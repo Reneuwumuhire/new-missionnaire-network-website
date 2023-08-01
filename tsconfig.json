@@ -1,0 +1,37 @@
+{
+	"extends": "./.svelte-kit/tsconfig.json",
+	"compilerOptions": {
+		"allowJs": true,
+		"checkJs": true,
+		"esModuleInterop": true,
+		"forceConsistentCasingInFileNames": true,
+		"resolveJsonModule": true,
+		"skipLibCheck": true,
+		"sourceMap": true,
+		"strict": true
+	},
+	"rules": {
+		"interface-name": [true, "never-prefix"],
+		"no-console": false,
+		"no-shadowed-variable": false,
+		"arrow-parens": false,
+		"trailing-comma": false,
+		"member-access": [true, "no-public"],
+		"callable-types": false,
+		"no-empty-interface": false,
+		"only-arrow-functions": false,
+		"variable-name": [true, "allow-leading-underscore"],
+		"object-literal-sort-keys": false
+	  },
+	  "linterOptions": {
+		"exclude": [
+		  "./**/node_modules/**",
+		  "entrypoint.hashmanifest.*"
+		]
+	  }
+	
+	// Path aliases are handled by https://kit.svelte.dev/docs/configuration#alias
+	//
+	// If you want to overwrite includes/excludes, make sure to copy over the relevant includes/excludes
+	// from the referenced tsconfig.json - TypeScript does not merge them in
+}
