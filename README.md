@@ -1,4 +1,4 @@
-# missionnaire network website
+# Missionnaire network website
 
 
 ## Developing
