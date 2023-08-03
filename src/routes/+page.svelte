@@ -1,4 +1,4 @@
-<h1>this is the implementation for {webName}</h1>
+<h1>Welcome to {webName}</h1>
 
 <script lang="ts">
     const webName: string = "missionaire network website";
