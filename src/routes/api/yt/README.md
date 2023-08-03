@@ -2,7 +2,7 @@
 
 ## Desc
 
-Fetch Youtube videos ordered by date.
+> Fetch Youtube videos ordered by date ```GET /api/yt/recent-videos```.
 
 ## Query Params
 - _**resultsPerPage**_              **10** _DEFAULT_
