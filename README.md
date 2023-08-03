@@ -20,6 +20,12 @@ To create a production version of your app:
 npm run build
 ```
 
+## YOUTUBE DATA API
+
+All implementations of API endpoints to fetch data from *@MissionnaireNetwork Youtube channel* are located in src/routes/api/yt directory. This directory contains a README.md file which describes how to use consume the API.
+
+
+
 You can preview the production build with `npm run preview`.
 
 > To deploy your app, you may need to install an [adapter](https://kit.svelte.dev/docs/adapters) for your target environment.
