@@ -3,7 +3,7 @@ import { writable, derived } from 'svelte/store';
 export const dict = writable();
 export const locale = writable('en');
 
-const localizedDict = derived([dict, locale], ([dictInit, localeInit]) => {
+const localizedDict = derived([dict, locale], ([dictInit, localeInit]: any) => {
  
   if (!dictInit || !localeInit) return;
   
