@@ -1,19 +1,18 @@
 <script lang="ts">
-    import type { PageData } from './$types';
+	import type { PageData } from './$types';
 	import '../app.css';
 	import { dict, locale, t } from '../i18n';
 	import fr from '../translations/fr';
 	import en from '../translations/en';
 	import { date } from 'zod';
+	import ThumbnailVideo from '$lib/components/+thumbnailVideo.svelte';
 	const languages = { en, fr };
 	dict.set(languages);
 	const webName: string = 'missionaire network website';
 	const name = 'website';
 	const email = 'site@gmail.com';
-    
-    export let data: PageData;
-    console.log(data);
-    
+
+	export let data: PageData;
 </script>
 
 <select bind:value={$locale}>
@@ -31,7 +30,6 @@
 </h1>
 <ul class="divide-y grid items-center justify-center divide-gray-200">
 	{#each data.videos as video}
-        <div>{video.title}</div>
-        <img src={video.thumbnails.medium.url} alt="">
-    {/each}
+		<ThumbnailVideo {video} />
+	{/each}
 </ul>
