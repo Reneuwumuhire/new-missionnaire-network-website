@@ -1,11 +1,10 @@
 import { json } from "@sveltejs/kit";
 import { YOUTUBE_API_URL, YOUTUBE_API_KEY, YOUTUBE_CHANNEL_ID } from '$env/static/private';
-import { z } from "zod";
 import { YtSearchResultSchema } from "../../../../core/model/youtube";
 
 
 
-export const GET = async (req) => {
+export const GET = async (req: { url: { search: string | string[][] | Record<string, string> | URLSearchParams | undefined; }; }) => {
     const searchParams = new URLSearchParams(req.url.search);
     const resultSize = searchParams.get("resultsPerPage") ? Number(searchParams.get("resultsPerPage")) : 10;
    
