@@ -25,7 +25,8 @@ export const YtSearchResultSchema = z.object({
         totalResults: z.number(),
         resultsPerPage: z.number()
     }),
-    nextPageToken: z.string(),
+    nextPageToken: z.string().optional(),
+    prevPageToken: z.string().optional(),
     items: z.object({
         id: z.object({
             kind: z.string(),
@@ -45,3 +46,10 @@ export const YtSearchResultSchema = z.object({
     }).array()
 });
 export type YtSearchResult = z.infer<typeof YtSearchResultSchema>;
+export type SearchVideosResult = {
+    resultsPerPage: number,
+    prevPageToken?: string,
+    nextPageToken?: string,
+    totalResults: number,
+    // videos: 
+}
