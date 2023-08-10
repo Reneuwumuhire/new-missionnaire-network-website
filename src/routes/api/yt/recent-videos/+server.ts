@@ -5,7 +5,7 @@ import { YtSearchResultSchema } from "../../../../core/model/youtube";
 
 const VIDEO_DURATIONS = ["long", "short", "medium"];
 
-export const GET = async (req) => {
+export const GET = async (req: { url: { search: string | string[][] | Record<string, string> | URLSearchParams | undefined; }; }) => {
     const searchParams = new URLSearchParams(req.url.search);
     const resultSizeString = searchParams.get("resultsPerPage");
     const pageToken = searchParams.get("pageToken");

@@ -1,15 +1,21 @@
 <script lang="ts">
+	import type { PageData } from './$types';
 	import '../app.css';
 	import { dict, locale, t } from '../i18n';
 	import fr from '../translations/fr';
 	import en from '../translations/en';
+	import { date } from 'zod';
+	import ThumbnailVideo from '$lib/components/+thumbnailVideo.svelte';
 	const languages = { en, fr };
 	dict.set(languages);
 	const webName: string = 'missionaire network website';
 	const name = 'website';
 	const email = 'site@gmail.com';
+
+	export let data: PageData;
 </script>
 
+<title>Missionnaire Network</title>
 <select bind:value={$locale}>
 	{#each Object.keys(languages) as lang}
 		<option value={lang}>
@@ -23,11 +29,10 @@
 	{$t('This is the implementation for')}
 	{webName}
 </h1>
-<ul class="divide-y grid items-center justify-center divide-gray-200">
-	<li class="py-4 flex mt-[100px]">
-		<div class="ml-3 grid gap-10">
-			<p class="text-5xl font-medium text-gray-900">{$t(name)}</p>
-			<p class="text-4xl text-gray-500">{email}</p>
-		</div>
-	</li>
-</ul>
+<main class=" align-middle flex flex-col items-center justify-center p-12">
+	<div class=" grid-cols-4 grid gap-4">
+		{#each data.videos as video}
+			<ThumbnailVideo {video} />
+		{/each}
+	</div>
+</main>
