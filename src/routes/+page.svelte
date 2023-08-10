@@ -8,10 +8,7 @@
 	import ThumbnailVideo from '$lib/components/+thumbnailVideo.svelte';
 	const languages = { en, fr };
 	dict.set(languages);
-	const webName: string = 'missionaire network website';
-	const name = 'website';
-	const email = 'site@gmail.com';
-
+	const webName: string = 'missionnaire network website';
 	export let data: PageData;
 </script>
 
@@ -30,9 +27,9 @@
 	{webName}
 </h1>
 <main class=" align-middle flex flex-col items-center justify-center p-12">
-	<div class=" grid-cols-4 grid gap-4">
-		{#each data.videos as video}
-			<ThumbnailVideo {video} />
+	<div class=" grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+		{#each data.videos as video, index}
+			<ThumbnailVideo {video} {index} />
 		{/each}
 	</div>
 </main>
