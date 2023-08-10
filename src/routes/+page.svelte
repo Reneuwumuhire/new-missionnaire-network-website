@@ -15,6 +15,7 @@
 	export let data: PageData;
 </script>
 
+<title>Missionnaire Network</title>
 <select bind:value={$locale}>
 	{#each Object.keys(languages) as lang}
 		<option value={lang}>
@@ -28,8 +29,10 @@
 	{$t('This is the implementation for')}
 	{webName}
 </h1>
-<ul class="divide-y grid items-center justify-center divide-gray-200">
-	{#each data.videos as video}
-		<ThumbnailVideo {video} />
-	{/each}
-</ul>
+<main class=" align-middle flex flex-col items-center justify-center p-12">
+	<div class=" grid-cols-4 grid gap-4">
+		{#each data.videos as video}
+			<ThumbnailVideo {video} />
+		{/each}
+	</div>
+</main>
