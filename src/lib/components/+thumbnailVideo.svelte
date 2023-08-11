@@ -59,12 +59,12 @@
 
 <svelte:window on:click={hideIfClickedOutside} />
 <div
-	class=" min-h-ful w-full cursor-pointer rounded-lg transition-all duration-300 ease-in-out hover:duration-300 hover:ease-in-out"
+	class=" min-h-ful w-full cursor-pointer transition-all duration-300 ease-in-out hover:duration-300 hover:ease-in-out"
 >
 	<!-- Thumbnail image -->
 	<div class="w-full h-full flex flex-col justify-between">
 		<div class="w-full">
-			<img class=" rounded-lg w-full" src={video.thumbnails.medium.url} alt={video.title} />
+			<img class="  w-full" src={video.thumbnails.medium.url} alt={video.title} />
 		</div>
 		<!-- Title- when streamed - download options -->
 		<div class="w-full h-full flex flex-col">
