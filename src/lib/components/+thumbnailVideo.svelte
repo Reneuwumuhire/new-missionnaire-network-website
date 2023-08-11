@@ -17,27 +17,19 @@
 
 	const toggleVisible: (event: MouseEvent) => void = (event) => {
 		event.stopPropagation();
-		// console.log('toggleVisible called', index);
-		// visible.map((_, i) => {
-		// 	console.log(_, i);
-		// 	return i === index ? !visible[i] : false;
-		// });
 		visible[index] = !visible[index];
+		visible.map((_, i) => {
+			return i === index ? true : false;
+		});
 	};
 
 	const hideIfClickedOutside = (event: MouseEvent) => {
+		event.stopPropagation();
 		if (downloadDivElement && !downloadDivElement.contains(event.target as Node)) {
-			// visible = visible.map((_, i) => (i === index ? true : false));
+			visible = visible.map((_, i) => (i === index ? true : false));
 			visible[index] = !visible[index];
 		}
 	};
-	onMount(() => {
-		document.body.addEventListener('click', hideIfClickedOutside);
-
-		return () => {
-			document.body.removeEventListener('click', hideIfClickedOutside);
-		};
-	});
 
 	function formatTime(date: number | Date | any) {
 		const now: Date | number | any = new Date();
