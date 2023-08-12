@@ -3,8 +3,11 @@
 	import { createEventDispatcher, onMount } from 'svelte';
 	import { slide } from 'svelte/transition';
 	import Icon from 'svelte-icons-pack/Icon.svelte';
-	import BsThreeDotsVertical from 'svelte-icons-pack/bs/BsThreeDotsVertical';
-	import BsFiletypeMp3 from 'svelte-icons-pack/bs/BsFiletypeMp3';
+	import More from 'iconsax-svelte/More.svelte';
+	import AudioSquare from 'iconsax-svelte/AudioSquare.svelte';
+	import DocumentText1 from 'iconsax-svelte/DocumentText1.svelte';
+	import VideoPlay from 'iconsax-svelte/VideoPlay.svelte';
+
 	import BsCameraVideo from 'svelte-icons-pack/bs/BsCameraVideo';
 	import BsFiletypePdf from 'svelte-icons-pack/bs/BsFiletypePdf';
 	export let video: import('../../core/model/youtube').VideoItem;
@@ -69,10 +72,17 @@
 		<!-- Title- when streamed - download options -->
 		<div class="w-full h-full flex flex-col">
 			<!-- Title and time streamed -->
-			<div class="  mt-3">
-				<p class=" font-medium text-xs text-ellipsis overflow-hidden line-clamp-2">
-					{video.title}
-				</p>
+			<div class="w-full flex flex-row justify-between">
+				<div class="  mt-3">
+					<p class=" font-medium text-xs text-ellipsis overflow-hidden line-clamp-2">
+						{video.title}
+					</p>
+				</div>
+				<div class=" flex flex-col items-center justify-center">
+					<button class=" rounded-full p-2 -mr-4 rotate-90" on:click|stopPropagation={toggleVisible}
+						><More size={24} color="#4F4F4F" variant="Linear" />
+					</button>
+				</div>
 			</div>
 			<!-- controls for download -->
 			<div class=" w-full flex justify-between items-center">
@@ -80,9 +90,9 @@
 					>Streamed {formatTime(new Date(video.publishedAt.toLocaleString()))}</small
 				>
 				<!-- Button to download -->
-				<button class=" rounded-full p-2 -mr-4" on:click|stopPropagation={toggleVisible}
+				<!-- <button class=" rounded-full p-2 -mr-4" on:click|stopPropagation={toggleVisible}
 					><Icon src={BsThreeDotsVertical} />
-				</button>
+				</button> -->
 			</div>
 		</div>
 	</div>
@@ -102,21 +112,27 @@
 						on:click|stopPropagation={toggleVisible}
 						class="transition duration-150 ease-in-out hover:ease-in-out w-full h-12 p-3 hover:bg-gray-200 flex flex-row items-center align-middle space-x-2"
 					>
-						<Icon src={BsFiletypeMp3} /><span class="">Download MP3</span>
+						<AudioSquare size={20} color="#4F4F4F" variant="Linear" /><span class=""
+							>Download MP3</span
+						>
 					</li>
 					<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
 					<li
 						on:click|stopPropagation={toggleVisible}
 						class="transition duration-150 ease-in-out hover:ease-in w-full h-12 p-3 hover:bg-gray-200 flex flex-row items-center align-middle space-x-2"
 					>
-						<Icon src={BsFiletypePdf} /><span class="">Download Transcript (PDF)</span>
+						<DocumentText1 size={20} color="#4F4F4F" variant="Linear" /><span class=""
+							>Download Transcript (PDF)</span
+						>
 					</li>
 					<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
 					<li
 						on:click|stopPropagation={toggleVisible}
 						class="transition duration-150 ease-in-out hover:ease-in w-full h-12 p-3 hover:bg-gray-200 flex flex-row items-center align-middle space-x-2"
 					>
-						<Icon src={BsCameraVideo} /><span class="">Download Video</span>
+						<VideoPlay size={20} color="#4F4F4F" variant="Linear" /><span class=""
+							>Download Video</span
+						>
 					</li>
 				</ul>
 			</div>

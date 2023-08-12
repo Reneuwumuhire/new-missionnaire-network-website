@@ -26,8 +26,8 @@
 	{$t('This is the implementation for')}
 	{webName}
 </h1>
-<main class=" align-middle flex flex-col items-center justify-center p-12">
-	<div class=" grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+<main class=" align-middle flex flex-col items-center justify-center p-4 max-w-[1200px] mx-auto">
+	<div class=" grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4">
 		{#each data.videos as video, index}
 			<ThumbnailVideo {video} {index} />
 		{/each}

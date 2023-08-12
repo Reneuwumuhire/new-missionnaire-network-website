@@ -1158,6 +1158,11 @@ has@^1.0.3:
   dependencies:
     function-bind "^1.1.1"
 
+iconsax-svelte@^0.0.1-alpha.11:
+  version "0.0.1-alpha.11"
+  resolved "https://registry.yarnpkg.com/iconsax-svelte/-/iconsax-svelte-0.0.1-alpha.11.tgz#a34e0a4c080fe0b64823ad2bf964868b1e3e08a4"
+  integrity sha512-pgwKMuBjxV3x+WnJ3txbIews2Tkynujn73/yV/5/ML4xd3cese12BRjlHgwByOIFCVqGBEfs/WD+GMgfuXEeWQ==
+
 ignore@^5.2.0:
   version "5.2.4"
   resolved "https://registry.yarnpkg.com/ignore/-/ignore-5.2.4.tgz#a291c0c6178ff1b960befe47fcdec301674a6324"
