@@ -1,5 +1,4 @@
 <script lang="ts">
-	import '../../app.css';
 	import Plyr from 'plyr';
 	import { dict, locale, t } from '../../i18n';
 	import fr from '../../translations/fr';
