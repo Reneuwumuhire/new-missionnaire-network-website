@@ -1,27 +1,25 @@
-<script lang="ts" >
-    	let currentViewingUrl = '';
+<script lang="ts">
+	let currentViewingUrl = '';
 	const handleClick = () => {
 		currentViewingUrl = 'https://www.youtube.com/embed/EK5u1gUI-KE';
 	};
-    </script>
-<div class="flex items-center justify-center mb-20 max-w-[1400px]">
-	<div
-		class="lg:grid sm:w-full xl:flex gap-[50px] xsm:px-[20px] 2xl:justify-center xl:px-[100px] mt-[60px]"
-	>
-		<div class="grid gap-5">
-			<h3
-				class="bg-primary w-fit px-[15px] h-[40px] py-[10px] text-center text-[15px] text-white font-bold"
-			>
-				LATEST UPLOADED
-			</h3>
-			<div class="relative xl:w-[calc(100vw-600px)] 2xl:max-w-[1400px]">
+</script>
+
+<div class=" min-w-full flex items-center justify-center">
+	<div class=" min-w-full flex flex-row justify-between space-x-4">
+		<!-- video and title -->
+		<div class=" w-full">
+			<div class="bg-primary mb-2 p-2 w-fit">
+				<h3 class="text-white font-bold">LATEST UPLOADED</h3>
+			</div>
+			<div class=" w-full relative">
 				{#if currentViewingUrl.length !== 0}
-					<div class="plyr__video-embed w-full" id="player">
+					<div class=" flex flex-row items-center justify-center w-full" id="player">
 						<iframe
-							class=" xsm:w-[calc(100vw-60px)] xsm:h-[300px] sm:w-full lg:h-[600px] 2xl:h-[800px] sm:h-[500px]"
+							class=" w-full aspect-video"
 							src={currentViewingUrl}
 							allowfullscreen
-                            title=""
+							title=""
 							allowtransparency
 							allow="autoplay"
 						/>
@@ -31,7 +29,9 @@
 					<div
 						class="absolute grid content-end h-full pl-10 w-full bg-gradient-to-t from-hardBlack bottom-0"
 					>
-						<h2 class="text-white font-bold xsm:text-sm lg:text-2xl leading-10 xsm:max-w-full lg:max-w-[60%]">
+						<h2
+							class="text-white font-bold xsm:text-sm lg:text-2xl leading-10 xsm:max-w-full lg:max-w-[60%]"
+						>
 							[EN DIRECT DE KREFELD ] - 2023-06-04 10:00 - Réunion de Krefeld - Mu Kinyarwanda
 						</h2>
 						<div class="flex xsm:gap-5 ms:gap-12">
@@ -40,50 +40,59 @@
 						</div>
 						<div class="xsm:mt-3 sm:mt-10 xsm:mb-5 lg:mb-10 flex gap-10">
 							<button on:click={handleClick}>
-								<img class=" xsm:w-[30px] lg:w-[45px] h-fit" src="/icons/play-yellow.png" alt="play" />
+								<img
+									class=" xsm:w-[30px] lg:w-[45px] h-fit"
+									src="/icons/play-yellow.png"
+									alt="play"
+								/>
 							</button>
 							<button>
-								<img class=" xsm:w-[30px]  w-[45px] h-fit" src="/icons/link-yellow.png" alt="play" />
+								<img class=" xsm:w-[30px] w-[45px] h-fit" src="/icons/link-yellow.png" alt="play" />
 							</button>
 							<button>
-								<img class=" xsm:w-[30px]  w-[45px] h-fit" src="/icons/download-yellow.png" alt="play" />
+								<img
+									class=" xsm:w-[30px] w-[45px] h-fit"
+									src="/icons/download-yellow.png"
+									alt="play"
+								/>
 							</button>
 						</div>
 					</div>
 				{/if}
 			</div>
 		</div>
-		<div class="xsm:hidden lg:block">
+		<!-- schedule -->
+		<div class="hidden md:flex w-fit max-w-xs shadow-md">
 			<div>
-				<div
-					class="bg-primary xsm:mt-10 sm:mt-20 w-full flex gap-3 px-[15px] h-[40px] py-[10px] text-center text-[13px] text-white font-medium"
-				>
-					<span class="font-bold">Schedule</span>
-					<span class="font-normal">July, 2023</span>
+				<div class="bg-primary mb-2 p-2 w-fit text-white">
+					<h3 class=" font-bold">
+						Schedule
+						<span class="font-normal">July, 2023</span>
+					</h3>
 				</div>
 				<div
-					class="w-[400px] mt-3 lg:flex xl:grid lg:overflow-y-hidden xl:overflow-x-hidden shadow-4xl bg-pureWhite p-8"
+					class="mt-3 lg:flex xl:grid lg:overflow-y-hidden xl:overflow-x-hidden shadow-4xl bg-pureWhite p-8"
 				>
 					<div class="flex mr-5">
 						<div class="mt-2">
 							<div class="w-[10px] h-[10px] bg-primary rounded-full" />
-							<div class="h-[90%] ml-1 mt-2 w-1 border-l-2 border-weakGray border-dashed" />
+							<div class="h-[90%] ml-1 mt-2 w-1 border-l border-weakGray border-dashed" />
 						</div>
 						<div class="ml-2">
-							<h5 class="text-[16px] font-medium">July, 13 6:00 PM</h5>
-							<img class="w-[300px] mt-2" src="/img/thumbnail.jpeg" alt="upcoming-img" />
-							<p class="text-[15px] text-grayWeak mt-3">
+							<h5 class="text-xs font-medium">July, 13 6:00 PM</h5>
+							<img class="w-full mt-2" src="/img/thumbnail.jpeg" alt="upcoming-img" />
+							<p
+								class=" w-full text-xs text-grayWeak mt-1 ext-ellipsis overflow-hidden line-clamp-2"
+							>
 								[RETRANSMISSION] - 2023-06-14 19:30 - Réunion de Krefeld [01.04.1973 15:00] - Mu
 								Kinyarwanda
 							</p>
 							<button
-								class="flex rounded-full mt-8 justify-center items-center bg-accentOrange w-full text-white"
+								class="flex rounded-full mt-1 py-2 justify-center items-center bg-accentOrange w-full text-white"
 								type="button"
 							>
-								<div class="flex p-3 justify-center items-center gap-3">
-									<img class="w-6" src="/icons/notification-white.png" alt="upcoming-img" />
-									<span class="text-[18px]">Notify me</span>
-								</div>
+								<img class="w-4" src="/icons/notification-white.png" alt="upcoming-img" />
+								<span class="text-xs">Notify me</span>
 							</button>
 						</div>
 					</div>

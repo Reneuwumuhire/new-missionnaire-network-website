@@ -19,7 +19,7 @@
 
 <main class=" align-middle flex flex-col items-center justify-center p-4 max-w-[1200px] mx-auto">
 	<VideoView />
-	<div class=" grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4">
+	<div class=" mt-7 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-8">
 		{#each data.videos as video, index}
 			<ThumbnailVideo {video} {index} />
 		{/each}
