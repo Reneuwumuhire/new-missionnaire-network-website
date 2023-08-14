@@ -7,7 +7,10 @@
 	const languages = { en, fr };
 	dict.set(languages);
 	console.log(Plyr);
-	const currentViewingUrl = 'https://www.youtube.com/embed/EK5u1gUI-KE';
+	let currentViewingUrl = '';
+	const handleClick = () => {
+		currentViewingUrl = 'https://www.youtube.com/embed/EK5u1gUI-KE';
+	};
 </script>
 
 <!-- 
@@ -53,7 +56,7 @@
 							<span class="text-grayWeak font-medium text-sm">120 min</span>
 						</div>
 						<div class="xsm:mt-3 sm:mt-10 mb-10 flex gap-10">
-							<button>
+							<button on:click={handleClick}>
 								<img class="w-[45px] h-fit" src="/icons/play-yellow.png" alt="play" />
 							</button>
 							<button>
