@@ -1,5 +1,6 @@
 <script type="ts">
 	import '../app.css';
+	import Menu from 'iconsax-svelte/Menu.svelte';
 </script>
 
 <nav
@@ -7,7 +8,7 @@
 >
 	<div class=" w-full flex flex-row justify-between items-center max-w-[1200px] mx-auto text-xs">
 		<img src="/icons/logo.png" class="w-auto h-10" alt="logo" />
-		<div class=" flex flex-row justify-between items-center space-x-4 text-sm">
+		<div class=" hidden md:flex flex-row justify-between items-center space-x-4 text-sm">
 			<div class=" flex flex-row items-center space-x-8">
 				<a class="text-accentGray" href="/">Home</a>
 				<a class="text-accentGray" href="/">Predications</a>
@@ -23,11 +24,14 @@
 				<img class="w-[30px] h-fit" src="/icons/moon.png" alt="english flag" />
 			</button>
 			<div class="w-[1px] opacity-7 xsm:hidden lg:block h-[40px] bg-veryWeakGray" />
-			<div class="flex flex-row items-center space-x-8">
+			<div class="hidden md:flex flex-row items-center space-x-8">
 				<img src="/icons/YouTube.png" class="w-[30px] h-fit" alt="YouTube" />
 				<img src="/icons/WhatsApp.png" class="w-[30px] h-fit" alt="WhatsApp" />
 				<img src="/icons/Facebook.png" class="w-[30px] h-fit" alt="Facebook" />
 			</div>
+		</div>
+		<div class="block md:hidden">
+			<Menu size={24} color="#fb923c" variant="Linear" />
 		</div>
 	</div>
 </nav>
