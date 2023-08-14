@@ -4,7 +4,7 @@
 </script>
 
 <nav
-	class="w-[100vw] flex flex-row justify-between xsm:px-[40px] lg:px-[100px] py-3 items-center h-[100px] bg-zinc-600 shadow"
+	class="w-[100vw] flex flex-row justify-between xsm:px-[20px] lg:px-[100px] py-3 items-center h-[100px] bg-zinc-600 shadow"
 >
 	<img src="/icons/logo.png" class="w-[140px] h-fit" alt="logo" />
 	<div class="xsm:flex xsm:flex-col xsm:hidden xsm:items-start xsm:gap-10 xsm:pt-20 lg:pt-0 lg:items-center  lg:flex-row xsm:bg-pureWhite xsm:absolute lg:relative xsm:w-[100%] xsm:left-0 xsm:px-9 lg:py-0 xsm:top-0 z-10 xsm:h-[100vh] lg:w-auto lg:h-auto lg:flex items-center lg:gap-6">
