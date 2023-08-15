@@ -1,11 +1,14 @@
 import { json } from "@sveltejs/kit";
 import { YOUTUBE_API_URL, YOUTUBE_API_KEY, YOUTUBE_CHANNEL_ID } from '$env/static/private';
-import { YtSearchResultSchema } from "../../../../core/model/youtube";
+import { YtSearchResultSchema, type SearchVideosResult } from "../../../../core/model/youtube";
 
 
 const VIDEO_DURATIONS = ["long", "short", "medium"];
 
-export const GET = async (req: { url: { search: string | string[][] | Record<string, string> | URLSearchParams | undefined; }; }) => {
+export const GET = async (
+    req: {
+        url: { search: string | string[][] | Record<string, string> | URLSearchParams | undefined; };
+    }) => {
     const searchParams = new URLSearchParams(req.url.search);
     const resultSizeString = searchParams.get("resultsPerPage");
     const pageToken = searchParams.get("pageToken");
@@ -33,10 +36,15 @@ export const GET = async (req: { url: { search: string | string[][] | Record<str
     pageToken  && apiURL.searchParams.set("pageToken", pageToken );
 
     const youtubeReqResult = await fetch(apiURL);
-    const reqDataResult = YtSearchResultSchema.safeParse(await youtubeReqResult.json());
+    const youtubeResultJSON = await youtubeReqResult.json();
+    const reqDataResult = YtSearchResultSchema.safeParse(youtubeResultJSON);
+    // console.log(youtubeResultJSON);
+    
     
     
     if(!reqDataResult.success){
+        console.log(reqDataResult.error);
+        
         return json({
             success: false
         });

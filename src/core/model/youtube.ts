@@ -64,20 +64,17 @@ export const YtSearchResultSchema = z.object({
         })
     }).array()
 });
-export type YtSearchResult = z.infer<typeof YtSearchResultSchema>;
-export type SearchVideosResult = {
-    resultsPerPage: number,
-    prevPageToken?: string,
-    nextPageToken?: string,
-    totalResults: number,
-    // videos: 
-}
-    nextPageToken: z.string(),
-    items: YtVideoItemSchema.array()
-});
+
 export type YtSearchResult = z.infer<typeof YtSearchResultSchema>;
 export const VideoItemSchema = YtVideoSnippet.extend({
     id: z.string(),
 });
 export type VideoItem = z.infer<typeof VideoItemSchema>;
-
+export const SearchVideosResultSchema = z.object({
+    resultsPerPage: z.number(),
+    prevPageToken: z.string().optional(),
+    nextPageToken: z.string().optional(),
+    totalResults: z.number(),
+    videos: VideoItemSchema.array()
+});
+export type SearchVideosResult = z.infer<typeof SearchVideosResultSchema>;

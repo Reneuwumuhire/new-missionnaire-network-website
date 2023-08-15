@@ -1,5 +1,5 @@
 import type { PageLoad } from './$types';
-import { VideoItemSchema, type VideoItem } from '../core/model/youtube';
+import { VideoItemSchema, type VideoItem, type SearchVideosResult } from '../core/model/youtube';
 
 export const load = (async ({ fetch }) => {
 	const requestOptions = {
@@ -9,7 +9,7 @@ export const load = (async ({ fetch }) => {
 
 	const response = await fetch(url, requestOptions);
 
-	const apiResult: { resultsPerPage: number; videos: VideoItem[] } = await response.json();
+	const apiResult: SearchVideosResult = await response.json();
 
 	return {
 		resultsPerPage: apiResult.resultsPerPage,
