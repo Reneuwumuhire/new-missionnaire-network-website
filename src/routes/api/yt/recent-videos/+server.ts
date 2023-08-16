@@ -41,9 +41,6 @@ export const GET = async (
     const youtubeReqResult = await fetch(apiURL);
     const youtubeResultJSON = await youtubeReqResult.json();
     const reqDataResult = YtSearchResultSchema.safeParse(youtubeResultJSON);
-    // console.log(youtubeResultJSON);
-    
-    
     
     if(!reqDataResult.success){
         console.log(reqDataResult.error);
