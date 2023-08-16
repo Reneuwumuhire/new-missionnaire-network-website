@@ -1,6 +1,8 @@
 import { json } from "@sveltejs/kit";
-import { _YOUTUBE_API_KEY } from '$env/static/private';
+// import { _YOUTUBE_API_KEY } from '$env/static/private';
 import { YtSearchResultSchema } from "../../../../core/model/youtube";
+const YOUTUBE_API_KEY = process.env._YOUTUBE_API_KEY;
+
 
 const YOUTUBE_API_URL = "https://youtube.googleapis.com/youtube/v3/search";
 const YOUTUBE_CHANNEL_ID = "UCS3zqpqnCvT0SFa_jI662Kg"
@@ -12,6 +14,13 @@ export const GET = async (
     req: {
         url: { search: string | string[][] | Record<string, string> | URLSearchParams | undefined; };
     }) => {
+        if(!YOUTUBE_API_KEY){
+            console.log("_YOUTUBE_API_KEY not found");
+            
+            return json({
+                success: false
+            });
+        }
     const searchParams = new URLSearchParams(req.url.search);
     const resultSizeString = searchParams.get("resultsPerPage");
     const pageToken = searchParams.get("pageToken");
@@ -30,7 +39,7 @@ export const GET = async (
     const apiURL = new URL(YOUTUBE_API_URL);
     apiURL.searchParams.set("part", "snippet");
     apiURL.searchParams.set("channelId", YOUTUBE_CHANNEL_ID);
-    apiURL.searchParams.set("key", _YOUTUBE_API_KEY);
+    apiURL.searchParams.set("key", YOUTUBE_API_KEY);
     apiURL.searchParams.set("order", "date");
     apiURL.searchParams.set("type", "video");
     apiURL.searchParams.set("videoDuration", videoDuration);
