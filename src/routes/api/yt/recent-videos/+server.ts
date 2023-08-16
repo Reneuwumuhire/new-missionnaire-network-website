@@ -1,6 +1,8 @@
 import { json } from "@sveltejs/kit";
-import { YOUTUBE_API_KEY } from '$env/static/private';
 import { YtSearchResultSchema } from "../../../../core/model/youtube";
+import Firestore from "@google-cloud/firestore";
+
+const db = new Firestore.Firestore();
 
 
 const YOUTUBE_API_URL = "https://youtube.googleapis.com/youtube/v3/search";
@@ -13,6 +15,13 @@ export const GET = async (
     req: {
         url: { search: string | string[][] | Record<string, string> | URLSearchParams | undefined; };
     }) => {
+    const preferences = await db.collection("PREFERENCES").doc("YOUTUBE_API_KEY").get();
+    if(!preferences.exists) {
+        return json({
+            success: false
+        });
+    }
+    const {value: YOUTUBE_API_KEY} = preferences.data()!;
     const searchParams = new URLSearchParams(req.url.search);
     const resultSizeString = searchParams.get("resultsPerPage");
     const pageToken = searchParams.get("pageToken");
