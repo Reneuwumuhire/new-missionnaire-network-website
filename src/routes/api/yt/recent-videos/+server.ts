@@ -1,6 +1,6 @@
 import { json } from "@sveltejs/kit";
 import { YOUTUBE_API_URL, YOUTUBE_API_KEY, YOUTUBE_CHANNEL_ID } from '$env/static/private';
-import { YtSearchResultSchema, type SearchVideosResult } from "../../../../core/model/youtube";
+import { YtSearchResultSchema } from "../../../../core/model/youtube";
 
 
 const VIDEO_DURATIONS = ["long", "short", "medium"];
