@@ -1,7 +1,6 @@
 import { json } from "@sveltejs/kit";
-// import { _YOUTUBE_API_KEY } from '$env/static/private';
+import { YOUTUBE_API_KEY } from '$env/static/private';
 import { YtSearchResultSchema } from "../../../../core/model/youtube";
-const YOUTUBE_API_KEY = process.env._YOUTUBE_API_KEY;
 
 
 const YOUTUBE_API_URL = "https://youtube.googleapis.com/youtube/v3/search";
@@ -14,13 +13,6 @@ export const GET = async (
     req: {
         url: { search: string | string[][] | Record<string, string> | URLSearchParams | undefined; };
     }) => {
-        if(!YOUTUBE_API_KEY){
-            console.log("_YOUTUBE_API_KEY not found");
-            
-            return json({
-                success: false
-            });
-        }
     const searchParams = new URLSearchParams(req.url.search);
     const resultSizeString = searchParams.get("resultsPerPage");
     const pageToken = searchParams.get("pageToken");
