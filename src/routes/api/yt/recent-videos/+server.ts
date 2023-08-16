@@ -18,7 +18,8 @@ export const GET = async (
     const preferences = await db.collection("PREFERENCES").doc("YOUTUBE_API_KEY").get();
     if(!preferences.exists) {
         return json({
-            success: false
+            success: false,
+            message: "hello.."
         });
     }
     const {value: YOUTUBE_API_KEY} = preferences.data()!;
