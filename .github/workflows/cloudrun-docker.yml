@@ -54,7 +54,7 @@ on:
 
 env:
   PROJECT_ID: missionnairenetwork # TODO: update Google Cloud project id
-  GAR_LOCATION: YOUR_GAR_LOCATION # TODO: update Artifact Registry location
+  GAR_LOCATION: us-central1 # TODO: update Artifact Registry location
   REPOSITORY: cloud-run-source-deploy # TODO: update Artifact Registry repository name
   SERVICE: missionnaire-website # TODO: update Cloud Run service name
   REGION: us-central1 # TODO: update Cloud Run service region
@@ -105,7 +105,7 @@ jobs:
 
       - name: Build and Push Container
         run: |-
-          docker build -t "${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE }}:${{ github.sha }}" ./
+          docker build --build-arg YOUTUBE_API_KEY=${{ env.YOUTUBE_API_KEY}} --build-arg YOUTUBE_CHANNEL_ID=${{ env.YOUTUBE_CHANNEL_ID}} --build-arg YOUTUBE_API_URL=${{ env.YOUTUBE_API_URL}} -t "${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE }}:${{ github.sha }}" ./
           docker push "${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE }}:${{ github.sha }}"
 
       # END - Docker auth and build
