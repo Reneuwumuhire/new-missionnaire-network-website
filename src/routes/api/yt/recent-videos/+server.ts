@@ -24,10 +24,10 @@ export const GET = async (
     
     const q = searchParams.get("q"); 
    
-    const apiURL = new URL(YOUTUBE_API_URL);
+    const apiURL = new URL(_YOUTUBE_API_URL);
     apiURL.searchParams.set("part", "snippet");
-    apiURL.searchParams.set("channelId", YOUTUBE_CHANNEL_ID);
-    apiURL.searchParams.set("key", YOUTUBE_API_KEY);
+    apiURL.searchParams.set("channelId", _YOUTUBE_CHANNEL_ID);
+    apiURL.searchParams.set("key", _YOUTUBE_API_KEY);
     apiURL.searchParams.set("order", "date");
     apiURL.searchParams.set("type", "video");
     apiURL.searchParams.set("videoDuration", videoDuration);
