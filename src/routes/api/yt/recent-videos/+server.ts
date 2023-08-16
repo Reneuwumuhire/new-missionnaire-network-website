@@ -1,5 +1,5 @@
 import { json } from "@sveltejs/kit";
-import { YOUTUBE_API_URL, YOUTUBE_API_KEY, YOUTUBE_CHANNEL_ID } from '$env/static/private';
+import { _YOUTUBE_API_URL, _YOUTUBE_API_KEY, _YOUTUBE_CHANNEL_ID } from '$env/static/private';
 import { YtSearchResultSchema } from "../../../../core/model/youtube";
 
 
