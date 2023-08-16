@@ -22,12 +22,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       
-
-      - name: Create env
-        shell: bash
+      - shell: bash
         run: echo YOUTUBE_API_KEY=${{secrets.YOUTUBE_API_KEY}} >> .env
-
+      - name: Upload env file
+        uses: actions/upload-artifact@v3
+        with:
+          name: .env
+          path: .env
       
+
       # NOTE: Alternative option - authentication via credentials json
       - name: Google Auth
         id: auth
