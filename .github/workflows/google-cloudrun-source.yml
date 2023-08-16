@@ -54,6 +54,9 @@ env:
   PROJECT_ID: missionnairenetwork # TODO: update Google Cloud project id
   SERVICE: missionnaire-website # TODO: update Cloud Run service name
   REGION: us-central1 # TODO: update Cloud Run service region
+  YOUTUBE_API_KEY: YOUTUBE_CHANNEL_ID
+  YOUTUBE_CHANNEL_ID: YOUTUBE_CHANNEL_ID
+  YOUTUBE_API_URL: YOUTUBE_API_URL
 
 jobs:
   deploy:
