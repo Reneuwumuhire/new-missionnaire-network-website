@@ -8,9 +8,6 @@ env:
   PROJECT_ID: missionnairenetwork # TODO: update Google Cloud project id
   SERVICE: missionnaire-website # TODO: update Cloud Run service name
   REGION: us-central1 # TODO: update Cloud Run service region
-  YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
-  YOUTUBE_CHANNEL_ID: UCS3zqpqnCvT0SFa_jI662Kg
-  YOUTUBE_API_URL: https://youtube.googleapis.com/youtube/v3/search
 
 jobs:
   deploy:
@@ -40,7 +37,6 @@ jobs:
           region: ${{ env.REGION }}
           # NOTE: If required, update to the appropriate source folder
           source: ./
-          env_vars: YOUTUBE_API_KEY=${{ secrets.YOUTUBE_API_KEY }},YOUTUBE_CHANNEL_ID=UCS3zqpqnCvT0SFa_jI662Kg YOUTUBE_API_URL=https://youtube.googleapis.com/youtube/v3/search
 
       # If required, use the Cloud Run url output in later steps
       - name: Show Output
