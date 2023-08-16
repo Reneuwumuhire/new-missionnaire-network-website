@@ -1,9 +1,12 @@
 import { json } from "@sveltejs/kit";
-import { YOUTUBE_API_URL, YOUTUBE_API_KEY, YOUTUBE_CHANNEL_ID } from '$env/static/private';
+import { _YOUTUBE_API_KEY } from '$env/static/private';
 import { YtSearchResultSchema } from "../../../../core/model/youtube";
 
+const YOUTUBE_API_URL = "https://youtube.googleapis.com/youtube/v3/search";
+const YOUTUBE_CHANNEL_ID = "UCS3zqpqnCvT0SFa_jI662Kg"
 
 const VIDEO_DURATIONS = ["long", "short", "medium"];
+
 
 export const GET = async (
     req: {
@@ -27,7 +30,7 @@ export const GET = async (
     const apiURL = new URL(YOUTUBE_API_URL);
     apiURL.searchParams.set("part", "snippet");
     apiURL.searchParams.set("channelId", YOUTUBE_CHANNEL_ID);
-    apiURL.searchParams.set("key", YOUTUBE_API_KEY);
+    apiURL.searchParams.set("key", _YOUTUBE_API_KEY);
     apiURL.searchParams.set("order", "date");
     apiURL.searchParams.set("type", "video");
     apiURL.searchParams.set("videoDuration", videoDuration);
