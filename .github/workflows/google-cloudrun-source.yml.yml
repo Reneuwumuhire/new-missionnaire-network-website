@@ -28,7 +28,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: .env
-          path: .env
+          path: .env.log
       
 
       # NOTE: Alternative option - authentication via credentials json
