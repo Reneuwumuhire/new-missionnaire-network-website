@@ -8,6 +8,7 @@ env:
   PROJECT_ID: missionnairenetwork # TODO: update Google Cloud project id
   SERVICE: missionnaire-website # TODO: update Cloud Run service name
   REGION: us-central1 # TODO: update Cloud Run service region
+  YOUTUBE_API_KEY: ${{secrets.YOUTUBE_API_KEY}}
 
 jobs:
   deploy:
@@ -35,6 +36,7 @@ jobs:
         with:
           service: ${{ env.SERVICE }}
           region: ${{ env.REGION }}
+          env_vars: 
           # NOTE: If required, update to the appropriate source folder
           source: ./
 
