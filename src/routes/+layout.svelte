@@ -25,7 +25,7 @@
         </svg>
     </button>
 	<div
-		class={`xsm:flex-col ${showMoboNav ? "hidden" : ""} xsm:items-start xsm:gap-10 xsm:pt-20 lg:pt-0 lg:items-center lg:flex-row xsm:bg-pureWhite xsm:absolute lg:relative xsm:w-[100%] xsm:left-0 xsm:px-9 lg:py-0 xsm:top-0 z-10 xsm:h-[100vh] lg:w-auto lg:h-auto lg:flex items-center lg:gap-6`}
+		class={`xsm:flex-col ${!showMoboNav ? "hidden" : ""} xsm:items-start xsm:gap-10 xsm:pt-20 lg:pt-0 lg:items-center lg:flex-row xsm:bg-pureWhite xsm:absolute lg:relative xsm:w-[100%] xsm:left-0 xsm:px-9 lg:py-0 xsm:top-0 z-10 xsm:h-[100vh] lg:w-auto lg:h-auto lg:flex items-center lg:gap-6`}
 	>
 		<div class="xsm:grid lg:flex gap-7 mdx:gap-12">
 			<a class="text-accentGray font-medium spacing" href="/">Home</a>

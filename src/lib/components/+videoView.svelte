@@ -1,9 +1,10 @@
-<script lang="ts" >
-    	let currentViewingUrl = '';
+<script lang="ts">
+	export let currentViewingUrl = '';
 	const handleClick = () => {
 		currentViewingUrl = 'https://www.youtube.com/embed/EK5u1gUI-KE';
 	};
-    </script>
+</script>
+
 <div class="flex items-center justify-center mb-20 max-w-[1400px]">
 	<div
 		class="lg:grid sm:w-full xl:flex gap-[50px] xsm:px-[20px] 2xl:justify-center xl:px-[100px] mt-[60px]"
@@ -21,7 +22,7 @@
 							class=" xsm:w-[calc(100vw-60px)] xsm:h-[300px] sm:w-full lg:h-[600px] 2xl:h-[800px] sm:h-[500px]"
 							src={currentViewingUrl}
 							allowfullscreen
-                            title=""
+							title=""
 							allowtransparency
 							allow="autoplay"
 						/>
@@ -31,7 +32,9 @@
 					<div
 						class="absolute grid content-end h-full pl-10 w-full bg-gradient-to-t from-hardBlack bottom-0"
 					>
-						<h2 class="text-white font-bold xsm:text-sm lg:text-2xl leading-10 xsm:max-w-full lg:max-w-[60%]">
+						<h2
+							class="text-white font-bold xsm:text-sm lg:text-2xl leading-10 xsm:max-w-full lg:max-w-[60%]"
+						>
 							[EN DIRECT DE KREFELD ] - 2023-06-04 10:00 - Réunion de Krefeld - Mu Kinyarwanda
 						</h2>
 						<div class="flex xsm:gap-5 ms:gap-12">
@@ -40,13 +43,21 @@
 						</div>
 						<div class="xsm:mt-3 sm:mt-10 xsm:mb-5 lg:mb-10 flex gap-10">
 							<button on:click={handleClick}>
-								<img class=" xsm:w-[30px] lg:w-[45px] h-fit" src="/icons/play-yellow.png" alt="play" />
+								<img
+									class=" xsm:w-[30px] lg:w-[45px] h-fit"
+									src="/icons/play-yellow.png"
+									alt="play"
+								/>
 							</button>
 							<button>
-								<img class=" xsm:w-[30px]  w-[45px] h-fit" src="/icons/link-yellow.png" alt="play" />
+								<img class=" xsm:w-[30px] w-[45px] h-fit" src="/icons/link-yellow.png" alt="play" />
 							</button>
 							<button>
-								<img class=" xsm:w-[30px]  w-[45px] h-fit" src="/icons/download-yellow.png" alt="play" />
+								<img
+									class=" xsm:w-[30px] w-[45px] h-fit"
+									src="/icons/download-yellow.png"
+									alt="play"
+								/>
 							</button>
 						</div>
 					</div>
