@@ -12,16 +12,17 @@
 	const webName: string = 'missionnaire network website';
 	export let data: PageData;
 	let currentViewingUrl = '';
-	const handleClick = () => {
-		currentViewingUrl = 'https://www.youtube.com/embed/EK5u1gUI-KE';
+	const handleClick = (e: any) => {
+		console.log(e.id);
+		currentViewingUrl = `https://www.youtube.com/embed/${e.id}`;
 	};
 </script>
 
 <main class=" align-middle flex flex-col items-center justify-center p-4 max-w-[1200px] mx-auto">
-	<VideoView />
+	<VideoView {currentViewingUrl} />
 	<div class=" mt-7 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-8">
 		{#each data.videos as video, index}
-			<ThumbnailVideo {video} {index} />
+			<ThumbnailVideo {video} {index} on:videoSelected={(e) => handleClick(e.detail)} />
 		{/each}
 	</div>
 </main>

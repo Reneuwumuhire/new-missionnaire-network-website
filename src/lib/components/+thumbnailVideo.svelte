@@ -1,3 +1,4 @@
+<!-- svelte-ignore a11y-no-static-element-interactions -->
 <!-- SomeComponent.svelte -->
 <script lang="ts">
 	import { createEventDispatcher, onMount } from 'svelte';
@@ -8,11 +9,9 @@
 	import DocumentText1 from 'iconsax-svelte/DocumentText1.svelte';
 	import VideoPlay from 'iconsax-svelte/VideoPlay.svelte';
 
-	import BsCameraVideo from 'svelte-icons-pack/bs/BsCameraVideo';
-	import BsFiletypePdf from 'svelte-icons-pack/bs/BsFiletypePdf';
 	export let video: import('../../core/model/youtube').VideoItem;
 	export let index: number;
-
+	let playing;
 	const dispatch = createEventDispatcher();
 	let visible: boolean[] = [];
 
@@ -61,8 +60,11 @@
 </script>
 
 <svelte:window on:click={hideIfClickedOutside} />
+<!-- svelte-ignore a11y-click-events-have-key-events -->
+<!-- svelte-ignore a11y-no-static-element-interactions -->
 <div
 	class=" min-h-ful w-full cursor-pointer transition-all duration-300 ease-in-out hover:duration-300 hover:ease-in-out"
+	on:click={() => dispatch('videoSelected', video)}
 >
 	<!-- Thumbnail image -->
 	<div class="w-full h-full flex flex-col justify-between">

@@ -1,8 +1,9 @@
 <script lang="ts">
-	let currentViewingUrl = '';
 	const handleClick = () => {
 		currentViewingUrl = 'https://www.youtube.com/embed/EK5u1gUI-KE';
 	};
+	export let currentViewingUrl: any;
+	console.log('playingVideo', currentViewingUrl);
 </script>
 
 <div class=" min-w-full flex items-center justify-center">
@@ -12,8 +13,8 @@
 			<div class="bg-primary mb-2 p-2 w-fit">
 				<h3 class="text-white font-bold">LATEST UPLOADED</h3>
 			</div>
-			<div class=" w-full relative">
-				{#if currentViewingUrl.length !== 0}
+			<div class=" w-full relative bg-hardBlack">
+				{#if currentViewingUrl.length}
 					<div class=" flex flex-row items-center justify-center w-full" id="player">
 						<iframe
 							class=" w-full aspect-video"
