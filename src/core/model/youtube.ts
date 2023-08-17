@@ -44,12 +44,37 @@ export const YtSearchResultSchema = z.object({
         totalResults: z.number(),
         resultsPerPage: z.number()
     }),
-    nextPageToken: z.string(),
-    items: YtVideoItemSchema.array()
+    nextPageToken: z.string().optional(),
+    prevPageToken: z.string().optional(),
+    items: z.object({
+        id: z.object({
+            kind: z.string(),
+            videoId: z.string()
+        }),
+        snippet: z.object({
+            publishedAt: z.coerce.date(),
+            channelId: z.string(),
+            title: z.string(),
+            description: z.string(),
+            thumbnails: z.object({
+                default: YTVideoThumbNailSchema,
+                medium: YTVideoThumbNailSchema,
+                high: YTVideoThumbNailSchema,
+            })
+        })
+    }).array()
 });
+
 export type YtSearchResult = z.infer<typeof YtSearchResultSchema>;
 export const VideoItemSchema = YtVideoSnippet.extend({
     id: z.string(),
 });
 export type VideoItem = z.infer<typeof VideoItemSchema>;
-
+export const SearchVideosResultSchema = z.object({
+    resultsPerPage: z.number(),
+    prevPageToken: z.string().optional(),
+    nextPageToken: z.string().optional(),
+    totalResults: z.number(),
+    videos: VideoItemSchema.array()
+});
+export type SearchVideosResult = z.infer<typeof SearchVideosResultSchema>;
