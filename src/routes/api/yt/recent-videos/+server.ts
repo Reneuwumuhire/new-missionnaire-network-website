@@ -1,9 +1,7 @@
 import { json } from "@sveltejs/kit";
 import { YtSearchResultSchema } from "../../../../core/model/youtube";
-import Firestore from "@google-cloud/firestore";
 
-const db = new Firestore.Firestore();
-
+import { db } from "$lib/server/firestore";
 
 const YOUTUBE_API_URL = "https://youtube.googleapis.com/youtube/v3/search";
 const YOUTUBE_CHANNEL_ID = "UCS3zqpqnCvT0SFa_jI662Kg"
@@ -54,8 +52,6 @@ export const GET = async (
     const reqDataResult = YtSearchResultSchema.safeParse(youtubeResultJSON);
     
     if(!reqDataResult.success){
-        console.log(reqDataResult.error);
-        
         return json({
             success: false
         });
