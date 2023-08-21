@@ -26,6 +26,7 @@
 		"eslint-plugin-svelte": "^2.30.0",
 		"iconsax-svelte": "^0.0.1-alpha.11",
 		"minimist": "^1.2.8",
+		"node-fetch": "^3.3.2",
 		"postcss": "^8.4.27",
 		"prettier": "^2.8.0",
 		"prettier-plugin-svelte": "^2.10.1",

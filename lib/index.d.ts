@@ -4,11 +4,14 @@ type Args = {
     page: number,
 }
 type ChannelSyncInfo = {
+    name: string,
     channelId: string,
-    currentPage: string,
-    prevPage: string,
-    nextPage: string,
-    totalVideos: number
+    currentPageToken?: string,
+    prevPageToken?: string,
+    nextPageToken?: string,
+    totalResults: number,
+    resultsPerPage: number,
+    totalSyncedVideos: number,
 }
 type ThumbnailInfo = {
     url: string,
@@ -22,7 +25,7 @@ type Thumbnails = {
     high: ThumbnailInfo
 }
 
-type YoutubeSearchResult = {
+type YoutubeVideo = {
     videoId: string,
     publishedAt: Date,
     channelId: string,
@@ -35,4 +38,11 @@ type YoutubeSearchResult = {
     nextPageToken?: string,
     prevPageToken?: string,
     
+}
+type YoutubeSearchResult = {
+    nextPageToken?: string,
+    prevPageToken?: string,
+    totalResults: number,
+    resultsPerPage: number,
+    videos: YoutubeVideo[]
 }
