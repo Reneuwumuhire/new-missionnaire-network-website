@@ -11,13 +11,17 @@
 	dict.set(languages);
 	const webName: string = 'missionnaire network website';
 	export let data: PageData;
+	let titleName: any = "Missionnaire network";
 	let currentViewingUrl = '';
 	const handleClick = (e: any) => {
 		console.log(e.id);
+		titleName=e.title;
 		currentViewingUrl = `https://www.youtube.com/embed/${e.id}?autoplay=1`;
 	};
 </script>
-
+<svelte:head>
+    <title>{titleName}</title> 
+</svelte:head>
 <main class=" align-middle flex flex-col items-center justify-center  max-w-[1200px] mx-auto">
 	<VideoView {currentViewingUrl} />
 	<div class=" mt-9 px-4 grid grid-cols-1 sm:px-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-8">
