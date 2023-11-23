@@ -3,7 +3,6 @@
 <script lang="ts">
 	import { createEventDispatcher, onMount } from 'svelte';
 	import { slide } from 'svelte/transition';
-	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import More from 'iconsax-svelte/More.svelte';
 	import AudioSquare from 'iconsax-svelte/AudioSquare.svelte';
 	import DocumentText1 from 'iconsax-svelte/DocumentText1.svelte';
@@ -141,3 +140,46 @@
 		</div>
 	{/if}
 </div>
+<!-- 
+<div class="flex flex-col">
+	<div class="flex flex-row items-center">
+		<a
+			href={link}
+			class={`text-base font-medium ${
+        active ? activeClass : inactiveClass
+      }
+
+      `}
+		>
+			{menuName}
+		</a>
+		{#if subMenu && subMenu.length > 0}
+			<button
+				class={`text-base font-medium ${
+        active ? activeClass : inactiveClass
+      }`}
+				on:click={() => {
+        showSubMenu = !showSubMenu;
+      }}
+			>
+				<Icon className="w-4 h-4 ml-1" src={BsChevronDown} />
+			</button>
+		{/if}
+	</div>
+	{#if showSubMenu}
+		<div class=" absolute mt-6 bg-primary flex flex-col">
+			{#each subMenu as { name, link } (name)}
+				<a
+					href={link}
+					class={`text-base font-medium ${
+            activeLink === link
+              ? activeLinkClass
+              : inactiveLinkClass
+          }`}
+				>
+					{name}
+				</a>
+			{/each}
+		</div>
+	{/if}
+</div> -->
