@@ -8,7 +8,37 @@ export default {
       },
       boxShadow: {
         "4xl": "0px 0px 14px 0px rgba(0, 0, 0, 0.04)"
-      }
+      },
+      colors: {
+        primary: "#FF880C",
+        accentOrange: "#F2994A",
+        accentGray: "#4F4F4F",
+        grayWeak: "#A7A7A7",
+        grayWhite: "#F3F1F1",
+        hardBlack: "#000",
+        pureWhite: "#fff",
+        weakGray: "#BABABA",
+        veryWeakGray: "#EBEBEB",
+        missionnaire: {
+          DEFAULT: "#FF880C",
+          50: "#FCF5ED",
+          100: "#FFE5C9",
+          Yellow: {
+            DEFAULT: "#FFF5EB",
+            50: "#FCF5ED",
+            100: "#FFE5C9",
+            200: "#FFD19F",
+            300: "#FFBD75",
+            400: "#FFA94B",
+            500: "#FF880C",
+            600: "#CC6A0A",
+            700: "#994C08",
+            800: "#663E06",
+            900: "#332003"
+          },
+          }
+        }
+      },
     },
     screens: {
       'xsm': '350px',
@@ -29,18 +59,6 @@ export default {
       '2xl': '1536px',
       // => @media (min-width: 1536px) { ... }
     },
-    colors: {
-      white: "#EFEFEF",
-      primary: "#FF880C",
-      accentOrange: "#F2994A",
-      accentGray: "#4F4F4F",
-      grayWeak: "#A7A7A7",
-      grayWhite: "#F3F1F1",
-      hardBlack: "#000",
-      pureWhite: "#fff",
-      weakGray: "#BABABA",
-      veryWeakGray: "#EBEBEB"
-    },
-  },
+    
   plugins: []
 };
