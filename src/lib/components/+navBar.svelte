@@ -32,19 +32,13 @@
 	};
 </script>
 
-<nav
-	class="max-w-full flex flex-row justify-between xsm:px-[20px] lg:px-[100px] py-3 items-center h-20 mb-6"
->
-	<div class=" w-full flex flex-row justify-between items-center max-w-7xl mx-auto text-xs">
-		<a href="/" class="flex flex-row items-center space-x-2">
+<nav class="max-w-full flex flex-row justify-between items-center h-20 px-6 my-4">
+	<div class=" w-full flex flex-row justify-between items-center max-w-7xl mx-auto">
+		<a href="/" class="flex flex-row items-center">
 			<img src="/icons/logo.png" class="w-auto h-10" alt="logo" />
 		</a>
-		<div
-			class={`xsm:flex-col ${
-				!showMoboNav ? 'hidden' : ''
-			} xsm:items-start xsm:gap-10 xsm:pt-20 lg:pt-0 lg:items-center lg:flex-row xsm:bg-pureWhite xsm:absolute lg:relative xsm:w-[100%] xsm:left-0 xsm:px-9 lg:py-0 xsm:top-0 z-10 xsm:h-[100vh] lg:w-auto lg:h-auto lg:flex items-center lg:gap-6`}
-		>
-			<div class="xsm:grid lg:flex gap-4 mdx:gap-12">
+		<div class="">
+			<div class=" flex flex-row space-x-4 justify-between">
 				{#each NavigationLinkList as link, index}
 					<HeaderMenuLink
 						menuName={link.menuName}

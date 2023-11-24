@@ -6,7 +6,7 @@
 	import ArticleCornerImage from '$lib/components/+articleCornerImage.svelte';
 </script>
 
-<title> Ewald Frank</title>
+<title> Missionnaire Network</title>
 <div class=" flex flex-col">
 	<header>
 		<div class="flex flex-row items-center justify-center space-x-2">

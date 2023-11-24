@@ -1,7 +1,6 @@
 <script lang="ts">
 	import ArticleParagraph from '$lib/components/+articleParagraph.svelte';
 	import Quotes from '$lib/components/+quotes.svelte';
-	import { text } from '@sveltejs/kit';
 	import { BranhamsBiographyParagraphsPart1, BranhamsBiographyParagraphsPart2 } from './paragraphs';
 	import ArticleImage from '$lib/components/+articleImage.svelte';
 	import ArticleCornerImage from '$lib/components/+articleCornerImage.svelte';

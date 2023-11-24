@@ -1,7 +1,6 @@
-import type { PageLoad } from './$types';
 import { VideoItemSchema, type VideoItem, type SearchVideosResult } from '../core/model/youtube';
 
-export const load = (async ({ fetch }) => {
+export const load = (async ({ fetch }: any) => {
 	const requestOptions = {
 		method: 'GET'
 	};
@@ -14,4 +13,4 @@ export const load = (async ({ fetch }) => {
 		resultsPerPage: apiResult.resultsPerPage,
 		videos: VideoItemSchema.array().parse(apiResult.videos)
 	};
-}) satisfies PageLoad;
+}) as any;
