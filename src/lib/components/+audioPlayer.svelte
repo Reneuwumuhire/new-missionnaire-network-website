@@ -137,7 +137,8 @@
 	};
 
 	// Add your audio file path
-	const audioSrc = '/audio/audio.mp3';
+	const audioSrc =
+		'https://firebasestorage.googleapis.com/v0/b/missionnairenetwork.appspot.com/o/predications%2Faudio.mp3?alt=media&token=2a3587c8-5583-4a98-b371-6874962e621f';
 
 	onMount(() => {
 		audio = new Audio(audioSrc);

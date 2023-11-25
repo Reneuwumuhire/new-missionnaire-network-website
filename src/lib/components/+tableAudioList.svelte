@@ -50,7 +50,7 @@
 				<span> Prev </span>
 			</div>
 			<div slot="next" class="flex flex-row items-center space-x-4">
-				<span> Prev </span>
+				<span> Next </span>
 				<Icon src={BsChevronRight} />
 			</div>
 		</Pagination>
