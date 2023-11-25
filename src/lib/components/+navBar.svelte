@@ -5,9 +5,16 @@
 	import fr from '../../translations/fr';
 	import en from '../../translations/en';
 	import { NavigationLinkList } from '../../helpers/NavigationLinkList';
+	// @ts-ignore
+	import Icon from 'svelte-icons-pack/Icon.svelte';
+	import HiSolidMenuAlt3 from 'svelte-icons-pack/hi/HiSolidMenuAlt3';
+	import IoCloseSharp from 'svelte-icons-pack/io/IoCloseSharp';
+	import BsChevronDown from 'svelte-icons-pack/bs/BsChevronDown';
+	import HeaderMenuLinkMobo from './+headerMenuLinkMobo.svelte';
 
 	const languages = { en, fr };
 	let currentLang = 'en';
+	let preventScroll = false;
 	let openMenuIndex: number | null = null;
 	dict.set(languages);
 	let showDropContents = false;
@@ -22,29 +29,34 @@
 			openMenuIndex = null;
 		}
 	};
+	// Function to toggle preventScroll when mobile navigation is shown/hidden
+	const toggleMobileNav = () => {
+		showMoboNav = !showMoboNav;
+		if (showMoboNav) {
+			document.body.classList.add('overflow-hidden', 'overscroll-none');
+		} else {
+			document.body.classList.remove('overflow-hidden', 'overscroll-none');
+		}
+	};
 	// toggle the menu when clicked
 	const toggleMenu = (index: number) => {
 		if (openMenuIndex === index) {
 			openMenuIndex = null;
+			toggleMobileNav();
 		} else {
 			openMenuIndex = index;
+			toggleMobileNav();
 		}
 	};
 </script>
 
-<nav
-	class="max-w-full flex flex-row justify-between xsm:px-[20px] lg:px-[100px] py-3 items-center h-20 mb-6"
->
-	<div class=" w-full flex flex-row justify-between items-center max-w-7xl mx-auto text-xs">
-		<a href="/" class="flex flex-row items-center space-x-2">
+<nav class="max-w-full flex flex-row justify-between items-center h-20 px-3 md:px-6 my-4">
+	<div class=" w-full flex flex-row justify-between items-center max-w-7xl mx-auto">
+		<a href="/" class="flex flex-row items-center">
 			<img src="/icons/logo.png" class="w-auto h-10" alt="logo" />
 		</a>
-		<div
-			class={`xsm:flex-col ${
-				!showMoboNav ? 'hidden' : ''
-			} xsm:items-start xsm:gap-10 xsm:pt-20 lg:pt-0 lg:items-center lg:flex-row xsm:bg-pureWhite xsm:absolute lg:relative xsm:w-[100%] xsm:left-0 xsm:px-9 lg:py-0 xsm:top-0 z-10 xsm:h-[100vh] lg:w-auto lg:h-auto lg:flex items-center lg:gap-6`}
-		>
-			<div class="xsm:grid lg:flex gap-4 mdx:gap-12">
+		<div class=" hidden md:block">
+			<div class=" flex flex-row space-x-4 justify-between">
 				{#each NavigationLinkList as link, index}
 					<HeaderMenuLink
 						menuName={link.menuName}
@@ -57,59 +69,50 @@
 									image: subLink.image
 							  }))
 							: []}
+						on:click={() => toggleMenu(index)}
 					/>
 				{/each}
-				<!-- add a nice header  -->
 			</div>
-			<!-- <div class="relative mt-6 mdx:mt-0">
-				<button
-					on:click={langSwitch}
-					class="flex rounded-full border-veryWeakGray border items-center px-4 py-4 space-x-2"
-				>
-					<img class=" w-5 h-auto" src="/icons/english-flag.png" alt="english flag" />
-					<span class="text-sm text-grayWeak">{currentLang.toUpperCase()}</span>
-					<img class="w-[20px] h-fit" src="/icons/arrow-down.png" alt="english flag" />
-				</button>
-				<div
-					id="dropdownNavbar"
-					class={`z-10 md:absolute ${
-						!showDropContents ? 'hidden' : ''
-					} font-normal bg-white divide-y divide-gray-100 rounded-lg md:shadow w-32 `}
-				>
-					<ul class="py-2 text-base md:text-sm text-gray-700" aria-labelledby="dropdownLargeButton">
-						{#each Object.keys(languages) as lang}
-							<li>
-								<button
-									on:click={() => {
-										locale.set(lang);
-										showDropContents = false;
-										currentLang = lang;
-									}}
-									class="block px-4 py-2 hover:bg-gray-100 text-textPrimary tracking-wide"
-									>{lang.toUpperCase()}</button
-								>
-							</li>
-						{/each}
-					</ul>
-				</div>
-			</div> -->
-			<!-- <button
-				class="bg-pureWhite mt-6 mdx:mt-0 gap-2 p-2 rounded-full border-veryWeakGray border-2 items-center"
+		</div>
+		<div class=" block md:hidden text-black text-4xl">
+			<!-- menu -->
+			<button
+				class="flex flex-row items-center w-10 h-10 transition-all duration-75 ease-in-out text-missionnaire"
+				on:click={toggleMobileNav}
 			>
-				<img class="w-[30px] h-fit" src="/icons/moon.png" alt="change mode" />
+				{#if showMoboNav}
+					<Icon src={IoCloseSharp} />
+				{:else}
+					<Icon src={HiSolidMenuAlt3} />
+				{/if}
 			</button>
-			<div class="w-[1px] opacity-7 hidden lg:block h-[40px] bg-veryWeakGray" />
-			<div class="flex mt-6 mdx:mt-0 flex-row items-center space-x-8">
-				<img src="/icons/YouTube.png" class="w-[30px] h-fit" alt="YouTube" />
-				<img src="/icons/WhatsApp.png" class="w-[30px] h-fit" alt="WhatsApp" />
-				<img src="/icons/Facebook.png" class="w-[30px] h-fit" alt="Facebook" />
+		</div>
+		<!-- mobo menu -->
+		{#if showMoboNav}
+			<div class="absolute z-50 top-32 left-0 w-full h-full bg-white border-t-2 py-6">
+				<div class="relative flex flex-col space-y-2 w-full h-full">
+					<div class="relative flex flex-col space-y-5 text-3xl px-5">
+						{#each NavigationLinkList as link, index}
+							<HeaderMenuLinkMobo
+								menuName={link.menuName}
+								link={link.link}
+								subMenu={link.subMenu
+									? link.subMenu.map((subLink) => ({
+											subName: subLink.subName,
+											link: subLink.link,
+											subText: subLink.subText
+									  }))
+									: []}
+								active={openMenuIndex === index}
+								activeClass="text-missionnaire"
+								inactiveClass="text-black"
+								on:click={() => toggleMenu(index)}
+								closeMenuFrom={toggleMobileNav}
+							/>
+						{/each}
+					</div>
+				</div>
 			</div>
-		</div>
-		<div class="block md:hidden z-20">
-			<button type="button" on:click={() => (showMoboNav = !showMoboNav)}>
-				<Menu size={24} color="#fb923c" variant="Linear" />
-			</button>
-		</div> -->
-		</div>
+		{/if}
 	</div>
 </nav>

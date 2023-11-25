@@ -39,7 +39,7 @@ export const NavigationLinkList: NavigationLink[] = [
 	{
 		id: 2,
 		menuName: 'William Branham',
-		link: '/william-branham',
+		link: '/william-branham/biographie',
 		subMenu: [
 			{
 				subName: 'Qui est William Marrion Branham?',
@@ -50,7 +50,7 @@ export const NavigationLinkList: NavigationLink[] = [
 			{
 				subName: 'Brochures',
 				subText: "Téléchargez les brochures pour connaitre le Message qu'il apporte.",
-				link: '/william-branham/brochures',
+				link: '/william-branham/biographie',
 				image: '/img/book_icon.png'
 			}
 		]

@@ -43,11 +43,11 @@
 						</div>
 						<div class="xsm:mt-3 sm:mt-10 xsm:mb-5 lg:mb-10 flex gap-10">
 							<button on:click={handleClick}>
-								<img
+								<!-- <img
 									class=" xsm:w-[30px] lg:w-[45px] h-fit"
 									src="/icons/play-yellow.png"
 									alt="play"
-								/>
+								/> -->
 							</button>
 							<button>
 								<img class=" xsm:w-[30px] w-[45px] h-fit" src="/icons/link-yellow.png" alt="play" />

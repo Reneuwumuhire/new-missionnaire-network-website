@@ -24,7 +24,7 @@
 <svelte:head>
 	<title>{titleName}</title>
 </svelte:head>
-<main class=" align-middle flex flex-col items-center justify-center max-w-[1200px] mx-auto">
+<main class=" align-middle flex flex-col items-center justify-center max-w-7xl mx-auto px-5">
 	<VideoView {currentViewingUrl} />
 	<CalendarWeekly />
 	<div

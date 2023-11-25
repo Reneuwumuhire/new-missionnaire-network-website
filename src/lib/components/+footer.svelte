@@ -73,6 +73,6 @@ Youtube -->
 				<Icon className="w-4 h-4" src={RiLogoWhatsappFill} />
 			</a>
 		</div>
-		<small>© 2012 - 2023 Missionnaire Network. Tous droits réservés</small>
+		<small class=" text-center">© 2012 - 2023 Missionnaire Network. Tous droits réservés</small>
 	</div>
 </footer>

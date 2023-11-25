@@ -7,6 +7,9 @@ export default defineConfig({
 		include: ['src/**/*.{test,spec}.{js,ts}']
 	},
 	server: {
-		port: 8080
+		port: 8080,
+		fs: {
+			strict: false
+		}
 	}
 });
