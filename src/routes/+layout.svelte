@@ -6,6 +6,9 @@
 </script>
 
 <SocialMediaAbove isLiveStream />
-<NavBar />
+<div class="flex flex-col">
+	<NavBar />
+</div>
+
 <slot />
 <Footer />

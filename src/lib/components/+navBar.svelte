@@ -50,7 +50,7 @@
 	};
 </script>
 
-<nav class="max-w-full flex flex-row justify-between items-center h-20 px-3 md:px-6 my-4">
+<nav class="z-50 max-w-full flex flex-row justify-between items-center h-20 px-3 md:px-6 my-4">
 	<div class=" w-full flex flex-row justify-between items-center max-w-7xl mx-auto">
 		<a href="/" class="flex flex-row items-center">
 			<img src="/icons/logo.png" class="w-auto h-10" alt="logo" />
@@ -69,7 +69,6 @@
 									image: subLink.image
 							  }))
 							: []}
-						on:click={() => toggleMenu(index)}
 					/>
 				{/each}
 			</div>
