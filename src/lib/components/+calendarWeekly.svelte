@@ -1,26 +1,23 @@
 <script lang="ts">
-  import CalendarDay from "./+calendarDay.svelte";
+	import CalendarDay from './+calendarDay.svelte';
 
-  const scrollLeft = () => {
-    const container = document.querySelector('.overflow-x-scroll');
-    if (container)
-    container.scrollBy({ left: -400, behavior: 'smooth' });
-  };
+	const scrollLeft = () => {
+		const container = document.querySelector('.overflow-x-scroll');
+		if (container) container.scrollBy({ left: -400, behavior: 'smooth' });
+	};
 
-  const scrollRight = () => {
-    const container = document.querySelector('.overflow-x-scroll');
-    if (container)
-    container.scrollBy({ left: 400, behavior: 'smooth' });
-  };
-
+	const scrollRight = () => {
+		const container = document.querySelector('.overflow-x-scroll');
+		if (container) container.scrollBy({ left: 400, behavior: 'smooth' });
+	};
 </script>
 
 <div class="w-full flex flow-row mt-10 space-x-3 p-5 border">
-	<div class="flex flex-row items-center">
+	<div class=" hidden md:flex flex-row items-center">
 		<h1 class="text-4xl font-black text-start mr-4">Cette <br /> Semaine</h1>
 	</div>
 	<!-- verical line between -->
-	<div class="flex flex-col items-center justify-center">
+	<div class="hidden md:flex flex-col items-center justify-center">
 		<div class="w-1 h-10 bg-gray-200" />
 	</div>
 
@@ -43,16 +40,32 @@
 		</button>
 		<div class="flex flex-row items-center space-x-3 overflow-x-scroll overflow-y-hidden px-16">
 			<CalendarDay
-				VideoScheduleInfo={{ dayAndDate: "Lundi 12", videoTitle: "[RETRANSMISSION] - 2023-06-14 19:30 - Réunion de Krefeld [01.04.1973 15:00] - Mu Kinyarwanda" }}
+				VideoScheduleInfo={{
+					dayAndDate: 'Lundi 12',
+					videoTitle:
+						'[RETRANSMISSION] - 2023-06-14 19:30 - Réunion de Krefeld [01.04.1973 15:00] - Mu Kinyarwanda'
+				}}
 			/>
 			<CalendarDay
-				VideoScheduleInfo={{ dayAndDate: "Mardi 13", videoTitle: "[RETRANSMISSION] - 2023-06-14 19:30 - Réunion de Krefeld [01.04.1973 15:00] - Mu Kinyarwanda" }}
+				VideoScheduleInfo={{
+					dayAndDate: 'Mardi 13',
+					videoTitle:
+						'[RETRANSMISSION] - 2023-06-14 19:30 - Réunion de Krefeld [01.04.1973 15:00] - Mu Kinyarwanda'
+				}}
 			/>
 			<CalendarDay
-				VideoScheduleInfo={{ dayAndDate: "Mercredi 14", videoTitle: "[RETRANSMISSION] - 2023-06-14 19:30 - Réunion de Krefeld [01.04.1973 15:00] - Mu Kinyarwanda" }}
+				VideoScheduleInfo={{
+					dayAndDate: 'Mercredi 14',
+					videoTitle:
+						'[RETRANSMISSION] - 2023-06-14 19:30 - Réunion de Krefeld [01.04.1973 15:00] - Mu Kinyarwanda'
+				}}
 			/>
 			<CalendarDay
-				VideoScheduleInfo={{ dayAndDate: "Jeudi 15", videoTitle: "[RETRANSMISSION] - 2023-06-14 19:30 - Réunion de Krefeld [01.04.1973 15:00] - Mu Kinyarwanda" }}
+				VideoScheduleInfo={{
+					dayAndDate: 'Jeudi 15',
+					videoTitle:
+						'[RETRANSMISSION] - 2023-06-14 19:30 - Réunion de Krefeld [01.04.1973 15:00] - Mu Kinyarwanda'
+				}}
 			/>
 		</div>
 		<!-- Right arrow for navigation -->
@@ -75,14 +88,20 @@
 </div>
 
 <style>
-  /* Hide scrollbar */
-  .overflow-x-scroll::-webkit-scrollbar {
-    display: none; /* Safari and Chrome browsers */
-  }
-  .right-arrow-button {
-    background: linear-gradient(89deg, #FFF 1.14%, #FFF 50%, #FFF 10%, rgba(255, 255, 255, 0.00) 90.25%);
-  }
-  .left-arrow-button {
-    background: linear-gradient(271deg, #FFF 1.14%, #FFF 40%, rgba(255, 255, 255, 0.00) 80.25%);
-    }
+	/* Hide scrollbar */
+	.overflow-x-scroll::-webkit-scrollbar {
+		display: none; /* Safari and Chrome browsers */
+	}
+	.right-arrow-button {
+		background: linear-gradient(
+			89deg,
+			#fff 1.14%,
+			#fff 50%,
+			#fff 10%,
+			rgba(255, 255, 255, 0) 90.25%
+		);
+	}
+	.left-arrow-button {
+		background: linear-gradient(271deg, #fff 1.14%, #fff 40%, rgba(255, 255, 255, 0) 80.25%);
+	}
 </style>

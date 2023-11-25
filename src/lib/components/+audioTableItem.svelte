@@ -1,12 +1,3 @@
-<!-- raw table item 
-  that take a row of data and display it
-  1. video name
-  2. video date
-  3. download pdf link
-  4. download audio link 
-  5. play audio button 
-  6. video thumbnail
- -->
 <script lang="ts">
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';

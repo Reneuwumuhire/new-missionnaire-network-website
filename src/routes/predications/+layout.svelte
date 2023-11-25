@@ -1,4 +1,5 @@
 <script lang="ts">
+	import AudioPlayer from '$lib/components/+audioPlayer.svelte';
 	import AudioTableItem from '$lib/components/+audioTableItem.svelte';
 	import { PredicationsRoutes, alphabeticCharacters } from './predicationsRoutesList.js';
 	export let data: any;
@@ -81,6 +82,8 @@
 		<slot />
 	</div>
 </div>
+
+<AudioPlayer />
 
 <style>
 	.header-predications {

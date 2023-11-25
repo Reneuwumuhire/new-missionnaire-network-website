@@ -19,7 +19,9 @@
 				<small class=" text-missionnaire uppercase leading-6 tracking-widest text-xl font-bold"
 					>Eglise</small
 				>
-				<h1 class=" text-4xl font-black text-[#414141]">Assemble de Kigali/Gatenga/Murambi</h1>
+				<h1 class=" text-2xl md:text-4xl font-black text-[#414141]">
+					Assemble de Kigali/Gatenga/Murambi
+				</h1>
 			</div>
 			{#each EgliseParagraph1 as paragraph, index}
 				<ArticleParagraph text={paragraph.text} />

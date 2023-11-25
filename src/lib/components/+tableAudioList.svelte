@@ -16,7 +16,7 @@
 	};
 </script>
 
-<div class=" w-full">
+<div class=" w-full overflow-hidden">
 	<!-- <AudioTableItem /> -->
 	<!-- table with ten AudioTableItem -->
 	<table class="w-full">
