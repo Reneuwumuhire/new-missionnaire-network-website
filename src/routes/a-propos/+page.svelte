@@ -36,10 +36,10 @@
 			<!-- +250 788 567 415
 						https://www.facebook.com/missionnaire.net
 						https://www.youtube.com/@MissionnaireNetwork -->
-			<div class="flex flex-col items-start space-y-5 text-xs md:text-base">
+			<div class="flex flex-col items-start space-y-2 md:space-y-4 text-xs md:text-base">
 				<!-- add link to icons -->
 				<a
-					class="flex flex-row space-x-4"
+					class="flex flex-row items-center space-x-2 md:space-x-4"
 					href="https://www.youtube.com/@MissionnaireNetwork"
 					target="_blank"
 				>
@@ -47,14 +47,18 @@
 					<span class="">https://www.youtube.com/@MissionnaireNetwork</span>
 				</a>
 				<a
-					class="flex flex-row space-x-4"
+					class="flex flex-row items-center space-x-2 md:space-x-4"
 					href="https://www.facebook.com/missionnaire.net"
 					target="_blank"
 				>
 					<Icon className="w-8 h-8" src={FaBrandsFacebook} />
 					<span>https://www.facebook.com/missionnaire.net</span>
 				</a>
-				<a class="flex flex-row space-x-4" href="https://wa.me/+250728727726" target="_blank">
+				<a
+					class="flex flex-row items-center space-x-2 md:space-x-4"
+					href="https://wa.me/+250728727726"
+					target="_blank"
+				>
 					<!-- when hover add a slight grey -->
 					<Icon className="w-8 h-8" src={RiLogoWhatsappFill} />
 					<span>+250 788 567 415</span>
