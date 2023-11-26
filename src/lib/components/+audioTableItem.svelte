@@ -4,31 +4,50 @@
 	import BsCloudDownloadFill from 'svelte-icons-pack/bs/BsCloudDownloadFill';
 	import BsFileEarmarkPdfFill from 'svelte-icons-pack/bs/BsFileEarmarkPdfFill';
 	import BsPlayCircleFill from 'svelte-icons-pack/bs/BsPlayCircleFill';
+	import type { VideoItem } from '../../core/model/youtube';
+	import { selectAudio } from '../stores/global';
+	import { setContext } from 'svelte';
 	let showDropContents = false;
+
+	export let audio: VideoItem;
+	export let index: number;
+	const updateSelectAudio = (audio: VideoItem) => {
+		selectAudio.set(audio); // Set the selectAudio value in the store
+	};
 </script>
 
 <div
 	class="flex flex-col w-full bg-gray-100 hover:bg-missionnaire-50 hover:text-black transition-all duration-75 ease-in-out cursor-pointer"
 >
-	<div class=" flex flex-row items-center justify-between px-4 py-3 overflow-hidden space-x-3">
-		<div>1</div>
+	<div
+		class=" flex flex-row items-center justify-between px-4 py-3 overflow-hidden space-x-3 font-semibold text-xs md:text-sm"
+	>
+		<div>
+			<span class="">{index + 1}</span>
+		</div>
 		<div class=" flex-1">
 			<p class=" max-w-2xl text-ellipsis overflow-hidden line-clamp-1">
-				[RETRANSMISSION] - 2023-06-14 19:30 - Réunion de Krefeld [01.04.1973 15:00] - Mu Kinyarwanda
+				{audio.title}
 			</p>
 		</div>
 		<div class="flex flex-row space-x-6">
 			<button class="flex flex-row items-center space-x-1 hover:text-missionnaire">
 				<Icon src={BsFileEarmarkPdfFill} />
-				<span>PDF</span>
+				<span class=" hidden md:block">PDF</span>
 			</button>
 			<button class="flex flex-row items-center space-x-1 hover:text-missionnaire">
 				<Icon src={BsCloudDownloadFill} />
-				<span>MP3</span>
+				<span class=" hidden md:block">MP3</span>
 			</button>
-			<button class="flex flex-row items-center space-x-1 hover:text-missionnaire">
+			<button
+				class="flex flex-row items-center space-x-1 hover:text-missionnaire"
+				on:click={() => {
+					updateSelectAudio(audio);
+					// console.log('Function called#########');
+				}}
+			>
 				<Icon src={BsPlayCircleFill} />
-				<span>Play</span>
+				<span class=" hidden md:block">Play</span>
 			</button>
 		</div>
 	</div>

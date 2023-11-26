@@ -1,8 +1,26 @@
 <script lang="ts">
 	import AudioPlayer from '$lib/components/+audioPlayer.svelte';
 	import AudioTableItem from '$lib/components/+audioTableItem.svelte';
+	import { onMount } from 'svelte';
+	import type { VideoItem } from '../../core/model/youtube.js';
 	import { PredicationsRoutes, alphabeticCharacters } from './predicationsRoutesList.js';
+	import { selectAudio } from '$lib/stores/global.js';
+	import { goto } from '$app/navigation';
+
 	export let data: any;
+	let selectedAudioToPlay: VideoItem | null = null;
+	onMount(() => {
+		selectAudio.subscribe((value) => {
+			selectedAudioToPlay = value;
+		});
+	});
+	async function handleClick(event: {
+		preventDefault: () => void;
+		currentTarget: { href: string | URL };
+	}) {
+		event.preventDefault();
+		await goto(event.currentTarget.href);
+	}
 </script>
 
 <div class=" flex flex-col">
@@ -36,28 +54,34 @@
 		</div>
 	</header>
 	<div class="relative flex flex-row justify-center h-auto w-full py-6">
-		<div class="relative flex flex-col items-start w-full max-w-5xl overflow-hidden space-y-6 px-5">
-			<h1 class=" text-2xl font-black text-[#414141]">Par Auteur</h1>
-			<ul class="flex flex-row w-full space-x-4">
+		<div
+			class="relative flex flex-col items-start w-full max-w-5xl overflow-hidden space-y-2 md:space-y-6 px-5"
+		>
+			<h1 class=" text-xl md:text-2xl font-black text-[#414141]">Par Auteur</h1>
+			<ul class="flex flex-col md:flex-row w-full space-y-2 md:space-y-0 md:space-x-4">
 				{#each PredicationsRoutes as slug}
 					<!-- list has to have equal width and fill the container and all have same height -->
-					<li class="flex-1 h-full">
+					<li class="flex-1 h-full max-w-sm">
 						<!-- it the slug is as the same active the link slug.slug === params.body.params.slug -->
 						<a
+							data-sveltekit-preload-data=""
 							href="/predications/{slug.slug}"
 							class={`
 							${slug.slug === data.body.params.slug ? 'bg-missionnaire-100 ' : ''}
-						flex flex-col space-y-1 border-2 border-missionnaire-100 rounded-lg p-4 hover:bg-missionnaire-100 transition-all h-full
+						flex flex-col space-y-1 border-2 border-missionnaire-100 rounded-lg p-2 md:p-4 hover:bg-missionnaire-100 transition-all h-full
 							`}
+							on:click={handleClick}
 						>
-							<span class=" font-bold text-lg">{slug.title}</span>
-							<span class=" font-light text-sm text-gray-600">{slug.description}</span>
+							<span class=" text-xs font-bold md:text-lg">{slug.title}</span>
+							<span class=" hidden md:block font-light text-sm text-gray-600"
+								>{slug.description}</span
+							>
 						</a>
 					</li>
 				{/each}
 			</ul>
-			<h1 class=" text-2xl font-black text-[#414141]">Par ordre alphabétique</h1>
-			<ul class=" flex flex-row justify-between w-full">
+			<h1 class=" hidden md:block text-2xl font-black text-[#414141]">Par ordre alphabétique</h1>
+			<ul class=" hidden md:flex flex-row justify-between w-full">
 				{#each alphabeticCharacters as character}
 					<li class="flex flex-row items-center">
 						<!-- add from the current url a &filter=alph&char=character avoid scrolling back to top -->
@@ -78,12 +102,14 @@
 </div>
 <div class="flex flex-row justify-center h-auto w-full py-6">
 	<div class=" flex flex-col w-full max-w-5xl px-5">
-		<h1 class=" text-2xl font-black text-[#414141]">List</h1>
+		<h1 class=" text-xl md:text-2xl font-black text-[#414141] mb-3">List</h1>
 		<slot />
 	</div>
 </div>
 
-<AudioPlayer />
+{#if selectedAudioToPlay}
+	<AudioPlayer />
+{/if}
 
 <style>
 	.header-predications {

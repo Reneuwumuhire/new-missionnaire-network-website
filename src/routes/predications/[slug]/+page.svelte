@@ -1,12 +1,15 @@
 <script lang="ts">
-	import { page } from '$app/stores';
-
 	import TableAudioList from '$lib/components/+tableAudioList.svelte';
+
+	export let data;
+	let isLoading: boolean = true; // Initialize local isLoading variable
+	data.loading.subscribe((value) => {
+		isLoading = value;
+	});
 </script>
 
-<div class=" flex flex-col py-4">
-	<TableAudioList />
-</div>
-
-<style>
-</style>
+{#if isLoading}
+	<p>Loading...</p>
+{:else}
+	<TableAudioList audioList={data.videos} loading={isLoading} />
+{/if}

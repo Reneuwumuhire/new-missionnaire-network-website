@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onDestroy, onMount } from 'svelte';
+	import { getContext, onDestroy, onMount } from 'svelte';
 	import { formatTime } from '../../utils/FormatTime';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
@@ -9,6 +9,9 @@
 	import BsPauseCircleFill from 'svelte-icons-pack/bs/BsPauseCircleFill';
 	import BsVolumeUpFill from 'svelte-icons-pack/bs/BsVolumeUpFill';
 	import BsVolumeMuteFill from 'svelte-icons-pack/bs/BsVolumeMuteFill';
+	import BsX from 'svelte-icons-pack/bs/BsX';
+	import type { VideoItem } from '../../core/model/youtube';
+	import { selectAudio } from '../stores/global';
 
 	let audio: HTMLAudioElement | null = null;
 	let isPlaying = false;
@@ -21,6 +24,16 @@
 	let initialIndicatorPosition = 0;
 	let volume = 1; // Initial volume (1 = full volume, 0 = mute)
 	let isMuted = false;
+	let selectedAudioToPlay: VideoItem | null = null;
+	selectedAudioToPlay = getContext('selectedAudio');
+	selectAudio.subscribe((value) => {
+		selectedAudioToPlay = value;
+		if (audio) {
+			audio.pause();
+			audio = null;
+		}
+	});
+	console.log('selectedAudioToPlay', selectedAudioToPlay);
 	const adjustVolume = (value: number) => {
 		if (!audio) return;
 
@@ -159,11 +172,28 @@
 	});
 </script>
 
-<div class="fixed z-20 bottom-0 bg-white w-full px-10 py-5 drop-shadow-2xl">
-	<div
-		class=" text-lg font-bold text-missionnaire my-2 max-w-full text-ellipsis overflow-hidden line-clamp-1"
-	>
-		[RETRANSMISSION] - 2023-06-14 19:30 - Réunion de Krefeld [01.04.1973 15:00] - Mu Kinyarwanda
+<div class="fixed z-20 bottom-0 bg-white w-full px-5 md:px-10 py-5 drop-shadow-2xl">
+	<div class="flex flex-row items-center justify-between w-full">
+		<div
+			class=" max-w-xs font-semibold text-xs md:text-lg text-missionnaire my-2 md:max-w-full text-ellipsis overflow-hidden line-clamp-1"
+		>
+			{selectedAudioToPlay?.title}
+		</div>
+		<!-- close button -->
+		<div class=" flex flex-row justify-end">
+			<button
+				class=" text-black text-2xl px-2 border rounded-full"
+				on:click={() => {
+					selectAudio.set(null);
+					if (audio) {
+						audio.pause();
+						audio = null;
+					}
+				}}
+			>
+				<Icon src={BsX} />
+			</button>
+		</div>
 	</div>
 	<div class=" flex flex-col space-y-5 md:flex-row items-center md:space-x-9 text-2xl">
 		<!-- controls -->
