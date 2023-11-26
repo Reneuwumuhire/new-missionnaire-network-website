@@ -11,7 +11,7 @@
 </script>
 
 <title>Missionnaire Network | A propos de nous</title>
-<div class=" flex flex-col">
+<div class=" flex flex-col overflow-hidden">
 	<header>
 		<div class="flex flex-row items-center justify-center space-x-2">
 			<div class="header-branham flex flex-col items-center justify-center w-full" />
@@ -36,7 +36,7 @@
 			<!-- +250 788 567 415
 						https://www.facebook.com/missionnaire.net
 						https://www.youtube.com/@MissionnaireNetwork -->
-			<div class="flex flex-col items-start space-y-5">
+			<div class="flex flex-col items-start space-y-5 text-xs md:text-base">
 				<!-- add link to icons -->
 				<a
 					class="flex flex-row space-x-4"
