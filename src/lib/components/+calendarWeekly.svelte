@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { date } from 'zod';
 	import CalendarDay from './+calendarDay.svelte';
 
 	const scrollLeft = () => {
@@ -12,9 +13,9 @@
 	};
 </script>
 
-<div class="w-full flex flow-row mt-10 space-x-3 p-5 border">
-	<div class=" hidden md:flex flex-row items-center">
-		<h1 class="text-4xl font-black text-start mr-4">Cette <br /> Semaine</h1>
+<div class="w-full flex flow-row mt-10 space-x-1 md:space-x-3 p-2 md:p-5 border">
+	<div class=" flex flex-row items-center">
+		<h1 class=" text-lg md:text-4xl font-black text-start mr-4">Cette <br /> Semaine</h1>
 	</div>
 	<!-- verical line between -->
 	<div class="hidden md:flex flex-col items-center justify-center">
@@ -24,7 +25,7 @@
 	<div class="relative flex flex-row items-center scroll-smooth overflow-x-hidden w-auto">
 		<!-- Left arrow for navigation -->
 		<button
-			class="absolute top-0 bottom-0 w-24 z-10 pl-2 flex items-center justify-start cursor-pointe right-arrow-button left-0"
+			class=" hidden md:flex absolute top-0 bottom-0 w-24 z-10 pl-2 items-center justify-start cursor-pointe right-arrow-button left-0"
 			on:click={scrollLeft}
 			aria-label="Scroll Left"
 		>
@@ -38,39 +39,33 @@
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
 			</svg>
 		</button>
-		<div class="flex flex-row items-center space-x-3 overflow-x-scroll overflow-y-hidden px-16">
+		<div
+			class="flex flex-row items-center space-x-3 overflow-x-scroll md:overflow-x-scroll md:overflow-y-hidden px-1 md:px-16"
+		>
 			<CalendarDay
-				VideoScheduleInfo={{
-					dayAndDate: 'Lundi 12',
-					videoTitle:
-						'[RETRANSMISSION] - 2023-06-14 19:30 - Réunion de Krefeld [01.04.1973 15:00] - Mu Kinyarwanda'
-				}}
+				dateToWhen={new Date('Tue Nov 28 2023 09:42:56 GMT+0200 (Central Africa Time)')}
+				videoTitle="[RETRANSMISSION] - 2023-06-14 19:30 - Réunion de Krefeld [01.04.1973 15:00] - Mu Kinyarwanda"
 			/>
 			<CalendarDay
-				VideoScheduleInfo={{
-					dayAndDate: 'Mardi 13',
-					videoTitle:
-						'[RETRANSMISSION] - 2023-06-14 19:30 - Réunion de Krefeld [01.04.1973 15:00] - Mu Kinyarwanda'
-				}}
+				dateToWhen={new Date('Wed Nov 29 2023 09:42:56 GMT+0200 (Central Africa Time)')}
+				videoTitle="[RETRANSMISSION] - 2023-06-14 19:30 - Réunion de Krefeld [01.04.1973 15:00] - Mu Kinyarwanda"
 			/>
 			<CalendarDay
-				VideoScheduleInfo={{
-					dayAndDate: 'Mercredi 14',
-					videoTitle:
-						'[RETRANSMISSION] - 2023-06-14 19:30 - Réunion de Krefeld [01.04.1973 15:00] - Mu Kinyarwanda'
-				}}
+				dateToWhen={new Date('Fri Dec 01 2023 09:42:56 GMT+0200 (Central Africa Time)')}
+				videoTitle="[RETRANSMISSION] - 2023-06-14 19:30 - Réunion de Krefeld [01.04.1973 15:00] - Mu Kinyarwanda"
 			/>
 			<CalendarDay
-				VideoScheduleInfo={{
-					dayAndDate: 'Jeudi 15',
-					videoTitle:
-						'[RETRANSMISSION] - 2023-06-14 19:30 - Réunion de Krefeld [01.04.1973 15:00] - Mu Kinyarwanda'
-				}}
+				dateToWhen={new Date('Sad Dec 02 2023 09:42:56 GMT+0200 (Central Africa Time)')}
+				videoTitle="[RETRANSMISSION] - 2023-06-14 19:30 - Réunion de Krefeld [01.04.1973 15:00] - Mu Kinyarwanda"
+			/>
+			<CalendarDay
+				dateToWhen={new Date('Sun Dec 03 2023 09:42:56 GMT+0200 (Central Africa Time)')}
+				videoTitle="[RETRANSMISSION] - 2023-06-14 19:30 - Réunion de Krefeld [01.04.1973 15:00] - Mu Kinyarwanda"
 			/>
 		</div>
 		<!-- Right arrow for navigation -->
 		<button
-			class="absolute top-0 bottom-0 w-24 z-10 flex items-center justify-end cursor-pointer left-arrow-button right-0"
+			class="hidden md:flex absolute top-0 bottom-0 w-24 z-10 items-center justify-end cursor-pointer left-arrow-button right-0"
 			on:click={scrollRight}
 			aria-label="Scroll Right"
 		>

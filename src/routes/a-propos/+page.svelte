@@ -33,9 +33,7 @@
 			<h1 class=" text-4xl font-black text-[#414141]">Contacter</h1>
 			<ContactCard />
 			<h1 class=" text-4xl font-black text-[#414141]">Social media links</h1>
-			<!-- +250 788 567 415
-						https://www.facebook.com/missionnaire.net
-						https://www.youtube.com/@MissionnaireNetwork -->
+
 			<div class="flex flex-col items-start space-y-2 md:space-y-4 text-xs md:text-base">
 				<!-- add link to icons -->
 				<a

@@ -13,7 +13,8 @@
 	const webName: string = 'missionnaire network website';
 	export let data: PageData;
 	let titleName: any = 'Missionnaire network';
-	let currentViewingUrl = '';
+	// currentViewingUrl = to the first video in the list
+	let currentViewingUrl = data.videos[0] || '';
 	const handleClick = (e: any) => {
 		console.log(e.id);
 		titleName = e.title;
@@ -27,9 +28,7 @@
 <main class=" align-middle flex flex-col items-center justify-center max-w-7xl mx-auto px-5">
 	<VideoView {currentViewingUrl} />
 	<CalendarWeekly />
-	<div
-		class=" mt-9 px-4 grid grid-cols-1 sm:px-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-8"
-	>
+	<div class=" mt-9 grid grid-cols-1 sm:px-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-8">
 		{#each data.videos as video, index}
 			<ThumbnailVideo {video} {index} on:videoSelected={(e) => handleClick(e.detail)} />
 		{/each}
