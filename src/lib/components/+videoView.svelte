@@ -27,7 +27,6 @@
 		selectedVideoToPlay = `https://www.youtube.com/embed/${currentViewingUrl.id}`;
 	};
 	export let currentViewingUrl: VideoItem;
-	console.log('currentViewingUrl', currentViewingUrl);
 </script>
 
 <div class=" w-full flex items-center justify-center">
