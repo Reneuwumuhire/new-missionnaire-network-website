@@ -13,9 +13,9 @@
 	};
 </script>
 
-<div class="w-full flex flow-row mt-10 space-x-1 md:space-x-3 p-2 md:p-5 border">
+<div class="w-full flex flex-col sm:flex-row mt-10 space-x-1 md:space-x-3 p-2 md:p-5 border">
 	<div class=" flex flex-row items-center">
-		<h1 class=" text-lg md:text-4xl font-black text-start mr-4">Cette <br /> Semaine</h1>
+		<h1 class=" text-lg md:text-4xl font-black text-start mr-4">Cette Semaine</h1>
 	</div>
 	<!-- verical line between -->
 	<div class="hidden md:flex flex-col items-center justify-center">
