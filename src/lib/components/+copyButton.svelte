@@ -1,5 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	// @ts-ignore
+	import Icon from 'svelte-icons-pack/Icon.svelte';
+	import BsClipboard2CheckFill from 'svelte-icons-pack/bs/BsClipboard2CheckFill';
 
 	let selectedText = '';
 	let showCopyButton = false;
@@ -16,6 +19,8 @@
 				.catch((err) => {
 					console.error('Failed to copy text:', err);
 				});
+			selectedText = '';
+			showCopyButton = false;
 		}
 	};
 
@@ -39,14 +44,15 @@
 
 {#if showCopyButton}
 	<button
-		class="copy-button bg-slate-900 rounded-full text-white text-xs font-bold px-5 py-4"
+		class="copy-button flex flex-row space-x-2 items-center bg-slate-900 rounded-full text-white text-xs font-bold px-5 py-4"
 		style="
       top: {buttonPosition.top}px;
       left: {buttonPosition.left}px;
-      display: {showCopyButton ? 'block' : 'none'}
+      display: {showCopyButton ? 'flex' : 'hidden'}
     "
 		on:click={handleCopy}
 	>
+		<Icon src={BsClipboard2CheckFill} />
 		<span class="copy-button-icon">Copy</span>
 	</button>
 {/if}

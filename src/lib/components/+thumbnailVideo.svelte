@@ -68,7 +68,14 @@
 	<!-- Thumbnail image -->
 	<div class="w-full h-full flex flex-col justify-between">
 		<div class="w-full">
-			<img class="  w-full" src={video.thumbnails.medium.url} alt={video.title} />
+			<figure>
+				<img
+					class="  w-full rounded-xl"
+					src={video.thumbnails.medium.url}
+					alt={video.title}
+					loading="lazy"
+				/>
+			</figure>
 		</div>
 		<!-- Title- when streamed - download options -->
 		<div class="w-full h-full flex flex-col">
