@@ -58,8 +58,11 @@
 						alt="thumbnail"
 					/>
 					<!-- play button in the middle of the div -->
+					<!-- svelte-ignore a11y-click-events-have-key-events -->
+					<!-- svelte-ignore a11y-no-static-element-interactions -->
 					<div
-						class="absolute flex flex-col justify-center mb-5 md:mb-0 items-center h-full w-full bg-gradient-to-t from-hardBlack to-transparent bottom-0"
+						on:click={handleClick}
+						class="absolute flex flex-col justify-center mb-5 md:mb-0 items-center h-full w-full bottom-0 gradient cursor-pointer bg-gradient-to-t from-hardBlack to-transparent hover:via-black transition-all duration-500 ease-in-out"
 					>
 						<button on:click={handleClick} class=" w-20 h-20 text-missionnaire">
 							<Icon size="5rem" src={BsPlayCircleFill} />

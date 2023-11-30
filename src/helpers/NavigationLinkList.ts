@@ -63,7 +63,7 @@ export const NavigationLinkList: NavigationLink[] = [
 	{
 		id: 4,
 		menuName: 'Prédications',
-		link: '/predications'
+		link: '/predications/tous'
 	},
 	{
 		id: 5,
