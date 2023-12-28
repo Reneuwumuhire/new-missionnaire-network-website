@@ -12,7 +12,6 @@ const resolver = async <T>(url: URL , method: Methods, requestBody?: { [key: str
     try {
         const res = await api.request(url, method, requestBody);
         const data = res.data ?? res;
-
         return !schema ? Result.ok(data) : Result.ok(schema.parse(data));
     } catch (error) {
 

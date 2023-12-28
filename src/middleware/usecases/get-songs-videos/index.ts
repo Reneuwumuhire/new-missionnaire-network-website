@@ -4,7 +4,6 @@ import { InternalFailure } from '../../errors/failures';
 import resolver from '../../repository/resolver';
 import { z } from 'zod';
 import { URLInstance } from '../../repository/repo';
-import { VideosResSchema } from '../../schema/getVideosSchema';
 import type { ArgsToGetVideos, VideoEntity } from '../../entity';
 import { YoutubeVideoSchema } from '@mnlib/lib/models/youtube';
 
