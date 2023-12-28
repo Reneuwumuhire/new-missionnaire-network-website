@@ -7,8 +7,9 @@ const LONG_VIDEO = 600;
 export async function GET({url}){
     try {
         const videoType = videoTypeSchema.parse(url.searchParams.get("type") ?? undefined);
-    let maxDuration = undefined;
-    let minDuration = undefined;
+    let maxDuration;
+    let minDuration;
+    let startAfter; 
     let limit = 5;
     if(url.searchParams.has("maxResults")){
         limit = z.coerce.number().parse(url.searchParams.get("maxResults"));
@@ -18,9 +19,13 @@ export async function GET({url}){
     }else if(videoType === "song"){
         maxDuration = LONG_VIDEO;
     }
+    if(startAfter){
+        startAfter = z.coerce.number().parse(url.searchParams.get("startAfter"));
+    }
    
+    
     const repo = new YtRepository();
-    const videos = await repo.getVideos({limit, maxDuration, minDuration});
+    const videos = await repo.getVideos({limit, maxDuration, minDuration, startAfter});
     return json({
         data: videos
     });
