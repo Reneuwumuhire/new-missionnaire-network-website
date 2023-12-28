@@ -1,6 +1,6 @@
 import { json } from "@sveltejs/kit";
 import YtRepository from "@mnlib/lib/repository/youtube-videos";
-import { ZodError } from "zod/lib";
+import { ZodError } from "zod";
 
 export async function GET(){
     
