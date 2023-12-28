@@ -15,7 +15,7 @@ export const GET = async (req: {
 		resultSize = Number(resultSizeString);
 	}
 	const youtubeVideosSnap = await db.collection(`/YOUTUBE_CHANNELS/${YOUTUBE_CHANNEL_ID}/YOUTUBE_VIDEOS`)
-		.orderBy("publishTime", "desc")
+		.orderBy("publishedAt", "desc")
 		.limit(resultSize).get();
 	const youtubeVideos = youtubeVideosSnap.docs.map((doc)=>{
 		const data = doc.data();
@@ -23,10 +23,12 @@ export const GET = async (req: {
 			id: doc.id,
 			channelId: YOUTUBE_CHANNEL_ID,
 			...data,
-			publishTime: data.publishTime.toDate(),
+			publishTime: data.publishedAt.toDate(),
 			publishedAt: data.publishedAt.toDate()
 		};
 	});
+	
+	
 	const response = {
 		resultsPerPage: resultSize,
 		prevPageToken: "",

@@ -1,0 +1,3 @@
+[submodule "mn-lib"]
+	path = mn-lib
+	url = https://github.com/Missionnaire-Network/mn-lib.git
