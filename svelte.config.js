@@ -6,7 +6,11 @@ import preprocess from 'svelte-preprocess';
 const config = {
 	preprocess: [vitePreprocess(), preprocess()],
 	kit: {
-		adapter: adapter()
+		adapter: adapter(),
+		alias: {
+			"@mnlib": "./mn-lib",
+			"@mnlib/*": "./mn-lib/*"
+		}
 	}
 };
 export default config;
