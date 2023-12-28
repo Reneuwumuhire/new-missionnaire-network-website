@@ -1,4 +1,9 @@
 import type { z } from "zod";
-import type { VideoSchema } from "../schema/getVideosSchema";
+import type { YoutubeVideoSchema } from "@mnlib/lib/models/youtube";
 
-export type VideoEntity = z.infer<typeof VideoSchema>
+export type VideoEntity = z.infer<typeof YoutubeVideoSchema>
+
+export type ArgsToGetVideos = {
+    videoCount: number,
+    startAfter?: number
+}

@@ -1,8 +1,10 @@
-import GetHomeVideosUsecase from '../middleware/usecases/get-videos';
+import GetSermonsVideosUsecase from '../middleware/usecases/get-videos-sermons';
 
 export const load = (async ({ fetch }: any) => {
-	const videosUsecase = new GetHomeVideosUsecase();
-	const res =  await videosUsecase.execute(10);
+	const videosUsecase = new GetSermonsVideosUsecase();
+	const res =  await videosUsecase.execute({
+		videoCount: 10
+	});
 	if(res.isOk) {
 		const value = res.value;
 		return(
