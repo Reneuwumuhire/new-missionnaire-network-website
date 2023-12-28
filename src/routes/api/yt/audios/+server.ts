@@ -26,7 +26,7 @@ export async function GET({url}: RequestEvent){
    
     
     const repo = new YtRepository();
-    const videos = await repo.getVideos({limit, maxDuration, minDuration, startAfter});
+    const videos = await repo.getVideosWithAudio({limit, maxDuration, minDuration, startAfter});
     return json({
         data: videos
     });
