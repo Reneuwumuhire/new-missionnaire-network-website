@@ -9,6 +9,6 @@ export interface ArgsToGetVideos  {
 }
 
 export interface ArgsToGetAudios {
-    songCount: number,
+    audioCount: number,
     startAfter: number
 }
