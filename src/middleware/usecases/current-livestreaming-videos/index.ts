@@ -4,11 +4,10 @@ import { InternalFailure } from "../../errors/failures";
 import resolver from "../../repository/resolver";
 import { z } from "zod";
 import { URLInstance } from "../../repository/repo";
-import type { VideoEntity } from "../../entity";
-import { YoutubeVideoSchema } from "@mnlib/lib/models/youtube";
+import { YoutubeVideoSchema, type YoutubeVideo } from "@mnlib/lib/models/youtube";
 
-export default class GetCurrentLiveStreamingEventsUsecase implements UseCase<void, VideoEntity|null>{
-    async execute(): Promise<Result<VideoEntity|null, InternalFailure>> {
+export default class GetCurrentLiveStreamingEventsUsecase implements UseCase<void, YoutubeVideo|null>{
+    async execute(): Promise<Result<YoutubeVideo|null, InternalFailure>> {
         try {
             const url = URLInstance;
             url.pathname = `/api/yt/livestream`;
@@ -16,7 +15,7 @@ export default class GetCurrentLiveStreamingEventsUsecase implements UseCase<voi
 
             if (res.isOk) {
                 const value = res.value;
-                let finalRes:VideoEntity | null = null;
+                let finalRes:YoutubeVideo | null = null;
 
                 if(value.length !== 0) finalRes = value[0];
 

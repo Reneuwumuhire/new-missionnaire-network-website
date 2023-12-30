@@ -4,14 +4,14 @@ import { InternalFailure } from '../../errors/failures';
 import resolver from '../../repository/resolver';
 import { z } from 'zod';
 import { URLInstance } from '../../repository/repo';
-import type { ArgsToGetVideos, VideoEntity } from '../../entity';
-import { YoutubeVideoSchema } from '@mnlib/lib/models/youtube';
+import type { ArgsToGetVideos } from '../../entity';
+import { YoutubeVideoSchema, type YoutubeVideo } from '@mnlib/lib/models/youtube';
 
-export default class GetSermonsVideosUsecase implements UseCase<ArgsToGetVideos, VideoEntity[]> {
+export default class GetSermonsVideosUsecase implements UseCase<ArgsToGetVideos, YoutubeVideo[]> {
 	async execute({
 		videoCount,
 		startAfter
-	}: ArgsToGetVideos): Promise<Result<VideoEntity[], InternalFailure>> {
+	}: ArgsToGetVideos): Promise<Result<YoutubeVideo[], InternalFailure>> {
 		try {
 			const url = URLInstance;
 			url.pathname = `/api/yt/videos`;
