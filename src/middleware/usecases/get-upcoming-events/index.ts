@@ -4,11 +4,10 @@ import { InternalFailure } from "../../errors/failures";
 import resolver from "../../repository/resolver";
 import { z } from "zod";
 import { URLInstance } from "../../repository/repo";
-import type { VideoEntity } from "../../entity";
-import { YoutubeVideoSchema } from "@mnlib/lib/models/youtube";
+import { YoutubeVideoSchema, type YoutubeVideo } from "@mnlib/lib/models/youtube";
 
-export default class GetUpcomingEventsUsecase implements UseCase<void, VideoEntity[]>{
-    async execute(): Promise<Result<VideoEntity[], InternalFailure>> {
+export default class GetUpcomingEventsUsecase implements UseCase<void, YoutubeVideo[]>{
+    async execute(): Promise<Result<YoutubeVideo[], InternalFailure>> {
         try {
             const url = URLInstance;
             url.pathname = `/api/yt/upcoming`;

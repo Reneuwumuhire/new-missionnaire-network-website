@@ -4,14 +4,14 @@ import { InternalFailure } from '../../errors/failures';
 import resolver from '../../repository/resolver';
 import { z } from 'zod';
 import { URLInstance } from '../../repository/repo';
-import type { ArgsToGetAudios, ArgsToGetVideos, VideoEntity } from '../../entity';
-import { YoutubeVideoSchema } from '@mnlib/lib/models/youtube';
+import type { ArgsToGetAudios, ArgsToGetVideos } from '../../entity';
+import { YoutubeAudioSchema, type YoutubeAudio } from '@mnlib/lib/models/youtube';
 
-export default class GetSongsAudioUsecase implements UseCase<ArgsToGetAudios, VideoEntity[]> {
+export default class GetSongsAudioUsecase implements UseCase<ArgsToGetAudios, YoutubeAudio[]> {
 	async execute({
 		audioCount,
 		startAfter
-	}: ArgsToGetAudios): Promise<Result<VideoEntity[], InternalFailure>> {
+	}: ArgsToGetAudios): Promise<Result<YoutubeAudio[], InternalFailure>> {
 		try {
 			const url = URLInstance;
 			url.pathname = `/api/yt/audios`;
@@ -19,7 +19,7 @@ export default class GetSongsAudioUsecase implements UseCase<ArgsToGetAudios, Vi
 			url.searchParams.set('maxResults', audioCount.toString());
 			if (startAfter) url.searchParams.set('startAfter', startAfter.toString());
 
-			const res = await resolver(url, 'GET', undefined, z.array(YoutubeVideoSchema));
+			const res = await resolver(url, 'GET', undefined, z.array(YoutubeAudioSchema));
 
 			if (res.isOk) {
 				return Result.ok(res.value);
