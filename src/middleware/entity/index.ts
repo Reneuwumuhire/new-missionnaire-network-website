@@ -8,6 +8,12 @@ export interface ArgsToGetVideos  {
     startAfter?: number
 }
 
+export interface ArgsToGetSermonVideos  {
+    videoCount: number,
+    pageNumber: number,
+    type: string[]
+}
+
 export interface ArgsToGetAudios {
     audioCount: number,
     startAfter: number

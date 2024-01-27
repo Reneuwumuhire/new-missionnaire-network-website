@@ -4,20 +4,23 @@ import { InternalFailure } from '../../errors/failures';
 import resolver from '../../repository/resolver';
 import { z } from 'zod';
 import { URLInstance } from '../../repository/repo';
-import type { ArgsToGetVideos } from '../../entity';
+import type { ArgsToGetSermonVideos } from '../../entity';
 import { YoutubeVideoSchema, type YoutubeVideo } from '@mnlib/lib/models/youtube';
 
-export default class GetSermonsVideosUsecase implements UseCase<ArgsToGetVideos, YoutubeVideo[]> {
+export default class GetSermonsVideosUsecase implements UseCase<ArgsToGetSermonVideos, YoutubeVideo[]> {
 	async execute({
 		videoCount,
-		startAfter
-	}: ArgsToGetVideos): Promise<Result<YoutubeVideo[], InternalFailure>> {
+		pageNumber,
+		type
+	}: ArgsToGetSermonVideos): Promise<Result<YoutubeVideo[], InternalFailure>> {
 		try {
+			// GET /api/yt/videos/query?searchTags=branham,frank&limit=5&pageNumber=1
+			if(!pageNumber) pageNumber = 1;
 			const url = URLInstance;
-			url.pathname = `/api/yt/videos`;
-			url.searchParams.set('type', 'predication');
-			url.searchParams.set('maxResults', videoCount.toString());
-			if (startAfter) url.searchParams.set('startAfter', startAfter.toString());
+			url.pathname = `/api/yt/videos/query`;
+			url.searchParams.set('searchTags', type.join(","));
+			url.searchParams.set('limit', videoCount.toString());
+			url.searchParams.set('pageNumber', pageNumber.toString());
 
 			const res = await resolver(url, 'GET', undefined, z.array(YoutubeVideoSchema));
 
