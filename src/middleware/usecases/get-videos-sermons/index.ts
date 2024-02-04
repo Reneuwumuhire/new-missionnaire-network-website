@@ -21,7 +21,6 @@ export default class GetSermonsVideosUsecase implements UseCase<ArgsToGetSermonV
 			url.searchParams.set('searchTags', type.join(","));
 			url.searchParams.set('limit', videoCount.toString());
 			url.searchParams.set('pageNumber', pageNumber.toString());
-
 			const res = await resolver(url, 'GET', undefined, z.array(YoutubeVideoSchema));
 
 			if (res.isOk) {
