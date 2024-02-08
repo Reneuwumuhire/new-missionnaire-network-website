@@ -23,7 +23,9 @@ const SearchTags = z.string().transform((arg, ctx) => {
 const Params = z.object({
     searchTags: SearchTags.default("any"),
     limit: z.coerce.number(),
-    pageNumber: z.coerce.number()
+    pageNumber: z.coerce.number(),
+    startDate: z.coerce.date().optional(),
+    endDate: z.coerce.date().optional()
 });
 
 
@@ -37,9 +39,9 @@ export async function GET({ url }: RequestEvent) {
         return json(videos);
     } catch (err) {
         let message = "That's an error :( \n failed to query videos";
-        if(err instanceof ZodError){
-            message = err.issues.map(i=>`${i.code}: ${i.message}`).join(", ");
-        } else if (err instanceof Error){
+        if (err instanceof ZodError) {
+            message = err.issues.map(i => `${i.code}: ${i.message}`).join(", ");
+        } else if (err instanceof Error) {
             message = err.message;
         }
         

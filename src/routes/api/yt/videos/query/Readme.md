@@ -4,6 +4,8 @@ const searchParam = {
     limit: number;
     pageNumber: number;
     searchTags?: void | ("branham" | "william" | "ewald" | "frank" | "local" | "song" | "any" | "predication" | "retransmission" | "ibaruwa" | "lettre" | "circulaire")[] ;
+    startDate: Date,
+    endDate: Date
 }
 ```
 
