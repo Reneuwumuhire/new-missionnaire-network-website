@@ -21,10 +21,13 @@ export default class GetSermonsVideosUsecase implements UseCase<ArgsToGetSermonV
 			url.searchParams.set('searchTags', type.join(","));
 			url.searchParams.set('limit', videoCount.toString());
 			url.searchParams.set('pageNumber', pageNumber.toString());
-			const res = await resolver(url, 'GET', undefined, z.array(YoutubeVideoSchema));
+			const res = await resolver(url, 'GET', undefined, z.object({
+				ok: z.boolean(),
+				value: z.array(YoutubeVideoSchema)
+			}));
 
 			if (res.isOk) {
-				return Result.ok(res.value);
+				return Result.ok(res.value.value);
 			} else throw new Error(res.error.message);
 		} catch (error) {
 			return Result.err(new InternalFailure('Failed to get Videos from server'));
