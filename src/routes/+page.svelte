@@ -13,13 +13,14 @@
 	const webName: string = 'missionnaire network website';
 	export let data: PageData;
 	let titleName: any = 'Missionnaire network';
-	// currentViewingUrl = to the first video in the list
 	let currentViewingUrl = data.videos[0] || '';
 	const handleClick = (e: any) => {
 		console.log(e.id);
 		titleName = e.title;
 		currentViewingUrl = `https://www.youtube.com/embed/${e.id}?autoplay=1`;
 	};
+
+		
 </script>
 
 <svelte:head>
@@ -32,5 +33,11 @@
 		{#each data.videos as video, index}
 			<ThumbnailVideo {video} {index} on:videoSelected={(e) => handleClick(e.detail)} />
 		{/each}
+		<!-- Add a button to load more 12 videos -->
+		<div class="">
+			<button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+				Load more
+				</button>
+		</div>
 	</div>
 </main>

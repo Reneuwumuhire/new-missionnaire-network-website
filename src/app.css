@@ -6,12 +6,11 @@
 	/* font is inter */
 	--font-family: 'Inter', sans-serif;
 }
-/* html,
+html,
 body,
 .app-container {
-	width: 100%;
-	height: 100%;
-} */
+	overflow-x: hidden;
+}
 ::selection {
 	background-color: #ff880c;
 	color: #fff;
