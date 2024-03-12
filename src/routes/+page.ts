@@ -5,7 +5,7 @@ export const load = (async ({ fetch }: any) => {
 
 	const res = await videosUsecase.execute({
 		videoCount: 12,
-		type: ['any'],
+		type: ['branham'],
 		pageNumber: 1
 	});
 
