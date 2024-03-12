@@ -127,7 +127,7 @@
 		{#if isVideoLoading}
 			{#each Array(12) as _}
 				<div
-					class="w-full flex items-center justify-center h-40 min-w-[380px] loading-animation rounded-lg"
+					class="w-full flex items-center justify-center h-40 min-w-[350px] loading-animation rounded-lg"
 				>
 					<span class="text-gray-500 text-lg w-full bg-transparent opacity-0">Loading video...</span
 					>
