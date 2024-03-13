@@ -10,12 +10,12 @@ export const formatTime = (time: number) => {
 	const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
 	const formattedSeconds = seconds < 10 ? `0${seconds}` : seconds;
 
-	return `${formattedMinutes}:${formattedSeconds}`;
+	return `${formattedMinutes} min ${formattedSeconds} sec`;
 };
 
 // function to format this dat: Mon Nov 27 2023 02:54:32 GMT+0200 (Central Africa Time) to this format: 27 Nov 2023
 
-export const formatDate = (date: string) => {
+export const formatDate = (date: string | Date) => {
 	const newDate = new Date(date);
 	const day = newDate.getDate();
 	const month = newDate.getMonth();

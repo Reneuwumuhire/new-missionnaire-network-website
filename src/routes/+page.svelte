@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { getContext, setContext } from 'svelte';
+	import { writable } from 'svelte/store';
 	import type { PageData } from './$types';
 	import '../app.css';
 	import { dict, locale, t } from '../i18n';
@@ -9,6 +11,7 @@
 	import VideoView from '$lib/components/+videoView.svelte';
 	import CalendarWeekly from '$lib/components/+calendarWeekly.svelte';
 	import GetSermonsVideosUsecase from '../middleware/usecases/get-videos-sermons';
+	import GetUpcomingEventsUsecase from '../middleware/usecases/get-upcoming-events';
 
 	const languages = {
 		en,
@@ -19,16 +22,18 @@
 	export let data: PageData;
 	let titleName: any = 'Missionnaire network';
 	let currentViewingUrl = data.videos[0] || '';
-	const handleClick = (e: any) => {
-		console.log(e.id);
-		titleName = e.title;
-		currentViewingUrl = `https://www.youtube.com/embed/${e.id}?autoplay=1`;
+
+	const selectedVideo = writable();
+
+	setContext('selectedVideo', selectedVideo);
+	const videoSelected = (video: any) => {
+		selectedVideo.set(video);
 	};
 	// Define an array of available types with labels, 'any', 'branham', 'frank'
 	const availableTypes = [
 		{
 			label: 'All Videos',
-			value: 'any'
+			value: 'retransmission'
 		},
 		{
 			label: 'William Branham',
@@ -39,7 +44,8 @@
 			value: 'frank'
 		}
 	];
-	let selectedType = 'any';
+	let selectedType = 'retransmission';
+	let upComingEventData: any;
 	// Add reactive variables for type and pageNumber
 	let pageNumber = 1;
 	// Add a reactive variable to track the loading state
@@ -58,11 +64,26 @@
 		const res = await videosUsecase.execute({ videoCount: 12, type, pageNumber });
 		if (res.isOk) {
 			data.videos = res.value;
-			currentViewingUrl = data.videos[0] || '';
+
+			if (data.videos[0].scheduledStartTime.toLocaleString() >= new Date().toLocaleString()) {
+				currentViewingUrl = data.videos[1] || '';
+				selectedVideo.set(data.videos[1] || '');
+			} else {
+				currentViewingUrl = data.videos[0] || '';
+				selectedVideo.set(data.videos[0] || '');
+			}
 		} else {
 			throw new Error(res.error.message);
 		}
-
+		//TODO:
+		const upComingEvent = new GetUpcomingEventsUsecase();
+		const resEvent = await upComingEvent.execute();
+		if (resEvent.isOk) {
+			data.events = resEvent.value;
+			upComingEventData = data.events;
+		} else {
+			throw new Error(resEvent.error.message);
+		}
 		isLoading = false; // Set the loading state to false after fetching data
 		isVideoLoading = false;
 	}
@@ -118,9 +139,11 @@
 			<span class="text-gray-500 text-lg">Loading video...</span>
 		</div>
 	{:else}
-		<VideoView {currentViewingUrl} on:loaded={() => (isVideoLoading = false)} />
+		<VideoView on:loaded={() => (isVideoLoading = false)} />
 	{/if}
-	<CalendarWeekly />
+	{#if upComingEventData !== undefined}
+		<CalendarWeekly {upComingEventData} />
+	{/if}
 	<div class=" mt-9 grid grid-cols-1 sm:px-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
 		<!-- add 12 thumbnail videos when loading -->
 		{#if isVideoLoading}
@@ -134,7 +157,13 @@
 			{/each}
 		{:else}
 			{#each data.videos as video, index}
-				<ThumbnailVideo {video} {index} on:videoSelected={(e) => handleClick(e.detail)} />
+				<ThumbnailVideo
+					{video}
+					{index}
+					on:videoSelected={(e) => {
+						videoSelected(e.detail);
+					}}
+				/>
 			{/each}
 		{/if}
 		<!-- Add a button to load more 12 videos -->

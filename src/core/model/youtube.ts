@@ -11,6 +11,7 @@ export const YTVideoResourceSchema = z.object({
 	title: z.string(),
 	description: z.string(),
 	publishedAt: z.coerce.date(),
+	scheduledStartTime: z.coerce.date(),
 	thumbNails: z.object({
 		default: YTVideoThumbNailSchema,
 		medium: YTVideoThumbNailSchema,
@@ -24,6 +25,7 @@ export const YtVideoSnippet = z.object({
 	channelId: z.string(),
 	title: z.string(),
 	description: z.string(),
+	scheduledStartTime: z.coerce.date(),
 	thumbnails: z.object({
 		default: YTVideoThumbNailSchema,
 		medium: YTVideoThumbNailSchema,
@@ -53,6 +55,7 @@ export const YtSearchResultSchema = z.object({
 			}),
 			snippet: z.object({
 				publishedAt: z.coerce.date(),
+				scheduledStartTime: z.coerce.date(),
 				channelId: z.string(),
 				title: z.string(),
 				description: z.string(),
@@ -68,7 +71,8 @@ export const YtSearchResultSchema = z.object({
 
 export type YtSearchResult = z.infer<typeof YtSearchResultSchema>;
 export const VideoItemSchema = YtVideoSnippet.extend({
-	id: z.string()
+	id: z.string(),
+	scheduledStartTime: z.coerce.date()
 });
 export type VideoItem = z.infer<typeof VideoItemSchema>;
 export const SearchVideosResultSchema = z.object({
