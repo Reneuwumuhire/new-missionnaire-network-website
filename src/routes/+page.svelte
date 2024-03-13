@@ -58,7 +58,6 @@
 		const res = await videosUsecase.execute({ videoCount: 12, type, pageNumber });
 		if (res.isOk) {
 			data.videos = res.value;
-			console.log(data.videos[0]);
 			currentViewingUrl = data.videos[0] || '';
 		} else {
 			throw new Error(res.error.message);
@@ -101,17 +100,17 @@
 	<title>{titleName}</title>
 </svelte:head>
 <!-- Add a dropdown or radio buttons to select the type -->
-<div class=" m-4 items-end justify-end text-right mr-5">
-	<label>
-		Filter By:
-		<select bind:value={selectedType} on:change={loadVideos} class=" px-3 py-3 border rounded-lg">
-			{#each availableTypes as { label, value: type }}
-				<option value={type}>{label}</option>
-			{/each}
-		</select>
-	</label>
-</div>
 <main class=" align-middle flex flex-col items-center justify-center max-w-7xl mx-auto px-5">
+	<div class="  mb-3 items-end justify-end text-right self-end">
+		<label>
+			Filter By:
+			<select bind:value={selectedType} on:change={loadVideos} class=" px-3 py-3 border rounded-lg">
+				{#each availableTypes as { label, value: type }}
+					<option value={type}>{label}</option>
+				{/each}
+			</select>
+		</label>
+	</div>
 	{#if isVideoLoading}
 		<div
 			class=" relative w-full md:min-h-[600px] min-h-[100px] rounded-2xl md:rounded-3xl overflow-hiddenw-full h-96 loading-animation flex items-center justify-center"
@@ -122,7 +121,7 @@
 		<VideoView {currentViewingUrl} on:loaded={() => (isVideoLoading = false)} />
 	{/if}
 	<CalendarWeekly />
-	<div class=" mt-9 grid grid-cols-1 sm:px-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-8">
+	<div class=" mt-9 grid grid-cols-1 sm:px-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
 		<!-- add 12 thumbnail videos when loading -->
 		{#if isVideoLoading}
 			{#each Array(12) as _}
