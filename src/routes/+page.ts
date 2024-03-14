@@ -1,6 +1,7 @@
+import type { YoutubeVideo } from '@mnlib/lib/models/youtube';
 import GetSermonsVideosUsecase from '../middleware/usecases/get-videos-sermons';
 
-export const load = (async ({ fetch }: any) => {
+export const load = async ({ fetch }: any) => {
 	const videosUsecase = new GetSermonsVideosUsecase();
 
 	const res = await videosUsecase.execute({
@@ -8,13 +9,13 @@ export const load = (async ({ fetch }: any) => {
 		type: ['branham'],
 		pageNumber: 1
 	});
+	let videos: YoutubeVideo[];
+	if (!res.isOk) videos = [];
+	else videos = res.value;
 
-	if (res.isOk) {
-		const value = res.value;
-		return {
-			videos: value
-		};
-	} else throw new Error(res.error.message);
-}) as any;
+	return {
+		videos
+	};
+};
 
 // function to load more videos

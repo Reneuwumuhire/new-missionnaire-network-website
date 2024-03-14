@@ -1,5 +1,3 @@
-/** @type {import('./$types').PageLoad} */
-
 import GetCurrentLiveStreamingEventsUsecase from '../middleware/usecases/current-livestreaming-videos';
 
 export const load = (async ({ fetch }: any) => {

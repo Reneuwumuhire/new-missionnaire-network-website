@@ -7,8 +7,9 @@
 	import AudioSquare from 'iconsax-svelte/AudioSquare.svelte';
 	import DocumentText1 from 'iconsax-svelte/DocumentText1.svelte';
 	import VideoPlay from 'iconsax-svelte/VideoPlay.svelte';
+	import type { YoutubeVideo } from '@mnlib/lib/models/youtube';
 
-	export let video: import('../../core/model/youtube').VideoItem;
+	export let video: YoutubeVideo;
 	export let index: number;
 	let playing;
 	const dispatch = createEventDispatcher();
@@ -98,12 +99,13 @@
 			<!-- controls for download -->
 			<div class=" w-full flex justify-between items-center">
 				<small class=" text-gray-500"
-					>{#if formatTime(new Date(video.scheduledStartTime.toLocaleString())) === 'Upcoming'}
+					>{#if video.liveBroadcastContent === 'upcoming'}
 						<div class=" bg-slate-950 text-weakGray px-3 py-2 rounded-full mt-2 font-bold">
 							Upcoming
 						</div>
 					{:else}
-						Streamed {formatTime(new Date(video.scheduledStartTime.toLocaleString()))}
+						Streamed {video.actualStartTime &&
+							formatTime(new Date(video.actualStartTime.toLocaleString()))}
 					{/if}
 				</small>
 				<!-- Button to download -->

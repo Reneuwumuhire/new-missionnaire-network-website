@@ -7,7 +7,7 @@
 		if (container) container.scrollBy({ left: -400, behavior: 'smooth' });
 	};
 	interface EventData {
-		scheduledStartTime: string; //Wed Mar 13 2024 20:30:00 GMT+0200 (Central Africa Time)
+		scheduledStartTime?: Date; //Wed Mar 13 2024 20:30:00 GMT+0200 (Central Africa Time)
 		title: string;
 	}
 	export let upComingEventData: EventData[] = [];
@@ -46,9 +46,11 @@
 		<div
 			class="flex flex-row items-center space-x-3 overflow-x-scroll md:overflow-x-scroll md:overflow-y-hidden px-1 md:px-16"
 		>
-			{#if upComingEventData !== undefined}
+			{#if upComingEventData.length > 0}
 				{#each upComingEventData as event}
-					<CalendarDay dateToWhen={new Date(event.scheduledStartTime)} videoTitle={event.title} />
+					{#if event.scheduledStartTime}
+						<CalendarDay dateToWhen={new Date(event.scheduledStartTime)} videoTitle={event.title} />
+					{/if}
 				{/each}
 			{/if}
 		</div>

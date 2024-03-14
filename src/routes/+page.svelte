@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { getContext, setContext } from 'svelte';
 	import { writable } from 'svelte/store';
-	import type { PageData } from './$types';
 	import '../app.css';
 	import { dict, locale, t } from '../i18n';
 	import fr from '../translations/fr';
@@ -12,6 +11,8 @@
 	import CalendarWeekly from '$lib/components/+calendarWeekly.svelte';
 	import GetSermonsVideosUsecase from '../middleware/usecases/get-videos-sermons';
 	import GetUpcomingEventsUsecase from '../middleware/usecases/get-upcoming-events';
+	import type { PageData } from './$types';
+	import type { YoutubeVideo } from '@mnlib/lib/models/youtube';
 
 	const languages = {
 		en,
@@ -20,8 +21,9 @@
 	dict.set(languages);
 	const webName: string = 'missionnaire network website';
 	export let data: PageData;
+	let { videos } = data;
 	let titleName: any = 'Missionnaire network';
-	let currentViewingUrl = data.videos[0] || '';
+	let currentViewingUrl = videos[0];
 
 	const selectedVideo = writable();
 
@@ -29,23 +31,15 @@
 	const videoSelected = (video: any) => {
 		selectedVideo.set(video);
 	};
-	// Define an array of available types with labels, 'any', 'branham', 'frank'
+	// ("branham" | "william" | "ewald" | "frank" | "local" | "song" | "any" | "predication" | "retransmission" | "ibaruwa" | "lettre" | "circulaire")
 	const availableTypes = [
 		{
 			label: 'All Videos',
 			value: 'retransmission'
-		},
-		{
-			label: 'William Branham',
-			value: 'branham'
-		},
-		{
-			label: 'Ewald Frank',
-			value: 'frank'
 		}
 	];
 	let selectedType = 'retransmission';
-	let upComingEventData: any;
+	let upComingEventData: YoutubeVideo[];
 	// Add reactive variables for type and pageNumber
 	let pageNumber = 1;
 	// Add a reactive variable to track the loading state
@@ -63,9 +57,13 @@
 		const videosUsecase = new GetSermonsVideosUsecase();
 		const res = await videosUsecase.execute({ videoCount: 12, type, pageNumber });
 		if (res.isOk) {
-			data.videos = res.value;
+			const videos = res.value;
+			const firstVideoScheduledTime = videos[0].scheduledStartTime;
 
-			if (data.videos[0].scheduledStartTime.toLocaleString() >= new Date().toLocaleString()) {
+			if (
+				firstVideoScheduledTime &&
+				firstVideoScheduledTime.toLocaleString() >= new Date().toLocaleString()
+			) {
 				currentViewingUrl = data.videos[1] || '';
 				selectedVideo.set(data.videos[1] || '');
 			} else {
@@ -79,8 +77,8 @@
 		const upComingEvent = new GetUpcomingEventsUsecase();
 		const resEvent = await upComingEvent.execute();
 		if (resEvent.isOk) {
-			data.events = resEvent.value;
-			upComingEventData = data.events;
+			upComingEventData = resEvent.value;
+			console.log(upComingEventData);
 		} else {
 			throw new Error(resEvent.error.message);
 		}
@@ -141,7 +139,7 @@
 	{:else}
 		<VideoView on:loaded={() => (isVideoLoading = false)} />
 	{/if}
-	{#if upComingEventData !== undefined}
+	{#if upComingEventData && upComingEventData.length > 0}
 		<CalendarWeekly {upComingEventData} />
 	{/if}
 	<div class=" mt-9 grid grid-cols-1 sm:px-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
@@ -156,7 +154,7 @@
 				</div>
 			{/each}
 		{:else}
-			{#each data.videos as video, index}
+			{#each videos as video, index}
 				<ThumbnailVideo
 					{video}
 					{index}
