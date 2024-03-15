@@ -8,6 +8,7 @@
 	import DocumentText1 from 'iconsax-svelte/DocumentText1.svelte';
 	import VideoPlay from 'iconsax-svelte/VideoPlay.svelte';
 	import type { YoutubeVideo } from '@mnlib/lib/models/youtube';
+	import Lazy from 'svelte-lazy';
 
 	export let video: YoutubeVideo;
 	export let index: number;
@@ -72,14 +73,16 @@
 	<!-- Thumbnail image -->
 	<div class="w-full h-full flex flex-col justify-between">
 		<div class="w-full">
-			<figure>
-				<img
-					class="  w-full rounded-xl"
-					src={video.thumbnails.medium.url}
-					alt={video.title}
-					loading="lazy"
-				/>
-			</figure>
+			<Lazy height={200} class=" bg-slate-100">
+				<figure>
+					<img
+						class="  w-full rounded-xl"
+						src={video.thumbnails.medium.url}
+						alt={video.title}
+						loading="lazy"
+					/>
+				</figure>
+			</Lazy>
 		</div>
 		<!-- Title- when streamed - download options -->
 		<div class="w-full h-full flex flex-col">
