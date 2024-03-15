@@ -5,6 +5,7 @@
 	import BsPlayCircleFill from 'svelte-icons-pack/bs/BsPlayCircleFill';
 	import { formatDate, formatTime } from '../../utils/FormatTime';
 	import { derived } from 'svelte/store';
+	import Lazy from 'svelte-lazy';
 
 	let selectedVideoToPlay: any = getContext('selectedVideo');
 	let currentVideo: VideoItem;
@@ -67,11 +68,13 @@
 
 				{#if !playNow}
 					<!-- use the next div and place the background image -->
-					<img
-						class=" w-full h-full aspect-video object-cover object-center max-h-[600px]"
-						src={currentVideo.thumbnails?.high.url}
-						alt="thumbnail"
-					/>
+					<Lazy height={800} class=" bg-slate-100">
+						<img
+							class=" w-full h-full aspect-video object-cover object-center max-h-[600px]"
+							src={currentVideo.thumbnails?.high.url}
+							alt="thumbnail"
+						/>
+					</Lazy>
 					<!-- play button in the middle of the div -->
 					<!-- svelte-ignore a11y-click-events-have-key-events -->
 					<!-- svelte-ignore a11y-no-static-element-interactions -->

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getContext, setContext } from 'svelte';
+	import { getContext, onMount, setContext } from 'svelte';
 	import { writable } from 'svelte/store';
 	import '../app.css';
 	import { dict, locale, t } from '../i18n';
@@ -12,6 +12,7 @@
 	import GetUpcomingEventsUsecase from '../middleware/usecases/get-upcoming-events';
 	import type { PageData } from './$types';
 	import type { YoutubeVideo } from '@mnlib/lib/models/youtube';
+	import Chart3 from 'iconsax-svelte/Chart3.svelte';
 
 	const languages = {
 		en,
@@ -23,6 +24,8 @@
 	let { videos } = data;
 	let titleName: any = 'Missionnaire network';
 	let currentViewingUrl = videos[0];
+
+	const videosStore = writable(videos);
 
 	const selectedVideo = writable();
 
@@ -53,7 +56,7 @@
 			value: 'ibaruwa'
 		}
 	];
-	let selectedType = 'retransmission';
+	let selectedType: string[] = ['retransmission', 'branham', 'frank', 'local', 'lettre'];
 	let upComingEventData: YoutubeVideo[];
 	// Add reactive variables for type and pageNumber
 	let pageNumber = 1;
@@ -61,19 +64,19 @@
 	let isLoading = false;
 	let isVideoLoading = true;
 
+	let shouldLoadMore = false; // Track if loading more is needed
+	let scrollPosition = 0;
 	// Function to load videos with the selected type
 	async function loadVideos() {
 		isLoading = true; // Set the loading state to true before fetching data
 		isVideoLoading = true;
-
-		const type = selectedType === 'retransmission' ? ['retransmission'] : [selectedType];
-		const pageNumber = 1; // Reset the page number to 1 when loading with a new type
-
 		const videosUsecase = new GetSermonsVideosUsecase();
-		const res = await videosUsecase.execute({ videoCount: 12, type, pageNumber });
+		const res = await videosUsecase.execute({ videoCount: 12, type: selectedType, pageNumber });
 		if (res.isOk) {
 			const videos = res.value;
 			const firstVideoScheduledTime = videos[0].scheduledStartTime;
+			videosStore.update((currentVideos) => [...currentVideos, ...videos]);
+			pageNumber++;
 
 			if (
 				firstVideoScheduledTime &&
@@ -102,26 +105,40 @@
 	}
 
 	// Load videos with the initial type
-	loadVideos();
+	onMount(async () => {
+		loadVideos();
+		window.addEventListener('scroll', handleScroll);
+	});
+	function handleScroll() {
+		const gridContainer = document.querySelector('.grid')?.scrollHeight; // Use optional chaining
+		if (gridContainer) {
+			const threshold = gridContainer - window.innerHeight - 500;
+			// Adjust threshold as desired
+			scrollPosition = window.scrollY || document.documentElement.scrollTop;
 
+			if (scrollPosition >= threshold && !isLoading && !shouldLoadMore) {
+				shouldLoadMore = true;
+				loadMoreVideos();
+			}
+		}
+	}
 	// Function to load more videos
 	async function loadMoreVideos() {
 		isLoading = true; // Set the loading state to true before fetching data
 		isVideoLoading = true;
-		// Map the selectedType to the appropriate type value for the usecase
-		const type = selectedType === 'retransmission' ? [] : [selectedType];
+
 		const videosUsecase = new GetSermonsVideosUsecase();
 		const res = await videosUsecase.execute({
 			videoCount: 12,
-			type,
+			type: selectedType,
 			pageNumber
 		});
 		if (res.isOk) {
-			const value = res.value;
 			// Update the data.videos array with the new videos
-			data.videos = [...data.videos, ...value];
+			videosStore.update((currentVideos) => [...currentVideos, ...res.value]);
 			// Increment the pageNumber for the next load
 			pageNumber++;
+			shouldLoadMore = false; // Reset for potential next load
 		} else {
 			throw new Error(res.error.message);
 		}
@@ -159,39 +176,23 @@
 	{/if}
 	<div class=" mt-9 grid grid-cols-1 sm:px-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
 		<!-- add 12 thumbnail videos when loading -->
-		{#if isVideoLoading}
-			{#each Array(12) as _}
-				<div
-					class="w-full flex items-center justify-center h-40 min-w-[350px] loading-animation rounded-lg"
-				>
-					<span class="text-gray-500 text-lg w-full bg-transparent opacity-0">Loading video...</span
-					>
-				</div>
-			{/each}
-		{:else}
-			{#each videos as video, index}
-				<ThumbnailVideo
-					{video}
-					{index}
-					on:videoSelected={(e) => {
-						videoSelected(e.detail);
-					}}
-				/>
-			{/each}
-		{/if}
+
+		{#each $videosStore as video, index (video.id + '-' + index)}
+			<ThumbnailVideo
+				{video}
+				{index}
+				key={video.id + '-' + index}
+				on:videoSelected={(e) => {
+					videoSelected(e.detail);
+				}}
+			/>
+		{/each}
 		<!-- Add a button to load more 12 videos -->
 	</div>
-	<div class=" relative flex items-center justify-center w-full mt-5">
-		<button
-			on:click={loadMoreVideos}
-			class="bg-[#F78B18] hover:bg-[#f78b18eb] text-white py-2 px-4 rounded text-xs md:text-sm"
-		>
-			{#if isLoading}
-				<p>Loading...</p>
-			{:else}
-				Load more
-			{/if}
-		</button>
+	<div class=" relative flex items-center justify-center w-full mt-5 animate-spin">
+		{#if isLoading}
+			<Chart3 size={60} color="#fb923c" variant="Linear" />
+		{/if}
 	</div>
 </main>
 

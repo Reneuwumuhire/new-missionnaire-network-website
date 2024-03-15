@@ -12,6 +12,7 @@
 
 	export let video: YoutubeVideo;
 	export let index: number;
+	export let key = 'key';
 	let playing;
 	const dispatch = createEventDispatcher();
 	let visible: boolean[] = [];
