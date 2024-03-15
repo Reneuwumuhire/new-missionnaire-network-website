@@ -47,6 +47,7 @@
 		"flowbite-svelte": "^0.44.20",
 		"plyr": "^3.7.8",
 		"svelte-icons-pack": "^2.1.0",
+		"svelte-lazy": "^1.2.7",
 		"zod": "^3.21.4"
 	}
 }
