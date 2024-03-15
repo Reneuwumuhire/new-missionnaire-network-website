@@ -5,7 +5,6 @@
 	import { dict, locale, t } from '../i18n';
 	import fr from '../translations/fr';
 	import en from '../translations/en';
-	import { date } from 'zod';
 	import ThumbnailVideo from '$lib/components/+thumbnailVideo.svelte';
 	import VideoView from '$lib/components/+videoView.svelte';
 	import CalendarWeekly from '$lib/components/+calendarWeekly.svelte';
@@ -36,6 +35,22 @@
 		{
 			label: 'All Videos',
 			value: 'retransmission'
+		},
+		{
+			label: 'William Branham',
+			value: 'william'
+		},
+		{
+			label: 'Ewald Frank',
+			value: 'ewald'
+		},
+		{
+			label: 'Local',
+			value: 'local'
+		},
+		{
+			label: 'Lettre circulaire',
+			value: 'ibaruwa'
 		}
 	];
 	let selectedType = 'retransmission';
@@ -51,7 +66,7 @@
 		isLoading = true; // Set the loading state to true before fetching data
 		isVideoLoading = true;
 
-		const type = selectedType === 'any' ? ['any'] : [selectedType];
+		const type = selectedType === 'retransmission' ? ['retransmission'] : [selectedType];
 		const pageNumber = 1; // Reset the page number to 1 when loading with a new type
 
 		const videosUsecase = new GetSermonsVideosUsecase();
@@ -94,7 +109,7 @@
 		isLoading = true; // Set the loading state to true before fetching data
 		isVideoLoading = true;
 		// Map the selectedType to the appropriate type value for the usecase
-		const type = selectedType === 'any' ? [] : [selectedType];
+		const type = selectedType === 'retransmission' ? [] : [selectedType];
 		const videosUsecase = new GetSermonsVideosUsecase();
 		const res = await videosUsecase.execute({
 			videoCount: 12,
@@ -119,7 +134,7 @@
 	<title>{titleName}</title>
 </svelte:head>
 <!-- Add a dropdown or radio buttons to select the type -->
-<main class=" align-middle flex flex-col items-center justify-center max-w-7xl mx-auto px-5">
+<main class=" align-middle flex flex-col items-center justify-center max-w-[1300px] mx-auto px-5">
 	<div class="  mb-3 items-end justify-end text-right self-end">
 		<label>
 			Filter By:
