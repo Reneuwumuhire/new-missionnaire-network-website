@@ -74,7 +74,7 @@
 	<!-- Thumbnail image -->
 	<div class="w-full h-full flex flex-col justify-between">
 		<div class="w-full">
-			<Lazy height={150} class=" bg-slate-100">
+			<Lazy height={150} class="rounded-xl bg-slate-100">
 				<figure>
 					<img
 						class="  w-full rounded-xl"

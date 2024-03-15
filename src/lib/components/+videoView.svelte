@@ -4,7 +4,6 @@
 	import { getContext } from 'svelte';
 	import BsPlayCircleFill from 'svelte-icons-pack/bs/BsPlayCircleFill';
 	import { formatDate, formatTime } from '../../utils/FormatTime';
-	import { derived } from 'svelte/store';
 	import Lazy from 'svelte-lazy';
 
 	let selectedVideoToPlay: any = getContext('selectedVideo');
