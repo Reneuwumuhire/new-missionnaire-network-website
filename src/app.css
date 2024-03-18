@@ -5,6 +5,7 @@
 	--icons-colors: #4f4f4f;
 	/* font is inter */
 	--font-family: 'Inter', sans-serif;
+	scroll-behavior: smooth;
 }
 html,
 body,

@@ -8,11 +8,10 @@
 	import DocumentText1 from 'iconsax-svelte/DocumentText1.svelte';
 	import VideoPlay from 'iconsax-svelte/VideoPlay.svelte';
 	import type { YoutubeVideo } from '@mnlib/lib/models/youtube';
-	import Lazy from 'svelte-lazy';
 
 	export let video: YoutubeVideo;
 	export let index: number;
-	export let key = 'key';
+	export const key = 'key';
 	let playing;
 	const dispatch = createEventDispatcher();
 	let visible: boolean[] = [];
@@ -69,21 +68,19 @@
 <!-- svelte-ignore a11y-no-static-element-interactions -->
 <div
 	class=" min-h-ful w-full cursor-pointer transition-all duration-300 ease-in-out hover:duration-300 hover:ease-in-out"
-	on:click={() => dispatch('videoSelected', video)}
+	on:click={() => dispatch('selectedVideo', video)}
 >
 	<!-- Thumbnail image -->
 	<div class="w-full h-full flex flex-col justify-between">
 		<div class="w-full">
-			<Lazy height={150} class="rounded-xl bg-slate-100">
-				<figure>
-					<img
-						class="  w-full rounded-xl"
-						src={video.thumbnails.medium.url}
-						alt={video.title}
-						loading="lazy"
-					/>
-				</figure>
-			</Lazy>
+			<figure>
+				<img
+					class="  w-full rounded-xl"
+					src={video.thumbnails.medium.url}
+					alt={video.title}
+					loading="lazy"
+				/>
+			</figure>
 		</div>
 		<!-- Title- when streamed - download options -->
 		<div class="w-full h-full flex flex-col">

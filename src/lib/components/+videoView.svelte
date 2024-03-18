@@ -5,17 +5,12 @@
 	import BsPlayCircleFill from 'svelte-icons-pack/bs/BsPlayCircleFill';
 	import { formatDate, formatTime } from '../../utils/FormatTime';
 	import Lazy from 'svelte-lazy';
+	import type { YoutubeVideo } from '@mnlib/lib/models/youtube';
 
-	let selectedVideoToPlay: any = getContext('selectedVideo');
-	let currentVideo: VideoItem;
-	let playNow: Boolean = false;
-	let videoId: string;
+	// @ts-ignore
+	let selectedVideoStore: YoutubeVideo = getContext('currentViewingVideo');
 
-	$: selectedVideoToPlay.subscribe((video: VideoItem) => {
-		currentVideo = video;
-		videoId = video.id;
-	});
-
+	let playNow = false;
 	type VideoItem = {
 		title: string;
 		id: string;
@@ -36,10 +31,9 @@
 		duration?: string;
 		durationInSeconds: number;
 	};
-	// export let currentViewingUrl: VideoItem;
-	// const handleClick = () => {
-	// 	selectedVideoToPlay = currentViewingUrl;
-	// };
+	const handleClick = () => {
+		playNow = !playNow;
+	};
 </script>
 
 <div class=" w-full flex items-center justify-center">
@@ -47,16 +41,16 @@
 		<!-- video and title -->
 		<div class=" w-full">
 			<div
-				class=" relative w-full md:min-h-[600px] min-h-[100px] bg-hardBlack rounded-2xl md:rounded-3xl overflow-hidden"
+				class=" relative w-full md:min-h-fit bg-hardBlack rounded-2xl md:rounded-3xl overflow-hidden"
 			>
-				{#if playNow && currentVideo}
+				{#if playNow}
 					<div
 						class=" flex flex-row items-center justify-center w-full rounded-xl overflow-hidden"
 						id="player"
 					>
 						<iframe
 							class=" w-full aspect-video rounded-xl"
-							src={`https://www.youtube.com/embed/${videoId}?autoplay=1`}
+							src={`https://www.youtube.com/embed/${$selectedVideoStore.id}?autoplay=1`}
 							allowfullscreen
 							allow="autoplay; encrypted-media"
 							title=""
@@ -70,7 +64,7 @@
 					<Lazy height={800} class=" bg-slate-100">
 						<img
 							class=" w-full h-full aspect-video object-cover object-center max-h-[600px]"
-							src={currentVideo.thumbnails?.high.url}
+							src={$selectedVideoStore.thumbnails?.high.url}
 							alt="thumbnail"
 						/>
 					</Lazy>
@@ -84,8 +78,6 @@
 						<button
 							on:click={() => {
 								playNow = true;
-								console.log('playNow is', playNow);
-								console.log('currentVideo is', currentVideo);
 							}}
 							class=" w-20 h-20 text-missionnaire"
 						>
@@ -98,16 +90,16 @@
 						<h2
 							class="text-white font-bold text-sm md:text-3xl text-ellipsis overflow-hidden line-clamp-2 leading-5 md:leading-10"
 						>
-							{currentVideo.title}
+							{$selectedVideoStore.title}
 						</h2>
 						<div
 							class="flex flex-row justify-between w-full max-w-xs text-xs md:text-sm mt-1 md:mt-3"
 						>
 							<span class="text-grayWeak font-medium">
-								{formatDate(currentVideo?.publishedAt)}
+								{formatDate($selectedVideoStore?.publishedAt)}
 							</span>
 							<span class="text-grayWeak font-medium">
-								{formatTime(currentVideo.durationInSeconds)}
+								{formatTime($selectedVideoStore.durationInSeconds)}
 							</span>
 						</div>
 						<!-- <div class="xsm:mt-3 sm:mt-10 xsm:mb-5 lg:mb-10 flex gap-10">

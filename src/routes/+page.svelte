@@ -1,5 +1,7 @@
 <script lang="ts">
-	import { getContext, onMount, setContext } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
+	import { createEventDispatcher, getContext, onDestroy, onMount, setContext } from 'svelte';
 	import { writable } from 'svelte/store';
 	import '../app.css';
 	import { dict, locale, t } from '../i18n';
@@ -9,8 +11,6 @@
 	import VideoView from '$lib/components/+videoView.svelte';
 	import CalendarWeekly from '$lib/components/+calendarWeekly.svelte';
 	import GetSermonsVideosUsecase from '../middleware/usecases/get-videos-sermons';
-	import GetUpcomingEventsUsecase from '../middleware/usecases/get-upcoming-events';
-	import type { PageData } from './$types';
 	import type { YoutubeVideo } from '@mnlib/lib/models/youtube';
 	import Chart3 from 'iconsax-svelte/Chart3.svelte';
 
@@ -19,24 +19,33 @@
 		fr
 	};
 	dict.set(languages);
-	const webName: string = 'missionnaire network website';
-	export let data: PageData;
-	let { videos } = data;
+	export let data;
+	let { videosResponse } = data;
 	let titleName: any = 'Missionnaire network';
-	let currentViewingUrl = videos[0];
+	let currentViewingVideo = writable<YoutubeVideo>({} as YoutubeVideo);
 
-	const videosStore = writable(videos);
-
-	const selectedVideo = writable();
-
-	setContext('selectedVideo', selectedVideo);
-	const videoSelected = (video: any) => {
-		selectedVideo.set(video);
-	};
-	// ("branham" | "william" | "ewald" | "frank" | "local" | "song" | "any" | "predication" | "retransmission" | "ibaruwa" | "lettre" | "circulaire")
+	const videosStore = writable(videosResponse.data);
+	videosStore.update((currentVideos) => [...currentVideos, ...videosResponse.data]);
 	const availableTypes = [
 		{
-			label: 'All Videos',
+			label: 'All',
+			value: [
+				'branham',
+				'william',
+				'ewald',
+				'frank',
+				'local',
+				'song',
+				'any',
+				'predication',
+				'retransmission',
+				'ibaruwa',
+				'lettre',
+				'circulaire'
+			]
+		},
+		{
+			label: 'Retransimission',
 			value: 'retransmission'
 		},
 		{
@@ -56,77 +65,53 @@
 			value: 'ibaruwa'
 		}
 	];
-	let selectedType: string[] = ['retransmission', 'branham', 'frank', 'local', 'lettre'];
 	let upComingEventData: YoutubeVideo[];
 	// Add reactive variables for type and pageNumber
-	let pageNumber = 1;
-	// Add a reactive variable to track the loading state
-	let isLoading = false;
-	let isVideoLoading = true;
+	let pageNumber = 2;
+	let selectedType = ['retransmission', 'branham', 'frank', 'local', 'lettre'];
+
+	let isLoading = true;
 
 	let shouldLoadMore = false; // Track if loading more is needed
 	let scrollPosition = 0;
-	// Function to load videos with the selected type
-	async function loadVideos() {
-		isLoading = true; // Set the loading state to true before fetching data
-		isVideoLoading = true;
-		const videosUsecase = new GetSermonsVideosUsecase();
-		const res = await videosUsecase.execute({ videoCount: 12, type: selectedType, pageNumber });
-		if (res.isOk) {
-			const videos = res.value;
-			const firstVideoScheduledTime = videos[0].scheduledStartTime;
-			videosStore.update((currentVideos) => [...currentVideos, ...videos]);
-			pageNumber++;
 
-			if (
-				firstVideoScheduledTime &&
-				firstVideoScheduledTime.toLocaleString() >= new Date().toLocaleString()
-			) {
-				currentViewingUrl = data.videos[1] || '';
-				selectedVideo.set(data.videos[1] || '');
-			} else {
-				currentViewingUrl = data.videos[0] || '';
-				selectedVideo.set(data.videos[0] || '');
-			}
-		} else {
-			throw new Error(res.error.message);
-		}
-		//TODO:
-		const upComingEvent = new GetUpcomingEventsUsecase();
-		const resEvent = await upComingEvent.execute();
-		if (resEvent.isOk) {
-			upComingEventData = resEvent.value;
-			console.log(upComingEventData);
-		} else {
-			throw new Error(resEvent.error.message);
-		}
-		isLoading = false; // Set the loading state to false after fetching data
-		isVideoLoading = false;
-	}
+	setContext('selectedVideo', $videosStore[0]);
+	currentViewingVideo.set($videosStore[0]);
 
-	// Load videos with the initial type
+	const videoSelected = (video: YoutubeVideo) => {
+		currentViewingVideo.update(() => video);
+		window.scrollTo({ top: 0, behavior: 'smooth' });
+	};
+	setContext('currentViewingVideo', currentViewingVideo);
 	onMount(async () => {
-		loadVideos();
-		window.addEventListener('scroll', handleScroll);
+		if (typeof window !== 'undefined') {
+			window.addEventListener('scroll', handleScroll);
+		}
+	});
+	onDestroy(() => {
+		if (typeof window !== 'undefined') {
+			window.removeEventListener('scroll', handleScroll);
+		}
 	});
 	function handleScroll() {
-		const gridContainer = document.querySelector('.grid')?.scrollHeight; // Use optional chaining
-		if (gridContainer) {
-			const threshold = gridContainer - window.innerHeight - 500;
-			// Adjust threshold as desired
-			scrollPosition = window.scrollY || document.documentElement.scrollTop;
+		const divList = document.querySelector('.div-list'); // Replace '.div-list' with the actual class of the div list
+		if (divList) {
+			divList.addEventListener('scroll', () => {
+				const scrollHeight = divList.scrollHeight;
+				const scrollTop = divList.scrollTop;
+				const clientHeight = divList.clientHeight;
 
-			if (scrollPosition >= threshold && !isLoading && !shouldLoadMore) {
-				shouldLoadMore = true;
-				loadMoreVideos();
-			}
+				if (scrollTop + clientHeight >= scrollHeight - 200) {
+					// Adjust the threshold as needed
+					shouldLoadMore = true;
+					loadMoreVideos();
+				}
+			});
 		}
 	}
 	// Function to load more videos
 	async function loadMoreVideos() {
 		isLoading = true; // Set the loading state to true before fetching data
-		isVideoLoading = true;
-
 		const videosUsecase = new GetSermonsVideosUsecase();
 		const res = await videosUsecase.execute({
 			videoCount: 12,
@@ -143,7 +128,6 @@
 			throw new Error(res.error.message);
 		}
 		isLoading = false; // Set the loading state to false after fetching data
-		isVideoLoading = false;
 	}
 </script>
 
@@ -155,39 +139,33 @@
 	<div class="  mb-3 items-end justify-end text-right self-end">
 		<label>
 			Filter By:
-			<select bind:value={selectedType} on:change={loadVideos} class=" px-3 py-3 border rounded-lg">
+			<select bind:value={selectedType} on:change={() => {}} class=" px-3 py-3 border rounded-lg">
 				{#each availableTypes as { label, value: type }}
-					<option value={type}>{label}</option>
+					<option value={type}>{label} </option>
 				{/each}
 			</select>
 		</label>
 	</div>
-	{#if isVideoLoading}
-		<div
-			class=" relative w-full md:min-h-[600px] min-h-[100px] rounded-2xl md:rounded-3xl overflow-hiddenw-full h-96 loading-animation flex items-center justify-center"
-		>
-			<span class="text-gray-500 text-lg">Loading video...</span>
-		</div>
-	{:else}
-		<VideoView on:loaded={() => (isVideoLoading = false)} />
+	{#if $videosStore.length > 0}
+		<VideoView on:loaded={() => {}} />
 	{/if}
 	{#if upComingEventData && upComingEventData.length > 0}
 		<CalendarWeekly {upComingEventData} />
 	{/if}
-	<div class=" mt-9 grid grid-cols-1 sm:px-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
-		<!-- add 12 thumbnail videos when loading -->
-
+	<div
+		class="div-list mt-9 grid grid-cols-1 sm:px-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8"
+	>
 		{#each $videosStore as video, index (video.id + '-' + index)}
-			<ThumbnailVideo
-				{video}
-				{index}
-				key={video.id + '-' + index}
-				on:videoSelected={(e) => {
-					videoSelected(e.detail);
+			<!-- svelte-ignore a11y-no-static-element-interactions -->
+			<!-- svelte-ignore a11y-click-events-have-key-events -->
+			<div
+				on:click={() => {
+					videoSelected(video);
 				}}
-			/>
+			>
+				<ThumbnailVideo {video} {index} />
+			</div>
 		{/each}
-		<!-- Add a button to load more 12 videos -->
 	</div>
 	<div class=" relative flex items-center justify-center w-full mt-5 animate-spin">
 		{#if isLoading}
@@ -197,12 +175,6 @@
 </main>
 
 <style>
-	/* Add CSS styles for the loading animation */
-	.loading-animation {
-		background-color: #bebebe; /* Light gray background */
-		animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-	}
-
 	@keyframes pulse {
 		0%,
 		100% {
