@@ -67,8 +67,8 @@ export const NavigationLinkList: NavigationLink[] = [
 	},
 	{
 		id: 5,
-		menuName: 'Chants',
-		link: '/chants'
+		menuName: 'songs',
+		link: '/song_audio'
 	},
 	{
 		id: 6,

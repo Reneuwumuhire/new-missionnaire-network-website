@@ -4,7 +4,6 @@
 	import { getContext } from 'svelte';
 	import BsPlayCircleFill from 'svelte-icons-pack/bs/BsPlayCircleFill';
 	import { formatDate, formatTime } from '../../utils/FormatTime';
-	import Lazy from 'svelte-lazy';
 	import type { YoutubeVideo } from '@mnlib/lib/models/youtube';
 
 	// @ts-ignore
@@ -61,13 +60,11 @@
 
 				{#if !playNow}
 					<!-- use the next div and place the background image -->
-					<Lazy height={800} class=" bg-slate-100">
-						<img
-							class=" w-full h-full aspect-video object-cover object-center max-h-[600px]"
-							src={$selectedVideoStore.thumbnails?.high.url}
-							alt="thumbnail"
-						/>
-					</Lazy>
+					<img
+						class=" w-full h-full aspect-video object-cover object-center max-h-[600px]"
+						src={$selectedVideoStore.thumbnails?.high.url}
+						alt="thumbnail"
+					/>
 					<!-- play button in the middle of the div -->
 					<!-- svelte-ignore a11y-click-events-have-key-events -->
 					<!-- svelte-ignore a11y-no-static-element-interactions -->
