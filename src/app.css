@@ -7,9 +7,7 @@
 	--font-family: 'Inter', sans-serif;
 	scroll-behavior: smooth;
 }
-html,
-body,
-.app-container {
+html {
 	overflow-x: hidden;
 }
 ::selection {

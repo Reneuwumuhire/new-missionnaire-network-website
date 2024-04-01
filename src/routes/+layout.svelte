@@ -8,17 +8,14 @@
 
 	export let data: PageData;
 	let isLiveStreamAvailable = data.IsLiveStreamlive.value;
-
-	
 </script>
 
-{#if isLiveStreamAvailable }
+{#if isLiveStreamAvailable}
 	<SocialMediaAbove isLiveStream />
 {/if}
 <div class="flex flex-col">
 	<NavBar />
 </div>
-
 <slot />
 <Footer />
 <CopyButton />

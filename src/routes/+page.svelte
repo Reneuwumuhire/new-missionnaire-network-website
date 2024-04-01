@@ -1,8 +1,5 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
-	import { createEventDispatcher, getContext, onDestroy, onMount, setContext } from 'svelte';
-	import { writable } from 'svelte/store';
+	import { onDestroy, onMount, setContext } from 'svelte';
 	import '../app.css';
 	import { dict, locale, t } from '../i18n';
 	import fr from '../translations/fr';
@@ -13,6 +10,8 @@
 	import GetSermonsVideosUsecase from '../middleware/usecases/get-videos-sermons';
 	import type { YoutubeVideo } from '@mnlib/lib/models/youtube';
 	import Chart3 from 'iconsax-svelte/Chart3.svelte';
+	import { writable } from 'svelte/store';
+	import debounce from '../utils/debounce';
 
 	const languages = {
 		en,
@@ -25,7 +24,9 @@
 	let currentViewingVideo = writable<YoutubeVideo>({} as YoutubeVideo);
 
 	const videosStore = writable(videosResponse.data);
+
 	videosStore.update((currentVideos) => [...currentVideos, ...videosResponse.data]);
+
 	const availableTypes = [
 		{
 			label: 'All',
@@ -68,9 +69,10 @@
 	let upComingEventData: YoutubeVideo[];
 	// Add reactive variables for type and pageNumber
 	let pageNumber = 2;
-	let selectedType = ['retransmission', 'branham', 'frank', 'local', 'lettre'];
+	let selectedType: any;
 
-	let isLoading = true;
+	let isLoading = false;
+	let isLoadingMore = false; // Flag to prevent multiple simultaneous requests
 
 	let shouldLoadMore = false; // Track if loading more is needed
 	let scrollPosition = 0;
@@ -95,29 +97,35 @@
 	});
 	function handleScroll() {
 		const divList = document.querySelector('.div-list'); // Replace '.div-list' with the actual class of the div list
-		if (divList) {
-			divList.addEventListener('scroll', () => {
-				const scrollHeight = divList.scrollHeight;
-				const scrollTop = divList.scrollTop;
-				const clientHeight = divList.clientHeight;
 
-				if (scrollTop + clientHeight >= scrollHeight - 200) {
-					// Adjust the threshold as needed
-					shouldLoadMore = true;
-					loadMoreVideos();
-				}
-			});
+		if (divList) {
+			const scrollHeight = divList.scrollHeight;
+			const scrollTop = divList.scrollTop;
+			const clientHeight = divList.clientHeight;
+
+			if (scrollTop + clientHeight >= scrollHeight - 200 && !isLoadingMore) {
+				isLoadingMore = true; // Set the flag to prevent multiple requests
+				loadMoreVideos().then(() => {
+					isLoadingMore = false; // Reset the flag after loading is complete
+				});
+			}
 		}
 	}
 	// Function to load more videos
 	async function loadMoreVideos() {
+		shouldLoadMore = true;
 		isLoading = true; // Set the loading state to true before fetching data
+		// if selectedType is undefined, set it to the first value for availableTypes
+		if (!selectedType) {
+			selectedType = availableTypes[0].value;
+		}
 		const videosUsecase = new GetSermonsVideosUsecase();
 		const res = await videosUsecase.execute({
 			videoCount: 12,
-			type: selectedType,
+			type: Array.isArray(selectedType) ? selectedType : [selectedType],
 			pageNumber
 		});
+
 		if (res.isOk) {
 			// Update the data.videos array with the new videos
 			videosStore.update((currentVideos) => [...currentVideos, ...res.value]);
@@ -129,6 +137,7 @@
 		}
 		isLoading = false; // Set the loading state to false after fetching data
 	}
+	// console.log(selectedType);
 </script>
 
 <svelte:head>
@@ -137,14 +146,17 @@
 <!-- Add a dropdown or radio buttons to select the type -->
 <main class=" align-middle flex flex-col items-center justify-center max-w-[1300px] mx-auto px-5">
 	<div class="  mb-3 items-end justify-end text-right self-end">
-		<label>
-			Filter By:
-			<select bind:value={selectedType} on:change={() => {}} class=" px-3 py-3 border rounded-lg">
-				{#each availableTypes as { label, value: type }}
-					<option value={type}>{label} </option>
-				{/each}
-			</select>
-		</label>
+		<form on:change={() => {}}>
+			<label>
+				Filter By:
+				<select bind:value={selectedType} class=" px-3 py-3 border rounded-lg">
+					<option value="" disabled selected>Select an option</option>
+					{#each availableTypes as { label, value }}
+						<option {value}>{label} </option>
+					{/each}
+				</select>
+			</label>
+		</form>
 	</div>
 	{#if $videosStore.length > 0}
 		<VideoView on:loaded={() => {}} />
