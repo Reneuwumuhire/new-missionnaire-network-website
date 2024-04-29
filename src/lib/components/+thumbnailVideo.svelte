@@ -7,9 +7,11 @@
 	import AudioSquare from 'iconsax-svelte/AudioSquare.svelte';
 	import DocumentText1 from 'iconsax-svelte/DocumentText1.svelte';
 	import VideoPlay from 'iconsax-svelte/VideoPlay.svelte';
+	import type { YoutubeVideo } from '@mnlib/lib/models/youtube';
 
-	export let video: import('../../core/model/youtube').VideoItem;
+	export let video: YoutubeVideo;
 	export let index: number;
+	export const key = 'key';
 	let playing;
 	const dispatch = createEventDispatcher();
 	let visible: boolean[] = [];
@@ -32,11 +34,14 @@
 		}
 	};
 
-	function formatTime(date: number | Date | any) {
+	export function formatTime(date: number | Date | any) {
 		const now: Date | number | any = new Date();
 		const diff = now - date;
 
-		if (diff < 60000) {
+		// if it is in future return  "Upcoming"
+		if (diff < 0) {
+			return 'Upcoming';
+		} else if (diff < 60000) {
 			return 'just now';
 		} else if (diff < 3600000) {
 			return Math.floor(diff / 60000) + ' minutes ago';
@@ -63,7 +68,7 @@
 <!-- svelte-ignore a11y-no-static-element-interactions -->
 <div
 	class=" min-h-ful w-full cursor-pointer transition-all duration-300 ease-in-out hover:duration-300 hover:ease-in-out"
-	on:click={() => dispatch('videoSelected', video)}
+	on:click={() => dispatch('selectedVideo', video)}
 >
 	<!-- Thumbnail image -->
 	<div class="w-full h-full flex flex-col justify-between">
@@ -95,8 +100,15 @@
 			<!-- controls for download -->
 			<div class=" w-full flex justify-between items-center">
 				<small class=" text-gray-500"
-					>Streamed {formatTime(new Date(video.publishedAt.toLocaleString()))}</small
-				>
+					>{#if video.liveBroadcastContent === 'upcoming'}
+						<div class=" bg-slate-950 text-weakGray px-3 py-2 rounded-full mt-2 font-bold">
+							Upcoming
+						</div>
+					{:else}
+						Streamed {video.actualStartTime &&
+							formatTime(new Date(video.actualStartTime.toLocaleString()))}
+					{/if}
+				</small>
 				<!-- Button to download -->
 				<!-- <button class=" rounded-full p-2 -mr-4" on:click|stopPropagation={toggleVisible}
 					><Icon src={BsThreeDotsVertical} />

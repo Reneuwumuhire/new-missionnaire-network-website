@@ -5,13 +5,11 @@
 	--icons-colors: #4f4f4f;
 	/* font is inter */
 	--font-family: 'Inter', sans-serif;
+	scroll-behavior: smooth;
 }
-/* html,
-body,
-.app-container {
-	width: 100%;
-	height: 100%;
-} */
+html {
+	overflow-x: hidden;
+}
 ::selection {
 	background-color: #ff880c;
 	color: #fff;

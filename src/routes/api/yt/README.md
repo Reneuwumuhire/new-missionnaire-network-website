@@ -2,12 +2,14 @@
 
 ## Desc
 
-> Fetch Youtube videos ordered by date ```GET /api/yt/recent-videos```.
+> Fetch Youtube videos ordered by date `GET /api/yt/recent-videos`.
 
 ## Query Params
-- _**resultsPerPage**_              **10** _DEFAULT_
+
+- _**resultsPerPage**_ **10** _DEFAULT_
 
 ## Example
+
 ```JS
 
 var requestOptions = {
@@ -21,13 +23,13 @@ const responseData = await res.json();
 
 ## Response Data
 
-
 ```TS
 type ResultType = {
     resultsPerPage: number,
     videos: {
         id: string;
         publishedAt: Date;
+        scheduledStartTime: Date;
         title: string;
         description: string;
         thumbNails: {

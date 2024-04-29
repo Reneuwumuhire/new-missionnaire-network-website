@@ -6,7 +6,11 @@
 		const container = document.querySelector('.overflow-x-scroll');
 		if (container) container.scrollBy({ left: -400, behavior: 'smooth' });
 	};
-
+	interface EventData {
+		scheduledStartTime?: Date; //Wed Mar 13 2024 20:30:00 GMT+0200 (Central Africa Time)
+		title: string;
+	}
+	export let upComingEventData: EventData[] = [];
 	const scrollRight = () => {
 		const container = document.querySelector('.overflow-x-scroll');
 		if (container) container.scrollBy({ left: 400, behavior: 'smooth' });
@@ -42,26 +46,13 @@
 		<div
 			class="flex flex-row items-center space-x-3 overflow-x-scroll md:overflow-x-scroll md:overflow-y-hidden px-1 md:px-16"
 		>
-			<CalendarDay
-				dateToWhen={new Date('Tue Nov 28 2023 09:42:56 GMT+0200 (Central Africa Time)')}
-				videoTitle="[RETRANSMISSION] - 2023-06-14 19:30 - Réunion de Krefeld [01.04.1973 15:00] - Mu Kinyarwanda"
-			/>
-			<CalendarDay
-				dateToWhen={new Date('Wed Nov 29 2023 09:42:56 GMT+0200 (Central Africa Time)')}
-				videoTitle="[RETRANSMISSION] - 2023-06-14 19:30 - Réunion de Krefeld [01.04.1973 15:00] - Mu Kinyarwanda"
-			/>
-			<CalendarDay
-				dateToWhen={new Date('Fri Dec 01 2023 09:42:56 GMT+0200 (Central Africa Time)')}
-				videoTitle="[RETRANSMISSION] - 2023-06-14 19:30 - Réunion de Krefeld [01.04.1973 15:00] - Mu Kinyarwanda"
-			/>
-			<CalendarDay
-				dateToWhen={new Date('Sad Dec 02 2023 09:42:56 GMT+0200 (Central Africa Time)')}
-				videoTitle="[RETRANSMISSION] - 2023-06-14 19:30 - Réunion de Krefeld [01.04.1973 15:00] - Mu Kinyarwanda"
-			/>
-			<CalendarDay
-				dateToWhen={new Date('Sun Dec 03 2023 09:42:56 GMT+0200 (Central Africa Time)')}
-				videoTitle="[RETRANSMISSION] - 2023-06-14 19:30 - Réunion de Krefeld [01.04.1973 15:00] - Mu Kinyarwanda"
-			/>
+			{#if upComingEventData.length > 0}
+				{#each upComingEventData as event}
+					{#if event.scheduledStartTime}
+						<CalendarDay dateToWhen={new Date(event.scheduledStartTime)} videoTitle={event.title} />
+					{/if}
+				{/each}
+			{/if}
 		</div>
 		<!-- Right arrow for navigation -->
 		<button

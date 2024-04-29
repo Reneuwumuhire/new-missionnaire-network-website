@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/stores';
 	import Menu from 'iconsax-svelte/Menu.svelte';
 	import HeaderMenuLink from '$lib/components/+headerMenuLink.svelte';
 	import { dict, locale, t } from '../../i18n';
@@ -10,6 +11,8 @@
 	import HiSolidMenuAlt3 from 'svelte-icons-pack/hi/HiSolidMenuAlt3';
 	import IoCloseSharp from 'svelte-icons-pack/io/IoCloseSharp';
 	import BsChevronDown from 'svelte-icons-pack/bs/BsChevronDown';
+	import SearchNormal1 from 'iconsax-svelte/SearchNormal1.svelte';
+	import CloseCircle from 'iconsax-svelte/CloseCircle.svelte';
 	import HeaderMenuLinkMobo from './+headerMenuLinkMobo.svelte';
 
 	const languages = { en, fr };
@@ -48,14 +51,76 @@
 			toggleMobileNav();
 		}
 	};
+
+	let isHovered = false;
+	let isFocused = false;
+	let searchTerm = '';
+
+	$: shouldExpand = isHovered || isFocused || searchTerm.trim().length > 0;
+	$: showClearButton = searchTerm.trim().length > 0;
+	$: showPlaceholder = shouldExpand;
+
+	function handleSubmit() {
+		// Handle search submission logic here
+		console.log('Searching for:', searchTerm);
+	}
+
+	function clearInput() {
+		searchTerm = '';
+	}
 </script>
 
 <nav class="z-50 max-w-full flex flex-row justify-between items-center h-20 px-3 md:px-6 my-4">
-	<div class=" w-full flex flex-row justify-between items-center max-w-7xl mx-auto">
+	<div class=" w-full flex flex-row justify-between items-center max-w-[1600px] mx-auto">
 		<a href="/" class="flex flex-row items-center">
 			<img src="/icons/logo.png" class="w-auto h-10" alt="logo" />
 		</a>
-		<div class=" hidden md:block">
+		<div class=" hidden md:flex items-center space-x-8">
+			<!-- svelte-ignore a11y-no-static-element-interactions -->
+			<!-- shows the search input only when the user is on the home page -->
+			{#if $page.url.pathname == '/'}
+				<div
+					class="relative inline-block"
+					on:mouseenter={() => (isHovered = true)}
+					on:mouseleave={() => (isHovered = false)}
+				>
+					<form on:submit|preventDefault={handleSubmit}>
+						<div class="flex items-center">
+							<div
+								class="w-10 h-10 rounded-full border-2 boder-[#C9C9C9] bg-gray-50 flex flex-row items-center justify-center transition-all duration-300 ease-in-out"
+								class:w-72={shouldExpand}
+								class:bg-white={shouldExpand}
+								class:border={shouldExpand}
+								class:border-gray-300={shouldExpand}
+							>
+								<div
+									class="w-6 h-6 rounded-full -mr-9 flex items-center justify-center"
+									class:pl-2={shouldExpand}
+								>
+									<SearchNormal1 size={20} color="#C9C9C9" variant="Linear" />
+								</div>
+								<input
+									type="text"
+									placeholder={showPlaceholder ? 'Search...' : ''}
+									bind:value={searchTerm}
+									class=" indent-8 px-4 py-2 text-gray-600 bg-transparent outline-none w-full font-semibold"
+									on:focus={() => (isFocused = true)}
+									on:blur={() => (isFocused = false)}
+								/>
+								{#if showClearButton}
+									<button
+										type="button"
+										class=" w-6 h-6 rounded-full flex items-center justify-center pr-2"
+										on:click={clearInput}
+									>
+										<CloseCircle size={80} color="#fb923c" variant="Linear" />
+									</button>
+								{/if}
+							</div>
+						</div>
+					</form>
+				</div>
+			{/if}
 			<div class=" flex flex-row space-x-4 justify-between">
 				{#each NavigationLinkList as link, index}
 					<HeaderMenuLink
@@ -88,8 +153,49 @@
 		</div>
 		<!-- mobo menu -->
 		{#if showMoboNav}
-			<div class="absolute z-50 top-32 left-0 w-full h-full bg-white border-t-2 py-6">
+			<div class="absolute z-50 top-28 left-0 w-full h-full bg-white border-t-2 py-6">
 				<div class="relative flex flex-col space-y-2 w-full h-full">
+					<!-- svelte-ignore a11y-no-static-element-interactions -->
+					<div
+						class="relative inline-block self-start ml-4"
+						on:mouseenter={() => (isHovered = true)}
+						on:mouseleave={() => (isHovered = false)}
+					>
+						<form on:submit|preventDefault={handleSubmit}>
+							<div class="flex items-center">
+								<div
+									class="w-72 h-10 rounded-full border-2 boder-[#C9C9C9] bg-gray-50 flex flex-row items-center justify-center transition-all duration-300 ease-in-out"
+									class:bg-white={shouldExpand}
+									class:border={shouldExpand}
+									class:border-gray-300={shouldExpand}
+								>
+									<div
+										class="w-6 h-6 rounded-full -mr-9 flex items-center justify-center"
+										class:pl-2={shouldExpand}
+									>
+										<SearchNormal1 size={20} color="#C9C9C9" variant="Linear" />
+									</div>
+									<input
+										type="text"
+										placeholder="Search..."
+										bind:value={searchTerm}
+										class=" indent-8 px-4 py-2 text-gray-600 bg-transparent outline-none w-full font-semibold"
+										on:focus={() => (isFocused = true)}
+										on:blur={() => (isFocused = false)}
+									/>
+									{#if showClearButton}
+										<button
+											type="button"
+											class=" w-6 h-6 rounded-full flex items-center justify-center pr-2"
+											on:click={clearInput}
+										>
+											<CloseCircle size={80} color="#fb923c" variant="Linear" />
+										</button>
+									{/if}
+								</div>
+							</div>
+						</form>
+					</div>
 					<div class="relative flex flex-col space-y-5 text-3xl px-5">
 						{#each NavigationLinkList as link, index}
 							<HeaderMenuLinkMobo
