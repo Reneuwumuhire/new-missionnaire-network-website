@@ -12,6 +12,7 @@
 	import Chart3 from 'iconsax-svelte/Chart3.svelte';
 	import { writable } from 'svelte/store';
 	import debounce from '../utils/debounce';
+	import { string } from 'zod';
 
 	const languages = {
 		en,
@@ -30,20 +31,7 @@
 	const availableTypes = [
 		{
 			label: 'All',
-			value: [
-				'branham',
-				'william',
-				'ewald',
-				'frank',
-				'local',
-				'song',
-				'any',
-				'predication',
-				'retransmission',
-				'ibaruwa',
-				'lettre',
-				'circulaire'
-			]
+			value: ['retransmission', 'branham', 'frank', 'local', 'lettre']
 		},
 		{
 			label: 'Retransimission',
@@ -63,13 +51,30 @@
 		},
 		{
 			label: 'Lettre circulaire',
-			value: 'ibaruwa'
+			value: 'lettre'
 		}
 	];
+	type AllowedType =
+		| 'branham'
+		| 'william'
+		| 'ewald'
+		| 'frank'
+		| 'local'
+		| 'song'
+		| 'any'
+		| 'predication'
+		| 'retransmission'
+		| 'ibaruwa'
+		| 'lettre'
+		| 'circulaire'
+		| '';
+
+	// Now you can use this type where the specific values are required
+
 	let upComingEventData: YoutubeVideo[];
 	// Add reactive variables for type and pageNumber
 	let pageNumber = 2;
-	let selectedType: any;
+	let selectedType: string[] = [''];
 
 	let isLoading = false;
 	let isLoadingMore = false; // Flag to prevent multiple simultaneous requests
@@ -105,9 +110,11 @@
 
 			if (scrollTop + clientHeight >= scrollHeight - 200 && !isLoadingMore) {
 				isLoadingMore = true; // Set the flag to prevent multiple requests
-				loadMoreVideos().then(() => {
-					isLoadingMore = false; // Reset the flag after loading is complete
-				});
+				debounce(() => {
+					loadMoreVideos().then(() => {
+						isLoadingMore = false; // Reset the flag after loading is complete
+					});
+				}, 2000);
 			}
 		}
 	}
@@ -117,7 +124,7 @@
 		isLoading = true; // Set the loading state to true before fetching data
 		// if selectedType is undefined, set it to the first value for availableTypes
 		if (!selectedType) {
-			selectedType = availableTypes[0].value;
+			selectedType = [...availableTypes[0].value];
 		}
 		const videosUsecase = new GetSermonsVideosUsecase();
 		const res = await videosUsecase.execute({
@@ -146,13 +153,13 @@
 <!-- Add a dropdown or radio buttons to select the type -->
 <main class=" align-middle flex flex-col items-center justify-center max-w-[1300px] mx-auto px-5">
 	<div class="  mb-3 items-end justify-end text-right self-end">
-		<form on:change={() => {}}>
+		<form>
 			<label>
 				Filter By:
 				<select bind:value={selectedType} class=" px-3 py-3 border rounded-lg">
 					<option value="" disabled selected>Select an option</option>
 					{#each availableTypes as { label, value }}
-						<option {value}>{label} </option>
+						<option {value}>{label}</option>
 					{/each}
 				</select>
 			</label>
@@ -167,14 +174,11 @@
 	<div
 		class="div-list mt-9 grid grid-cols-1 sm:px-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8"
 	>
-		{#each $videosStore as video, index (video.id + '-' + index)}
+		<!-- @ts-ignore -->
+		{#each $videosStore.filter( (video) => (selectedType.length ? selectedType.some( (type) => video.tags.includes(type) ) : true) ) as video, index (video.id + '-' + index)}
 			<!-- svelte-ignore a11y-no-static-element-interactions -->
 			<!-- svelte-ignore a11y-click-events-have-key-events -->
-			<div
-				on:click={() => {
-					videoSelected(video);
-				}}
-			>
+			<div on:click={() => videoSelected(video)}>
 				<ThumbnailVideo {video} {index} />
 			</div>
 		{/each}
