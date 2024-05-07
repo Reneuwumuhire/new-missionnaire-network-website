@@ -10,10 +10,10 @@
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import HiSolidMenuAlt3 from 'svelte-icons-pack/hi/HiSolidMenuAlt3';
 	import IoCloseSharp from 'svelte-icons-pack/io/IoCloseSharp';
-	import BsChevronDown from 'svelte-icons-pack/bs/BsChevronDown';
 	import SearchNormal1 from 'iconsax-svelte/SearchNormal1.svelte';
 	import CloseCircle from 'iconsax-svelte/CloseCircle.svelte';
 	import HeaderMenuLinkMobo from './+headerMenuLinkMobo.svelte';
+	import { searchTerm } from '$lib/stores/videoStore';
 
 	const languages = { en, fr };
 	let currentLang = 'en';
@@ -54,28 +54,27 @@
 
 	let isHovered = false;
 	let isFocused = false;
-	let searchTerm = '';
 
-	$: shouldExpand = isHovered || isFocused || searchTerm.trim().length > 0;
-	$: showClearButton = searchTerm.trim().length > 0;
+	$: shouldExpand = isHovered || isFocused || $searchTerm.trim().length > 0;
+	$: showClearButton = $searchTerm.trim().length > 0;
 	$: showPlaceholder = shouldExpand;
 
 	function handleSubmit() {
 		// Handle search submission logic here
-		console.log('Searching for:', searchTerm);
+		console.log('Searching for:', $searchTerm);
 	}
 
 	function clearInput() {
-		searchTerm = '';
+		searchTerm.set('');
 	}
 </script>
 
-<nav class="z-50 max-w-full flex flex-row justify-between items-center h-20 px-3 md:px-6 my-4">
+<nav class=" z-50 max-w-full flex flex-row justify-between items-center h-20 px-3 md:px-6 my-4">
 	<div class=" w-full flex flex-row justify-between items-center max-w-[1600px] mx-auto">
 		<a href="/" class="flex flex-row items-center">
 			<img src="/icons/logo.png" class="w-auto h-10" alt="logo" />
 		</a>
-		<div class=" hidden md:flex items-center space-x-8">
+		<div class=" hidden lg:flex items-center space-x-8">
 			<!-- svelte-ignore a11y-no-static-element-interactions -->
 			<!-- shows the search input only when the user is on the home page -->
 			{#if $page.url.pathname == '/'}
@@ -87,7 +86,7 @@
 					<form on:submit|preventDefault={handleSubmit}>
 						<div class="flex items-center">
 							<div
-								class="w-10 h-10 rounded-full border-2 boder-[#C9C9C9] bg-gray-50 flex flex-row items-center justify-center transition-all duration-300 ease-in-out"
+								class="w-10 h-10 rounded-full border-2 border-[#191919]/50 bg-white flex flex-row items-center justify-center transition-all duration-300 ease-in-out"
 								class:w-72={shouldExpand}
 								class:bg-white={shouldExpand}
 								class:border={shouldExpand}
@@ -97,13 +96,13 @@
 									class="w-6 h-6 rounded-full -mr-9 flex items-center justify-center"
 									class:pl-2={shouldExpand}
 								>
-									<SearchNormal1 size={20} color="#C9C9C9" variant="Linear" />
+									<SearchNormal1 size={15} color="#191919" variant="Linear" />
 								</div>
 								<input
 									type="text"
 									placeholder={showPlaceholder ? 'Search...' : ''}
-									bind:value={searchTerm}
-									class=" indent-8 px-4 py-2 text-gray-600 bg-transparent outline-none w-full font-semibold"
+									bind:value={$searchTerm}
+									class=" indent-8 px-4 py-2 text-gray-600 bg-transparent outline-none w-full font-normal text-current"
 									on:focus={() => (isFocused = true)}
 									on:blur={() => (isFocused = false)}
 								/>
@@ -138,7 +137,7 @@
 				{/each}
 			</div>
 		</div>
-		<div class=" block md:hidden text-black text-4xl">
+		<div class=" block lg:hidden text-black text-4xl">
 			<!-- menu -->
 			<button
 				class="flex flex-row items-center w-10 h-10 transition-all duration-75 ease-in-out text-missionnaire"
@@ -153,8 +152,8 @@
 		</div>
 		<!-- mobo menu -->
 		{#if showMoboNav}
-			<div class="absolute z-50 top-28 left-0 w-full h-full bg-white border-t-2 py-6">
-				<div class="relative flex flex-col space-y-2 w-full h-full">
+			<div class="absolute z-50 top-28 left-0 w-full h-screen bg-white border-t-2 py-6">
+				<div class="relative flex flex-col space-y-2 w-full h-full bg-white">
 					<!-- svelte-ignore a11y-no-static-element-interactions -->
 					<div
 						class="relative inline-block self-start ml-4"
@@ -178,8 +177,8 @@
 									<input
 										type="text"
 										placeholder="Search..."
-										bind:value={searchTerm}
-										class=" indent-8 px-4 py-2 text-gray-600 bg-transparent outline-none w-full font-semibold"
+										bind:value={$searchTerm}
+										class=" indent-8 px-4 py-2 text-gray-600 bg-transparent outline-none w-full font-light"
 										on:focus={() => (isFocused = true)}
 										on:blur={() => (isFocused = false)}
 									/>

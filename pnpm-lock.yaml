@@ -14,6 +14,9 @@ dependencies:
   '@googlemaps/js-api-loader':
     specifier: ^1.16.2
     version: 1.16.2
+  '@tanstack/svelte-query':
+    specifier: ^5.35.1
+    version: 5.35.1(svelte@4.2.12)
   flowbite-svelte:
     specifier: ^0.44.20
     version: 0.44.20(svelte@4.2.12)
@@ -24,7 +27,7 @@ dependencies:
     specifier: ^2.1.0
     version: 2.1.0
   zod:
-    specifier: ^3.21.4
+    specifier: ^3.22.2
     version: 3.22.2
 
 devDependencies:
@@ -35,16 +38,16 @@ devDependencies:
     specifier: ^1.3.1
     version: 1.3.1(@sveltejs/kit@1.22.6)
   '@sveltejs/kit':
-    specifier: ^1.20.4
+    specifier: ^1.22.6
     version: 1.22.6(svelte@4.2.12)(vite@4.4.9)
   '@typescript-eslint/eslint-plugin':
-    specifier: ^5.45.0
+    specifier: ^5.62.0
     version: 5.62.0(@typescript-eslint/parser@5.62.0)(eslint@8.47.0)(typescript@5.1.6)
   '@typescript-eslint/parser':
-    specifier: ^5.45.0
+    specifier: ^5.62.0
     version: 5.62.0(eslint@8.47.0)(typescript@5.1.6)
   autoprefixer:
-    specifier: ^10.4.14
+    specifier: ^10.4.15
     version: 10.4.15(postcss@8.4.28)
   chalk:
     specifier: ^5.3.0
@@ -53,16 +56,16 @@ devDependencies:
     specifier: ^4.3.4
     version: 4.3.4
   eslint:
-    specifier: ^8.28.0
+    specifier: ^8.47.0
     version: 8.47.0
   eslint-config-prettier:
-    specifier: ^8.5.0
+    specifier: ^8.10.0
     version: 8.10.0(eslint@8.47.0)
   eslint-plugin-svelte:
-    specifier: ^2.30.0
+    specifier: ^2.32.4
     version: 2.32.4(eslint@8.47.0)(svelte@4.2.12)
   iconsax-svelte:
-    specifier: ^0.0.1-alpha.11
+    specifier: 0.0.1-alpha.11
     version: 0.0.1-alpha.11
   minimist:
     specifier: ^1.2.8
@@ -71,10 +74,10 @@ devDependencies:
     specifier: ^3.3.2
     version: 3.3.2
   postcss:
-    specifier: ^8.4.27
+    specifier: ^8.4.28
     version: 8.4.28
   prettier:
-    specifier: ^2.8.0
+    specifier: ^2.8.8
     version: 2.8.8
   prettier-plugin-svelte:
     specifier: ^2.10.1
@@ -83,7 +86,7 @@ devDependencies:
     specifier: ^4.2.12
     version: 4.2.12
   svelte-check:
-    specifier: ^3.4.3
+    specifier: ^3.5.0
     version: 3.5.0(postcss@8.4.28)(svelte@4.2.12)
   svelte-preprocess:
     specifier: ^5.1.1
@@ -92,13 +95,13 @@ devDependencies:
     specifier: ^3.3.3
     version: 3.3.3
   tslib:
-    specifier: ^2.4.1
+    specifier: ^2.6.2
     version: 2.6.2
   typescript:
-    specifier: ^5.0.0
+    specifier: ^5.1.6
     version: 5.1.6
   vite:
-    specifier: ^4.4.2
+    specifier: ^4.4.9
     version: 4.4.9(@types/node@20.5.1)
   vitest:
     specifier: ^0.33.0
@@ -735,6 +738,19 @@ packages:
       - supports-color
     dev: true
 
+  /@tanstack/query-core@5.35.1:
+    resolution: {integrity: sha512-0Dnpybqb8+ps6WgqBnqFEC+1F/xLvUosRAq+wiGisTgolOZzqZfkE2995dEXmhuzINiTM7/a6xSGznU0NIvBkw==}
+    dev: false
+
+  /@tanstack/svelte-query@5.35.1(svelte@4.2.12):
+    resolution: {integrity: sha512-DlgzwhYYN2fUIdE71xh0UWJ8r1VslYBgiP6xcMBPc3YU8eCdiY6fgtBwTkyuNOfaNJlyEiH9X/XxqjjKULp0PQ==}
+    peerDependencies:
+      svelte: ^3.54.0 || ^4.0.0 || ^5.0.0-next.0
+    dependencies:
+      '@tanstack/query-core': 5.35.1
+      svelte: 4.2.12
+    dev: false
+
   /@types/chai-subset@1.3.3:
     resolution: {integrity: sha512-frBecisrNGz+F4T6bcc+NLeolfiojh5FxW2klu669+8BARtyQv2C/GkNW6FUodVe4BroGMP/wER/YDGc7rEllw==}
     dependencies:
@@ -1095,7 +1111,7 @@ packages:
       postcss: ^8.1.0
     dependencies:
       browserslist: 4.21.10
-      caniuse-lite: 1.0.30001522
+      caniuse-lite: 1.0.30001616
       fraction.js: 4.2.1
       normalize-range: 0.1.2
       picocolors: 1.0.0
@@ -1151,7 +1167,7 @@ packages:
     engines: {node: ^6 || ^7 || ^8 || ^9 || ^10 || ^11 || ^12 || >=13.7}
     hasBin: true
     dependencies:
-      caniuse-lite: 1.0.30001522
+      caniuse-lite: 1.0.30001616
       electron-to-chromium: 1.4.496
       node-releases: 2.0.13
       update-browserslist-db: 1.0.11(browserslist@4.21.10)
@@ -1192,8 +1208,8 @@ packages:
     engines: {node: '>= 6'}
     dev: true
 
-  /caniuse-lite@1.0.30001522:
-    resolution: {integrity: sha512-TKiyTVZxJGhsTszLuzb+6vUZSjVOAhClszBr2Ta2k9IwtNBT/4dzmL6aywt0HCgEZlmwJzXJd8yNiob6HgwTRg==}
+  /caniuse-lite@1.0.30001616:
+    resolution: {integrity: sha512-RHVYKov7IcdNjVHJFNY/78RdG4oGVjbayxv8u5IO74Wv7Hlq4PnJE6mo/OjFijjVFNy5ijnCt6H3IIo4t+wfEw==}
     dev: true
 
   /catharsis@0.9.0:

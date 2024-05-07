@@ -1,25 +1,31 @@
 <script lang="ts">
+	import { page, navigating } from '$app/stores';
 	import AudioPlayer from '$lib/components/+audioPlayer.svelte';
-	import AudioTableItem from '$lib/components/+audioTableItem.svelte';
+	import { searchQuery, selectAudio } from '$lib/stores/global';
+	import type { AudioAsset } from '@mnlib/lib/models/media-assets';
 	import { onMount } from 'svelte';
-	import type { VideoItem } from '../../core/model/youtube.js';
-	import { PredicationsRoutes, alphabeticCharacters } from './predicationsRoutesList.js';
-	import { selectAudio } from '$lib/stores/global.js';
-	import { goto } from '$app/navigation';
+	import { PredicationsRoutes } from '../../utils/predicationsRoutesList';
 
-	export let data: any;
-	let selectedAudioToPlay: VideoItem | null = null;
+	let { loading = true } = $page.data;
+
+	export let searchTerm: string;
+
+	let selectedAudioToPlay: AudioAsset | null = null;
 	onMount(() => {
 		selectAudio.subscribe((value) => {
 			selectedAudioToPlay = value;
 		});
 	});
-	async function handleClick(event: {
-		preventDefault: () => void;
-		currentTarget: { href: string | URL };
-	}) {
-		event.preventDefault();
-		await goto(event.currentTarget.href);
+
+	function updateSearchQuery(event: Event) {
+		searchTerm = (event.target as HTMLInputElement).value;
+		updateQueryParam(searchTerm);
+	}
+
+	function updateQueryParam(query: string) {
+		const currentUrl = new URL($page.url);
+		currentUrl.searchParams.set('q', query);
+		history.replaceState(null, '', currentUrl.toString());
 	}
 </script>
 
@@ -43,8 +49,10 @@
 						<div class="flex flex-row w-full max-w-md">
 							<input
 								type="text"
-								class="border border-gray-300 p-2 w-full"
+								class="border border-gray-300 rounded-l-full indent-4 p-2 w-full text-gray-900 outline-none"
 								placeholder="Rechercher par titre, annee, predicateur..."
+								bind:value={$searchQuery}
+								on:input={updateSearchQuery}
 							/>
 							<button class="bg-missionnaire text-white px-4 py-2">Search</button>
 						</div>
@@ -59,18 +67,16 @@
 		>
 			<h1 class=" text-xl md:text-2xl font-black text-[#414141]">Par Auteur</h1>
 			<ul class="flex flex-col md:flex-row w-full space-y-2 md:space-y-0 md:space-x-4">
+				<!-- href="/predications/{slug.slug}" -->
 				{#each PredicationsRoutes as slug}
-					<!-- list has to have equal width and fill the container and all have same height -->
 					<li class="flex-1 h-full max-w-sm">
-						<!-- it the slug is as the same active the link slug.slug === params.body.params.slug -->
 						<a
+							href=""
 							data-sveltekit-preload-data=""
-							href="/predications/{slug.slug}"
 							class={`
-							${slug.slug === data.body.params.slug ? 'bg-missionnaire-100 ' : ''}
+							'bg-missionnaire-100 ' : ''}
 						flex flex-col space-y-1 border-2 border-missionnaire-100 rounded-lg p-2 md:p-4 hover:bg-missionnaire-100 transition-all h-full
 							`}
-							on:click={handleClick}
 						>
 							<span class=" text-xs font-bold md:text-lg">{slug.title}</span>
 							<span class=" hidden md:block font-light text-sm text-gray-600"
@@ -82,9 +88,8 @@
 			</ul>
 			<h1 class=" hidden md:block text-2xl font-black text-[#414141]">Par ordre alphabétique</h1>
 			<ul class=" hidden md:flex flex-row justify-between w-full">
-				{#each alphabeticCharacters as character}
+				<!-- {#each alphabeticCharacters as character}
 					<li class="flex flex-row items-center">
-						<!-- add from the current url a &filter=alph&char=character avoid scrolling back to top -->
 						<a
 							href="?filter=alph&char={character}"
 							class={`
@@ -95,7 +100,7 @@
 							<span class=" font-medium text-lg">{character}</span>
 						</a>
 					</li>
-				{/each}
+				{/each} -->
 			</ul>
 		</div>
 	</div>
@@ -106,7 +111,6 @@
 		<slot />
 	</div>
 </div>
-
 {#if selectedAudioToPlay}
 	<AudioPlayer />
 {/if}

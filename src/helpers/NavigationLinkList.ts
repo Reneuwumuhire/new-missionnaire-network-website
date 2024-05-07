@@ -46,13 +46,13 @@ export const NavigationLinkList: NavigationLink[] = [
 				subText: 'Découvrez toute la biographie du prophète et son histoire.',
 				link: '/william-branham/biographie',
 				image: '/img/branham_icon.png'
-			},
-			{
-				subName: 'Brochures',
-				subText: "Téléchargez les brochures pour connaitre le Message qu'il apporte.",
-				link: '/william-branham/biographie',
-				image: '/img/book_icon.png'
 			}
+			// {
+			// 	subName: 'Brochures',
+			// 	subText: "Téléchargez les brochures pour connaitre le Message qu'il apporte.",
+			// 	link: '/william-branham/biographie',
+			// 	image: '/img/book_icon.png'
+			// }
 		]
 	},
 	{
@@ -63,16 +63,21 @@ export const NavigationLinkList: NavigationLink[] = [
 	{
 		id: 4,
 		menuName: 'Prédications',
-		link: '/predications/tous'
+		link: '/predications'
 	},
 	{
-		id: 5,
-		menuName: 'songs',
-		link: '/song_audio'
-	},
-	{
-		id: 6,
-		menuName: 'Galerie',
-		link: '/galerie'
+		id: 47,
+		menuName: 'À propos',
+		link: '/a-propos'
 	}
+	// {
+	// 	id: 5,
+	// 	menuName: 'songs',
+	// 	link: '/song_audio'
+	// },
+	// {
+	// 	id: 6,
+	// 	menuName: 'Galerie',
+	// 	link: '/galerie'
+	// }
 ];

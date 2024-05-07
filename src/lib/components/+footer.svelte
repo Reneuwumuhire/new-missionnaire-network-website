@@ -6,7 +6,7 @@
 	import RiLogoWhatsappFill from 'svelte-icons-pack/ri/RiLogoWhatsappFill';
 </script>
 
-<footer class=" w-full flex flex-row justify-center text-gray-500">
+<footer class=" bottom-0 w-full flex flex-row justify-center text-gray-500">
 	<!-- 	A propos
 Prédications
 Galerie
@@ -21,13 +21,13 @@ Youtube -->
 		<!-- div for links -->
 		<div>
 			<ul
-				class="flex flex-col md:flex-row items-center justify-center md:space-x-9 font-semibold text-base"
+				class="flex flex-col md:flex-row items-center justify-center md:space-x-9 font-normal text-base"
 			>
 				<li>
 					<a
 						href="/a-propos"
 						class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out"
-						>A propos</a
+						>À propos</a
 					>
 				</li>
 				<li>
@@ -73,6 +73,8 @@ Youtube -->
 				<Icon className="w-4 h-4" src={RiLogoWhatsappFill} />
 			</a>
 		</div>
-		<small class=" text-center">© 2012 - 2023 Missionnaire Network. Tous droits réservés</small>
+		<small class=" text-center"
+			>© 2012 - {new Date().getFullYear()} Missionnaire Network. Tous droits réservés</small
+		>
 	</div>
 </footer>

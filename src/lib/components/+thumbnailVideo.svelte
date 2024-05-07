@@ -71,9 +71,11 @@
 	on:click={() => dispatch('selectedVideo', video)}
 >
 	<!-- Thumbnail image -->
-	<div class="w-full h-full flex flex-col justify-between">
+	<div class=" group w-full h-full flex flex-col justify-between">
 		<div class="w-full">
-			<figure>
+			<figure
+				class=" bg-slate-200 rounded-xl min-h-[240px] md:min-h-[120px] lg:min-h-[160px] h-fit"
+			>
 				<img
 					class="  w-full rounded-xl"
 					src={video.thumbnails.medium.url}
@@ -91,8 +93,10 @@
 						{video.title}
 					</p>
 				</div>
-				<div class=" flex flex-col items-center justify-center">
-					<button class=" rounded-full p-2 -mr-4 rotate-90" on:click|stopPropagation={toggleVisible}
+				<div class="  flex flex-col items-center justify-center min-h-[24px] min-w-[24px]">
+					<button
+						class=" hidden group-hover:block rounded-full p-2 -mr-4 rotate-90"
+						on:click|stopPropagation={toggleVisible}
 						><More size={24} color="#4F4F4F" variant="Linear" />
 					</button>
 				</div>

@@ -1,35 +1,15 @@
 <script lang="ts">
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
-	import { getContext } from 'svelte';
 	import BsPlayCircleFill from 'svelte-icons-pack/bs/BsPlayCircleFill';
 	import { formatDate, formatTime } from '../../utils/FormatTime';
 	import type { YoutubeVideo } from '@mnlib/lib/models/youtube';
+	import { page } from '$app/stores';
+	import { currentViewingVideo } from '$lib/stores/global';
 
-	// @ts-ignore
-	let selectedVideoStore: YoutubeVideo = getContext('currentViewingVideo');
+	export let selectedVideoStore: YoutubeVideo;
 
 	let playNow = false;
-	type VideoItem = {
-		title: string;
-		id: string;
-		thumbnails?: {
-			default: {
-				url: string;
-			};
-			high: {
-				url: string;
-			};
-			medium: {
-				url: string;
-			};
-		};
-		publishedAt?: any;
-		scheduledStartTime?: any;
-		description?: string;
-		duration?: string;
-		durationInSeconds: number;
-	};
 	const handleClick = () => {
 		playNow = !playNow;
 	};
@@ -49,7 +29,7 @@
 					>
 						<iframe
 							class=" w-full aspect-video rounded-xl"
-							src={`https://www.youtube.com/embed/${$selectedVideoStore.id}?autoplay=1`}
+							src={`https://www.youtube.com/embed/${selectedVideoStore.id}?autoplay=1`}
 							allowfullscreen
 							allow="autoplay; encrypted-media"
 							title=""
@@ -62,9 +42,10 @@
 					<!-- use the next div and place the background image -->
 					<img
 						class=" w-full h-full aspect-video object-cover object-center max-h-[600px]"
-						src={$selectedVideoStore.thumbnails?.high.url}
+						src={selectedVideoStore.thumbnails.high.url}
 						alt="thumbnail"
 					/>
+					home
 					<!-- play button in the middle of the div -->
 					<!-- svelte-ignore a11y-click-events-have-key-events -->
 					<!-- svelte-ignore a11y-no-static-element-interactions -->
@@ -87,16 +68,16 @@
 						<h2
 							class="text-white font-bold text-sm md:text-3xl text-ellipsis overflow-hidden line-clamp-2 leading-5 md:leading-10"
 						>
-							{$selectedVideoStore.title}
+							{selectedVideoStore.title}
 						</h2>
 						<div
 							class="flex flex-row justify-between w-full max-w-xs text-xs md:text-sm mt-1 md:mt-3"
 						>
 							<span class="text-grayWeak font-medium">
-								{formatDate($selectedVideoStore?.publishedAt)}
+								{formatDate(selectedVideoStore?.publishedAt)}
 							</span>
 							<span class="text-grayWeak font-medium">
-								{formatTime($selectedVideoStore.durationInSeconds)}
+								{formatTime(selectedVideoStore.durationInSeconds)}
 							</span>
 						</div>
 						<!-- <div class="xsm:mt-3 sm:mt-10 xsm:mb-5 lg:mb-10 flex gap-10">

@@ -4,12 +4,12 @@
 </script>
 
 <div class="relative w-80 h-96">
+	<div class="background-dot absolute top-0 right-0" />
 	<img
 		src={image}
 		{alt}
-		class="absolute top-32 -left-20 z-20 w-full h-full object-cover rounded-[48px]"
+		class="relative top-32 -left-20 w-full h-full object-cover rounded-[48px]"
 	/>
-	<div class="background-dot absolute top-0 right-0 z-10" />
 </div>
 
 <style>

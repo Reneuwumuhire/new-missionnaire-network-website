@@ -7,10 +7,10 @@
 	import BsChevronDoubleLeft from 'svelte-icons-pack/bs/BsChevronDoubleLeft';
 	import AudioTableItem from './+audioTableItem.svelte';
 	import { Pagination } from 'flowbite-svelte';
-	import type { VideoItem } from '../../core/model/youtube';
+	import type { AudioAsset } from '@mnlib/lib/models/media-assets';
 
-	export let audioList: VideoItem[] = [];
-	export let loading: boolean = false;
+	export let audioList: AudioAsset[] = [];
+	export let loading: boolean;
 
 	let helper = { start: 1, end: 10, total: 100 };
 	const previous = () => {
@@ -33,7 +33,7 @@
 		<!-- if audioList is not empty return table -->
 		<!-- <AudioTableItem /> -->
 		<!-- table with ten AudioTableItem -->
-		<div class=" w-full overflow-hidden">
+		<div class="border border-gray-300 shadow rounded-md p-4 w-full mx-auto overflow-hidden">
 			<table class="w-full">
 				<thead>
 					<!-- <tr>

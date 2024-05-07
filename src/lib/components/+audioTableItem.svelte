@@ -4,14 +4,14 @@
 	import BsCloudDownloadFill from 'svelte-icons-pack/bs/BsCloudDownloadFill';
 	import BsFileEarmarkPdfFill from 'svelte-icons-pack/bs/BsFileEarmarkPdfFill';
 	import BsPlayCircleFill from 'svelte-icons-pack/bs/BsPlayCircleFill';
-	import type { VideoItem } from '../../core/model/youtube';
 	import { selectAudio } from '../stores/global';
 	import { setContext } from 'svelte';
+	import type { AudioAsset } from '@mnlib/lib/models/media-assets';
 	let showDropContents = false;
 
-	export let audio: VideoItem;
+	export let audio: AudioAsset;
 	export let index: number;
-	const updateSelectAudio = (audio: VideoItem) => {
+	const updateSelectAudio = (audio: AudioAsset) => {
 		selectAudio.set(audio); // Set the selectAudio value in the store
 	};
 </script>
@@ -43,7 +43,6 @@
 				class="flex flex-row items-center space-x-1 hover:text-missionnaire"
 				on:click={() => {
 					updateSelectAudio(audio);
-					// console.log('Function called#########');
 				}}
 			>
 				<Icon src={BsPlayCircleFill} />

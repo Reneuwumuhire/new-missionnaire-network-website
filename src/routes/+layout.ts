@@ -1,9 +1,17 @@
+import { browser } from '$app/environment';
 import GetCurrentLiveStreamingEventsUsecase from '../middleware/usecases/current-livestreaming-videos';
-
-export const load = (async ({ fetch }: any) => {
-	const IsLiveStreamlive = await new GetCurrentLiveStreamingEventsUsecase().execute();
-
+import { QueryClient } from '@tanstack/svelte-query';
+export const load = async () => {
+	// const IsLiveStreamlive = await new GetCurrentLiveStreamingEventsUsecase().execute();
+	const queryClient = new QueryClient({
+		defaultOptions: {
+			queries: {
+				enabled: browser
+			}
+		}
+	});
 	return {
-		IsLiveStreamlive
+		IsLiveStreamlive: false,
+		queryClient
 	};
-}) as any;
+};

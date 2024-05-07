@@ -1,29 +1,27 @@
 import { Result } from '@badrap/result';
 import type { UseCase } from '..';
 import { InternalFailure } from '../../errors/failures';
-import resolver from '../../repository/resolver';
-import { z } from 'zod';
-import { URLInstance } from '../../repository/repo';
-import type { ArgsToGetAudios, ArgsToGetVideos } from '../../entity';
-import {  type YoutubeAudio, YoutubeAudioSchema } from '@mnlib/lib/models/youtube';
+import { type AudioAsset, AudioAssetSchema } from '@mnlib/lib/models/media-assets';
+import type { SearchAudioUsecaseArgs } from '@mnlib/lib/usecase/search-audios';
+import { PUBLIC_MAIN_URL } from '$env/static/public';
 
-export default class GetSermonsAudioUsecase implements UseCase<ArgsToGetAudios, YoutubeAudio[]> {
+export type GetSermonArgsType = {
+	params: Partial<SearchAudioUsecaseArgs>;
+	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+};
+export default class GetSermonsAudioUsecase implements UseCase<GetSermonArgsType, AudioAsset[]> {
 	async execute({
-		audioCount,
-		startAfter
-	}: ArgsToGetAudios): Promise<Result<YoutubeAudio[], InternalFailure>> {
+		params,
+		fetch
+	}: GetSermonArgsType): Promise<Result<AudioAsset[], InternalFailure>> {
 		try {
-			const url = URLInstance;
-			url.pathname = `/api/yt/audios`;
-			url.searchParams.set('type', 'predication');
-			url.searchParams.set('maxResults', audioCount.toString());
-			if (startAfter) url.searchParams.set('startAfter', startAfter.toString());
-
-			const res = await resolver(url, 'GET', undefined, z.array(YoutubeAudioSchema));
-
-			if (res.isOk) {
-				return Result.ok(res.value);
-			} else throw new Error(res.error.message);
+			const url = new URL(`api/audios`, PUBLIC_MAIN_URL);
+			Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value.toString()));
+			const results = await fetch(url.toString());
+			const jsonData = await results.json();
+			if (jsonData.error) return Result.err(new InternalFailure(jsonData.error));
+			const data = AudioAssetSchema.array().parse(jsonData.data);
+			return Result.ok(data as AudioAsset[]);
 		} catch (error) {
 			return Result.err(new InternalFailure('Failed to get sermons'));
 		}

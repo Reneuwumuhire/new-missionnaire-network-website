@@ -22,14 +22,11 @@
 		"only-arrow-functions": false,
 		"variable-name": [true, "allow-leading-underscore"],
 		"object-literal-sort-keys": false
-	  },
-	  "linterOptions": {
-		"exclude": [
-		  "./**/node_modules/**",
-		  "entrypoint.hashmanifest.*"
-		]
-	  }
-	
+	},
+	"linterOptions": {
+		"exclude": ["./**/node_modules/**", "entrypoint.hashmanifest.*"]
+	}
+
 	// Path aliases are handled by https://kit.svelte.dev/docs/configuration#alias
 	//
 	// If you want to overwrite includes/excludes, make sure to copy over the relevant includes/excludes

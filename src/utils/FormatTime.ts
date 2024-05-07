@@ -10,7 +10,7 @@ export const formatTime = (time: number) => {
 	const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
 	const formattedSeconds = seconds < 10 ? `0${seconds}` : seconds;
 
-	return `${formattedMinutes} min ${formattedSeconds} sec`;
+	return `${formattedMinutes} : ${formattedSeconds} `;
 };
 
 // function to format this dat: Mon Nov 27 2023 02:54:32 GMT+0200 (Central Africa Time) to this format: 27 Nov 2023

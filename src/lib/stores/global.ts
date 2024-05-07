@@ -1,7 +1,11 @@
-import { setContext } from 'svelte';
 import { writable } from 'svelte/store';
-import type { VideoItem } from '../../core/model/youtube';
+import type { AudioAsset } from '@mnlib/lib/models/media-assets';
+import type { YoutubeVideo } from '@mnlib/lib/models/youtube';
 
 // Create a writable store to hold the selectAudio value
 
-export const selectAudio = writable<VideoItem | null>(null);
+export const selectAudio = writable<AudioAsset | null>(null);
+export const isLoading = writable<Boolean>(false);
+export const searchQuery = writable<String>('');
+export const currentViewingVideo = writable<YoutubeVideo>();
+export const filteredVideos = writable<YoutubeVideo[]>();

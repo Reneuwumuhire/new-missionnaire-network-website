@@ -10,10 +10,10 @@
 	import BsVolumeUpFill from 'svelte-icons-pack/bs/BsVolumeUpFill';
 	import BsVolumeMuteFill from 'svelte-icons-pack/bs/BsVolumeMuteFill';
 	import BsX from 'svelte-icons-pack/bs/BsX';
-	import type { VideoItem } from '../../core/model/youtube';
 	import { selectAudio } from '../stores/global';
+	import type { AudioAsset } from '@mnlib/lib/models/media-assets';
 
-	let audio: HTMLAudioElement | null = null;
+	let audio: HTMLAudioElement;
 	let isPlaying = false;
 	let currentTime = 0;
 	let duration = 0;
@@ -24,22 +24,40 @@
 	let initialIndicatorPosition = 0;
 	let volume = 1; // Initial volume (1 = full volume, 0 = mute)
 	let isMuted = false;
-	let selectedAudioToPlay: VideoItem | null = null;
+	let selectedAudioToPlay: AudioAsset | null = null;
+	let audioSrc: string;
+
+	function updateAudioSource(url: string) {
+		if (audio) {
+			audio.pause();
+			audio.src = url;
+			audio.load();
+			duration = 0; // Reset duration
+			audio.play();
+		} else {
+			audio = new Audio(url);
+			audio.addEventListener('ended', () => {
+				isPlaying = false;
+			});
+			audio.addEventListener('timeupdate', updateAudioTime);
+			audio.addEventListener('timeupdate', updateIndicator);
+			audio.addEventListener('loadedmetadata', () => {
+				duration = audio.duration; // Set duration after metadata is loaded
+				audio.play();
+				isPlaying = true;
+			});
+		}
+	}
+
+	$: if (selectedAudioToPlay) {
+		updateAudioSource(selectedAudioToPlay.url);
+	}
+
 	selectedAudioToPlay = getContext('selectedAudio');
 	selectAudio.subscribe((value) => {
 		selectedAudioToPlay = value;
-		if (audio) {
-			audio.pause();
-			audio = null;
-		}
+		if (selectedAudioToPlay) audioSrc = selectedAudioToPlay.url;
 	});
-	console.log('selectedAudioToPlay', selectedAudioToPlay);
-	const adjustVolume = (value: number) => {
-		if (!audio) return;
-
-		volume = value;
-		audio.volume = volume;
-	};
 
 	const toggleMute = () => {
 		if (!audio) return;
@@ -150,8 +168,6 @@
 	};
 
 	// Add your audio file path
-	const audioSrc =
-		'https://firebasestorage.googleapis.com/v0/b/missionnairenetwork.appspot.com/o/predications%2Faudio.mp3?alt=media&token=2a3587c8-5583-4a98-b371-6874962e621f';
 
 	onMount(() => {
 		audio = new Audio(audioSrc);
@@ -167,7 +183,6 @@
 	onDestroy(() => {
 		if (audio) {
 			audio.pause();
-			audio = null;
 		}
 	});
 </script>
@@ -187,7 +202,6 @@
 					selectAudio.set(null);
 					if (audio) {
 						audio.pause();
-						audio = null;
 					}
 				}}
 			>
@@ -236,29 +250,17 @@
 		</div>
 
 		<div class="flex flex-row text-gray-500 space-x-1 text-base">
-			<span>{formatTime(currentTime)}</span> <span>/</span> <span>{formatTime(duration)}</span>
+			<span class=" whitespace-nowrap">{formatTime(currentTime)} - {formatTime(duration)}</span>
 		</div>
 		<div class="hidden md:block">
 			<button on:click={toggleMute} class=" text-missionnaire px-3 py-3 border space-x-11">
-				{#if isMuted}
+				{#if !isMuted}
 					<Icon src={BsVolumeUpFill} />
 				{/if}
-				{#if !isMuted}
+				{#if isMuted}
 					<Icon src={BsVolumeMuteFill} />
 				{/if}
 			</button>
-			<!-- <input
-				type="range"
-				min="0"
-				max="1"
-				step="0.01"
-				class=" -rotate-90 w-20 h-5"
-				bind:value={volume}
-				on:input={(event) => {
-					const target = event.target;
-					adjustVolume(parseFloat(target.value));
-				}}
-			/> -->
 		</div>
 	</div>
 </div>
