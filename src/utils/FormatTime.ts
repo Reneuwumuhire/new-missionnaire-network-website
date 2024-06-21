@@ -1,16 +1,18 @@
 // Function to format time in MM:SS format
-export const formatTime = (time: number) => {
+export const formatTime = (time: number): string => {
 	if (isNaN(time) || time === Infinity) {
-		return '00:00';
+		return "00h:00min:00sec";
 	}
 
-	const minutes = Math.floor(time / 60);
+	const hours = Math.floor(time / 3600);
+	const minutes = Math.floor((time % 3600) / 60);
 	const seconds = Math.floor(time % 60);
 
-	const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
-	const formattedSeconds = seconds < 10 ? `0${seconds}` : seconds;
+	const formattedHours = hours > 0 ? `${hours}h` : "";
+	const formattedMinutes = minutes > 0 ? `${minutes}min` : "";
+	const formattedSeconds = `${seconds}sec`;
 
-	return `${formattedMinutes} : ${formattedSeconds} `;
+	return `${formattedHours} ${formattedMinutes} ${formattedSeconds}`;
 };
 
 // function to format this dat: Mon Nov 27 2023 02:54:32 GMT+0200 (Central Africa Time) to this format: 27 Nov 2023
@@ -21,20 +23,7 @@ export const formatDate = (date: string | Date) => {
 	const month = newDate.getMonth();
 	const year = newDate.getFullYear();
 
-	const months = [
-		'Jan',
-		'Feb',
-		'Mar',
-		'Apr',
-		'May',
-		'Jun',
-		'July',
-		'Aug',
-		'Sept',
-		'Oct',
-		'Nov',
-		'Dec'
-	];
+	const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "July", "Aug", "Sept", "Oct", "Nov", "Dec"];
 
 	return `${day} ${months[month]} ${year}`;
 };
