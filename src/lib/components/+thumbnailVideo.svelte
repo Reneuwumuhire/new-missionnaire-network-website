@@ -73,9 +73,7 @@
 	<!-- Thumbnail image -->
 	<div class=" group w-full h-full flex flex-col justify-between">
 		<div class="w-full">
-			<figure
-				class=" bg-slate-200 rounded-xl min-h-[240px] md:min-h-[120px] lg:min-h-[160px] h-fit"
-			>
+			<figure class=" bg-slate-200 rounded-xl h-fit aspect-video min-h-[140px]">
 				<img
 					class="  w-full rounded-xl"
 					src={video.thumbnails.medium.url}
