@@ -86,22 +86,6 @@
 					</li>
 				{/each}
 			</ul>
-			<h1 class=" hidden md:block text-2xl font-black text-[#414141]">Par ordre alphabétique</h1>
-			<ul class=" hidden md:flex flex-row justify-between w-full">
-				<!-- {#each alphabeticCharacters as character}
-					<li class="flex flex-row items-center">
-						<a
-							href="?filter=alph&char={character}"
-							class={`
-
-							 text-missionnaire
-							`}
-						>
-							<span class=" font-medium text-lg">{character}</span>
-						</a>
-					</li>
-				{/each} -->
-			</ul>
 		</div>
 	</div>
 </div>

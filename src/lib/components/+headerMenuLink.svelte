@@ -28,26 +28,26 @@
 	}
 </script>
 
-<div class="flex flex-col">
+<div class="flex flex-col text-sm">
 	<div
-		class="flex flex-row items-center space-x-2 hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out"
+		class="flex flex-row items-center space-x-2 hover:text-missionnaire transition-all duration-75 ease-in-out"
 	>
 		{#if subMenu && subMenu.length > 0}
 			<button
-				class="text-base font-normal whitespace-nowrap"
+				class="whitespace-nowrap"
 				on:click={() => {
 					showSubMenu = !showSubMenu;
 				}}>{menuName}</button
 			>
 		{:else}
-			<a href={link} class="text-base font-normal whitespace-nowrap">
+			<a href={link} class=" font-normal whitespace-nowrap">
 				{menuName}
 			</a>
 		{/if}
 		{#if subMenu && subMenu.length > 0}
 			<!-- button to trigger the show subMenu with Icon -->
 			<button
-				class={`text-base font-normal ${active ? activeClass : inactiveClass}`}
+				class={` ${active ? activeClass : inactiveClass}`}
 				on:click={() => {
 					showSubMenu = !showSubMenu;
 				}}
@@ -68,7 +68,7 @@
 			{#each subMenu as { subName, link, subText, image } (subName)}
 				<a
 					href={link}
-					class="text-base font-normal w-full hover:bg-missionnaire-50 my-1 p-2 rounded-md transition duration-500 ease-in-out"
+					class="w-full hover:bg-missionnaire-50 my-1 p-2 rounded-md transition duration-500 ease-in-out"
 					on:click={() => {
 						showSubMenu = false;
 					}}
@@ -81,7 +81,7 @@
 							{/if}
 						</div>
 						<div>
-							<span class=" text-base font-bold text-hardBlack">
+							<span class=" text-hardBlack">
 								{subName}
 							</span>
 							<p>

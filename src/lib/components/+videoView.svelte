@@ -15,7 +15,7 @@
 	};
 </script>
 
-<div class=" w-full flex items-center justify-center">
+<div class=" w-full flex items-center justify-center mb-6">
 	<div class="flex w-full flex-row justify-between space-x-4">
 		<!-- video and title -->
 		<div class=" w-full">

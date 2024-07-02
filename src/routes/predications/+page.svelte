@@ -3,6 +3,8 @@
 	import TableAudioList from '$lib/components/+tableAudioList.svelte';
 	import { page } from '$app/stores';
 	import TableLoadingSkeltoon from '$lib/components/+tableLoadingSkeltoon.svelte';
+
+	// filter the audios based on the searchTerm
 </script>
 
 {#await $page.data.streamed?.audiosRes}

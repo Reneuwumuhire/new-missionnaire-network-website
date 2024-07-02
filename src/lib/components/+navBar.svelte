@@ -69,10 +69,10 @@
 	}
 </script>
 
-<nav class=" z-50 max-w-full flex flex-row justify-between items-center h-20 px-3 md:px-6 my-4">
+<nav class="z-50 max-w-full flex flex-row justify-between items-center px-3 md:px-6 my-4">
 	<div class=" w-full flex flex-row justify-between items-center max-w-[1600px] mx-auto">
 		<a href="/" class="flex flex-row items-center">
-			<img src="/icons/logo.png" class="w-auto h-10" alt="logo" />
+			<img src="/icons/logo.png" class="w-auto h-8" alt="logo" />
 		</a>
 		<div class=" hidden lg:flex items-center space-x-8">
 			<!-- svelte-ignore a11y-no-static-element-interactions -->
@@ -86,17 +86,16 @@
 					<form on:submit|preventDefault={handleSubmit}>
 						<div class="flex items-center">
 							<div
-								class="w-10 h-10 rounded-full border-2 border-[#191919]/50 bg-white flex flex-row items-center justify-center transition-all duration-300 ease-in-out"
+								class="w-10 h-10 rounded-full border-[1px] border-[#ccc] bg-white flex flex-row items-center justify-center transition-all duration-300 ease-in-out"
 								class:w-72={shouldExpand}
 								class:bg-white={shouldExpand}
 								class:border={shouldExpand}
-								class:border-gray-300={shouldExpand}
 							>
 								<div
 									class="w-6 h-6 rounded-full -mr-9 flex items-center justify-center"
 									class:pl-2={shouldExpand}
 								>
-									<SearchNormal1 size={15} color="#191919" variant="Linear" />
+									<SearchNormal1 size={15} color="#ccc" variant="Linear" />
 								</div>
 								<input
 									type="text"
@@ -112,7 +111,7 @@
 										class=" w-6 h-6 rounded-full flex items-center justify-center pr-2"
 										on:click={clearInput}
 									>
-										<CloseCircle size={80} color="#fb923c" variant="Linear" />
+										<CloseCircle size={80} color="#ccc" variant="Linear" />
 									</button>
 								{/if}
 							</div>
@@ -140,7 +139,7 @@
 		<div class=" block lg:hidden text-black text-4xl">
 			<!-- menu -->
 			<button
-				class="flex flex-row items-center w-10 h-10 transition-all duration-75 ease-in-out text-missionnaire"
+				class="flex flex-row items-center w-8 h-8 transition-all duration-75 ease-in-out text-missionnaire"
 				on:click={toggleMobileNav}
 			>
 				{#if showMoboNav}

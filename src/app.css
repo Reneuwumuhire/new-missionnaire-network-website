@@ -4,7 +4,7 @@
 :root {
 	--icons-colors: #4f4f4f;
 	/* font is inter */
-	--font-family: 'Inter', sans-serif;
+	--font-family: "Inter", sans-serif;
 	scroll-behavior: smooth;
 }
 html {
@@ -13,4 +13,14 @@ html {
 ::selection {
 	background-color: #ff880c;
 	color: #fff;
+}
+
+@keyframes pulse {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.5;
+	}
 }
