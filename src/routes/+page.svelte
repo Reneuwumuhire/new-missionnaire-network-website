@@ -163,6 +163,7 @@
 	<title>{titleName}</title>
 </svelte:head>
 
+<!-- TODO: remove these tags buttons to navbar -->
 <main
 	class="align-middle flex flex-col items-center justify-center max-w-[1640px] mx-auto px-5 mt-[130px] relative"
 >

@@ -9,7 +9,8 @@
 
 	export let data: LayoutData;
 	// fix :>>>>>>>> data.IsLiveStreamlive.value
-	let isLiveStreamAvailable = false;
+
+	let isLiveStreamAvailable = data.IsLiveStreamlive;
 </script>
 
 <QueryClientProvider client={data.queryClient}>

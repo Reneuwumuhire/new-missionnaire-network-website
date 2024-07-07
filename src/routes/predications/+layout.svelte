@@ -29,7 +29,7 @@
 	}
 </script>
 
-<div class=" flex flex-col">
+<div class=" flex flex-col mt-8">
 	<header>
 		<div class="flex flex-row items-center justify-center space-x-2">
 			<!-- "/img/branham_page_header.jpg" use the image as the background for the next div -->

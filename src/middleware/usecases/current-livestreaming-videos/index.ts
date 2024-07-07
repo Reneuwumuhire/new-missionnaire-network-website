@@ -16,9 +16,10 @@ export default class GetCurrentLiveStreamingEventsUsecase implements UseCase<voi
             if (res.isOk) {
                 const value = res.value;
                 let finalRes:YoutubeVideo | null = null;
-
+                
                 if(value.length !== 0) finalRes = value[0];
-
+                
+                console.log(finalRes);
                 return Result.ok(finalRes)
             }
             else throw new Error(res.error.message);
