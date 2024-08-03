@@ -1,26 +1,36 @@
-export const availableTypes = [
+export const availableTypesTag = [
 	{
-		label: "All",
-		value: ["retransmission", "branham", "frank", "local", "lettre"],
+		label: 'All',
+		value: [
+			'retransmission',
+			'branham',
+			'frank',
+			'local',
+			'lettre',
+			'letter',
+			'ibaruwa',
+			'william',
+			'local'
+		]
 	},
 	{
-		label: "Retransimission",
-		value: ["retransmission"],
+		label: 'Retransimission',
+		value: ['frank', 'retransmission']
 	},
 	{
-		label: "William Branham",
-		value: ["william"],
+		label: 'William Branham',
+		value: ['william', 'branham']
 	},
 	{
-		label: "Ewald Frank",
-		value: ["ewald"],
+		label: 'Ewald Frank',
+		value: ['frank', 'retransmission']
 	},
 	{
-		label: "Local",
-		value: ["local"],
+		label: 'Local',
+		value: ['Local', 'local']
 	},
 	{
-		label: "Lettre circulaire",
-		value: ["lettre"],
-	},
+		label: 'Lettre circulaire',
+		value: ['lettre', 'letter', 'ibaruwa']
+	}
 ];

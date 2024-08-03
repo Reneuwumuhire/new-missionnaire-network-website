@@ -15,7 +15,7 @@
 
 <QueryClientProvider client={data.queryClient}>
 	<div class="flex flex-col fixed top-0 z-10 bg-white w-full">
-		{#if isLiveStreamAvailable}
+		{#if !isLiveStreamAvailable}
 			<SocialMediaAbove isLiveStream />
 		{/if}
 		<NavBar />

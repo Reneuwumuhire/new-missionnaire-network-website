@@ -42,7 +42,7 @@
 					<!-- use the next div and place the background image -->
 					<img
 						class=" w-full h-full aspect-video object-cover object-center max-h-[600px]"
-						src={selectedVideoStore.thumbnails.high.url}
+						src={selectedVideoStore.thumbnail}
 						alt="thumbnail"
 					/>
 					home
@@ -74,10 +74,10 @@
 							class="flex flex-row justify-between w-full max-w-xs text-xs md:text-sm mt-1 md:mt-3"
 						>
 							<span class="text-grayWeak font-medium">
-								{formatDate(selectedVideoStore?.publishedAt)}
+								<!-- {formatDate(selectedVideoStore?.publishedAt)} -->
 							</span>
 							<span class="text-grayWeak font-medium">
-								{formatTime(selectedVideoStore.durationInSeconds)}
+								<!-- {formatTime(selectedVideoStore.durationInSeconds)} -->
 							</span>
 						</div>
 						<!-- <div class="xsm:mt-3 sm:mt-10 xsm:mb-5 lg:mb-10 flex gap-10">

@@ -75,8 +75,8 @@
 		<div class="w-full">
 			<figure class=" bg-slate-200 rounded-xl h-fit aspect-video min-h-[140px]">
 				<img
-					class="  w-full rounded-xl"
-					src={video.thumbnails.medium.url}
+					class={` w-full rounded-xl aspect-video`}
+					src={video.thumbnail}
 					alt={video.title}
 					loading="lazy"
 				/>
@@ -101,15 +101,14 @@
 			</div>
 			<!-- controls for download -->
 			<div class=" w-full flex justify-between items-center">
-				<small class=" text-gray-500"
-					>{#if video.liveBroadcastContent === 'upcoming'}
+				<small class=" text-gray-500">
+					<!-- {#if video.liveBroadcastContent === 'upcoming'}
 						<div class=" bg-slate-950 text-weakGray px-3 py-2 rounded-full mt-2 font-bold">
 							Upcoming
 						</div>
-					{:else}
-						Streamed {video.actualStartTime &&
-							formatTime(new Date(video.actualStartTime.toLocaleString()))}
-					{/if}
+					{:else} -->
+					<!-- Streamed {formatTime(new Date(video.actualStartTime.toLocaleString()))} -->
+					<!-- {/if} -->
 				</small>
 				<!-- Button to download -->
 				<!-- <button class=" rounded-full p-2 -mr-4" on:click|stopPropagation={toggleVisible}

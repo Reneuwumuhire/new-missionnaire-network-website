@@ -46,6 +46,7 @@
 		"@googlemaps/js-api-loader": "^1.16.2",
 		"@tanstack/svelte-query": "^5.35.1",
 		"flowbite-svelte": "^0.44.20",
+		"mongodb": "^6.8.0",
 		"plyr": "^3.7.8",
 		"svelte-icons-pack": "^2.1.0",
 		"zod": "^3.22.2"
