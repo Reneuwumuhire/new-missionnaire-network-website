@@ -14,7 +14,7 @@ export const availableTypesTag = [
 		]
 	},
 	{
-		label: 'Retransimission',
+		label: 'Retransmission',
 		value: ['frank', 'retransmission']
 	},
 	{

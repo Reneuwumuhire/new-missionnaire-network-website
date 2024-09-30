@@ -60,8 +60,8 @@
 	$: showPlaceholder = shouldExpand;
 
 	function handleSubmit() {
-		// Handle search submission logic here
-		console.log('Searching for:', $searchTerm);
+		const searchEvent = new CustomEvent('search', { detail: $searchTerm });
+		window.dispatchEvent(searchEvent);
 	}
 
 	function clearInput() {
@@ -69,7 +69,7 @@
 	}
 </script>
 
-<nav class="z-50 max-w-full flex flex-row justify-between items-center px-3 md:px-6 my-4">
+<nav class="relative z-50 max-w-full flex flex-row justify-between items-center px-3 md:px-6 my-4">
 	<div class=" w-full flex flex-row justify-between items-center max-w-[1600px] mx-auto">
 		<a href="/" class="flex flex-row items-center">
 			<img src="/icons/logo.png" class="w-auto h-8" alt="logo" />
