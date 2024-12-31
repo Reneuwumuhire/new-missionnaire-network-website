@@ -1,5 +1,5 @@
 import { MongoClient, ServerApiVersion } from 'mongodb';
-// import { MONGODB_URI } from '$env/static/private';
+import { MONGODB_URI } from '$env/static/private';
 
 let client: MongoClient | null = null;
 
@@ -7,7 +7,7 @@ export async function connect() {
     try {
         if (!client) {
             console.log('[MongoDB] Attempting to connect...');
-            client = new MongoClient("mongodb+srv://renefrontend:MScHkNSaPKCwn0lN@cluster0.z9vgqkr.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0", {
+            client = new MongoClient(MONGODB_URI, {
                 serverApi: {
                     version: ServerApiVersion.v1,
                     strict: true,
