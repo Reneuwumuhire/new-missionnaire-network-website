@@ -11,3 +11,4 @@ vite.config.ts.timestamp-*
 .env
 application_default_credentials.json
 package-lock.json
+.vercel
