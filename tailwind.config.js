@@ -1,6 +1,6 @@
 /** @type {import('tailwindcss').Config} */
-const scrollbarHide = require('./tailwind-scrollbar-hide');
-const scrollbarCustom = require('./tailwind-scrollbar-custom');
+import scrollbarHide from './tailwind-scrollbar-hide';
+import scrollbarCustom from './tailwind-scrollbar-custom';
 
 export default {
 	content: ['./src/**/*.{html,js,svelte,ts}'],
