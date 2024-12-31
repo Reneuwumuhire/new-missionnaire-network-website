@@ -8,7 +8,6 @@
 	import { QueryClientProvider } from '@tanstack/svelte-query';
 
 	export let data: LayoutData;
-	// fix :>>>>>>>> data.IsLiveStreamlive.value
 
 	let isLiveStreamAvailable = data.IsLiveStreamlive;
 </script>
