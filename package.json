@@ -44,6 +44,7 @@
     "@badrap/result": "^0.2.13",
     "@google-cloud/firestore": "^6.7.0",
     "@googlemaps/js-api-loader": "^1.16.2",
+    "@sveltejs/adapter-vercel": "^5.5.2",
     "@tanstack/svelte-query": "^5.35.1",
     "flowbite-svelte": "^0.44.20",
     "mongodb": "^6.8.0",
