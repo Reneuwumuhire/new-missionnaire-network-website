@@ -14,6 +14,7 @@
 	import CloseCircle from 'iconsax-svelte/CloseCircle.svelte';
 	import HeaderMenuLinkMobo from './+headerMenuLinkMobo.svelte';
 	import { searchTerm } from '$lib/stores/videoStore';
+	import { createEventDispatcher } from 'svelte';
 
 	const languages = { en, fr };
 	let currentLang = 'en';
@@ -21,6 +22,8 @@
 	let openMenuIndex: number | null = null;
 	dict.set(languages);
 	let showDropContents = false;
+	const dispatch = createEventDispatcher();
+
 	const langSwitch = () => {
 		showDropContents = !showDropContents;
 	};
@@ -60,13 +63,17 @@
 	$: showPlaceholder = shouldExpand;
 
 	function handleSubmit() {
-		const searchEvent = new CustomEvent('search', { detail: $searchTerm });
-		window.dispatchEvent(searchEvent);
+		dispatch('search', $searchTerm);
 	}
 
+	function handleSearchInput() {
+        dispatch('search', $searchTerm);
+    }
+
 	function clearInput() {
-		searchTerm.set('');
-	}
+        searchTerm.set('');
+        dispatch('search', '');
+    }
 </script>
 
 <nav class="relative z-50 max-w-full flex flex-row justify-between items-center px-3 md:px-6 my-4">
@@ -95,7 +102,7 @@
 									class="w-6 h-6 rounded-full -mr-9 flex items-center justify-center"
 									class:pl-2={shouldExpand}
 								>
-									<SearchNormal1 size={15} color="#ccc" variant="Linear" />
+									<SearchNormal1 size={12} color="#ccc" variant="Linear" />
 								</div>
 								<input
 									type="text"
@@ -104,6 +111,7 @@
 									class=" indent-8 px-4 py-2 text-gray-600 bg-transparent outline-none w-full font-normal text-current"
 									on:focus={() => (isFocused = true)}
 									on:blur={() => (isFocused = false)}
+									on:input={handleSearchInput}
 								/>
 								{#if showClearButton}
 									<button

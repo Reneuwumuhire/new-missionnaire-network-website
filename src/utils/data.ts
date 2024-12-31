@@ -5,7 +5,6 @@ export const availableTypesTag = [
 			'retransmission',
 			'branham',
 			'frank',
-			'local',
 			'lettre',
 			'letter',
 			'ibaruwa',
@@ -27,7 +26,7 @@ export const availableTypesTag = [
 	},
 	{
 		label: 'Local',
-		value: ['Local', 'local']
+		value: ['local']
 	},
 	{
 		label: 'Lettre circulaire',

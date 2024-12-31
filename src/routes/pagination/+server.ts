@@ -1,17 +1,37 @@
-import { getCollection } from "../../db/collections";
+import { json } from '@sveltejs/kit';
+import { getCollection } from '../../db/collections';
 
-export async function GET(request: Request): Promise<Response> {
-    // get skip and limit from searchParams in request
-    const url = new URL(request.url);
-    let skip = Number(url.searchParams.get("skip") || "0");
-    if (skip < 0)
-        skip = 0;
+export const GET = async ({ url }) => {
+    const startTime = performance.now();
 
-    const limit = 20; // Define limit explicitly
+    try {
+        const skip = parseInt(url.searchParams.get('skip') || '0');
+        const filter = url.searchParams.get('filter') || 'All';
+        const search = url.searchParams.get('search') || '';
+        const limit = 20;
 
-    // get videos from MongoDB
-    const videos = await getCollection("videos", skip, limit);
+        console.log('[API] Received request:', { skip, filter, search, limit });
 
-    // return JSON response
-    return new Response(JSON.stringify({ data: videos }));
-}
+        const videos = await getCollection('videos', skip, limit, filter, search);
+
+        const response = {
+            data: videos,
+            timing: performance.now() - startTime,
+            params: { skip, filter, search, limit }
+        };
+
+        console.log('[API] Sending response:', {
+            resultCount: videos.length,
+            timing: response.timing
+        });
+
+        return json(response);
+    } catch (error) {
+        console.error('[API] Error processing request:', error);
+        return json({
+            error: 'Failed to fetch videos',
+            details: error instanceof Error ? error.message : 'Unknown error',
+            data: []
+        }, { status: 500 });
+    }
+};

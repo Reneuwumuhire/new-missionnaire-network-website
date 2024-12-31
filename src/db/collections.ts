@@ -1,21 +1,69 @@
-import { getDB } from "./mongo";
+import { getDb } from "./mongo";
+import { availableTypesTag } from '../utils/data';
 
-const db = getDB();
+export async function getCollection(
+    collection_name: string,
+    skip: number,
+    limit: number,
+    filter?: string,
+    search?: string
+): Promise<any> {
+    console.log('[DB] Starting query with params:', { collection_name, skip, limit, filter, search });
 
-export async function getCollection(collection_name:string, skip:number, limit:number): Promise<any>
-{
-    // get repositories from MongoDB with skip and limit
-    const data = await db.collection(collection_name).find({}).skip(skip).limit(limit).toArray();
+    try {
+        const db = await getDb();
+        const query: any = {};
+        const conditions: any[] = [];
 
-    // return JSON response
-    return data;
-}
+        // Add search condition if provided
+        if (search && search.trim()) {
+            conditions.push({
+                $or: [
+                    { title: { $regex: search, $options: 'i' } },
+                    { description: { $regex: search, $options: 'i' } }
+                ]
+            });
+        }
 
-export async function searchCollection(collection_name:string, search:string): Promise<any>
-{
-    // get repositories from MongoDB with search query and regex options
-    const data = await db.collection(collection_name).find({title:{$regex:search, $options:'i'}}).toArray();
+        // Add filter condition if provided and not 'All'
+        if (filter && filter !== 'All') {
+            const tagConfig = availableTypesTag.find(tag => tag.label === filter);
+            console.log('[DB] Tag config for filter:', tagConfig);
 
-    // return JSON response
-    return data;
+            if (tagConfig) {
+                const regexPatterns = tagConfig.value.map(value =>
+                    new RegExp(`^${value}$`, 'i')
+                );
+                conditions.push({
+                    tags: { $in: regexPatterns }
+                });
+            }
+        }
+
+        // Combine conditions if they exist
+        if (conditions.length > 0) {
+            query.$and = conditions;
+        }
+
+        console.log('[DB] Final query:', JSON.stringify(query, null, 2));
+
+        // Let MongoDB handle sorting and pagination
+        const data = await db.collection(collection_name)
+            .find(query)
+            .sort({ upload_date: -1 }) // Sort in MongoDB instead of in memory
+            .skip(skip)
+            .limit(limit)
+            .toArray();
+
+        console.log(`[DB] Found ${data.length} documents`);
+
+        // Convert MongoDB documents to plain objects and stringify ObjectIds
+        return data.map(doc => ({
+            ...doc,
+            _id: doc._id.toString()
+        }));
+    } catch (error) {
+        console.error('[DB] Error in getCollection:', error);
+        throw error;
+    }
 }

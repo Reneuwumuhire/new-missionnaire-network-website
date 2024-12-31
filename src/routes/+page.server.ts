@@ -1,18 +1,14 @@
-import { YoutubeVideo } from "@mnlib/lib/models/youtube";
-import { getCollection } from "../db/collections";
+import type { PageServerLoad } from './$types';
+import { getCollection } from '../db/collections';
 
-export async function load({ url }: { url: URL }): Promise<{ data: YoutubeVideo[] }> {
-    // get skip and limit from searchParams in request
-    let skip = Number(url.searchParams.get("skip") || "0");
-    if (skip < 0) skip = 0;
+export const load: PageServerLoad = async ({ url }) => {
+    const filter = url.searchParams.get('filter') || 'All';
+    const search = url.searchParams.get('search') || '';
 
-    const limit = 20; // Define the limit explicitly
+    // Use the same parameters as pagination
+    const videos = await getCollection('videos', 0, 20, filter, search);
 
-    // get videos from MongoDB
-    const videos = await getCollection("videos", skip, limit);
-    const serializedVideos = videos.map((video: YoutubeVideo) => ({
-        ...video,
-        _id: video?._id.toString()
-    }));
-    return { data: serializedVideos };
-}
+    return {
+        data: videos
+    };
+};

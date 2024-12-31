@@ -1,8 +1,7 @@
-import { connect } from "./db/mongo";
+import { connect } from './db/mongo';
 
-connect().then((result) => {
+connect().then(async () => {
     console.log("MongoDB started");
-    return result;
 }).catch((e) => {
     console.log("MongoDB failed to start");
     console.log(e);

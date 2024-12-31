@@ -1,19 +1,37 @@
-import { MONGODB_URI } from '$env/static/private';
-import { Db, MongoClient } from 'mongodb';
+import { MongoClient, ServerApiVersion } from 'mongodb';
+// import { MONGODB_URI } from '$env/static/private';
 
-const client = new MongoClient("mongodb+srv://renefrontend:JjjRblRkX8dDuS0d@cluster0.z9vgqkr.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0");
+let client: MongoClient | null = null;
 
-// connect to the database
-export async function connect(): Promise<void> {
-    await client.connect();
+export async function connect() {
+    try {
+        if (!client) {
+            console.log('[MongoDB] Attempting to connect...');
+            client = new MongoClient("mongodb+srv://renefrontend:MScHkNSaPKCwn0lN@cluster0.z9vgqkr.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0", {
+                serverApi: {
+                    version: ServerApiVersion.v1,
+                    strict: true,
+                    deprecationErrors: true,
+                }
+            });
+            await client.connect();
+            console.log('[MongoDB] Connected successfully');
+
+            // Test the connection
+            const db = client.db("youtube_data");
+            const collections = await db.listCollections().toArray();
+            console.log('[MongoDB] Available collections:', collections.map(c => c.name));
+        }
+        return client;
+    } catch (error) {
+        console.error('[MongoDB] Connection error:', error);
+        throw error;
+    }
 }
 
-// disconnect from the database
-export async function disconnect(): Promise<void> {
-    await client.close();
-}
-
-// get the database
-export function getDB(): Db {
-    return client.db('youtube_data');
+export async function getDb() {
+    if (!client) {
+        await connect();
+    }
+    return client!.db("youtube_data");
 }
