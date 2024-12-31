@@ -9,13 +9,7 @@ const config = {
 			base: '' // or your actual base path if not root
 		}
 	},
-	preprocess: [
-		vitePreprocess({
-			typescript: {
-				tsconfigFile: './tsconfig.json'
-			}
-		})
-	]
+	preprocess: [vitePreprocess()]
 };
 
 export default config;
