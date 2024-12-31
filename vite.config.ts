@@ -15,7 +15,8 @@ export default defineConfig({
 	},
 	resolve: {
 		alias: {
-			'@mnlib': path.resolve(__dirname, './mn-lib')
+			'@mnlib': path.resolve(__dirname, './mn-lib'),
+			'@mnlib/*': path.resolve(__dirname, './mn-lib/*')
 		}
 	}
 });
