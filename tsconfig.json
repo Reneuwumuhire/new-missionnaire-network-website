@@ -8,7 +8,9 @@
 		"resolveJsonModule": true,
 		"skipLibCheck": true,
 		"sourceMap": true,
-		"strict": true
+		"strict": true,
+		"verbatimModuleSyntax": true,
+		"isolatedModules": true
 	},
 	"rules": {
 		"interface-name": [true, "never-prefix"],
