@@ -50,7 +50,7 @@ export async function getCollection(
         // Let MongoDB handle sorting and pagination
         const data = await db.collection(collection_name)
             .find(query)
-            .sort({ upload_date: -1 }) // Sort in MongoDB instead of in memory
+            .sort({ release_timestamp: -1 }) // Sort in MongoDB instead of in memory
             .skip(skip)
             .limit(limit)
             .toArray();
