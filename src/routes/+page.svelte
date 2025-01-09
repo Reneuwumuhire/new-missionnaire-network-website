@@ -173,7 +173,7 @@
 	<div class="mt-24">
 		{#if $isInitialLoading}
 			<div class="flex items-center justify-center min-h-screen">
-				<div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-gray-900" />
+				<div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary" />
 			</div>
 		{:else}
 			{#if selectedVideo}
@@ -193,14 +193,10 @@
 				{/if}
 				{#if $isLoading}
 					<HomepageLoadingSkelton />
-				{:else if !$hasMore}
-					<div class="text-center w-full py-8">
-						<p class="text-gray-500 font-bold">**** End of list ****</p>
-					</div>
 				{/if}
-			{:else if !$isLoading}
+			{:else if !$isLoading && !$hasMore}
 				<div class="text-center w-full items-center justify-center">
-					<p class="text-gray-500">No videos found for the selected filters.</p>
+					<p class="text-gray-500">No more videos found for the selected filters.</p>
 				</div>
 			{/if}
 		{/if}
