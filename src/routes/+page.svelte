@@ -9,7 +9,7 @@
 	import type { YoutubeVideo } from '@mnlib/lib/models/youtube';
 	import HomepageLoadingSkelton from '$lib/components/+homepageLoadingSkelton.svelte';
 	import { availableTypesTag } from '../utils/data';
-	import { searchTerm, skip } from '$lib/stores/videoStore';
+	import { searchTerm, selectedVideo, skip } from '$lib/stores/videoStore';
 	import { onMount } from 'svelte';
 	import {
 		activeFilter,
@@ -82,15 +82,13 @@
 		};
 	}
 
-	let selectedVideo: YoutubeVideo | undefined;
-
 	$: videoSelected = (video: YoutubeVideo) => {
-		currentViewingVideo.set(video);
+		selectedVideo.set(video);
 		window.scrollTo({ top: 0, behavior: 'smooth' });
 	};
 
 	$: currentViewingVideo.subscribe((value) => {
-		selectedVideo = value;
+		selectedVideo.set(value);
 	});
 
 	$: filteredVideos = derived(
@@ -160,6 +158,7 @@
 	$: if ($searchTerm !== undefined && browser) {
 		const searchValue = $searchTerm;
 		if (searchValue !== '') {
+			selectedVideo.set(undefined);
 			handleSearch(searchValue);
 		}
 	}
@@ -169,15 +168,15 @@
 	<title>{titleName}</title>
 </svelte:head>
 
-<main class="relative max-w-[1640px] mx-auto px-5 mt-[70px]">
+<main class="relative max-w-[1640px] mx-auto px-5">
 	<div class="mt-24">
 		{#if $isInitialLoading}
 			<div class="flex items-center justify-center min-h-screen">
 				<div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary" />
 			</div>
 		{:else}
-			{#if selectedVideo}
-				<VideoView selectedVideoStore={selectedVideo} />
+			{#if $selectedVideo !== undefined}
+				<VideoView />
 			{/if}
 
 			{#if $filteredVideos.length > 0}

@@ -5,9 +5,7 @@
 	import { formatDate, formatTime } from '../../utils/FormatTime';
 	import type { YoutubeVideo } from '@mnlib/lib/models/youtube';
 	import { page } from '$app/stores';
-	import { currentViewingVideo } from '$lib/stores/global';
-
-	export let selectedVideoStore: YoutubeVideo;
+	import { selectedVideo } from '$lib/stores/videoStore';
 
 	let playNow = false;
 	const handleClick = () => {
@@ -29,7 +27,7 @@
 					>
 						<iframe
 							class=" w-full aspect-video rounded-xl"
-							src={`https://www.youtube.com/embed/${selectedVideoStore.id}?autoplay=1`}
+							src={`https://www.youtube.com/embed/${$selectedVideo?.id}?autoplay=1`}
 							allowfullscreen
 							allow="autoplay; encrypted-media"
 							title=""
@@ -42,7 +40,7 @@
 					<!-- use the next div and place the background image -->
 					<img
 						class=" w-full h-full aspect-video object-cover object-center max-h-[600px]"
-						src={selectedVideoStore.thumbnail}
+						src={$selectedVideo?.thumbnail}
 						alt="thumbnail"
 					/>
 					home
@@ -68,7 +66,7 @@
 						<h2
 							class="text-white font-bold text-sm md:text-3xl text-ellipsis overflow-hidden line-clamp-2 leading-5 md:leading-10"
 						>
-							{selectedVideoStore.title}
+							{$selectedVideo?.title}
 						</h2>
 						<div
 							class="flex flex-row justify-between w-full max-w-xs text-xs md:text-sm mt-1 md:mt-3"

@@ -7,9 +7,8 @@
 	import type { LayoutData } from './$types';
 	import { QueryClientProvider } from '@tanstack/svelte-query';
 	import { availableTypesTag } from '../utils/data';
-	import { activeFilter, isLoading, isInitialLoading } from '$lib/stores/videoStore';
+	import { activeFilter, isLoading } from '$lib/stores/videoStore';
 	import { setFilter } from '../utils/videoUtils';
-	import { get } from 'svelte/store';
 	import { page } from '$app/stores';
 	export let data: LayoutData;
 
@@ -49,7 +48,7 @@
 				</div>
 			</div>
 		{/if}
-		<div class={`mt-[${$page.url.pathname === '/' ? '160px' : '60px'}]`}>
+		<div class={`relative ${$page.url.pathname === '/' ? 'mt-[160px]' : 'mt-[60px]'}`}>
 			<slot />
 		</div>
 	</div>

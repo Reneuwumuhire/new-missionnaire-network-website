@@ -8,6 +8,7 @@ export const isLoading = writable<boolean>(false);
 export const isInitialLoading = writable<boolean>(true);
 export const skip = writable(0);
 export const videos = writable<any[]>([]);
+export const selectedVideo = writable<YoutubeVideo | undefined>(undefined);
 export const hasMore = writable(true);
 export const filteredVideoList = derived(
 	[searchTerm, videoList],

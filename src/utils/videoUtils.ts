@@ -1,6 +1,6 @@
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
-import { activeFilter, isLoading, isInitialLoading, skip, videos, hasMore, searchTerm } from '$lib/stores/videoStore';
+import { activeFilter, isLoading, isInitialLoading, skip, videos, hasMore, searchTerm, selectedVideo } from '$lib/stores/videoStore';
 import { get } from 'svelte/store';
 const limit = 20;
 
@@ -119,6 +119,7 @@ export async function setFilter(filter: string) {
     if (get(activeFilter) === filter) return;
 
     activeFilter.set(filter);
+    selectedVideo.set(undefined);
     resetPagination();
     await fetchInitialVideos();
     updateURL(filter);
