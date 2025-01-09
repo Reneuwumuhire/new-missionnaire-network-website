@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import Menu from 'iconsax-svelte/Menu.svelte';
 	import HeaderMenuLink from '$lib/components/+headerMenuLink.svelte';
 	import { dict, locale, t } from '../../i18n';
 	import fr from '../../translations/fr';
@@ -15,6 +14,7 @@
 	import HeaderMenuLinkMobo from './+headerMenuLinkMobo.svelte';
 	import { searchTerm } from '$lib/stores/videoStore';
 	import { createEventDispatcher } from 'svelte';
+	import { fetchInitialVideos } from '../../utils/videoUtils';
 
 	const languages = { en, fr };
 	let currentLang = 'en';
@@ -40,8 +40,16 @@
 		showMoboNav = !showMoboNav;
 		if (showMoboNav) {
 			document.body.classList.add('overflow-hidden', 'overscroll-none');
+			document.body.style.overflow = 'hidden';
+			document.body.style.height = '100vh';
+			document.body.style.position = 'fixed';
+			document.body.style.width = '100%';
 		} else {
 			document.body.classList.remove('overflow-hidden', 'overscroll-none');
+			document.body.style.overflow = 'auto';
+			document.body.style.height = 'auto';
+			document.body.style.position = 'relative';
+			document.body.style.width = 'auto';
 		}
 	};
 	// toggle the menu when clicked
@@ -67,13 +75,14 @@
 	}
 
 	function handleSearchInput() {
-        dispatch('search', $searchTerm);
-    }
+		dispatch('search', $searchTerm);
+	}
 
 	function clearInput() {
-        searchTerm.set('');
-        dispatch('search', '');
-    }
+		searchTerm.set('');
+		fetchInitialVideos();
+		dispatch('search', '');
+	}
 </script>
 
 <nav class="relative z-50 max-w-full flex flex-row justify-between items-center px-3 md:px-6 my-4">
@@ -144,7 +153,7 @@
 				{/each}
 			</div>
 		</div>
-		<div class=" block lg:hidden text-black text-4xl">
+		<div class=" relative block lg:hidden text-black text-4xl">
 			<!-- menu -->
 			<button
 				class="flex flex-row items-center w-8 h-8 transition-all duration-75 ease-in-out text-missionnaire"
@@ -159,7 +168,11 @@
 		</div>
 		<!-- mobo menu -->
 		{#if showMoboNav}
-			<div class="absolute z-50 top-28 left-0 w-full h-screen bg-white border-t-2 py-6">
+			<div
+				class={`absolute z-50 ${
+					$page.url.pathname === '/' ? 'top-[140px]' : 'top-[40px]'
+				} left-0 w-full h-screen bg-white border-t-2 py-6`}
+			>
 				<div class="relative flex flex-col space-y-2 w-full h-full bg-white">
 					<!-- svelte-ignore a11y-no-static-element-interactions -->
 					<div

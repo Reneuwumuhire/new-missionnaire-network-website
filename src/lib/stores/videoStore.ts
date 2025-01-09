@@ -3,6 +3,12 @@ import { derived, writable } from 'svelte/store';
 
 export const searchTerm = writable<string>('');
 export const videoList = writable<YoutubeVideo[]>();
+export const activeFilter = writable<string>('All');
+export const isLoading = writable<boolean>(false);
+export const isInitialLoading = writable<boolean>(true);
+export const skip = writable(0);
+export const videos = writable<any[]>([]);
+export const hasMore = writable(true);
 export const filteredVideoList = derived(
 	[searchTerm, videoList],
 	([$term, $videoList]) => {
@@ -14,3 +20,5 @@ export const filteredVideoList = derived(
 	},
 	[]
 );
+
+
