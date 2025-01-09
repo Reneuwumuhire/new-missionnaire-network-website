@@ -193,11 +193,11 @@
 				{/if}
 				{#if $isLoading}
 					<HomepageLoadingSkelton />
+				{:else if !$hasMore}
+					<div class="text-center w-full py-8">
+						<p class="text-primary font-bold">*******************</p>
+					</div>
 				{/if}
-			{:else if !$isLoading && !$hasMore}
-				<div class="text-center w-full items-center justify-center">
-					<p class="text-gray-500">No more videos found for the selected filters.</p>
-				</div>
 			{/if}
 		{/if}
 	</div>

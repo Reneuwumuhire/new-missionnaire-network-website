@@ -72,6 +72,9 @@
 
 	function handleSubmit() {
 		dispatch('search', $searchTerm);
+		if (showMoboNav) {
+			toggleMobileNav(); // Close the mobile menu
+		}
 	}
 
 	function handleSearchInput() {
@@ -82,6 +85,9 @@
 		searchTerm.set('');
 		fetchInitialVideos();
 		dispatch('search', '');
+		if (showMoboNav) {
+			toggleMobileNav(); // Close the mobile menu
+		}
 	}
 </script>
 

@@ -49,7 +49,7 @@
 				</div>
 			</div>
 		{/if}
-		<div class={`mt-[${$page.url.pathname === '/' ? '140px' : '60px'}]`}>
+		<div class={`mt-[${$page.url.pathname === '/' ? '160px' : '60px'}]`}>
 			<slot />
 		</div>
 	</div>
