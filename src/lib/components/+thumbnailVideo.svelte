@@ -8,6 +8,8 @@
 	import DocumentText1 from 'iconsax-svelte/DocumentText1.svelte';
 	import VideoPlay from 'iconsax-svelte/VideoPlay.svelte';
 	import type { YoutubeVideo } from '@mnlib/lib/models/youtube';
+	import Icon from 'svelte-icons-pack';
+	import BsThreeDotsVertical from 'svelte-icons-pack/bs/BsThreeDotsVertical';
 
 	export let video: YoutubeVideo;
 	export let index: number;
@@ -111,9 +113,9 @@
 					<!-- {/if} -->
 				</small>
 				<!-- Button to download -->
-				<!-- <button class=" rounded-full p-2 -mr-4" on:click|stopPropagation={toggleVisible}
+				<button class=" rounded-full p-2 -mr-4" on:click|stopPropagation={toggleVisible}
 					><Icon src={BsThreeDotsVertical} />
-				</button> -->
+				</button>
 			</div>
 		</div>
 	</div>

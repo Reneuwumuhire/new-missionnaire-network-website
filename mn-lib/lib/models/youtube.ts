@@ -75,7 +75,15 @@ export const YoutubeVideoSchema = z.object({
 	duration_string: z.string(),
 	release_year: z.number(),
 	epoch: z.number(),
-	aspect_ratio: z.number()
+	aspect_ratio: z.number(),
+	pdfInfo: z.array(
+		z.object({
+			url: z.string().url(),
+			size: z.number(),
+			fileName: z.string(),
+			s3Key: z.string()
+		})
+	)
 });
 export const YoutubeAudioSchema = YoutubeVideoSchema.extend({
 	audioFiles: z.object({

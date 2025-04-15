@@ -69,34 +69,31 @@
 							{$selectedVideo?.title}
 						</h2>
 						<div
-							class="flex flex-row justify-between w-full max-w-xs text-xs md:text-sm mt-1 md:mt-3"
+							class="flex flex-row justify-start w-full max-w-xs text-xs md:text-sm mt-1 md:mt-3"
 						>
 							<span class="text-grayWeak font-medium">
-								<!-- {formatDate(selectedVideoStore?.publishedAt)} -->
-							</span>
-							<span class="text-grayWeak font-medium">
-								<!-- {formatTime(selectedVideoStore.durationInSeconds)} -->
+								Duration: {$selectedVideo?.duration_string}
 							</span>
 						</div>
-						<!-- <div class="xsm:mt-3 sm:mt-10 xsm:mb-5 lg:mb-10 flex gap-10">
-							<button on:click={() => {}}>
+						<div class="xsm:mt-3 sm:mt-10 xsm:mb-5 lg:mb-10 flex gap-10">
+							<!-- <button on:click={() => {}}>
 								<img
 									class=" xsm:w-[30px] lg:w-[45px] h-fit"
 									src="/icons/play-yellow.png"
 									alt="play"
 								/>
-							</button>
-							<button>
+							</button> -->
+							<!-- <button>
 								<img class=" xsm:w-[30px] w-[45px] h-fit" src="/icons/link-yellow.png" alt="play" />
 							</button>
 							<button>
 								<img
 									class=" xsm:w-[30px] w-[45px] h-fit"
 									src="/icons/download-yellow.png"
-									alt="play"
+									alt="download"
 								/>
-							</button>
-						</div> -->
+							</button> -->
+						</div>
 					</div>
 				{/if}
 			</div>
