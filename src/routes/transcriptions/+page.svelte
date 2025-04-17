@@ -16,37 +16,67 @@
 	let selectedDocument: (typeof data.documents)[0] | null = null;
 	const isDocumentOpen = writable(false);
 	let searchTerm = '';
-	let filteredDocuments = data.documents;
 	let sortOrder = data.sort || 'desc';
 	let selectedYear = data.selectedYear || '';
+	let isSearching = false;
+	let searchInput: HTMLInputElement;
+	let typingTimeout: NodeJS.Timeout;
+	let lastSearch = '';
 
 	$: currentPage = data.pagination.page;
 	$: totalPages = Math.ceil(data.pagination.total / data.pagination.limit);
 	$: visiblePages = getVisiblePages(currentPage, totalPages);
-	
-	$: {
-		if (searchTerm.trim() === '') {
-			filteredDocuments = data.documents;
-		} else {
-			const searchLower = searchTerm.toLowerCase();
-			filteredDocuments = data.documents.filter(doc => 
-				doc.filename.toLowerCase().includes(searchLower)
-			);
-		}
+	$: filteredDocuments = data.documents;
+	$: showPagination = data.pagination.total > 10;
+
+	function handleSearch(value: string) {
+		if (!browser) return;
+		
+		clearTimeout(typingTimeout);
+		
+		// Don't search if the value hasn't changed from last search
+		if (value.trim() === lastSearch) return;
+		
+		typingTimeout = setTimeout(async () => {
+			isSearching = true;
+			const url = new URL(window.location.href);
+			
+			if (value.trim()) {
+				url.searchParams.set('search', value.trim());
+			} else {
+				url.searchParams.delete('search');
+			}
+			
+			url.searchParams.set('page', '1');
+			lastSearch = value.trim();
+			
+			try {
+				await goto(url.toString(), { keepFocus: true });
+			} finally {
+				isSearching = false;
+			}
+		}, 500); // Reduced debounce time for better responsiveness
 	}
 
+	function handleFocus(event: FocusEvent) {
+		// Don't select all text on focus, more like YouTube behavior
+		const input = event.target as HTMLInputElement;
+		input.focus();
+	}
+
+	// Handle other navigation without forcing focus
 	function handlePageChange(newPage: number) {
 		if (browser) {
 			const url = new URL(window.location.href);
 			url.searchParams.set('page', newPage.toString());
-			goto(url.toString(), { keepFocus: true });
+			goto(url.toString());
 		}
 	}
 
 	function handleSort() {
 		if (browser) {
-			const newSort = sortOrder === 'asc' ? 'desc' : 'asc'; // Toggle between asc and desc
-			sortOrder = newSort; // Update local state immediately
+			const newSort = sortOrder === 'asc' ? 'desc' : 'asc';
+			sortOrder = newSort;
 			const url = new URL(window.location.href);
 			url.searchParams.set('sort', newSort);
 			goto(url.toString());
@@ -62,21 +92,7 @@
 			} else {
 				url.searchParams.delete('year');
 			}
-			url.searchParams.set('page', '1'); // Reset to first page on year change
-			goto(url.toString());
-		}
-	}
-
-	function handleSearch(e: Event) {
-		e.preventDefault();
-		if (browser) {
-			const url = new URL(window.location.href);
-			if (searchTerm.trim()) {
-				url.searchParams.set('search', searchTerm);
-			} else {
-				url.searchParams.delete('search');
-			}
-			url.searchParams.set('page', '1'); // Reset to first page on search
+			url.searchParams.set('page', '1');
 			goto(url.toString());
 		}
 	}
@@ -87,10 +103,14 @@
 	}
 
 	onMount(() => {
-		// Initialize search term from URL
 		if (browser) {
 			const url = new URL(window.location.href);
 			searchTerm = url.searchParams.get('search') || '';
+			lastSearch = searchTerm;
+			// Only focus on initial load if there's a search term
+			if (searchTerm && searchInput) {
+				searchInput.focus();
+			}
 		}
 		window.scrollTo(0, 0);
 	});
@@ -144,17 +164,27 @@
 				<h1 class="text-2xl sm:text-3xl font-bold mb-2 sm:mb-4">Transcriptions</h1>
 				<p class="text-gray-600 mb-2 text-sm sm:text-base">Trouvez les transcriptions des prédications</p>
 				<p class="text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6">{data.pagination.total} transcription{data.pagination.total > 1 ? 's' : ''} disponible{data.pagination.total > 1 ? 's' : ''}</p>
-				<form on:submit={handleSearch} class="flex flex-row w-full max-w-xl mx-auto px-2 sm:px-0">
-					<input
-						type="text"
-						class="border border-gray-300 rounded-l-full indent-2 sm:indent-4 p-2 w-full text-gray-900 text-sm sm:text-base outline-none focus:ring-2 focus:ring-missionnaire focus:border-transparent"
-						placeholder="Rechercher par titre..."
-						bind:value={searchTerm}
-					/>
-					<button type="submit" class="bg-missionnaire text-white px-4 sm:px-6 py-2 rounded-r-full hover:bg-missionnaire/90 text-sm sm:text-base">
-						Rechercher
-					</button>
-				</form>
+					<form class="flex flex-row w-full max-w-xl mx-auto px-2 sm:px-0" on:submit|preventDefault>
+						<div class="relative flex-1">
+							<input
+								type="text"
+								class="border border-gray-300 rounded-l-full indent-2 sm:indent-4 p-2 w-full text-gray-900 text-sm sm:text-base outline-none focus:ring-2 focus:ring-missionnaire focus:border-transparent"
+								placeholder="Rechercher par titre..."
+								bind:value={searchTerm}
+								bind:this={searchInput}
+								on:focus={handleFocus}
+								on:input={() => handleSearch(searchTerm)}
+							/>
+							{#if isSearching}
+								<div class="absolute right-3 top-1/2 -translate-y-1/2">
+									<div class="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-missionnaire"></div>
+								</div>
+							{/if}
+						</div>
+						<button type="button" class="bg-missionnaire text-white px-4 sm:px-6 py-2 rounded-r-full hover:bg-missionnaire/90 text-sm sm:text-base">
+							Rechercher
+						</button>
+					</form>
 			</div>
 		</div>
 	</div>
@@ -247,7 +277,7 @@
 				</div>
 
 				<!-- Pagination -->
-				{#if totalPages > 1}
+				{#if showPagination && totalPages > 1}
 					<div class="flex justify-center mt-4 sm:mt-8 gap-1 sm:gap-2 px-2 sm:px-0">
 						<button
 							class="px-2 sm:px-4 py-2 text-xs sm:text-sm rounded-md transition-colors duration-200 {currentPage === 1

@@ -1,6 +1,6 @@
 import { getDb } from './mongo';
 import { availableTypesTag } from '../utils/data';
-
+import { ObjectId } from 'mongodb';
 export async function getCollection(
 	collection_name: string,
 	skip: number,
@@ -56,13 +56,53 @@ export async function getCollection(
 
 		console.log(`[DB] Found ${data.length} documents`);
 
-		// Convert MongoDB documents to plain objects and stringify ObjectIds
-		return data.map((doc) => ({
-			...doc,
-			_id: doc._id.toString()
-		}));
+		// Convert MongoDB documents to plain objects and stringify all ObjectIds recursively
+		return data.map(doc => serializeDocument(doc));
 	} catch (error) {
 		console.error('[DB] Error in getCollection:', error);
 		throw error;
 	}
+}
+
+/**
+ * Recursively serializes a MongoDB document, converting all ObjectIds to strings
+ * and ensuring the document is fully serializable for SvelteKit data loading.
+ * 
+ * @param doc The document or value to serialize
+ * @returns A serialized version of the document with all ObjectIds converted to strings
+ */
+function serializeDocument(doc: any): any {
+	// Handle null/undefined
+	if (doc == null) {
+		return doc;
+	}
+
+	// Handle ObjectId (this is the key part that fixes the serialization issue)
+	if (doc instanceof ObjectId) {
+		return doc.toString();
+	}
+
+	// Handle Date objects
+	if (doc instanceof Date) {
+		return doc.toISOString();
+	}
+
+	// Handle arrays
+	if (Array.isArray(doc)) {
+		return doc.map(item => serializeDocument(item));
+	}
+
+	// Handle objects (but not special types like Buffer)
+	if (typeof doc === 'object' && doc.constructor === Object) {
+		const result: Record<string, any> = {};
+		for (const key in doc) {
+			if (Object.prototype.hasOwnProperty.call(doc, key)) {
+				result[key] = serializeDocument(doc[key]);
+			}
+		}
+		return result;
+	}
+
+	// Return primitives and other types as is
+	return doc;
 }
