@@ -37,13 +37,13 @@ Youtube -->
 						>Prédications</a
 					>
 				</li>
-				<li>
+				<!-- <li>
 					<a
 						href="/galerie"
 						class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out"
 						>Galerie</a
 					>
-				</li>
+				</li> -->
 				<!-- <li>
 					<a
 						href="/actualites"
