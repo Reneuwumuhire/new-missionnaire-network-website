@@ -9,13 +9,17 @@ connect()
 	.catch((e) => {
 		console.error('[MongoDB] Initialization failed:', e);
 	});
-
 export const handle: Handle = async ({ event, resolve }) => {
 	const { pathname } = event.url;
+	const userAgent = event.request.headers.get('user-agent') || 'unknown';
+	const isVercelBot = userAgent.includes('vercel-screenshot');
 
-	// Ignore static assets, API routes, and internal requests for tracking
+	// Ignore static assets, API routes, internal requests, and Vercel bots for tracking
 	const isPageRequest =
-		!pathname.includes('.') && !pathname.startsWith('/api/') && !pathname.startsWith('/_');
+		!pathname.includes('.') &&
+		!pathname.startsWith('/api/') &&
+		!pathname.startsWith('/_') &&
+		!isVercelBot;
 
 	if (isPageRequest) {
 		try {
@@ -29,7 +33,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 				} catch (e) {
 					console.warn('[Tracking] Could not determine client IP:', e);
 				}
-				const userAgent = event.request.headers.get('user-agent') || 'unknown';
 				const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
 				// Extract Country and City from common proxy headers (e.g. Cloudflare, Vercel)
