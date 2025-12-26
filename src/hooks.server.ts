@@ -12,7 +12,8 @@ connect()
 export const handle: Handle = async ({ event, resolve }) => {
 	const { pathname } = event.url;
 	const userAgent = event.request.headers.get('user-agent') || 'unknown';
-	const isVercelBot = userAgent.includes('vercel-screenshot');
+	const isVercelBot =
+		userAgent.includes('vercel-screenshot') || userAgent.includes('vercel-favicon/1.0');
 
 	// Ignore static assets, API routes, internal requests, and Vercel bots for tracking
 	const isPageRequest =
