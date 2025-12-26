@@ -11,7 +11,7 @@
 	let center = { lat: -1.9764085434636591, lng: 30.09164164940503 }; // Example coordinates
 	let destination = { lat: -1.9829317239823283, lng: 30.089299358595436 }; // Example destination coordinates
 	let loader = new Loader({
-		apiKey: 'AIzaSyCS5-5ITNSGHunCL_r6LhtQBcmEo6aEbBQ  ', // Replace with your Google Maps API key
+		apiKey: 'AIzaSyCS5-5ITNSGHunCL_r6LhtQBcmEo6aEbBQ', // Replace with your Google Maps API key
 		version: 'weekly'
 	});
 
@@ -41,7 +41,7 @@
 			{
 				origin: center,
 				destination: destination,
-				travelMode: 'DRIVING' // You can change this to other modes like 'WALKING', 'BICYCLING', or 'TRANSIT'
+				travelMode: 'DRIVING'
 			},
 			// @ts-ignore
 			(response, status) => {
@@ -49,7 +49,17 @@
 					// @ts-ignore
 					directionsRenderer.setDirections(response);
 				} else {
-					window.alert('Directions request failed due to ' + status);
+					console.error('Directions request failed due to ' + status);
+					if (status === 'REQUEST_DENIED') {
+						console.error('Possible causes: Directions API not enabled for this project, or API key restriction mismatch.');
+					}
+					// Add a simple marker for the destination as a fallback
+					// @ts-ignore
+					new google.maps.Marker({
+						position: destination,
+						map: map,
+						title: 'Missionnaire Network'
+					});
 				}
 			}
 		);

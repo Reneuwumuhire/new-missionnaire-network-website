@@ -23,7 +23,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 			if (db) {
 				const analytics = db.collection('analytics');
 
-				const ip = event.getClientAddress();
+				let ip = '127.0.0.1';
+				try {
+					ip = event.getClientAddress();
+				} catch (e) {
+					console.warn('[Tracking] Could not determine client IP:', e);
+				}
 				const userAgent = event.request.headers.get('user-agent') || 'unknown';
 				const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
