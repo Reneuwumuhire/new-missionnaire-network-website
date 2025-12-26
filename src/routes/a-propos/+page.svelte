@@ -8,6 +8,25 @@
 	import { EgliseParagraph1 } from './paragraphs';
 	import ContactCard from '$lib/components/+contactCard.svelte';
 	import MapComponent from '$lib/components/+mapComponent.svelte';
+	import { onMount } from 'svelte';
+
+	let stats: {
+		totalVisitors: number;
+		todayVisitors: number;
+		topCountries: { name: string; count: number }[];
+		deviceStats: { type: string; count: number }[];
+	} | null = null;
+
+	onMount(async () => {
+		try {
+			const res = await fetch('/api/analytics');
+			if (res.ok) {
+				stats = await res.json();
+			}
+		} catch (e) {
+			console.error('Failed to fetch stats:', e);
+		}
+	});
 </script>
 
 <title>Missionnaire Network | A propos de nous</title>
@@ -32,6 +51,64 @@
 			<MapComponent />
 			<h1 class=" text-4xl font-black text-[#414141]">Contacter</h1>
 			<ContactCard />
+			{#if stats}
+				<h1 class=" text-4xl font-black text-[#414141]">Statistiques</h1>
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+					<!-- Core Counter Stats -->
+					<div class="space-y-4">
+						<div class="bg-gray-50 p-6 rounded-2xl border border-gray-100 flex flex-col space-y-2">
+							<span class="text-sm font-medium text-gray-500 uppercase tracking-wider"
+								>Visites Aujourd'hui</span
+							>
+							<div class="flex items-center space-x-2">
+								<div class="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
+								<span class="text-3xl font-black text-hardBlack">{stats.todayVisitors}</span>
+							</div>
+						</div>
+						<div class="bg-gray-50 p-6 rounded-2xl border border-gray-100 flex flex-col space-y-2">
+							<span class="text-sm font-medium text-gray-500 uppercase tracking-wider"
+								>Total Visiteurs</span
+							>
+							<span class="text-3xl font-black text-hardBlack">{stats.totalVisitors}</span>
+						</div>
+
+						<!-- Device Stats -->
+						<div class="bg-gray-50 p-6 rounded-2xl border border-gray-100 flex flex-col space-y-4">
+							<span class="text-sm font-medium text-gray-500 uppercase tracking-wider"
+								>Appareils</span
+							>
+							<div class="flex flex-col space-y-2">
+								{#each stats.deviceStats as device}
+									<div class="flex justify-between items-center">
+										<span class="text-gray-600 capitalize">{device.type}</span>
+										<span class="text-hardBlack font-bold">{device.count}</span>
+									</div>
+								{/each}
+							</div>
+						</div>
+					</div>
+
+					<!-- Country Stats -->
+					<div class="bg-gray-50 p-6 rounded-2xl border border-gray-100 flex flex-col space-y-4">
+						<span class="text-sm font-medium text-gray-500 uppercase tracking-wider"
+							>Top Pays</span
+						>
+						<div class="flex flex-col space-y-3">
+							{#each stats.topCountries as country}
+								<div class="flex justify-between items-center">
+									<div class="flex items-center space-x-2">
+										<span class="text-gray-600"
+											>{country.name === 'Unknown' ? '🌍 Autre' : country.name}</span
+										>
+									</div>
+									<span class="text-hardBlack font-bold">{country.count}</span>
+								</div>
+							{/each}
+						</div>
+					</div>
+				</div>
+			{/if}
+
 			<h1 class=" text-4xl font-black text-[#414141]">Social media links</h1>
 
 			<div class="flex flex-col items-start space-y-2 md:space-y-4 text-xs md:text-base">
