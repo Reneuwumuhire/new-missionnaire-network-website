@@ -17,7 +17,7 @@
 
 <QueryClientProvider client={data.queryClient}>
 	<div class="relative">
-		<div class="flex flex-col fixed top-0 z-10 bg-white w-full">
+		<div class="flex flex-col fixed top-0 z-40 bg-white w-full">
 			{#if !isLiveStreamAvailable}
 				<SocialMediaAbove isLiveStream />
 			{/if}

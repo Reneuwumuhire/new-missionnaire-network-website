@@ -63,7 +63,7 @@
 	</div>
 	{#if showSubMenu && subMenu && subMenu.length > 0}
 		<div
-			class="absolute self-center w-fit items-end max-w-md mt-10 bg-pureWhite border-2 border-grayWhite flex flex-col rounded-md p-3 transition-all duration-300 ease-in-out"
+			class="absolute z-50 self-center w-fit items-end max-w-md mt-10 bg-pureWhite border-2 border-grayWhite flex flex-col rounded-md p-3 transition-all duration-300 ease-in-out"
 		>
 			{#each subMenu as { subName, link, subText, image } (subName)}
 				<a
