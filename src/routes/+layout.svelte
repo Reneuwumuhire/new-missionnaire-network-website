@@ -11,16 +11,15 @@
 	import { setFilter } from '../utils/videoUtils';
 	import { page } from '$app/stores';
 	export let data: LayoutData;
-
-	let isLiveStreamAvailable = data.IsLiveStreamlive;
 </script>
 
 <QueryClientProvider client={data.queryClient}>
 	<div class="relative">
 		<div class="flex flex-col fixed top-0 z-40 bg-white w-full">
-			{#if !isLiveStreamAvailable}
-				<SocialMediaAbove isLiveStream />
-			{/if}
+			<SocialMediaAbove
+				isLiveStream={!!data.liveStream}
+				liveUrl={data.liveStream?.webpage_url}
+			/>
 			<NavBar />
 		</div>
 		{#if $page.url.pathname === '/'}
