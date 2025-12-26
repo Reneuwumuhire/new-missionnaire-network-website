@@ -7,7 +7,7 @@
 	import ArticleParagraph from '$lib/components/+articleParagraph.svelte';
 	import { EgliseParagraph1 } from './paragraphs';
 	import ContactCard from '$lib/components/+contactCard.svelte';
-	import MapComponent from '$lib/components/+mapComponent.svelte';
+	// import MapComponent from '$lib/components/+mapComponent.svelte';
 	import { onMount } from 'svelte';
 
 	let stats: {
@@ -47,8 +47,8 @@
 			{#each EgliseParagraph1 as paragraph, index}
 				<ArticleParagraph text={paragraph.text} />
 			{/each}
-			<h1 class=" text-4xl font-black text-[#414141]">Location</h1>
-			<MapComponent />
+			<!-- <h1 class=" text-4xl font-black text-[#414141]">Location</h1>
+			<MapComponent /> -->
 			<h1 class=" text-4xl font-black text-[#414141]">Contacter</h1>
 			<ContactCard />
 			{#if stats}
