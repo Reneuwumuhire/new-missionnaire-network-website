@@ -80,7 +80,7 @@ export const YoutubeVideoSchema = z.object({
 		z.object({
 			url: z.string().url(),
 			size: z.number(),
-			fileName: z.string(),
+			filename: z.string(),
 			s3Key: z.string()
 		})
 	)
