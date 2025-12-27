@@ -1,6 +1,10 @@
 import { connect, getDb } from './db/mongo';
+import { checkAndIngestLiveStream } from './lib/server/youtube-poller';
 import type { Handle } from '@sveltejs/kit';
 import { getFullCountryName } from './utils/countries';
+
+let lastCheckTime = 0;
+const CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
 // Initialize MongoDB on server start
 connect()
@@ -10,6 +14,9 @@ connect()
 	.catch((e) => {
 		console.error('[MongoDB] Initialization failed:', e);
 	});
+
+// Run an immediate check on startup to populate in-memory state
+checkAndIngestLiveStream().catch((e) => console.error('[Startup] Poller error:', e));
 
 async function trackAnalytics(event: any, isPageRequest: boolean) {
 	if (!isPageRequest) return;
@@ -108,6 +115,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	// Fire and forget analytics tracking
 	trackAnalytics(event, isPageRequest);
+
+	// Fire and forget livestream check (throttled)
+	const now = Date.now();
+	if (now - lastCheckTime > CHECK_INTERVAL) {
+		lastCheckTime = now;
+		checkAndIngestLiveStream().catch((e) => console.error('[Hooks] Poller error:', e));
+	}
 
 	const response = await resolve(event);
 

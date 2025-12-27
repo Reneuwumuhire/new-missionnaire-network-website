@@ -44,6 +44,7 @@
 	"type": "module",
 	"dependencies": {
 		"@badrap/result": "^0.2.13",
+		"@distube/ytdl-core": "^4.16.12",
 		"@googlemaps/js-api-loader": "^1.16.2",
 		"@tanstack/svelte-query": "^5.35.1",
 		"flowbite-svelte": "^0.44.20",
