@@ -1,5 +1,6 @@
 import { connect, getDb } from './db/mongo';
 import type { Handle } from '@sveltejs/kit';
+import { getFullCountryName } from './utils/countries';
 
 // Initialize MongoDB on server start
 connect()
@@ -9,68 +10,109 @@ connect()
 	.catch((e) => {
 		console.error('[MongoDB] Initialization failed:', e);
 	});
+
+async function trackAnalytics(event: any, isPageRequest: boolean) {
+	if (!isPageRequest) return;
+
+	try {
+		const db = await getDb();
+		if (!db) return;
+
+		const analytics = db.collection('analytics');
+		const { pathname } = event.url;
+		const userAgent = event.request.headers.get('user-agent') || 'unknown';
+		const referrer = event.request.headers.get('referer') || 'direct';
+
+		let ip = 'unknown';
+		try {
+			ip = event.getClientAddress();
+		} catch (e) {
+			console.warn('[Tracking] Could not determine client IP:', e);
+		}
+		const today = new Date().toISOString().split('T')[0];
+
+		const countryCode =
+			event.request.headers.get('cf-ipcountry') ||
+			event.request.headers.get('x-vercel-ip-country') ||
+			'Unknown';
+		const countryFull = getFullCountryName(countryCode);
+		const city = event.request.headers.get('x-vercel-ip-city') || 'Unknown';
+
+		let device = 'Desktop';
+		if (/mobile|android|iphone|phone/i.test(userAgent)) {
+			device = 'Mobile';
+		} else if (/tablet|ipad/i.test(userAgent)) {
+			device = 'Tablet';
+		} else if (/bot|spider|crawl/i.test(userAgent)) {
+			device = 'Bot';
+		}
+
+		const now = Date.now();
+		await analytics.updateOne(
+			{ date: today, ip: ip },
+			{
+				$setOnInsert: {
+					userAgent,
+					countryShort: countryCode,
+					countryFull,
+					city,
+					device,
+					referrer,
+					firstSeen: now
+				},
+				$set: { lastSeen: now },
+				$inc: { pageViews: 1 },
+				$addToSet: { viewedPaths: pathname }
+			},
+			{ upsert: true }
+		);
+	} catch (error) {
+		console.error('[Tracking Error]:', error);
+	}
+}
+
+async function trackMissedRoute(event: any, response: Response, isPageRequest: boolean) {
+	if (response.status !== 404 || !isPageRequest) return;
+
+	try {
+		const db = await getDb();
+		if (!db) return;
+
+		const missedRoutes = db.collection('missed_routes');
+		const referrer = event.request.headers.get('referer') || 'direct';
+		await missedRoutes.updateOne(
+			{ path: event.url.pathname },
+			{
+				$inc: { count: 1 },
+				$set: { lastMissed: Date.now() },
+				$addToSet: { referrers: referrer }
+			},
+			{ upsert: true }
+		);
+	} catch (e) {
+		console.error('[Missed Route Tracking Error]:', e);
+	}
+}
+
 export const handle: Handle = async ({ event, resolve }) => {
 	const { pathname } = event.url;
 	const userAgent = event.request.headers.get('user-agent') || 'unknown';
 	const isVercelBot =
 		userAgent.includes('vercel-screenshot') || userAgent.includes('vercel-favicon/1.0');
 
-	// Ignore static assets, API routes, internal requests, and Vercel bots for tracking
 	const isPageRequest =
 		!pathname.includes('.') &&
 		!pathname.startsWith('/api/') &&
 		!pathname.startsWith('/_') &&
 		!isVercelBot;
 
-	if (isPageRequest) {
-		try {
-			const db = await getDb();
-			if (db) {
-				const analytics = db.collection('analytics');
-
-				let ip = '127.0.0.1';
-				try {
-					ip = event.getClientAddress();
-				} catch (e) {
-					console.warn('[Tracking] Could not determine client IP:', e);
-				}
-				const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-
-				// Extract Country and City from common proxy headers (e.g. Cloudflare, Vercel)
-				const country =
-					event.request.headers.get('cf-ipcountry') ||
-					event.request.headers.get('x-vercel-ip-country') ||
-					'Unknown';
-				const city = event.request.headers.get('x-vercel-ip-city') || 'Unknown';
-
-				// Basic Device Detection
-				let device = 'Desktop';
-				if (/mobile|android|iphone|ipad|phone/i.test(userAgent)) {
-					device = 'Mobile';
-				} else if (/tablet/i.test(userAgent)) {
-					device = 'Tablet';
-				}
-
-				// Record unique daily visits per IP with enhanced data
-				await analytics.updateOne(
-					{ date: today, ip: ip },
-					{
-						$setOnInsert: {
-							userAgent,
-							country,
-							city,
-							device,
-							timestamp: Date.now()
-						}
-					},
-					{ upsert: true }
-				);
-			}
-		} catch (error) {
-			console.error('[Tracking Error]:', error);
-		}
-	}
+	// Fire and forget analytics tracking
+	trackAnalytics(event, isPageRequest);
 
 	const response = await resolve(event);
+
+	// Fire and forget missed route tracking
+	trackMissedRoute(event, response, isPageRequest);
+
 	return response;
 };
