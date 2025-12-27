@@ -6,7 +6,7 @@
 	import ThumbnailVideo from '$lib/components/+thumbnailVideo.svelte';
 	import VideoView from '$lib/components/+videoView.svelte';
 	// import CalendarWeekly from '$lib/components/+calendarWeekly.svelte';
-	import type { YoutubeVideo } from '@mnlib/lib/models/youtube';
+	import type { YoutubeVideo } from '$lib/models/youtube';
 	import HomepageLoadingSkelton from '$lib/components/+homepageLoadingSkelton.svelte';
 	import { availableTypesTag } from '../utils/data';
 	import { searchTerm, selectedVideo, skip } from '$lib/stores/videoStore';

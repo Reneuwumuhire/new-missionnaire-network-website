@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { YoutubeVideo } from '@mnlib/lib/models/youtube';
+	import type { YoutubeVideo } from '$lib/models/youtube';
 	export let videoData: YoutubeVideo;
 
 	let showFullDescription = false;
@@ -35,9 +35,7 @@
 			</button>
 		{/if}
 		<p class="text-sm text-gray-500">
-			Duration: {videoData.duration} | Published: {new Date(
-				videoData.publishedAt
-			).toLocaleDateString()}
+			Duration: {videoData.duration} | Published: {videoData.upload_date}
 		</p>
 	</div>
 </div>

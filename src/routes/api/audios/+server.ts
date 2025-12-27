@@ -1,35 +1,39 @@
-import { parseSearchParams } from '@mnlib/lib/utils/url';
-import SearchAudiosUsecase, {
-	SearchAudioUsecaseArgsSchema
-} from '@mnlib/lib/usecase/search-audios';
+import { parseSearchParams } from '../../../utils/url';
+import { queryAudios } from '../../../db/collections';
 import { json } from '@sveltejs/kit';
-import { ZodError } from 'zod';
+import { ZodError, z } from 'zod';
+
+const SearchAudioArgsSchema = z.object({
+	searchTags: z
+		.string()
+		.optional()
+		.transform((arg) => arg?.split(',').map((v) => v.trim())),
+	limit: z.coerce.number().default(10),
+	pageNumber: z.coerce.number().default(1),
+	startDate: z.coerce.date().optional(),
+	endDate: z.coerce.date().optional()
+});
 
 export async function GET({ url }) {
 	try {
-		const params = parseSearchParams(url) as any;
-		const { searchTags } = params;
-		if (searchTags) {
-			params['searchTags'] = searchTags.split(',');
-		}
-		const usecase = new SearchAudiosUsecase();
-		const res = await usecase.execute(SearchAudioUsecaseArgsSchema.parse(params));
-		const data = res.ok ? res.value : [];
-		const error = !res.ok ? res.error.message : null;
+		const params = parseSearchParams(url);
+		const parsedParams = SearchAudioArgsSchema.parse(params);
+
+		const data = await queryAudios(parsedParams);
 		return json({
 			data,
-			error
+			error: null
 		});
 	} catch (e) {
-		let error = new Error('Invalid parameters');
+		let message = 'Invalid parameters';
 		if (e instanceof ZodError) {
-			error = new Error(e.issues.map((i) => `${i.code}: ${i.message}`).join(', '));
+			message = e.issues.map((i) => `${i.code}: ${i.message}`).join(', ');
 		} else if (e instanceof Error) {
-			error = e;
+			message = e.message;
 		}
 		return json({
 			ok: false,
-			error: error.message
+			error: message
 		});
-  }
+	}
 }

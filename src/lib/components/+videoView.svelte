@@ -2,7 +2,7 @@
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import BsPlayCircleFill from 'svelte-icons-pack/bs/BsPlayCircleFill';
 	import { formatDate, formatTime, formatFileSize } from '../../utils/FormatTime';
-	import type { YoutubeVideo } from '@mnlib/lib/models/youtube';
+	import type { YoutubeVideo } from '$lib/models/youtube';
 	import { page } from '$app/stores';
 	import { selectedVideo } from '$lib/stores/videoStore';
 	import AiOutlineFilePdf from 'svelte-icons-pack/ai/AiOutlineFilePdf';

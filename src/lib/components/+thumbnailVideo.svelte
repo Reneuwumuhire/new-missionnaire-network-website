@@ -7,7 +7,7 @@
 	import AudioSquare from 'iconsax-svelte/AudioSquare.svelte';
 	import DocumentText1 from 'iconsax-svelte/DocumentText1.svelte';
 	import VideoPlay from 'iconsax-svelte/VideoPlay.svelte';
-	import type { YoutubeVideo } from '@mnlib/lib/models/youtube';
+	import type { YoutubeVideo } from '$lib/models/youtube';
 	import Icon from 'svelte-icons-pack';
 	import BsThreeDotsVertical from 'svelte-icons-pack/bs/BsThreeDotsVertical';
 

@@ -5,7 +5,7 @@ import resolver from '../../repository/resolver';
 import { z } from 'zod';
 import { URLInstance } from '../../repository/repo';
 import type { ArgsToGetAudios, ArgsToGetVideos } from '../../entity';
-import { YoutubeAudioSchema, type YoutubeAudio } from '@mnlib/lib/models/youtube';
+import { YoutubeAudioSchema, type YoutubeAudio } from '$lib/models/youtube';
 
 export default class GetSongsAudioUsecase implements UseCase<ArgsToGetAudios, YoutubeAudio[]> {
 	async execute({

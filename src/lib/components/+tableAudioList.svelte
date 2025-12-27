@@ -7,7 +7,7 @@
 	import BsChevronDoubleLeft from 'svelte-icons-pack/bs/BsChevronDoubleLeft';
 	import AudioTableItem from './+audioTableItem.svelte';
 	import { Pagination } from 'flowbite-svelte';
-	import type { AudioAsset } from '@mnlib/lib/models/media-assets';
+	import type { AudioAsset } from '$lib/models/media-assets';
 
 	export let audioList: AudioAsset[] = [];
 	export let loading: boolean;

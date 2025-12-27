@@ -1,6 +1,6 @@
 import { writable } from 'svelte/store';
-import type { AudioAsset } from '@mnlib/lib/models/media-assets';
-import type { YoutubeVideo } from '@mnlib/lib/models/youtube';
+import type { AudioAsset } from '$lib/models/media-assets';
+import type { YoutubeVideo } from '$lib/models/youtube';
 
 // Create a writable store to hold the selectAudio value
 

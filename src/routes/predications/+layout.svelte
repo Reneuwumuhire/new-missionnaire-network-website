@@ -2,7 +2,7 @@
 	import { page, navigating } from '$app/stores';
 	import AudioPlayer from '$lib/components/+audioPlayer.svelte';
 	import { searchQuery, selectAudio } from '$lib/stores/global';
-	import type { AudioAsset } from '@mnlib/lib/models/media-assets';
+	import type { AudioAsset } from '$lib/models/media-assets';
 	import { onMount } from 'svelte';
 	import { PredicationsRoutes } from '../../utils/predicationsRoutesList';
 

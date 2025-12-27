@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AudioAssetSchema, TextAssetSchema } from './media-assets';
+import { AudioAssetSchema, TextAssetSchema } from '$lib/models/media-assets';
 
 export const SONG_VIDEO_MAX_DURATION = 60 * 15;
 

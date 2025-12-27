@@ -1,12 +1,11 @@
 import { Result } from '@badrap/result';
 import type { UseCase } from '..';
 import { InternalFailure } from '../../errors/failures';
-import { type AudioAsset, AudioAssetSchema } from '@mnlib/lib/models/media-assets';
-import type { SearchAudioUsecaseArgs } from '@mnlib/lib/usecase/search-audios';
+import { type AudioAsset, AudioAssetSchema } from '$lib/models/media-assets';
 import { PUBLIC_MAIN_URL } from '$env/static/public';
 
 export type GetSermonArgsType = {
-	params: Partial<SearchAudioUsecaseArgs>;
+	params: Record<string, any>;
 	fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 };
 export default class GetSermonsAudioUsecase implements UseCase<GetSermonArgsType, AudioAsset[]> {

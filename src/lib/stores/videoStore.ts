@@ -1,4 +1,4 @@
-import type { YoutubeVideo } from '@mnlib/lib/models/youtube';
+import type { YoutubeVideo } from '$lib/models/youtube';
 import { derived, writable } from 'svelte/store';
 
 export const searchTerm = writable<string>('');
@@ -21,5 +21,3 @@ export const filteredVideoList = derived(
 	},
 	[]
 );
-
-

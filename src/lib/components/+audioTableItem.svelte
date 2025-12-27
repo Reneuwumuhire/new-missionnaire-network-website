@@ -6,7 +6,7 @@
 	import BsPlayCircleFill from 'svelte-icons-pack/bs/BsPlayCircleFill';
 	import { selectAudio } from '../stores/global';
 	import { setContext } from 'svelte';
-	import type { AudioAsset } from '@mnlib/lib/models/media-assets';
+	import type { AudioAsset } from '$lib/models/media-assets';
 	import { writable } from 'svelte/store';
 	let showDropContents = false;
 

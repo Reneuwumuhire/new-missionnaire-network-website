@@ -11,7 +11,7 @@
 	import BsVolumeMuteFill from 'svelte-icons-pack/bs/BsVolumeMuteFill';
 	import BsX from 'svelte-icons-pack/bs/BsX';
 	import { selectAudio } from '../stores/global';
-	import type { AudioAsset } from '@mnlib/lib/models/media-assets';
+	import type { AudioAsset } from '$lib/models/media-assets';
 
 	let audio: HTMLAudioElement;
 	let isPlaying = false;

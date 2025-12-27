@@ -1,5 +1,5 @@
-import { z } from "zod";
-import { TimestampType } from "./media-assets";
+import { z } from 'zod';
+import { TimestampType } from './media-assets';
 
 export const UserBasicInfoSchema = z.object({
 	name: z.string(),
@@ -7,6 +7,7 @@ export const UserBasicInfoSchema = z.object({
 	picture: z.string().url()
 });
 export type UserBasicInfo = z.infer<typeof UserBasicInfoSchema>;
+
 export const DocumentBaseSchema = z.object({
 	createdBy: UserBasicInfoSchema,
 	updatedBy: UserBasicInfoSchema,
@@ -17,34 +18,36 @@ export const DocumentBaseSchema = z.object({
 });
 export type DocumentBase = z.infer<typeof DocumentBaseSchema>;
 
-
 export const UserSchema = DocumentBaseSchema.extend({
 	id: z.string(),
 	name: z.string(),
 	picture: z.string().url(),
-	status: z.enum(["disabled", "active", "inactive"])
+	status: z.enum(['disabled', 'active', 'inactive'])
 });
 export type User = z.infer<typeof UserSchema>;
+
 export const NewUserSchema = UserBasicInfoSchema.extend({
-	status: z.enum(["disabled", "active"])
+	status: z.enum(['disabled', 'active'])
 });
 export type UserInfo = z.infer<typeof NewUserSchema>;
+
 export const NewUserSessionSchema = z.object({
 	access_token: z.string(),
 	expiry_date: z.number(),
 	id_token: z.string(),
-	scope: z.string().transform((a => a.split(" "))),
+	scope: z.string().transform((a) => a.split(' ')),
 	token_type: z.string(),
-	status: z.enum(["valid", "invalid"])
+	status: z.enum(['valid', 'invalid'])
 });
 export type NewUserSession = z.infer<typeof NewUserSessionSchema>;
+
 export const UserSessionSchema = DocumentBaseSchema.extend({
 	access_token: z.string(),
 	expiry_date: z.number(),
 	id_token: z.string(),
 	scope: z.string().array(),
 	token_type: z.string(),
-	status: z.enum(["valid", "invalid"])
+	status: z.enum(['valid', 'invalid'])
 });
 
 export type UserSession = z.infer<typeof UserSessionSchema>;

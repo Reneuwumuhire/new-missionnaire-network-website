@@ -5,7 +5,7 @@ import resolver from '../../repository/resolver';
 import { z } from 'zod';
 import { URLInstance } from '../../repository/repo';
 import type { ArgsToGetVideos } from '../../entity';
-import { YoutubeVideoSchema, type YoutubeVideo } from '@mnlib/lib/models/youtube';
+import { YoutubeVideoSchema, type YoutubeVideo } from '$lib/models/youtube';
 
 export default class GetSongsVideosUsecase implements UseCase<ArgsToGetVideos, YoutubeVideo[]> {
 	async execute({

@@ -1,7 +1,6 @@
 <script lang="ts">
 	import SongVideoCard from '$lib/components/+songVideoCard.svelte';
-	import type { YoutubeVideo } from '@mnlib/lib/models/youtube.js';
-	import ThumbnailVideo from '$lib/components/+thumbnailVideo.svelte';
+	import type { YoutubeVideo } from '$lib/models/youtube';
 
 	export let data;
 	const songs: YoutubeVideo[] = data.videosResponse.data;

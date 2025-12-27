@@ -1,6 +1,6 @@
-import { Timestamp } from "@google-cloud/firestore";
-import { z } from "zod";
-export const LanguageSchema = z.enum(["kinyarwanda", "english", "francais"]);
+import { z } from 'zod';
+
+export const LanguageSchema = z.enum(['kinyarwanda', 'english', 'francais']);
 
 export const ThumbnailSchema = z.object({
 	url: z.string().url(),
@@ -8,18 +8,13 @@ export const ThumbnailSchema = z.object({
 	height: z.number()
 });
 
-export const TimestampType = z.custom<Timestamp | Date>((value) => {
-	if (!(value instanceof Timestamp) && !(value instanceof Date)) {
-		throw new Error("invalid Timestamp");
-	}
-	return true;
+export const TimestampType = z
+	.union([z.instanceof(Date), z.string(), z.number()])
+	.transform((value) => {
+		if (value instanceof Date) return value;
+		return new Date(value);
+	});
 
-}).transform((value) => {
-	if (value instanceof Timestamp) {
-		return value.toDate()
-	}
-	return value;
-});
 export const AssetSchema = z.object({
 	fileName: z.string(),
 	type: z.string(),
@@ -29,7 +24,7 @@ export const AssetSchema = z.object({
 		default: ThumbnailSchema,
 		medium: ThumbnailSchema.optional(),
 		high: ThumbnailSchema.optional(),
-		standard: ThumbnailSchema.optional(),
+		standard: ThumbnailSchema.optional()
 	}),
 	languages: LanguageSchema.array(),
 	description: z.string(),
@@ -40,24 +35,24 @@ export const AssetSchema = z.object({
 });
 
 export const AssetTagSchema = z.enum([
-	"branham",
-	"william",
-	"ewald",
-	"frank",
-	"local",
-	"song",
-	"any",
-	"predication",
-	"retransmission",
-	"ibaruwa",
-	"lettre",
-	"circulaire",
-	"book",
-	"audio"
+	'branham',
+	'william',
+	'ewald',
+	'frank',
+	'local',
+	'song',
+	'any',
+	'predication',
+	'retransmission',
+	'ibaruwa',
+	'lettre',
+	'circulaire',
+	'book',
+	'audio'
 ]);
 
 export const AudioVersionSchema = z.object({
-	versionName: z.enum(["LQ", "HQ"]),
+	versionName: z.enum(['LQ', 'HQ']),
 	sampleRate: z.number(),
 	waveform: z.number().array(),
 	url: z.string().url(),
@@ -73,11 +68,12 @@ export const AudioAssetSchema = AssetSchema.extend({
 	tags: AssetTagSchema.array(),
 	transcription: AssetSchema.nullable().default(null),
 	video: AssetSchema.nullable().default(null),
-	versions: z.object({
-		LQ: AudioVersionSchema.optional(),
-		HQ: AudioVersionSchema.optional()
-	}).default({})
-
+	versions: z
+		.object({
+			LQ: AudioVersionSchema.optional(),
+			HQ: AudioVersionSchema.optional()
+		})
+		.default({})
 });
 
 export type AudioAsset = z.infer<typeof AudioAssetSchema>;
@@ -93,8 +89,6 @@ export const TextAssetSchema = AssetSchema.extend({
 
 export type TextAsset = z.infer<typeof TextAssetSchema>;
 
-
-
 export const NewLoadedTextAssetSchema = z.object({
 	pages: z.number(),
 	fileName: z.string(),
@@ -107,8 +101,8 @@ export const NewLoadedTextAssetSchema = z.object({
 		default: ThumbnailSchema,
 		medium: ThumbnailSchema.optional(),
 		high: ThumbnailSchema.optional(),
-		standard: ThumbnailSchema.optional(),
-	}),
+		standard: ThumbnailSchema.optional()
+	})
 });
 
 export type NewLoadedTextAsset = z.infer<typeof NewLoadedTextAssetSchema>;

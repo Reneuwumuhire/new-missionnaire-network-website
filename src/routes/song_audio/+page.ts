@@ -1,4 +1,4 @@
-import type { YoutubeVideo } from '@mnlib/lib/models/youtube';
+import type { YoutubeVideo } from '$lib/models/youtube';
 import GetSermonsVideosUsecase from '../../middleware/usecases/get-videos-sermons';
 
 type VideosResponse = {
@@ -14,7 +14,7 @@ let pageResponse: {
 	videosResponse: VideosResponse;
 };
 
-export const load = async ({ params, url }: { params: RouteParams; url: URL }) => {
+export const load = async () => {
 	const videosUsecase = new GetSermonsVideosUsecase();
 	const searchTags = ['song'];
 	const pageNumber = 1;
