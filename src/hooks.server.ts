@@ -4,7 +4,7 @@ import type { Handle } from '@sveltejs/kit';
 import { getFullCountryName } from './utils/countries';
 
 let lastCheckTime = 0;
-const CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const CHECK_INTERVAL = 1 * 60 * 1000; // 1 minute
 
 // Initialize MongoDB on server start
 connect()

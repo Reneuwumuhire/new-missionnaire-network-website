@@ -38,7 +38,13 @@ function updateStatus(newStatus: LiveStatus) {
 }
 
 const CHANNEL_URL = 'https://www.youtube.com/@MissionnaireNetwork/live';
+const USER_AGENT =
+	'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 let isChecking = false;
+
+function getCookies(): string {
+	return process.env.YOUTUBE_COOKIES || '';
+}
 
 export async function checkAndIngestLiveStream() {
 	if (isChecking) {
@@ -50,13 +56,24 @@ export async function checkAndIngestLiveStream() {
 	console.log(`[YouTube Poller] Checking for livestream at ${new Date().toISOString()}`);
 
 	try {
+		const cookies = getCookies();
+		const headers: Record<string, string> = {
+			'User-Agent': USER_AGENT,
+			Accept:
+				'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+			'Accept-Language': 'en-US,en;q=0.9'
+		};
+
+		if (cookies) {
+			console.log('[YouTube Poller] Using provided cookies for authentication');
+			headers['Cookie'] = cookies;
+		}
+
 		// 1. Check for live video redirection OR inline content
 		const response = await fetch(CHANNEL_URL, {
 			method: 'GET',
 			redirect: 'follow',
-			headers: {
-				'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
-			}
+			headers: headers
 		});
 
 		const finalUrl = response.url;
@@ -71,6 +88,13 @@ export async function checkAndIngestLiveStream() {
 		} else {
 			// No redirect, check page content for video ID
 			const text = await response.text();
+
+			// Check for title to debug blocks
+			const titleMatch = text.match(/<title>(.*?)<\/title>/);
+			if (titleMatch) {
+				console.log(`[YouTube Poller DEBUG] Page Title: ${titleMatch[1]}`);
+			}
+
 			const match = text.match(/"videoId":"([^"]+)"/);
 			if (match && match[1]) {
 				videoId = match[1];
@@ -80,12 +104,6 @@ export async function checkAndIngestLiveStream() {
 
 		if (!videoId) {
 			console.log('[YouTube Poller] No active livestream found (no video ID in URL or HTML)');
-
-			// Debug: Log the page title to see if we are being blocked
-			const titleMatch = (await response.clone().text()).match(/<title>(.*?)<\/title>/);
-			if (titleMatch) {
-				console.log(`[YouTube Poller DEBUG] Page Title: ${titleMatch[1]}`);
-			}
 
 			// Update status in-memory
 			updateStatus({
@@ -101,7 +119,12 @@ export async function checkAndIngestLiveStream() {
 		console.log(`[YouTube Poller] Found potential live video: ${videoId}`);
 
 		// 3. Get Video Info
-		const info = await ytdl.getBasicInfo(videoId);
+		// Pass cookies to ytdl as well
+		const info = await ytdl.getBasicInfo(videoId, {
+			requestOptions: {
+				headers: headers
+			}
+		});
 		// @ts-ignore
 		const videoDetails = info.videoDetails;
 
@@ -122,6 +145,14 @@ export async function checkAndIngestLiveStream() {
 		console.log(`[YouTube Poller] Successfully updated livestream status (In-Memory).`);
 	} catch (error) {
 		console.error('[YouTube Poller] Error checking for livestream:', error);
+		// CRITICAL FIX: If checking fails, assume NOT LIVE to prevent stuck banner
+		updateStatus({
+			isLive: false,
+			videoId: null,
+			title: null,
+			url: null,
+			updatedAt: new Date().toISOString()
+		});
 	} finally {
 		isChecking = false;
 	}
