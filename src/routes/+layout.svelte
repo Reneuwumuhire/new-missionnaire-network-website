@@ -13,6 +13,10 @@
 	export let data: LayoutData;
 </script>
 
+<svelte:head>
+	<title>Missionnaire Network</title>
+</svelte:head>
+
 <QueryClientProvider client={data.queryClient}>
 	<div class="relative">
 		<div class="flex flex-col fixed top-0 z-40 bg-white w-full">

@@ -6,7 +6,12 @@
 	const songs: YoutubeVideo[] = data.videosResponse.data;
 </script>
 
-<title> Songs </title>
+<svelte:head>
+	<title>Cantiques - Missionnaire Network</title>
+	<meta name="description" content="Ecoutez les cantiques du Message de l'Heure sur Missionnaire Network." />
+	<meta property="og:title" content="Cantiques - Missionnaire Network" />
+	<meta property="og:description" content="Ecoutez les cantiques du Message de l'Heure." />
+</svelte:head>
 
 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
 	{#each songs as song}

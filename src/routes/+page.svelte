@@ -165,7 +165,10 @@
 </script>
 
 <svelte:head>
-	<title>{titleName}</title>
+	<title>Missionnaire Network - Accueil</title>
+	<meta name="description" content="Bienvenue sur Missionnaire Network. Découvrez les prédications et cantiques du Message de l'Heure." />
+	<meta property="og:title" content="Missionnaire Network - Accueil" />
+	<meta property="og:description" content="Découvrez les prédications et cantiques du Message de l'Heure." />
 </svelte:head>
 
 <main class="relative max-w-[1640px] mx-auto px-5">

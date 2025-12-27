@@ -49,7 +49,7 @@ async function trackAnalytics(event: any, isPageRequest: boolean) {
 
 		const now = Date.now();
 		await analytics.updateOne(
-			{ date: today, ip: ip },
+			{ date: today, ip: ip, userAgent: userAgent },
 			{
 				$setOnInsert: {
 					userAgent,
