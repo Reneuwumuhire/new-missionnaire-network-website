@@ -81,6 +81,12 @@ export async function checkAndIngestLiveStream() {
 		if (!videoId) {
 			console.log('[YouTube Poller] No active livestream found (no video ID in URL or HTML)');
 
+			// Debug: Log the page title to see if we are being blocked
+			const titleMatch = (await response.clone().text()).match(/<title>(.*?)<\/title>/);
+			if (titleMatch) {
+				console.log(`[YouTube Poller DEBUG] Page Title: ${titleMatch[1]}`);
+			}
+
 			// Update status in-memory
 			updateStatus({
 				isLive: false,
