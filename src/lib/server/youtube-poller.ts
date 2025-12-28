@@ -1,6 +1,5 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import ytdl from '@distube/ytdl-core';
+import cookieFileContent from '../../../cookies.txt?raw';
 
 export type LiveStatus = {
 	isLive: boolean;
@@ -63,19 +62,28 @@ function parseCookieFile(content: string): string[] {
 
 function getCookies(): string {
 	try {
-		const cookieFilePath = path.join(process.cwd(), 'cookies.txt');
-		if (fs.existsSync(cookieFilePath)) {
-			const fileContent = fs.readFileSync(cookieFilePath, 'utf-8');
-			const cookies = parseCookieFile(fileContent);
-
+		// Priority 1: Use bundled cookie file content
+		if (cookieFileContent) {
+			const cookies = parseCookieFile(cookieFileContent);
 			if (cookies.length > 0) {
+				console.log(`[YouTube Poller] Loaded ${cookies.length} cookies from bundled file.`);
 				return cookies.join('; ');
 			}
+		} else {
+			console.warn('[YouTube Poller] Bundled cookie content is empty.');
 		}
 	} catch (error) {
-		console.warn('[YouTube Poller] Failed to read cookies.txt:', error);
+		console.warn('[YouTube Poller] Failed to parse bundled cookies:', error);
 	}
-	return process.env.YOUTUBE_COOKIES || '';
+
+	// Priority 2: Fallback to env var
+	const envCookies = process.env.YOUTUBE_COOKIES || '';
+	if (envCookies) {
+		console.log('[YouTube Poller] Using cookies from environment variable.');
+	} else {
+		console.log('[YouTube Poller] No cookies found in file or environment.');
+	}
+	return envCookies;
 }
 
 export async function checkAndIngestLiveStream() {
