@@ -1,4 +1,5 @@
-import ytdl from '@distube/ytdl-core';
+// import ytdl from '@distube/ytdl-core';
+// removed ytdl usage
 import cookieFileContent from '../../../cookies.txt?raw';
 
 export type LiveStatus = {
@@ -109,6 +110,8 @@ export async function checkAndIngestLiveStream() {
 			headers['Cookie'] = cookies;
 		}
 
+		let text = ''; // Declare text variable in outer scope
+
 		// 1. Check for live video redirection OR inline content
 		const response = await fetch(CHANNEL_URL, {
 			method: 'GET',
@@ -127,15 +130,16 @@ export async function checkAndIngestLiveStream() {
 			videoId = urlObj.searchParams.get('v');
 		} else {
 			// No redirect, check page content for video ID
-			const text = await response.text();
+			const pageText = await response.text();
+			text = pageText; // Assign to outer scope variable
 
 			// Check for title to debug blocks
-			const titleMatch = text.match(/<title>(.*?)<\/title>/);
+			const titleMatch = pageText.match(/<title>(.*?)<\/title>/);
 			if (titleMatch) {
 				console.log(`[YouTube Poller DEBUG] Page Title: ${titleMatch[1]}`);
 			}
 
-			const match = text.match(/"videoId":"([^"]+)"/);
+			const match = pageText.match(/"videoId":"([^"]+)"/);
 			if (match && match[1]) {
 				videoId = match[1];
 				console.log(`[YouTube Poller] Extracted video ID from HTML: ${videoId}`);
@@ -156,31 +160,35 @@ export async function checkAndIngestLiveStream() {
 			return;
 		}
 
-		console.log(`[YouTube Poller] Found potential live video: ${videoId}`);
+		// Check for specific "Live" markers in the HTML
+		// Common patterns: "status":"LIVE", "iconType":"LIVE", "isLive":true
+		const isLiveMatch =
+			text.match(/"status":"LIVE"/) ||
+			text.match(/"iconType":"LIVE"/) ||
+			text.match(/"isLive":true/);
+		const isLive = !!isLiveMatch;
 
-		// 3. Get Video Info
-		// Pass cookies to ytdl as well
-		const info = await ytdl.getBasicInfo(videoId, {
-			requestOptions: {
-				headers: headers
-			}
-		});
-		// @ts-ignore
-		const videoDetails = info.videoDetails;
+		// Extract title if not already found (channel page title usually has " - YouTube")
+		let title = null;
+		const titleMatch = text.match(/<title>(.*?)<\/title>/);
+		if (titleMatch) {
+			title = titleMatch[1].replace(' - YouTube', '');
+		}
 
-		// Check if it's actually live or upcoming
-		const isLive = videoDetails.isLiveContent;
+		console.log(
+			`[YouTube Poller] Manual Scrape Result -> Video: ${videoId}, Title: ${title}, Live: ${isLive}`
+		);
 
-		console.log(`[YouTube Poller] Updating Live Status: ${isLive} (Video: ${videoDetails.title})`);
-
-		// 4. Update In-Memory Status
+		// 4. Update In-Memory Status (Bypassing ytdl-core to avoid bot detection)
 		updateStatus({
 			isLive: isLive,
 			videoId: isLive ? videoId : null,
-			title: isLive ? videoDetails.title : null,
-			url: isLive ? videoDetails.video_url : null,
+			title: isLive ? title : null,
+			url: isLive ? `https://www.youtube.com/watch?v=${videoId}` : null,
 			updatedAt: new Date().toISOString()
 		});
+
+		console.log(`[YouTube Poller] Successfully updated livestream status (In-Memory).`);
 
 		console.log(`[YouTube Poller] Successfully updated livestream status (In-Memory).`);
 	} catch (error) {
