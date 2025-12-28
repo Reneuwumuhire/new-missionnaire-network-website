@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import ytdl from '@distube/ytdl-core';
 
 export type LiveStatus = {
@@ -42,7 +44,37 @@ const USER_AGENT =
 	'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 let isChecking = false;
 
+function parseCookieFile(content: string): string[] {
+	const cookies: string[] = [];
+	const lines = content.split('\n');
+	for (const line of lines) {
+		if (line.startsWith('#') || !line.trim()) continue;
+		const parts = line.split('\t');
+		if (parts.length >= 7) {
+			const name = parts[5];
+			const value = parts[6].trim();
+			if (name && value) {
+				cookies.push(`${name}=${value}`);
+			}
+		}
+	}
+	return cookies;
+}
+
 function getCookies(): string {
+	try {
+		const cookieFilePath = path.join(process.cwd(), 'cookies.txt');
+		if (fs.existsSync(cookieFilePath)) {
+			const fileContent = fs.readFileSync(cookieFilePath, 'utf-8');
+			const cookies = parseCookieFile(fileContent);
+
+			if (cookies.length > 0) {
+				return cookies.join('; ');
+			}
+		}
+	} catch (error) {
+		console.warn('[YouTube Poller] Failed to read cookies.txt:', error);
+	}
 	return process.env.YOUTUBE_COOKIES || '';
 }
 
