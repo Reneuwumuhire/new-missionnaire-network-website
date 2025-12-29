@@ -1,47 +1,50 @@
-import type { YoutubeVideo } from '$lib/models/youtube';
-import GetSermonsVideosUsecase from '../../middleware/usecases/get-videos-sermons';
+import type { MusicAudio } from '$lib/models/music-audio';
 
-type VideosResponse = {
-	data: YoutubeVideo[];
-	error: string;
-};
-type RouteParams = {
-	page: number;
-	searchTags: string[];
-};
+export const load = async ({ fetch, url }) => {
+	const category = url.searchParams.get('category') || 'All';
+	const search = url.searchParams.get('search') || '';
+	const alpha = url.searchParams.get('alpha') || '';
+	const artist = url.searchParams.get('artist') || '';
+	const pageNumber = url.searchParams.get('page') || '1';
+	const limit = url.searchParams.get('limit') || '100';
+	const sort = url.searchParams.get('sort') || 'uploaded_at:desc';
 
-let pageResponse: {
-	videosResponse: VideosResponse;
-};
+	let artists: string[] = [];
+	try {
+		const artistResponse = await fetch('/api/music-artists');
+		if (artistResponse.ok) {
+			const artistResult = await artistResponse.json();
+			artists = artistResult.data || [];
+		} else {
+			console.error('[Load] Failed to fetch artists:', artistResponse.status);
+		}
+	} catch (e) {
+		console.error('[Load] Error fetching artists:', e);
+	}
 
-export const load = async () => {
-	const videosUsecase = new GetSermonsVideosUsecase();
-	const searchTags = ['song'];
-	const pageNumber = 1;
-
-	const videosRes = await videosUsecase.execute({
-		videoCount: 5,
-		type: searchTags,
-		pageNumber: (pageNumber as number) || 1
+	const queryParams = new URLSearchParams({
+		category,
+		search,
+		alpha,
+		artist,
+		pageNumber,
+		limit,
+		sort
 	});
 
-	if (videosRes.isOk) {
-		pageResponse = {
-			videosResponse: {
-				data: videosRes.value,
-				error: ''
-			}
-		};
-		return pageResponse;
-	} else {
-		if (videosRes.isErr) {
-			pageResponse.videosResponse = {
-				data: [],
-				error: new Error('Failed to load videos').message
-			};
-		}
-		return {
-			videosResponse: pageResponse.videosResponse
-		};
-	}
+	const response = await fetch(`/api/music-audio?${queryParams.toString()}`);
+	const result = await response.json();
+
+	return {
+		musicAudio: result.data as MusicAudio[],
+		artists: artists,
+		total: result.total as number,
+		category,
+		search,
+		alpha,
+		artist,
+		sort,
+		page: Number.parseInt(pageNumber),
+		limit: Number.parseInt(limit)
+	};
 };

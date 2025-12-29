@@ -279,6 +279,107 @@ export async function queryAudios(options: {
 	}
 }
 
+export async function queryMusicAudio(options: {
+	category?: string;
+	search?: string;
+	alpha?: string;
+	artist?: string;
+	number?: number;
+	limit?: number;
+	pageNumber?: number;
+	orderBy?: string;
+}): Promise<{ data: any[]; total: number }> {
+	const {
+		category,
+		search,
+		alpha,
+		artist,
+		number,
+		limit = 20,
+		pageNumber = 1,
+		orderBy = 'uploaded_at:desc'
+	} = options;
+
+	try {
+		const db = await getDb();
+		const query: Record<string, any> = {
+			title: { $nin: [null, ''] } // Exclude missing titles
+		};
+		const conditions: any[] = [];
+
+		if (category && category !== 'All') {
+			conditions.push({ category: category });
+		}
+
+		if (search && search.trim()) {
+			conditions.push({
+				$or: [
+					{ title: { $regex: search, $options: 'i' } },
+					{ book_full_name: { $regex: search, $options: 'i' } },
+					{ artist: { $regex: search, $options: 'i' } }
+				]
+			});
+		}
+
+		if (alpha && alpha.length === 1) {
+			conditions.push({ title: { $regex: `^${alpha}`, $options: 'i' } });
+		}
+
+		if (artist) {
+			conditions.push({ artist: artist });
+		}
+
+		if (number !== undefined && number !== null) {
+			conditions.push({ number: number });
+		}
+
+		if (conditions.length > 0) {
+			query.$and = conditions;
+		}
+
+		const [property, order] = orderBy.split(/[: ,]/);
+		const sort: Record<string, any> = {};
+		sort[property] = order === 'asc' ? 1 : -1;
+
+		const skip = (pageNumber - 1) * limit;
+
+		const total = await db.collection('music_audio').countDocuments(query);
+		const data = await db
+			.collection('music_audio')
+			.find(query)
+			.sort(sort)
+			.collation({ locale: 'fr', numericOrdering: true })
+			.skip(skip)
+			.limit(limit)
+			.toArray();
+
+		return {
+			data: data.map((doc) => serializeDocument(doc)),
+			total
+		};
+	} catch (error) {
+		console.error('[DB] Error in queryMusicAudio:', error);
+		throw error;
+	}
+}
+
+export async function getMusicArtists(): Promise<string[]> {
+	try {
+		const db = await getDb();
+		// Get unique artists that are not null or empty
+		const artists = await db.collection('music_audio').distinct('artist', {
+			artist: { $ne: null, $nin: ['', undefined] }
+		});
+
+		return (artists as any[])
+			.filter((a): a is string => typeof a === 'string' && a.trim().length > 0)
+			.sort((a, b) => a.localeCompare(b, 'fr', { numeric: true, sensitivity: 'base' }));
+	} catch (error) {
+		console.error('[DB] Error in getMusicArtists:', error);
+		throw error;
+	}
+}
+
 /**
  * Recursively serializes a MongoDB document, converting all ObjectIds to strings
  * and ensuring the document is fully serializable for SvelteKit data loading.

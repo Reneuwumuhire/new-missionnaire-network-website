@@ -54,11 +54,11 @@ export const NavigationLinkList: NavigationLink[] = [
 		menuName: 'Ewald Frank',
 		link: '/ewald-frank'
 	},
-	// {
-	// 	id: 4,
-	// 	menuName: 'Prédications',
-	// 	link: '/predications'
-	// },
+	{
+		id: 4,
+		menuName: 'Musique',
+		link: '/song_audio'
+	},
 	{
 		id: 5,
 		menuName: 'Transcriptions',
