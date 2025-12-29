@@ -3,6 +3,7 @@ import { availableTypesTag } from '../utils/data';
 import { ObjectId } from 'mongodb';
 import type { YoutubeVideo } from '$lib/models/youtube';
 import type { AudioAsset } from '$lib/models/media-assets';
+import type { MusicAudio } from '$lib/models/music-audio';
 export async function getCollection(
 	collection_name: string,
 	skip: number,
@@ -288,7 +289,7 @@ export async function queryMusicAudio(options: {
 	limit?: number;
 	pageNumber?: number;
 	orderBy?: string;
-}): Promise<{ data: any[]; total: number }> {
+}): Promise<{ data: MusicAudio[]; total: number }> {
 	const {
 		category,
 		search,
@@ -303,7 +304,7 @@ export async function queryMusicAudio(options: {
 	try {
 		const db = await getDb();
 		const query: Record<string, any> = {};
-		const conditions: any[] = [];
+		const conditions: Record<string, any>[] = [];
 
 		if (category && category !== 'All') {
 			conditions.push({ category: category });
@@ -377,7 +378,7 @@ export async function getMusicArtists(): Promise<string[]> {
 			artist: { $ne: null, $nin: ['', undefined] }
 		});
 
-		return (artists as any[])
+		return (artists as string[])
 			.filter((a): a is string => typeof a === 'string' && a.trim().length > 0)
 			.sort((a, b) => a.localeCompare(b, 'fr', { numeric: true, sensitivity: 'base' }));
 	} catch (error) {
