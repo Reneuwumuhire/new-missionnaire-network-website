@@ -54,7 +54,8 @@
 		'Umuco',
 		'Nyimbo za Wokovu',
 		'Ikirundi',
-		'Impimbano'
+		'Impimbano',
+		'Kolowezi'
 	];
 
 	// Sync playlist when songs are loaded
