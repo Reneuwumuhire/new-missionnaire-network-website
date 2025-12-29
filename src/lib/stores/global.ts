@@ -11,6 +11,7 @@ export const basePlaylist = writable<(AudioAsset | MusicAudio)[]>([]);
 export const currentIndex = writable<number>(0);
 export const autoNext = writable<boolean>(true);
 export const isShuffle = writable<boolean>(false);
+export const isPlaying = writable<boolean>(false);
 export const isLoading = writable<boolean>(false);
 export const searchQuery = writable<string>('');
 export const currentViewingVideo = writable<YoutubeVideo>();

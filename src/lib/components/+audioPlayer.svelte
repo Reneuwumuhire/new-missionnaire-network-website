@@ -12,7 +12,7 @@
 	import BsVolumeMuteFill from 'svelte-icons-pack/bs/BsVolumeMuteFill';
 	import BsX from 'svelte-icons-pack/bs/BsX';
 	import BsShuffle from 'svelte-icons-pack/bs/BsShuffle';
-	import { selectAudio, playlist, basePlaylist, currentIndex, autoNext, isShuffle } from '../stores/global';
+	import { selectAudio, playlist, basePlaylist, currentIndex, autoNext, isShuffle, isPlaying } from '../stores/global';
 	import type { AudioAsset } from '$lib/models/media-assets';
 	import type { MusicAudio } from '$lib/models/music-audio';
 	import IoRepeat from 'svelte-icons-pack/io/IoRepeat';
@@ -21,7 +21,6 @@
 	import IoPlaySkipForwardOutline from 'svelte-icons-pack/io/IoPlaySkipForwardOutline';
 
 	let audio: HTMLAudioElement;
-	let isPlaying = false;
 	let currentTime = 0;
 	let duration = 0;
 	let progressBarWidth = 0;
@@ -118,8 +117,8 @@
 			audio.addEventListener('ended', handleEnded);
 			audio.addEventListener('timeupdate', updateAudioTime);
 			audio.addEventListener('timeupdate', updateIndicator);
-			audio.addEventListener('play', () => { isPlaying = true; });
-			audio.addEventListener('pause', () => { isPlaying = false; });
+			audio.addEventListener('play', () => { isPlaying.set(true); });
+			audio.addEventListener('pause', () => { isPlaying.set(false); });
 			audio.addEventListener('loadedmetadata', () => {
 				duration = audio.duration;
 			});
@@ -130,7 +129,7 @@
 		if (playPromise !== undefined) {
 			playPromise.catch(error => {
 				console.error("Playback failed (possibly browser policy):", error);
-				isPlaying = false;
+				isPlaying.set(false);
 			});
 		}
 		duration = 0;
@@ -157,14 +156,40 @@
 		isMuted = !isMuted;
 	};
 
+	let progressBarElement: HTMLDivElement;
+
 	const startDrag = (event: TouchEvent | MouseEvent) => {
 		isDragging = true;
-		initialClickX = 'touches' in event ? event.touches[0].clientX : event.clientX;
-		initialIndicatorPosition = indicatorPosition;
+		handleDrag(event); // Initial seek on click/touch
 	};
 
 	const endDrag = () => {
 		isDragging = false;
+	};
+
+	const handleDrag = (event: TouchEvent | MouseEvent) => {
+		if (!isDragging || !progressBarElement || !duration) return;
+
+		// Get clientX from mouse or touch
+		const clientX = 'touches' in event ? event.touches[0].clientX : event.clientX;
+		const rect = progressBarElement.getBoundingClientRect();
+		
+		// Calculate percentage
+		let percentage = (clientX - rect.left) / rect.width;
+		percentage = Math.max(0, Math.min(1, percentage));
+		
+		// Update UI immediately for smoothness
+		// Also update indicatorPosition so the knob follows the simplified logic
+		progressBarWidth = percentage * 100;
+		indicatorPosition = progressBarWidth; 
+		
+		// Update audio
+		if (audio) {
+			const newTime = percentage * duration;
+			if (Math.abs(audio.currentTime - newTime) > 0.1) {
+				audio.currentTime = newTime;
+			}
+		}
 	};
 
 	const seekForward = () => {
@@ -325,26 +350,37 @@
 	});
 </script>
 
-<svelte:window on:keydown={handleKeydown} />
+<svelte:window 
+	on:keydown={handleKeydown} 
+	on:mousemove={handleDrag}
+	on:touchmove={handleDrag}
+	on:mouseup={endDrag}
+	on:touchend={endDrag}
+/>
 
 <div class="fixed z-[100] bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-gray-100 shadow-[0_-8px_30px_rgb(0,0,0,0.12)] pb-safe pt-2 md:pt-4 md:pb-4 transition-all duration-300">
 	<!-- Top Progress Bar -->
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <!-- svelte-ignore a11y-no-static-element-interactions -->
 <div
-	class="absolute top-0 left-0 w-full h-[3px] bg-gray-100 cursor-pointer group/progress overflow-visible"
+	bind:this={progressBarElement}
+	class="absolute top-0 left-0 w-full h-8 -translate-y-1/2 cursor-pointer group/progress flex items-center justify-start z-50 touch-none select-none transition-all"
 	on:mousedown={startDrag}
-	on:touchstart={startDrag}
+	on:touchstart|nonpassive={startDrag}
 	on:click={seekTo}
 >
-	<div 
-		class="h-full bg-orange-500 transition-all duration-150 ease-out relative" 
-		style="width: {progressBarWidth}%"
-	>
-		<!-- Indicator Knob -->
+	<!-- Visual Track -->
+	<div class="w-full h-[4px] bg-gray-200 relative overflow-visible rounded-full">
+		<!-- Active Progress -->
 		<div 
-			class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3 h-3 bg-orange-500 border-2 border-white rounded-full shadow-md opacity-0 md:group-hover/progress:opacity-100 transition-opacity {isDragging ? 'opacity-100 scale-125' : ''}"
-		></div>
+			class="h-full bg-orange-500 rounded-full relative" 
+			style="width: {progressBarWidth}%"
+		>
+			<!-- Indicator Knob -->
+			<div 
+				class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-4 h-4 bg-orange-500 border-[3px] border-white rounded-full shadow-md transform transition-transform duration-100 {isDragging ? 'scale-125' : 'scale-100'} md:scale-0 md:group-hover/progress:scale-100"
+			></div>
+		</div>
 	</div>
 </div>
 

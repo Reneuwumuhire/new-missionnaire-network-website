@@ -19,7 +19,7 @@ export async function GET() {
 		'/ewald-frank',
 		'/galerie',
 		'/predications',
-		'/song_audio',
+		'/musique',
 		'/transcriptions',
 		'/william-branham'
 	];
@@ -50,7 +50,7 @@ export async function GET() {
 		.map(
 			(a) => `
   <url>
-    <loc>${baseUrl}/song_audio/${a.slug || a._id}</loc>
+    <loc>${baseUrl}/musique/${a.slug || a._id}</loc>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>`

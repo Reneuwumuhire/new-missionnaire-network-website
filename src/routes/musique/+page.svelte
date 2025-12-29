@@ -3,7 +3,7 @@
 	import { page } from '$app/stores';
 	import type { MusicAudio } from '$lib/models/music-audio';
 	import type { AudioAsset } from '$lib/models/media-assets';
-	import { selectAudio, basePlaylist, playlist, currentIndex, autoNext, isShuffle } from '$lib/stores/global';
+	import { selectAudio, basePlaylist, playlist, currentIndex, autoNext, isShuffle, isPlaying } from '$lib/stores/global';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import BsSearch from 'svelte-icons-pack/bs/BsSearch';
@@ -14,6 +14,7 @@
 
 	import IoCloudDownloadOutline from 'svelte-icons-pack/io/IoCloudDownloadOutline';
 	import IoPlayCircle from 'svelte-icons-pack/io/IoPlayCircle';
+	import IoPauseCircle from 'svelte-icons-pack/io/IoPauseCircle';
 	import { formatTime } from '../../utils/FormatTime';
 	export let data;
 
@@ -205,13 +206,12 @@
 		</div>
 	</div>
 
-	<!-- Recueils (Chips) -->
 	<div class="mb-12">
 		<h2 class="text-[10px] md:text-xs font-black text-orange-500 uppercase tracking-[0.2em] mb-4">Recueils</h2>
-		<div class="flex flex-wrap gap-3">
+		<div class="flex overflow-x-auto pb-4 gap-3 no-scrollbar -mx-4 px-4 md:mx-0 md:px-0 md:pb-0" style="scrollbar-width: none; -ms-overflow-style: none;">
 			{#each categories as category}
 				<button 
-					class="px-5 py-2.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all border {currentCategory === category ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-500'}"
+					class="flex-shrink-0 px-5 py-2.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all border {currentCategory === category ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-500'}"
 					on:click={() => handleCategoryChange(category)}
 				>
 					{category === 'All' ? 'Tout Voir' : category}
@@ -222,7 +222,60 @@
 
 	<!-- List Title and Mobile Filters -->
 	<div class="flex flex-col gap-2 mb-6">
-		<h2 class="text-3xl font-black text-gray-800">List</h2>
+		<div class="flex items-center justify-between">
+			<h2 class="text-3xl font-black text-gray-800">List</h2>
+			<!-- Mobile Artist Filter Toggle -->
+			<div class="relative md:hidden">
+				<button 
+					class="flex items-center gap-2 bg-white border border-gray-200 text-gray-600 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm active:scale-95 transition-transform"
+					on:click|stopPropagation={() => isArtistMenuOpen = !isArtistMenuOpen}
+				>
+					<Icon src={BsSearch} size="12" />
+					Artiste
+				</button>
+				{#if isArtistMenuOpen}
+					<!-- svelte-ignore a11y-no-static-element-interactions -->
+					<!-- svelte-ignore a11y-click-events-have-key-events -->
+					<div 
+						class="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-100 p-3 z-50 normal-case tracking-normal"
+						on:click|stopPropagation
+					>
+						<div class="flex items-center gap-2 bg-gray-50 px-2 py-1.5 rounded-lg mb-2">
+							<Icon src={BsSearch} size="12" color="#999" />
+							<input 
+								type="text" 
+								placeholder="Rechercher un artiste..." 
+								class="bg-transparent border-none outline-none text-xs w-full text-gray-700 placeholder:text-gray-400"
+								bind:value={artistSearch}
+							/>
+						</div>
+						
+						<div class="max-h-60 overflow-y-auto space-y-1 custom-scrollbar">
+							{#if filteredArtists.length === 0}
+								<div class="px-3 py-4 text-xs text-gray-400 text-center italic">
+									Aucun artiste trouvé
+								</div>
+							{:else}
+								<button 
+									class="w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-colors {!currentArtist ? 'bg-orange-50 text-orange-600' : 'text-gray-500 hover:bg-gray-50'}"
+									on:click={() => { handleArtistChange(''); isArtistMenuOpen = false; }}
+								>
+									Tous les artistes
+								</button>
+								{#each filteredArtists as artist}
+									<button 
+										class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-colors {currentArtist === artist ? 'bg-orange-50 text-orange-600 font-bold' : 'text-gray-600 hover:bg-gray-50'}"
+										on:click={() => { handleArtistChange(artist); isArtistMenuOpen = false; }}
+									>
+										{artist}
+									</button>
+								{/each}
+							{/if}
+						</div>
+					</div>
+				{/if}
+			</div>
+		</div>
 		
 		<!-- Active Filters (Mobile Only) -->
 		{#if (currentArtist || (currentCategory && currentCategory !== 'All'))}
@@ -404,10 +457,16 @@
 					<div class="w-10 text-center">
 						<button
 							class="hover:scale-110 active:scale-95 transition-all p-2 {isActive ? 'text-orange-600' : 'text-orange-500'}"
-							on:click|stopPropagation={() => playSong(song, i)}
-							title="Lire"
+							on:click|stopPropagation={() => {
+								if (isActive && $isPlaying) {
+									isPlaying.set(false);
+								} else {
+									playSong(song, i);
+								}
+							}}
+							title={isActive && $isPlaying ? 'Pause' : 'Lire'}
 						>
-							<Icon src={IoPlayCircle} size="24" />
+							<Icon src={isActive && $isPlaying ? IoPauseCircle : IoPlayCircle} size="24" />
 						</button>
 					</div>
 				</div>
@@ -499,5 +558,16 @@
 	}
 	:global(.border-missionnaire) {
 		border-color: #1e40af;
+	}
+
+	/* Hide scrollbar for Chrome, Safari and Opera */
+	.no-scrollbar::-webkit-scrollbar {
+		display: none;
+	}
+
+	/* Hide scrollbar for IE, Edge and Firefox */
+	.no-scrollbar {
+		-ms-overflow-style: none;  /* IE and Edge */
+		scrollbar-width: none;  /* Firefox */
 	}
 </style>
