@@ -33,7 +33,7 @@
 	let audioSrc: string = '';
 
 	function handleEnded() {
-		isPlaying = false;
+		isPlaying.set(false);
 		if ($autoNext && $playlist.length > 0) {
 			const nextIndex = $currentIndex + 1;
 			if (nextIndex < $playlist.length) {
