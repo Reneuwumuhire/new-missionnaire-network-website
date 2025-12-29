@@ -17,6 +17,8 @@
 	<title>Missionnaire Network</title>
 	<meta property="og:site_name" content="Missionnaire Network" />
 	<meta property="og:type" content="website" />
+	<meta property="og:url" content={$page.url.href} />
+	<meta property="og:logo" content="https://www.missionnaire.net/favicon.png" />
 	<meta property="og:image" content="https://www.missionnaire.net/og-image.png" />
 	<meta property="og:image:width" content="1200" />
 	<meta property="og:image:height" content="630" />
