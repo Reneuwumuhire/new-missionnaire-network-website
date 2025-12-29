@@ -55,7 +55,7 @@
 		'Nyimbo za Wokovu',
 		'Ikirundi',
 		'Impimbano',
-		'Kolowezi'
+		'Kolwezi'
 	];
 
 	// Sync playlist when songs are loaded
