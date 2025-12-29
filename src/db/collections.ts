@@ -302,9 +302,7 @@ export async function queryMusicAudio(options: {
 
 	try {
 		const db = await getDb();
-		const query: Record<string, any> = {
-			title: { $nin: [null, ''] } // Exclude missing titles
-		};
+		const query: Record<string, any> = {};
 		const conditions: any[] = [];
 
 		if (category && category !== 'All') {
