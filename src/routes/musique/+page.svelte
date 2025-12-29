@@ -11,6 +11,7 @@
 	import BsArrowUp from 'svelte-icons-pack/bs/BsArrowUp';
 	import BsArrowDown from 'svelte-icons-pack/bs/BsArrowDown';
 	import BsX from 'svelte-icons-pack/bs/BsX';
+	import BsShuffle from 'svelte-icons-pack/bs/BsShuffle';
 
 	import IoCloudDownloadOutline from 'svelte-icons-pack/io/IoCloudDownloadOutline';
 	import IoPlayCircle from 'svelte-icons-pack/io/IoPlayCircle';
@@ -416,7 +417,15 @@
 				Durée
 			</button>
 			<div class="w-10 text-center"></div>
-			<div class="w-10 text-center"></div>
+			<div class="w-10 text-center flex items-center justify-center">
+				<button 
+					class="hover:scale-110 active:scale-95 transition-all {currentSort.startsWith('random') ? 'text-orange-500' : 'text-gray-300 hover:text-orange-400'}"
+					on:click={() => handleSortChange('random')}
+					title="Mélanger la liste"
+				>
+					<Icon src={BsShuffle} size="16" />
+				</button>
+			</div>
 		</div>
 
 		<div class="divide-y divide-gray-100">

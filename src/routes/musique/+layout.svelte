@@ -50,7 +50,7 @@
 <div class="flex flex-col">
 	<header>
 		<div class="relative header-predications flex flex-col items-center justify-center w-full min-h-[400px]">
-			<div class="absolute inset-0 overlay-predications flex items-center justify-center pt-12 pb-32 md:py-12">
+			<div class="absolute inset-0 overlay-predications flex items-center justify-center pt-12 pb-24 md:py-12">
 				<div class="flex flex-col items-center text-white space-y-2 px-5 w-full max-w-4xl text-center">
 					<small class="text-orange-500 uppercase tracking-[0.2em] font-black text-xs mb-2">
 						Tous les cantiques
@@ -60,7 +60,7 @@
 						Trouvez ici les cantiques.
 					</p>
 					<form 
-						class="flex flex-row w-full max-w-2xl bg-white rounded-lg overflow-hidden shadow-2xl"
+						class="flex flex-row w-full max-w-2xl bg-white rounded-xl overflow-hidden shadow-2xl"
 						on:submit|preventDefault={handleHeroSearch}
 					>
 						<input
