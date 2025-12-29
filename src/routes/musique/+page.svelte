@@ -190,7 +190,7 @@
 	<meta name="description" content="Ecoutez les cantiques du Message de l'Heure sur Missionnaire Network." />
 </svelte:head>
 
-<div class="container mx-auto px-4 py-8 max-w-5xl">
+<div class="container mx-auto px-2 md:px-4 py-8 max-w-5xl">
 	<!-- Alpha Filter -->
 	<div class="mb-10">
 		<h2 class="text-[10px] md:text-xs font-black text-orange-500 uppercase tracking-[0.2em] mb-4">Par ordre alphabétique</h2>
@@ -458,8 +458,8 @@
 						<button
 							class="hover:scale-110 active:scale-95 transition-all p-2 {isActive ? 'text-orange-600' : 'text-orange-500'}"
 							on:click|stopPropagation={() => {
-								if (isActive && $isPlaying) {
-									isPlaying.set(false);
+								if (isActive) {
+									isPlaying.update(v => !v);
 								} else {
 									playSong(song, i);
 								}
@@ -550,16 +550,6 @@
 </div>
 
 <style>
-	:global(.text-missionnaire) {
-		color: #1e40af;
-	}
-	:global(.bg-missionnaire) {
-		background-color: #1e40af;
-	}
-	:global(.border-missionnaire) {
-		border-color: #1e40af;
-	}
-
 	/* Hide scrollbar for Chrome, Safari and Opera */
 	.no-scrollbar::-webkit-scrollbar {
 		display: none;

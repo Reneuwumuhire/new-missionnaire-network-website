@@ -135,6 +135,17 @@
 		duration = 0;
 	}
 
+	$: if (browser && audio && $isPlaying !== undefined) {
+		if ($isPlaying && audio.paused) {
+			audio.play().catch(e => {
+				console.error("Play failed via store sync:", e);
+				isPlaying.set(false);
+			});
+		} else if (!$isPlaying && !audio.paused) {
+			audio.pause();
+		}
+	}
+
 	$: if ($selectAudio) {
 		const newSelected = $selectAudio;
 		const url = 's3_url' in newSelected ? newSelected.s3_url : (newSelected as AudioAsset).url;
@@ -389,7 +400,7 @@
 		<div class="flex items-center justify-between mb-3 md:mb-0 md:flex-1 md:min-w-0">
 			<div class="flex-1 min-w-0">
 				<div class="text-[10px] uppercase tracking-[0.2em] font-bold text-orange-500 mb-0.5 opacity-80">Lecture en cours</div>
-				<div class="font-black text-sm md:text-lg text-missionnaire truncate pr-4">
+				<div class="font-black text-sm md:text-lg text-gray-900 truncate pr-4">
 					{$selectAudio?.title || 'Chargement...'}
 				</div>
 				<div class="flex items-center gap-2 mt-0.5 md:hidden">
@@ -425,27 +436,27 @@
 				</div>
 
 				<div class="flex items-center gap-1 md:gap-3">
-					<button on:click={playPrevious} class="p-2 text-missionnaire hover:text-orange-600 transition-colors" title="Précédent">
+					<button on:click={playPrevious} class="p-2 text-gray-600 hover:text-orange-600 transition-colors" title="Précédent">
 						<Icon src={IoPlaySkipBackOutline} size="24" />
 					</button>
 					
-					<button on:click={seekBackward} class="hidden md:block p-2 text-gray-300 hover:text-missionnaire transition-colors" title="-5s">
+					<button on:click={seekBackward} class="hidden md:block p-2 text-gray-300 hover:text-orange-600 transition-colors" title="-5s">
 						<Icon src={IoPlayBackOutline} size="18" />
 					</button>
 
-					<button on:click={togglePlay} class="relative flex items-center justify-center w-14 h-14 md:w-12 md:h-12 bg-missionnaire text-white rounded-full hover:scale-105 transition-transform shadow-lg shadow-missionnaire/20 active:scale-95">
-						{#if isPlaying}
+					<button on:click={togglePlay} class="relative flex items-center justify-center w-14 h-14 md:w-12 md:h-12 bg-orange-500 text-white rounded-full hover:scale-105 transition-transform shadow-lg shadow-orange-500/20 active:scale-95">
+						{#if $isPlaying}
 							<Icon src={BsPauseCircleFill} size="32" />
 						{:else}
 							<Icon src={BsPlayCircleFill} size="32" />
 						{/if}
 					</button>
 
-					<button on:click={seekForward} class="hidden md:block p-2 text-gray-300 hover:text-missionnaire transition-colors" title="+5s">
+					<button on:click={seekForward} class="hidden md:block p-2 text-gray-300 hover:text-orange-600 transition-colors" title="+5s">
 						<Icon src={IoPlayForwardOutline} size="18" />
 					</button>
 
-					<button on:click={playNext} class="p-2 text-missionnaire hover:text-orange-600 transition-colors" title="Suivant">
+					<button on:click={playNext} class="p-2 text-gray-600 hover:text-orange-600 transition-colors" title="Suivant">
 						<Icon src={IoPlaySkipForwardOutline} size="24" />
 					</button>
 				</div>
@@ -465,7 +476,7 @@
 			<!-- Time & Extra Controls (Desktop) -->
 			<div class="hidden md:flex items-center gap-6">
 				<div class="flex items-center gap-1.5 font-bold text-[13px] text-gray-500 min-w-[90px]">
-					<span class="text-missionnaire">{formatTime(currentTime)}</span>
+					<span class="text-gray-500">{formatTime(currentTime)}</span>
 					<span class="text-gray-300">/</span>
 					<span>{formatTime(duration)}</span>
 				</div>
@@ -488,7 +499,7 @@
 					</button>
 
 					<div class="flex items-center gap-2 ml-2">
-						<button on:click={toggleMute} class="p-2 text-gray-400 hover:text-missionnaire transition-colors">
+						<button on:click={toggleMute} class="p-2 text-gray-400 hover:text-orange-600 transition-colors">
 							{#if !isMuted}
 								<Icon src={BsVolumeUpFill} size="20" />
 							{:else}
