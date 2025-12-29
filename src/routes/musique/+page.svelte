@@ -108,6 +108,29 @@
 		params.set('category', category);
 		params.delete('artist');
 		params.set('page', '1');
+		
+		// If switching to 'All' (Tout Voir), remove explicit sort to allow default random shuffle
+		if (category === 'All') {
+			params.delete('sort');
+		} else {
+			// For specific categories, default to recent uploads if no sort exists, 
+			// or keep existing sort? 
+			// Better to keep existing sort if user chose one? 
+			// Or maybe reset to default (uploaded_at) for cleaner UX?
+			// Let's just remove sort for 'All' which triggers the +page.ts default 'random'.
+			// For others, if we keep sort, it might be random?
+			// If sort was 'random' and we switch to 'Umuco', we probably want 'uploaded_at' or 'title'.
+			// 'random' is only handled for 'All' in +page.ts default.
+			// But if we keep 'sort=random' in URL, backend handles proper random for categories too?
+			// Backend: `if (property === 'random')` works for any query.
+			// So random sort works for categories too!
+			// Does the user *want* that? "in the list when it is Voir tous".
+			// Maybe for specific collections they want order?
+			// Let's explicitly remove 'sort' if it was 'random' when switching categories, or just always reset sort on category change?
+			// Common pattern: Category change resets sort to default.
+			params.delete('sort');
+		}
+		
 		goto(`?${params.toString()}`);
 	}
 

@@ -335,21 +335,29 @@ export async function queryMusicAudio(options: {
 			query.$and = conditions;
 		}
 
-		const [property, order] = orderBy.split(/[: ,]/);
-		const sort: Record<string, any> = {};
-		sort[property] = order === 'asc' ? 1 : -1;
-
 		const skip = (pageNumber - 1) * limit;
-
 		const total = await db.collection('music_audio').countDocuments(query);
-		const data = await db
-			.collection('music_audio')
-			.find(query)
-			.sort(sort)
-			.collation({ locale: 'fr', numericOrdering: true })
-			.skip(skip)
-			.limit(limit)
-			.toArray();
+
+		const [property, order] = orderBy.split(/[: ,]/);
+
+		let data;
+		if (property === 'random') {
+			data = await db
+				.collection('music_audio')
+				.aggregate([{ $match: query }, { $sample: { size: limit } }])
+				.toArray();
+		} else {
+			const sort: Record<string, any> = {};
+			sort[property] = order === 'asc' ? 1 : -1;
+			data = await db
+				.collection('music_audio')
+				.find(query)
+				.sort(sort)
+				.collation({ locale: 'fr', numericOrdering: true })
+				.skip(skip)
+				.limit(limit)
+				.toArray();
+		}
 
 		return {
 			data: data.map((doc) => serializeDocument(doc)),

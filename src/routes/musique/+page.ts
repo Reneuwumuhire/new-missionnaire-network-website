@@ -7,7 +7,14 @@ export const load = async ({ fetch, url }) => {
 	const artist = url.searchParams.get('artist') || '';
 	const pageNumber = url.searchParams.get('page') || '1';
 	const limit = url.searchParams.get('limit') || '100';
-	const sort = url.searchParams.get('sort') || 'uploaded_at:desc';
+
+	// Default to random sort for "All" category if no specific sort is requested
+	let defaultSort = 'uploaded_at:desc';
+	if (category === 'All' && !search && !alpha && !artist) {
+		defaultSort = 'random';
+	}
+
+	const sort = url.searchParams.get('sort') || defaultSort;
 
 	let artists: string[] = [];
 	try {
