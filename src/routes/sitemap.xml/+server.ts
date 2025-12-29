@@ -11,7 +11,7 @@ export async function GET() {
 		.find({}, { projection: { slug: 1 } })
 		.toArray();
 
-	const baseUrl = 'https://missionnaire-network.com';
+	const baseUrl = 'https://www.missionnaire.net';
 	const pages = [
 		'',
 		'/a-propos',

@@ -213,6 +213,8 @@
 <svelte:head>
 	<title>Cantiques - Missionnaire Network</title>
 	<meta name="description" content="Ecoutez les cantiques du Message de l'Heure sur Missionnaire Network." />
+	<meta property="og:title" content="Cantiques - Missionnaire Network" />
+	<meta property="og:description" content="Ecoutez les cantiques du Message de l'Heure sur Missionnaire Network." />
 </svelte:head>
 
 <div class="container mx-auto px-2 md:px-4 py-8 max-w-5xl">
