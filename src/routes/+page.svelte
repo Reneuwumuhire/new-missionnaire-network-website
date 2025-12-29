@@ -165,10 +165,10 @@
 </script>
 
 <svelte:head>
-	<title>Missionnaire Network - Accueil</title>
-	<meta name="description" content="Bienvenue sur Missionnaire Network. Découvrez les prédications et cantiques du Message de l'Heure." />
-	<meta property="og:title" content="Missionnaire Network - Accueil" />
-	<meta property="og:description" content="Découvrez les prédications et cantiques du Message de l'Heure." />
+	<title>Missionnaire Network - Accueil | Prédications et Cantiques du Message</title>
+	<meta name="description" content="Bienvenue sur Missionnaire Network. Découvrez les prédications and cantiques inspirants du Message de l'Heure pour votre édification spirituelle." />
+	<meta property="og:title" content="Missionnaire Network - Accueil | Prédications et Cantiques du Message" />
+	<meta property="og:description" content="Découvrez les prédications et cantiques inspirants du Message de l'Heure pour votre édification spirituelle." />
 </svelte:head>
 
 <main class="relative max-w-[1640px] mx-auto px-5">

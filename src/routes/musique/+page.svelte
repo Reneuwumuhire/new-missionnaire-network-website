@@ -211,10 +211,10 @@
 </script>
 
 <svelte:head>
-	<title>Cantiques - Missionnaire Network</title>
-	<meta name="description" content="Ecoutez les cantiques du Message de l'Heure sur Missionnaire Network." />
-	<meta property="og:title" content="Cantiques - Missionnaire Network" />
-	<meta property="og:description" content="Ecoutez les cantiques du Message de l'Heure sur Missionnaire Network." />
+	<title>Cantiques et Louanges - Missionnaire Network | Musique du Message</title>
+	<meta name="description" content="Ecoutez les cantiques, louanges et adorations du Message de l'Heure sur Missionnaire Network. Une collection riche pour votre adoration quotidienne." />
+	<meta property="og:title" content="Cantiques et Louanges - Missionnaire Network | Musique du Message" />
+	<meta property="og:description" content="Ecoutez les cantiques, louanges et adorations du Message de l'Heure sur Missionnaire Network. Une collection riche pour votre adoration quotidienne." />
 </svelte:head>
 
 <div class="container mx-auto px-2 md:px-4 py-8 max-w-5xl">

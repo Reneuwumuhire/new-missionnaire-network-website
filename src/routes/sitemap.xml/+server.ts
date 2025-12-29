@@ -10,6 +10,10 @@ export async function GET() {
 		.collection('AUDIO_ASSETS')
 		.find({}, { projection: { slug: 1 } })
 		.toArray();
+	const newMusic = await db
+		.collection('music_audio')
+		.find({}, { projection: { _id: 1, title: 1 } })
+		.toArray();
 
 	const baseUrl = 'https://www.missionnaire.net';
 	const pages = [
@@ -20,6 +24,7 @@ export async function GET() {
 		'/galerie',
 		'/predications',
 		'/musique',
+		'/documents',
 		'/transcriptions',
 		'/william-branham'
 	];
@@ -52,7 +57,17 @@ export async function GET() {
   <url>
     <loc>${baseUrl}/musique/${a.slug || a._id}</loc>
     <changefreq>weekly</changefreq>
-    <priority>0.6</priority>
+    <priority>0.5</priority>
+  </url>`
+		)
+		.join('')}
+  ${newMusic
+		.map(
+			(m) => `
+  <url>
+    <loc>${baseUrl}/musique?search=${encodeURIComponent(m.title || '')}</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
   </url>`
 		)
 		.join('')}
