@@ -4,6 +4,7 @@ import { ObjectId } from 'mongodb';
 import type { YoutubeVideo } from '$lib/models/youtube';
 import type { AudioAsset } from '$lib/models/media-assets';
 import type { MusicAudio } from '$lib/models/music-audio';
+import type { Sermon } from '$lib/models/sermon';
 export async function getCollection(
 	collection_name: string,
 	skip: number,
@@ -477,6 +478,108 @@ export async function getSongsCount(search?: string): Promise<number> {
 		return await db.collection('songs').countDocuments(query);
 	} catch (error) {
 		console.error('[DB] Error in getSongsCount:', error);
+		throw error;
+	}
+}
+
+export async function querySermons(options: {
+	author?: string;
+	search?: string;
+	alpha?: string;
+	year?: string;
+	hasAudio?: boolean;
+	limit?: number;
+	pageNumber?: number;
+	orderBy?: string;
+}): Promise<{ data: Sermon[]; total: number }> {
+	const {
+		author,
+		search,
+		alpha,
+		year,
+		hasAudio = false,
+		limit = 100,
+		pageNumber = 1,
+		orderBy = 'iso_date:desc'
+	} = options;
+
+	try {
+		const db = await getDb();
+		const query: Record<string, any> = {};
+		const conditions: Record<string, any>[] = [];
+
+		if (author && author !== 'All' && author !== 'Tous') {
+			conditions.push({ author: author });
+		}
+
+		if (search && search.trim()) {
+			conditions.push({
+				$or: [
+					{ english_title: { $regex: search, $options: 'i' } },
+					{ french_title: { $regex: search, $options: 'i' } },
+					{ full_date_code: { $regex: search, $options: 'i' } }
+				]
+			});
+		}
+
+		if (alpha && alpha.length === 1) {
+			conditions.push({ french_title: { $regex: `^${alpha}`, $options: 'i' } });
+		}
+
+		if (year) {
+			conditions.push({ iso_date: { $regex: `^${year}` } });
+		}
+
+		if (hasAudio) {
+			conditions.push({ mp3_url: { $exists: true, $ne: null, $nin: ['', 'null'] } });
+		}
+
+		if (conditions.length > 0) {
+			query.$and = conditions;
+		}
+
+		const skip = (pageNumber - 1) * limit;
+		const total = await db.collection('sermons').countDocuments(query);
+
+		const [property, order] = orderBy.split(/[: ,]/);
+		const sort: Record<string, any> = {};
+		sort[property] = order === 'asc' ? 1 : -1;
+
+		const data = await db
+			.collection('sermons')
+			.find(query)
+			.sort(sort)
+			.skip(skip)
+			.limit(limit)
+			.toArray();
+
+		return {
+			data: data.map((doc) => serializeDocument(doc)),
+			total
+		};
+	} catch (error) {
+		console.error('[DB] Error in querySermons:', error);
+		throw error;
+	}
+}
+
+export async function getSermonYears(): Promise<string[]> {
+	try {
+		const db = await getDb();
+		const dates = await db.collection('sermons').distinct('iso_date', {
+			iso_date: { $ne: null, $nin: ['', undefined] }
+		});
+
+		const years = new Set<string>();
+		(dates as string[]).forEach((date) => {
+			if (date && date.length >= 4) {
+				years.add(date.substring(0, 4));
+			}
+		});
+
+		return Array.from(years).sort((a, b) => b.localeCompare(a));
+	} catch (error) {
+		console.error('[DB] Error in getSermonYears:', error);
 		throw error;
 	}
 }

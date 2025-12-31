@@ -15,6 +15,7 @@
 	import { selectAudio, playlist, basePlaylist, currentIndex, autoNext, isShuffle, isPlaying } from '../stores/global';
 	import type { AudioAsset } from '$lib/models/media-assets';
 	import type { MusicAudio } from '$lib/models/music-audio';
+	import type { Sermon } from '$lib/models/sermon';
 	import IoRepeat from 'svelte-icons-pack/io/IoRepeat';
 	import RiMediaPlayList2Fill from 'svelte-icons-pack/ri/RiMediaPlayList2Fill';
 	import IoPlaySkipBackOutline from 'svelte-icons-pack/io/IoPlaySkipBackOutline';
@@ -64,10 +65,11 @@
 				// Ensure current song is at its new position and update index
 				playlist.set(list);
 				if (currentSong) {
-					const newIndex = list.findIndex(s => 
-						('s3_url' in s ? s.s3_url : s.url) === 
-						('s3_url' in currentSong ? currentSong.s3_url : currentSong.url)
-					);
+					const newIndex = list.findIndex(s => {
+						const url = 's3_url' in s ? s.s3_url : ('mp3_url' in s ? s.mp3_url : (s as AudioAsset).url);
+						const currentUrl = 's3_url' in currentSong ? currentSong.s3_url : ('mp3_url' in currentSong ? currentSong.mp3_url : (currentSong as AudioAsset).url);
+						return url === currentUrl;
+					});
 					if (newIndex !== -1) currentIndex.set(newIndex);
 				}
 			} else {
@@ -77,10 +79,11 @@
 				playlist.set(originalList);
 				
 				if (currentSong) {
-					const newIndex = originalList.findIndex(s => 
-						('s3_url' in s ? s.s3_url : s.url) === 
-						('s3_url' in currentSong ? currentSong.s3_url : currentSong.url)
-					);
+					const newIndex = originalList.findIndex(s => {
+						const url = 's3_url' in s ? s.s3_url : ('mp3_url' in s ? s.mp3_url : (s as AudioAsset).url);
+						const currentUrl = 's3_url' in currentSong ? currentSong.s3_url : ('mp3_url' in currentSong ? currentSong.mp3_url : (currentSong as AudioAsset).url);
+						return url === currentUrl;
+					});
 					if (newIndex !== -1) currentIndex.set(newIndex);
 				}
 			}
@@ -107,13 +110,16 @@
 	function updateAudioSource(url: string) {
 		if (!url) return;
 		
+		const encodedUrl = encodeURI(url);
+		console.log("[AudioPlayer] Updating source to:", encodedUrl);
+
 		if (audio) {
 			audio.pause();
-			audio.src = url;
+			audio.src = encodedUrl;
 			audio.load();
 		} else {
-			audio = new Audio(url);
-			audio.crossOrigin = 'anonymous'; // Good practice for external streams
+			audio = new Audio(encodedUrl);
+			audio.crossOrigin = 'anonymous';
 			audio.addEventListener('ended', handleEnded);
 			audio.addEventListener('timeupdate', updateAudioTime);
 			audio.addEventListener('timeupdate', updateIndicator);
@@ -121,14 +127,10 @@
 			audio.addEventListener('pause', () => { isPlaying.set(false); });
 			audio.addEventListener('loadedmetadata', () => {
 				duration = audio.duration;
+				console.log("[AudioPlayer] Metadata loaded, duration:", duration);
 			});
-		}
-
-		// Ensure we attempt to play after source change
-		const playPromise = audio.play();
-		if (playPromise !== undefined) {
-			playPromise.catch(error => {
-				console.error("Playback failed (possibly browser policy):", error);
+			audio.addEventListener('error', (e) => {
+				console.error("[AudioPlayer] Audio error:", e);
 				isPlaying.set(false);
 			});
 		}
@@ -137,21 +139,26 @@
 
 	$: if (browser && audio && $isPlaying !== undefined) {
 		if ($isPlaying && audio.paused) {
+			console.log("[AudioPlayer] Sync: Playing");
 			audio.play().catch(e => {
-				console.error("Play failed via store sync:", e);
+				console.error("[AudioPlayer] Sync: Play failed:", e);
 				isPlaying.set(false);
 			});
 		} else if (!$isPlaying && !audio.paused) {
+			console.log("[AudioPlayer] Sync: Pausing");
 			audio.pause();
 		}
 	}
 
-	$: if ($selectAudio) {
+	$: if ($selectAudio && browser) {
 		const newSelected = $selectAudio;
-		const url = 's3_url' in newSelected ? newSelected.s3_url : (newSelected as AudioAsset).url;
-		if (url && url !== audioSrc) {
-			audioSrc = url;
-			updateAudioSource(url);
+		// Check for s3_url (Music), mp3_url (Sermon), or url (Asset)
+		const rawUrl = (newSelected as any).s3_url || (newSelected as any).mp3_url || (newSelected as any).url || '';
+		console.log("[AudioPlayer] Selected audio change, raw URL:", rawUrl);
+		
+		if (rawUrl && rawUrl !== audioSrc) {
+			audioSrc = rawUrl;
+			updateAudioSource(rawUrl);
 		}
 	}
 
@@ -299,13 +306,14 @@
 	$: if (browser && $selectAudio && 'mediaSession' in navigator) {
 		const current = $selectAudio;
 		const isMusic = 'category' in current;
+		const isSermon = 'mp3_url' in current;
 		
 		navigator.mediaSession.metadata = new MediaMetadata({
-			title: current.title || 'Sans titre',
-			artist: isMusic ? (current as MusicAudio).artist || 'Artiste inconnu' : 'Missionnaire',
+			title: ('title' in current ? current.title : (isSermon ? (current as Sermon).french_title || (current as Sermon).english_title : 'Sans titre')) || 'Sans titre',
+			artist: isMusic ? (current as MusicAudio).artist || 'Artiste inconnu' : (isSermon ? (current as Sermon).author : 'Missionnaire'),
 			album: isMusic 
 				? (current as MusicAudio).book_full_name || (current as MusicAudio).category || 'Missionnaire'
-				: 'Media',
+				: (isSermon ? (current as Sermon).iso_date || 'Prédication' : 'Media'),
 			artwork: [
 				{ src: '/logo.png', sizes: '512x512', type: 'image/png' },
 			]
@@ -401,7 +409,20 @@
 			<div class="flex-1 min-w-0">
 				<div class="text-[10px] uppercase tracking-[0.2em] font-bold text-orange-500 mb-0.5 opacity-80">Lecture en cours</div>
 				<div class="font-black text-sm md:text-lg text-gray-900 truncate pr-4">
-					{$selectAudio?.title || 'Chargement...'}
+				<div class="font-black text-sm md:text-lg text-gray-900 truncate pr-4">
+					{#if $selectAudio}
+						{@const current = $selectAudio}
+						{#if 'french_title' in current}
+							{current.french_title || current.english_title || 'Sans titre'}
+						{:else if 'title' in current}
+							{current.title || 'Sans titre'}
+						{:else}
+							Sans titre
+						{/if}
+					{:else}
+						Chargement...
+					{/if}
+				</div>
 				</div>
 				<div class="flex items-center gap-2 mt-0.5 md:hidden">
 					<span class="text-[10px] font-medium text-gray-400">{formatTime(currentTime)}</span>

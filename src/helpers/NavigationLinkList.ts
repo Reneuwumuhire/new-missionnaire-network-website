@@ -18,11 +18,15 @@
 // <HeaderMenuLink menuName="Chants" link="/" />
 // <HeaderMenuLink menuName="Galerie" link="/" />
 
+import IoMusicalNotes from 'svelte-icons-pack/io/IoMusicalNotes';
+import IoVideocam from 'svelte-icons-pack/io/IoVideocam';
+
 export interface NavigationLinkSubmenu {
 	subName: string;
 	link: string;
 	subText?: string;
 	image?: string;
+	icon?: any;
 }
 export interface NavigationLink {
 	id?: number;
@@ -63,23 +67,36 @@ export const NavigationLinkList: NavigationLink[] = [
 				subName: 'Cantiques (Audio)',
 				subText: 'Ecoutez les chants de louange et adoration.',
 				link: '/musique',
-				image: '/img/music_audio_icon.png'
+				icon: IoMusicalNotes
 			},
 			{
 				subName: 'Chants en Vidéo',
 				subText: 'Regardez nos clips et enregistrements de chants.',
 				link: '/musique/videos',
-				image: '/img/music_video_icon.png'
+				icon: IoVideocam
 			}
 		]
 	},
 	{
 		id: 5,
+		menuName: 'Prédications',
+		link: '/predications',
+		subMenu: [
+			{
+				subName: 'Prédications (Audio)',
+				subText: 'Ecoutez les prédications de Branham, Ewald Frank et locales.',
+				link: '/predications',
+				icon: IoMusicalNotes
+			}
+		]
+	},
+	{
+		id: 6,
 		menuName: 'Transcriptions',
 		link: '/transcriptions'
 	},
 	{
-		id: 6,
+		id: 7,
 		menuName: 'À propos',
 		link: '/a-propos'
 	}

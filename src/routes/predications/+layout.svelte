@@ -1,116 +1,105 @@
 <script lang="ts">
-	import { page, navigating } from '$app/stores';
 	import AudioPlayer from '$lib/components/+audioPlayer.svelte';
-	import { searchQuery, selectAudio } from '$lib/stores/global';
-	import type { AudioAsset } from '$lib/models/media-assets';
+	import AndroidBanner from '$lib/components/+androidBanner.svelte';
+	import { browser } from '$app/environment';
+	import { page } from '$app/stores';
+	import { selectAudio, searchQuery } from '$lib/stores/global';
+	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
-	import { PredicationsRoutes } from '../../utils/predicationsRoutesList';
 
-	let { loading = true } = $page.data;
+	export let data;
+	let heroSearchValue = (data as any).search || '';
+	let debounceTimer: NodeJS.Timeout;
 
-	export let searchTerm: string;
+	function handleHeroSearch() {
+		if (!browser) return;
+		const params = new URLSearchParams($page.url.searchParams);
+		if (heroSearchValue.trim()) {
+			params.set('search', heroSearchValue.trim());
+		} else {
+			params.delete('search');
+		}
+		params.set('page', '1');
+		params.delete('alpha');
+		params.delete('year');
+		goto(`?${params.toString()}`, { keepFocus: true, noScroll: true });
+	}
 
-	let selectedAudioToPlay: AudioAsset | null = null;
+	$: if (browser) {
+		if (heroSearchValue !== undefined) {
+			clearTimeout(debounceTimer);
+			debounceTimer = setTimeout(() => {
+				const currentSearch = $page.url.searchParams.get('search') || '';
+				if (heroSearchValue.trim() !== currentSearch) {
+					handleHeroSearch();
+				}
+			}, 300);
+		}
+	}
+
 	onMount(() => {
-		selectAudio.subscribe((value) => {
-			selectedAudioToPlay = value;
-		});
+		// Sync global search query if needed
+		searchQuery.set(heroSearchValue);
 	});
-
-	function updateSearchQuery(event: Event) {
-		searchTerm = (event.target as HTMLInputElement).value;
-		updateQueryParam(searchTerm);
-	}
-
-	function updateQueryParam(query: string) {
-		const currentUrl = new URL($page.url);
-		currentUrl.searchParams.set('q', query);
-		history.replaceState(null, '', currentUrl.toString());
-	}
 </script>
 
-<div class=" flex flex-col mt-8">
+<div class="flex flex-col">
 	<header>
-		<div class="flex flex-row items-center justify-center space-x-2">
-			<!-- "/img/branham_page_header.jpg" use the image as the background for the next div -->
-			<div
-				class="relative header-predications flex flex-col items-center backdrop-blur-sm justify-center w-full"
-			>
-				<div class="absolute inset-0 overlay-predications flex items-center justify-center">
-					<div class="flex flex-col items-center text-white space-y-4 px-5">
-						<small class=" text-missionnaire uppercase tracking-widest font-bold">
-							Tous les Predications de
-						</small>
-						<h1 class="text-4xl font-black mb-4 text-center">Branham, Ewald Frank et Locales</h1>
-						<p class=" text-sm max-w-md text-center font-light leading-5 tracking-wider">
-							Trouvez ici les predication de William Marrion Branham et Ewald Frank traduits en
-							Kinyarwanda et Predications Locales.
-						</p>
-						<div class="flex flex-row w-full max-w-md">
-							<input
-								type="text"
-								class="border border-gray-300 rounded-l-full indent-4 p-2 w-full text-gray-900 outline-none"
-								placeholder="Rechercher par titre, annee, predicateur..."
-								bind:value={$searchQuery}
-								on:input={updateSearchQuery}
-							/>
-							<button class="bg-missionnaire text-white px-4 py-2">Search</button>
-						</div>
-					</div>
+		<div class="relative header-predications flex flex-col items-center justify-center w-full min-h-[400px]">
+			<div class="absolute inset-0 overlay-predications flex items-center justify-center pt-12 pb-24 md:py-12">
+				<div class="flex flex-col items-center text-white space-y-2 px-5 w-full max-w-4xl text-center">
+					<small class="text-orange-500 uppercase tracking-[0.2em] font-black text-xs mb-2">
+						Tous les prédications
+					</small>
+					<h1 class="text-4xl md:text-6xl font-black mb-1">Branham, Ewald Frank et Locales</h1>
+					<p class="text-sm md:text-base font-medium opacity-80 mb-8 max-w-2xl">
+						Trouvez ici les prédications de William Marrion Branham et Ewald Frank traduits en Kinyarwanda et prédications locales.
+					</p>
+					<form 
+						class="flex flex-row w-full max-w-2xl bg-white rounded-xl overflow-hidden shadow-2xl"
+						on:submit|preventDefault={handleHeroSearch}
+					>
+						<input
+							id="hero-search"
+							type="text"
+							class="flex-1 outline-none text-gray-800 px-6 py-4 text-sm md:text-base"
+							placeholder="Rechercher par titre, annee, predicateur..."
+							bind:value={heroSearchValue}
+						/>
+						<button type="submit" class="bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 font-bold transition-colors">
+							Rechercher
+						</button>
+					</form>
 				</div>
 			</div>
 		</div>
 	</header>
-	<div class="relative flex flex-row justify-center h-auto w-full py-6">
-		<div
-			class="relative flex flex-col items-start w-full max-w-5xl overflow-hidden space-y-2 md:space-y-6 px-5"
-		>
-			<h1 class=" text-xl md:text-2xl font-black text-[#414141]">Par Auteur</h1>
-			<ul class="flex flex-col md:flex-row w-full space-y-2 md:space-y-0 md:space-x-4">
-				<!-- href="/predications/{slug.slug}" -->
-				{#each PredicationsRoutes as slug}
-					<li class="flex-1 h-full max-w-sm">
-						<a
-							href=""
-							data-sveltekit-preload-data=""
-							class={`
-							'bg-missionnaire-100 ' : ''}
-						flex flex-col space-y-1 border-2 border-missionnaire-100 rounded-lg p-2 md:p-4 hover:bg-missionnaire-100 transition-all h-full
-							`}
-						>
-							<span class=" text-xs font-bold md:text-lg">{slug.title}</span>
-							<span class=" hidden md:block font-light text-sm text-gray-600"
-								>{slug.description}</span
-							>
-						</a>
-					</li>
-				{/each}
-			</ul>
-		</div>
-	</div>
 </div>
-<div class="flex flex-row justify-center h-auto w-full py-6">
-	<div class=" flex flex-col w-full max-w-5xl px-5">
-		<h1 class=" text-xl md:text-2xl font-black text-[#414141] mb-3">List</h1>
+
+<div class="flex flex-row justify-center h-auto w-full pt-20 pb-32 md:py-16">
+	<div class="flex flex-col w-full max-w-7xl px-2 md:px-5">
 		<slot />
 	</div>
 </div>
-{#if selectedAudioToPlay}
+
+{#if $selectAudio}
 	<AudioPlayer />
 {/if}
 
 <style>
 	.header-predications {
 		background-image: url('/img/predications_header.jpg');
-		background-color: #cccccc;
+		background-color: #1a1a1a;
 		background-repeat: no-repeat;
 		background-size: cover;
 		background-position: center;
-		height: 300px;
 	}
 	.overlay-predications {
-		background-color: rgba(0, 0, 0, 0.7);
-		backdrop-filter: blur(5px);
-		-webkit-backdrop-filter: blur(9px);
+		background-color: rgba(0, 0, 0, 0.6);
+		backdrop-filter: blur(2px);
+		-webkit-backdrop-filter: blur(2px);
 	}
+	:global(.text-orange-500) { color: #f97316; }
+	:global(.bg-orange-500) { background-color: #f97316; }
+	:global(.hover\:bg-orange-600:hover) { background-color: #ea580c; }
 </style>
