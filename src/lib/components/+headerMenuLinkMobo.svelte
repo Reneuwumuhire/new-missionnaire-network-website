@@ -1,5 +1,4 @@
 <script lang="ts">
-	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import BsChevronDown from 'svelte-icons-pack/bs/BsChevronDown';
 	// FiBookOpen
@@ -68,7 +67,7 @@
 		<div
 			class=" self-start w-full items-end mt-2 border-2 bg-missionnaire-50 border-grayWhite flex flex-col transition-all duration-300 ease-in-out"
 		>
-			{#each subMenu as { subName, link } (subName)}
+			{#each subMenu as { subName, link, icon } (subName)}
 				<a
 					href={link}
 					class="text-sm font-normal w-full my-1 p-2 transition duration-500 ease-in-out"
@@ -77,9 +76,16 @@
 						closeMenuFrom();
 					}}
 				>
-					<span class="  font-bold text-hardBlack">
-						{subName}
-					</span>
+					<div class="flex flex-row items-center space-x-3">
+						{#if icon}
+							<div class="text-missionnaire">
+								<Icon src={icon} size="16" />
+							</div>
+						{/if}
+						<span class="  font-bold text-hardBlack">
+							{subName}
+						</span>
+					</div>
 				</a>
 			{/each}
 		</div>

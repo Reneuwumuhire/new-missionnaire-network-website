@@ -1,5 +1,4 @@
 <script lang="ts">
-	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import BsChevronDown from 'svelte-icons-pack/bs/BsChevronDown';
 	// FiBookOpen
@@ -65,7 +64,7 @@
 		<div
 			class="absolute z-50 self-center w-fit items-end max-w-md mt-10 bg-pureWhite border-2 border-grayWhite flex flex-col rounded-md p-3 transition-all duration-300 ease-in-out"
 		>
-			{#each subMenu as { subName, link, subText, image } (subName)}
+			{#each subMenu as { subName, link, subText, image, icon } (subName)}
 				<a
 					href={link}
 					class="w-full hover:bg-missionnaire-50 my-1 p-2 rounded-md transition duration-500 ease-in-out"
@@ -75,9 +74,13 @@
 				>
 					<div class=" flex flex-row space-x-2 items-start">
 						<!-- if image render if not hide -->
-						<div class=" w-12 h-12">
+						<div class=" w-12 h-12 flex items-center justify-center">
 							{#if image}
 								<img src={image} class="w-full h-auto rounded-md mt-1" alt={subName} />
+							{:else if icon}
+								<div class="text-orange-500">
+									<Icon src={icon} size="12" />
+								</div>
 							{/if}
 						</div>
 						<div>

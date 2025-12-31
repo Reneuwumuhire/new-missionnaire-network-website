@@ -152,7 +152,8 @@
 									subName: subLink.subName,
 									link: subLink.link,
 									subText: subLink.subText,
-									image: subLink.image
+									image: subLink.image,
+									icon: subLink.icon
 							  }))
 							: []}
 					/>
@@ -230,7 +231,8 @@
 									? link.subMenu.map((subLink) => ({
 											subName: subLink.subName,
 											link: subLink.link,
-											subText: subLink.subText
+											subText: subLink.subText,
+											icon: subLink.icon
 									  }))
 									: []}
 								active={openMenuIndex === index}
