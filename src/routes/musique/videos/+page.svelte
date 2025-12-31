@@ -9,6 +9,9 @@
 	import BsX from 'svelte-icons-pack/bs/BsX';
 	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
+	import { isVideoPlaylistActive, videoPlaylist, videoPlaylistIndex, isVideoShuffle, videoPlaylistSearch, videoPlaylistTotal } from '$lib/stores/global';
+	import BsPlayCircleFill from 'svelte-icons-pack/bs/BsPlayCircleFill';
+	import BsShuffle from 'svelte-icons-pack/bs/BsShuffle';
 
 	export let data;
 
@@ -120,6 +123,40 @@
 			}
 		};
 	}
+
+	function playAll() {
+		if (loadedVideos.length === 0) return;
+		videoPlaylist.set([...loadedVideos]);
+		videoPlaylistIndex.set(0);
+		videoPlaylistSearch.set(lastSearch);
+		videoPlaylistTotal.set(data.total);
+		isVideoShuffle.set(false);
+		isVideoPlaylistActive.set(true);
+	}
+
+	function playFromIndex(index: number) {
+		videoPlaylist.set([...loadedVideos]);
+		videoPlaylistIndex.set(index);
+		videoPlaylistSearch.set(lastSearch);
+		videoPlaylistTotal.set(data.total);
+		isVideoShuffle.set(false);
+		isVideoPlaylistActive.set(true);
+	}
+
+	function shuffleAll() {
+		if (loadedVideos.length === 0) return;
+		const list = [...loadedVideos];
+		for (let i = list.length - 1; i > 0; i--) {
+			const j = Math.floor(Math.random() * (i + 1));
+			[list[i], list[j]] = [list[j], list[i]];
+		}
+		videoPlaylist.set(list);
+		videoPlaylistIndex.set(0);
+		videoPlaylistSearch.set(lastSearch);
+		videoPlaylistTotal.set(data.total);
+		isVideoShuffle.set(true);
+		isVideoPlaylistActive.set(true);
+	}
 </script>
 
 <svelte:head>
@@ -128,7 +165,25 @@
 
 <div class="container mx-auto px-2 md:px-4 py-8 max-w-7xl">
 	<div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-		<h2 class="text-3xl font-black text-gray-800">Chants en Vidéo</h2>
+		<div class="flex flex-col gap-2 w-full md:w-auto">
+			<h2 class="text-3xl font-black text-gray-800">Chants en Vidéo</h2>
+			<div class="flex items-center gap-6">
+				<button 
+					on:click={playAll}
+					class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-orange-500 hover:text-orange-600 transition-all active:scale-95"
+				>
+					<Icon src={BsPlayCircleFill} size="16" />
+					Tout Lire
+				</button>
+				<button 
+					on:click={shuffleAll}
+					class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-orange-500 transition-all active:scale-95"
+				>
+					<Icon src={BsShuffle} size="14" />
+					Aléatoire
+				</button>
+			</div>
+		</div>
 		
 		<div class="flex items-center gap-2 bg-white border border-gray-200 px-4 py-2 rounded-xl shadow-sm w-full md:w-96">
 			<Icon src={BsSearch} size="16" color="#94a3b8" />
@@ -149,8 +204,11 @@
 
 	{#if loadedVideos.length > 0}
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-			{#each loadedVideos as video (video._id)}
-				<SongVideoCard videoData={video} />
+			{#each loadedVideos as video, i (video._id)}
+				<SongVideoCard 
+					videoData={video} 
+					on:playPlaylist={() => playFromIndex(i)}
+				/>
 			{/each}
 		</div>
 

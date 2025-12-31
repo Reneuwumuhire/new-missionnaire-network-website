@@ -7,6 +7,11 @@
 	import IoCalendarOutline from 'svelte-icons-pack/io/IoCalendarOutline';
 	import { formatTime } from '../../utils/FormatTime';
 
+	import { createEventDispatcher } from 'svelte';
+	import BsShuffle from 'svelte-icons-pack/bs/BsShuffle';
+
+	const dispatch = createEventDispatcher();
+
 	export let videoData: YoutubeVideo;
 
 	let showFullDescription = false;
@@ -51,11 +56,22 @@
 				<!-- Gradient Overlay -->
 				<div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity"></div>
 				
-				<!-- Play Button Overlay -->
-				<div class="absolute inset-0 flex items-center justify-center">
-					<div class="bg-white/90 text-orange-500 p-4 rounded-full shadow-2xl transform translate-y-4 group-hover:translate-y-0 opacity-0 group-hover:opacity-100 transition-all duration-300 backdrop-blur-sm">
-						<Icon src={IoPlayCircle} size="40" />
-					</div>
+				<!-- Play Button Overlays -->
+				<div class="absolute inset-0 flex items-center justify-center gap-4">
+					<button 
+						class="bg-white/90 text-orange-500 p-4 rounded-full shadow-2xl transform translate-y-4 group-hover:translate-y-0 opacity-0 group-hover:opacity-100 transition-all duration-300 backdrop-blur-sm hover:scale-110 active:scale-95"
+						on:click|stopPropagation={() => isPlaying = true}
+						title="Lire cette vidéo"
+					>
+						<Icon src={IoPlayCircle} size="32" />
+					</button>
+					<button 
+						class="bg-orange-500 text-white p-4 rounded-full shadow-2xl transform translate-y-4 group-hover:translate-y-0 opacity-0 group-hover:opacity-100 transition-all duration-300 delay-75 hover:scale-110 active:scale-95"
+						on:click|stopPropagation={() => dispatch('playPlaylist')}
+						title="Lire en playlist à partir d'ici"
+					>
+						<Icon src={BsShuffle} size="24" />
+					</button>
 				</div>
 
 				<!-- Duration Badge -->

@@ -16,3 +16,11 @@ export const isLoading = writable<boolean>(false);
 export const searchQuery = writable<string>('');
 export const currentViewingVideo = writable<YoutubeVideo>();
 export const filteredVideos = writable<YoutubeVideo[]>();
+
+// Video Playlist Search
+export const videoPlaylist = writable<YoutubeVideo[]>([]);
+export const videoPlaylistIndex = writable<number>(0);
+export const isVideoPlaylistActive = writable<boolean>(false);
+export const isVideoShuffle = writable<boolean>(false);
+export const videoPlaylistSearch = writable<string>('');
+export const videoPlaylistTotal = writable<number>(0);

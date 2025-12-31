@@ -4,17 +4,26 @@
 	import SocialMediaAbove from '$lib/components/+socialMediaAbove.svelte';
 	import Footer from '$lib/components/+footer.svelte';
 	import CopyButton from '$lib/components/+copyButton.svelte';
+	import VideoPlaylistPlayer from '$lib/components/VideoPlaylistPlayer.svelte';
 	import type { LayoutData } from './$types';
 	import { QueryClientProvider } from '@tanstack/svelte-query';
 	import { availableTypesTag } from '../utils/data';
 	import { activeFilter, isLoading } from '$lib/stores/videoStore';
 	import { setFilter } from '../utils/videoUtils';
 	import { page } from '$app/stores';
+	import { browser } from '$app/environment';
 	export let data: LayoutData;
+
+	if (browser) {
+		(window as any).onYouTubeIframeAPIReady = () => {
+			window.dispatchEvent(new CustomEvent('yt-ready'));
+		};
+	}
 </script>
 
 <svelte:head>
 	<title>Missionnaire Network</title>
+	<script src="https://www.youtube.com/iframe_api"></script>
 	<meta property="og:site_name" content="Missionnaire Network" />
 	<meta property="og:type" content="website" />
 	<meta property="og:url" content={$page.url.href} />
@@ -66,4 +75,5 @@
 	</div>
 	<Footer />
 	<CopyButton />
+	<VideoPlaylistPlayer />
 </QueryClientProvider>

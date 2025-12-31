@@ -57,6 +57,7 @@ export const YoutubeVideoSchema = z.object({
 	_id: z.string(),
 	id: z.string(),
 	title: z.string(),
+	artist: z.string().optional(),
 	thumbnails: z.array(z.unknown()), // You might want to define a more specific schema for thumbnails
 	thumbnail: z.string().url(),
 	description: z.string(),
