@@ -1,6 +1,6 @@
 <script lang="ts">
     import { goto } from '$app/navigation';
-    import { page } from '$app/stores';
+    import { page, navigating } from '$app/stores';
     import type { Sermon } from '$lib/models/sermon';
     import { basePlaylist, playlist, isShuffle } from '$lib/stores/global';
     // @ts-ignore
@@ -12,6 +12,7 @@
     import BsShuffle from 'svelte-icons-pack/bs/BsShuffle';
     import SermonTableItem from '$lib/components/SermonTableItem.svelte';
     import IoPlayCircle from 'svelte-icons-pack/io/IoPlayCircle';
+    import IoReload from 'svelte-icons-pack/io/IoReload';
 
     export let data;
 
@@ -134,8 +135,9 @@
             <div class="flex overflow-x-auto pb-2 gap-3 no-scrollbar justify-center md:justify-start">
                 {#each authors as author}
                     <button 
-                        class="flex-shrink-0 px-5 py-2.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all border {(author === 'Tous' && !currentAuthor) || currentAuthor === author ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-500'}"
-                        on:click={() => handleAuthorChange(author)}
+                        class="flex-shrink-0 px-5 py-2.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all border {(author === 'Tous' && !currentAuthor) || currentAuthor === author ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-500'} {$navigating ? 'opacity-50 cursor-not-allowed' : ''}"
+                        on:click={() => !$navigating && handleAuthorChange(author)}
+                        disabled={$navigating ? true : false}
                     >
                         {author === 'Tous' ? 'Tout Voir' : author}
                     </button>
@@ -147,8 +149,9 @@
             <h2 class="text-[10px] md:text-xs font-black text-orange-500 uppercase tracking-[0.2em] mb-4 text-center md:text-left">Options</h2>
             <div class="flex justify-center md:justify-start">
                 <button 
-                    class="flex items-center gap-2 px-5 py-2.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all border {currentHasAudio ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-500'}"
-                    on:click={handleAudioFilterToggle}
+                    class="flex items-center gap-2 px-5 py-2.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all border {currentHasAudio ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-500'} {$navigating ? 'opacity-50 cursor-not-allowed' : ''}"
+                    on:click={() => !$navigating && handleAudioFilterToggle()}
+                    disabled={$navigating ? true : false}
                 >
                     <Icon src={IoPlayCircle} size="16" />
                     Audio Uniquement
@@ -166,8 +169,9 @@
                     <div class="grid grid-cols-3 gap-2 max-h-[70vh] overflow-y-auto no-scrollbar pr-1">
                         {#each years as year}
                             <button 
-                                class="px-3 py-2 rounded-lg text-[11px] font-bold transition-all border text-center {currentYear === year ? 'bg-orange-500 text-white border-orange-500 shadow-md' : 'bg-white text-gray-400 border-gray-100 hover:border-orange-200 hover:text-orange-500'}"
-                                on:click={() => handleYearChange(year)}
+                                class="px-3 py-2 rounded-lg text-[11px] font-bold transition-all border text-center {currentYear === year ? 'bg-orange-500 text-white border-orange-500 shadow-md' : 'bg-white text-gray-400 border-gray-100 hover:border-orange-200 hover:text-orange-500'} {$navigating ? 'opacity-50 cursor-not-allowed' : ''}"
+                                on:click={() => !$navigating && handleYearChange(year)}
+                                disabled={$navigating ? true : false}
                             >
                                 {year}
                             </button>
@@ -178,7 +182,17 @@
         {/if}
 
         <!-- Main Content: Sermons List -->
-        <div class="flex-1 min-w-0">
+        <div class="flex-1 min-w-0 relative">
+            {#if $navigating}
+                <div class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-20 flex items-center justify-center rounded-xl transition-all duration-300">
+                    <div class="flex flex-col items-center gap-4">
+                        <div class="text-orange-500 animate-spin">
+                            <Icon src={IoReload} size="32" />
+                        </div>
+                        <span class="text-[10px] font-black uppercase tracking-[0.2em] text-orange-600 animate-pulse">Chargement...</span>
+                    </div>
+                </div>
+            {/if}
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 min-h-[500px] flex flex-col">
                 <div class="grid grid-cols-[30px_1fr_auto_auto] md:grid-cols-[30px_2.5fr_1.2fr_1fr_auto_auto] gap-2 md:gap-4 px-3 md:px-4 py-3 border-b border-gray-100 text-[10px] md:text-[11px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50/50 rounded-t-xl items-center">
                     <div class="text-center">#</div>

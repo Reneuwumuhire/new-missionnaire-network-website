@@ -56,10 +56,8 @@
 	const toggleMenu = (index: number) => {
 		if (openMenuIndex === index) {
 			openMenuIndex = null;
-			toggleMobileNav();
 		} else {
 			openMenuIndex = index;
-			toggleMobileNav();
 		}
 	};
 
@@ -238,7 +236,7 @@
 								active={openMenuIndex === index}
 								activeClass="text-missionnaire"
 								inactiveClass="text-black"
-								on:click={() => toggleMenu(index)}
+								on:toggle={() => toggleMenu(index)}
 								closeMenuFrom={toggleMobileNav}
 							/>
 						{/each}

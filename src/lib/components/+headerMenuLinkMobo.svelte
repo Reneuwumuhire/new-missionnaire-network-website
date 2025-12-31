@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { createEventDispatcher } from 'svelte';
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import BsChevronDown from 'svelte-icons-pack/bs/BsChevronDown';
 	// FiBookOpen
@@ -13,17 +14,7 @@
 	export let activeClass: string = 'text-accentGray';
 	export let inactiveClass: string = 'text-grayWeak';
 
-	let showSubMenu: boolean = false;
-
-	const closeMenu = (event: any) => {
-		if (showSubMenu && !(event.target as Element).closest('div')) {
-			showSubMenu = false;
-		}
-	};
-	// @ts-ignore
-	if (typeof window !== 'undefined') {
-		window.addEventListener('click', closeMenu);
-	}
+	const dispatch = createEventDispatcher();
 </script>
 
 <div class="flex flex-col w-full">
@@ -34,7 +25,7 @@
 			<button
 				class="text-base font-normal whitespace-nowrap"
 				on:click={() => {
-					showSubMenu = !showSubMenu;
+					dispatch('toggle');
 				}}>{menuName}</button
 			>
 		{:else}
@@ -50,20 +41,18 @@
 			<!-- button to trigger the show subMenu with Icon -->
 			<button
 				class={`text-base font-normal ${active ? activeClass : inactiveClass}`}
-				on:click={() => {
-					showSubMenu = !showSubMenu;
-				}}
+				on:click={() => dispatch('toggle')}
 			>
 				<Icon
-					className={`w-4 h-4 ml-1 transition
-          duration-500 ease-in-out
-           ${showSubMenu ? 'transform rotate-180' : ''}`}
 					src={BsChevronDown}
+					className={`w-4 h-4 ml-1 transition duration-500 ease-in-out ${
+						active ? 'transform rotate-180' : ''
+					}`}
 				/>
 			</button>
 		{/if}
 	</div>
-	{#if showSubMenu && subMenu && subMenu.length > 0}
+	{#if active && subMenu && subMenu.length > 0}
 		<div
 			class=" self-start w-full items-end mt-2 border-2 bg-missionnaire-50 border-grayWhite flex flex-col transition-all duration-300 ease-in-out"
 		>
@@ -72,7 +61,6 @@
 					href={link}
 					class="text-sm font-normal w-full my-1 p-2 transition duration-500 ease-in-out"
 					on:click={() => {
-						showSubMenu = false;
 						closeMenuFrom();
 					}}
 				>
