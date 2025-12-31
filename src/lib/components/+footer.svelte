@@ -21,36 +21,32 @@ Youtube -->
 		<!-- div for links -->
 		<div>
 			<ul
-				class="flex flex-col md:flex-row items-center justify-center md:space-x-9 font-normal text-base"
+				class="flex flex-col md:flex-row items-center justify-center gap-x-6 gap-y-4 md:space-x-4 font-normal text-sm md:text-base flex-wrap"
 			>
 				<li>
-					<a
-						href="/a-propos"
-						class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out"
-						>À propos</a
-					>
+					<a href="/eglise" class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out">L'église</a>
 				</li>
-				<!-- <li>
-					<a
-						href="/predications"
-						class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out"
-						>Prédications</a
-					>
-				</li> -->
-				<!-- <li>
-					<a
-						href="/galerie"
-						class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out"
-						>Galerie</a
-					>
-				</li> -->
-				<!-- <li>
-					<a
-						href="/actualites"
-						class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out"
-						>Actualités</a
-					>
-				</li> -->
+				<li>
+					<a href="/william-branham/biographie" class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out">William Branham</a>
+				</li>
+				<li>
+					<a href="/ewald-frank" class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out">Ewald Frank</a>
+				</li>
+				<li>
+					<a href="/musique" class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out">Musique</a>
+				</li>
+				<li>
+					<a href="/predications" class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out">Prédications</a>
+				</li>
+				<li>
+					<a href="/transcriptions" class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out">Transcriptions</a>
+				</li>
+				<li>
+					<a href="/galerie" class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out">Galerie</a>
+				</li>
+				<li>
+					<a href="/a-propos" class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out">À propos</a>
+				</li>
 				<li>
 					<a
 						href="https://www.youtube.com/channel/UCS3zqpqnCvT0SFa_jI662Kg"
