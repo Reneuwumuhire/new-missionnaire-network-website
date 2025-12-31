@@ -30,13 +30,13 @@ Youtube -->
 						>À propos</a
 					>
 				</li>
-				<li>
+				<!-- <li>
 					<a
 						href="/predications"
 						class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out"
 						>Prédications</a
 					>
-				</li>
+				</li> -->
 				<!-- <li>
 					<a
 						href="/galerie"
