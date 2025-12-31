@@ -74,6 +74,20 @@
 							Rechercher
 						</button>
 					</form>
+					<div class="flex items-center gap-4 mt-8">
+						<a 
+							href="/musique" 
+							class="px-6 py-2 rounded-full text-sm font-bold transition-all border {$page.url.pathname === '/musique' ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}"
+						>
+							Audio
+						</a>
+						<a 
+							href="/musique/videos" 
+							class="px-6 py-2 rounded-full text-sm font-bold transition-all border {$page.url.pathname === '/musique/videos' ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}"
+						>
+							Vidéos
+						</a>
+					</div>
 				</div>
 			</div>
 			

@@ -429,3 +429,54 @@ function serializeDocument(doc: any): any {
 	// Return primitives and other types as is
 	return doc;
 }
+
+export async function getSongs(options: {
+	limit?: number;
+	skip?: number;
+	search?: string;
+}): Promise<YoutubeVideo[]> {
+	const { limit = 20, skip = 0, search } = options;
+	try {
+		const db = await getDb();
+		const query: Record<string, any> = {};
+
+		if (search?.trim()) {
+			query.$or = [
+				{ title: { $regex: search, $options: 'i' } },
+				{ description: { $regex: search, $options: 'i' } }
+			];
+		}
+
+		const data = await db
+			.collection('songs')
+			.find(query)
+			.sort({ release_timestamp: -1 })
+			.skip(skip)
+			.limit(limit)
+			.toArray();
+
+		return data.map((doc) => serializeDocument(doc));
+	} catch (error) {
+		console.error('[DB] Error in getSongs:', error);
+		throw error;
+	}
+}
+
+export async function getSongsCount(search?: string): Promise<number> {
+	try {
+		const db = await getDb();
+		const query: Record<string, any> = {};
+
+		if (search?.trim()) {
+			query.$or = [
+				{ title: { $regex: search, $options: 'i' } },
+				{ description: { $regex: search, $options: 'i' } }
+			];
+		}
+
+		return await db.collection('songs').countDocuments(query);
+	} catch (error) {
+		console.error('[DB] Error in getSongsCount:', error);
+		throw error;
+	}
+}

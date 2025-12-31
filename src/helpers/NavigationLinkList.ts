@@ -57,7 +57,21 @@ export const NavigationLinkList: NavigationLink[] = [
 	{
 		id: 4,
 		menuName: 'Musique',
-		link: '/musique'
+		link: '/musique',
+		subMenu: [
+			{
+				subName: 'Cantiques (Audio)',
+				subText: 'Ecoutez les chants de louange et adoration.',
+				link: '/musique',
+				image: '/img/music_audio_icon.png'
+			},
+			{
+				subName: 'Chants en Vidéo',
+				subText: 'Regardez nos clips et enregistrements de chants.',
+				link: '/musique/videos',
+				image: '/img/music_video_icon.png'
+			}
+		]
 	},
 	{
 		id: 5,

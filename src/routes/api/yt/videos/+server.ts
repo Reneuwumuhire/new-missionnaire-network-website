@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { getVideosByDuration } from '../../../../db/collections';
+import { getVideosByDuration, getSongs, getSongsCount } from '../../../../db/collections';
 import { ZodError, z } from 'zod';
 import type { RequestEvent } from './$types';
 const videoTypeSchema = z.enum(['predication', 'song']).optional();
@@ -14,15 +14,28 @@ export async function GET({ url }: RequestEvent) {
 		if (url.searchParams.has('maxResults')) {
 			limit = z.coerce.number().parse(url.searchParams.get('maxResults'));
 		}
-		if (videoType === 'predication') {
-			minDuration = LONG_VIDEO;
-		} else if (videoType === 'song') {
-			maxDuration = LONG_VIDEO;
+		let videos;
+		let total = 0;
+		const search = url.searchParams.get('search') ?? undefined;
+		const skip = z.coerce.number().default(0).parse(url.searchParams.get('skip'));
+
+		if (videoType === 'song') {
+			const [items, count] = await Promise.all([
+				getSongs({ limit, skip, search }),
+				getSongsCount(search)
+			]);
+			videos = items;
+			total = count;
+		} else {
+			if (videoType === 'predication') {
+				minDuration = LONG_VIDEO;
+			}
+			videos = await getVideosByDuration({ limit, skip, maxDuration, minDuration });
 		}
 
-		const videos = await getVideosByDuration({ limit, maxDuration, minDuration });
 		return json({
-			data: videos
+			data: videos,
+			total
 		});
 	} catch (error) {
 		let message = 'error';
