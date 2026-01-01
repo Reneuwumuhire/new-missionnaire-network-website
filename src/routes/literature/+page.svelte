@@ -43,6 +43,12 @@
 		const params = new URLSearchParams($page.url.searchParams);
 		if (author === 'Tous') params.delete('author');
 		else params.set('author', author);
+		
+		// Branham only has books, so reset category Filter if he is selected
+		if (author === 'William Marrion Branham') {
+			params.delete('category');
+		}
+
 		params.set('page', '1');
 		goto(`?${params.toString()}`);
 	}
@@ -123,27 +129,29 @@
 		</div>
 
 		<!-- Types Filter -->
-		<div>
-			<h2 class="text-[10px] md:text-xs font-black text-orange-500 uppercase tracking-[0.2em] mb-4 text-left">Types</h2>
-			<div class="flex overflow-x-auto pb-2 gap-3 no-scrollbar justify-start">
-				{#each categories as cat}
-					<button 
-						class="flex-shrink-0 px-5 py-2.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all border {(cat === 'All' && !currentType) || currentType === cat ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-500'}"
-						on:click={() => handleTypeChange(cat)}
-					>
-						{#if cat === 'All'}
-							Tout
-						{:else if cat === 'book'}
-							Livres & Brochures
-						{:else if cat === 'circular_letter'}
-							Lettres Circulaires
-						{:else}
-							{cat}
-						{/if}
-					</button>
-				{/each}
+		{#if currentAuthor !== 'William Marrion Branham'}
+			<div>
+				<h2 class="text-[10px] md:text-xs font-black text-orange-500 uppercase tracking-[0.2em] mb-4 text-left">Types</h2>
+				<div class="flex overflow-x-auto pb-2 gap-3 no-scrollbar justify-start">
+					{#each categories as cat}
+						<button 
+							class="flex-shrink-0 px-5 py-2.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all border {(cat === 'All' && !currentType) || currentType === cat ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-500'}"
+							on:click={() => handleTypeChange(cat)}
+						>
+							{#if cat === 'All'}
+								Tout
+							{:else if cat === 'book'}
+								Livres & Brochures
+							{:else if cat === 'circular_letter'}
+								Lettres Circulaires
+							{:else}
+								{cat}
+							{/if}
+						</button>
+					{/each}
+				</div>
 			</div>
-		</div>
+		{/if}
 
 		<!-- Language Filter -->
 		<div>
