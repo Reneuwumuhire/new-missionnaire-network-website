@@ -145,6 +145,9 @@
 					<HeaderMenuLink
 						menuName={link.menuName}
 						link={link.link}
+						isOpen={openMenuIndex === index}
+						on:toggle={() => toggleMenu(index)}
+						on:close={() => (openMenuIndex = null)}
 						subMenu={link.subMenu
 							? link.subMenu.map((subLink) => ({
 									subName: subLink.subName,

@@ -20,6 +20,8 @@
 
 import IoMusicalNotes from 'svelte-icons-pack/io/IoMusicalNotes';
 import IoVideocam from 'svelte-icons-pack/io/IoVideocam';
+import IoBookOutline from 'svelte-icons-pack/io/IoBookOutline';
+import IoInformationCircleOutline from 'svelte-icons-pack/io/IoInformationCircleOutline';
 
 export interface NavigationLinkSubmenu {
 	subName: string;
@@ -50,13 +52,33 @@ export const NavigationLinkList: NavigationLink[] = [
 				subText: 'Découvrez toute la biographie du prophète et son histoire.',
 				link: '/william-branham/biographie',
 				image: '/img/branham_icon.png'
+			},
+			{
+				subName: 'Brochures',
+				subText: "Téléchargez les brochures pour connaitre le Message qu'il apporte.",
+				link: '/literature?author=William Marrion Branham&category=book',
+				icon: IoBookOutline
 			}
 		]
 	},
 	{
 		id: 3,
 		menuName: 'Ewald Frank',
-		link: '/ewald-frank'
+		link: '/ewald-frank',
+		subMenu: [
+			{
+				subName: 'À propos de Ewald Frank',
+				subText: "Tout savoir sur l'homme de Dieu Ewald Frank.",
+				link: '/ewald-frank',
+				icon: IoInformationCircleOutline
+			},
+			{
+				subName: 'Livres & Brochures',
+				subText: 'Consultez les livres et brochures de Ewald Frank.',
+				link: '/literature?author=Ewald Frank&category=book',
+				icon: IoBookOutline
+			}
+		]
 	},
 	{
 		id: 4,

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import BsChevronDown from 'svelte-icons-pack/bs/BsChevronDown';
-	// FiBookOpen
+	import { createEventDispatcher } from 'svelte';
 	import type { NavigationLinkSubmenu } from '../../helpers/NavigationLinkList';
 
 	export let subMenu: NavigationLinkSubmenu[];
@@ -9,34 +9,36 @@
 	export let link: string;
 
 	export let active: boolean = false;
+	export let isOpen: boolean = false;
 	export let activeClass: string = 'text-accentGray';
 	export let inactiveClass: string = 'text-grayWeak';
 
-	let showSubMenu: boolean = false;
+	const dispatch = createEventDispatcher();
+
+	function handleToggle() {
+		dispatch('toggle');
+	}
 
 	const closeMenu = (event: any) => {
-		if (showSubMenu && !(event.target as Element).closest('div')) {
-			showSubMenu = false;
+		if (isOpen && !(event.target as Element).closest('div')) {
+			dispatch('close');
 		}
 	};
-	// @ts-ignore
-	// when clicked outside the menu close the menu and when window is available
-	// add the event listener
+
 	if (typeof window !== 'undefined') {
 		window.addEventListener('click', closeMenu);
 	}
 </script>
 
-<div class="flex flex-col text-sm">
+<div class="flex flex-col text-sm relative">
 	<div
 		class="flex flex-row items-center space-x-2 hover:text-missionnaire transition-all duration-75 ease-in-out"
 	>
 		{#if subMenu && subMenu.length > 0}
 			<button
+				type="button"
 				class="whitespace-nowrap"
-				on:click={() => {
-					showSubMenu = !showSubMenu;
-				}}>{menuName}</button
+				on:click|stopPropagation={handleToggle}>{menuName}</button
 			>
 		{:else}
 			<a href={link} class=" font-normal whitespace-nowrap">
@@ -44,53 +46,48 @@
 			</a>
 		{/if}
 		{#if subMenu && subMenu.length > 0}
-			<!-- button to trigger the show subMenu with Icon -->
 			<button
+				type="button"
 				class={` ${active ? activeClass : inactiveClass}`}
-				on:click={() => {
-					showSubMenu = !showSubMenu;
-				}}
+				on:click|stopPropagation={handleToggle}
 			>
 				<Icon
 					className={`w-4 h-4 ml-1 transition
           duration-500 ease-in-out
-           ${showSubMenu ? 'transform rotate-180' : ''}`}
+           ${isOpen ? 'transform rotate-180' : ''}`}
 					src={BsChevronDown}
 				/>
 			</button>
 		{/if}
 	</div>
-	{#if showSubMenu && subMenu && subMenu.length > 0}
+	{#if isOpen && subMenu && subMenu.length > 0}
 		<div
-			class="absolute z-50 self-center w-fit items-end max-w-md mt-10 bg-pureWhite border-2 border-grayWhite flex flex-col rounded-md p-3 transition-all duration-300 ease-in-out"
+			class="absolute z-50 self-center w-[450px] mt-10 bg-pureWhite border border-gray-100 flex flex-col rounded-2xl p-4 shadow-2xl shadow-black/5"
 		>
-			{#each subMenu as { subName, link, subText, image, icon } (subName)}
+			{#each subMenu as { subName, link, subText, image, icon }, i (subName)}
 				<a
 					href={link}
-					class="w-full hover:bg-missionnaire-50 my-1 p-2 rounded-md transition duration-500 ease-in-out"
+					class="w-full flex items-center gap-4 p-4 rounded-xl transition-all duration-300 {i === 0 ? 'bg-orange-50/50 hover:bg-orange-50' : 'hover:bg-orange-50/30'}"
 					on:click={() => {
-						showSubMenu = false;
+						dispatch('close');
 					}}
 				>
-					<div class=" flex flex-row space-x-2 items-start">
-						<!-- if image render if not hide -->
-						<div class=" w-12 h-12 flex items-center justify-center">
-							{#if image}
-								<img src={image} class="w-full h-auto rounded-md mt-1" alt={subName} />
-							{:else if icon}
-								<div class="text-orange-500">
-									<Icon src={icon} size="12" />
-								</div>
-							{/if}
-						</div>
-						<div>
-							<span class=" text-hardBlack">
-								{subName}
-							</span>
-							<p>
-								{subText}
-							</p>
-						</div>
+					<div class="flex-shrink-0 w-16 h-16 rounded-2xl overflow-hidden bg-white shadow-sm border border-gray-50 flex items-center justify-center">
+						{#if image}
+							<img src={image} class="w-full h-full object-cover" alt={subName} />
+						{:else if icon}
+							<div class="text-orange-500">
+								<Icon src={icon} size="32" />
+							</div>
+						{/if}
+					</div>
+					<div class="flex flex-col min-w-0">
+						<span class="text-sm font-black text-gray-900 group-hover:text-missionnaire leading-tight">
+							{subName}
+						</span>
+						<p class="text-[11px] font-medium text-gray-400 mt-1 line-clamp-2 leading-relaxed">
+							{subText}
+						</p>
 					</div>
 				</a>
 			{/each}
@@ -98,9 +95,7 @@
 	{/if}
 </div>
 
-<!--  -->
 <style>
-	/* Use specific classes or define styles as needed */
 	.scale-y-0 {
 		transform: scaleY(0);
 	}

@@ -5,6 +5,7 @@ import type { YoutubeVideo } from '$lib/models/youtube';
 import type { AudioAsset } from '$lib/models/media-assets';
 import type { MusicAudio } from '$lib/models/music-audio';
 import type { Sermon } from '$lib/models/sermon';
+import type { Literature } from '$lib/models/literature';
 export async function getCollection(
 	collection_name: string,
 	skip: number,
@@ -580,6 +581,83 @@ export async function getSermonYears(): Promise<string[]> {
 		return Array.from(years).sort((a, b) => b.localeCompare(a));
 	} catch (error) {
 		console.error('[DB] Error in getSermonYears:', error);
+		throw error;
+	}
+}
+
+export async function queryLiterature(options: {
+	author?: string;
+	search?: string;
+	type?: string;
+	language?: string;
+	limit?: number;
+	pageNumber?: number;
+	orderBy?: string;
+}): Promise<{ data: Literature[]; total: number }> {
+	const {
+		author,
+		search,
+		type,
+		language,
+		limit = 20,
+		pageNumber = 1,
+		orderBy = 'release_date:desc'
+	} = options;
+
+	try {
+		const db = await getDb();
+		const query: Record<string, any> = {};
+		const conditions: Record<string, any>[] = [];
+
+		if (author && author !== 'All' && author !== 'Tous') {
+			conditions.push({ author: author });
+		}
+
+		if (type && type !== 'All' && type !== 'Tous' && type !== 'Tout') {
+			conditions.push({ type: { $regex: new RegExp(`^${type}$`, 'i') } });
+		}
+
+		if (search && search.trim()) {
+			conditions.push({
+				$or: [{ title: { $regex: search, $options: 'i' } }]
+			});
+		}
+
+		if (language && language !== 'All') {
+			if (language === 'french') {
+				conditions.push({
+					$or: [{ language: 'french' }, { language: { $exists: false } }]
+				});
+			} else {
+				conditions.push({ language: language });
+			}
+		}
+
+		if (conditions.length > 0) {
+			query.$and = conditions;
+		}
+
+		const skip = (pageNumber - 1) * limit;
+		const total = await db.collection('literature').countDocuments(query);
+
+		const [property, order] = orderBy.split(/[: ,]/);
+		const sort: Record<string, any> = {};
+		sort[property] = order === 'asc' ? 1 : -1;
+
+		const data = await db
+			.collection('literature')
+			.find(query)
+			.sort(sort)
+			.skip(skip)
+			.limit(limit)
+			.toArray();
+
+		return {
+			data: data.map((doc) => serializeDocument(doc)),
+			total
+		};
+	} catch (error) {
+		console.error('[DB] Error in queryLiterature:', error);
 		throw error;
 	}
 }

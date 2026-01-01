@@ -69,7 +69,7 @@
 				</div>
 			</div>
 		{/if}
-		<div class={`relative ${$page.url.pathname === '/' ? 'mt-[160px]' : 'mt-[60px]'}`}>
+		<div class={`relative ${$page.url.pathname === '/' ? 'mt-[160px]' : 'mt-[120px]'}`}>
 			<slot />
 		</div>
 	</div>
