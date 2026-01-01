@@ -72,12 +72,12 @@
 						dispatch('close');
 					}}
 				>
-					<div class="flex-shrink-0 w-16 h-16 rounded-2xl overflow-hidden bg-white shadow-sm border border-gray-50 flex items-center justify-center">
+					<div class="flex-shrink-0 w-12 h-12 rounded-2xl overflow-hidden bg-white shadow-sm border border-gray-50 flex items-center justify-center">
 						{#if image}
 							<img src={image} class="w-full h-full object-cover" alt={subName} />
 						{:else if icon}
 							<div class="text-orange-500">
-								<Icon src={icon} size="32" />
+								<Icon src={icon} size="20" />
 							</div>
 						{/if}
 					</div>

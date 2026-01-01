@@ -208,77 +208,158 @@
 			</div>
 		{/if}
 
-		<div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-			<div class="grid grid-cols-[50px_1fr_auto] md:grid-cols-[60px_2fr_1fr_1fr_120px] gap-4 px-4 py-4 bg-gray-50/50 border-b border-gray-100 items-center">
-				<div class="text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">#</div>
-				<button class="text-left flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-orange-500 transition-colors" on:click={() => handleSortChange('title')}>
-					TITRE
-					{#if currentSort.startsWith('title')}
-						<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" className="text-orange-500" />
-					{/if}
-				</button>
-				<button class="hidden md:flex text-left items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-orange-500 transition-colors" on:click={() => handleSortChange('author')}>
-					AUTEUR
-					{#if currentSort.startsWith('author')}
-						<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" className="text-orange-500" />
-					{/if}
-				</button>
-				<div class="hidden md:block text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">CATÉGORIE</div>
-				<div class="text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">ACTIONS</div>
-			</div>
-
-			<div class="divide-y divide-gray-50">
-				{#each literature as item, i}
-					<div class="grid grid-cols-[50px_1fr_auto] md:grid-cols-[60px_2fr_1fr_1fr_120px] gap-4 px-4 py-5 items-center hover:bg-orange-50/30 transition-colors group">
-						<div class="text-center text-xs font-bold text-gray-300 group-hover:text-orange-300">
-							{i + 1 + (currentPage - 1) * limit}
-						</div>
-						<div class="flex flex-col min-w-0">
-							<span class="text-sm font-bold text-gray-800 group-hover:text-orange-600 transition-colors line-clamp-2 leading-snug">
-								{item.title || 'Sans titre'}
-							</span>
-							<div class="flex items-center gap-2 mt-1 md:hidden">
-								<span class="text-[10px] font-medium text-gray-400">{item.author}</span>
-								<span class="text-gray-200">•</span>
-								<span class="text-[10px] font-medium text-orange-400">{item.type}</span>
+		{#if currentAuthor === 'William Marrion Branham'}
+			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+				{#each literature as item}
+					<div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all group flex flex-col h-full">
+						<!-- Cover Image Area -->
+						<div class="aspect-[2/3] bg-gray-50 relative overflow-hidden flex items-center justify-center">
+							{#if item.cover_url}
+								<img 
+									src={item.cover_url} 
+									alt={item.title} 
+									class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+								/>
+							{:else}
+								<div class="text-center p-6">
+									<div class="w-16 h-16 mx-auto bg-orange-100 text-orange-500 rounded-full flex items-center justify-center mb-4">
+										<Icon src={IoBookOutline} size="32" />
+									</div>
+									<span class="text-xs font-black text-gray-300 uppercase tracking-widest">Pas de couverture</span>
+								</div>
+							{/if}
+							
+							<!-- Hover Overlay with Download Action -->
+							<div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
+								{#if item.pdf_url}
+									<a 
+										href={item.pdf_url} 
+										target="_blank" 
+										rel="noopener noreferrer"
+										class="flex items-center gap-2 px-6 py-3 bg-white text-orange-600 rounded-full font-bold shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-all"
+									>
+										<Icon src={IoCloudDownloadOutline} size="20" />
+										Télécharger
+									</a>
+								{/if}
 							</div>
 						</div>
-						<div class="hidden md:block text-xs font-semibold text-gray-500">
-							{item.author}
-						</div>
-						<div class="hidden md:block">
-							<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider {item.type === 'book' ? 'bg-blue-50 text-blue-600' : 'bg-green-50 text-green-600'}">
-								<Icon src={item.type === 'book' ? IoBookOutline : IoCreate} size="12" />
-								{item.type === 'book' ? 'Livre' : 'Lettre'}
-							</span>
-						</div>
-						<div class="flex justify-end pr-2">
-							{#if item.pdf_url}
-								<a 
-									href={item.pdf_url} 
-									target="_blank" 
-									rel="noopener noreferrer"
-									class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-100 rounded-lg text-xs font-bold text-gray-600 hover:bg-orange-500 hover:text-white hover:border-orange-500 shadow-sm transition-all active:scale-95"
-								>
-									<Icon src={IoCloudDownloadOutline} size="16" />
-									<span class="hidden lg:inline">Télécharger</span>
-								</a>
+
+						<!-- Content -->
+						<div class="p-6 flex flex-col flex-grow">
+							<h3 class="text-lg font-black text-gray-900 mb-2 leading-tight group-hover:text-orange-600 transition-colors">
+								{item.title}
+							</h3>
+							
+							{#if item.description}
+								<p class="text-sm text-gray-500 leading-relaxed line-clamp-3 mb-4 flex-grow">
+									{item.description}
+								</p>
 							{:else}
-								<span class="text-[10px] font-bold text-gray-300 uppercase tracking-widest italic">Indisponible</span>
+								<div class="flex-grow"></div>
 							{/if}
+							
+							<div class="pt-4 border-t border-gray-50 flex items-center justify-between text-xs font-medium text-gray-400 uppercase tracking-wider">
+								<span>{item.language === 'english' ? 'English' : 'Français'}</span>
+								{#if item.release_date}
+									<span>{formatDate(item.release_date)}</span>
+								{/if}
+							</div>
 						</div>
-					</div>
-				{:else}
-					<div class="py-24 text-center">
-						<div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gray-50 text-gray-200 mb-6">
-							<Icon src={BsSearch} size="32" />
-						</div>
-						<h3 class="text-xl font-bold text-gray-800 mb-2">Aucun document trouvé</h3>
-						<p class="text-gray-400 text-sm">Réessayez avec d'autres filtres ou vérifiez l'orthographe.</p>
 					</div>
 				{/each}
 			</div>
-		</div>
+
+			<!-- Empty State for Grid -->
+			{#if literature.length === 0}
+				<div class="py-24 text-center bg-white rounded-2xl border border-gray-100">
+					<div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gray-50 text-gray-200 mb-6">
+						<Icon src={BsSearch} size="32" />
+					</div>
+					<h3 class="text-xl font-bold text-gray-800 mb-2">Aucun livre trouvé</h3>
+					<p class="text-gray-400 text-sm">Nous n'avons trouvé aucun livre correspondant à votre recherche.</p>
+				</div>
+			{/if}
+
+		{:else}
+			<!-- Standard List View -->
+			<div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+				<div class="grid grid-cols-[50px_1fr_auto] md:grid-cols-[60px_2fr_1fr_1fr_120px] gap-4 px-4 py-4 bg-gray-50/50 border-b border-gray-100 items-center">
+					<div class="text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">#</div>
+					<button class="text-left flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-orange-500 transition-colors" on:click={() => handleSortChange('title')}>
+						TITRE
+						{#if currentSort.startsWith('title')}
+							<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" className="text-orange-500" />
+						{/if}
+					</button>
+					<button class="hidden md:flex text-left items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-orange-500 transition-colors" on:click={() => handleSortChange('author')}>
+						AUTEUR
+						{#if currentSort.startsWith('author')}
+							<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" className="text-orange-500" />
+						{/if}
+					</button>
+					<div class="hidden md:block text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">CATÉGORIE</div>
+					<div class="text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">ACTIONS</div>
+				</div>
+
+				<div class="divide-y divide-gray-50">
+					{#each literature as item, i}
+						<div class="grid grid-cols-[50px_1fr_auto] md:grid-cols-[60px_2fr_1fr_1fr_120px] gap-4 px-4 py-5 items-center hover:bg-orange-50/30 transition-colors group">
+							<div class="text-center text-xs font-bold text-gray-300 group-hover:text-orange-300">
+								{i + 1 + (currentPage - 1) * limit}
+							</div>
+							<div class="flex flex-col min-w-0">
+								<span class="text-sm font-bold text-gray-800 group-hover:text-orange-600 transition-colors line-clamp-2 leading-snug">
+									{item.title || 'Sans titre'}
+								</span>
+							{#if item.description}
+								<p class="text-xs text-gray-500 mt-1 line-clamp-2 md:line-clamp-1">
+									{item.description}
+								</p>
+							{/if}
+							<div class="flex items-center gap-2 mt-1 md:hidden">
+									<span class="text-[10px] font-medium text-gray-400">{item.author}</span>
+									<span class="text-gray-200">•</span>
+									<span class="text-[10px] font-medium text-orange-400">{item.type}</span>
+								</div>
+							</div>
+							<div class="hidden md:block text-xs font-semibold text-gray-500">
+								{item.author}
+							</div>
+							<div class="hidden md:block">
+								<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider {item.type === 'book' ? 'bg-blue-50 text-blue-600' : 'bg-green-50 text-green-600'}">
+									<Icon src={item.type === 'book' ? IoBookOutline : IoCreate} size="12" />
+									{item.type === 'book' ? 'Livre' : 'Lettre'}
+								</span>
+							</div>
+							<div class="flex justify-end pr-2">
+								{#if item.pdf_url}
+									<a 
+										href={item.pdf_url} 
+										target="_blank" 
+										rel="noopener noreferrer"
+										class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-100 rounded-lg text-xs font-bold text-gray-600 hover:bg-orange-500 hover:text-white hover:border-orange-500 shadow-sm transition-all active:scale-95"
+									>
+										<Icon src={IoCloudDownloadOutline} size="16" />
+										<span class="hidden lg:inline">Télécharger</span>
+									</a>
+								{:else}
+									<span class="text-[10px] font-bold text-gray-300 uppercase tracking-widest italic">Indisponible</span>
+								{/if}
+							</div>
+						</div>
+					{:else}
+						<div class="py-24 text-center">
+							<div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gray-50 text-gray-200 mb-6">
+								<Icon src={BsSearch} size="32" />
+							</div>
+							<h3 class="text-xl font-bold text-gray-800 mb-2">Aucun document trouvé</h3>
+							<p class="text-gray-400 text-sm">Réessayez avec d'autres filtres ou vérifiez l'orthographe.</p>
+						</div>
+					{/each}
+				</div>
+			</div>
+		{/if}
 	</div>
 </div>
 

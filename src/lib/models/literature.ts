@@ -7,6 +7,8 @@ export const LiteratureSchema = z.object({
 	type: z.string(), // "Lettre Circulaire" or "Books"
 	language: z.string().optional().default('french'),
 	pdf_url: z.string().url().nullable().optional(),
+	cover_url: z.string().optional(),
+	description: z.string().optional(),
 	release_date: z
 		.union([z.instanceof(Date), z.string()])
 		.optional()
