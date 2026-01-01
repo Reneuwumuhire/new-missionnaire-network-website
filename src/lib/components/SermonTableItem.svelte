@@ -12,10 +12,20 @@
     export let sermon: Sermon;
     export let index: number;
     export let absoluteIndex: number;
+    export let language: string = 'french';
 
     $: isActive = isSermonActive(sermon, $selectAudio);
 
     function isSermonActive(s: Sermon, current: Sermon | AudioAsset | MusicAudio | null) {
+        // Check for specific english audio URL match
+        if (language === 'english') {
+            if (!s.english_audio_url) return false;
+            // Check if current is null before using 'in' operator
+            if (!current) return false;
+            const currentUrl = 'mp3_url' in current ? current.mp3_url : ('s3_url' in current ? current.s3_url : (current as any).url);
+            return currentUrl === s.english_audio_url;
+        }
+
         if (!current || !s.mp3_url) return false;
         const currentUrl = 'mp3_url' in current ? current.mp3_url : ('s3_url' in current ? current.s3_url : (current as any).url);
         return currentUrl === s.mp3_url;
@@ -29,25 +39,38 @@
     }
 
     function togglePlay() {
-        if (!sermon.mp3_url) return;
+        const audioUrl = language === 'english' ? sermon.english_audio_url : sermon.mp3_url;
+        
+        if (!audioUrl) return;
+        
         if (isActive) {
             isPlaying.update(v => !v);
         } else {
             currentIndex.set(index);
-            selectAudio.set(sermon);
+            // If English, we might need to create a temporary object or modify logic to use English URL
+            // Ideally, the global player should just take a URL and metadata. 
+            // For now, let's try modifying the sermon object passed to selectAudio if it's English
+            if (language === 'english' && sermon.english_audio_url) {
+                 const englishSermon = { ...sermon, mp3_url: sermon.english_audio_url, french_title: sermon.english_title || sermon.french_title, title: sermon.english_title };
+                 selectAudio.set(englishSermon);
+            } else {
+                 selectAudio.set(sermon);
+            }
             isPlaying.set(true);
         }
     }
 
     function downloadMp3() {
-        if (sermon.mp3_url) {
-            window.open(sermon.mp3_url, '_blank');
+        const url = language === 'english' ? sermon.english_audio_url : sermon.mp3_url;
+        if (url) {
+            window.open(url, '_blank');
         }
     }
 
     function downloadPdf() {
-        if (sermon.pdf_url) {
-            window.open(sermon.pdf_url, '_blank');
+        const url = language === 'english' ? sermon.english_pdf_url : sermon.pdf_url;
+        if (url) {
+            window.open(url, '_blank');
         }
     }
 
@@ -76,7 +99,11 @@
     <!-- Title and Mobile Metadata -->
     <div class="flex flex-col min-w-0">
         <div class="text-sm font-bold line-clamp-1 transition-colors {isActive ? 'text-orange-600' : 'text-gray-800 group-hover:text-orange-500'}">
-            {sermon.french_title || sermon.english_title || 'Sans titre'}
+            {#if language === 'english'}
+                {sermon.english_title || 'Untitled'}
+            {:else}
+                {sermon.french_title || sermon.english_title || 'Sans titre'}
+            {/if}
         </div>
         <div class="flex flex-row items-center gap-2 md:hidden overflow-hidden text-ellipsis whitespace-nowrap">
             <span class="text-[10px] font-medium {isActive ? 'text-orange-400' : 'text-gray-500'}">
@@ -101,7 +128,7 @@
 
     <!-- Actions -->
     <div class="flex items-center justify-end gap-1 md:gap-2">
-        {#if sermon.pdf_url}
+        {#if (language === 'english' && sermon.english_pdf_url) || (language !== 'english' && sermon.pdf_url)}
             <button 
                 class="p-2 text-gray-400 hover:text-red-500 transition-colors"
                 on:click|stopPropagation={downloadPdf}
@@ -111,7 +138,7 @@
             </button>
         {/if}
 
-        {#if sermon.mp3_url}
+        {#if (language === 'english' && sermon.english_audio_url) || (language !== 'english' && sermon.mp3_url)}
             <button 
                 class="p-2 text-gray-400 hover:text-orange-500 transition-colors"
                 on:click|stopPropagation={downloadMp3}
@@ -121,7 +148,7 @@
             </button>
         {/if}
 
-        {#if sermon.mp3_url}
+        {#if (language === 'english' && sermon.english_audio_url) || (language !== 'english' && sermon.mp3_url)}
             <button 
                 class="hover:scale-110 active:scale-95 transition-all p-2 {isActive ? 'text-orange-600' : 'text-orange-500'}"
                 on:click|stopPropagation={togglePlay}

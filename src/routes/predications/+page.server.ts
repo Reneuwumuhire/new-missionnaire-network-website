@@ -11,6 +11,7 @@ export const load: PageServerLoad = async ({ url }) => {
 	const pageNumber = url.searchParams.get('page') || '1';
 	const limit = url.searchParams.get('limit') || '100';
 	const sort = url.searchParams.get('sort') || 'iso_date:desc';
+	const language = url.searchParams.get('language') || 'french';
 
 	const fetchYears = async () => {
 		try {
@@ -31,7 +32,8 @@ export const load: PageServerLoad = async ({ url }) => {
 				hasAudio,
 				limit: Number.parseInt(limit),
 				pageNumber: Number.parseInt(pageNumber),
-				orderBy: sort
+				orderBy: sort,
+				language
 			});
 			return result;
 		} catch (error) {
@@ -52,6 +54,7 @@ export const load: PageServerLoad = async ({ url }) => {
 		year,
 		hasAudio,
 		sort,
+		language,
 		page: Number.parseInt(pageNumber),
 		limit: Number.parseInt(limit)
 	};

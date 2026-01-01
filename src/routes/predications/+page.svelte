@@ -27,6 +27,7 @@
     $: currentSort = data.sort || 'iso_date:desc';
     $: currentPage = data.page;
     $: limit = data.limit;
+    $: currentLanguage = data.language || 'french';
     $: totalPages = Math.ceil(totalSermons / limit);
 
     const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -70,6 +71,14 @@
         const params = new URLSearchParams($page.url.searchParams);
         if (currentHasAudio) params.delete('hasAudio');
         else params.set('hasAudio', 'true');
+        params.set('page', '1');
+        goto(`?${params.toString()}`);
+    }
+
+    function handleLanguageChange(lang: string) {
+        if (currentLanguage === lang) return;
+        const params = new URLSearchParams($page.url.searchParams);
+        params.set('language', lang);
         params.set('page', '1');
         goto(`?${params.toString()}`);
     }
@@ -145,17 +154,38 @@
             </div>
         </div>
 
+        <!-- Language and Audio Filters -->
         <div>
             <h2 class="text-[10px] md:text-xs font-black text-orange-500 uppercase tracking-[0.2em] mb-4 text-center md:text-left">Options</h2>
-            <div class="flex justify-center md:justify-start">
-                <button 
-                    class="flex items-center gap-2 px-5 py-2.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all border {currentHasAudio ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-500'} {$navigating ? 'opacity-50 cursor-not-allowed' : ''}"
-                    on:click={() => !$navigating && handleAudioFilterToggle()}
-                    disabled={$navigating ? true : false}
-                >
-                    <Icon src={IoPlayCircle} size="16" />
-                    Audio Uniquement
-                </button>
+            <div class="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                <div class="flex items-center gap-4 w-full md:w-auto">
+                    <!-- Language Toggle -->
+                    <div class="flex bg-gray-100 rounded-lg p-1">
+                        <button 
+                            class="px-3 py-1.5 rounded-md text-xs font-bold transition-all {currentLanguage === 'french' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}"
+                            on:click={() => handleLanguageChange('french')}
+                        >
+                            Français
+                        </button>
+                        <button 
+                            class="px-3 py-1.5 rounded-md text-xs font-bold transition-all {currentLanguage === 'english' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}"
+                            on:click={() => handleLanguageChange('english')}
+                        >
+                            English
+                        </button>
+                    </div>
+
+                    <div class="h-6 w-px bg-gray-200"></div>
+
+                    <button 
+                        class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all {currentHasAudio ? 'bg-orange-50 text-orange-600 border border-orange-200' : 'bg-gray-50 text-gray-500 border border-transparent hover:bg-gray-100'}"
+                        on:click={() => !$navigating && handleAudioFilterToggle()}
+                        disabled={$navigating ? true : false}
+                    >
+                        <Icon src={IoPlayCircle} size="16" />
+                        Audio Uniquement
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -236,9 +266,14 @@
                 </div>
 
         <div class="divide-y divide-gray-100">
-            {#each sermons as sermon, i}
-                <SermonTableItem {sermon} index={i} absoluteIndex={i + 1 + (currentPage - 1) * limit} />
-            {:else}
+                {#each sermons as sermon, i (sermon._id)}
+                    <SermonTableItem 
+                        {sermon} 
+                        index={i} 
+                        absoluteIndex={i + 1 + (currentPage - 1) * limit}
+                        language={currentLanguage}
+                    />
+                {:else}
                 <div class="py-24 text-center">
                     <div class="bg-gray-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-gray-200">
                         <Icon src={BsSearch} size="32" />

@@ -492,6 +492,7 @@ export async function querySermons(options: {
 	limit?: number;
 	pageNumber?: number;
 	orderBy?: string;
+	language?: string;
 }): Promise<{ data: Sermon[]; total: number }> {
 	const {
 		author,
@@ -501,7 +502,8 @@ export async function querySermons(options: {
 		hasAudio = false,
 		limit = 100,
 		pageNumber = 1,
-		orderBy = 'iso_date:desc'
+		orderBy = 'iso_date:desc',
+		language = 'french'
 	} = options;
 
 	try {
@@ -532,8 +534,25 @@ export async function querySermons(options: {
 		}
 
 		if (hasAudio) {
-			conditions.push({ mp3_url: { $exists: true, $ne: null, $nin: ['', 'null'] } });
+			if (language === 'english') {
+				conditions.push({ english_audio_url: { $regex: '.+' } });
+			} else {
+				conditions.push({ mp3_url: { $regex: '.+' } });
+			}
 		}
+
+		// Language filtering logic
+		if (language === 'english') {
+			// For English, we specifically want items with english_audio_url OR english_pdf_url
+			// (User requested to hide entry if no audio/pdf is available)
+			conditions.push({
+				$or: [{ english_pdf_url: { $regex: '.+' } }, { english_audio_url: { $regex: '.+' } }]
+			});
+		}
+		// For French (default), we show everything unless specifically filtered out,
+		// but typically the default view is the "French" view.
+		// If we wanted to be strict about "French only", we could check for french_title,
+		// but traditionally the main collection is French.
 
 		if (conditions.length > 0) {
 			query.$and = conditions;
