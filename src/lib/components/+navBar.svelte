@@ -178,7 +178,7 @@
 		{#if showMoboNav}
 			<div
 				class={`absolute z-50 ${
-					$page.url.pathname === '/' ? 'top-[140px]' : 'top-[40px]'
+					$page.url.pathname === '/' ? 'top-[100px]' : 'top-[40px]'
 				} left-0 w-full h-screen bg-white border-t-2 py-6`}
 			>
 				<div class="relative flex flex-col space-y-2 w-full h-full bg-white">
