@@ -87,6 +87,27 @@
 			toggleMobileNav(); // Close the mobile menu
 		}
 	}
+
+	import { onMount } from 'svelte';
+	onMount(() => {
+		const mediaQuery = window.matchMedia('(min-width: 1024px)');
+		const handleMediaChange = (e: MediaQueryListEvent | MediaQueryList) => {
+			if (e.matches && showMoboNav) {
+				showMoboNav = false;
+				document.body.classList.remove('overflow-hidden', 'overscroll-none');
+				document.body.style.overflow = 'auto';
+				document.body.style.height = 'auto';
+				document.body.style.position = 'relative';
+				document.body.style.width = 'auto';
+				openMenuIndex = null;
+			}
+		};
+		// Initial check
+		handleMediaChange(mediaQuery);
+		// Listener
+		mediaQuery.addEventListener('change', handleMediaChange);
+		return () => mediaQuery.removeEventListener('change', handleMediaChange);
+	});
 </script>
 
 <nav class="relative z-50 max-w-full flex flex-row justify-between items-center px-3 md:px-6 my-4">
