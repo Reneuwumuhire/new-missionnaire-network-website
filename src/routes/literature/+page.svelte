@@ -116,10 +116,10 @@
 		<!-- Authors Filter -->
 		<div>
 			<h2 class="text-[10px] md:text-xs font-black text-orange-500 uppercase tracking-[0.2em] mb-4 text-left">Auteurs</h2>
-			<div class="flex overflow-x-auto pb-2 gap-3 no-scrollbar justify-start">
+			<div class="flex flex-wrap gap-3 justify-start">
 				{#each authors as author}
 					<button 
-						class="flex-shrink-0 px-5 py-2.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all border {(author === 'Tous' && !currentAuthor) || currentAuthor === author ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-500'}"
+						class="px-5 py-2.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all border {(author === 'Tous' && !currentAuthor) || currentAuthor === author ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-500'}"
 						on:click={() => handleAuthorChange(author)}
 					>
 						{author === 'Tous' ? 'Tout le monde' : author}
@@ -132,10 +132,10 @@
 		{#if currentAuthor !== 'William Marrion Branham'}
 			<div>
 				<h2 class="text-[10px] md:text-xs font-black text-orange-500 uppercase tracking-[0.2em] mb-4 text-left">Types</h2>
-				<div class="flex overflow-x-auto pb-2 gap-3 no-scrollbar justify-start">
+				<div class="flex flex-wrap gap-3 justify-start">
 					{#each categories as cat}
 						<button 
-							class="flex-shrink-0 px-5 py-2.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all border {(cat === 'All' && !currentType) || currentType === cat ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-500'}"
+							class="px-5 py-2.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all border {(cat === 'All' && !currentType) || currentType === cat ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-500'}"
 							on:click={() => handleTypeChange(cat)}
 						>
 							{#if cat === 'All'}
@@ -156,10 +156,10 @@
 		<!-- Language Filter -->
 		<div>
 			<h2 class="text-[10px] md:text-xs font-black text-orange-500 uppercase tracking-[0.2em] mb-4 text-left">Langues</h2>
-			<div class="flex overflow-x-auto pb-2 gap-3 no-scrollbar justify-start">
+			<div class="flex flex-wrap gap-3 justify-start">
 				{#each languages as lang}
 					<button 
-						class="flex-shrink-0 px-5 py-2.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all border {currentLanguage === lang.id ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-500'}"
+						class="px-5 py-2.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all border {currentLanguage === lang.id ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-500'}"
 						on:click={() => handleLanguageChange(lang.id)}
 					>
 						{lang.name}
@@ -283,11 +283,5 @@
 </div>
 
 <style>
-	.no-scrollbar::-webkit-scrollbar {
-		display: none;
-	}
-	.no-scrollbar {
-		-ms-overflow-style: none;
-		scrollbar-width: none;
-	}
+
 </style>
