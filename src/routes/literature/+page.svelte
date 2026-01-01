@@ -209,7 +209,7 @@
 		{/if}
 
 		<div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-			<div class="grid grid-cols-[50px_1fr_150px_auto] md:grid-cols-[60px_2fr_1fr_1fr_120px] gap-4 px-4 py-4 bg-gray-50/50 border-b border-gray-100 items-center">
+			<div class="grid grid-cols-[50px_1fr_auto] md:grid-cols-[60px_2fr_1fr_1fr_120px] gap-4 px-4 py-4 bg-gray-50/50 border-b border-gray-100 items-center">
 				<div class="text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">#</div>
 				<button class="text-left flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-orange-500 transition-colors" on:click={() => handleSortChange('title')}>
 					TITRE
@@ -229,7 +229,7 @@
 
 			<div class="divide-y divide-gray-50">
 				{#each literature as item, i}
-					<div class="grid grid-cols-[50px_1fr_150px_auto] md:grid-cols-[60px_2fr_1fr_1fr_120px] gap-4 px-4 py-5 items-center hover:bg-orange-50/30 transition-colors group">
+					<div class="grid grid-cols-[50px_1fr_auto] md:grid-cols-[60px_2fr_1fr_1fr_120px] gap-4 px-4 py-5 items-center hover:bg-orange-50/30 transition-colors group">
 						<div class="text-center text-xs font-bold text-gray-300 group-hover:text-orange-300">
 							{i + 1 + (currentPage - 1) * limit}
 						</div>
