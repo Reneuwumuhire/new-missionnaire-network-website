@@ -176,7 +176,7 @@
 		{/if}
 
 		<!-- Source Filter -->
-		{#if currentAuthor === 'Ewald Frank'}
+		{#if currentAuthor === 'Ewald Frank' && currentType === 'circular_letter'}
 			<div>
 				<h2 class="text-[10px] md:text-xs font-black text-orange-500 uppercase tracking-[0.2em] mb-4 text-left">Sources</h2>
 				<div class="flex flex-wrap gap-3 justify-start">
