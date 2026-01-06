@@ -7,6 +7,7 @@ export const load: PageServerLoad = async ({ url }) => {
 	const type = url.searchParams.get('category') || 'All';
 	const language = url.searchParams.get('language') || 'french';
 	const search = url.searchParams.get('search') || '';
+	const source = url.searchParams.get('source') || 'All';
 	const pageNumber = url.searchParams.get('page') || '1';
 	const limit = url.searchParams.get('limit') || '100';
 	const sort = url.searchParams.get('sort') || 'release_date:desc';
@@ -18,6 +19,7 @@ export const load: PageServerLoad = async ({ url }) => {
 				type,
 				language,
 				search,
+				source,
 				limit: Number.parseInt(limit),
 				pageNumber: Number.parseInt(pageNumber),
 				orderBy: sort
@@ -38,6 +40,7 @@ export const load: PageServerLoad = async ({ url }) => {
 		category: type,
 		language,
 		search,
+		source,
 		sort,
 		page: Number.parseInt(pageNumber),
 		limit: Number.parseInt(limit)

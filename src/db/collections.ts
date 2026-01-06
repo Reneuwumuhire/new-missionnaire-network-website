@@ -609,6 +609,7 @@ export async function queryLiterature(options: {
 	search?: string;
 	type?: string;
 	language?: string;
+	source?: string;
 	limit?: number;
 	pageNumber?: number;
 	orderBy?: string;
@@ -618,6 +619,7 @@ export async function queryLiterature(options: {
 		search,
 		type,
 		language,
+		source,
 		limit = 20,
 		pageNumber = 1,
 		orderBy = 'release_date:desc'
@@ -640,6 +642,10 @@ export async function queryLiterature(options: {
 			conditions.push({
 				$or: [{ title: { $regex: search, $options: 'i' } }]
 			});
+		}
+
+		if (source && source !== 'All' && source !== 'Tous' && source !== 'Tout') {
+			conditions.push({ source: source });
 		}
 
 		if (language && language !== 'All') {

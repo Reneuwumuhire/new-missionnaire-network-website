@@ -24,9 +24,23 @@
 	$: currentPage = data.page;
 	$: limit = data.limit;
 	$: currentLanguage = data.language;
+	$: currentSource = data.source || 'All';
+
+	let expandedItems = new Set<string>();
+
+	function toggleDescription(id: string | undefined) {
+		if (!id) return;
+		if (expandedItems.has(id)) {
+			expandedItems.delete(id);
+		} else {
+			expandedItems.add(id);
+		}
+		expandedItems = expandedItems; // trigger reactivity
+	}
 
 	const authors = ['Tous', 'William Marrion Branham', 'Ewald Frank'];
 	const categories = ['All', 'book', 'circular_letter'];
+	const sources = ['All', 'freie-volksmission', 'cmpp'];
 	const languages = [
 		{ id: 'french', name: 'Français' },
 		{ id: 'english', name: 'English' }
@@ -57,6 +71,14 @@
 		const params = new URLSearchParams($page.url.searchParams);
 		if (type === 'All') params.delete('category');
 		else params.set('category', type);
+		params.set('page', '1');
+		goto(`?${params.toString()}`);
+	}
+
+	function handleSourceChange(source: string) {
+		const params = new URLSearchParams($page.url.searchParams);
+		if (source === 'All') params.delete('source');
+		else params.set('source', source);
 		params.set('page', '1');
 		goto(`?${params.toString()}`);
 	}
@@ -153,6 +175,31 @@
 			</div>
 		{/if}
 
+		<!-- Source Filter -->
+		{#if currentAuthor === 'Ewald Frank'}
+			<div>
+				<h2 class="text-[10px] md:text-xs font-black text-orange-500 uppercase tracking-[0.2em] mb-4 text-left">Sources</h2>
+				<div class="flex flex-wrap gap-3 justify-start">
+					{#each sources as src}
+						<button 
+							class="px-5 py-2.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all border {(src === 'All' && currentSource === 'All') || currentSource === src ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-500'}"
+							on:click={() => handleSourceChange(src)}
+						>
+							{#if src === 'All'}
+								Toutes
+							{:else if src === 'freie-volksmission'}
+								Freie Volksmission
+							{:else if src === 'cmpp'}
+								CMPP
+							{:else}
+								{src}
+							{/if}
+						</button>
+					{/each}
+				</div>
+			</div>
+		{/if}
+
 		<!-- Language Filter -->
 		<div>
 			<h2 class="text-[10px] md:text-xs font-black text-orange-500 uppercase tracking-[0.2em] mb-4 text-left">Langues</h2>
@@ -183,7 +230,7 @@
 				/>
 			</div>
 			
-			{#if currentSearch || (currentAuthor && currentAuthor !== 'Tous') || (currentType && currentType !== 'All')}
+			{#if currentSearch || (currentAuthor && currentAuthor !== 'Tous') || (currentType && currentType !== 'All') || (currentSource && currentSource !== 'All')}
 				<button 
 					class="flex items-center gap-2 text-orange-500 font-bold text-xs uppercase tracking-widest hover:text-orange-600 transition-colors"
 					on:click={() => goto('?')}
@@ -313,14 +360,28 @@
 									{item.title || 'Sans titre'}
 								</span>
 							{#if item.description}
-								<p class="text-xs text-gray-500 mt-1 line-clamp-2 md:line-clamp-1">
-									{item.description}
-								</p>
+								<div class="mt-1">
+									<p class="text-xs text-gray-500 leading-relaxed {expandedItems.has(item._id || '') ? '' : 'line-clamp-2 md:line-clamp-1'}">
+										{item.description}
+									</p>
+									{#if item.description.length > 100}
+										<button 
+											class="text-[10px] font-bold text-orange-500 hover:text-orange-600 mt-1 uppercase tracking-wider"
+											on:click={() => toggleDescription(item._id)}
+										>
+											{expandedItems.has(item._id || '') ? 'Voir moins' : 'Voir plus'}
+										</button>
+									{/if}
+								</div>
 							{/if}
 							<div class="flex items-center gap-2 mt-1 md:hidden">
 									<span class="text-[10px] font-medium text-gray-400">{item.author}</span>
 									<span class="text-gray-200">•</span>
 									<span class="text-[10px] font-medium text-orange-400">{item.type}</span>
+									{#if item.source}
+										<span class="text-gray-200">•</span>
+										<span class="text-[10px] font-medium text-blue-400">{item.source}</span>
+									{/if}
 								</div>
 							</div>
 							<div class="hidden md:block text-xs font-semibold text-gray-500">

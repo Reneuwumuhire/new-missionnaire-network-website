@@ -9,6 +9,7 @@ export const LiteratureSchema = z.object({
 	pdf_url: z.string().url().nullable().optional(),
 	cover_url: z.string().optional(),
 	description: z.string().optional(),
+	source: z.string().optional(),
 	release_date: z
 		.union([z.instanceof(Date), z.string()])
 		.optional()
