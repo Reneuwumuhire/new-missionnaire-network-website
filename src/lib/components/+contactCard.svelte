@@ -9,7 +9,7 @@
 		<p class="">François-Xavier CHAUFFEUR</p>
 		<p class="">MISSIONNAIRE NETWORK</p>
 		<p class="">Assemblée de Kigali</p>
-		<p class="">P.O.Box 1718, Kigali</p>
+		<p class="">P.O.Box 4782, Kigali</p>
 		<p class="">Tél : +250 788 567 415</p>
 		<p class=" underline">
 			<a href="mailto:xavier@missionnaire.net"> chaufraxa@gmail.com </a>
