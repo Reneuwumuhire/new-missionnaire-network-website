@@ -12,7 +12,7 @@
 		<p class="">P.O.Box 1718, Kigali</p>
 		<p class="">Tél : +250 788 567 415</p>
 		<p class=" underline">
-			<a href="mailto:xavier@missionnaire.net"> xavier@missionnaire.net </a>
+			<a href="mailto:xavier@missionnaire.net"> chaufraxa@gmail.com </a>
 		</p>
 	</div>
 </div>
