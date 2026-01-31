@@ -4,6 +4,9 @@ export type LiveStatus = {
 	isLive: boolean;
 	videoId: string | null;
 	title: string | null;
+	description: string | null;
+	thumbnail: string | null;
+	duration: number;
 	url: string | null;
 	updatedAt: string | null;
 };
@@ -15,25 +18,26 @@ const INITIAL_STATUS: LiveStatus = {
 	isLive: false,
 	videoId: null,
 	title: null,
+	description: null,
+	thumbnail: null,
+	duration: 0,
 	url: null,
 	updatedAt: null
 };
 
-// @ts-ignore
-if (!globalThis[GLOBAL_KEY]) {
-	// @ts-ignore
-	globalThis[GLOBAL_KEY] = INITIAL_STATUS;
+const globalAny = globalThis as any;
+
+if (!globalAny[GLOBAL_KEY]) {
+	globalAny[GLOBAL_KEY] = INITIAL_STATUS;
 }
 
 export function getLiveStatus(): LiveStatus {
-	// @ts-ignore
-	const status = globalThis[GLOBAL_KEY];
+	const status = globalAny[GLOBAL_KEY];
 	return status;
 }
 
 function updateStatus(newStatus: LiveStatus) {
-	// @ts-ignore
-	globalThis[GLOBAL_KEY] = newStatus;
+	globalAny[GLOBAL_KEY] = newStatus;
 }
 
 const CHANNEL_ID = 'UCS3zqpqnCvT0SFa_jI662Kg';
@@ -55,7 +59,6 @@ export async function checkAndIngestLiveStream() {
 			return;
 		}
 
-		// Use YouTube Search API to find current live video for the channel
 		const apiUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${CHANNEL_ID}&type=video&eventType=live&key=${apiKey}`;
 
 		const response = await fetch(apiUrl);
@@ -73,6 +76,8 @@ export async function checkAndIngestLiveStream() {
 			const item = data.items[0];
 			const videoId = item.id.videoId;
 			const title = item.snippet.title;
+			const description = item.snippet.description;
+			const thumbnail = item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.default?.url;
 
 			console.log(`[YouTube Poller] Live stream detected via API: ${title} (${videoId})`);
 
@@ -80,15 +85,24 @@ export async function checkAndIngestLiveStream() {
 				isLive: true,
 				videoId: videoId,
 				title: title,
+				description: description,
+				thumbnail: thumbnail,
+				duration: 0,
 				url: `https://www.youtube.com/watch?v=${videoId}`,
 				updatedAt: new Date().toISOString()
 			});
 		} else {
 			console.log('[YouTube Poller] No active livestream found via API');
+			if (data.error) {
+				console.log('[YouTube Poller] API returned error in data:', JSON.stringify(data.error));
+			}
 			updateStatus({
 				isLive: false,
 				videoId: null,
 				title: null,
+				description: null,
+				thumbnail: null,
+				duration: 0,
 				url: null,
 				updatedAt: new Date().toISOString()
 			});
@@ -100,6 +114,9 @@ export async function checkAndIngestLiveStream() {
 			isLive: false,
 			videoId: null,
 			title: null,
+			description: null,
+			thumbnail: null,
+			duration: 0,
 			url: null,
 			updatedAt: new Date().toISOString()
 		});

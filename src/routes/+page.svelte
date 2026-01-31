@@ -16,6 +16,7 @@
 		isLoading,
 		isInitialLoading,
 		videos,
+		liveVideo,
 		hasMore
 	} from '$lib/stores/videoStore';
 	import { fetchInitialVideos, fetchMoreVideos, resetPagination } from '../utils/videoUtils';
@@ -27,7 +28,7 @@
 
 	let titleName: string = 'Missionnaire network';
 	/** @type {import('./$types').PageData} */
-	export let data: { data: YoutubeVideo[] };
+	export let data: { data: YoutubeVideo[], liveStatus?: any };
 
 	const limit = 20;
 
@@ -97,11 +98,26 @@
 	});
 
 	$: filteredVideos = derived(
-		[videos, activeFilter, searchTerm],
-		([$videos, $activeFilter, $searchTerm]) =>
-			$videos.filter((video) => {
+		[videos, liveVideo, activeFilter, searchTerm],
+		([$videos, $liveVideo, $activeFilter, $searchTerm]) => {
+			const allVids = [...$videos];
+			if ($liveVideo) {
+				// Avoid duplicates if live video is also in the list
+				const exists = allVids.find(v => v.id === $liveVideo.id);
+				if (!exists) {
+					allVids.unshift($liveVideo);
+				} else {
+					// Move to top if it exists
+					const index = allVids.findIndex(v => v.id === $liveVideo.id);
+					allVids.splice(index, 1);
+					allVids.unshift($liveVideo);
+				}
+			}
+
+			return allVids.filter((video) => {
 				const matchesFilter =
 					$activeFilter === '' ||
+					video.tags.includes('LIVE') ||
 					video.tags.some(
 						(tag: string | undefined) => $activeFilter === tagLabelMap.get(tag as string) || 'All'
 					) ||
@@ -114,7 +130,8 @@
 					video.description.toLowerCase().includes($searchTerm.toLowerCase());
 
 				return matchesFilter && matchesSearch;
-			})
+			});
+		}
 	);
 
 	const handleSearch = debounce(async (searchValue: string) => {
@@ -129,6 +146,37 @@
 			const filterParam = url.searchParams.get('filter');
 			const searchParam = url.searchParams.get('search');
 
+			if (data.liveStatus?.isLive) {
+				const liveVid: YoutubeVideo = {
+					id: data.liveStatus.videoId,
+					display_id: data.liveStatus.videoId,
+					_id: `live-${data.liveStatus.videoId}`,
+					title: data.liveStatus.title,
+					description: data.liveStatus.description || '',
+					thumbnail: data.liveStatus.thumbnail || '',
+					duration_string: 'EN DIRECT',
+					duration: 0,
+					tags: ['retransmission', 'LIVE'],
+					view_count: 0,
+					webpage_url: data.liveStatus.url,
+					live_status: 'live',
+					release_timestamp: Date.now() / 1000,
+					upload_date: new Date().toISOString(),
+					timestamp: Date.now(),
+					availability: 'public',
+					original_url: data.liveStatus.url,
+					fulltitle: data.liveStatus.title,
+					release_year: new Date().getFullYear(),
+					epoch: Date.now() / 1000,
+					aspect_ratio: 1.777,
+					pdfInfo: [],
+					thumbnails: []
+				} as any;
+				liveVideo.set(liveVid);
+			} else {
+				liveVideo.set(undefined);
+			}
+
 			// Initialize videos with server-side data first
 			if (data.data && data.data.length > 0) {
 				videos.set(data.data);
@@ -136,21 +184,21 @@
 					hasMore.set(false);
 				} else {
 					skip.set(limit);
+					hasMore.set(true);
 				}
 			}
 
 			// Then set the filters and search terms
 			if (filterParam) {
 				activeFilter.set(filterParam);
-				fetchInitialVideos(); // Add this line to fetch when filter is set from URL
-			}
-			if (searchParam) {
+				// Only fetch if it's different from what we might have loaded
+				fetchInitialVideos();
+			} else if (searchParam) {
 				searchTerm.set(searchParam);
-			} else {
-				// Only fetch initial videos if there's no search term and no filter
-				if (!filterParam) {
-					fetchInitialVideos();
-				}
+				fetchInitialVideos();
+			} else if (!data.data || data.data.length === 0) {
+				// Only fetch if we don't have server-side data
+				fetchInitialVideos();
 			}
 
 			window.addEventListener('search', handleSearch);
@@ -207,8 +255,8 @@
 						<!-- Content -->
 						<div class="absolute bottom-0 left-0 w-full p-6 md:p-12 text-white">
 							<div class="max-w-4xl space-y-4">
-								<div class="inline-block px-3 py-1 bg-orange-500 rounded-full text-xs font-bold uppercase tracking-widest mb-2">
-									À la une
+								<div class="inline-block px-3 py-1 {$filteredVideos[0].tags.includes('LIVE') ? 'bg-red-600' : 'bg-orange-500'} rounded-full text-xs font-bold uppercase tracking-widest mb-2">
+									{$filteredVideos[0].tags.includes('LIVE') ? 'EN DIRECT' : 'À la une'}
 								</div>
 								<h1 class="text-3xl md:text-5xl lg:text-6xl font-black leading-tight tracking-tight line-clamp-2 group-hover:text-orange-100 transition-colors">
 									{$filteredVideos[0].title}
