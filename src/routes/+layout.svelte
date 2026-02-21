@@ -12,17 +12,71 @@
 	import { setFilter } from '../utils/videoUtils';
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
+	import { afterUpdate, onMount } from 'svelte';
 	export let data: LayoutData;
 	const SITE_URL = 'https://missionnaire.net';
 	const DEFAULT_SEO_DESCRIPTION =
 		"Prédications, cantiques, littérature et transcriptions du Message de l'Heure pour l'édification spirituelle.";
 	const DEFAULT_SEO_TITLE = 'Missionnaire Network | Prédications et Cantiques du Message';
+	let headerRef: HTMLDivElement | null = null;
+	let homeFilterRef: HTMLDivElement | null = null;
+	let headerHeight = 120;
+	let topContentOffset = 120;
+	let resizeObserver: ResizeObserver | null = null;
+
+	$: isHomePage = $page.url.pathname === '/';
 
 	if (browser) {
 		(window as any).onYouTubeIframeAPIReady = () => {
 			window.dispatchEvent(new CustomEvent('yt-ready'));
 		};
 	}
+
+	const updateLayoutOffset = () => {
+		if (!browser) return;
+
+		const nextHeaderHeight = headerRef?.offsetHeight ?? 0;
+		const nextFilterHeight = isHomePage ? homeFilterRef?.offsetHeight ?? 0 : 0;
+
+		headerHeight = nextHeaderHeight;
+		topContentOffset = nextHeaderHeight + nextFilterHeight;
+	};
+
+	const observeStickySections = () => {
+		if (!resizeObserver) return;
+		resizeObserver.disconnect();
+
+		if (headerRef) {
+			resizeObserver.observe(headerRef);
+		}
+
+		if (isHomePage && homeFilterRef) {
+			resizeObserver.observe(homeFilterRef);
+		}
+	};
+
+	onMount(() => {
+		if (!browser) return;
+
+		resizeObserver = new ResizeObserver(() => {
+			updateLayoutOffset();
+		});
+
+		observeStickySections();
+		updateLayoutOffset();
+		window.addEventListener('resize', updateLayoutOffset);
+
+		return () => {
+			resizeObserver?.disconnect();
+			window.removeEventListener('resize', updateLayoutOffset);
+		};
+	});
+
+	afterUpdate(() => {
+		if (!browser || !resizeObserver) return;
+		observeStickySections();
+		updateLayoutOffset();
+	});
 
 	$: canonicalUrl = `${SITE_URL}${$page.url.pathname}`;
 </script>
@@ -49,12 +103,16 @@
 
 <QueryClientProvider client={data.queryClient}>
 	<div class="relative">
-		<div class="flex flex-col fixed top-0 z-40 bg-white w-full">
+		<div bind:this={headerRef} class="flex flex-col fixed top-0 z-40 bg-white w-full">
 			<SocialMediaAbove isLiveStream={!!data.liveStream} liveUrl={data.liveStream?.webpage_url} />
 			<NavBar />
 		</div>
-		{#if $page.url.pathname === '/'}
-			<div class="fixed top-[60px] left-0 right-0 z-30 bg-white shadow-sm">
+		{#if isHomePage}
+			<div
+				bind:this={homeFilterRef}
+				class="fixed top-[100px] left-0 right-0 z-30 bg-white shadow-sm"
+				style={browser ? `top: ${headerHeight}px;` : undefined}
+			>
 				<div class="max-w-[1640px] mx-auto px-5 py-4">
 					<div class="flex flex-wrap gap-2 items-center">
 						{#each availableTypesTag as tagType}
@@ -78,7 +136,10 @@
 				</div>
 			</div>
 		{/if}
-		<div class={`relative ${$page.url.pathname === '/' ? 'mt-[160px]' : 'mt-[120px]'}`}>
+		<div
+			class={`relative ${isHomePage ? 'mt-[170px]' : 'mt-[120px]'}`}
+			style={browser ? `margin-top: ${topContentOffset}px;` : undefined}
+		>
 			<slot />
 		</div>
 	</div>
