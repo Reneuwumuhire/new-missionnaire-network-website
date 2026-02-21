@@ -29,7 +29,18 @@
 	});
 </script>
 
-<title>Missionnaire Network | A propos de nous</title>
+<svelte:head>
+	<title>À propos - Missionnaire Network</title>
+	<meta
+		name="description"
+		content="Découvrez la mission de Missionnaire Network, nos contacts et les statistiques de visite du site."
+	/>
+	<meta property="og:title" content="À propos - Missionnaire Network" />
+	<meta
+		property="og:description"
+		content="Qui nous sommes, comment nous contacter et suivre l'oeuvre de Missionnaire Network."
+	/>
+</svelte:head>
 <div class=" flex flex-col overflow-hidden">
 	<header>
 		<div class="flex flex-row items-center justify-center space-x-2">
@@ -90,9 +101,7 @@
 
 					<!-- Country Stats -->
 					<div class="bg-gray-50 p-6 rounded-2xl border border-gray-100 flex flex-col space-y-4">
-						<span class="text-sm font-medium text-gray-500 uppercase tracking-wider"
-							>Top Pays</span
-						>
+						<span class="text-sm font-medium text-gray-500 uppercase tracking-wider">Top Pays</span>
 						<div class="flex flex-col space-y-3">
 							{#each stats.topCountries as country}
 								<div class="flex justify-between items-center">
@@ -131,7 +140,7 @@
 				</a>
 				<a
 					class="flex flex-row items-center space-x-2 md:space-x-4"
-					href="https://wa.me/+250728727726"
+					href="https://wa.me/250788567415"
 					target="_blank"
 				>
 					<!-- when hover add a slight grey -->

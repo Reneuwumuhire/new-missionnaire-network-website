@@ -6,7 +6,18 @@
 	import ArticleCornerImage from '$lib/components/+articleCornerImage.svelte';
 </script>
 
-<title> William Branham </title>
+<svelte:head>
+	<title>William Branham - Missionnaire Network</title>
+	<meta
+		name="description"
+		content="Biographie de William Marrion Branham, ministère, citations et ressources du Message."
+	/>
+	<meta property="og:title" content="William Branham - Missionnaire Network" />
+	<meta
+		property="og:description"
+		content="Découvrez la biographie de William Branham et son impact dans le Message de l'Heure."
+	/>
+</svelte:head>
 <div class=" flex flex-col">
 	<header>
 		<div class="flex flex-row items-center justify-center space-x-2">

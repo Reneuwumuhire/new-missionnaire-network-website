@@ -64,7 +64,7 @@ Youtube -->
 			<a href="https://www.facebook.com/missionnaire.net" target="_blank">
 				<Icon className="w-4 h-4" src={FaBrandsFacebook} />
 			</a>
-			<a href="https://wa.me/+250728727726" target="_blank">
+			<a href="https://wa.me/250788567415" target="_blank">
 				<!-- when hover add a slight grey -->
 				<Icon className="w-4 h-4" src={RiLogoWhatsappFill} />
 			</a>

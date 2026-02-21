@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://missionnaire-network.com/sitemap.xml
+Sitemap: https://missionnaire.net/sitemap.xml

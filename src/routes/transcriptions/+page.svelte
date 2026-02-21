@@ -31,25 +31,25 @@
 
 	function handleSearch(value: string) {
 		if (!browser) return;
-		
+
 		clearTimeout(typingTimeout);
-		
+
 		// Don't search if the value hasn't changed from last search
 		if (value.trim() === lastSearch) return;
-		
+
 		typingTimeout = setTimeout(async () => {
 			isSearching = true;
 			const url = new URL(window.location.href);
-			
+
 			if (value.trim()) {
 				url.searchParams.set('search', value.trim());
 			} else {
 				url.searchParams.delete('search');
 			}
-			
+
 			url.searchParams.set('page', '1');
 			lastSearch = value.trim();
-			
+
 			try {
 				await goto(url.toString(), { keepFocus: true });
 			} finally {
@@ -121,10 +121,10 @@
 		}
 
 		const pages: number[] = [];
-		
+
 		// Always show first page
 		pages.push(1);
-		
+
 		if (current <= 4) {
 			// Near start: 1 2 3 4 5 ... last
 			for (let i = 2; i <= 5; i++) {
@@ -154,6 +154,15 @@
 
 <svelte:head>
 	<title>Transcriptions - Missionnaire Network</title>
+	<meta
+		name="description"
+		content="Recherchez les transcriptions des prédications par année et par titre sur Missionnaire Network."
+	/>
+	<meta property="og:title" content="Transcriptions - Missionnaire Network" />
+	<meta
+		property="og:description"
+		content="Bibliothèque de transcriptions du Message pour étude et édification."
+	/>
 </svelte:head>
 
 <div class="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
@@ -162,38 +171,54 @@
 		<div class="flex flex-row items-center justify-center">
 			<div class="w-full max-w-4xl text-center">
 				<h1 class="text-2xl sm:text-3xl font-bold mb-2 sm:mb-4">Transcriptions</h1>
-				<p class="text-gray-600 mb-2 text-sm sm:text-base">Trouvez les transcriptions des prédications</p>
-				<p class="text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6">{data.pagination.total} transcription{data.pagination.total > 1 ? 's' : ''} disponible{data.pagination.total > 1 ? 's' : ''}</p>
-					<form class="flex flex-row w-full max-w-xl mx-auto px-2 sm:px-0" on:submit|preventDefault>
-						<div class="relative flex-1">
-							<input
-								type="text"
-								class="border border-gray-300 rounded-l-full indent-2 sm:indent-4 p-2 w-full text-gray-900 text-sm sm:text-base outline-none focus:ring-2 focus:ring-missionnaire focus:border-transparent"
-								placeholder="Rechercher par titre..."
-								bind:value={searchTerm}
-								bind:this={searchInput}
-								on:focus={handleFocus}
-								on:input={() => handleSearch(searchTerm)}
-							/>
-							{#if isSearching}
-								<div class="absolute right-3 top-1/2 -translate-y-1/2">
-									<div class="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-missionnaire"></div>
-								</div>
-							{/if}
-						</div>
-						<button type="button" class="bg-missionnaire text-white px-4 sm:px-6 py-2 rounded-r-full hover:bg-missionnaire/90 text-sm sm:text-base">
-							Rechercher
-						</button>
-					</form>
+				<p class="text-gray-600 mb-2 text-sm sm:text-base">
+					Trouvez les transcriptions des prédications
+				</p>
+				<p class="text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6">
+					{data.pagination.total} transcription{data.pagination.total > 1 ? 's' : ''} disponible{data
+						.pagination.total > 1
+						? 's'
+						: ''}
+				</p>
+				<form class="flex flex-row w-full max-w-xl mx-auto px-2 sm:px-0" on:submit|preventDefault>
+					<div class="relative flex-1">
+						<input
+							type="text"
+							class="border border-gray-300 rounded-l-full indent-2 sm:indent-4 p-2 w-full text-gray-900 text-sm sm:text-base outline-none focus:ring-2 focus:ring-missionnaire focus:border-transparent"
+							placeholder="Rechercher par titre..."
+							bind:value={searchTerm}
+							bind:this={searchInput}
+							on:focus={handleFocus}
+							on:input={() => handleSearch(searchTerm)}
+						/>
+						{#if isSearching}
+							<div class="absolute right-3 top-1/2 -translate-y-1/2">
+								<div
+									class="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-missionnaire"
+								/>
+							</div>
+						{/if}
+					</div>
+					<button
+						type="button"
+						class="bg-missionnaire text-white px-4 sm:px-6 py-2 rounded-r-full hover:bg-missionnaire/90 text-sm sm:text-base"
+					>
+						Rechercher
+					</button>
+				</form>
 			</div>
 		</div>
 	</div>
 
 	<div class="flex w-full h-full flex-col lg:flex-row">
 		<!-- List Panel -->
-		<div class="flex-1 min-w-0 {$isDocumentOpen ? 'lg:w-1/2' : 'w-full'} transition-all duration-300">
+		<div
+			class="flex-1 min-w-0 {$isDocumentOpen ? 'lg:w-1/2' : 'w-full'} transition-all duration-300"
+		>
 			<!-- Sort and Filter Controls -->
-			<div class="flex flex-col sm:flex-row justify-end mb-4 items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 px-2 sm:px-0">
+			<div
+				class="flex flex-col sm:flex-row justify-end mb-4 items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 px-2 sm:px-0"
+			>
 				<!-- Year Filter -->
 				<div class="flex items-center space-x-2 w-full sm:w-auto">
 					<label for="year-filter" class="text-sm text-gray-600">Année:</label>
@@ -231,16 +256,23 @@
 			{:else}
 				<div class="border border-gray-300 shadow rounded-md mx-2 sm:mx-0">
 					{#each filteredDocuments as document}
-						<div class="flex items-center border-b border-gray-200 last:border-b-0 hover:bg-gray-50">
-							<button 
-								class="flex-1 p-3 sm:p-4 flex items-start space-x-2 sm:space-x-4 text-left {selectedDocument?.filename === document.filename ? 'bg-gray-100' : ''}"
+						<div
+							class="flex items-center border-b border-gray-200 last:border-b-0 hover:bg-gray-50"
+						>
+							<button
+								class="flex-1 p-3 sm:p-4 flex items-start space-x-2 sm:space-x-4 text-left {selectedDocument?.filename ===
+								document.filename
+									? 'bg-gray-100'
+									: ''}"
 								on:click={() => handleSelectDocument(document)}
 							>
 								<div class="flex-shrink-0 pt-1">
-									<DocumentText1 size={18} color="#6B7280"/>
+									<DocumentText1 size={18} color="#6B7280" />
 								</div>
 								<div class="flex-1 min-w-0">
-									<h3 class="text-xs sm:text-sm font-medium text-gray-900 break-words">{document.filename}</h3>
+									<h3 class="text-xs sm:text-sm font-medium text-gray-900 break-words">
+										{document.filename}
+									</h3>
 									<div class="mt-1 flex flex-col sm:flex-row sm:flex-wrap sm:space-x-6">
 										<div class="text-xs text-gray-500">
 											{formatFileSize(document.size)}
@@ -280,7 +312,8 @@
 				{#if showPagination && totalPages > 1}
 					<div class="flex justify-center mt-4 sm:mt-8 gap-1 sm:gap-2 px-2 sm:px-0">
 						<button
-							class="px-2 sm:px-4 py-2 text-xs sm:text-sm rounded-md transition-colors duration-200 {currentPage === 1
+							class="px-2 sm:px-4 py-2 text-xs sm:text-sm rounded-md transition-colors duration-200 {currentPage ===
+							1
 								? 'bg-gray-100 text-gray-400'
 								: 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
 							disabled={currentPage === 1}
@@ -294,7 +327,8 @@
 								<span class="px-2 py-2 text-gray-500">...</span>
 							{:else}
 								<button
-									class="min-w-[32px] px-2 sm:px-3 py-2 text-xs sm:text-sm rounded-md transition-colors duration-200 {currentPage === pageNum
+									class="min-w-[32px] px-2 sm:px-3 py-2 text-xs sm:text-sm rounded-md transition-colors duration-200 {currentPage ===
+									pageNum
 										? 'bg-missionnaire text-white'
 										: 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
 									on:click={() => handlePageChange(pageNum)}
@@ -305,7 +339,8 @@
 						{/each}
 
 						<button
-							class="px-2 sm:px-4 py-2 text-xs sm:text-sm rounded-md transition-colors duration-200 {currentPage === totalPages
+							class="px-2 sm:px-4 py-2 text-xs sm:text-sm rounded-md transition-colors duration-200 {currentPage ===
+							totalPages
 								? 'bg-gray-100 text-gray-400'
 								: 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
 							disabled={currentPage === totalPages}
@@ -320,16 +355,25 @@
 
 		<!-- Document Preview Panel -->
 		{#if $isDocumentOpen && selectedDocument}
-			<div class="fixed inset-0 lg:relative lg:w-1/2 border-l border-gray-200 bg-white p-4 sm:p-6 min-h-screen z-50 lg:z-auto">
+			<div
+				class="fixed inset-0 lg:relative lg:w-1/2 border-l border-gray-200 bg-white p-4 sm:p-6 min-h-screen z-50 lg:z-auto"
+			>
 				<div class="flex flex-col h-full">
 					<div class="flex justify-between items-start mb-4 sm:mb-6">
-						<h2 class="text-lg sm:text-xl font-semibold text-gray-900 pr-8">{selectedDocument.filename}</h2>
-						<button 
-							class="text-gray-400 hover:text-gray-500" 
+						<h2 class="text-lg sm:text-xl font-semibold text-gray-900 pr-8">
+							{selectedDocument.filename}
+						</h2>
+						<button
+							class="text-gray-400 hover:text-gray-500"
 							on:click={() => isDocumentOpen.set(false)}
 						>
 							<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M6 18L18 6M6 6l12 12"
+								/>
 							</svg>
 						</button>
 					</div>
@@ -339,7 +383,9 @@
 							<dl class="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
 								<div>
 									<dt class="text-xs sm:text-sm font-medium text-gray-500">Taille du fichier</dt>
-									<dd class="mt-1 text-xs sm:text-sm text-gray-900">{formatFileSize(selectedDocument.size)}</dd>
+									<dd class="mt-1 text-xs sm:text-sm text-gray-900">
+										{formatFileSize(selectedDocument.size)}
+									</dd>
 								</div>
 								<div>
 									<dt class="text-xs sm:text-sm font-medium text-gray-500">Date de publication</dt>
@@ -350,12 +396,16 @@
 							</dl>
 						</div>
 
-						<div class="relative w-full h-[calc(100vh-300px)] border border-gray-200 rounded-lg bg-gray-50 flex flex-col items-center justify-center p-4 sm:p-8 text-center">
+						<div
+							class="relative w-full h-[calc(100vh-300px)] border border-gray-200 rounded-lg bg-gray-50 flex flex-col items-center justify-center p-4 sm:p-8 text-center"
+						>
 							<DocumentText1 size={40} color="#9CA3AF" />
-							<h3 class="mt-4 text-base sm:text-lg font-medium text-gray-900">Visualisation du document</h3>
+							<h3 class="mt-4 text-base sm:text-lg font-medium text-gray-900">
+								Visualisation du document
+							</h3>
 							<p class="mt-2 text-xs sm:text-sm text-gray-500 max-w-md">
-								Pour des raisons de sécurité, la prévisualisation du document peut être bloquée par votre navigateur. 
-								Vous pouvez :
+								Pour des raisons de sécurité, la prévisualisation du document peut être bloquée par
+								votre navigateur. Vous pouvez :
 							</p>
 							<div class="mt-4 sm:mt-6 flex flex-col gap-2 sm:gap-4 w-full px-4">
 								<a
@@ -364,8 +414,18 @@
 									rel="noopener noreferrer"
 									class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-xs sm:text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-missionnaire w-full"
 								>
-									<svg class="w-4 h-4 mr-2 -ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+									<svg
+										class="w-4 h-4 mr-2 -ml-1"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+										/>
 									</svg>
 									Ouvrir dans un nouvel onglet
 								</a>

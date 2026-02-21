@@ -6,7 +6,18 @@
 	import ArticleCornerImage from '$lib/components/+articleCornerImage.svelte';
 </script>
 
-<title> Ewald Frank</title>
+<svelte:head>
+	<title>Ewald Frank - Missionnaire Network</title>
+	<meta
+		name="description"
+		content="Biographie et enseignements d'Ewald Frank, avec citations et contenus d'édification."
+	/>
+	<meta property="og:title" content="Ewald Frank - Missionnaire Network" />
+	<meta
+		property="og:description"
+		content="Parcours du ministère d'Ewald Frank et ressources du Message."
+	/>
+</svelte:head>
 <div class=" flex flex-col">
 	<header>
 		<div class="flex flex-row items-center justify-center space-x-2">
