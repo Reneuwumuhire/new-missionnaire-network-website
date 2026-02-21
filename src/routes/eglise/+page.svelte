@@ -6,7 +6,18 @@
 	import ArticleCornerImage from '$lib/components/+articleCornerImage.svelte';
 </script>
 
-<title> Missionnaire Network</title>
+<svelte:head>
+	<title>Église Locale - Missionnaire Network</title>
+	<meta
+		name="description"
+		content="Présentation de l'assemblée locale de Kigali/Gatenga/Murambi et de son ministère sur Missionnaire Network."
+	/>
+	<meta property="og:title" content="Église Locale - Missionnaire Network" />
+	<meta
+		property="og:description"
+		content="Découvrez l'assemblée locale et son engagement pour le Message de l'Heure."
+	/>
+</svelte:head>
 <div class=" flex flex-col">
 	<header>
 		<div class="flex flex-row items-center justify-center space-x-2">

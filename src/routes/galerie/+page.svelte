@@ -36,7 +36,18 @@
 	$: console.log(_list);
 </script>
 
-<title>Missionnaire Network | Galerie</title>
+<svelte:head>
+	<title>Galerie - Missionnaire Network</title>
+	<meta
+		name="description"
+		content="Galerie photo de l'assemblée locale et des activités Missionnaire Network."
+	/>
+	<meta property="og:title" content="Galerie - Missionnaire Network" />
+	<meta
+		property="og:description"
+		content="Explorez les images des réunions, événements et moments marquants."
+	/>
+</svelte:head>
 <div class=" flex flex-col">
 	<header>
 		<div class="flex flex-row items-center justify-center space-x-2">

@@ -13,35 +13,44 @@
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
 	export let data: LayoutData;
+	const SITE_URL = 'https://missionnaire.net';
+	const DEFAULT_SEO_DESCRIPTION =
+		"Prédications, cantiques, littérature et transcriptions du Message de l'Heure pour l'édification spirituelle.";
+	const DEFAULT_SEO_TITLE = 'Missionnaire Network | Prédications et Cantiques du Message';
 
 	if (browser) {
 		(window as any).onYouTubeIframeAPIReady = () => {
 			window.dispatchEvent(new CustomEvent('yt-ready'));
 		};
 	}
+
+	$: canonicalUrl = `${SITE_URL}${$page.url.pathname}`;
 </script>
 
 <svelte:head>
 	<title>Missionnaire Network</title>
 	<script src="https://www.youtube.com/iframe_api"></script>
+	<link rel="canonical" href={canonicalUrl} />
+	<meta name="description" content={DEFAULT_SEO_DESCRIPTION} />
 	<meta property="og:site_name" content="Missionnaire Network" />
 	<meta property="og:type" content="website" />
-	<meta property="og:url" content={$page.url.href} />
-	<meta property="og:logo" content="https://www.missionnaire.net/favicon.png" />
-	<meta property="og:image" content="https://www.missionnaire.net/og-image.png" />
+	<meta property="og:title" content={DEFAULT_SEO_TITLE} />
+	<meta property="og:description" content={DEFAULT_SEO_DESCRIPTION} />
+	<meta property="og:url" content={canonicalUrl} />
+	<meta property="og:logo" content="https://missionnaire.net/favicon.png" />
+	<meta property="og:image" content="https://missionnaire.net/og-image.png" />
 	<meta property="og:image:width" content="1200" />
 	<meta property="og:image:height" content="630" />
 	<meta name="twitter:card" content="summary_large_image" />
-	<meta name="twitter:image" content="https://www.missionnaire.net/og-image.png" />
+	<meta name="twitter:title" content={DEFAULT_SEO_TITLE} />
+	<meta name="twitter:description" content={DEFAULT_SEO_DESCRIPTION} />
+	<meta name="twitter:image" content="https://missionnaire.net/og-image.png" />
 </svelte:head>
 
 <QueryClientProvider client={data.queryClient}>
 	<div class="relative">
 		<div class="flex flex-col fixed top-0 z-40 bg-white w-full">
-			<SocialMediaAbove
-				isLiveStream={!!data.liveStream}
-				liveUrl={data.liveStream?.webpage_url}
-			/>
+			<SocialMediaAbove isLiveStream={!!data.liveStream} liveUrl={data.liveStream?.webpage_url} />
 			<NavBar />
 		</div>
 		{#if $page.url.pathname === '/'}

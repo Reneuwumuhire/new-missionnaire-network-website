@@ -22,13 +22,13 @@
 
 	$: currentPage = data.pagination.page;
 	$: totalPages = Math.ceil(data.pagination.total / data.pagination.limit);
-	
+
 	$: {
 		if (searchTerm.trim() === '') {
 			filteredDocuments = data.documents;
 		} else {
 			const searchLower = searchTerm.toLowerCase();
-			filteredDocuments = data.documents.filter(doc => 
+			filteredDocuments = data.documents.filter((doc) =>
 				doc.filename.toLowerCase().includes(searchLower)
 			);
 		}
@@ -96,6 +96,15 @@
 
 <svelte:head>
 	<title>Transcriptions - Missionnaire Network</title>
+	<meta
+		name="description"
+		content="Consultez et téléchargez les documents et transcriptions classés par année sur Missionnaire Network."
+	/>
+	<meta property="og:title" content="Transcriptions - Missionnaire Network" />
+	<meta
+		property="og:description"
+		content="Accédez rapidement aux transcriptions et documents du Message."
+	/>
 </svelte:head>
 
 <div class="container mx-auto px-4 py-8">
@@ -112,7 +121,10 @@
 						placeholder="Rechercher par titre..."
 						bind:value={searchTerm}
 					/>
-					<button type="submit" class="bg-missionnaire text-white px-6 py-2 rounded-r-full hover:bg-missionnaire/90">
+					<button
+						type="submit"
+						class="bg-missionnaire text-white px-6 py-2 rounded-r-full hover:bg-missionnaire/90"
+					>
 						Rechercher
 					</button>
 				</form>
@@ -162,13 +174,18 @@
 			{:else}
 				<div class="border border-gray-300 shadow rounded-md">
 					{#each filteredDocuments as document}
-						<div class="flex items-center border-b border-gray-200 last:border-b-0 hover:bg-gray-50">
-							<button 
-								class="flex-1 p-4 flex items-start space-x-4 text-left {selectedDocument?.filename === document.filename ? 'bg-gray-100' : ''}"
+						<div
+							class="flex items-center border-b border-gray-200 last:border-b-0 hover:bg-gray-50"
+						>
+							<button
+								class="flex-1 p-4 flex items-start space-x-4 text-left {selectedDocument?.filename ===
+								document.filename
+									? 'bg-gray-100'
+									: ''}"
 								on:click={() => handleSelectDocument(document)}
 							>
 								<div class="flex-shrink-0 pt-1">
-									<DocumentText1 size={20} color="#6B7280"/>
+									<DocumentText1 size={20} color="#6B7280" />
 								</div>
 								<div class="flex-1 min-w-0">
 									<h3 class="text-sm font-medium text-gray-900">{document.filename}</h3>
@@ -249,12 +266,17 @@
 				<div class="flex flex-col h-full">
 					<div class="flex justify-between items-start mb-6">
 						<h2 class="text-xl font-semibold text-gray-900">{selectedDocument.filename}</h2>
-						<button 
-							class="text-gray-400 hover:text-gray-500" 
+						<button
+							class="text-gray-400 hover:text-gray-500"
 							on:click={() => isDocumentOpen.set(false)}
 						>
 							<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M6 18L18 6M6 6l12 12"
+								/>
 							</svg>
 						</button>
 					</div>
@@ -264,7 +286,9 @@
 							<dl class="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
 								<div>
 									<dt class="text-sm font-medium text-gray-500">Taille du fichier</dt>
-									<dd class="mt-1 text-sm text-gray-900">{formatFileSize(selectedDocument.size)}</dd>
+									<dd class="mt-1 text-sm text-gray-900">
+										{formatFileSize(selectedDocument.size)}
+									</dd>
 								</div>
 								<div>
 									<dt class="text-sm font-medium text-gray-500">Date de publication</dt>
@@ -275,12 +299,14 @@
 							</dl>
 						</div>
 
-						<div class="relative w-full h-[calc(100vh-300px)] border border-gray-200 rounded-lg bg-gray-50 flex flex-col items-center justify-center p-8 text-center">
+						<div
+							class="relative w-full h-[calc(100vh-300px)] border border-gray-200 rounded-lg bg-gray-50 flex flex-col items-center justify-center p-8 text-center"
+						>
 							<DocumentText1 size={48} color="#9CA3AF" />
 							<h3 class="mt-4 text-lg font-medium text-gray-900">Visualisation du document</h3>
 							<p class="mt-2 text-sm text-gray-500 max-w-md">
-								Pour des raisons de sécurité, la prévisualisation du document peut être bloquée par votre navigateur. 
-								Vous pouvez :
+								Pour des raisons de sécurité, la prévisualisation du document peut être bloquée par
+								votre navigateur. Vous pouvez :
 							</p>
 							<div class="mt-6 flex flex-col gap-4">
 								<a
@@ -289,8 +315,18 @@
 									rel="noopener noreferrer"
 									class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-missionnaire"
 								>
-									<svg class="w-5 h-5 mr-2 -ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+									<svg
+										class="w-5 h-5 mr-2 -ml-1"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+										/>
 									</svg>
 									Ouvrir dans un nouvel onglet
 								</a>
