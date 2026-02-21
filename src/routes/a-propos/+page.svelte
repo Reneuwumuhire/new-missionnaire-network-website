@@ -140,7 +140,7 @@
 				</a>
 				<a
 					class="flex flex-row items-center space-x-2 md:space-x-4"
-					href="https://wa.me/+250728727726"
+					href="https://wa.me/250788567415"
 					target="_blank"
 				>
 					<!-- when hover add a slight grey -->

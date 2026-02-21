@@ -60,7 +60,7 @@
 					<Icon color={isLiveStream ? 'white' : 'black'} className="w-4 h-4" src={FaBrandsFacebook} />
 				</a>
 				<a
-					href="https://wa.me/+250728727726"
+					href="https://wa.me/250788567415"
 					target="_blank"
 					class="hover:opacity-70 transition-opacity"
 				>
