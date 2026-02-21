@@ -32,6 +32,7 @@
 	let volume = 1; // Initial volume (1 = full volume, 0 = mute)
 	let isMuted = false;
 	let audioSrc: string = '';
+	let isAudioReady = false;
 
 	function handleEnded() {
 		isPlaying.set(false);
@@ -112,6 +113,7 @@
 		
 		const encodedUrl = encodeURI(url);
 		console.log("[AudioPlayer] Updating source to:", encodedUrl);
+		isAudioReady = false;
 
 		if (audio) {
 			audio.pause();
@@ -129,9 +131,13 @@
 				duration = audio.duration;
 				console.log("[AudioPlayer] Metadata loaded, duration:", duration);
 			});
+			audio.addEventListener('canplay', () => {
+				isAudioReady = true;
+			});
 			audio.addEventListener('error', (e) => {
 				console.error("[AudioPlayer] Audio error:", e);
 				isPlaying.set(false);
+				isAudioReady = false;
 			});
 		}
 		duration = 0;
@@ -377,6 +383,7 @@
 	on:touchend={endDrag}
 />
 
+{#if isAudioReady}
 <div class="fixed z-[100] bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-gray-100 shadow-[0_-8px_30px_rgb(0,0,0,0.12)] pb-safe pt-2 md:pt-4 md:pb-4 transition-all duration-300">
 	<!-- Top Progress Bar -->
 <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -543,6 +550,7 @@
 		</div>
 	</div>
 </div>
+{/if}
 
 <style>
 </style>

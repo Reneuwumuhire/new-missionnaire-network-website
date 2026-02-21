@@ -1,4 +1,5 @@
 import { getDb } from '../../db/mongo';
+import { buildSermonSlug, type SermonSlugInput } from '../../utils/sermonSlug';
 
 type SitemapDoc = Record<string, unknown>;
 
@@ -69,19 +70,18 @@ function buildUrlEntry({
 
 export async function GET() {
 	const db = await getDb();
-	const videos = await db
-		.collection('videos')
+	const sermons = await db
+		.collection('sermons')
 		.find(
 			{},
 			{
 				projection: {
-					id: 1,
 					_id: 1,
-					release_timestamp: 1,
-					timestamp: 1,
-					upload_date: 1,
-					publishedAt: 1,
-					updatedAt: 1,
+					french_title: 1,
+					english_title: 1,
+					date_code: 1,
+					full_date_code: 1,
+					iso_date: 1,
 					updated_at: 1
 				}
 			}
@@ -149,18 +149,14 @@ ${buildUrlEntry({
 })}`
 		)
 		.join('')}
-  ${videos
+  ${sermons
 		.map(
-			(v) => `
+			(s) => `
 ${buildUrlEntry({
-	loc: `${baseUrl}/predications/${String(v.id || v._id)}`,
-	lastmod: pickLastmod(
-		v as SitemapDoc,
-		['updatedAt', 'updated_at', 'publishedAt', 'upload_date', 'release_timestamp', 'timestamp'],
-		generatedAt
-	),
+	loc: `${baseUrl}/predications/${buildSermonSlug(s as SermonSlugInput)}`,
+	lastmod: pickLastmod(s as SitemapDoc, ['updated_at', 'iso_date'], generatedAt),
 	changefreq: 'weekly',
-	priority: '0.6'
+	priority: '0.7'
 })}`
 		)
 		.join('')}
