@@ -1,5 +1,29 @@
 {
-  "buildCommand": "pnpm run build",
-  "installCommand": "pnpm install",
-  "framework": "sveltekit"
+	"buildCommand": "pnpm run build",
+	"installCommand": "pnpm install",
+	"framework": "sveltekit",
+	"redirects": [
+		{
+			"source": "/:path*",
+			"has": [
+				{
+					"type": "host",
+					"value": "missionnaire-network.com"
+				}
+			],
+			"destination": "https://missionnaire.net/:path*",
+			"permanent": true
+		},
+		{
+			"source": "/:path*",
+			"has": [
+				{
+					"type": "host",
+					"value": "www.missionnaire-network.com"
+				}
+			],
+			"destination": "https://missionnaire.net/:path*",
+			"permanent": true
+		}
+	]
 }
