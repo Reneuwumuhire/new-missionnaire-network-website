@@ -3,6 +3,8 @@
 	import type { Sermon } from '$lib/models/sermon';
 	import { basePlaylist, currentIndex, isPlaying, playlist, selectAudio } from '$lib/stores/global';
 	import { onMount } from 'svelte';
+	import Icon from 'svelte-icons-pack/Icon.svelte';
+	import BsChevronLeft from 'svelte-icons-pack/bs/BsChevronLeft';
 
 	export let data: PageData;
 
@@ -97,15 +99,18 @@
 	<meta name="twitter:description" content={description} />
 </svelte:head>
 
+<div class="w-full max-w-7xl mx-auto mb-4">
+	<a
+		href="/predications"
+		class="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 bg-white text-gray-700 text-xs font-black uppercase tracking-wider hover:border-orange-300 hover:text-orange-600 transition-colors shadow-sm"
+	>
+		<Icon src={BsChevronLeft} size="14" />
+		<span>Retour aux prédications</span>
+	</a>
+</div>
+
 <article class="w-full max-w-7xl mx-auto bg-white border border-gray-100 rounded-2xl p-4 md:p-8 shadow-sm">
 	<div class="max-w-4xl">
-		<a
-			href="/predications"
-			class="inline-flex text-[11px] font-black uppercase tracking-wider text-gray-500 hover:text-orange-500 transition-colors mb-5"
-		>
-			Retour aux prédications
-		</a>
-
 		<h1 class="text-2xl md:text-4xl font-black text-gray-900 leading-tight">{sermonTitle}</h1>
 		<div class="mt-3 flex flex-wrap gap-3 text-sm text-gray-500">
 			{#if sermon.author}
