@@ -8,7 +8,7 @@ export const load: PageServerLoad = async ({ url }) => {
 	try {
 		const page = Number(url.searchParams.get('page')) || 1;
 		const limit = 12;
-		const sortOrder = url.searchParams.get('sort') || 'desc';
+		const sortOrder = url.searchParams.get('sort') === 'asc' ? 'asc' : 'desc';
 		const selectedYear = url.searchParams.get('year');
 		const searchTerm = url.searchParams.get('search');
 
@@ -48,8 +48,10 @@ export const load: PageServerLoad = async ({ url }) => {
 			.find(query)
 			.sort({
 				publishedOn: sortOrder === 'desc' ? -1 : 1,
-				_id: sortOrder === 'desc' ? -1 : 1 // Secondary sort by _id to ensure consistent ordering
+				filename: sortOrder === 'desc' ? -1 : 1,
+				_id: sortOrder === 'desc' ? -1 : 1 // Final fallback keeps ordering stable when date and filename match
 			})
+			.collation({ locale: 'fr', numericOrdering: true })
 			.skip(skip)
 			.limit(limit)
 			.toArray();

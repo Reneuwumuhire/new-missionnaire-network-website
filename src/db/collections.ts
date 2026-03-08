@@ -6,6 +6,57 @@ import type { AudioAsset } from '$lib/models/media-assets';
 import type { MusicAudio } from '$lib/models/music-audio';
 import type { Sermon } from '$lib/models/sermon';
 import type { Literature } from '$lib/models/literature';
+
+const titleDateSortExpression = {
+	$switch: {
+		branches: [
+			{
+				case: {
+					$regexMatch: {
+						input: { $ifNull: ['$title', ''] },
+						regex: /^\d{4}-\d{2}-\d{2} \d{2}h\d{2}/
+					}
+				},
+				then: {
+					$dateFromString: {
+						dateString: { $substrBytes: ['$title', 0, 16] },
+						format: '%Y-%m-%d %Hh%M',
+						timezone: 'Africa/Kigali',
+						onError: null,
+						onNull: null
+					}
+				}
+			},
+			{
+				case: {
+					$regexMatch: {
+						input: { $ifNull: ['$title', ''] },
+						regex: /^\d{4}-\d{2}-\d{2}/
+					}
+				},
+				then: {
+					$dateFromString: {
+						dateString: { $substrBytes: ['$title', 0, 10] },
+						format: '%Y-%m-%d',
+						timezone: 'Africa/Kigali',
+						onError: null,
+						onNull: null
+					}
+				}
+			}
+		],
+		default: null
+	}
+} as const;
+
+const releaseTimestampSortExpression = {
+	$cond: [
+		{ $ne: ['$release_timestamp', null] },
+		{ $toDate: { $multiply: ['$release_timestamp', 1000] } },
+		null
+	]
+} as const;
+
 export async function getCollection(
 	collection_name: string,
 	skip: number,
@@ -50,14 +101,42 @@ export async function getCollection(
 
 		console.log('[DB] Final query:', JSON.stringify(query, null, 2));
 
-		// Let MongoDB handle sorting and pagination
-		const data = await db
-			.collection(collection_name)
-			.find(query)
-			.sort({ release_timestamp: -1 }) // Sort in MongoDB instead of in memory
-			.skip(skip)
-			.limit(limit)
-			.toArray();
+		let data;
+		if (collection_name === 'videos') {
+			// Homepage cards lead with an event date in the title, which should win over upload time.
+			data = await db
+				.collection(collection_name)
+				.aggregate([
+					{ $match: query },
+					{
+						$addFields: {
+							titleSortDate: titleDateSortExpression,
+							releaseTimestampSortDate: releaseTimestampSortExpression
+						}
+					},
+					{
+						$addFields: {
+							sortDate: {
+								$ifNull: ['$titleSortDate', { $ifNull: ['$publishedAt', '$releaseTimestampSortDate'] }]
+							}
+						}
+					},
+					{ $sort: { sortDate: -1, release_timestamp: -1, _id: -1 } },
+					{ $skip: skip },
+					{ $limit: limit },
+					{ $project: { titleSortDate: 0, releaseTimestampSortDate: 0, sortDate: 0 } }
+				])
+				.toArray();
+		} else {
+			// Let MongoDB handle sorting and pagination
+			data = await db
+				.collection(collection_name)
+				.find(query)
+				.sort({ release_timestamp: -1 }) // Sort in MongoDB instead of in memory
+				.skip(skip)
+				.limit(limit)
+				.toArray();
+		}
 
 		console.log(`[DB] Found ${data.length} documents`);
 
