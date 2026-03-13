@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import IoCloudDownloadOutline from 'svelte-icons-pack/io/IoCloudDownloadOutline';
 	import BsFileEarmarkPdfFill from 'svelte-icons-pack/bs/BsFileEarmarkPdfFill';
@@ -9,14 +10,33 @@
 	import type { AudioAsset } from '$lib/models/media-assets';
 	import type { MusicAudio } from '$lib/models/music-audio';
 	import { buildSermonSlug } from '../../utils/sermonSlug';
+	import { formatTime } from '../../utils/FormatTime';
+	import { createPlayableSermon } from '../../utils/audioPlayback';
+	import { getAudioDuration } from '../../utils/audioDuration';
 
 	export let sermon: Sermon;
 	export let index: number;
 	export let absoluteIndex: number;
 	export let language: string = 'french';
+	let resolvedDuration: number | null = sermon.duration ?? null;
+	let isDurationLoading = false;
+	let requestedDurationUrl = '';
+	const desktopSermonGrid = 'md:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.35fr)_110px_80px_120px]';
 
 	$: isActive = isSermonActive(sermon, $selectAudio);
 	$: sermonHref = `/predications/${buildSermonSlug(sermon)}`;
+	$: durationAudioUrl = language === 'english' ? sermon.english_audio_url : sermon.mp3_url;
+	$: hasDurationAudio = Boolean(durationAudioUrl);
+	$: if (sermon.duration !== undefined && sermon.duration !== null) {
+		resolvedDuration = sermon.duration;
+		isDurationLoading = false;
+	} else if (!durationAudioUrl) {
+		resolvedDuration = null;
+		isDurationLoading = false;
+		requestedDurationUrl = '';
+	} else if (browser && durationAudioUrl !== requestedDurationUrl) {
+		void loadDuration(durationAudioUrl);
+	}
 
 	function isSermonActive(s: Sermon, current: Sermon | AudioAsset | MusicAudio | null) {
 		// Check for specific english audio URL match
@@ -51,7 +71,11 @@
 	}
 
 	function togglePlay() {
-		const audioUrl = language === 'english' ? sermon.english_audio_url : sermon.mp3_url;
+		const playbackSermon = createPlayableSermon(
+			sermon,
+			language === 'english' ? 'english' : 'french'
+		);
+		const audioUrl = playbackSermon.mp3_url;
 
 		if (!audioUrl) return;
 
@@ -59,20 +83,7 @@
 			isPlaying.update((v) => !v);
 		} else {
 			currentIndex.set(index);
-			// If English, we might need to create a temporary object or modify logic to use English URL
-			// Ideally, the global player should just take a URL and metadata.
-			// For now, let's try modifying the sermon object passed to selectAudio if it's English
-			if (language === 'english' && sermon.english_audio_url) {
-				const englishSermon = {
-					...sermon,
-					mp3_url: sermon.english_audio_url,
-					french_title: sermon.english_title || sermon.french_title,
-					title: sermon.english_title
-				};
-				selectAudio.set(englishSermon);
-			} else {
-				selectAudio.set(sermon);
-			}
+			selectAudio.set(playbackSermon);
 			isPlaying.set(true);
 		}
 	}
@@ -91,17 +102,34 @@
 		}
 	}
 
-	function formatTime(s: number | undefined) {
-		if (!s) return '--:--';
-		const mins = Math.floor(s / 60);
-		const secs = Math.floor(s % 60);
-		return `${mins}:${secs.toString().padStart(2, '0')}`;
+	async function loadDuration(url: string) {
+		requestedDurationUrl = url;
+		isDurationLoading = true;
+
+		const duration = await getAudioDuration(url);
+		if (requestedDurationUrl !== url) return;
+
+		resolvedDuration = duration;
+		isDurationLoading = false;
 	}
+
+	function formatDuration(value: number | null) {
+		if (!hasDurationAudio) {
+			return '';
+		}
+
+		if (value !== null && value !== undefined) {
+			return formatTime(value);
+		}
+
+		return isDurationLoading ? '...' : '--:--';
+	}
+
 </script>
 
 <!-- svelte-ignore a11y-no-noninteractive-tabindex -->
 <div
-	class="grid grid-cols-[30px_1fr_auto_auto] md:grid-cols-[30px_2.5fr_1.2fr_1fr_auto_auto] gap-2 md:gap-4 px-3 md:px-4 py-3 md:py-4 items-center transition-all group cursor-pointer {isActive
+	class="grid grid-cols-[30px_1fr_auto_auto] {desktopSermonGrid} gap-2 md:gap-4 px-3 md:px-4 py-3 md:py-4 items-center transition-all group cursor-pointer {isActive
 		? 'bg-orange-50/80 border-l-4 border-l-orange-500'
 		: 'hover:bg-gray-50'}"
 	on:click={togglePlay}
@@ -140,6 +168,12 @@
 			<span class="text-[10px] font-medium {isActive ? 'text-orange-400' : 'text-gray-500'}">
 				{sermon.full_date_code}
 			</span>
+			{#if hasDurationAudio}
+				<span class="text-[10px] text-gray-300">•</span>
+				<span class="text-[10px] font-mono {isActive ? 'text-orange-300' : 'text-gray-400'}">
+					{formatDuration(resolvedDuration)}
+				</span>
+			{/if}
 			<span class="text-[10px] text-gray-300">•</span>
 			<span class="text-[10px] font-medium italic {isActive ? 'text-orange-300' : 'text-gray-400'}">
 				{sermon.author}
@@ -165,8 +199,12 @@
 		{sermon.full_date_code}
 	</div>
 
+	<div class="hidden md:block text-center text-xs font-mono {isActive ? 'text-orange-500' : 'text-gray-400'}">
+		{formatDuration(resolvedDuration)}
+	</div>
+
 	<!-- Actions -->
-	<div class="flex items-center justify-end gap-1 md:gap-2">
+	<div class="flex w-full items-center justify-center gap-1 md:gap-2">
 		{#if (language === 'english' && sermon.english_pdf_url) || (language !== 'english' && sermon.pdf_url)}
 			<button
 				class="p-2 text-gray-400 hover:text-red-500 transition-colors"

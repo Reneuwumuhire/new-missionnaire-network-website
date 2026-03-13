@@ -12,6 +12,7 @@ export const SermonSchema = z.object({
 	iso_date: z.string().nullable().optional(),
 	mp3_url: z.string().url().nullable().optional(),
 	pdf_url: z.string().url().nullable().optional(),
+	duration: z.number().nullable().optional(),
 	translations: z.string().array().optional(),
 	updated_at: z.string().optional()
 });

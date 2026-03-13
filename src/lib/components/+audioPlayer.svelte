@@ -20,6 +20,11 @@
 	import RiMediaPlayList2Fill from 'svelte-icons-pack/ri/RiMediaPlayList2Fill';
 	import IoPlaySkipBackOutline from 'svelte-icons-pack/io/IoPlaySkipBackOutline';
 	import IoPlaySkipForwardOutline from 'svelte-icons-pack/io/IoPlaySkipForwardOutline';
+	import {
+		findAdjacentPlayableIndex,
+		getPlayableAudioUrl,
+		type PlayableAudio
+	} from '../../utils/audioPlayback';
 
 	let audio: HTMLAudioElement;
 	let currentTime = 0;
@@ -33,16 +38,27 @@
 	let isMuted = false;
 	let audioSrc: string = '';
 	let isAudioReady = false;
+	let shouldAutoplayOnLoad = false;
 
 	function handleEnded() {
-		isPlaying.set(false);
-		if ($autoNext && $playlist.length > 0) {
-			const nextIndex = $currentIndex + 1;
-			if (nextIndex < $playlist.length) {
-				currentIndex.set(nextIndex);
-				selectAudio.set($playlist[nextIndex]);
-			}
+		if (!$autoNext || $playlist.length === 0) {
+			isPlaying.set(false);
+			return;
 		}
+
+		const nextIndex = findAdjacentPlayableIndex(
+			$playlist as PlayableAudio[],
+			$currentIndex,
+			1,
+			false
+		);
+
+		if (nextIndex === -1) {
+			isPlaying.set(false);
+			return;
+		}
+
+		selectPlaylistItem(nextIndex, true);
 	}
 
 	const toggleAutoNext = () => {
@@ -92,19 +108,38 @@
 		});
 	}
 
+	function selectPlaylistItem(index: number, autoplay = true) {
+		if (index < 0 || index >= $playlist.length) return;
+
+		currentIndex.set(index);
+		selectAudio.set($playlist[index]);
+
+		if (autoplay) {
+			shouldAutoplayOnLoad = true;
+			isPlaying.set(true);
+		}
+	}
+
 	function playNext() {
-		if ($playlist.length > 0) {
-			const nextIndex = ($currentIndex + 1) % $playlist.length;
-			currentIndex.set(nextIndex);
-			selectAudio.set($playlist[nextIndex]);
+		if ($playlist.length === 0) return;
+
+		const nextIndex = findAdjacentPlayableIndex($playlist as PlayableAudio[], $currentIndex, 1, true);
+		if (nextIndex !== -1) {
+			selectPlaylistItem(nextIndex, true);
 		}
 	}
 
 	function playPrevious() {
-		if ($playlist.length > 0) {
-			const prevIndex = ($currentIndex - 1 + $playlist.length) % $playlist.length;
-			currentIndex.set(prevIndex);
-			selectAudio.set($playlist[prevIndex]);
+		if ($playlist.length === 0) return;
+
+		const prevIndex = findAdjacentPlayableIndex(
+			$playlist as PlayableAudio[],
+			$currentIndex,
+			-1,
+			true
+		);
+		if (prevIndex !== -1) {
+			selectPlaylistItem(prevIndex, true);
 		}
 	}
 
@@ -114,6 +149,10 @@
 		const encodedUrl = encodeURI(url);
 		console.log("[AudioPlayer] Updating source to:", encodedUrl);
 		isAudioReady = false;
+		currentTime = 0;
+		duration = 0;
+		progressBarWidth = 0;
+		indicatorPosition = 0;
 
 		if (audio) {
 			audio.pause();
@@ -133,14 +172,21 @@
 			});
 			audio.addEventListener('canplay', () => {
 				isAudioReady = true;
+				if (shouldAutoplayOnLoad || $isPlaying) {
+					audio.play().catch((e) => {
+						console.error('[AudioPlayer] Autoplay on load failed:', e);
+						isPlaying.set(false);
+					});
+				}
+				shouldAutoplayOnLoad = false;
 			});
 			audio.addEventListener('error', (e) => {
 				console.error("[AudioPlayer] Audio error:", e);
 				isPlaying.set(false);
 				isAudioReady = false;
+				shouldAutoplayOnLoad = false;
 			});
 		}
-		duration = 0;
 	}
 
 	$: if (browser && audio && $isPlaying !== undefined) {
@@ -158,8 +204,7 @@
 
 	$: if ($selectAudio && browser) {
 		const newSelected = $selectAudio;
-		// Check for s3_url (Music), mp3_url (Sermon), or url (Asset)
-		const rawUrl = (newSelected as any).s3_url || (newSelected as any).mp3_url || (newSelected as any).url || '';
+		const rawUrl = getPlayableAudioUrl(newSelected as PlayableAudio);
 		console.log("[AudioPlayer] Selected audio change, raw URL:", rawUrl);
 		
 		if (rawUrl && rawUrl !== audioSrc) {
@@ -235,6 +280,9 @@
 
 		try {
 			if (audio.paused) {
+				if (audio.duration && audio.currentTime >= audio.duration) {
+					audio.currentTime = 0;
+				}
 				await audio.play();
 			} else {
 				audio.pause();
@@ -383,7 +431,7 @@
 	on:touchend={endDrag}
 />
 
-{#if isAudioReady}
+{#if $selectAudio}
 <div class="fixed z-[100] bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-gray-100 shadow-[0_-8px_30px_rgb(0,0,0,0.12)] pb-safe pt-2 md:pt-4 md:pb-4 transition-all duration-300">
 	<!-- Top Progress Bar -->
 <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -431,6 +479,11 @@
 					{/if}
 				</div>
 				</div>
+				{#if !isAudioReady}
+					<div class="text-[10px] font-medium uppercase tracking-[0.15em] text-gray-400 mt-1">
+						Chargement...
+					</div>
+				{/if}
 				<div class="flex items-center gap-2 mt-0.5 md:hidden">
 					<span class="text-[10px] font-medium text-gray-400">{formatTime(currentTime)}</span>
 					<div class="w-1 h-1 rounded-full bg-gray-200"></div>

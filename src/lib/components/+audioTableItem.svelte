@@ -4,7 +4,7 @@
 	import BsCloudDownloadFill from 'svelte-icons-pack/bs/BsCloudDownloadFill';
 	import BsFileEarmarkPdfFill from 'svelte-icons-pack/bs/BsFileEarmarkPdfFill';
 	import BsPlayCircleFill from 'svelte-icons-pack/bs/BsPlayCircleFill';
-	import { selectAudio } from '../stores/global';
+	import { currentIndex, isPlaying, selectAudio } from '../stores/global';
 	import { setContext } from 'svelte';
 	import type { AudioAsset } from '$lib/models/media-assets';
 	import { writable } from 'svelte/store';
@@ -14,6 +14,8 @@
 	export let index: number;
 	const updateSelectAudio = (audio: AudioAsset) => {
 		selectAudio.set(audio); // Set the selectAudio value in the store
+		currentIndex.set(index);
+		isPlaying.set(true);
 	};
 	let downloadProgress = writable(0);
 	let isDownloading = writable(false);

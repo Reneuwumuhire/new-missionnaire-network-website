@@ -13,6 +13,7 @@
 	import SermonTableItem from '$lib/components/SermonTableItem.svelte';
 	import IoPlayCircle from 'svelte-icons-pack/io/IoPlayCircle';
 	import IoReload from 'svelte-icons-pack/io/IoReload';
+	import { createPlayableSermon } from '../../utils/audioPlayback';
 
 	export let data;
 
@@ -29,15 +30,19 @@
 	$: limit = data.limit;
 	$: currentLanguage = data.language || 'french';
 	$: totalPages = Math.ceil(totalSermons / limit);
+	$: playlistSermons = sermons.map((sermon: Sermon) =>
+		createPlayableSermon(sermon, currentLanguage === 'english' ? 'english' : 'french')
+	);
+	const desktopSermonGrid = 'md:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.35fr)_110px_80px_120px]';
 
 	const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 	const authors = ['Tous', 'William Marrion Branham', 'Ewald Frank', 'Eglise Locale'];
 
 	// Sync playlist when sermons are loaded
-	$: if (sermons.length > 0) {
-		basePlaylist.set(sermons);
+	$: if (playlistSermons.length > 0) {
+		basePlaylist.set(playlistSermons);
 		if (!$isShuffle) {
-			playlist.set(sermons);
+			playlist.set(playlistSermons);
 		}
 	}
 
@@ -279,7 +284,7 @@
 			{/if}
 			<div class="bg-white rounded-xl shadow-sm border border-gray-100 min-h-[500px] flex flex-col">
 				<div
-					class="grid grid-cols-[30px_1fr_auto_auto] md:grid-cols-[30px_2.5fr_1.2fr_1fr_auto_auto] gap-2 md:gap-4 px-3 md:px-4 py-3 border-b border-gray-100 text-[10px] md:text-[11px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50/50 rounded-t-xl items-center"
+					class="relative grid grid-cols-[30px_1fr_auto_auto] {desktopSermonGrid} gap-2 md:gap-4 px-3 md:px-4 py-3 border-b border-gray-100 text-[10px] md:text-[11px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50/50 rounded-t-xl items-center"
 				>
 					<div class="text-center">#</div>
 					<button
@@ -315,10 +320,21 @@
 						{/if}
 						Date
 					</button>
-					<div class="flex items-center justify-end gap-3">
+					<button
+						class="hidden md:flex text-center items-center justify-center gap-1.5 hover:text-orange-500 transition-colors"
+						on:click={() => handleSortChange('duration')}
+					>
+						{#if currentSort.startsWith('duration')}
+							<span class="text-orange-500">
+								<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
+							</span>
+						{/if}
+						Durée
+					</button>
+					<div class="flex items-center justify-center text-center">
 						{#if currentSearch || currentAlpha || currentYear || currentHasAudio || (currentAuthor && currentAuthor !== 'Tous')}
 							<button
-								class="flex items-center gap-1.5 text-[9px] font-bold text-orange-500 bg-orange-50 px-2 py-1 rounded-full hover:bg-orange-100 transition-colors normal-case tracking-normal"
+								class="absolute right-3 top-1/2 -translate-y-1/2 md:right-4 flex items-center gap-1.5 text-[9px] font-bold text-orange-500 bg-orange-50 px-2 py-1 rounded-full hover:bg-orange-100 transition-colors normal-case tracking-normal"
 								on:click={() => goto('?')}
 								title="Réinitialiser les filtres"
 							>
@@ -326,7 +342,7 @@
 								<span class="hidden lg:inline">Réinitialiser</span>
 							</button>
 						{/if}
-						<span class="pr-2">Actions</span>
+						<span>Actions</span>
 					</div>
 				</div>
 

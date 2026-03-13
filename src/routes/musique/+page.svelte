@@ -3,6 +3,7 @@
 	import { page } from '$app/stores';
 	import type { MusicAudio } from '$lib/models/music-audio';
 	import type { AudioAsset } from '$lib/models/media-assets';
+	import type { Sermon } from '$lib/models/sermon';
 	import { selectAudio, basePlaylist, playlist, currentIndex, autoNext, isShuffle, isPlaying } from '$lib/stores/global';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
@@ -57,6 +58,8 @@
 		'Impimbano',
 		'Kolwezi'
 	];
+	const desktopMusicGrid =
+		'md:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.2fr)_minmax(0,1fr)_80px_40px_40px]';
 
 	// Sync playlist when songs are loaded
 	$: if (musicList) {
@@ -180,6 +183,7 @@
 	function playSong(song: MusicAudio, index: number) {
 		currentIndex.set(index);
 		selectAudio.set(song);
+		isPlaying.set(true);
 	}
 
 	async function downloadSong(song: MusicAudio) {
@@ -202,9 +206,14 @@
 			window.open(song.s3_url, '_blank');
 		}
 	}
-	function isSongActive(song: MusicAudio, current: MusicAudio | AudioAsset | null) {
+	function isSongActive(song: MusicAudio, current: MusicAudio | AudioAsset | Sermon | null) {
 		if (!current) return false;
-		const activeUrl = 's3_url' in current ? current.s3_url : (current as any).url;
+		const activeUrl =
+			's3_url' in current
+				? current.s3_url
+				: 'mp3_url' in current
+				? current.mp3_url
+				: (current as any).url;
 		const songUrl = 's3_url' in song ? song.s3_url : (song as any).url;
 		return activeUrl === songUrl;
 	}
@@ -330,8 +339,8 @@
 	</div>
 
 	<!-- Songs List -->
-	<div class="bg-white rounded-xl shadow-sm border border-gray-100 min-h-[500px] flex flex-col">
-		<div class="grid grid-cols-[30px_1fr_auto_auto] md:grid-cols-[30px_2.5fr_1.2fr_1fr_80px_auto_auto] gap-2 md:gap-4 px-3 md:px-4 py-3 border-b border-gray-100 text-[10px] md:text-[11px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50/50 rounded-t-xl">
+		<div class="bg-white rounded-xl shadow-sm border border-gray-100 min-h-[500px] flex flex-col">
+		<div class="grid grid-cols-[30px_1fr_auto_auto] {desktopMusicGrid} gap-2 md:gap-4 px-3 md:px-4 py-3 border-b border-gray-100 text-[10px] md:text-[11px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50/50 rounded-t-xl">
 			<div class="text-center">#</div>
 			<button class="text-left flex items-center gap-1.5 hover:text-orange-500 transition-colors" on:click={() => handleSortChange('title')}>
 				{#if currentSort.startsWith('title')}
@@ -437,7 +446,7 @@
 				<!-- svelte-ignore a11y-click-events-have-key-events -->
 				<!-- svelte-ignore a11y-no-static-element-interactions -->
 				<div 
-					class="grid grid-cols-[30px_1fr_auto_auto] md:grid-cols-[30px_2.5fr_1.2fr_1fr_80px_auto_auto] gap-2 md:gap-4 px-3 md:px-4 py-3 md:py-4 items-center transition-all group cursor-pointer {isActive ? 'bg-orange-50/80 border-l-4 border-l-orange-500' : 'hover:bg-gray-50'}"
+					class="grid grid-cols-[30px_1fr_auto_auto] {desktopMusicGrid} gap-2 md:gap-4 px-3 md:px-4 py-3 md:py-4 items-center transition-all group cursor-pointer {isActive ? 'bg-orange-50/80 border-l-4 border-l-orange-500' : 'hover:bg-gray-50'}"
 					on:click={() => playSong(song, i)}
 				>
 					<div class="text-center text-[10px] md:text-xs font-bold {isActive ? 'text-orange-500' : 'text-gray-300'}">
