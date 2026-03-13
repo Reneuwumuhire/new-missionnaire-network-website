@@ -21,6 +21,7 @@
 	export let data;
 
 	$: musicList = (data as any).musicAudio;
+	$: musicPlaylist = (data as any).playlistAudio || musicList;
 	$: artists = (data as any).artists || [];
 	$: currentCategory = (data as any).category;
 	$: currentSearch = (data as any).search;
@@ -35,6 +36,14 @@
 	let isArtistMenuOpen = false;
 	let artistSearch = '';
 	$: filteredArtists = artists.filter((a: string) => a.toLowerCase().includes(artistSearch.toLowerCase()));
+	$: playlistIndexByUrl = new Map<string, number>(
+		(musicPlaylist || []).map((song: MusicAudio, index: number) => [song.s3_url, index])
+	);
+	$: activeMusicSong = isMusicAudio($selectAudio) ? $selectAudio : null;
+	$: activeMusicSongIndex = activeMusicSong ? (playlistIndexByUrl.get(activeMusicSong.s3_url) ?? -1) : -1;
+	$: isActiveMusicSongVisible =
+		!!activeMusicSong && (musicList || []).some((song: MusicAudio) => song.s3_url === activeMusicSong.s3_url);
+	$: activeMusicSongPage = activeMusicSongIndex >= 0 ? Math.floor(activeMusicSongIndex / limit) + 1 : null;
 
 	let searchInput = currentSearch;
 
@@ -62,10 +71,10 @@
 		'md:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.2fr)_minmax(0,1fr)_80px_40px_40px]';
 
 	// Sync playlist when songs are loaded
-	$: if (musicList) {
-		basePlaylist.set(musicList);
+	$: if (musicPlaylist) {
+		basePlaylist.set(musicPlaylist);
 		if (!$isShuffle) {
-			playlist.set(musicList);
+			playlist.set(musicPlaylist);
 		}
 	}
 
@@ -180,10 +189,22 @@
 		goto(`?${params.toString()}`);
 	}
 
-	function playSong(song: MusicAudio, index: number) {
+	function playSong(song: MusicAudio) {
+		const index = playlistIndexByUrl.get(song.s3_url) ?? 0;
 		currentIndex.set(index);
 		selectAudio.set(song);
 		isPlaying.set(true);
+	}
+
+	function isMusicAudio(current: MusicAudio | AudioAsset | Sermon | null): current is MusicAudio {
+		return !!current && 's3_url' in current;
+	}
+
+	function goToActiveSongPage() {
+		if (!activeMusicSongPage || activeMusicSongPage === currentPage) return;
+		const params = new URLSearchParams($page.url.searchParams);
+		params.set('page', activeMusicSongPage.toString());
+		goto(`?${params.toString()}`);
 	}
 
 	async function downloadSong(song: MusicAudio) {
@@ -338,6 +359,45 @@
 		{/if}
 	</div>
 
+	{#if activeMusicSong && !isActiveMusicSongVisible}
+		<div class="mb-4 rounded-2xl border border-orange-200 bg-orange-50/80 px-4 py-3 shadow-sm">
+			<div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+				<div class="min-w-0">
+					<div class="text-[10px] font-black uppercase tracking-[0.2em] text-orange-500">
+						Lecture en cours
+					</div>
+					<div class="mt-1 truncate text-sm font-black text-gray-900">
+						{activeMusicSong.title || 'Sans titre'}
+					</div>
+					<div class="mt-1 text-[11px] font-medium text-gray-500">
+						{activeMusicSong.artist || activeMusicSong.book_full_name || activeMusicSong.category || 'Missionnaire'}
+						{#if activeMusicSongPage}
+							<span class="mx-1 text-gray-300">•</span>
+							<span>Page {activeMusicSongPage}</span>
+						{/if}
+					</div>
+				</div>
+
+				<div class="flex items-center gap-2">
+					<button
+						class="flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-bold text-orange-600 shadow-sm transition-colors hover:bg-orange-100"
+						on:click={() => isPlaying.update((value) => !value)}
+						title={$isPlaying ? 'Pause' : 'Lire'}
+					>
+						<Icon src={$isPlaying ? IoPauseCircle : IoPlayCircle} size="18" />
+						<span>{$isPlaying ? 'Pause' : 'Lire'}</span>
+					</button>
+					<button
+						class="rounded-full border border-orange-200 bg-white px-3 py-2 text-xs font-bold text-gray-700 transition-colors hover:border-orange-300 hover:text-orange-600"
+						on:click={goToActiveSongPage}
+					>
+						Afficher dans la liste
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
+
 	<!-- Songs List -->
 		<div class="bg-white rounded-xl shadow-sm border border-gray-100 min-h-[500px] flex flex-col">
 		<div class="grid grid-cols-[30px_1fr_auto_auto] {desktopMusicGrid} gap-2 md:gap-4 px-3 md:px-4 py-3 border-b border-gray-100 text-[10px] md:text-[11px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50/50 rounded-t-xl">
@@ -447,7 +507,7 @@
 				<!-- svelte-ignore a11y-no-static-element-interactions -->
 				<div 
 					class="grid grid-cols-[30px_1fr_auto_auto] {desktopMusicGrid} gap-2 md:gap-4 px-3 md:px-4 py-3 md:py-4 items-center transition-all group cursor-pointer {isActive ? 'bg-orange-50/80 border-l-4 border-l-orange-500' : 'hover:bg-gray-50'}"
-					on:click={() => playSong(song, i)}
+					on:click={() => playSong(song)}
 				>
 					<div class="text-center text-[10px] md:text-xs font-bold {isActive ? 'text-orange-500' : 'text-gray-300'}">
 						{i + 1 + (currentPage - 1) * limit}
@@ -505,7 +565,7 @@
 								if (isActive) {
 									isPlaying.update(v => !v);
 								} else {
-									playSong(song, i);
+									playSong(song);
 								}
 							}}
 							title={isActive && $isPlaying ? 'Pause' : 'Lire'}

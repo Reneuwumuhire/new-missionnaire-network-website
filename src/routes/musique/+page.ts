@@ -41,11 +41,37 @@ export const load = async ({ fetch, url }) => {
 
 	const response = await fetch(`/api/music-audio?${queryParams.toString()}`);
 	const result = await response.json();
+	const musicAudio = result.data as MusicAudio[];
+	const total = result.total as number;
+	let playlistAudio = musicAudio;
+
+	if (total > musicAudio.length) {
+		const playlistParams = new URLSearchParams({
+			category,
+			search,
+			alpha,
+			artist,
+			pageNumber: '1',
+			limit: total.toString(),
+			sort
+		});
+
+		try {
+			const playlistResponse = await fetch(`/api/music-audio?${playlistParams.toString()}`);
+			if (playlistResponse.ok) {
+				const playlistResult = await playlistResponse.json();
+				playlistAudio = (playlistResult.data as MusicAudio[]) || musicAudio;
+			}
+		} catch (e) {
+			console.error('[Load] Error fetching full music playlist:', e);
+		}
+	}
 
 	return {
-		musicAudio: result.data as MusicAudio[],
+		musicAudio,
+		playlistAudio,
 		artists: artists,
-		total: result.total as number,
+		total,
 		category,
 		search,
 		alpha,
