@@ -361,6 +361,45 @@ export async function queryAudios(options: {
 	}
 }
 
+// Map base characters to regex character classes that match accented variants
+// Include both composed (é) and decomposed (e\u0301) Unicode forms
+const ACCENT_MAP: Record<string, string> = {
+	a: '[a\u00e0\u00e2\u00e4\u00e1\u00e3\u00e5a\u0300a\u0302a\u0308a\u0301]',
+	e: '[e\u00e8\u00e9\u00ea\u00ebe\u0300e\u0301e\u0302e\u0308]',
+	i: '[i\u00ec\u00ed\u00ee\u00efi\u0300i\u0301i\u0302i\u0308]',
+	o: '[o\u00f2\u00f3\u00f4\u00f5\u00f6o\u0300o\u0301o\u0302o\u0308]',
+	u: '[u\u00f9\u00fa\u00fb\u00fcu\u0300u\u0301u\u0302u\u0308]',
+	c: '[c\u00e7c\u0327]',
+	n: '[n\u00f1n\u0303]',
+	y: '[y\u00fd\u00ff]'
+};
+
+function buildFuzzySearchPattern(search: string): string {
+	// Normalize: strip accents to get base characters, then build a regex
+	// where each letter matches its accented variants
+	const normalized = search.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+	let pattern = '';
+	for (const char of normalized) {
+		const lower = char.toLowerCase();
+		if (lower in ACCENT_MAP) {
+			pattern += ACCENT_MAP[lower];
+		} else if (/[a-z0-9]/i.test(char)) {
+			pattern += char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+		} else if (char === "'" || char === '\u2019' || char === '\u2018') {
+			// Match any apostrophe variant or missing apostrophe
+			pattern += "[''ʼ\u2018\u2019]?";
+		} else if (char === ' ') {
+			// Space matches spaces, hyphens, or nothing (for compound words)
+			pattern += "[\\s\\-]?";
+		} else {
+			// Escape other special regex chars
+			pattern += char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+		}
+	}
+	return pattern;
+}
+
 export async function queryMusicAudio(options: {
 	category?: string;
 	search?: string;
@@ -392,13 +431,18 @@ export async function queryMusicAudio(options: {
 		}
 
 		if (search && search.trim()) {
-			conditions.push({
-				$or: [
-					{ title: { $regex: search, $options: 'i' } },
-					{ book_full_name: { $regex: search, $options: 'i' } },
-					{ artist: { $regex: search, $options: 'i' } }
-				]
-			});
+			const searchPattern = buildFuzzySearchPattern(search.trim());
+			const fields = ['title', 'book_full_name', 'artist'];
+			const searchConditions: Record<string, any>[] = [];
+			for (const field of fields) {
+				searchConditions.push({ [field]: { $regex: searchPattern, $options: 'i' } });
+			}
+			// Also search with plain escaped term for exact substring match (in case regex char classes fail)
+			const escaped = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			for (const field of fields) {
+				searchConditions.push({ [field]: { $regex: escaped, $options: 'i' } });
+			}
+			conditions.push({ $or: searchConditions });
 		}
 
 		if (alpha && alpha.length === 1) {
@@ -418,7 +462,9 @@ export async function queryMusicAudio(options: {
 		}
 
 		const skip = (pageNumber - 1) * limit;
-		const total = await db.collection('music_audio').countDocuments(query);
+		const total = await db.collection('music_audio').countDocuments(query, {
+			collation: { locale: 'fr', strength: 1 }
+		});
 
 		const [property, order] = orderBy.split(/[: ,]/);
 

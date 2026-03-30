@@ -12,6 +12,8 @@
 	import BsVolumeMuteFill from 'svelte-icons-pack/bs/BsVolumeMuteFill';
 	import BsX from 'svelte-icons-pack/bs/BsX';
 	import BsShuffle from 'svelte-icons-pack/bs/BsShuffle';
+	import BsHeartFill from 'svelte-icons-pack/bs/BsHeartFill';
+	import BsHeart from 'svelte-icons-pack/bs/BsHeart';
 	import { selectAudio, playlist, basePlaylist, currentIndex, autoNext, isShuffle, isPlaying } from '../stores/global';
 	import type { AudioAsset } from '$lib/models/media-assets';
 	import type { MusicAudio } from '$lib/models/music-audio';
@@ -25,6 +27,7 @@
 		getPlayableAudioUrl,
 		type PlayableAudio
 	} from '../../utils/audioPlayback';
+	import { toggleFavorite, isFavorite, favorites } from '../stores/musicHistory';
 
 	let audio: HTMLAudioElement;
 	let currentTime = 0;
@@ -46,6 +49,26 @@
 		if ('title' in item) return item.title || 'Sans titre';
 		return 'Sans titre';
 	}
+
+	function getAudioFavId(item: any): string {
+		if (!item) return '';
+		return String(item._id || item.s3_url || item.mp3_url || '');
+	}
+
+	function handleToggleFavorite() {
+		if (!$selectAudio) return;
+		const audio = $selectAudio as any;
+		toggleFavorite({
+			_id: getAudioFavId(audio),
+			title: getDisplayTitle(audio),
+			artist: audio.artist,
+			category: audio.category,
+			s3_url: audio.s3_url
+		});
+	}
+
+	$: currentFavId = getAudioFavId($selectAudio);
+	$: isCurrentFavorite = isFavorite(currentFavId, $favorites);
 
 	function handleEnded() {
 		if (!$autoNext || $playlist.length === 0) {
@@ -484,7 +507,16 @@
 					<span class="text-[10px] font-medium text-gray-400">{formatTime(duration)}</span>
 				</div>
 			</div>
-			
+
+			<button
+				class="p-2 rounded-full transition-colors flex-shrink-0 {isCurrentFavorite ? 'text-red-500 hover:text-red-600' : 'text-gray-300 hover:text-red-400'}"
+				on:click={handleToggleFavorite}
+				aria-label={isCurrentFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+				title={isCurrentFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+			>
+				<Icon src={isCurrentFavorite ? BsHeartFill : BsHeart} size="18" />
+			</button>
+
 			<button
 				class="bg-gray-50 hover:bg-gray-100 text-gray-400 hover:text-gray-800 p-2 rounded-full transition-colors md:hidden"
 				on:click={() => {
