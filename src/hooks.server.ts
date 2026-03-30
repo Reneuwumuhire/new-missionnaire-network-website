@@ -9,9 +9,8 @@ import { getFullCountryName } from './utils/countries';
 let lastCheckTime = 0;
 const CHECK_INTERVAL = 15 * 60 * 1000; // 15 minutes to stay within Search API quota
 
-// Radio live state transition tracking
+// Radio live state tracking
 let lastRadioCheckTime = 0;
-let wasRadioLive = false;
 const RADIO_CHECK_INTERVAL = 60 * 1000; // Check radio every 60 seconds
 const RADIO_NOTIFICATION_COOLDOWN = 10 * 60 * 1000; // 10 min cooldown between radio notifications
 
@@ -137,19 +136,18 @@ export const handle: Handle = async ({ event, resolve }) => {
 		lastRadioCheckTime = now;
 		probeLiveAudio(fetch)
 			.then(async (probe) => {
-				if (probe.isLive && !wasRadioLive) {
-					// Use DB-based lock so only one serverless instance sends the notification
+				if (probe.isLive) {
+					// DB-based lock handles dedup across all serverless instances.
+					// No in-memory state needed — the lock ensures only one notification
+					// per cooldown period regardless of cold starts.
 					const canSend = await claimNotificationSlot('radio_live', RADIO_NOTIFICATION_COOLDOWN);
 					if (canSend) {
-						console.log('[Hooks] Radio state transition: offline → live. Sending push.');
+						console.log('[Hooks] Radio is live. Sending push notification.');
 						sendPushToAll(radioLivePayload()).catch((e) =>
 							console.error('[Hooks] Radio push error:', e)
 						);
-					} else {
-						console.log('[Hooks] Radio went live but notification already sent recently — skipping.');
 					}
 				}
-				wasRadioLive = probe.isLive;
 			})
 			.catch((e) => console.error('[Hooks] Radio probe error:', e));
 	}

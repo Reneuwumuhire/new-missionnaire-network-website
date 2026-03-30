@@ -585,6 +585,45 @@ export async function getAllPushSubscriptions(): Promise<PushSubscriptionRecord[
 
 let lockIndexEnsured = false;
 
+async function ensureLockIndex() {
+	if (lockIndexEnsured) return;
+	try {
+		const db = await getDb();
+		const col = db.collection('notification_locks');
+		// Drop duplicate documents first — keep only the most recent per type
+		const pipeline = [
+			{ $sort: { lastSentAt: -1 } },
+			{
+				$group: {
+					_id: '$type',
+					keepId: { $first: '$_id' },
+					allIds: { $push: '$_id' }
+				}
+			},
+			{ $project: { removeIds: { $slice: ['$allIds', 1, { $size: '$allIds' }] } } }
+		];
+		const dupes = await col.aggregate(pipeline).toArray();
+		for (const dupe of dupes) {
+			if (dupe.removeIds.length > 0) {
+				await col.deleteMany({ _id: { $in: dupe.removeIds } });
+				console.log(`[NotifLock] Cleaned ${dupe.removeIds.length} duplicate(s) for type "${dupe._id}"`);
+			}
+		}
+		await col.createIndex({ type: 1 }, { unique: true });
+		lockIndexEnsured = true;
+	} catch (e: any) {
+		// If index creation fails due to existing duplicates, drop and recreate
+		if (e.code === 11000 || e.codeName === 'DuplicateKey') {
+			const db = await getDb();
+			await db.collection('notification_locks').dropIndexes();
+			await db.collection('notification_locks').createIndex({ type: 1 }, { unique: true });
+			lockIndexEnsured = true;
+		} else {
+			console.error('[NotifLock] Index setup error:', e);
+		}
+	}
+}
+
 /**
  * Check whether a push notification of the given type was sent recently.
  * Returns true if it's safe to send (i.e. cooldown has elapsed).
@@ -595,21 +634,13 @@ export async function claimNotificationSlot(
 	type: string,
 	cooldownMs: number
 ): Promise<boolean> {
+	await ensureLockIndex();
+
 	const db = await getDb();
 	const col = db.collection('notification_locks');
-
-	// Ensure unique index once per process (no-op if already exists)
-	if (!lockIndexEnsured) {
-		await col.createIndex({ type: 1 }, { unique: true });
-		lockIndexEnsured = true;
-	}
-
 	const now = Date.now();
 
 	try {
-		// Atomic: only matches if cooldown has elapsed (or doc doesn't exist → upsert).
-		// With the unique index, concurrent upserts for the same type will fail
-		// with error 11000, so only one instance wins.
 		const result = await col.findOneAndUpdate(
 			{
 				type,
@@ -626,7 +657,9 @@ export async function claimNotificationSlot(
 	} catch (e: any) {
 		// Duplicate key error → another instance already claimed the slot
 		if (e.code === 11000) return false;
-		throw e;
+		console.error('[NotifLock] claimNotificationSlot error:', e);
+		// On unexpected errors, allow sending to avoid silent notification blackout
+		return true;
 	}
 }
 

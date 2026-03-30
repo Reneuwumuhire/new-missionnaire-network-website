@@ -127,10 +127,6 @@ export async function checkAndIngestLiveStream() {
 
 			console.log(`[YouTube Poller] Live stream detected via API: ${title} (${videoId})`);
 
-			// Detect state transition: was NOT live → now IS live
-			const previousStatus = getLiveStatus();
-			const wasLive = previousStatus.isLive;
-
 			updateStatus({
 				isLive: true,
 				videoId: videoId,
@@ -142,16 +138,13 @@ export async function checkAndIngestLiveStream() {
 				updatedAt: new Date().toISOString()
 			});
 
-			if (!wasLive) {
-				const canSend = await claimNotificationSlot('youtube_live', YOUTUBE_NOTIFICATION_COOLDOWN);
-				if (canSend) {
-					console.log('[YouTube Poller] State transition: offline → live. Sending push notifications.');
-					sendPushToAll(youtubeLivePayload(title, streamUrl)).catch((e) =>
-						console.error('[YouTube Poller] Push notification error:', e)
-					);
-				} else {
-					console.log('[YouTube Poller] YouTube went live but notification already sent recently — skipping.');
-				}
+			// DB lock handles dedup — no in-memory state needed
+			const canSend = await claimNotificationSlot('youtube_live', YOUTUBE_NOTIFICATION_COOLDOWN);
+			if (canSend) {
+				console.log('[YouTube Poller] YouTube is live. Sending push notifications.');
+				sendPushToAll(youtubeLivePayload(title, streamUrl)).catch((e) =>
+					console.error('[YouTube Poller] Push notification error:', e)
+				);
 			}
 		} else {
 			console.log('[YouTube Poller] No active livestream found via API');
