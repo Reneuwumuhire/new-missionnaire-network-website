@@ -37,7 +37,16 @@ export async function probeLiveAudio(fetchFn: typeof fetch): Promise<LiveAudioPr
 		});
 
 		await response.body?.cancel();
-		const isHealthy = response.ok;
+		const contentType = response.headers.get('content-type') || '';
+		// The upstream server may return 200 even when no source is connected
+		// (e.g. Icecast returns an HTML status page). Only treat it as live
+		// if the response is OK *and* the content is actually audio.
+		const isAudioContent =
+			contentType.startsWith('audio/') ||
+			contentType.includes('mpeg') ||
+			contentType.includes('ogg') ||
+			contentType.includes('aac');
+		const isHealthy = response.ok && isAudioContent;
 		if (isHealthy) {
 			lastHealthyProbeAt = Date.now();
 		}

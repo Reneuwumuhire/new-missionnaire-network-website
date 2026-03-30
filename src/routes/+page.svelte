@@ -1,18 +1,41 @@
 <script lang="ts">
 	import '../app.css';
+	import { browser } from '$app/environment';
+	import { onDestroy, onMount } from 'svelte';
 	import type { YoutubeVideo } from '$lib/models/youtube';
+	import type { LiveStatus } from '$lib/server/youtube-poller';
 	import NotificationBell from '$lib/components/+notificationBell.svelte';
 
 	export let data: {
 		data: YoutubeVideo[];
-		liveStatus?: any;
+		liveStatus?: LiveStatus;
 		radioStatus?: { isLive: boolean; sourceUrl: string };
 	};
 
-	$: radioIsLive = data.radioStatus?.isLive ?? false;
+	let radioIsLive = data.radioStatus?.isLive ?? false;
 	$: recentVideos = (data.data || []).slice(0, 3);
 
-	let bellRef: any;
+	let bellRef: NotificationBell | undefined;
+
+	// Keep the radio banner in sync via SSE so it updates without a page refresh
+	let eventSource: EventSource | null = null;
+
+	onMount(() => {
+		if (!browser) return;
+		eventSource = new EventSource('/api/live/sse');
+		eventSource.onmessage = (event) => {
+			try {
+				const status = JSON.parse(event.data) as { isLive: boolean };
+				radioIsLive = status.isLive;
+			} catch {
+				// ignore parse errors
+			}
+		};
+	});
+
+	onDestroy(() => {
+		eventSource?.close();
+	});
 
 	const quickLinks = [
 		{ label: 'Videos', href: '/videos' },
