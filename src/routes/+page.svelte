@@ -9,6 +9,7 @@
 	import IoRadioOutline from 'svelte-icons-pack/io/IoRadioOutline';
 	import IoDocumentTextOutline from 'svelte-icons-pack/io/IoDocumentTextOutline';
 	import IoImagesOutline from 'svelte-icons-pack/io/IoImagesOutline';
+	import NotificationBell from '$lib/components/+notificationBell.svelte';
 
 	export let data: {
 		data: YoutubeVideo[];
@@ -151,34 +152,36 @@
 
 	<!-- B. Live Radio Callout -->
 	<section class="mb-10">
-		<a
-			href="/live"
-			class="flex items-center gap-4 rounded-2xl border px-5 py-4 transition-all hover:shadow-md {radioIsLive
+		<div
+			class="flex items-center gap-4 rounded-2xl border px-5 py-4 {radioIsLive
 				? 'border-red-200 bg-red-50/60'
 				: 'border-gray-100 bg-white'}"
 		>
-			<span class="relative flex h-3 w-3 shrink-0">
-				{#if radioIsLive}
-					<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"></span>
-					<span class="relative inline-flex h-3 w-3 rounded-full bg-red-500"></span>
-				{:else}
-					<span class="relative inline-flex h-3 w-3 rounded-full bg-gray-300"></span>
-				{/if}
-			</span>
-			<div class="flex-1 min-w-0">
-				<p class="text-sm font-bold text-gray-900">
-					{radioIsLive ? 'Radio en direct' : 'Radio Missionnaire'}
-				</p>
-				<p class="text-xs text-gray-500 truncate">
-					{radioIsLive
-						? 'La radio est en cours de diffusion — Ecouter maintenant'
-						: 'Actuellement hors antenne'}
-				</p>
-			</div>
-			<span class="text-[11px] font-black uppercase tracking-wider {radioIsLive ? 'text-red-600' : 'text-gray-400'}">
-				{radioIsLive ? 'En direct' : 'Hors ligne'}
-			</span>
-		</a>
+			<a href="/live" class="flex items-center gap-4 flex-1 min-w-0 hover:opacity-80 transition-opacity">
+				<span class="relative flex h-3 w-3 shrink-0">
+					{#if radioIsLive}
+						<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"></span>
+						<span class="relative inline-flex h-3 w-3 rounded-full bg-red-500"></span>
+					{:else}
+						<span class="relative inline-flex h-3 w-3 rounded-full bg-gray-300"></span>
+					{/if}
+				</span>
+				<div class="flex-1 min-w-0">
+					<p class="text-sm font-bold text-gray-900">
+						{radioIsLive ? 'Radio en direct' : 'Radio Missionnaire'}
+					</p>
+					<p class="text-xs text-gray-500 truncate">
+						{radioIsLive
+							? 'La radio est en cours de diffusion — Ecouter maintenant'
+							: 'Actuellement hors antenne'}
+					</p>
+				</div>
+				<span class="text-[11px] font-black uppercase tracking-wider shrink-0 {radioIsLive ? 'text-red-600' : 'text-gray-400'}">
+					{radioIsLive ? 'En direct' : 'Hors ligne'}
+				</span>
+			</a>
+			<NotificationBell />
+		</div>
 	</section>
 
 	<!-- C. Services Grid -->

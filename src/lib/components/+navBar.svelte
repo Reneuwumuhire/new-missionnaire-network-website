@@ -62,6 +62,9 @@
 	let isHovered = false;
 	let isFocused = false;
 
+	const searchablePages = ['/videos', '/predications', '/musique', '/literature', '/transcriptions'];
+	$: showSearch = searchablePages.some((p) => $page.url.pathname.startsWith(p));
+
 	$: shouldExpand = isHovered || isFocused || $searchTerm.trim().length > 0;
 	$: showClearButton = $searchTerm.trim().length > 0;
 	$: showPlaceholder = shouldExpand;
@@ -113,51 +116,53 @@
 		<a href="/" class="flex flex-row items-center">
 			<img src="/icons/logo.png" class="w-auto h-8" alt="logo" />
 		</a>
-		<div class=" hidden lg:flex items-center space-x-8">
-			<!-- svelte-ignore a11y-no-static-element-interactions -->
-			<div
-				class="relative inline-block"
-				on:mouseenter={() => (isHovered = true)}
-				on:mouseleave={() => (isHovered = false)}
-			>
-				<form on:submit|preventDefault={handleSubmit}>
-					<div class="flex items-center">
-						<div
-							class="w-10 h-10 rounded-full border-[1px] border-[#ccc] bg-white flex flex-row items-center justify-center transition-all duration-300 ease-in-out"
-							class:w-72={shouldExpand}
-							class:bg-white={shouldExpand}
-							class:border={shouldExpand}
-						>
+		<div class=" hidden lg:flex items-center space-x-4">
+			{#if showSearch}
+				<!-- svelte-ignore a11y-no-static-element-interactions -->
+				<div
+					class="relative inline-block"
+					on:mouseenter={() => (isHovered = true)}
+					on:mouseleave={() => (isHovered = false)}
+				>
+					<form on:submit|preventDefault={handleSubmit}>
+						<div class="flex items-center">
 							<div
-								class="w-6 h-6 rounded-full -mr-9 flex items-center justify-center"
-								class:pl-2={shouldExpand}
+								class="w-10 h-10 rounded-full border-[1px] border-[#ccc] bg-white flex flex-row items-center justify-center transition-all duration-300 ease-in-out"
+								class:w-72={shouldExpand}
+								class:bg-white={shouldExpand}
+								class:border={shouldExpand}
 							>
-								<SearchNormal1 size={12} color="#ccc" variant="Linear" />
-							</div>
-							<input
-								type="text"
-								placeholder={showPlaceholder ? 'Rechercher...' : ''}
-								aria-label="Rechercher"
-								bind:value={$searchTerm}
-								class=" indent-8 px-4 py-2 text-gray-600 bg-transparent outline-none w-full font-normal text-current"
-								on:focus={() => (isFocused = true)}
-								on:blur={() => (isFocused = false)}
-								on:input={handleSearchInput}
-							/>
-							{#if showClearButton}
-								<button
-									type="button"
-									class=" w-6 h-6 rounded-full flex items-center justify-center pr-2"
-									on:click={clearInput}
-									aria-label="Effacer la recherche"
+								<div
+									class="w-6 h-6 rounded-full -mr-9 flex items-center justify-center"
+									class:pl-2={shouldExpand}
 								>
-									<CloseCircle size={80} color="#ccc" variant="Linear" />
-								</button>
-							{/if}
+									<SearchNormal1 size={12} color="#ccc" variant="Linear" />
+								</div>
+								<input
+									type="text"
+									placeholder={showPlaceholder ? 'Rechercher...' : ''}
+									aria-label="Rechercher"
+									bind:value={$searchTerm}
+									class=" indent-8 px-4 py-2 text-gray-600 bg-transparent outline-none w-full font-normal text-current"
+									on:focus={() => (isFocused = true)}
+									on:blur={() => (isFocused = false)}
+									on:input={handleSearchInput}
+								/>
+								{#if showClearButton}
+									<button
+										type="button"
+										class=" w-6 h-6 rounded-full flex items-center justify-center pr-2"
+										on:click={clearInput}
+										aria-label="Effacer la recherche"
+									>
+										<CloseCircle size={80} color="#ccc" variant="Linear" />
+									</button>
+								{/if}
+							</div>
 						</div>
-					</div>
-				</form>
-			</div>
+					</form>
+				</div>
+			{/if}
 			<div class=" flex flex-row space-x-4 justify-between">
 				{#each NavigationLinkList as link, index}
 					<HeaderMenuLink
@@ -199,49 +204,51 @@
 				class="absolute z-50 top-[40px] left-0 w-full h-screen bg-white border-t-2 py-6"
 			>
 				<div class="relative flex flex-col space-y-2 w-full h-full bg-white">
-					<!-- svelte-ignore a11y-no-static-element-interactions -->
-					<div
-						class="relative inline-block self-start ml-4"
-						on:mouseenter={() => (isHovered = true)}
-						on:mouseleave={() => (isHovered = false)}
-					>
-						<form on:submit|preventDefault={handleSubmit}>
-							<div class="flex items-center">
-								<div
-									class="w-72 h-10 rounded-full border-2 boder-[#C9C9C9] bg-gray-50 flex flex-row items-center justify-center transition-all duration-300 ease-in-out"
-									class:bg-white={shouldExpand}
-									class:border={shouldExpand}
-									class:border-gray-300={shouldExpand}
-								>
+					{#if showSearch}
+						<!-- svelte-ignore a11y-no-static-element-interactions -->
+						<div
+							class="relative inline-block self-start ml-4"
+							on:mouseenter={() => (isHovered = true)}
+							on:mouseleave={() => (isHovered = false)}
+						>
+							<form on:submit|preventDefault={handleSubmit}>
+								<div class="flex items-center">
 									<div
-										class="w-6 h-6 rounded-full -mr-9 flex items-center justify-center"
-										class:pl-2={shouldExpand}
+										class="w-72 h-10 rounded-full border-2 boder-[#C9C9C9] bg-gray-50 flex flex-row items-center justify-center transition-all duration-300 ease-in-out"
+										class:bg-white={shouldExpand}
+										class:border={shouldExpand}
+										class:border-gray-300={shouldExpand}
 									>
-										<SearchNormal1 size={20} color="#C9C9C9" variant="Linear" />
-									</div>
-									<input
-										type="text"
-										placeholder="Rechercher..."
-										aria-label="Rechercher"
-										bind:value={$searchTerm}
-										class=" indent-8 px-4 py-2 text-gray-600 bg-transparent outline-none w-full font-light"
-										on:focus={() => (isFocused = true)}
-										on:blur={() => (isFocused = false)}
-									/>
-									{#if showClearButton}
-										<button
-											type="button"
-											class=" w-6 h-6 rounded-full flex items-center justify-center pr-2"
-											on:click={clearInput}
-											aria-label="Effacer la recherche"
+										<div
+											class="w-6 h-6 rounded-full -mr-9 flex items-center justify-center"
+											class:pl-2={shouldExpand}
 										>
-											<CloseCircle size={80} color="#fb923c" variant="Linear" />
-										</button>
-									{/if}
+											<SearchNormal1 size={20} color="#C9C9C9" variant="Linear" />
+										</div>
+										<input
+											type="text"
+											placeholder="Rechercher..."
+											aria-label="Rechercher"
+											bind:value={$searchTerm}
+											class=" indent-8 px-4 py-2 text-gray-600 bg-transparent outline-none w-full font-light"
+											on:focus={() => (isFocused = true)}
+											on:blur={() => (isFocused = false)}
+										/>
+										{#if showClearButton}
+											<button
+												type="button"
+												class=" w-6 h-6 rounded-full flex items-center justify-center pr-2"
+												on:click={clearInput}
+												aria-label="Effacer la recherche"
+											>
+												<CloseCircle size={80} color="#fb923c" variant="Linear" />
+											</button>
+										{/if}
+									</div>
 								</div>
-							</div>
-						</form>
-					</div>
+							</form>
+						</div>
+					{/if}
 					<div class="relative flex flex-col space-y-5 text-3xl px-5">
 						{#each NavigationLinkList as link, index}
 							<HeaderMenuLinkMobo

@@ -34,6 +34,55 @@ sw.addEventListener('activate', (event) => {
 	);
 });
 
+// ── Push Notifications ────────────────────────────────────────────
+
+sw.addEventListener('push', (event) => {
+	if (!event.data) return;
+
+	try {
+		const payload = event.data.json() as {
+			title: string;
+			body: string;
+			url?: string;
+			icon?: string;
+		};
+
+		event.waitUntil(
+			sw.registration.showNotification(payload.title, {
+				body: payload.body,
+				icon: payload.icon || '/favicon.png',
+				badge: '/favicon.png',
+				data: { url: payload.url || '/' }
+			})
+		);
+	} catch (e) {
+		console.error('[SW] Error handling push event:', e);
+	}
+});
+
+sw.addEventListener('notificationclick', (event) => {
+	event.notification.close();
+
+	const url = (event.notification.data?.url as string) || '/';
+
+	event.waitUntil(
+		sw.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+			// Focus an existing tab if one is open on the same origin
+			for (const client of clients) {
+				if (new URL(client.url).origin === sw.location.origin && 'focus' in client) {
+					client.focus();
+					client.navigate(url);
+					return;
+				}
+			}
+			// Otherwise open a new window
+			return sw.clients.openWindow(url);
+		})
+	);
+});
+
+// ── Fetch / Cache ─────────────────────────────────────────────────
+
 sw.addEventListener('fetch', (event) => {
 	if (event.request.method !== 'GET') return;
 

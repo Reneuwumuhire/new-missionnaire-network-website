@@ -1,10 +1,17 @@
 import { connect, getDb } from './db/mongo';
 import { checkAndIngestLiveStream } from './lib/server/youtube-poller';
+import { probeLiveAudio } from '$lib/server/live-audio';
+import { sendPushToAll, radioLivePayload } from '$lib/server/push-notifications';
 import type { Handle } from '@sveltejs/kit';
 import { getFullCountryName } from './utils/countries';
 
 let lastCheckTime = 0;
 const CHECK_INTERVAL = 15 * 60 * 1000; // 15 minutes to stay within Search API quota
+
+// Radio live state transition tracking
+let lastRadioCheckTime = 0;
+let wasRadioLive = false;
+const RADIO_CHECK_INTERVAL = 60 * 1000; // Check radio every 60 seconds
 
 // Initialize MongoDB on server start
 connect()
@@ -121,6 +128,22 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (now - lastCheckTime > CHECK_INTERVAL) {
 		lastCheckTime = now;
 		checkAndIngestLiveStream().catch((e) => console.error('[Hooks] Poller error:', e));
+	}
+
+	// Fire and forget radio live check (throttled)
+	if (now - lastRadioCheckTime > RADIO_CHECK_INTERVAL) {
+		lastRadioCheckTime = now;
+		probeLiveAudio(fetch)
+			.then((probe) => {
+				if (probe.isLive && !wasRadioLive) {
+					console.log('[Hooks] Radio state transition: offline → live. Sending push.');
+					sendPushToAll(radioLivePayload()).catch((e) =>
+						console.error('[Hooks] Radio push error:', e)
+					);
+				}
+				wasRadioLive = probe.isLive;
+			})
+			.catch((e) => console.error('[Hooks] Radio probe error:', e));
 	}
 
 	const response = await resolve(event);

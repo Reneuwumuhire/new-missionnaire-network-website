@@ -1,29 +1,34 @@
 <script lang="ts">
 	import LiveRadioPlayer from '$lib/components/+liveRadioPlayer.svelte';
+	import NotificationBell from '$lib/components/+notificationBell.svelte';
 </script>
 
 <svelte:head>
 	<title>Radio en direct - Missionnaire Network</title>
 </svelte:head>
 
-<section class="w-full py-16 px-4 md:px-8">
-	<div class="max-w-4xl mx-auto">
-		<div
-			class="rounded-3xl bg-gradient-to-br from-neutral-950 to-neutral-800 px-6 py-10 md:px-10 md:py-12 text-white shadow-xl"
-		>
-			<p class="text-xs font-black uppercase tracking-[0.24em] text-orange-300 mb-3">
-				Radio en direct
-			</p>
-			<h1 class="text-3xl md:text-5xl font-black leading-tight">Radio en direct</h1>
-			<p class="mt-4 text-sm md:text-base text-neutral-200 max-w-2xl">
-				Quand le flux est
-				<span class="font-bold text-white">hors ligne</span>,
-				la page surveille automatiquement le signal. Appuyez sur
-				<span class="font-bold text-white">Ecouter</span>.
-			</p>
+<section class="w-full py-10 px-4 md:px-8">
+	<div class="max-w-3xl mx-auto">
+		<!-- Header with notification -->
+		<div class="flex items-start justify-between mb-8">
+			<div>
+				<p class="text-[11px] font-black uppercase tracking-[0.2em] text-orange-600 mb-2">
+					Radio Missionnaire
+				</p>
+				<h1 class="text-2xl md:text-4xl font-black text-gray-900">Radio en direct</h1>
+				<p class="mt-2 text-sm text-gray-500 max-w-lg">
+					La page surveille automatiquement le signal. Des que le direct commence, appuyez sur Lecture.
+				</p>
+			</div>
+			<div class="flex items-center gap-2 shrink-0 mt-1">
+				<NotificationBell />
+				<span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider hidden sm:block">
+					Alertes
+				</span>
+			</div>
 		</div>
-		<div class="mt-8">
-			<LiveRadioPlayer />
-		</div>
+
+		<!-- Player -->
+		<LiveRadioPlayer />
 	</div>
 </section>

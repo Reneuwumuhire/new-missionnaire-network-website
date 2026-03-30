@@ -539,6 +539,46 @@ export async function getVideoById(videoId: string): Promise<YoutubeVideo | null
 	}
 }
 
+// ── Push Subscription helpers ─────────────────────────────────────
+
+export interface PushSubscriptionRecord {
+	endpoint: string;
+	keys: { p256dh: string; auth: string };
+	createdAt: Date;
+	userAgent?: string;
+}
+
+export async function savePushSubscription(
+	subscription: { endpoint: string; keys: { p256dh: string; auth: string } },
+	userAgent?: string
+): Promise<void> {
+	const db = await getDb();
+	const col = db.collection('push_subscriptions');
+	await col.updateOne(
+		{ endpoint: subscription.endpoint },
+		{
+			$set: {
+				keys: subscription.keys,
+				userAgent: userAgent ?? null,
+				createdAt: new Date()
+			}
+		},
+		{ upsert: true }
+	);
+}
+
+export async function removePushSubscription(endpoint: string): Promise<void> {
+	const db = await getDb();
+	const col = db.collection('push_subscriptions');
+	await col.deleteOne({ endpoint });
+}
+
+export async function getAllPushSubscriptions(): Promise<PushSubscriptionRecord[]> {
+	const db = await getDb();
+	const col = db.collection<PushSubscriptionRecord>('push_subscriptions');
+	return col.find({}).toArray();
+}
+
 /**
  * Recursively serializes a MongoDB document, converting all ObjectIds to strings
  * and ensuring the document is fully serializable for SvelteKit data loading.

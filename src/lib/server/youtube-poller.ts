@@ -1,4 +1,5 @@
 import { YOUTUBE_API_KEY } from '$env/static/private';
+import { sendPushToAll, youtubeLivePayload } from './push-notifications';
 
 export type LiveStatus = {
 	isLive: boolean;
@@ -119,8 +120,13 @@ export async function checkAndIngestLiveStream() {
 			const title = item.snippet.title;
 			const description = item.snippet.description;
 			const thumbnail = item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.default?.url;
+			const streamUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
 			console.log(`[YouTube Poller] Live stream detected via API: ${title} (${videoId})`);
+
+			// Detect state transition: was NOT live → now IS live
+			const previousStatus = getLiveStatus();
+			const wasLive = previousStatus.isLive;
 
 			updateStatus({
 				isLive: true,
@@ -129,9 +135,16 @@ export async function checkAndIngestLiveStream() {
 				description: description,
 				thumbnail: thumbnail,
 				duration: 0,
-				url: `https://www.youtube.com/watch?v=${videoId}`,
+				url: streamUrl,
 				updatedAt: new Date().toISOString()
 			});
+
+			if (!wasLive) {
+				console.log('[YouTube Poller] State transition: offline → live. Sending push notifications.');
+				sendPushToAll(youtubeLivePayload(title, streamUrl)).catch((e) =>
+					console.error('[YouTube Poller] Push notification error:', e)
+				);
+			}
 		} else {
 			console.log('[YouTube Poller] No active livestream found via API');
 			if (data.error) {

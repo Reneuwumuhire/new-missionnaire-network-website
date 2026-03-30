@@ -21,7 +21,7 @@ Youtube -->
 		<!-- div for links -->
 		<div>
 			<ul
-				class="flex flex-col md:flex-row items-center justify-center gap-x-6 gap-y-4 md:space-x-4 font-normal text-sm md:text-base flex-wrap"
+				class="grid grid-cols-2 md:flex md:flex-row items-center justify-center gap-x-4 gap-y-5 md:space-x-4 font-normal text-sm md:text-base flex-wrap text-center"
 			>
 				<li>
 					<a href="/eglise" class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out">L'église</a>
