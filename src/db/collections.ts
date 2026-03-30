@@ -1,6 +1,6 @@
 import { getDb } from './mongo';
 import { availableTypesTag } from '../utils/data';
-import { ObjectId } from 'mongodb';
+import { ObjectId, type Document, type Filter, type Sort } from 'mongodb';
 import type { YoutubeVideo } from '$lib/models/youtube';
 import type { AudioAsset } from '$lib/models/media-assets';
 import type { MusicAudio } from '$lib/models/music-audio';
@@ -68,8 +68,8 @@ export async function getCollection(
 
 	try {
 		const db = await getDb();
-		const query: Record<string, any> = {};
-		const conditions: Record<string, any>[] = [];
+		const query: Filter<Document> = {};
+		const conditions: Filter<Document>[] = [];
 
 		// Add search condition if provided
 		if (search?.trim()) {
@@ -141,7 +141,7 @@ export async function getCollection(
 		console.log(`[DB] Found ${data.length} documents`);
 
 		// Convert MongoDB documents to plain objects and stringify all ObjectIds recursively
-		return data.map((doc) => serializeDocument(doc));
+		return data.map((doc) => serializeDocument<YoutubeVideo>(doc));
 	} catch (error) {
 		console.error('[DB] Error in getCollection:', error);
 		throw error;
@@ -167,7 +167,7 @@ export async function getLiveVideos(): Promise<YoutubeVideo[]> {
 			}
 		}
 
-		return data.map((doc) => serializeDocument(doc));
+		return data.map((doc) => serializeDocument<YoutubeVideo>(doc));
 	} catch (error) {
 		console.error('[DB] Error in getLiveVideos:', error);
 		throw error;
@@ -184,7 +184,7 @@ export async function getUpcomingVideos(limit = 20): Promise<YoutubeVideo[]> {
 			.limit(limit)
 			.toArray();
 
-		return data.map((doc) => serializeDocument(doc));
+		return data.map((doc) => serializeDocument<YoutubeVideo>(doc));
 	} catch (error) {
 		console.error('[DB] Error in getUpcomingVideos:', error);
 		throw error;
@@ -200,12 +200,13 @@ export async function getVideosByDuration(options: {
 	const { minDuration, maxDuration, limit = 20, skip = 0 } = options;
 	try {
 		const db = await getDb();
-		const query: Record<string, any> = {};
+		const query: Filter<Document> = {};
 
 		if (minDuration !== undefined || maxDuration !== undefined) {
-			query.duration = {};
-			if (minDuration !== undefined) query.duration.$gte = minDuration;
-			if (maxDuration !== undefined) query.duration.$lte = maxDuration;
+			const dur: Filter<Document> = {};
+			if (minDuration !== undefined) dur.$gte = minDuration;
+			if (maxDuration !== undefined) dur.$lte = maxDuration;
+			query.duration = dur;
 		}
 
 		const data = await db
@@ -216,7 +217,7 @@ export async function getVideosByDuration(options: {
 			.limit(limit)
 			.toArray();
 
-		return data.map((doc) => serializeDocument(doc));
+		return data.map((doc) => serializeDocument<YoutubeVideo>(doc));
 	} catch (error) {
 		console.error('[DB] Error in getVideosByDuration:', error);
 		throw error;
@@ -232,12 +233,13 @@ export async function getVideosWithAudio(options: {
 	const { limit = 20, skip = 0, maxDuration, minDuration } = options;
 	try {
 		const db = await getDb();
-		const query: Record<string, any> = { audioFiles: { $exists: true, $ne: null } };
+		const query: Filter<Document> = { audioFiles: { $exists: true, $ne: null } };
 
 		if (maxDuration !== undefined || minDuration !== undefined) {
-			query.duration = {};
-			if (maxDuration !== undefined) query.duration.$lte = maxDuration;
-			if (minDuration !== undefined) query.duration.$gte = minDuration;
+			const dur: Filter<Document> = {};
+			if (maxDuration !== undefined) dur.$lte = maxDuration;
+			if (minDuration !== undefined) dur.$gte = minDuration;
+			query.duration = dur;
 		}
 
 		const data = await db
@@ -248,7 +250,7 @@ export async function getVideosWithAudio(options: {
 			.limit(limit)
 			.toArray();
 
-		return data.map((doc) => serializeDocument(doc));
+		return data.map((doc) => serializeDocument<YoutubeVideo>(doc));
 	} catch (error) {
 		console.error('[DB] Error in getVideosWithAudio:', error);
 		throw error;
@@ -274,7 +276,7 @@ export async function queryVideos(options: {
 
 	try {
 		const db = await getDb();
-		const query: Record<string, any> = {};
+		const query: Filter<Document> = {};
 
 		if (searchTags && searchTags.length > 0 && !searchTags.includes('any')) {
 			const regexPatterns = searchTags.map((tag) => new RegExp(`^${tag}$`, 'i'));
@@ -288,7 +290,7 @@ export async function queryVideos(options: {
 		}
 
 		const [property, order] = orderBy.split(/[: ,]/);
-		const sort: Record<string, any> = {};
+		const sort: Sort = {};
 		sort[property] = order === 'asc' ? 1 : -1;
 
 		const skip = (pageNumber - 1) * limit;
@@ -301,7 +303,7 @@ export async function queryVideos(options: {
 			.limit(limit)
 			.toArray();
 
-		return data.map((doc) => serializeDocument(doc));
+		return data.map((doc) => serializeDocument<YoutubeVideo>(doc));
 	} catch (error) {
 		console.error('[DB] Error in queryVideos:', error);
 		throw error;
@@ -327,7 +329,7 @@ export async function queryAudios(options: {
 
 	try {
 		const db = await getDb();
-		const query: Record<string, any> = {};
+		const query: Filter<Document> = {};
 
 		if (searchTags && searchTags.length > 0 && !searchTags.includes('any')) {
 			const regexPatterns = searchTags.map((tag) => new RegExp(`^${tag}$`, 'i'));
@@ -341,7 +343,7 @@ export async function queryAudios(options: {
 		}
 
 		const [property, order] = orderBy.split(/[: ,]/);
-		const sort: Record<string, any> = {};
+		const sort: Sort = {};
 		sort[property] = order === 'asc' ? 1 : -1;
 
 		const skip = (pageNumber - 1) * limit;
@@ -354,7 +356,7 @@ export async function queryAudios(options: {
 			.limit(limit)
 			.toArray();
 
-		return data.map((doc) => serializeDocument(doc));
+		return data.map((doc) => serializeDocument<AudioAsset>(doc));
 	} catch (error) {
 		console.error('[DB] Error in queryAudios:', error);
 		throw error;
@@ -430,8 +432,8 @@ export async function queryMusicAudio(options: {
 
 	try {
 		const db = await getDb();
-		const query: Record<string, any> = {};
-		const conditions: Record<string, any>[] = [];
+		const query: Filter<Document> = {};
+		const conditions: Filter<Document>[] = [];
 
 		if (category && category !== 'All') {
 			conditions.push({ category: category });
@@ -440,7 +442,7 @@ export async function queryMusicAudio(options: {
 		if (search && search.trim()) {
 			const searchPattern = buildFuzzySearchPattern(search.trim());
 			const fields = ['title', 'book_full_name', 'artist'];
-			const searchConditions: Record<string, any>[] = [];
+			const searchConditions: Filter<Document>[] = [];
 			for (const field of fields) {
 				searchConditions.push({ [field]: { $regex: searchPattern, $options: 'i' } });
 			}
@@ -482,7 +484,7 @@ export async function queryMusicAudio(options: {
 				.aggregate([{ $match: query }, { $sample: { size: limit } }])
 				.toArray();
 		} else {
-			const sort: Record<string, any> = {};
+			const sort: Sort = {};
 			sort[property] = order === 'asc' ? 1 : -1;
 			data = await db
 				.collection('music_audio')
@@ -495,7 +497,7 @@ export async function queryMusicAudio(options: {
 		}
 
 		return {
-			data: data.map((doc) => serializeDocument(doc)),
+			data: data.map((doc) => serializeDocument<MusicAudio>(doc)),
 			total
 		};
 	} catch (error) {
@@ -532,7 +534,7 @@ export async function getVideoById(videoId: string): Promise<YoutubeVideo | null
 			doc = await collection.findOne({ _id: new ObjectId(videoId) });
 		}
 
-		return doc ? serializeDocument(doc) : null;
+		return doc ? serializeDocument<YoutubeVideo>(doc) : null;
 	} catch (error) {
 		console.error('[DB] Error in getVideoById:', error);
 		return null;
@@ -586,40 +588,34 @@ export async function getAllPushSubscriptions(): Promise<PushSubscriptionRecord[
  * @param doc The document or value to serialize
  * @returns A serialized version of the document with all ObjectIds converted to strings
  */
-function serializeDocument(doc: any): any {
-	// Handle null/undefined
+function serializeDocument<T = unknown>(doc: unknown): T {
 	if (doc == null) {
-		return doc;
+		return doc as T;
 	}
 
-	// Handle ObjectId (this is the key part that fixes the serialization issue)
 	if (doc instanceof ObjectId) {
-		return doc.toString();
+		return doc.toString() as T;
 	}
 
-	// Handle Date objects
 	if (doc instanceof Date) {
-		return doc.toISOString();
+		return doc.toISOString() as T;
 	}
 
-	// Handle arrays
 	if (Array.isArray(doc)) {
-		return doc.map((item) => serializeDocument(item));
+		return doc.map((item) => serializeDocument(item)) as T;
 	}
 
-	// Handle objects (but not special types like Buffer)
-	if (typeof doc === 'object' && doc.constructor === Object) {
-		const result: Record<string, any> = {};
-		for (const key in doc) {
-			if (Object.hasOwn(doc, key)) {
-				result[key] = serializeDocument(doc[key]);
+	if (typeof doc === 'object' && (doc as object).constructor === Object) {
+		const result: Record<string, unknown> = {};
+		for (const key in doc as Record<string, unknown>) {
+			if (Object.hasOwn(doc as object, key)) {
+				result[key] = serializeDocument((doc as Record<string, unknown>)[key]);
 			}
 		}
-		return result;
+		return result as T;
 	}
 
-	// Return primitives and other types as is
-	return doc;
+	return doc as T;
 }
 
 export async function getSongs(options: {
@@ -630,7 +626,7 @@ export async function getSongs(options: {
 	const { limit = 20, skip = 0, search } = options;
 	try {
 		const db = await getDb();
-		const query: Record<string, any> = {};
+		const query: Filter<Document> = {};
 
 		if (search?.trim()) {
 			query.$or = [
@@ -647,7 +643,7 @@ export async function getSongs(options: {
 			.limit(limit)
 			.toArray();
 
-		return data.map((doc) => serializeDocument(doc));
+		return data.map((doc) => serializeDocument<YoutubeVideo>(doc));
 	} catch (error) {
 		console.error('[DB] Error in getSongs:', error);
 		throw error;
@@ -657,7 +653,7 @@ export async function getSongs(options: {
 export async function getSongsCount(search?: string): Promise<number> {
 	try {
 		const db = await getDb();
-		const query: Record<string, any> = {};
+		const query: Filter<Document> = {};
 
 		if (search?.trim()) {
 			query.$or = [
@@ -698,8 +694,8 @@ export async function querySermons(options: {
 
 	try {
 		const db = await getDb();
-		const query: Record<string, any> = {};
-		const conditions: Record<string, any>[] = [];
+		const query: Filter<Document> = {};
+		const conditions: Filter<Document>[] = [];
 
 		if (author && author !== 'All' && author !== 'Tous') {
 			conditions.push({ author: author });
@@ -752,7 +748,7 @@ export async function querySermons(options: {
 		const total = await db.collection('sermons').countDocuments(query);
 
 		const [property, order] = orderBy.split(/[: ,]/);
-		const sort: Record<string, any> = {};
+		const sort: Sort = {};
 		sort[property] = order === 'asc' ? 1 : -1;
 
 		const data = await db
@@ -764,7 +760,7 @@ export async function querySermons(options: {
 			.toArray();
 
 		return {
-			data: data.map((doc) => serializeDocument(doc)),
+			data: data.map((doc) => serializeDocument<Sermon>(doc)),
 			total
 		};
 	} catch (error) {
@@ -817,8 +813,8 @@ export async function queryLiterature(options: {
 
 	try {
 		const db = await getDb();
-		const query: Record<string, any> = {};
-		const conditions: Record<string, any>[] = [];
+		const query: Filter<Document> = {};
+		const conditions: Filter<Document>[] = [];
 
 		if (author && author !== 'All' && author !== 'Tous') {
 			conditions.push({ author: author });
@@ -856,7 +852,7 @@ export async function queryLiterature(options: {
 		const total = await db.collection('literature').countDocuments(query);
 
 		const [property, order] = orderBy.split(/[: ,]/);
-		const sort: Record<string, any> = {};
+		const sort: Sort = {};
 		sort[property] = order === 'asc' ? 1 : -1;
 
 		const data = await db
@@ -868,7 +864,7 @@ export async function queryLiterature(options: {
 			.toArray();
 
 		return {
-			data: data.map((doc) => serializeDocument(doc)),
+			data: data.map((doc) => serializeDocument<Literature>(doc)),
 			total
 		};
 	} catch (error) {
