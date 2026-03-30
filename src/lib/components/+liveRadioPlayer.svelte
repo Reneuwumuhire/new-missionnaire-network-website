@@ -27,8 +27,9 @@
 	let retryTimer: ReturnType<typeof setTimeout> | null = null;
 	let retryCount = 0;
 	let userWantsToPlay = false;
+	let isReconnecting = false;
 
-	const OFFLINE_THRESHOLD = 6; // 30s of offline probes before giving up (was 3 = 15s)
+	const OFFLINE_THRESHOLD = 6; // 30s of offline probes before marking offline
 	const MAX_RETRY_DELAY = 30_000;
 	const streamUrl = '/api/live/audio';
 
@@ -51,23 +52,26 @@
 			isLive = true;
 			hasError = false;
 
-			// If user was playing and stream recovered, auto-reconnect
-			if (userWantsToPlay && !isPlaying && !isBuffering) {
-				reconnectAudio();
+			if (isPlaying) {
+				// Audio is already playing — don't touch it, just update status text
+				statusKey = 'listening';
+			} else if (isBuffering || isReconnecting) {
+				// Already connecting — let it finish, don't restart
+				statusKey = 'connecting';
+			} else if (userWantsToPlay) {
+				// User was playing but audio died and no retry is pending — reconnect
+				if (!retryTimer) {
+					scheduleRetry();
+				}
 			} else {
-				statusKey = isPlaying
-					? 'listening'
-					: isBuffering
-						? 'connecting'
-						: 'availablePressPlay';
+				statusKey = 'availablePressPlay';
 			}
 		} else {
 			offlineStreak += 1;
 
 			if (isPlaying || isBuffering) {
 				// Don't kill playback from status probes — the audio stream
-				// might still be flowing even if the probe endpoint is slow.
-				// Only update the status text as a hint.
+				// and the probe are independent connections.
 				if (offlineStreak >= OFFLINE_THRESHOLD) {
 					statusKey = 'unstableReconnecting';
 				}
@@ -75,6 +79,7 @@
 				isLive = false;
 				statusKey = 'offline';
 				userWantsToPlay = false;
+				clearRetryTimer();
 			} else {
 				statusKey = 'waiting';
 			}
@@ -82,36 +87,37 @@
 	}
 
 	function getRetryDelay(): number {
-		// Exponential backoff: 2s, 4s, 8s, 16s, 30s cap
 		return Math.min(2000 * Math.pow(2, retryCount), MAX_RETRY_DELAY);
 	}
 
 	function reconnectAudio() {
-		if (!audio || !isLive) return;
+		if (!audio || !isLive || isReconnecting) return;
 
 		clearRetryTimer();
+		isReconnecting = true;
 		isBuffering = true;
 		statusKey = 'reconnecting';
 
-		// Append cache-buster to force a fresh stream connection
 		audio.src = `${streamUrl}?t=${Date.now()}`;
 		audio.load();
 		audio.play().catch((err) => {
 			console.error('[LiveRadio] Reconnect play error:', err);
+			isReconnecting = false;
 			scheduleRetry();
 		});
 	}
 
 	function scheduleRetry() {
 		if (!userWantsToPlay || !isLive) return;
+		if (retryTimer) return; // already scheduled
 
-		clearRetryTimer();
 		const delay = getRetryDelay();
 		retryCount++;
 		console.log(`[LiveRadio] Scheduling retry #${retryCount} in ${delay}ms`);
 		statusKey = 'reconnecting';
 
 		retryTimer = setTimeout(() => {
+			retryTimer = null;
 			if (userWantsToPlay && isLive) {
 				reconnectAudio();
 			}
@@ -140,13 +146,11 @@
 		};
 
 		eventSource.onerror = () => {
-			// EventSource auto-reconnects; just update status while disconnected
 			if (!isPlaying && !isBuffering) {
 				statusKey = 'waiting';
 			}
 		};
 
-		// Handle mobile returning from background / screen unlock
 		document.addEventListener('visibilitychange', handleVisibilityChange);
 	});
 
@@ -162,9 +166,10 @@
 		if (document.visibilityState !== 'visible') return;
 		if (!userWantsToPlay || !audio) return;
 
-		// When returning from background, check if audio died
 		if (audio.paused || audio.ended) {
 			console.log('[LiveRadio] Returned from background, audio stopped. Reconnecting...');
+			isReconnecting = false; // reset so reconnectAudio can proceed
+			retryCount = 0;
 			reconnectAudio();
 		}
 	}
@@ -181,19 +186,21 @@
 				}
 				hasError = false;
 				isBuffering = true;
+				isReconnecting = true;
 				userWantsToPlay = true;
 				retryCount = 0;
-				// Cache-buster ensures fresh stream connection
 				audio.src = `${streamUrl}?t=${Date.now()}`;
 				audio.load();
 				await audio.play();
 			} else {
 				userWantsToPlay = false;
+				isReconnecting = false;
 				clearRetryTimer();
 				audio.pause();
 			}
 		} catch (error) {
 			console.error('[LiveRadio] Playback error:', error);
+			isReconnecting = false;
 			hasError = true;
 			isPlaying = false;
 			statusKey = 'cannotPlay';
@@ -210,6 +217,7 @@
 	const handlePlay = () => {
 		isPlaying = true;
 		isBuffering = false;
+		isReconnecting = false;
 		hasError = false;
 		isLive = true;
 		offlineStreak = 0;
@@ -221,16 +229,18 @@
 		isPlaying = false;
 		isBuffering = false;
 
-		// Only update status if user intentionally paused
 		if (!userWantsToPlay) {
+			// User intentionally paused
+			isReconnecting = false;
 			if (isLive) {
 				statusKey = 'availablePressPlay';
 			}
-		} else {
+		} else if (!isReconnecting) {
 			// Unexpected pause (network drop, buffer underrun) — retry
 			console.log('[LiveRadio] Unexpected pause, scheduling retry');
 			scheduleRetry();
 		}
+		// If isReconnecting is true, a new play() is already in flight — don't schedule another retry
 	};
 
 	const handleWaiting = () => {
@@ -248,9 +258,9 @@
 	const handleError = () => {
 		isPlaying = false;
 		isBuffering = false;
+		isReconnecting = false;
 
 		if (userWantsToPlay && isLive) {
-			// Auto-retry on error instead of giving up
 			console.log('[LiveRadio] Audio error, scheduling retry');
 			scheduleRetry();
 		} else {
@@ -260,8 +270,7 @@
 	};
 
 	const handleStalled = () => {
-		// Stream stalled (no data flowing) — nudge a reconnect if user wants to play
-		if (userWantsToPlay && isLive && !isBuffering) {
+		if (userWantsToPlay && isLive && !isBuffering && !isReconnecting) {
 			console.log('[LiveRadio] Stream stalled, scheduling retry');
 			scheduleRetry();
 		}

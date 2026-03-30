@@ -21,7 +21,7 @@ const POLL_INTERVAL_MS = 5_000;
 interface BrokerState {
 	listeners: Set<Listener>;
 	timer: ReturnType<typeof setInterval> | null;
-	lastStatus: RadioStatusEvent;
+	lastStatus: RadioStatusEvent | null;
 }
 
 const globalAny = globalThis as any;
@@ -31,7 +31,9 @@ function getBroker(): BrokerState {
 		globalAny[GLOBAL_KEY] = {
 			listeners: new Set<Listener>(),
 			timer: null,
-			lastStatus: { isLive: false, checkedAt: new Date().toISOString() }
+			// Start with null — we don't know the status yet.
+			// Don't send a stale isLive:false to new clients.
+			lastStatus: null as RadioStatusEvent | null
 		};
 	}
 	return globalAny[GLOBAL_KEY];
@@ -46,7 +48,7 @@ async function poll() {
 			checkedAt: new Date().toISOString()
 		};
 
-		const changed = event.isLive !== broker.lastStatus.isLive;
+		const changed = broker.lastStatus === null || event.isLive !== broker.lastStatus.isLive;
 		broker.lastStatus = event;
 
 		// Broadcast to all listeners (always send so clients know we're alive,
@@ -93,8 +95,11 @@ export function subscribe(listener: Listener): () => void {
 	broker.listeners.add(listener);
 	ensurePolling();
 
-	// Send current status immediately so client doesn't have to wait
-	listener(broker.lastStatus);
+	// Only send current status if we've completed at least one real poll.
+	// Avoids sending a stale isLive:false that would flip to true moments later.
+	if (broker.lastStatus) {
+		listener(broker.lastStatus);
+	}
 
 	// Return unsubscribe function
 	return () => {
@@ -103,6 +108,6 @@ export function subscribe(listener: Listener): () => void {
 	};
 }
 
-export function getLastStatus(): RadioStatusEvent {
+export function getLastStatus(): RadioStatusEvent | null {
 	return getBroker().lastStatus;
 }
