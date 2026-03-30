@@ -141,7 +141,7 @@
 	<div class="flex flex-col gap-8 mb-12">
 		<div>
 			<h2
-				class="text-[10px] md:text-xs font-black text-orange-500 uppercase tracking-[0.2em] mb-4 text-center md:text-left"
+				class="text-[10px] md:text-xs font-black text-orange-600 uppercase tracking-[0.2em] mb-4 text-center md:text-left"
 			>
 				Par ordre alphabétique
 			</h2>
@@ -149,7 +149,7 @@
 				{#each alphabet as letter}
 					<button
 						class="text-sm md:text-base font-bold transition-all {currentAlpha === letter
-							? 'text-orange-500 scale-110'
+							? 'text-orange-600 scale-110'
 							: 'text-gray-300 hover:text-orange-400'}"
 						on:click={() => handleAlphaChange(letter)}
 					>
@@ -161,7 +161,7 @@
 
 		<div>
 			<h2
-				class="text-[10px] md:text-xs font-black text-orange-500 uppercase tracking-[0.2em] mb-4 text-center md:text-left"
+				class="text-[10px] md:text-xs font-black text-orange-600 uppercase tracking-[0.2em] mb-4 text-center md:text-left"
 			>
 				Prédicateurs
 			</h2>
@@ -173,7 +173,7 @@
 							!currentAuthor) ||
 						currentAuthor === author
 							? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20'
-							: 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-500'} {$navigating
+							: 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-600'} {$navigating
 							? 'opacity-50 cursor-not-allowed'
 							: ''}"
 						on:click={() => !$navigating && handleAuthorChange(author)}
@@ -188,7 +188,7 @@
 		<!-- Language and Audio Filters -->
 		<div>
 			<h2
-				class="text-[10px] md:text-xs font-black text-orange-500 uppercase tracking-[0.2em] mb-4 text-center md:text-left"
+				class="text-[10px] md:text-xs font-black text-orange-600 uppercase tracking-[0.2em] mb-4 text-center md:text-left"
 			>
 				Options
 			</h2>
@@ -251,7 +251,7 @@
 								class="px-3 py-2 rounded-lg text-[11px] font-bold transition-all border text-center {currentYear ===
 								year
 									? 'bg-orange-500 text-white border-orange-500 shadow-md'
-									: 'bg-white text-gray-400 border-gray-100 hover:border-orange-200 hover:text-orange-500'} {$navigating
+									: 'bg-white text-gray-400 border-gray-100 hover:border-orange-200 hover:text-orange-600'} {$navigating
 									? 'opacity-50 cursor-not-allowed'
 									: ''}"
 								on:click={() => !$navigating && handleYearChange(year)}
@@ -272,7 +272,7 @@
 					class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-20 flex items-center justify-center rounded-xl transition-all duration-300"
 				>
 					<div class="flex flex-col items-center gap-4">
-						<div class="text-orange-500 animate-spin">
+						<div class="text-orange-600 animate-spin">
 							<Icon src={IoReload} size="32" />
 						</div>
 						<span
@@ -288,44 +288,44 @@
 				>
 					<div class="text-center">#</div>
 					<button
-						class="text-left flex items-center gap-1.5 hover:text-orange-500 transition-colors"
+						class="text-left flex items-center gap-1.5 hover:text-orange-600 transition-colors"
 						on:click={() => handleSortChange('french_title')}
 					>
 						{#if currentSort.startsWith('french_title')}
-							<span class="text-orange-500">
+							<span class="text-orange-600">
 								<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
 							</span>
 						{/if}
 						Titre
 					</button>
 					<button
-						class="hidden md:flex text-left items-center gap-1.5 hover:text-orange-500 transition-colors"
+						class="hidden md:flex text-left items-center gap-1.5 hover:text-orange-600 transition-colors"
 						on:click={() => handleSortChange('author')}
 					>
 						{#if currentSort.startsWith('author')}
-							<span class="text-orange-500">
+							<span class="text-orange-600">
 								<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
 							</span>
 						{/if}
 						Prédicateur
 					</button>
 					<button
-						class="hidden md:flex text-left items-center gap-1.5 hover:text-orange-500 transition-colors"
+						class="hidden md:flex text-left items-center gap-1.5 hover:text-orange-600 transition-colors"
 						on:click={() => handleSortChange('iso_date')}
 					>
 						{#if currentSort.startsWith('iso_date')}
-							<span class="text-orange-500">
+							<span class="text-orange-600">
 								<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
 							</span>
 						{/if}
 						Date
 					</button>
 					<button
-						class="hidden md:flex text-center items-center justify-center gap-1.5 hover:text-orange-500 transition-colors"
+						class="hidden md:flex text-center items-center justify-center gap-1.5 hover:text-orange-600 transition-colors"
 						on:click={() => handleSortChange('duration')}
 					>
 						{#if currentSort.startsWith('duration')}
-							<span class="text-orange-500">
+							<span class="text-orange-600">
 								<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
 							</span>
 						{/if}
@@ -334,7 +334,7 @@
 					<div class="flex items-center justify-center text-center">
 						{#if currentSearch || currentAlpha || currentYear || currentHasAudio || (currentAuthor && currentAuthor !== 'Tous')}
 							<button
-								class="absolute right-3 top-1/2 -translate-y-1/2 md:right-4 flex items-center gap-1.5 text-[9px] font-bold text-orange-500 bg-orange-50 px-2 py-1 rounded-full hover:bg-orange-100 transition-colors normal-case tracking-normal"
+								class="absolute right-3 top-1/2 -translate-y-1/2 md:right-4 flex items-center gap-1.5 text-[9px] font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded-full hover:bg-orange-100 transition-colors normal-case tracking-normal"
 								on:click={() => goto('?')}
 								title="Réinitialiser les filtres"
 							>

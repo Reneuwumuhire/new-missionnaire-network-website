@@ -61,7 +61,7 @@
 					<div
 						role="button"
 						tabindex="0"
-						class="bg-white/90 text-orange-500 p-4 rounded-full shadow-2xl transform translate-y-4 group-hover:translate-y-0 opacity-0 group-hover:opacity-100 transition-all duration-300 backdrop-blur-sm hover:scale-110 active:scale-95"
+						class="bg-white/90 text-orange-600 p-4 rounded-full shadow-2xl transform translate-y-4 group-hover:translate-y-0 opacity-0 group-hover:opacity-100 transition-all duration-300 backdrop-blur-sm hover:scale-110 active:scale-95"
 						on:click|stopPropagation={() => isPlaying = true}
 						on:keydown|stopPropagation={(e) => e.key === 'Enter' && (isPlaying = true)}
 						title="Lire cette vidéo"
@@ -92,7 +92,7 @@
 
 	<!-- Content -->
 	<div class="p-5 flex flex-col flex-grow">
-		<h3 class="text-lg font-black text-gray-800 line-clamp-2 leading-tight mb-3 group-hover:text-orange-500 transition-colors">
+		<h3 class="text-lg font-black text-gray-800 line-clamp-2 leading-tight mb-3 group-hover:text-orange-600 transition-colors">
 			{videoData.title}
 		</h3>
 
@@ -101,7 +101,7 @@
 				{showFullDescription ? videoData.description : truncatedDescription}
 				{#if videoData.description.length > maxDescriptionLength}
 					<button
-						class="text-orange-500 hover:text-orange-600 font-bold ml-1 text-xs uppercase tracking-wider"
+						class="text-orange-600 hover:text-orange-600 font-bold ml-1 text-xs uppercase tracking-wider"
 						on:click|stopPropagation={() => (showFullDescription = !showFullDescription)}
 					>
 						{showFullDescription ? 'Moins' : 'Plus...'}
@@ -125,7 +125,7 @@
 			</div>
 			
 			<div class="opacity-0 group-hover:opacity-100 transition-opacity">
-				<span class="text-[10px] font-black text-orange-500 uppercase tracking-[0.2em]">Lire</span>
+				<span class="text-[10px] font-black text-orange-600 uppercase tracking-[0.2em]">Lire</span>
 			</div>
 		</div>
 	</div>

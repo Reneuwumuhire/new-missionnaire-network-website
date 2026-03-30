@@ -492,7 +492,7 @@
 		<!-- Info Row -->
 		<div class="flex items-center justify-between mb-3 md:mb-0 md:flex-1 md:min-w-0">
 			<div class="flex-1 min-w-0">
-				<div class="text-[10px] uppercase tracking-[0.2em] font-bold text-orange-500 mb-0.5 opacity-80">Lecture en cours</div>
+				<div class="text-[10px] uppercase tracking-[0.2em] font-bold text-orange-600 mb-0.5 opacity-80">Lecture en cours</div>
 				<div class="font-black text-sm md:text-lg text-gray-900 truncate pr-4" title={getDisplayTitle($selectAudio)}>
 					{getDisplayTitle($selectAudio)}
 				</div>
@@ -537,7 +537,7 @@
 				<div class="flex md:hidden items-center gap-1">
 					<button 
 						on:click={toggleShuffle} 
-						class="p-2 transition-all {$isShuffle ? 'text-orange-500' : 'text-gray-300'}"
+						class="p-2 transition-all {$isShuffle ? 'text-orange-600' : 'text-gray-300'}"
 					>
 						<Icon src={BsShuffle} size="16" />
 					</button>
@@ -573,7 +573,7 @@
 				<div class="flex md:hidden items-center gap-1">
 					<button 
 						on:click={toggleAutoNext} 
-						class="p-2 transition-all {$autoNext ? 'text-orange-500 bg-orange-50 rounded-lg' : 'text-gray-300'}"
+						class="p-2 transition-all {$autoNext ? 'text-orange-600 bg-orange-50 rounded-lg' : 'text-gray-300'}"
 						title={$autoNext ? 'Lecture auto activée' : 'Lecture auto désactivée'}
 					>
 						<Icon src={RiMediaPlayList2Fill} size="18" />

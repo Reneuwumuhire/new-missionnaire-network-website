@@ -84,7 +84,7 @@
 				<div class="w-full bg-red-50 rounded-2xl border border-red-100 p-8 text-center">
 					<p class="text-red-600 font-medium text-sm">Impossible de charger les statistiques.</p>
 					<button
-						class="mt-3 text-sm text-orange-500 hover:text-orange-600 font-bold"
+						class="mt-3 text-sm text-orange-600 hover:text-orange-600 font-bold"
 						on:click={() => { statsLoading = true; statsError = false; fetch('/api/analytics').then(r => r.ok ? r.json() : Promise.reject()).then(d => { stats = d; }).catch(() => { statsError = true; }).finally(() => { statsLoading = false; }); }}
 					>
 						Reessayer

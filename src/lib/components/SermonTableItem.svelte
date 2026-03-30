@@ -141,7 +141,7 @@
 	<!-- Index -->
 	<div
 		class="text-center text-[10px] md:text-xs font-bold {isActive
-			? 'text-orange-500'
+			? 'text-orange-600'
 			: 'text-gray-300'}"
 	>
 		{absoluteIndex}
@@ -153,7 +153,7 @@
 			href={sermonHref}
 			class="text-sm font-bold line-clamp-1 transition-colors {isActive
 				? 'text-orange-600'
-				: 'text-gray-800 group-hover:text-orange-500'} hover:underline underline-offset-2"
+				: 'text-gray-800 group-hover:text-orange-600'} hover:underline underline-offset-2"
 			on:click|stopPropagation
 		>
 			{#if language === 'english'}
@@ -199,7 +199,7 @@
 		{sermon.full_date_code}
 	</div>
 
-	<div class="hidden md:block text-center text-xs font-mono {isActive ? 'text-orange-500' : 'text-gray-400'}">
+	<div class="hidden md:block text-center text-xs font-mono {isActive ? 'text-orange-600' : 'text-gray-400'}">
 		{formatDuration(resolvedDuration)}
 	</div>
 
@@ -217,7 +217,7 @@
 
 		{#if (language === 'english' && sermon.english_audio_url) || (language !== 'english' && sermon.mp3_url)}
 			<button
-				class="p-2 text-gray-400 hover:text-orange-500 transition-colors"
+				class="p-2 text-gray-400 hover:text-orange-600 transition-colors"
 				on:click|stopPropagation={downloadMp3}
 				title="Télécharger MP3"
 			>
@@ -229,7 +229,7 @@
 			<button
 				class="hover:scale-110 active:scale-95 transition-all p-2 {isActive
 					? 'text-orange-600'
-					: 'text-orange-500'}"
+					: 'text-orange-600'}"
 				on:click|stopPropagation={togglePlay}
 				title={isActive && $isPlaying ? 'Pause' : 'Lire'}
 			>

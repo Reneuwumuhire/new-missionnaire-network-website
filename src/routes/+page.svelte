@@ -279,7 +279,7 @@
 		<section class="mb-8 rounded-2xl border border-gray-200 bg-white p-4 md:p-6 shadow-sm">
 			<div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
 				<div>
-					<p class="text-[11px] font-black uppercase tracking-[0.2em] text-orange-500 mb-2">
+					<p class="text-[11px] font-black uppercase tracking-[0.2em] text-orange-600 mb-2">
 						Missionnaire Network
 					</p>
 					<h1 class="text-xl md:text-3xl font-black text-gray-900 leading-tight">
@@ -419,7 +419,7 @@
 					<section id="recent-publications" class="mb-12 scroll-mt-36">
 						<div class="flex items-end justify-between mb-8 px-2">
 							<div>
-								<h2 class="text-xs font-black text-orange-500 uppercase tracking-[0.2em] mb-2">
+								<h2 class="text-xs font-black text-orange-600 uppercase tracking-[0.2em] mb-2">
 									Découvrir
 								</h2>
 								<h3 class="text-2xl md:text-3xl font-bold text-gray-900">Vidéos Récentes</h3>
@@ -464,7 +464,7 @@
 					<div class="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-5">
 						<div>
 							<h2
-								class="text-xs md:text-sm font-black uppercase tracking-[0.2em] text-orange-500 mb-2"
+								class="text-xs md:text-sm font-black uppercase tracking-[0.2em] text-orange-600 mb-2"
 							>
 								Nouveautés
 							</h2>
@@ -472,7 +472,7 @@
 						</div>
 						<a
 							href="/predications"
-							class="text-[11px] font-black uppercase tracking-wider text-gray-500 hover:text-orange-500 transition-colors"
+							class="text-[11px] font-black uppercase tracking-wider text-gray-500 hover:text-orange-600 transition-colors"
 						>
 							Voir toutes les prédications
 						</a>
@@ -502,7 +502,7 @@
 										href={resourceUrl}
 										target={isExternalUrl(resourceUrl) ? '_blank' : undefined}
 										rel={isExternalUrl(resourceUrl) ? 'noopener noreferrer' : undefined}
-										class="block text-base font-bold text-gray-900 hover:text-orange-500 transition-colors line-clamp-2"
+										class="block text-base font-bold text-gray-900 hover:text-orange-600 transition-colors line-clamp-2"
 									>
 										{video.title}
 									</a>
@@ -513,7 +513,7 @@
 										href={resourceUrl}
 										target={isExternalUrl(resourceUrl) ? '_blank' : undefined}
 										rel={isExternalUrl(resourceUrl) ? 'noopener noreferrer' : undefined}
-										class="inline-flex mt-4 text-[11px] font-black uppercase tracking-wider text-orange-500 hover:text-orange-600 transition-colors"
+										class="inline-flex mt-4 text-[11px] font-black uppercase tracking-wider text-orange-600 hover:text-orange-600 transition-colors"
 									>
 										Consulter
 									</a>

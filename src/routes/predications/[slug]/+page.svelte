@@ -173,11 +173,11 @@
 	{#if previewPdfUrl}
 		<section id="pdf-preview" class="mt-10 scroll-mt-28">
 			<div class="flex flex-col gap-2 mb-3 sm:flex-row sm:items-center sm:justify-between">
-				<h2 class="text-sm font-black uppercase tracking-[0.2em] text-orange-500">Aperçu PDF</h2>
+				<h2 class="text-sm font-black uppercase tracking-[0.2em] text-orange-600">Aperçu PDF</h2>
 				<a
 					href={previewPdfUrl}
 					target="_blank" rel="noopener noreferrer"
-					class="text-[11px] font-black uppercase tracking-wider text-gray-500 hover:text-orange-500 transition-colors"
+					class="text-[11px] font-black uppercase tracking-wider text-gray-500 hover:text-orange-600 transition-colors"
 				>
 					Ouvrir dans un nouvel onglet
 				</a>
@@ -211,7 +211,7 @@
 					href="/predications/{related.slug}"
 					class="bg-white border border-gray-100 rounded-xl p-4 hover:border-orange-200 hover:shadow-sm transition-all group"
 				>
-					<div class="text-sm font-bold text-gray-800 group-hover:text-orange-500 transition-colors line-clamp-2">
+					<div class="text-sm font-bold text-gray-800 group-hover:text-orange-600 transition-colors line-clamp-2">
 						{related.french_title || related.english_title || 'Sans titre'}
 					</div>
 					<div class="flex items-center gap-2 mt-2 text-[10px] text-gray-400 font-medium">

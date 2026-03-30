@@ -274,11 +274,11 @@
 <div class="container mx-auto px-2 md:px-4 py-8 max-w-5xl">
 	<!-- Alpha Filter -->
 	<div class="mb-10">
-		<h2 class="text-[10px] md:text-xs font-black text-orange-500 uppercase tracking-[0.2em] mb-4">Par ordre alphabétique</h2>
+		<h2 class="text-[10px] md:text-xs font-black text-orange-600 uppercase tracking-[0.2em] mb-4">Par ordre alphabétique</h2>
 		<div class="flex flex-wrap gap-x-4 gap-y-2">
 			{#each alphabet as letter}
 				<button 
-					class="text-sm md:text-base font-bold transition-all {currentAlpha === letter ? 'text-orange-500 scale-110' : 'text-gray-300 hover:text-orange-400'}"
+					class="text-sm md:text-base font-bold transition-all {currentAlpha === letter ? 'text-orange-600 scale-110' : 'text-gray-300 hover:text-orange-400'}"
 					on:click={() => handleAlphaChange(letter)}
 				>
 					{letter}
@@ -288,11 +288,11 @@
 	</div>
 
 	<div class="mb-12">
-		<h2 class="text-[10px] md:text-xs font-black text-orange-500 uppercase tracking-[0.2em] mb-4">Recueils</h2>
+		<h2 class="text-[10px] md:text-xs font-black text-orange-600 uppercase tracking-[0.2em] mb-4">Recueils</h2>
 		<div class="flex overflow-x-auto pb-4 gap-3 no-scrollbar -mx-4 px-4 md:mx-0 md:px-0 md:pb-0" style="scrollbar-width: none; -ms-overflow-style: none;">
 			{#each categories as category}
 				<button 
-					class="flex-shrink-0 px-5 py-2.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all border {currentCategory === category ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-500'}"
+					class="flex-shrink-0 px-5 py-2.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all border {currentCategory === category ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-600'}"
 					on:click={() => handleCategoryChange(category)}
 				>
 					{category === 'All' ? 'Tout Voir' : category}
@@ -387,7 +387,7 @@
 		<div class="mb-4 rounded-2xl border border-orange-200 bg-orange-50/80 px-4 py-3 shadow-sm">
 			<div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
 				<div class="min-w-0">
-					<div class="text-[10px] font-black uppercase tracking-[0.2em] text-orange-500">
+					<div class="text-[10px] font-black uppercase tracking-[0.2em] text-orange-600">
 						Lecture en cours
 					</div>
 					<div class="mt-1 truncate text-sm font-black text-gray-900">
@@ -436,7 +436,7 @@
 			{/if}
 			{#if $recentlyPlayed.length > 0}
 				<button
-					class="flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-bold uppercase tracking-wider transition-colors {showRecent ? 'border-orange-200 bg-orange-50 text-orange-600' : 'border-gray-200 bg-white text-gray-500 hover:border-orange-200 hover:text-orange-500'}"
+					class="flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-bold uppercase tracking-wider transition-colors {showRecent ? 'border-orange-200 bg-orange-50 text-orange-600' : 'border-gray-200 bg-white text-gray-500 hover:border-orange-200 hover:text-orange-600'}"
 					on:click={() => { showRecent = !showRecent; showFavorites = false; }}
 				>
 					<Icon src={BsClockHistory} size="12" />
@@ -468,7 +468,7 @@
 								class="flex-1 min-w-0 text-left"
 								on:click={() => { if (favSong) playSong(favSong); }}
 							>
-								<div class="text-sm font-bold text-gray-800 group-hover:text-orange-500 transition-colors truncate">{fav.title}</div>
+								<div class="text-sm font-bold text-gray-800 group-hover:text-orange-600 transition-colors truncate">{fav.title}</div>
 								<div class="flex items-center gap-2">
 									{#if fav.artist}
 										<span class="text-[10px] text-gray-400">{fav.artist}</span>
@@ -509,7 +509,7 @@
 								class="flex-1 min-w-0 text-left"
 								on:click={() => { if (recentSong) playSong(recentSong); }}
 							>
-								<div class="text-sm font-bold text-gray-800 group-hover:text-orange-500 transition-colors truncate">{recent.title}</div>
+								<div class="text-sm font-bold text-gray-800 group-hover:text-orange-600 transition-colors truncate">{recent.title}</div>
 								{#if recent.artist}
 									<span class="text-[10px] text-gray-400">{recent.artist}</span>
 								{/if}
@@ -525,17 +525,17 @@
 		<div class="bg-white rounded-xl shadow-sm border border-gray-100 min-h-[500px] flex flex-col">
 		<div class="grid grid-cols-[30px_1fr_auto_auto] {desktopMusicGrid} gap-2 md:gap-4 px-3 md:px-4 py-3 border-b border-gray-100 text-[10px] md:text-[11px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50/50 rounded-t-xl">
 			<div class="text-center">#</div>
-			<button class="text-left flex items-center gap-1.5 hover:text-orange-500 transition-colors" on:click={() => handleSortChange('title')}>
+			<button class="text-left flex items-center gap-1.5 hover:text-orange-600 transition-colors" on:click={() => handleSortChange('title')}>
 				{#if currentSort.startsWith('title')}
-					<span class="text-orange-500">
+					<span class="text-orange-600">
 						<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
 					</span>
 				{/if}
 				Titre
 			</button>
-			<button class="hidden md:flex text-left items-center gap-1.5 hover:text-orange-500 transition-colors" on:click={() => handleSortChange('category')}>
+			<button class="hidden md:flex text-left items-center gap-1.5 hover:text-orange-600 transition-colors" on:click={() => handleSortChange('category')}>
 				{#if currentSort.startsWith('category')}
-					<span class="text-orange-500">
+					<span class="text-orange-600">
 						<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
 					</span>
 				{/if}
@@ -543,11 +543,11 @@
 			</button>
 			<div class="hidden md:flex relative items-center gap-1.5">
 				<button 
-					class="hover:text-orange-500 transition-colors flex items-center gap-1.5"
+					class="hover:text-orange-600 transition-colors flex items-center gap-1.5"
 					on:click={() => isArtistMenuOpen = !isArtistMenuOpen}
 				>
 					{#if currentSort.startsWith('artist')}
-						<span class="text-orange-500 font-bold">
+						<span class="text-orange-600 font-bold">
 							<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
 						</span>
 					{/if}
@@ -603,9 +603,9 @@
 					<div class="fixed inset-0 z-40" on:click={() => isArtistMenuOpen = false}></div>
 				{/if}
 			</div>
-			<button class="hidden md:flex text-center items-center justify-center gap-1.5 hover:text-orange-500 transition-colors" on:click={() => handleSortChange('duration')}>
+			<button class="hidden md:flex text-center items-center justify-center gap-1.5 hover:text-orange-600 transition-colors" on:click={() => handleSortChange('duration')}>
 				{#if currentSort.startsWith('duration')}
-					<span class="text-orange-500">
+					<span class="text-orange-600">
 						<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
 					</span>
 				{/if}
@@ -615,7 +615,7 @@
 			<div class="w-10 text-center"></div>
 			<div class="w-10 text-center flex items-center justify-center">
 				<button 
-					class="hover:scale-110 active:scale-95 transition-all {currentSort.startsWith('random') ? 'text-orange-500' : 'text-gray-300 hover:text-orange-400'}"
+					class="hover:scale-110 active:scale-95 transition-all {currentSort.startsWith('random') ? 'text-orange-600' : 'text-gray-300 hover:text-orange-400'}"
 					on:click={() => handleSortChange('random')}
 					title="Mélanger la liste"
 				>
@@ -633,11 +633,11 @@
 					class="grid grid-cols-[30px_1fr_auto_auto] {desktopMusicGrid} gap-2 md:gap-4 px-3 md:px-4 py-3 md:py-4 items-center transition-all group cursor-pointer {isActive ? 'bg-orange-50/80 border-l-4 border-l-orange-500' : 'hover:bg-gray-50'}"
 					on:click={() => playSong(song)}
 				>
-					<div class="text-center text-[10px] md:text-xs font-bold {isActive ? 'text-orange-500' : 'text-gray-300'}">
+					<div class="text-center text-[10px] md:text-xs font-bold {isActive ? 'text-orange-600' : 'text-gray-300'}">
 						{i + 1 + (currentPage - 1) * limit}
 					</div>
 					<div class="flex flex-col min-w-0">
-						<div class="text-sm font-bold line-clamp-1 transition-colors {isActive ? 'text-orange-600' : 'text-gray-800 group-hover:text-orange-500'}">
+						<div class="text-sm font-bold line-clamp-1 transition-colors {isActive ? 'text-orange-600' : 'text-gray-800 group-hover:text-orange-600'}">
 							{song.title || 'Sans titre'}
 						</div>
 						<div class="flex flex-row items-center gap-2 md:hidden overflow-hidden text-ellipsis whitespace-nowrap">
@@ -647,7 +647,7 @@
 							{#if song.artist}
 								<span class="text-[10px] text-gray-300">•</span>
 								<button 
-									class="text-[10px] font-medium italic transition-colors {isActive ? 'text-orange-300 hover:text-orange-500' : 'text-gray-400 hover:text-orange-500'} {currentArtist === song.artist ? 'text-orange-500 underline' : ''}"
+									class="text-[10px] font-medium italic transition-colors {isActive ? 'text-orange-300 hover:text-orange-600' : 'text-gray-400 hover:text-orange-600'} {currentArtist === song.artist ? 'text-orange-600 underline' : ''}"
 									on:click|stopPropagation={() => handleArtistChange(song.artist || '')}
 								>
 									{song.artist}
@@ -661,7 +661,7 @@
 					<div class="hidden md:block text-xs font-medium line-clamp-1 italic {isActive ? 'text-orange-300' : 'text-gray-400'}">
 						{#if song.artist}
 							<button 
-								class="hover:text-orange-500 transition-colors cursor-pointer {currentArtist === song.artist ? 'text-orange-500 font-bold underline' : ''}"
+								class="hover:text-orange-600 transition-colors cursor-pointer {currentArtist === song.artist ? 'text-orange-600 font-bold underline' : ''}"
 								on:click|stopPropagation={() => handleArtistChange(song.artist || '')}
 							>
 								{song.artist}
@@ -670,7 +670,7 @@
 							-
 						{/if}
 					</div>
-					<div class="hidden md:block text-center text-xs font-mono {isActive ? 'text-orange-500' : 'text-gray-400'}">
+					<div class="hidden md:block text-center text-xs font-mono {isActive ? 'text-orange-600' : 'text-gray-400'}">
 						{song['duration'] ? formatTime(song['duration']) : '--:--'}
 					</div>
 					<div class="w-8 text-center hidden md:block">
@@ -684,7 +684,7 @@
 					</div>
 					<div class="w-10 text-center">
 						<button
-							class="transition-colors p-2 {isActive ? 'text-orange-400 hover:text-orange-600' : 'text-gray-400 hover:text-orange-500'}"
+							class="transition-colors p-2 {isActive ? 'text-orange-400 hover:text-orange-600' : 'text-gray-400 hover:text-orange-600'}"
 							on:click|stopPropagation={() => downloadSong(song)}
 							title="Télécharger"
 						>
@@ -693,7 +693,7 @@
 					</div>
 					<div class="w-10 text-center">
 						<button
-							class="hover:scale-110 active:scale-95 transition-all p-2 {isActive ? 'text-orange-600' : 'text-orange-500'}"
+							class="hover:scale-110 active:scale-95 transition-all p-2 {isActive ? 'text-orange-600' : 'text-orange-600'}"
 							on:click|stopPropagation={() => {
 								if (isActive) {
 									isPlaying.update(v => !v);

@@ -48,7 +48,7 @@
 		<div class="relative header-predications flex flex-col items-center justify-center w-full min-h-[400px]">
 			<div class="absolute inset-0 overlay-predications flex items-center justify-center pt-12 pb-24 md:py-12">
 				<div class="flex flex-col items-center text-white space-y-2 px-5 w-full max-w-4xl text-center">
-					<small class="text-orange-500 uppercase tracking-[0.2em] font-black text-xs mb-2">
+					<small class="text-orange-600 uppercase tracking-[0.2em] font-black text-xs mb-2">
 						Tous les prédications
 					</small>
 					<h1 class="text-4xl md:text-6xl font-black mb-1">Branham, Ewald Frank et Locales</h1>
@@ -99,7 +99,7 @@
 		backdrop-filter: blur(2px);
 		-webkit-backdrop-filter: blur(2px);
 	}
-	:global(.text-orange-500) { color: #f97316; }
+	:global(.text-orange-600) { color: #f97316; }
 	:global(.bg-orange-500) { background-color: #f97316; }
 	:global(.hover\:bg-orange-600:hover) { background-color: #ea580c; }
 </style>

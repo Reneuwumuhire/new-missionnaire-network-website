@@ -196,14 +196,14 @@
 			<div class="flex items-center gap-6">
 				<button
 					on:click={playAll}
-					class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-orange-500 hover:text-orange-600 transition-all active:scale-95"
+					class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-orange-600 hover:text-orange-600 transition-all active:scale-95"
 				>
 					<Icon src={BsPlayCircleFill} size="16" />
 					Tout Lire
 				</button>
 				<button
 					on:click={shuffleAll}
-					class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-orange-500 transition-all active:scale-95"
+					class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-orange-600 transition-all active:scale-95"
 				>
 					<Icon src={BsShuffle} size="14" />
 					Aléatoire
@@ -248,14 +248,14 @@
 					<div
 						class="animate-spin rounded-full h-10 w-10 border-t-4 border-b-4 border-orange-500"
 					/>
-					<p class="text-[10px] font-black text-orange-500 uppercase tracking-widest">
+					<p class="text-[10px] font-black text-orange-600 uppercase tracking-widest">
 						Chargement...
 					</p>
 				{:else}
 					<!-- Manual fallback button just in case -->
 					<button
 						on:click={loadMoreVideos}
-						class="text-[10px] font-black text-gray-400 hover:text-orange-500 uppercase tracking-widest transition-colors"
+						class="text-[10px] font-black text-gray-400 hover:text-orange-600 uppercase tracking-widest transition-colors"
 					>
 						Charger plus de vidéos
 					</button>
@@ -281,7 +281,7 @@
 					searchInput = '';
 					handleSearch();
 				}}
-				class="mt-6 text-orange-500 font-bold hover:underline"
+				class="mt-6 text-orange-600 font-bold hover:underline"
 			>
 				Voir tout
 			</button>

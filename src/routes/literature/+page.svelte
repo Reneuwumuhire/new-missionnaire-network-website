@@ -150,7 +150,7 @@
 		<!-- Authors Filter -->
 		<div>
 			<h2
-				class="text-[10px] md:text-xs font-black text-orange-500 uppercase tracking-[0.2em] mb-4 text-left"
+				class="text-[10px] md:text-xs font-black text-orange-600 uppercase tracking-[0.2em] mb-4 text-left"
 			>
 				Auteurs
 			</h2>
@@ -162,7 +162,7 @@
 							!currentAuthor) ||
 						currentAuthor === author
 							? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20'
-							: 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-500'}"
+							: 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-600'}"
 						on:click={() => handleAuthorChange(author)}
 					>
 						{author === 'Tous' ? 'Tout le monde' : author}
@@ -175,7 +175,7 @@
 		{#if currentAuthor !== 'William Marrion Branham'}
 			<div>
 				<h2
-					class="text-[10px] md:text-xs font-black text-orange-500 uppercase tracking-[0.2em] mb-4 text-left"
+					class="text-[10px] md:text-xs font-black text-orange-600 uppercase tracking-[0.2em] mb-4 text-left"
 				>
 					Types
 				</h2>
@@ -187,7 +187,7 @@
 								!currentType) ||
 							currentType === cat
 								? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20'
-								: 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-500'}"
+								: 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-600'}"
 							on:click={() => handleTypeChange(cat)}
 						>
 							{#if cat === 'All'}
@@ -209,7 +209,7 @@
 		{#if currentAuthor === 'Ewald Frank' && currentType === 'circular_letter'}
 			<div>
 				<h2
-					class="text-[10px] md:text-xs font-black text-orange-500 uppercase tracking-[0.2em] mb-4 text-left"
+					class="text-[10px] md:text-xs font-black text-orange-600 uppercase tracking-[0.2em] mb-4 text-left"
 				>
 					Sources
 				</h2>
@@ -221,7 +221,7 @@
 								currentSource === 'All') ||
 							currentSource === src
 								? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20'
-								: 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-500'}"
+								: 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-600'}"
 							on:click={() => handleSourceChange(src)}
 						>
 							{#if src === 'All'}
@@ -242,7 +242,7 @@
 		<!-- Language Filter -->
 		<div>
 			<h2
-				class="text-[10px] md:text-xs font-black text-orange-500 uppercase tracking-[0.2em] mb-4 text-left"
+				class="text-[10px] md:text-xs font-black text-orange-600 uppercase tracking-[0.2em] mb-4 text-left"
 			>
 				Langues
 			</h2>
@@ -252,7 +252,7 @@
 						class="px-5 py-2.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all border {currentLanguage ===
 						lang.id
 							? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20'
-							: 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-500'}"
+							: 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-600'}"
 						on:click={() => handleLanguageChange(lang.id)}
 					>
 						{lang.name}
@@ -278,7 +278,7 @@
 
 			{#if currentSearch || (currentAuthor && currentAuthor !== 'Tous') || (currentType && currentType !== 'All') || (currentSource && currentSource !== 'All')}
 				<button
-					class="flex items-center gap-2 text-orange-500 font-bold text-xs uppercase tracking-widest hover:text-orange-600 transition-colors"
+					class="flex items-center gap-2 text-orange-600 font-bold text-xs uppercase tracking-widest hover:text-orange-600 transition-colors"
 					on:click={() => goto('?')}
 				>
 					<Icon src={BsX} size="18" />
@@ -295,7 +295,7 @@
 				class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-20 flex items-center justify-center rounded-xl transition-all duration-300"
 			>
 				<div class="flex flex-col items-center gap-4">
-					<div class="text-orange-500 animate-spin">
+					<div class="text-orange-600 animate-spin">
 						<Icon src={IoReload} size="32" />
 					</div>
 					<span
@@ -325,7 +325,7 @@
 							{:else}
 								<div class="text-center p-6">
 									<div
-										class="w-16 h-16 mx-auto bg-orange-100 text-orange-500 rounded-full flex items-center justify-center mb-4"
+										class="w-16 h-16 mx-auto bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mb-4"
 									>
 										<Icon src={IoBookOutline} size="32" />
 									</div>
@@ -405,7 +405,7 @@
 						#
 					</div>
 					<button
-						class="text-left flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-orange-500 transition-colors"
+						class="text-left flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-orange-600 transition-colors"
 						on:click={() => handleSortChange('title')}
 					>
 						TITRE
@@ -413,12 +413,12 @@
 							<Icon
 								src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp}
 								size="12"
-								className="text-orange-500"
+								className="text-orange-600"
 							/>
 						{/if}
 					</button>
 					<button
-						class="hidden md:flex text-left items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-orange-500 transition-colors"
+						class="hidden md:flex text-left items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-orange-600 transition-colors"
 						on:click={() => handleSortChange('author')}
 					>
 						AUTEUR
@@ -426,7 +426,7 @@
 							<Icon
 								src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp}
 								size="12"
-								className="text-orange-500"
+								className="text-orange-600"
 							/>
 						{/if}
 					</button>
@@ -467,7 +467,7 @@
 										</p>
 										{#if item.description.length > 100}
 											<button
-												class="text-[10px] font-bold text-orange-500 hover:text-orange-600 mt-1 uppercase tracking-wider"
+												class="text-[10px] font-bold text-orange-600 hover:text-orange-600 mt-1 uppercase tracking-wider"
 												on:click={() => toggleDescription(item._id)}
 											>
 												{expandedItems.has(item._id || '') ? 'Voir moins' : 'Voir plus'}

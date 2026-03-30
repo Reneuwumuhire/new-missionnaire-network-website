@@ -77,7 +77,7 @@
 						{#if image}
 							<img src={image} class="w-full h-full object-cover" alt={subName} />
 						{:else if icon}
-							<div class="text-orange-500">
+							<div class="text-orange-600">
 								<Icon src={icon} size="20" />
 							</div>
 						{/if}
