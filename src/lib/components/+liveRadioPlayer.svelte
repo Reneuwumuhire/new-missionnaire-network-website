@@ -30,6 +30,12 @@
 	let probeReachable = false; // SSE probe says the endpoint responds with audio
 	let confirmedLive = false; // Audio element has successfully played
 
+	// Auto-reconnect state
+	let reconnectAttempts = 0;
+	let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+	const MAX_RECONNECT_ATTEMPTS = 5;
+	const RECONNECT_DELAYS = [2000, 4000, 6000, 10000, 15000]; // escalating backoff
+
 	const OFFLINE_THRESHOLD = 6;
 	const streamUrl = '/api/live/audio';
 
@@ -77,6 +83,10 @@
 				hasError = false;
 				statusKey = 'offline';
 
+				// Cancel any pending reconnect — stream is confirmed offline
+				clearReconnectTimer();
+				reconnectAttempts = 0;
+
 				if (isPlaying || isBuffering || userWantsToPlay) {
 					isPlaying = false;
 					isBuffering = false;
@@ -120,6 +130,7 @@
 
 	onDestroy(() => {
 		eventSource?.close();
+		clearReconnectTimer();
 		if (browser) {
 			document.removeEventListener('visibilitychange', handleVisibilityChange);
 		}
@@ -129,16 +140,52 @@
 		if (document.visibilityState !== 'visible') return;
 		if (!userWantsToPlay || !audio) return;
 
-		// Returned from background — if audio died, let user know
+		// Returned from background — if audio died, reconnect
 		if (audio.paused && !audio.ended) {
-			// Try to resume the existing stream, not a fresh one
-			audio.play().catch(() => {
-				statusKey = 'availablePressPlay';
-				isPlaying = false;
-				isBuffering = false;
-				userWantsToPlay = false;
-			});
+			attemptReconnect();
 		}
+	}
+
+	function clearReconnectTimer() {
+		if (reconnectTimer) {
+			clearTimeout(reconnectTimer);
+			reconnectTimer = null;
+		}
+	}
+
+	function attemptReconnect() {
+		if (!audio || !userWantsToPlay) return;
+		if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+			// Give up after max attempts
+			userWantsToPlay = false;
+			confirmedLive = false;
+			hasError = true;
+			statusKey = 'unavailable';
+			reconnectAttempts = 0;
+			return;
+		}
+
+		isBuffering = true;
+		statusKey = 'connecting';
+
+		const delay = RECONNECT_DELAYS[reconnectAttempts] ?? RECONNECT_DELAYS[RECONNECT_DELAYS.length - 1];
+		reconnectAttempts += 1;
+
+		clearReconnectTimer();
+		reconnectTimer = setTimeout(async () => {
+			if (!audio || !userWantsToPlay) return;
+
+			audio.src = `${streamUrl}?t=${Date.now()}`;
+			audio.load();
+
+			try {
+				await audio.play();
+				// Success — reset counter
+				reconnectAttempts = 0;
+			} catch {
+				// Will trigger handleError which calls attemptReconnect again
+			}
+		}, delay);
 	}
 
 	// ── User controls ──────────────────────────────────────────────
@@ -146,9 +193,11 @@
 	const togglePlay = async () => {
 		if (!audio) return;
 
-		if (!audio.paused) {
-			// Pause
+		if (!audio.paused || reconnectTimer) {
+			// Pause — also cancel any pending reconnect
 			userWantsToPlay = false;
+			clearReconnectTimer();
+			reconnectAttempts = 0;
 			audio.pause();
 			return;
 		}
@@ -163,6 +212,7 @@
 		hasError = false;
 		isBuffering = true;
 		userWantsToPlay = true;
+		reconnectAttempts = 0;
 		statusKey = 'connecting';
 
 		// Fresh stream URL each time user presses play
@@ -193,9 +243,9 @@
 		isPlaying = true;
 		isBuffering = false;
 		hasError = false;
-		// The audio element successfully started playing — this is the ONLY
-		// reliable signal that a real live stream is running. Mark confirmed.
 		confirmedLive = true;
+		reconnectAttempts = 0;
+		clearReconnectTimer();
 		statusKey = 'listening';
 	};
 
@@ -225,29 +275,30 @@
 	const handleEnded = () => {
 		isPlaying = false;
 		isBuffering = false;
-		userWantsToPlay = false;
 		confirmedLive = false;
-		statusKey = 'offline';
+
+		// Stream ended naturally — try to reconnect in case it restarts
+		if (userWantsToPlay) {
+			attemptReconnect();
+		} else {
+			statusKey = 'offline';
+		}
 	};
 
 	const handleError = () => {
 		isPlaying = false;
 		isBuffering = false;
+		confirmedLive = false;
 
-		// Only show error if the user was actively trying to listen
+		// Clear the src to stop the browser's built-in retry loop.
+		if (audio) {
+			audio.removeAttribute('src');
+			audio.load();
+		}
+
+		// If the user wanted to listen, auto-reconnect instead of giving up
 		if (userWantsToPlay) {
-			hasError = true;
-			userWantsToPlay = false;
-			confirmedLive = false;
-			statusKey = 'unavailable';
-
-			// Clear the src to stop the browser's built-in retry loop.
-			// Without this, the audio element keeps making failed requests
-			// every ~3 seconds, creating a request storm visible in DevTools.
-			if (audio) {
-				audio.removeAttribute('src');
-				audio.load();
-			}
+			attemptReconnect();
 		}
 	};
 </script>
