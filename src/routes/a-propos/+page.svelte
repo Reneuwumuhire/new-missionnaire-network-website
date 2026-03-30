@@ -13,6 +13,8 @@
 	let stats: {
 		totalVisitors: number;
 		todayVisitors: number;
+		dailyAverage: number;
+		monthlyAverage: number;
 		topCountries: { name: string; count: number }[];
 		deviceStats: { type: string; count: number }[];
 	} | null = null;
@@ -81,6 +83,20 @@
 								>Visiteurs Uniques</span
 							>
 							<span class="text-3xl font-black text-hardBlack">{stats.totalVisitors}</span>
+						</div>
+						<div class="grid grid-cols-2 gap-4">
+							<div class="bg-gray-50 p-6 rounded-2xl border border-gray-100 flex flex-col space-y-2">
+								<span class="text-sm font-medium text-gray-500 uppercase tracking-wider"
+									>Moy. / Jour</span
+								>
+								<span class="text-3xl font-black text-hardBlack">{stats.dailyAverage}</span>
+							</div>
+							<div class="bg-gray-50 p-6 rounded-2xl border border-gray-100 flex flex-col space-y-2">
+								<span class="text-sm font-medium text-gray-500 uppercase tracking-wider"
+									>Moy. / Mois</span
+								>
+								<span class="text-3xl font-black text-hardBlack">{stats.monthlyAverage}</span>
+							</div>
 						</div>
 
 						<!-- Device Stats -->

@@ -26,6 +26,35 @@ export const GET: RequestHandler = async () => {
 		const todayUniqueIPs = await analytics.distinct('ip', { ...noBotsFilter, date: today });
 		const todayVisitors = todayUniqueIPs.length;
 
+		// Daily average: distinct IPs per day, averaged across all days with data
+		const dailyStats = await analytics
+			.aggregate([
+				{ $match: noBotsFilter },
+				{ $group: { _id: { date: '$date', ip: '$ip' } } },
+				{ $group: { _id: '$_id.date', uniqueVisitors: { $sum: 1 } } },
+				{ $group: { _id: null, totalDays: { $sum: 1 }, totalDailyVisitors: { $sum: '$uniqueVisitors' } } }
+			])
+			.toArray();
+
+		const dailyAverage = dailyStats.length > 0
+			? Math.round(dailyStats[0].totalDailyVisitors / dailyStats[0].totalDays)
+			: 0;
+
+		// Monthly average: distinct IPs per month, averaged across all months with data
+		const monthlyStats = await analytics
+			.aggregate([
+				{ $match: noBotsFilter },
+				{ $addFields: { month: { $substr: ['$date', 0, 7] } } },
+				{ $group: { _id: { month: '$month', ip: '$ip' } } },
+				{ $group: { _id: '$_id.month', uniqueVisitors: { $sum: 1 } } },
+				{ $group: { _id: null, totalMonths: { $sum: 1 }, totalMonthlyVisitors: { $sum: '$uniqueVisitors' } } }
+			])
+			.toArray();
+
+		const monthlyAverage = monthlyStats.length > 0
+			? Math.round(monthlyStats[0].totalMonthlyVisitors / monthlyStats[0].totalMonths)
+			: 0;
+
 		// Top Countries (excluding bots, counted by distinct IPs)
 		const rawCountryStats = await analytics
 			.aggregate([
@@ -81,6 +110,8 @@ export const GET: RequestHandler = async () => {
 		return json({
 			totalVisitors,
 			todayVisitors,
+			dailyAverage,
+			monthlyAverage,
 			topCountries,
 			topPages,
 			topMissed,
