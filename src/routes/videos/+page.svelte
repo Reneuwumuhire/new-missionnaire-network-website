@@ -218,7 +218,7 @@
 	<meta property="og:url" content="https://missionnaire.net/videos" />
 </svelte:head>
 
-<main class="relative max-w-[1640px] mx-auto px-5">
+<main class="relative max-w-7xl mx-auto px-4 md:px-8">
 	<div class="mt-5 mb-16">
 		<!-- Page Header -->
 		<section class="mb-8">

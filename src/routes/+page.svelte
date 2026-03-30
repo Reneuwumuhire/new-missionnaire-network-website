@@ -56,7 +56,7 @@
 	<meta name="twitter:description" content="Decouvrez les predications et cantiques inspirants du Message de l'Heure pour votre edification spirituelle." />
 </svelte:head>
 
-<main class="max-w-5xl mx-auto px-5 pb-20 relative">
+<main class="max-w-7xl mx-auto px-4 md:px-8 pb-20 relative">
 
 	<!-- Church symbols — scroll with page, in margins on large screens -->
 	<div class="hidden lg:block absolute -left-[80px] -right-[80px] top-[500px] bottom-0 pointer-events-none overflow-visible" aria-hidden="true">
@@ -112,7 +112,7 @@
 		<div class="mt-8 flex flex-wrap justify-center gap-3">
 			<a
 				href="/videos"
-				class="px-5 py-2.5 rounded-full bg-orange-500 text-white text-xs font-bold uppercase tracking-wider hover:bg-orange-600 transition-colors"
+				class="px-5 py-2.5 rounded-full bg-orange-600 text-white text-xs font-bold uppercase tracking-wider hover:bg-orange-700 transition-colors"
 			>
 				Explorer
 			</a>
