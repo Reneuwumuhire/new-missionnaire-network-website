@@ -6,7 +6,7 @@
  * N clients = 1 poll, not N polls.
  */
 
-import { probeLiveAudio } from './live-audio';
+import { probeLiveAudio, getLiveAudioSourceUrl } from './live-audio';
 import { sendPushToAll, radioLivePayload } from './push-notifications';
 import { claimNotificationSlot, countActiveListeners } from '../../db/collections';
 
@@ -14,6 +14,7 @@ export type RadioStatusEvent = {
 	isLive: boolean;
 	checkedAt: string;
 	listeners: number;
+	streamUrl?: string; // Direct URL to the audio source — bypasses serverless proxy
 };
 
 /** Internal status without the dynamic listener count */
@@ -72,7 +73,11 @@ async function poll() {
 			listeners = broker.listeners.size;
 		}
 
-		const event: RadioStatusEvent = { ...status, listeners };
+		// Include the direct stream URL so the client connects directly
+		// to the audio source, bypassing the serverless proxy which has
+		// execution time limits that kill the stream.
+		const streamUrl = status.isLive ? getLiveAudioSourceUrl() : undefined;
+		const event: RadioStatusEvent = { ...status, listeners, streamUrl };
 
 		for (const listener of broker.listeners) {
 			try {

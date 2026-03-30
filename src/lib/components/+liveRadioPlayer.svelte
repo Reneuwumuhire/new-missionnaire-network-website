@@ -27,12 +27,14 @@
 
 	let probeReachable = false;
 	let confirmedLive = false;
-
-	// When true, the audio element has failed (error/ended). The probe
-	// can no longer flip the UI to "available" — the UI stays at offline
-	// until the user manually clicks play. This prevents the on/off
-	// flicker caused by an unreliable probe after stream ends.
 	let playbackFailed = false;
+
+	// Direct URL to the audio source, received from the server via SSE.
+	// Bypasses the serverless proxy which has execution time limits.
+	let directStreamUrl = '';
+
+	// Fallback proxy URL — used only when the server hasn't sent a direct URL yet.
+	const proxyStreamUrl = '/api/live/audio';
 
 	// Auto-reconnect state
 	let reconnectAttempts = 0;
@@ -41,7 +43,6 @@
 	const RECONNECT_DELAYS = [1000, 2000, 3000, 5000, 5000, 10000, 10000, 15000];
 
 	const OFFLINE_THRESHOLD = 6;
-	const streamUrl = '/api/live/audio';
 
 	// Stable session ID for listener tracking — survives page refresh
 	// but not tab close, so the DB record is reused on refresh.
@@ -53,6 +54,12 @@
 			sessionStorage.setItem('radio-session-id', id);
 		}
 		return id;
+	}
+
+	/** Get the best stream URL — prefer direct, fall back to proxy */
+	function getStreamUrl(): string {
+		const base = directStreamUrl || proxyStreamUrl;
+		return `${base}${base.includes('?') ? '&' : '?'}t=${Date.now()}`;
 	}
 
 	$: showLive = confirmedLive;
@@ -69,9 +76,10 @@
 
 	// ── SSE status handler ─────────────────────────────────────────
 
-	function handleStatusEvent(liveNow: boolean, checkedAt: string, listeners: number) {
+	function handleStatusEvent(liveNow: boolean, checkedAt: string, listeners: number, streamUrl?: string) {
 		lastCheckedAt = checkedAt;
 		listenerCount = listeners;
+		if (streamUrl) directStreamUrl = streamUrl;
 
 		if (liveNow) {
 			offlineStreak = 0;
@@ -118,8 +126,8 @@
 
 		eventSource.onmessage = (event) => {
 			try {
-				const data = JSON.parse(event.data) as { isLive: boolean; checkedAt: string; listeners?: number };
-				handleStatusEvent(data.isLive, data.checkedAt, data.listeners ?? 0);
+				const data = JSON.parse(event.data) as { isLive: boolean; checkedAt: string; listeners?: number; streamUrl?: string };
+				handleStatusEvent(data.isLive, data.checkedAt, data.listeners ?? 0, data.streamUrl);
 			} catch (e) {
 				console.error('[LiveRadio] Failed to parse SSE event:', e);
 			}
@@ -185,6 +193,11 @@
 			statusKey = 'unavailable';
 			reconnectAttempts = 0;
 			clearReconnectTimer();
+			// Only clear src when fully giving up
+			if (audio) {
+				audio.removeAttribute('src');
+				audio.load();
+			}
 			return;
 		}
 
@@ -198,15 +211,12 @@
 		reconnectTimer = setTimeout(() => {
 			if (!audio || !userWantsToPlay) return;
 
-			// Set a fresh src and load. On mobile, the audio session from the
-			// user's initial play gesture is still active, so load + play works
-			// without a new user gesture.
-			audio.src = `${streamUrl}?t=${Date.now()}`;
+			// Fresh src — the browser reuses the audio session from the
+			// user's initial play tap, so play() works on mobile.
+			audio.src = getStreamUrl();
 			audio.load();
-			// Don't call play() here — the audio element will fire 'canplay'
-			// then we play from there, or it will fire 'error' to retry.
 			audio.play().catch(() => {
-				// play() rejected (e.g. mobile policy) — handleError will retry
+				// play() rejected — handleError will fire and retry
 			});
 		}, delay);
 	}
@@ -238,7 +248,7 @@
 		reconnectAttempts = 0;
 		statusKey = 'connecting';
 
-		audio.src = `${streamUrl}?t=${Date.now()}`;
+		audio.src = getStreamUrl();
 		audio.load();
 
 		try {
@@ -283,10 +293,19 @@
 
 	const handleWaiting = () => {
 		// 'waiting' fires during normal buffering (network hiccup).
-		// Don't treat this as an error — the stream is just rebuffering.
+		// This is completely normal on mobile — don't treat as error.
 		isBuffering = true;
 		if (userWantsToPlay) {
 			statusKey = reconnectAttempts > 0 ? 'reconnecting' : 'connecting';
+		}
+	};
+
+	const handleStalled = () => {
+		// 'stalled' means data stopped arriving — common on mobile networks.
+		// NOT an error. The browser will keep trying. Just show buffering.
+		if (isPlaying || userWantsToPlay) {
+			isBuffering = true;
+			statusKey = 'connecting';
 		}
 	};
 
@@ -317,16 +336,16 @@
 		isPlaying = false;
 		isBuffering = false;
 		confirmedLive = false;
-		playbackFailed = true;
-
-		// Clear src to stop the browser's built-in retry storm
-		if (audio) {
-			audio.removeAttribute('src');
-			audio.load();
-		}
 
 		if (userWantsToPlay) {
+			// Don't clear the src or give up — just set a fresh URL and
+			// let the audio element reconnect. This is mobile-friendly:
+			// the browser reuses the existing audio session from the
+			// user's initial tap, so no autoplay policy issues.
+			playbackFailed = false; // allow UI updates during reconnect
 			attemptReconnect();
+		} else {
+			playbackFailed = true;
 		}
 	};
 </script>
@@ -445,6 +464,7 @@
 			on:play={handlePlay}
 			on:pause={handlePause}
 			on:waiting={handleWaiting}
+			on:stalled={handleStalled}
 			on:canplay={handleCanPlay}
 			on:error={handleError}
 			on:ended={handleEnded}
