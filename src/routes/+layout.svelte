@@ -5,6 +5,7 @@
 	import Footer from '$lib/components/+footer.svelte';
 	import CopyButton from '$lib/components/+copyButton.svelte';
 	import VideoPlaylistPlayer from '$lib/components/VideoPlaylistPlayer.svelte';
+	import InstallPrompt from '$lib/components/+installPrompt.svelte';
 	import type { LayoutData } from './$types';
 	import { QueryClientProvider } from '@tanstack/svelte-query';
 	import { availableTypesTag } from '../utils/data';
@@ -146,4 +147,5 @@
 	<Footer />
 	<CopyButton />
 	<VideoPlaylistPlayer />
+	<InstallPrompt />
 </QueryClientProvider>
