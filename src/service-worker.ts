@@ -88,8 +88,9 @@ sw.addEventListener('fetch', (event) => {
 
 	const url = new URL(event.request.url);
 
-	// Don't cache API requests
+	// Don't cache API requests or crawler files
 	if (url.pathname.startsWith('/api/')) return;
+	if (url.pathname === '/robots.txt' || url.pathname === '/sitemap.xml') return;
 
 	// Cache YouTube thumbnails with long TTL
 	if (url.hostname === 'i.ytimg.com') {
