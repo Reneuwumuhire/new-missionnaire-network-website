@@ -7,11 +7,9 @@
 		listening: 'Vous ecoutez le direct',
 		connecting: 'Connexion en cours...',
 		availablePressPlay: 'Direct disponible. Appuyez sur Lecture.',
-		unstableReconnecting: 'Le direct est instable, reconnexion...',
 		waiting: 'En attente du signal...',
 		cannotPlay: 'Impossible de lire le direct pour le moment',
-		unavailable: 'Le direct est indisponible pour le moment',
-		reconnecting: 'Reconnexion en cours...'
+		unavailable: 'Le direct est indisponible pour le moment'
 	};
 
 	let audio: HTMLAudioElement | null = null;
@@ -24,17 +22,15 @@
 	let statusKey = 'waiting';
 	let eventSource: EventSource | null = null;
 	let offlineStreak = 0;
-	let retryTimer: ReturnType<typeof setTimeout> | null = null;
-	let retryCount = 0;
 	let userWantsToPlay = false;
-	let isReconnecting = false;
 
-	const OFFLINE_THRESHOLD = 6; // 30s of offline probes before marking offline
-	const MAX_RETRY_DELAY = 30_000;
+	const OFFLINE_THRESHOLD = 6;
 	const streamUrl = '/api/live/audio';
 
-	$: showLive = isLive || isPlaying || isBuffering;
-	$: canPlay = isLive || isPlaying;
+	// Only show "EN DIRECT" if the SSE probe confirms the stream is live.
+	// isPlaying/isBuffering alone should not override a confirmed-offline status.
+	$: showLive = isLive;
+	$: canPlay = isLive;
 	$: statusMessage = STATUS_MESSAGES[statusKey] || '';
 	$: checkedAtLabel = lastCheckedAt
 		? new Date(lastCheckedAt).toLocaleTimeString('fr-FR', {
@@ -44,6 +40,10 @@
 		  })
 		: '';
 
+	// ── SSE status handler ─────────────────────────────────────────
+	// This ONLY updates isLive and status text. It never touches the audio element.
+	// The audio element manages its own lifecycle through its native events.
+
 	function handleStatusEvent(liveNow: boolean, checkedAt: string) {
 		lastCheckedAt = checkedAt;
 
@@ -52,84 +52,36 @@
 			isLive = true;
 			hasError = false;
 
+			// Update status text based on current audio state — don't change audio
 			if (isPlaying) {
-				// Audio is already playing — don't touch it, just update status text
 				statusKey = 'listening';
-			} else if (isBuffering || isReconnecting) {
-				// Already connecting — let it finish, don't restart
+			} else if (isBuffering) {
 				statusKey = 'connecting';
-			} else if (userWantsToPlay) {
-				// User was playing but audio died and no retry is pending — reconnect
-				if (!retryTimer) {
-					scheduleRetry();
-				}
 			} else {
 				statusKey = 'availablePressPlay';
 			}
 		} else {
 			offlineStreak += 1;
 
-			if (isPlaying || isBuffering) {
-				// Don't kill playback from status probes — the audio stream
-				// and the probe are independent connections.
-				if (offlineStreak >= OFFLINE_THRESHOLD) {
-					statusKey = 'unstableReconnecting';
-				}
-			} else if (offlineStreak >= OFFLINE_THRESHOLD) {
+			// After threshold, we're confident the stream is offline — reset everything
+			if (offlineStreak >= OFFLINE_THRESHOLD) {
 				isLive = false;
-				statusKey = 'offline';
+				isPlaying = false;
+				isBuffering = false;
 				userWantsToPlay = false;
-				clearRetryTimer();
-			} else {
+				hasError = false;
+				statusKey = 'offline';
+				audio?.pause();
+			} else if (!isPlaying && !isBuffering) {
+				// Not playing yet and not enough offline probes to be sure — show waiting
 				statusKey = 'waiting';
 			}
+			// If audio is playing/buffering and threshold not reached, don't touch anything —
+			// the audio stream and the probe endpoint are independent connections.
 		}
 	}
 
-	function getRetryDelay(): number {
-		return Math.min(2000 * Math.pow(2, retryCount), MAX_RETRY_DELAY);
-	}
-
-	function reconnectAudio() {
-		if (!audio || !isLive || isReconnecting) return;
-
-		clearRetryTimer();
-		isReconnecting = true;
-		isBuffering = true;
-		statusKey = 'reconnecting';
-
-		audio.src = `${streamUrl}?t=${Date.now()}`;
-		audio.load();
-		audio.play().catch((err) => {
-			console.error('[LiveRadio] Reconnect play error:', err);
-			isReconnecting = false;
-			scheduleRetry();
-		});
-	}
-
-	function scheduleRetry() {
-		if (!userWantsToPlay || !isLive) return;
-		if (retryTimer) return; // already scheduled
-
-		const delay = getRetryDelay();
-		retryCount++;
-		console.log(`[LiveRadio] Scheduling retry #${retryCount} in ${delay}ms`);
-		statusKey = 'reconnecting';
-
-		retryTimer = setTimeout(() => {
-			retryTimer = null;
-			if (userWantsToPlay && isLive) {
-				reconnectAudio();
-			}
-		}, delay);
-	}
-
-	function clearRetryTimer() {
-		if (retryTimer) {
-			clearTimeout(retryTimer);
-			retryTimer = null;
-		}
-	}
+	// ── Lifecycle ──────────────────────────────────────────────────
 
 	onMount(() => {
 		if (!browser) return;
@@ -156,7 +108,6 @@
 
 	onDestroy(() => {
 		eventSource?.close();
-		clearRetryTimer();
 		if (browser) {
 			document.removeEventListener('visibilitychange', handleVisibilityChange);
 		}
@@ -166,45 +117,55 @@
 		if (document.visibilityState !== 'visible') return;
 		if (!userWantsToPlay || !audio) return;
 
-		if (audio.paused || audio.ended) {
-			console.log('[LiveRadio] Returned from background, audio stopped. Reconnecting...');
-			isReconnecting = false; // reset so reconnectAudio can proceed
-			retryCount = 0;
-			reconnectAudio();
+		// Returned from background — if audio died, let user know
+		if (audio.paused && !audio.ended) {
+			// Try to resume the existing stream, not a fresh one
+			audio.play().catch(() => {
+				statusKey = 'availablePressPlay';
+				isPlaying = false;
+				isBuffering = false;
+				userWantsToPlay = false;
+			});
 		}
 	}
+
+	// ── User controls ──────────────────────────────────────────────
 
 	const togglePlay = async () => {
 		if (!audio) return;
 
+		if (!audio.paused) {
+			// Pause
+			userWantsToPlay = false;
+			audio.pause();
+			return;
+		}
+
+		// Play
+		if (!isLive) {
+			hasError = true;
+			statusKey = 'offline';
+			return;
+		}
+
+		hasError = false;
+		isBuffering = true;
+		userWantsToPlay = true;
+		statusKey = 'connecting';
+
+		// Fresh stream URL each time user presses play
+		audio.src = `${streamUrl}?t=${Date.now()}`;
+		audio.load();
+
 		try {
-			if (audio.paused) {
-				if (!isLive) {
-					hasError = true;
-					statusKey = 'offline';
-					return;
-				}
-				hasError = false;
-				isBuffering = true;
-				isReconnecting = true;
-				userWantsToPlay = true;
-				retryCount = 0;
-				audio.src = `${streamUrl}?t=${Date.now()}`;
-				audio.load();
-				await audio.play();
-			} else {
-				userWantsToPlay = false;
-				isReconnecting = false;
-				clearRetryTimer();
-				audio.pause();
-			}
+			await audio.play();
 		} catch (error) {
 			console.error('[LiveRadio] Playback error:', error);
-			isReconnecting = false;
 			hasError = true;
 			isPlaying = false;
+			isBuffering = false;
+			userWantsToPlay = false;
 			statusKey = 'cannotPlay';
-			scheduleRetry();
 		}
 	};
 
@@ -214,14 +175,14 @@
 		isMuted = audio.muted;
 	};
 
+	// ── Audio element event handlers ───────────────────────────────
+
 	const handlePlay = () => {
 		isPlaying = true;
 		isBuffering = false;
-		isReconnecting = false;
 		hasError = false;
 		isLive = true;
 		offlineStreak = 0;
-		retryCount = 0;
 		statusKey = 'listening';
 	};
 
@@ -229,23 +190,16 @@
 		isPlaying = false;
 		isBuffering = false;
 
-		if (!userWantsToPlay) {
-			// User intentionally paused
-			isReconnecting = false;
-			if (isLive) {
-				statusKey = 'availablePressPlay';
-			}
-		} else if (!isReconnecting) {
-			// Unexpected pause (network drop, buffer underrun) — retry
-			console.log('[LiveRadio] Unexpected pause, scheduling retry');
-			scheduleRetry();
+		if (isLive && !userWantsToPlay) {
+			statusKey = 'availablePressPlay';
 		}
-		// If isReconnecting is true, a new play() is already in flight — don't schedule another retry
 	};
 
 	const handleWaiting = () => {
 		isBuffering = true;
-		statusKey = 'connecting';
+		if (userWantsToPlay) {
+			statusKey = 'connecting';
+		}
 	};
 
 	const handleCanPlay = () => {
@@ -258,21 +212,12 @@
 	const handleError = () => {
 		isPlaying = false;
 		isBuffering = false;
-		isReconnecting = false;
 
-		if (userWantsToPlay && isLive) {
-			console.log('[LiveRadio] Audio error, scheduling retry');
-			scheduleRetry();
-		} else {
+		// Only show error if the user was actively trying to listen
+		if (userWantsToPlay) {
 			hasError = true;
-			statusKey = 'unavailable';
-		}
-	};
-
-	const handleStalled = () => {
-		if (userWantsToPlay && isLive && !isBuffering && !isReconnecting) {
-			console.log('[LiveRadio] Stream stalled, scheduling retry');
-			scheduleRetry();
+			userWantsToPlay = false;
+			statusKey = isLive ? 'cannotPlay' : 'unavailable';
 		}
 	};
 </script>
@@ -388,7 +333,6 @@
 			on:waiting={handleWaiting}
 			on:canplay={handleCanPlay}
 			on:error={handleError}
-			on:stalled={handleStalled}
 		/>
 	{/if}
 </div>
