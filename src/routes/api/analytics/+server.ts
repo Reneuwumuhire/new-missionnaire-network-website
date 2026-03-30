@@ -13,27 +13,25 @@ export const GET: RequestHandler = async () => {
 		const analytics = db.collection('analytics');
 		const missedRoutes = db.collection('missed_routes');
 
-		// Total unique daily visits
-		const totalVisitors = await analytics.countDocuments();
+		// Exclude bots from all visitor-facing stats
+		const noBotsFilter = { device: { $ne: 'Bot' } };
 
-		// Unique visitors today
 		const today = new Date().toISOString().split('T')[0];
-		const todayVisitors = await analytics.countDocuments({ date: today });
 
-		// Top Countries (Handle legacy fields and map to full names)
+		// Total unique visitors (distinct IPs, excluding bots)
+		const uniqueIPs = await analytics.distinct('ip', noBotsFilter);
+		const totalVisitors = uniqueIPs.length;
+
+		// Unique visitors today (distinct IPs today, excluding bots)
+		const todayUniqueIPs = await analytics.distinct('ip', { ...noBotsFilter, date: today });
+		const todayVisitors = todayUniqueIPs.length;
+
+		// Top Countries (excluding bots, counted by distinct IPs)
 		const rawCountryStats = await analytics
 			.aggregate([
-				{
-					$group: {
-						_id: {
-							$ifNull: [
-								'$countryFull',
-								{ $ifNull: ['$country', { $ifNull: ['$countryShort', 'Unknown'] }] }
-							]
-						},
-						count: { $sum: 1 }
-					}
-				}
+				{ $match: noBotsFilter },
+				{ $group: { _id: { ip: '$ip', country: { $ifNull: ['$countryFull', { $ifNull: ['$country', { $ifNull: ['$countryShort', 'Unknown'] }] }] } } } },
+				{ $group: { _id: '$_id.country', count: { $sum: 1 } } }
 			])
 			.toArray();
 
@@ -48,11 +46,13 @@ export const GET: RequestHandler = async () => {
 			.sort((a, b) => b.count - a.count)
 			.slice(0, 10);
 
-		// Top Visited Pages (Aggregated from viewedPaths)
+		// Top Visited Pages (distinct IPs per page, excluding bots)
 		const topPages = await analytics
 			.aggregate([
+				{ $match: noBotsFilter },
 				{ $unwind: '$viewedPaths' },
-				{ $group: { _id: '$viewedPaths', count: { $sum: 1 } } },
+				{ $group: { _id: { path: '$viewedPaths', ip: '$ip' } } },
+				{ $group: { _id: '$_id.path', count: { $sum: 1 } } },
 				{ $sort: { count: -1 } },
 				{ $limit: 10 },
 				{ $project: { path: '$_id', count: 1, _id: 0 } }
@@ -67,10 +67,12 @@ export const GET: RequestHandler = async () => {
 			.project({ path: 1, count: 1, _id: 0 })
 			.toArray();
 
-		// Device distribution
+		// Device distribution (distinct IPs per device type, excluding bots)
 		const deviceStats = await analytics
 			.aggregate([
-				{ $group: { _id: '$device', count: { $sum: 1 } } },
+				{ $match: noBotsFilter },
+				{ $group: { _id: { device: '$device', ip: '$ip' } } },
+				{ $group: { _id: '$_id.device', count: { $sum: 1 } } },
 				{ $sort: { count: -1 } },
 				{ $project: { type: '$_id', count: 1, _id: 0 } }
 			])

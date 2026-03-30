@@ -69,7 +69,7 @@
 					<div class="space-y-4">
 						<div class="bg-gray-50 p-6 rounded-2xl border border-gray-100 flex flex-col space-y-2">
 							<span class="text-sm font-medium text-gray-500 uppercase tracking-wider"
-								>Visites Aujourd'hui</span
+								>Visiteurs Aujourd'hui</span
 							>
 							<div class="flex items-center space-x-2">
 								<div class="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
@@ -78,7 +78,7 @@
 						</div>
 						<div class="bg-gray-50 p-6 rounded-2xl border border-gray-100 flex flex-col space-y-2">
 							<span class="text-sm font-medium text-gray-500 uppercase tracking-wider"
-								>Total Visiteurs</span
+								>Visiteurs Uniques</span
 							>
 							<span class="text-3xl font-black text-hardBlack">{stats.totalVisitors}</span>
 						</div>
