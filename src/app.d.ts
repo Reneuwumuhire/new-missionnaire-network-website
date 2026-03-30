@@ -14,6 +14,33 @@ declare module '*?raw' {
 	export default content;
 }
 
+declare module 'svelte-icons-pack' {
+	import type { Component } from 'svelte';
+	const Icon: Component<{
+		src?: any;
+		size?: number | string;
+		color?: string;
+		className?: string;
+	}>;
+	export default Icon;
+}
+
+declare module 'svelte-icons-pack/Icon.svelte' {
+	import type { Component } from 'svelte';
+	const component: Component<{
+		src?: any;
+		size?: number | string;
+		color?: string;
+		className?: string;
+	}>;
+	export default component;
+}
+
+declare module 'svelte-icons-pack/*' {
+	const icon: any;
+	export default icon;
+}
+
 declare module 'iconsax-svelte/*.svelte' {
 	import type { Component } from 'svelte';
 	const component: Component<{

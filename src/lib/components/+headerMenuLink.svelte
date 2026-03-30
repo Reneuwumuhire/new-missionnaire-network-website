@@ -50,6 +50,7 @@
 				type="button"
 				class={` ${active ? activeClass : inactiveClass}`}
 				on:click|stopPropagation={handleToggle}
+				aria-label="{menuName} - {isOpen ? 'fermer' : 'ouvrir'} le sous-menu"
 			>
 				<Icon
 					className={`w-4 h-4 ml-1 transition

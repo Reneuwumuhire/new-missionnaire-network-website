@@ -117,7 +117,7 @@
 					<!-- {/if} -->
 				</small>
 				<!-- Button to download -->
-				<button class=" rounded-full p-2 -mr-4" on:click|stopPropagation={toggleVisible}
+				<button class=" rounded-full p-2 -mr-4" on:click|stopPropagation={toggleVisible} aria-label="Options"
 					><Icon src={BsThreeDotsVertical} />
 				</button>
 			</div>
