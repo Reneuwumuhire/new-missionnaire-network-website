@@ -262,7 +262,7 @@
 		</div>
 		<div class="grid md:grid-cols-2 gap-4">
 			<a
-				href="/william-branham"
+				href="/william-branham/biographie"
 				class="group flex items-center gap-5 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm hover:shadow-md transition-all"
 			>
 				<img

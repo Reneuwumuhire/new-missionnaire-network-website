@@ -45,6 +45,34 @@
 			{#each EwaldFrankParagraph3 as paragraph, index}
 				<ArticleParagraph text={paragraph.text} />
 			{/each}
+
+			<!-- Resource Links -->
+			<div class="w-full border-t border-gray-200 pt-8 mt-4">
+				<p class="text-[11px] font-black uppercase tracking-[0.2em] text-orange-600 mb-4">
+					Ressources d'Ewald Frank
+				</p>
+				<div class="flex flex-wrap gap-3">
+					<a
+						href="/predications?author=Ewald Frank"
+						class="px-4 py-2 rounded-full bg-orange-500 text-white text-xs font-black uppercase tracking-wider hover:bg-orange-600 transition-colors"
+					>
+						Predications
+					</a>
+					<a
+						href="/videos?filter=Ewald Frank"
+						class="px-4 py-2 rounded-full border border-gray-200 bg-white text-gray-700 text-xs font-black uppercase tracking-wider hover:border-orange-300 hover:text-orange-600 transition-colors"
+					>
+						Videos
+					</a>
+					<a
+						href="/literature?author=Ewald Frank&category=book"
+						class="px-4 py-2 rounded-full border border-gray-200 bg-white text-gray-700 text-xs font-black uppercase tracking-wider hover:border-orange-300 hover:text-orange-600 transition-colors"
+					>
+						Litterature
+					</a>
+				</div>
+			</div>
+
 			<div class="hidden lg:block absolute -right-[400px]">
 				<ArticleCornerImage image="/img/ewald_frank_second_img.jpg" />
 			</div>
