@@ -184,8 +184,7 @@
 							class="absolute inset-0 w-full h-full object-cover"
 							width="600"
 							height="417"
-							loading="lazy"
-							decoding="async"
+							fetchpriority="high"
 						/>
 					</picture>
 				</div>

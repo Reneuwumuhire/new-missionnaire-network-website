@@ -62,7 +62,13 @@
 	let isHovered = false;
 	let isFocused = false;
 
-	const searchablePages = ['/videos', '/predications', '/musique', '/literature', '/transcriptions'];
+	const searchablePages = [
+		'/videos',
+		'/predications',
+		'/musique',
+		'/literature',
+		'/transcriptions'
+	];
 	$: showSearch = searchablePages.some((p) => $page.url.pathname.startsWith(p));
 
 	$: shouldExpand = isHovered || isFocused || $searchTerm.trim().length > 0;
@@ -114,7 +120,10 @@
 <nav class="relative z-50 max-w-full flex flex-row justify-between items-center px-3 md:px-6 my-4">
 	<div class=" w-full flex flex-row justify-between items-center max-w-[1600px] mx-auto">
 		<a href="/" class="flex flex-row items-center">
-			<img src="/icons/logo.png" class="w-auto h-8" alt="logo" />
+			<picture>
+				<source srcset="/icons/logo.webp" type="image/webp" />
+				<img src="/icons/logo.png" class="w-auto h-8" alt="logo" width="75" height="32" />
+			</picture>
 		</a>
 		<div class=" hidden lg:flex items-center space-x-4">
 			{#if showSearch}
@@ -178,7 +187,7 @@
 									subText: subLink.subText,
 									image: subLink.image,
 									icon: subLink.icon
-							  }))
+								}))
 							: []}
 					/>
 				{/each}
@@ -200,9 +209,7 @@
 		</div>
 		<!-- mobo menu -->
 		{#if showMoboNav}
-			<div
-				class="absolute z-50 top-[40px] left-0 w-full h-screen bg-white border-t-2 py-6"
-			>
+			<div class="absolute z-50 top-[40px] left-0 w-full h-screen bg-white border-t-2 py-6">
 				<div class="relative flex flex-col space-y-2 w-full h-full bg-white">
 					{#if showSearch}
 						<!-- svelte-ignore a11y-no-static-element-interactions -->
@@ -260,7 +267,7 @@
 											link: subLink.link,
 											subText: subLink.subText,
 											icon: subLink.icon
-									  }))
+										}))
 									: []}
 								active={openMenuIndex === index}
 								activeClass="text-missionnaire"
