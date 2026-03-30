@@ -1,6 +1,6 @@
 import { getDb } from './mongo';
 import { availableTypesTag } from '../utils/data';
-import { ObjectId, type Document, type Filter, type Sort } from 'mongodb';
+import { ObjectId, MongoServerError, type Document, type Filter, type Sort } from 'mongodb';
 import type { YoutubeVideo } from '$lib/models/youtube';
 import type { AudioAsset } from '$lib/models/media-assets';
 import type { MusicAudio } from '$lib/models/music-audio';
@@ -611,9 +611,9 @@ async function ensureLockIndex() {
 		}
 		await col.createIndex({ type: 1 }, { unique: true });
 		lockIndexEnsured = true;
-	} catch (e: any) {
+	} catch (e: unknown) {
 		// If index creation fails due to existing duplicates, drop and recreate
-		if (e.code === 11000 || e.codeName === 'DuplicateKey') {
+		if (e instanceof MongoServerError && (e.code === 11000 || e.codeName === 'DuplicateKey')) {
 			const db = await getDb();
 			await db.collection('notification_locks').dropIndexes();
 			await db.collection('notification_locks').createIndex({ type: 1 }, { unique: true });
@@ -654,9 +654,9 @@ export async function claimNotificationSlot(
 		);
 
 		return result !== null;
-	} catch (e: any) {
+	} catch (e: unknown) {
 		// Duplicate key error → another instance already claimed the slot
-		if (e.code === 11000) return false;
+		if (e instanceof MongoServerError && e.code === 11000) return false;
 		console.error('[NotifLock] claimNotificationSlot error:', e);
 		// On unexpected errors, allow sending to avoid silent notification blackout
 		return true;
