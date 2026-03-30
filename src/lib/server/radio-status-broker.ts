@@ -13,6 +13,7 @@ import { claimNotificationSlot } from '../../db/collections';
 export type RadioStatusEvent = {
 	isLive: boolean;
 	checkedAt: string;
+	listeners: number;
 };
 
 type Listener = (event: RadioStatusEvent) => void;
@@ -50,7 +51,8 @@ async function poll() {
 		const probe = await probeLiveAudio(fetch);
 		const event: RadioStatusEvent = {
 			isLive: probe.isLive,
-			checkedAt: new Date().toISOString()
+			checkedAt: new Date().toISOString(),
+			listeners: broker.listeners.size
 		};
 
 		const changed = broker.lastStatus === null || event.isLive !== broker.lastStatus.isLive;

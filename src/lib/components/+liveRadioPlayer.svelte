@@ -17,22 +17,26 @@
 	let isMuted = false;
 	let isBuffering = false;
 	let hasError = false;
-	let isLive = false;
 	let lastCheckedAt = '';
 	let statusKey = 'waiting';
 	let eventSource: EventSource | null = null;
 	let offlineStreak = 0;
-	let onlineStreak = 0;
 	let userWantsToPlay = false;
+	let listenerCount = 0;
+
+	// The probe reports whether it can reach the audio server, but it can
+	// be fooled (Icecast returns data even with no source). These two flags
+	// separate "probe says reachable" from "audio is actually playing".
+	let probeReachable = false; // SSE probe says the endpoint responds with audio
+	let confirmedLive = false; // Audio element has successfully played
 
 	const OFFLINE_THRESHOLD = 6;
-	const ONLINE_THRESHOLD = 2;
 	const streamUrl = '/api/live/audio';
 
-	// Only show "EN DIRECT" if the SSE probe confirms the stream is live.
-	// isPlaying/isBuffering alone should not override a confirmed-offline status.
-	$: showLive = isLive;
-	$: canPlay = isLive;
+	// "EN DIRECT" only shown when the audio element has confirmed playback.
+	// The probe alone enables the play button but doesn't show "EN DIRECT".
+	$: showLive = confirmedLive;
+	$: canPlay = probeReachable || confirmedLive;
 	$: statusMessage = STATUS_MESSAGES[statusKey] || '';
 	$: checkedAtLabel = lastCheckedAt
 		? new Date(lastCheckedAt).toLocaleTimeString('fr-FR', {
@@ -46,45 +50,33 @@
 	// This ONLY updates isLive and status text. It never touches the audio element.
 	// The audio element manages its own lifecycle through its native events.
 
-	function handleStatusEvent(liveNow: boolean, checkedAt: string) {
+	function handleStatusEvent(liveNow: boolean, checkedAt: string, listeners: number) {
 		lastCheckedAt = checkedAt;
+		listenerCount = listeners;
 
 		if (liveNow) {
 			offlineStreak = 0;
-			onlineStreak += 1;
+			probeReachable = true;
+			hasError = false;
 
-			// Require consecutive positive probes before confirming live.
-			// This prevents UI flicker when the probe flaps (e.g. Icecast
-			// returning 200 + audio headers without real audio data).
-			if (onlineStreak >= ONLINE_THRESHOLD) {
-				isLive = true;
-				hasError = false;
-
-				if (isPlaying) {
-					statusKey = 'listening';
-				} else if (isBuffering) {
-					statusKey = 'connecting';
-				} else {
-					statusKey = 'availablePressPlay';
-				}
+			// Probe says reachable — update status text but do NOT set confirmedLive.
+			// Only the audio element's "play" event can do that.
+			if (isPlaying) {
+				statusKey = 'listening';
+			} else if (isBuffering) {
+				statusKey = 'connecting';
 			} else {
-				// Not enough consecutive positive probes yet — show waiting
-				if (!isPlaying && !isBuffering) {
-					statusKey = 'waiting';
-				}
+				statusKey = 'availablePressPlay';
 			}
 		} else {
 			offlineStreak += 1;
-			onlineStreak = 0;
 
 			if (offlineStreak >= OFFLINE_THRESHOLD) {
-				// Confident the stream is offline — update status
-				isLive = false;
+				probeReachable = false;
+				confirmedLive = false;
 				hasError = false;
 				statusKey = 'offline';
 
-				// If audio is still trying to play, stop it and clear the src
-				// to prevent the browser's built-in retry loop (request storm).
 				if (isPlaying || isBuffering || userWantsToPlay) {
 					isPlaying = false;
 					isBuffering = false;
@@ -96,11 +88,8 @@
 					}
 				}
 			} else if (!isPlaying && !isBuffering) {
-				// Not playing yet and not enough offline probes to be sure — show waiting
 				statusKey = 'waiting';
 			}
-			// If audio is playing/buffering and threshold not reached, don't touch anything —
-			// the audio stream and the probe endpoint are independent connections.
 		}
 	}
 
@@ -113,8 +102,8 @@
 
 		eventSource.onmessage = (event) => {
 			try {
-				const data = JSON.parse(event.data) as { isLive: boolean; checkedAt: string };
-				handleStatusEvent(data.isLive, data.checkedAt);
+				const data = JSON.parse(event.data) as { isLive: boolean; checkedAt: string; listeners?: number };
+				handleStatusEvent(data.isLive, data.checkedAt, data.listeners ?? 0);
 			} catch (e) {
 				console.error('[LiveRadio] Failed to parse SSE event:', e);
 			}
@@ -164,8 +153,8 @@
 			return;
 		}
 
-		// Play
-		if (!isLive) {
+		// Play — only if probe says the endpoint is reachable
+		if (!probeReachable && !confirmedLive) {
 			hasError = true;
 			statusKey = 'offline';
 			return;
@@ -204,19 +193,17 @@
 		isPlaying = true;
 		isBuffering = false;
 		hasError = false;
-		// Do NOT set isLive here — SSE is the sole authority on live status.
-		// Setting isLive = true here overrides a confirmed-offline SSE status,
-		// causing the UI to show "EN DIRECT" when the stream is actually down.
-		if (isLive) {
-			statusKey = 'listening';
-		}
+		// The audio element successfully started playing — this is the ONLY
+		// reliable signal that a real live stream is running. Mark confirmed.
+		confirmedLive = true;
+		statusKey = 'listening';
 	};
 
 	const handlePause = () => {
 		isPlaying = false;
 		isBuffering = false;
 
-		if (isLive && !userWantsToPlay) {
+		if (probeReachable && !userWantsToPlay) {
 			statusKey = 'availablePressPlay';
 		}
 	};
@@ -236,12 +223,10 @@
 	};
 
 	const handleEnded = () => {
-		// Live stream ended naturally — reflect offline in UI.
-		// Next SSE event will correct if stream comes back.
 		isPlaying = false;
 		isBuffering = false;
 		userWantsToPlay = false;
-		isLive = false;
+		confirmedLive = false;
 		statusKey = 'offline';
 	};
 
@@ -253,12 +238,7 @@
 		if (userWantsToPlay) {
 			hasError = true;
 			userWantsToPlay = false;
-
-			// The audio element has a direct connection to the stream.
-			// If it fails, the user can't hear anything — reflect that in the UI
-			// regardless of what the probe says. The next SSE event will flip
-			// isLive back to true if the stream is genuinely still up.
-			isLive = false;
+			confirmedLive = false;
 			statusKey = 'unavailable';
 
 			// Clear the src to stop the browser's built-in retry loop.
@@ -309,6 +289,11 @@
 				<p class="text-sm font-medium text-slate-600">
 					{statusMessage}
 				</p>
+				{#if listenerCount > 0 && showLive}
+					<p class="text-xs font-semibold text-red-500">
+						{listenerCount} {listenerCount === 1 ? 'auditeur' : 'auditeurs'} en ligne
+					</p>
+				{/if}
 				{#if checkedAtLabel}
 					<p class="text-xs text-slate-500">
 						Derniere verification: {checkedAtLabel}
