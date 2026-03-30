@@ -2,18 +2,13 @@
 	import { browser } from '$app/environment';
 	import { onDestroy, onMount } from 'svelte';
 
-	type LiveStatusResponse = {
-		isLive?: boolean;
-		checkedAt?: string;
-	};
-
 	const STATUS_MESSAGES: Record<string, string> = {
 		offline: 'La radio est hors ligne',
 		listening: 'Vous ecoutez le direct',
 		connecting: 'Connexion en cours...',
 		availablePressPlay: 'Direct disponible. Appuyez sur Lecture.',
 		unstableReconnecting: 'Le direct est instable, reconnexion...',
-		checking: 'Verification du direct...',
+		waiting: 'En attente du signal...',
 		cannotPlay: 'Impossible de lire le direct pour le moment',
 		unavailable: 'Le direct est indisponible pour le moment'
 	};
@@ -24,16 +19,13 @@
 	let isBuffering = false;
 	let hasError = false;
 	let isLive = false;
-	let isCheckingStatus = false;
 	let lastCheckedAt = '';
-	let statusKey = 'offline';
-	let statusInterval: ReturnType<typeof setInterval> | null = null;
+	let statusKey = 'waiting';
+	let eventSource: EventSource | null = null;
 	let offlineStreak = 0;
 
-	const STATUS_REFRESH_MS = 5000;
 	const OFFLINE_THRESHOLD = 3;
 	const streamUrl = '/api/live/audio';
-	const statusUrl = '/api/live/status';
 
 	$: showLive = isLive || isPlaying || isBuffering;
 	$: canPlay = isLive || isPlaying;
@@ -46,66 +38,58 @@
 		  })
 		: '';
 
-	const refreshStatus = async () => {
-		if (!browser || isCheckingStatus) return;
-		isCheckingStatus = true;
-		try {
-			const response = await fetch(statusUrl, { cache: 'no-store' });
-			if (!response.ok) {
-				throw new Error(`Live status failed (${response.status})`);
-			}
-			const payload = (await response.json()) as LiveStatusResponse;
-			const liveNow = Boolean(payload.isLive);
-			lastCheckedAt = payload.checkedAt ?? new Date().toISOString();
+	function handleStatusEvent(liveNow: boolean, checkedAt: string) {
+		lastCheckedAt = checkedAt;
 
-			if (liveNow) {
-				offlineStreak = 0;
-				isLive = true;
-				hasError = false;
-				statusKey = isPlaying
-					? 'listening'
-					: isBuffering
-					? 'connecting'
-					: 'availablePressPlay';
-			} else {
-				offlineStreak += 1;
-				if (isPlaying || isBuffering) {
-					statusKey = 'unstableReconnecting';
-				} else if (offlineStreak >= OFFLINE_THRESHOLD) {
-					isLive = false;
-					statusKey = 'offline';
-					if (audio && !audio.paused) {
-						audio.pause();
-					}
-				} else {
-					statusKey = 'checking';
-				}
-			}
-		} catch (error) {
-			console.error('[LiveRadio] Status check failed:', error);
+		if (liveNow) {
+			offlineStreak = 0;
+			isLive = true;
+			hasError = false;
+			statusKey = isPlaying
+				? 'listening'
+				: isBuffering
+				? 'connecting'
+				: 'availablePressPlay';
+		} else {
 			offlineStreak += 1;
-			if (offlineStreak >= OFFLINE_THRESHOLD && !isPlaying && !isBuffering) {
+			if (isPlaying || isBuffering) {
+				statusKey = 'unstableReconnecting';
+			} else if (offlineStreak >= OFFLINE_THRESHOLD) {
 				isLive = false;
 				statusKey = 'offline';
+				if (audio && !audio.paused) {
+					audio.pause();
+				}
 			} else {
-				statusKey = 'checking';
+				statusKey = 'waiting';
 			}
-		} finally {
-			isCheckingStatus = false;
 		}
-	};
+	}
 
 	onMount(() => {
-		void refreshStatus();
-		statusInterval = setInterval(() => {
-			void refreshStatus();
-		}, STATUS_REFRESH_MS);
+		if (!browser) return;
+
+		eventSource = new EventSource('/api/live/sse');
+
+		eventSource.onmessage = (event) => {
+			try {
+				const data = JSON.parse(event.data) as { isLive: boolean; checkedAt: string };
+				handleStatusEvent(data.isLive, data.checkedAt);
+			} catch (e) {
+				console.error('[LiveRadio] Failed to parse SSE event:', e);
+			}
+		};
+
+		eventSource.onerror = () => {
+			// EventSource auto-reconnects; just update status while disconnected
+			if (!isPlaying && !isBuffering) {
+				statusKey = 'waiting';
+			}
+		};
 	});
 
 	onDestroy(() => {
-		if (statusInterval) {
-			clearInterval(statusInterval);
-		}
+		eventSource?.close();
 	});
 
 	const togglePlay = async () => {
@@ -172,7 +156,6 @@
 		isPlaying = false;
 		isBuffering = false;
 		statusKey = 'unavailable';
-		void refreshStatus();
 	};
 </script>
 
@@ -212,11 +195,6 @@
 				</h2>
 				<p class="text-sm font-medium text-slate-600">
 					{statusMessage}
-					{#if isCheckingStatus}
-						<span class="ml-2 text-xs font-semibold uppercase tracking-[0.1em] text-slate-400">
-							Verification...
-						</span>
-					{/if}
 				</p>
 				{#if checkedAtLabel}
 					<p class="text-xs text-slate-500">
@@ -270,9 +248,7 @@
 			</p>
 			<p class="mt-2 text-lg font-bold text-slate-900">La radio est hors ligne</p>
 			<p class="mt-2 text-sm text-slate-600">
-				Cette page verifie automatiquement le direct toutes les
-				{Math.floor(STATUS_REFRESH_MS / 1000)}
-				secondes.
+				Cette page se met a jour automatiquement en temps reel.
 				Des que le direct commence, le bouton
 				<span class="font-bold">Lecture</span>
 				devient actif.
