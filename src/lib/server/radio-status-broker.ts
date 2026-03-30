@@ -16,6 +16,12 @@ export type RadioStatusEvent = {
 	listeners: number;
 };
 
+/** Internal status without the dynamic listener count */
+type BrokerStatus = {
+	isLive: boolean;
+	checkedAt: string;
+};
+
 type Listener = (event: RadioStatusEvent) => void;
 
 const GLOBAL_KEY = Symbol.for('missionnaire_radio_broker');
@@ -25,7 +31,7 @@ const RADIO_NOTIFICATION_COOLDOWN = 10 * 60 * 1000; // 10 min cooldown
 interface BrokerState {
 	listeners: Set<Listener>;
 	timer: ReturnType<typeof setInterval> | null;
-	lastStatus: RadioStatusEvent | null;
+	lastStatus: BrokerStatus | null;
 	keepAlive: boolean; // true when ensureBrokerPolling() was called — never stop polling
 }
 
@@ -38,7 +44,7 @@ function getBroker(): BrokerState {
 			timer: null,
 			// Start with null — we don't know the status yet.
 			// Don't send a stale isLive:false to new clients.
-			lastStatus: null as RadioStatusEvent | null,
+			lastStatus: null as BrokerStatus | null,
 			keepAlive: false
 		};
 	}
@@ -49,17 +55,20 @@ async function poll() {
 	const broker = getBroker();
 	try {
 		const probe = await probeLiveAudio(fetch);
-		const event: RadioStatusEvent = {
+		const status: BrokerStatus = {
 			isLive: probe.isLive,
-			checkedAt: new Date().toISOString(),
+			checkedAt: new Date().toISOString()
+		};
+
+		const changed = broker.lastStatus === null || status.isLive !== broker.lastStatus.isLive;
+		broker.lastStatus = status;
+
+		// Inject live listener count at broadcast time so it's always current
+		const event: RadioStatusEvent = {
+			...status,
 			listeners: broker.listeners.size
 		};
 
-		const changed = broker.lastStatus === null || event.isLive !== broker.lastStatus.isLive;
-		broker.lastStatus = event;
-
-		// Broadcast to all listeners (always send so clients know we're alive,
-		// but mark whether it actually changed)
 		for (const listener of broker.listeners) {
 			try {
 				listener(event);
@@ -69,14 +78,10 @@ async function poll() {
 		}
 
 		if (changed) {
-			console.log(`[RadioBroker] Status changed: ${event.isLive ? 'LIVE' : 'OFFLINE'}`);
+			console.log(`[RadioBroker] Status changed: ${status.isLive ? 'LIVE' : 'OFFLINE'}`);
 		}
 
-		// Attempt notification on every poll where stream is live, not just on
-		// transitions. On serverless, the process can cold-start and miss the
-		// exact transition moment. The DB-based claimNotificationSlot ensures
-		// only one notification per cooldown period across all instances.
-		if (event.isLive) {
+		if (status.isLive) {
 			claimNotificationSlot('radio_live', RADIO_NOTIFICATION_COOLDOWN)
 				.then((canSend) => {
 					if (canSend) {
@@ -128,7 +133,7 @@ export function subscribe(listener: Listener): () => void {
 	// Only send current status if we've completed at least one real poll.
 	// Avoids sending a stale isLive:false that would flip to true moments later.
 	if (broker.lastStatus) {
-		listener(broker.lastStatus);
+		listener({ ...broker.lastStatus, listeners: broker.listeners.size });
 	}
 
 	// Return unsubscribe function
@@ -139,5 +144,7 @@ export function subscribe(listener: Listener): () => void {
 }
 
 export function getLastStatus(): RadioStatusEvent | null {
-	return getBroker().lastStatus;
+	const broker = getBroker();
+	if (!broker.lastStatus) return null;
+	return { ...broker.lastStatus, listeners: broker.listeners.size };
 }
