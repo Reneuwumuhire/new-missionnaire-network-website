@@ -3,12 +3,12 @@
 	import type { Sermon } from '$lib/models/sermon';
 	import { basePlaylist, currentIndex, isPlaying, playlist, selectAudio } from '$lib/stores/global';
 	import { onMount } from 'svelte';
-	import Icon from 'svelte-icons-pack/Icon.svelte';
-	import BsChevronLeft from 'svelte-icons-pack/bs/BsChevronLeft';
+	import Breadcrumbs from '$lib/components/+breadcrumbs.svelte';
 
 	export let data: PageData;
 
 	$: sermon = data.sermon as unknown as Sermon;
+	$: relatedSermons = (data.relatedSermons || []) as any[];
 	$: sermonTitle = sermon.french_title || sermon.english_title || 'Prédication';
 	$: sermonDate = sermon.full_date_code || sermon.date_code || sermon.iso_date || '';
 	$: description = `Écoutez la prédication "${sermonTitle}"${
@@ -99,15 +99,10 @@
 	<meta name="twitter:description" content={description} />
 </svelte:head>
 
-<div class="w-full max-w-7xl mx-auto mb-4">
-	<a
-		href="/predications"
-		class="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 bg-white text-gray-700 text-xs font-black uppercase tracking-wider hover:border-orange-300 hover:text-orange-600 transition-colors shadow-sm"
-	>
-		<Icon src={BsChevronLeft} size="14" />
-		<span>Retour aux prédications</span>
-	</a>
-</div>
+<Breadcrumbs items={[
+	{ label: 'Predications', href: '/predications' },
+	{ label: sermonTitle }
+]} />
 
 <article class="w-full max-w-7xl mx-auto bg-white border border-gray-100 rounded-2xl p-4 md:p-8 shadow-sm">
 	<div class="max-w-4xl">
@@ -207,3 +202,34 @@
 		</section>
 	{/if}
 </article>
+
+{#if relatedSermons.length > 0}
+	<section class="w-full max-w-7xl mx-auto mt-8">
+		<h2 class="text-sm font-black uppercase tracking-[0.2em] text-gray-400 mb-4">
+			Du meme auteur
+		</h2>
+		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+			{#each relatedSermons as related}
+				<a
+					href="/predications/{related.slug}"
+					class="bg-white border border-gray-100 rounded-xl p-4 hover:border-orange-200 hover:shadow-sm transition-all group"
+				>
+					<div class="text-sm font-bold text-gray-800 group-hover:text-orange-500 transition-colors line-clamp-2">
+						{related.french_title || related.english_title || 'Sans titre'}
+					</div>
+					<div class="flex items-center gap-2 mt-2 text-[10px] text-gray-400 font-medium">
+						{#if related.full_date_code || related.date_code}
+							<span>{related.full_date_code || related.date_code}</span>
+						{/if}
+						{#if related.mp3_url}
+							<span class="text-orange-400">Audio</span>
+						{/if}
+						{#if related.pdf_url}
+							<span class="text-red-400">PDF</span>
+						{/if}
+					</div>
+				</a>
+			{/each}
+		</div>
+	</section>
+{/if}

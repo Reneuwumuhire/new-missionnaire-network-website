@@ -17,7 +17,11 @@
 	import IoCloudDownloadOutline from 'svelte-icons-pack/io/IoCloudDownloadOutline';
 	import IoPlayCircle from 'svelte-icons-pack/io/IoPlayCircle';
 	import IoPauseCircle from 'svelte-icons-pack/io/IoPauseCircle';
+	import BsHeartFill from 'svelte-icons-pack/bs/BsHeartFill';
+	import BsHeart from 'svelte-icons-pack/bs/BsHeart';
+	import BsClockHistory from 'svelte-icons-pack/bs/BsClockHistory';
 	import { formatTime } from '../../utils/FormatTime';
+	import { addToRecentlyPlayed, toggleFavorite, isFavorite, recentlyPlayed, favorites } from '$lib/stores/musicHistory';
 	export let data;
 
 	$: musicList = (data as any).musicAudio;
@@ -68,7 +72,7 @@
 		'Kolwezi'
 	];
 	const desktopMusicGrid =
-		'md:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.2fr)_minmax(0,1fr)_80px_40px_40px]';
+		'md:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.2fr)_minmax(0,1fr)_80px_32px_40px_40px]';
 
 	// Sync playlist when songs are loaded
 	$: if (musicPlaylist) {
@@ -194,6 +198,7 @@
 		currentIndex.set(index);
 		selectAudio.set(song);
 		isPlaying.set(true);
+		addToRecentlyPlayed(song as any);
 	}
 
 	function isMusicAudio(current: MusicAudio | AudioAsset | Sermon | null): current is MusicAudio {
@@ -398,6 +403,75 @@
 		</div>
 	{/if}
 
+	<!-- Favorites & Recently Played -->
+	{#if $favorites.length > 0 || $recentlyPlayed.length > 0}
+		<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+			{#if $favorites.length > 0}
+				<div class="bg-white rounded-xl border border-gray-100 p-4">
+					<div class="flex items-center gap-2 mb-3">
+						<Icon src={BsHeartFill} size="14" className="text-red-500" />
+						<span class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Favoris</span>
+					</div>
+					<div class="flex flex-col gap-1 max-h-[200px] overflow-y-auto">
+						{#each $favorites.slice(0, 8) as fav}
+							<button
+								class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-orange-50 transition-colors text-left w-full group"
+								on:click={() => {
+									const found = musicPlaylist.find((s: MusicAudio) => (s._id || s.s3_url) === fav.id);
+									if (found) playSong(found);
+								}}
+							>
+								<Icon src={IoPlayCircle} size="16" className="text-orange-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+								<div class="flex-1 min-w-0">
+									<div class="text-xs font-bold text-gray-700 truncate">{fav.title}</div>
+									{#if fav.artist}
+										<div class="text-[10px] text-gray-400">{fav.artist}</div>
+									{/if}
+								</div>
+								<!-- svelte-ignore a11y-click-events-have-key-events -->
+								<!-- svelte-ignore a11y-no-static-element-interactions -->
+								<div
+									class="text-red-400 hover:text-red-600 p-1 flex-shrink-0 cursor-pointer"
+									on:click|stopPropagation={() => toggleFavorite({ _id: fav.id, title: fav.title, artist: fav.artist, s3_url: fav.s3_url })}
+									title="Retirer des favoris"
+								>
+									<Icon src={BsX} size="12" />
+								</div>
+							</button>
+						{/each}
+					</div>
+				</div>
+			{/if}
+			{#if $recentlyPlayed.length > 0}
+				<div class="bg-white rounded-xl border border-gray-100 p-4">
+					<div class="flex items-center gap-2 mb-3">
+						<Icon src={BsClockHistory} size="14" className="text-gray-400" />
+						<span class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Recemment joues</span>
+					</div>
+					<div class="flex flex-col gap-1 max-h-[200px] overflow-y-auto">
+						{#each $recentlyPlayed.slice(0, 8) as recent}
+							<button
+								class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-orange-50 transition-colors text-left w-full group"
+								on:click={() => {
+									const found = musicPlaylist.find((s: MusicAudio) => (s._id || s.s3_url) === recent.id);
+									if (found) playSong(found);
+								}}
+							>
+								<Icon src={IoPlayCircle} size="16" className="text-orange-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+								<div class="flex-1 min-w-0">
+									<div class="text-xs font-bold text-gray-700 truncate">{recent.title}</div>
+									{#if recent.artist}
+										<div class="text-[10px] text-gray-400">{recent.artist}</div>
+									{/if}
+								</div>
+							</button>
+						{/each}
+					</div>
+				</div>
+			{/if}
+		</div>
+	{/if}
+
 	<!-- Songs List -->
 		<div class="bg-white rounded-xl shadow-sm border border-gray-100 min-h-[500px] flex flex-col">
 		<div class="grid grid-cols-[30px_1fr_auto_auto] {desktopMusicGrid} gap-2 md:gap-4 px-3 md:px-4 py-3 border-b border-gray-100 text-[10px] md:text-[11px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50/50 rounded-t-xl">
@@ -488,6 +562,7 @@
 				{/if}
 				Durée
 			</button>
+			<div class="w-8 hidden md:block"></div>
 			<div class="w-10 text-center"></div>
 			<div class="w-10 text-center flex items-center justify-center">
 				<button 
@@ -548,6 +623,15 @@
 					</div>
 					<div class="hidden md:block text-center text-xs font-mono {isActive ? 'text-orange-500' : 'text-gray-400'}">
 						{song['duration'] ? formatTime(song['duration']) : '--:--'}
+					</div>
+					<div class="w-8 text-center hidden md:block">
+						<button
+							class="transition-colors p-1.5 {isFavorite(song._id || song.s3_url, $favorites) ? 'text-red-500' : 'text-gray-300 hover:text-red-400'}"
+							on:click|stopPropagation={() => toggleFavorite(song)}
+							title={isFavorite(song._id || song.s3_url, $favorites) ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+						>
+							<Icon src={isFavorite(song._id || song.s3_url, $favorites) ? BsHeartFill : BsHeart} size="14" />
+						</button>
 					</div>
 					<div class="w-10 text-center">
 						<button

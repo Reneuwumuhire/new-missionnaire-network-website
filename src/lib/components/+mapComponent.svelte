@@ -1,9 +1,9 @@
-<script>
+<script lang="ts">
 	import { onMount } from 'svelte';
 	// @ts-ignore
 	import { Loader } from '@googlemaps/js-api-loader';
 
-	let map;
+	let map: any = null;
 	// @ts-ignore
 	let directionsService;
 	// @ts-ignore
