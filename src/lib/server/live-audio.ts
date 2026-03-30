@@ -4,6 +4,8 @@ import { normalizeLiveStreamUrl } from '$lib/utils/liveStreamUrl';
 const DEFAULT_LIVE_AUDIO_SOURCE_URL = 'http://localhost:8000/radio.mp3';
 const LIVE_AUDIO_PROBE_TIMEOUT_MS = 5000;
 const LIVE_AUDIO_GRACE_WINDOW_MS = 35_000;
+/** Minimum bytes the probe must read to confirm real audio data is flowing. */
+const LIVE_AUDIO_MIN_BYTES = 256;
 
 let lastHealthyProbeAt = 0;
 
@@ -30,13 +32,9 @@ export async function probeLiveAudio(fetchFn: typeof fetch): Promise<LiveAudioPr
 	try {
 		const response = await fetchFn(sourceUrl, {
 			method: 'GET',
-			headers: {
-				Range: 'bytes=0-0'
-			},
 			signal: controller.signal
 		});
 
-		await response.body?.cancel();
 		const contentType = response.headers.get('content-type') || '';
 		// The upstream server may return 200 even when no source is connected
 		// (e.g. Icecast returns an HTML status page). Only treat it as live
@@ -46,7 +44,29 @@ export async function probeLiveAudio(fetchFn: typeof fetch): Promise<LiveAudioPr
 			contentType.includes('mpeg') ||
 			contentType.includes('ogg') ||
 			contentType.includes('aac');
-		const isHealthy = response.ok && isAudioContent;
+
+		// Headers alone are not enough — Icecast can return 200 + audio/mpeg
+		// even when no source is connected. Actually read bytes to confirm
+		// real audio data is flowing.
+		let hasAudioData = false;
+		if (response.ok && isAudioContent && response.body) {
+			const reader = response.body.getReader();
+			try {
+				let bytesRead = 0;
+				while (bytesRead < LIVE_AUDIO_MIN_BYTES) {
+					const { done, value } = await reader.read();
+					if (done) break;
+					bytesRead += value.byteLength;
+				}
+				hasAudioData = bytesRead >= LIVE_AUDIO_MIN_BYTES;
+			} finally {
+				reader.cancel();
+			}
+		} else {
+			await response.body?.cancel();
+		}
+
+		const isHealthy = response.ok && isAudioContent && hasAudioData;
 		if (isHealthy) {
 			lastHealthyProbeAt = Date.now();
 		}

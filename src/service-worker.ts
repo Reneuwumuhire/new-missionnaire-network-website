@@ -97,12 +97,18 @@ sw.addEventListener('notificationclick', (event) => {
 
 	event.waitUntil(
 		sw.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
-			// Focus an existing tab if one is open on the same origin
+			// Focus an existing tab already on the target URL
+			for (const client of clients) {
+				if (new URL(client.url).pathname === url && 'focus' in client) {
+					return client.focus();
+				}
+			}
+			// Focus any existing tab on the same origin and navigate it
 			for (const client of clients) {
 				if (new URL(client.url).origin === sw.location.origin && 'focus' in client) {
-					client.focus();
-					client.navigate(url);
-					return;
+					return client.focus().then((c) =>
+						'navigate' in c ? c.navigate(url) : sw.clients.openWindow(url)
+					);
 				}
 			}
 			// Otherwise open a new window

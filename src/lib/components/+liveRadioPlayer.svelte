@@ -22,9 +22,11 @@
 	let statusKey = 'waiting';
 	let eventSource: EventSource | null = null;
 	let offlineStreak = 0;
+	let onlineStreak = 0;
 	let userWantsToPlay = false;
 
 	const OFFLINE_THRESHOLD = 6;
+	const ONLINE_THRESHOLD = 2;
 	const streamUrl = '/api/live/audio';
 
 	// Only show "EN DIRECT" if the SSE probe confirms the stream is live.
@@ -49,19 +51,31 @@
 
 		if (liveNow) {
 			offlineStreak = 0;
-			isLive = true;
-			hasError = false;
+			onlineStreak += 1;
 
-			// Update status text based on current audio state — don't change audio
-			if (isPlaying) {
-				statusKey = 'listening';
-			} else if (isBuffering) {
-				statusKey = 'connecting';
+			// Require consecutive positive probes before confirming live.
+			// This prevents UI flicker when the probe flaps (e.g. Icecast
+			// returning 200 + audio headers without real audio data).
+			if (onlineStreak >= ONLINE_THRESHOLD) {
+				isLive = true;
+				hasError = false;
+
+				if (isPlaying) {
+					statusKey = 'listening';
+				} else if (isBuffering) {
+					statusKey = 'connecting';
+				} else {
+					statusKey = 'availablePressPlay';
+				}
 			} else {
-				statusKey = 'availablePressPlay';
+				// Not enough consecutive positive probes yet — show waiting
+				if (!isPlaying && !isBuffering) {
+					statusKey = 'waiting';
+				}
 			}
 		} else {
 			offlineStreak += 1;
+			onlineStreak = 0;
 
 			if (offlineStreak >= OFFLINE_THRESHOLD) {
 				// Confident the stream is offline — update status
