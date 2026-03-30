@@ -45,6 +45,9 @@ Youtube -->
 					<a href="/galerie" class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out">Galerie</a>
 				</li>
 				<li>
+					<a href="/live" class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out">Radio</a>
+				</li>
+				<li>
 					<a href="/a-propos" class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out">À propos</a>
 				</li>
 				<li>

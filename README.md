@@ -47,6 +47,7 @@ Keep secrets in `.env.local` (it’s ignored by git).
 | `PUBLIC_LIVE_STREAM_URL` | public | yes | `https://…` | Live radio stream URL. Set to an empty string (`""`) to hide the player. |
 | `MONGODB_URI` | private | yes | `mongodb://127.0.0.1:27017` | Used for analytics + other server routes. Provide a real connection string to avoid Mongo connection errors on startup. |
 | `YOUTUBE_API_KEY` | private | yes | `AIza…` | Used by the YouTube poller. Set to `""` to disable polling (it will skip the check). |
+| `LIVE_AUDIO_SOURCE_URL` | private | no | `http://localhost:8000/radio.mp3` | Upstream audio source for the live radio proxy. Only needed if testing live streaming. |
 
 Example `.env.local` (safe defaults for local dev):
 
@@ -68,6 +69,73 @@ pnpm format       # prettier write
 pnpm check        # svelte-check
 pnpm test         # vitest
 ```
+
+## Live audio streaming (local)
+
+The site includes a live radio feature at `/live`. To test it locally you need Docker and OBS (or any RTMP source).
+
+### Prerequisites
+
+- Docker & Docker Compose
+- OBS Studio (or any RTMP streaming tool)
+
+### Architecture
+
+```
+OBS (RTMP) --> MediaMTX --> FFmpeg transcoder --> Icecast --> /api/live/audio --> Radio player
+```
+
+Three containers run locally:
+- **mediamtx** — receives RTMP from OBS on port 1935
+- **audio-transcoder** — strips video with FFmpeg, outputs audio-only
+- **icecast** — serves the MP3 stream on port 8000
+
+### Quick start
+
+1. Start the streaming stack:
+
+```bash
+pnpm stream:up
+```
+
+2. Configure OBS:
+   - **Server:** `rtmp://localhost:1935/live`
+   - **Stream Key:** `obs`
+   - Start streaming in OBS
+
+3. Add streaming env vars to `.env.local`:
+
+```bash
+PUBLIC_LIVE_STREAM_URL="http://localhost:8000/radio.mp3"
+LIVE_AUDIO_SOURCE_URL="http://localhost:8000/radio.mp3"
+```
+
+4. Start the dev server and visit `http://localhost:8080/live`:
+
+```bash
+pnpm dev
+```
+
+### Useful commands
+
+```bash
+pnpm stream:up      # start all streaming containers
+pnpm stream:down    # stop all streaming containers
+pnpm stream:logs    # tail container logs
+```
+
+### Verify audio is working
+
+- Raw stream: open `http://localhost:8000/radio.mp3` in a browser or VLC
+- Via the app: open `http://localhost:8080/live` — the player should show "En direct" when audio is detected
+
+### Troubleshooting
+
+- **Containers not starting:** run `docker compose -f ops/streaming/docker-compose.yml ps` to check status
+- **No audio:** check transcoder logs with `docker logs mn-audio-transcoder --tail=200`
+- **Player shows "hors ligne":** ensure OBS is actively streaming and `LIVE_AUDIO_SOURCE_URL` points to `http://localhost:8000/radio.mp3`
+
+See `ops/streaming/README.md` for detailed configuration and `ops/fly/streaming/README.md` for production deployment on Fly.io.
 
 ## YouTube Data API routes
 

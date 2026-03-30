@@ -119,6 +119,11 @@ export const NavigationLinkList: NavigationLink[] = [
 	},
 	{
 		id: 7,
+		menuName: 'Radio',
+		link: '/live'
+	},
+	{
+		id: 8,
 		menuName: 'À propos',
 		link: '/a-propos'
 	}
