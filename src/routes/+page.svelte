@@ -118,7 +118,7 @@
 			</a>
 			<a
 				href="/live"
-				class="px-5 py-2.5 rounded-full border border-orange-200 text-orange-600 text-xs font-bold uppercase tracking-wider hover:bg-orange-50 transition-colors"
+				class="px-5 py-2.5 rounded-full border border-orange-200 text-orange-700 text-xs font-bold uppercase tracking-wider hover:bg-orange-50 transition-colors"
 			>
 				Radio en direct
 			</a>
@@ -162,7 +162,7 @@
 			<NotificationBell bind:this={bellRef} />
 			<p class="text-xs text-gray-500">
 				{#if bellRef?.isSubscribed}
-					<span class="font-semibold text-orange-600">Notifications activees</span> — vous serez alerte quand la radio est en direct
+					<span class="font-semibold text-orange-700">Notifications activees</span> — vous serez alerte quand la radio est en direct
 				{:else}
 					<span class="font-semibold text-gray-700">Recevoir une notification</span> quand la radio est en direct
 				{/if}
@@ -197,7 +197,7 @@
 						predications, cantiques, litterature — pour l'edification des croyants partout dans le monde.
 					</p>
 					<div class="mt-4 flex gap-3">
-						<a href="/a-propos" class="text-xs font-bold text-orange-600 hover:text-orange-700 uppercase tracking-wider">
+						<a href="/a-propos" class="text-xs font-bold text-orange-700 hover:text-orange-800 uppercase tracking-wider">
 							En savoir plus &rarr;
 						</a>
 					</div>
@@ -216,10 +216,10 @@
 					<img src="/img/branham_icon.png" alt="William Branham" class="w-20 h-20 rounded-full object-cover mx-auto" width="160" height="160" loading="lazy" decoding="async" />
 				</picture>
 				<p class="text-sm font-bold text-gray-900 group-hover:text-orange-600 transition-colors mt-4">William M. Branham</p>
-				<p class="text-xs text-gray-400 mt-1.5 leading-relaxed">
+				<p class="text-xs text-gray-500 mt-1.5 leading-relaxed">
 					Prophete du Message de l'Heure (1909–1965). Son ministere a marque des millions de croyants a travers le monde.
 				</p>
-				<span class="inline-block mt-3 text-[10px] font-bold text-orange-600 uppercase tracking-wider">Biographie &rarr;</span>
+				<span class="inline-block mt-3 text-xs font-bold text-orange-700 uppercase tracking-wider">Biographie &rarr;</span>
 			</a>
 			<a
 				href="/ewald-frank"
@@ -230,10 +230,10 @@
 					<img src="/img/ewald_frank_second_img.jpg" alt="Ewald Frank" class="w-20 h-20 rounded-full object-cover mx-auto" width="160" height="160" loading="lazy" decoding="async" />
 				</picture>
 				<p class="text-sm font-bold text-gray-900 group-hover:text-orange-600 transition-colors mt-4">Ewald Frank</p>
-				<p class="text-xs text-gray-400 mt-1.5 leading-relaxed">
+				<p class="text-xs text-gray-500 mt-1.5 leading-relaxed">
 					Missionnaire international base a Krefeld, Allemagne. Il porte le Message aux nations depuis plus de 60 ans.
 				</p>
-				<span class="inline-block mt-3 text-[10px] font-bold text-orange-600 uppercase tracking-wider">En savoir plus &rarr;</span>
+				<span class="inline-block mt-3 text-xs font-bold text-orange-700 uppercase tracking-wider">En savoir plus &rarr;</span>
 			</a>
 		</div>
 	</section>
@@ -243,7 +243,7 @@
 		<section class="mb-8">
 			<div class="flex items-end justify-between mb-6">
 				<h2 class="text-lg font-bold text-gray-900">Recemment ajoute</h2>
-				<a href="/videos" class="text-xs font-bold text-gray-400 hover:text-orange-600 uppercase tracking-wider transition-colors">
+				<a href="/videos" class="text-xs font-bold text-gray-500 hover:text-orange-700 uppercase tracking-wider transition-colors">
 					Tout voir &rarr;
 				</a>
 			</div>
@@ -266,7 +266,7 @@
 							</div>
 						{/if}
 						{#if publishedLabel}
-							<p class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">
+							<p class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
 								{publishedLabel}
 							</p>
 						{/if}

@@ -16,7 +16,10 @@ Youtube -->
 		class=" relative w-full max-w-5xl flex flex-col justify-center items-center self-center px-12 pt-12 pb-4 space-y-8"
 	>
 		<div class=" w-14">
-			<img src="/icons/logo.png" alt="logo" />
+			<picture>
+				<source srcset="/icons/logo.webp" type="image/webp" />
+				<img src="/icons/logo.png" alt="logo" width="75" height="32" loading="lazy" />
+			</picture>
 		</div>
 		<!-- div for links -->
 		<div>
