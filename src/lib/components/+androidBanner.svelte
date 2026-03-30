@@ -56,8 +56,7 @@
 		<div class="flex items-center gap-2 md:gap-4 shrink-0">
 			<a 
 				href={downloadUrl}
-				target="_blank"
-				rel="noopener noreferrer"
+				target="_blank" rel="noopener noreferrer"
 				class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 md:px-5 md:py-2.5 rounded-xl font-bold transition-all shadow-sm hover:shadow-md flex items-center gap-2 text-[10px] md:text-[11px] tracking-wide uppercase whitespace-nowrap"
 			>
 				<Icon src={IoCloudDownloadOutline} size="14" />

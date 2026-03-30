@@ -168,6 +168,7 @@
 					class="flex flex-row items-center space-x-2 md:space-x-4"
 					href="https://www.youtube.com/@MissionnaireNetwork"
 					target="_blank"
+					rel="noopener noreferrer"
 				>
 					<Icon className="w-8 h-8" src={FaBrandsYoutube} />
 					<span class="">https://www.youtube.com/@MissionnaireNetwork</span>
@@ -176,6 +177,7 @@
 					class="flex flex-row items-center space-x-2 md:space-x-4"
 					href="https://www.facebook.com/missionnaire.net"
 					target="_blank"
+					rel="noopener noreferrer"
 				>
 					<Icon className="w-8 h-8" src={FaBrandsFacebook} />
 					<span>https://www.facebook.com/missionnaire.net</span>
@@ -184,6 +186,7 @@
 					class="flex flex-row items-center space-x-2 md:space-x-4"
 					href="https://wa.me/250788567415"
 					target="_blank"
+					rel="noopener noreferrer"
 				>
 					<!-- when hover add a slight grey -->
 					<Icon className="w-8 h-8" src={RiLogoWhatsappFill} />

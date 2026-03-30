@@ -48,6 +48,8 @@
 				<a
 					href="https://www.youtube.com/channel/UCS3zqpqnCvT0SFa_jI662Kg"
 					target="_blank"
+					rel="noopener noreferrer"
+					aria-label="YouTube"
 					class="hover:opacity-70 transition-opacity"
 				>
 					<Icon color={isLiveStream ? 'white' : 'black'} className="w-4 h-4" src={FaBrandsYoutube} />
@@ -55,6 +57,8 @@
 				<a
 					href="https://www.facebook.com/missionnaire.net"
 					target="_blank"
+					rel="noopener noreferrer"
+					aria-label="Facebook"
 					class="hover:opacity-70 transition-opacity"
 				>
 					<Icon color={isLiveStream ? 'white' : 'black'} className="w-4 h-4" src={FaBrandsFacebook} />
@@ -62,6 +66,8 @@
 				<a
 					href="https://wa.me/250788567415"
 					target="_blank"
+					rel="noopener noreferrer"
+					aria-label="WhatsApp"
 					class="hover:opacity-70 transition-opacity"
 				>
 					<Icon

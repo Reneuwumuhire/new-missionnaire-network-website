@@ -150,6 +150,7 @@
 							<input
 								type="text"
 								placeholder={showPlaceholder ? 'Rechercher...' : ''}
+								aria-label="Rechercher"
 								bind:value={$searchTerm}
 								class=" indent-8 px-4 py-2 text-gray-600 bg-transparent outline-none w-full font-normal text-current"
 								on:focus={() => (isFocused = true)}
@@ -161,6 +162,7 @@
 									type="button"
 									class=" w-6 h-6 rounded-full flex items-center justify-center pr-2"
 									on:click={clearInput}
+									aria-label="Effacer la recherche"
 								>
 									<CloseCircle size={80} color="#ccc" variant="Linear" />
 								</button>
@@ -195,6 +197,7 @@
 			<button
 				class="flex flex-row items-center w-8 h-8 transition-all duration-75 ease-in-out text-missionnaire"
 				on:click={toggleMobileNav}
+				aria-label={showMoboNav ? 'Fermer le menu' : 'Ouvrir le menu'}
 			>
 				{#if showMoboNav}
 					<Icon src={IoCloseSharp} />
@@ -233,7 +236,8 @@
 									</div>
 									<input
 										type="text"
-										placeholder="Search..."
+										placeholder="Rechercher..."
+										aria-label="Rechercher"
 										bind:value={$searchTerm}
 										class=" indent-8 px-4 py-2 text-gray-600 bg-transparent outline-none w-full font-light"
 										on:focus={() => (isFocused = true)}
@@ -244,6 +248,7 @@
 											type="button"
 											class=" w-6 h-6 rounded-full flex items-center justify-center pr-2"
 											on:click={clearInput}
+											aria-label="Effacer la recherche"
 										>
 											<CloseCircle size={80} color="#fb923c" variant="Linear" />
 										</button>

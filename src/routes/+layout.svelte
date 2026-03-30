@@ -85,7 +85,11 @@
 
 <svelte:head>
 	<title>Missionnaire Network</title>
-	<script src="https://www.youtube.com/iframe_api"></script>
+	<script src="https://www.youtube.com/iframe_api" async></script>
+	<link rel="preconnect" href="https://i.ytimg.com" />
+	<link rel="preconnect" href="https://www.youtube.com" />
+	<link rel="dns-prefetch" href="https://i.ytimg.com" />
+	<link rel="dns-prefetch" href="https://www.youtube.com" />
 	<link rel="canonical" href={canonicalUrl} />
 	<meta name="description" content={DEFAULT_SEO_DESCRIPTION} />
 	<meta property="og:site_name" content="Missionnaire Network" />

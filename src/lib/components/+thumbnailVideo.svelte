@@ -77,10 +77,13 @@
 		<div class="w-full">
 			<figure class=" bg-slate-200 rounded-xl h-fit aspect-video min-h-[140px]">
 				<img
-					class={` w-full rounded-xl aspect-video`}
+					class="w-full rounded-xl aspect-video"
 					src={`https://i.ytimg.com/vi/${video.display_id}/mqdefault.jpg`}
 					alt={video.title}
 					loading="lazy"
+					width="320"
+					height="180"
+					decoding="async"
 				/>
 			</figure>
 		</div>
@@ -97,6 +100,7 @@
 					<button
 						class=" hidden group-hover:block rounded-full p-2 -mr-4 rotate-90"
 						on:click|stopPropagation={toggleVisible}
+						aria-label="Options"
 						><More size={24} color="#4F4F4F" variant="Linear" />
 					</button>
 				</div>

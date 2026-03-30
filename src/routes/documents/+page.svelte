@@ -203,8 +203,7 @@
 								{#if document.videoDisplayId}
 									<a
 										href={`https://www.youtube.com/watch?v=${document.videoDisplayId}`}
-										target="_blank"
-										rel="noopener noreferrer"
+										target="_blank" rel="noopener noreferrer"
 										class="p-2 text-gray-500 hover:text-missionnaire transition-colors"
 										title="Voir la vidéo"
 									>
@@ -311,8 +310,7 @@
 							<div class="mt-6 flex flex-col gap-4">
 								<a
 									href={selectedDocument.url}
-									target="_blank"
-									rel="noopener noreferrer"
+									target="_blank" rel="noopener noreferrer"
 									class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-missionnaire"
 								>
 									<svg
@@ -343,8 +341,7 @@
 								{#if selectedDocument.videoDisplayId}
 									<a
 										href={`https://www.youtube.com/watch?v=${selectedDocument.videoDisplayId}`}
-										target="_blank"
-										rel="noopener noreferrer"
+										target="_blank" rel="noopener noreferrer"
 										class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-missionnaire"
 									>
 										<div class="mr-2">

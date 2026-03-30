@@ -137,8 +137,7 @@
 			{#if previewPdfUrl}
 				<a
 					href={frenchPdfProxyUrl || previewPdfUrl}
-					target="_blank"
-					rel="noopener noreferrer"
+					target="_blank" rel="noopener noreferrer"
 					class="px-4 py-2 rounded-full border border-gray-200 bg-white text-gray-700 text-xs font-black uppercase tracking-wider hover:border-orange-300 hover:text-orange-600 transition-colors"
 				>
 					Ouvrir PDF
@@ -156,8 +155,7 @@
 			{#if sermon.english_pdf_url}
 				<a
 					href={englishPdfProxyUrl}
-					target="_blank"
-					rel="noopener noreferrer"
+					target="_blank" rel="noopener noreferrer"
 					class="px-4 py-2 rounded-full border border-gray-200 bg-white text-gray-700 text-xs font-black uppercase tracking-wider hover:border-orange-300 hover:text-orange-600 transition-colors"
 				>
 					PDF English
@@ -178,8 +176,7 @@
 				<h2 class="text-sm font-black uppercase tracking-[0.2em] text-orange-500">Aperçu PDF</h2>
 				<a
 					href={previewPdfUrl}
-					target="_blank"
-					rel="noopener noreferrer"
+					target="_blank" rel="noopener noreferrer"
 					class="text-[11px] font-black uppercase tracking-wider text-gray-500 hover:text-orange-500 transition-colors"
 				>
 					Ouvrir dans un nouvel onglet

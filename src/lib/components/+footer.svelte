@@ -51,21 +51,19 @@ Youtube -->
 					<a
 						href="https://www.youtube.com/channel/UCS3zqpqnCvT0SFa_jI662Kg"
 						class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out"
-						target="_blank">Youtube</a
-					>
+						target="_blank"
+						rel="noopener noreferrer">Youtube </a>
 				</li>
 			</ul>
 		</div>
 		<div class="flex flex-row items-center space-x-5">
-			<!-- add link to icons -->
-			<a href="https://www.youtube.com/channel/UCS3zqpqnCvT0SFa_jI662Kg" target="_blank">
-				<Icon className="w-4 h-" src={FaBrandsYoutube} />
+			<a href="https://www.youtube.com/channel/UCS3zqpqnCvT0SFa_jI662Kg" target="_blank" rel="noopener noreferrer" aria-label="YouTube">
+				<Icon className="w-4 h-4" src={FaBrandsYoutube} />
 			</a>
-			<a href="https://www.facebook.com/missionnaire.net" target="_blank">
+			<a href="https://www.facebook.com/missionnaire.net" target="_blank" rel="noopener noreferrer" aria-label="Facebook">
 				<Icon className="w-4 h-4" src={FaBrandsFacebook} />
 			</a>
-			<a href="https://wa.me/250788567415" target="_blank">
-				<!-- when hover add a slight grey -->
+			<a href="https://wa.me/250788567415" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp">
 				<Icon className="w-4 h-4" src={RiLogoWhatsappFill} />
 			</a>
 		</div>

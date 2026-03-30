@@ -54,8 +54,7 @@
 									{#each $selectedVideo.pdfInfo as pdf}
 										<a
 											href={pdf.url}
-											target="_blank"
-											rel="noopener noreferrer"
+											target="_blank" rel="noopener noreferrer"
 											class="flex items-center gap-2 px-4 py-2 bg-missionnaire/90 hover:bg-missionnaire text-white rounded-full shadow-lg transition-all hover:scale-105 active:scale-95 group/pdf"
 											title={pdf.filename}
 										>

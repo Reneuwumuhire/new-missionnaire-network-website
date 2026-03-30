@@ -342,8 +342,7 @@
 								{#if item.pdf_url}
 									<a
 										href={item.pdf_url}
-										target="_blank"
-										rel="noopener noreferrer"
+										target="_blank" rel="noopener noreferrer"
 										class="flex items-center gap-2 px-6 py-3 bg-white text-orange-600 rounded-full font-bold shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-all"
 									>
 										<Icon src={IoCloudDownloadOutline} size="20" />
@@ -504,8 +503,7 @@
 								{#if item.pdf_url}
 									<a
 										href={item.pdf_url}
-										target="_blank"
-										rel="noopener noreferrer"
+										target="_blank" rel="noopener noreferrer"
 										class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-100 rounded-lg text-xs font-bold text-gray-600 hover:bg-orange-500 hover:text-white hover:border-orange-500 shadow-sm transition-all active:scale-95"
 									>
 										<Icon src={IoCloudDownloadOutline} size="16" />
