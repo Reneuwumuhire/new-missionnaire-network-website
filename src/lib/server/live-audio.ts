@@ -2,12 +2,20 @@ import { env } from '$env/dynamic/private';
 import { normalizeLiveStreamUrl } from '$lib/utils/liveStreamUrl';
 
 const DEFAULT_LIVE_AUDIO_SOURCE_URL = 'http://localhost:8000/radio.mp3';
-const LIVE_AUDIO_PROBE_TIMEOUT_MS = 5000;
-const LIVE_AUDIO_GRACE_WINDOW_MS = 35_000;
-/** Minimum bytes the probe must read to confirm real audio data is flowing. */
-const LIVE_AUDIO_MIN_BYTES = 256;
+const LIVE_AUDIO_PROBE_TIMEOUT_MS = 4000;
 
-let lastHealthyProbeAt = 0;
+/**
+ * To confirm a live stream we read data in two rounds separated by a pause.
+ * A real stream keeps producing bytes continuously; a static/buffered
+ * response (e.g. Icecast with no source) delivers an initial burst then stalls.
+ *
+ * Round 1: read ≥ ROUND1_MIN_BYTES  (proves the server responded with data)
+ * Wait   : PAUSE_MS
+ * Round 2: read ≥ ROUND2_MIN_BYTES  (proves data is still flowing)
+ */
+const ROUND1_MIN_BYTES = 512;
+const ROUND2_MIN_BYTES = 512;
+const PAUSE_BETWEEN_READS_MS = 800;
 
 export type LiveAudioProbe = {
 	isLive: boolean;
@@ -24,6 +32,24 @@ export function getLiveAudioSourceUrl(): string {
 	return DEFAULT_LIVE_AUDIO_SOURCE_URL;
 }
 
+/** Read at least `minBytes` from a ReadableStreamDefaultReader. */
+async function readAtLeast(
+	reader: ReadableStreamDefaultReader<Uint8Array>,
+	minBytes: number
+): Promise<boolean> {
+	let bytesRead = 0;
+	while (bytesRead < minBytes) {
+		const { done, value } = await reader.read();
+		if (done) return false;
+		bytesRead += value.byteLength;
+	}
+	return true;
+}
+
+function sleep(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function probeLiveAudio(fetchFn: typeof fetch): Promise<LiveAudioProbe> {
 	const sourceUrl = getLiveAudioSourceUrl();
 	const controller = new AbortController();
@@ -36,29 +62,25 @@ export async function probeLiveAudio(fetchFn: typeof fetch): Promise<LiveAudioPr
 		});
 
 		const contentType = response.headers.get('content-type') || '';
-		// The upstream server may return 200 even when no source is connected
-		// (e.g. Icecast returns an HTML status page). Only treat it as live
-		// if the response is OK *and* the content is actually audio.
 		const isAudioContent =
 			contentType.startsWith('audio/') ||
 			contentType.includes('mpeg') ||
 			contentType.includes('ogg') ||
 			contentType.includes('aac');
 
-		// Headers alone are not enough — Icecast can return 200 + audio/mpeg
-		// even when no source is connected. Actually read bytes to confirm
-		// real audio data is flowing.
-		let hasAudioData = false;
+		let isLive = false;
 		if (response.ok && isAudioContent && response.body) {
 			const reader = response.body.getReader();
 			try {
-				let bytesRead = 0;
-				while (bytesRead < LIVE_AUDIO_MIN_BYTES) {
-					const { done, value } = await reader.read();
-					if (done) break;
-					bytesRead += value.byteLength;
+				// Round 1 — can we read initial data?
+				const round1 = await readAtLeast(reader, ROUND1_MIN_BYTES);
+				if (round1) {
+					// Pause, then check data is still arriving.
+					// A dead server sends a burst then stalls; a live stream keeps going.
+					await sleep(PAUSE_BETWEEN_READS_MS);
+					const round2 = await readAtLeast(reader, ROUND2_MIN_BYTES);
+					isLive = round2;
 				}
-				hasAudioData = bytesRead >= LIVE_AUDIO_MIN_BYTES;
 			} finally {
 				reader.cancel();
 			}
@@ -66,25 +88,15 @@ export async function probeLiveAudio(fetchFn: typeof fetch): Promise<LiveAudioPr
 			await response.body?.cancel();
 		}
 
-		const isHealthy = response.ok && isAudioContent && hasAudioData;
-		if (isHealthy) {
-			lastHealthyProbeAt = Date.now();
-		}
-		const withinGracePeriod =
-			!isHealthy && lastHealthyProbeAt > 0 && Date.now() - lastHealthyProbeAt <= LIVE_AUDIO_GRACE_WINDOW_MS;
-
 		return {
-			isLive: isHealthy || withinGracePeriod,
+			isLive,
 			sourceUrl,
 			status: response.status,
 			error: null
 		};
 	} catch (error) {
-		const withinGracePeriod =
-			lastHealthyProbeAt > 0 && Date.now() - lastHealthyProbeAt <= LIVE_AUDIO_GRACE_WINDOW_MS;
-
 		return {
-			isLive: withinGracePeriod,
+			isLive: false,
 			sourceUrl,
 			status: null,
 			error: error instanceof Error ? error.message : 'Unknown live audio probe error'
