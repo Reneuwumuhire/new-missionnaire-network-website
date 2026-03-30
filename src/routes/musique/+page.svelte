@@ -39,6 +39,25 @@
 
 	let isArtistMenuOpen = false;
 	let artistSearch = '';
+	let showFavorites = false;
+	let showRecent = false;
+
+	function findSongById(list: MusicAudio[], id: string): MusicAudio | undefined {
+		return list.find((s) => (s._id || s.s3_url) === id);
+	}
+
+	function playAllFavorites() {
+		const favSongs = $favorites
+			.map((fav) => findSongById(musicPlaylist, fav.id))
+			.filter(Boolean) as MusicAudio[];
+		if (favSongs.length === 0) return;
+		basePlaylist.set(favSongs);
+		playlist.set(favSongs);
+		currentIndex.set(0);
+		selectAudio.set(favSongs[0]);
+		isPlaying.set(true);
+		addToRecentlyPlayed(favSongs[0] as any);
+	}
 	$: filteredArtists = artists.filter((a: string) => a.toLowerCase().includes(artistSearch.toLowerCase()));
 	$: playlistIndexByUrl = new Map<string, number>(
 		(musicPlaylist || []).map((song: MusicAudio, index: number) => [song.s3_url, index])
@@ -403,73 +422,103 @@
 		</div>
 	{/if}
 
-	<!-- Favorites & Recently Played -->
+	<!-- Favorites & Recently Played (collapsed by default) -->
 	{#if $favorites.length > 0 || $recentlyPlayed.length > 0}
-		<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+		<div class="flex gap-2 mb-4">
 			{#if $favorites.length > 0}
-				<div class="bg-white rounded-xl border border-gray-100 p-4">
-					<div class="flex items-center gap-2 mb-3">
-						<Icon src={BsHeartFill} size="14" className="text-red-500" />
-						<span class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Favoris</span>
-					</div>
-					<div class="flex flex-col gap-1 max-h-[200px] overflow-y-auto">
-						{#each $favorites.slice(0, 8) as fav}
-							<button
-								class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-orange-50 transition-colors text-left w-full group"
-								on:click={() => {
-									const found = musicPlaylist.find((s: MusicAudio) => (s._id || s.s3_url) === fav.id);
-									if (found) playSong(found);
-								}}
-							>
-								<Icon src={IoPlayCircle} size="16" className="text-orange-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-								<div class="flex-1 min-w-0">
-									<div class="text-xs font-bold text-gray-700 truncate">{fav.title}</div>
-									{#if fav.artist}
-										<div class="text-[10px] text-gray-400">{fav.artist}</div>
-									{/if}
-								</div>
-								<!-- svelte-ignore a11y-click-events-have-key-events -->
-								<!-- svelte-ignore a11y-no-static-element-interactions -->
-								<div
-									class="text-red-400 hover:text-red-600 p-1 flex-shrink-0 cursor-pointer"
-									on:click|stopPropagation={() => toggleFavorite({ _id: fav.id, title: fav.title, artist: fav.artist, s3_url: fav.s3_url })}
-									title="Retirer des favoris"
-								>
-									<Icon src={BsX} size="12" />
-								</div>
-							</button>
-						{/each}
-					</div>
-				</div>
+				<button
+					class="flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-bold uppercase tracking-wider transition-colors {showFavorites ? 'border-red-200 bg-red-50 text-red-600' : 'border-gray-200 bg-white text-gray-500 hover:border-red-200 hover:text-red-500'}"
+					on:click={() => { showFavorites = !showFavorites; showRecent = false; }}
+				>
+					<Icon src={BsHeartFill} size="12" />
+					Favoris ({$favorites.length})
+				</button>
 			{/if}
 			{#if $recentlyPlayed.length > 0}
-				<div class="bg-white rounded-xl border border-gray-100 p-4">
-					<div class="flex items-center gap-2 mb-3">
-						<Icon src={BsClockHistory} size="14" className="text-gray-400" />
-						<span class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Recemment joues</span>
-					</div>
-					<div class="flex flex-col gap-1 max-h-[200px] overflow-y-auto">
-						{#each $recentlyPlayed.slice(0, 8) as recent}
+				<button
+					class="flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-bold uppercase tracking-wider transition-colors {showRecent ? 'border-orange-200 bg-orange-50 text-orange-600' : 'border-gray-200 bg-white text-gray-500 hover:border-orange-200 hover:text-orange-500'}"
+					on:click={() => { showRecent = !showRecent; showFavorites = false; }}
+				>
+					<Icon src={BsClockHistory} size="12" />
+					Recents ({$recentlyPlayed.length})
+				</button>
+			{/if}
+		</div>
+
+		{#if showFavorites && $favorites.length > 0}
+			<div class="bg-white rounded-xl border border-gray-100 mb-6 overflow-hidden">
+				<div class="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/50">
+					<span class="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+						Favoris — {$favorites.length} {$favorites.length > 1 ? 'chants' : 'chant'}
+					</span>
+					<button
+						class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-500 hover:bg-orange-600 text-white text-[10px] font-bold uppercase tracking-wider transition-colors"
+						on:click={() => playAllFavorites()}
+					>
+						<Icon src={BsPlayFill} size="10" />
+						Tout lire
+					</button>
+				</div>
+				<div class="divide-y divide-gray-50 max-h-[300px] overflow-y-auto">
+					{#each $favorites as fav, i}
+						{@const favSong = findSongById(musicPlaylist, fav.id)}
+						<div class="flex items-center gap-3 px-4 py-2.5 hover:bg-orange-50/50 transition-colors group">
+							<span class="text-[10px] font-bold text-gray-300 w-5 text-center">{i + 1}</span>
 							<button
-								class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-orange-50 transition-colors text-left w-full group"
-								on:click={() => {
-									const found = musicPlaylist.find((s: MusicAudio) => (s._id || s.s3_url) === recent.id);
-									if (found) playSong(found);
-								}}
+								class="flex-1 min-w-0 text-left"
+								on:click={() => { if (favSong) playSong(favSong); }}
 							>
-								<Icon src={IoPlayCircle} size="16" className="text-orange-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-								<div class="flex-1 min-w-0">
-									<div class="text-xs font-bold text-gray-700 truncate">{recent.title}</div>
-									{#if recent.artist}
-										<div class="text-[10px] text-gray-400">{recent.artist}</div>
+								<div class="text-sm font-bold text-gray-800 group-hover:text-orange-500 transition-colors truncate">{fav.title}</div>
+								<div class="flex items-center gap-2">
+									{#if fav.artist}
+										<span class="text-[10px] text-gray-400">{fav.artist}</span>
+									{/if}
+									{#if fav.category}
+										<span class="text-[10px] text-gray-300">{fav.category}</span>
 									{/if}
 								</div>
 							</button>
-						{/each}
-					</div>
+							<!-- svelte-ignore a11y-click-events-have-key-events -->
+							<!-- svelte-ignore a11y-no-static-element-interactions -->
+							<div
+								class="text-red-300 hover:text-red-500 p-1 cursor-pointer transition-colors"
+								on:click|stopPropagation={() => toggleFavorite({ _id: fav.id, title: fav.title, artist: fav.artist, s3_url: fav.s3_url })}
+								title="Retirer des favoris"
+							>
+								<Icon src={BsX} size="14" />
+							</div>
+						</div>
+					{/each}
 				</div>
-			{/if}
-		</div>
+			</div>
+		{/if}
+
+		{#if showRecent && $recentlyPlayed.length > 0}
+			<div class="bg-white rounded-xl border border-gray-100 mb-6 overflow-hidden">
+				<div class="px-4 py-3 border-b border-gray-100 bg-gray-50/50">
+					<span class="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+						Recemment joues
+					</span>
+				</div>
+				<div class="divide-y divide-gray-50 max-h-[300px] overflow-y-auto">
+					{#each $recentlyPlayed as recent, i}
+						{@const recentSong = findSongById(musicPlaylist, recent.id)}
+						<div class="flex items-center gap-3 px-4 py-2.5 hover:bg-orange-50/50 transition-colors group">
+							<span class="text-[10px] font-bold text-gray-300 w-5 text-center">{i + 1}</span>
+							<button
+								class="flex-1 min-w-0 text-left"
+								on:click={() => { if (recentSong) playSong(recentSong); }}
+							>
+								<div class="text-sm font-bold text-gray-800 group-hover:text-orange-500 transition-colors truncate">{recent.title}</div>
+								{#if recent.artist}
+									<span class="text-[10px] text-gray-400">{recent.artist}</span>
+								{/if}
+							</button>
+						</div>
+					{/each}
+				</div>
+			</div>
+		{/if}
 	{/if}
 
 	<!-- Songs List -->
