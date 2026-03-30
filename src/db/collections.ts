@@ -361,39 +361,46 @@ export async function queryAudios(options: {
 	}
 }
 
-// Map base characters to regex character classes that match accented variants
-// Include both composed (é) and decomposed (e\u0301) Unicode forms
-const ACCENT_MAP: Record<string, string> = {
-	a: '[a\u00e0\u00e2\u00e4\u00e1\u00e3\u00e5a\u0300a\u0302a\u0308a\u0301]',
-	e: '[e\u00e8\u00e9\u00ea\u00ebe\u0300e\u0301e\u0302e\u0308]',
-	i: '[i\u00ec\u00ed\u00ee\u00efi\u0300i\u0301i\u0302i\u0308]',
-	o: '[o\u00f2\u00f3\u00f4\u00f5\u00f6o\u0300o\u0301o\u0302o\u0308]',
-	u: '[u\u00f9\u00fa\u00fb\u00fcu\u0300u\u0301u\u0302u\u0308]',
-	c: '[c\u00e7c\u0327]',
-	n: '[n\u00f1n\u0303]',
-	y: '[y\u00fd\u00ff]'
+// Map base characters to regex alternation that matches accented variants
+// Uses alternation (a|à|â) instead of character classes to avoid issues
+// with multi-byte characters in MongoDB's regex engine
+const ACCENT_MAP: Record<string, string[]> = {
+	a: ['a', 'à', 'â', 'ä', 'á', 'ã', 'å'],
+	e: ['e', 'è', 'é', 'ê', 'ë'],
+	i: ['i', 'ì', 'í', 'î', 'ï'],
+	o: ['o', 'ò', 'ó', 'ô', 'õ', 'ö'],
+	u: ['u', 'ù', 'ú', 'û', 'ü'],
+	c: ['c', 'ç'],
+	n: ['n', 'ñ'],
+	y: ['y', 'ý', 'ÿ']
 };
+
+// Optional combining accent mark — consumes any Unicode combining diacritical
+// that may follow a base letter in decomposed (NFD) storage
+const OPT_COMBINING = '[\u0300-\u036f]?';
 
 function buildFuzzySearchPattern(search: string): string {
 	// Normalize: strip accents to get base characters, then build a regex
-	// where each letter matches its accented variants
+	// where each letter matches its accented variants (composed)
+	// AND tolerates decomposed storage (base + combining mark)
 	const normalized = search.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
 	let pattern = '';
 	for (const char of normalized) {
 		const lower = char.toLowerCase();
 		if (lower in ACCENT_MAP) {
-			pattern += ACCENT_MAP[lower];
-		} else if (/[a-z0-9]/i.test(char)) {
-			pattern += char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			// Match composed accented char OR base letter + optional combining mark
+			pattern += '(?:' + ACCENT_MAP[lower].join('|') + ')' + OPT_COMBINING;
+		} else if (/[a-z]/i.test(char)) {
+			// Regular letter — still may have an unexpected combining mark after it
+			pattern += char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + OPT_COMBINING;
+		} else if (/[0-9]/.test(char)) {
+			pattern += char;
 		} else if (char === "'" || char === '\u2019' || char === '\u2018') {
-			// Match any apostrophe variant or missing apostrophe
-			pattern += "[''ʼ\u2018\u2019]?";
+			pattern += "['ʼ\u2018\u2019]?";
 		} else if (char === ' ') {
-			// Space matches spaces, hyphens, or nothing (for compound words)
-			pattern += "[\\s\\-]?";
+			pattern += '[\\s\\-]?';
 		} else {
-			// Escape other special regex chars
 			pattern += char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 		}
 	}
