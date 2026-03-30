@@ -28,9 +28,13 @@
 	let probeReachable = false;
 	let confirmedLive = false;
 
-	// Auto-reconnect: uses audio.load() (not play()) so mobile browsers
-	// don't block it. The existing audio session from the user's initial
-	// tap satisfies the autoplay policy — load + play works after that.
+	// When true, the audio element has failed (error/ended). The probe
+	// can no longer flip the UI to "available" — the UI stays at offline
+	// until the user manually clicks play. This prevents the on/off
+	// flicker caused by an unreliable probe after stream ends.
+	let playbackFailed = false;
+
+	// Auto-reconnect state
 	let reconnectAttempts = 0;
 	let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 	const MAX_RECONNECT_ATTEMPTS = 8;
@@ -52,7 +56,8 @@
 	}
 
 	$: showLive = confirmedLive;
-	$: canPlay = probeReachable || confirmedLive;
+	// Button stays enabled after failure so user can manually retry
+	$: canPlay = probeReachable || confirmedLive || playbackFailed;
 	$: statusMessage = STATUS_MESSAGES[statusKey] || '';
 	$: checkedAtLabel = lastCheckedAt
 		? new Date(lastCheckedAt).toLocaleTimeString('fr-FR', {
@@ -71,6 +76,13 @@
 		if (liveNow) {
 			offlineStreak = 0;
 			probeReachable = true;
+
+			// If playback previously failed, DON'T update the status text.
+			// The UI stays at offline/unavailable until the user manually
+			// clicks play. This prevents the on/off flicker from an
+			// unreliable probe after the stream ends.
+			if (playbackFailed) return;
+
 			hasError = false;
 
 			if (isPlaying) {
@@ -86,10 +98,11 @@
 			if (offlineStreak >= OFFLINE_THRESHOLD) {
 				probeReachable = false;
 				confirmedLive = false;
+				playbackFailed = false; // Reset — confirmed offline, clean slate
 				hasError = false;
 				statusKey = 'offline';
 				stopPlayback();
-			} else if (!isPlaying && !isBuffering) {
+			} else if (!isPlaying && !isBuffering && !playbackFailed) {
 				statusKey = 'waiting';
 			}
 		}
@@ -167,6 +180,7 @@
 		if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
 			userWantsToPlay = false;
 			confirmedLive = false;
+			playbackFailed = true;
 			hasError = true;
 			statusKey = 'unavailable';
 			reconnectAttempts = 0;
@@ -220,6 +234,7 @@
 		hasError = false;
 		isBuffering = true;
 		userWantsToPlay = true;
+		playbackFailed = false;
 		reconnectAttempts = 0;
 		statusKey = 'connecting';
 
@@ -251,6 +266,7 @@
 		isBuffering = false;
 		hasError = false;
 		confirmedLive = true;
+		playbackFailed = false;
 		reconnectAttempts = 0;
 		clearReconnectTimer();
 		statusKey = 'listening';
@@ -285,6 +301,7 @@
 		isPlaying = false;
 		isBuffering = false;
 		confirmedLive = false;
+		playbackFailed = true;
 
 		if (userWantsToPlay) {
 			attemptReconnect();
@@ -300,6 +317,7 @@
 		isPlaying = false;
 		isBuffering = false;
 		confirmedLive = false;
+		playbackFailed = true;
 
 		// Clear src to stop the browser's built-in retry storm
 		if (audio) {
