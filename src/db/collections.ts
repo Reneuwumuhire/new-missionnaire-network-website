@@ -583,10 +583,13 @@ export async function getAllPushSubscriptions(): Promise<PushSubscriptionRecord[
 
 // ── Notification dedup helpers ───────────────────────────────────
 
+let lockIndexEnsured = false;
+
 /**
  * Check whether a push notification of the given type was sent recently.
  * Returns true if it's safe to send (i.e. cooldown has elapsed).
- * Atomically sets the timestamp so only one instance wins the race.
+ * Uses a unique index on `type` + atomic findOneAndUpdate so that
+ * only one serverless instance can win the race, even across cold starts.
  */
 export async function claimNotificationSlot(
 	type: string,
@@ -594,22 +597,54 @@ export async function claimNotificationSlot(
 ): Promise<boolean> {
 	const db = await getDb();
 	const col = db.collection('notification_locks');
+
+	// Ensure unique index once per process (no-op if already exists)
+	if (!lockIndexEnsured) {
+		await col.createIndex({ type: 1 }, { unique: true });
+		lockIndexEnsured = true;
+	}
+
 	const now = Date.now();
 
-	const result = await col.findOneAndUpdate(
-		{
-			type,
-			$or: [
-				{ lastSentAt: { $exists: false } },
-				{ lastSentAt: { $lt: now - cooldownMs } }
-			]
-		},
-		{ $set: { lastSentAt: now } },
-		{ upsert: true, returnDocument: 'after' }
-	);
+	try {
+		// Atomic: only matches if cooldown has elapsed (or doc doesn't exist → upsert).
+		// With the unique index, concurrent upserts for the same type will fail
+		// with error 11000, so only one instance wins.
+		const result = await col.findOneAndUpdate(
+			{
+				type,
+				$or: [
+					{ lastSentAt: { $exists: false } },
+					{ lastSentAt: { $lt: now - cooldownMs } }
+				]
+			},
+			{ $set: { lastSentAt: now } },
+			{ upsert: true, returnDocument: 'after' }
+		);
 
-	// If the update matched and set our timestamp, we won the slot
-	return result?.lastSentAt === now;
+		return result !== null;
+	} catch (e: any) {
+		// Duplicate key error → another instance already claimed the slot
+		if (e.code === 11000) return false;
+		throw e;
+	}
+}
+
+// ── Notification event tracking ──────────────────────────────────
+
+export async function trackNotificationEvent(event: {
+	action: string;
+	tag: string;
+	timestamp: number;
+}): Promise<void> {
+	const db = await getDb();
+	const col = db.collection('notification_events');
+	await col.insertOne({
+		action: event.action,
+		tag: event.tag,
+		timestamp: event.timestamp,
+		createdAt: new Date()
+	});
 }
 
 /**

@@ -36,6 +36,16 @@ sw.addEventListener('activate', (event) => {
 
 // ── Push Notifications ────────────────────────────────────────────
 
+function ackNotification(action: string, tag: string) {
+	fetch('/api/notifications/ack', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ action, tag, timestamp: Date.now() })
+	}).catch(() => {
+		// Best-effort tracking — don't block user interaction
+	});
+}
+
 sw.addEventListener('push', (event) => {
 	if (!event.data) return;
 
@@ -47,12 +57,24 @@ sw.addEventListener('push', (event) => {
 			icon?: string;
 		};
 
+		const tag = payload.url || 'missionnaire-notification';
+
+		const options: NotificationOptions & { renotify?: boolean; actions?: { action: string; title: string; icon?: string }[] } = {
+			body: payload.body,
+			icon: payload.icon || '/favicon.png',
+			badge: '/favicon.png',
+			data: { url: payload.url || '/' },
+			tag,
+			renotify: true,
+			actions: [
+				{ action: 'open', title: 'Ouvrir' },
+				{ action: 'dismiss', title: 'Ignorer' }
+			]
+		};
+
 		event.waitUntil(
-			sw.registration.showNotification(payload.title, {
-				body: payload.body,
-				icon: payload.icon || '/favicon.png',
-				badge: '/favicon.png',
-				data: { url: payload.url || '/' }
+			sw.registration.showNotification(payload.title, options).then(() => {
+				ackNotification('received', tag);
 			})
 		);
 	} catch (e) {
@@ -64,6 +86,14 @@ sw.addEventListener('notificationclick', (event) => {
 	event.notification.close();
 
 	const url = (event.notification.data?.url as string) || '/';
+	const tag = event.notification.tag || 'unknown';
+	const action = event.action || 'click';
+
+	// Track that the user interacted with the notification
+	ackNotification(action === 'dismiss' ? 'dismissed' : 'clicked', tag);
+
+	// "dismiss" action — just close, don't navigate
+	if (action === 'dismiss') return;
 
 	event.waitUntil(
 		sw.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
