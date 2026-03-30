@@ -3,7 +3,11 @@ import { env } from '$env/dynamic/private';
 import { env as publicEnv } from '$env/dynamic/public';
 import { getAllPushSubscriptions, removePushSubscription } from '../../db/collections';
 
+let vapidConfigured = false;
+
 function ensureVapidConfigured() {
+	if (vapidConfigured) return true;
+
 	const publicKey = publicEnv.PUBLIC_VAPID_KEY;
 	const privateKey = env.VAPID_PRIVATE_KEY;
 
@@ -13,6 +17,7 @@ function ensureVapidConfigured() {
 	}
 
 	webpush.setVapidDetails('https://missionnaire.net', publicKey, privateKey);
+	vapidConfigured = true;
 	return true;
 }
 
@@ -41,10 +46,12 @@ export async function sendPushToAll(payload: PushPayload): Promise<void> {
 		const result = results[i];
 		if (result.status === 'rejected') {
 			const statusCode = result.reason?.statusCode;
-			// 410 Gone or 404 Not Found — subscription is no longer valid
-			if (statusCode === 410 || statusCode === 404) {
+			// 410 Gone, 404 Not Found, 401 Unauthorized, 403 Forbidden —
+			// subscription is no longer valid or has expired.
+			// Push services return various codes for expired/invalid endpoints.
+			if (statusCode === 410 || statusCode === 404 || statusCode === 401 || statusCode === 403) {
 				await removePushSubscription(subscriptions[i].endpoint);
-				console.log('[Push] Removed expired subscription:', subscriptions[i].endpoint);
+				console.log(`[Push] Removed invalid subscription (${statusCode}):`, subscriptions[i].endpoint);
 			} else {
 				console.error('[Push] Failed to send to', subscriptions[i].endpoint, result.reason);
 			}

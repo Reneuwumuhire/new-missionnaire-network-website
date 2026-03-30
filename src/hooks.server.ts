@@ -1,18 +1,11 @@
 import { connect, getDb } from './db/mongo';
 import { checkAndIngestLiveStream } from './lib/server/youtube-poller';
-import { probeLiveAudio } from '$lib/server/live-audio';
-import { sendPushToAll, radioLivePayload } from '$lib/server/push-notifications';
-import { claimNotificationSlot } from './db/collections';
+import { ensureBrokerPolling } from '$lib/server/radio-status-broker';
 import type { Handle } from '@sveltejs/kit';
 import { getFullCountryName } from './utils/countries';
 
 let lastCheckTime = 0;
 const CHECK_INTERVAL = 15 * 60 * 1000; // 15 minutes to stay within Search API quota
-
-// Radio live state tracking
-let lastRadioCheckTime = 0;
-const RADIO_CHECK_INTERVAL = 60 * 1000; // Check radio every 60 seconds
-const RADIO_NOTIFICATION_COOLDOWN = 10 * 60 * 1000; // 10 min cooldown between radio notifications
 
 // Initialize MongoDB on server start
 connect()
@@ -25,6 +18,10 @@ connect()
 
 // Run an immediate check on startup to populate in-memory state
 checkAndIngestLiveStream().catch((e) => console.error('[Startup] Poller error:', e));
+
+// Start the radio status broker independently of SSE clients.
+// This ensures push notifications fire even when nobody has the site open.
+ensureBrokerPolling();
 
 async function trackAnalytics(event: any, isPageRequest: boolean) {
 	if (!isPageRequest) return;
@@ -131,26 +128,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 		checkAndIngestLiveStream().catch((e) => console.error('[Hooks] Poller error:', e));
 	}
 
-	// Fire and forget radio live check (throttled)
-	if (now - lastRadioCheckTime > RADIO_CHECK_INTERVAL) {
-		lastRadioCheckTime = now;
-		probeLiveAudio(fetch)
-			.then(async (probe) => {
-				if (probe.isLive) {
-					// DB-based lock handles dedup across all serverless instances.
-					// No in-memory state needed — the lock ensures only one notification
-					// per cooldown period regardless of cold starts.
-					const canSend = await claimNotificationSlot('radio_live', RADIO_NOTIFICATION_COOLDOWN);
-					if (canSend) {
-						console.log('[Hooks] Radio is live. Sending push notification.');
-						sendPushToAll(radioLivePayload()).catch((e) =>
-							console.error('[Hooks] Radio push error:', e)
-						);
-					}
-				}
-			})
-			.catch((e) => console.error('[Hooks] Radio probe error:', e));
-	}
+	// Radio live checks + push notifications are handled by the radio-status-broker
+	// on its own 5-second interval, independent of HTTP traffic.
 
 	const response = await resolve(event);
 

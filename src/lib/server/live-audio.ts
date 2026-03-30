@@ -2,8 +2,8 @@ import { env } from '$env/dynamic/private';
 import { normalizeLiveStreamUrl } from '$lib/utils/liveStreamUrl';
 
 const DEFAULT_LIVE_AUDIO_SOURCE_URL = 'http://localhost:8000/radio.mp3';
-const LIVE_AUDIO_PROBE_TIMEOUT_MS = 3000;
-const LIVE_AUDIO_GRACE_WINDOW_MS = 15000;
+const LIVE_AUDIO_PROBE_TIMEOUT_MS = 5000;
+const LIVE_AUDIO_GRACE_WINDOW_MS = 35_000;
 
 let lastHealthyProbeAt = 0;
 

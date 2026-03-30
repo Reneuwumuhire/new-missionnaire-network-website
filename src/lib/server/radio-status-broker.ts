@@ -7,6 +7,8 @@
  */
 
 import { probeLiveAudio } from './live-audio';
+import { sendPushToAll, radioLivePayload } from './push-notifications';
+import { claimNotificationSlot } from '../../db/collections';
 
 export type RadioStatusEvent = {
 	isLive: boolean;
@@ -17,11 +19,13 @@ type Listener = (event: RadioStatusEvent) => void;
 
 const GLOBAL_KEY = Symbol.for('missionnaire_radio_broker');
 const POLL_INTERVAL_MS = 5_000;
+const RADIO_NOTIFICATION_COOLDOWN = 10 * 60 * 1000; // 10 min cooldown
 
 interface BrokerState {
 	listeners: Set<Listener>;
 	timer: ReturnType<typeof setInterval> | null;
 	lastStatus: RadioStatusEvent | null;
+	keepAlive: boolean; // true when ensureBrokerPolling() was called — never stop polling
 }
 
 const globalAny = globalThis as any;
@@ -33,7 +37,8 @@ function getBroker(): BrokerState {
 			timer: null,
 			// Start with null — we don't know the status yet.
 			// Don't send a stale isLive:false to new clients.
-			lastStatus: null as RadioStatusEvent | null
+			lastStatus: null as RadioStatusEvent | null,
+			keepAlive: false
 		};
 	}
 	return globalAny[GLOBAL_KEY];
@@ -61,13 +66,33 @@ async function poll() {
 			}
 		}
 
-		// If status changed, log it
+		// If status changed, log it and trigger notifications
 		if (changed) {
 			console.log(`[RadioBroker] Status changed: ${event.isLive ? 'LIVE' : 'OFFLINE'}`);
+
+			// Send push notification when stream goes live.
+			// This runs on the broker's own interval (every 5s), independent of
+			// HTTP traffic, so notifications fire even if nobody is on the site.
+			if (event.isLive) {
+				claimNotificationSlot('radio_live', RADIO_NOTIFICATION_COOLDOWN)
+					.then((canSend) => {
+						if (canSend) {
+							console.log('[RadioBroker] Radio is live. Sending push notification.');
+							return sendPushToAll(radioLivePayload());
+						}
+					})
+					.catch((e) => console.error('[RadioBroker] Radio push error:', e));
+			}
 		}
 	} catch (error) {
 		console.error('[RadioBroker] Poll error:', error);
 	}
+}
+
+export function ensureBrokerPolling() {
+	const broker = getBroker();
+	broker.keepAlive = true;
+	ensurePolling();
 }
 
 function ensurePolling() {
@@ -83,6 +108,9 @@ function ensurePolling() {
 
 function stopPollingIfEmpty() {
 	const broker = getBroker();
+	// If keepAlive is set (ensureBrokerPolling was called), never stop polling —
+	// we need the interval running for push notifications even with 0 SSE clients.
+	if (broker.keepAlive) return;
 	if (broker.listeners.size === 0 && broker.timer) {
 		clearInterval(broker.timer);
 		broker.timer = null;

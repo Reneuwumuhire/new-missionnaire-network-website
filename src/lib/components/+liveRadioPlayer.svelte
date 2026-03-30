@@ -63,15 +63,24 @@
 		} else {
 			offlineStreak += 1;
 
-			// After threshold, we're confident the stream is offline — reset everything
 			if (offlineStreak >= OFFLINE_THRESHOLD) {
+				// Confident the stream is offline — update status
 				isLive = false;
-				isPlaying = false;
-				isBuffering = false;
-				userWantsToPlay = false;
 				hasError = false;
 				statusKey = 'offline';
-				audio?.pause();
+
+				// If audio is still trying to play, stop it and clear the src
+				// to prevent the browser's built-in retry loop (request storm).
+				if (isPlaying || isBuffering || userWantsToPlay) {
+					isPlaying = false;
+					isBuffering = false;
+					userWantsToPlay = false;
+					audio?.pause();
+					if (audio) {
+						audio.removeAttribute('src');
+						audio.load();
+					}
+				}
 			} else if (!isPlaying && !isBuffering) {
 				// Not playing yet and not enough offline probes to be sure — show waiting
 				statusKey = 'waiting';
@@ -181,9 +190,12 @@
 		isPlaying = true;
 		isBuffering = false;
 		hasError = false;
-		isLive = true;
-		offlineStreak = 0;
-		statusKey = 'listening';
+		// Do NOT set isLive here — SSE is the sole authority on live status.
+		// Setting isLive = true here overrides a confirmed-offline SSE status,
+		// causing the UI to show "EN DIRECT" when the stream is actually down.
+		if (isLive) {
+			statusKey = 'listening';
+		}
 	};
 
 	const handlePause = () => {
@@ -218,6 +230,14 @@
 			hasError = true;
 			userWantsToPlay = false;
 			statusKey = isLive ? 'cannotPlay' : 'unavailable';
+
+			// Clear the src to stop the browser's built-in retry loop.
+			// Without this, the audio element keeps making failed requests
+			// every ~3 seconds, creating a request storm visible in DevTools.
+			if (audio) {
+				audio.removeAttribute('src');
+				audio.load();
+			}
 		}
 	};
 </script>
