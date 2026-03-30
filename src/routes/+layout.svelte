@@ -7,6 +7,7 @@
 	import VideoPlaylistPlayer from '$lib/components/VideoPlaylistPlayer.svelte';
 	import InstallPrompt from '$lib/components/+installPrompt.svelte';
 	import OfflineIndicator from '$lib/components/+offlineIndicator.svelte';
+	import PullToRefresh from '$lib/components/+pullToRefresh.svelte';
 	import type { LayoutData } from './$types';
 	import { QueryClientProvider } from '@tanstack/svelte-query';
 	import { navigating, page } from '$app/stores';
@@ -109,4 +110,5 @@
 	<VideoPlaylistPlayer />
 	<InstallPrompt />
 	<OfflineIndicator />
+	<PullToRefresh />
 </QueryClientProvider>
