@@ -112,7 +112,7 @@
 		<div class="mt-8 flex flex-wrap justify-center gap-3">
 			<a
 				href="/videos"
-				class="px-5 py-2.5 rounded-full bg-orange-600 text-white text-xs font-bold uppercase tracking-wider hover:bg-orange-700 transition-colors"
+				class="px-5 py-2.5 rounded-full bg-orange-700 text-white text-xs font-bold uppercase tracking-wider hover:bg-orange-800 transition-colors"
 			>
 				Explorer
 			</a>
