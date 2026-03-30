@@ -1,3 +1,5 @@
+import type { Action } from 'svelte/action';
+
 let intersectionObserver: IntersectionObserver;
 
 function ensureIntersectionObserver() {
@@ -11,26 +13,38 @@ function ensureIntersectionObserver() {
 	});
 }
 
-export default function viewport(element: Element, callbacks?: { onEnter?: () => void; onExit?: () => void }) {
+interface ViewportCallbacks {
+	onEnter?: () => void;
+	onExit?: () => void;
+}
+
+const viewport: Action<Element, ViewportCallbacks | undefined> = (element, callbacks?) => {
 	ensureIntersectionObserver();
 
 	intersectionObserver.observe(element);
 
+	let cbs = callbacks;
+
 	function handleEnter() {
-		callbacks?.onEnter?.();
+		cbs?.onEnter?.();
 	}
 	function handleExit() {
-		callbacks?.onExit?.();
+		cbs?.onExit?.();
 	}
 
 	element.addEventListener('enterViewport', handleEnter);
 	element.addEventListener('exitViewport', handleExit);
 
 	return {
+		update(newCallbacks?: ViewportCallbacks) {
+			cbs = newCallbacks;
+		},
 		destroy() {
 			intersectionObserver.unobserve(element);
 			element.removeEventListener('enterViewport', handleEnter);
 			element.removeEventListener('exitViewport', handleExit);
 		}
 	};
-}
+};
+
+export default viewport;
