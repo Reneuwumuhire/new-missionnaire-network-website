@@ -53,15 +53,20 @@
 	});
 
 	$: canonicalUrl = `${SITE_URL}${$page.url.pathname}`;
+
+	const ytPages = ['/videos', '/musique', '/predications'];
+	$: needsYouTube = ytPages.some((p) => $page.url.pathname.startsWith(p));
 </script>
 
 <svelte:head>
 	<title>Missionnaire Network</title>
-	<script src="https://www.youtube.com/iframe_api" async></script>
-	<link rel="preconnect" href="https://i.ytimg.com" />
-	<link rel="preconnect" href="https://www.youtube.com" />
-	<link rel="dns-prefetch" href="https://i.ytimg.com" />
-	<link rel="dns-prefetch" href="https://www.youtube.com" />
+	{#if needsYouTube}
+		<script src="https://www.youtube.com/iframe_api" async></script>
+		<link rel="preconnect" href="https://i.ytimg.com" />
+		<link rel="preconnect" href="https://www.youtube.com" />
+		<link rel="dns-prefetch" href="https://i.ytimg.com" />
+		<link rel="dns-prefetch" href="https://www.youtube.com" />
+	{/if}
 	<link rel="canonical" href={canonicalUrl} />
 	<meta name="description" content={DEFAULT_SEO_DESCRIPTION} />
 	<meta property="og:site_name" content="Missionnaire Network" />

@@ -88,8 +88,28 @@ sw.addEventListener('fetch', (event) => {
 
 	const url = new URL(event.request.url);
 
-	// Don't cache API requests or external URLs
+	// Don't cache API requests
 	if (url.pathname.startsWith('/api/')) return;
+
+	// Cache YouTube thumbnails with long TTL
+	if (url.hostname === 'i.ytimg.com') {
+		event.respondWith(
+			(async () => {
+				const cache = await caches.open('yt-thumbnails');
+				const cached = await cache.match(event.request);
+				if (cached) return cached;
+
+				const response = await fetch(event.request);
+				if (response.ok) {
+					cache.put(event.request, response.clone());
+				}
+				return response;
+			})()
+		);
+		return;
+	}
+
+	// Don't cache other external URLs
 	if (url.origin !== sw.location.origin) return;
 
 	event.respondWith(

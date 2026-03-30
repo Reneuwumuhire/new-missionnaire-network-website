@@ -50,10 +50,49 @@
 	<meta name="twitter:description" content="Decouvrez les predications et cantiques inspirants du Message de l'Heure pour votre edification spirituelle." />
 </svelte:head>
 
-<main class="max-w-5xl mx-auto px-5 pb-20">
+<main class="max-w-5xl mx-auto px-5 pb-20 relative">
 
-	<!-- Hero — tight, text-only, no card wrapper -->
-	<section class="pt-10 pb-12 md:pt-16 md:pb-16 text-center">
+	<!-- Church symbols — scroll with page, in margins on large screens -->
+	<div class="hidden lg:block absolute -left-[80px] -right-[80px] top-[500px] bottom-0 pointer-events-none overflow-visible" aria-hidden="true">
+		<!-- Cross — right margin -->
+		<svg class="absolute top-0 -right-[60px] w-[40px] h-[54px] church-float" viewBox="0 0 40 54" fill="none">
+			<rect x="14" y="0" width="12" height="54" rx="3" fill="#FF880C" fill-opacity="0.12" />
+			<rect x="0" y="12" width="40" height="12" rx="3" fill="#FF880C" fill-opacity="0.12" />
+		</svg>
+
+		<!-- Open book — left margin -->
+		<svg class="absolute top-[350px] -left-[70px] w-[60px] h-[42px] church-float-slow" viewBox="0 0 60 42" fill="none">
+			<path d="M30 6 C22 3, 6 3, 1 7 L1 36 C6 32, 22 32, 30 34" stroke="#FF880C" stroke-opacity="0.15" stroke-width="1.5" fill="#FF880C" fill-opacity="0.04" />
+			<path d="M30 6 C38 3, 54 3, 59 7 L59 36 C54 32, 38 32, 30 34" stroke="#FF880C" stroke-opacity="0.15" stroke-width="1.5" fill="#FF880C" fill-opacity="0.04" />
+			<line x1="30" y1="6" x2="30" y2="34" stroke="#FF880C" stroke-opacity="0.1" stroke-width="1" />
+		</svg>
+	</div>
+
+	<!-- Hero with wave mesh background -->
+	<section class="pt-10 pb-12 md:pt-16 md:pb-16 text-center relative overflow-hidden">
+		<!-- Wave mesh — hero only -->
+		<div class="absolute inset-0 pointer-events-none -z-10" aria-hidden="true">
+			<svg class="hero-waves absolute -left-[20%] -top-[20%] w-[140%] h-[140%]" viewBox="0 0 1000 600" fill="none" preserveAspectRatio="none">
+				<!-- Flowing mesh — group A (flows right) -->
+				<path d="M-100 80 C100 20, 300 160, 500 60 C700 -40, 850 120, 1100 50" stroke="#FF880C" stroke-opacity="0.18" stroke-width="1.5" />
+				<path d="M-100 110 C120 40, 320 180, 520 90 C720 0, 870 140, 1100 80" stroke="#FF880C" stroke-opacity="0.14" stroke-width="1.2" />
+				<path d="M-100 140 C140 60, 340 200, 540 120 C740 40, 890 160, 1100 110" stroke="#FF880C" stroke-opacity="0.1" stroke-width="1" />
+
+				<!-- Flowing mesh — group B (flows left, crossing A) -->
+				<path d="M-100 200 C150 300, 400 120, 600 250 C800 380, 900 180, 1100 280" stroke="#FF880C" stroke-opacity="0.16" stroke-width="1.5" />
+				<path d="M-100 230 C170 320, 420 150, 620 270 C820 400, 920 210, 1100 300" stroke="#FF880C" stroke-opacity="0.12" stroke-width="1.2" />
+				<path d="M-100 260 C190 340, 440 180, 640 290 C840 420, 940 240, 1100 320" stroke="#FF880C" stroke-opacity="0.08" stroke-width="1" />
+
+				<!-- Flowing mesh — group C (center weave) -->
+				<path d="M-100 350 C200 250, 350 450, 550 320 C750 190, 850 400, 1100 340" stroke="#FF880C" stroke-opacity="0.14" stroke-width="1.5" />
+				<path d="M-100 380 C220 270, 370 470, 570 340 C770 210, 870 420, 1100 360" stroke="#FF880C" stroke-opacity="0.1" stroke-width="1.2" />
+				<path d="M-100 410 C240 290, 390 490, 590 360 C790 230, 890 440, 1100 380" stroke="#FF880C" stroke-opacity="0.07" stroke-width="1" />
+
+				<!-- Lower strands — fading out -->
+				<path d="M-100 480 C300 400, 500 560, 750 460 C950 370, 1000 500, 1100 450" stroke="#FF880C" stroke-opacity="0.1" stroke-width="1.2" />
+				<path d="M-100 510 C280 420, 520 580, 770 480 C970 390, 1020 520, 1100 470" stroke="#FF880C" stroke-opacity="0.06" stroke-width="1" />
+			</svg>
+		</div>
 		<p class="text-[11px] font-black uppercase tracking-[0.25em] text-orange-600 mb-4">
 			Missionnaire Network
 		</p>
@@ -135,6 +174,10 @@
 						src="/img/eglise_inside.jpg"
 						alt="Interieur de l'eglise"
 						class="absolute inset-0 w-full h-full object-cover"
+						width="776"
+						height="539"
+						loading="lazy"
+						decoding="async"
 					/>
 				</div>
 				<div class="p-6">
@@ -160,7 +203,7 @@
 				href="/william-branham/biographie"
 				class="group rounded-2xl border border-gray-100 p-5 hover:border-gray-200 transition-colors flex-1 text-center"
 			>
-				<img src="/img/branham_icon.png" alt="William Branham" class="w-20 h-20 rounded-full object-cover mx-auto" />
+				<img src="/img/branham_icon.png" alt="William Branham" class="w-20 h-20 rounded-full object-cover mx-auto" width="80" height="80" loading="lazy" decoding="async" />
 				<p class="text-sm font-bold text-gray-900 group-hover:text-orange-600 transition-colors mt-4">William M. Branham</p>
 				<p class="text-xs text-gray-400 mt-1.5 leading-relaxed">
 					Prophete du Message de l'Heure (1909–1965). Son ministere a marque des millions de croyants a travers le monde.
@@ -171,7 +214,7 @@
 				href="/ewald-frank"
 				class="group rounded-2xl border border-gray-100 p-5 hover:border-gray-200 transition-colors flex-1 text-center"
 			>
-				<img src="/img/ewald_frank_second_img.jpg" alt="Ewald Frank" class="w-20 h-20 rounded-full object-cover mx-auto" />
+				<img src="/img/ewald_frank_second_img.jpg" alt="Ewald Frank" class="w-20 h-20 rounded-full object-cover mx-auto" width="80" height="80" loading="lazy" decoding="async" />
 				<p class="text-sm font-bold text-gray-900 group-hover:text-orange-600 transition-colors mt-4">Ewald Frank</p>
 				<p class="text-xs text-gray-400 mt-1.5 leading-relaxed">
 					Missionnaire international base a Krefeld, Allemagne. Il porte le Message aux nations depuis plus de 60 ans.
@@ -218,3 +261,26 @@
 		</section>
 	{/if}
 </main>
+
+<style>
+	.hero-waves {
+		animation: wave-sway 12s ease-in-out infinite;
+	}
+	.church-float {
+		animation: church-bob 7s ease-in-out infinite;
+	}
+	.church-float-slow {
+		animation: church-bob 9s ease-in-out infinite 2s;
+	}
+
+	@keyframes wave-sway {
+		0%, 100% { transform: translate(-20%, -20%) scaleX(1); }
+		33% { transform: translate(-18%, -21%) scaleX(1.02); }
+		66% { transform: translate(-22%, -19%) scaleX(0.98); }
+	}
+	@keyframes church-bob {
+		0%, 100% { transform: translateY(0); }
+		50% { transform: translateY(-8px); }
+	}
+</style>
+
