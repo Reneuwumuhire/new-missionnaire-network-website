@@ -109,6 +109,12 @@ export const NavigationLinkList: NavigationLink[] = [
 				subText: 'Ecoutez les prédications de Branham, Ewald Frank et locales.',
 				link: '/predications',
 				icon: IoMusicalNotes
+			},
+			{
+				subName: 'Vidéos',
+				subText: 'Regardez les retransmissions et enseignements en vidéo.',
+				link: '/videos',
+				icon: IoVideocam
 			}
 		]
 	},

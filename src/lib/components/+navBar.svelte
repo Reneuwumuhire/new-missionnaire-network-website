@@ -13,9 +13,7 @@
 	import CloseCircle from 'iconsax-svelte/CloseCircle.svelte';
 	import HeaderMenuLinkMobo from './+headerMenuLinkMobo.svelte';
 	import { searchTerm } from '$lib/stores/videoStore';
-	import { createEventDispatcher } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { fetchInitialVideos } from '../../utils/videoUtils';
 
 	const languages = { en, fr };
 	let currentLang = 'en';
@@ -23,7 +21,6 @@
 	let openMenuIndex: number | null = null;
 	dict.set(languages);
 	let showDropContents = false;
-	const dispatch = createEventDispatcher();
 
 	const langSwitch = () => {
 		showDropContents = !showDropContents;
@@ -69,13 +66,9 @@
 	$: showClearButton = $searchTerm.trim().length > 0;
 	$: showPlaceholder = shouldExpand;
 
-	$: isHomePage = $page.url.pathname === '/';
-
 	function handleSubmit() {
-		if (!isHomePage && $searchTerm.trim()) {
-			goto(`/?search=${encodeURIComponent($searchTerm.trim())}`);
-		} else {
-			dispatch('search', $searchTerm);
+		if ($searchTerm.trim()) {
+			goto(`/videos?search=${encodeURIComponent($searchTerm.trim())}`);
 		}
 		if (showMoboNav) {
 			toggleMobileNav();
@@ -83,17 +76,11 @@
 	}
 
 	function handleSearchInput() {
-		if (isHomePage) {
-			dispatch('search', $searchTerm);
-		}
+		// Search is handled on submit, navigating to /predications
 	}
 
 	function clearInput() {
 		searchTerm.set('');
-		if (isHomePage) {
-			fetchInitialVideos();
-		}
-		dispatch('search', '');
 		if (showMoboNav) {
 			toggleMobileNav();
 		}
@@ -209,9 +196,7 @@
 		<!-- mobo menu -->
 		{#if showMoboNav}
 			<div
-				class={`absolute z-50 ${
-					$page.url.pathname === '/' ? 'top-[100px]' : 'top-[40px]'
-				} left-0 w-full h-screen bg-white border-t-2 py-6`}
+				class="absolute z-50 top-[40px] left-0 w-full h-screen bg-white border-t-2 py-6"
 			>
 				<div class="relative flex flex-col space-y-2 w-full h-full bg-white">
 					<!-- svelte-ignore a11y-no-static-element-interactions -->

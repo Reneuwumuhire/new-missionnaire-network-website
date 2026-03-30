@@ -521,6 +521,24 @@ export async function getMusicArtists(): Promise<string[]> {
 	}
 }
 
+export async function getVideoById(videoId: string): Promise<YoutubeVideo | null> {
+	try {
+		const db = await getDb();
+		const collection = db.collection('videos');
+
+		// Try matching by `id` field first (YouTube video ID), then by `_id`
+		let doc = await collection.findOne({ id: videoId });
+		if (!doc && ObjectId.isValid(videoId)) {
+			doc = await collection.findOne({ _id: new ObjectId(videoId) });
+		}
+
+		return doc ? serializeDocument(doc) : null;
+	} catch (error) {
+		console.error('[DB] Error in getVideoById:', error);
+		return null;
+	}
+}
+
 /**
  * Recursively serializes a MongoDB document, converting all ObjectIds to strings
  * and ensuring the document is fully serializable for SvelteKit data loading.
