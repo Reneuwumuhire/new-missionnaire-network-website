@@ -42,10 +42,27 @@ function updateStatus(newStatus: LiveStatus) {
 
 const CHANNEL_ID = 'UCS3zqpqnCvT0SFa_jI662Kg';
 let isChecking = false;
+let quotaBlockedUntil = 0;
+let lastQuotaLogAt = 0;
+
+const YOUTUBE_QUOTA_BACKOFF_MS = 60 * 60 * 1000;
+const QUOTA_LOG_THROTTLE_MS = 10 * 60 * 1000;
 
 export async function checkAndIngestLiveStream() {
 	if (isChecking) {
 		console.log('[YouTube Poller] Check already in progress, skipping');
+		return;
+	}
+
+	if (Date.now() < quotaBlockedUntil) {
+		if (Date.now() - lastQuotaLogAt > QUOTA_LOG_THROTTLE_MS) {
+			lastQuotaLogAt = Date.now();
+			console.warn(
+				`[YouTube Poller] Quota exhausted, skipping checks until ${new Date(
+					quotaBlockedUntil
+				).toISOString()}`
+			);
+		}
 		return;
 	}
 
@@ -67,6 +84,30 @@ export async function checkAndIngestLiveStream() {
 			const errorData = await response.json().catch(() => ({}));
 			const errorMsg = errorData.error?.message || response.statusText;
 			console.error(`[YouTube Poller] API request failed: ${errorMsg}`);
+
+			const quotaExceeded = response.status === 403 && errorMsg.toLowerCase().includes('quota');
+
+			if (quotaExceeded) {
+				quotaBlockedUntil = Date.now() + YOUTUBE_QUOTA_BACKOFF_MS;
+				lastQuotaLogAt = Date.now();
+				console.warn(
+					`[YouTube Poller] Quota exceeded. Backing off until ${new Date(
+						quotaBlockedUntil
+					).toISOString()}`
+				);
+				updateStatus({
+					isLive: false,
+					videoId: null,
+					title: null,
+					description: null,
+					thumbnail: null,
+					duration: 0,
+					url: null,
+					updatedAt: new Date().toISOString()
+				});
+				return;
+			}
+
 			throw new Error(`YouTube API error: ${response.status} - ${errorMsg}`);
 		}
 
@@ -108,7 +149,8 @@ export async function checkAndIngestLiveStream() {
 			});
 		}
 	} catch (error) {
-		console.error('[YouTube Poller] Error checking for livestream:', error);
+		const message = error instanceof Error ? error.message : String(error);
+		console.error(`[YouTube Poller] Error checking for livestream: ${message}`);
 		// CRITICAL FIX: If checking fails, assume NOT LIVE to prevent stuck banner
 		updateStatus({
 			isLive: false,
