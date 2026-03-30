@@ -221,6 +221,16 @@
 		}
 	};
 
+	const handleEnded = () => {
+		// Live stream ended naturally — reflect offline in UI.
+		// Next SSE event will correct if stream comes back.
+		isPlaying = false;
+		isBuffering = false;
+		userWantsToPlay = false;
+		isLive = false;
+		statusKey = 'offline';
+	};
+
 	const handleError = () => {
 		isPlaying = false;
 		isBuffering = false;
@@ -229,7 +239,13 @@
 		if (userWantsToPlay) {
 			hasError = true;
 			userWantsToPlay = false;
-			statusKey = isLive ? 'cannotPlay' : 'unavailable';
+
+			// The audio element has a direct connection to the stream.
+			// If it fails, the user can't hear anything — reflect that in the UI
+			// regardless of what the probe says. The next SSE event will flip
+			// isLive back to true if the stream is genuinely still up.
+			isLive = false;
+			statusKey = 'unavailable';
 
 			// Clear the src to stop the browser's built-in retry loop.
 			// Without this, the audio element keeps making failed requests
@@ -353,6 +369,7 @@
 			on:waiting={handleWaiting}
 			on:canplay={handleCanPlay}
 			on:error={handleError}
+			on:ended={handleEnded}
 		/>
 	{/if}
 </div>

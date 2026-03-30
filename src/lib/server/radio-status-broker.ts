@@ -66,23 +66,23 @@ async function poll() {
 			}
 		}
 
-		// If status changed, log it and trigger notifications
 		if (changed) {
 			console.log(`[RadioBroker] Status changed: ${event.isLive ? 'LIVE' : 'OFFLINE'}`);
+		}
 
-			// Send push notification when stream goes live.
-			// This runs on the broker's own interval (every 5s), independent of
-			// HTTP traffic, so notifications fire even if nobody is on the site.
-			if (event.isLive) {
-				claimNotificationSlot('radio_live', RADIO_NOTIFICATION_COOLDOWN)
-					.then((canSend) => {
-						if (canSend) {
-							console.log('[RadioBroker] Radio is live. Sending push notification.');
-							return sendPushToAll(radioLivePayload());
-						}
-					})
-					.catch((e) => console.error('[RadioBroker] Radio push error:', e));
-			}
+		// Attempt notification on every poll where stream is live, not just on
+		// transitions. On serverless, the process can cold-start and miss the
+		// exact transition moment. The DB-based claimNotificationSlot ensures
+		// only one notification per cooldown period across all instances.
+		if (event.isLive) {
+			claimNotificationSlot('radio_live', RADIO_NOTIFICATION_COOLDOWN)
+				.then((canSend) => {
+					if (canSend) {
+						console.log('[RadioBroker] Radio is live. Sending push notification.');
+						return sendPushToAll(radioLivePayload());
+					}
+				})
+				.catch((e) => console.error('[RadioBroker] Radio push error:', e));
 		}
 	} catch (error) {
 		console.error('[RadioBroker] Poll error:', error);
