@@ -4,9 +4,10 @@
 	import { env } from '$env/dynamic/public';
 
 	let permission: NotificationPermission = 'default';
-	let isSubscribed = false;
-	let isSupported = false;
+	export let isSubscribed = false;
+	export let isSupported = false;
 	let loading = false;
+	let justToggled = false;
 
 	onMount(async () => {
 		isSupported =
@@ -23,8 +24,8 @@
 		}
 	});
 
-	async function toggleSubscription() {
-		if (loading) return;
+	export async function toggle() {
+		if (loading || !isSupported) return;
 		loading = true;
 
 		try {
@@ -37,6 +38,8 @@
 			console.error('[NotificationBell] Error:', e);
 		} finally {
 			loading = false;
+			justToggled = true;
+			setTimeout(() => (justToggled = false), 1500);
 		}
 	}
 
@@ -67,6 +70,14 @@
 
 		if (response.ok) {
 			isSubscribed = true;
+
+			// Show a sample notification so the user sees what to expect
+			reg.showNotification('Notifications activees', {
+				body: 'Vous recevrez une alerte quand la radio sera en direct.',
+				icon: '/favicon.png',
+				badge: '/favicon.png',
+				tag: 'welcome-notification'
+			});
 		}
 	}
 
@@ -100,23 +111,49 @@
 </script>
 
 {#if isSupported && permission !== 'denied'}
-	<button
-		on:click={toggleSubscription}
-		class="relative w-8 h-8 rounded-full border border-[#ccc] bg-white flex items-center justify-center hover:border-orange-300 transition-colors shrink-0"
-		class:opacity-50={loading}
-		disabled={loading}
-		aria-label={isSubscribed ? 'Desactiver les notifications' : 'Activer les notifications'}
-		title={isSubscribed ? 'Notifications activees' : 'Activer les notifications'}
-	>
-		{#if isSubscribed}
-			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4 text-orange-500">
+	<span class="relative inline-flex shrink-0" class:animate-wiggle={justToggled && isSubscribed}>
+		{#if loading}
+			<span class="w-5 h-5 border-2 border-orange-300 border-t-orange-600 rounded-full animate-spin"></span>
+		{:else if justToggled}
+			{#if isSubscribed}
+				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 text-green-500 animate-pop">
+					<path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clip-rule="evenodd" />
+				</svg>
+			{:else}
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-400 animate-pop">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M9.143 17.082a24.248 24.248 0 005.714 0m-5.714 0a3 3 0 115.714 0M3.124 15.07A8.965 8.965 0 016 9.75V9a6 6 0 1112 0v.75a8.965 8.965 0 012.876 5.32M3.124 15.07a23.814 23.814 0 005.876 1.93m5.876-1.93a23.814 23.814 0 01-5.876 1.93m0 0a3 3 0 01-5.714 0" />
+				</svg>
+			{/if}
+		{:else if isSubscribed}
+			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 text-orange-500">
 				<path fill-rule="evenodd" d="M5.25 9a6.75 6.75 0 0113.5 0v.75c0 2.123.8 4.057 2.118 5.52a.75.75 0 01-.297 1.206c-1.544.57-3.16.99-4.831 1.243a3.75 3.75 0 11-7.48 0 24.585 24.585 0 01-4.831-1.244.75.75 0 01-.298-1.205A8.217 8.217 0 005.25 9.75V9zm4.502 8.9a2.25 2.25 0 004.496 0 25.057 25.057 0 01-4.496 0z" clip-rule="evenodd" />
 			</svg>
-			<span class="absolute -top-0.5 -right-0.5 w-2 h-2 bg-orange-500 rounded-full border border-white"></span>
 		{:else}
-			<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-[#ccc]">
+			<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-400">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
 			</svg>
 		{/if}
-	</button>
+	</span>
 {/if}
+
+<style>
+	@keyframes pop {
+		0% { transform: scale(0.5); opacity: 0; }
+		50% { transform: scale(1.2); }
+		100% { transform: scale(1); opacity: 1; }
+	}
+	@keyframes wiggle {
+		0%, 100% { transform: rotate(0deg); }
+		15% { transform: rotate(14deg); }
+		30% { transform: rotate(-12deg); }
+		45% { transform: rotate(10deg); }
+		60% { transform: rotate(-8deg); }
+		75% { transform: rotate(4deg); }
+	}
+	:global(.animate-pop) {
+		animation: pop 0.35s ease-out;
+	}
+	:global(.animate-wiggle) {
+		animation: wiggle 0.6s ease-in-out;
+	}
+</style>

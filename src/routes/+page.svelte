@@ -1,14 +1,6 @@
 <script lang="ts">
 	import '../app.css';
 	import type { YoutubeVideo } from '$lib/models/youtube';
-	// @ts-ignore
-	import Icon from 'svelte-icons-pack/Icon.svelte';
-	import IoVideocam from 'svelte-icons-pack/io/IoVideocam';
-	import IoMusicalNotes from 'svelte-icons-pack/io/IoMusicalNotes';
-	import IoBookOutline from 'svelte-icons-pack/io/IoBookOutline';
-	import IoRadioOutline from 'svelte-icons-pack/io/IoRadioOutline';
-	import IoDocumentTextOutline from 'svelte-icons-pack/io/IoDocumentTextOutline';
-	import IoImagesOutline from 'svelte-icons-pack/io/IoImagesOutline';
 	import NotificationBell from '$lib/components/+notificationBell.svelte';
 
 	export let data: {
@@ -20,63 +12,15 @@
 	$: radioIsLive = data.radioStatus?.isLive ?? false;
 	$: recentVideos = (data.data || []).slice(0, 3);
 
-	const services = [
-		{
-			title: 'Videos',
-			description: 'Retransmissions et enseignements en video',
-			href: '/videos',
-			icon: IoVideocam,
-			bgColor: 'bg-orange-50',
-			textColor: 'text-orange-600'
-		},
-		{
-			title: 'Predications',
-			description: 'Sermons et enseignements du Message',
-			href: '/predications',
-			icon: IoDocumentTextOutline,
-			bgColor: 'bg-teal-50',
-			textColor: 'text-teal-600'
-		},
-		{
-			title: 'Musique',
-			description: 'Cantiques et louanges inspirants',
-			href: '/musique',
-			icon: IoMusicalNotes,
-			bgColor: 'bg-blue-50',
-			textColor: 'text-blue-600'
-		},
-		{
-			title: 'Radio',
-			description: 'Ecouter la radio en direct',
-			href: '/live',
-			icon: IoRadioOutline,
-			bgColor: 'bg-red-50',
-			textColor: 'text-red-600'
-		},
-		{
-			title: 'Transcriptions',
-			description: 'Textes des predications',
-			href: '/transcriptions',
-			icon: IoBookOutline,
-			bgColor: 'bg-purple-50',
-			textColor: 'text-purple-600'
-		},
-		{
-			title: 'Litterature',
-			description: 'Livres et brochures du Message',
-			href: '/literature',
-			icon: IoBookOutline,
-			bgColor: 'bg-green-50',
-			textColor: 'text-green-600'
-		},
-		{
-			title: 'Galerie',
-			description: 'Photos et images historiques',
-			href: '/galerie',
-			icon: IoImagesOutline,
-			bgColor: 'bg-amber-50',
-			textColor: 'text-amber-600'
-		}
+	let bellRef: any;
+
+	const quickLinks = [
+		{ label: 'Videos', href: '/videos' },
+		{ label: 'Predications', href: '/predications' },
+		{ label: 'Musique', href: '/musique' },
+		{ label: 'Radio', href: '/live' },
+		{ label: 'Transcriptions', href: '/transcriptions' },
+		{ label: 'Litterature', href: '/literature' }
 	];
 
 	function getVideoDateLabel(video: YoutubeVideo): string {
@@ -91,7 +35,6 @@
 			year: 'numeric'
 		});
 	}
-
 </script>
 
 <svelte:head>
@@ -100,259 +43,174 @@
 		name="description"
 		content="Bienvenue sur Missionnaire Network. Decouvrez les predications et cantiques inspirants du Message de l'Heure pour votre edification spirituelle."
 	/>
-	<meta
-		property="og:title"
-		content="Missionnaire Network - Accueil | Predications et Cantiques du Message"
-	/>
-	<meta
-		property="og:description"
-		content="Decouvrez les predications et cantiques inspirants du Message de l'Heure pour votre edification spirituelle."
-	/>
+	<meta property="og:title" content="Missionnaire Network - Accueil | Predications et Cantiques du Message" />
+	<meta property="og:description" content="Decouvrez les predications et cantiques inspirants du Message de l'Heure pour votre edification spirituelle." />
 	<meta property="og:url" content="https://missionnaire.net/" />
-	<meta
-		name="twitter:title"
-		content="Missionnaire Network - Accueil | Predications et Cantiques du Message"
-	/>
-	<meta
-		name="twitter:description"
-		content="Decouvrez les predications et cantiques inspirants du Message de l'Heure pour votre edification spirituelle."
-	/>
+	<meta name="twitter:title" content="Missionnaire Network - Accueil | Predications et Cantiques du Message" />
+	<meta name="twitter:description" content="Decouvrez les predications et cantiques inspirants du Message de l'Heure pour votre edification spirituelle." />
 </svelte:head>
 
-<main class="max-w-[1640px] mx-auto px-5">
-	<!-- A. Hero Section -->
-	<section class="relative rounded-3xl overflow-hidden bg-gradient-to-br from-orange-50 via-white to-orange-50/30 py-16 md:py-24 px-6 md:px-16 mb-10 mt-5">
-		<div class="max-w-3xl mx-auto text-center">
-			<p class="text-[11px] font-black uppercase tracking-[0.2em] text-orange-600 mb-4">
-				Missionnaire Network
-			</p>
-			<h1 class="text-3xl md:text-5xl lg:text-6xl font-black text-gray-900 leading-tight">
-				Ressources du Message de l'Heure
-			</h1>
-			<p class="mt-5 text-base md:text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
-				Retrouvez les predications, cantiques, transcriptions et publications
-				pour fortifier votre communion et votre marche quotidienne.
-			</p>
-			<div class="mt-8 flex flex-wrap justify-center gap-3">
-				<a
-					href="/videos"
-					class="px-6 py-3 rounded-full bg-orange-500 text-white text-xs font-black uppercase tracking-wider hover:bg-orange-600 transition-colors shadow-sm"
-				>
-					Explorer les ressources
-				</a>
-				<a
-					href="/live"
-					class="px-6 py-3 rounded-full border border-gray-200 bg-white text-gray-700 text-xs font-black uppercase tracking-wider hover:border-orange-300 hover:text-orange-600 transition-colors"
-				>
-					Ecouter la radio
-				</a>
-			</div>
-		</div>
-	</section>
+<main class="max-w-5xl mx-auto px-5 pb-20">
 
-	<!-- B. Live Radio Callout -->
-	<section class="mb-10">
-		<div
-			class="flex items-center gap-4 rounded-2xl border px-5 py-4 {radioIsLive
-				? 'border-red-200 bg-red-50/60'
-				: 'border-gray-100 bg-white'}"
-		>
-			<a href="/live" class="flex items-center gap-4 flex-1 min-w-0 hover:opacity-80 transition-opacity">
-				<span class="relative flex h-3 w-3 shrink-0">
-					{#if radioIsLive}
-						<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"></span>
-						<span class="relative inline-flex h-3 w-3 rounded-full bg-red-500"></span>
-					{:else}
-						<span class="relative inline-flex h-3 w-3 rounded-full bg-gray-300"></span>
-					{/if}
-				</span>
-				<div class="flex-1 min-w-0">
-					<p class="text-sm font-bold text-gray-900">
-						{radioIsLive ? 'Radio en direct' : 'Radio Missionnaire'}
-					</p>
-					<p class="text-xs text-gray-500 truncate">
-						{radioIsLive
-							? 'La radio est en cours de diffusion — Ecouter maintenant'
-							: 'Actuellement hors antenne'}
-					</p>
-				</div>
-				<span class="text-[11px] font-black uppercase tracking-wider shrink-0 {radioIsLive ? 'text-red-600' : 'text-gray-400'}">
-					{radioIsLive ? 'En direct' : 'Hors ligne'}
-				</span>
+	<!-- Hero — tight, text-only, no card wrapper -->
+	<section class="pt-10 pb-12 md:pt-16 md:pb-16 text-center">
+		<p class="text-[11px] font-black uppercase tracking-[0.25em] text-orange-600 mb-4">
+			Missionnaire Network
+		</p>
+		<h1 class="text-3xl md:text-5xl font-black text-gray-900 leading-[1.1] max-w-2xl mx-auto">
+			Ressources du Message de l'Heure
+		</h1>
+		<p class="mt-4 text-gray-500 max-w-lg mx-auto leading-relaxed">
+			Predications, cantiques, transcriptions et publications
+			pour fortifier votre marche quotidienne.
+		</p>
+		<div class="mt-8 flex flex-wrap justify-center gap-3">
+			<a
+				href="/videos"
+				class="px-5 py-2.5 rounded-full bg-orange-500 text-white text-xs font-bold uppercase tracking-wider hover:bg-orange-600 transition-colors"
+			>
+				Explorer
 			</a>
-			<NotificationBell />
+			<a
+				href="/live"
+				class="px-5 py-2.5 rounded-full border border-orange-200 text-orange-600 text-xs font-bold uppercase tracking-wider hover:bg-orange-50 transition-colors"
+			>
+				Radio en direct
+			</a>
 		</div>
 	</section>
 
-	<!-- C. Services Grid -->
-	<section class="mb-16">
-		<div class="mb-6">
-			<h2 class="text-xs font-black uppercase tracking-[0.2em] text-orange-600 mb-2">Nos services</h2>
-			<p class="text-2xl md:text-3xl font-bold text-gray-900">Explorez nos contenus</p>
-		</div>
-		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-			{#each services as service}
-				<a
-					href={service.href}
-					class="group rounded-2xl border border-gray-100 bg-white p-5 shadow-sm hover:shadow-md transition-all"
-				>
-					<div class="flex items-start gap-4">
-						<div class="w-10 h-10 rounded-xl {service.bgColor} flex items-center justify-center shrink-0">
-							<Icon src={service.icon} size="20" className={service.textColor} />
-						</div>
-						<div class="min-w-0">
-							<h3 class="text-sm font-bold text-gray-900 group-hover:text-orange-600 transition-colors">
-								{service.title}
-							</h3>
-							<p class="text-xs text-gray-500 mt-1">{service.description}</p>
-							<span class="inline-block mt-3 text-[10px] font-black uppercase tracking-wider text-orange-600 opacity-0 group-hover:opacity-100 transition-opacity">
-								Voir tout &rarr;
-							</span>
-						</div>
-					</div>
-				</a>
-			{/each}
-		</div>
-	</section>
+	<!-- Quick links — compact pill row -->
+	<nav class="flex flex-wrap justify-center gap-2 mb-12">
+		{#each quickLinks as link}
+			<a
+				href={link.href}
+				class="px-4 py-2 rounded-full bg-gray-50 text-sm text-gray-600 font-medium hover:bg-orange-50 hover:text-orange-600 transition-colors"
+			>
+				{link.label}
+			</a>
+		{/each}
+	</nav>
 
-	<!-- D. About / Mission Section -->
-	<section class="mb-16">
-		<div class="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
-			<div class="grid md:grid-cols-2 gap-0">
-				<div class="p-6 md:p-10 flex flex-col justify-center">
-					<p class="text-[11px] font-black uppercase tracking-[0.2em] text-orange-600 mb-3">
-						Notre mission
-					</p>
-					<h2 class="text-xl md:text-2xl font-bold text-gray-900 leading-snug">
-						Repandre le Message de l'Heure a travers le monde
-					</h2>
-					<p class="mt-4 text-sm text-gray-600 leading-relaxed">
-						Missionnaire Network met a disposition des ressources spirituelles — predications,
-						cantiques, litterature et transcriptions — pour l'edification des croyants du
-						Message. Notre objectif est de rendre ces ressources accessibles a tous, partout.
-					</p>
-					<div class="mt-6 flex flex-wrap gap-3">
-						<a
-							href="/a-propos"
-							class="px-4 py-2 rounded-full bg-orange-500 text-white text-xs font-black uppercase tracking-wider hover:bg-orange-600 transition-colors"
-						>
-							En savoir plus
-						</a>
-						<a
-							href="/eglise"
-							class="px-4 py-2 rounded-full border border-gray-200 bg-white text-gray-700 text-xs font-black uppercase tracking-wider hover:border-orange-300 hover:text-orange-600 transition-colors"
-						>
-							Notre eglise
-						</a>
-					</div>
-				</div>
-				<div class="relative min-h-[250px] md:min-h-0">
+	<!-- Radio status + notification opt-in -->
+	<div class="rounded-xl mb-12 overflow-hidden {radioIsLive ? 'bg-red-50' : 'bg-gray-50'}">
+		<a
+			href="/live"
+			class="flex items-center gap-3 px-4 py-3 transition-colors {radioIsLive ? 'hover:bg-red-100' : 'hover:bg-gray-100'}"
+		>
+			<span class="relative flex h-2 w-2 shrink-0">
+				{#if radioIsLive}
+					<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"></span>
+					<span class="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
+				{:else}
+					<span class="relative inline-flex h-2 w-2 rounded-full bg-gray-300"></span>
+				{/if}
+			</span>
+			<span class="text-sm {radioIsLive ? 'text-red-700 font-semibold' : 'text-gray-500'}">
+				{radioIsLive ? 'Radio en direct — Ecouter' : 'Radio hors antenne'}
+			</span>
+		</a>
+		<button
+			on:click={() => bellRef?.toggle()}
+			class="flex items-center gap-3 px-4 py-3 border-t w-full text-left cursor-pointer hover:bg-gray-100 transition-colors {radioIsLive ? 'border-red-100 hover:bg-red-100' : 'border-gray-100'}"
+		>
+			<NotificationBell bind:this={bellRef} />
+			<p class="text-xs text-gray-500">
+				{#if bellRef?.isSubscribed}
+					<span class="font-semibold text-orange-600">Notifications activees</span> — vous serez alerte quand la radio est en direct
+				{:else}
+					<span class="font-semibold text-gray-700">Recevoir une notification</span> quand la radio est en direct
+				{/if}
+			</p>
+		</button>
+	</div>
+
+	<!-- Two-column: Mission + Key figures -->
+	<section class="grid md:grid-cols-5 gap-8 mb-16">
+		<!-- Mission — 3 cols -->
+		<div class="md:col-span-3">
+			<div class="rounded-2xl overflow-hidden border border-gray-100">
+				<div class="relative aspect-[16/9] md:aspect-[2/1]">
 					<img
 						src="/img/eglise_inside.jpg"
 						alt="Interieur de l'eglise"
 						class="absolute inset-0 w-full h-full object-cover"
 					/>
 				</div>
+				<div class="p-6">
+					<h2 class="text-lg font-bold text-gray-900">
+						Repandre le Message a travers le monde
+					</h2>
+					<p class="mt-2 text-sm text-gray-500 leading-relaxed">
+						Missionnaire Network rend accessible les ressources spirituelles —
+						predications, cantiques, litterature — pour l'edification des croyants partout dans le monde.
+					</p>
+					<div class="mt-4 flex gap-3">
+						<a href="/a-propos" class="text-xs font-bold text-orange-600 hover:text-orange-700 uppercase tracking-wider">
+							En savoir plus &rarr;
+						</a>
+					</div>
+				</div>
 			</div>
 		</div>
-	</section>
 
-	<!-- E. Key Figures -->
-	<section class="mb-16">
-		<div class="mb-6">
-			<h2 class="text-xs font-black uppercase tracking-[0.2em] text-orange-600 mb-2">Figures cles</h2>
-			<p class="text-2xl md:text-3xl font-bold text-gray-900">Serviteurs du Message</p>
-		</div>
-		<div class="grid md:grid-cols-2 gap-4">
+		<!-- Key figures — 2 cols -->
+		<div class="md:col-span-2 flex flex-col gap-4">
 			<a
 				href="/william-branham/biographie"
-				class="group flex items-center gap-5 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm hover:shadow-md transition-all"
+				class="group rounded-2xl border border-gray-100 p-5 hover:border-gray-200 transition-colors flex-1 text-center"
 			>
-				<img
-					src="/img/branham_icon.png"
-					alt="William Branham"
-					class="w-16 h-16 rounded-full object-cover shrink-0"
-				/>
-				<div class="min-w-0">
-					<h3 class="text-sm font-bold text-gray-900 group-hover:text-orange-600 transition-colors">
-						William Marrion Branham
-					</h3>
-					<p class="text-xs text-gray-500 mt-1">
-						Le prophete du Message de l'Heure
-					</p>
-					<span class="inline-block mt-2 text-[10px] font-black uppercase tracking-wider text-orange-600">
-						Decouvrir &rarr;
-					</span>
-				</div>
+				<img src="/img/branham_icon.png" alt="William Branham" class="w-20 h-20 rounded-full object-cover mx-auto" />
+				<p class="text-sm font-bold text-gray-900 group-hover:text-orange-600 transition-colors mt-4">William M. Branham</p>
+				<p class="text-xs text-gray-400 mt-1.5 leading-relaxed">
+					Prophete du Message de l'Heure (1909–1965). Son ministere a marque des millions de croyants a travers le monde.
+				</p>
+				<span class="inline-block mt-3 text-[10px] font-bold text-orange-600 uppercase tracking-wider">Biographie &rarr;</span>
 			</a>
 			<a
 				href="/ewald-frank"
-				class="group flex items-center gap-5 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm hover:shadow-md transition-all"
+				class="group rounded-2xl border border-gray-100 p-5 hover:border-gray-200 transition-colors flex-1 text-center"
 			>
-				<img
-					src="/img/ewald_frank_second_img.jpg"
-					alt="Ewald Frank"
-					class="w-16 h-16 rounded-full object-cover shrink-0"
-				/>
-				<div class="min-w-0">
-					<h3 class="text-sm font-bold text-gray-900 group-hover:text-orange-600 transition-colors">
-						Ewald Frank
-					</h3>
-					<p class="text-xs text-gray-500 mt-1">
-						Serviteur de Dieu et missionnaire international
-					</p>
-					<span class="inline-block mt-2 text-[10px] font-black uppercase tracking-wider text-orange-600">
-						Decouvrir &rarr;
-					</span>
-				</div>
+				<img src="/img/ewald_frank_second_img.jpg" alt="Ewald Frank" class="w-20 h-20 rounded-full object-cover mx-auto" />
+				<p class="text-sm font-bold text-gray-900 group-hover:text-orange-600 transition-colors mt-4">Ewald Frank</p>
+				<p class="text-xs text-gray-400 mt-1.5 leading-relaxed">
+					Missionnaire international base a Krefeld, Allemagne. Il porte le Message aux nations depuis plus de 60 ans.
+				</p>
+				<span class="inline-block mt-3 text-[10px] font-bold text-orange-600 uppercase tracking-wider">En savoir plus &rarr;</span>
 			</a>
 		</div>
 	</section>
 
-	<!-- F. Latest Content Teaser -->
+	<!-- Latest videos — clean, no heavy borders -->
 	{#if recentVideos.length > 0}
-		<section class="mb-16">
-			<div class="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-5">
-				<div>
-					<h2 class="text-xs font-black uppercase tracking-[0.2em] text-orange-600 mb-2">
-						Nouveautes
-					</h2>
-					<p class="text-2xl md:text-3xl font-bold text-gray-900">Publications recentes</p>
-				</div>
-				<a
-					href="/videos"
-					class="text-[11px] font-black uppercase tracking-wider text-gray-500 hover:text-orange-600 transition-colors"
-				>
-					Voir toutes les videos &rarr;
+		<section class="mb-8">
+			<div class="flex items-end justify-between mb-6">
+				<h2 class="text-lg font-bold text-gray-900">Recemment ajoute</h2>
+				<a href="/videos" class="text-xs font-bold text-gray-400 hover:text-orange-600 uppercase tracking-wider transition-colors">
+					Tout voir &rarr;
 				</a>
 			</div>
-			<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+			<div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
 				{#each recentVideos as video (video._id)}
 					{@const publishedLabel = getVideoDateLabel(video)}
 					{@const videoPageUrl = `/videos?v=${video.id || video._id}`}
-					<a
-						href={videoPageUrl}
-						class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm hover:shadow-md transition-shadow block group"
-					>
+					<a href={videoPageUrl} class="group block">
 						{#if video.thumbnail}
-							<div class="rounded-xl overflow-hidden mb-4 aspect-video">
+							<div class="rounded-xl overflow-hidden aspect-video mb-3">
 								<img
 									src={video.thumbnail}
 									alt={video.title}
-									class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+									class="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
 								/>
 							</div>
 						{/if}
 						{#if publishedLabel}
-							<span class="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+							<p class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">
 								{publishedLabel}
-							</span>
+							</p>
 						{/if}
-						<p class="mt-2 text-base font-bold text-gray-900 group-hover:text-orange-600 transition-colors line-clamp-2">
+						<p class="text-sm font-semibold text-gray-900 group-hover:text-orange-600 transition-colors line-clamp-2">
 							{video.title}
-						</p>
-						<p class="mt-2 text-sm text-gray-600 line-clamp-2">
-							{video.description || 'Nouvel ajout disponible sur Missionnaire Network.'}
 						</p>
 					</a>
 				{/each}
