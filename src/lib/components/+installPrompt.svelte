@@ -5,19 +5,29 @@
 	let deferredPrompt: any = null;
 	let showPrompt = false;
 	let dismissed = false;
+	let isIOS = false;
+	let showIOSInstructions = false;
 
 	onMount(() => {
 		if (!browser) return;
 
 		// Don't show if already installed or previously dismissed this session
 		if (window.matchMedia('(display-mode: standalone)').matches) return;
+		if ((navigator as any).standalone === true) return; // iOS standalone check
 		if (sessionStorage.getItem('pwa-install-dismissed')) return;
 
-		window.addEventListener('beforeinstallprompt', (e) => {
-			e.preventDefault();
-			deferredPrompt = e;
+		isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+
+		if (isIOS) {
+			// iOS doesn't support beforeinstallprompt — show manual instructions
 			showPrompt = true;
-		});
+		} else {
+			window.addEventListener('beforeinstallprompt', (e) => {
+				e.preventDefault();
+				deferredPrompt = e;
+				showPrompt = true;
+			});
+		}
 
 		window.addEventListener('appinstalled', () => {
 			showPrompt = false;
@@ -26,6 +36,10 @@
 	});
 
 	async function handleInstall() {
+		if (isIOS) {
+			showIOSInstructions = true;
+			return;
+		}
 		if (!deferredPrompt) return;
 		deferredPrompt.prompt();
 		const { outcome } = await deferredPrompt.userChoice;
@@ -37,6 +51,7 @@
 
 	function handleDismiss() {
 		showPrompt = false;
+		showIOSInstructions = false;
 		dismissed = true;
 		sessionStorage.setItem('pwa-install-dismissed', 'true');
 	}
@@ -52,23 +67,58 @@
 			/>
 			<div class="flex-1 min-w-0">
 				<h3 class="font-bold text-gray-900 text-sm">Installer Missionnaire Network</h3>
-				<p class="text-xs text-gray-500 mt-0.5 leading-relaxed">
-					Accedez rapidement aux predications et cantiques depuis votre ecran d'accueil.
-				</p>
-				<div class="flex gap-2 mt-3">
-					<button
-						on:click={handleInstall}
-						class="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-lg transition-colors"
-					>
-						Installer
-					</button>
-					<button
-						on:click={handleDismiss}
-						class="px-4 py-2 text-gray-500 hover:text-gray-700 text-xs font-medium rounded-lg transition-colors"
-					>
-						Plus tard
-					</button>
-				</div>
+
+				{#if showIOSInstructions}
+					<div class="mt-2 space-y-2">
+						<p class="text-xs text-gray-600 leading-relaxed">
+							Pour installer l'application sur votre iPhone :
+						</p>
+						<ol class="text-xs text-gray-600 leading-relaxed space-y-1 list-decimal pl-4">
+							<li>
+								Appuyez sur le bouton
+								<span class="inline-flex items-center align-middle">
+									<svg class="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+									</svg>
+								</span>
+								<span class="font-semibold">Partager</span> en bas de Safari
+							</li>
+							<li>
+								Faites defiler et appuyez sur
+								<span class="font-semibold">"Sur l'ecran d'accueil"</span>
+							</li>
+							<li>
+								Appuyez sur <span class="font-semibold">"Ajouter"</span>
+							</li>
+						</ol>
+					</div>
+					<div class="flex gap-2 mt-3">
+						<button
+							on:click={handleDismiss}
+							class="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-lg transition-colors"
+						>
+							Compris
+						</button>
+					</div>
+				{:else}
+					<p class="text-xs text-gray-500 mt-0.5 leading-relaxed">
+						Accedez rapidement aux predications et cantiques depuis votre ecran d'accueil.
+					</p>
+					<div class="flex gap-2 mt-3">
+						<button
+							on:click={handleInstall}
+							class="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-lg transition-colors"
+						>
+							Installer
+						</button>
+						<button
+							on:click={handleDismiss}
+							class="px-4 py-2 text-gray-500 hover:text-gray-700 text-xs font-medium rounded-lg transition-colors"
+						>
+							Plus tard
+						</button>
+					</div>
+				{/if}
 			</div>
 			<button
 				on:click={handleDismiss}
