@@ -78,7 +78,7 @@
 	<section class="pt-10 pb-12 md:pt-16 md:pb-16 text-center relative overflow-hidden">
 		<!-- Wave mesh — hero only -->
 		<div class="absolute inset-0 pointer-events-none -z-10" aria-hidden="true">
-			<svg class="hero-waves absolute -left-[20%] -top-[20%] w-[140%] h-[140%]" viewBox="0 0 1000 600" fill="none" preserveAspectRatio="none">
+			<svg class="hero-waves absolute left-1/2 top-1/2 w-[140%] h-[140%]" style="transform: translate(-50%, -50%);" viewBox="0 0 1000 600" fill="none" preserveAspectRatio="none">
 				<!-- Flowing mesh — group A (flows right) -->
 				<path d="M-100 80 C100 20, 300 160, 500 60 C700 -40, 850 120, 1100 50" stroke="#FF880C" stroke-opacity="0.18" stroke-width="1.5" />
 				<path d="M-100 110 C120 40, 320 180, 520 90 C720 0, 870 140, 1100 80" stroke="#FF880C" stroke-opacity="0.14" stroke-width="1.2" />
@@ -292,9 +292,9 @@
 	}
 
 	@keyframes wave-sway {
-		0%, 100% { transform: translate(-20%, -20%) scaleX(1); }
-		33% { transform: translate(-18%, -21%) scaleX(1.02); }
-		66% { transform: translate(-22%, -19%) scaleX(0.98); }
+		0%, 100% { transform: translate(-50%, -50%) scaleX(1); }
+		33% { transform: translate(-48%, -51%) scaleX(1.02); }
+		66% { transform: translate(-52%, -49%) scaleX(0.98); }
 	}
 	@keyframes church-bob {
 		0%, 100% { transform: translateY(0); }
