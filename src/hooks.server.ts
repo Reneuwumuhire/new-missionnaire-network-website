@@ -2,6 +2,7 @@ import { connect, getDb } from './db/mongo';
 import { checkAndIngestLiveStream } from './lib/server/youtube-poller';
 import { probeLiveAudio } from '$lib/server/live-audio';
 import { sendPushToAll, radioLivePayload } from '$lib/server/push-notifications';
+import { claimNotificationSlot } from './db/collections';
 import type { Handle } from '@sveltejs/kit';
 import { getFullCountryName } from './utils/countries';
 
@@ -12,6 +13,7 @@ const CHECK_INTERVAL = 15 * 60 * 1000; // 15 minutes to stay within Search API q
 let lastRadioCheckTime = 0;
 let wasRadioLive = false;
 const RADIO_CHECK_INTERVAL = 60 * 1000; // Check radio every 60 seconds
+const RADIO_NOTIFICATION_COOLDOWN = 10 * 60 * 1000; // 10 min cooldown between radio notifications
 
 // Initialize MongoDB on server start
 connect()
@@ -134,12 +136,18 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (now - lastRadioCheckTime > RADIO_CHECK_INTERVAL) {
 		lastRadioCheckTime = now;
 		probeLiveAudio(fetch)
-			.then((probe) => {
+			.then(async (probe) => {
 				if (probe.isLive && !wasRadioLive) {
-					console.log('[Hooks] Radio state transition: offline → live. Sending push.');
-					sendPushToAll(radioLivePayload()).catch((e) =>
-						console.error('[Hooks] Radio push error:', e)
-					);
+					// Use DB-based lock so only one serverless instance sends the notification
+					const canSend = await claimNotificationSlot('radio_live', RADIO_NOTIFICATION_COOLDOWN);
+					if (canSend) {
+						console.log('[Hooks] Radio state transition: offline → live. Sending push.');
+						sendPushToAll(radioLivePayload()).catch((e) =>
+							console.error('[Hooks] Radio push error:', e)
+						);
+					} else {
+						console.log('[Hooks] Radio went live but notification already sent recently — skipping.');
+					}
 				}
 				wasRadioLive = probe.isLive;
 			})

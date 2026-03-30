@@ -16,8 +16,16 @@
 		return window.scrollY <= 0;
 	}
 
+	function isAudioPlaying(): boolean {
+		const audios = document.querySelectorAll('audio');
+		for (const el of audios) {
+			if (!el.paused) return true;
+		}
+		return false;
+	}
+
 	function handleTouchStart(e: TouchEvent) {
-		if (!isAtTop() || isRefreshing) return;
+		if (!isAtTop() || isRefreshing || isAudioPlaying()) return;
 		startY = e.touches[0].clientY;
 		isPulling = true;
 	}

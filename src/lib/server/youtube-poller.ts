@@ -1,5 +1,8 @@
 import { YOUTUBE_API_KEY } from '$env/static/private';
 import { sendPushToAll, youtubeLivePayload } from './push-notifications';
+import { claimNotificationSlot } from '../../db/collections';
+
+const YOUTUBE_NOTIFICATION_COOLDOWN = 15 * 60 * 1000; // 15 min cooldown
 
 export type LiveStatus = {
 	isLive: boolean;
@@ -140,10 +143,15 @@ export async function checkAndIngestLiveStream() {
 			});
 
 			if (!wasLive) {
-				console.log('[YouTube Poller] State transition: offline → live. Sending push notifications.');
-				sendPushToAll(youtubeLivePayload(title, streamUrl)).catch((e) =>
-					console.error('[YouTube Poller] Push notification error:', e)
-				);
+				const canSend = await claimNotificationSlot('youtube_live', YOUTUBE_NOTIFICATION_COOLDOWN);
+				if (canSend) {
+					console.log('[YouTube Poller] State transition: offline → live. Sending push notifications.');
+					sendPushToAll(youtubeLivePayload(title, streamUrl)).catch((e) =>
+						console.error('[YouTube Poller] Push notification error:', e)
+					);
+				} else {
+					console.log('[YouTube Poller] YouTube went live but notification already sent recently — skipping.');
+				}
 			}
 		} else {
 			console.log('[YouTube Poller] No active livestream found via API');

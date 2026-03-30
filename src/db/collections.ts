@@ -581,6 +581,37 @@ export async function getAllPushSubscriptions(): Promise<PushSubscriptionRecord[
 	return col.find({}).toArray();
 }
 
+// ── Notification dedup helpers ───────────────────────────────────
+
+/**
+ * Check whether a push notification of the given type was sent recently.
+ * Returns true if it's safe to send (i.e. cooldown has elapsed).
+ * Atomically sets the timestamp so only one instance wins the race.
+ */
+export async function claimNotificationSlot(
+	type: string,
+	cooldownMs: number
+): Promise<boolean> {
+	const db = await getDb();
+	const col = db.collection('notification_locks');
+	const now = Date.now();
+
+	const result = await col.findOneAndUpdate(
+		{
+			type,
+			$or: [
+				{ lastSentAt: { $exists: false } },
+				{ lastSentAt: { $lt: now - cooldownMs } }
+			]
+		},
+		{ $set: { lastSentAt: now } },
+		{ upsert: true, returnDocument: 'after' }
+	);
+
+	// If the update matched and set our timestamp, we won the slot
+	return result?.lastSentAt === now;
+}
+
 /**
  * Recursively serializes a MongoDB document, converting all ObjectIds to strings
  * and ensuring the document is fully serializable for SvelteKit data loading.
