@@ -134,7 +134,7 @@
 
 	<div class="flex w-full h-full">
 		<!-- List Panel -->
-		<div class="flex-1 min-w-0 {$isDocumentOpen ? 'w-1/2' : 'w-full'} transition-all duration-300">
+		<div class="flex-1 min-w-0 {$isDocumentOpen ? 'hidden md:block md:w-1/2' : 'w-full'} transition-all duration-300">
 			<!-- Sort and Filter Controls -->
 			<div class="flex justify-end mb-4 items-center space-x-4">
 				<!-- Year Filter -->
@@ -262,7 +262,7 @@
 
 		<!-- Document Preview Panel -->
 		{#if $isDocumentOpen && selectedDocument}
-			<div class="w-1/2 border-l border-gray-200 bg-white p-6 min-h-screen">
+			<div class="fixed inset-0 z-50 bg-white p-6 overflow-y-auto md:static md:inset-auto md:z-auto md:w-1/2 md:border-l md:border-gray-200 md:min-h-screen">
 				<div class="flex flex-col h-full">
 					<div class="flex justify-between items-start mb-6">
 						<h2 class="text-xl font-semibold text-gray-900">{selectedDocument.filename}</h2>

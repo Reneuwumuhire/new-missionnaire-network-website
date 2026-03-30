@@ -18,15 +18,22 @@
 		topCountries: { name: string; count: number }[];
 		deviceStats: { type: string; count: number }[];
 	} | null = null;
+	let statsError = false;
+	let statsLoading = true;
 
 	onMount(async () => {
 		try {
 			const res = await fetch('/api/analytics');
 			if (res.ok) {
 				stats = await res.json();
+			} else {
+				statsError = true;
 			}
 		} catch (e) {
 			console.error('Failed to fetch stats:', e);
+			statsError = true;
+		} finally {
+			statsLoading = false;
 		}
 	});
 </script>
@@ -64,7 +71,26 @@
 			<MapComponent /> -->
 			<h1 class=" text-4xl font-black text-[#414141]">Contacter</h1>
 			<ContactCard />
-			{#if stats}
+			{#if statsLoading}
+				<h1 class=" text-4xl font-black text-[#414141]">Statistiques</h1>
+				<div class="w-full bg-gray-50 rounded-2xl border border-gray-100 p-8 flex items-center justify-center">
+					<div class="flex items-center gap-3 text-gray-400">
+						<div class="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-orange-500"></div>
+						<span class="text-sm font-medium">Chargement des statistiques...</span>
+					</div>
+				</div>
+			{:else if statsError}
+				<h1 class=" text-4xl font-black text-[#414141]">Statistiques</h1>
+				<div class="w-full bg-red-50 rounded-2xl border border-red-100 p-8 text-center">
+					<p class="text-red-600 font-medium text-sm">Impossible de charger les statistiques.</p>
+					<button
+						class="mt-3 text-sm text-orange-500 hover:text-orange-600 font-bold"
+						on:click={() => { statsLoading = true; statsError = false; fetch('/api/analytics').then(r => r.ok ? r.json() : Promise.reject()).then(d => { stats = d; }).catch(() => { statsError = true; }).finally(() => { statsLoading = false; }); }}
+					>
+						Reessayer
+					</button>
+				</div>
+			{:else if stats}
 				<h1 class=" text-4xl font-black text-[#414141]">Statistiques</h1>
 				<div class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
 					<!-- Core Counter Stats -->

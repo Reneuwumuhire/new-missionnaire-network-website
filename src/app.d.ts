@@ -13,3 +13,13 @@ declare module '*?raw' {
 	const content: string;
 	export default content;
 }
+
+declare module 'iconsax-svelte/*.svelte' {
+	import type { Component } from 'svelte';
+	const component: Component<{
+		size?: number | string;
+		color?: string;
+		variant?: 'Linear' | 'Outline' | 'Broken' | 'Bold' | 'Bulk' | 'TwoTone';
+	}>;
+	export default component;
+}

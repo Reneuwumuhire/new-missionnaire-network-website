@@ -6,12 +6,13 @@
 	import CopyButton from '$lib/components/+copyButton.svelte';
 	import VideoPlaylistPlayer from '$lib/components/VideoPlaylistPlayer.svelte';
 	import InstallPrompt from '$lib/components/+installPrompt.svelte';
+	import OfflineIndicator from '$lib/components/+offlineIndicator.svelte';
 	import type { LayoutData } from './$types';
 	import { QueryClientProvider } from '@tanstack/svelte-query';
 	import { availableTypesTag } from '../utils/data';
 	import { activeFilter, isLoading } from '$lib/stores/videoStore';
 	import { setFilter } from '../utils/videoUtils';
-	import { page } from '$app/stores';
+	import { navigating, page } from '$app/stores';
 	import { browser } from '$app/environment';
 	import { afterUpdate, onMount } from 'svelte';
 	export let data: LayoutData;
@@ -102,6 +103,12 @@
 	<meta name="twitter:image" content="https://missionnaire.net/og-image.png" />
 </svelte:head>
 
+{#if $navigating}
+	<div class="fixed top-0 left-0 right-0 z-[9999] h-1 bg-orange-100">
+		<div class="h-full bg-orange-500 animate-progress rounded-r-full"></div>
+	</div>
+{/if}
+
 <QueryClientProvider client={data.queryClient}>
 	<div class="relative">
 		<div bind:this={headerRef} class="flex flex-col fixed top-0 z-40 bg-white w-full">
@@ -148,4 +155,5 @@
 	<CopyButton />
 	<VideoPlaylistPlayer />
 	<InstallPrompt />
+	<OfflineIndicator />
 </QueryClientProvider>

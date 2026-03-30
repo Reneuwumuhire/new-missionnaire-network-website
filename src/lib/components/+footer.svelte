@@ -15,9 +15,9 @@ Youtube -->
 	<div
 		class=" relative w-full max-w-5xl flex flex-col justify-center items-center self-center px-12 pt-12 pb-4 space-y-8"
 	>
-		<diV class=" w-14">
+		<div class=" w-14">
 			<img src="/icons/logo.png" alt="logo" />
-		</diV>
+		</div>
 		<!-- div for links -->
 		<div>
 			<ul

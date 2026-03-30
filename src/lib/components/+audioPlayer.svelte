@@ -4,8 +4,8 @@
 	import { formatTime } from '../../utils/FormatTime';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
-	import IoPlayBackOutline from 'svelte-icons-pack/io/IoPlayBackOutline';
-	import IoPlayForwardOutline from 'svelte-icons-pack/io/IoPlayForwardOutline';
+	import BsSkipBackwardFill from 'svelte-icons-pack/bs/BsSkipBackwardFill';
+	import BsSkipForwardFill from 'svelte-icons-pack/bs/BsSkipForwardFill';
 	import BsPlayCircleFill from 'svelte-icons-pack/bs/BsPlayCircleFill';
 	import BsPauseCircleFill from 'svelte-icons-pack/bs/BsPauseCircleFill';
 	import BsVolumeUpFill from 'svelte-icons-pack/bs/BsVolumeUpFill';
@@ -18,8 +18,8 @@
 	import type { Sermon } from '$lib/models/sermon';
 	import IoRepeat from 'svelte-icons-pack/io/IoRepeat';
 	import RiMediaPlayList2Fill from 'svelte-icons-pack/ri/RiMediaPlayList2Fill';
-	import IoPlaySkipBackOutline from 'svelte-icons-pack/io/IoPlaySkipBackOutline';
-	import IoPlaySkipForwardOutline from 'svelte-icons-pack/io/IoPlaySkipForwardOutline';
+	import BsSkipStartFill from 'svelte-icons-pack/bs/BsSkipStartFill';
+	import BsSkipEndFill from 'svelte-icons-pack/bs/BsSkipEndFill';
 	import {
 		findAdjacentPlayableIndex,
 		getPlayableAudioUrl,
@@ -39,6 +39,13 @@
 	let audioSrc: string = '';
 	let isAudioReady = false;
 	let shouldAutoplayOnLoad = false;
+
+	function getDisplayTitle(item: any): string {
+		if (!item) return 'Chargement...';
+		if ('french_title' in item) return item.french_title || item.english_title || 'Sans titre';
+		if ('title' in item) return item.title || 'Sans titre';
+		return 'Sans titre';
+	}
 
 	function handleEnded() {
 		if (!$autoNext || $playlist.length === 0) {
@@ -463,21 +470,8 @@
 		<div class="flex items-center justify-between mb-3 md:mb-0 md:flex-1 md:min-w-0">
 			<div class="flex-1 min-w-0">
 				<div class="text-[10px] uppercase tracking-[0.2em] font-bold text-orange-500 mb-0.5 opacity-80">Lecture en cours</div>
-				<div class="font-black text-sm md:text-lg text-gray-900 truncate pr-4">
-				<div class="font-black text-sm md:text-lg text-gray-900 truncate pr-4">
-					{#if $selectAudio}
-						{@const current = $selectAudio}
-						{#if 'french_title' in current}
-							{current.french_title || current.english_title || 'Sans titre'}
-						{:else if 'title' in current}
-							{current.title || 'Sans titre'}
-						{:else}
-							Sans titre
-						{/if}
-					{:else}
-						Chargement...
-					{/if}
-				</div>
+				<div class="font-black text-sm md:text-lg text-gray-900 truncate pr-4" title={getDisplayTitle($selectAudio)}>
+					{getDisplayTitle($selectAudio)}
 				</div>
 				{#if !isAudioReady}
 					<div class="text-[10px] font-medium uppercase tracking-[0.15em] text-gray-400 mt-1">
@@ -497,6 +491,7 @@
 					selectAudio.set(null);
 					if (audio) audio.pause();
 				}}
+				aria-label="Fermer le lecteur"
 			>
 				<Icon src={BsX} size="20" />
 			</button>
@@ -518,11 +513,11 @@
 
 				<div class="flex items-center gap-1 md:gap-3">
 					<button on:click={playPrevious} class="p-2 text-gray-600 hover:text-orange-600 transition-colors" title="Précédent">
-						<Icon src={IoPlaySkipBackOutline} size="24" />
+						<Icon src={BsSkipStartFill} size="22" />
 					</button>
-					
+
 					<button on:click={seekBackward} class="hidden md:block p-2 text-gray-300 hover:text-orange-600 transition-colors" title="-5s">
-						<Icon src={IoPlayBackOutline} size="18" />
+						<Icon src={BsSkipBackwardFill} size="16" />
 					</button>
 
 					<button on:click={togglePlay} class="relative flex items-center justify-center w-14 h-14 md:w-12 md:h-12 bg-orange-500 text-white rounded-full hover:scale-105 transition-transform shadow-lg shadow-orange-500/20 active:scale-95">
@@ -534,11 +529,11 @@
 					</button>
 
 					<button on:click={seekForward} class="hidden md:block p-2 text-gray-300 hover:text-orange-600 transition-colors" title="+5s">
-						<Icon src={IoPlayForwardOutline} size="18" />
+						<Icon src={BsSkipForwardFill} size="16" />
 					</button>
 
 					<button on:click={playNext} class="p-2 text-gray-600 hover:text-orange-600 transition-colors" title="Suivant">
-						<Icon src={IoPlaySkipForwardOutline} size="24" />
+						<Icon src={BsSkipEndFill} size="22" />
 					</button>
 				</div>
 

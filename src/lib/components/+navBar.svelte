@@ -14,6 +14,7 @@
 	import HeaderMenuLinkMobo from './+headerMenuLinkMobo.svelte';
 	import { searchTerm } from '$lib/stores/videoStore';
 	import { createEventDispatcher } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { fetchInitialVideos } from '../../utils/videoUtils';
 
 	const languages = { en, fr };
@@ -68,23 +69,33 @@
 	$: showClearButton = $searchTerm.trim().length > 0;
 	$: showPlaceholder = shouldExpand;
 
+	$: isHomePage = $page.url.pathname === '/';
+
 	function handleSubmit() {
-		dispatch('search', $searchTerm);
+		if (!isHomePage && $searchTerm.trim()) {
+			goto(`/?search=${encodeURIComponent($searchTerm.trim())}`);
+		} else {
+			dispatch('search', $searchTerm);
+		}
 		if (showMoboNav) {
-			toggleMobileNav(); // Close the mobile menu
+			toggleMobileNav();
 		}
 	}
 
 	function handleSearchInput() {
-		dispatch('search', $searchTerm);
+		if (isHomePage) {
+			dispatch('search', $searchTerm);
+		}
 	}
 
 	function clearInput() {
 		searchTerm.set('');
-		fetchInitialVideos();
+		if (isHomePage) {
+			fetchInitialVideos();
+		}
 		dispatch('search', '');
 		if (showMoboNav) {
-			toggleMobileNav(); // Close the mobile menu
+			toggleMobileNav();
 		}
 	}
 
@@ -117,50 +128,47 @@
 		</a>
 		<div class=" hidden lg:flex items-center space-x-8">
 			<!-- svelte-ignore a11y-no-static-element-interactions -->
-			<!-- shows the search input only when the user is on the home page -->
-			{#if $page.url.pathname == '/'}
-				<div
-					class="relative inline-block"
-					on:mouseenter={() => (isHovered = true)}
-					on:mouseleave={() => (isHovered = false)}
-				>
-					<form on:submit|preventDefault={handleSubmit}>
-						<div class="flex items-center">
+			<div
+				class="relative inline-block"
+				on:mouseenter={() => (isHovered = true)}
+				on:mouseleave={() => (isHovered = false)}
+			>
+				<form on:submit|preventDefault={handleSubmit}>
+					<div class="flex items-center">
+						<div
+							class="w-10 h-10 rounded-full border-[1px] border-[#ccc] bg-white flex flex-row items-center justify-center transition-all duration-300 ease-in-out"
+							class:w-72={shouldExpand}
+							class:bg-white={shouldExpand}
+							class:border={shouldExpand}
+						>
 							<div
-								class="w-10 h-10 rounded-full border-[1px] border-[#ccc] bg-white flex flex-row items-center justify-center transition-all duration-300 ease-in-out"
-								class:w-72={shouldExpand}
-								class:bg-white={shouldExpand}
-								class:border={shouldExpand}
+								class="w-6 h-6 rounded-full -mr-9 flex items-center justify-center"
+								class:pl-2={shouldExpand}
 							>
-								<div
-									class="w-6 h-6 rounded-full -mr-9 flex items-center justify-center"
-									class:pl-2={shouldExpand}
-								>
-									<SearchNormal1 size={12} color="#ccc" variant="Linear" />
-								</div>
-								<input
-									type="text"
-									placeholder={showPlaceholder ? 'Search...' : ''}
-									bind:value={$searchTerm}
-									class=" indent-8 px-4 py-2 text-gray-600 bg-transparent outline-none w-full font-normal text-current"
-									on:focus={() => (isFocused = true)}
-									on:blur={() => (isFocused = false)}
-									on:input={handleSearchInput}
-								/>
-								{#if showClearButton}
-									<button
-										type="button"
-										class=" w-6 h-6 rounded-full flex items-center justify-center pr-2"
-										on:click={clearInput}
-									>
-										<CloseCircle size={80} color="#ccc" variant="Linear" />
-									</button>
-								{/if}
+								<SearchNormal1 size={12} color="#ccc" variant="Linear" />
 							</div>
+							<input
+								type="text"
+								placeholder={showPlaceholder ? 'Rechercher...' : ''}
+								bind:value={$searchTerm}
+								class=" indent-8 px-4 py-2 text-gray-600 bg-transparent outline-none w-full font-normal text-current"
+								on:focus={() => (isFocused = true)}
+								on:blur={() => (isFocused = false)}
+								on:input={handleSearchInput}
+							/>
+							{#if showClearButton}
+								<button
+									type="button"
+									class=" w-6 h-6 rounded-full flex items-center justify-center pr-2"
+									on:click={clearInput}
+								>
+									<CloseCircle size={80} color="#ccc" variant="Linear" />
+								</button>
+							{/if}
 						</div>
-					</form>
-				</div>
-			{/if}
+					</div>
+				</form>
+			</div>
 			<div class=" flex flex-row space-x-4 justify-between">
 				{#each NavigationLinkList as link, index}
 					<HeaderMenuLink
