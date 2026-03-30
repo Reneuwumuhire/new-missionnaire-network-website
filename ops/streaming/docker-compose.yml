@@ -1,0 +1,29 @@
+services:
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: mn-mediamtx
+    restart: unless-stopped
+    ports:
+      - '1935:1935'
+
+  icecast:
+    image: deepcomp/icecast2:latest
+    container_name: mn-icecast
+    restart: unless-stopped
+    environment:
+      - ICECAST_SOURCE_PASSWORD=hackme
+      - ICECAST_ADMIN_USER=admin
+      - ICECAST_ADMIN_PASSWORD=hackme
+      - ICECAST_SERVER_HOST=localhost
+    ports:
+      - '8000:8000'
+
+  audio-transcoder:
+    build:
+      context: .
+      dockerfile: transcoder/Dockerfile
+    container_name: mn-audio-transcoder
+    restart: unless-stopped
+    depends_on:
+      - mediamtx
+      - icecast

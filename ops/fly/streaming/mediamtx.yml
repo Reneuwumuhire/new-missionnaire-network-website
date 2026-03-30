@@ -1,0 +1,13 @@
+logLevel: info
+
+rtmp: yes
+rtmpAddress: :1935
+
+hls: no
+webrtc: no
+rtsp: no
+srt: no
+
+paths:
+  all_others:
+    source: publisher
