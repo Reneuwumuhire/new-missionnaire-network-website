@@ -23,6 +23,12 @@
 		{ label: 'Litterature', href: '/literature' }
 	];
 
+	function getSmallThumbnail(video: YoutubeVideo): string {
+		const url = video.thumbnail || '';
+		// Prefer mqdefault (320px) for small cards instead of maxresdefault (1280px)
+		return url.replace(/maxresdefault|hqdefault/, 'mqdefault');
+	}
+
 	function getVideoDateLabel(video: YoutubeVideo): string {
 		const timestamp =
 			typeof video.release_timestamp === 'number'
@@ -170,15 +176,18 @@
 		<div class="md:col-span-3">
 			<div class="rounded-2xl overflow-hidden border border-gray-100">
 				<div class="relative aspect-[16/9] md:aspect-[2/1]">
-					<img
-						src="/img/eglise_inside.jpg"
-						alt="Interieur de l'eglise"
-						class="absolute inset-0 w-full h-full object-cover"
-						width="776"
-						height="539"
-						loading="lazy"
-						decoding="async"
-					/>
+					<picture>
+						<source srcset="/img/eglise_inside.webp" type="image/webp" />
+						<img
+							src="/img/eglise_inside.jpg"
+							alt="Interieur de l'eglise"
+							class="absolute inset-0 w-full h-full object-cover"
+							width="600"
+							height="417"
+							loading="lazy"
+							decoding="async"
+						/>
+					</picture>
 				</div>
 				<div class="p-6">
 					<h2 class="text-lg font-bold text-gray-900">
@@ -203,7 +212,10 @@
 				href="/william-branham/biographie"
 				class="group rounded-2xl border border-gray-100 p-5 hover:border-gray-200 transition-colors flex-1 text-center"
 			>
-				<img src="/img/branham_icon.png" alt="William Branham" class="w-20 h-20 rounded-full object-cover mx-auto" width="80" height="80" loading="lazy" decoding="async" />
+				<picture>
+					<source srcset="/img/branham_icon.webp" type="image/webp" />
+					<img src="/img/branham_icon.png" alt="William Branham" class="w-20 h-20 rounded-full object-cover mx-auto" width="160" height="160" loading="lazy" decoding="async" />
+				</picture>
 				<p class="text-sm font-bold text-gray-900 group-hover:text-orange-600 transition-colors mt-4">William M. Branham</p>
 				<p class="text-xs text-gray-400 mt-1.5 leading-relaxed">
 					Prophete du Message de l'Heure (1909–1965). Son ministere a marque des millions de croyants a travers le monde.
@@ -214,7 +226,10 @@
 				href="/ewald-frank"
 				class="group rounded-2xl border border-gray-100 p-5 hover:border-gray-200 transition-colors flex-1 text-center"
 			>
-				<img src="/img/ewald_frank_second_img.jpg" alt="Ewald Frank" class="w-20 h-20 rounded-full object-cover mx-auto" width="80" height="80" loading="lazy" decoding="async" />
+				<picture>
+					<source srcset="/img/ewald_frank_second_img.webp" type="image/webp" />
+					<img src="/img/ewald_frank_second_img.jpg" alt="Ewald Frank" class="w-20 h-20 rounded-full object-cover mx-auto" width="160" height="160" loading="lazy" decoding="async" />
+				</picture>
 				<p class="text-sm font-bold text-gray-900 group-hover:text-orange-600 transition-colors mt-4">Ewald Frank</p>
 				<p class="text-xs text-gray-400 mt-1.5 leading-relaxed">
 					Missionnaire international base a Krefeld, Allemagne. Il porte le Message aux nations depuis plus de 60 ans.
@@ -241,8 +256,12 @@
 						{#if video.thumbnail}
 							<div class="rounded-xl overflow-hidden aspect-video mb-3">
 								<img
-									src={video.thumbnail}
+									src={getSmallThumbnail(video)}
 									alt={video.title}
+									width="320"
+									height="180"
+									loading="lazy"
+									decoding="async"
 									class="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
 								/>
 							</div>
