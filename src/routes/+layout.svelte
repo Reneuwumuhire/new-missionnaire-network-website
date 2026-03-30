@@ -27,28 +27,29 @@
 		};
 	}
 
+	let rafId = 0;
 	const updateLayoutOffset = () => {
 		if (!browser) return;
-		headerHeight = headerRef?.offsetHeight ?? 120;
+		cancelAnimationFrame(rafId);
+		rafId = requestAnimationFrame(() => {
+			headerHeight = headerRef?.offsetHeight ?? 120;
+		});
 	};
 
 	onMount(() => {
 		if (!browser) return;
 
-		resizeObserver = new ResizeObserver(() => {
-			updateLayoutOffset();
-		});
+		resizeObserver = new ResizeObserver(updateLayoutOffset);
 
 		if (headerRef) {
 			resizeObserver.observe(headerRef);
 		}
 
 		updateLayoutOffset();
-		window.addEventListener('resize', updateLayoutOffset);
 
 		return () => {
+			cancelAnimationFrame(rafId);
 			resizeObserver?.disconnect();
-			window.removeEventListener('resize', updateLayoutOffset);
 		};
 	});
 
