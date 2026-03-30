@@ -29,6 +29,6 @@ export async function GET({ url }: RequestEvent) {
 		} else if (err instanceof Error) {
 			message = err.message;
 		}
-		throw error(400, message);
+		error(400, message);
 	}
 }

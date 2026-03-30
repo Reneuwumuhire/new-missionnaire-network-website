@@ -71,8 +71,7 @@
 					</div>
 				{/each}
 			</div>
-			<!-- //@ts-ignore -->
-			<div use:viewport on:enterViewport={paginate} class="loader" />
+			<div use:viewport={{ onEnter: paginate }} class="loader"></div>
 		</div>
 	</div>
 </div>

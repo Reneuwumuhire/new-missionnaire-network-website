@@ -97,7 +97,7 @@ export const load: PageServerLoad = async ({ url }) => {
 		};
 	} catch (err) {
 		console.error('Error loading documents:', err);
-		throw error(500, {
+		error(500, {
 			message: 'Failed to load documents. Please check your MongoDB connection.'
 		});
 	}

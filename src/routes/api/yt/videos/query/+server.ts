@@ -52,6 +52,6 @@ export async function GET({ url }: RequestEvent) {
 			message = err.message;
 		}
 
-		throw error(400, message);
+		error(400, message);
 	}
 }

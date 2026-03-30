@@ -369,7 +369,7 @@
 				? (current as MusicAudio).book_full_name || (current as MusicAudio).category || 'Missionnaire'
 				: (isSermon ? (current as Sermon).iso_date || 'Prédication' : 'Media'),
 			artwork: [
-				{ src: '/logo.png', sizes: '512x512', type: 'image/png' },
+				{ src: '/icons/logo.png', sizes: '512x512', type: 'image/png' },
 			]
 		});
 

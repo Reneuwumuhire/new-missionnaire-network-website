@@ -33,16 +33,16 @@ export const GET: RequestHandler = async ({ params, url, fetch }) => {
 	const sermon = await findSermonByIdentifier(identifier);
 
 	if (!sermon) {
-		throw error(404, 'Prédication introuvable');
+		error(404, 'Prédication introuvable');
 	}
 
 	const canonicalSlug = buildSermonSlug(sermon);
 	if (!canonicalSlug) {
-		throw error(404, 'URL de prédication invalide');
+		error(404, 'URL de prédication invalide');
 	}
 
 	if (identifier.toLowerCase() !== canonicalSlug.toLowerCase()) {
-		throw redirect(301, `/predications/${canonicalSlug}/pdf${url.search}`);
+		redirect(301, `/predications/${canonicalSlug}/pdf${url.search}`);
 	}
 
 	const frenchPdfUrl = normalizePdfUrl(sermon.pdf_url);
@@ -50,7 +50,7 @@ export const GET: RequestHandler = async ({ params, url, fetch }) => {
 	const pdfUrl = selectPdfUrl(frenchPdfUrl, englishPdfUrl, url.searchParams.get('lang'));
 
 	if (!pdfUrl) {
-		throw error(404, 'PDF introuvable');
+		error(404, 'PDF introuvable');
 	}
 
 	let upstreamResponse: Response;
@@ -61,11 +61,11 @@ export const GET: RequestHandler = async ({ params, url, fetch }) => {
 			}
 		});
 	} catch {
-		throw error(502, 'Impossible de charger le PDF');
+		error(502, 'Impossible de charger le PDF');
 	}
 
 	if (!upstreamResponse.ok || !upstreamResponse.body) {
-		throw error(502, 'Le serveur PDF a renvoyé une erreur');
+		error(502, 'Le serveur PDF a renvoyé une erreur');
 	}
 
 	const headers = new Headers();

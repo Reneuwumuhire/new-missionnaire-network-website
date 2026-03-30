@@ -8,16 +8,16 @@ export const load: PageServerLoad = async ({ params }) => {
 	const sermon = await findSermonByIdentifier(identifier);
 
 	if (!sermon) {
-		throw error(404, 'Prédication introuvable');
+		error(404, 'Prédication introuvable');
 	}
 
 	const canonicalSlug = buildSermonSlug(sermon);
 	if (!canonicalSlug) {
-		throw error(404, 'URL de prédication invalide');
+		error(404, 'URL de prédication invalide');
 	}
 
 	if (identifier.toLowerCase() !== canonicalSlug.toLowerCase()) {
-		throw redirect(301, `/predications/${canonicalSlug}`);
+		redirect(301, `/predications/${canonicalSlug}`);
 	}
 
 	return {
