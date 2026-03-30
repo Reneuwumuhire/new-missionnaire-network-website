@@ -680,6 +680,33 @@ export async function trackNotificationEvent(event: {
 	});
 }
 
+// ── Live radio listener tracking ────────────────────────────────
+
+const LISTENER_TTL_MS = 15_000; // Consider a listener gone after 15s without heartbeat
+
+export async function heartbeatListener(listenerId: string): Promise<void> {
+	const db = await getDb();
+	const col = db.collection('radio_listeners');
+	await col.updateOne(
+		{ _id: listenerId as unknown as ObjectId },
+		{ $set: { lastSeen: Date.now() } },
+		{ upsert: true }
+	);
+}
+
+export async function removeListener(listenerId: string): Promise<void> {
+	const db = await getDb();
+	const col = db.collection('radio_listeners');
+	await col.deleteOne({ _id: listenerId as unknown as ObjectId });
+}
+
+export async function countActiveListeners(): Promise<number> {
+	const db = await getDb();
+	const col = db.collection('radio_listeners');
+	const cutoff = Date.now() - LISTENER_TTL_MS;
+	return col.countDocuments({ lastSeen: { $gt: cutoff } });
+}
+
 /**
  * Recursively serializes a MongoDB document, converting all ObjectIds to strings
  * and ensuring the document is fully serializable for SvelteKit data loading.

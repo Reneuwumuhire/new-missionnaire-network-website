@@ -8,7 +8,7 @@
 
 import { probeLiveAudio } from './live-audio';
 import { sendPushToAll, radioLivePayload } from './push-notifications';
-import { claimNotificationSlot } from '../../db/collections';
+import { claimNotificationSlot, countActiveListeners } from '../../db/collections';
 
 export type RadioStatusEvent = {
 	isLive: boolean;
@@ -63,11 +63,16 @@ async function poll() {
 		const changed = broker.lastStatus === null || status.isLive !== broker.lastStatus.isLive;
 		broker.lastStatus = status;
 
-		// Inject live listener count at broadcast time so it's always current
-		const event: RadioStatusEvent = {
-			...status,
-			listeners: broker.listeners.size
-		};
+		// Get the real listener count from the DB — shared across all instances
+		let listeners = 0;
+		try {
+			listeners = await countActiveListeners();
+		} catch {
+			// DB unavailable — fall back to in-memory count
+			listeners = broker.listeners.size;
+		}
+
+		const event: RadioStatusEvent = { ...status, listeners };
 
 		for (const listener of broker.listeners) {
 			try {
@@ -133,7 +138,10 @@ export function subscribe(listener: Listener): () => void {
 	// Only send current status if we've completed at least one real poll.
 	// Avoids sending a stale isLive:false that would flip to true moments later.
 	if (broker.lastStatus) {
-		listener({ ...broker.lastStatus, listeners: broker.listeners.size });
+		const status = broker.lastStatus;
+		countActiveListeners()
+			.then((count) => listener({ ...status, listeners: count }))
+			.catch(() => listener({ ...status, listeners: broker.listeners.size }));
 	}
 
 	// Return unsubscribe function
@@ -143,8 +151,12 @@ export function subscribe(listener: Listener): () => void {
 	};
 }
 
-export function getLastStatus(): RadioStatusEvent | null {
+export async function getLastStatus(): Promise<RadioStatusEvent | null> {
 	const broker = getBroker();
 	if (!broker.lastStatus) return null;
-	return { ...broker.lastStatus, listeners: broker.listeners.size };
+	let listeners = broker.listeners.size;
+	try {
+		listeners = await countActiveListeners();
+	} catch { /* fallback to in-memory */ }
+	return { ...broker.lastStatus, listeners };
 }
