@@ -1,65 +1,85 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import BsClipboard2CheckFill from 'svelte-icons-pack/bs/BsClipboard2CheckFill';
 
 	let selectedText = '';
 	let showCopyButton = false;
-	let buttonPosition = { top: '0px', left: '0px' }; // Button position
-	const buttonOffset = 30; // Offset value to position the button above the text
+	let copied = false;
+	let buttonPosition = { top: 0, left: 0 };
+	let selectionChangeHandler: (() => void) | null = null;
 
 	const handleCopy = () => {
 		if (selectedText) {
 			navigator.clipboard
 				.writeText(selectedText)
 				.then(() => {
-					console.log('Text copied to clipboard:', selectedText);
+					copied = true;
+					setTimeout(() => {
+						copied = false;
+						showCopyButton = false;
+						selectedText = '';
+						window.getSelection()?.removeAllRanges();
+					}, 1000);
 				})
 				.catch((err) => {
 					console.error('Failed to copy text:', err);
 				});
-			selectedText = '';
-			showCopyButton = false;
 		}
 	};
 
+	function updatePosition() {
+		const selection = window.getSelection();
+		if (!selection || selection.rangeCount === 0) {
+			showCopyButton = false;
+			return;
+		}
+
+		const text = selection.toString().trim();
+		if (text.length === 0) {
+			showCopyButton = false;
+			selectedText = '';
+			return;
+		}
+
+		const range = selection.getRangeAt(0);
+		const rect = range.getBoundingClientRect();
+
+		if (rect.width === 0 && rect.height === 0) {
+			showCopyButton = false;
+			return;
+		}
+
+		selectedText = text;
+		buttonPosition = {
+			top: rect.top - 48,
+			left: rect.left + rect.width / 2
+		};
+		showCopyButton = true;
+		copied = false;
+	}
+
 	onMount(() => {
-		document.addEventListener('selectionchange', () => {
-			const selection = window.getSelection();
-			if (!selection) return;
-			const range = selection.getRangeAt(0);
-			const rect = range.getBoundingClientRect();
+		selectionChangeHandler = () => updatePosition();
+		document.addEventListener('selectionchange', selectionChangeHandler);
+	});
 
-			buttonPosition = {
-				top: (rect.top + window.scrollY - buttonOffset).toString(),
-				left: (rect.left + window.scrollX + rect.width / 2).toString() // Adjust position near text horizontally
-			};
-
-			selectedText = selection.toString();
-			showCopyButton = selectedText.length > 0;
-		});
+	onDestroy(() => {
+		if (selectionChangeHandler) {
+			document.removeEventListener('selectionchange', selectionChangeHandler);
+		}
 	});
 </script>
 
 {#if showCopyButton}
 	<button
-		class="copy-button flex flex-row space-x-2 items-center bg-slate-900 rounded-full text-white text-xs font-bold px-5 py-4"
-		style="
-      top: {buttonPosition.top}px;
-      left: {buttonPosition.left}px;
-      display: {showCopyButton ? 'flex' : 'hidden'}
-    "
+		class="fixed z-[9999] flex flex-row items-center gap-1.5 bg-slate-900 rounded-full text-white text-xs font-bold px-4 py-2.5 shadow-lg -translate-x-1/2 pointer-events-auto select-none hover:bg-slate-700 transition-colors"
+		style="top: {buttonPosition.top}px; left: {buttonPosition.left}px;"
+		on:mousedown|preventDefault
 		on:click={handleCopy}
 	>
 		<Icon src={BsClipboard2CheckFill} />
-		<span class="copy-button-icon">Copy</span>
+		<span>{copied ? 'Copied!' : 'Copy'}</span>
 	</button>
 {/if}
-
-<style>
-	.copy-button {
-		position: absolute;
-		z-index: 9999; /* Ensures the button stays on top */
-	}
-</style>
