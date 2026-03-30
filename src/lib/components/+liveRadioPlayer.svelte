@@ -6,6 +6,7 @@
 		offline: 'La radio est hors ligne',
 		listening: 'Vous ecoutez le direct',
 		connecting: 'Connexion en cours...',
+		reconnecting: 'Reconnexion en cours...',
 		availablePressPlay: 'Direct disponible. Appuyez sur Lecture.',
 		waiting: 'En attente du signal...',
 		cannotPlay: 'Impossible de lire le direct pour le moment',
@@ -24,23 +25,32 @@
 	let userWantsToPlay = false;
 	let listenerCount = 0;
 
-	// The probe reports whether it can reach the audio server, but it can
-	// be fooled (Icecast returns data even with no source). These two flags
-	// separate "probe says reachable" from "audio is actually playing".
-	let probeReachable = false; // SSE probe says the endpoint responds with audio
-	let confirmedLive = false; // Audio element has successfully played
+	let probeReachable = false;
+	let confirmedLive = false;
 
-	// Auto-reconnect state
+	// Auto-reconnect: uses audio.load() (not play()) so mobile browsers
+	// don't block it. The existing audio session from the user's initial
+	// tap satisfies the autoplay policy — load + play works after that.
 	let reconnectAttempts = 0;
 	let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-	const MAX_RECONNECT_ATTEMPTS = 5;
-	const RECONNECT_DELAYS = [2000, 4000, 6000, 10000, 15000]; // escalating backoff
+	const MAX_RECONNECT_ATTEMPTS = 8;
+	const RECONNECT_DELAYS = [1000, 2000, 3000, 5000, 5000, 10000, 10000, 15000];
 
 	const OFFLINE_THRESHOLD = 6;
 	const streamUrl = '/api/live/audio';
 
-	// "EN DIRECT" only shown when the audio element has confirmed playback.
-	// The probe alone enables the play button but doesn't show "EN DIRECT".
+	// Stable session ID for listener tracking — survives page refresh
+	// but not tab close, so the DB record is reused on refresh.
+	function getSessionId(): string {
+		if (!browser) return '';
+		let id = sessionStorage.getItem('radio-session-id');
+		if (!id) {
+			id = crypto.randomUUID();
+			sessionStorage.setItem('radio-session-id', id);
+		}
+		return id;
+	}
+
 	$: showLive = confirmedLive;
 	$: canPlay = probeReachable || confirmedLive;
 	$: statusMessage = STATUS_MESSAGES[statusKey] || '';
@@ -53,8 +63,6 @@
 		: '';
 
 	// ── SSE status handler ─────────────────────────────────────────
-	// This ONLY updates isLive and status text. It never touches the audio element.
-	// The audio element manages its own lifecycle through its native events.
 
 	function handleStatusEvent(liveNow: boolean, checkedAt: string, listeners: number) {
 		lastCheckedAt = checkedAt;
@@ -65,12 +73,10 @@
 			probeReachable = true;
 			hasError = false;
 
-			// Probe says reachable — update status text but do NOT set confirmedLive.
-			// Only the audio element's "play" event can do that.
 			if (isPlaying) {
 				statusKey = 'listening';
 			} else if (isBuffering) {
-				statusKey = 'connecting';
+				statusKey = reconnectAttempts > 0 ? 'reconnecting' : 'connecting';
 			} else {
 				statusKey = 'availablePressPlay';
 			}
@@ -82,21 +88,7 @@
 				confirmedLive = false;
 				hasError = false;
 				statusKey = 'offline';
-
-				// Cancel any pending reconnect — stream is confirmed offline
-				clearReconnectTimer();
-				reconnectAttempts = 0;
-
-				if (isPlaying || isBuffering || userWantsToPlay) {
-					isPlaying = false;
-					isBuffering = false;
-					userWantsToPlay = false;
-					audio?.pause();
-					if (audio) {
-						audio.removeAttribute('src');
-						audio.load();
-					}
-				}
+				stopPlayback();
 			} else if (!isPlaying && !isBuffering) {
 				statusKey = 'waiting';
 			}
@@ -108,7 +100,8 @@
 	onMount(() => {
 		if (!browser) return;
 
-		eventSource = new EventSource('/api/live/sse');
+		const sessionId = getSessionId();
+		eventSource = new EventSource(`/api/live/sse?sid=${encodeURIComponent(sessionId)}`);
 
 		eventSource.onmessage = (event) => {
 			try {
@@ -140,11 +133,12 @@
 		if (document.visibilityState !== 'visible') return;
 		if (!userWantsToPlay || !audio) return;
 
-		// Returned from background — if audio died, reconnect
 		if (audio.paused && !audio.ended) {
 			attemptReconnect();
 		}
 	}
+
+	// ── Reconnect logic ───────────────────────────────────────────
 
 	function clearReconnectTimer() {
 		if (reconnectTimer) {
@@ -153,38 +147,53 @@
 		}
 	}
 
+	function stopPlayback() {
+		clearReconnectTimer();
+		reconnectAttempts = 0;
+		if (isPlaying || isBuffering || userWantsToPlay) {
+			isPlaying = false;
+			isBuffering = false;
+			userWantsToPlay = false;
+			audio?.pause();
+			if (audio) {
+				audio.removeAttribute('src');
+				audio.load();
+			}
+		}
+	}
+
 	function attemptReconnect() {
 		if (!audio || !userWantsToPlay) return;
 		if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-			// Give up after max attempts
 			userWantsToPlay = false;
 			confirmedLive = false;
 			hasError = true;
 			statusKey = 'unavailable';
 			reconnectAttempts = 0;
+			clearReconnectTimer();
 			return;
 		}
 
 		isBuffering = true;
-		statusKey = 'connecting';
+		statusKey = 'reconnecting';
 
 		const delay = RECONNECT_DELAYS[reconnectAttempts] ?? RECONNECT_DELAYS[RECONNECT_DELAYS.length - 1];
 		reconnectAttempts += 1;
 
 		clearReconnectTimer();
-		reconnectTimer = setTimeout(async () => {
+		reconnectTimer = setTimeout(() => {
 			if (!audio || !userWantsToPlay) return;
 
+			// Set a fresh src and load. On mobile, the audio session from the
+			// user's initial play gesture is still active, so load + play works
+			// without a new user gesture.
 			audio.src = `${streamUrl}?t=${Date.now()}`;
 			audio.load();
-
-			try {
-				await audio.play();
-				// Success — reset counter
-				reconnectAttempts = 0;
-			} catch {
-				// Will trigger handleError which calls attemptReconnect again
-			}
+			// Don't call play() here — the audio element will fire 'canplay'
+			// then we play from there, or it will fire 'error' to retry.
+			audio.play().catch(() => {
+				// play() rejected (e.g. mobile policy) — handleError will retry
+			});
 		}, delay);
 	}
 
@@ -194,15 +203,14 @@
 		if (!audio) return;
 
 		if (!audio.paused || reconnectTimer) {
-			// Pause — also cancel any pending reconnect
 			userWantsToPlay = false;
 			clearReconnectTimer();
 			reconnectAttempts = 0;
 			audio.pause();
+			confirmedLive = false;
 			return;
 		}
 
-		// Play — only if probe says the endpoint is reachable
 		if (!probeReachable && !confirmedLive) {
 			hasError = true;
 			statusKey = 'offline';
@@ -215,7 +223,6 @@
 		reconnectAttempts = 0;
 		statusKey = 'connecting';
 
-		// Fresh stream URL each time user presses play
 		audio.src = `${streamUrl}?t=${Date.now()}`;
 		audio.load();
 
@@ -259,9 +266,11 @@
 	};
 
 	const handleWaiting = () => {
+		// 'waiting' fires during normal buffering (network hiccup).
+		// Don't treat this as an error — the stream is just rebuffering.
 		isBuffering = true;
 		if (userWantsToPlay) {
-			statusKey = 'connecting';
+			statusKey = reconnectAttempts > 0 ? 'reconnecting' : 'connecting';
 		}
 	};
 
@@ -277,7 +286,6 @@
 		isBuffering = false;
 		confirmedLive = false;
 
-		// Stream ended naturally — try to reconnect in case it restarts
 		if (userWantsToPlay) {
 			attemptReconnect();
 		} else {
@@ -286,17 +294,19 @@
 	};
 
 	const handleError = () => {
+		// Don't react to errors on an empty src (we cleared it intentionally)
+		if (!audio?.src || audio.src === location.href) return;
+
 		isPlaying = false;
 		isBuffering = false;
 		confirmedLive = false;
 
-		// Clear the src to stop the browser's built-in retry loop.
+		// Clear src to stop the browser's built-in retry storm
 		if (audio) {
 			audio.removeAttribute('src');
 			audio.load();
 		}
 
-		// If the user wanted to listen, auto-reconnect instead of giving up
 		if (userWantsToPlay) {
 			attemptReconnect();
 		}

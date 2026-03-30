@@ -1,15 +1,17 @@
 import { subscribe } from '$lib/server/radio-status-broker';
 import { heartbeatListener, removeListener } from '../../../../db/collections';
 
-export function GET() {
+export function GET({ url }) {
 	let unsubscribe: (() => void) | null = null;
-	const listenerId = crypto.randomUUID();
+
+	// Use client-provided session ID so page refreshes reuse the same
+	// DB record instead of creating duplicates.
+	const listenerId = url.searchParams.get('sid') || crypto.randomUUID();
 
 	const stream = new ReadableStream({
 		start(controller) {
 			const encoder = new TextEncoder();
 
-			// Register this listener in the DB
 			heartbeatListener(listenerId).catch(() => {});
 
 			unsubscribe = subscribe((event) => {
@@ -17,7 +19,7 @@ export function GET() {
 					const data = JSON.stringify(event);
 					controller.enqueue(encoder.encode(`data: ${data}\n\n`));
 
-					// Heartbeat on every poll (every 5s) to keep the DB record alive
+					// Heartbeat every poll (5s) to keep the DB record alive
 					heartbeatListener(listenerId).catch(() => {});
 				} catch {
 					// Stream closed
