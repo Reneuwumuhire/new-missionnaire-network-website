@@ -113,7 +113,6 @@ export async function GET() {
 		'/a-propos',
 		'/eglise',
 		'/ewald-frank',
-		'/galerie',
 		'/predications',
 		'/musique',
 		'/documents',

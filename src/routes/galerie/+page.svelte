@@ -38,6 +38,7 @@
 
 <svelte:head>
 	<title>Galerie - Missionnaire Network</title>
+	<meta name="robots" content="noindex, nofollow" />
 	<meta
 		name="description"
 		content="Galerie photo de l'assemblée locale et des activités Missionnaire Network."
