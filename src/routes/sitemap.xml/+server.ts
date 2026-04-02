@@ -105,21 +105,6 @@ export async function GET() {
 			}
 		)
 		.toArray();
-	const newMusic = await db
-		.collection('music_audio')
-		.find(
-			{},
-			{
-				projection: {
-					_id: 1,
-					title: 1,
-					uploaded_at: 1,
-					updatedAt: 1,
-					updated_at: 1
-				}
-			}
-		)
-		.toArray();
 
 	const generatedAt = new Date().toISOString().split('T')[0];
 	const baseUrl = 'https://missionnaire.net';
@@ -133,7 +118,10 @@ export async function GET() {
 		'/musique',
 		'/documents',
 		'/transcriptions',
-		'/william-branham'
+		'/william-branham/biographie',
+		'/videos',
+		'/live',
+		'/literature'
 	];
 
 	const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
@@ -175,17 +163,7 @@ ${buildUrlEntry({
 })}`
 		)
 		.join('')}
-  ${newMusic
-		.map(
-			(m) => `
-${buildUrlEntry({
-	loc: `${baseUrl}/musique?search=${encodeURIComponent(String(m.title || ''))}`,
-	lastmod: pickLastmod(m as SitemapDoc, ['updatedAt', 'updated_at', 'uploaded_at'], generatedAt),
-	changefreq: 'monthly',
-	priority: '0.4'
-})}`
-		)
-		.join('')}
+
 </urlset>`.trim();
 
 	return new Response(sitemap, {

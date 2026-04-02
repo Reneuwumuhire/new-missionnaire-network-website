@@ -15,6 +15,24 @@
 		sermonDate ? ` (${sermonDate})` : ''
 	} sur Missionnaire Network.`;
 	$: canonicalUrl = `https://missionnaire.net/predications/${data.canonicalSlug}`;
+	$: jsonLd = JSON.stringify({
+		'@context': 'https://schema.org',
+		'@type': 'AudioObject',
+		name: sermonTitle,
+		description,
+		url: canonicalUrl,
+		contentUrl: sermon.mp3_url || undefined,
+		encodingFormat: 'audio/mpeg',
+		duration: sermon.duration ? `PT${Math.floor(sermon.duration / 60)}M${sermon.duration % 60}S` : undefined,
+		datePublished: sermon.iso_date || sermon.full_date_code || undefined,
+		author: sermon.author ? { '@type': 'Person', name: sermon.author } : undefined,
+		publisher: {
+			'@type': 'Organization',
+			name: 'Missionnaire Network',
+			url: 'https://missionnaire.net'
+		},
+		inLanguage: 'fr'
+	});
 	$: frenchPdfProxyUrl = sermon.pdf_url ? `/predications/${data.canonicalSlug}/pdf?lang=fr` : '';
 	$: englishPdfProxyUrl = sermon.english_pdf_url
 		? `/predications/${data.canonicalSlug}/pdf?lang=en`
@@ -97,6 +115,7 @@
 	<meta property="og:url" content={canonicalUrl} />
 	<meta name="twitter:title" content={`${sermonTitle} | Prédications - Missionnaire Network`} />
 	<meta name="twitter:description" content={description} />
+	{@html `<script type="application/ld+json">${jsonLd}</script>`}
 </svelte:head>
 
 <Breadcrumbs items={[

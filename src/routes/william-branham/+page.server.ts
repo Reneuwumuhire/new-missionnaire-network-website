@@ -2,5 +2,5 @@ import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async () => {
-	throw redirect(302, '/william-branham/biographie');
+	throw redirect(301, '/william-branham/biographie');
 };

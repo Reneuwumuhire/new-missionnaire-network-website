@@ -7,6 +7,11 @@
 
 <svelte:head>
 	<title>Radio en direct - Missionnaire Network</title>
+	<meta name="description" content="Écoutez la radio Missionnaire Network en direct. Prédications et cantiques du Message de l'Heure en streaming continu." />
+	<link rel="canonical" href="https://missionnaire.net/live" />
+	<meta property="og:title" content="Radio en direct - Missionnaire Network" />
+	<meta property="og:description" content="Écoutez la radio Missionnaire Network en direct. Prédications et cantiques du Message de l'Heure en streaming continu." />
+	<meta property="og:url" content="https://missionnaire.net/live" />
 </svelte:head>
 
 <section class="w-full py-10 px-4 md:px-8">
