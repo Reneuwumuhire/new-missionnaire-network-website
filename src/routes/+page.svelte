@@ -90,6 +90,7 @@
 		content="Decouvrez les predications et cantiques inspirants du Message de l'Heure pour votre edification spirituelle."
 	/>
 	<meta name="google-site-verification" content="5KUjbDomG7hhFBwtEU79pKDetc2q3I2qhEE_0BO4o_o" />
+	<link rel="preload" as="image" type="image/webp" href="/img/eglise_inside.webp" />
 </svelte:head>
 
 <main class="max-w-7xl mx-auto px-4 md:px-8 pb-20 relative">

@@ -2,9 +2,9 @@ import type { PageServerLoad } from './$types';
 import { redirect } from '@sveltejs/kit';
 import { getCollection } from '../db/collections';
 import { getLiveStatus } from '../lib/server/youtube-poller';
-import { probeLiveAudio } from '$lib/server/live-audio';
+import { getLastStatus } from '$lib/server/radio-status-broker';
 
-export const load: PageServerLoad = async ({ url, fetch }) => {
+export const load: PageServerLoad = async ({ url }) => {
 	const filter = url.searchParams.get('filter');
 	const search = url.searchParams.get('search');
 
@@ -16,18 +16,18 @@ export const load: PageServerLoad = async ({ url, fetch }) => {
 		throw redirect(301, `/videos?${params.toString()}`);
 	}
 
-	const [videos, liveStatus, radioProbe] = await Promise.all([
+	const [videos, liveStatus, radioStatus] = await Promise.all([
 		getCollection('videos', 0, 3, 'All', ''),
 		getLiveStatus(),
-		probeLiveAudio(fetch)
+		getLastStatus()
 	]);
 
 	return {
 		data: videos,
 		liveStatus,
 		radioStatus: {
-			isLive: radioProbe.isLive,
-			sourceUrl: radioProbe.sourceUrl
+			isLive: radioStatus?.isLive ?? false,
+			sourceUrl: radioStatus?.streamUrl ?? ''
 		}
 	};
 };
