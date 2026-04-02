@@ -5,7 +5,7 @@ import type { Handle } from '@sveltejs/kit';
 import { getFullCountryName } from './utils/countries';
 
 let lastCheckTime = 0;
-const CHECK_INTERVAL = 15 * 60 * 1000; // 15 minutes to stay within Search API quota
+const CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes — RSS is free, videos.list is 1 unit
 
 // Initialize MongoDB on server start
 connect()
