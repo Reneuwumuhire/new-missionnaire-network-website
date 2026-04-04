@@ -4,77 +4,138 @@
 	import FaBrandsYoutube from 'svelte-icons-pack/fa/FaBrandsYoutube';
 	import FaBrandsFacebook from 'svelte-icons-pack/fa/FaBrandsFacebook';
 	import RiLogoWhatsappFill from 'svelte-icons-pack/ri/RiLogoWhatsappFill';
+
+	const navColumns = [
+		{
+			title: 'Ressources',
+			links: [
+				{ label: 'Prédications', href: '/predications' },
+				{ label: 'Musique', href: '/musique' },
+				{ label: 'Vidéos', href: '/videos' },
+				{ label: 'Transcriptions', href: '/transcriptions' },
+				{ label: 'Littérature', href: '/literature' }
+			]
+		},
+		{
+			title: 'Découvrir',
+			links: [
+				{ label: 'William Branham', href: '/william-branham/biographie' },
+				{ label: 'Ewald Frank', href: '/ewald-frank' },
+				{ label: "L'église", href: '/eglise' },
+				{ label: 'Galerie', href: '/galerie' },
+				{ label: 'Radio', href: '/live' }
+			]
+		},
+		{
+			title: 'Informations',
+			links: [
+				{ label: 'À propos', href: '/a-propos' },
+				{
+					label: 'YouTube',
+					href: 'https://www.youtube.com/channel/UCS3zqpqnCvT0SFa_jI662Kg',
+					external: true
+				}
+			]
+		}
+	];
+
+	const socials = [
+		{
+			label: 'YouTube',
+			href: 'https://www.youtube.com/channel/UCS3zqpqnCvT0SFa_jI662Kg',
+			icon: FaBrandsYoutube
+		},
+		{
+			label: 'Facebook',
+			href: 'https://www.facebook.com/missionnaire.net',
+			icon: FaBrandsFacebook
+		},
+		{
+			label: 'WhatsApp',
+			href: 'https://wa.me/250788567415',
+			icon: RiLogoWhatsappFill
+		}
+	];
 </script>
 
-<footer class=" bottom-0 w-full flex flex-row justify-center text-gray-500">
-	<!-- 	A propos
-Prédications
-Galerie
-Actualités
-Youtube -->
-	<div
-		class=" relative w-full max-w-5xl flex flex-col justify-center items-center self-center px-12 pt-12 pb-4 space-y-8"
-	>
-		<div class=" w-14">
-			<picture>
-				<source srcset="/icons/logo.webp" type="image/webp" />
-				<img src="/icons/logo.png" alt="logo" width="75" height="32" loading="lazy" />
-			</picture>
+<footer class="footer relative bg-stone-900 text-stone-400 overflow-hidden">
+	<!-- Decorative top accent line -->
+	<div class="h-px w-full bg-gradient-to-r from-transparent via-missionnaire/40 to-transparent"></div>
+
+	<div class="max-w-5xl mx-auto px-6 pt-16 pb-8">
+		<!-- Top section: Logo + Nav columns -->
+		<div class="grid grid-cols-2 md:grid-cols-12 gap-10 md:gap-8 pb-12 border-b border-stone-800">
+			<!-- Brand column -->
+			<div class="col-span-2 md:col-span-4">
+				<div class="flex items-center gap-3 mb-5">
+					<picture>
+						<source srcset="/icons/logo.webp" type="image/webp" />
+						<img
+							src="/icons/logo.png"
+							alt="Missionnaire Network"
+							class="h-8 w-auto brightness-0 invert opacity-80"
+							width="75"
+							height="32"
+							loading="lazy"
+						/>
+					</picture>
+				</div>
+				<p class="text-sm leading-relaxed text-stone-400 max-w-xs">
+					Prédications, cantiques et ressources du Message de l'Heure pour l'édification des croyants.
+				</p>
+
+				<!-- Social icons -->
+				<div class="flex items-center gap-4 mt-6">
+					{#each socials as social}
+						<a
+							href={social.href}
+							target="_blank"
+							rel="noopener noreferrer"
+							aria-label={social.label}
+							class="flex items-center justify-center w-9 h-9 border border-stone-700 text-stone-400 hover:border-missionnaire hover:text-missionnaire transition-all duration-300"
+						>
+							<Icon className="w-3.5 h-3.5" color="#a8a29e" src={social.icon} />
+						</a>
+					{/each}
+				</div>
+			</div>
+
+			<!-- Nav columns -->
+			{#each navColumns as column}
+				<div class="col-span-1 md:col-span-2 {column.title === 'Informations' ? 'md:col-start-11 md:col-span-2' : ''}">
+					<p class="text-[10px] font-semibold uppercase tracking-[0.25em] text-stone-400 mb-4">
+						{column.title}
+					</p>
+					<ul class="flex flex-col gap-2.5">
+						{#each column.links as link}
+							<li>
+								<a
+									href={link.href}
+									class="text-sm text-stone-400 hover:text-white transition-colors duration-200"
+									target={link.external ? '_blank' : undefined}
+									rel={link.external ? 'noopener noreferrer' : undefined}
+								>
+									{link.label}
+								</a>
+							</li>
+						{/each}
+					</ul>
+				</div>
+			{/each}
 		</div>
-		<!-- div for links -->
-		<div>
-			<ul
-				class="grid grid-cols-2 md:flex md:flex-row items-center justify-center gap-x-4 gap-y-5 md:space-x-4 font-normal text-sm md:text-base flex-wrap text-center"
-			>
-				<li>
-					<a href="/eglise" class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out">L'église</a>
-				</li>
-				<li>
-					<a href="/william-branham/biographie" class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out">William Branham</a>
-				</li>
-				<li>
-					<a href="/ewald-frank" class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out">Ewald Frank</a>
-				</li>
-				<li>
-					<a href="/musique" class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out">Musique</a>
-				</li>
-				<li>
-					<a href="/predications" class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out">Prédications</a>
-				</li>
-				<li>
-					<a href="/transcriptions" class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out">Transcriptions</a>
-				</li>
-				<li>
-					<a href="/galerie" class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out">Galerie</a>
-				</li>
-				<li>
-					<a href="/live" class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out">Radio</a>
-				</li>
-				<li>
-					<a href="/a-propos" class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out">À propos</a>
-				</li>
-				<li>
-					<a
-						href="https://www.youtube.com/channel/UCS3zqpqnCvT0SFa_jI662Kg"
-						class="hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out"
-						target="_blank"
-						rel="noopener noreferrer">Youtube </a>
-				</li>
-			</ul>
+
+		<!-- Bottom bar -->
+		<div class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-8">
+			<p class="text-xs text-stone-400">
+				© 2012 – {new Date().getFullYear()} Missionnaire Network. Tous droits réservés.
+			</p>
+
+			<!-- Decorative cross -->
+			<svg width="16" height="22" viewBox="0 0 16 22" fill="none" class="opacity-20 hidden sm:block" aria-hidden="true">
+				<rect x="5.5" y="0" width="5" height="22" rx="1" fill="#FF880C" />
+				<rect x="0" y="5" width="16" height="5" rx="1" fill="#FF880C" />
+			</svg>
 		</div>
-		<div class="flex flex-row items-center space-x-5">
-			<a href="https://www.youtube.com/channel/UCS3zqpqnCvT0SFa_jI662Kg" target="_blank" rel="noopener noreferrer" aria-label="YouTube">
-				<Icon className="w-4 h-4" src={FaBrandsYoutube} />
-			</a>
-			<a href="https://www.facebook.com/missionnaire.net" target="_blank" rel="noopener noreferrer" aria-label="Facebook">
-				<Icon className="w-4 h-4" src={FaBrandsFacebook} />
-			</a>
-			<a href="https://wa.me/250788567415" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp">
-				<Icon className="w-4 h-4" src={RiLogoWhatsappFill} />
-			</a>
-		</div>
-		<small class=" text-center"
-			>© 2012 - {new Date().getFullYear()} Missionnaire Network. Tous droits réservés</small
-		>
 	</div>
 </footer>
+

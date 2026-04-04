@@ -141,7 +141,7 @@
 	<div class="flex flex-col gap-8 mb-12">
 		<div>
 			<h2
-				class="text-[10px] md:text-xs font-black text-orange-600 uppercase tracking-[0.2em] mb-4 text-center md:text-left"
+				class="text-[10px] md:text-xs font-semibold text-missionnaire uppercase tracking-[0.25em] mb-4 text-center md:text-left"
 			>
 				Par ordre alphabétique
 			</h2>
@@ -149,8 +149,8 @@
 				{#each alphabet as letter}
 					<button
 						class="text-sm md:text-base font-bold transition-all {currentAlpha === letter
-							? 'text-orange-600 scale-110'
-							: 'text-gray-300 hover:text-orange-400'}"
+							? 'text-missionnaire scale-110'
+							: 'text-stone-300 hover:text-missionnaire/60'}"
 						on:click={() => handleAlphaChange(letter)}
 					>
 						{letter}
@@ -161,19 +161,19 @@
 
 		<div>
 			<h2
-				class="text-[10px] md:text-xs font-black text-orange-600 uppercase tracking-[0.2em] mb-4 text-center md:text-left"
+				class="text-[10px] md:text-xs font-semibold text-missionnaire uppercase tracking-[0.25em] mb-4 text-center md:text-left"
 			>
 				Prédicateurs
 			</h2>
 			<div class="flex overflow-x-auto pb-2 gap-3 no-scrollbar justify-center md:justify-start">
 				{#each authors as author}
 					<button
-						class="flex-shrink-0 px-5 py-2.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all border {(author ===
+						class="flex-shrink-0 px-5 py-2.5 text-[11px] font-bold uppercase tracking-wider transition-all border {(author ===
 							'Tous' &&
 							!currentAuthor) ||
 						currentAuthor === author
-							? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20'
-							: 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-600'} {$navigating
+							? 'bg-stone-900 text-white border-stone-900'
+							: 'bg-white text-stone-500 border-stone-200 hover:border-missionnaire hover:text-missionnaire'} {$navigating
 							? 'opacity-50 cursor-not-allowed'
 							: ''}"
 						on:click={() => !$navigating && handleAuthorChange(author)}
@@ -188,21 +188,21 @@
 		<!-- Language and Audio Filters -->
 		<div>
 			<h2
-				class="text-[10px] md:text-xs font-black text-orange-600 uppercase tracking-[0.2em] mb-4 text-center md:text-left"
+				class="text-[10px] md:text-xs font-semibold text-missionnaire uppercase tracking-[0.25em] mb-4 text-center md:text-left"
 			>
 				Options
 			</h2>
 			<div
-				class="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-4 rounded-xl shadow-sm border border-gray-100"
+				class="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-4 border border-stone-200"
 			>
 				<div class="flex items-center gap-4 w-full md:w-auto">
 					<!-- Language Toggle -->
-					<div class="flex bg-gray-100 rounded-lg p-1">
+					<div class="flex bg-stone-100 rounded-lg p-1">
 						<button
 							class="px-3 py-1.5 rounded-md text-xs font-bold transition-all {currentLanguage ===
 							'french'
-								? 'bg-white text-orange-600 shadow-sm'
-								: 'text-gray-500 hover:text-gray-700'}"
+								? 'bg-white text-missionnaire shadow-sm'
+								: 'text-stone-500 hover:text-stone-700'}"
 							on:click={() => handleLanguageChange('french')}
 						>
 							Français
@@ -210,20 +210,20 @@
 						<button
 							class="px-3 py-1.5 rounded-md text-xs font-bold transition-all {currentLanguage ===
 							'english'
-								? 'bg-white text-orange-600 shadow-sm'
-								: 'text-gray-500 hover:text-gray-700'}"
+								? 'bg-white text-missionnaire shadow-sm'
+								: 'text-stone-500 hover:text-stone-700'}"
 							on:click={() => handleLanguageChange('english')}
 						>
 							English
 						</button>
 					</div>
 
-					<div class="h-6 w-px bg-gray-200" />
+					<div class="h-6 w-px bg-stone-200" />
 
 					<button
 						class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all {currentHasAudio
-							? 'bg-orange-50 text-orange-600 border border-orange-200'
-							: 'bg-gray-50 text-gray-500 border border-transparent hover:bg-gray-100'}"
+							? 'bg-stone-100 text-missionnaire border border-stone-300'
+							: 'bg-stone-50 text-stone-500 border border-transparent hover:bg-stone-100'}"
 						on:click={() => !$navigating && handleAudioFilterToggle()}
 						disabled={$navigating ? true : false}
 					>
@@ -239,9 +239,9 @@
 		<!-- Sidebar: Years -->
 		{#if sermons.length > 0}
 			<aside class="w-full md:w-56 flex-shrink-0">
-				<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 md:sticky md:top-24">
+				<div class="bg-white border border-stone-200 p-5 md:sticky md:top-24">
 					<h2
-						class="text-xs font-black text-gray-800 uppercase tracking-widest mb-6 pb-2 border-b border-gray-50"
+						class="text-xs font-semibold text-stone-800 uppercase tracking-widest mb-6 pb-2 border-b border-stone-100"
 					>
 						Années
 					</h2>
@@ -250,8 +250,8 @@
 							<button
 								class="px-3 py-2 rounded-lg text-[11px] font-bold transition-all border text-center {currentYear ===
 								year
-									? 'bg-orange-500 text-white border-orange-500 shadow-md'
-									: 'bg-white text-gray-400 border-gray-100 hover:border-orange-200 hover:text-orange-600'} {$navigating
+									? 'bg-stone-900 text-white border-stone-900'
+									: 'bg-white text-stone-400 border-stone-200 hover:border-missionnaire hover:text-missionnaire'} {$navigating
 									? 'opacity-50 cursor-not-allowed'
 									: ''}"
 								on:click={() => !$navigating && handleYearChange(year)}
@@ -269,63 +269,63 @@
 		<div class="flex-1 min-w-0 relative">
 			{#if $navigating}
 				<div
-					class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-20 flex items-center justify-center rounded-xl transition-all duration-300"
+					class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-20 flex items-center justify-center transition-all duration-300"
 				>
 					<div class="flex flex-col items-center gap-4">
-						<div class="text-orange-600 animate-spin">
+						<div class="text-missionnaire animate-spin">
 							<Icon src={IoReload} size="32" />
 						</div>
 						<span
-							class="text-[10px] font-black uppercase tracking-[0.2em] text-orange-600 animate-pulse"
+							class="text-[10px] font-semibold uppercase tracking-[0.25em] text-missionnaire animate-pulse"
 							>Chargement...</span
 						>
 					</div>
 				</div>
 			{/if}
-			<div class="bg-white rounded-xl shadow-sm border border-gray-100 min-h-[500px] flex flex-col">
+			<div class="bg-white border border-stone-200 min-h-[500px] flex flex-col">
 				<div
-					class="relative grid grid-cols-[30px_1fr_auto_auto] {desktopSermonGrid} gap-2 md:gap-4 px-3 md:px-4 py-3 border-b border-gray-100 text-[10px] md:text-[11px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50/50 rounded-t-xl items-center"
+					class="relative grid grid-cols-[30px_1fr_auto_auto] {desktopSermonGrid} gap-2 md:gap-4 px-3 md:px-4 py-3 border-b border-stone-200 text-[10px] md:text-[11px] font-bold text-stone-400 uppercase tracking-widest bg-stone-50/50 items-center"
 				>
 					<div class="text-center">#</div>
 					<button
-						class="text-left flex items-center gap-1.5 hover:text-orange-600 transition-colors"
+						class="text-left flex items-center gap-1.5 hover:text-missionnaire transition-colors"
 						on:click={() => handleSortChange('french_title')}
 					>
 						{#if currentSort.startsWith('french_title')}
-							<span class="text-orange-600">
+							<span class="text-missionnaire">
 								<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
 							</span>
 						{/if}
 						Titre
 					</button>
 					<button
-						class="hidden md:flex text-left items-center gap-1.5 hover:text-orange-600 transition-colors"
+						class="hidden md:flex text-left items-center gap-1.5 hover:text-missionnaire transition-colors"
 						on:click={() => handleSortChange('author')}
 					>
 						{#if currentSort.startsWith('author')}
-							<span class="text-orange-600">
+							<span class="text-missionnaire">
 								<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
 							</span>
 						{/if}
 						Prédicateur
 					</button>
 					<button
-						class="hidden md:flex text-left items-center gap-1.5 hover:text-orange-600 transition-colors"
+						class="hidden md:flex text-left items-center gap-1.5 hover:text-missionnaire transition-colors"
 						on:click={() => handleSortChange('iso_date')}
 					>
 						{#if currentSort.startsWith('iso_date')}
-							<span class="text-orange-600">
+							<span class="text-missionnaire">
 								<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
 							</span>
 						{/if}
 						Date
 					</button>
 					<button
-						class="hidden md:flex text-center items-center justify-center gap-1.5 hover:text-orange-600 transition-colors"
+						class="hidden md:flex text-center items-center justify-center gap-1.5 hover:text-missionnaire transition-colors"
 						on:click={() => handleSortChange('duration')}
 					>
 						{#if currentSort.startsWith('duration')}
-							<span class="text-orange-600">
+							<span class="text-missionnaire">
 								<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
 							</span>
 						{/if}
@@ -334,7 +334,7 @@
 					<div class="flex items-center justify-center text-center">
 						{#if currentSearch || currentAlpha || currentYear || currentHasAudio || (currentAuthor && currentAuthor !== 'Tous')}
 							<button
-								class="absolute right-3 top-1/2 -translate-y-1/2 md:right-4 flex items-center gap-1.5 text-[9px] font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded-full hover:bg-orange-100 transition-colors normal-case tracking-normal"
+								class="absolute right-3 top-1/2 -translate-y-1/2 md:right-4 flex items-center gap-1.5 text-[9px] font-bold text-missionnaire bg-stone-100 px-2 py-1 rounded-full hover:bg-stone-200 transition-colors normal-case tracking-normal"
 								on:click={() => goto('?')}
 								title="Réinitialiser les filtres"
 							>
@@ -346,7 +346,7 @@
 					</div>
 				</div>
 
-				<div class="divide-y divide-gray-100">
+				<div class="divide-y divide-stone-100">
 					{#each sermons as sermon, i (sermon._id)}
 						<SermonTableItem
 							{sermon}
@@ -357,12 +357,12 @@
 					{:else}
 						<div class="py-24 text-center">
 							<div
-								class="bg-gray-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-gray-200"
+								class="bg-stone-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-stone-200"
 							>
 								<Icon src={BsSearch} size="32" />
 							</div>
-							<h3 class="text-xl font-bold text-gray-800 mb-2">Aucun sermon trouvé</h3>
-							<p class="text-gray-400 text-sm">
+							<h3 class="text-xl font-bold text-stone-800 mb-2">Aucun sermon trouvé</h3>
+							<p class="text-stone-400 text-sm">
 								Essayez de modifier vos filtres ou votre recherche.
 							</p>
 						</div>
@@ -373,7 +373,7 @@
 			<!-- Pagination -->
 			{#if totalPages > 1}
 				<div
-					class="flex flex-col md:flex-row justify-between items-center mt-12 py-6 gap-6 text-[10px] md:text-xs font-bold text-gray-400 tracking-widest uppercase border-t border-gray-100"
+					class="flex flex-col md:flex-row justify-between items-center mt-12 py-6 gap-6 text-[10px] md:text-xs font-bold text-stone-400 tracking-widest uppercase border-t border-stone-200"
 				>
 					<div class="hidden md:block">
 						Affichage de {sermons.length} sur {totalSermons} prédications
@@ -383,7 +383,7 @@
 						<div class="flex items-center gap-3">
 							<span class="opacity-60">Lignes:</span>
 							<select
-								class="bg-gray-100 rounded-lg px-3 py-1.5 outline-none text-gray-800 focus:ring-2 focus:ring-orange-500/20 transition-all cursor-pointer"
+								class="bg-stone-100 rounded-lg px-3 py-1.5 outline-none text-stone-800 focus:ring-2 focus:ring-missionnaire/20 transition-all cursor-pointer"
 								value={limit}
 								on:change={(e) => {
 									const params = new URLSearchParams($page.url.searchParams);
@@ -401,10 +401,10 @@
 
 						<div class="flex items-center gap-2">
 							<div
-								class="flex items-center gap-1 bg-white p-1 rounded-xl border border-gray-100 shadow-sm"
+								class="flex items-center gap-1 bg-white p-1 rounded-xl border border-stone-200"
 							>
 								<button
-									class="px-3 py-1.5 rounded-lg hover:bg-orange-50 disabled:opacity-20 transition-all text-[10px] md:text-xs font-bold"
+									class="px-3 py-1.5 rounded-lg hover:bg-stone-50 disabled:opacity-20 transition-all text-[10px] md:text-xs font-bold"
 									disabled={currentPage === 1}
 									on:click={() => goToPage(currentPage - 1)}
 								>
@@ -415,8 +415,8 @@
 									<button
 										class="w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-lg transition-all text-[10px] md:text-xs font-bold {currentPage ===
 										p
-											? 'bg-orange-500 text-white shadow-md shadow-orange-500/20'
-											: 'hover:bg-gray-50 text-gray-600'}"
+											? 'bg-stone-900 text-white'
+											: 'hover:bg-stone-50 text-stone-600'}"
 										on:click={() => goToPage(p)}
 									>
 										{p}
@@ -424,7 +424,7 @@
 								{/each}
 
 								<button
-									class="px-3 py-1.5 rounded-lg hover:bg-orange-50 disabled:opacity-20 transition-all text-[10px] md:text-xs font-bold"
+									class="px-3 py-1.5 rounded-lg hover:bg-stone-50 disabled:opacity-20 transition-all text-[10px] md:text-xs font-bold"
 									disabled={currentPage === totalPages}
 									on:click={() => goToPage(currentPage + 1)}
 								>

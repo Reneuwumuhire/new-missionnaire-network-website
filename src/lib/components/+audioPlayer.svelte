@@ -462,7 +462,7 @@
 />
 
 {#if $selectAudio}
-<div class="fixed z-[100] bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-gray-100 shadow-[0_-8px_30px_rgb(0,0,0,0.12)] pb-safe pt-2 md:pt-4 md:pb-4 transition-all duration-300">
+<div class="fixed z-[100] bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-stone-200 shadow-[0_-4px_20px_rgb(0,0,0,0.06)] pb-safe pt-2 md:pt-4 md:pb-4 transition-all duration-300">
 	<!-- Top Progress Bar -->
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <!-- svelte-ignore a11y-no-static-element-interactions -->
@@ -474,15 +474,15 @@
 	on:click={seekTo}
 >
 	<!-- Visual Track -->
-	<div class="w-full h-[4px] bg-gray-200 relative overflow-visible rounded-full">
+	<div class="w-full h-[4px] bg-stone-200 relative overflow-visible rounded-full">
 		<!-- Active Progress -->
 		<div 
-			class="h-full bg-orange-500 rounded-full relative" 
+			class="h-full bg-missionnaire rounded-full relative" 
 			style="width: {progressBarWidth}%"
 		>
 			<!-- Indicator Knob -->
 			<div 
-				class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-4 h-4 bg-orange-500 border-[3px] border-white rounded-full shadow-md transform transition-transform duration-100 {isDragging ? 'scale-125' : 'scale-100'} md:scale-0 md:group-hover/progress:scale-100"
+				class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-4 h-4 bg-missionnaire border-[3px] border-white rounded-full shadow-md transform transition-transform duration-100 {isDragging ? 'scale-125' : 'scale-100'} md:scale-0 md:group-hover/progress:scale-100"
 			></div>
 		</div>
 	</div>
@@ -492,24 +492,24 @@
 		<!-- Info Row -->
 		<div class="flex items-center justify-between mb-3 md:mb-0 md:flex-1 md:min-w-0">
 			<div class="flex-1 min-w-0">
-				<div class="text-[10px] uppercase tracking-[0.2em] font-bold text-orange-600 mb-0.5 opacity-80">Lecture en cours</div>
-				<div class="font-black text-sm md:text-lg text-gray-900 truncate pr-4" title={getDisplayTitle($selectAudio)}>
+				<div class="text-[10px] uppercase tracking-[0.2em] font-bold text-missionnaire mb-0.5 opacity-80">Lecture en cours</div>
+				<div class="font-black text-sm md:text-lg text-stone-900 truncate pr-4" title={getDisplayTitle($selectAudio)}>
 					{getDisplayTitle($selectAudio)}
 				</div>
 				{#if !isAudioReady}
-					<div class="text-[10px] font-medium uppercase tracking-[0.15em] text-gray-400 mt-1">
+					<div class="text-[10px] font-medium uppercase tracking-[0.15em] text-stone-400 mt-1">
 						Chargement...
 					</div>
 				{/if}
 				<div class="flex items-center gap-2 mt-0.5 md:hidden">
-					<span class="text-[10px] font-medium text-gray-400">{formatTime(currentTime)}</span>
-					<div class="w-1 h-1 rounded-full bg-gray-200"></div>
-					<span class="text-[10px] font-medium text-gray-400">{formatTime(duration)}</span>
+					<span class="text-[10px] font-medium text-stone-400">{formatTime(currentTime)}</span>
+					<div class="w-1 h-1 rounded-full bg-stone-200"></div>
+					<span class="text-[10px] font-medium text-stone-400">{formatTime(duration)}</span>
 				</div>
 			</div>
 
 			<button
-				class="p-2 rounded-full transition-colors flex-shrink-0 {isCurrentFavorite ? 'text-red-500 hover:text-red-600' : 'text-gray-300 hover:text-red-400'}"
+				class="p-2 rounded-full transition-colors flex-shrink-0 {isCurrentFavorite ? 'text-red-500 hover:text-red-600' : 'text-stone-300 hover:text-red-400'}"
 				on:click={handleToggleFavorite}
 				aria-label={isCurrentFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
 				title={isCurrentFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
@@ -518,7 +518,7 @@
 			</button>
 
 			<button
-				class="bg-gray-50 hover:bg-gray-100 text-gray-400 hover:text-gray-800 p-2 rounded-full transition-colors md:hidden"
+				class="bg-stone-50 hover:bg-stone-100 text-stone-400 hover:text-stone-800 p-2 rounded-full transition-colors md:hidden"
 				on:click={() => {
 					selectAudio.set(null);
 					if (audio) audio.pause();
@@ -537,22 +537,22 @@
 				<div class="flex md:hidden items-center gap-1">
 					<button 
 						on:click={toggleShuffle} 
-						class="p-2 transition-all {$isShuffle ? 'text-orange-600' : 'text-gray-300'}"
+						class="p-2 transition-all {$isShuffle ? 'text-missionnaire' : 'text-stone-300'}"
 					>
 						<Icon src={BsShuffle} size="16" />
 					</button>
 				</div>
 
 				<div class="flex items-center gap-1 md:gap-3">
-					<button on:click={playPrevious} class="p-2 text-gray-600 hover:text-orange-600 transition-colors" title="Précédent">
+					<button on:click={playPrevious} class="p-2 text-stone-600 hover:text-missionnaire transition-colors" title="Précédent">
 						<Icon src={BsSkipStartFill} size="22" />
 					</button>
 
-					<button on:click={seekBackward} class="hidden md:block p-2 text-gray-300 hover:text-orange-600 transition-colors" title="-5s">
+					<button on:click={seekBackward} class="hidden md:block p-2 text-stone-300 hover:text-missionnaire transition-colors" title="-5s">
 						<Icon src={BsSkipBackwardFill} size="16" />
 					</button>
 
-					<button on:click={togglePlay} class="relative flex items-center justify-center w-14 h-14 md:w-12 md:h-12 bg-orange-500 text-white rounded-full hover:scale-105 transition-transform shadow-lg shadow-orange-500/20 active:scale-95">
+					<button on:click={togglePlay} class="relative flex items-center justify-center w-14 h-14 md:w-12 md:h-12 bg-missionnaire text-white rounded-full hover:scale-105 transition-transform shadow-lg shadow-missionnaire/20 active:scale-95">
 						{#if $isPlaying}
 							<Icon src={BsPauseCircleFill} size="32" />
 						{:else}
@@ -560,11 +560,11 @@
 						{/if}
 					</button>
 
-					<button on:click={seekForward} class="hidden md:block p-2 text-gray-300 hover:text-orange-600 transition-colors" title="+5s">
+					<button on:click={seekForward} class="hidden md:block p-2 text-stone-300 hover:text-missionnaire transition-colors" title="+5s">
 						<Icon src={BsSkipForwardFill} size="16" />
 					</button>
 
-					<button on:click={playNext} class="p-2 text-gray-600 hover:text-orange-600 transition-colors" title="Suivant">
+					<button on:click={playNext} class="p-2 text-stone-600 hover:text-missionnaire transition-colors" title="Suivant">
 						<Icon src={BsSkipEndFill} size="22" />
 					</button>
 				</div>
@@ -573,7 +573,7 @@
 				<div class="flex md:hidden items-center gap-1">
 					<button 
 						on:click={toggleAutoNext} 
-						class="p-2 transition-all {$autoNext ? 'text-orange-600 bg-orange-50 rounded-lg' : 'text-gray-300'}"
+						class="p-2 transition-all {$autoNext ? 'text-missionnaire bg-orange-50 rounded-lg' : 'text-stone-300'}"
 						title={$autoNext ? 'Lecture auto activée' : 'Lecture auto désactivée'}
 					>
 						<Icon src={RiMediaPlayList2Fill} size="18" />
@@ -583,16 +583,16 @@
 
 			<!-- Time & Extra Controls (Desktop) -->
 			<div class="hidden md:flex items-center gap-6">
-				<div class="flex items-center gap-1.5 font-bold text-[13px] text-gray-500 min-w-[90px]">
-					<span class="text-gray-500">{formatTime(currentTime)}</span>
-					<span class="text-gray-300">/</span>
+				<div class="flex items-center gap-1.5 font-bold text-[13px] text-stone-500 min-w-[90px]">
+					<span class="text-stone-500">{formatTime(currentTime)}</span>
+					<span class="text-stone-300">/</span>
 					<span>{formatTime(duration)}</span>
 				</div>
 
-				<div class="flex items-center gap-2 border-l border-gray-100 pl-6">
+				<div class="flex items-center gap-2 border-l border-stone-100 pl-6">
 					<button 
 						on:click={toggleShuffle} 
-						class="p-2.5 rounded-full transition-all flex items-center gap-2 {$isShuffle ? 'bg-orange-500 text-white' : 'bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600'}"
+						class="p-2.5 rounded-full transition-all flex items-center gap-2 {$isShuffle ? 'bg-missionnaire text-white' : 'bg-stone-50 text-stone-400 hover:bg-stone-100 hover:text-stone-600'}"
 						title={$isShuffle ? 'Aléatoire activé' : 'Aléatoire désactivé'}
 					>
 						<Icon src={BsShuffle} size="16" />
@@ -600,14 +600,14 @@
 
 					<button 
 						on:click={toggleAutoNext} 
-						class="p-2.5 rounded-full transition-all flex items-center gap-2 {$autoNext ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}"
+						class="p-2.5 rounded-full transition-all flex items-center gap-2 {$autoNext ? 'bg-missionnaire text-white shadow-md shadow-missionnaire/20' : 'bg-stone-50 text-stone-400 hover:bg-stone-100'}"
 						title={$autoNext ? 'Lecture auto activée' : 'Lecture auto désactivée'}
 					>
 						<Icon src={RiMediaPlayList2Fill} size="18" />
 					</button>
 
 					<div class="flex items-center gap-2 ml-2">
-						<button on:click={toggleMute} class="p-2 text-gray-400 hover:text-orange-600 transition-colors">
+						<button on:click={toggleMute} class="p-2 text-stone-400 hover:text-missionnaire transition-colors">
 							{#if !isMuted}
 								<Icon src={BsVolumeUpFill} size="20" />
 							{:else}

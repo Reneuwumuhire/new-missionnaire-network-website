@@ -6,6 +6,10 @@ export default {
 	content: ['./src/**/*.{html,js,svelte,ts}'],
 	theme: {
 		extend: {
+			fontFamily: {
+				display: ["'Cormorant Garamond'", 'Georgia', 'serif'],
+				body: ["'Outfit'", 'system-ui', 'sans-serif']
+			},
 			padding: {
 				primarySpace: '100px'
 			},

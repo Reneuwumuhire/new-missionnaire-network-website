@@ -58,10 +58,25 @@
 
 	const ytPages = ['/videos', '/musique', '/predications'];
 	$: needsYouTube = ytPages.some((p) => $page.url.pathname.startsWith(p));
+
+	// Load Google Fonts globally (non-render-blocking)
+	onMount(() => {
+		if (!browser) return;
+		const fontUrl = 'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Outfit:wght@300;400;500;600;700&display=swap';
+		if (!document.querySelector(`link[href="${fontUrl}"]`)) {
+			const link = document.createElement('link');
+			link.rel = 'stylesheet';
+			link.href = fontUrl;
+			document.head.appendChild(link);
+		}
+	});
 </script>
 
 <svelte:head>
 	<title>Missionnaire Network</title>
+	<!-- Font preconnect (global) -->
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
 	{#if needsYouTube}
 		<script src="https://www.youtube.com/iframe_api" async></script>
 		<link rel="preconnect" href="https://i.ytimg.com" />
@@ -87,14 +102,14 @@
 </svelte:head>
 
 {#if $navigating}
-	<div class="fixed top-0 left-0 right-0 z-[9999] h-1 bg-orange-100">
-		<div class="h-full bg-orange-500 animate-progress rounded-r-full"></div>
+	<div class="fixed top-0 left-0 right-0 z-[9999] h-[2px]">
+		<div class="h-full bg-missionnaire animate-progress"></div>
 	</div>
 {/if}
 
 <QueryClientProvider client={data.queryClient}>
 	<div class="relative">
-		<div bind:this={headerRef} class="flex flex-col fixed top-0 z-40 bg-white w-full">
+		<div bind:this={headerRef} class="flex flex-col fixed top-0 z-40 bg-white/95 backdrop-blur-sm w-full">
 			<SocialMediaAbove isLiveStream={!!data.liveStream} liveUrl={data.liveStream?.webpage_url} />
 			<NavBar />
 		</div>

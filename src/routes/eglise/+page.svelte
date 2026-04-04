@@ -19,21 +19,18 @@
 	/>
 </svelte:head>
 <div class=" flex flex-col">
-	<header>
-		<div class="flex flex-row items-center justify-center space-x-2">
-			<div class="header-branham flex flex-col items-center justify-center w-full" />
+	<header class="relative h-[40vh] min-h-[300px] max-h-[500px] overflow-hidden">
+		<img src="/img/eglise_header.jpg" alt="Église Murambi" class="absolute inset-0 w-full h-full object-cover" />
+		<div class="absolute inset-0 bg-gradient-to-t from-stone-900/70 via-stone-900/30 to-transparent"></div>
+		<div class="absolute bottom-0 left-0 right-0 p-8 md:p-12">
+			<div class="max-w-3xl mx-auto">
+				<p class="text-[10px] font-semibold uppercase tracking-[0.25em] text-white/70 mb-3">Église</p>
+				<h1 class="font-display text-3xl md:text-5xl text-white leading-tight">Assemblée de Kigali/Gatenga/Murambi</h1>
+			</div>
 		</div>
 	</header>
-	<div class="relative flex flex-row justify-center h-auto w-full py-14">
-		<div class="relative flex flex-col items-start w-full max-w-3xl space-y-6 px-5">
-			<div>
-				<small class=" text-missionnaire uppercase leading-6 tracking-widest text-xl font-bold"
-					>Église</small
-				>
-				<h1 class=" text-2xl md:text-4xl font-black text-[#414141]">
-					Assemblée de Kigali/Gatenga/Murambi
-				</h1>
-			</div>
+	<div class="relative flex flex-row justify-center h-auto w-full py-16">
+		<div class="relative flex flex-col items-start w-full max-w-3xl space-y-8 px-6">
 			{#each EgliseParagraph1 as paragraph, index}
 				<ArticleParagraph text={paragraph.text} />
 			{/each}
@@ -47,15 +44,3 @@
 		</div>
 	</div>
 </div>
-
-<style>
-	.header-branham {
-		background-image: url('/img/eglise_header.jpg');
-		background-color: #cccccc;
-		background-repeat: no-repeat;
-		background-size: cover;
-		background-position: center;
-		/* background-attachment: fixed; */
-		height: 500px;
-	}
-</style>

@@ -222,13 +222,13 @@
 	<div class="mt-5 mb-16">
 		<!-- Page Header -->
 		<section class="mb-8">
-			<p class="text-[11px] font-black uppercase tracking-[0.2em] text-orange-600 mb-2">
+			<p class="text-[10px] font-semibold uppercase tracking-[0.25em] text-missionnaire mb-2">
 				Missionnaire Network
 			</p>
-			<h1 class="text-2xl md:text-3xl font-black text-gray-900">
+			<h1 class="font-display text-2xl md:text-3xl font-bold text-stone-900">
 				Vidéos
 			</h1>
-			<p class="mt-2 text-sm text-gray-600 max-w-2xl">
+			<p class="mt-2 text-sm text-stone-600 max-w-2xl">
 				Retrouvez les retransmissions, prédications et enseignements en vidéo.
 			</p>
 		</section>
@@ -238,9 +238,9 @@
 			<div class="flex flex-wrap gap-2 items-center">
 				{#each availableTypesTag as tagType}
 					<button
-						class="px-3 py-1.5 rounded-full text-sm font-medium transition-colors {$activeFilter === tagType.label
-							? 'bg-gray-900 text-white'
-							: 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
+						class="px-3 py-1.5 text-sm font-medium transition-colors {$activeFilter === tagType.label
+							? 'bg-stone-900 text-white'
+							: 'bg-stone-100 text-stone-600 hover:bg-stone-200'}"
 						on:click={() => setFilter(tagType.label)}
 					>
 						{tagType.label}
@@ -248,7 +248,7 @@
 				{/each}
 				{#if $isLoading}
 					<div class="inline-block">
-						<div class="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-orange-500"></div>
+						<div class="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-missionnaire"></div>
 					</div>
 				{/if}
 			</div>
@@ -267,7 +267,7 @@
 				{#if !$selectedVideo && $filteredVideos[0]}
 					<!-- Featured Video -->
 					<button
-						class="relative w-full h-[50vh] min-h-[400px] max-h-[600px] rounded-3xl overflow-hidden mb-16 group text-left shadow-2xl transition-all hover:shadow-orange-500/10 block"
+						class="relative w-full h-[50vh] min-h-[400px] max-h-[600px] overflow-hidden mb-16 group text-left transition-all block"
 						on:click={() => videoSelected($filteredVideos[0])}
 					>
 						<img
@@ -283,12 +283,12 @@
 								<div
 									class="inline-block px-3 py-1 {$filteredVideos[0].tags.includes('LIVE')
 										? 'bg-red-600'
-										: 'bg-orange-500'} rounded-full text-xs font-bold uppercase tracking-widest mb-2"
+										: 'bg-missionnaire'} rounded-full text-xs font-bold uppercase tracking-widest mb-2"
 								>
 									{$filteredVideos[0].tags.includes('LIVE') ? 'EN DIRECT' : 'À la une'}
 								</div>
 								<h2
-									class="text-3xl md:text-5xl lg:text-6xl font-black leading-tight tracking-tight line-clamp-2 group-hover:text-orange-100 transition-colors"
+									class="text-3xl md:text-5xl lg:text-6xl font-black leading-tight tracking-tight line-clamp-2 group-hover:text-stone-200 transition-colors"
 								>
 									{$filteredVideos[0].title}
 								</h2>
@@ -317,10 +317,10 @@
 					<section class="mb-12">
 						<div class="flex items-end justify-between mb-8 px-2">
 							<div>
-								<h2 class="text-xs font-black text-orange-600 uppercase tracking-[0.2em] mb-2">
+								<h2 class="text-[10px] font-semibold text-missionnaire uppercase tracking-[0.25em] mb-2">
 									Découvrir
 								</h2>
-								<h3 class="text-2xl md:text-3xl font-bold text-gray-900">Vidéos récentes</h3>
+								<h3 class="font-display text-2xl md:text-3xl font-bold text-stone-900">Vidéos récentes</h3>
 							</div>
 						</div>
 
@@ -336,7 +336,7 @@
 							<div use:intersectionObserver class="h-20 w-full flex items-center justify-center mt-12">
 								{#if $isLoading}
 									<div
-										class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"
+										class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-missionnaire"
 									></div>
 								{/if}
 							</div>
@@ -344,14 +344,14 @@
 
 						{#if !$hasMore && !$isLoading}
 							<div class="text-center w-full py-20 opacity-50">
-								<div class="w-16 h-1 bg-gray-200 mx-auto rounded-full mb-4"></div>
-								<p class="text-xs font-bold uppercase tracking-widest text-gray-400">Fin de la liste</p>
+								<div class="w-16 h-1 bg-stone-200 mx-auto rounded-full mb-4"></div>
+								<p class="text-xs font-bold uppercase tracking-widest text-stone-400">Fin de la liste</p>
 							</div>
 						{/if}
 					</section>
 				{:else}
-					<div class="flex flex-col items-center justify-center py-32 text-center text-gray-400">
-						<div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4 text-2xl">
+					<div class="flex flex-col items-center justify-center py-32 text-center text-stone-400">
+						<div class="w-16 h-16 bg-stone-100 rounded-full flex items-center justify-center mb-4 text-2xl">
 							🔍
 						</div>
 						<p>Aucune vidéo trouvée</p>

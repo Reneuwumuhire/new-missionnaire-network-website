@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
+	import { page } from '$app/stores';
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import BsChevronDown from 'svelte-icons-pack/bs/BsChevronDown';
-	// FiBookOpen
 	import type { NavigationLinkSubmenu } from '../../helpers/NavigationLinkList';
 
 	export let subMenu: NavigationLinkSubmenu[];
@@ -11,91 +11,83 @@
 	export let closeMenuFrom: () => void;
 
 	export let active: boolean = false;
-	export let activeClass: string = 'text-accentGray';
-	export let inactiveClass: string = 'text-grayWeak';
+	export let activeClass: string = 'text-missionnaire';
+	export let inactiveClass: string = 'text-stone-400';
 
 	const dispatch = createEventDispatcher();
+
+	$: isActive = $page.url.pathname === link || $page.url.pathname.startsWith(link + '/');
 </script>
 
-<div class="flex flex-col w-full">
-	<div
-		class="flex flex-row items-center justify-between space-x-2 hover:text-missionnaire hover:font-bold transition-all duration-75 ease-in-out"
-	>
-		{#if subMenu && subMenu.length > 0}
-			<button
-				class="text-base font-normal whitespace-nowrap"
-				on:click={() => {
-					dispatch('toggle');
-				}}>{menuName}</button
-			>
-		{:else}
-			<a
-				href={link}
-				class="text-base font-normal whitespace-nowrap w-full"
-				on:click={() => closeMenuFrom()}
-			>
+<div class="flex flex-col w-full border-b border-stone-100 last:border-b-0">
+	{#if subMenu && subMenu.length > 0}
+		<!-- Entire row is a single button for sub-menu items -->
+		<button
+			class="flex items-center justify-between w-full py-3.5 transition-colors duration-200 cursor-pointer"
+			on:click={() => dispatch('toggle')}
+		>
+			<span class="text-[15px] font-medium whitespace-nowrap {isActive ? 'text-missionnaire' : 'text-stone-700'}">
 				{menuName}
-			</a>
-		{/if}
-		{#if subMenu && subMenu.length > 0}
-			<!-- button to trigger the show subMenu with Icon -->
-			<button
-				class={`text-base font-normal ${active ? activeClass : inactiveClass}`}
-				on:click={() => dispatch('toggle')}
-			>
+			</span>
+			<span class="{active ? activeClass : inactiveClass} transition-colors">
 				<Icon
 					src={BsChevronDown}
-					className={`w-4 h-4 ml-1 transition duration-500 ease-in-out ${
-						active ? 'transform rotate-180' : ''
-					}`}
+					className="w-3.5 h-3.5 transition duration-300 ease-out {active ? 'transform rotate-180' : ''}"
 				/>
-			</button>
-		{/if}
-	</div>
-	{#if active && subMenu && subMenu.length > 0}
-		<div
-			class=" self-start w-full items-end mt-2 border-2 bg-missionnaire-50 border-grayWhite flex flex-col transition-all duration-300 ease-in-out"
+			</span>
+		</button>
+	{:else}
+		<!-- No sub-menu — the whole row is a link -->
+		<a
+			href={link}
+			class="flex items-center py-3.5 text-[15px] font-medium whitespace-nowrap w-full transition-colors duration-200 {isActive ? 'text-missionnaire' : 'text-stone-700 hover:text-missionnaire'}"
+			on:click={() => closeMenuFrom()}
 		>
-			{#each subMenu as { subName, link, icon } (subName)}
+			{menuName}
+			{#if isActive}
+				<span class="ml-2 w-1.5 h-1.5 rounded-full bg-missionnaire"></span>
+			{/if}
+		</a>
+	{/if}
+
+	{#if active && subMenu && subMenu.length > 0}
+		<div class="mobo-submenu flex flex-col ml-4 mb-3 border-l-2 border-missionnaire/20 pl-4">
+			{#each subMenu as { subName, link: subLink, icon }, i (subName)}
+				{@const isSubActive = $page.url.pathname === subLink || $page.url.pathname.startsWith(subLink + '/')}
 				<a
-					href={link}
-					class="text-sm font-normal w-full my-1 p-2 transition duration-500 ease-in-out"
+					href={subLink}
+					class="flex items-center gap-3 py-2.5 transition-colors duration-200 {isSubActive ? 'text-missionnaire' : 'hover:text-missionnaire'}"
 					on:click={() => {
 						closeMenuFrom();
 					}}
 				>
-					<div class="flex flex-row items-center space-x-3">
-						{#if icon}
-							<div class="text-missionnaire">
-								<Icon src={icon} size="16" />
-							</div>
-						{/if}
-						<span class="  font-bold text-hardBlack">
-							{subName}
-						</span>
-					</div>
+					{#if icon}
+						<div class="{isSubActive ? 'text-missionnaire' : 'text-missionnaire/60'}">
+							<Icon src={icon} size="14" />
+						</div>
+					{/if}
+					<span class="text-sm font-medium {isSubActive ? 'text-missionnaire font-semibold' : 'text-stone-600'}">
+						{subName}
+					</span>
 				</a>
 			{/each}
 		</div>
 	{/if}
 </div>
 
-<!--  -->
 <style>
-	/* Use specific classes or define styles as needed */
-	.scale-y-0 {
-		transform: scaleY(0);
+	.mobo-submenu {
+		animation: submenu-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 	}
 
-	.scale-y-100 {
-		transform: scaleY(1);
-	}
-
-	.opacity-0 {
-		opacity: 0;
-	}
-
-	.opacity-100 {
-		opacity: 1;
+	@keyframes submenu-in {
+		from {
+			opacity: 0;
+			transform: translateX(-4px);
+		}
+		to {
+			opacity: 1;
+			transform: translateX(0);
+		}
 	}
 </style>

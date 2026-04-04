@@ -58,10 +58,10 @@
 	<div class="relative flex flex-row justify-center h-auto w-full py-14">
 		<div class="relative flex flex-col items-start w-full max-w-3xl space-y-6 px-5">
 			<div>
-				<small class=" text-missionnaire uppercase leading-6 tracking-widest text-xl font-bold"
+				<small class="text-[10px] font-semibold uppercase tracking-[0.25em] text-missionnaire"
 					>ASSEMBLÉE LOCALE</small
 				>
-				<h1 class=" text-4xl font-black text-[#414141]">Galerie</h1>
+				<h1 class="font-display text-2xl md:text-3xl font-bold text-stone-900">Galerie</h1>
 			</div>
 			<div class="grid">
 				{#each _list as col}

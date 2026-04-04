@@ -10,8 +10,8 @@
 
 	export let active: boolean = false;
 	export let isOpen: boolean = false;
-	export let activeClass: string = 'text-accentGray';
-	export let inactiveClass: string = 'text-grayWeak';
+	export let activeClass: string = 'text-stone-600';
+	export let inactiveClass: string = 'text-stone-400';
 
 	const dispatch = createEventDispatcher();
 
@@ -19,7 +19,7 @@
 		dispatch('toggle');
 	}
 
-	const closeMenu = (event: any) => {
+	const closeMenu = (event: MouseEvent) => {
 		if (isOpen && !(event.target as Element).closest('div')) {
 			dispatch('close');
 		}
@@ -30,86 +30,78 @@
 	}
 </script>
 
-<div class="flex flex-col text-sm relative">
-	<div
-		class="flex flex-row items-center space-x-2 hover:text-missionnaire transition-all duration-75 ease-in-out"
-	>
-		{#if subMenu && subMenu.length > 0}
-			<button
-				type="button"
-				class="whitespace-nowrap"
-				on:click|stopPropagation={handleToggle}>{menuName}</button
-			>
-		{:else}
-			<a href={link} class=" font-normal whitespace-nowrap">
-				{menuName}
-			</a>
-		{/if}
-		{#if subMenu && subMenu.length > 0}
-			<button
-				type="button"
-				class={` ${active ? activeClass : inactiveClass}`}
-				on:click|stopPropagation={handleToggle}
-				aria-label="{menuName} - {isOpen ? 'fermer' : 'ouvrir'} le sous-menu"
-			>
-				<Icon
-					className={`w-4 h-4 ml-1 transition
-          duration-500 ease-in-out
-           ${isOpen ? 'transform rotate-180' : ''}`}
-					src={BsChevronDown}
-				/>
-			</button>
-		{/if}
-	</div>
+<div class="flex flex-col text-[13px] relative">
+	{#if subMenu && subMenu.length > 0}
+		<button
+			type="button"
+			class="flex items-center gap-1 px-3 py-2 whitespace-nowrap text-stone-600 hover:text-missionnaire transition-colors duration-200"
+			on:click|stopPropagation={handleToggle}
+			aria-label="{menuName} - {isOpen ? 'fermer' : 'ouvrir'} le sous-menu"
+		>
+			{menuName}
+			<Icon
+				className="w-3 h-3 transition duration-300 ease-out {isOpen ? 'transform rotate-180' : ''}"
+				src={BsChevronDown}
+			/>
+		</button>
+	{:else}
+		<a href={link} class="flex items-center px-3 py-2 whitespace-nowrap text-stone-600 hover:text-missionnaire transition-colors duration-200">
+			{menuName}
+		</a>
+	{/if}
 	{#if isOpen && subMenu && subMenu.length > 0}
 		<div
-			class="absolute z-50 self-center w-[450px] mt-10 bg-pureWhite border border-gray-100 flex flex-col rounded-2xl p-4 shadow-2xl shadow-black/5"
+			class="submenu-dropdown absolute z-50 self-center w-[400px] mt-10 bg-white border border-stone-200 flex flex-col p-2 shadow-xl shadow-stone-900/5"
 		>
-			{#each subMenu as { subName, link, subText, image, icon }, i (subName)}
+			{#each subMenu as { subName, link: subLink, subText, image, icon }, i (subName)}
 				<a
-					href={link}
-					class="w-full flex items-center gap-4 p-4 rounded-xl transition-all duration-300 {i === 0 ? 'bg-orange-50/50 hover:bg-orange-50' : 'hover:bg-orange-50/30'}"
+					href={subLink}
+					class="w-full flex items-center gap-4 p-3.5 transition-colors duration-200 hover:bg-stone-50"
 					on:click={() => {
 						dispatch('close');
 					}}
 				>
-					<div class="flex-shrink-0 w-12 h-12 rounded-2xl overflow-hidden bg-white shadow-sm border border-gray-50 flex items-center justify-center">
+					<div class="flex-shrink-0 w-10 h-10 overflow-hidden bg-stone-100 border border-stone-200 flex items-center justify-center">
 						{#if image}
 							<img src={image} class="w-full h-full object-cover" alt={subName} />
 						{:else if icon}
-							<div class="text-orange-600">
-								<Icon src={icon} size="20" />
+							<div class="text-missionnaire">
+								<Icon src={icon} size="18" />
 							</div>
 						{/if}
 					</div>
 					<div class="flex flex-col min-w-0">
-						<span class="text-sm font-black text-gray-900 group-hover:text-missionnaire leading-tight">
+						<span class="text-sm font-semibold text-stone-800 leading-tight">
 							{subName}
 						</span>
-						<p class="text-[11px] font-medium text-gray-400 mt-1 line-clamp-2 leading-relaxed">
-							{subText}
-						</p>
+						{#if subText}
+							<p class="text-[11px] text-stone-400 mt-0.5 line-clamp-2 leading-relaxed">
+								{subText}
+							</p>
+						{/if}
 					</div>
 				</a>
+				{#if i < subMenu.length - 1}
+					<div class="mx-3.5 border-b border-stone-100"></div>
+				{/if}
 			{/each}
 		</div>
 	{/if}
 </div>
 
 <style>
-	.scale-y-0 {
-		transform: scaleY(0);
+	.submenu-dropdown {
+		animation: dropdown-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 	}
 
-	.scale-y-100 {
-		transform: scaleY(1);
-	}
-
-	.opacity-0 {
-		opacity: 0;
-	}
-
-	.opacity-100 {
-		opacity: 1;
+	@keyframes dropdown-in {
+		from {
+			opacity: 0;
+			transform: translateY(-4px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
 	}
 </style>

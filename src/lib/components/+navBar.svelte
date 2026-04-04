@@ -26,14 +26,14 @@
 		showDropContents = !showDropContents;
 	};
 	let showMoboNav = false;
-	// close the menu when clicked outside
-	const closeMenu = (event: any) => {
+
+	const closeMenu = (event: MouseEvent) => {
 		if (showMoboNav && !(event.target as Element).closest('nav')) {
 			showMoboNav = false;
 			openMenuIndex = null;
 		}
 	};
-	// Function to toggle preventScroll when mobile navigation is shown/hidden
+
 	const toggleMobileNav = () => {
 		showMoboNav = !showMoboNav;
 		if (showMoboNav) {
@@ -50,7 +50,7 @@
 			document.body.style.width = 'auto';
 		}
 	};
-	// toggle the menu when clicked
+
 	const toggleMenu = (index: number) => {
 		if (openMenuIndex === index) {
 			openMenuIndex = null;
@@ -85,7 +85,7 @@
 	}
 
 	function handleSearchInput() {
-		// Search is handled on submit, navigating to /predications
+		// Search is handled on submit
 	}
 
 	function clearInput() {
@@ -109,50 +109,49 @@
 				openMenuIndex = null;
 			}
 		};
-		// Initial check
 		handleMediaChange(mediaQuery);
-		// Listener
 		mediaQuery.addEventListener('change', handleMediaChange);
 		return () => mediaQuery.removeEventListener('change', handleMediaChange);
 	});
 </script>
 
-<nav class="relative z-50 max-w-full flex flex-row justify-between items-center px-3 md:px-6 my-4">
-	<div class=" w-full flex flex-row justify-between items-center max-w-[1600px] mx-auto">
-		<a href="/" class="flex flex-row items-center">
+<nav class="navbar relative z-50 max-w-full border-b border-stone-200/60 backdrop-blur-md bg-white/90">
+	<div class="flex items-center justify-between max-w-[1600px] mx-auto px-4 md:px-6 h-14">
+		<!-- Logo -->
+		<a href="/" class="flex items-center shrink-0">
 			<picture>
 				<source srcset="/icons/logo.webp" type="image/webp" />
-				<img src="/icons/logo.png" class="w-auto h-8" alt="logo" width="75" height="32" />
+				<img src="/icons/logo.png" class="w-auto h-7" alt="logo" width="75" height="32" fetchpriority="high" />
 			</picture>
 		</a>
-		<div class=" hidden lg:flex items-center space-x-4">
+
+		<!-- Desktop nav -->
+		<div class="hidden lg:flex items-center gap-1">
 			{#if showSearch}
 				<!-- svelte-ignore a11y-no-static-element-interactions -->
 				<div
-					class="relative inline-block"
+					class="relative mr-2"
 					on:mouseenter={() => (isHovered = true)}
 					on:mouseleave={() => (isHovered = false)}
 				>
 					<form on:submit|preventDefault={handleSubmit}>
-						<div class="flex items-center">
-							<div
-								class="w-10 h-10 rounded-full border-[1px] border-[#ccc] bg-white flex flex-row items-center justify-center transition-all duration-300 ease-in-out"
-								class:w-72={shouldExpand}
-								class:bg-white={shouldExpand}
-								class:border={shouldExpand}
-							>
-								<div
-									class="w-6 h-6 rounded-full -mr-9 flex items-center justify-center"
-									class:pl-2={shouldExpand}
-								>
-									<SearchNormal1 size={12} color="#ccc" variant="Linear" />
-								</div>
+						<div
+							class="flex items-center h-9 border border-stone-200 bg-stone-50/50 transition-all duration-300 ease-out"
+							class:w-9={!shouldExpand}
+							class:w-60={shouldExpand}
+							class:bg-white={shouldExpand}
+							class:border-stone-300={shouldExpand}
+						>
+							<div class="flex items-center justify-center w-9 shrink-0">
+								<SearchNormal1 size={14} color="#a8a29e" variant="Linear" />
+							</div>
+							{#if shouldExpand}
 								<input
 									type="text"
-									placeholder={showPlaceholder ? 'Rechercher...' : ''}
+									placeholder="Rechercher..."
 									aria-label="Rechercher"
 									bind:value={$searchTerm}
-									class=" indent-8 px-4 py-2 text-gray-600 bg-transparent outline-none w-full font-normal text-current"
+									class="w-full pr-3 py-1.5 text-sm text-stone-700 bg-transparent outline-none font-body placeholder:text-stone-400"
 									on:focus={() => (isFocused = true)}
 									on:blur={() => (isFocused = false)}
 									on:input={handleSearchInput}
@@ -160,19 +159,20 @@
 								{#if showClearButton}
 									<button
 										type="button"
-										class=" w-6 h-6 rounded-full flex items-center justify-center pr-2"
+										class="flex items-center justify-center w-7 h-7 shrink-0 mr-1"
 										on:click={clearInput}
 										aria-label="Effacer la recherche"
 									>
-										<CloseCircle size={80} color="#ccc" variant="Linear" />
+										<CloseCircle size={16} color="#a8a29e" variant="Linear" />
 									</button>
 								{/if}
-							</div>
+							{/if}
 						</div>
 					</form>
 				</div>
 			{/if}
-			<div class=" flex flex-row space-x-4 justify-between">
+
+			<div class="flex items-center gap-0.5">
 				{#each NavigationLinkList as link, index}
 					<HeaderMenuLink
 						menuName={link.menuName}
@@ -193,92 +193,110 @@
 				{/each}
 			</div>
 		</div>
-		<div class=" relative block lg:hidden text-black text-4xl">
-			<!-- menu -->
-			<button
-				class="flex flex-row items-center w-8 h-8 transition-all duration-75 ease-in-out text-missionnaire"
-				on:click={toggleMobileNav}
-				aria-label={showMoboNav ? 'Fermer le menu' : 'Ouvrir le menu'}
-			>
-				{#if showMoboNav}
-					<Icon src={IoCloseSharp} />
-				{:else}
-					<Icon src={HiSolidMenuAlt3} />
-				{/if}
-			</button>
-		</div>
-		<!-- mobo menu -->
-		{#if showMoboNav}
-			<div class="absolute z-50 top-[40px] left-0 w-full h-screen bg-white border-t-2 py-6">
-				<div class="relative flex flex-col space-y-2 w-full h-full bg-white">
-					{#if showSearch}
-						<!-- svelte-ignore a11y-no-static-element-interactions -->
-						<div
-							class="relative inline-block self-start ml-4"
-							on:mouseenter={() => (isHovered = true)}
-							on:mouseleave={() => (isHovered = false)}
-						>
-							<form on:submit|preventDefault={handleSubmit}>
-								<div class="flex items-center">
-									<div
-										class="w-72 h-10 rounded-full border-2 boder-[#C9C9C9] bg-gray-50 flex flex-row items-center justify-center transition-all duration-300 ease-in-out"
-										class:bg-white={shouldExpand}
-										class:border={shouldExpand}
-										class:border-gray-300={shouldExpand}
-									>
-										<div
-											class="w-6 h-6 rounded-full -mr-9 flex items-center justify-center"
-											class:pl-2={shouldExpand}
-										>
-											<SearchNormal1 size={20} color="#C9C9C9" variant="Linear" />
-										</div>
-										<input
-											type="text"
-											placeholder="Rechercher..."
-											aria-label="Rechercher"
-											bind:value={$searchTerm}
-											class=" indent-8 px-4 py-2 text-gray-600 bg-transparent outline-none w-full font-light"
-											on:focus={() => (isFocused = true)}
-											on:blur={() => (isFocused = false)}
-										/>
-										{#if showClearButton}
-											<button
-												type="button"
-												class=" w-6 h-6 rounded-full flex items-center justify-center pr-2"
-												on:click={clearInput}
-												aria-label="Effacer la recherche"
-											>
-												<CloseCircle size={80} color="#fb923c" variant="Linear" />
-											</button>
-										{/if}
-									</div>
+
+		<!-- Mobile hamburger -->
+		<button
+			class="relative lg:hidden flex items-center justify-center w-9 h-9 text-stone-700 transition-colors hover:text-missionnaire"
+			on:click={toggleMobileNav}
+			aria-label={showMoboNav ? 'Fermer le menu' : 'Ouvrir le menu'}
+		>
+			{#if showMoboNav}
+				<Icon src={IoCloseSharp} className="w-5 h-5" />
+			{:else}
+				<Icon src={HiSolidMenuAlt3} className="w-5 h-5" />
+			{/if}
+		</button>
+
+	</div>
+
+	<!-- Mobile menu overlay — direct child of nav for correct absolute positioning -->
+	{#if showMoboNav}
+		<div class="mobo-menu absolute left-0 right-0 top-full z-50 bg-white overflow-y-auto border-t border-stone-100 h-screen">
+			<div class="flex flex-col px-6 py-8 max-w-lg mx-auto pb-32">
+				{#if showSearch}
+					<!-- svelte-ignore a11y-no-static-element-interactions -->
+					<div
+						class="mb-8"
+						on:mouseenter={() => (isHovered = true)}
+						on:mouseleave={() => (isHovered = false)}
+					>
+						<form on:submit|preventDefault={handleSubmit}>
+							<div
+								class="flex items-center h-11 border border-stone-200 bg-stone-50"
+							>
+								<div class="flex items-center justify-center w-11 shrink-0">
+									<SearchNormal1 size={18} color="#a8a29e" variant="Linear" />
 								</div>
-							</form>
-						</div>
-					{/if}
-					<div class="relative flex flex-col space-y-5 text-3xl px-5">
-						{#each NavigationLinkList as link, index}
-							<HeaderMenuLinkMobo
-								menuName={link.menuName}
-								link={link.link}
-								subMenu={link.subMenu
-									? link.subMenu.map((subLink) => ({
-											subName: subLink.subName,
-											link: subLink.link,
-											subText: subLink.subText,
-											icon: subLink.icon
-										}))
-									: []}
-								active={openMenuIndex === index}
-								activeClass="text-missionnaire"
-								inactiveClass="text-black"
-								on:toggle={() => toggleMenu(index)}
-								closeMenuFrom={toggleMobileNav}
-							/>
-						{/each}
+								<input
+									type="text"
+									placeholder="Rechercher..."
+									aria-label="Rechercher"
+									bind:value={$searchTerm}
+									class="w-full pr-4 py-2 text-base text-stone-700 bg-transparent outline-none font-body placeholder:text-stone-400"
+									on:focus={() => (isFocused = true)}
+									on:blur={() => (isFocused = false)}
+								/>
+								{#if showClearButton}
+									<button
+										type="button"
+										class="flex items-center justify-center w-9 h-9 shrink-0 mr-1"
+										on:click={clearInput}
+										aria-label="Effacer la recherche"
+									>
+										<CloseCircle size={20} color="#FF880C" variant="Linear" />
+									</button>
+								{/if}
+							</div>
+						</form>
 					</div>
+				{/if}
+
+				<div class="flex flex-col gap-1">
+					{#each NavigationLinkList as link, index}
+						<HeaderMenuLinkMobo
+							menuName={link.menuName}
+							link={link.link}
+							subMenu={link.subMenu
+								? link.subMenu.map((subLink) => ({
+										subName: subLink.subName,
+										link: subLink.link,
+										subText: subLink.subText,
+										icon: subLink.icon
+									}))
+								: []}
+							active={openMenuIndex === index}
+							activeClass="text-missionnaire"
+							inactiveClass="text-stone-400"
+							on:toggle={() => toggleMenu(index)}
+							closeMenuFrom={toggleMobileNav}
+						/>
+					{/each}
+				</div>
+
+				<!-- Mobile footer accent -->
+				<div class="mt-12 pt-8 border-t border-stone-100">
+					<p class="text-[10px] uppercase tracking-[0.3em] text-stone-400 font-body">
+						Missionnaire Network
+					</p>
 				</div>
 			</div>
-		{/if}
-	</div>
+		</div>
+	{/if}
 </nav>
+
+<style>
+	.mobo-menu {
+		animation: mobo-slide 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+	}
+
+	@keyframes mobo-slide {
+		from {
+			opacity: 0;
+			transform: translateY(-8px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+</style>

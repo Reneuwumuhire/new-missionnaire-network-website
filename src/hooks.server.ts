@@ -136,5 +136,15 @@ export const handle: Handle = async ({ event, resolve }) => {
 	// Fire and forget missed route tracking
 	trackMissedRoute(event, response, isPageRequest);
 
+	// Cache static assets (images, icons, fonts) for 1 year
+	if (
+		pathname.startsWith('/img/') ||
+		pathname.startsWith('/icons/') ||
+		pathname.startsWith('/fonts/') ||
+		/\.(webp|jpg|jpeg|png|svg|ico|woff2?|ttf|otf)$/i.test(pathname)
+	) {
+		response.headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+	}
+
 	return response;
 };

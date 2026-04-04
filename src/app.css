@@ -1,30 +1,65 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ═══════════════════════════════════════════
+   MISSIONNAIRE NETWORK — Global Design System
+   Font pairing: Cormorant Garamond (display) + Outfit (body)
+   ═══════════════════════════════════════════ */
+
 :root {
 	--icons-colors: #4f4f4f;
-	/* font is inter */
-	--font-family: "Inter", sans-serif;
+	--font-display: 'Cormorant Garamond', Georgia, serif;
+	--font-body: 'Outfit', system-ui, sans-serif;
+	--color-missionnaire: #FF880C;
 	scroll-behavior: smooth;
 }
+
+/* ── Base typography ── */
 html {
 	overflow-x: hidden;
+	font-family: var(--font-body);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	text-rendering: optimizeLegibility;
 }
+
+body {
+	color: #292524; /* stone-800 — warmer than pure black */
+}
+
+/* ── Selection highlight ── */
 ::selection {
-	background-color: #ff880c;
+	background-color: #FF880C;
 	color: #fff;
 }
 
-@keyframes pulse {
-	0%,
-	100% {
-		opacity: 1;
+/* ── Font utility classes ── */
+.font-display {
+	font-family: var(--font-display);
+}
+
+.font-body {
+	font-family: var(--font-body);
+}
+
+/* ── Smooth page transitions ── */
+.page-transition-enter {
+	animation: page-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes page-in {
+	from {
+		opacity: 0;
+		transform: translateY(8px);
 	}
-	50% {
-		opacity: 0.5;
+	to {
+		opacity: 1;
+		transform: translateY(0);
 	}
 }
 
+/* ── Navigation progress bar ── */
 @keyframes progress {
 	0% {
 		width: 0%;
@@ -39,4 +74,39 @@ html {
 
 .animate-progress {
 	animation: progress 2s ease-out forwards;
+}
+
+/* ── Global link hover accent ── */
+a {
+	transition: color 0.2s ease;
+}
+
+/* ── Scrollbar refinement (webkit) ── */
+::-webkit-scrollbar {
+	width: 6px;
+}
+
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+	background: #d6d3d1; /* stone-300 */
+	border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: #a8a29e; /* stone-400 */
+}
+
+/* ── Image polish ── */
+img {
+	image-rendering: auto;
+}
+
+/* ── Focus styles — accessible + aesthetic ── */
+:focus-visible {
+	outline: 2px solid var(--color-missionnaire);
+	outline-offset: 2px;
+	border-radius: 2px;
 }
