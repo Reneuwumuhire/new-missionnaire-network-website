@@ -24,6 +24,8 @@
 	}
 
 	const closeMenu = (event: MouseEvent) => {
+		// Only handle close on desktop (lg+) — the mobile menu has its own toggle logic
+		if (typeof window !== 'undefined' && window.innerWidth < 1024) return;
 		if (isOpen && menuEl && !menuEl.contains(event.target as Node)) {
 			dispatch('close');
 		}
