@@ -2,7 +2,7 @@ import { browser } from '$app/environment';
 import { QueryClient } from '@tanstack/svelte-query';
 
 export const trailingSlash = 'never';
-export const load = async ({ data }) => {
+export const load = async () => {
 	const queryClient = new QueryClient({
 		defaultOptions: {
 			queries: {
@@ -12,8 +12,6 @@ export const load = async ({ data }) => {
 		}
 	});
 	return {
-		liveStream: data?.liveStream ?? null,
-		radioIsLive: data?.radioIsLive ?? false,
 		queryClient
 	};
 };

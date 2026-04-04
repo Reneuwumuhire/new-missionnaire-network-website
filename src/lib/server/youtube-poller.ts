@@ -49,19 +49,22 @@ if (!globalAny[GLOBAL_KEY]) {
 
 /**
  * Returns the current YouTube live status.
- * Reads from in-memory cache first, falls back to MongoDB on cold starts.
+ * Always reads from MongoDB to stay in sync across serverless instances.
+ * Uses in-memory cache only if the DB read fails.
  */
 export async function getLiveStatus(): Promise<LiveStatus> {
-	const local = globalAny[GLOBAL_KEY];
-	// If the in-memory cache has been populated (has an updatedAt), use it
-	if (local && local.updatedAt) {
-		return local;
-	}
-	// Cold start — read from MongoDB
-	const cached = await getYouTubeCachedStatus();
-	if (cached) {
-		globalAny[GLOBAL_KEY] = cached;
-		return cached;
+	try {
+		const cached = await getYouTubeCachedStatus();
+		if (cached) {
+			globalAny[GLOBAL_KEY] = cached;
+			return cached;
+		}
+	} catch {
+		// DB unavailable — fall back to in-memory
+		const local = globalAny[GLOBAL_KEY];
+		if (local && local.updatedAt) {
+			return local;
+		}
 	}
 	return INITIAL_STATUS;
 }
@@ -103,15 +106,33 @@ export async function checkAndIngestLiveStream(force = false) {
 			return;
 		}
 
-		// RSS + videos.list (1 quota unit)
+		// Step 1: RSS + videos.list (1 quota unit)
 		const liveFromRss = await checkViaRss(apiKey);
 		if (liveFromRss) return;
 
-		// No live stream found — only mark offline if currently live
-		const current = globalAny[GLOBAL_KEY];
-		if (current && current.isLive) {
-			updateStatus({ ...INITIAL_STATUS, updatedAt: new Date().toISOString() });
-		} else if (!current?.updatedAt) {
+		// Step 2: When forced (radio triggered) or near scheduled time,
+		// also try search.list (100 units) — RSS can lag 15-30 min.
+		if (force || isNearScheduledLiveTime()) {
+			const liveFromSearch = await checkViaSearch(apiKey);
+			if (liveFromSearch) return;
+		}
+
+		// No live stream found.
+		// Only mark offline if search.list explicitly confirmed no live stream.
+		// RSS alone is not reliable enough (15-30 min lag) to conclude "offline".
+		// During live windows or forced checks, search.list already ran above,
+		// so reaching here means it truly found nothing.
+		if (force || isNearScheduledLiveTime()) {
+			// search.list ran and found nothing — safe to mark offline
+			const dbStatus = await getYouTubeCachedStatus();
+			if (dbStatus && dbStatus.isLive) {
+				updateStatus({ ...INITIAL_STATUS, updatedAt: new Date().toISOString() });
+			}
+		}
+		// Outside live windows (RSS-only check): never mark offline.
+		// The stream will be marked offline by WebSub callback or
+		// the next live-window check.
+		if (!globalAny[GLOBAL_KEY]?.updatedAt) {
 			updateStatus({ ...INITIAL_STATUS, updatedAt: new Date().toISOString() });
 		}
 	} catch (error) {
@@ -184,6 +205,34 @@ async function checkViaRss(apiKey: string): Promise<boolean> {
 		return handleLiveResult(data);
 	} catch (error) {
 		console.error(`[YouTube Poller] RSS check error: ${error instanceof Error ? error.message : error}`);
+		return false;
+	}
+}
+
+/** search.list (100 quota units). Most reliable — catches live streams not yet in RSS. */
+async function checkViaSearch(apiKey: string): Promise<boolean> {
+	try {
+		const apiUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${CHANNEL_ID}&type=video&eventType=live&key=${apiKey}`;
+		const response = await fetch(apiUrl);
+
+		if (!response.ok) {
+			const errorData = await response.json().catch(() => ({}));
+			const errorMsg =
+				(errorData as Record<string, Record<string, string>>).error?.message || response.statusText;
+			console.error(`[YouTube Poller] search.list failed: ${errorMsg}`);
+			return false;
+		}
+
+		const data = await response.json();
+
+		if (data.items && data.items.length > 0) {
+			const item = data.items[0];
+			await applyLiveStatus(item.id.videoId, item.snippet);
+			return true;
+		}
+		return false;
+	} catch (error) {
+		console.error(`[YouTube Poller] search check error: ${error instanceof Error ? error.message : error}`);
 		return false;
 	}
 }

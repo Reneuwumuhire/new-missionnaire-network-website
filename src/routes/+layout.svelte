@@ -12,7 +12,8 @@
 	import { QueryClientProvider } from '@tanstack/svelte-query';
 	import { navigating, page } from '$app/stores';
 	import { browser } from '$app/environment';
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
+	import { radioIsLive } from '$lib/stores/global';
 	export let data: LayoutData;
 	const SITE_URL = 'https://missionnaire.net';
 	const DEFAULT_SEO_DESCRIPTION =
@@ -58,6 +59,28 @@
 
 	const ytPages = ['/videos', '/musique', '/predications'];
 	$: needsYouTube = ytPages.some((p) => $page.url.pathname.startsWith(p));
+
+	// Radio live status polling — runs globally so the banner works on all pages
+	let radioPollTimer: ReturnType<typeof setInterval> | null = null;
+
+	async function pollRadioStatus() {
+		try {
+			const res = await fetch('/api/live/radio-poll');
+			if (!res.ok) return;
+			const status = (await res.json()) as { isLive: boolean };
+			radioIsLive.set(status.isLive);
+		} catch { /* ignore */ }
+	}
+
+	onMount(() => {
+		if (!browser) return;
+		pollRadioStatus();
+		radioPollTimer = setInterval(pollRadioStatus, 10_000);
+	});
+
+	onDestroy(() => {
+		if (radioPollTimer) clearInterval(radioPollTimer);
+	});
 
 	// Load Google Fonts globally (non-render-blocking)
 	onMount(() => {
@@ -110,7 +133,7 @@
 <QueryClientProvider client={data.queryClient}>
 	<div class="relative">
 		<div bind:this={headerRef} class="flex flex-col fixed top-0 z-40 bg-[#FAF8F3]/95 backdrop-blur-sm w-full">
-			<SocialMediaAbove isLiveStream={!!data.liveStream} isRadioLive={!!data.radioIsLive} liveUrl={data.liveStream?.webpage_url} />
+			<SocialMediaAbove />
 			<NavBar />
 		</div>
 		<div

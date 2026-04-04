@@ -1,6 +1,5 @@
 import type { PageServerLoad } from './$types';
-import { getCollection, getVideoById } from '../../db/collections';
-import { getLiveStatus } from '../../lib/server/youtube-poller';
+import { getCollection, getVideoById, getYouTubeCachedStatus } from '../../db/collections';
 
 export const load: PageServerLoad = async ({ url }) => {
 	const filter = url.searchParams.get('filter') || 'All';
@@ -9,7 +8,7 @@ export const load: PageServerLoad = async ({ url }) => {
 
 	const [videos, liveStatus, requestedVideo] = await Promise.all([
 		getCollection('videos', 0, 20, filter, search),
-		getLiveStatus(),
+		getYouTubeCachedStatus(),
 		videoId ? getVideoById(videoId) : Promise.resolve(null)
 	]);
 

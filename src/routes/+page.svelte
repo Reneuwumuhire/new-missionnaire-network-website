@@ -3,34 +3,18 @@
 	import { browser } from '$app/environment';
 	import { onDestroy, onMount } from 'svelte';
 	import type { YoutubeVideo } from '$lib/models/youtube';
-	import type { LiveStatus } from '$lib/server/youtube-poller';
 	import NotificationBell from '$lib/components/+notificationBell.svelte';
 	import { radioIsLive as radioIsLiveStore } from '$lib/stores/global';
 
 	export let data: {
 		data: YoutubeVideo[];
-		liveStatus?: LiveStatus;
 		radioStatus?: { isLive: boolean; sourceUrl: string };
 	};
 
-	let radioIsLive = data.radioStatus?.isLive ?? false;
+	$: radioIsLive = $radioIsLiveStore || (data.radioStatus?.isLive ?? false);
 	$: recentVideos = (data.data || []).slice(0, 3);
 
 	let bellRef: NotificationBell | undefined;
-
-	let radioPollTimer: ReturnType<typeof setInterval> | null = null;
-
-	async function pollRadioStatus() {
-		try {
-			const response = await fetch('/api/live/radio-poll');
-			if (!response.ok) return;
-			const status = (await response.json()) as { isLive: boolean };
-			radioIsLive = status.isLive;
-			radioIsLiveStore.set(status.isLive);
-		} catch {
-			// ignore poll errors
-		}
-	}
 
 	// Scroll-triggered reveal
 	let heroVisible = false;
@@ -39,10 +23,6 @@
 
 	onMount(() => {
 		if (!browser) return;
-
-		// Poll radio status every 10s
-		pollRadioStatus();
-		radioPollTimer = setInterval(pollRadioStatus, 10_000);
 
 		// Trigger hero reveal
 		requestAnimationFrame(() => {
@@ -75,7 +55,6 @@
 	});
 
 	onDestroy(() => {
-		if (radioPollTimer) clearInterval(radioPollTimer);
 		clearInterval(heroVerseInterval);
 	});
 

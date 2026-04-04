@@ -6,11 +6,7 @@
 	import RiLogoWhatsappFill from 'svelte-icons-pack/ri/RiLogoWhatsappFill';
 	import { radioIsLive as radioIsLiveStore } from '$lib/stores/global';
 
-	export let isLiveStream: boolean = false;
-	export let isRadioLive: boolean = false;
-	export let liveUrl: string | undefined = undefined;
-
-	$: isLive = isLiveStream || isRadioLive || $radioIsLiveStore;
+	$: isLive = $radioIsLiveStore;
 </script>
 
 <div
@@ -19,12 +15,7 @@
 		: 'bg-stone-900'}"
 >
 	{#if isLive}
-		<a
-			href={isLiveStream ? (liveUrl || 'https://www.youtube.com/@MissionnaireNetwork/live') : '/live'}
-			target={isLiveStream ? '_blank' : undefined}
-			class="absolute inset-0 z-0"
-			aria-label={isLiveStream ? 'Regarder le direct sur YouTube' : 'Écouter la radio en direct'}
-		/>
+		<a href="/live" class="absolute inset-0 z-0" aria-label="Écouter la radio en direct"></a>
 	{/if}
 
 	<div
@@ -39,9 +30,7 @@
 						></span>
 						<span class="relative inline-flex h-2 w-2 rounded-full bg-red-300"></span>
 					</span>
-					<span class="font-semibold uppercase tracking-[0.2em] text-white">
-						{isLiveStream ? 'Live en cours' : 'Radio en direct'}
-					</span>
+					<span class="font-semibold uppercase tracking-[0.2em] text-white"> Radio en direct </span>
 				</div>
 			{:else}
 				<span class="text-stone-400 uppercase tracking-[0.2em] hidden sm:block">
@@ -94,4 +83,3 @@
 		</div>
 	</div>
 </div>
-

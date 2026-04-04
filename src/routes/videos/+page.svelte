@@ -20,7 +20,9 @@
 	} from '$lib/stores/videoStore';
 	import { fetchInitialVideos, fetchMoreVideos, resetPagination, setFilter } from '../../utils/videoUtils';
 
-	export let data: { data: YoutubeVideo[]; liveStatus?: any; requestedVideo?: YoutubeVideo | null };
+	import type { YouTubeCachedStatus } from '../../db/collections';
+
+	export let data: { data: YoutubeVideo[]; liveStatus?: YouTubeCachedStatus | null; requestedVideo?: YoutubeVideo | null };
 
 	const limit = 20;
 
@@ -135,33 +137,33 @@
 			const filterParam = url.searchParams.get('filter');
 			const searchParam = url.searchParams.get('search');
 
-			if (data.liveStatus?.isLive) {
-				const liveVid: YoutubeVideo = {
-					id: data.liveStatus.videoId,
-					display_id: data.liveStatus.videoId,
-					_id: `live-${data.liveStatus.videoId}`,
-					title: data.liveStatus.title,
-					description: data.liveStatus.description || '',
-					thumbnail: data.liveStatus.thumbnail || '',
+			if (data.liveStatus?.isLive && data.liveStatus.videoId) {
+				const ls = data.liveStatus;
+				liveVideo.set({
+					id: ls.videoId,
+					display_id: ls.videoId,
+					_id: `live-${ls.videoId}`,
+					title: ls.title || '',
+					description: ls.description || '',
+					thumbnail: ls.thumbnail || '',
 					duration_string: 'EN DIRECT',
 					duration: 0,
 					tags: ['retransmission', 'LIVE'],
 					view_count: 0,
-					webpage_url: data.liveStatus.url,
+					webpage_url: ls.url || '',
 					live_status: 'live',
 					release_timestamp: Date.now() / 1000,
 					upload_date: new Date().toISOString(),
 					timestamp: Date.now(),
 					availability: 'public',
-					original_url: data.liveStatus.url,
-					fulltitle: data.liveStatus.title,
+					original_url: ls.url || '',
+					fulltitle: ls.title || '',
 					release_year: new Date().getFullYear(),
 					epoch: Date.now() / 1000,
 					aspect_ratio: 1.777,
 					pdfInfo: [],
 					thumbnails: []
-				} as any;
-				liveVideo.set(liveVid);
+				} as YoutubeVideo);
 			} else {
 				liveVideo.set(undefined);
 			}

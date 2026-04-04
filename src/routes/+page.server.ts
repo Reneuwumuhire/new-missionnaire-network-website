@@ -1,7 +1,6 @@
 import type { PageServerLoad } from './$types';
 import { redirect } from '@sveltejs/kit';
 import { getCollection } from '../db/collections';
-import { getLiveStatus } from '../lib/server/youtube-poller';
 import { getLastStatus } from '$lib/server/radio-status-broker';
 
 export const load: PageServerLoad = async ({ url }) => {
@@ -16,15 +15,13 @@ export const load: PageServerLoad = async ({ url }) => {
 		throw redirect(301, `/videos?${params.toString()}`);
 	}
 
-	const [videos, liveStatus, radioStatus] = await Promise.all([
+	const [videos, radioStatus] = await Promise.all([
 		getCollection('videos', 0, 3, 'All', ''),
-		getLiveStatus(),
 		getLastStatus()
 	]);
 
 	return {
 		data: videos,
-		liveStatus,
 		radioStatus: {
 			isLive: radioStatus?.isLive ?? false,
 			sourceUrl: radioStatus?.streamUrl ?? ''
