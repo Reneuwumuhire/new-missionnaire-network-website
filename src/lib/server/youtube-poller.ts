@@ -6,10 +6,14 @@ import {
 	getYouTubeCachedStatus,
 	setYouTubeCachedStatus
 } from '../../db/collections';
+import { isNearScheduledLiveTime } from './youtube-websub';
 
 const YOUTUBE_NOTIFICATION_COOLDOWN = 15 * 60 * 1000; // 15 min cooldown
-const CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes between RSS checks
-const SEARCH_INTERVAL = 2 * 60 * 60 * 1000; // 2 hours between search.list calls
+
+// Near scheduled live times, poll every 2 min as safety net for WebSub.
+// Outside live windows, poll every 15 min (just to catch edge cases).
+const CHECK_INTERVAL_NEAR_LIVE = 2 * 60 * 1000;   // 2 minutes
+const CHECK_INTERVAL_DEFAULT = 15 * 60 * 1000;     // 15 minutes
 
 export type LiveStatus = {
 	isLive: boolean;
@@ -74,23 +78,21 @@ const CHANNEL_ID = 'UCS3zqpqnCvT0SFa_jI662Kg';
 const RSS_URL = `https://www.youtube.com/feeds/videos.xml?channel_id=${CHANNEL_ID}`;
 
 /**
- * Hybrid live-stream detection:
+ * Live-stream detection — safety net for WebSub.
  *
- * 1. **RSS + videos.list** (primary, every 5 min) — RSS is free, videos.list
- *    costs 1 unit. Detects streams that appear in the channel's recent feed.
+ * Primary detection is via WebSub push notifications (zero quota).
+ * This function runs as a fallback:
+ * - Near scheduled live times (Wed/Sat 19:30, Sun 10:00 Berlin): every 2 min
+ * - Outside live windows: every 15 min
+ * - When radio goes live (force=true): immediately
  *
- * 2. **search.list** (fallback, every 2 hours) — costs 100 units but catches
- *    live streams that haven't appeared in the RSS feed yet (RSS can lag 15-30 min).
- *
- * Both are throttled via DB locks so multiple serverless instances don't duplicate work.
- *
- * Quota budget: ~288 (videos.list) + ~1,200 (search.list) ≈ 1,500 units/day
+ * Uses RSS + videos.list (1 quota unit per call).
+ * Quota budget: ~50-100 units/day (mostly during live windows).
  */
 export async function checkAndIngestLiveStream(force = false) {
-	// DB-level throttle — prevents multiple serverless instances from checking.
-	// `force` bypasses the RSS throttle (used when radio goes live as a hint).
 	if (!force) {
-		const canCheck = await claimCheckSlot('youtube_rss', CHECK_INTERVAL);
+		const interval = isNearScheduledLiveTime() ? CHECK_INTERVAL_NEAR_LIVE : CHECK_INTERVAL_DEFAULT;
+		const canCheck = await claimCheckSlot('youtube_rss', interval);
 		if (!canCheck) return;
 	}
 
@@ -101,29 +103,54 @@ export async function checkAndIngestLiveStream(force = false) {
 			return;
 		}
 
-		// Step 1: Try RSS + videos.list first (cheap — 1 quota unit)
+		// RSS + videos.list (1 quota unit)
 		const liveFromRss = await checkViaRss(apiKey);
-		if (liveFromRss) return; // found live stream, done
+		if (liveFromRss) return;
 
-		// Step 2: Fallback to search.list (100 quota units, throttled to every 2 hours)
-		const canSearch = await claimCheckSlot('youtube_search', SEARCH_INTERVAL);
-		if (canSearch) {
-			const liveFromSearch = await checkViaSearch(apiKey);
-			if (liveFromSearch) return; // found live stream, done
-		}
-
-		// Neither method found a live stream — mark offline.
-		// Only update if the current status is live (avoid overwriting on every check).
+		// No live stream found — only mark offline if currently live
 		const current = globalAny[GLOBAL_KEY];
 		if (current && current.isLive) {
 			updateStatus({ ...INITIAL_STATUS, updatedAt: new Date().toISOString() });
 		} else if (!current?.updatedAt) {
-			// First check ever — write an initial status
 			updateStatus({ ...INITIAL_STATUS, updatedAt: new Date().toISOString() });
 		}
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		console.error(`[YouTube Poller] Error: ${message}`);
+	}
+}
+
+/**
+ * Called by the WebSub webhook when a push notification arrives.
+ * Checks a specific video ID to see if it's a live stream.
+ * Costs 1 quota unit.
+ */
+export async function checkVideoLiveStatus(videoId: string, apiKey: string): Promise<void> {
+	try {
+		const apiUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,liveStreamingDetails&id=${videoId}&key=${apiKey}`;
+		const response = await fetch(apiUrl);
+
+		if (!response.ok) {
+			console.error(`[YouTube WebSub] videos.list failed: ${response.status}`);
+			return;
+		}
+
+		const data = (await response.json()) as VideoListResponse;
+		const liveItem = data.items?.find((item) => item.snippet.liveBroadcastContent === 'live');
+
+		if (liveItem) {
+			await applyLiveStatus(liveItem.id, liveItem.snippet);
+		} else {
+			// Video exists but isn't live — could be a new upload or ended stream.
+			// If we're currently showing this video as live, mark offline.
+			const current = globalAny[GLOBAL_KEY];
+			if (current?.isLive && current?.videoId === videoId) {
+				console.log(`[YouTube WebSub] Stream ended for: ${videoId}`);
+				updateStatus({ ...INITIAL_STATUS, updatedAt: new Date().toISOString() });
+			}
+		}
+	} catch (error) {
+		console.error(`[YouTube WebSub] Check error: ${error instanceof Error ? error.message : error}`);
 	}
 }
 
@@ -157,34 +184,6 @@ async function checkViaRss(apiKey: string): Promise<boolean> {
 		return handleLiveResult(data);
 	} catch (error) {
 		console.error(`[YouTube Poller] RSS check error: ${error instanceof Error ? error.message : error}`);
-		return false;
-	}
-}
-
-/** search.list fallback (100 quota units). Catches live streams not yet in RSS. */
-async function checkViaSearch(apiKey: string): Promise<boolean> {
-	try {
-		const apiUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${CHANNEL_ID}&type=video&eventType=live&key=${apiKey}`;
-		const response = await fetch(apiUrl);
-
-		if (!response.ok) {
-			const errorData = await response.json().catch(() => ({}));
-			const errorMsg =
-				(errorData as Record<string, Record<string, string>>).error?.message || response.statusText;
-			console.error(`[YouTube Poller] search.list failed: ${errorMsg}`);
-			return false;
-		}
-
-		const data = await response.json();
-
-		if (data.items && data.items.length > 0) {
-			const item = data.items[0];
-			await applyLiveStatus(item.id.videoId, item.snippet);
-			return true;
-		}
-		return false;
-	} catch (error) {
-		console.error(`[YouTube Poller] search check error: ${error instanceof Error ? error.message : error}`);
 		return false;
 	}
 }

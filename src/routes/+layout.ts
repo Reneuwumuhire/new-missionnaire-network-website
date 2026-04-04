@@ -12,8 +12,8 @@ export const load = async ({ data }) => {
 		}
 	});
 	return {
-		// Use server data if available, otherwise null (or whatever default)
 		liveStream: data?.liveStream ?? null,
+		radioIsLive: data?.radioIsLive ?? false,
 		queryClient
 	};
 };

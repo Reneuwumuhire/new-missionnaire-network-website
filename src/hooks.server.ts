@@ -1,14 +1,17 @@
 import { connect, getDb } from './db/mongo';
 import { checkAndIngestLiveStream } from './lib/server/youtube-poller';
+import { ensureWebSubSubscription } from '$lib/server/youtube-websub';
 import type { Handle } from '@sveltejs/kit';
 import { getFullCountryName } from './utils/countries';
 
-// Initialize MongoDB on server start, then run an initial YouTube check.
-// The check is self-throttled via DB lock, so multiple cold starts are safe.
+// Initialize MongoDB on server start, then:
+// 1. Run an initial YouTube check (self-throttled via DB lock)
+// 2. Ensure WebSub subscription is active (re-subscribes every 4 days)
 connect()
-	.then(() => {
+	.then(async () => {
 		console.log('[MongoDB] Database connection initialized on startup');
-		return checkAndIngestLiveStream();
+		await checkAndIngestLiveStream();
+		await ensureWebSubSubscription();
 	})
 	.catch((e) => {
 		console.error('[MongoDB] Initialization failed:', e);
