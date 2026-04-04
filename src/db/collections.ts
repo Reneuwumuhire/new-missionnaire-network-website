@@ -709,6 +709,38 @@ export async function countActiveListeners(): Promise<number> {
 
 // ── Shared check-slot lock (YouTube & Radio) ───────────────────
 
+let checkLockIndexEnsured = false;
+
+async function ensureCheckLockIndex() {
+	if (checkLockIndexEnsured) return;
+	try {
+		const db = await getDb();
+		await db.collection('check_locks').createIndex({ type: 1 }, { unique: true });
+		checkLockIndexEnsured = true;
+	} catch (e: unknown) {
+		if (e instanceof MongoServerError && (e.code === 11000 || e.codeName === 'DuplicateKey')) {
+			// Duplicates exist — clean them up and retry
+			const db = await getDb();
+			const col = db.collection('check_locks');
+			const pipeline = [
+				{ $sort: { lastCheckAt: -1 } },
+				{ $group: { _id: '$type', keepId: { $first: '$_id' }, allIds: { $push: '$_id' } } },
+				{ $project: { removeIds: { $slice: ['$allIds', 1, { $size: '$allIds' }] } } }
+			];
+			const dupes = await col.aggregate(pipeline).toArray();
+			for (const dupe of dupes) {
+				if (dupe.removeIds.length > 0) {
+					await col.deleteMany({ _id: { $in: dupe.removeIds } });
+				}
+			}
+			await col.createIndex({ type: 1 }, { unique: true });
+			checkLockIndexEnsured = true;
+		} else {
+			console.error('[CheckLock] Index setup error:', e);
+		}
+	}
+}
+
 /**
  * Atomic DB-level throttle that works across serverless instances.
  * Returns `true` if the caller should proceed with the check (slot claimed).
@@ -717,6 +749,8 @@ export async function countActiveListeners(): Promise<number> {
  * On DB errors, returns `true` to avoid silently skipping checks.
  */
 export async function claimCheckSlot(type: string, intervalMs: number): Promise<boolean> {
+	await ensureCheckLockIndex();
+
 	try {
 		const db = await getDb();
 		const col = db.collection('check_locks');

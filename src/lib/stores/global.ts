@@ -18,6 +18,9 @@ export const searchQuery = writable<string>('');
 export const currentViewingVideo = writable<YoutubeVideo>();
 export const filteredVideos = writable<YoutubeVideo[]>();
 
+// Radio live status — shared across components (banner, homepage, radio player)
+export const radioIsLive = writable<boolean>(false);
+
 // Video Playlist Search
 export const videoPlaylist = writable<YoutubeVideo[]>([]);
 export const videoPlaylistIndex = writable<number>(0);

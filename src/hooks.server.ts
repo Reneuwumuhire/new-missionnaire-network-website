@@ -3,10 +3,12 @@ import { checkAndIngestLiveStream } from './lib/server/youtube-poller';
 import type { Handle } from '@sveltejs/kit';
 import { getFullCountryName } from './utils/countries';
 
-// Initialize MongoDB on server start
+// Initialize MongoDB on server start, then run an initial YouTube check.
+// The check is self-throttled via DB lock, so multiple cold starts are safe.
 connect()
 	.then(() => {
 		console.log('[MongoDB] Database connection initialized on startup');
+		return checkAndIngestLiveStream();
 	})
 	.catch((e) => {
 		console.error('[MongoDB] Initialization failed:', e);

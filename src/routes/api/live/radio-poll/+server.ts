@@ -10,6 +10,7 @@ import {
 	countActiveListeners
 } from '../../../../db/collections';
 import { sendPushToAll, radioLivePayload } from '$lib/server/push-notifications';
+import { checkAndIngestLiveStream } from '$lib/server/youtube-poller';
 
 const RADIO_NOTIFICATION_COOLDOWN = 10 * 60 * 1000; // 10 min cooldown
 const RADIO_PROBE_INTERVAL = 10_000; // 10 seconds between probes
@@ -50,6 +51,12 @@ export async function GET({ url }) {
 						}
 					})
 					.catch((e) => console.error('[RadioPoll] Radio push error:', e));
+
+				// Radio just went live — YouTube likely started too.
+				// Trigger an immediate YouTube check (force bypasses the 5-min throttle).
+				checkAndIngestLiveStream(true).catch((e) =>
+					console.error('[RadioPoll] YouTube check triggered by radio error:', e)
+				);
 			} else if (!newStatus.isLive && wasLive) {
 				console.log('[RadioPoll] Status changed: OFFLINE');
 			}

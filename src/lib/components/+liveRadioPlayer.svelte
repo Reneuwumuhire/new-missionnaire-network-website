@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { onDestroy, onMount } from 'svelte';
+	import { radioIsLive as radioIsLiveStore } from '$lib/stores/global';
 
 	const STATUS_MESSAGES: Record<string, string> = {
 		offline: 'La radio est hors ligne',
@@ -81,6 +82,9 @@
 		lastCheckedAt = checkedAt;
 		listenerCount = listeners;
 		if (streamUrl) directStreamUrl = streamUrl;
+
+		// Update the global store so the banner and other components react
+		radioIsLiveStore.set(liveNow);
 
 		if (liveNow) {
 			offlineStreak = 0;

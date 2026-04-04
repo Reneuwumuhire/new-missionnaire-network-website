@@ -5,6 +5,7 @@
 	import type { YoutubeVideo } from '$lib/models/youtube';
 	import type { LiveStatus } from '$lib/server/youtube-poller';
 	import NotificationBell from '$lib/components/+notificationBell.svelte';
+	import { radioIsLive as radioIsLiveStore } from '$lib/stores/global';
 
 	export let data: {
 		data: YoutubeVideo[];
@@ -25,6 +26,7 @@
 			if (!response.ok) return;
 			const status = (await response.json()) as { isLive: boolean };
 			radioIsLive = status.isLive;
+			radioIsLiveStore.set(status.isLive);
 		} catch {
 			// ignore poll errors
 		}

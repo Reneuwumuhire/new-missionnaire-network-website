@@ -4,11 +4,13 @@
 	import FaBrandsYoutube from 'svelte-icons-pack/fa/FaBrandsYoutube';
 	import FaBrandsFacebook from 'svelte-icons-pack/fa/FaBrandsFacebook';
 	import RiLogoWhatsappFill from 'svelte-icons-pack/ri/RiLogoWhatsappFill';
+	import { radioIsLive as radioIsLiveStore } from '$lib/stores/global';
+
 	export let isLiveStream: boolean = false;
 	export let isRadioLive: boolean = false;
 	export let liveUrl: string | undefined = undefined;
 
-	$: isLive = isLiveStream || isRadioLive;
+	$: isLive = isLiveStream || isRadioLive || $radioIsLiveStore;
 </script>
 
 <div
@@ -21,7 +23,7 @@
 			href={isLiveStream ? (liveUrl || 'https://www.youtube.com/@MissionnaireNetwork/live') : '/live'}
 			target={isLiveStream ? '_blank' : undefined}
 			class="absolute inset-0 z-0"
-			aria-label={isLiveStream ? 'Regarder le direct YouTube' : 'Écouter la radio en direct'}
+			aria-label={isLiveStream ? 'Regarder le direct sur YouTube' : 'Écouter la radio en direct'}
 		/>
 	{/if}
 
