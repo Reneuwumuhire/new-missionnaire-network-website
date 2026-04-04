@@ -63,6 +63,7 @@
 	}
 
 	$: showLive = confirmedLive;
+	$: awaitingPlay = probeReachable && !isPlaying && !isBuffering && !confirmedLive;
 	// Button stays enabled after failure so user can manually retry
 	$: canPlay = probeReachable || confirmedLive || playbackFailed;
 	$: statusMessage = STATUS_MESSAGES[statusKey] || '';
@@ -376,20 +377,22 @@
 <div class="space-y-4">
 	<!-- Main player card -->
 	<div
-		class="border p-6 md:p-8 transition-all duration-500 {showLive
+		class="relative border p-6 md:p-8 transition-all duration-500 {showLive
 			? 'border-red-200 bg-red-50/30'
-			: 'border-stone-200/60 bg-white/40'}"
+			: awaitingPlay
+				? 'border-missionnaire/40 bg-orange-50/30 radio-pulse'
+				: 'border-stone-200/60 bg-white/40'}"
 	>
 		<!-- Status indicator -->
 		<div class="flex items-center gap-2.5 mb-4">
 			<span class="relative inline-flex h-2.5 w-2.5">
-				{#if showLive}
-					<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"></span>
+				{#if showLive || awaitingPlay}
+					<span class="absolute inline-flex h-full w-full animate-ping rounded-full {showLive ? 'bg-red-500' : 'bg-missionnaire'} opacity-75"></span>
 				{/if}
-				<span class="relative inline-flex h-2.5 w-2.5 rounded-full {showLive ? 'bg-red-500' : 'bg-stone-300'}"></span>
+				<span class="relative inline-flex h-2.5 w-2.5 rounded-full {showLive ? 'bg-red-500' : awaitingPlay ? 'bg-missionnaire' : 'bg-stone-300'}"></span>
 			</span>
-			<span class="text-[10px] font-bold uppercase tracking-[0.25em] font-body {showLive ? 'text-red-600' : 'text-stone-400'}">
-				{showLive ? 'En direct' : 'Radio hors ligne'}
+			<span class="text-[10px] font-bold uppercase tracking-[0.25em] font-body {showLive ? 'text-red-600' : awaitingPlay ? 'text-missionnaire' : 'text-stone-400'}">
+				{showLive ? 'En direct' : awaitingPlay ? 'Direct disponible' : 'Radio hors ligne'}
 			</span>
 			{#if listenerCount > 0 && showLive}
 				<span class="text-[10px] text-red-400 font-body">
@@ -399,8 +402,8 @@
 		</div>
 
 		<!-- Title and status -->
-		<h2 class="font-display text-2xl md:text-3xl font-semibold {showLive ? 'text-stone-900' : 'text-stone-700'}">
-			{showLive ? 'Radio en direct' : 'Radio hors ligne'}
+		<h2 class="font-display text-2xl md:text-3xl font-semibold {showLive ? 'text-stone-900' : awaitingPlay ? 'text-stone-900' : 'text-stone-700'}">
+			{showLive ? 'Radio en direct' : awaitingPlay ? 'Radio en direct' : 'Radio hors ligne'}
 		</h2>
 		<p class="text-sm text-stone-500 font-body mt-1.5">
 			{statusMessage}
@@ -497,3 +500,18 @@
 		></audio>
 	{/if}
 </div>
+
+<style>
+	.radio-pulse {
+		animation: radio-glow 2.5s ease-in-out infinite;
+	}
+
+	@keyframes radio-glow {
+		0%, 100% {
+			box-shadow: 0 0 0 0 rgba(255, 136, 12, 0);
+		}
+		50% {
+			box-shadow: 0 0 0 6px rgba(255, 136, 12, 0.12);
+		}
+	}
+</style>

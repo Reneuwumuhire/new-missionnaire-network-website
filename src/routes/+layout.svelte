@@ -110,7 +110,7 @@
 <QueryClientProvider client={data.queryClient}>
 	<div class="relative">
 		<div bind:this={headerRef} class="flex flex-col fixed top-0 z-40 bg-[#FAF8F3]/95 backdrop-blur-sm w-full">
-			<SocialMediaAbove isLiveStream={!!data.liveStream} liveUrl={data.liveStream?.webpage_url} />
+			<SocialMediaAbove isLiveStream={!!data.liveStream} isRadioLive={!!data.radioIsLive} liveUrl={data.liveStream?.webpage_url} />
 			<NavBar />
 		</div>
 		<div

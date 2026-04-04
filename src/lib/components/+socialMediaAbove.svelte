@@ -5,20 +5,23 @@
 	import FaBrandsFacebook from 'svelte-icons-pack/fa/FaBrandsFacebook';
 	import RiLogoWhatsappFill from 'svelte-icons-pack/ri/RiLogoWhatsappFill';
 	export let isLiveStream: boolean = false;
+	export let isRadioLive: boolean = false;
 	export let liveUrl: string | undefined = undefined;
+
+	$: isLive = isLiveStream || isRadioLive;
 </script>
 
 <div
-	class="relative flex items-center justify-center h-9 text-[11px] font-body tracking-wide transition-colors duration-300 {isLiveStream
+	class="relative flex items-center justify-center h-9 text-[11px] font-body tracking-wide transition-colors duration-300 {isLive
 		? 'bg-red-700'
 		: 'bg-stone-900'}"
 >
-	{#if isLiveStream}
+	{#if isLive}
 		<a
-			href={liveUrl || 'https://www.youtube.com/@MissionnaireNetwork/live'}
-			target="_blank"
+			href={isLiveStream ? (liveUrl || 'https://www.youtube.com/@MissionnaireNetwork/live') : '/live'}
+			target={isLiveStream ? '_blank' : undefined}
 			class="absolute inset-0 z-0"
-			aria-label="Watch live stream"
+			aria-label={isLiveStream ? 'Regarder le direct YouTube' : 'Écouter la radio en direct'}
 		/>
 	{/if}
 
@@ -26,7 +29,7 @@
 		class="relative z-10 flex items-center justify-between w-full max-w-[1600px] px-4 md:px-6 pointer-events-none"
 	>
 		<div class="flex items-center">
-			{#if isLiveStream}
+			{#if isLive}
 				<div class="flex items-center gap-2.5 pointer-events-auto">
 					<span class="relative flex h-2 w-2">
 						<span
@@ -35,7 +38,7 @@
 						<span class="relative inline-flex h-2 w-2 rounded-full bg-red-300"></span>
 					</span>
 					<span class="font-semibold uppercase tracking-[0.2em] text-white">
-						Live en cours
+						{isLiveStream ? 'Live en cours' : 'Radio en direct'}
 					</span>
 				</div>
 			{:else}
@@ -54,7 +57,7 @@
 					class="text-stone-400 hover:text-white transition-colors duration-200 p-2 flex items-center justify-center"
 				>
 					<Icon
-						color={isLiveStream ? 'white' : 'currentColor'}
+						color={isLive ? 'white' : 'currentColor'}
 						className="w-3.5 h-3.5"
 						src={FaBrandsYoutube}
 					/>
@@ -67,7 +70,7 @@
 					class="text-stone-400 hover:text-white transition-colors duration-200 p-2 flex items-center justify-center"
 				>
 					<Icon
-						color={isLiveStream ? 'white' : 'currentColor'}
+						color={isLive ? 'white' : 'currentColor'}
 						className="w-3.5 h-3.5"
 						src={FaBrandsFacebook}
 					/>
@@ -80,7 +83,7 @@
 					class="text-stone-400 hover:text-white transition-colors duration-200 p-2 flex items-center justify-center"
 				>
 					<Icon
-						color={isLiveStream ? 'white' : 'currentColor'}
+						color={isLive ? 'white' : 'currentColor'}
 						className="w-3.5 h-3.5"
 						src={RiLogoWhatsappFill}
 					/>
