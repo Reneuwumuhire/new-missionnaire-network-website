@@ -1,11 +1,7 @@
 import { connect, getDb } from './db/mongo';
 import { checkAndIngestLiveStream } from './lib/server/youtube-poller';
-import { ensureBrokerPolling } from '$lib/server/radio-status-broker';
 import type { Handle } from '@sveltejs/kit';
 import { getFullCountryName } from './utils/countries';
-
-let lastCheckTime = 0;
-const CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes — RSS is free, videos.list is 1 unit
 
 // Initialize MongoDB on server start
 connect()
@@ -15,13 +11,6 @@ connect()
 	.catch((e) => {
 		console.error('[MongoDB] Initialization failed:', e);
 	});
-
-// Run an immediate check on startup to populate in-memory state
-checkAndIngestLiveStream().catch((e) => console.error('[Startup] Poller error:', e));
-
-// Start the radio status broker independently of SSE clients.
-// This ensures push notifications fire even when nobody has the site open.
-ensureBrokerPolling();
 
 async function trackAnalytics(event: any, isPageRequest: boolean) {
 	if (!isPageRequest) return;
@@ -121,15 +110,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 	// Fire and forget analytics tracking
 	trackAnalytics(event, isPageRequest);
 
-	// Fire and forget livestream check (throttled)
-	const now = Date.now();
-	if (now - lastCheckTime > CHECK_INTERVAL) {
-		lastCheckTime = now;
-		checkAndIngestLiveStream().catch((e) => console.error('[Hooks] Poller error:', e));
-	}
-
-	// Radio live checks + push notifications are handled by the radio-status-broker
-	// on its own 5-second interval, independent of HTTP traffic.
+	// Fire and forget livestream check (self-throttled via DB lock)
+	checkAndIngestLiveStream().catch((e) => console.error('[Hooks] Poller error:', e));
 
 	const response = await resolve(event);
 

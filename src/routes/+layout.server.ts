@@ -2,7 +2,7 @@ import { getLiveStatus } from '$lib/server/youtube-poller';
 import type { LayoutServerLoad } from './$types';
 
 export const load: LayoutServerLoad = async () => {
-	const liveStatus = getLiveStatus();
+	const liveStatus = await getLiveStatus();
 
 	// Map the ephemeral status to something the layout expects (Partial<YoutubeVideo>)
 	// OR update layout to just check isLive and url.

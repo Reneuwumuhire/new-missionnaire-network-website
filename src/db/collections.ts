@@ -682,7 +682,7 @@ export async function trackNotificationEvent(event: {
 
 // ── Live radio listener tracking ────────────────────────────────
 
-const LISTENER_TTL_MS = 15_000; // Consider a listener gone after 15s without heartbeat
+const LISTENER_TTL_MS = 25_000; // Consider a listener gone after 25s without heartbeat (accommodates 10s poll interval)
 
 export async function heartbeatListener(listenerId: string): Promise<void> {
 	const db = await getDb();
@@ -705,6 +705,125 @@ export async function countActiveListeners(): Promise<number> {
 	const col = db.collection('radio_listeners');
 	const cutoff = Date.now() - LISTENER_TTL_MS;
 	return col.countDocuments({ lastSeen: { $gt: cutoff } });
+}
+
+// ── Shared check-slot lock (YouTube & Radio) ───────────────────
+
+/**
+ * Atomic DB-level throttle that works across serverless instances.
+ * Returns `true` if the caller should proceed with the check (slot claimed).
+ * Returns `false` if another instance already checked recently.
+ *
+ * On DB errors, returns `true` to avoid silently skipping checks.
+ */
+export async function claimCheckSlot(type: string, intervalMs: number): Promise<boolean> {
+	try {
+		const db = await getDb();
+		const col = db.collection('check_locks');
+		const now = Date.now();
+
+		const result = await col.findOneAndUpdate(
+			{
+				type,
+				$or: [
+					{ lastCheckAt: { $exists: false } },
+					{ lastCheckAt: { $lt: now - intervalMs } }
+				]
+			},
+			{ $set: { lastCheckAt: now } },
+			{ upsert: true, returnDocument: 'after' }
+		);
+
+		return result !== null;
+	} catch (e: unknown) {
+		if (e instanceof MongoServerError && e.code === 11000) return false;
+		console.error('[CheckLock] claimCheckSlot error:', e);
+		return true;
+	}
+}
+
+// ── YouTube live status cache ──────────────────────────────────
+
+export type YouTubeCachedStatus = {
+	isLive: boolean;
+	videoId: string | null;
+	title: string | null;
+	description: string | null;
+	thumbnail: string | null;
+	duration: number;
+	url: string | null;
+	updatedAt: string | null;
+};
+
+export async function getYouTubeCachedStatus(): Promise<YouTubeCachedStatus | null> {
+	try {
+		const db = await getDb();
+		const doc = await db.collection('youtube_live_cache').findOne({ _id: 'current' as unknown as ObjectId });
+		if (!doc) return null;
+		return {
+			isLive: doc.isLive,
+			videoId: doc.videoId,
+			title: doc.title,
+			description: doc.description,
+			thumbnail: doc.thumbnail,
+			duration: doc.duration,
+			url: doc.url,
+			updatedAt: doc.updatedAt
+		};
+	} catch (e) {
+		console.error('[YouTubeCache] getYouTubeCachedStatus error:', e);
+		return null;
+	}
+}
+
+export async function setYouTubeCachedStatus(status: YouTubeCachedStatus): Promise<void> {
+	try {
+		const db = await getDb();
+		await db.collection('youtube_live_cache').updateOne(
+			{ _id: 'current' as unknown as ObjectId },
+			{ $set: { ...status } },
+			{ upsert: true }
+		);
+	} catch (e) {
+		console.error('[YouTubeCache] setYouTubeCachedStatus error:', e);
+	}
+}
+
+// ── Radio status cache ─────────────────────────────────────────
+
+export type RadioCachedStatus = {
+	isLive: boolean;
+	checkedAt: string;
+	streamUrl?: string;
+};
+
+export async function getRadioCachedStatus(): Promise<RadioCachedStatus | null> {
+	try {
+		const db = await getDb();
+		const doc = await db.collection('radio_status_cache').findOne({ _id: 'current' as unknown as ObjectId });
+		if (!doc) return null;
+		return {
+			isLive: doc.isLive,
+			checkedAt: doc.checkedAt,
+			streamUrl: doc.streamUrl
+		};
+	} catch (e) {
+		console.error('[RadioCache] getRadioCachedStatus error:', e);
+		return null;
+	}
+}
+
+export async function setRadioCachedStatus(status: RadioCachedStatus): Promise<void> {
+	try {
+		const db = await getDb();
+		await db.collection('radio_status_cache').updateOne(
+			{ _id: 'current' as unknown as ObjectId },
+			{ $set: { ...status } },
+			{ upsert: true }
+		);
+	} catch (e) {
+		console.error('[RadioCache] setRadioCachedStatus error:', e);
+	}
 }
 
 /**

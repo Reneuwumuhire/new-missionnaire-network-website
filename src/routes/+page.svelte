@@ -17,7 +17,18 @@
 
 	let bellRef: NotificationBell | undefined;
 
-	let eventSource: EventSource | null = null;
+	let radioPollTimer: ReturnType<typeof setInterval> | null = null;
+
+	async function pollRadioStatus() {
+		try {
+			const response = await fetch('/api/live/radio-poll');
+			if (!response.ok) return;
+			const status = (await response.json()) as { isLive: boolean };
+			radioIsLive = status.isLive;
+		} catch {
+			// ignore poll errors
+		}
+	}
 
 	// Scroll-triggered reveal
 	let heroVisible = false;
@@ -27,16 +38,9 @@
 	onMount(() => {
 		if (!browser) return;
 
-		// SSE for radio status
-		eventSource = new EventSource('/api/live/sse');
-		eventSource.onmessage = (event) => {
-			try {
-				const status = JSON.parse(event.data) as { isLive: boolean };
-				radioIsLive = status.isLive;
-			} catch {
-				// ignore parse errors
-			}
-		};
+		// Poll radio status every 10s
+		pollRadioStatus();
+		radioPollTimer = setInterval(pollRadioStatus, 10_000);
 
 		// Trigger hero reveal
 		requestAnimationFrame(() => {
@@ -69,7 +73,7 @@
 	});
 
 	onDestroy(() => {
-		eventSource?.close();
+		if (radioPollTimer) clearInterval(radioPollTimer);
 		clearInterval(heroVerseInterval);
 	});
 

@@ -20,7 +20,7 @@
 	let hasError = false;
 	let lastCheckedAt = '';
 	let statusKey = 'waiting';
-	let eventSource: EventSource | null = null;
+	let pollTimer: ReturnType<typeof setInterval> | null = null;
 	let offlineStreak = 0;
 	let userWantsToPlay = false;
 	let listenerCount = 0;
@@ -116,46 +116,69 @@
 		}
 	}
 
+	// ── Polling ───────────────────────────────────────────────────
+
+	const POLL_INTERVAL = 10_000; // 10 seconds
+
+	async function pollRadioStatus() {
+		try {
+			const sessionId = getSessionId();
+			const response = await fetch(`/api/live/radio-poll?sid=${encodeURIComponent(sessionId)}`);
+			if (!response.ok) return;
+			const data = (await response.json()) as { isLive: boolean; checkedAt: string; listeners: number; streamUrl?: string };
+			handleStatusEvent(data.isLive, data.checkedAt, data.listeners, data.streamUrl);
+		} catch {
+			// Network error — keep current state, will retry next interval
+		}
+	}
+
+	function startPolling() {
+		if (pollTimer) return;
+		pollRadioStatus(); // immediate first poll
+		pollTimer = setInterval(pollRadioStatus, POLL_INTERVAL);
+	}
+
+	function stopPolling() {
+		if (pollTimer) {
+			clearInterval(pollTimer);
+			pollTimer = null;
+		}
+	}
+
 	// ── Lifecycle ──────────────────────────────────────────────────
 
 	onMount(() => {
 		if (!browser) return;
 
-		const sessionId = getSessionId();
-		eventSource = new EventSource(`/api/live/sse?sid=${encodeURIComponent(sessionId)}`);
-
-		eventSource.onmessage = (event) => {
-			try {
-				const data = JSON.parse(event.data) as { isLive: boolean; checkedAt: string; listeners?: number; streamUrl?: string };
-				handleStatusEvent(data.isLive, data.checkedAt, data.listeners ?? 0, data.streamUrl);
-			} catch (e) {
-				console.error('[LiveRadio] Failed to parse SSE event:', e);
-			}
-		};
-
-		eventSource.onerror = () => {
-			if (!isPlaying && !isBuffering) {
-				statusKey = 'waiting';
-			}
-		};
-
+		startPolling();
 		document.addEventListener('visibilitychange', handleVisibilityChange);
 	});
 
 	onDestroy(() => {
-		eventSource?.close();
+		stopPolling();
 		clearReconnectTimer();
 		if (browser) {
 			document.removeEventListener('visibilitychange', handleVisibilityChange);
+			// Notify server to remove listener
+			const sid = getSessionId();
+			if (sid) {
+				navigator.sendBeacon?.(`/api/live/radio-poll?sid=${encodeURIComponent(sid)}&action=disconnect`);
+			}
 		}
 	});
 
 	function handleVisibilityChange() {
-		if (document.visibilityState !== 'visible') return;
-		if (!userWantsToPlay || !audio) return;
+		if (document.visibilityState === 'visible') {
+			// Resume polling and trigger immediate check
+			startPolling();
 
-		if (audio.paused && !audio.ended) {
-			attemptReconnect();
+			// Resume audio if user was listening
+			if (userWantsToPlay && audio && audio.paused && !audio.ended) {
+				attemptReconnect();
+			}
+		} else {
+			// Pause polling when tab is hidden to save resources
+			stopPolling();
 		}
 	}
 
