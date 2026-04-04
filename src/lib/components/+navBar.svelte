@@ -26,15 +26,25 @@
 		showDropContents = !showDropContents;
 	};
 	let showMoboNav = false;
+	let navEl: HTMLElement;
+	let ignoreNextClick = false;
 
-	const closeMenu = (event: MouseEvent) => {
-		if (showMoboNav && !(event.target as Element).closest('nav')) {
+	const handleWindowClick = (event: MouseEvent) => {
+		if (ignoreNextClick) {
+			ignoreNextClick = false;
+			return;
+		}
+		if (openMenuIndex !== null && navEl && !navEl.contains(event.target as Node)) {
+			openMenuIndex = null;
+		}
+		if (showMoboNav && navEl && !navEl.contains(event.target as Node)) {
 			showMoboNav = false;
 			openMenuIndex = null;
 		}
 	};
 
 	const toggleMobileNav = () => {
+		ignoreNextClick = true;
 		showMoboNav = !showMoboNav;
 		if (showMoboNav) {
 			document.body.classList.add('overflow-hidden', 'overscroll-none');
@@ -52,6 +62,7 @@
 	};
 
 	const toggleMenu = (index: number) => {
+		ignoreNextClick = true;
 		if (openMenuIndex === index) {
 			openMenuIndex = null;
 		} else {
@@ -115,7 +126,9 @@
 	});
 </script>
 
-<nav class="navbar relative z-50 max-w-full border-b border-stone-200/40 backdrop-blur-md bg-[#FAF8F3]/90">
+<svelte:window on:click={handleWindowClick} />
+
+<nav class="navbar relative z-50 max-w-full border-b border-stone-200/40 backdrop-blur-md bg-[#FAF8F3]/90" bind:this={navEl}>
 	<div class="flex items-center justify-between max-w-[1600px] mx-auto px-4 md:px-6 h-16">
 		<!-- Logo -->
 		<a href="/" class="flex items-center shrink-0">
@@ -193,7 +206,7 @@
 		<!-- Mobile hamburger -->
 		<button
 			class="relative lg:hidden flex items-center justify-center w-9 h-9 text-stone-700 transition-colors hover:text-missionnaire"
-			on:click={toggleMobileNav}
+			on:click|stopPropagation={toggleMobileNav}
 			aria-label={showMoboNav ? 'Fermer le menu' : 'Ouvrir le menu'}
 		>
 			{#if showMoboNav}
