@@ -98,7 +98,7 @@
 		</div>
 	</header>
 </div>
-<div class="flex flex-row justify-center h-auto w-full pt-20 pb-32 md:py-16">
+<div class="flex flex-row justify-center h-auto w-full pt-20 pb-32 md:py-16 overflow-x-hidden">
 	<div class=" flex flex-col w-full max-w-7xl px-2 md:px-5">
 		<slot />
 	</div>
