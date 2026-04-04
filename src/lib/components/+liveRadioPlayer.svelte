@@ -22,9 +22,11 @@
 	let lastCheckedAt = '';
 	let statusKey = 'waiting';
 	let pollTimer: ReturnType<typeof setInterval> | null = null;
+	let noAudioGraceTimer: ReturnType<typeof setTimeout> | null = null;
 	let offlineStreak = 0;
 	let userWantsToPlay = false;
 	let listenerCount = 0;
+	let keepLiveUi = false;
 
 	let probeReachable = false;
 	let confirmedLive = false;
@@ -44,6 +46,7 @@
 	const RECONNECT_DELAYS = [1000, 2000, 3000, 5000, 5000, 10000, 10000, 15000];
 
 	const OFFLINE_THRESHOLD = 6;
+	const NO_AUDIO_GRACE_MS = 30_000;
 
 	// Stable session ID for listener tracking — survives page refresh
 	// but not tab close, so the DB record is reused on refresh.
@@ -63,8 +66,8 @@
 		return `${base}${base.includes('?') ? '&' : '?'}t=${Date.now()}`;
 	}
 
-	$: showLive = confirmedLive;
-	$: awaitingPlay = probeReachable && !isPlaying && !isBuffering && !confirmedLive;
+	$: showLive = confirmedLive || keepLiveUi;
+	$: awaitingPlay = probeReachable && !isPlaying && !isBuffering && !confirmedLive && !keepLiveUi;
 	// Button stays enabled after failure so user can manually retry
 	$: canPlay = probeReachable || confirmedLive || playbackFailed;
 	$: statusMessage = STATUS_MESSAGES[statusKey] || '';
@@ -78,6 +81,37 @@
 
 	// ── SSE status handler ─────────────────────────────────────────
 
+	function clearNoAudioGraceTimer() {
+		if (noAudioGraceTimer) {
+			clearTimeout(noAudioGraceTimer);
+			noAudioGraceTimer = null;
+		}
+	}
+
+	function cancelNoAudioGrace() {
+		clearNoAudioGraceTimer();
+		keepLiveUi = false;
+	}
+
+	function startNoAudioGrace() {
+		if (noAudioGraceTimer) return;
+		clearNoAudioGraceTimer();
+		keepLiveUi = true;
+		noAudioGraceTimer = setTimeout(() => {
+			noAudioGraceTimer = null;
+			keepLiveUi = false;
+
+			if (confirmedLive) return;
+
+			probeReachable = false;
+			confirmedLive = false;
+			playbackFailed = false;
+			hasError = false;
+			statusKey = 'offline';
+			stopPlayback();
+		}, NO_AUDIO_GRACE_MS);
+	}
+
 	function handleStatusEvent(liveNow: boolean, checkedAt: string, listeners: number, streamUrl?: string) {
 		lastCheckedAt = checkedAt;
 		listenerCount = listeners;
@@ -87,6 +121,7 @@
 		radioIsLiveStore.set(liveNow);
 
 		if (liveNow) {
+			cancelNoAudioGrace();
 			offlineStreak = 0;
 			probeReachable = true;
 
@@ -106,9 +141,14 @@
 				statusKey = 'availablePressPlay';
 			}
 		} else {
+			if (confirmedLive || keepLiveUi || isPlaying || isBuffering || probeReachable) {
+				startNoAudioGrace();
+			}
+
 			offlineStreak += 1;
 
 			if (offlineStreak >= OFFLINE_THRESHOLD) {
+				cancelNoAudioGrace();
 				probeReachable = false;
 				confirmedLive = false;
 				playbackFailed = false; // Reset — confirmed offline, clean slate
@@ -162,6 +202,7 @@
 	onDestroy(() => {
 		stopPolling();
 		clearReconnectTimer();
+		clearNoAudioGraceTimer();
 		if (browser) {
 			document.removeEventListener('visibilitychange', handleVisibilityChange);
 			// Notify server to remove listener
@@ -255,6 +296,7 @@
 		if (!audio) return;
 
 		if (!audio.paused || reconnectTimer) {
+			cancelNoAudioGrace();
 			userWantsToPlay = false;
 			clearReconnectTimer();
 			reconnectAttempts = 0;
@@ -300,6 +342,7 @@
 	// ── Audio element event handlers ───────────────────────────────
 
 	const handlePlay = () => {
+		cancelNoAudioGrace();
 		isPlaying = true;
 		isBuffering = false;
 		hasError = false;
@@ -315,6 +358,7 @@
 		isBuffering = false;
 
 		if (probeReachable && !userWantsToPlay) {
+			cancelNoAudioGrace();
 			statusKey = 'availablePressPlay';
 		}
 	};
@@ -348,12 +392,13 @@
 		isPlaying = false;
 		isBuffering = false;
 		confirmedLive = false;
-		playbackFailed = true;
+		playbackFailed = false;
+		startNoAudioGrace();
 
 		if (userWantsToPlay) {
 			attemptReconnect();
 		} else {
-			statusKey = 'offline';
+			statusKey = 'waiting';
 		}
 	};
 
@@ -370,10 +415,13 @@
 			// let the audio element reconnect. This is mobile-friendly:
 			// the browser reuses the existing audio session from the
 			// user's initial tap, so no autoplay policy issues.
+			startNoAudioGrace();
 			playbackFailed = false; // allow UI updates during reconnect
 			attemptReconnect();
 		} else {
-			playbackFailed = true;
+			playbackFailed = false;
+			startNoAudioGrace();
+			statusKey = 'waiting';
 		}
 	};
 </script>
