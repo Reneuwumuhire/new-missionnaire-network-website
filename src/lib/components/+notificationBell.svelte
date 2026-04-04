@@ -72,7 +72,7 @@
 			isSubscribed = true;
 
 			// Show a sample notification so the user sees what to expect
-			reg.showNotification('Notifications activees', {
+			reg.showNotification('Notifications activées', {
 				body: 'Vous recevrez une alerte quand la radio sera en direct.',
 				icon: '/favicon.png',
 				badge: '/favicon.png',

@@ -68,7 +68,7 @@ export async function sendPushToAll(payload: PushPayload): Promise<void> {
 export function radioLivePayload(): PushPayload {
 	return {
 		title: 'Radio en direct',
-		body: 'La radio Missionnaire est en direct maintenant!',
+		body: 'La radio Missionnaire est en direct maintenant\u00a0!',
 		url: '/live',
 		icon: '/favicon.png'
 	};

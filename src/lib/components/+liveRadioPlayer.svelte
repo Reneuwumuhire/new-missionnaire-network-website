@@ -4,7 +4,7 @@
 
 	const STATUS_MESSAGES: Record<string, string> = {
 		offline: 'La radio est hors ligne',
-		listening: 'Vous ecoutez le direct',
+		listening: 'Vous écoutez le direct',
 		connecting: 'Connexion en cours...',
 		reconnecting: 'Reconnexion en cours...',
 		availablePressPlay: 'Direct disponible. Appuyez sur Lecture.',
@@ -394,7 +394,7 @@
 				{/if}
 				{#if checkedAtLabel}
 					<p class="text-xs text-slate-500">
-						Derniere verification: {checkedAtLabel}
+						Dernière vérification : {checkedAtLabel}
 					</p>
 				{/if}
 			</div>
@@ -405,7 +405,7 @@
 						canPlay ? 'bg-red-600 hover:bg-red-700' : 'cursor-not-allowed bg-slate-400'
 					}`}
 					on:click={togglePlay}
-					aria-label={isPlaying ? 'Mettre en pause le direct' : 'Ecouter le direct'}
+					aria-label={isPlaying ? 'Mettre en pause le direct' : 'Écouter le direct'}
 					disabled={!canPlay}
 				>
 					{#if isPlaying}
@@ -444,8 +444,8 @@
 			</p>
 			<p class="mt-2 text-lg font-bold text-slate-900">La radio est hors ligne</p>
 			<p class="mt-2 text-sm text-slate-600">
-				Cette page se met a jour automatiquement en temps reel.
-				Des que le direct commence, le bouton
+				Cette page se met à jour automatiquement en temps réel.
+				Dès que le direct commence, le bouton
 				<span class="font-bold">Lecture</span>
 				devient actif.
 			</p>

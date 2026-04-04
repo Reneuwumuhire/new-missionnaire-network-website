@@ -23,7 +23,7 @@
 			</p>
 			<h1 class="text-2xl md:text-4xl font-black text-gray-900">Radio en direct</h1>
 			<p class="mt-2 text-sm text-gray-500 max-w-lg">
-				La page se met a jour automatiquement en temps reel. Des que le direct commence, appuyez sur Lecture.
+				La page se met à jour automatiquement en temps réel. Dès que le direct commence, appuyez sur Lecture.
 			</p>
 		</div>
 
@@ -35,7 +35,7 @@
 			<NotificationBell bind:this={bellRef} />
 			<p class="text-xs text-gray-500">
 				{#if bellRef?.isSubscribed}
-					<span class="font-semibold text-orange-600">Notifications activees</span> — vous serez alerte quand la radio est en direct
+					<span class="font-semibold text-orange-600">Notifications activées</span> — vous serez alerté quand la radio est en direct
 				{:else}
 					<span class="font-semibold text-gray-700">Recevoir une notification</span> quand la radio est en direct
 				{/if}
