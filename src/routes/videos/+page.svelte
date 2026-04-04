@@ -248,7 +248,7 @@
 				{/each}
 				{#if $isLoading}
 					<div class="inline-block">
-						<div class="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-orange-500" />
+						<div class="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-orange-500"></div>
 					</div>
 				{/if}
 			</div>
@@ -277,7 +277,7 @@
 						/>
 						<div
 							class="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent opacity-90 group-hover:opacity-80 transition-opacity"
-						/>
+						></div>
 						<div class="absolute bottom-0 left-0 w-full p-6 md:p-12 text-white">
 							<div class="max-w-4xl space-y-4">
 								<div
@@ -304,7 +304,7 @@
 									<div
 										class="px-8 py-4 bg-white/10 backdrop-blur-md text-white border border-white/20 rounded-full font-bold text-sm uppercase tracking-wider flex items-center gap-2"
 									>
-										<span class="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+										<span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
 										{$filteredVideos[0].duration_string || 'Video'}
 									</div>
 								</div>
@@ -337,14 +337,14 @@
 								{#if $isLoading}
 									<div
 										class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"
-									/>
+									></div>
 								{/if}
 							</div>
 						{/if}
 
 						{#if !$hasMore && !$isLoading}
 							<div class="text-center w-full py-20 opacity-50">
-								<div class="w-16 h-1 bg-gray-200 mx-auto rounded-full mb-4" />
+								<div class="w-16 h-1 bg-gray-200 mx-auto rounded-full mb-4"></div>
 								<p class="text-xs font-bold uppercase tracking-widest text-gray-400">Fin de la liste</p>
 							</div>
 						{/if}

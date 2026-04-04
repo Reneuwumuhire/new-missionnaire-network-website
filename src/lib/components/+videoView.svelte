@@ -29,7 +29,7 @@
 							allow="autoplay; encrypted-media"
 							title={$selectedVideo?.title}
 							allowtransparency
-						/>
+						></iframe>
 					</div>
 				{:else}
 					<img
@@ -39,7 +39,7 @@
 					/>
 					
 					<!-- Overlay Gradient -->
-					<div class="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent transition-opacity duration-500 opacity-95 group-hover:opacity-90" />
+					<div class="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent transition-opacity duration-500 opacity-95 group-hover:opacity-90"></div>
 
 					<!-- Overlay Content -->
 					<div class="absolute inset-0 p-6 md:p-12 flex flex-col justify-between pointer-events-none">
