@@ -170,21 +170,22 @@
 	<div class="relative mb-4 sm:mb-8">
 		<div class="flex flex-row items-center justify-center">
 			<div class="w-full max-w-4xl text-center">
-				<h1 class="text-2xl sm:text-3xl font-bold mb-2 sm:mb-4">Transcriptions</h1>
-				<p class="text-gray-600 mb-2 text-sm sm:text-base">
+				<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body">Transcriptions</p>
+				<h1 class="font-display text-2xl sm:text-3xl font-semibold text-stone-900 mb-2">Transcriptions</h1>
+				<p class="text-sm text-stone-500 font-body mb-2">
 					Trouvez les transcriptions des prédications
 				</p>
-				<p class="text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6">
+				<p class="text-[12px] text-stone-400 font-body mb-6">
 					{data.pagination.total} transcription{data.pagination.total > 1 ? 's' : ''} disponible{data
 						.pagination.total > 1
 						? 's'
 						: ''}
 				</p>
-				<form class="flex flex-row w-full max-w-xl mx-auto px-2 sm:px-0" on:submit|preventDefault>
+				<form class="flex w-full max-w-xl mx-auto border border-stone-200/60 bg-white/40 overflow-hidden" on:submit|preventDefault>
 					<div class="relative flex-1">
 						<input
 							type="text"
-							class="border border-gray-300 rounded-l-full indent-2 sm:indent-4 p-2 w-full text-gray-900 text-sm sm:text-base outline-none focus:ring-2 focus:ring-missionnaire focus:border-transparent"
+							class="w-full bg-transparent text-stone-800 px-5 py-3.5 text-sm font-body outline-none placeholder:text-stone-400"
 							placeholder="Rechercher par titre..."
 							bind:value={searchTerm}
 							bind:this={searchInput}
@@ -194,14 +195,14 @@
 						{#if isSearching}
 							<div class="absolute right-3 top-1/2 -translate-y-1/2">
 								<div
-									class="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-missionnaire"
-								/>
+									class="animate-spin h-4 w-4 border-t-2 border-b-2 border-missionnaire"
+								></div>
 							</div>
 						{/if}
 					</div>
 					<button
 						type="button"
-						class="bg-missionnaire text-white px-4 sm:px-6 py-2 rounded-r-full hover:bg-missionnaire/90 text-sm sm:text-base"
+						class="bg-missionnaire hover:bg-missionnaire/90 text-white px-6 py-3.5 text-[11px] font-bold uppercase tracking-[0.15em] font-body transition-colors shrink-0"
 					>
 						Rechercher
 					</button>

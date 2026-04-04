@@ -50,28 +50,28 @@
 		content="Qui nous sommes, comment nous contacter et suivre l'œuvre de Missionnaire Network."
 	/>
 </svelte:head>
-<div class=" flex flex-col overflow-hidden">
+<div class="flex flex-col overflow-hidden">
 	<header class="relative h-[40vh] min-h-[300px] max-h-[500px] overflow-hidden">
 		<img src="/img/eglise_header.jpg" alt="Église Murambi" class="absolute inset-0 w-full h-full object-cover" />
 		<div class="absolute inset-0 bg-gradient-to-t from-stone-900/70 via-stone-900/30 to-transparent"></div>
 		<div class="absolute bottom-0 left-0 right-0 p-8 md:p-12">
 			<div class="max-w-3xl mx-auto">
-				<p class="text-[10px] font-semibold uppercase tracking-[0.25em] text-white/70 mb-3">Église</p>
+				<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body" style="color: rgba(255,255,255,0.7);">À propos</p>
 				<h1 class="font-display text-3xl md:text-5xl text-white leading-tight">Qui nous sommes</h1>
 			</div>
 		</div>
 	</header>
-	<div class="relative flex flex-row justify-center h-auto w-full py-16">
-		<div class="relative flex flex-col items-start w-full max-w-3xl space-y-8 px-6">
+	<div class="relative flex flex-row justify-center h-auto w-full pt-16 pb-12">
+		<div class="relative flex flex-col items-start w-full max-w-6xl space-y-8 mx-auto px-6">
 			{#each EgliseParagraph1 as paragraph, index}
 				<ArticleParagraph text={paragraph.text} />
 			{/each}
 			<!-- <h2 class="font-display text-2xl md:text-3xl text-stone-900">Location</h2>
 			<MapComponent /> -->
-			<h2 class="font-display text-2xl md:text-3xl text-stone-900">Contacter</h2>
+			<h2 class="font-display text-2xl md:text-3xl font-semibold text-stone-900">Contacter</h2>
 			<ContactCard />
 			{#if statsLoading}
-				<h2 class="font-display text-2xl md:text-3xl text-stone-900">Statistiques</h2>
+				<h2 class="font-display text-2xl md:text-3xl font-semibold text-stone-900">Statistiques</h2>
 				<div class="w-full bg-stone-50 border border-stone-100 p-8 flex items-center justify-center">
 					<div class="flex items-center gap-3 text-stone-400">
 						<div class="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-missionnaire"></div>
@@ -79,7 +79,7 @@
 					</div>
 				</div>
 			{:else if statsError}
-				<h2 class="font-display text-2xl md:text-3xl text-stone-900">Statistiques</h2>
+				<h2 class="font-display text-2xl md:text-3xl font-semibold text-stone-900">Statistiques</h2>
 				<div class="w-full bg-red-50 border border-red-100 p-8 text-center">
 					<p class="text-red-600 font-medium text-sm">Impossible de charger les statistiques.</p>
 					<button
@@ -90,12 +90,12 @@
 					</button>
 				</div>
 			{:else if stats}
-				<h2 class="font-display text-2xl md:text-3xl text-stone-900">Statistiques</h2>
+				<h2 class="font-display text-2xl md:text-3xl font-semibold text-stone-900">Statistiques</h2>
 				<div class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
 					<!-- Core Counter Stats -->
 					<div class="space-y-4">
-						<div class="bg-stone-50 p-6 border border-stone-100 flex flex-col space-y-2">
-							<span class="text-sm font-medium text-stone-500 uppercase tracking-wider"
+						<div class="border border-stone-200/60 bg-white/40 p-6 card-lift flex flex-col space-y-2">
+							<span class="text-sm font-medium text-stone-500 font-body uppercase tracking-wider"
 								>Visiteurs Aujourd'hui</span
 							>
 							<div class="flex items-center space-x-2">
@@ -103,21 +103,21 @@
 								<span class="text-3xl font-black text-stone-900">{stats.todayVisitors}</span>
 							</div>
 						</div>
-						<div class="bg-stone-50 p-6 border border-stone-100 flex flex-col space-y-2">
-							<span class="text-sm font-medium text-stone-500 uppercase tracking-wider"
+						<div class="border border-stone-200/60 bg-white/40 p-6 card-lift flex flex-col space-y-2">
+							<span class="text-sm font-medium text-stone-500 font-body uppercase tracking-wider"
 								>Visiteurs Uniques</span
 							>
 							<span class="text-3xl font-black text-stone-900">{stats.totalVisitors}</span>
 						</div>
 						<div class="grid grid-cols-2 gap-4">
-							<div class="bg-stone-50 p-6 border border-stone-100 flex flex-col space-y-2">
-								<span class="text-sm font-medium text-stone-500 uppercase tracking-wider"
+							<div class="border border-stone-200/60 bg-white/40 p-6 card-lift flex flex-col space-y-2">
+								<span class="text-sm font-medium text-stone-500 font-body uppercase tracking-wider"
 									>Moy. / Jour</span
 								>
 								<span class="text-3xl font-black text-stone-900">{stats.dailyAverage}</span>
 							</div>
-							<div class="bg-stone-50 p-6 border border-stone-100 flex flex-col space-y-2">
-								<span class="text-sm font-medium text-stone-500 uppercase tracking-wider"
+							<div class="border border-stone-200/60 bg-white/40 p-6 card-lift flex flex-col space-y-2">
+								<span class="text-sm font-medium text-stone-500 font-body uppercase tracking-wider"
 									>Moy. / Mois</span
 								>
 								<span class="text-3xl font-black text-stone-900">{stats.monthlyAverage}</span>
@@ -125,7 +125,7 @@
 						</div>
 
 						<!-- Device Stats -->
-						<div class="bg-stone-50 p-6 border border-stone-100 flex flex-col space-y-4">
+						<div class="border border-stone-200/60 bg-white/40 p-6 card-lift flex flex-col space-y-4">
 							<span class="text-sm font-medium text-stone-500 uppercase tracking-wider"
 								>Appareils</span
 							>
@@ -141,7 +141,7 @@
 					</div>
 
 					<!-- Country Stats -->
-					<div class="bg-stone-50 p-6 border border-stone-100 flex flex-col space-y-4">
+					<div class="border border-stone-200/60 bg-white/40 p-6 card-lift flex flex-col space-y-4">
 						<span class="text-sm font-medium text-stone-500 uppercase tracking-wider">Top Pays</span>
 						<div class="flex flex-col space-y-3">
 							{#each stats.topCountries as country}
@@ -159,9 +159,9 @@
 				</div>
 			{/if}
 
-			<h2 class="font-display text-2xl md:text-3xl text-stone-900">Réseaux sociaux</h2>
+			<h2 class="font-display text-2xl md:text-3xl font-semibold text-stone-900">Réseaux sociaux</h2>
 
-			<div class="flex flex-col items-start space-y-2 md:space-y-4 text-xs md:text-base">
+			<div class="flex flex-col items-start space-y-2 md:space-y-4 text-xs md:text-base text-stone-500 font-body">
 				<!-- add link to icons -->
 				<a
 					class="flex flex-row items-center space-x-2 md:space-x-4"

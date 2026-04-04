@@ -271,14 +271,20 @@
 	<meta property="og:description" content="Ecoutez les cantiques, louanges et adorations du Message de l'Heure sur Missionnaire Network. Une collection riche pour votre adoration quotidienne." />
 </svelte:head>
 
-<div class="container mx-auto px-2 md:px-4 py-8 max-w-5xl">
+<div class="max-w-6xl mx-auto px-6 py-8">
+	<!-- Page Header -->
+	<div class="mb-10">
+		<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body">Cantiques & Louange</p>
+		<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">Musique</h1>
+	</div>
+
 	<!-- Alpha Filter -->
 	<div class="mb-10">
-		<h2 class="text-[10px] md:text-xs font-semibold text-missionnaire uppercase tracking-[0.25em] mb-4">Par ordre alphabétique</h2>
+		<h2 class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.35em] mb-4 font-body">Par ordre alphabétique</h2>
 		<div class="flex flex-wrap gap-x-4 gap-y-2">
 			{#each alphabet as letter}
 				<button 
-					class="text-sm md:text-base font-bold transition-all {currentAlpha === letter ? 'text-missionnaire scale-110' : 'text-stone-300 hover:text-missionnaire/60'}"
+					class="text-[11px] font-body font-bold transition-all {currentAlpha === letter ? 'text-missionnaire font-semibold' : 'text-stone-400 hover:text-missionnaire'}"
 					on:click={() => handleAlphaChange(letter)}
 				>
 					{letter}
@@ -288,11 +294,11 @@
 	</div>
 
 	<div class="mb-12">
-		<h2 class="text-[10px] md:text-xs font-semibold text-missionnaire uppercase tracking-[0.25em] mb-4">Recueils</h2>
+		<h2 class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.35em] mb-4 font-body">Recueils</h2>
 		<div class="flex overflow-x-auto pb-4 gap-3 no-scrollbar -mx-4 px-4 md:mx-0 md:px-0 md:pb-0" style="scrollbar-width: none; -ms-overflow-style: none;">
 			{#each categories as category}
 				<button 
-					class="flex-shrink-0 px-5 py-2.5 text-[11px] font-bold uppercase tracking-wider transition-all border {currentCategory === category ? 'bg-stone-900 text-white border-stone-900' : 'bg-white text-stone-500 border-stone-200 hover:border-missionnaire hover:text-missionnaire'}"
+					class="flex-shrink-0 px-5 py-2.5 text-[11px] font-bold uppercase tracking-wider transition-all border {currentCategory === category ? 'border-missionnaire text-missionnaire bg-missionnaire/5' : 'bg-white/40 text-stone-500 border-stone-200/60 hover:border-missionnaire hover:text-missionnaire'}"
 					on:click={() => handleCategoryChange(category)}
 				>
 					{category === 'All' ? 'Tout Voir' : category}
@@ -446,7 +452,7 @@
 		</div>
 
 		{#if showFavorites && $favorites.length > 0}
-			<div class="bg-white border border-stone-200 mb-6 overflow-hidden">
+			<div class="bg-white/40 border border-stone-200/60 mb-6 overflow-hidden">
 				<div class="flex items-center justify-between px-4 py-3 border-b border-stone-200 bg-stone-50/50">
 					<span class="text-[10px] font-bold uppercase tracking-widest text-stone-400">
 						Favoris — {$favorites.length} {$favorites.length > 1 ? 'chants' : 'chant'}
@@ -494,7 +500,7 @@
 		{/if}
 
 		{#if showRecent && $recentlyPlayed.length > 0}
-			<div class="bg-white border border-stone-200 mb-6 overflow-hidden">
+			<div class="bg-white/40 border border-stone-200/60 mb-6 overflow-hidden">
 				<div class="px-4 py-3 border-b border-stone-200 bg-stone-50/50">
 					<span class="text-[10px] font-bold uppercase tracking-widest text-stone-400">
 						Récemment joués
@@ -522,8 +528,8 @@
 	{/if}
 
 	<!-- Songs List -->
-		<div class="bg-white border border-stone-200 min-h-[500px] flex flex-col">
-		<div class="grid grid-cols-[30px_1fr_auto_auto] {desktopMusicGrid} gap-2 md:gap-4 px-3 md:px-4 py-3 border-b border-stone-200 text-[10px] md:text-[11px] font-bold text-stone-400 uppercase tracking-widest bg-stone-50/50">
+		<div class="bg-white/40 border border-stone-200/60 min-h-[500px] flex flex-col">
+		<div class="grid grid-cols-[30px_1fr_auto_auto] {desktopMusicGrid} gap-2 md:gap-4 px-3 md:px-4 py-3 border-b border-stone-200/60 text-[10px] md:text-[11px] font-bold text-stone-400 uppercase tracking-widest bg-white/40">
 			<div class="text-center">#</div>
 			<button class="text-left flex items-center gap-1.5 hover:text-missionnaire transition-colors" on:click={() => handleSortChange('title')}>
 				{#if currentSort.startsWith('title')}
@@ -630,7 +636,7 @@
 				<!-- svelte-ignore a11y-click-events-have-key-events -->
 				<!-- svelte-ignore a11y-no-static-element-interactions -->
 				<div 
-					class="grid grid-cols-[30px_1fr_auto_auto] {desktopMusicGrid} gap-2 md:gap-4 px-3 md:px-4 py-3 md:py-4 items-center transition-all group cursor-pointer {isActive ? 'bg-stone-100/80 border-l-4 border-l-missionnaire' : 'hover:bg-stone-50'}"
+					class="grid grid-cols-[30px_1fr_auto_auto] {desktopMusicGrid} gap-2 md:gap-4 px-3 md:px-4 py-3 md:py-4 items-center transition-all group cursor-pointer {isActive ? 'bg-missionnaire/5 border-l-4 border-l-missionnaire' : 'hover:bg-white/60'}"
 					on:click={() => playSong(song)}
 				>
 					<div class="text-center text-[10px] md:text-xs font-bold {isActive ? 'text-missionnaire' : 'text-stone-300'}">
@@ -720,7 +726,7 @@
 
 	<!-- Pagination -->
 	{#if totalPages > 1}
-		<div class="flex flex-col md:flex-row justify-between items-center mt-12 py-6 gap-6 text-[10px] md:text-xs font-bold text-stone-400 tracking-widest uppercase border-t border-stone-200">
+		<div class="flex flex-col md:flex-row justify-between items-center mt-12 py-6 gap-6 text-[10px] md:text-xs font-bold text-stone-400 tracking-widest uppercase border-t border-stone-200/60">
 			<div class="hidden md:block">
 				Affichage de {musicList.length} sur {totalSongs} chants
 			</div>

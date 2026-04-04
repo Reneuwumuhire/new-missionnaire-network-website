@@ -115,8 +115,8 @@
 	});
 </script>
 
-<nav class="navbar relative z-50 max-w-full border-b border-stone-200/60 backdrop-blur-md bg-white/90">
-	<div class="flex items-center justify-between max-w-[1600px] mx-auto px-4 md:px-6 h-14">
+<nav class="navbar relative z-50 max-w-full border-b border-stone-200/40 backdrop-blur-md bg-[#FAF8F3]/90">
+	<div class="flex items-center justify-between max-w-[1600px] mx-auto px-4 md:px-6 h-16">
 		<!-- Logo -->
 		<a href="/" class="flex items-center shrink-0">
 			<picture>
@@ -136,14 +136,10 @@
 				>
 					<form on:submit|preventDefault={handleSubmit}>
 						<div
-							class="flex items-center h-9 border border-stone-200 bg-stone-50/50 transition-all duration-300 ease-out"
-							class:w-9={!shouldExpand}
-							class:w-60={shouldExpand}
-							class:bg-white={shouldExpand}
-							class:border-stone-300={shouldExpand}
+							class="flex items-center h-9 border outline-none ring-0 transition-all duration-300 ease-out {shouldExpand ? 'w-60 bg-white/60 border-stone-300/80' : 'w-9 bg-transparent border-transparent hover:border-stone-200/40'}"
 						>
 							<div class="flex items-center justify-center w-9 shrink-0">
-								<SearchNormal1 size={14} color="#a8a29e" variant="Linear" />
+								<SearchNormal1 size={14} color={shouldExpand ? '#78716c' : '#a8a29e'} variant="Linear" />
 							</div>
 							{#if shouldExpand}
 								<input
@@ -151,7 +147,7 @@
 									placeholder="Rechercher..."
 									aria-label="Rechercher"
 									bind:value={$searchTerm}
-									class="w-full pr-3 py-1.5 text-sm text-stone-700 bg-transparent outline-none font-body placeholder:text-stone-400"
+									class="w-full pr-3 py-1.5 text-[13px] text-stone-700 bg-transparent outline-none ring-0 border-none font-body placeholder:text-stone-400/70 focus:outline-none focus:ring-0"
 									on:focus={() => (isFocused = true)}
 									on:blur={() => (isFocused = false)}
 									on:input={handleSearchInput}
@@ -159,11 +155,11 @@
 								{#if showClearButton}
 									<button
 										type="button"
-										class="flex items-center justify-center w-7 h-7 shrink-0 mr-1"
+										class="flex items-center justify-center w-7 h-7 shrink-0 mr-1 hover:opacity-70 transition-opacity"
 										on:click={clearInput}
 										aria-label="Effacer la recherche"
 									>
-										<CloseCircle size={16} color="#a8a29e" variant="Linear" />
+										<CloseCircle size={14} color="#a8a29e" variant="Linear" />
 									</button>
 								{/if}
 							{/if}
@@ -211,7 +207,7 @@
 
 	<!-- Mobile menu overlay — direct child of nav for correct absolute positioning -->
 	{#if showMoboNav}
-		<div class="mobo-menu absolute left-0 right-0 top-full z-50 bg-white overflow-y-auto border-t border-stone-100 h-screen">
+		<div class="mobo-menu absolute left-0 right-0 top-full z-50 bg-[#FAF8F3] overflow-y-auto border-t border-stone-100 h-screen">
 			<div class="flex flex-col px-6 py-8 max-w-lg mx-auto pb-32">
 				{#if showSearch}
 					<!-- svelte-ignore a11y-no-static-element-interactions -->
@@ -222,17 +218,17 @@
 					>
 						<form on:submit|preventDefault={handleSubmit}>
 							<div
-								class="flex items-center h-11 border border-stone-200 bg-stone-50"
+								class="flex items-center h-11 border border-stone-200/60 bg-white/40 outline-none ring-0"
 							>
 								<div class="flex items-center justify-center w-11 shrink-0">
-									<SearchNormal1 size={18} color="#a8a29e" variant="Linear" />
+									<SearchNormal1 size={16} color="#a8a29e" variant="Linear" />
 								</div>
 								<input
 									type="text"
 									placeholder="Rechercher..."
 									aria-label="Rechercher"
 									bind:value={$searchTerm}
-									class="w-full pr-4 py-2 text-base text-stone-700 bg-transparent outline-none font-body placeholder:text-stone-400"
+									class="w-full pr-4 py-2 text-sm text-stone-700 bg-transparent outline-none ring-0 border-none font-body placeholder:text-stone-400/70 focus:outline-none focus:ring-0"
 									on:focus={() => (isFocused = true)}
 									on:blur={() => (isFocused = false)}
 								/>

@@ -123,10 +123,10 @@
 	{ label: sermonTitle }
 ]} />
 
-<article class="w-full max-w-7xl mx-auto bg-white border border-stone-200 p-4 md:p-8">
+<article class="w-full max-w-4xl mx-auto bg-white/40 border border-stone-200/60 p-6 md:p-8">
 	<div class="max-w-4xl">
-		<h1 class="font-display text-2xl md:text-4xl font-bold text-stone-900 leading-tight">{sermonTitle}</h1>
-		<div class="mt-3 flex flex-wrap gap-3 text-sm text-stone-500">
+		<h1 class="font-display text-3xl font-semibold text-stone-900 leading-tight">{sermonTitle}</h1>
+		<div class="mt-3 flex flex-wrap gap-3 text-[12px] text-stone-400 font-body">
 			{#if sermon.author}
 				<span class="font-semibold text-stone-700">{sermon.author}</span>
 			{/if}
@@ -148,7 +148,7 @@
 			{#if previewPdfUrl}
 				<a
 					href="#pdf-preview"
-					class="px-4 py-2 border border-stone-200 bg-white text-stone-700 text-xs font-semibold uppercase tracking-wider hover:border-missionnaire hover:text-missionnaire transition-colors"
+					class="px-4 py-2 border border-stone-200/60 bg-white/40 text-stone-700 text-xs font-semibold uppercase tracking-wider hover:border-missionnaire hover:text-missionnaire transition-colors"
 				>
 					Voir PDF sur la page
 				</a>
@@ -157,7 +157,7 @@
 				<a
 					href={frenchPdfProxyUrl || previewPdfUrl}
 					target="_blank" rel="noopener noreferrer"
-					class="px-4 py-2 border border-stone-200 bg-white text-stone-700 text-xs font-semibold uppercase tracking-wider hover:border-missionnaire hover:text-missionnaire transition-colors"
+					class="px-4 py-2 border border-stone-200/60 bg-white/40 text-stone-700 text-xs font-semibold uppercase tracking-wider hover:border-missionnaire hover:text-missionnaire transition-colors"
 				>
 					Ouvrir PDF
 				</a>
@@ -165,7 +165,7 @@
 			{#if sermon.english_audio_url}
 				<button
 					type="button"
-					class="px-4 py-2 border border-stone-200 bg-white text-stone-700 text-xs font-semibold uppercase tracking-wider hover:border-missionnaire hover:text-missionnaire transition-colors"
+					class="px-4 py-2 border border-stone-200/60 bg-white/40 text-stone-700 text-xs font-semibold uppercase tracking-wider hover:border-missionnaire hover:text-missionnaire transition-colors"
 					on:click={() => toggleSermonAudio('english')}
 				>
 					{isEnglishTrackActive && $isPlaying ? 'Pause audio EN' : 'Lire audio EN'}
@@ -175,7 +175,7 @@
 				<a
 					href={englishPdfProxyUrl}
 					target="_blank" rel="noopener noreferrer"
-					class="px-4 py-2 border border-stone-200 bg-white text-stone-700 text-xs font-semibold uppercase tracking-wider hover:border-missionnaire hover:text-missionnaire transition-colors"
+					class="px-4 py-2 border border-stone-200/60 bg-white/40 text-stone-700 text-xs font-semibold uppercase tracking-wider hover:border-missionnaire hover:text-missionnaire transition-colors"
 				>
 					PDF English
 				</a>
@@ -202,7 +202,7 @@
 				</a>
 			</div>
 
-			<div class="border border-stone-200 overflow-hidden bg-stone-50">
+			<div class="border border-stone-200/60 overflow-hidden bg-white/40">
 				<object
 					data={previewPdfUrl}
 					type="application/pdf"
@@ -220,7 +220,7 @@
 </article>
 
 {#if relatedSermons.length > 0}
-	<section class="w-full max-w-7xl mx-auto mt-8">
+	<section class="w-full max-w-4xl mx-auto mt-8">
 		<h2 class="text-sm font-semibold uppercase tracking-[0.25em] text-stone-400 mb-4">
 			Du meme auteur
 		</h2>
@@ -228,12 +228,12 @@
 			{#each relatedSermons as related}
 				<a
 					href="/predications/{related.slug}"
-					class="bg-white border border-stone-200 p-4 hover:border-missionnaire transition-all group"
+					class="bg-white/40 border border-stone-200/60 p-4 hover:border-missionnaire transition-all group card-lift"
 				>
 					<div class="text-sm font-bold text-stone-800 group-hover:text-missionnaire transition-colors line-clamp-2">
 						{related.french_title || related.english_title || 'Sans titre'}
 					</div>
-					<div class="flex items-center gap-2 mt-2 text-[10px] text-stone-400 font-medium">
+					<div class="flex items-center gap-2 mt-2 text-[12px] text-stone-400 font-body">
 						{#if related.full_date_code || related.date_code}
 							<span>{related.full_date_code || related.date_code}</span>
 						{/if}

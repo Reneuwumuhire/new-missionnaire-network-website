@@ -22,6 +22,7 @@
 	// Scroll-triggered reveal
 	let heroVisible = false;
 	let sectionsVisible: Record<string, boolean> = {};
+	let scrolledPastHero = false;
 
 	onMount(() => {
 		if (!browser) return;
@@ -41,6 +42,12 @@
 		requestAnimationFrame(() => {
 			heroVisible = true;
 		});
+
+		// Hide scroll indicator once scrolled past hero
+		const handleScroll = () => {
+			scrolledPastHero = window.scrollY > 200;
+		};
+		window.addEventListener('scroll', handleScroll, { passive: true });
 
 		// Intersection observer for scroll reveals
 		const observer = new IntersectionObserver(
@@ -63,11 +70,40 @@
 
 	onDestroy(() => {
 		eventSource?.close();
+		clearInterval(heroVerseInterval);
+	});
+
+	// Hero Bible verse rotator
+	const heroVerses = [
+		{ text: 'Car la parole de Dieu est vivante et efficace, plus tranchante qu\u2019une épée quelconque à deux tranchants.', ref: 'Hébreux 4:12' },
+		{ text: 'Ainsi la foi vient de ce qu\u2019on entend, et ce qu\u2019on entend vient de la parole de Christ.', ref: 'Romains 10:17' },
+		{ text: 'Ta parole est une lampe à mes pieds, et une lumière sur mon sentier.', ref: 'Psaume 119:105' },
+		{ text: 'Veillez donc, car vous ne savez ni le jour, ni l\u2019heure.', ref: 'Matthieu 25:13' },
+		{ text: 'Voici, je viens bientôt. Heureux celui qui garde les paroles de la prophétie de ce livre.', ref: 'Apocalypse 22:7' },
+		{ text: 'Car Dieu a tant aimé le monde qu\u2019il a donné son Fils unique.', ref: 'Jean 3:16' },
+		{ text: 'Ne crains point, car je suis avec toi ; ne t\u2019effraie point, car je suis ton Dieu.', ref: 'Ésaïe 41:10' },
+		{ text: 'Je puis tout par celui qui me fortifie.', ref: 'Philippiens 4:13' },
+		{ text: 'Celui qui a commencé en vous cette bonne œuvre la rendra parfaite pour le jour de Jésus-Christ.', ref: 'Philippiens 1:6' },
+		{ text: 'Voici, je me tiens à la porte, et je frappe. Si quelqu\u2019un entend ma voix et ouvre la porte, j\u2019entrerai.', ref: 'Apocalypse 3:20' },
+	];
+
+	let heroVerseIndex = 0;
+	let heroVerseVisible = true;
+	let heroVerseInterval: ReturnType<typeof setInterval>;
+
+	onMount(() => {
+		heroVerseInterval = setInterval(() => {
+			heroVerseVisible = false;
+			setTimeout(() => {
+				heroVerseIndex = (heroVerseIndex + 1) % heroVerses.length;
+				heroVerseVisible = true;
+			}, 600);
+		}, 7000);
 	});
 
 	const quickLinks = [
-		{ label: 'Vidéos', href: '/videos', icon: '▶' },
 		{ label: 'Prédications', href: '/predications', icon: '✦' },
+		{ label: 'Vidéos', href: '/videos', icon: '▶' },
 		{ label: 'Musique', href: '/musique', icon: '♪' },
 		{ label: 'Radio', href: '/live', icon: '◉' },
 		{ label: 'Transcriptions', href: '/transcriptions', icon: '¶' },
@@ -120,110 +156,148 @@
 </svelte:head>
 
 <main class="homepage relative overflow-hidden">
-	<!-- Atmospheric grain overlay -->
+	<!-- Grain overlay -->
 	<div class="fixed inset-0 pointer-events-none z-50 mix-blend-multiply opacity-[0.03]" aria-hidden="true">
 		<div class="grain-texture w-full h-full"></div>
 	</div>
 
-	<!-- ═══════════════════════ HERO ═══════════════════════ -->
+	<!-- ═══ HERO ═══ -->
 	<section
-		class="relative min-h-[85vh] md:min-h-[90vh] flex items-center justify-center overflow-hidden"
+		class="relative min-h-svh flex flex-col items-center justify-center overflow-hidden px-5 pt-20 pb-12"
 	>
-		<!-- Radial glow behind hero -->
+		<!-- Radial warm glow -->
 		<div
-			class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full pointer-events-none"
-			style="background: radial-gradient(circle, rgba(255,136,12,0.08) 0%, transparent 70%);"
+			class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] md:w-[900px] h-[600px] md:h-[900px] rounded-full pointer-events-none"
+			style="background: radial-gradient(circle, rgba(255,136,12,0.06) 0%, transparent 70%);"
 			aria-hidden="true"
 		></div>
 
-		<!-- Decorative vertical line -->
+		<!-- Cross at the origin of the vertical line — descends from above -->
+		<div class="absolute left-1/2 top-[80px] md:top-[90px] -translate-x-1/2 z-10 pointer-events-none cross-descend" aria-hidden="true">
+			<svg width="22" height="30" viewBox="0 0 28 38" fill="none" class="md:w-7 md:h-[38px]">
+				<rect x="10" y="0" width="8" height="38" rx="1.5" fill="#FF880C" fill-opacity="0.25" />
+				<rect x="0" y="8" width="28" height="8" rx="1.5" fill="#FF880C" fill-opacity="0.25" />
+			</svg>
+		</div>
+
+		<!-- Decorative vertical line — grows from below the cross -->
 		<div
-			class="absolute left-1/2 top-0 w-px h-full -translate-x-1/2 pointer-events-none"
-			style="background: linear-gradient(to bottom, transparent, rgba(255,136,12,0.15) 30%, rgba(255,136,12,0.15) 70%, transparent);"
+			class="absolute left-1/2 top-[118px] md:top-[128px] bottom-0 w-px -translate-x-1/2 pointer-events-none line-grow"
 			aria-hidden="true"
 		></div>
 
 		<div
-			class="relative z-10 max-w-4xl mx-auto px-6 text-center hero-content"
+			class="relative z-10 max-w-4xl mx-auto text-center hero-content"
 			class:hero-visible={heroVisible}
 		>
-			<!-- Ornamental cross mark -->
-			<div class="flex justify-center mb-8">
-				<svg width="28" height="38" viewBox="0 0 28 38" fill="none" class="hero-cross">
-					<rect x="10" y="0" width="8" height="38" rx="1.5" fill="#FF880C" fill-opacity="0.25" />
-					<rect x="0" y="8" width="28" height="8" rx="1.5" fill="#FF880C" fill-opacity="0.25" />
-				</svg>
-			</div>
-
-			<p class="hero-label text-[11px] font-semibold uppercase tracking-[0.35em] text-missionnaire mb-6 font-body">
+			<p class="hero-label text-[10px] md:text-[11px] font-semibold uppercase tracking-[0.35em] md:tracking-[0.4em] text-missionnaire mb-4 md:mb-6 font-body">
 				Missionnaire Network
 			</p>
 
-			<h1 class="hero-title font-display font-semibold text-[clamp(2.8rem,7vw,5rem)] leading-[1.05] text-stone-900">
-				Ressources du<br />
-				<span class="text-missionnaire italic">Message</span> de l'Heure
+			<h1 class="hero-title font-display font-semibold text-[clamp(2.2rem,7vw,4.8rem)] leading-[1.08] text-stone-900">
+				Le Message de l'Heure<br />
+				<span class="text-missionnaire italic">pour aujourd'hui</span>
 			</h1>
 
-			<p class="hero-subtitle mt-6 text-stone-500 max-w-md mx-auto leading-relaxed text-base font-body font-light">
-				Prédications, cantiques, transcriptions et publications pour fortifier votre marche quotidienne.
+			<p class="hero-subtitle mt-5 md:mt-7 text-stone-400 max-w-md mx-auto leading-relaxed text-[15px] md:text-[17px] font-body font-light px-2">
+				Prédications, cantiques, transcriptions et enseignements pour fortifier votre marche spirituelle.
 			</p>
 
-			<div class="hero-cta mt-10 flex flex-wrap justify-center gap-4">
-				<a
-					href="/videos"
-					class="group relative px-8 py-3.5 bg-stone-900 text-white text-xs font-semibold uppercase tracking-[0.2em] font-body overflow-hidden transition-all duration-300 hover:bg-missionnaire"
-				>
-					<span class="relative z-10">Explorer</span>
-				</a>
+			<div class="hero-cta mt-8 md:mt-10 flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
 				<a
 					href="/live"
-					class="px-8 py-3.5 border border-stone-300 text-stone-700 text-xs font-semibold uppercase tracking-[0.2em] font-body hover:border-missionnaire hover:text-missionnaire transition-all duration-300"
+					class="group px-6 sm:px-8 py-3.5 text-white text-[11px] sm:text-[12px] font-semibold uppercase tracking-[0.2em] font-body overflow-hidden transition-all duration-300 flex items-center justify-center gap-3 {radioIsLive
+						? 'bg-red-700 hover:bg-red-800'
+						: 'bg-stone-900 hover:bg-missionnaire'}"
 				>
-					Radio en direct
+					{#if radioIsLive}
+						<span class="relative flex h-2 w-2 shrink-0">
+							<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75"></span>
+							<span class="relative inline-flex h-2 w-2 rounded-full bg-white"></span>
+						</span>
+						<span>Écouter en direct</span>
+					{:else}
+						<svg width="11" height="13" viewBox="0 0 12 14" fill="none"><path d="M2 1L10 7L2 13V1Z" fill="white" stroke="white" stroke-width="1" stroke-linejoin="round"/></svg>
+						<span>Écouter la radio</span>
+					{/if}
 				</a>
+				<a
+					href="/predications"
+					class="px-6 sm:px-8 py-3.5 border border-stone-300 text-stone-600 text-[11px] sm:text-[12px] font-semibold uppercase tracking-[0.2em] font-body hover:border-missionnaire hover:text-missionnaire transition-all duration-300 text-center"
+				>
+					Explorer les prédications
+				</a>
+			</div>
+
+			<!-- Animated Bible verse below buttons -->
+			<div class="hero-verse mt-8 md:mt-12 max-w-xl mx-auto">
+				<div class="ornament-line text-missionnaire/30 mb-4 md:mb-5">
+					<svg width="10" height="10" viewBox="0 0 14 14" fill="none"><path d="M7 0L8.5 5.5L14 7L8.5 8.5L7 14L5.5 8.5L0 7L5.5 5.5L7 0Z" fill="currentColor"/></svg>
+				</div>
+				<div
+					class="verse-anim"
+					class:verse-visible={heroVerseVisible}
+					style="min-height: 3.5rem;"
+				>
+					<p class="font-display text-base md:text-xl italic text-stone-500 leading-relaxed px-2">
+						« {heroVerses[heroVerseIndex].text} »
+					</p>
+					<p class="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.25em] md:tracking-[0.3em] text-missionnaire/70 mt-2 md:mt-3 font-body">
+						— {heroVerses[heroVerseIndex].ref}
+					</p>
+				</div>
 			</div>
 		</div>
 
-		<!-- Scroll indicator -->
-		<div class="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 opacity-40">
-			<span class="text-[10px] uppercase tracking-[0.25em] text-stone-400 font-body">Défiler</span>
-			<div class="w-px h-8 bg-stone-300 scroll-line"></div>
-		</div>
 	</section>
 
-	<!-- ═══════════════════════ QUICK NAV ═══════════════════════ -->
+	<!-- Scroll indicator — fixed to viewport bottom, hidden after scroll -->
+	{#if !scrolledPastHero}
+		<div class="fixed bottom-6 left-1/2 z-30 flex flex-col items-center gap-2 scroll-indicator">
+			<span class="text-[10px] uppercase tracking-[0.3em] text-stone-500 font-body font-semibold">Défiler</span>
+			<div class="scroll-chevrons flex flex-col items-center">
+				<svg width="22" height="12" viewBox="0 0 22 12" fill="none" class="chevron-1 text-stone-400">
+					<path d="M2 2L11 9L20 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+				</svg>
+				<svg width="22" height="12" viewBox="0 0 22 12" fill="none" class="chevron-2 text-missionnaire -mt-1">
+					<path d="M2 2L11 9L20 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+				</svg>
+			</div>
+		</div>
+	{/if}
+
+	<!-- ═══ QUICK NAV ═══ -->
 	<nav
 		data-reveal="nav"
-		class="reveal-section max-w-5xl mx-auto px-6 py-16 border-t border-stone-200"
+		class="reveal-section max-w-6xl mx-auto px-6 py-16 border-t border-stone-200/60"
 		class:revealed={sectionsVisible['nav']}
 	>
 		<div class="grid grid-cols-3 md:grid-cols-6 gap-3">
 			{#each quickLinks as link, i}
 				<a
 					href={link.href}
-					class="quick-link group flex flex-col items-center gap-3 py-5 px-3 border border-transparent hover:border-stone-200 transition-all duration-300"
+					class="quick-link group flex flex-col items-center gap-3 py-6 px-3 border border-transparent hover:border-stone-200 hover:bg-white/50 transition-all duration-300"
 					style="animation-delay: {i * 80}ms"
 				>
-					<span class="text-lg text-stone-400 group-hover:text-missionnaire transition-colors duration-300">{link.icon}</span>
-					<span class="text-xs font-semibold uppercase tracking-[0.15em] text-stone-600 group-hover:text-stone-900 transition-colors duration-300 font-body">{link.label}</span>
+					<span class="text-lg text-stone-300 group-hover:text-missionnaire transition-colors duration-300">{link.icon}</span>
+					<span class="text-[11px] font-semibold uppercase tracking-[0.15em] text-stone-500 group-hover:text-stone-800 transition-colors duration-300 font-body">{link.label}</span>
 				</a>
 			{/each}
 		</div>
 	</nav>
 
-	<!-- ═══════════════════════ RADIO STATUS ═══════════════════════ -->
+	<!-- ═══ RADIO STATUS ═══ -->
 	<div
 		data-reveal="radio"
-		class="reveal-section max-w-5xl mx-auto px-6 mb-16"
+		class="reveal-section max-w-6xl mx-auto px-6 mb-16"
 		class:revealed={sectionsVisible['radio']}
 	>
 		<div class="flex flex-col sm:flex-row gap-4">
-			<!-- Radio link -->
 			<a
 				href="/live"
-				class="group flex items-center gap-4 px-5 py-4 border flex-1 transition-all duration-200 {radioIsLive
+				class="group flex items-center gap-4 px-6 py-5 border flex-1 transition-all duration-200 bg-white/40 {radioIsLive
 					? 'border-red-200 bg-red-50/40 hover:bg-red-50'
-					: 'border-stone-200 hover:border-stone-300 hover:bg-stone-50'}"
+					: 'border-stone-200/60 hover:border-missionnaire/30 hover:bg-white/60'}"
 			>
 				<span class="relative flex h-2.5 w-2.5 shrink-0">
 					{#if radioIsLive}
@@ -234,7 +308,7 @@
 					{/if}
 				</span>
 				<div class="flex-1 min-w-0">
-					<p class="text-sm font-body {radioIsLive ? 'text-red-700 font-semibold' : 'text-stone-700'}">
+					<p class="text-sm font-body {radioIsLive ? 'text-red-700 font-semibold' : 'text-stone-700 font-medium'}">
 						{radioIsLive ? 'Radio en direct' : 'Radio hors antenne'}
 					</p>
 					<p class="text-[11px] text-stone-400 font-body mt-0.5">
@@ -244,12 +318,11 @@
 				<span class="text-stone-300 group-hover:text-missionnaire transition-colors text-xs">→</span>
 			</a>
 
-			<!-- Notification toggle -->
 			<button
 				on:click={() => bellRef?.toggle()}
-				class="group flex items-center gap-4 px-5 py-4 border transition-all duration-200 cursor-pointer sm:w-auto {bellRef?.isSubscribed
+				class="group flex items-center gap-4 px-6 py-5 border transition-all duration-200 cursor-pointer sm:w-auto bg-white/40 {bellRef?.isSubscribed
 					? 'border-missionnaire/30 bg-orange-50/40'
-					: 'border-stone-200 hover:border-missionnaire/30 hover:bg-orange-50/30'}"
+					: 'border-stone-200/60 hover:border-missionnaire/30 hover:bg-white/60'}"
 			>
 				<NotificationBell bind:this={bellRef} />
 				<div class="flex-1 min-w-0 text-left">
@@ -257,7 +330,7 @@
 						<p class="text-sm font-semibold text-missionnaire font-body">Notifications activées</p>
 						<p class="text-[11px] text-stone-400 font-body mt-0.5">Cliquez pour désactiver</p>
 					{:else}
-						<p class="text-sm font-semibold text-stone-700 font-body">Activer les notifications</p>
+						<p class="text-sm font-medium text-stone-700 font-body">Activer les notifications</p>
 						<p class="text-[11px] text-stone-400 font-body mt-0.5">Soyez alerté quand la radio est en direct</p>
 					{/if}
 				</div>
@@ -265,46 +338,45 @@
 		</div>
 	</div>
 
-	<!-- ═══════════════════════ MISSION + FIGURES ═══════════════════════ -->
+	<!-- ═══ MISSION + KEY FIGURES ═══ -->
 	<section
 		data-reveal="mission"
-		class="reveal-section max-w-5xl mx-auto px-6 mb-20"
+		class="reveal-section max-w-6xl mx-auto px-6 mb-20"
 		class:revealed={sectionsVisible['mission']}
 	>
 		<div class="grid md:grid-cols-12 gap-6 md:gap-8">
-			<!-- Mission — editorial image block -->
+			<!-- Mission editorial image block -->
 			<div class="md:col-span-7">
-				<div class="relative group">
+				<div class="relative group card-lift">
 					<div class="relative overflow-hidden">
 						<picture>
 							<source srcset="/img/eglise_inside.webp" type="image/webp" />
 							<img
 								src="/img/eglise_inside.jpg"
 								alt="Intérieur de l'église"
-								class="w-full aspect-[4/3] object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+								class="w-full aspect-[4/3] object-cover img-zoom"
 								width="400"
 								height="300"
 								sizes="(max-width: 768px) 100vw, 58vw"
 								fetchpriority="high"
 							/>
 						</picture>
-						<!-- Image overlay gradient -->
-						<div class="absolute inset-0 bg-gradient-to-t from-stone-900/60 via-transparent to-transparent"></div>
-						<!-- Text on image -->
+						<div class="absolute inset-0 bg-gradient-to-t from-stone-900/70 via-stone-900/20 to-transparent"></div>
 						<div class="absolute bottom-0 left-0 right-0 p-6 md:p-8">
+							<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire-100 mb-3 font-body">Notre mission</p>
 							<h2 class="font-display font-semibold text-3xl md:text-4xl text-white leading-tight">
 								Répandre le <span class="italic">Message</span><br />à travers le monde
 							</h2>
 						</div>
 					</div>
-					<div class="p-6 bg-stone-50 border border-t-0 border-stone-200">
+					<div class="p-6 bg-white/60 border border-t-0 border-stone-200/60">
 						<p class="text-sm text-stone-500 leading-relaxed font-body">
 							Missionnaire Network rend accessible les ressources spirituelles — prédications,
 							cantiques, littérature — pour l'édification des croyants partout dans le monde.
 						</p>
 						<a
 							href="/a-propos"
-							class="inline-block mt-4 text-xs font-semibold text-missionnaire uppercase tracking-[0.2em] font-body hover:text-orange-800 transition-colors"
+							class="inline-block mt-4 text-[11px] font-semibold text-missionnaire uppercase tracking-[0.2em] font-body hover:text-orange-700 transition-colors"
 						>
 							En savoir plus →
 						</a>
@@ -312,11 +384,11 @@
 				</div>
 			</div>
 
-			<!-- Key figures — stacked cards -->
+			<!-- Key figures -->
 			<div class="md:col-span-5 flex flex-col gap-6">
 				<a
 					href="/william-branham/biographie"
-					class="group block border border-stone-200 hover:border-missionnaire/30 transition-all duration-300 flex-1"
+					class="group block border border-stone-200/60 hover:border-missionnaire/30 bg-white/40 transition-all duration-300 card-lift flex-1"
 				>
 					<div class="p-6 flex items-start gap-5">
 						<picture class="shrink-0">
@@ -335,11 +407,11 @@
 							<p class="font-display font-medium text-xl text-stone-900 group-hover:text-missionnaire transition-colors">
 								William M. Branham
 							</p>
-							<p class="text-xs text-stone-400 mt-1 font-body uppercase tracking-wider">1909 – 1965</p>
+							<p class="text-[10px] text-stone-400 mt-1 font-body uppercase tracking-wider">1909 – 1965 · Prophète du Message</p>
 							<p class="text-sm text-stone-500 mt-2 leading-relaxed font-body">
-								Prophète du Message de l'Heure. Son ministère a marqué des millions de croyants à travers le monde.
+								Son ministère a marqué des millions de croyants à travers le monde.
 							</p>
-							<span class="inline-block mt-3 text-xs font-semibold text-missionnaire uppercase tracking-[0.2em] font-body">
+							<span class="inline-block mt-3 text-[11px] font-semibold text-missionnaire uppercase tracking-[0.2em] font-body">
 								Biographie →
 							</span>
 						</div>
@@ -348,7 +420,7 @@
 
 				<a
 					href="/ewald-frank"
-					class="group block border border-stone-200 hover:border-missionnaire/30 transition-all duration-300 flex-1"
+					class="group block border border-stone-200/60 hover:border-missionnaire/30 bg-white/40 transition-all duration-300 card-lift flex-1"
 				>
 					<div class="p-6 flex items-start gap-5">
 						<picture class="shrink-0">
@@ -367,36 +439,60 @@
 							<p class="font-display font-medium text-xl text-stone-900 group-hover:text-missionnaire transition-colors">
 								Ewald Frank
 							</p>
-							<p class="text-xs text-stone-400 mt-1 font-body uppercase tracking-wider">Krefeld, Allemagne</p>
+							<p class="text-[10px] text-stone-400 mt-1 font-body uppercase tracking-wider">Krefeld, Allemagne · Missionnaire</p>
 							<p class="text-sm text-stone-500 mt-2 leading-relaxed font-body">
 								Missionnaire international portant le Message aux nations depuis plus de 60 ans.
 							</p>
-							<span class="inline-block mt-3 text-xs font-semibold text-missionnaire uppercase tracking-[0.2em] font-body">
+							<span class="inline-block mt-3 text-[11px] font-semibold text-missionnaire uppercase tracking-[0.2em] font-body">
 								En savoir plus →
 							</span>
 						</div>
+					</div>
+				</a>
+
+				<!-- Église de Kigali -->
+				<a
+					href="/eglise"
+					class="group block border border-stone-200/60 hover:border-missionnaire/30 bg-white/40 transition-all duration-300 card-lift"
+				>
+					<div class="p-6">
+						<div class="flex items-center gap-3 mb-2">
+							<span class="w-2 h-2 rounded-full bg-missionnaire/40"></span>
+							<p class="text-[10px] font-bold uppercase tracking-[0.3em] text-missionnaire font-body">Assemblée locale</p>
+						</div>
+						<p class="font-display font-medium text-lg text-stone-900 group-hover:text-missionnaire transition-colors">
+							Église de Kigali
+						</p>
+						<p class="text-[12px] text-stone-400 mt-1 font-body">Cultes, retransmissions et programme des réunions</p>
 					</div>
 				</a>
 			</div>
 		</div>
 	</section>
 
-	<!-- ═══════════════════════ LATEST VIDEOS ═══════════════════════ -->
+	<!-- ═══ ORNAMENT ═══ -->
+	<div class="max-w-6xl mx-auto px-6 mb-4">
+		<div class="ornament-line text-missionnaire/40">
+			<svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M7 0L8.5 5.5L14 7L8.5 8.5L7 14L5.5 8.5L0 7L5.5 5.5L7 0Z" fill="currentColor"/></svg>
+		</div>
+	</div>
+
+	<!-- ═══ LATEST VIDEOS ═══ -->
 	{#if recentVideos.length > 0}
 		<section
 			data-reveal="videos"
-			class="reveal-section max-w-5xl mx-auto px-6 pb-24"
+			class="reveal-section max-w-6xl mx-auto px-6 pb-24"
 			class:revealed={sectionsVisible['videos']}
 		>
-			<div class="border-t border-stone-200 pt-12">
-				<div class="flex items-end justify-between mb-8">
+			<div class="pt-12">
+				<div class="flex items-end justify-between mb-10">
 					<div>
-						<p class="text-[10px] font-semibold uppercase tracking-[0.3em] text-missionnaire font-body mb-2">Nouveautés</p>
-						<h2 class="font-display font-semibold text-3xl md:text-4xl text-stone-900">Récemment ajouté</h2>
+						<p class="text-[10px] font-semibold uppercase tracking-[0.35em] text-missionnaire font-body mb-2">Nouveautés</p>
+						<h2 class="font-display font-semibold text-3xl md:text-[2.6rem] text-stone-900">Récemment ajouté</h2>
 					</div>
 					<a
 						href="/videos"
-						class="text-xs font-semibold text-stone-500 hover:text-missionnaire uppercase tracking-[0.2em] transition-colors font-body hidden sm:block"
+						class="text-[11px] font-semibold text-stone-400 hover:text-missionnaire uppercase tracking-[0.2em] transition-colors font-body hidden sm:block"
 					>
 						Tout voir →
 					</a>
@@ -408,11 +504,11 @@
 						{@const videoPageUrl = `/videos?v=${video.id || video._id}`}
 						<a
 							href={videoPageUrl}
-							class="video-card group block"
+							class="video-card group block card-lift border border-stone-200/60 bg-white/40 overflow-hidden"
 							style="animation-delay: {i * 120}ms"
 						>
 							{#if video.thumbnail}
-								<div class="relative overflow-hidden aspect-video mb-4">
+								<div class="relative overflow-hidden aspect-video">
 									<img
 										src={getSmallThumbnail(video)}
 										alt={video.title}
@@ -420,11 +516,10 @@
 										height="180"
 										loading="lazy"
 										decoding="async"
-										class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.05]"
+										class="w-full h-full object-cover img-zoom"
 									/>
-									<!-- Play hint -->
 									<div class="absolute inset-0 bg-stone-900/0 group-hover:bg-stone-900/20 transition-colors duration-300 flex items-center justify-center">
-										<div class="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 scale-90 group-hover:scale-100">
+										<div class="w-11 h-11 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 scale-90 group-hover:scale-100">
 											<svg width="14" height="16" viewBox="0 0 14 16" fill="none">
 												<path d="M2 1.5L12.5 8L2 14.5V1.5Z" fill="#1c1917" stroke="#1c1917" stroke-width="1.5" stroke-linejoin="round"/>
 											</svg>
@@ -432,21 +527,23 @@
 									</div>
 								</div>
 							{/if}
-							{#if publishedLabel}
-								<p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-400 mb-1.5 font-body">
-									{publishedLabel}
+							<div class="p-4">
+								{#if publishedLabel}
+									<p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-400 mb-1.5 font-body">
+										{publishedLabel}
+									</p>
+								{/if}
+								<p class="text-sm font-medium text-stone-700 group-hover:text-missionnaire transition-colors duration-300 line-clamp-2 font-body leading-relaxed">
+									{video.title}
 								</p>
-							{/if}
-							<p class="text-sm font-medium text-stone-800 group-hover:text-missionnaire transition-colors duration-300 line-clamp-2 font-body leading-relaxed">
-								{video.title}
-							</p>
+							</div>
 						</a>
 					{/each}
 				</div>
 
 				<a
 					href="/videos"
-					class="block text-center mt-8 text-xs font-semibold text-stone-500 hover:text-missionnaire uppercase tracking-[0.2em] transition-colors font-body sm:hidden"
+					class="block text-center mt-8 text-[11px] font-semibold text-stone-400 hover:text-missionnaire uppercase tracking-[0.2em] transition-colors font-body sm:hidden"
 				>
 					Tout voir →
 				</a>
@@ -463,23 +560,43 @@
 		background-size: 256px 256px;
 	}
 
+	/* ── Cross descending from above ── */
+	.cross-descend {
+		opacity: 0;
+		transform: translate(-50%, -60px);
+		animation: cross-fall 2.2s cubic-bezier(0.22, 1, 0.36, 1) 0.1s forwards;
+	}
+	@keyframes cross-fall {
+		0% { opacity: 0; transform: translate(-50%, -60px); }
+		40% { opacity: 0.6; }
+		70% { opacity: 1; transform: translate(-50%, 3px); }
+		85% { transform: translate(-50%, -1px); }
+		100% { opacity: 1; transform: translate(-50%, 0); }
+	}
+
+	/* ── Vertical line growing downward ── */
+	.line-grow {
+		background: linear-gradient(to bottom, rgba(255,136,12,0.15), rgba(255,136,12,0.08) 70%, transparent);
+		transform-origin: top;
+		animation: line-extend 1.5s cubic-bezier(0.16, 1, 0.3, 1) 0.8s both;
+	}
+	@keyframes line-extend {
+		from { transform: translate(-50%, 0) scaleY(0); opacity: 0; }
+		to { transform: translate(-50%, 0) scaleY(1); opacity: 1; }
+	}
+
 	/* ── Hero entrance animations ── */
-	.hero-content .hero-cross,
 	.hero-content .hero-label,
 	.hero-content .hero-title,
 	.hero-content .hero-subtitle,
-	.hero-content .hero-cta {
+	.hero-content .hero-cta,
+	.hero-content .hero-verse {
 		opacity: 0;
 		transform: translateY(24px);
 		transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
 					transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
 	}
 
-	.hero-visible .hero-cross {
-		opacity: 1;
-		transform: translateY(0);
-		transition-delay: 0.1s;
-	}
 	.hero-visible .hero-label {
 		opacity: 1;
 		transform: translateY(0);
@@ -500,14 +617,42 @@
 		transform: translateY(0);
 		transition-delay: 0.8s;
 	}
+	.hero-visible .hero-verse {
+		opacity: 1;
+		transform: translateY(0);
+		transition-delay: 1.1s;
+	}
+
+	/* ── Hero verse gentle animation ── */
+	.verse-anim {
+		opacity: 0;
+		transform: translateY(8px);
+		transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+					transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+	}
+	.verse-visible {
+		opacity: 1;
+		transform: translateY(0);
+	}
 
 	/* ── Scroll indicator ── */
-	.scroll-line {
-		animation: scroll-pulse 2s ease-in-out infinite;
+	.scroll-indicator {
+		transform: translateX(-50%);
+		animation: indicator-in 1s ease 2.5s both;
 	}
-	@keyframes scroll-pulse {
-		0%, 100% { opacity: 0.3; transform: scaleY(1); }
-		50% { opacity: 0.8; transform: scaleY(1.2); transform-origin: top; }
+	@keyframes indicator-in {
+		from { opacity: 0; transform: translate(-50%, 12px); }
+		to { opacity: 1; transform: translate(-50%, 0); }
+	}
+	.scroll-hint .chevron-1 {
+		animation: chevron-bounce 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+	}
+	.scroll-hint .chevron-2 {
+		animation: chevron-bounce 2s cubic-bezier(0.4, 0, 0.2, 1) 0.15s infinite;
+	}
+	@keyframes chevron-bounce {
+		0%, 100% { opacity: 0.3; transform: translateY(0); }
+		50% { opacity: 1; transform: translateY(4px); }
 	}
 
 	/* ── Scroll reveal sections ── */

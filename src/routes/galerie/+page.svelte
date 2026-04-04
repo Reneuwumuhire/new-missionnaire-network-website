@@ -49,25 +49,25 @@
 		content="Explorez les images des réunions, événements et moments marquants."
 	/>
 </svelte:head>
-<div class=" flex flex-col">
+<div class="flex flex-col">
 	<header>
 		<div class="flex flex-row items-center justify-center space-x-2">
 			<div class="header-branham flex flex-col items-center justify-center w-full" />
 		</div>
 	</header>
 	<div class="relative flex flex-row justify-center h-auto w-full py-14">
-		<div class="relative flex flex-col items-start w-full max-w-3xl space-y-6 px-5">
+		<div class="relative flex flex-col items-start w-full max-w-6xl space-y-8 px-6">
 			<div>
-				<small class="text-[10px] font-semibold uppercase tracking-[0.25em] text-missionnaire"
-					>ASSEMBLÉE LOCALE</small
+				<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body"
+					>ASSEMBLÉE LOCALE</p
 				>
-				<h1 class="font-display text-2xl md:text-3xl font-bold text-stone-900">Galerie</h1>
+				<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">Galerie</h1>
 			</div>
-			<div class="grid">
+			<div class="grid gap-1">
 				{#each _list as col}
 					<div class="col">
 						{#each col as item}
-							<img loading="lazy" src={item.download_url} alt="" />
+							<img loading="lazy" src={item.download_url} alt="" class="img-zoom" />
 						{/each}
 					</div>
 				{/each}
@@ -110,6 +110,6 @@
 		display: flex;
 		position: relative;
 		align-items: flex-start;
-		gap: 0.2rem;
+		gap: 0.5rem;
 	}
 </style>

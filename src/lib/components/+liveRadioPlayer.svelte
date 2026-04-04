@@ -350,107 +350,110 @@
 	};
 </script>
 
-<div class="mb-8 space-y-4">
+<div class="space-y-4">
+	<!-- Main player card -->
 	<div
-		class={`rounded-2xl border p-5 md:p-6 shadow-sm transition-colors ${
-			showLive
-				? 'border-red-200 bg-gradient-to-r from-red-50 via-white to-orange-50'
-				: 'border-slate-200 bg-gradient-to-r from-slate-50 via-white to-slate-100'
-		}`}
+		class="border p-6 md:p-8 transition-all duration-500 {showLive
+			? 'border-red-200 bg-red-50/30'
+			: 'border-stone-200/60 bg-white/40'}"
 	>
-		<div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-			<div class="space-y-2">
-				<div class="flex items-center gap-2">
-					<span class="relative inline-flex h-3 w-3">
-						{#if showLive}
-							<span
-								class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"
-							></span>
-						{/if}
-						<span
-							class={`relative inline-flex h-3 w-3 rounded-full ${
-								showLive ? 'bg-red-600' : 'bg-slate-400'
-							}`}
-						></span>
-					</span>
-					<span
-						class={`text-xs font-black uppercase tracking-[0.18em] ${
-							showLive ? 'text-red-600' : 'text-slate-500'
-						}`}
-					>
-						{showLive ? 'En direct' : 'Radio hors ligne'}
-					</span>
-				</div>
-				<h2 class="text-2xl font-black text-slate-900">
-					{showLive ? 'Radio en direct' : 'Radio hors ligne'}
-				</h2>
-				<p class="text-sm font-medium text-slate-600">
-					{statusMessage}
-				</p>
-				{#if listenerCount > 0 && showLive}
-					<p class="text-xs font-semibold text-red-500">
-						{listenerCount} {listenerCount === 1 ? 'auditeur' : 'auditeurs'} en ligne
-					</p>
+		<!-- Status indicator -->
+		<div class="flex items-center gap-2.5 mb-4">
+			<span class="relative inline-flex h-2.5 w-2.5">
+				{#if showLive}
+					<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"></span>
 				{/if}
-				{#if checkedAtLabel}
-					<p class="text-xs text-slate-500">
-						Dernière vérification : {checkedAtLabel}
-					</p>
-				{/if}
-			</div>
-
-			<div class="flex items-center gap-2">
-				<button
-					class={`inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-bold text-white shadow-md transition ${
-						canPlay ? 'bg-red-600 hover:bg-red-700' : 'cursor-not-allowed bg-slate-400'
-					}`}
-					on:click={togglePlay}
-					aria-label={isPlaying ? 'Mettre en pause le direct' : 'Écouter le direct'}
-					disabled={!canPlay}
-				>
-					{#if isPlaying}
-						<svg viewBox="0 0 24 24" class="h-4 w-4 fill-current" aria-hidden="true">
-							<path d="M8 5h3v14H8zm5 0h3v14h-3z" />
-						</svg>
-						<span>Pause</span>
-					{:else}
-						<svg viewBox="0 0 24 24" class="h-4 w-4 fill-current" aria-hidden="true">
-							<path d="M8 5v14l11-7z" />
-						</svg>
-						<span>Lecture</span>
-					{/if}
-				</button>
-
-				<button
-					class="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-3 text-xs font-semibold text-slate-700 transition hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
-					on:click={toggleMute}
-					aria-label={isMuted ? 'Activer le son' : 'Couper le son'}
-					disabled={!canPlay}
-				>
-					{#if isMuted}
-						<span>Activer le son</span>
-					{:else}
-						<span>Couper le son</span>
-					{/if}
-				</button>
-			</div>
+				<span class="relative inline-flex h-2.5 w-2.5 rounded-full {showLive ? 'bg-red-500' : 'bg-stone-300'}"></span>
+			</span>
+			<span class="text-[10px] font-bold uppercase tracking-[0.25em] font-body {showLive ? 'text-red-600' : 'text-stone-400'}">
+				{showLive ? 'En direct' : 'Radio hors ligne'}
+			</span>
+			{#if listenerCount > 0 && showLive}
+				<span class="text-[10px] text-red-400 font-body">
+					· {listenerCount} {listenerCount === 1 ? 'auditeur' : 'auditeurs'}
+				</span>
+			{/if}
 		</div>
+
+		<!-- Title and status -->
+		<h2 class="font-display text-2xl md:text-3xl font-semibold {showLive ? 'text-stone-900' : 'text-stone-700'}">
+			{showLive ? 'Radio en direct' : 'Radio hors ligne'}
+		</h2>
+		<p class="text-sm text-stone-500 font-body mt-1.5">
+			{statusMessage}
+		</p>
+		{#if checkedAtLabel}
+			<p class="text-[11px] text-stone-400 font-body mt-1">
+				Dernière vérification : {checkedAtLabel}
+			</p>
+		{/if}
+
+		<!-- Controls -->
+		<div class="flex items-center gap-3 mt-6">
+			<button
+				class="inline-flex items-center gap-2.5 px-6 py-3 text-[12px] font-bold uppercase tracking-[0.15em] font-body transition-all duration-300 {canPlay
+					? showLive
+						? 'bg-red-600 hover:bg-red-700 text-white'
+						: 'bg-stone-900 hover:bg-missionnaire text-white'
+					: 'bg-stone-200 text-stone-400 cursor-not-allowed'}"
+				on:click={togglePlay}
+				aria-label={isPlaying ? 'Mettre en pause le direct' : 'Écouter le direct'}
+				disabled={!canPlay}
+			>
+				{#if isPlaying}
+					<svg viewBox="0 0 24 24" class="h-4 w-4 fill-current" aria-hidden="true">
+						<path d="M8 5h3v14H8zm5 0h3v14h-3z" />
+					</svg>
+					<span>Pause</span>
+				{:else}
+					<svg viewBox="0 0 24 24" class="h-4 w-4 fill-current" aria-hidden="true">
+						<path d="M8 5v14l11-7z" />
+					</svg>
+					<span>Lecture</span>
+				{/if}
+			</button>
+
+			<button
+				class="inline-flex items-center gap-2 px-5 py-3 border text-[12px] font-semibold font-body transition-all duration-300 {canPlay
+					? 'border-stone-200/60 text-stone-600 hover:border-missionnaire hover:text-missionnaire'
+					: 'border-stone-200/40 text-stone-300 cursor-not-allowed'}"
+				on:click={toggleMute}
+				aria-label={isMuted ? 'Activer le son' : 'Couper le son'}
+				disabled={!canPlay}
+			>
+				{#if isMuted}
+					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+					<span>Son coupé</span>
+				{:else}
+					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+					<span>Couper le son</span>
+				{/if}
+			</button>
+		</div>
+
+		<!-- Buffering indicator -->
+		{#if isBuffering}
+			<div class="flex items-center gap-2 mt-4">
+				<div class="animate-spin h-3.5 w-3.5 border-t-2 border-missionnaire rounded-full"></div>
+				<span class="text-[11px] text-stone-400 font-body">Chargement...</span>
+			</div>
+		{/if}
 	</div>
 
+	<!-- Offline info card -->
 	{#if !showLive}
-		<div class="rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm">
-			<p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+		<div class="border border-stone-200/60 bg-white/40 p-5 md:p-6">
+			<p class="text-[10px] font-bold uppercase tracking-[0.25em] text-stone-400 font-body mb-2">
 				Information
 			</p>
-			<p class="mt-2 text-lg font-bold text-slate-900">La radio est hors ligne</p>
-			<p class="mt-2 text-sm text-slate-600">
+			<p class="text-sm text-stone-500 font-body leading-relaxed">
 				Cette page se met à jour automatiquement en temps réel.
 				Dès que le direct commence, le bouton
-				<span class="font-bold">Lecture</span>
+				<span class="font-semibold text-stone-700">Lecture</span>
 				devient actif.
 			</p>
 			{#if hasError}
-				<p class="mt-3 text-sm font-semibold text-red-600">
+				<p class="mt-3 text-[12px] font-semibold text-red-600 font-body">
 					Le direct n'est pas encore disponible.
 				</p>
 			{/if}
@@ -468,6 +471,6 @@
 			on:canplay={handleCanPlay}
 			on:error={handleError}
 			on:ended={handleEnded}
-		/>
+		></audio>
 	{/if}
 </div>

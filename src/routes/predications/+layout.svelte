@@ -45,28 +45,28 @@
 
 <div class="flex flex-col">
 	<header>
-		<div class="relative header-predications flex flex-col items-center justify-center w-full min-h-[400px]">
-			<div class="absolute inset-0 overlay-predications flex items-center justify-center pt-12 pb-24 md:py-12">
-				<div class="flex flex-col items-center text-white space-y-2 px-5 w-full max-w-4xl text-center">
-					<small class="text-orange-600 uppercase tracking-[0.2em] font-black text-xs mb-2">
+		<div class="relative header-predications flex flex-col items-center justify-center w-full min-h-[340px] md:min-h-[400px]">
+			<div class="absolute inset-0 overlay-predications flex items-center justify-center px-5 py-12">
+				<div class="flex flex-col items-center text-white w-full max-w-3xl text-center">
+					<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-4 font-body">
 						Tous les prédications
-					</small>
-					<h1 class="text-4xl md:text-6xl font-black mb-1">Branham, Ewald Frank et Locales</h1>
-					<p class="text-sm md:text-base font-medium opacity-80 mb-8 max-w-2xl">
-						Trouvez ici les prédications de William Marrion Branham et Ewald Frank traduits en Kinyarwanda et prédications locales.
 					</p>
-					<form 
-						class="flex flex-row w-full max-w-2xl bg-white rounded-xl overflow-hidden shadow-2xl"
+					<h1 class="font-display text-3xl md:text-5xl font-semibold leading-tight">Branham, Ewald Frank et Locales</h1>
+					<p class="text-sm text-white/60 font-body mt-3 mb-8 max-w-xl leading-relaxed">
+						Trouvez les prédications de William Marrion Branham et Ewald Frank traduits en Kinyarwanda et prédications locales.
+					</p>
+					<form
+						class="flex w-full max-w-xl border border-white/25 bg-white/90 backdrop-blur-sm overflow-hidden"
 						on:submit|preventDefault={handleHeroSearch}
 					>
 						<input
 							id="hero-search"
 							type="text"
-							class="flex-1 outline-none text-gray-800 px-6 py-4 text-sm md:text-base"
-							placeholder="Rechercher par titre, annee, predicateur..."
+							class="flex-1 bg-transparent text-stone-800 px-5 py-3.5 text-sm font-body outline-none placeholder:text-stone-400"
+							placeholder="Rechercher par titre, année, prédicateur..."
 							bind:value={heroSearchValue}
 						/>
-						<button type="submit" class="bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 font-bold transition-colors">
+						<button type="submit" class="bg-missionnaire hover:bg-missionnaire/90 text-white px-6 py-3.5 text-[11px] font-bold uppercase tracking-[0.15em] font-body transition-colors shrink-0">
 							Rechercher
 						</button>
 					</form>
@@ -99,7 +99,4 @@
 		backdrop-filter: blur(2px);
 		-webkit-backdrop-filter: blur(2px);
 	}
-	:global(.text-orange-600) { color: #f97316; }
-	:global(.bg-orange-500) { background-color: #f97316; }
-	:global(.hover\:bg-orange-600:hover) { background-color: #ea580c; }
 </style>

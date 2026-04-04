@@ -39,6 +39,41 @@
 		}
 	];
 
+	import { onMount, onDestroy } from 'svelte';
+
+	const bibleVerses = [
+		{ text: 'Car la parole de Dieu est vivante et efficace, plus tranchante qu\u2019une épée quelconque à deux tranchants.', ref: 'Hébreux 4:12' },
+		{ text: 'Ainsi la foi vient de ce qu\u2019on entend, et ce qu\u2019on entend vient de la parole de Christ.', ref: 'Romains 10:17' },
+		{ text: 'Ta parole est une lampe à mes pieds, et une lumière sur mon sentier.', ref: 'Psaume 119:105' },
+		{ text: 'Veillez donc, car vous ne savez ni le jour, ni l\u2019heure.', ref: 'Matthieu 25:13' },
+		{ text: 'Voici, je viens bientôt. Heureux celui qui garde les paroles de la prophétie de ce livre.', ref: 'Apocalypse 22:7' },
+		{ text: 'Ne crains point, car je suis avec toi ; ne t\u2019effraie point, car je suis ton Dieu.', ref: 'Ésaïe 41:10' },
+		{ text: 'Je puis tout par celui qui me fortifie.', ref: 'Philippiens 4:13' },
+		{ text: 'L\u2019Éternel est mon berger : je ne manquerai de rien.', ref: 'Psaume 23:1' },
+		{ text: 'Celui qui a commencé en vous cette bonne œuvre la rendra parfaite pour le jour de Jésus-Christ.', ref: 'Philippiens 1:6' },
+		{ text: 'Je suis le chemin, la vérité, et la vie. Nul ne vient au Père que par moi.', ref: 'Jean 14:6' },
+		{ text: 'Voici, je me tiens à la porte, et je frappe. Si quelqu\u2019un entend ma voix et ouvre la porte, j\u2019entrerai.', ref: 'Apocalypse 3:20' },
+		{ text: 'Car Dieu a tant aimé le monde qu\u2019il a donné son Fils unique.', ref: 'Jean 3:16' },
+	];
+
+	let verseIndex = 0;
+	let verseVisible = true;
+	let verseInterval: ReturnType<typeof setInterval>;
+
+	onMount(() => {
+		verseInterval = setInterval(() => {
+			verseVisible = false;
+			setTimeout(() => {
+				verseIndex = (verseIndex + 1) % bibleVerses.length;
+				verseVisible = true;
+			}, 500);
+		}, 8000);
+	});
+
+	onDestroy(() => {
+		clearInterval(verseInterval);
+	});
+
 	const socials = [
 		{
 			label: 'YouTube',
@@ -61,6 +96,22 @@
 <footer class="footer relative bg-stone-900 text-stone-400 overflow-hidden">
 	<!-- Decorative top accent line -->
 	<div class="h-px w-full bg-gradient-to-r from-transparent via-missionnaire/40 to-transparent"></div>
+
+	<!-- Bible verse rotator -->
+	<div class="border-b border-stone-800 py-6">
+		<div class="max-w-5xl mx-auto px-6 text-center" style="min-height: 5rem;">
+			<div
+				style="opacity: {verseVisible ? 1 : 0}; transform: translateY({verseVisible ? '0' : '6px'}); transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);"
+			>
+				<p class="font-display text-xl md:text-2xl italic text-stone-300 leading-relaxed">
+					« {bibleVerses[verseIndex].text} »
+				</p>
+				<p class="text-[12px] font-semibold uppercase tracking-[0.25em] text-missionnaire mt-3 font-body">
+					{bibleVerses[verseIndex].ref}
+				</p>
+			</div>
+		</div>
+	</div>
 
 	<div class="max-w-5xl mx-auto px-6 pt-16 pb-8">
 		<!-- Top section: Logo + Nav columns -->
@@ -135,6 +186,10 @@
 				<rect x="5.5" y="0" width="5" height="22" rx="1" fill="#FF880C" />
 				<rect x="0" y="5" width="16" height="5" rx="1" fill="#FF880C" />
 			</svg>
+
+			<p class="text-[11px] italic text-stone-400 font-display hidden sm:block">
+				« Jésus-Christ est le même hier, aujourd'hui, et éternellement » — Hébreux 13:8
+			</p>
 		</div>
 	</div>
 </footer>

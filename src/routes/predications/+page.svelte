@@ -136,21 +136,31 @@
 	/>
 </svelte:head>
 
-<div class="container mx-auto px-2 md:px-4 py-8 max-w-7xl">
+<div class="max-w-6xl mx-auto px-6 py-8">
+	<!-- Page Header -->
+	<div class="mb-10">
+		<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body">Prédications</p>
+		<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">Prédications</h1>
+		<a href="/videos" class="inline-flex items-center gap-2 mt-2 text-[12px] font-semibold text-stone-400 hover:text-missionnaire uppercase tracking-[0.15em] font-body transition-colors">
+			<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+			Voir en vidéo →
+		</a>
+	</div>
+
 	<!-- Top Filters (Alpha & Authors) -->
 	<div class="flex flex-col gap-8 mb-12">
 		<div>
 			<h2
-				class="text-[10px] md:text-xs font-semibold text-missionnaire uppercase tracking-[0.25em] mb-4 text-center md:text-left"
+				class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.35em] mb-4 text-center md:text-left font-body"
 			>
 				Par ordre alphabétique
 			</h2>
 			<div class="flex flex-wrap justify-center md:justify-start gap-x-4 gap-y-2">
 				{#each alphabet as letter}
 					<button
-						class="text-sm md:text-base font-bold transition-all {currentAlpha === letter
-							? 'text-missionnaire scale-110'
-							: 'text-stone-300 hover:text-missionnaire/60'}"
+						class="text-[11px] font-body font-bold transition-all {currentAlpha === letter
+							? 'text-missionnaire font-semibold'
+							: 'text-stone-400 hover:text-missionnaire'}"
 						on:click={() => handleAlphaChange(letter)}
 					>
 						{letter}
@@ -161,7 +171,7 @@
 
 		<div>
 			<h2
-				class="text-[10px] md:text-xs font-semibold text-missionnaire uppercase tracking-[0.25em] mb-4 text-center md:text-left"
+				class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.35em] mb-4 text-center md:text-left font-body"
 			>
 				Prédicateurs
 			</h2>
@@ -172,8 +182,8 @@
 							'Tous' &&
 							!currentAuthor) ||
 						currentAuthor === author
-							? 'bg-stone-900 text-white border-stone-900'
-							: 'bg-white text-stone-500 border-stone-200 hover:border-missionnaire hover:text-missionnaire'} {$navigating
+							? 'border-missionnaire text-missionnaire bg-missionnaire/5'
+							: 'bg-white/40 text-stone-500 border-stone-200/60 hover:border-missionnaire hover:text-missionnaire'} {$navigating
 							? 'opacity-50 cursor-not-allowed'
 							: ''}"
 						on:click={() => !$navigating && handleAuthorChange(author)}
@@ -188,12 +198,12 @@
 		<!-- Language and Audio Filters -->
 		<div>
 			<h2
-				class="text-[10px] md:text-xs font-semibold text-missionnaire uppercase tracking-[0.25em] mb-4 text-center md:text-left"
+				class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.35em] mb-4 text-center md:text-left font-body"
 			>
 				Options
 			</h2>
 			<div
-				class="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-4 border border-stone-200"
+				class="flex flex-col md:flex-row gap-4 items-center justify-between bg-white/40 p-4 border border-stone-200/60"
 			>
 				<div class="flex items-center gap-4 w-full md:w-auto">
 					<!-- Language Toggle -->
@@ -239,9 +249,9 @@
 		<!-- Sidebar: Years -->
 		{#if sermons.length > 0}
 			<aside class="w-full md:w-56 flex-shrink-0">
-				<div class="bg-white border border-stone-200 p-5 md:sticky md:top-24">
+				<div class="bg-white/40 border border-stone-200/60 p-5 md:sticky md:top-24">
 					<h2
-						class="text-xs font-semibold text-stone-800 uppercase tracking-widest mb-6 pb-2 border-b border-stone-100"
+						class="text-xs font-bold text-stone-800 uppercase tracking-widest mb-6 pb-2 border-b border-stone-200/60 font-body"
 					>
 						Années
 					</h2>
@@ -250,8 +260,8 @@
 							<button
 								class="px-3 py-2 rounded-lg text-[11px] font-bold transition-all border text-center {currentYear ===
 								year
-									? 'bg-stone-900 text-white border-stone-900'
-									: 'bg-white text-stone-400 border-stone-200 hover:border-missionnaire hover:text-missionnaire'} {$navigating
+									? 'border-missionnaire text-missionnaire bg-missionnaire/5'
+									: 'bg-white/40 text-stone-400 border-stone-200/60 hover:border-missionnaire hover:text-missionnaire'} {$navigating
 									? 'opacity-50 cursor-not-allowed'
 									: ''}"
 								on:click={() => !$navigating && handleYearChange(year)}
@@ -282,9 +292,9 @@
 					</div>
 				</div>
 			{/if}
-			<div class="bg-white border border-stone-200 min-h-[500px] flex flex-col">
+			<div class="bg-white/40 border border-stone-200/60 min-h-[500px] flex flex-col">
 				<div
-					class="relative grid grid-cols-[30px_1fr_auto_auto] {desktopSermonGrid} gap-2 md:gap-4 px-3 md:px-4 py-3 border-b border-stone-200 text-[10px] md:text-[11px] font-bold text-stone-400 uppercase tracking-widest bg-stone-50/50 items-center"
+					class="relative grid grid-cols-[30px_1fr_auto_auto] {desktopSermonGrid} gap-2 md:gap-4 px-3 md:px-4 py-3 border-b border-stone-200/60 text-[10px] md:text-[11px] font-bold text-stone-400 uppercase tracking-widest bg-white/40 items-center"
 				>
 					<div class="text-center">#</div>
 					<button
@@ -346,7 +356,7 @@
 					</div>
 				</div>
 
-				<div class="divide-y divide-stone-100">
+				<div class="divide-y divide-stone-100 [&>*]:hover:bg-white/60">
 					{#each sermons as sermon, i (sermon._id)}
 						<SermonTableItem
 							{sermon}
@@ -373,7 +383,7 @@
 			<!-- Pagination -->
 			{#if totalPages > 1}
 				<div
-					class="flex flex-col md:flex-row justify-between items-center mt-12 py-6 gap-6 text-[10px] md:text-xs font-bold text-stone-400 tracking-widest uppercase border-t border-stone-200"
+					class="flex flex-col md:flex-row justify-between items-center mt-12 py-6 gap-6 text-[10px] md:text-xs font-bold text-stone-400 tracking-widest uppercase border-t border-stone-200/60"
 				>
 					<div class="hidden md:block">
 						Affichage de {sermons.length} sur {totalSermons} prédications
@@ -401,7 +411,7 @@
 
 						<div class="flex items-center gap-2">
 							<div
-								class="flex items-center gap-1 bg-white p-1 rounded-xl border border-stone-200"
+								class="flex items-center gap-1 bg-white/40 p-1 rounded-xl border border-stone-200/60"
 							>
 								<button
 									class="px-3 py-1.5 rounded-lg hover:bg-stone-50 disabled:opacity-20 transition-all text-[10px] md:text-xs font-bold"

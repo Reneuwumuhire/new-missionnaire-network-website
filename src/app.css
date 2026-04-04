@@ -26,6 +26,7 @@ html {
 
 body {
 	color: #292524; /* stone-800 — warmer than pure black */
+	background-color: #FAF8F3; /* cream — warm editorial base */
 }
 
 /* ── Selection highlight ── */
@@ -109,4 +110,48 @@ img {
 	outline: 2px solid var(--color-missionnaire);
 	outline-offset: 2px;
 	border-radius: 2px;
+}
+
+/* ── Scroll-triggered reveal animation ── */
+.reveal-up {
+	opacity: 0;
+	transform: translateY(28px);
+	transition: opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+				transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.reveal-up.visible {
+	opacity: 1;
+	transform: translateY(0);
+}
+
+/* ── Card hover lift ── */
+.card-lift {
+	transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+				box-shadow 0.35s ease;
+}
+.card-lift:hover {
+	transform: translateY(-3px);
+	box-shadow: 0 12px 40px rgba(0, 0, 0, 0.06);
+}
+
+/* ── Ornamental divider ── */
+.ornament-line {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+}
+.ornament-line::before,
+.ornament-line::after {
+	content: '';
+	flex: 1;
+	height: 1px;
+	background: linear-gradient(to right, transparent, #D4C9B5, transparent);
+}
+
+/* ── Image zoom on parent hover ── */
+.img-zoom {
+	transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.group:hover .img-zoom {
+	transform: scale(1.04);
 }

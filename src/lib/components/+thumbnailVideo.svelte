@@ -69,97 +69,79 @@
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <!-- svelte-ignore a11y-no-static-element-interactions -->
 <div
-	class=" min-h-ful w-full cursor-pointer transition-all duration-300 ease-in-out hover:duration-300 hover:ease-in-out"
+	class="group w-full cursor-pointer border border-stone-200/60 bg-white/40 overflow-hidden transition-all duration-300 hover:shadow-md hover:shadow-stone-200/40 hover:-translate-y-1"
 	on:click={() => dispatch('selectedVideo', video)}
 >
-	<!-- Thumbnail image -->
-	<div class=" group w-full h-full flex flex-col justify-between">
-		<div class="w-full">
-			<figure class=" bg-slate-200 rounded-xl h-fit aspect-video min-h-[140px]">
-				<img
-					class="w-full rounded-xl aspect-video"
-					src={`https://i.ytimg.com/vi/${video.display_id}/mqdefault.jpg`}
-					alt={video.title}
-					loading="lazy"
-					width="320"
-					height="180"
-					decoding="async"
-				/>
-			</figure>
-		</div>
-		<!-- Title- when streamed - download options -->
-		<div class="w-full h-full flex flex-col">
-			<!-- Title and time streamed -->
-			<div class="w-full flex flex-row justify-between">
-				<div class="  mt-3">
-					<p class=" font-medium text-xs text-ellipsis overflow-hidden line-clamp-2">
-						{video.title}
-					</p>
-				</div>
-				<div class="  flex flex-col items-center justify-center min-h-[24px] min-w-[24px]">
-					<button
-						class=" hidden group-hover:block rounded-full p-2 -mr-4 rotate-90"
-						on:click|stopPropagation={toggleVisible}
-						aria-label="Options"
-						><More size={24} color="#4F4F4F" variant="Linear" />
-					</button>
-				</div>
-			</div>
-			<!-- controls for download -->
-			<div class=" w-full flex justify-between items-center">
-				<small class=" text-gray-500">
-					<!-- {#if video.liveBroadcastContent === 'upcoming'}
-						<div class=" bg-slate-950 text-weakGray px-3 py-2 rounded-full mt-2 font-bold">
-							Upcoming
-						</div>
-					{:else} -->
-					<!-- Streamed {formatTime(new Date(video.actualStartTime.toLocaleString()))} -->
-					<!-- {/if} -->
-				</small>
-				<!-- Button to download -->
-				<button class=" rounded-full p-2 -mr-4" on:click|stopPropagation={toggleVisible} aria-label="Options"
-					><Icon src={BsThreeDotsVertical} />
-				</button>
+	<!-- Thumbnail -->
+	<div class="relative overflow-hidden aspect-video">
+		<img
+			class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+			src={`https://i.ytimg.com/vi/${video.display_id}/mqdefault.jpg`}
+			alt={video.title}
+			loading="lazy"
+			width="320"
+			height="180"
+			decoding="async"
+		/>
+		<!-- Play overlay on hover -->
+		<div class="absolute inset-0 bg-stone-900/0 group-hover:bg-stone-900/15 transition-colors duration-300 flex items-center justify-center">
+			<div class="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 scale-90 group-hover:scale-100 shadow-sm">
+				<svg width="12" height="14" viewBox="0 0 14 16" fill="none">
+					<path d="M2 1.5L12.5 8L2 14.5V1.5Z" fill="#292524" stroke="#292524" stroke-width="1.5" stroke-linejoin="round"/>
+				</svg>
 			</div>
 		</div>
 	</div>
+
+	<!-- Content -->
+	<div class="px-4 pt-3 pb-3">
+		<p class="text-[13px] font-medium text-stone-700 group-hover:text-stone-900 line-clamp-2 leading-snug font-body">
+			{video.title}
+		</p>
+
+		<!-- Actions row -->
+		<div class="flex items-center justify-end mt-2 -mr-1">
+			<button
+				class="p-1.5 rounded-full text-stone-300 hover:text-stone-600 hover:bg-stone-100 transition-colors duration-200"
+				on:click|stopPropagation={toggleVisible}
+				aria-label="Options"
+			>
+				<Icon src={BsThreeDotsVertical} className="w-3.5 h-3.5" />
+			</button>
+		</div>
+	</div>
+
+	<!-- Dropdown menu -->
 	{#if visible[index]}
-		<!-- svelte-ignore missing-declaration -->
 		<!-- svelte-ignore a11y-click-events-have-key-events -->
 		<!-- svelte-ignore a11y-no-static-element-interactions -->
 		<div
-			transition:slide={{ duration: 300 }}
+			transition:slide={{ duration: 200 }}
 			bind:this={downloadDivElement}
-			class="relative drop-shadow-md transition-all duration-300 ease-in-out"
+			class="relative"
 		>
-			<div class="absolute w-60 z-20 bg-white self-end right-0 bottom-2 rounded-xl">
-				<ul class=" w-full overflow-hidden rounded-xl text-sm">
+			<div class="absolute w-56 z-20 bg-white border border-stone-200/80 shadow-lg shadow-stone-200/30 right-2 bottom-1">
+				<ul class="w-full text-[13px] font-body">
 					<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
 					<li
 						on:click|stopPropagation={toggleVisible}
-						class="transition duration-150 ease-in-out hover:ease-in-out w-full h-12 p-3 hover:bg-gray-200 flex flex-row items-center align-middle space-x-2"
+						class="w-full px-4 py-3 hover:bg-stone-50 flex items-center gap-3 text-stone-600 hover:text-stone-900 transition-colors cursor-pointer"
 					>
-						<AudioSquare size={20} color="#4F4F4F" variant="Linear" /><span class=""
-							>Download MP3</span
-						>
+						<AudioSquare size={16} color="currentColor" variant="Linear" /><span>Télécharger MP3</span>
 					</li>
 					<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
 					<li
 						on:click|stopPropagation={toggleVisible}
-						class="transition duration-150 ease-in-out hover:ease-in w-full h-12 p-3 hover:bg-gray-200 flex flex-row items-center align-middle space-x-2"
+						class="w-full px-4 py-3 hover:bg-stone-50 flex items-center gap-3 text-stone-600 hover:text-stone-900 transition-colors border-t border-stone-100 cursor-pointer"
 					>
-						<DocumentText1 size={20} color="#4F4F4F" variant="Linear" /><span class=""
-							>Download Transcript (PDF)</span
-						>
+						<DocumentText1 size={16} color="currentColor" variant="Linear" /><span>Télécharger PDF</span>
 					</li>
 					<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
 					<li
 						on:click|stopPropagation={toggleVisible}
-						class="transition duration-150 ease-in-out hover:ease-in w-full h-12 p-3 hover:bg-gray-200 flex flex-row items-center align-middle space-x-2"
+						class="w-full px-4 py-3 hover:bg-stone-50 flex items-center gap-3 text-stone-600 hover:text-stone-900 transition-colors border-t border-stone-100 cursor-pointer"
 					>
-						<VideoPlay size={20} color="#4F4F4F" variant="Linear" /><span class=""
-							>Download Video</span
-						>
+						<VideoPlay size={16} color="currentColor" variant="Linear" /><span>Télécharger vidéo</span>
 					</li>
 				</ul>
 			</div>

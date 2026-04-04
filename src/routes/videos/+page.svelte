@@ -218,17 +218,23 @@
 	<meta property="og:url" content="https://missionnaire.net/videos" />
 </svelte:head>
 
-<main class="relative max-w-7xl mx-auto px-4 md:px-8">
+<main class="relative max-w-6xl mx-auto px-6">
 	<div class="mt-5 mb-16">
 		<!-- Page Header -->
 		<section class="mb-8">
-			<p class="text-[10px] font-semibold uppercase tracking-[0.25em] text-missionnaire mb-2">
+			<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body">
 				Missionnaire Network
 			</p>
-			<h1 class="font-display text-2xl md:text-3xl font-bold text-stone-900">
-				Vidéos
-			</h1>
-			<p class="mt-2 text-sm text-stone-600 max-w-2xl">
+			<div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+				<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">
+					Vidéos
+				</h1>
+				<a href="/predications" class="inline-flex items-center gap-2 text-[12px] font-semibold text-stone-400 hover:text-missionnaire uppercase tracking-[0.15em] font-body transition-colors">
+					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+					Écouter en audio →
+				</a>
+			</div>
+			<p class="mt-2 text-sm text-stone-500 font-body max-w-2xl">
 				Retrouvez les retransmissions, prédications et enseignements en vidéo.
 			</p>
 		</section>
@@ -238,9 +244,9 @@
 			<div class="flex flex-wrap gap-2 items-center">
 				{#each availableTypesTag as tagType}
 					<button
-						class="px-3 py-1.5 text-sm font-medium transition-colors {$activeFilter === tagType.label
-							? 'bg-stone-900 text-white'
-							: 'bg-stone-100 text-stone-600 hover:bg-stone-200'}"
+						class="px-3 py-1.5 text-sm font-medium transition-colors border {$activeFilter === tagType.label
+							? 'border-missionnaire text-missionnaire bg-missionnaire/5'
+							: 'border-stone-200/60 text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
 						on:click={() => setFilter(tagType.label)}
 					>
 						{tagType.label}
@@ -317,16 +323,16 @@
 					<section class="mb-12">
 						<div class="flex items-end justify-between mb-8 px-2">
 							<div>
-								<h2 class="text-[10px] font-semibold text-missionnaire uppercase tracking-[0.25em] mb-2">
+								<h2 class="text-[10px] font-bold text-missionnaire uppercase tracking-[0.35em] mb-2 font-body">
 									Découvrir
 								</h2>
-								<h3 class="font-display text-2xl md:text-3xl font-bold text-stone-900">Vidéos récentes</h3>
+								<h3 class="font-display text-2xl md:text-3xl font-semibold text-stone-900">Vidéos récentes</h3>
 							</div>
 						</div>
 
-						<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-10">
+						<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
 							{#each $filteredVideos.slice($selectedVideo ? 0 : 1) as video, index (video._id)}
-								<button on:click={() => videoSelected(video)} class="text-left group video-card">
+								<button on:click={() => videoSelected(video)} class="text-left w-full">
 									<ThumbnailVideo {video} index={index + ($selectedVideo ? 0 : 1)} />
 								</button>
 							{/each}
@@ -344,14 +350,14 @@
 
 						{#if !$hasMore && !$isLoading}
 							<div class="text-center w-full py-20 opacity-50">
-								<div class="w-16 h-1 bg-stone-200 mx-auto rounded-full mb-4"></div>
-								<p class="text-xs font-bold uppercase tracking-widest text-stone-400">Fin de la liste</p>
+								<div class="w-16 h-1 bg-stone-200/60 mx-auto rounded-full mb-4"></div>
+								<p class="text-xs font-bold uppercase tracking-widest text-stone-400 font-body">Fin de la liste</p>
 							</div>
 						{/if}
 					</section>
 				{:else}
 					<div class="flex flex-col items-center justify-center py-32 text-center text-stone-400">
-						<div class="w-16 h-16 bg-stone-100 rounded-full flex items-center justify-center mb-4 text-2xl">
+						<div class="w-16 h-16 bg-white/40 border border-stone-200/60 rounded-full flex items-center justify-center mb-4 text-2xl">
 							🔍
 						</div>
 						<p>Aucune vidéo trouvée</p>

@@ -49,48 +49,48 @@
 
 <div class="flex flex-col">
 	<header>
-		<div class="relative header-predications flex flex-col items-center justify-center w-full min-h-[400px]">
-			<div class="absolute inset-0 overlay-predications flex items-center justify-center pt-12 pb-24 md:py-12">
-				<div class="flex flex-col items-center text-white space-y-2 px-5 w-full max-w-4xl text-center">
-					<small class="text-orange-600 uppercase tracking-[0.2em] font-black text-xs mb-2">
+		<div class="relative header-predications flex flex-col items-center justify-center w-full min-h-[340px] md:min-h-[400px]">
+			<div class="absolute inset-0 overlay-predications flex items-center justify-center px-5 py-12">
+				<div class="flex flex-col items-center text-white w-full max-w-3xl text-center">
+					<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-4 font-body">
 						Tous les cantiques
-					</small>
-					<h1 class="text-4xl md:text-6xl font-black mb-1">Louange et Adoration</h1>
-					<p class="text-sm md:text-base font-medium opacity-80 mb-8 max-w-lg">
+					</p>
+					<h1 class="font-display text-3xl md:text-5xl font-semibold leading-tight">Louange et Adoration</h1>
+					<p class="text-sm text-white/60 font-body mt-3 mb-8 max-w-lg leading-relaxed">
 						Trouvez ici les cantiques.
 					</p>
-					<form 
-						class="flex flex-row w-full max-w-2xl bg-white rounded-xl overflow-hidden shadow-2xl"
+					<form
+						class="flex w-full max-w-xl border border-white/25 bg-white/90 backdrop-blur-sm overflow-hidden"
 						on:submit|preventDefault={handleHeroSearch}
 					>
 						<input
 							id="hero-search"
 							type="text"
-							class="flex-1 outline-none text-gray-800 px-6 py-4 text-sm md:text-base"
+							class="flex-1 bg-transparent text-stone-800 px-5 py-3.5 text-sm font-body outline-none placeholder:text-stone-400"
 							placeholder="Rechercher par titre..."
 							bind:value={heroSearchValue}
 						/>
-						<button type="submit" class="bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 font-bold transition-colors">
+						<button type="submit" class="bg-missionnaire hover:bg-missionnaire/90 text-white px-6 py-3.5 text-[11px] font-bold uppercase tracking-[0.15em] font-body transition-colors shrink-0">
 							Rechercher
 						</button>
 					</form>
-					<div class="flex items-center gap-4 mt-8">
-						<a 
-							href="/musique" 
-							class="px-6 py-2 rounded-full text-sm font-bold transition-all border {$page.url.pathname === '/musique' ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}"
+					<div class="flex items-center gap-3 mt-6">
+						<a
+							href="/musique"
+							class="px-5 py-2 text-[11px] font-bold uppercase tracking-[0.15em] font-body transition-all border {$page.url.pathname === '/musique' ? 'bg-missionnaire text-white border-missionnaire' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}"
 						>
 							Audio
 						</a>
-						<a 
-							href="/musique/videos" 
-							class="px-6 py-2 rounded-full text-sm font-bold transition-all border {$page.url.pathname === '/musique/videos' ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}"
+						<a
+							href="/musique/videos"
+							class="px-5 py-2 text-[11px] font-bold uppercase tracking-[0.15em] font-body transition-all border {$page.url.pathname === '/musique/videos' ? 'bg-missionnaire text-white border-missionnaire' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}"
 						>
 							Vidéos
 						</a>
 					</div>
 				</div>
 			</div>
-			
+
 			<!-- Floating Banner -->
 			<div class="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-full max-w-2xl px-2 md:px-5 z-10">
 				<AndroidBanner />
@@ -121,7 +121,4 @@
 		backdrop-filter: blur(2px);
 		-webkit-backdrop-filter: blur(2px);
 	}
-	:global(.text-orange-600) { color: #f97316; }
-	:global(.bg-orange-500) { background-color: #f97316; }
-	:global(.hover\:bg-orange-600:hover) { background-color: #ea580c; }
 </style>

@@ -39,68 +39,6 @@ export interface NavigationLink {
 export const NavigationLinkList: NavigationLink[] = [
 	{
 		id: 1,
-		menuName: "L'église",
-		link: '/eglise'
-	},
-	{
-		id: 2,
-		menuName: 'William Branham',
-		link: '/william-branham/biographie',
-		subMenu: [
-			{
-				subName: 'Qui est William Marrion Branham?',
-				subText: 'Découvrez toute la biographie du prophète et son histoire.',
-				link: '/william-branham/biographie',
-				image: '/img/branham_icon.png'
-			},
-			{
-				subName: 'Brochures',
-				subText: "Téléchargez les brochures pour connaître le Message qu'il apporte.",
-				link: '/literature?author=William Marrion Branham&category=book',
-				icon: IoBookOutline
-			}
-		]
-	},
-	{
-		id: 3,
-		menuName: 'Ewald Frank',
-		link: '/ewald-frank',
-		subMenu: [
-			{
-				subName: 'À propos de Ewald Frank',
-				subText: "Tout savoir sur l'homme de Dieu Ewald Frank.",
-				link: '/ewald-frank',
-				icon: IoInformationCircleOutline
-			},
-			{
-				subName: 'Livres & Brochures',
-				subText: 'Consultez les livres et brochures de Ewald Frank.',
-				link: '/literature?author=Ewald Frank&category=book',
-				icon: IoBookOutline
-			}
-		]
-	},
-	{
-		id: 4,
-		menuName: 'Musique',
-		link: '/musique',
-		subMenu: [
-			{
-				subName: 'Cantiques (Audio)',
-				subText: 'Écoutez les chants de louange et adoration.',
-				link: '/musique',
-				icon: IoMusicalNotes
-			},
-			{
-				subName: 'Chants en Vidéo',
-				subText: 'Regardez nos clips et enregistrements de chants.',
-				link: '/musique/videos',
-				icon: IoVideocam
-			}
-		]
-	},
-	{
-		id: 5,
 		menuName: 'Prédications',
 		link: '/predications',
 		subMenu: [
@@ -119,14 +57,76 @@ export const NavigationLinkList: NavigationLink[] = [
 		]
 	},
 	{
-		id: 6,
+		id: 2,
 		menuName: 'Transcriptions',
 		link: '/transcriptions'
 	},
 	{
-		id: 7,
+		id: 3,
+		menuName: 'William Branham',
+		link: '/william-branham/biographie',
+		subMenu: [
+			{
+				subName: 'Qui est William Marrion Branham?',
+				subText: 'Découvrez toute la biographie du prophète et son histoire.',
+				link: '/william-branham/biographie',
+				image: '/img/branham_icon.png'
+			},
+			{
+				subName: 'Brochures',
+				subText: "Téléchargez les brochures pour connaître le Message qu'il apporte.",
+				link: '/literature?author=William Marrion Branham&category=book',
+				icon: IoBookOutline
+			}
+		]
+	},
+	{
+		id: 4,
+		menuName: 'Ewald Frank',
+		link: '/ewald-frank',
+		subMenu: [
+			{
+				subName: 'À propos de Ewald Frank',
+				subText: "Tout savoir sur l'homme de Dieu Ewald Frank.",
+				link: '/ewald-frank',
+				icon: IoInformationCircleOutline
+			},
+			{
+				subName: 'Livres & Brochures',
+				subText: 'Consultez les livres et brochures de Ewald Frank.',
+				link: '/literature?author=Ewald Frank&category=book',
+				icon: IoBookOutline
+			}
+		]
+	},
+	{
+		id: 5,
+		menuName: 'Musique',
+		link: '/musique',
+		subMenu: [
+			{
+				subName: 'Cantiques (Audio)',
+				subText: 'Écoutez les chants de louange et adoration.',
+				link: '/musique',
+				icon: IoMusicalNotes
+			},
+			{
+				subName: 'Chants en Vidéo',
+				subText: 'Regardez nos clips et enregistrements de chants.',
+				link: '/musique/videos',
+				icon: IoVideocam
+			}
+		]
+	},
+	{
+		id: 6,
 		menuName: 'Radio',
 		link: '/live'
+	},
+	{
+		id: 7,
+		menuName: "L'église",
+		link: '/eglise'
 	},
 	{
 		id: 8,

@@ -26,6 +26,8 @@ export default {
 				pureWhite: '#fff',
 				weakGray: '#BABABA',
 				veryWeakGray: '#EBEBEB',
+				cream: { DEFAULT: '#FAF8F3', dark: '#F0ECE3' },
+				earth: { DEFAULT: '#8B7355', light: '#A89070', dark: '#6B5740' },
 				missionnaire: {
 					DEFAULT: '#FF880C',
 					50: '#FCF5ED',

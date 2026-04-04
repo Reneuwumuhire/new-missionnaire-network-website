@@ -13,14 +13,18 @@
 	export let activeClass: string = 'text-stone-600';
 	export let inactiveClass: string = 'text-stone-400';
 
+	import { onDestroy } from 'svelte';
+
 	const dispatch = createEventDispatcher();
+
+	let menuEl: HTMLDivElement;
 
 	function handleToggle() {
 		dispatch('toggle');
 	}
 
 	const closeMenu = (event: MouseEvent) => {
-		if (isOpen && !(event.target as Element).closest('div')) {
+		if (isOpen && menuEl && !menuEl.contains(event.target as Node)) {
 			dispatch('close');
 		}
 	};
@@ -28,9 +32,15 @@
 	if (typeof window !== 'undefined') {
 		window.addEventListener('click', closeMenu);
 	}
+
+	onDestroy(() => {
+		if (typeof window !== 'undefined') {
+			window.removeEventListener('click', closeMenu);
+		}
+	});
 </script>
 
-<div class="flex flex-col text-[13px] relative">
+<div class="flex flex-col text-[13px] relative" bind:this={menuEl}>
 	{#if subMenu && subMenu.length > 0}
 		<button
 			type="button"
