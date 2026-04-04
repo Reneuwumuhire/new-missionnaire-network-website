@@ -38,12 +38,12 @@
 	});
 
 	const quickLinks = [
-		{ label: 'Videos', href: '/videos' },
-		{ label: 'Predications', href: '/predications' },
+		{ label: 'Vidéos', href: '/videos' },
+		{ label: 'Prédications', href: '/predications' },
 		{ label: 'Musique', href: '/musique' },
 		{ label: 'Radio', href: '/live' },
 		{ label: 'Transcriptions', href: '/transcriptions' },
-		{ label: 'Litterature', href: '/literature' }
+		{ label: 'Littérature', href: '/literature' }
 	];
 
 	function getSmallThumbnail(video: YoutubeVideo): string {
@@ -67,27 +67,27 @@
 </script>
 
 <svelte:head>
-	<title>Missionnaire Network - Accueil | Predications et Cantiques du Message</title>
+	<title>Missionnaire Network - Accueil | Prédications et Cantiques du Message</title>
 	<meta
 		name="description"
-		content="Bienvenue sur Missionnaire Network. Decouvrez les predications et cantiques inspirants du Message de l'Heure pour votre edification spirituelle."
+		content="Bienvenue sur Missionnaire Network. Découvrez les prédications et cantiques inspirants du Message de l'Heure pour votre édification spirituelle."
 	/>
 	<meta
 		property="og:title"
-		content="Missionnaire Network - Accueil | Predications et Cantiques du Message"
+		content="Missionnaire Network - Accueil | Prédications et Cantiques du Message"
 	/>
 	<meta
 		property="og:description"
-		content="Decouvrez les predications et cantiques inspirants du Message de l'Heure pour votre edification spirituelle."
+		content="Découvrez les prédications et cantiques inspirants du Message de l'Heure pour votre édification spirituelle."
 	/>
 	<meta property="og:url" content="https://missionnaire.net/" />
 	<meta
 		name="twitter:title"
-		content="Missionnaire Network - Accueil | Predications et Cantiques du Message"
+		content="Missionnaire Network - Accueil | Prédications et Cantiques du Message"
 	/>
 	<meta
 		name="twitter:description"
-		content="Decouvrez les predications et cantiques inspirants du Message de l'Heure pour votre edification spirituelle."
+		content="Découvrez les prédications et cantiques inspirants du Message de l'Heure pour votre édification spirituelle."
 	/>
 	<meta name="google-site-verification" content="5KUjbDomG7hhFBwtEU79pKDetc2q3I2qhEE_0BO4o_o" />
 </svelte:head>
@@ -227,7 +227,7 @@
 			Ressources du Message de l'Heure
 		</h1>
 		<p class="mt-4 text-gray-500 max-w-lg mx-auto leading-relaxed">
-			Predications, cantiques, transcriptions et publications pour fortifier votre marche
+			Prédications, cantiques, transcriptions et publications pour fortifier votre marche
 			quotidienne.
 		</p>
 		<div class="mt-8 flex flex-wrap justify-center gap-3">
@@ -277,7 +277,7 @@
 				{/if}
 			</span>
 			<span class="text-sm {radioIsLive ? 'text-red-700 font-semibold' : 'text-gray-500'}">
-				{radioIsLive ? 'Radio en direct — Ecouter' : 'Radio hors antenne'}
+				{radioIsLive ? 'Radio en direct — Écouter' : 'Radio hors antenne'}
 			</span>
 		</a>
 		<button
@@ -289,7 +289,7 @@
 			<NotificationBell bind:this={bellRef} />
 			<p class="text-xs text-gray-500">
 				{#if bellRef?.isSubscribed}
-					<span class="font-semibold text-orange-700">Notifications activees</span> — vous serez alerte
+					<span class="font-semibold text-orange-700">Notifications activées</span> — vous serez alerté
 					quand la radio est en direct
 				{:else}
 					<span class="font-semibold text-gray-700">Recevoir une notification</span> quand la radio est
@@ -309,7 +309,7 @@
 						<source srcset="/img/eglise_inside.webp" type="image/webp" />
 						<img
 							src="/img/eglise_inside.jpg"
-							alt="Interieur de l'eglise"
+							alt="Intérieur de l'église"
 							class="absolute inset-0 w-full h-full object-cover"
 							width="600"
 							height="417"
@@ -318,10 +318,10 @@
 					</picture>
 				</div>
 				<div class="p-6">
-					<h2 class="text-lg font-bold text-gray-900">Repandre le Message a travers le monde</h2>
+					<h2 class="text-lg font-bold text-gray-900">Répandre le Message à travers le monde</h2>
 					<p class="mt-2 text-sm text-gray-500 leading-relaxed">
-						Missionnaire Network rend accessible les ressources spirituelles — predications,
-						cantiques, litterature — pour l'edification des croyants partout dans le monde.
+						Missionnaire Network rend accessible les ressources spirituelles — prédications,
+						cantiques, littérature — pour l'édification des croyants partout dans le monde.
 					</p>
 					<div class="mt-4 flex gap-3">
 						<a
@@ -359,8 +359,8 @@
 					William M. Branham
 				</p>
 				<p class="text-xs text-gray-500 mt-1.5 leading-relaxed">
-					Prophete du Message de l'Heure (1909–1965). Son ministere a marque des millions de
-					croyants a travers le monde.
+					Prophète du Message de l'Heure (1909–1965). Son ministère a marqué des millions de
+					croyants à travers le monde.
 				</p>
 				<span class="inline-block mt-3 text-xs font-bold text-orange-700 uppercase tracking-wider"
 					>Biographie &rarr;</span
@@ -388,7 +388,7 @@
 					Ewald Frank
 				</p>
 				<p class="text-xs text-gray-500 mt-1.5 leading-relaxed">
-					Missionnaire international base a Krefeld, Allemagne. Il porte le Message aux nations
+					Missionnaire international basé à Krefeld, Allemagne. Il porte le Message aux nations
 					depuis plus de 60 ans.
 				</p>
 				<span class="inline-block mt-3 text-xs font-bold text-orange-700 uppercase tracking-wider"
@@ -402,7 +402,7 @@
 	{#if recentVideos.length > 0}
 		<section class="mb-8">
 			<div class="flex items-end justify-between mb-6">
-				<h2 class="text-lg font-bold text-gray-900">Recemment ajoute</h2>
+				<h2 class="text-lg font-bold text-gray-900">Récemment ajouté</h2>
 				<a
 					href="/videos"
 					class="text-xs font-bold text-gray-500 hover:text-orange-700 uppercase tracking-wider transition-colors"

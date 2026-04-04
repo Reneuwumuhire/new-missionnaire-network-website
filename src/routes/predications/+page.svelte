@@ -36,7 +36,7 @@
 	const desktopSermonGrid = 'md:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.35fr)_110px_80px_120px]';
 
 	const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-	const authors = ['Tous', 'William Marrion Branham', 'Ewald Frank', 'Eglise Locale'];
+	const authors = ['Tous', 'William Marrion Branham', 'Ewald Frank', 'Église Locale'];
 
 	// Sync playlist when sermons are loaded
 	$: if (playlistSermons.length > 0) {

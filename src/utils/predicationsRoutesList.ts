@@ -22,8 +22,8 @@ export const PredicationsRoutes: PredicationRoutesType[] = [
 	},
 	{
 		slug: 'eglise-locale',
-		title: 'Eglise locale',
-		description: "Listes les predications de l'eglise locale sur notre site. "
+		title: 'Église locale',
+		description: "Liste les prédications de l'église locale sur notre site."
 	}
 ];
 

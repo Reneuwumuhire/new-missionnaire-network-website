@@ -102,7 +102,7 @@
 					</div>
 				{:else}
 					<p class="text-xs text-gray-500 mt-0.5 leading-relaxed">
-						Accedez rapidement aux predications et cantiques depuis votre ecran d'accueil.
+						Accédez rapidement aux prédications et cantiques depuis votre écran d'accueil.
 					</p>
 					<div class="flex gap-2 mt-3">
 						<button

@@ -56,19 +56,19 @@
 						href="/predications?author=Ewald Frank"
 						class="px-4 py-2 rounded-full bg-orange-500 text-white text-xs font-black uppercase tracking-wider hover:bg-orange-600 transition-colors"
 					>
-						Predications
+						Prédications
 					</a>
 					<a
 						href="/videos?filter=Ewald Frank"
 						class="px-4 py-2 rounded-full border border-gray-200 bg-white text-gray-700 text-xs font-black uppercase tracking-wider hover:border-orange-300 hover:text-orange-600 transition-colors"
 					>
-						Videos
+						Vidéos
 					</a>
 					<a
 						href="/literature?author=Ewald Frank&category=book"
 						class="px-4 py-2 rounded-full border border-gray-200 bg-white text-gray-700 text-xs font-black uppercase tracking-wider hover:border-orange-300 hover:text-orange-600 transition-colors"
 					>
-						Litterature
+						Littérature
 					</a>
 				</div>
 			</div>

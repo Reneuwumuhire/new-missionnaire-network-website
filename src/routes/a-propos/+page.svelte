@@ -47,7 +47,7 @@
 	<meta property="og:title" content="À propos - Missionnaire Network" />
 	<meta
 		property="og:description"
-		content="Qui nous sommes, comment nous contacter et suivre l'oeuvre de Missionnaire Network."
+		content="Qui nous sommes, comment nous contacter et suivre l'œuvre de Missionnaire Network."
 	/>
 </svelte:head>
 <div class=" flex flex-col overflow-hidden">
@@ -60,7 +60,7 @@
 		<div class="relative flex flex-col items-start w-full max-w-3xl space-y-6 px-5">
 			<div>
 				<small class=" text-missionnaire uppercase leading-6 tracking-widest text-xl font-bold"
-					>Eglise</small
+					>Église</small
 				>
 				<h1 class=" text-4xl font-black text-[#414141]">Qui nous sommes</h1>
 			</div>
@@ -87,7 +87,7 @@
 						class="mt-3 text-sm text-orange-600 hover:text-orange-600 font-bold"
 						on:click={() => { statsLoading = true; statsError = false; fetch('/api/analytics').then(r => r.ok ? r.json() : Promise.reject()).then(d => { stats = d; }).catch(() => { statsError = true; }).finally(() => { statsLoading = false; }); }}
 					>
-						Reessayer
+						Réessayer
 					</button>
 				</div>
 			{:else if stats}
@@ -160,7 +160,7 @@
 				</div>
 			{/if}
 
-			<h1 class=" text-4xl font-black text-[#414141]">Social media links</h1>
+			<h1 class=" text-4xl font-black text-[#414141]">Réseaux sociaux</h1>
 
 			<div class="flex flex-col items-start space-y-2 md:space-y-4 text-xs md:text-base">
 				<!-- add link to icons -->

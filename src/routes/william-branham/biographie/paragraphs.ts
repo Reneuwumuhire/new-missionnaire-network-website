@@ -22,7 +22,7 @@ export const BranhamsBiographyParagraphsPart2 = [
   },
   {
     id: 2,
-    text: `Vous trouverez sur la gauche de cette page les liens conduisant aux prédications traduites en langue française. Que Dieu bénisse tous les frères qui ont traduit en français ces prédications de frère Branham pour l'Eglise du Dieu vivant. Nous sommes donc très reconnaissants à Dieu pour cette œuvre de traduction et comptons sur Lui pour que Sa bénédiction repose sur Son peuple par ces prédications.`
+    text: `Vous trouverez sur la gauche de cette page les liens conduisant aux prédications traduites en langue française. Que Dieu bénisse tous les frères qui ont traduit en français ces prédications de frère Branham pour l'Église du Dieu vivant. Nous sommes donc très reconnaissants à Dieu pour cette œuvre de traduction et comptons sur Lui pour que Sa bénédiction repose sur Son peuple par ces prédications.`
   }, 
   {
     id: 3,

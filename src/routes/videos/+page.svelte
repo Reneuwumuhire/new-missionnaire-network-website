@@ -205,15 +205,15 @@
 </script>
 
 <svelte:head>
-	<title>Videos | Missionnaire Network</title>
+	<title>Vidéos | Missionnaire Network</title>
 	<meta
 		name="description"
-		content="Regardez les videos de predications, retransmissions et enseignements du Message sur Missionnaire Network."
+		content="Regardez les vidéos de prédications, retransmissions et enseignements du Message sur Missionnaire Network."
 	/>
-	<meta property="og:title" content="Videos | Missionnaire Network" />
+	<meta property="og:title" content="Vidéos | Missionnaire Network" />
 	<meta
 		property="og:description"
-		content="Regardez les videos de predications, retransmissions et enseignements du Message."
+		content="Regardez les vidéos de prédications, retransmissions et enseignements du Message."
 	/>
 	<meta property="og:url" content="https://missionnaire.net/videos" />
 </svelte:head>
@@ -226,10 +226,10 @@
 				Missionnaire Network
 			</p>
 			<h1 class="text-2xl md:text-3xl font-black text-gray-900">
-				Videos
+				Vidéos
 			</h1>
 			<p class="mt-2 text-sm text-gray-600 max-w-2xl">
-				Retrouvez les retransmissions, predications et enseignements en video.
+				Retrouvez les retransmissions, prédications et enseignements en vidéo.
 			</p>
 		</section>
 
@@ -285,7 +285,7 @@
 										? 'bg-red-600'
 										: 'bg-orange-500'} rounded-full text-xs font-bold uppercase tracking-widest mb-2"
 								>
-									{$filteredVideos[0].tags.includes('LIVE') ? 'EN DIRECT' : 'A la une'}
+									{$filteredVideos[0].tags.includes('LIVE') ? 'EN DIRECT' : 'À la une'}
 								</div>
 								<h2
 									class="text-3xl md:text-5xl lg:text-6xl font-black leading-tight tracking-tight line-clamp-2 group-hover:text-orange-100 transition-colors"
@@ -318,9 +318,9 @@
 						<div class="flex items-end justify-between mb-8 px-2">
 							<div>
 								<h2 class="text-xs font-black text-orange-600 uppercase tracking-[0.2em] mb-2">
-									Decouvrir
+									Découvrir
 								</h2>
-								<h3 class="text-2xl md:text-3xl font-bold text-gray-900">Videos Recentes</h3>
+								<h3 class="text-2xl md:text-3xl font-bold text-gray-900">Vidéos récentes</h3>
 							</div>
 						</div>
 
@@ -354,7 +354,7 @@
 						<div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4 text-2xl">
 							🔍
 						</div>
-						<p>Aucune video trouvee</p>
+						<p>Aucune vidéo trouvée</p>
 					</div>
 				{/if}
 			{/if}

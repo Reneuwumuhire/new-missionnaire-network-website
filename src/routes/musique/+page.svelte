@@ -497,7 +497,7 @@
 			<div class="bg-white rounded-xl border border-gray-100 mb-6 overflow-hidden">
 				<div class="px-4 py-3 border-b border-gray-100 bg-gray-50/50">
 					<span class="text-[10px] font-bold uppercase tracking-widest text-gray-400">
-						Recemment joues
+						Récemment joués
 					</span>
 				</div>
 				<div class="divide-y divide-gray-50 max-h-[300px] overflow-y-auto">

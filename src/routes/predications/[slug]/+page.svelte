@@ -119,7 +119,7 @@
 </svelte:head>
 
 <Breadcrumbs items={[
-	{ label: 'Predications', href: '/predications' },
+	{ label: 'Prédications', href: '/predications' },
 	{ label: sermonTitle }
 ]} />
 

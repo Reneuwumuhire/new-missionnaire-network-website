@@ -28,16 +28,16 @@
 		<div class="relative flex flex-col items-start w-full max-w-3xl space-y-6 px-5">
 			<div>
 				<small class=" text-missionnaire uppercase leading-6 tracking-widest text-xl font-bold"
-					>Eglise</small
+					>Église</small
 				>
 				<h1 class=" text-2xl md:text-4xl font-black text-[#414141]">
-					Assemble de Kigali/Gatenga/Murambi
+					Assemblée de Kigali/Gatenga/Murambi
 				</h1>
 			</div>
 			{#each EgliseParagraph1 as paragraph, index}
 				<ArticleParagraph text={paragraph.text} />
 			{/each}
-			<ArticleImage image="/img/eglise_inside.jpg" alt="Eglise Murambi- Missionnaire Nerwork" />
+			<ArticleImage image="/img/eglise_inside.jpg" alt="Église Murambi - Missionnaire Network" />
 			{#each EgliseParagraph2 as paragraph, index}
 				<ArticleParagraph text={paragraph.text} />
 			{/each}

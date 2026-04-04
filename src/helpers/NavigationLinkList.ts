@@ -55,7 +55,7 @@ export const NavigationLinkList: NavigationLink[] = [
 			},
 			{
 				subName: 'Brochures',
-				subText: "Téléchargez les brochures pour connaitre le Message qu'il apporte.",
+				subText: "Téléchargez les brochures pour connaître le Message qu'il apporte.",
 				link: '/literature?author=William Marrion Branham&category=book',
 				icon: IoBookOutline
 			}
@@ -87,7 +87,7 @@ export const NavigationLinkList: NavigationLink[] = [
 		subMenu: [
 			{
 				subName: 'Cantiques (Audio)',
-				subText: 'Ecoutez les chants de louange et adoration.',
+				subText: 'Écoutez les chants de louange et adoration.',
 				link: '/musique',
 				icon: IoMusicalNotes
 			},
@@ -106,7 +106,7 @@ export const NavigationLinkList: NavigationLink[] = [
 		subMenu: [
 			{
 				subName: 'Prédications (Audio)',
-				subText: 'Ecoutez les prédications de Branham, Ewald Frank et locales.',
+				subText: 'Écoutez les prédications de Branham, Ewald Frank et locales.',
 				link: '/predications',
 				icon: IoMusicalNotes
 			},
