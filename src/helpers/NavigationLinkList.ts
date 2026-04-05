@@ -120,7 +120,7 @@ export const NavigationLinkList: NavigationLink[] = [
 	},
 	{
 		id: 6,
-		menuName: 'Radio',
+		menuName: 'Direct',
 		link: '/live'
 	},
 	{

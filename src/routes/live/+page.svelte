@@ -6,11 +6,11 @@
 </script>
 
 <svelte:head>
-	<title>Radio en direct - Missionnaire Network</title>
-	<meta name="description" content="Écoutez la radio Missionnaire Network en direct. Prédications et cantiques du Message de l'Heure en streaming continu." />
+	<title>Audio en direct - Missionnaire Network</title>
+	<meta name="description" content="Écoutez Missionnaire Network en direct audio. Prédications et cantiques du Message de l'Heure en streaming continu." />
 	<link rel="canonical" href="https://missionnaire.net/live" />
-	<meta property="og:title" content="Radio en direct - Missionnaire Network" />
-	<meta property="og:description" content="Écoutez la radio Missionnaire Network en direct. Prédications et cantiques du Message de l'Heure en streaming continu." />
+	<meta property="og:title" content="Audio en direct - Missionnaire Network" />
+	<meta property="og:description" content="Écoutez Missionnaire Network en direct audio. Prédications et cantiques du Message de l'Heure en streaming continu." />
 	<meta property="og:url" content="https://missionnaire.net/live" />
 </svelte:head>
 
@@ -19,17 +19,36 @@
 		<!-- Header -->
 		<div class="text-center mb-12">
 			<div class="flex justify-center mb-5">
-				<svg width="20" height="28" viewBox="0 0 28 38" fill="none">
-					<rect x="10" y="0" width="8" height="38" rx="1.5" fill="#FF880C" fill-opacity="0.2" />
-					<rect x="0" y="8" width="28" height="8" rx="1.5" fill="#FF880C" fill-opacity="0.2" />
+				<!-- Audio waveform icon -->
+				<svg width="32" height="28" viewBox="0 0 32 28" fill="none">
+					<rect x="0" y="8" width="4" height="12" rx="2" fill="#FF880C" fill-opacity="0.3">
+						<animate attributeName="height" values="12;20;12" dur="1.2s" repeatCount="indefinite" />
+						<animate attributeName="y" values="8;4;8" dur="1.2s" repeatCount="indefinite" />
+					</rect>
+					<rect x="7" y="4" width="4" height="20" rx="2" fill="#FF880C" fill-opacity="0.4">
+						<animate attributeName="height" values="20;10;20" dur="1s" repeatCount="indefinite" />
+						<animate attributeName="y" values="4;9;4" dur="1s" repeatCount="indefinite" />
+					</rect>
+					<rect x="14" y="2" width="4" height="24" rx="2" fill="#FF880C" fill-opacity="0.5">
+						<animate attributeName="height" values="24;14;24" dur="1.4s" repeatCount="indefinite" />
+						<animate attributeName="y" values="2;7;2" dur="1.4s" repeatCount="indefinite" />
+					</rect>
+					<rect x="21" y="6" width="4" height="16" rx="2" fill="#FF880C" fill-opacity="0.4">
+						<animate attributeName="height" values="16;22;16" dur="1.1s" repeatCount="indefinite" />
+						<animate attributeName="y" values="6;3;6" dur="1.1s" repeatCount="indefinite" />
+					</rect>
+					<rect x="28" y="9" width="4" height="10" rx="2" fill="#FF880C" fill-opacity="0.3">
+						<animate attributeName="height" values="10;18;10" dur="1.3s" repeatCount="indefinite" />
+						<animate attributeName="y" values="9;5;9" dur="1.3s" repeatCount="indefinite" />
+					</rect>
 				</svg>
 			</div>
 			<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body">
-				Radio Missionnaire
+				Direct Audio
 			</p>
-			<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">Radio en direct</h1>
+			<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">Écoute en direct</h1>
 			<p class="mt-3 text-[15px] text-stone-400 font-body font-light max-w-md mx-auto leading-relaxed">
-				La page se met à jour automatiquement. Dès que le direct commence, appuyez sur Lecture.
+				La page se met à jour automatiquement. Dès que le direct audio commence, appuyez sur Lecture.
 			</p>
 		</div>
 
@@ -55,7 +74,7 @@
 					<p class="text-[11px] text-stone-400 mt-0.5">Cliquez pour désactiver</p>
 				{:else}
 					<p class="text-sm font-semibold text-stone-700 group-hover:text-missionnaire transition-colors">Activer les notifications</p>
-					<p class="text-[11px] text-stone-400 mt-0.5">Soyez alerté quand la radio est en direct</p>
+					<p class="text-[11px] text-stone-400 mt-0.5">Soyez alerté quand le direct audio commence</p>
 				{/if}
 			</div>
 			<span class="text-[11px] font-bold uppercase tracking-[0.15em] font-body shrink-0 transition-colors duration-300 {bellRef?.isSubscribed

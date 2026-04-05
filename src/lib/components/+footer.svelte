@@ -23,7 +23,7 @@
 				{ label: 'Ewald Frank', href: '/ewald-frank' },
 				{ label: "L'église", href: '/eglise' },
 				{ label: 'Galerie', href: '/galerie' },
-				{ label: 'Radio', href: '/live' }
+				{ label: 'Direct', href: '/live' }
 			]
 		},
 		{

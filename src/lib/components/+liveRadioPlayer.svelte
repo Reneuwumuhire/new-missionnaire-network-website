@@ -4,14 +4,14 @@
 	import { radioIsLive as radioIsLiveStore } from '$lib/stores/global';
 
 	const STATUS_MESSAGES: Record<string, string> = {
-		offline: 'La radio est hors ligne',
-		listening: 'Vous écoutez le direct',
+		offline: 'L\'audio en direct est hors ligne',
+		listening: 'Vous écoutez le direct audio',
 		connecting: 'Connexion en cours...',
 		reconnecting: 'Reconnexion en cours...',
-		availablePressPlay: 'Direct disponible. Appuyez sur Lecture.',
-		waiting: 'En attente du signal...',
+		availablePressPlay: 'Direct audio disponible. Appuyez sur Lecture.',
+		waiting: 'En attente du signal audio...',
 		cannotPlay: 'Impossible de lire le direct pour le moment',
-		unavailable: 'Le direct est indisponible pour le moment'
+		unavailable: 'Le direct audio est indisponible pour le moment'
 	};
 
 	let audio: HTMLAudioElement | null = null;
@@ -444,7 +444,7 @@
 				<span class="relative inline-flex h-2.5 w-2.5 rounded-full {showLive ? 'bg-red-500' : awaitingPlay ? 'bg-missionnaire' : 'bg-stone-300'}"></span>
 			</span>
 			<span class="text-[10px] font-bold uppercase tracking-[0.25em] font-body {showLive ? 'text-red-600' : awaitingPlay ? 'text-missionnaire' : 'text-stone-400'}">
-				{showLive ? 'En direct' : awaitingPlay ? 'Direct disponible' : 'Radio hors ligne'}
+				{showLive ? 'Audio en direct' : awaitingPlay ? 'Direct audio disponible' : 'Audio hors ligne'}
 			</span>
 			{#if listenerCount > 0 && showLive}
 				<span class="text-[10px] text-red-400 font-body">
@@ -455,7 +455,7 @@
 
 		<!-- Title and status -->
 		<h2 class="font-display text-2xl md:text-3xl font-semibold {showLive ? 'text-stone-900' : awaitingPlay ? 'text-stone-900' : 'text-stone-700'}">
-			{showLive ? 'Radio en direct' : awaitingPlay ? 'Radio en direct' : 'Radio hors ligne'}
+			{showLive ? 'Audio en direct' : awaitingPlay ? 'Audio en direct' : 'Audio hors ligne'}
 		</h2>
 		<p class="text-sm text-stone-500 font-body mt-1.5">
 			{statusMessage}

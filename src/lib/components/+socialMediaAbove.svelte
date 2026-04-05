@@ -15,7 +15,7 @@
 		: 'bg-stone-900'}"
 >
 	{#if isLive}
-		<a href="/live" class="absolute inset-0 z-0" aria-label="Écouter la radio en direct"></a>
+		<a href="/live" class="absolute inset-0 z-0" aria-label="Écouter l'audio en direct"></a>
 	{/if}
 
 	<div
@@ -30,7 +30,7 @@
 						></span>
 						<span class="relative inline-flex h-2 w-2 rounded-full bg-red-300"></span>
 					</span>
-					<span class="font-semibold uppercase tracking-[0.2em] text-white"> Radio en direct </span>
+					<span class="font-semibold uppercase tracking-[0.2em] text-white"> Audio en direct </span>
 				</div>
 			{:else}
 				<span class="text-stone-400 uppercase tracking-[0.2em] hidden sm:block">

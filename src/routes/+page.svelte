@@ -90,7 +90,7 @@
 		{ label: 'Prédications', href: '/predications', icon: '✦' },
 		{ label: 'Vidéos', href: '/videos', icon: '▶' },
 		{ label: 'Musique', href: '/musique', icon: '♪' },
-		{ label: 'Radio', href: '/live', icon: '◉' },
+		{ label: 'Direct', href: '/live', icon: '◉' },
 		{ label: 'Transcriptions', href: '/transcriptions', icon: '¶' },
 		{ label: 'Littérature', href: '/literature', icon: '▣' }
 	];
@@ -203,7 +203,7 @@
 						<span>Écouter en direct</span>
 					{:else}
 						<svg width="11" height="13" viewBox="0 0 12 14" fill="none"><path d="M2 1L10 7L2 13V1Z" fill="white" stroke="white" stroke-width="1" stroke-linejoin="round"/></svg>
-						<span>Écouter la radio</span>
+						<span>Écouter le direct</span>
 					{/if}
 				</a>
 				<a
@@ -294,10 +294,10 @@
 				</span>
 				<div class="flex-1 min-w-0">
 					<p class="text-sm font-body {radioIsLive ? 'text-red-700 font-semibold' : 'text-stone-700 font-medium'}">
-						{radioIsLive ? 'Radio en direct' : 'Radio hors antenne'}
+						{radioIsLive ? 'Audio en direct' : 'Direct audio hors antenne'}
 					</p>
 					<p class="text-[11px] text-stone-400 font-body mt-0.5">
-						{radioIsLive ? 'Cliquez pour écouter' : 'Accéder à la page radio'}
+						{radioIsLive ? 'Cliquez pour écouter' : 'Accéder au direct audio'}
 					</p>
 				</div>
 				<span class="text-stone-300 group-hover:text-missionnaire transition-colors text-xs">→</span>
@@ -316,7 +316,7 @@
 						<p class="text-[11px] text-stone-400 font-body mt-0.5">Cliquez pour désactiver</p>
 					{:else}
 						<p class="text-sm font-medium text-stone-700 font-body">Activer les notifications</p>
-						<p class="text-[11px] text-stone-400 font-body mt-0.5">Soyez alerté quand la radio est en direct</p>
+						<p class="text-[11px] text-stone-400 font-body mt-0.5">Soyez alerté quand le direct audio commence</p>
 					{/if}
 				</div>
 			</button>
