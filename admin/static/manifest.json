@@ -1,0 +1,30 @@
+{
+	"name": "Missionnaire Admin",
+	"short_name": "MN Admin",
+	"description": "Panneau d'administration Missionnaire Network",
+	"start_url": "/",
+	"display": "standalone",
+	"background_color": "#FAF8F3",
+	"theme_color": "#f97316",
+	"orientation": "any",
+	"icons": [
+		{
+			"src": "/icons/pwa-192x192.png",
+			"sizes": "192x192",
+			"type": "image/png"
+		},
+		{
+			"src": "/icons/pwa-512x512.png",
+			"sizes": "512x512",
+			"type": "image/png"
+		},
+		{
+			"src": "/icons/pwa-512x512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "maskable"
+		}
+	],
+	"lang": "fr",
+	"dir": "ltr"
+}

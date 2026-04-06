@@ -1,0 +1,145 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════════════════════════════════════
+   MISSIONNAIRE ADMIN — Design System
+   Font pairing: Cormorant Garamond (display) + Outfit (body)
+   Matches main site aesthetic
+   ═══════════════════════════════════════════ */
+
+:root {
+	--font-display: 'Cormorant Garamond', Georgia, serif;
+	--font-body: 'Outfit', system-ui, sans-serif;
+	--color-missionnaire: #ff880c;
+	scroll-behavior: smooth;
+}
+
+html {
+	overflow-x: hidden;
+	font-family: var(--font-body);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	text-rendering: optimizeLegibility;
+}
+
+body {
+	color: #292524;
+	background-color: #faf8f3;
+}
+
+::selection {
+	background-color: #ff880c;
+	color: #fff;
+}
+
+.font-display {
+	font-family: var(--font-display);
+}
+
+.font-body {
+	font-family: var(--font-body);
+}
+
+/* ── Focus styles ── */
+:focus-visible {
+	outline: 2px solid var(--color-missionnaire);
+	outline-offset: 2px;
+	border-radius: 2px;
+}
+
+/* ── Scrollbar refinement ── */
+::-webkit-scrollbar {
+	width: 6px;
+}
+
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+	background: #d6d3d1;
+	border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: #a8a29e;
+}
+
+/* ── Page transition ── */
+.page-transition-enter {
+	animation: page-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes page-in {
+	from {
+		opacity: 0;
+		transform: translateY(8px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* ── Card hover lift ── */
+.card-lift {
+	transition:
+		transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+		box-shadow 0.35s ease;
+}
+.card-lift:hover {
+	transform: translateY(-3px);
+	box-shadow: 0 12px 40px rgba(0, 0, 0, 0.06);
+}
+
+/* ── Ornamental divider ── */
+.ornament-line {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+}
+.ornament-line::before,
+.ornament-line::after {
+	content: '';
+	flex: 1;
+	height: 1px;
+	background: linear-gradient(to right, transparent, #d4c9b5, transparent);
+}
+
+/* ── Skeleton shimmer ── */
+@keyframes shimmer {
+	0% {
+		background-position: -400px 0;
+	}
+	100% {
+		background-position: 400px 0;
+	}
+}
+
+.skeleton-shimmer {
+	background: linear-gradient(90deg, #f0ece3 0%, #faf8f3 40%, #f0ece3 80%);
+	background-size: 800px 100%;
+	animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* ── Admin-specific utilities ── */
+.admin-input {
+	@apply w-full rounded-lg border border-stone-200 bg-white px-4 py-2.5 font-body text-sm text-stone-800 transition-all placeholder:text-stone-400 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none;
+}
+
+.admin-label {
+	@apply mb-1.5 block font-body text-sm font-medium text-stone-600;
+}
+
+.admin-btn-primary {
+	@apply inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 font-body text-sm font-medium text-white transition-all hover:bg-missionnaire-600 focus:ring-2 focus:ring-primary/30 active:scale-[0.98];
+}
+
+.admin-btn-secondary {
+	@apply inline-flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-5 py-2.5 font-body text-sm font-medium text-stone-700 transition-all hover:bg-cream-dark focus:ring-2 focus:ring-stone-200 active:scale-[0.98];
+}
+
+.admin-btn-danger {
+	@apply inline-flex items-center gap-2 rounded-lg bg-red-500 px-5 py-2.5 font-body text-sm font-medium text-white transition-all hover:bg-red-600 focus:ring-2 focus:ring-red-300 active:scale-[0.98];
+}
