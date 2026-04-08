@@ -74,11 +74,3 @@ export function radioLivePayload(): PushPayload {
 	};
 }
 
-export function youtubeLivePayload(streamTitle: string, streamUrl?: string): PushPayload {
-	return {
-		title: 'En direct sur YouTube',
-		body: streamTitle,
-		url: streamUrl || '/videos',
-		icon: '/favicon.png'
-	};
-}

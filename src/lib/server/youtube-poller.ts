@@ -1,14 +1,10 @@
 import { YOUTUBE_API_KEY } from '$env/static/private';
-import { sendPushToAll, youtubeLivePayload } from './push-notifications';
 import {
-	claimNotificationSlot,
 	claimCheckSlot,
 	getYouTubeCachedStatus,
 	setYouTubeCachedStatus
 } from '../../db/collections';
 import { isNearScheduledLiveTime } from './youtube-websub';
-
-const YOUTUBE_NOTIFICATION_COOLDOWN = 15 * 60 * 1000; // 15 min cooldown
 
 // Near scheduled live times, poll every 2 min as safety net for WebSub.
 // Outside live windows, poll every 15 min (just to catch edge cases).
@@ -282,12 +278,4 @@ async function applyLiveStatus(
 		url: streamUrl,
 		updatedAt: new Date().toISOString()
 	});
-
-	const canSend = await claimNotificationSlot('youtube_live', YOUTUBE_NOTIFICATION_COOLDOWN);
-	if (canSend) {
-		console.log('[YouTube Poller] YouTube is live. Sending push notifications.');
-		sendPushToAll(youtubeLivePayload(title, streamUrl)).catch((e) =>
-			console.error('[YouTube Poller] Push notification error:', e)
-		);
-	}
 }
