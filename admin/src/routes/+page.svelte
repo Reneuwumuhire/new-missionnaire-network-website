@@ -55,7 +55,7 @@
 	<title>Tableau de bord - Missionnaire Admin</title>
 </svelte:head>
 
-{#if data.liveButNotRecording}
+{#if data.liveButNotBroadcasting}
 	<a
 		href="/recordings"
 		class="mb-6 flex items-start gap-3 rounded-2xl border border-green-200 bg-green-50/80 p-5 transition-colors hover:bg-green-50"
@@ -67,9 +67,27 @@
 			</span>
 		</div>
 		<div class="min-w-0 flex-1">
-			<p class="text-sm font-semibold text-green-800">Direct détecté — prêt à enregistrer</p>
+			<p class="text-sm font-semibold text-green-800">Direct détecté — prêt à passer en direct</p>
 			<p class="mt-1 text-xs text-green-700">
-				Un flux audio est actif sur Icecast. Cliquez pour démarrer l'enregistrement.
+				Le flux audio est actif sur Icecast mais l'audience ne le voit pas encore. Cliquez pour aller en direct.
+			</p>
+		</div>
+	</a>
+{:else if data.liveButNotRecording}
+	<a
+		href="/recordings"
+		class="mb-6 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-5 transition-colors hover:bg-amber-50"
+	>
+		<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100">
+			<svg class="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+				<circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" />
+				<path stroke-linecap="round" stroke-linejoin="round" d="M12 3a9 9 0 109 9" />
+			</svg>
+		</div>
+		<div class="min-w-0 flex-1">
+			<p class="text-sm font-semibold text-amber-800">En direct — aucun enregistrement en cours</p>
+			<p class="mt-1 text-xs text-amber-700">
+				Le direct est diffusé mais rien n'est sauvegardé. Cliquez pour démarrer l'enregistrement.
 			</p>
 		</div>
 	</a>

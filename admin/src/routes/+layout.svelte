@@ -20,6 +20,7 @@
 				role: data.user.role,
 				canManageRecordings: data.user.permissions.can_manage_recordings
 			}}
+			broadcastIsLive={data.broadcastIsLive}
 		/>
 
 		<!-- Main content -->

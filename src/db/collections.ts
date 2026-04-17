@@ -860,6 +860,69 @@ export async function setRadioCachedStatus(status: RadioCachedStatus): Promise<v
 	}
 }
 
+// ── Broadcast admin gate state ─────────────────────────────────
+// Single document controlling whether the public site shows "live" — toggled
+// by an admin via the /recordings page. Independent from Icecast detection.
+// `icecast_offline_since` powers the 60s auto-end safety net implemented in
+// the radio-poll endpoint.
+
+export type BroadcastAdminState = {
+	is_live: boolean;
+	started_at: string | null;
+	ended_at: string | null;
+	started_by: string | null;
+	icecast_offline_since: string | null;
+	notification_pending: boolean;
+	updated_at: string;
+};
+
+const BROADCAST_DEFAULT: BroadcastAdminState = {
+	is_live: false,
+	started_at: null,
+	ended_at: null,
+	started_by: null,
+	icecast_offline_since: null,
+	notification_pending: false,
+	updated_at: new Date(0).toISOString()
+};
+
+export async function getBroadcastAdminState(): Promise<BroadcastAdminState> {
+	try {
+		const db = await getDb();
+		const doc = await db
+			.collection('broadcast_admin_state')
+			.findOne({ _id: 'current' as unknown as ObjectId });
+		if (!doc) return BROADCAST_DEFAULT;
+		return {
+			is_live: Boolean(doc.is_live),
+			started_at: (doc.started_at as string | null) ?? null,
+			ended_at: (doc.ended_at as string | null) ?? null,
+			started_by: (doc.started_by as string | null) ?? null,
+			icecast_offline_since: (doc.icecast_offline_since as string | null) ?? null,
+			notification_pending: Boolean(doc.notification_pending),
+			updated_at: (doc.updated_at as string) ?? new Date(0).toISOString()
+		};
+	} catch (e) {
+		console.error('[BroadcastAdminState] get error:', e);
+		return BROADCAST_DEFAULT;
+	}
+}
+
+export async function setBroadcastAdminState(
+	updates: Partial<BroadcastAdminState>
+): Promise<void> {
+	try {
+		const db = await getDb();
+		await db.collection('broadcast_admin_state').updateOne(
+			{ _id: 'current' as unknown as ObjectId },
+			{ $set: { ...updates, updated_at: new Date().toISOString() } },
+			{ upsert: true }
+		);
+	} catch (e) {
+		console.error('[BroadcastAdminState] set error:', e);
+	}
+}
+
 /**
  * Recursively serializes a MongoDB document, converting all ObjectIds to strings
  * and ensuring the document is fully serializable for SvelteKit data loading.

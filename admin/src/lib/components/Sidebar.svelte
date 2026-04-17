@@ -7,7 +7,13 @@
 		icon: string;
 	}
 
-	let { user }: { user: { name: string; email: string; role?: string; canManageRecordings?: boolean } } = $props();
+	let {
+		user,
+		broadcastIsLive = false
+	}: {
+		user: { name: string; email: string; role?: string; canManageRecordings?: boolean };
+		broadcastIsLive?: boolean;
+	} = $props();
 
 	const navItems: NavItem[] = $derived([
 		{ href: '/', label: 'Tableau de bord', icon: 'home' },
@@ -127,7 +133,16 @@
 							</svg>
 						{/if}
 					</span>
-					{item.label}
+					<span class="flex-1">{item.label}</span>
+					{#if item.icon === 'recordings' && broadcastIsLive}
+						<span class="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-red-600" title="Audience en direct">
+							<span class="relative inline-flex h-1.5 w-1.5">
+								<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"></span>
+								<span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500"></span>
+							</span>
+							Live
+						</span>
+					{/if}
 				</a>
 			{/each}
 		</div>

@@ -2,18 +2,19 @@ import { json } from '@sveltejs/kit';
 import { probeLiveAudio, getLiveAudioSourceUrl } from '$lib/server/live-audio';
 import {
 	claimCheckSlot,
-	claimNotificationSlot,
 	getRadioCachedStatus,
 	setRadioCachedStatus,
 	heartbeatListener,
 	removeListener,
-	countActiveListeners
+	countActiveListeners,
+	getBroadcastAdminState,
+	setBroadcastAdminState
 } from '../../../../db/collections';
-import { sendPushToAll, radioLivePayload } from '$lib/server/push-notifications';
 import { checkAndIngestLiveStream } from '$lib/server/youtube-poller';
+import { sendPushToAll, radioLivePayload } from '$lib/server/push-notifications';
 
-const RADIO_NOTIFICATION_COOLDOWN = 10 * 60 * 1000; // 10 min cooldown
 const RADIO_PROBE_INTERVAL = 10_000; // 10 seconds between probes
+const ICECAST_OFFLINE_AUTO_END_MS = 60_000; // 60s grace before auto-ending the broadcast
 
 export async function GET({ url }) {
 	const sid = url.searchParams.get('sid');
@@ -24,6 +25,7 @@ export async function GET({ url }) {
 	}
 
 	let status = await getRadioCachedStatus();
+	let adminGate = await getBroadcastAdminState();
 
 	// Try to claim the probe slot — only one instance probes per interval
 	const canProbe = await claimCheckSlot('radio_probe', RADIO_PROBE_INTERVAL);
@@ -39,26 +41,31 @@ export async function GET({ url }) {
 
 			await setRadioCachedStatus(newStatus);
 
-			// Send push notification on state change to live
 			const wasLive = status?.isLive ?? false;
 			if (newStatus.isLive && !wasLive) {
-				console.log('[RadioPoll] Status changed: LIVE');
-				claimNotificationSlot('radio_live', RADIO_NOTIFICATION_COOLDOWN)
-					.then((canSend) => {
-						if (canSend) {
-							console.log('[RadioPoll] Radio is live. Sending push notification.');
-							return sendPushToAll(radioLivePayload());
-						}
-					})
-					.catch((e) => console.error('[RadioPoll] Radio push error:', e));
-
+				console.log('[RadioPoll] Icecast: LIVE');
 				// Radio just went live — YouTube likely started too.
 				// Trigger an immediate YouTube check (force bypasses the 5-min throttle).
 				checkAndIngestLiveStream(true).catch((e) =>
 					console.error('[RadioPoll] YouTube check triggered by radio error:', e)
 				);
 			} else if (!newStatus.isLive && wasLive) {
-				console.log('[RadioPoll] Status changed: OFFLINE');
+				console.log('[RadioPoll] Icecast: OFFLINE');
+			}
+
+			// Auto-end safety: if admin opened the gate but Icecast has been offline for >60s,
+			// flip the gate closed so the public site doesn't show a stalled "live" indicator.
+			adminGate = await applyAutoEndSafety(adminGate, newStatus.isLive);
+
+			// Consume notification_pending: admin set the flag when going live;
+			// we send the push from here (where the VAPID keys + push-notifications lib live).
+			if (adminGate.is_live && adminGate.notification_pending) {
+				await setBroadcastAdminState({ notification_pending: false });
+				adminGate = { ...adminGate, notification_pending: false };
+				console.log('[RadioPoll] Sending Go Live push notification (admin-triggered)');
+				sendPushToAll(radioLivePayload()).catch((e) =>
+					console.error('[RadioPoll] Push send failed:', e)
+				);
 			}
 
 			status = newStatus;
@@ -76,12 +83,71 @@ export async function GET({ url }) {
 		// DB unavailable
 	}
 
+	const icecastLive = status?.isLive ?? false;
+	const isLive = icecastLive && adminGate.is_live;
+
 	return json({
-		isLive: status?.isLive ?? false,
+		isLive,
 		checkedAt: status?.checkedAt ?? new Date().toISOString(),
 		listeners,
 		streamUrl: status?.streamUrl
 	});
+}
+
+/**
+ * If the admin gate is open but Icecast has been offline for >60s, close the gate.
+ * Tracks the start of the offline window in `broadcast_admin_state.icecast_offline_since`.
+ * Resets that timestamp whenever Icecast is detected live again.
+ *
+ * Returns the (possibly updated) admin gate state.
+ */
+async function applyAutoEndSafety(
+	current: Awaited<ReturnType<typeof getBroadcastAdminState>>,
+	icecastLive: boolean
+): Promise<Awaited<ReturnType<typeof getBroadcastAdminState>>> {
+	if (!current.is_live) {
+		// Gate already closed — nothing to do, but keep timestamp clean.
+		if (current.icecast_offline_since) {
+			await setBroadcastAdminState({ icecast_offline_since: null });
+			return { ...current, icecast_offline_since: null };
+		}
+		return current;
+	}
+
+	if (icecastLive) {
+		// Stream is healthy — clear any stale "offline since" mark.
+		if (current.icecast_offline_since) {
+			await setBroadcastAdminState({ icecast_offline_since: null });
+			return { ...current, icecast_offline_since: null };
+		}
+		return current;
+	}
+
+	// Gate open AND Icecast offline — start or check the timer.
+	const now = Date.now();
+	if (!current.icecast_offline_since) {
+		const stamp = new Date(now).toISOString();
+		await setBroadcastAdminState({ icecast_offline_since: stamp });
+		return { ...current, icecast_offline_since: stamp };
+	}
+
+	const offlineFor = now - new Date(current.icecast_offline_since).getTime();
+	if (offlineFor >= ICECAST_OFFLINE_AUTO_END_MS) {
+		console.log('[RadioPoll] Auto-ending broadcast: Icecast offline >60s with gate open');
+		await setBroadcastAdminState({
+			is_live: false,
+			ended_at: new Date(now).toISOString(),
+			icecast_offline_since: null
+		});
+		return {
+			...current,
+			is_live: false,
+			ended_at: new Date(now).toISOString(),
+			icecast_offline_since: null
+		};
+	}
+
+	return current;
 }
 
 // Clean up listener on explicit disconnect

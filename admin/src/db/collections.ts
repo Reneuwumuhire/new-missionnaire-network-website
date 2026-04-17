@@ -510,3 +510,61 @@ export async function countRecordingsByStatus(status: RecordingStatus): Promise<
 	const db = await getDb();
 	return db.collection('recordings').countDocuments({ status });
 }
+
+// ══════════════════════════════════════
+//  BROADCAST ADMIN GATE
+// ══════════════════════════════════════
+// Mirrors the helpers in main src/db/collections.ts. Same collection + shape.
+
+export type BroadcastAdminState = {
+	is_live: boolean;
+	started_at: string | null;
+	ended_at: string | null;
+	started_by: string | null;
+	icecast_offline_since: string | null;
+	notification_pending: boolean;
+	updated_at: string;
+};
+
+const BROADCAST_DEFAULT: BroadcastAdminState = {
+	is_live: false,
+	started_at: null,
+	ended_at: null,
+	started_by: null,
+	icecast_offline_since: null,
+	notification_pending: false,
+	updated_at: new Date(0).toISOString()
+};
+
+export async function getBroadcastAdminState(): Promise<BroadcastAdminState> {
+	const db = await getDb();
+	const doc = await db
+		.collection('broadcast_admin_state')
+		.findOne({ _id: 'current' as unknown as ObjectId });
+	if (!doc) return BROADCAST_DEFAULT;
+	return {
+		is_live: Boolean(doc.is_live),
+		started_at: (doc.started_at as string | null) ?? null,
+		ended_at: (doc.ended_at as string | null) ?? null,
+		started_by: (doc.started_by as string | null) ?? null,
+		icecast_offline_since: (doc.icecast_offline_since as string | null) ?? null,
+		notification_pending: Boolean(doc.notification_pending),
+		updated_at: (doc.updated_at as string) ?? new Date(0).toISOString()
+	};
+}
+
+export async function setBroadcastAdminState(
+	updates: Partial<BroadcastAdminState>
+): Promise<void> {
+	const db = await getDb();
+	await db.collection('broadcast_admin_state').updateOne(
+		{ _id: 'current' as unknown as ObjectId },
+		{ $set: { ...updates, updated_at: new Date().toISOString() } },
+		{ upsert: true }
+	);
+}
+
+export async function countPushSubscriptions(): Promise<number> {
+	const db = await getDb();
+	return db.collection('push_subscriptions').countDocuments({});
+}

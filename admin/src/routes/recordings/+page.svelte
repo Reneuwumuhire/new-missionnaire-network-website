@@ -11,8 +11,11 @@
 
 	const recorder: RecorderSnapshot = $derived(data.recorder);
 	const icecast: IcecastSnapshot = $derived(data.icecast);
+	const broadcast = $derived(data.broadcast);
+	const subscriberCount = $derived(data.subscriberCount);
 	let elapsed = $state(0);
 	let busy = $state(false);
+	let broadcastBusy = $state(false);
 	let actionError = $state<string | null>(null);
 	let editing = $state<Record<string, string>>({});
 	let confirmDelete = $state<string | null>(null);
@@ -119,6 +122,48 @@
 		}
 	}
 
+	async function goLive() {
+		if (broadcastBusy) return;
+		const msg = subscriberCount > 0
+			? `Cela enverra une notification à ${subscriberCount} abonné${subscriberCount > 1 ? 's' : ''}. Continuer ?`
+			: 'Aucun abonné aux notifications pour l\'instant. Aller en direct quand même ?';
+		if (!confirm(msg)) return;
+		broadcastBusy = true;
+		actionError = null;
+		try {
+			const res = await fetch('/api/broadcast/go-live', { method: 'POST' });
+			if (!res.ok) {
+				const text = await res.text();
+				actionError = text || `Erreur ${res.status}`;
+			}
+			await invalidateAll();
+		} finally {
+			broadcastBusy = false;
+		}
+	}
+
+	async function endLive() {
+		if (broadcastBusy) return;
+		if (!confirm('Terminer le direct ? Le site public ne montrera plus le lecteur en direct.')) return;
+		broadcastBusy = true;
+		actionError = null;
+		try {
+			const res = await fetch('/api/broadcast/end-live', { method: 'POST' });
+			if (!res.ok) {
+				const text = await res.text();
+				actionError = text || `Erreur ${res.status}`;
+			}
+			await invalidateAll();
+		} finally {
+			broadcastBusy = false;
+		}
+	}
+
+	function formatTime(iso: string | null): string {
+		if (!iso) return '—';
+		return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+	}
+
 	async function saveTitle(rec: Recording) {
 		const id = rec._id!;
 		const title = editing[id]?.trim();
@@ -216,6 +261,64 @@
 		</div>
 	</div>
 {/if}
+
+<!-- Broadcast (Go Live / End Live) control card -->
+<div class="mb-6 rounded-2xl border bg-white p-6 {broadcast.is_live ? 'border-red-200' : 'border-stone-200/60'}">
+	<div class="flex flex-wrap items-center justify-between gap-4">
+		<div class="flex items-center gap-4">
+			<div class="flex h-12 w-12 items-center justify-center rounded-xl {broadcast.is_live ? 'bg-red-50' : 'bg-stone-100'}">
+				{#if broadcast.is_live}
+					<span class="relative inline-flex h-2.5 w-2.5">
+						<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"></span>
+						<span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500"></span>
+					</span>
+				{:else}
+					<svg class="h-5 w-5 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+					</svg>
+				{/if}
+			</div>
+			<div>
+				{#if broadcast.is_live}
+					<p class="font-display text-lg font-semibold text-red-700">Audience en direct</p>
+					<p class="text-xs text-stone-500">
+						Démarré à {formatTime(broadcast.started_at)} · le site public affiche le lecteur
+					</p>
+				{:else}
+					<p class="font-display text-lg font-semibold text-stone-800">Audience hors ligne</p>
+					<p class="text-xs text-stone-500">
+						Le site public ne montre pas le lecteur, même si Icecast diffuse.
+						{subscriberCount > 0 ? `${subscriberCount} abonné${subscriberCount > 1 ? 's' : ''} aux notifications.` : ''}
+					</p>
+				{/if}
+			</div>
+		</div>
+
+		<div class="flex items-center gap-3">
+			{#if broadcast.is_live}
+				<button
+					onclick={endLive}
+					disabled={broadcastBusy}
+					class="rounded-xl bg-stone-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-stone-800 disabled:opacity-50"
+				>
+					{broadcastBusy ? '…' : 'Terminer le direct'}
+				</button>
+			{:else if icecast.sourceActive}
+				<button
+					onclick={goLive}
+					disabled={broadcastBusy}
+					class="rounded-xl bg-green-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-50"
+				>
+					{broadcastBusy ? '…' : 'Aller en direct'}
+				</button>
+			{:else}
+				<span class="rounded-xl border border-stone-200 bg-stone-50 px-5 py-2.5 text-sm font-medium text-stone-400" title="Démarrez OBS d'abord pour activer ce bouton">
+					En attente d'un flux audio…
+				</span>
+			{/if}
+		</div>
+	</div>
+</div>
 
 <!-- Recorder control card -->
 <div class="mb-8 rounded-2xl border border-stone-200/60 bg-white p-6">
