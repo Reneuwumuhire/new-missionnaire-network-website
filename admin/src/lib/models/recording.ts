@@ -20,6 +20,9 @@ export const RecordingSchema = z.object({
 	published: z.boolean().default(false),
 	created_by: z.string(),
 	failure_reason: z.string().nullable().optional(),
+	/** Auto-snapshot of broadcast_admin_state.thumbnail_url at recording-save time.
+	 *  Lets archive cards show the same thumbnail the live page displayed. */
+	thumbnail_url: z.string().url().nullable().optional(),
 	updated_at: z
 		.union([z.instanceof(Date), z.string()])
 		.transform((val) => new Date(val))

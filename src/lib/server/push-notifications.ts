@@ -42,24 +42,38 @@ export async function sendPushToAll(payload: PushPayload): Promise<void> {
 		)
 	);
 
+	let sent = 0;
+	let failed = 0;
+	let removed = 0;
 	for (let i = 0; i < results.length; i++) {
 		const result = results[i];
-		if (result.status === 'rejected') {
-			const statusCode = result.reason?.statusCode;
-			// 410 Gone, 404 Not Found, 401 Unauthorized, 403 Forbidden —
-			// subscription is no longer valid or has expired.
-			// Push services return various codes for expired/invalid endpoints.
-			if (statusCode === 410 || statusCode === 404 || statusCode === 401 || statusCode === 403) {
-				await removePushSubscription(subscriptions[i].endpoint);
-				console.log(`[Push] Removed invalid subscription (${statusCode}):`, subscriptions[i].endpoint);
-			} else {
-				console.error('[Push] Failed to send to', subscriptions[i].endpoint, result.reason);
-			}
+		if (result.status === 'fulfilled') {
+			sent++;
+			continue;
+		}
+		const statusCode = result.reason?.statusCode;
+		// 410 Gone, 404 Not Found, 401 Unauthorized, 403 Forbidden —
+		// subscription is no longer valid or has expired.
+		if (statusCode === 410 || statusCode === 404 || statusCode === 401 || statusCode === 403) {
+			await removePushSubscription(subscriptions[i].endpoint);
+			removed++;
+			console.log(`[Push] Removed invalid subscription (${statusCode}):`, subscriptions[i].endpoint);
+		} else {
+			failed++;
+			// Timeouts (ETIMEDOUT / EHOSTUNREACH) are transient — the subscription
+			// itself is probably fine; next push attempt will likely succeed.
+			console.error(
+				'[Push] Failed to send to',
+				subscriptions[i].endpoint,
+				result.reason?.code ?? result.reason
+			);
 		}
 	}
 
+	const failedSegment = failed > 0 ? `, transient-failed: ${failed}` : '';
+	const removedSegment = removed > 0 ? `, removed: ${removed}` : '';
 	console.log(
-		`[Push] Sent notification to ${subscriptions.length} subscribers: "${payload.title}"`
+		`[Push] "${payload.title}" — sent: ${sent}/${subscriptions.length}${failedSegment}${removedSegment}`
 	);
 }
 

@@ -8,6 +8,7 @@ import {
 	writeSidecar
 } from './sidecar.js';
 import {
+	getBroadcastSnapshot,
 	insertRecordingStarting,
 	markRecordingFailed,
 	markRecordingReady,
@@ -149,7 +150,17 @@ async function finalizeUpload(rec: Pick<ActiveRecording, 'id' | 'idStr' | 'start
 			filePath: mp3Path(rec.idStr),
 			startedAt: rec.startedAt
 		});
-		await markRecordingReady(rec.id, { s3Key, s3Url, sizeBytes });
+		// Snapshot whatever title + thumbnail the admin has configured right now.
+		// If they change or clear either later, this recording keeps what was live
+		// at save time — matches what the audience actually saw during the broadcast.
+		const snap = await getBroadcastSnapshot();
+		await markRecordingReady(rec.id, {
+			s3Key,
+			s3Url,
+			sizeBytes,
+			thumbnailUrl: snap.thumbnail_url,
+			title: snap.title
+		});
 		await removeRecordingFiles(rec.idStr);
 		console.log(`[recorder] uploaded ${rec.idStr} -> ${s3Key}`);
 	} catch (err) {

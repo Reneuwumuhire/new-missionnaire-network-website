@@ -41,12 +41,32 @@
 				<li>
 					<a
 						href="/live/archives/{rec.id}"
-						class="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-missionnaire/5 group"
+						class="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-missionnaire/5 group"
 					>
-						<div class="flex h-10 w-10 shrink-0 items-center justify-center border border-stone-200/60 text-missionnaire/60 group-hover:border-missionnaire/30 group-hover:text-missionnaire transition-colors">
-							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-								<polygon points="5,3 19,12 5,21" fill="currentColor" stroke="none" />
-							</svg>
+						<div class="relative h-14 w-20 shrink-0 overflow-hidden border border-stone-200/60 bg-stone-100">
+							{#if rec.thumbnail_url}
+								<img
+									src={rec.thumbnail_url}
+									alt=""
+									class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+									width="160"
+									height="90"
+									loading="lazy"
+									decoding="async"
+								/>
+							{:else}
+								<div class="recent-default-thumb absolute inset-0 flex items-center justify-center">
+									<picture>
+										<source srcset="/icons/logo.webp" type="image/webp" />
+										<img src="/icons/logo.png" alt="" class="h-4 w-auto opacity-70" width="150" height="64" loading="lazy" />
+									</picture>
+								</div>
+							{/if}
+							<div class="absolute inset-0 flex items-center justify-center bg-stone-900/0 group-hover:bg-stone-900/30 transition-colors duration-300">
+								<svg width="10" height="12" viewBox="0 0 14 16" fill="none" class="opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true">
+									<path d="M2 1.5L12.5 8L2 14.5V1.5Z" fill="white" />
+								</svg>
+							</div>
 						</div>
 						<div class="min-w-0 flex-1">
 							<p class="truncate text-sm font-medium text-stone-700 group-hover:text-missionnaire transition-colors">
@@ -62,3 +82,11 @@
 		</ul>
 	</section>
 {/if}
+
+<style>
+	.recent-default-thumb {
+		background:
+			radial-gradient(circle at 30% 20%, rgba(255, 136, 12, 0.08), transparent 60%),
+			linear-gradient(135deg, #FAF6F1 0%, #F1EAE0 100%);
+	}
+</style>

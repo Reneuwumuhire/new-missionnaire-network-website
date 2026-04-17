@@ -35,7 +35,31 @@ export interface RecordingDoc {
 	published: boolean;
 	created_by: string;
 	failure_reason: string | null;
+	/** Snapshot of broadcast_admin_state.thumbnail_url at recording-save time. */
+	thumbnail_url: string | null;
 	updated_at: Date;
+}
+
+/** Minimal shape of the broadcast admin state doc for snapshot reads. */
+interface BroadcastAdminStateSnapshot {
+	title: string | null;
+	thumbnail_url: string | null;
+}
+
+export async function getBroadcastSnapshot(): Promise<BroadcastAdminStateSnapshot> {
+	try {
+		const db = await getDb();
+		const doc = (await db
+			.collection('broadcast_admin_state')
+			.findOne({ _id: 'current' as unknown as ObjectId })) as BroadcastAdminStateSnapshot | null;
+		return {
+			title: doc?.title ?? null,
+			thumbnail_url: doc?.thumbnail_url ?? null
+		};
+	} catch (err) {
+		console.error('[recorder/mongo] failed to read broadcast snapshot:', err);
+		return { title: null, thumbnail_url: null };
+	}
 }
 
 export async function insertRecordingStarting(params: {
@@ -58,6 +82,7 @@ export async function insertRecordingStarting(params: {
 		published: false,
 		created_by: params.createdBy,
 		failure_reason: null,
+		thumbnail_url: null,
 		updated_at: new Date()
 	});
 }
@@ -72,21 +97,29 @@ export async function markRecordingStopping(id: ObjectId, endedAt: Date, duratio
 		);
 }
 
-export async function markRecordingReady(id: ObjectId, params: { s3Key: string; s3Url: string; sizeBytes: number }) {
+export async function markRecordingReady(
+	id: ObjectId,
+	params: {
+		s3Key: string;
+		s3Url: string;
+		sizeBytes: number;
+		thumbnailUrl: string | null;
+		title: string | null;
+	}
+) {
 	const db = await getDb();
-	await db.collection<RecordingDoc>('recordings').updateOne(
-		{ _id: id },
-		{
-			$set: {
-				status: 'ready',
-				s3_key: params.s3Key,
-				s3_url: params.s3Url,
-				size_bytes: params.sizeBytes,
-				failure_reason: null,
-				updated_at: new Date()
-			}
-		}
-	);
+	const setOps: Partial<RecordingDoc> = {
+		status: 'ready',
+		s3_key: params.s3Key,
+		s3_url: params.s3Url,
+		size_bytes: params.sizeBytes,
+		thumbnail_url: params.thumbnailUrl,
+		failure_reason: null,
+		updated_at: new Date()
+	};
+	// Only override the default title if admin set a broadcast-level title.
+	if (params.title) setOps.title = params.title;
+	await db.collection<RecordingDoc>('recordings').updateOne({ _id: id }, { $set: setOps });
 }
 
 export async function markRecordingFailed(id: ObjectId, reason: string) {

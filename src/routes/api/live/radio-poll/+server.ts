@@ -16,8 +16,16 @@ import { sendPushToAll, radioLivePayload } from '$lib/server/push-notifications'
 const RADIO_PROBE_INTERVAL = 10_000; // 10 seconds between probes
 const ICECAST_OFFLINE_AUTO_END_MS = 60_000; // 60s grace before auto-ending the broadcast
 
-export async function GET({ url }) {
+export async function GET({ url, setHeaders }) {
 	const sid = url.searchParams.get('sid');
+
+	// Prevent any intermediate cache (browser, CDN, Vercel edge) from serving
+	// stale title/thumbnail/listener data. The client polls every 10s and
+	// expects fresh values every request.
+	setHeaders({
+		'Cache-Control': 'no-store, no-cache, must-revalidate',
+		Pragma: 'no-cache'
+	});
 
 	// Heartbeat the listener if a session ID is provided
 	if (sid) {

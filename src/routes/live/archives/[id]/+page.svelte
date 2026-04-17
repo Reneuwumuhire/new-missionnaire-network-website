@@ -5,6 +5,22 @@
 
 	$: rec = data.recording;
 
+	let thumbnailExpanded = false;
+
+	function openThumbnail() {
+		if (!rec.thumbnail_url) return;
+		thumbnailExpanded = true;
+	}
+	function closeThumbnail() {
+		thumbnailExpanded = false;
+	}
+	function onLightboxKeydown(e: KeyboardEvent) {
+		if (e.key === 'Escape') closeThumbnail();
+	}
+	function onBackdropClick(e: MouseEvent) {
+		if (e.target === e.currentTarget) closeThumbnail();
+	}
+
 	function formatDate(iso: string): string {
 		return new Date(iso).toLocaleDateString('fr-FR', {
 			day: 'numeric',
@@ -25,10 +41,15 @@
 	<title>{rec.title} - Missionnaire Network</title>
 	<meta name="description" content="Réécoutez le direct audio du {formatDate(rec.started_at)}." />
 	<link rel="canonical" href="https://missionnaire.net/live/archives/{rec.id}" />
+	{#if rec.thumbnail_url}
+		<meta property="og:image" content={rec.thumbnail_url} />
+	{/if}
 </svelte:head>
 
+<svelte:window on:keydown={onLightboxKeydown} />
+
 <section class="w-full py-14 md:py-20 px-6">
-	<div class="max-w-2xl mx-auto">
+	<div class="max-w-3xl mx-auto">
 		<div class="mb-8">
 			<a
 				href="/live/archives"
@@ -48,10 +69,61 @@
 			</p>
 		</div>
 
-		<div class="border border-stone-200/60 bg-white/40 p-6">
-			<audio controls preload="metadata" class="w-full" src={rec.s3_url}>
-				Votre navigateur ne prend pas en charge l'audio HTML5.
-			</audio>
+		<!-- Thumbnail + Player: side-by-side on desktop, stacked on mobile -->
+		<div class="flex flex-col md:flex-row md:items-stretch gap-4">
+			<!-- Thumbnail (click to expand) -->
+			<div class="md:w-64 md:shrink-0">
+				{#if rec.thumbnail_url}
+					<button
+						type="button"
+						on:click={openThumbnail}
+						aria-label="Agrandir la vignette"
+						class="group relative aspect-video w-full overflow-hidden border border-stone-200/60 bg-stone-100 cursor-zoom-in transition-all duration-300 hover:border-missionnaire/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
+					>
+						<img
+							src={rec.thumbnail_url}
+							alt=""
+							class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+							loading="eager"
+						/>
+						<span class="pointer-events-none absolute inset-0 flex items-end justify-end p-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+							<span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/90 shadow">
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-stone-700">
+									<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+								</svg>
+							</span>
+						</span>
+					</button>
+				{:else}
+					<div class="default-thumbnail relative aspect-video w-full overflow-hidden border border-stone-200/60">
+						<div class="absolute inset-0 flex flex-col items-center justify-center gap-2">
+							<picture>
+								<source srcset="/icons/logo.webp" type="image/webp" />
+								<img
+									src="/icons/logo.png"
+									alt=""
+									class="h-9 w-auto opacity-90"
+									width="150"
+									height="64"
+								/>
+							</picture>
+							<span class="text-[9px] font-bold uppercase tracking-[0.25em] text-missionnaire/70 font-body">
+								Archive
+							</span>
+						</div>
+						<svg class="absolute top-2 right-2 h-3 w-3 text-missionnaire/30" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
+							<path d="M7 0L8.5 5.5L14 7L8.5 8.5L7 14L5.5 8.5L0 7L5.5 5.5L7 0Z" />
+						</svg>
+					</div>
+				{/if}
+			</div>
+
+			<!-- Audio player -->
+			<div class="flex-1 border border-stone-200/60 bg-white/40 p-6 flex items-center">
+				<audio controls preload="metadata" class="w-full" src={rec.s3_url}>
+					Votre navigateur ne prend pas en charge l'audio HTML5.
+				</audio>
+			</div>
 		</div>
 
 		<div class="mt-6 text-center">
@@ -67,3 +139,46 @@
 		</div>
 	</div>
 </section>
+
+{#if thumbnailExpanded && rec.thumbnail_url}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-lightbox-in"
+		on:click={onBackdropClick}
+		on:keydown={onLightboxKeydown}
+		role="dialog"
+		aria-modal="true"
+		aria-label="Vignette du direct"
+		tabindex="-1"
+	>
+		<button
+			type="button"
+			on:click={closeThumbnail}
+			aria-label="Fermer"
+			class="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+		>
+			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+				<path d="M6 6l12 12M6 18L18 6" />
+			</svg>
+		</button>
+		<img
+			src={rec.thumbnail_url}
+			alt={rec.title}
+			class="max-h-[90vh] max-w-[90vw] object-contain shadow-2xl"
+		/>
+	</div>
+{/if}
+
+<style>
+	.default-thumbnail {
+		background:
+			radial-gradient(circle at 30% 20%, rgba(255, 136, 12, 0.08), transparent 60%),
+			linear-gradient(135deg, #FAF6F1 0%, #F1EAE0 100%);
+	}
+	.animate-lightbox-in {
+		animation: lightbox-fade 0.18s ease-out;
+	}
+	@keyframes lightbox-fade {
+		from { opacity: 0; }
+		to { opacity: 1; }
+	}
+</style>
