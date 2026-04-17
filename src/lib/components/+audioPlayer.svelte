@@ -88,7 +88,45 @@
 			return;
 		}
 
-		selectPlaylistItem(nextIndex, true);
+		const nextItem = $playlist[nextIndex];
+		const nextUrl = getPlayableAudioUrl(nextItem as PlayableAudio);
+
+		if (!nextUrl) {
+			isPlaying.set(false);
+			return;
+		}
+
+		// iOS PWA background: keep the audio session alive by swapping src on the
+		// existing element and calling play() synchronously — without pausing
+		// first and without waiting for the async `canplay` event (which the
+		// reactive-statement path relies on). Pausing or deferring play() breaks
+		// background playback when the screen is locked.
+		if (audio) {
+			const encodedUrl = encodeURI(nextUrl);
+			audioSrc = nextUrl; // prevents the reactive $: block from re-loading
+			isAudioReady = false;
+			currentTime = 0;
+			duration = 0;
+			progressBarWidth = 0;
+			indicatorPosition = 0;
+
+			audio.src = encodedUrl;
+			const playPromise = audio.play();
+			if (playPromise) {
+				playPromise.catch((e) => {
+					console.error('[AudioPlayer] Autoplay next failed:', e);
+					isPlaying.set(false);
+				});
+			}
+
+			if ('mediaSession' in navigator) {
+				navigator.mediaSession.playbackState = 'playing';
+			}
+		}
+
+		currentIndex.set(nextIndex);
+		selectAudio.set(nextItem);
+		isPlaying.set(true);
 	}
 
 	const toggleAutoNext = () => {
@@ -194,8 +232,18 @@
 			audio.addEventListener('ended', handleEnded);
 			audio.addEventListener('timeupdate', updateAudioTime);
 			audio.addEventListener('timeupdate', updateIndicator);
-			audio.addEventListener('play', () => { isPlaying.set(true); });
-			audio.addEventListener('pause', () => { isPlaying.set(false); });
+			audio.addEventListener('play', () => {
+				isPlaying.set(true);
+				if ('mediaSession' in navigator) {
+					navigator.mediaSession.playbackState = 'playing';
+				}
+			});
+			audio.addEventListener('pause', () => {
+				isPlaying.set(false);
+				if ('mediaSession' in navigator) {
+					navigator.mediaSession.playbackState = 'paused';
+				}
+			});
 			audio.addEventListener('loadedmetadata', () => {
 				duration = audio.duration;
 				console.log("[AudioPlayer] Metadata loaded, duration:", duration);
