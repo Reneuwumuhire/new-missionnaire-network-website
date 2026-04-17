@@ -662,7 +662,7 @@
 				<div class="flex items-center gap-3">
 					<input
 						type="range"
-						class="live-scrubber flex-1"
+						class="live-scrubber flex-1 max-w-[50%]"
 						min={bufferStart}
 						max={liveEdge}
 						step="0.1"
@@ -671,22 +671,30 @@
 						on:change={onSeekCommit}
 						aria-label="Position dans le direct"
 					/>
-					{#if isAtLive}
-						<span class="text-[11px] font-bold uppercase tracking-[0.15em] font-body text-red-600 shrink-0">
-							● En direct
-						</span>
-					{:else}
+					{#if !isAtLive}
 						<span class="text-[11px] font-mono text-stone-500 tabular-nums shrink-0">
 							{behindLiveLabel}
 						</span>
-						<button
-							type="button"
-							on:click={backToLive}
-							class="text-[10px] font-bold uppercase tracking-[0.15em] font-body text-missionnaire hover:text-missionnaire-dark transition-colors shrink-0"
-						>
-							Revenir au direct
-						</button>
 					{/if}
+					<button
+						type="button"
+						on:click={backToLive}
+						aria-label={isAtLive ? 'Recharger le direct' : 'Revenir au direct'}
+						title={isAtLive ? 'Recharger le direct' : 'Revenir au direct'}
+						class="inline-flex items-center gap-1.5 px-3 py-1.5 border text-[10px] font-bold uppercase tracking-[0.15em] font-body transition-all duration-200 shrink-0 {isAtLive
+							? 'border-red-500 text-red-600 bg-red-50/60 hover:bg-red-100'
+							: 'border-missionnaire text-missionnaire hover:bg-missionnaire hover:text-white'}"
+					>
+						{#if isAtLive}
+							<span class="relative inline-flex h-2 w-2">
+								<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"></span>
+								<span class="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
+							</span>
+							En direct
+						{:else}
+							Revenir au direct
+						{/if}
+					</button>
 				</div>
 				<p class="mt-2 text-[10px] text-stone-400 font-body">
 					Vous pouvez faire glisser le curseur pour revenir en arrière dans ce que vous avez déjà écouté.
@@ -750,7 +758,7 @@
 	.live-scrubber {
 		-webkit-appearance: none;
 		appearance: none;
-		height: 4px;
+		height: 3px;
 		background: rgb(229 225 220);
 		border-radius: 9999px;
 		outline: none;
@@ -759,21 +767,21 @@
 	.live-scrubber::-webkit-slider-thumb {
 		-webkit-appearance: none;
 		appearance: none;
-		width: 14px;
-		height: 14px;
+		width: 11px;
+		height: 11px;
 		border-radius: 9999px;
 		background: #FF880C;
 		border: 2px solid white;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 		cursor: pointer;
 	}
 	.live-scrubber::-moz-range-thumb {
-		width: 14px;
-		height: 14px;
+		width: 11px;
+		height: 11px;
 		border-radius: 9999px;
 		background: #FF880C;
 		border: 2px solid white;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 		cursor: pointer;
 	}
 	.live-scrubber:focus-visible::-webkit-slider-thumb {

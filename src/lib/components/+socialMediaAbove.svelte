@@ -15,7 +15,11 @@
 		: 'bg-stone-900'}"
 >
 	{#if isLive}
-		<a href="/live" class="absolute inset-0 z-0" aria-label="Écouter l'audio en direct"></a>
+		<a
+			href="/live"
+			class="absolute inset-0 z-0 cursor-pointer transition-colors duration-200 hover:bg-red-800"
+			aria-label="Écouter l'audio en direct"
+		></a>
 	{/if}
 
 	<div
@@ -23,7 +27,8 @@
 	>
 		<div class="flex items-center">
 			{#if isLive}
-				<div class="flex items-center gap-2.5 pointer-events-auto">
+				<!-- pointer-events-none so clicks pass through to the full-banner <a> overlay -->
+				<div class="flex items-center gap-2.5 pointer-events-none">
 					<span class="relative flex h-2 w-2">
 						<span
 							class="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"
