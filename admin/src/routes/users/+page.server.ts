@@ -149,16 +149,20 @@ export const actions: Actions = {
 		const canAdd = formData.get('can_add') === 'on';
 		const canEdit = formData.get('can_edit') === 'on';
 		const canDelete = formData.get('can_delete') === 'on';
+		const canManageRecordings = formData.get('can_manage_recordings') === 'on';
 
 		if (!email) {
 			return fail(400, { permError: 'Email requis' });
 		}
 
-		await updateAdminPermissions(email, {
+		const nextPermissions = {
 			can_add: canAdd,
 			can_edit: canEdit,
-			can_delete: canDelete
-		});
+			can_delete: canDelete,
+			can_manage_recordings: canManageRecordings
+		};
+
+		await updateAdminPermissions(email, nextPermissions);
 
 		await logAudit({
 			user_id: locals.user.email,
@@ -166,7 +170,7 @@ export const actions: Actions = {
 			action: 'update',
 			target_collection: 'admin_users',
 			target_id: email,
-			changes: { permissions: { old: 'previous', new: { can_add: canAdd, can_edit: canEdit, can_delete: canDelete } } },
+			changes: { permissions: { old: 'previous', new: nextPermissions } },
 			ip_address: getClientAddress()
 		});
 

@@ -4,6 +4,7 @@ import type { MusicAudio } from '$lib/models/music-audio';
 import type { AdminUser } from '$lib/models/admin-user';
 import type { AdminSession } from '$lib/models/session';
 import type { AuditAction, AuditLog } from '$lib/models/audit-log';
+import type { Recording, RecordingStatus } from '$lib/models/recording';
 
 // ── Serialization ──
 
@@ -375,7 +376,12 @@ export async function resetAdminPassword(email: string, newPasswordHash: string)
 
 export async function updateAdminPermissions(
 	email: string,
-	permissions: { can_add: boolean; can_edit: boolean; can_delete: boolean }
+	permissions: {
+		can_add: boolean;
+		can_edit: boolean;
+		can_delete: boolean;
+		can_manage_recordings: boolean;
+	}
 ): Promise<boolean> {
 	const db = await getDb();
 	const result = await db
@@ -440,4 +446,67 @@ export async function getRecentAuditLogs(limit: number = 20): Promise<AuditLog[]
 	const db = await getDb();
 	const docs = await db.collection('audit_log').find().sort({ timestamp: -1 }).limit(limit).toArray();
 	return docs.map((doc) => serializeDocument<AuditLog>(doc));
+}
+
+// ══════════════════════════════════════
+//  RECORDINGS (live broadcast archive)
+// ══════════════════════════════════════
+
+export async function listRecordings(options: {
+	limit?: number;
+	pageNumber?: number;
+	publishedOnly?: boolean;
+} = {}): Promise<{ data: Recording[]; total: number }> {
+	const { limit = 50, pageNumber = 1, publishedOnly = false } = options;
+	const db = await getDb();
+	const query: Filter<Document> = publishedOnly ? { published: true, status: 'ready' } : {};
+	const skip = (pageNumber - 1) * limit;
+	const total = await db.collection('recordings').countDocuments(query);
+	const data = await db
+		.collection('recordings')
+		.find(query)
+		.sort({ started_at: -1 })
+		.skip(skip)
+		.limit(limit)
+		.toArray();
+	return {
+		data: data.map((doc) => serializeDocument<Recording>(doc)),
+		total
+	};
+}
+
+export async function getRecordingById(id: string): Promise<Recording | null> {
+	const db = await getDb();
+	const doc = await db.collection('recordings').findOne({ _id: new ObjectId(id) });
+	return doc ? serializeDocument<Recording>(doc) : null;
+}
+
+export async function updateRecording(
+	id: string,
+	updates: Partial<{ title: string; published: boolean }>
+): Promise<boolean> {
+	const db = await getDb();
+	const result = await db.collection('recordings').updateOne(
+		{ _id: new ObjectId(id) },
+		{
+			$set: {
+				...updates,
+				updated_at: new Date()
+			}
+		}
+	);
+	return result.modifiedCount > 0;
+}
+
+export async function deleteRecording(id: string): Promise<{ s3_key: string | null } | null> {
+	const db = await getDb();
+	const doc = await db.collection('recordings').findOne({ _id: new ObjectId(id) });
+	if (!doc) return null;
+	await db.collection('recordings').deleteOne({ _id: new ObjectId(id) });
+	return { s3_key: (doc.s3_key as string | null | undefined) ?? null };
+}
+
+export async function countRecordingsByStatus(status: RecordingStatus): Promise<number> {
+	const db = await getDb();
+	return db.collection('recordings').countDocuments({ status });
 }

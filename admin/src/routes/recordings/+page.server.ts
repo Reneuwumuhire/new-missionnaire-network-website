@@ -1,0 +1,28 @@
+import { error } from '@sveltejs/kit';
+import type { PageServerLoad } from './$types';
+import { getPermissions } from '$lib/models/admin-user';
+import { listRecordings } from '../../db/collections';
+import { RecorderError, recorderStatus, type RecorderStatus } from '$lib/server/recorder-client';
+import { getIcecastSnapshot, icecastStreamUrl } from '$lib/server/icecast';
+
+export const load: PageServerLoad = async ({ locals }) => {
+	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
+
+	const [{ data: recordings, total }, statusResult, icecast] = await Promise.all([
+		listRecordings({ limit: 100 }),
+		recorderStatus().catch((err: unknown) => {
+			const message = err instanceof RecorderError ? err.message : (err as Error).message;
+			return { error: message } as const;
+		}),
+		getIcecastSnapshot()
+	]);
+
+	const hasRecorderStatus = (v: unknown): v is RecorderStatus =>
+		typeof v === 'object' && v !== null && 'recording' in v;
+
+	const recorder = hasRecorderStatus(statusResult)
+		? { available: true as const, ...statusResult }
+		: { available: false as const, error: statusResult.error };
+
+	return { recordings, total, recorder, icecast, liveStreamUrl: icecastStreamUrl() };
+};

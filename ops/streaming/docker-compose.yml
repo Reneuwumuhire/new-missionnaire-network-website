@@ -27,3 +27,31 @@ services:
     depends_on:
       - mediamtx
       - icecast
+
+  # Local recorder (Fly runs the same code bundled into the streaming image).
+  # Admin hits http://localhost:8080 directly — no TLS locally.
+  audio-recorder:
+    build:
+      context: .
+      dockerfile: recorder/Dockerfile
+    container_name: mn-audio-recorder
+    restart: unless-stopped
+    depends_on:
+      - icecast
+    environment:
+      - RECORDER_TOKEN=${RECORDER_TOKEN:-change-me}
+      - ICECAST_URL=${ICECAST_URL:-http://icecast:8000/radio.mp3}
+      - MONGODB_URI=${MONGODB_URI}
+      - MONGODB_DB=${MONGODB_DB:-youtube_data}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_S3_BUCKET=${AWS_S3_BUCKET}
+      - AWS_S3_REGION=${AWS_S3_REGION}
+      - MAX_RECORDING_SECONDS=${MAX_RECORDING_SECONDS:-14400}
+    volumes:
+      - recordings_data:/data/recordings
+    ports:
+      - '8080:8080'
+
+volumes:
+  recordings_data:

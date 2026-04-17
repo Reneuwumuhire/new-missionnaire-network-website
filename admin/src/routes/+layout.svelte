@@ -13,7 +13,14 @@
 
 {#if isLoggedIn && data.user}
 	<div class="min-h-screen bg-cream">
-		<Sidebar user={{ name: data.user.name, email: data.user.email, role: data.user.role }} />
+		<Sidebar
+			user={{
+				name: data.user.name,
+				email: data.user.email,
+				role: data.user.role,
+				canManageRecordings: data.user.permissions.can_manage_recordings
+			}}
+		/>
 
 		<!-- Main content -->
 		<main class="lg:pl-64">

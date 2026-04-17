@@ -7,12 +7,13 @@
 		icon: string;
 	}
 
-	let { user }: { user: { name: string; email: string; role?: string } } = $props();
+	let { user }: { user: { name: string; email: string; role?: string; canManageRecordings?: boolean } } = $props();
 
 	const navItems: NavItem[] = $derived([
 		{ href: '/', label: 'Tableau de bord', icon: 'home' },
 		{ href: '/audio', label: 'Bibliothèque audio', icon: 'music' },
 		{ href: '/audio/new', label: 'Importer', icon: 'upload' },
+		...(user.canManageRecordings ? [{ href: '/recordings', label: 'Enregistrements', icon: 'recordings' }] : []),
 		...(user.role === 'superadmin' ? [{ href: '/users', label: 'Utilisateurs', icon: 'users' }] : []),
 		{ href: '/settings', label: 'Paramètres', icon: 'settings' }
 	]);
@@ -113,6 +114,11 @@
 						{:else if item.icon === 'users'}
 							<svg class="h-[15px] w-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 								<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+							</svg>
+						{:else if item.icon === 'recordings'}
+							<svg class="h-[15px] w-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+								<circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" />
+								<path stroke-linecap="round" stroke-linejoin="round" d="M12 3a9 9 0 109 9M12 3v4m0 0a5 5 0 015 5" />
 							</svg>
 						{:else if item.icon === 'settings'}
 							<svg class="h-[15px] w-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">

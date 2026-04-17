@@ -1,11 +1,14 @@
 logLevel: info
 
+api: yes
+
 rtmp: yes
 rtmpAddress: :1935
 
 hls: no
 webrtc: no
-rtsp: no
+rtsp: yes
+rtspAddress: :8554
 srt: no
 
 paths:

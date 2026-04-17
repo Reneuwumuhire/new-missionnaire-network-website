@@ -55,6 +55,25 @@
 	<title>Tableau de bord - Missionnaire Admin</title>
 </svelte:head>
 
+{#if data.liveButNotRecording}
+	<a
+		href="/recordings"
+		class="mb-6 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-5 transition-colors hover:bg-amber-50"
+	>
+		<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100">
+			<svg class="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.2 16c-.77 1.33.2 3 1.73 3z" />
+			</svg>
+		</div>
+		<div class="min-w-0 flex-1">
+			<p class="text-sm font-semibold text-amber-800">Direct détecté — aucun enregistrement en cours</p>
+			<p class="mt-1 text-xs text-amber-600">
+				Un flux audio est actif sur Icecast mais rien n'est sauvegardé. Cliquez pour démarrer l'enregistrement.
+			</p>
+		</div>
+	</a>
+{/if}
+
 <!-- Header -->
 <div class="mb-8 flex items-end justify-between">
 	<div>

@@ -4,6 +4,11 @@ primary_region = "jnb"
 [deploy]
   strategy = "immediate"
 
+# NOTE: Dockerfile needs the repo root as build context (to reach
+# ops/streaming/recorder/). Deploy with:
+#   flyctl deploy --config ops/fly/streaming/fly.toml \
+#                 --dockerfile ops/fly/streaming/Dockerfile
+# (run from repo root — the `dockerfile` line below is a fallback for IDE hints)
 [build]
   dockerfile = "Dockerfile"
 
@@ -12,7 +17,11 @@ primary_region = "jnb"
   AUDIO_MOUNT = "radio.mp3"
   AUDIO_BITRATE = "128k"
   INPUT_PROTOCOL = "rtsp"
+  RECORDINGS_DIR = "/data/recordings"
+  MONGODB_DB = "youtube_data"
+  AWS_S3_REGION = "af-south-1"
 
+# ── Icecast (public audio stream) ──
 [[services]]
   internal_port = 8000
   protocol = "tcp"
@@ -31,6 +40,7 @@ primary_region = "jnb"
     timeout = "2s"
     grace_period = "30s"
 
+# ── RTMP ingest (OBS → mediamtx) ──
 [[services]]
   internal_port = 1935
   protocol = "tcp"
@@ -42,6 +52,29 @@ primary_region = "jnb"
     interval = "15s"
     timeout = "2s"
     grace_period = "30s"
+
+# ── Recorder HTTP API (admin → recorder) ──
+# Exposed on public 8443 with TLS. Admin calls:
+#   https://missionnaire-streaming-app.fly.dev:8443/{start,stop,status,retry/:id}
+[[services]]
+  internal_port = 8080
+  protocol = "tcp"
+
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = 8443
+
+  [[services.tcp_checks]]
+    interval = "30s"
+    timeout = "2s"
+    grace_period = "30s"
+
+# ── Persistent volume for in-progress recordings ──
+# Survives machine restarts so orphan recovery on boot can re-upload any MP3
+# that FFmpeg wrote but never finished uploading to S3.
+[[mounts]]
+  source = "recordings_data"
+  destination = "/data"
 
 [[vm]]
   cpu_kind = "shared"

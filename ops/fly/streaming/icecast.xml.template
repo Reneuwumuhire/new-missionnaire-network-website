@@ -1,6 +1,8 @@
 <icecast>
   <location>Fly.io</location>
   <admin>admin@localhost</admin>
+  <hostname>${ICECAST_HOSTNAME}</hostname>
+  <background>0</background>
 
   <limits>
     <clients>1000</clients>
@@ -20,9 +22,8 @@
     <admin-password>${ICECAST_ADMIN_PASSWORD}</admin-password>
   </authentication>
 
-  <hostname>0.0.0.0</hostname>
-
   <listen-socket>
+    <bind-address>0.0.0.0</bind-address>
     <port>8000</port>
   </listen-socket>
 
@@ -45,5 +46,9 @@
 
   <security>
     <chroot>0</chroot>
+    <changeowner>
+      <user>nobody</user>
+      <group>nogroup</group>
+    </changeowner>
   </security>
 </icecast>

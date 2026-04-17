@@ -1,7 +1,10 @@
 <script lang="ts">
 	import LiveRadioPlayer from '$lib/components/+liveRadioPlayer.svelte';
 	import NotificationBell from '$lib/components/+notificationBell.svelte';
+	import RecentRecordings from '$lib/components/+recentRecordings.svelte';
+	import type { PageData } from './$types';
 
+	export let data: PageData;
 	let bellRef: any;
 </script>
 
@@ -54,6 +57,9 @@
 
 		<!-- Player -->
 		<LiveRadioPlayer />
+
+		<!-- Recent recordings -->
+		<RecentRecordings recordings={data.recentRecordings} />
 
 		<!-- Notification opt-in -->
 		<button

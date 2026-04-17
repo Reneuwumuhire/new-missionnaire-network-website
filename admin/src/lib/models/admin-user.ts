@@ -3,7 +3,8 @@ import { z } from 'zod';
 export const PermissionsSchema = z.object({
 	can_add: z.boolean().default(true),
 	can_edit: z.boolean().default(true),
-	can_delete: z.boolean().default(false)
+	can_delete: z.boolean().default(false),
+	can_manage_recordings: z.boolean().default(false)
 });
 
 export type Permissions = z.infer<typeof PermissionsSchema>;
@@ -11,13 +12,15 @@ export type Permissions = z.infer<typeof PermissionsSchema>;
 export const DEFAULT_PERMISSIONS: Permissions = {
 	can_add: true,
 	can_edit: true,
-	can_delete: false
+	can_delete: false,
+	can_manage_recordings: false
 };
 
 export const SUPERADMIN_PERMISSIONS: Permissions = {
 	can_add: true,
 	can_edit: true,
-	can_delete: true
+	can_delete: true,
+	can_manage_recordings: true
 };
 
 export const AdminUserSchema = z.object({
@@ -40,5 +43,6 @@ export type AdminUser = z.infer<typeof AdminUserSchema>;
 /** Resolve effective permissions — superadmins always get full access */
 export function getPermissions(user: AdminUser): Permissions {
 	if (user.role === 'superadmin') return SUPERADMIN_PERMISSIONS;
-	return user.permissions ?? DEFAULT_PERMISSIONS;
+	const stored = user.permissions ?? {};
+	return { ...DEFAULT_PERMISSIONS, ...stored };
 }

@@ -212,6 +212,9 @@
 								<span class="inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {ep.can_delete ? 'bg-red-100 text-red-700' : 'bg-stone-100 text-stone-400'}">
 									Suppr
 								</span>
+								<span class="inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {ep.can_manage_recordings ? 'bg-purple-100 text-purple-700' : 'bg-stone-100 text-stone-400'}">
+									Enreg.
+								</span>
 								<button
 									onclick={() => permissionsEmail = permissionsEmail === user.email ? null : user.email}
 									class="ml-1 rounded-md p-1 text-stone-400 transition-colors hover:bg-cream-dark hover:text-stone-600"
@@ -370,6 +373,19 @@
 									<div>
 										<span class="text-sm font-medium text-stone-700">Supprimer</span>
 										<p class="text-[10px] text-stone-400">Retirer des audios du serveur</p>
+									</div>
+								</label>
+
+								<label class="flex cursor-pointer items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2 transition-colors has-[:checked]:border-purple-300 has-[:checked]:bg-purple-50">
+									<input
+										type="checkbox"
+										name="can_manage_recordings"
+										checked={ep.can_manage_recordings}
+										class="h-4 w-4 rounded border-stone-300 text-purple-600 focus:ring-purple-500/30"
+									/>
+									<div>
+										<span class="text-sm font-medium text-stone-700">Gérer les enregistrements</span>
+										<p class="text-[10px] text-stone-400">Démarrer / arrêter et publier les directs</p>
 									</div>
 								</label>
 

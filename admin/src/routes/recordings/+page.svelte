@@ -1,0 +1,396 @@
+<script lang="ts">
+	import { onMount, onDestroy } from 'svelte';
+	import { invalidateAll } from '$app/navigation';
+	import type { PageData } from './$types';
+	import type { Recording, RecordingStatus } from '$lib/models/recording';
+
+	let { data }: { data: PageData } = $props();
+
+	type RecorderSnapshot = PageData['recorder'];
+	type IcecastSnapshot = PageData['icecast'];
+
+	const recorder: RecorderSnapshot = $derived(data.recorder);
+	const icecast: IcecastSnapshot = $derived(data.icecast);
+	let elapsed = $state(0);
+	let busy = $state(false);
+	let actionError = $state<string | null>(null);
+	let editing = $state<Record<string, string>>({});
+	let confirmDelete = $state<string | null>(null);
+
+	let pollTimer: ReturnType<typeof setInterval> | null = null;
+	let tickTimer: ReturnType<typeof setInterval> | null = null;
+
+	const isRecording = $derived(recorder.available && 'recording' in recorder && recorder.recording);
+	const showLiveBanner = $derived(
+		icecast.reachable && icecast.sourceActive && !isRecording
+	);
+
+	async function refreshStatus() {
+		// Re-runs the page's load fn, which updates `data.recorder` and `data.icecast`.
+		await invalidateAll();
+		recomputeElapsed();
+	}
+
+	function recomputeElapsed() {
+		if (recorder.available && 'recording' in recorder && recorder.recording && recorder.startedAt) {
+			elapsed = Math.max(0, Math.floor((Date.now() - new Date(recorder.startedAt).getTime()) / 1000));
+		} else {
+			elapsed = 0;
+		}
+	}
+
+	onMount(() => {
+		recomputeElapsed();
+		pollTimer = setInterval(refreshStatus, 5000);
+		tickTimer = setInterval(recomputeElapsed, 1000);
+	});
+
+	onDestroy(() => {
+		if (pollTimer) clearInterval(pollTimer);
+		if (tickTimer) clearInterval(tickTimer);
+	});
+
+	function formatElapsed(sec: number): string {
+		const h = Math.floor(sec / 3600);
+		const m = Math.floor((sec % 3600) / 60);
+		const s = sec % 60;
+		const pad = (n: number) => n.toString().padStart(2, '0');
+		return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+	}
+
+	function formatDuration(sec: number | null | undefined): string {
+		if (sec == null) return '—';
+		return formatElapsed(sec);
+	}
+
+	function formatBytes(bytes: number | null | undefined): string {
+		if (!bytes) return '—';
+		const units = ['B', 'KB', 'MB', 'GB'];
+		let n = bytes;
+		let i = 0;
+		while (n >= 1024 && i < units.length - 1) {
+			n /= 1024;
+			i++;
+		}
+		return `${n.toFixed(1)} ${units[i]}`;
+	}
+
+	function formatDateTime(d: string | Date): string {
+		return new Date(d).toLocaleString('fr-FR', {
+			day: '2-digit',
+			month: 'short',
+			year: 'numeric',
+			hour: '2-digit',
+			minute: '2-digit'
+		});
+	}
+
+	async function start() {
+		if (busy) return;
+		busy = true;
+		actionError = null;
+		try {
+			const res = await fetch('/api/recordings/start', { method: 'POST' });
+			if (!res.ok) {
+				const text = await res.text();
+				actionError = text || `Erreur ${res.status}`;
+			}
+			await refreshStatus();
+			await invalidateAll();
+		} finally {
+			busy = false;
+		}
+	}
+
+	async function stop() {
+		if (busy) return;
+		busy = true;
+		actionError = null;
+		try {
+			const res = await fetch('/api/recordings/stop', { method: 'POST' });
+			if (!res.ok) {
+				const text = await res.text();
+				actionError = text || `Erreur ${res.status}`;
+			}
+			await refreshStatus();
+			await invalidateAll();
+		} finally {
+			busy = false;
+		}
+	}
+
+	async function saveTitle(rec: Recording) {
+		const id = rec._id!;
+		const title = editing[id]?.trim();
+		if (!title || title === rec.title) {
+			delete editing[id];
+			editing = { ...editing };
+			return;
+		}
+		await fetch(`/api/recordings/${id}`, {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ title })
+		});
+		delete editing[id];
+		editing = { ...editing };
+		await invalidateAll();
+	}
+
+	async function togglePublish(rec: Recording) {
+		await fetch(`/api/recordings/${rec._id}`, {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ published: !rec.published })
+		});
+		await invalidateAll();
+	}
+
+	async function retryUpload(id: string) {
+		const res = await fetch(`/api/recordings/retry/${id}`, { method: 'POST' });
+		if (!res.ok) actionError = await res.text();
+		await invalidateAll();
+	}
+
+	async function remove(id: string) {
+		const res = await fetch(`/api/recordings/${id}`, { method: 'DELETE' });
+		if (!res.ok) actionError = await res.text();
+		confirmDelete = null;
+		await invalidateAll();
+	}
+
+	const statusLabel: Record<RecordingStatus, string> = {
+		recording: 'En cours',
+		uploading: 'Téléversement',
+		ready: 'Prêt',
+		failed: 'Échec'
+	};
+
+	function statusClass(status: RecordingStatus): string {
+		switch (status) {
+			case 'ready':
+				return 'bg-green-100 text-green-700';
+			case 'recording':
+				return 'bg-red-100 text-red-700 animate-pulse';
+			case 'uploading':
+				return 'bg-blue-100 text-blue-700';
+			case 'failed':
+				return 'bg-amber-100 text-amber-700';
+		}
+	}
+</script>
+
+<svelte:head>
+	<title>Enregistrements - Missionnaire Admin</title>
+</svelte:head>
+
+<div class="mb-8">
+	<h1 class="font-display text-3xl font-bold text-stone-800">Enregistrements</h1>
+	<p class="mt-1 text-sm text-stone-500">
+		Capture le direct audio en temps réel. {data.total} enregistrement{data.total !== 1 ? 's' : ''}.
+	</p>
+</div>
+
+{#if !recorder.available}
+	<div class="mb-6 rounded-2xl border border-red-200 bg-red-50/80 p-5">
+		<p class="text-sm font-semibold text-red-800">Service d'enregistrement injoignable</p>
+		<p class="mt-1 text-xs text-red-600">{recorder.error}</p>
+	</div>
+{/if}
+
+{#if showLiveBanner}
+	<div class="mb-6 rounded-2xl border border-amber-200 bg-amber-50/80 p-5">
+		<div class="flex items-start gap-3">
+			<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100">
+				<svg class="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.2 16c-.77 1.33.2 3 1.73 3z" />
+				</svg>
+			</div>
+			<div>
+				<p class="text-sm font-semibold text-amber-800">Direct détecté — aucun enregistrement en cours</p>
+				<p class="mt-1 text-xs text-amber-600">
+					Icecast reçoit un flux audio mais rien n'est sauvegardé. Cliquez sur <strong>Démarrer</strong> pour capturer.
+				</p>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Recorder control card -->
+<div class="mb-8 rounded-2xl border border-stone-200/60 bg-white p-6">
+	<div class="flex flex-wrap items-center justify-between gap-4">
+		<div class="flex items-center gap-4">
+			<div class="flex h-12 w-12 items-center justify-center rounded-xl {isRecording ? 'bg-red-50' : 'bg-stone-100'}">
+				{#if isRecording}
+					<span class="h-3 w-3 rounded-full bg-red-500 animate-pulse"></span>
+				{:else}
+					<svg class="h-5 w-5 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 11-14 0M12 18v3m-4 0h8" />
+					</svg>
+				{/if}
+			</div>
+			<div>
+				{#if isRecording}
+					<p class="font-display text-lg font-semibold text-stone-800">Enregistrement en cours</p>
+					<p class="text-xs text-stone-500">
+						Démarré à {recorder.available && 'startedAt' in recorder && recorder.startedAt ? formatDateTime(recorder.startedAt) : '—'}
+					</p>
+				{:else}
+					<p class="font-display text-lg font-semibold text-stone-800">Aucun enregistrement actif</p>
+					<p class="text-xs text-stone-500">
+						{#if icecast.reachable}Flux Icecast {icecast.sourceActive ? 'actif' : 'inactif'} · {icecast.listeners} auditeur{icecast.listeners !== 1 ? 's' : ''}{:else}Icecast injoignable{/if}
+					</p>
+				{/if}
+			</div>
+		</div>
+
+		<div class="flex items-center gap-3">
+			{#if isRecording}
+				<span class="font-mono text-2xl font-semibold text-stone-700 tabular-nums">
+					{formatElapsed(elapsed)}
+				</span>
+				<button
+					onclick={stop}
+					disabled={busy}
+					class="rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+				>
+					{busy ? 'Arrêt…' : 'Arrêter'}
+				</button>
+			{:else}
+				<button
+					onclick={start}
+					disabled={busy || !recorder.available || ('pendingOrphans' in recorder && recorder.pendingOrphans > 0)}
+					class="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-missionnaire-600 disabled:opacity-50"
+				>
+					{busy ? 'Démarrage…' : 'Démarrer l\'enregistrement'}
+				</button>
+			{/if}
+		</div>
+	</div>
+
+	{#if recorder.available && 'pendingOrphans' in recorder && recorder.pendingOrphans > 0}
+		<p class="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+			Récupération en cours : {recorder.pendingOrphans} enregistrement(s) en attente de téléversement.
+		</p>
+	{/if}
+
+	{#if actionError}
+		<p class="mt-4 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{actionError}</p>
+	{/if}
+
+	<!-- Live audio monitor -->
+	<div class="mt-5 flex flex-wrap items-center gap-3 border-t border-stone-100 pt-4">
+		<div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-stone-500">
+			<svg class="h-4 w-4 text-missionnaire" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z" />
+			</svg>
+			Écoute du direct
+		</div>
+		<audio controls preload="none" src={data.liveStreamUrl} class="h-8 flex-1 min-w-[280px]"></audio>
+		<span class="text-[11px] text-stone-400">
+			{icecast.sourceActive ? 'Flux actif' : 'Aucune source active'}
+		</span>
+	</div>
+</div>
+
+<!-- Recordings table -->
+<div class="overflow-hidden rounded-2xl border border-stone-200/60 bg-white">
+	<table class="w-full text-left text-sm">
+		<thead>
+			<tr class="border-b border-stone-100 bg-cream/50">
+				<th class="px-5 py-3.5 font-medium text-stone-500">Titre</th>
+				<th class="px-5 py-3.5 font-medium text-stone-500">Date</th>
+				<th class="px-5 py-3.5 font-medium text-stone-500">Durée</th>
+				<th class="px-5 py-3.5 font-medium text-stone-500">Taille</th>
+				<th class="px-5 py-3.5 font-medium text-stone-500">Statut</th>
+				<th class="px-5 py-3.5 font-medium text-stone-500">Publié</th>
+				<th class="px-5 py-3.5 text-right font-medium text-stone-500">Actions</th>
+			</tr>
+		</thead>
+		<tbody>
+			{#each data.recordings as rec}
+				<tr class="border-b border-stone-50">
+					<td class="px-5 py-4">
+						{#if editing[rec._id!] !== undefined}
+							<input
+								type="text"
+								bind:value={editing[rec._id!]}
+								onblur={() => saveTitle(rec)}
+								onkeydown={(e) => {
+									if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
+									if (e.key === 'Escape') {
+										delete editing[rec._id!];
+										editing = { ...editing };
+									}
+								}}
+								class="admin-input text-sm"
+							/>
+						{:else}
+							<button
+								onclick={() => {
+									editing[rec._id!] = rec.title;
+									editing = { ...editing };
+								}}
+								class="text-left font-medium text-stone-700 transition-colors hover:text-primary"
+							>
+								{rec.title}
+							</button>
+						{/if}
+					</td>
+					<td class="px-5 py-4 text-stone-500">{formatDateTime(rec.started_at)}</td>
+					<td class="px-5 py-4 font-mono text-xs text-stone-500">{formatDuration(rec.duration_sec)}</td>
+					<td class="px-5 py-4 text-stone-500">{formatBytes(rec.size_bytes)}</td>
+					<td class="px-5 py-4">
+						<span class="inline-flex rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {statusClass(rec.status)}">
+							{statusLabel[rec.status]}
+						</span>
+					</td>
+					<td class="px-5 py-4">
+						<button
+							onclick={() => togglePublish(rec)}
+							disabled={rec.status !== 'ready'}
+							aria-label={rec.published ? 'Dépublier' : 'Publier'}
+							title={rec.published ? 'Dépublier' : 'Publier'}
+							class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors {rec.published ? 'bg-primary' : 'bg-stone-200'} disabled:opacity-40"
+						>
+							<span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform {rec.published ? 'translate-x-4' : 'translate-x-0.5'}"></span>
+						</button>
+					</td>
+					<td class="px-5 py-4">
+						<div class="flex items-center justify-end gap-2">
+							{#if rec.status === 'ready' && rec.s3_url}
+								<audio src={rec.s3_url} controls preload="none" class="h-8 w-44"></audio>
+							{/if}
+							{#if rec.status === 'failed'}
+								<button onclick={() => retryUpload(rec._id!)} class="rounded-lg bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-200">
+									Réessayer
+								</button>
+							{/if}
+							{#if confirmDelete === rec._id}
+								<button onclick={() => remove(rec._id!)} class="rounded-lg bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-200">
+									Confirmer
+								</button>
+								<button onclick={() => (confirmDelete = null)} class="rounded-lg px-2 py-1 text-xs text-stone-400 hover:text-stone-600">
+									Annuler
+								</button>
+							{:else}
+								<button onclick={() => (confirmDelete = rec._id!)} class="rounded-lg px-2 py-1.5 text-xs text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600" title="Supprimer">
+									<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
+									</svg>
+								</button>
+							{/if}
+						</div>
+					</td>
+				</tr>
+			{/each}
+			{#if data.recordings.length === 0}
+				<tr>
+					<td colspan="7" class="px-5 py-12 text-center text-stone-400">
+						Aucun enregistrement pour l'instant. Démarrez le premier ci-dessus.
+					</td>
+				</tr>
+			{/if}
+		</tbody>
+	</table>
+</div>
