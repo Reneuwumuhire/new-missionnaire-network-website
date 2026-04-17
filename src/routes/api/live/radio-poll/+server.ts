@@ -57,22 +57,24 @@ export async function GET({ url }) {
 			// flip the gate closed so the public site doesn't show a stalled "live" indicator.
 			adminGate = await applyAutoEndSafety(adminGate, newStatus.isLive);
 
-			// Consume notification_pending: admin set the flag when going live;
-			// we send the push from here (where the VAPID keys + push-notifications lib live).
-			if (adminGate.is_live && adminGate.notification_pending) {
-				await setBroadcastAdminState({ notification_pending: false });
-				adminGate = { ...adminGate, notification_pending: false };
-				console.log('[RadioPoll] Sending Go Live push notification (admin-triggered)');
-				sendPushToAll(radioLivePayload()).catch((e) =>
-					console.error('[RadioPoll] Push send failed:', e)
-				);
-			}
-
 			status = newStatus;
 		} catch (error) {
 			console.error('[RadioPoll] Probe error:', error);
 			// Fall through to return cached status
 		}
+	}
+
+	// Consume notification_pending outside the probe gate — the push must fire
+	// the moment admin opens the gate, regardless of whether we just probed.
+	// The admin go-live endpoint also pings this endpoint directly to ensure
+	// at least one consumer runs right after the click.
+	if (adminGate.is_live && adminGate.notification_pending) {
+		await setBroadcastAdminState({ notification_pending: false });
+		adminGate = { ...adminGate, notification_pending: false };
+		console.log('[RadioPoll] Sending Go Live push notification (admin-triggered)');
+		sendPushToAll(radioLivePayload()).catch((e) =>
+			console.error('[RadioPoll] Push send failed:', e)
+		);
 	}
 
 	// Get listener count

@@ -1,4 +1,5 @@
 import { json, error } from '@sveltejs/kit';
+import { env } from '$env/dynamic/private';
 import type { RequestHandler } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
 import {
@@ -27,6 +28,23 @@ export const POST: RequestHandler = async ({ locals, getClientAddress }) => {
 		// push notification (VAPID keys + web-push live there, not in admin).
 		notification_pending: true
 	});
+
+	// Ping the main-site radio-poll once so the push fires immediately, even if
+	// no public visitor has /live open. Fire-and-forget — failure here must not
+	// block the Go Live action; the flag stays pending and will be consumed by
+	// the next natural radio-poll request from any visitor.
+	if (env.MAIN_SITE_URL) {
+		fetch(`${env.MAIN_SITE_URL.replace(/\/$/, '')}/api/live/radio-poll`, {
+			method: 'GET',
+			headers: { 'Cache-Control': 'no-cache' }
+		}).catch((err) => {
+			console.error('[broadcast/go-live] Main-site ping failed:', err);
+		});
+	} else {
+		console.warn(
+			'[broadcast/go-live] MAIN_SITE_URL not set — push may be delayed until a visitor loads /live'
+		);
+	}
 
 	await logAudit({
 		user_id: locals.user.email,
