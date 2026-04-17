@@ -27,6 +27,29 @@
 	let userWantsToPlay = false;
 	let listenerCount = 0;
 	let keepLiveUi = false;
+	let broadcastTitle: string | null = null;
+	let broadcastThumbnail: string | null = null;
+	let thumbnailExpanded = false;
+
+	function openThumbnail() {
+		if (!broadcastThumbnail) return;
+		thumbnailExpanded = true;
+	}
+
+	function closeThumbnail() {
+		thumbnailExpanded = false;
+	}
+
+	function handleLightboxKeydown(e: KeyboardEvent) {
+		if (e.key === 'Escape') closeThumbnail();
+	}
+
+	function handleBackdropClick(e: MouseEvent) {
+		// Only close when the click is on the backdrop itself, not on the image
+		// or the close button. This avoids putting click handlers on the <img>,
+		// which triggers Svelte's a11y warnings.
+		if (e.target === e.currentTarget) closeThumbnail();
+	}
 
 	// DVR / scrubber state.
 	// We derive the seekable window from audio.buffered + a locally-tracked
@@ -194,7 +217,16 @@
 			const sessionId = getSessionId();
 			const response = await fetch(`/api/live/radio-poll?sid=${encodeURIComponent(sessionId)}`);
 			if (!response.ok) return;
-			const data = (await response.json()) as { isLive: boolean; checkedAt: string; listeners: number; streamUrl?: string };
+			const data = (await response.json()) as {
+				isLive: boolean;
+				checkedAt: string;
+				listeners: number;
+				streamUrl?: string;
+				title?: string | null;
+				thumbnailUrl?: string | null;
+			};
+			broadcastTitle = data.title ?? null;
+			broadcastThumbnail = data.thumbnailUrl ?? null;
 			handleStatusEvent(data.isLive, data.checkedAt, data.listeners, data.streamUrl);
 		} catch {
 			// Network error — keep current state, will retry next interval
@@ -592,60 +624,89 @@
 			{/if}
 		</div>
 
-		<!-- Title and status -->
-		<h2 class="font-display text-2xl md:text-3xl font-semibold {showLive ? 'text-stone-900' : awaitingPlay ? 'text-stone-900' : 'text-stone-700'}">
-			{showLive ? 'Audio en direct' : awaitingPlay ? 'Audio en direct' : 'Audio hors ligne'}
-		</h2>
-		<p class="text-sm text-stone-500 font-body mt-1.5">
-			{statusMessage}
-		</p>
-		{#if checkedAtLabel}
-			<p class="text-[11px] text-stone-400 font-body mt-1">
-				Dernière vérification : {checkedAtLabel}
-			</p>
-		{/if}
-
-		<!-- Controls -->
-		<div class="flex items-center gap-3 mt-6">
-			<button
-				class="inline-flex items-center gap-2.5 px-6 py-3 text-[12px] font-bold uppercase tracking-[0.15em] font-body transition-all duration-300 {canPlay
-					? showLive
-						? 'bg-red-600 hover:bg-red-700 text-white'
-						: 'bg-stone-900 hover:bg-missionnaire text-white'
-					: 'bg-stone-200 text-stone-400 cursor-not-allowed'}"
-				on:click={togglePlay}
-				aria-label={isPlaying ? 'Mettre en pause le direct' : 'Écouter le direct'}
-				disabled={!canPlay}
-			>
-				{#if isPlaying}
-					<svg viewBox="0 0 24 24" class="h-4 w-4 fill-current" aria-hidden="true">
-						<path d="M8 5h3v14H8zm5 0h3v14h-3z" />
-					</svg>
-					<span>Pause</span>
-				{:else}
-					<svg viewBox="0 0 24 24" class="h-4 w-4 fill-current" aria-hidden="true">
-						<path d="M8 5v14l11-7z" />
-					</svg>
-					<span>Lecture</span>
+		<!-- Title + thumbnail (2-column when thumbnail available) -->
+		<div class="flex flex-col md:flex-row md:items-start gap-6">
+			<div class="flex-1 min-w-0">
+				<h2 class="font-display text-2xl md:text-3xl font-semibold {showLive ? 'text-stone-900' : awaitingPlay ? 'text-stone-900' : 'text-stone-700'}">
+					{showLive && broadcastTitle ? broadcastTitle : showLive ? 'Audio en direct' : awaitingPlay ? 'Audio en direct' : 'Audio hors ligne'}
+				</h2>
+				<p class="text-sm text-stone-500 font-body mt-1.5">
+					{statusMessage}
+				</p>
+				{#if checkedAtLabel}
+					<p class="text-[11px] text-stone-400 font-body mt-1">
+						Dernière vérification : {checkedAtLabel}
+					</p>
 				{/if}
-			</button>
 
-			<button
-				class="inline-flex items-center gap-2 px-5 py-3 border text-[12px] font-semibold font-body transition-all duration-300 {canPlay
-					? 'border-stone-200/60 text-stone-600 hover:border-missionnaire hover:text-missionnaire'
-					: 'border-stone-200/40 text-stone-300 cursor-not-allowed'}"
-				on:click={toggleMute}
-				aria-label={isMuted ? 'Activer le son' : 'Couper le son'}
-				disabled={!canPlay}
-			>
-				{#if isMuted}
-					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
-					<span>Son coupé</span>
-				{:else}
-					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-					<span>Couper le son</span>
-				{/if}
-			</button>
+				<!-- Controls -->
+				<div class="flex items-center gap-3 mt-6">
+					<button
+						class="inline-flex items-center gap-2.5 px-6 py-3 text-[12px] font-bold uppercase tracking-[0.15em] font-body transition-all duration-300 {canPlay
+							? showLive
+								? 'bg-red-600 hover:bg-red-700 text-white'
+								: 'bg-stone-900 hover:bg-missionnaire text-white'
+							: 'bg-stone-200 text-stone-400 cursor-not-allowed'}"
+						on:click={togglePlay}
+						aria-label={isPlaying ? 'Mettre en pause le direct' : 'Écouter le direct'}
+						disabled={!canPlay}
+					>
+						{#if isPlaying}
+							<svg viewBox="0 0 24 24" class="h-4 w-4 fill-current" aria-hidden="true">
+								<path d="M8 5h3v14H8zm5 0h3v14h-3z" />
+							</svg>
+							<span>Pause</span>
+						{:else}
+							<svg viewBox="0 0 24 24" class="h-4 w-4 fill-current" aria-hidden="true">
+								<path d="M8 5v14l11-7z" />
+							</svg>
+							<span>Lecture</span>
+						{/if}
+					</button>
+
+					<button
+						class="inline-flex items-center gap-2 px-5 py-3 border text-[12px] font-semibold font-body transition-all duration-300 {canPlay
+							? 'border-stone-200/60 text-stone-600 hover:border-missionnaire hover:text-missionnaire'
+							: 'border-stone-200/40 text-stone-300 cursor-not-allowed'}"
+						on:click={toggleMute}
+						aria-label={isMuted ? 'Activer le son' : 'Couper le son'}
+						disabled={!canPlay}
+					>
+						{#if isMuted}
+							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+							<span>Son coupé</span>
+						{:else}
+							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+							<span>Couper le son</span>
+						{/if}
+					</button>
+				</div>
+			</div>
+
+			{#if showLive && broadcastThumbnail}
+				<div class="md:w-56 md:shrink-0 order-first md:order-last">
+					<button
+						type="button"
+						on:click={openThumbnail}
+						aria-label="Agrandir la vignette"
+						class="group relative aspect-video w-full overflow-hidden border border-stone-200/60 bg-stone-100 cursor-zoom-in transition-all duration-300 hover:border-missionnaire/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
+					>
+						<img
+							src={broadcastThumbnail}
+							alt={broadcastTitle || 'Vignette du direct'}
+							class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+							loading="eager"
+						/>
+						<span class="pointer-events-none absolute inset-0 flex items-end justify-end p-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+							<span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/90 shadow">
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-stone-700">
+									<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+								</svg>
+							</span>
+						</span>
+					</button>
+				</div>
+			{/if}
 		</div>
 
 		<!-- Buffering indicator -->
@@ -740,6 +801,38 @@
 	{/if}
 </div>
 
+<svelte:window on:keydown={handleLightboxKeydown} />
+
+{#if thumbnailExpanded && broadcastThumbnail}
+	<!-- Lightbox: click backdrop or press Escape to close. Image inside
+	     stops propagation so clicking the image itself doesn't dismiss. -->
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-lightbox-in"
+		on:click={handleBackdropClick}
+		on:keydown={handleLightboxKeydown}
+		role="dialog"
+		aria-modal="true"
+		aria-label="Vignette du direct"
+		tabindex="-1"
+	>
+		<button
+			type="button"
+			on:click={closeThumbnail}
+			aria-label="Fermer"
+			class="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+		>
+			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+				<path d="M6 6l12 12M6 18L18 6" />
+			</svg>
+		</button>
+		<img
+			src={broadcastThumbnail}
+			alt={broadcastTitle || 'Vignette du direct'}
+			class="max-h-[90vh] max-w-[90vw] object-contain shadow-2xl"
+		/>
+	</div>
+{/if}
+
 <style>
 	.radio-pulse {
 		animation: radio-glow 2.5s ease-in-out infinite;
@@ -786,5 +879,13 @@
 	}
 	.live-scrubber:focus-visible::-webkit-slider-thumb {
 		box-shadow: 0 0 0 3px rgba(255, 136, 12, 0.3);
+	}
+
+	.animate-lightbox-in {
+		animation: lightbox-fade 0.18s ease-out;
+	}
+	@keyframes lightbox-fade {
+		from { opacity: 0; }
+		to { opacity: 1; }
 	}
 </style>

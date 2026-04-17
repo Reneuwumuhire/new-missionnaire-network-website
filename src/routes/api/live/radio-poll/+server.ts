@@ -92,7 +92,9 @@ export async function GET({ url }) {
 		isLive,
 		checkedAt: status?.checkedAt ?? new Date().toISOString(),
 		listeners,
-		streamUrl: status?.streamUrl
+		streamUrl: status?.streamUrl,
+		title: adminGate.title,
+		thumbnailUrl: adminGate.thumbnail_url
 	});
 }
 

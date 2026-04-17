@@ -168,6 +168,114 @@
 		}
 	}
 
+	// ── Broadcast metadata (title + thumbnail) ──────────────────────
+	let titleDraft = $state<string>('');
+	let titleEditing = $state(false);
+	let titleSaving = $state(false);
+	let thumbnailUploading = $state(false);
+	let thumbnailError = $state<string | null>(null);
+
+	$effect(() => {
+		if (!titleEditing) titleDraft = broadcast.title ?? '';
+	});
+
+	async function saveBroadcastTitle() {
+		const value = titleDraft.trim();
+		if (value === (broadcast.title ?? '')) {
+			titleEditing = false;
+			return;
+		}
+		titleSaving = true;
+		try {
+			const res = await fetch('/api/broadcast/metadata', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ title: value || null })
+			});
+			if (!res.ok) {
+				thumbnailError = (await res.text()) || `Erreur ${res.status}`;
+			} else {
+				titleEditing = false;
+				await invalidateAll();
+			}
+		} finally {
+			titleSaving = false;
+		}
+	}
+
+	async function uploadThumbnail(file: File) {
+		thumbnailError = null;
+		if (!file.type.startsWith('image/')) {
+			thumbnailError = 'Sélectionnez un fichier image';
+			return;
+		}
+		thumbnailUploading = true;
+		try {
+			const presignRes = await fetch('/api/broadcast/thumbnail/presign', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ contentType: file.type, size: file.size })
+			});
+			if (!presignRes.ok) {
+				thumbnailError = (await presignRes.text()) || `Erreur ${presignRes.status}`;
+				return;
+			}
+			const { uploadUrl, key, publicUrl } = (await presignRes.json()) as {
+				uploadUrl: string;
+				key: string;
+				publicUrl: string;
+			};
+			const uploadRes = await fetch(uploadUrl, {
+				method: 'PUT',
+				headers: { 'Content-Type': file.type },
+				body: file
+			});
+			if (!uploadRes.ok) {
+				thumbnailError = 'Échec du téléversement vers S3';
+				return;
+			}
+			const commitRes = await fetch('/api/broadcast/metadata', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ thumbnail_url: publicUrl, thumbnail_s3_key: key })
+			});
+			if (!commitRes.ok) {
+				thumbnailError = (await commitRes.text()) || `Erreur ${commitRes.status}`;
+				return;
+			}
+			await invalidateAll();
+		} finally {
+			thumbnailUploading = false;
+		}
+	}
+
+	async function clearThumbnail() {
+		if (!confirm('Retirer la vignette actuelle ?')) return;
+		thumbnailError = null;
+		thumbnailUploading = true;
+		try {
+			const res = await fetch('/api/broadcast/metadata', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ thumbnail_url: null, thumbnail_s3_key: null })
+			});
+			if (!res.ok) {
+				thumbnailError = (await res.text()) || `Erreur ${res.status}`;
+			} else {
+				await invalidateAll();
+			}
+		} finally {
+			thumbnailUploading = false;
+		}
+	}
+
+	function onThumbnailFileChange(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (file) uploadThumbnail(file);
+		input.value = '';
+	}
+
 	/** End the live broadcast AND stop the recording in one click. Order matters:
 	 *  end-live first so the public site flips offline immediately, then stop
 	 *  recording (which triggers the S3 upload). Single confirmation for both. */
@@ -519,6 +627,120 @@
 		<span class="text-[11px] text-stone-400">
 			{icecast.sourceActive ? 'Flux actif' : 'Aucune source active'}
 		</span>
+	</div>
+
+	<!-- Broadcast metadata: title + thumbnail shown on the public /live page -->
+	<div class="mt-5 border-t border-stone-100 pt-5">
+		<p class="mb-3 text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500">
+			Informations affichées pendant le direct
+		</p>
+		<div class="flex flex-col gap-4 sm:flex-row sm:items-start">
+			<!-- Thumbnail upload -->
+			<div class="flex flex-col gap-2">
+				<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Vignette</span>
+				<div class="relative h-28 w-44 overflow-hidden rounded-xl border border-dashed border-stone-300 bg-cream/40">
+					{#if broadcast.thumbnail_url}
+						<img
+							src={broadcast.thumbnail_url}
+							alt="Vignette du direct"
+							class="h-full w-full object-cover"
+						/>
+					{:else}
+						<div class="flex h-full w-full flex-col items-center justify-center gap-1 text-stone-400">
+							<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+							</svg>
+							<span class="text-[10px]">Aucune vignette</span>
+						</div>
+					{/if}
+					{#if thumbnailUploading}
+						<div class="absolute inset-0 flex items-center justify-center bg-white/80 text-xs font-medium text-stone-600">
+							Téléversement…
+						</div>
+					{/if}
+				</div>
+				<div class="flex gap-2">
+					<label class="cursor-pointer rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-primary hover:text-primary">
+						{broadcast.thumbnail_url ? 'Changer' : 'Téléverser'}
+						<input
+							type="file"
+							accept="image/jpeg,image/png,image/webp,image/gif"
+							class="hidden"
+							onchange={onThumbnailFileChange}
+							disabled={thumbnailUploading}
+						/>
+					</label>
+					{#if broadcast.thumbnail_url}
+						<button
+							type="button"
+							onclick={clearThumbnail}
+							disabled={thumbnailUploading}
+							class="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-500 transition-colors hover:border-red-200 hover:text-red-600 disabled:opacity-50"
+						>
+							Retirer
+						</button>
+					{/if}
+				</div>
+				<p class="text-[10px] text-stone-400">JPEG, PNG, WebP ou GIF · 5 Mo max</p>
+			</div>
+
+			<!-- Title -->
+			<div class="flex flex-1 flex-col gap-2">
+				<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Titre du direct</span>
+				{#if titleEditing}
+					<div class="flex gap-2">
+						<input
+							type="text"
+							bind:value={titleDraft}
+							placeholder="Ex. Prédication du mercredi"
+							maxlength="120"
+							class="admin-input flex-1 text-sm"
+							onkeydown={(e) => {
+								if (e.key === 'Enter') saveBroadcastTitle();
+								if (e.key === 'Escape') titleEditing = false;
+							}}
+						/>
+						<button
+							type="button"
+							onclick={saveBroadcastTitle}
+							disabled={titleSaving}
+							class="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-missionnaire-600 disabled:opacity-50"
+						>
+							{titleSaving ? '…' : 'Enregistrer'}
+						</button>
+						<button
+							type="button"
+							onclick={() => (titleEditing = false)}
+							class="rounded-lg px-2 py-1.5 text-xs text-stone-400 hover:text-stone-600"
+						>
+							Annuler
+						</button>
+					</div>
+				{:else}
+					<div class="flex items-center gap-3">
+						<span class="flex-1 text-sm {broadcast.title ? 'text-stone-700' : 'text-stone-400 italic'}">
+							{broadcast.title || 'Aucun titre (le site affichera «\u00a0Audio en direct\u00a0»)'}
+						</span>
+						<button
+							type="button"
+							onclick={() => {
+								titleDraft = broadcast.title ?? '';
+								titleEditing = true;
+							}}
+							class="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 hover:border-primary hover:text-primary"
+						>
+							Modifier
+						</button>
+					</div>
+				{/if}
+				<p class="text-[10px] text-stone-400">
+					Persiste entre les directs — modifiable à tout moment.
+				</p>
+			</div>
+		</div>
+		{#if thumbnailError}
+			<p class="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{thumbnailError}</p>
+		{/if}
 	</div>
 </div>
 
