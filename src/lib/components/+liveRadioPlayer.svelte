@@ -683,28 +683,50 @@
 				</div>
 			</div>
 
-			{#if showLive && broadcastThumbnail}
+			{#if showLive}
 				<div class="md:w-56 md:shrink-0 order-first md:order-last">
-					<button
-						type="button"
-						on:click={openThumbnail}
-						aria-label="Agrandir la vignette"
-						class="group relative aspect-video w-full overflow-hidden border border-stone-200/60 bg-stone-100 cursor-zoom-in transition-all duration-300 hover:border-missionnaire/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
-					>
-						<img
-							src={broadcastThumbnail}
-							alt={broadcastTitle || 'Vignette du direct'}
-							class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-							loading="eager"
-						/>
-						<span class="pointer-events-none absolute inset-0 flex items-end justify-end p-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-							<span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/90 shadow">
-								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-stone-700">
-									<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
-								</svg>
+					{#if broadcastThumbnail}
+						<button
+							type="button"
+							on:click={openThumbnail}
+							aria-label="Agrandir la vignette"
+							class="group relative aspect-video w-full overflow-hidden border border-stone-200/60 bg-stone-100 cursor-zoom-in transition-all duration-300 hover:border-missionnaire/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
+						>
+							<img
+								src={broadcastThumbnail}
+								alt={broadcastTitle || 'Vignette du direct'}
+								class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+								loading="eager"
+							/>
+							<span class="pointer-events-none absolute inset-0 flex items-end justify-end p-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+								<span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/90 shadow">
+									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-stone-700">
+										<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+									</svg>
+								</span>
 							</span>
-						</span>
-					</button>
+						</button>
+					{:else}
+						<div class="default-thumbnail relative aspect-video w-full overflow-hidden border border-stone-200/60">
+							<div class="absolute inset-0 flex flex-col items-center justify-center gap-2.5">
+								<picture>
+									<source srcset="/icons/logo.webp" type="image/webp" />
+									<img src="/icons/logo.png" alt="" class="h-9 w-auto opacity-90" width="150" height="64" loading="eager" />
+								</picture>
+								<div class="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.25em] text-red-600 font-body">
+									<span class="relative inline-flex h-1.5 w-1.5">
+										<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"></span>
+										<span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500"></span>
+									</span>
+									En direct
+								</div>
+							</div>
+							<!-- Decorative ornament -->
+							<svg class="absolute top-2 right-2 h-3 w-3 text-missionnaire/30" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
+								<path d="M7 0L8.5 5.5L14 7L8.5 8.5L7 14L5.5 8.5L0 7L5.5 5.5L7 0Z" />
+							</svg>
+						</div>
+					{/if}
 				</div>
 			{/if}
 		</div>
@@ -887,5 +909,12 @@
 	@keyframes lightbox-fade {
 		from { opacity: 0; }
 		to { opacity: 1; }
+	}
+
+	/* Default live thumbnail — warm stone gradient matching the site palette */
+	.default-thumbnail {
+		background:
+			radial-gradient(circle at 30% 20%, rgba(255, 136, 12, 0.08), transparent 60%),
+			linear-gradient(135deg, #FAF6F1 0%, #F1EAE0 100%);
 	}
 </style>

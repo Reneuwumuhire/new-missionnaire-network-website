@@ -174,6 +174,21 @@
 	let titleSaving = $state(false);
 	let thumbnailUploading = $state(false);
 	let thumbnailError = $state<string | null>(null);
+	let thumbnailExpanded = $state(false);
+
+	function openThumbnail() {
+		if (!broadcast.thumbnail_url) return;
+		thumbnailExpanded = true;
+	}
+	function closeThumbnail() {
+		thumbnailExpanded = false;
+	}
+	function onLightboxKeydown(e: KeyboardEvent) {
+		if (e.key === 'Escape') closeThumbnail();
+	}
+	function onBackdropClick(e: MouseEvent) {
+		if (e.target === e.currentTarget) closeThumbnail();
+	}
 
 	$effect(() => {
 		if (!titleEditing) titleDraft = broadcast.title ?? '';
@@ -638,27 +653,57 @@
 			<!-- Thumbnail upload -->
 			<div class="flex flex-col gap-2">
 				<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Vignette</span>
-				<div class="relative h-28 w-44 overflow-hidden rounded-xl border border-dashed border-stone-300 bg-cream/40">
-					{#if broadcast.thumbnail_url}
+				{#if broadcast.thumbnail_url}
+					<button
+						type="button"
+						onclick={openThumbnail}
+						aria-label="Agrandir la vignette"
+						class="relative h-28 w-44 overflow-hidden rounded-xl border border-stone-300 bg-cream/40 cursor-zoom-in transition-all hover:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 group"
+					>
 						<img
 							src={broadcast.thumbnail_url}
 							alt="Vignette du direct"
-							class="h-full w-full object-cover"
+							class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
 						/>
-					{:else}
-						<div class="flex h-full w-full flex-col items-center justify-center gap-1 text-stone-400">
-							<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-							</svg>
-							<span class="text-[10px]">Aucune vignette</span>
+						<span class="pointer-events-none absolute inset-0 flex items-end justify-end p-1.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+							<span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/90 shadow">
+								<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-stone-700">
+									<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+								</svg>
+							</span>
+						</span>
+						{#if thumbnailUploading}
+							<div class="absolute inset-0 flex items-center justify-center bg-white/80 text-xs font-medium text-stone-600">
+								Téléversement…
+							</div>
+						{/if}
+					</button>
+				{:else}
+					<!-- Default fallback preview — this is what the public site will show -->
+					<div class="relative h-28 w-44 overflow-hidden rounded-xl border border-dashed border-stone-300 default-thumbnail-admin">
+						<div class="flex h-full w-full flex-col items-center justify-center gap-1.5">
+							<picture>
+								<source srcset="/icons/logo.webp" type="image/webp" />
+								<img src="/icons/logo.png" alt="" class="h-6 w-auto opacity-90" width="150" height="64" />
+							</picture>
+							<div class="flex items-center gap-1 text-[8px] font-bold uppercase tracking-[0.2em] text-red-600">
+								<span class="relative inline-flex h-1 w-1">
+									<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"></span>
+									<span class="relative inline-flex h-1 w-1 rounded-full bg-red-500"></span>
+								</span>
+								En direct
+							</div>
 						</div>
-					{/if}
-					{#if thumbnailUploading}
-						<div class="absolute inset-0 flex items-center justify-center bg-white/80 text-xs font-medium text-stone-600">
-							Téléversement…
-						</div>
-					{/if}
-				</div>
+						<span class="absolute bottom-1 left-1 rounded-sm bg-stone-900/70 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wider text-white">
+							Défaut
+						</span>
+						{#if thumbnailUploading}
+							<div class="absolute inset-0 flex items-center justify-center bg-white/80 text-xs font-medium text-stone-600">
+								Téléversement…
+							</div>
+						{/if}
+					</div>
+				{/if}
 				<div class="flex gap-2">
 					<label class="cursor-pointer rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-primary hover:text-primary">
 						{broadcast.thumbnail_url ? 'Changer' : 'Téléverser'}
@@ -845,3 +890,49 @@
 		</tbody>
 	</table>
 </div>
+
+<svelte:window onkeydown={onLightboxKeydown} />
+
+{#if thumbnailExpanded && broadcast.thumbnail_url}
+	<!-- Lightbox: click backdrop or press Escape to close. -->
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-lightbox-in"
+		onclick={onBackdropClick}
+		onkeydown={onLightboxKeydown}
+		role="dialog"
+		aria-modal="true"
+		aria-label="Vignette du direct"
+		tabindex="-1"
+	>
+		<button
+			type="button"
+			onclick={closeThumbnail}
+			aria-label="Fermer"
+			class="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+		>
+			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+				<path d="M6 6l12 12M6 18L18 6" />
+			</svg>
+		</button>
+		<img
+			src={broadcast.thumbnail_url}
+			alt={broadcast.title || 'Vignette du direct'}
+			class="max-h-[90vh] max-w-[90vw] object-contain shadow-2xl"
+		/>
+	</div>
+{/if}
+
+<style>
+	.default-thumbnail-admin {
+		background:
+			radial-gradient(circle at 30% 20%, rgba(255, 136, 12, 0.08), transparent 60%),
+			linear-gradient(135deg, #FAF6F1 0%, #F1EAE0 100%);
+	}
+	.animate-lightbox-in {
+		animation: lightbox-fade 0.18s ease-out;
+	}
+	@keyframes lightbox-fade {
+		from { opacity: 0; }
+		to { opacity: 1; }
+	}
+</style>
