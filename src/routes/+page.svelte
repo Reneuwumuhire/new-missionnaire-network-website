@@ -323,12 +323,100 @@
 		</div>
 	</div>
 
+	<!-- ═══ LATEST VIDEOS (moved above Mission) ═══ -->
+	{#if recentVideos.length > 0}
+		<section
+			data-reveal="videos"
+			class="reveal-section max-w-6xl mx-auto px-6 pb-16"
+			class:revealed={sectionsVisible['videos']}
+		>
+			<div class="pt-4">
+				<div class="flex items-end justify-between mb-10">
+					<div>
+						<p class="text-[10px] font-semibold uppercase tracking-[0.35em] text-missionnaire font-body mb-2">Nouveautés</p>
+						<h2 class="font-display font-semibold text-3xl md:text-[2.6rem] text-stone-900">Récemment ajouté</h2>
+					</div>
+					<a href="/videos" class="section-cta hidden sm:inline-flex">
+						<span class="section-cta-label">Tout voir</span>
+						<span class="section-cta-arrow" aria-hidden="true">→</span>
+					</a>
+				</div>
+
+				<div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+					{#each recentVideos as video, i (video._id)}
+						{@const publishedLabel = getVideoDateLabel(video)}
+						{@const videoPageUrl = `/videos?v=${video.id || video._id}`}
+						<a
+							href={videoPageUrl}
+							class="video-card group block card-lift border border-stone-200/60 bg-white/40 overflow-hidden"
+							style="animation-delay: {i * 120}ms"
+						>
+							{#if video.thumbnail}
+								<div class="relative overflow-hidden aspect-video">
+									<img
+										src={getSmallThumbnail(video)}
+										alt={video.title}
+										width="320"
+										height="180"
+										loading="lazy"
+										decoding="async"
+										class="w-full h-full object-cover img-zoom"
+									/>
+									<div class="absolute inset-0 bg-stone-900/0 group-hover:bg-stone-900/20 transition-colors duration-300 flex items-center justify-center">
+										<div class="w-11 h-11 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 scale-90 group-hover:scale-100">
+											<svg width="14" height="16" viewBox="0 0 14 16" fill="none">
+												<path d="M2 1.5L12.5 8L2 14.5V1.5Z" fill="#1c1917" stroke="#1c1917" stroke-width="1.5" stroke-linejoin="round"/>
+											</svg>
+										</div>
+									</div>
+								</div>
+							{/if}
+							<div class="p-4">
+								{#if publishedLabel}
+									<p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-400 mb-1.5 font-body">
+										{publishedLabel}
+									</p>
+								{/if}
+								<p class="text-sm font-medium text-stone-700 group-hover:text-missionnaire transition-colors duration-300 line-clamp-2 font-body leading-relaxed">
+									{video.title}
+								</p>
+							</div>
+						</a>
+					{/each}
+				</div>
+
+				<a href="/videos" class="section-cta section-cta-mobile sm:hidden mt-8">
+					<span class="section-cta-label">Tout voir</span>
+					<span class="section-cta-arrow" aria-hidden="true">→</span>
+				</a>
+			</div>
+		</section>
+
+		<!-- ═══ ORNAMENT (between Videos and Mission) ═══ -->
+		<div class="max-w-6xl mx-auto px-6 mb-4">
+			<div class="ornament-line text-missionnaire/40">
+				<svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M7 0L8.5 5.5L14 7L8.5 8.5L7 14L5.5 8.5L0 7L5.5 5.5L7 0Z" fill="currentColor"/></svg>
+			</div>
+		</div>
+	{/if}
+
 	<!-- ═══ MISSION + KEY FIGURES ═══ -->
 	<section
 		data-reveal="mission"
 		class="reveal-section max-w-6xl mx-auto px-6 mb-20"
 		class:revealed={sectionsVisible['mission']}
 	>
+		<div class="flex items-end justify-between mb-10">
+			<div>
+				<p class="text-[10px] font-semibold uppercase tracking-[0.35em] text-missionnaire font-body mb-2">À propos</p>
+				<h2 class="font-display font-semibold text-3xl md:text-[2.6rem] text-stone-900">Notre héritage</h2>
+			</div>
+			<a href="/a-propos" class="section-cta hidden sm:inline-flex">
+				<span class="section-cta-label">En savoir plus</span>
+				<span class="section-cta-arrow" aria-hidden="true">→</span>
+			</a>
+		</div>
+
 		<div class="grid md:grid-cols-12 gap-6 md:gap-8">
 			<!-- Mission editorial image block -->
 			<div class="md:col-span-7">
@@ -455,89 +543,52 @@
 		</div>
 	</section>
 
-	<!-- ═══ ORNAMENT ═══ -->
-	<div class="max-w-6xl mx-auto px-6 mb-4">
-		<div class="ornament-line text-missionnaire/40">
-			<svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M7 0L8.5 5.5L14 7L8.5 8.5L7 14L5.5 8.5L0 7L5.5 5.5L7 0Z" fill="currentColor"/></svg>
-		</div>
-	</div>
-
-	<!-- ═══ LATEST VIDEOS ═══ -->
-	{#if recentVideos.length > 0}
-		<section
-			data-reveal="videos"
-			class="reveal-section max-w-6xl mx-auto px-6 pb-24"
-			class:revealed={sectionsVisible['videos']}
-		>
-			<div class="pt-12">
-				<div class="flex items-end justify-between mb-10">
-					<div>
-						<p class="text-[10px] font-semibold uppercase tracking-[0.35em] text-missionnaire font-body mb-2">Nouveautés</p>
-						<h2 class="font-display font-semibold text-3xl md:text-[2.6rem] text-stone-900">Récemment ajouté</h2>
-					</div>
-					<a
-						href="/videos"
-						class="text-[11px] font-semibold text-stone-400 hover:text-missionnaire uppercase tracking-[0.2em] transition-colors font-body hidden sm:block"
-					>
-						Tout voir →
-					</a>
-				</div>
-
-				<div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
-					{#each recentVideos as video, i (video._id)}
-						{@const publishedLabel = getVideoDateLabel(video)}
-						{@const videoPageUrl = `/videos?v=${video.id || video._id}`}
-						<a
-							href={videoPageUrl}
-							class="video-card group block card-lift border border-stone-200/60 bg-white/40 overflow-hidden"
-							style="animation-delay: {i * 120}ms"
-						>
-							{#if video.thumbnail}
-								<div class="relative overflow-hidden aspect-video">
-									<img
-										src={getSmallThumbnail(video)}
-										alt={video.title}
-										width="320"
-										height="180"
-										loading="lazy"
-										decoding="async"
-										class="w-full h-full object-cover img-zoom"
-									/>
-									<div class="absolute inset-0 bg-stone-900/0 group-hover:bg-stone-900/20 transition-colors duration-300 flex items-center justify-center">
-										<div class="w-11 h-11 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 scale-90 group-hover:scale-100">
-											<svg width="14" height="16" viewBox="0 0 14 16" fill="none">
-												<path d="M2 1.5L12.5 8L2 14.5V1.5Z" fill="#1c1917" stroke="#1c1917" stroke-width="1.5" stroke-linejoin="round"/>
-											</svg>
-										</div>
-									</div>
-								</div>
-							{/if}
-							<div class="p-4">
-								{#if publishedLabel}
-									<p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-400 mb-1.5 font-body">
-										{publishedLabel}
-									</p>
-								{/if}
-								<p class="text-sm font-medium text-stone-700 group-hover:text-missionnaire transition-colors duration-300 line-clamp-2 font-body leading-relaxed">
-									{video.title}
-								</p>
-							</div>
-						</a>
-					{/each}
-				</div>
-
-				<a
-					href="/videos"
-					class="block text-center mt-8 text-[11px] font-semibold text-stone-400 hover:text-missionnaire uppercase tracking-[0.2em] transition-colors font-body sm:hidden"
-				>
-					Tout voir →
-				</a>
-			</div>
-		</section>
-	{/if}
 </main>
 
 <style>
+	/* ── Section-level CTA links (Tout voir, En savoir plus, etc.) ── */
+	.section-cta {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.5rem 1rem;
+		border: 1px solid rgba(255, 136, 12, 0.25);
+		color: #FF880C;
+		font-family: var(--font-body, inherit);
+		font-size: 11px;
+		font-weight: 600;
+		letter-spacing: 0.2em;
+		text-transform: uppercase;
+		border-radius: 9999px;
+		transition: background-color 220ms ease, border-color 220ms ease, color 220ms ease;
+	}
+	.section-cta:hover {
+		background-color: #FF880C;
+		border-color: #FF880C;
+		color: #ffffff;
+	}
+	.section-cta:focus-visible {
+		outline: none;
+		box-shadow: 0 0 0 3px rgba(255, 136, 12, 0.3);
+	}
+	.section-cta-arrow {
+		display: inline-block;
+		transition: transform 220ms ease;
+	}
+	.section-cta:hover .section-cta-arrow {
+		transform: translateX(3px);
+	}
+	.section-cta-label {
+		/* So the text can never wrap on small viewports */
+		white-space: nowrap;
+	}
+	/* Mobile variant: centered and full width under the grid */
+	.section-cta-mobile {
+		justify-content: center;
+		margin-left: auto;
+		margin-right: auto;
+	}
+
 	/* ── Grain texture ── */
 	.grain-texture {
 		background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
