@@ -28,6 +28,17 @@
 	let listenerCount = 0;
 	let keepLiveUi = false;
 
+	// DVR / scrubber state.
+	// We derive the seekable window from audio.buffered + a locally-tracked
+	// "liveEdge" (the highest currentTime we've seen while playing forward).
+	// We do NOT use audio.seekable or audio.duration because Icecast MP3
+	// streams report them as Infinity, which breaks arithmetic & UI.
+	let currentTime = 0;
+	let bufferStart = 0;
+	let liveEdge = 0;
+	let isSeeking = false;
+	const LIVE_THRESHOLD_SEC = 3;
+
 	let probeReachable = false;
 	let confirmedLive = false;
 	let playbackFailed = false;
@@ -71,6 +82,19 @@
 	// Button stays enabled after failure so user can manually retry
 	$: canPlay = probeReachable || confirmedLive || playbackFailed;
 	$: statusMessage = STATUS_MESSAGES[statusKey] || '';
+	$: behindLiveSec = Math.max(0, liveEdge - currentTime);
+	$: isAtLive = behindLiveSec < LIVE_THRESHOLD_SEC;
+	$: hasSeekableRange =
+		Number.isFinite(liveEdge) && Number.isFinite(bufferStart) && liveEdge > bufferStart + 1;
+	$: behindLiveLabel = formatBehindLive(behindLiveSec);
+
+	function formatBehindLive(sec: number): string {
+		if (!Number.isFinite(sec) || sec < 0) return '';
+		const s = Math.floor(sec);
+		const m = Math.floor(s / 60);
+		const rem = s % 60;
+		return `-${m}:${rem.toString().padStart(2, '0')}`;
+	}
 	$: checkedAtLabel = lastCheckedAt
 		? new Date(lastCheckedAt).toLocaleTimeString('fr-FR', {
 				hour: '2-digit',
@@ -296,12 +320,12 @@
 		if (!audio) return;
 
 		if (!audio.paused || reconnectTimer) {
-			cancelNoAudioGrace();
+			// Pause only — keep the audio session + buffer intact so
+			// resume plays from where the listener paused (time-shift).
 			userWantsToPlay = false;
 			clearReconnectTimer();
 			reconnectAttempts = 0;
 			audio.pause();
-			confirmedLive = false;
 			return;
 		}
 
@@ -312,25 +336,140 @@
 		}
 
 		hasError = false;
-		isBuffering = true;
 		userWantsToPlay = true;
 		playbackFailed = false;
 		reconnectAttempts = 0;
-		statusKey = 'connecting';
 
-		audio.src = getStreamUrl();
-		audio.load();
+		// Only load a fresh stream on first play or after a reconnect cleared src.
+		// Otherwise resume from buffered position.
+		const needsFreshStream = !audio.src || audio.src === location.href || audio.error;
+		if (needsFreshStream) {
+			isBuffering = true;
+			statusKey = 'connecting';
+			audio.src = getStreamUrl();
+			audio.load();
+		}
 
 		try {
 			await audio.play();
 		} catch (error) {
 			console.error('[LiveRadio] Playback error:', error);
+			// If resuming from buffered position failed (often because the
+			// buffer expired during a long pause), fall back to a fresh stream.
+			if (!needsFreshStream) {
+				try {
+					isBuffering = true;
+					statusKey = 'reconnecting';
+					audio.src = getStreamUrl();
+					audio.load();
+					await audio.play();
+					return;
+				} catch (retryError) {
+					console.error('[LiveRadio] Fresh stream retry failed:', retryError);
+				}
+			}
 			hasError = true;
 			isPlaying = false;
 			isBuffering = false;
 			userWantsToPlay = false;
 			statusKey = 'cannotPlay';
 		}
+	};
+
+	/** Jump the playhead to the current live edge.
+	 *  For Icecast (continuous MP3), the most reliable way to get truly-live
+	 *  audio is to reconnect to a fresh stream — seeking within the buffer
+	 *  only gets you to the end of what the browser has already downloaded. */
+	const backToLive = async () => {
+		if (!audio) return;
+		userWantsToPlay = true;
+		isBuffering = true;
+		statusKey = 'connecting';
+		hasError = false;
+		reconnectAttempts = 0;
+		// Reset local tracking so we start a fresh window
+		currentTime = 0;
+		bufferStart = 0;
+		liveEdge = 0;
+		audio.src = getStreamUrl();
+		audio.load();
+		try {
+			await audio.play();
+		} catch {
+			// handleError will fire if playback fails
+		}
+	};
+
+	const handleTimeUpdate = () => {
+		if (!audio) return;
+		if (!isSeeking) {
+			currentTime = audio.currentTime;
+		}
+		if (!isSeeking && isPlaying && audio.currentTime > liveEdge) {
+			liveEdge = audio.currentTime;
+		}
+		updateBufferRange();
+	};
+
+	const handleProgress = () => {
+		if (!audio) return;
+		updateBufferRange();
+	};
+
+	/** Snap the scrubber bounds to the contiguous buffered range that contains
+	 *  the playhead. Icecast doesn't support server-side seeking, so seeking
+	 *  outside the buffered range stalls indefinitely. */
+	function updateBufferRange() {
+		if (!audio || audio.buffered.length === 0) return;
+		const t = audio.currentTime;
+		let idx = -1;
+		for (let i = 0; i < audio.buffered.length; i++) {
+			const s = audio.buffered.start(i);
+			const e = audio.buffered.end(i);
+			if (t >= s - 0.5 && t <= e + 0.5) {
+				idx = i;
+				break;
+			}
+		}
+		// If the playhead isn't in any range (stalled in a gap), use the latest range.
+		if (idx === -1) idx = audio.buffered.length - 1;
+		const start = audio.buffered.start(idx);
+		const end = audio.buffered.end(idx);
+		if (Number.isFinite(start)) bufferStart = start;
+		if (Number.isFinite(end) && end > liveEdge) liveEdge = end;
+	}
+
+	const onSeekInput = (event: Event) => {
+		if (!audio) return;
+		const target = event.target as HTMLInputElement;
+		const value = Number(target.value);
+		isSeeking = true;
+		currentTime = value;
+	};
+
+	const onSeekCommit = (event: Event) => {
+		if (!audio) return;
+		const target = event.target as HTMLInputElement;
+		let value = Number(target.value);
+		// Re-check buffered ranges at commit time — they may have shifted since
+		// the user started dragging. Clamp to the latest contiguous range so
+		// we never seek into purged/non-existent data (which on Icecast would
+		// stall the player indefinitely).
+		if (audio.buffered.length > 0) {
+			const last = audio.buffered.length - 1;
+			const safeStart = audio.buffered.start(last);
+			const safeEnd = audio.buffered.end(last);
+			if (Number.isFinite(safeStart) && Number.isFinite(safeEnd)) {
+				value = Math.max(safeStart, Math.min(safeEnd, value));
+			}
+		}
+		try {
+			audio.currentTime = value;
+			currentTime = value;
+		} catch {
+			// ignore
+		}
+		isSeeking = false;
 	};
 
 	const toggleMute = () => {
@@ -516,6 +655,44 @@
 				<span class="text-[11px] text-stone-400 font-body">Chargement...</span>
 			</div>
 		{/if}
+
+		<!-- Scrubber (only shown when there's a seekable buffer) -->
+		{#if hasSeekableRange}
+			<div class="mt-6">
+				<div class="flex items-center gap-3">
+					<input
+						type="range"
+						class="live-scrubber flex-1"
+						min={bufferStart}
+						max={liveEdge}
+						step="0.1"
+						value={currentTime}
+						on:input={onSeekInput}
+						on:change={onSeekCommit}
+						aria-label="Position dans le direct"
+					/>
+					{#if isAtLive}
+						<span class="text-[11px] font-bold uppercase tracking-[0.15em] font-body text-red-600 shrink-0">
+							● En direct
+						</span>
+					{:else}
+						<span class="text-[11px] font-mono text-stone-500 tabular-nums shrink-0">
+							{behindLiveLabel}
+						</span>
+						<button
+							type="button"
+							on:click={backToLive}
+							class="text-[10px] font-bold uppercase tracking-[0.15em] font-body text-missionnaire hover:text-missionnaire-dark transition-colors shrink-0"
+						>
+							Revenir au direct
+						</button>
+					{/if}
+				</div>
+				<p class="mt-2 text-[10px] text-stone-400 font-body">
+					Vous pouvez faire glisser le curseur pour revenir en arrière dans ce que vous avez déjà écouté.
+				</p>
+			</div>
+		{/if}
 	</div>
 
 	<!-- Offline info card -->
@@ -549,6 +726,8 @@
 			on:canplay={handleCanPlay}
 			on:error={handleError}
 			on:ended={handleEnded}
+			on:timeupdate={handleTimeUpdate}
+			on:progress={handleProgress}
 		></audio>
 	{/if}
 </div>
@@ -565,5 +744,39 @@
 		50% {
 			box-shadow: 0 0 0 6px rgba(255, 136, 12, 0.12);
 		}
+	}
+
+	/* Minimal cross-browser scrubber styling */
+	.live-scrubber {
+		-webkit-appearance: none;
+		appearance: none;
+		height: 4px;
+		background: rgb(229 225 220);
+		border-radius: 9999px;
+		outline: none;
+		cursor: pointer;
+	}
+	.live-scrubber::-webkit-slider-thumb {
+		-webkit-appearance: none;
+		appearance: none;
+		width: 14px;
+		height: 14px;
+		border-radius: 9999px;
+		background: #FF880C;
+		border: 2px solid white;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+		cursor: pointer;
+	}
+	.live-scrubber::-moz-range-thumb {
+		width: 14px;
+		height: 14px;
+		border-radius: 9999px;
+		background: #FF880C;
+		border: 2px solid white;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+		cursor: pointer;
+	}
+	.live-scrubber:focus-visible::-webkit-slider-thumb {
+		box-shadow: 0 0 0 3px rgba(255, 136, 12, 0.3);
 	}
 </style>
