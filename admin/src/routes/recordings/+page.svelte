@@ -168,6 +168,61 @@
 		}
 	}
 
+	/** End the live broadcast AND stop the recording in one click. Order matters:
+	 *  end-live first so the public site flips offline immediately, then stop
+	 *  recording (which triggers the S3 upload). Single confirmation for both. */
+	async function stopBoth() {
+		if (broadcastBusy || busy) return;
+		if (!confirm('Terminer le direct ET arrêter l\'enregistrement ?')) return;
+		broadcastBusy = true;
+		busy = true;
+		actionError = null;
+		try {
+			const liveRes = await fetch('/api/broadcast/end-live', { method: 'POST' });
+			if (!liveRes.ok) {
+				actionError = (await liveRes.text()) || `Erreur fin direct: ${liveRes.status}`;
+			}
+			const recRes = await fetch('/api/recordings/stop', { method: 'POST' });
+			if (!recRes.ok) {
+				const recErr = (await recRes.text()) || `${recRes.status}`;
+				actionError = actionError ? `${actionError} · arrêt enregistrement: ${recErr}` : `Arrêt enregistrement: ${recErr}`;
+			}
+			await invalidateAll();
+		} finally {
+			broadcastBusy = false;
+			busy = false;
+		}
+	}
+
+	/** Fire both actions in sequence. Confirmation happens once up-front; if
+	 *  recording start fails after the push already went out, surface an error
+	 *  but leave the broadcast running — admin can retry recording separately. */
+	async function startBoth() {
+		if (broadcastBusy || busy) return;
+		const msg = subscriberCount > 0
+			? `Aller en direct ET démarrer l'enregistrement ? Une notification sera envoyée à ${subscriberCount} abonné${subscriberCount > 1 ? 's' : ''}.`
+			: 'Aller en direct ET démarrer l\'enregistrement ?';
+		if (!confirm(msg)) return;
+		broadcastBusy = true;
+		busy = true;
+		actionError = null;
+		try {
+			const liveRes = await fetch('/api/broadcast/go-live', { method: 'POST' });
+			if (!liveRes.ok) {
+				actionError = (await liveRes.text()) || `Erreur ${liveRes.status}`;
+				return;
+			}
+			const recRes = await fetch('/api/recordings/start', { method: 'POST' });
+			if (!recRes.ok) {
+				actionError = `Direct démarré, mais échec de l'enregistrement: ${(await recRes.text()) || recRes.status}`;
+			}
+			await invalidateAll();
+		} finally {
+			broadcastBusy = false;
+			busy = false;
+		}
+	}
+
 	function formatTime(iso: string | null): string {
 		if (!iso) return '—';
 		return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -271,12 +326,35 @@
 	</div>
 {/if}
 
-<!-- Broadcast (Go Live / End Live) control card -->
-<div class="mb-6 rounded-2xl border bg-white p-6 {broadcast.is_live ? 'border-red-200' : 'border-stone-200/60'}">
+<!-- Unified broadcast + recording control card -->
+{#snippet iconBroadcast()}
+	<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+		<path stroke-linecap="round" stroke-linejoin="round" d="M5.636 5.636a9 9 0 010 12.728m12.728 0a9 9 0 010-12.728M8.464 8.464a5 5 0 000 7.072m7.072 0a5 5 0 000-7.072M12 12h.01" />
+	</svg>
+{/snippet}
+{#snippet iconRecord()}
+	<svg class="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
+		<circle cx="12" cy="12" r="6" fill="currentColor" />
+	</svg>
+{/snippet}
+{#snippet iconStop()}
+	<svg class="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
+		<rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor" />
+	</svg>
+{/snippet}
+{#snippet iconBoth()}
+	<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+		<circle cx="9" cy="12" r="3" fill="currentColor" stroke="none" />
+		<path stroke-linecap="round" stroke-linejoin="round" d="M15 9a4.5 4.5 0 010 6m2.5-8.5a8 8 0 010 11" />
+	</svg>
+{/snippet}
+
+<div class="mb-8 rounded-2xl border bg-white p-6 {broadcast.is_live ? 'border-red-200' : 'border-stone-200/60'}">
+	<!-- Header: status + timers -->
 	<div class="flex flex-wrap items-center justify-between gap-4">
 		<div class="flex items-center gap-4">
-			<div class="flex h-12 w-12 items-center justify-center rounded-xl {broadcast.is_live ? 'bg-red-50' : 'bg-stone-100'}">
-				{#if broadcast.is_live}
+			<div class="flex h-12 w-12 items-center justify-center rounded-xl {broadcast.is_live || isRecording ? 'bg-red-50' : 'bg-stone-100'}">
+				{#if broadcast.is_live || isRecording}
 					<span class="relative inline-flex h-2.5 w-2.5">
 						<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"></span>
 						<span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500"></span>
@@ -287,105 +365,136 @@
 					</svg>
 				{/if}
 			</div>
+
 			<div>
-				{#if broadcast.is_live}
-					<p class="font-display text-lg font-semibold text-red-700">Audience en direct</p>
+				{#if broadcast.is_live && isRecording}
+					<p class="font-display text-lg font-semibold text-red-700">En direct + enregistrement</p>
 					<p class="text-xs text-stone-500">
-						Démarré à {formatTime(broadcast.started_at)} · le site public affiche le lecteur
+						Audience en direct · capture en cours vers S3
+					</p>
+				{:else if broadcast.is_live}
+					<p class="font-display text-lg font-semibold text-red-700">En direct</p>
+					<p class="text-xs text-stone-500">
+						Démarré à {formatTime(broadcast.started_at)} · {icecast.listeners} auditeur{icecast.listeners !== 1 ? 's' : ''}
+					</p>
+				{:else if isRecording}
+					<p class="font-display text-lg font-semibold text-stone-800">Enregistrement seul</p>
+					<p class="text-xs text-stone-500">
+						Capture silencieuse · audience hors ligne
 					</p>
 				{:else}
-					<p class="font-display text-lg font-semibold text-stone-800">Audience hors ligne</p>
+					<p class="font-display text-lg font-semibold text-stone-800">Prêt à diffuser</p>
 					<p class="text-xs text-stone-500">
-						Le site public ne montre pas le lecteur, même si Icecast diffuse.
-						{subscriberCount > 0 ? `${subscriberCount} abonné${subscriberCount > 1 ? 's' : ''} aux notifications.` : ''}
+						{#if icecast.reachable}
+							Flux Icecast {icecast.sourceActive ? 'actif' : 'inactif'} · {icecast.listeners} auditeur{icecast.listeners !== 1 ? 's' : ''}
+						{:else}
+							Icecast injoignable
+						{/if}
+						{#if subscriberCount > 0} · {subscriberCount} abonné{subscriberCount > 1 ? 's' : ''}{/if}
 					</p>
 				{/if}
 			</div>
 		</div>
 
-		<div class="flex items-center gap-3">
+		<!-- Live timers (shown only for active states) -->
+		{#if broadcast.is_live || isRecording}
+			<div class="flex items-center gap-5">
+				{#if broadcast.is_live}
+					<div class="flex flex-col items-end">
+						<span class="text-[9px] font-bold uppercase tracking-[0.2em] text-red-600">Direct</span>
+						<span class="font-mono text-2xl font-semibold text-red-700 tabular-nums leading-tight">
+							{formatElapsed(broadcastElapsed)}
+						</span>
+					</div>
+				{/if}
+				{#if isRecording}
+					<div class="flex flex-col items-end">
+						<span class="text-[9px] font-bold uppercase tracking-[0.2em] text-stone-500">Enregistrement</span>
+						<span class="font-mono text-2xl font-semibold text-stone-700 tabular-nums leading-tight">
+							{formatElapsed(elapsed)}
+						</span>
+					</div>
+				{/if}
+			</div>
+		{/if}
+	</div>
+
+	<!-- Actions -->
+	<div class="mt-5 flex flex-wrap gap-2.5 border-t border-stone-100 pt-5">
+		{#if !icecast.sourceActive && !broadcast.is_live && !isRecording}
+			<span class="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm font-medium text-stone-400">
+				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+				</svg>
+				En attente d'un flux audio… (démarrez OBS)
+			</span>
+		{:else}
+			<!-- Broadcast controls -->
 			{#if broadcast.is_live}
-				<span class="font-mono text-2xl font-semibold text-red-700 tabular-nums" title="Durée depuis le début du direct">
-					{formatElapsed(broadcastElapsed)}
-				</span>
 				<button
 					onclick={endLive}
 					disabled={broadcastBusy}
-					class="rounded-xl bg-stone-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-stone-800 disabled:opacity-50"
+					class="inline-flex items-center gap-2 rounded-xl bg-stone-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-stone-800 disabled:opacity-50"
 				>
+					{@render iconStop()}
 					{broadcastBusy ? '…' : 'Terminer le direct'}
 				</button>
 			{:else if icecast.sourceActive}
 				<button
 					onclick={goLive}
 					disabled={broadcastBusy}
-					class="rounded-xl bg-green-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-50"
+					class="inline-flex items-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-50"
 				>
-					{broadcastBusy ? '…' : 'Aller en direct'}
+					{@render iconBroadcast()}
+					{broadcastBusy ? '…' : isRecording ? 'Aller en direct aussi' : 'Aller en direct'}
 				</button>
-			{:else}
-				<span class="rounded-xl border border-stone-200 bg-stone-50 px-5 py-2.5 text-sm font-medium text-stone-400" title="Démarrez OBS d'abord pour activer ce bouton">
-					En attente d'un flux audio…
-				</span>
 			{/if}
-		</div>
-	</div>
-</div>
 
-<!-- Recorder control card -->
-<div class="mb-8 rounded-2xl border border-stone-200/60 bg-white p-6">
-	<div class="flex flex-wrap items-center justify-between gap-4">
-		<div class="flex items-center gap-4">
-			<div class="flex h-12 w-12 items-center justify-center rounded-xl {isRecording ? 'bg-red-50' : 'bg-stone-100'}">
-				{#if isRecording}
-					<span class="h-3 w-3 rounded-full bg-red-500 animate-pulse"></span>
-				{:else}
-					<svg class="h-5 w-5 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 11-14 0M12 18v3m-4 0h8" />
-					</svg>
-				{/if}
-			</div>
-			<div>
-				{#if isRecording}
-					<p class="font-display text-lg font-semibold text-stone-800">Enregistrement en cours</p>
-					<p class="text-xs text-stone-500">
-						Démarré à {recorder.available && 'startedAt' in recorder && recorder.startedAt ? formatDateTime(recorder.startedAt) : '—'}
-					</p>
-				{:else}
-					<p class="font-display text-lg font-semibold text-stone-800">Aucun enregistrement actif</p>
-					<p class="text-xs text-stone-500">
-						{#if icecast.reachable}Flux Icecast {icecast.sourceActive ? 'actif' : 'inactif'} · {icecast.listeners} auditeur{icecast.listeners !== 1 ? 's' : ''}{:else}Icecast injoignable{/if}
-					</p>
-				{/if}
-			</div>
-		</div>
-
-		<div class="flex items-center gap-3">
+			<!-- Recording controls -->
 			{#if isRecording}
-				<span class="font-mono text-2xl font-semibold text-stone-700 tabular-nums">
-					{formatElapsed(elapsed)}
-				</span>
 				<button
 					onclick={stop}
 					disabled={busy}
-					class="rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+					class="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
 				>
-					{busy ? 'Arrêt…' : 'Arrêter'}
+					{@render iconStop()}
+					{busy ? 'Arrêt…' : 'Arrêter l\'enregistrement'}
 				</button>
 			{:else if icecast.sourceActive}
 				<button
 					onclick={start}
 					disabled={busy || !recorder.available || ('pendingOrphans' in recorder && recorder.pendingOrphans > 0)}
-					class="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-missionnaire-600 disabled:opacity-50"
+					class="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-missionnaire-600 disabled:opacity-50"
 				>
-					{busy ? 'Démarrage…' : 'Démarrer l\'enregistrement'}
+					{@render iconRecord()}
+					{busy ? 'Démarrage…' : broadcast.is_live ? 'Démarrer l\'enregistrement aussi' : 'Démarrer l\'enregistrement'}
 				</button>
-			{:else}
-				<span class="rounded-xl border border-stone-200 bg-stone-50 px-5 py-2.5 text-sm font-medium text-stone-400">
-					En attente d'un flux audio…
-				</span>
 			{/if}
-		</div>
+
+			<!-- Combined start (only when nothing is active) -->
+			{#if !broadcast.is_live && !isRecording && icecast.sourceActive}
+				<button
+					onclick={startBoth}
+					disabled={broadcastBusy || busy || !recorder.available || ('pendingOrphans' in recorder && recorder.pendingOrphans > 0)}
+					class="inline-flex items-center gap-2 rounded-xl border-2 border-stone-800 bg-stone-800 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-stone-900 disabled:opacity-50"
+				>
+					{@render iconBoth()}
+					Tout démarrer
+				</button>
+			{/if}
+
+			<!-- Combined stop (only when both are active) — pushed to the far right -->
+			{#if broadcast.is_live && isRecording}
+				<button
+					onclick={stopBoth}
+					disabled={broadcastBusy || busy}
+					class="ml-auto inline-flex items-center gap-2 rounded-xl border-2 border-stone-800 bg-stone-800 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-stone-900 disabled:opacity-50"
+				>
+					{@render iconStop()}
+					Tout arrêter
+				</button>
+			{/if}
+		{/if}
 	</div>
 
 	{#if recorder.available && 'pendingOrphans' in recorder && recorder.pendingOrphans > 0}
