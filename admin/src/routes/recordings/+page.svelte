@@ -199,17 +199,18 @@
 {/if}
 
 {#if showLiveBanner}
-	<div class="mb-6 rounded-2xl border border-amber-200 bg-amber-50/80 p-5">
+	<div class="mb-6 rounded-2xl border border-green-200 bg-green-50/80 p-5">
 		<div class="flex items-start gap-3">
-			<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100">
-				<svg class="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.2 16c-.77 1.33.2 3 1.73 3z" />
-				</svg>
+			<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-green-100">
+				<span class="relative inline-flex h-2.5 w-2.5">
+					<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75"></span>
+					<span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-600"></span>
+				</span>
 			</div>
 			<div>
-				<p class="text-sm font-semibold text-amber-800">Direct détecté — aucun enregistrement en cours</p>
-				<p class="mt-1 text-xs text-amber-600">
-					Icecast reçoit un flux audio mais rien n'est sauvegardé. Cliquez sur <strong>Démarrer</strong> pour capturer.
+				<p class="text-sm font-semibold text-green-800">Direct détecté — prêt à enregistrer</p>
+				<p class="mt-1 text-xs text-green-700">
+					Icecast reçoit un flux audio. Cliquez sur <strong>Démarrer l'enregistrement</strong> pour le capturer.
 				</p>
 			</div>
 		</div>
@@ -256,7 +257,7 @@
 				>
 					{busy ? 'Arrêt…' : 'Arrêter'}
 				</button>
-			{:else}
+			{:else if icecast.sourceActive}
 				<button
 					onclick={start}
 					disabled={busy || !recorder.available || ('pendingOrphans' in recorder && recorder.pendingOrphans > 0)}
@@ -264,6 +265,10 @@
 				>
 					{busy ? 'Démarrage…' : 'Démarrer l\'enregistrement'}
 				</button>
+			{:else}
+				<span class="rounded-xl border border-stone-200 bg-stone-50 px-5 py-2.5 text-sm font-medium text-stone-400">
+					En attente d'un flux audio…
+				</span>
 			{/if}
 		</div>
 	</div>
