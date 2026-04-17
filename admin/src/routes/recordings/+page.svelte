@@ -14,6 +14,7 @@
 	const broadcast = $derived(data.broadcast);
 	const subscriberCount = $derived(data.subscriberCount);
 	let elapsed = $state(0);
+	let broadcastElapsed = $state(0);
 	let busy = $state(false);
 	let broadcastBusy = $state(false);
 	let actionError = $state<string | null>(null);
@@ -39,6 +40,14 @@
 			elapsed = Math.max(0, Math.floor((Date.now() - new Date(recorder.startedAt).getTime()) / 1000));
 		} else {
 			elapsed = 0;
+		}
+		if (broadcast.is_live && broadcast.started_at) {
+			broadcastElapsed = Math.max(
+				0,
+				Math.floor((Date.now() - new Date(broadcast.started_at).getTime()) / 1000)
+			);
+		} else {
+			broadcastElapsed = 0;
 		}
 	}
 
@@ -296,6 +305,9 @@
 
 		<div class="flex items-center gap-3">
 			{#if broadcast.is_live}
+				<span class="font-mono text-2xl font-semibold text-red-700 tabular-nums" title="Durée depuis le début du direct">
+					{formatElapsed(broadcastElapsed)}
+				</span>
 				<button
 					onclick={endLive}
 					disabled={broadcastBusy}
