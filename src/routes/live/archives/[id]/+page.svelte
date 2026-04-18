@@ -35,6 +35,20 @@
 		const m = Math.floor((sec % 3600) / 60);
 		return h > 0 ? `${h}h${m.toString().padStart(2, '0')}` : `${m} min`;
 	}
+
+	function formatBytes(bytes: number | null): string | null {
+		if (!bytes) return null;
+		const units = ['o', 'Ko', 'Mo', 'Go'];
+		let n = bytes;
+		let i = 0;
+		while (n >= 1024 && i < units.length - 1) {
+			n /= 1024;
+			i++;
+		}
+		// 1 decimal for >= 1 Mo, integer for smaller
+		const formatted = i >= 2 ? n.toFixed(1) : Math.round(n).toString();
+		return `${formatted} ${units[i]}`;
+	}
 </script>
 
 <svelte:head>
@@ -135,6 +149,9 @@
 					<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 4v12m0 0l-4-4m4 4l4-4" />
 				</svg>
 				Télécharger
+				{#if rec.size_bytes}
+					<span class="text-stone-400 font-normal">· {formatBytes(rec.size_bytes)}</span>
+				{/if}
 			</a>
 		</div>
 

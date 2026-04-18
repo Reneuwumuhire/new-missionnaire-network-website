@@ -18,8 +18,135 @@
 	let busy = $state(false);
 	let broadcastBusy = $state(false);
 	let actionError = $state<string | null>(null);
-	let editing = $state<Record<string, string>>({});
 	let confirmDelete = $state<string | null>(null);
+
+	// ── Per-recording edit state (only one row editable at a time) ────
+	let editingRecordingId = $state<string | null>(null);
+	let recDraftTitle = $state<string>('');
+	let recDraftDescription = $state<string>('');
+	let recThumbnailFile = $state<File | null>(null);
+	let recThumbnailPreviewUrl = $state<string | null>(null);
+	let recThumbnailAction = $state<'keep' | 'replace' | 'remove'>('keep');
+	let recThumbnailError = $state<string | null>(null);
+	let recSaving = $state(false);
+
+	function enterRecordingEdit(rec: Recording) {
+		if (recThumbnailPreviewUrl) URL.revokeObjectURL(recThumbnailPreviewUrl);
+		recThumbnailPreviewUrl = null;
+		recThumbnailFile = null;
+		recThumbnailAction = 'keep';
+		recThumbnailError = null;
+		recDraftTitle = rec.title ?? '';
+		recDraftDescription = rec.description ?? '';
+		editingRecordingId = rec._id!;
+	}
+
+	function cancelRecordingEdit() {
+		if (recThumbnailPreviewUrl) URL.revokeObjectURL(recThumbnailPreviewUrl);
+		recThumbnailPreviewUrl = null;
+		recThumbnailFile = null;
+		recThumbnailAction = 'keep';
+		recThumbnailError = null;
+		editingRecordingId = null;
+	}
+
+	function onRecThumbnailFileChange(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		if (!file) return;
+		if (!file.type.startsWith('image/')) {
+			recThumbnailError = 'Sélectionnez un fichier image';
+			return;
+		}
+		if (file.size > 5 * 1024 * 1024) {
+			recThumbnailError = 'Image trop volumineuse (max 5 Mo)';
+			return;
+		}
+		recThumbnailError = null;
+		if (recThumbnailPreviewUrl) URL.revokeObjectURL(recThumbnailPreviewUrl);
+		recThumbnailFile = file;
+		recThumbnailPreviewUrl = URL.createObjectURL(file);
+		recThumbnailAction = 'replace';
+	}
+
+	function markRecThumbnailRemove() {
+		if (recThumbnailPreviewUrl) URL.revokeObjectURL(recThumbnailPreviewUrl);
+		recThumbnailPreviewUrl = null;
+		recThumbnailFile = null;
+		recThumbnailAction = 'remove';
+	}
+
+	function recPreviewSrc(rec: Recording): string | null {
+		if (recThumbnailPreviewUrl) return recThumbnailPreviewUrl;
+		if (recThumbnailAction === 'remove') return null;
+		return rec.thumbnail_url ?? null;
+	}
+
+	async function saveRecordingMetadata(rec: Recording) {
+		if (recSaving) return;
+		recSaving = true;
+		recThumbnailError = null;
+		try {
+			const patch: Record<string, unknown> = {};
+
+			const nextTitle = recDraftTitle.trim();
+			if (nextTitle && nextTitle !== rec.title) patch.title = nextTitle;
+
+			const nextDescription = recDraftDescription.trim() || null;
+			if (nextDescription !== (rec.description ?? null)) patch.description = nextDescription;
+
+			if (recThumbnailAction === 'replace' && recThumbnailFile) {
+				const presignRes = await fetch('/api/broadcast/thumbnail/presign', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ contentType: recThumbnailFile.type, size: recThumbnailFile.size })
+				});
+				if (!presignRes.ok) {
+					recThumbnailError = (await presignRes.text()) || `Erreur ${presignRes.status}`;
+					return;
+				}
+				const { uploadUrl, key, publicUrl } = (await presignRes.json()) as {
+					uploadUrl: string;
+					key: string;
+					publicUrl: string;
+				};
+				const uploadRes = await fetch(uploadUrl, {
+					method: 'PUT',
+					headers: { 'Content-Type': recThumbnailFile.type },
+					body: recThumbnailFile
+				});
+				if (!uploadRes.ok) {
+					recThumbnailError = 'Échec du téléversement vers S3';
+					return;
+				}
+				patch.thumbnail_url = publicUrl;
+				patch.thumbnail_s3_key = key;
+			} else if (recThumbnailAction === 'remove') {
+				patch.thumbnail_url = null;
+				patch.thumbnail_s3_key = null;
+			}
+
+			if (Object.keys(patch).length === 0) {
+				cancelRecordingEdit();
+				return;
+			}
+
+			const res = await fetch(`/api/recordings/${rec._id}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(patch)
+			});
+			if (!res.ok) {
+				recThumbnailError = (await res.text()) || `Erreur ${res.status}`;
+				return;
+			}
+			cancelRecordingEdit();
+			await invalidateAll();
+		} finally {
+			recSaving = false;
+		}
+	}
 
 	let pollTimer: ReturnType<typeof setInterval> | null = null;
 	let tickTimer: ReturnType<typeof setInterval> | null = null;
@@ -320,10 +447,29 @@
 		thumbnailExpanded = false;
 	}
 	function onLightboxKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') closeThumbnail();
+		if (e.key !== 'Escape') return;
+		// Layered: thumbnail lightbox → broadcast modal → recording modal
+		// (close the topmost one, one press per close).
+		if (thumbnailExpanded) {
+			closeThumbnail();
+		} else if (metadataEditing && !metadataSaving) {
+			cancelEditMode();
+		} else if (editingRecordingId && !recSaving) {
+			cancelRecordingEdit();
+		}
 	}
 	function onBackdropClick(e: MouseEvent) {
 		if (e.target === e.currentTarget) closeThumbnail();
+	}
+	function onEditModalBackdropClick(e: MouseEvent) {
+		if (e.target === e.currentTarget && !recSaving) cancelRecordingEdit();
+	}
+	function onBroadcastModalBackdropClick(e: MouseEvent) {
+		if (e.target === e.currentTarget && !metadataSaving) cancelEditMode();
+	}
+	function getEditingRecording(): Recording | null {
+		if (!editingRecordingId) return null;
+		return data.recordings.find((r) => r._id === editingRecordingId) ?? null;
 	}
 
 	/** End the live broadcast AND stop the recording in one click. Order matters:
@@ -384,24 +530,6 @@
 	function formatTime(iso: string | null): string {
 		if (!iso) return '—';
 		return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-	}
-
-	async function saveTitle(rec: Recording) {
-		const id = rec._id!;
-		const title = editing[id]?.trim();
-		if (!title || title === rec.title) {
-			delete editing[id];
-			editing = { ...editing };
-			return;
-		}
-		await fetch(`/api/recordings/${id}`, {
-			method: 'PATCH',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ title })
-		});
-		delete editing[id];
-		editing = { ...editing };
-		await invalidateAll();
 	}
 
 	async function togglePublish(rec: Recording) {
@@ -682,75 +810,54 @@
 	<!-- Broadcast metadata: title + description + thumbnail shown on the public /live page -->
 	<div class="mt-5 border-t border-stone-100 pt-5">
 		<div class="mb-4 flex items-start justify-between gap-4">
-			<div>
+			<div class="min-w-0 flex-1">
 				<p class="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500">
 					Informations affichées pendant le direct
 				</p>
 				<p class="mt-1 text-[10px] text-stone-400">
 					Persiste entre les directs — modifiable à tout moment.
 				</p>
-			</div>
-			{#if !metadataEditing}
-				<button
-					type="button"
-					onclick={enterEditMode}
-					class="shrink-0 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-primary hover:text-primary"
-				>
-					Modifier
-				</button>
-			{:else}
-				<div class="shrink-0 flex items-center gap-2">
-					<button
-						type="button"
-						onclick={saveMetadata}
-						disabled={metadataSaving}
-						class="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-missionnaire-600 disabled:opacity-50"
-					>
-						{metadataSaving ? 'Enregistrement…' : 'Enregistrer'}
-					</button>
-					<button
-						type="button"
-						onclick={cancelEditMode}
-						disabled={metadataSaving}
-						class="rounded-lg px-2 py-1.5 text-xs text-stone-400 hover:text-stone-600 disabled:opacity-50"
-					>
-						Annuler
-					</button>
+				<div class="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2">
+					<svg class="h-3.5 w-3.5 shrink-0 text-amber-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.2 16c-.77 1.33.2 3 1.73 3z" />
+					</svg>
+					<p class="text-[11px] leading-snug text-amber-800">
+						<strong>Avant chaque direct</strong>, pensez à mettre à jour ces informations pour que les auditeurs aient le bon titre, la description et la vignette dès le début de la diffusion.
+					</p>
 				</div>
-			{/if}
+			</div>
+			<button
+				type="button"
+				onclick={enterEditMode}
+				class="shrink-0 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-primary hover:text-primary"
+			>
+				Modifier
+			</button>
 		</div>
 
 		<div class="flex flex-col gap-5 sm:flex-row sm:items-start">
-			<!-- Thumbnail -->
+			<!-- Thumbnail (view-only, click to expand) -->
 			<div class="flex flex-col gap-2">
 				<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Vignette</span>
-				{#if previewSrc}
+				{#if broadcast.thumbnail_url}
 					<button
 						type="button"
-						onclick={metadataEditing ? undefined : openThumbnail}
-						aria-label={metadataEditing ? 'Vignette' : 'Agrandir la vignette'}
-						disabled={metadataEditing}
-						class="relative h-28 w-44 overflow-hidden rounded-xl border border-stone-300 bg-cream/40 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 group disabled:cursor-default {metadataEditing ? '' : 'cursor-zoom-in hover:border-primary'}"
+						onclick={openThumbnail}
+						aria-label="Agrandir la vignette"
+						class="relative h-28 w-44 overflow-hidden rounded-xl border border-stone-300 bg-cream/40 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 group cursor-zoom-in hover:border-primary"
 					>
 						<img
-							src={previewSrc}
+							src={broadcast.thumbnail_url}
 							alt="Vignette du direct"
-							class="h-full w-full object-cover transition-transform duration-300 {metadataEditing ? '' : 'group-hover:scale-105'}"
+							class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
 						/>
-						{#if !metadataEditing}
-							<span class="pointer-events-none absolute inset-0 flex items-end justify-end p-1.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-								<span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/90 shadow">
-									<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-stone-700">
-										<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
-									</svg>
-								</span>
+						<span class="pointer-events-none absolute inset-0 flex items-end justify-end p-1.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+							<span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/90 shadow">
+								<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-stone-700">
+									<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+								</svg>
 							</span>
-						{/if}
-						{#if metadataSaving && thumbnailAction === 'replace'}
-							<div class="absolute inset-0 flex items-center justify-center bg-white/80 text-xs font-medium text-stone-600">
-								Téléversement…
-							</div>
-						{/if}
+						</span>
 					</button>
 				{:else}
 					<!-- Default fallback preview — this is what the public site will show -->
@@ -773,81 +880,25 @@
 						</span>
 					</div>
 				{/if}
-				{#if metadataEditing}
-					<div class="flex gap-2">
-						<label class="cursor-pointer rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-primary hover:text-primary">
-							{previewSrc ? 'Changer' : 'Téléverser'}
-							<input
-								type="file"
-								accept="image/jpeg,image/png,image/webp,image/gif"
-								class="hidden"
-								onchange={onThumbnailFileChange}
-								disabled={metadataSaving}
-							/>
-						</label>
-						{#if previewSrc}
-							<button
-								type="button"
-								onclick={markThumbnailForRemoval}
-								disabled={metadataSaving}
-								class="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-500 transition-colors hover:border-red-200 hover:text-red-600 disabled:opacity-50"
-							>
-								Retirer
-							</button>
-						{/if}
-					</div>
-					<p class="text-[10px] text-stone-400">JPEG, PNG, WebP ou GIF · 5 Mo max</p>
-				{/if}
 			</div>
 
-			<!-- Title + Description (stacked) -->
+			<!-- Title + Description (view-only) -->
 			<div class="flex flex-1 flex-col gap-4">
 				<div class="flex flex-col gap-2">
 					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Titre du direct</span>
-					{#if metadataEditing}
-						<input
-							type="text"
-							bind:value={titleDraft}
-							placeholder="Ex. Prédication du mercredi"
-							maxlength="120"
-							disabled={metadataSaving}
-							class="admin-input text-sm"
-						/>
-					{:else}
-						<p class="text-sm {broadcast.title ? 'text-stone-700' : 'text-stone-400 italic'}">
-							{broadcast.title || 'Aucun titre (le site affichera «\u00a0Audio en direct\u00a0»)'}
-						</p>
-					{/if}
+					<p class="text-sm {broadcast.title ? 'text-stone-700' : 'text-stone-400 italic'}">
+						{broadcast.title || 'Aucun titre (le site affichera «\u00a0Audio en direct\u00a0»)'}
+					</p>
 				</div>
 
 				<div class="flex flex-col gap-2">
-					<div class="flex items-baseline justify-between">
-						<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Description</span>
-						{#if metadataEditing}
-							<span class="text-[10px] text-stone-400 tabular-nums">{descriptionDraft.length} / 2000</span>
-						{/if}
-					</div>
-					{#if metadataEditing}
-						<textarea
-							bind:value={descriptionDraft}
-							placeholder="Décrivez ce direct : sujet, orateur, texte biblique…"
-							maxlength="2000"
-							rows="4"
-							disabled={metadataSaving}
-							class="admin-input text-sm resize-y min-h-[96px]"
-						></textarea>
-					{:else}
-						<p class="text-sm whitespace-pre-wrap {broadcast.description ? 'text-stone-700' : 'text-stone-400 italic'}">
-							{broadcast.description || 'Aucune description'}
-						</p>
-					{/if}
+					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Description</span>
+					<p class="text-sm whitespace-pre-wrap {broadcast.description ? 'text-stone-700' : 'text-stone-400 italic'}">
+						{broadcast.description || 'Aucune description'}
+					</p>
 				</div>
 			</div>
 		</div>
-
-		{#if thumbnailError}
-			<p class="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{thumbnailError}</p>
-		{/if}
 	</div>
 </div>
 
@@ -867,33 +918,19 @@
 		</thead>
 		<tbody>
 			{#each data.recordings as rec}
+				{@const isEditing = editingRecordingId === rec._id}
 				<tr class="border-b border-stone-50">
 					<td class="px-5 py-4">
-						{#if editing[rec._id!] !== undefined}
-							<input
-								type="text"
-								bind:value={editing[rec._id!]}
-								onblur={() => saveTitle(rec)}
-								onkeydown={(e) => {
-									if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
-									if (e.key === 'Escape') {
-										delete editing[rec._id!];
-										editing = { ...editing };
-									}
-								}}
-								class="admin-input text-sm"
-							/>
-						{:else}
-							<button
-								onclick={() => {
-									editing[rec._id!] = rec.title;
-									editing = { ...editing };
-								}}
-								class="text-left font-medium text-stone-700 transition-colors hover:text-primary"
-							>
-								{rec.title}
-							</button>
-						{/if}
+						<div class="flex items-center gap-3">
+							{#if rec.thumbnail_url}
+								<img
+									src={rec.thumbnail_url}
+									alt=""
+									class="h-9 w-14 shrink-0 rounded object-cover border border-stone-200/60"
+								/>
+							{/if}
+							<span class="font-medium text-stone-700">{rec.title}</span>
+						</div>
 					</td>
 					<td class="px-5 py-4 text-stone-500">{formatDateTime(rec.started_at)}</td>
 					<td class="px-5 py-4 font-mono text-xs text-stone-500">{formatDuration(rec.duration_sec)}</td>
@@ -924,6 +961,14 @@
 									Réessayer
 								</button>
 							{/if}
+							{#if rec.status === 'ready'}
+								<button
+									onclick={() => (isEditing ? cancelRecordingEdit() : enterRecordingEdit(rec))}
+									class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs font-medium text-stone-600 hover:border-primary hover:text-primary"
+								>
+									{isEditing ? 'Fermer' : 'Modifier'}
+								</button>
+							{/if}
 							{#if confirmDelete === rec._id}
 								<button onclick={() => remove(rec._id!)} class="rounded-lg bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-200">
 									Confirmer
@@ -941,7 +986,7 @@
 						</div>
 					</td>
 				</tr>
-			{/each}
+				{/each}
 			{#if data.recordings.length === 0}
 				<tr>
 					<td colspan="7" class="px-5 py-12 text-center text-stone-400">
@@ -954,6 +999,282 @@
 </div>
 
 <svelte:window onkeydown={onLightboxKeydown} />
+
+{#if metadataEditing}
+	<!-- Broadcast metadata edit modal — title, description, thumbnail for the live broadcast. -->
+	<div
+		class="fixed inset-0 z-40 flex items-center justify-center bg-stone-900/60 p-4 backdrop-blur-sm animate-lightbox-in overflow-y-auto"
+		onclick={onBroadcastModalBackdropClick}
+		onkeydown={onLightboxKeydown}
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="edit-broadcast-title"
+		tabindex="-1"
+	>
+		<div class="w-full max-w-3xl rounded-2xl bg-white shadow-2xl my-8">
+			<div class="flex items-center justify-between border-b border-stone-100 px-6 py-4">
+				<h2 id="edit-broadcast-title" class="font-display text-lg font-semibold text-stone-800">
+					Modifier les informations du direct
+				</h2>
+				<button
+					type="button"
+					onclick={cancelEditMode}
+					disabled={metadataSaving}
+					aria-label="Fermer"
+					class="flex h-8 w-8 items-center justify-center rounded-full text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 disabled:opacity-50"
+				>
+					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<path d="M6 6l12 12M6 18L18 6" />
+					</svg>
+				</button>
+			</div>
+
+			<div class="px-6 py-6">
+				<div class="flex flex-col gap-5 sm:flex-row sm:items-start">
+					<div class="flex flex-col gap-2 shrink-0">
+						<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Vignette</span>
+						{#if previewSrc}
+							<div class="relative aspect-video w-48 overflow-hidden rounded-xl border border-stone-300 bg-cream/40">
+								<img src={previewSrc} alt="" class="h-full w-full object-cover" />
+								{#if metadataSaving && thumbnailAction === 'replace'}
+									<div class="absolute inset-0 flex items-center justify-center bg-white/80 text-xs font-medium text-stone-600">
+										Téléversement…
+									</div>
+								{/if}
+							</div>
+						{:else}
+							<div class="default-thumbnail-admin relative flex aspect-video w-48 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-stone-300">
+								<picture>
+									<source srcset="/icons/logo.webp" type="image/webp" />
+									<img src="/icons/logo.png" alt="" class="h-5 w-auto opacity-90" width="150" height="64" />
+								</picture>
+								<span class="text-[8px] font-bold uppercase tracking-[0.2em] text-stone-500">Aucune vignette</span>
+							</div>
+						{/if}
+						<div class="flex gap-2">
+							<label class="cursor-pointer rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-primary hover:text-primary">
+								{previewSrc ? 'Changer' : 'Téléverser'}
+								<input
+									type="file"
+									accept="image/jpeg,image/png,image/webp,image/gif"
+									class="hidden"
+									onchange={onThumbnailFileChange}
+									disabled={metadataSaving}
+								/>
+							</label>
+							{#if previewSrc}
+								<button
+									type="button"
+									onclick={markThumbnailForRemoval}
+									disabled={metadataSaving}
+									class="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-500 transition-colors hover:border-red-200 hover:text-red-600 disabled:opacity-50"
+								>
+									Retirer
+								</button>
+							{/if}
+						</div>
+						<p class="text-[10px] text-stone-400">JPEG, PNG, WebP ou GIF · 5 Mo max</p>
+					</div>
+
+					<div class="flex flex-1 flex-col gap-4">
+						<div class="flex flex-col gap-1.5">
+							<label for="edit-broadcast-title-input" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Titre du direct</label>
+							<input
+								id="edit-broadcast-title-input"
+								type="text"
+								bind:value={titleDraft}
+								maxlength="120"
+								disabled={metadataSaving}
+								placeholder="Ex. Prédication du mercredi"
+								class="admin-input text-sm"
+							/>
+							<span class="self-end text-[10px] text-stone-400 tabular-nums">{titleDraft.length} / 120</span>
+						</div>
+
+						<div class="flex flex-col gap-1.5">
+							<label for="edit-broadcast-desc" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Description</label>
+							<textarea
+								id="edit-broadcast-desc"
+								bind:value={descriptionDraft}
+								placeholder="Décrivez ce direct : sujet, orateur, texte biblique…"
+								maxlength="2000"
+								rows="6"
+								disabled={metadataSaving}
+								class="admin-input text-sm resize-y min-h-[120px]"
+							></textarea>
+							<span class="self-end text-[10px] text-stone-400 tabular-nums">{descriptionDraft.length} / 2000</span>
+						</div>
+
+						{#if thumbnailError}
+							<p class="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{thumbnailError}</p>
+						{/if}
+					</div>
+				</div>
+			</div>
+
+			<div class="flex items-center justify-end gap-2 border-t border-stone-100 px-6 py-4">
+				<button
+					type="button"
+					onclick={cancelEditMode}
+					disabled={metadataSaving}
+					class="rounded-lg px-3 py-2 text-sm font-medium text-stone-500 hover:bg-stone-100 hover:text-stone-700 disabled:opacity-50"
+				>
+					Annuler
+				</button>
+				<button
+					type="button"
+					onclick={saveMetadata}
+					disabled={metadataSaving}
+					class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-missionnaire-600 disabled:opacity-50"
+				>
+					{metadataSaving ? 'Enregistrement…' : 'Enregistrer'}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+{#if editingRecordingId}
+	{@const editingRec = getEditingRecording()}
+	{#if editingRec}
+		<!-- Recording metadata edit modal — focused editing with thumbnail + title + description. -->
+		<div
+			class="fixed inset-0 z-40 flex items-center justify-center bg-stone-900/60 p-4 backdrop-blur-sm animate-lightbox-in overflow-y-auto"
+			onclick={onEditModalBackdropClick}
+			onkeydown={onLightboxKeydown}
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="edit-rec-title"
+			tabindex="-1"
+		>
+			<div class="w-full max-w-3xl rounded-2xl bg-white shadow-2xl my-8">
+				<!-- Modal header -->
+				<div class="flex items-center justify-between border-b border-stone-100 px-6 py-4">
+					<h2 id="edit-rec-title" class="font-display text-lg font-semibold text-stone-800">
+						Modifier l'enregistrement
+					</h2>
+					<button
+						type="button"
+						onclick={cancelRecordingEdit}
+						disabled={recSaving}
+						aria-label="Fermer"
+						class="flex h-8 w-8 items-center justify-center rounded-full text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 disabled:opacity-50"
+					>
+						<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<path d="M6 6l12 12M6 18L18 6" />
+						</svg>
+					</button>
+				</div>
+
+				<!-- Modal body -->
+				<div class="px-6 py-6">
+					<div class="flex flex-col gap-5 sm:flex-row sm:items-start">
+						<!-- Thumbnail editor -->
+						<div class="flex flex-col gap-2 shrink-0">
+							<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Vignette</span>
+							{#if recPreviewSrc(editingRec)}
+								<div class="relative aspect-video w-48 overflow-hidden rounded-xl border border-stone-300 bg-cream/40">
+									<img src={recPreviewSrc(editingRec)} alt="" class="h-full w-full object-cover" />
+									{#if recSaving && recThumbnailAction === 'replace'}
+										<div class="absolute inset-0 flex items-center justify-center bg-white/80 text-xs font-medium text-stone-600">
+											Téléversement…
+										</div>
+									{/if}
+								</div>
+							{:else}
+								<div class="default-thumbnail-admin relative flex aspect-video w-48 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-stone-300">
+									<picture>
+										<source srcset="/icons/logo.webp" type="image/webp" />
+										<img src="/icons/logo.png" alt="" class="h-5 w-auto opacity-90" width="150" height="64" />
+									</picture>
+									<span class="text-[8px] font-bold uppercase tracking-[0.2em] text-stone-500">Aucune vignette</span>
+								</div>
+							{/if}
+							<div class="flex gap-2">
+								<label class="cursor-pointer rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-primary hover:text-primary">
+									{recPreviewSrc(editingRec) ? 'Changer' : 'Téléverser'}
+									<input
+										type="file"
+										accept="image/jpeg,image/png,image/webp,image/gif"
+										class="hidden"
+										onchange={onRecThumbnailFileChange}
+										disabled={recSaving}
+									/>
+								</label>
+								{#if recPreviewSrc(editingRec)}
+									<button
+										type="button"
+										onclick={markRecThumbnailRemove}
+										disabled={recSaving}
+										class="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-500 transition-colors hover:border-red-200 hover:text-red-600 disabled:opacity-50"
+									>
+										Retirer
+									</button>
+								{/if}
+							</div>
+							<p class="text-[10px] text-stone-400">JPEG, PNG, WebP ou GIF · 5 Mo max</p>
+						</div>
+
+						<!-- Title + Description -->
+						<div class="flex flex-1 flex-col gap-4">
+							<div class="flex flex-col gap-1.5">
+								<label for="edit-rec-title-input" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Titre</label>
+								<input
+									id="edit-rec-title-input"
+									type="text"
+									bind:value={recDraftTitle}
+									maxlength="200"
+									disabled={recSaving}
+									placeholder="Ex. Prédication du dimanche — Foi et prière"
+									class="admin-input text-sm"
+								/>
+								<span class="self-end text-[10px] text-stone-400 tabular-nums">{recDraftTitle.length} / 200</span>
+							</div>
+
+							<div class="flex flex-col gap-1.5">
+								<label for="edit-rec-desc" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Description</label>
+								<textarea
+									id="edit-rec-desc"
+									bind:value={recDraftDescription}
+									placeholder="Décrivez ce direct enregistré : sujet, orateur, texte biblique…"
+									maxlength="2000"
+									rows="6"
+									disabled={recSaving}
+									class="admin-input text-sm resize-y min-h-[120px]"
+								></textarea>
+								<span class="self-end text-[10px] text-stone-400 tabular-nums">{recDraftDescription.length} / 2000</span>
+							</div>
+
+							{#if recThumbnailError}
+								<p class="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{recThumbnailError}</p>
+							{/if}
+						</div>
+					</div>
+				</div>
+
+				<!-- Modal footer -->
+				<div class="flex items-center justify-end gap-2 border-t border-stone-100 px-6 py-4">
+					<button
+						type="button"
+						onclick={cancelRecordingEdit}
+						disabled={recSaving}
+						class="rounded-lg px-3 py-2 text-sm font-medium text-stone-500 hover:bg-stone-100 hover:text-stone-700 disabled:opacity-50"
+					>
+						Annuler
+					</button>
+					<button
+						type="button"
+						onclick={() => saveRecordingMetadata(editingRec)}
+						disabled={recSaving}
+						class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-missionnaire-600 disabled:opacity-50"
+					>
+						{recSaving ? 'Enregistrement…' : 'Enregistrer'}
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
+{/if}
 
 {#if thumbnailExpanded && broadcast.thumbnail_url}
 	<!-- Lightbox: click backdrop or press Escape to close. -->

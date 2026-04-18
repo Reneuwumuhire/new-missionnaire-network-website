@@ -23,6 +23,8 @@ export const RecordingSchema = z.object({
 	/** Auto-snapshot of broadcast_admin_state.thumbnail_url at recording-save time.
 	 *  Lets archive cards show the same thumbnail the live page displayed. */
 	thumbnail_url: z.string().url().nullable().optional(),
+	/** S3 key for the thumbnail — used to delete the old object when replacing. */
+	thumbnail_s3_key: z.string().nullable().optional(),
 	/** Auto-snapshot of broadcast_admin_state.description at recording-save time. */
 	description: z.string().nullable().optional(),
 	updated_at: z
