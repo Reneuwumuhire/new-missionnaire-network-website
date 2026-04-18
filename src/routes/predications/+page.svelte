@@ -175,7 +175,7 @@
 			>
 				Prédicateurs
 			</h2>
-			<div class="flex overflow-x-auto pb-2 gap-3 no-scrollbar justify-center md:justify-start">
+			<div class="flex overflow-x-auto pb-2 gap-3 no-scrollbar justify-start">
 				{#each authors as author}
 					<button
 						class="flex-shrink-0 px-5 py-2.5 text-[11px] font-bold uppercase tracking-wider transition-all border {(author ===
