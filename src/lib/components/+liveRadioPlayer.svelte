@@ -90,6 +90,12 @@
 	const OFFLINE_THRESHOLD = 6;
 	const NO_AUDIO_GRACE_MS = 30_000;
 
+	// Attempt browser autoplay exactly once when the broadcast is reachable.
+	// Browsers block `play()` without prior user interaction, so this is a
+	// best-effort: if it succeeds the listener hears the stream immediately,
+	// if it fails we silently fall back to the normal "press Lecture" UI.
+	let hasAttemptedAutoplay = false;
+
 	// Stable session ID for listener tracking — survives page refresh
 	// but not tab close, so the DB record is reused on refresh.
 	function getSessionId(): string {
@@ -167,6 +173,39 @@
 		}, NO_AUDIO_GRACE_MS);
 	}
 
+	/** Silently try browser autoplay the first time the stream becomes
+	 *  reachable. Most browsers block autoplay with sound without a prior
+	 *  user gesture — we catch that rejection and reset state so the UI
+	 *  stays on the normal "Lecture" prompt. No error toasts, no status
+	 *  flicker: either it plays or the listener taps Lecture like usual. */
+	async function tryAutoplay() {
+		if (hasAttemptedAutoplay) return;
+		if (!browser || !audio) return;
+		if (isPlaying || userWantsToPlay || isBuffering) return;
+		if (!probeReachable) return;
+		hasAttemptedAutoplay = true;
+
+		audio.src = getStreamUrl();
+		audio.load();
+		isBuffering = true;
+		userWantsToPlay = true;
+		statusKey = 'connecting';
+		try {
+			await audio.play();
+			// handlePlay will flip isPlaying / statusKey = 'listening'.
+		} catch {
+			// Autoplay blocked (no user gesture yet). Restore the "ready"
+			// state without surfacing an error to the user.
+			userWantsToPlay = false;
+			isBuffering = false;
+			if (audio) {
+				audio.removeAttribute('src');
+				audio.load();
+			}
+			statusKey = 'availablePressPlay';
+		}
+	}
+
 	function handleStatusEvent(liveNow: boolean, checkedAt: string, listeners: number, streamUrl?: string) {
 		lastCheckedAt = checkedAt;
 		listenerCount = listeners;
@@ -194,6 +233,10 @@
 				statusKey = reconnectAttempts > 0 ? 'reconnecting' : 'connecting';
 			} else {
 				statusKey = 'availablePressPlay';
+				// First time the stream is reachable on this page load — try to
+				// start playback immediately. Fails silently if the browser
+				// requires a user gesture first.
+				void tryAutoplay();
 			}
 		} else {
 			if (confirmedLive || keepLiveUi || isPlaying || isBuffering || probeReachable) {
