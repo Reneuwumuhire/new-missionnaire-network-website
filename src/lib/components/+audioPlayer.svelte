@@ -448,34 +448,92 @@
 
 	// Add your audio file path
 
+	/** Timestamp (ms) recorded when the document last went hidden. Used to
+	 *  distinguish quick tab-switches from long interruptions like phone
+	 *  calls, which need a different resume strategy on iOS. */
+	let appHiddenAt = 0;
+
 	/** Try to resume playback silently. Called when the app regains focus after
 	 *  a phone-call / Siri / another-app audio interruption. Only re-attempts
-	 *  when the listener had pressed play before the interruption. */
-	function tryResumeAfterInterruption() {
+	 *  when the listener had pressed play before the interruption.
+	 *
+	 *  iOS gotcha: after a phone call, calling `audio.play()` *may* succeed
+	 *  (the promise resolves, `playing` event fires) but the audio session's
+	 *  output route can still be pointed at nowhere — listener hears silence
+	 *  on their Bluetooth earphones. Calling `audio.load()` first forces
+	 *  iOS to re-bind the audio session to the current output device, then
+	 *  we restore the playback position and play once the element is ready.
+	 *
+	 *  We only pay that reload cost for interruptions longer than 1.5s —
+	 *  quick tab-switches don't break routing and would waste a second of
+	 *  silence on a gratuitous reload. */
+	function tryResumeAfterInterruption(hiddenMs: number = 0) {
 		if (!browser || !audio) return;
 		if (!userWantsToPlay) return;
 		if (!audio.paused) return;
-		// iOS quirk: poke currentTime so the element refreshes its audio
-		// context after an interruption, otherwise play() resolves but no
-		// sound comes out.
-		try {
-			audio.currentTime = audio.currentTime;
-		} catch {
-			/* ignore */
+
+		// Short absence: just play. No routing issue to clean up.
+		if (hiddenMs < 1500) {
+			audio.play().catch((err) => {
+				console.warn('[AudioPlayer] Quick resume failed:', err);
+			});
+			return;
 		}
-		audio.play().catch((err) => {
-			console.warn('[AudioPlayer] Resume-after-interruption failed:', err);
-		});
+
+		// Long absence: full audio-session reload so Bluetooth/route is
+		// re-established before we ask for playback.
+		const savedTime = audio.currentTime;
+		const savedSrc = audio.src;
+		let settled = false;
+		const finish = () => {
+			if (settled) return;
+			settled = true;
+			if (!userWantsToPlay || !audio.paused || audio.src !== savedSrc) return;
+			try {
+				audio.currentTime = savedTime;
+			} catch {
+				/* currentTime may reject until metadata is loaded — ignore */
+			}
+			audio.play().catch((err) => {
+				console.warn('[AudioPlayer] Post-interruption play failed:', err);
+			});
+		};
+		audio.addEventListener('canplay', finish, { once: true });
+		// Safety net: don't stall forever if canplay never fires.
+		setTimeout(finish, 2000);
+		try {
+			audio.load();
+		} catch (err) {
+			console.warn('[AudioPlayer] audio.load() after interruption failed:', err);
+			finish();
+		}
 	}
 
 	onMount(() => {
 		if (!browser) return;
 
 		const onVisibility = () => {
-			if (document.visibilityState === 'visible') tryResumeAfterInterruption();
+			if (document.visibilityState === 'hidden') {
+				appHiddenAt = Date.now();
+			} else {
+				const elapsed = appHiddenAt > 0 ? Date.now() - appHiddenAt : 0;
+				appHiddenAt = 0;
+				tryResumeAfterInterruption(elapsed);
+			}
 		};
-		const onFocus = () => tryResumeAfterInterruption();
-		const onPageShow = () => tryResumeAfterInterruption();
+		// `focus` and `pageshow` on iOS can fire without a preceding
+		// `visibilitychange` (e.g. returning from control-center). Use
+		// appHiddenAt if set, otherwise assume short absence.
+		const onFocus = () => {
+			const elapsed = appHiddenAt > 0 ? Date.now() - appHiddenAt : 0;
+			appHiddenAt = 0;
+			tryResumeAfterInterruption(elapsed);
+		};
+		const onPageShow = () => {
+			const elapsed = appHiddenAt > 0 ? Date.now() - appHiddenAt : 0;
+			appHiddenAt = 0;
+			tryResumeAfterInterruption(elapsed);
+		};
 
 		document.addEventListener('visibilitychange', onVisibility);
 		window.addEventListener('focus', onFocus);
