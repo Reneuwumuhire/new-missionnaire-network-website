@@ -7,7 +7,7 @@ import {
 	logAudit,
 	updateRecording
 } from '../../../../db/collections';
-import { deleteObject } from '$lib/server/s3';
+import { deleteObject, updateDownloadFilename } from '$lib/server/s3';
 
 const MAX_TITLE_LEN = 200;
 const MAX_DESCRIPTION_LEN = 2000;
@@ -91,6 +91,18 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 		deleteObject(oldThumbnailKey).catch((err) =>
 			console.error('[recordings/patch] old thumbnail delete failed:', err)
 		);
+	}
+
+	// When the title changes, rewrite the S3 Content-Disposition so future
+	// downloads use the new name. Done asynchronously — admins shouldn't wait
+	// for S3, and a failure here doesn't invalidate the DB update.
+	if (updates.title) {
+		const current = await getRecordingById(id);
+		if (current?.s3_key) {
+			updateDownloadFilename(current.s3_key, updates.title).catch((err) =>
+				console.error('[recordings/patch] Content-Disposition update failed:', err)
+			);
+		}
 	}
 
 	await logAudit({

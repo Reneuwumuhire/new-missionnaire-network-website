@@ -31,18 +31,36 @@ export function formatBerlinDate(d: Date): string {
 	return `${y}-${m}-${day}`;
 }
 
-export function buildDownloadFilename(startedAt: Date): string {
+function sanitizeFilenameBase(input: string): string {
+	return input
+		.replace(/[\\/:*?"<>|\x00-\x1F]/g, '')
+		.replace(/\s+/g, ' ')
+		.trim();
+}
+
+export function buildDownloadFilename(startedAt: Date, title?: string | null): string {
+	const safe = title ? sanitizeFilenameBase(title) : '';
+	if (safe) return `${safe}.mp3`;
 	return `${formatBerlinDate(startedAt)} Live recording.mp3`;
+}
+
+/** Build an RFC 5987-compliant Content-Disposition header that survives both
+ *  ASCII-only clients (via `filename=`) and UTF-8 clients (via `filename*=`). */
+function buildContentDisposition(filename: string): string {
+	// eslint-disable-next-line no-control-regex
+	const asciiFallback = filename.replace(/[^\x20-\x7E]/g, '').trim() || 'recording.mp3';
+	return `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
 }
 
 export async function uploadRecording(params: {
 	id: string;
 	filePath: string;
 	startedAt: Date;
+	title?: string | null;
 }): Promise<{ s3Key: string; s3Url: string; sizeBytes: number }> {
 	const stat = await fs.stat(params.filePath);
 	const key = buildS3Key(params.id);
-	const filename = buildDownloadFilename(params.startedAt);
+	const filename = buildDownloadFilename(params.startedAt, params.title);
 
 	await s3.send(
 		new PutObjectCommand({
@@ -51,7 +69,7 @@ export async function uploadRecording(params: {
 			Body: createReadStream(params.filePath),
 			ContentType: 'audio/mpeg',
 			ContentLength: stat.size,
-			ContentDisposition: `attachment; filename="${filename}"`,
+			ContentDisposition: buildContentDisposition(filename),
 			CacheControl: 'public, max-age=31536000, immutable'
 		})
 	);

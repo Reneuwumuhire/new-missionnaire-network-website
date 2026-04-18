@@ -145,15 +145,17 @@ export async function stopRecording(): Promise<{ id: string }> {
 
 async function finalizeUpload(rec: Pick<ActiveRecording, 'id' | 'idStr' | 'startedAt'>): Promise<void> {
 	try {
-		const { s3Key, s3Url, sizeBytes } = await uploadRecording({
-			id: rec.idStr,
-			filePath: mp3Path(rec.idStr),
-			startedAt: rec.startedAt
-		});
 		// Snapshot whatever title + thumbnail the admin has configured right now.
 		// If they change or clear either later, this recording keeps what was live
 		// at save time — matches what the audience actually saw during the broadcast.
+		// Fetched before upload so the title can be baked into Content-Disposition.
 		const snap = await getBroadcastSnapshot();
+		const { s3Key, s3Url, sizeBytes } = await uploadRecording({
+			id: rec.idStr,
+			filePath: mp3Path(rec.idStr),
+			startedAt: rec.startedAt,
+			title: snap.title
+		});
 		await markRecordingReady(rec.id, {
 			s3Key,
 			s3Url,

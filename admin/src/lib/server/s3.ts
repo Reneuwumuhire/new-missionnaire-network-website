@@ -2,7 +2,8 @@ import {
 	S3Client,
 	PutObjectCommand,
 	DeleteObjectCommand,
-	DeleteObjectsCommand
+	DeleteObjectsCommand,
+	CopyObjectCommand
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
@@ -49,6 +50,43 @@ export async function generatePresignedUploadUrl(
 		ContentType: contentType
 	});
 	return getSignedUrl(s3, command, { expiresIn: 900 }); // 15 minutes
+}
+
+function sanitizeDownloadName(input: string): string {
+	return input
+		.replaceAll(/[\\/:*?"<>|\x00-\x1F]/g, '')
+		.replaceAll(/\s+/g, ' ')
+		.trim();
+}
+
+function buildContentDisposition(filename: string): string {
+	// eslint-disable-next-line no-control-regex
+	const asciiFallback = filename.replaceAll(/[^\x20-\x7E]/g, '').trim() || 'recording.mp3';
+	return `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+}
+
+/** Rewrite an object's Content-Disposition so the browser download name
+ *  matches the current title. Uses a self-copy with MetadataDirective=REPLACE
+ *  because S3 object metadata is immutable otherwise. */
+export async function updateDownloadFilename(
+	key: string,
+	title: string,
+	contentType = 'audio/mpeg'
+): Promise<void> {
+	const safe = sanitizeDownloadName(title);
+	if (!safe) return;
+	const filename = `${safe}.mp3`;
+	await s3.send(
+		new CopyObjectCommand({
+			Bucket: AWS_S3_BUCKET,
+			Key: key,
+			CopySource: `${AWS_S3_BUCKET}/${encodeURI(key)}`,
+			MetadataDirective: 'REPLACE',
+			ContentType: contentType,
+			ContentDisposition: buildContentDisposition(filename),
+			CacheControl: 'public, max-age=31536000, immutable'
+		})
+	);
 }
 
 export async function deleteObject(key: string): Promise<void> {
