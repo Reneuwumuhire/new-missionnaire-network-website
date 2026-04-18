@@ -31,22 +31,22 @@
 </svelte:head>
 
 <div class="mb-8">
-	<h1 class="font-display text-3xl font-bold text-stone-800">Paramètres</h1>
+	<h1 class="font-display text-3xl font-semibold text-stone-800">Paramètres</h1>
 	<p class="mt-1 text-sm text-stone-500">Gérez votre profil et votre sécurité</p>
 </div>
 
 <div class="mx-auto max-w-2xl space-y-6">
 
 	<!-- Profile card -->
-	<div class="overflow-hidden rounded-2xl border border-stone-200/60 bg-white">
+	<div class="overflow-hidden border border-stone-200/60 bg-white/40">
 		<!-- Header with avatar -->
 		<div class="relative border-b border-stone-100 bg-gradient-to-br from-missionnaire-50 via-cream to-cream-dark px-6 pb-6 pt-8">
 			<div class="flex items-center gap-5">
-				<div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-2xl font-bold text-primary shadow-sm ring-4 ring-white font-display">
+				<div class="flex h-16 w-16 items-center justify-center rounded-full bg-white text-2xl font-semibold text-primary shadow-sm ring-4 ring-white font-display">
 					{data.user.name.charAt(0).toUpperCase()}
 				</div>
 				<div>
-					<h2 class="font-display text-xl font-bold text-stone-800">{data.user.name}</h2>
+					<h2 class="font-display text-xl font-semibold text-stone-800">{data.user.name}</h2>
 					<p class="text-sm text-stone-500">{data.user.email}</p>
 					<span class="mt-1.5 inline-flex items-center rounded-full bg-white/80 px-2.5 py-0.5 text-xs font-medium text-earth shadow-sm">
 						{roleLabel[data.user.role] ?? data.user.role}
@@ -76,12 +76,12 @@
 			</h3>
 
 			{#if form?.profileSuccess}
-				<div class="mb-5 rounded-xl border border-green-200 bg-green-50/80 px-4 py-3 text-sm text-green-700">
+				<div class="mb-5 border border-green-200 bg-green-50/80 px-4 py-3 text-sm text-green-700">
 					Profil mis à jour avec succès
 				</div>
 			{/if}
 			{#if form?.profileError}
-				<div class="mb-5 rounded-xl border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-red-700">
+				<div class="mb-5 border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-red-700">
 					{form.profileError}
 				</div>
 			{/if}
@@ -113,7 +113,7 @@
 			</div>
 
 			<!-- Account info -->
-			<div class="mt-5 rounded-xl bg-cream/50 p-4">
+			<div class="mt-5 bg-cream/50 p-4">
 				<div class="grid grid-cols-2 gap-3 text-xs">
 					<div>
 						<span class="text-stone-400">Membre depuis</span>
@@ -141,7 +141,7 @@
 	</div>
 
 	<!-- Password card -->
-	<div class="rounded-2xl border border-stone-200/60 bg-white p-6">
+	<div class="border border-stone-200/60 bg-white/40 p-6">
 		<h3 class="mb-5 flex items-center gap-2 text-sm font-semibold tracking-wide text-stone-500 uppercase">
 			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -150,12 +150,12 @@
 		</h3>
 
 		{#if form?.passwordSuccess}
-			<div class="mb-5 rounded-xl border border-green-200 bg-green-50/80 px-4 py-3 text-sm text-green-700">
+			<div class="mb-5 border border-green-200 bg-green-50/80 px-4 py-3 text-sm text-green-700">
 				Mot de passe mis à jour avec succès
 			</div>
 		{/if}
 		{#if form?.passwordError}
-			<div class="mb-5 rounded-xl border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-red-700">
+			<div class="mb-5 border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-red-700">
 				{form.passwordError}
 			</div>
 		{/if}

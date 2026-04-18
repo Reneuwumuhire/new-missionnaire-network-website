@@ -53,7 +53,7 @@
 <!-- Header -->
 <div class="mb-6 flex items-end justify-between">
 	<div>
-		<h1 class="font-display text-3xl font-bold text-stone-800">Bibliothèque audio</h1>
+		<h1 class="font-display text-3xl font-semibold text-stone-800">Bibliothèque audio</h1>
 		<p class="mt-1 text-sm text-stone-500">{data.total} piste{data.total !== 1 ? 's' : ''} au total</p>
 	</div>
 	{#if perms.can_add}
@@ -72,7 +72,7 @@
 </div>
 
 <!-- Table -->
-<div class="overflow-hidden rounded-2xl border border-stone-200/60 bg-white">
+<div class="overflow-hidden border border-stone-200/60 bg-white/40">
 	<div class="overflow-x-auto">
 		<table class="w-full text-left text-sm">
 			<thead>

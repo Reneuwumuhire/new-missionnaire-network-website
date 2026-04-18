@@ -60,12 +60,12 @@
 <div>
 	<button
 		type="button"
-		class="relative w-full cursor-pointer rounded-2xl border-2 border-dashed transition-all duration-200
+		class="relative w-full cursor-pointer rounded-none border-2 border-dashed transition-all duration-200
 		{dragover
 			? 'border-primary bg-missionnaire-50/50'
 			: selectedFile
 				? 'border-green-300 bg-green-50/30'
-				: 'border-stone-200 bg-white hover:border-stone-300 hover:bg-cream/50'}"
+				: 'border-stone-200 bg-white/40 hover:border-stone-300 hover:bg-cream/50'}"
 		ondragover={(e) => { e.preventDefault(); dragover = true; }}
 		ondragleave={() => (dragover = false)}
 		ondrop={(e) => { e.preventDefault(); handleDrop(e); }}
@@ -81,7 +81,7 @@
 
 		<div class="flex flex-col items-center justify-center px-6 py-12">
 			{#if selectedFile}
-				<div class="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-green-100">
+				<div class="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
 					<svg class="h-7 w-7 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 					</svg>
@@ -92,7 +92,7 @@
 				</p>
 				<p class="mt-3 text-xs text-stone-400">Cliquez pour changer de fichier</p>
 			{:else}
-				<div class="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl {dragover ? 'bg-missionnaire-100' : 'bg-cream-dark'}">
+				<div class="mb-3 flex h-14 w-14 items-center justify-center rounded-full {dragover ? 'bg-missionnaire-100' : 'bg-cream-dark'}">
 					<svg class="h-7 w-7 {dragover ? 'text-primary' : 'text-stone-400'}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
 					</svg>

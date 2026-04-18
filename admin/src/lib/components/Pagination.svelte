@@ -38,13 +38,13 @@
 			<button
 				disabled={currentPage <= 1}
 				onclick={() => goToPage(currentPage - 1)}
-				class="rounded-lg px-3 py-1.5 text-sm text-stone-600 transition-colors hover:bg-cream-dark disabled:opacity-40"
+				class="rounded-none px-3 py-1.5 text-sm text-stone-600 transition-colors hover:bg-cream-dark disabled:opacity-40"
 			>
 				&larr;
 			</button>
 
 			{#if visiblePages[0] > 1}
-				<button onclick={() => goToPage(1)} class="rounded-lg px-3 py-1.5 text-sm text-stone-600 hover:bg-cream-dark">
+				<button onclick={() => goToPage(1)} class="rounded-none px-3 py-1.5 text-sm text-stone-600 hover:bg-cream-dark">
 					1
 				</button>
 				{#if visiblePages[0] > 2}
@@ -55,7 +55,7 @@
 			{#each visiblePages as p}
 				<button
 					onclick={() => goToPage(p)}
-					class="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors
+					class="rounded-none px-3 py-1.5 text-sm font-medium transition-colors
 					{p === currentPage ? 'bg-primary text-white' : 'text-stone-600 hover:bg-cream-dark'}"
 				>
 					{p}
@@ -66,7 +66,7 @@
 				{#if visiblePages[visiblePages.length - 1] < totalPages - 1}
 					<span class="px-1 text-stone-400">&hellip;</span>
 				{/if}
-				<button onclick={() => goToPage(totalPages)} class="rounded-lg px-3 py-1.5 text-sm text-stone-600 hover:bg-cream-dark">
+				<button onclick={() => goToPage(totalPages)} class="rounded-none px-3 py-1.5 text-sm text-stone-600 hover:bg-cream-dark">
 					{totalPages}
 				</button>
 			{/if}
@@ -74,7 +74,7 @@
 			<button
 				disabled={currentPage >= totalPages}
 				onclick={() => goToPage(currentPage + 1)}
-				class="rounded-lg px-3 py-1.5 text-sm text-stone-600 transition-colors hover:bg-cream-dark disabled:opacity-40"
+				class="rounded-none px-3 py-1.5 text-sm text-stone-600 transition-colors hover:bg-cream-dark disabled:opacity-40"
 			>
 				&rarr;
 			</button>

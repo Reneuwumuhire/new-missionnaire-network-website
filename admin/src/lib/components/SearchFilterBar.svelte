@@ -47,7 +47,7 @@
 	const activeSort = $derived($page.url.searchParams.get('sort') ?? 'uploaded_at:desc');
 </script>
 
-<div class="rounded-2xl border border-stone-200/60 bg-white p-4">
+<div class="border border-stone-200/60 bg-white/40 p-4">
 	<!-- Top row: search + clear -->
 	<div class="relative">
 		<svg
@@ -62,7 +62,7 @@
 		<input
 			type="text"
 			placeholder="Rechercher titre, artiste, livre..."
-			class="w-full rounded-xl border border-stone-200 bg-cream/50 px-4 py-2.5 pl-10 text-sm text-stone-800 transition-all placeholder:text-stone-400 focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 focus:outline-none"
+			class="w-full rounded-none border border-stone-200/60 bg-white/60 px-4 py-3 pl-10 text-sm text-stone-800 transition-all placeholder:text-stone-400 focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 focus:outline-none"
 			bind:value={searchValue}
 			oninput={handleSearch}
 		/>
@@ -84,7 +84,7 @@
 		<span class="mr-1 text-xs font-medium tracking-wide text-stone-400 uppercase">Filtres</span>
 
 		<select
-			class="rounded-lg border border-stone-200 bg-cream/40 px-3 py-1.5 text-xs font-medium text-stone-600 transition-all hover:border-stone-300 focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none {activeCategory ? 'border-primary/40 bg-missionnaire-50 text-primary' : ''}"
+			class="rounded-none border border-stone-200/60 bg-white/60 px-3 py-1.5 text-xs font-medium text-stone-600 transition-all hover:border-stone-300 focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none {activeCategory ? 'border-primary/40 bg-missionnaire-50 text-primary' : ''}"
 			value={activeCategory}
 			onchange={(e) => updateParam('category', e.currentTarget.value)}
 		>
@@ -95,7 +95,7 @@
 		</select>
 
 		<select
-			class="rounded-lg border border-stone-200 bg-cream/40 px-3 py-1.5 text-xs font-medium text-stone-600 transition-all hover:border-stone-300 focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none {activeArtist ? 'border-primary/40 bg-missionnaire-50 text-primary' : ''}"
+			class="rounded-none border border-stone-200/60 bg-white/60 px-3 py-1.5 text-xs font-medium text-stone-600 transition-all hover:border-stone-300 focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none {activeArtist ? 'border-primary/40 bg-missionnaire-50 text-primary' : ''}"
 			value={activeArtist}
 			onchange={(e) => updateParam('artist', e.currentTarget.value)}
 		>
@@ -108,7 +108,7 @@
 		<div class="h-4 w-px bg-stone-200"></div>
 
 		<select
-			class="rounded-lg border border-stone-200 bg-cream/40 px-3 py-1.5 text-xs font-medium text-stone-600 transition-all hover:border-stone-300 focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none"
+			class="rounded-none border border-stone-200/60 bg-white/60 px-3 py-1.5 text-xs font-medium text-stone-600 transition-all hover:border-stone-300 focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none"
 			value={activeSort}
 			onchange={(e) => updateParam('sort', e.currentTarget.value)}
 		>
@@ -122,7 +122,7 @@
 		{#if hasFilters}
 			<button
 				onclick={clearFilters}
-				class="ml-auto flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600"
+				class="ml-auto flex items-center gap-1 rounded-none px-2.5 py-1.5 text-xs font-medium text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600"
 			>
 				<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />

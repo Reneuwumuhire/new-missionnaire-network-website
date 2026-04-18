@@ -43,7 +43,7 @@
 
 <div class="mb-8 flex items-end justify-between">
 	<div>
-		<h1 class="font-display text-3xl font-bold text-stone-800">Utilisateurs</h1>
+		<h1 class="font-display text-3xl font-semibold text-stone-800">Utilisateurs</h1>
 		<p class="mt-1 text-sm text-stone-500">{data.users.length} compte{data.users.length !== 1 ? 's' : ''} administrateur</p>
 	</div>
 	<button onclick={() => (showCreateForm = !showCreateForm)} class="admin-btn-primary">
@@ -56,9 +56,9 @@
 
 <!-- Generated password banner -->
 {#if generatedPassword && passwordTargetEmail}
-	<div class="mb-6 rounded-2xl border border-amber-200 bg-amber-50/80 p-5">
+	<div class="mb-6 border border-amber-200 bg-amber-50/80 p-5">
 		<div class="flex items-start gap-3">
-			<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100">
+			<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100">
 				<svg class="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
 				</svg>
@@ -71,12 +71,12 @@
 					Copiez ce mot de passe et partagez-le avec l'utilisateur. Il ne sera plus visible après avoir quitté cette page.
 				</p>
 				<div class="mt-3 flex items-center gap-2">
-					<code class="rounded-lg border border-amber-200 bg-white px-4 py-2 font-mono text-base font-bold tracking-wider text-stone-800 select-all">
+					<code class="border border-amber-200 bg-white px-4 py-2 font-mono text-base font-bold tracking-wider text-stone-800 select-all">
 						{generatedPassword}
 					</code>
 					<button
 						onclick={copyPassword}
-						class="rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-50"
+						class="border border-amber-200 bg-white px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-700 transition-colors hover:bg-amber-50"
 					>
 						{#if copiedPassword}
 							<span class="flex items-center gap-1">
@@ -97,7 +97,7 @@
 
 <!-- Create user form -->
 {#if showCreateForm}
-	<div class="mb-6 rounded-2xl border border-stone-200/60 bg-white p-6">
+	<div class="mb-6 border border-stone-200/60 bg-white/40 p-6">
 		<h2 class="mb-5 flex items-center gap-2 font-display text-lg font-semibold text-stone-700">
 			<svg class="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
@@ -106,7 +106,7 @@
 		</h2>
 
 		{#if form?.createError}
-			<div class="mb-4 rounded-xl border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-red-700">
+			<div class="mb-4 border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-red-700">
 				{form.createError}
 			</div>
 		{/if}
@@ -143,7 +143,7 @@
 				</div>
 			</div>
 
-			<div class="mt-3 rounded-lg bg-cream/60 px-4 py-2.5 text-xs text-stone-500">
+			<div class="mt-3 bg-cream/60 px-4 py-2.5 text-xs text-stone-500">
 				Un mot de passe sera généré automatiquement. Vous pourrez le copier et le partager avec l'utilisateur.
 			</div>
 
@@ -166,7 +166,7 @@
 {/if}
 
 <!-- Users table -->
-<div class="overflow-hidden rounded-2xl border border-stone-200/60 bg-white">
+<div class="overflow-hidden border border-stone-200/60 bg-white/40">
 	<table class="w-full text-left text-sm">
 		<thead>
 			<tr class="border-b border-stone-100 bg-cream/50">
@@ -184,7 +184,7 @@
 				<tr class="border-b border-stone-50 transition-colors hover:bg-cream/30">
 					<td class="px-5 py-4">
 						<div class="flex items-center gap-3">
-							<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-display text-sm font-bold {user.is_active ? 'bg-missionnaire-50 text-primary' : 'bg-stone-100 text-stone-400'}">
+							<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-display text-sm font-semibold {user.is_active ? 'bg-missionnaire-50 text-primary' : 'bg-stone-100 text-stone-400'}">
 								{user.name.charAt(0).toUpperCase()}
 							</div>
 							<div>
@@ -251,17 +251,17 @@
 								>
 									<input type="hidden" name="email" value={user.email} />
 									<span class="text-xs text-amber-600">Confirmer ?</span>
-									<button type="submit" class="rounded-lg bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-200">
+									<button type="submit" class="bg-amber-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-700 hover:bg-amber-200">
 										Oui
 									</button>
-									<button type="button" onclick={() => (confirmResetEmail = null)} class="rounded-lg px-2 py-1 text-xs text-stone-400 hover:text-stone-600">
+									<button type="button" onclick={() => (confirmResetEmail = null)} class="px-2 py-1 text-[10px] uppercase tracking-[0.15em] text-stone-400 hover:text-stone-600">
 										Non
 									</button>
 								</form>
 							{:else}
 								<button
 									onclick={() => { confirmResetEmail = user.email; confirmToggleEmail = null; permissionsEmail = null; }}
-									class="rounded-lg px-2.5 py-1.5 text-xs text-stone-500 transition-colors hover:bg-amber-50 hover:text-amber-700"
+									class="px-2.5 py-1.5 text-[10px] uppercase tracking-[0.15em] text-stone-500 transition-colors hover:bg-amber-50 hover:text-amber-700"
 									title="Réinitialiser le mot de passe"
 								>
 									<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -288,17 +288,17 @@
 									<span class="text-xs {user.is_active ? 'text-red-600' : 'text-green-600'}">
 										{user.is_active ? 'Désactiver ?' : 'Activer ?'}
 									</span>
-									<button type="submit" class="rounded-lg px-2.5 py-1 text-xs font-medium {user.is_active ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200'}">
+									<button type="submit" class="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] {user.is_active ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200'}">
 										Oui
 									</button>
-									<button type="button" onclick={() => (confirmToggleEmail = null)} class="rounded-lg px-2 py-1 text-xs text-stone-400 hover:text-stone-600">
+									<button type="button" onclick={() => (confirmToggleEmail = null)} class="px-2 py-1 text-[10px] uppercase tracking-[0.15em] text-stone-400 hover:text-stone-600">
 										Non
 									</button>
 								</form>
 							{:else}
 								<button
 									onclick={() => { confirmToggleEmail = user.email; confirmResetEmail = null; permissionsEmail = null; }}
-									class="rounded-lg px-2.5 py-1.5 text-xs transition-colors {user.is_active ? 'text-stone-500 hover:bg-red-50 hover:text-red-600' : 'text-stone-500 hover:bg-green-50 hover:text-green-600'}"
+									class="px-2.5 py-1.5 text-[10px] uppercase tracking-[0.15em] transition-colors {user.is_active ? 'text-stone-500 hover:bg-red-50 hover:text-red-600' : 'text-stone-500 hover:bg-green-50 hover:text-green-600'}"
 									title={user.is_active ? 'Désactiver' : 'Activer'}
 								>
 									{#if user.is_active}
@@ -337,7 +337,7 @@
 									Permissions pour {user.name}
 								</span>
 
-								<label class="flex cursor-pointer items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2 transition-colors has-[:checked]:border-green-300 has-[:checked]:bg-green-50">
+								<label class="flex cursor-pointer items-center gap-2 border border-stone-200 bg-white px-3 py-2 transition-colors has-[:checked]:border-green-300 has-[:checked]:bg-green-50">
 									<input
 										type="checkbox"
 										name="can_add"
@@ -350,7 +350,7 @@
 									</div>
 								</label>
 
-								<label class="flex cursor-pointer items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2 transition-colors has-[:checked]:border-blue-300 has-[:checked]:bg-blue-50">
+								<label class="flex cursor-pointer items-center gap-2 border border-stone-200 bg-white px-3 py-2 transition-colors has-[:checked]:border-blue-300 has-[:checked]:bg-blue-50">
 									<input
 										type="checkbox"
 										name="can_edit"
@@ -363,7 +363,7 @@
 									</div>
 								</label>
 
-								<label class="flex cursor-pointer items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2 transition-colors has-[:checked]:border-red-300 has-[:checked]:bg-red-50">
+								<label class="flex cursor-pointer items-center gap-2 border border-stone-200 bg-white px-3 py-2 transition-colors has-[:checked]:border-red-300 has-[:checked]:bg-red-50">
 									<input
 										type="checkbox"
 										name="can_delete"
@@ -376,7 +376,7 @@
 									</div>
 								</label>
 
-								<label class="flex cursor-pointer items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2 transition-colors has-[:checked]:border-purple-300 has-[:checked]:bg-purple-50">
+								<label class="flex cursor-pointer items-center gap-2 border border-stone-200 bg-white px-3 py-2 transition-colors has-[:checked]:border-purple-300 has-[:checked]:bg-purple-50">
 									<input
 										type="checkbox"
 										name="can_manage_recordings"
@@ -414,12 +414,12 @@
 </div>
 
 {#if form?.toggleError}
-	<div class="mt-4 rounded-xl border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-red-700">
+	<div class="mt-4 border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-red-700">
 		{form.toggleError}
 	</div>
 {/if}
 {#if form?.permSuccess}
-	<div class="mt-4 rounded-xl border border-green-200 bg-green-50/80 px-4 py-3 text-sm text-green-700">
+	<div class="mt-4 border border-green-200 bg-green-50/80 px-4 py-3 text-sm text-green-700">
 		Permissions mises à jour pour {form.permEmail}
 	</div>
 {/if}

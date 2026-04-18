@@ -14,7 +14,7 @@
 	<div class="w-full max-w-md">
 		<!-- Logo / Brand -->
 		<div class="mb-10 text-center">
-			<h1 class="font-display text-4xl font-bold tracking-tight text-stone-800">
+			<h1 class="font-display text-4xl font-semibold tracking-tight text-stone-800">
 				Missionnaire
 			</h1>
 			<p class="mt-1 font-body text-sm tracking-widest text-earth uppercase">
@@ -26,10 +26,10 @@
 		</div>
 
 		<!-- Login Card -->
-		<div class="rounded-2xl border border-stone-200/60 bg-white p-8 shadow-4xl">
+		<div class="border border-stone-200/60 bg-white/40 p-8 shadow-4xl">
 			{#if form?.error}
 				<div
-					class="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+					class="mb-6 border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
 				>
 					{form.error}
 				</div>

@@ -58,7 +58,7 @@
 </script>
 
 {#if $count > 0}
-	<div class="sticky bottom-4 z-20 mx-auto w-fit animate-[page-in_0.2s_ease] rounded-2xl border border-stone-200 bg-white px-6 py-3 shadow-lg">
+	<div class="sticky bottom-4 z-20 mx-auto w-fit animate-[page-in_0.2s_ease] rounded-sm border border-stone-200 bg-white px-6 py-3 shadow-lg">
 		<div class="flex items-center gap-4">
 			<span class="text-sm font-medium text-stone-700">
 				{$count} sélectionné{$count > 1 ? 's' : ''}
@@ -75,12 +75,12 @@
 					Changer catégorie
 				</button>
 				{#if showCategoryPicker}
-					<div class="absolute bottom-full left-0 mb-2 w-48 rounded-xl border border-stone-200 bg-white p-2 shadow-lg">
+					<div class="absolute bottom-full left-0 mb-2 w-48 rounded-sm border border-stone-200 bg-white p-2 shadow-lg">
 						{#each categories as cat}
 							<button
 								onclick={() => bulkUpdateCategory(cat)}
 								disabled={loading}
-								class="w-full rounded-lg px-3 py-1.5 text-left text-sm text-stone-600 transition-colors hover:bg-cream"
+								class="w-full rounded-none px-3 py-1.5 text-left text-sm text-stone-600 transition-colors hover:bg-cream"
 							>
 								{cat}
 							</button>

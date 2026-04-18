@@ -108,13 +108,13 @@
 		</svg>
 		Bibliothèque
 	</a>
-	<h1 class="font-display text-3xl font-bold text-stone-800">Éditer l'audio</h1>
+	<h1 class="font-display text-3xl font-semibold text-stone-800">Éditer l'audio</h1>
 </div>
 
 <div class="mx-auto grid max-w-4xl gap-6 lg:grid-cols-3">
 	<!-- Main form (2 cols) -->
 	<div class="lg:col-span-2">
-		<div class="rounded-2xl border border-stone-200/60 bg-white p-6">
+		<div class="border border-stone-200/60 bg-white/40 p-6">
 			<h2 class="mb-5 font-display text-lg font-semibold text-stone-700">Métadonnées</h2>
 
 			<div class="grid gap-5 sm:grid-cols-2">
@@ -185,7 +185,7 @@
 	<!-- Sidebar info (1 col) -->
 	<div class="space-y-6">
 		<!-- Audio preview -->
-		<div class="rounded-2xl border border-stone-200/60 bg-white p-6">
+		<div class="border border-stone-200/60 bg-white/40 p-6">
 			<h3 class="mb-4 text-sm font-medium text-stone-500 uppercase tracking-wider">Aperçu</h3>
 			<div class="mb-4">
 				<AudioPreviewPlayer src={data.audio.s3_url} />
@@ -230,7 +230,7 @@
 		</div>
 
 		<!-- Danger zone -->
-		<div class="rounded-2xl border border-red-200/60 bg-white p-6">
+		<div class="border border-red-200/60 bg-white/40 p-6">
 			<h3 class="mb-3 text-sm font-medium text-red-600 uppercase tracking-wider">Zone dangereuse</h3>
 			<p class="mb-4 text-sm text-stone-500">
 				Supprimer cet audio définitivement. Le fichier sera retiré du serveur et de la base de données.

@@ -172,7 +172,7 @@
 		</svg>
 		Bibliothèque
 	</a>
-	<h1 class="font-display text-3xl font-bold text-stone-800">Importer un audio</h1>
+	<h1 class="font-display text-3xl font-semibold text-stone-800">Importer un audio</h1>
 </div>
 
 <div class="mx-auto max-w-2xl">
@@ -183,7 +183,7 @@
 	</div>
 
 	<!-- Step 2: Metadata -->
-	<div class="mb-8 rounded-2xl border border-stone-200/60 bg-white p-6">
+	<div class="mb-8 border border-stone-200/60 bg-white/40 p-6">
 		<h2 class="mb-5 font-display text-lg font-semibold text-stone-700">2. Métadonnées</h2>
 
 		<div class="grid gap-5 sm:grid-cols-2">
@@ -249,7 +249,7 @@
 	</div>
 
 	<!-- Step 3: Upload & Save -->
-	<div class="mb-8 rounded-2xl border border-stone-200/60 bg-white p-6">
+	<div class="mb-8 border border-stone-200/60 bg-white/40 p-6">
 		<h2 class="mb-5 font-display text-lg font-semibold text-stone-700">3. Import</h2>
 
 		{#if !uploaded}
@@ -289,7 +289,7 @@
 			{/if}
 		{:else}
 			<!-- Save record -->
-			<div class="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+			<div class="mb-4 border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
 				Fichier importé avec succès. Enregistrez les métadonnées pour finaliser.
 			</div>
 

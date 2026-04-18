@@ -799,16 +799,16 @@
 </div>
 
 {#if !recorder.available}
-	<div class="mb-6 rounded-2xl border border-red-200 bg-red-50/80 p-5">
+	<div class="mb-6 border border-red-200 bg-red-50/80 p-5">
 		<p class="text-sm font-semibold text-red-800">Service d'enregistrement injoignable</p>
 		<p class="mt-1 text-xs text-red-600">{recorder.error}</p>
 	</div>
 {/if}
 
 {#if showLiveBanner}
-	<div class="mb-6 rounded-2xl border border-green-200 bg-green-50/80 p-5">
+	<div class="mb-6 border border-green-200 bg-green-50/80 p-5">
 		<div class="flex items-start gap-3">
-			<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-green-100">
+			<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100">
 				<span class="relative inline-flex h-2.5 w-2.5">
 					<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75"></span>
 					<span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-600"></span>
@@ -847,11 +847,11 @@
 	</svg>
 {/snippet}
 
-<div class="mb-8 rounded-2xl border bg-white p-6 {broadcast.is_live ? 'border-red-200' : 'border-stone-200/60'}">
+<div class="mb-8 border bg-white/40 p-6 {broadcast.is_live ? 'border-red-200' : 'border-stone-200/60'}">
 	<!-- Header: status + timers -->
 	<div class="flex flex-wrap items-center justify-between gap-4">
 		<div class="flex items-center gap-4">
-			<div class="flex h-12 w-12 items-center justify-center rounded-xl {broadcast.is_live || isRecording ? 'bg-red-50' : 'bg-stone-100'}">
+			<div class="flex h-12 w-12 items-center justify-center rounded-full {broadcast.is_live || isRecording ? 'bg-red-50' : 'bg-stone-100'}">
 				{#if broadcast.is_live || isRecording}
 					<span class="relative inline-flex h-2.5 w-2.5">
 						<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"></span>
@@ -934,7 +934,7 @@
 	<!-- Actions -->
 	<div class="mt-5 border-t border-stone-100 pt-5">
 		{#if !icecast.sourceActive && !broadcast.is_live && !isRecording}
-			<span class="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm font-medium text-stone-400">
+			<span class="inline-flex items-center gap-2 border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm font-medium text-stone-400">
 				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
 				</svg>
@@ -951,7 +951,7 @@
 				<button
 					onclick={endLive}
 					disabled={broadcastBusy}
-					class="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-300 bg-stone-100 px-4 py-3 text-sm font-semibold text-stone-800 transition-all hover:border-stone-900 hover:bg-stone-900 hover:text-white disabled:opacity-50 sm:order-1"
+					class="inline-flex items-center justify-center gap-2 border border-stone-300 bg-stone-100 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-stone-800 transition-all hover:border-stone-900 hover:bg-stone-900 hover:text-white disabled:opacity-50 sm:order-1"
 				>
 					{@render iconStop()}
 					<span>{broadcastBusy ? '…' : 'Terminer le direct'}</span>
@@ -959,7 +959,7 @@
 				<button
 					onclick={stop}
 					disabled={busy}
-					class="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 transition-all hover:border-rose-600 hover:bg-rose-600 hover:text-white disabled:opacity-50 sm:order-2"
+					class="inline-flex items-center justify-center gap-2 border border-rose-200 bg-rose-50 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-rose-700 transition-all hover:border-rose-600 hover:bg-rose-600 hover:text-white disabled:opacity-50 sm:order-2"
 				>
 					{@render iconStop()}
 					<span>{busy ? 'Arrêt…' : 'Arrêter l\'enregistrement'}</span>
@@ -967,7 +967,7 @@
 				<button
 					onclick={stopBoth}
 					disabled={broadcastBusy || busy}
-					class="order-first inline-flex items-center justify-center gap-2 rounded-xl bg-red-700 px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-red-700/30 ring-1 ring-red-700/60 transition-all hover:bg-red-800 hover:shadow-md hover:shadow-red-700/40 disabled:opacity-50 sm:order-3"
+					class="order-first inline-flex items-center justify-center gap-2 bg-red-700 px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white shadow-sm shadow-red-700/30 ring-1 ring-red-700/60 transition-all hover:bg-red-800 hover:shadow-md hover:shadow-red-700/40 disabled:opacity-50 sm:order-3"
 				>
 					{@render iconStop()}
 					<span>{(broadcastBusy || busy) ? 'Arrêt…' : 'Tout arrêter'}</span>
@@ -983,7 +983,7 @@
 				<button
 					onclick={goLive}
 					disabled={broadcastBusy}
-					class="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-300 bg-stone-100 px-4 py-3 text-sm font-semibold text-stone-800 transition-all hover:border-stone-900 hover:bg-stone-900 hover:text-white disabled:opacity-50 sm:order-1"
+					class="inline-flex items-center justify-center gap-2 border border-stone-300 bg-stone-100 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-stone-800 transition-all hover:border-stone-900 hover:bg-stone-900 hover:text-white disabled:opacity-50 sm:order-1"
 				>
 					{@render iconBroadcast()}
 					<span>{broadcastBusy ? '…' : 'Aller en direct'}</span>
@@ -991,7 +991,7 @@
 				<button
 					onclick={start}
 					disabled={busy || !recorder.available || ('pendingOrphans' in recorder && recorder.pendingOrphans > 0)}
-					class="inline-flex items-center justify-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-semibold text-primary transition-all hover:border-primary hover:bg-primary hover:text-white disabled:opacity-50 sm:order-2"
+					class="inline-flex items-center justify-center gap-2 border border-orange-200 bg-orange-50 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-primary transition-all hover:border-primary hover:bg-primary hover:text-white disabled:opacity-50 sm:order-2"
 				>
 					{@render iconRecord()}
 					<span>{busy ? '…' : 'Enregistrer'}</span>
@@ -999,7 +999,7 @@
 				<button
 					onclick={startBoth}
 					disabled={broadcastBusy || busy || !recorder.available || ('pendingOrphans' in recorder && recorder.pendingOrphans > 0)}
-					class="order-first inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-emerald-600/30 ring-1 ring-emerald-600/50 transition-all hover:bg-emerald-700 hover:shadow-md hover:shadow-emerald-600/40 disabled:opacity-50 sm:order-3"
+					class="order-first inline-flex items-center justify-center gap-2 bg-emerald-600 px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white shadow-sm shadow-emerald-600/30 ring-1 ring-emerald-600/50 transition-all hover:bg-emerald-700 hover:shadow-md hover:shadow-emerald-600/40 disabled:opacity-50 sm:order-3"
 				>
 					{@render iconBoth()}
 					<span>{(broadcastBusy || busy) ? 'Démarrage…' : 'Tout démarrer'}</span>
@@ -1015,7 +1015,7 @@
 				<button
 					onclick={endLive}
 					disabled={broadcastBusy}
-					class="inline-flex items-center justify-center gap-2 rounded-xl bg-stone-800 px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-stone-900/20 ring-1 ring-stone-900/40 transition-all hover:bg-stone-900 hover:shadow-md hover:shadow-stone-900/30 disabled:opacity-50"
+					class="inline-flex items-center justify-center gap-2 bg-stone-800 px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white shadow-sm shadow-stone-900/20 ring-1 ring-stone-900/40 transition-all hover:bg-stone-900 hover:shadow-md hover:shadow-stone-900/30 disabled:opacity-50"
 				>
 					{@render iconStop()}
 					<span>{broadcastBusy ? 'Arrêt…' : 'Terminer le direct'}</span>
@@ -1023,7 +1023,7 @@
 				<button
 					onclick={start}
 					disabled={busy || !recorder.available || ('pendingOrphans' in recorder && recorder.pendingOrphans > 0)}
-					class="inline-flex items-center justify-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-semibold text-primary transition-all hover:border-primary hover:bg-primary hover:text-white disabled:opacity-50"
+					class="inline-flex items-center justify-center gap-2 border border-orange-200 bg-orange-50 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-primary transition-all hover:border-primary hover:bg-primary hover:text-white disabled:opacity-50"
 				>
 					{@render iconRecord()}
 					<span>{busy ? 'Démarrage…' : 'Démarrer l\'enregistrement'}</span>
@@ -1039,7 +1039,7 @@
 				<button
 					onclick={stop}
 					disabled={busy}
-					class="inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-rose-600/30 ring-1 ring-rose-600/50 transition-all hover:bg-rose-700 hover:shadow-md hover:shadow-rose-600/40 disabled:opacity-50"
+					class="inline-flex items-center justify-center gap-2 bg-rose-600 px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white shadow-sm shadow-rose-600/30 ring-1 ring-rose-600/50 transition-all hover:bg-rose-700 hover:shadow-md hover:shadow-rose-600/40 disabled:opacity-50"
 				>
 					{@render iconStop()}
 					<span>{busy ? 'Arrêt…' : 'Arrêter l\'enregistrement'}</span>
@@ -1047,7 +1047,7 @@
 				<button
 					onclick={goLive}
 					disabled={broadcastBusy}
-					class="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-300 bg-stone-100 px-4 py-3 text-sm font-semibold text-stone-800 transition-all hover:border-stone-900 hover:bg-stone-900 hover:text-white disabled:opacity-50"
+					class="inline-flex items-center justify-center gap-2 border border-stone-300 bg-stone-100 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-stone-800 transition-all hover:border-stone-900 hover:bg-stone-900 hover:text-white disabled:opacity-50"
 				>
 					{@render iconBroadcast()}
 					<span>{broadcastBusy ? '…' : 'Aller en direct'}</span>
@@ -1057,13 +1057,13 @@
 	</div>
 
 	{#if recorder.available && 'pendingOrphans' in recorder && recorder.pendingOrphans > 0}
-		<p class="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+		<p class="mt-4 bg-amber-50 px-3 py-2 text-xs text-amber-700">
 			Récupération en cours : {recorder.pendingOrphans} enregistrement(s) en attente de téléversement.
 		</p>
 	{/if}
 
 	{#if actionError}
-		<p class="mt-4 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{actionError}</p>
+		<p class="mt-4 bg-red-50 px-3 py-2 text-xs text-red-700">{actionError}</p>
 	{/if}
 
 	<!-- Live audio monitor -->
@@ -1094,7 +1094,7 @@
 			<button
 				type="button"
 				onclick={enterEditMode}
-				class="shrink-0 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-primary hover:text-primary"
+				class="shrink-0 border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-stone-600 transition-colors hover:border-primary hover:text-primary"
 			>
 				Modifier
 			</button>
@@ -1102,7 +1102,7 @@
 
 		<!-- Full-width reminder banner — spans under the label/button row so the
 		     message reads comfortably regardless of viewport size. -->
-		<div class="mb-4 flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50/80 px-3.5 py-2.5">
+		<div class="mb-4 flex items-start gap-2.5 border border-amber-200 bg-amber-50/80 px-3.5 py-2.5">
 			<svg class="h-4 w-4 shrink-0 text-amber-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.2 16c-.77 1.33.2 3 1.73 3z" />
 			</svg>
@@ -1120,7 +1120,7 @@
 						type="button"
 						onclick={openThumbnail}
 						aria-label="Agrandir la vignette"
-						class="relative h-28 w-44 overflow-hidden rounded-xl border border-stone-300 bg-cream/40 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 group cursor-zoom-in hover:border-primary"
+						class="relative h-28 w-44 overflow-hidden border border-stone-300 bg-cream/40 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 group cursor-zoom-in hover:border-primary"
 					>
 						<img
 							src={broadcast.thumbnail_url}
@@ -1138,7 +1138,7 @@
 					</button>
 				{:else}
 					<!-- Default fallback preview — this is what the public site will show -->
-					<div class="relative h-28 w-44 overflow-hidden rounded-xl border border-dashed border-stone-300 default-thumbnail-admin">
+					<div class="relative h-28 w-44 overflow-hidden border border-dashed border-stone-300 default-thumbnail-admin">
 						<div class="flex h-full w-full flex-col items-center justify-center gap-1.5">
 							<picture>
 								<source srcset="/icons/logo.webp" type="image/webp" />
@@ -1219,7 +1219,7 @@
 		<button
 			type="button"
 			onclick={resetFilters}
-			class="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-stone-500 transition-colors hover:border-stone-400 hover:text-stone-700"
+			class="inline-flex items-center gap-1 border border-stone-200 bg-white/60 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 transition-colors hover:border-stone-400 hover:text-stone-700"
 		>
 			<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -1265,7 +1265,7 @@
 		{@const isEditing = editingRecordingId === rec._id}
 		{@const isSelected = selectedIds.has(rec._id!)}
 		<article
-			class="group overflow-hidden rounded-2xl border bg-white transition-all {isSelected ? 'border-primary/50 bg-orange-50/30 shadow-sm shadow-primary/10' : 'border-stone-200/70'}"
+			class="group overflow-hidden border bg-white/60 transition-all {isSelected ? 'border-primary/50 bg-orange-50/40 shadow-sm shadow-primary/10' : 'border-stone-200/70'}"
 		>
 			<!-- Header: checkbox + thumbnail + title block -->
 			<div class="flex items-start gap-3 p-4">
@@ -1282,10 +1282,10 @@
 						src={rec.thumbnail_url}
 						alt=""
 						onerror={() => markThumbnailFailed(rec._id!)}
-						class="h-14 w-20 shrink-0 rounded-lg object-cover border border-stone-200/60"
+						class="h-14 w-20 shrink-0 object-cover border border-stone-200/60"
 					/>
 				{:else}
-					<div class="flex h-14 w-20 shrink-0 items-center justify-center rounded-lg border border-stone-200/60 bg-cream/60 text-stone-300" aria-hidden="true">
+					<div class="flex h-14 w-20 shrink-0 items-center justify-center border border-stone-200/60 bg-cream/60 text-stone-300" aria-hidden="true">
 						<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M4 6h16v12H4V6z" />
 						</svg>
@@ -1341,7 +1341,7 @@
 				{#if rec.status === 'failed'}
 					<button
 						onclick={() => retryUpload(rec._id!)}
-						class="rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-200"
+						class="bg-amber-100 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-700 transition-colors hover:bg-amber-200"
 					>
 						Réessayer l'envoi
 					</button>
@@ -1349,7 +1349,7 @@
 				{#if rec.status === 'ready' || rec.status === 'failed'}
 					<button
 						onclick={() => (isEditing ? cancelRecordingEdit() : enterRecordingEdit(rec))}
-						class="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-primary hover:text-primary"
+						class="inline-flex items-center gap-1.5 border border-stone-200 bg-white/60 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary"
 					>
 						<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -1359,7 +1359,7 @@
 				{/if}
 				<button
 					onclick={() => remove(rec._id!)}
-					class="ml-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600"
+					class="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600"
 					title="Supprimer"
 				>
 					<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -1372,7 +1372,7 @@
 	{/each}
 
 	{#if filteredRecordings.length === 0}
-		<div class="rounded-2xl border border-dashed border-stone-200 bg-white px-5 py-14 text-center">
+		<div class="border border-dashed border-stone-200 bg-white/40 px-5 py-14 text-center">
 			<p class="font-display text-sm text-stone-500">
 				{#if data.recordings.length === 0}
 					Aucun enregistrement pour l'instant.
@@ -1392,7 +1392,7 @@
 </div>
 
 <!-- Recordings table (≥ lg). Original dense layout unchanged. -->
-<div class="hidden overflow-hidden rounded-2xl border border-stone-200/60 bg-white lg:block">
+<div class="hidden overflow-hidden border border-stone-200/60 bg-white/40 lg:block">
 	<table class="w-full text-left text-sm">
 		<thead>
 			<tr class="border-b border-stone-100 bg-cream/50">
@@ -1479,19 +1479,19 @@
 								<audio src={rec.s3_url} controls preload="none" class="h-8 w-44"></audio>
 							{/if}
 							{#if rec.status === 'failed'}
-								<button onclick={() => retryUpload(rec._id!)} class="rounded-lg bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-200">
+								<button onclick={() => retryUpload(rec._id!)} class="bg-amber-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-700 hover:bg-amber-200">
 									Réessayer
 								</button>
 							{/if}
 							{#if rec.status === 'ready' || rec.status === 'failed'}
 								<button
 									onclick={() => (isEditing ? cancelRecordingEdit() : enterRecordingEdit(rec))}
-									class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs font-medium text-stone-600 hover:border-primary hover:text-primary"
+									class="border border-stone-200 bg-white/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 hover:border-primary hover:text-primary"
 								>
 									{isEditing ? 'Fermer' : 'Modifier'}
 								</button>
 							{/if}
-							<button onclick={() => remove(rec._id!)} class="rounded-lg px-2 py-1.5 text-xs text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600" title="Supprimer">
+							<button onclick={() => remove(rec._id!)} class="px-2 py-1.5 text-xs text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600" title="Supprimer">
 								<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 									<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
 								</svg>
@@ -1522,7 +1522,7 @@
 
 <!-- Bulk action bar — sticky footer appears while anything is selected -->
 {#if selectedIds.size > 0}
-	<div class="sticky bottom-4 z-20 mx-auto mt-4 w-fit animate-[page-in_0.2s_ease] rounded-2xl border border-stone-200 bg-white px-6 py-3 shadow-lg">
+	<div class="sticky bottom-4 z-20 mx-auto mt-4 w-fit animate-[page-in_0.2s_ease] rounded-sm border border-stone-200 bg-white px-6 py-3 shadow-lg">
 		<div class="flex items-center gap-4">
 			<span class="text-sm font-medium text-stone-700">
 				{selectedIds.size} sélectionné{selectedIds.size > 1 ? 's' : ''}
@@ -1555,7 +1555,7 @@
 		aria-labelledby="edit-broadcast-title"
 		tabindex="-1"
 	>
-		<div class="w-full max-w-3xl rounded-2xl bg-white shadow-2xl my-8">
+		<div class="w-full max-w-3xl rounded-sm bg-white shadow-2xl my-8">
 			<div class="flex items-center justify-between border-b border-stone-100 px-6 py-4">
 				<h2 id="edit-broadcast-title" class="font-display text-lg font-semibold text-stone-800">
 					Modifier les informations du direct
@@ -1578,7 +1578,7 @@
 					<div class="flex flex-col gap-2 shrink-0">
 						<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Vignette</span>
 						{#if previewSrc}
-							<div class="relative aspect-video w-48 overflow-hidden rounded-xl border border-stone-300 bg-cream/40">
+							<div class="relative aspect-video w-48 overflow-hidden border border-stone-300 bg-cream/40">
 								<img
 									src={previewSrc}
 									alt=""
@@ -1594,7 +1594,7 @@
 								{/if}
 							</div>
 						{:else}
-							<div class="default-thumbnail-admin relative flex aspect-video w-48 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-stone-300">
+							<div class="default-thumbnail-admin relative flex aspect-video w-48 flex-col items-center justify-center gap-1 border border-dashed border-stone-300">
 								<picture>
 									<source srcset="/icons/logo.webp" type="image/webp" />
 									<img src="/icons/logo.png" alt="" class="h-5 w-auto opacity-90" width="150" height="64" />
@@ -1603,7 +1603,7 @@
 							</div>
 						{/if}
 						<div class="flex gap-2">
-							<label class="cursor-pointer rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-primary hover:text-primary">
+							<label class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary">
 								{previewSrc ? 'Changer' : 'Téléverser'}
 								<input
 									type="file"
@@ -1618,7 +1618,7 @@
 									type="button"
 									onclick={markThumbnailForRemoval}
 									disabled={metadataSaving}
-									class="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-500 transition-colors hover:border-red-200 hover:text-red-600 disabled:opacity-50"
+									class="border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 transition-colors hover:border-red-200 hover:text-red-600 disabled:opacity-50"
 								>
 									Retirer
 								</button>
@@ -1657,7 +1657,7 @@
 						</div>
 
 						{#if thumbnailError}
-							<p class="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{thumbnailError}</p>
+							<p class="bg-red-50 px-3 py-2 text-xs text-red-700">{thumbnailError}</p>
 						{/if}
 					</div>
 				</div>
@@ -1668,7 +1668,7 @@
 					type="button"
 					onclick={cancelEditMode}
 					disabled={metadataSaving}
-					class="rounded-lg px-3 py-2 text-sm font-medium text-stone-500 hover:bg-stone-100 hover:text-stone-700 disabled:opacity-50"
+					class="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500 hover:bg-stone-100 hover:text-stone-700 disabled:opacity-50"
 				>
 					Annuler
 				</button>
@@ -1676,7 +1676,7 @@
 					type="button"
 					onclick={saveMetadata}
 					disabled={metadataSaving}
-					class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-missionnaire-600 disabled:opacity-50"
+					class="bg-primary px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-white hover:bg-missionnaire-600 disabled:opacity-50"
 				>
 					{metadataSaving ? 'Enregistrement…' : 'Enregistrer'}
 				</button>
@@ -1698,7 +1698,7 @@
 			aria-labelledby="edit-rec-title"
 			tabindex="-1"
 		>
-			<div class="w-full max-w-3xl rounded-2xl bg-white shadow-2xl my-8">
+			<div class="w-full max-w-3xl rounded-sm bg-white shadow-2xl my-8">
 				<!-- Modal header -->
 				<div class="flex items-center justify-between border-b border-stone-100 px-6 py-4">
 					<h2 id="edit-rec-title" class="font-display text-lg font-semibold text-stone-800">
@@ -1724,7 +1724,7 @@
 						<div class="flex flex-col gap-2 shrink-0">
 							<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Vignette</span>
 							{#if recPreviewSrc(editingRec)}
-								<div class="relative aspect-video w-48 overflow-hidden rounded-xl border border-stone-300 bg-cream/40">
+								<div class="relative aspect-video w-48 overflow-hidden border border-stone-300 bg-cream/40">
 									<img
 										src={recPreviewSrc(editingRec)}
 										alt=""
@@ -1742,7 +1742,7 @@
 									{/if}
 								</div>
 							{:else}
-								<div class="default-thumbnail-admin relative flex aspect-video w-48 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-stone-300">
+								<div class="default-thumbnail-admin relative flex aspect-video w-48 flex-col items-center justify-center gap-1 border border-dashed border-stone-300">
 									<picture>
 										<source srcset="/icons/logo.webp" type="image/webp" />
 										<img src="/icons/logo.png" alt="" class="h-5 w-auto opacity-90" width="150" height="64" />
@@ -1751,7 +1751,7 @@
 								</div>
 							{/if}
 							<div class="flex gap-2">
-								<label class="cursor-pointer rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-primary hover:text-primary">
+								<label class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary">
 									{recPreviewSrc(editingRec) ? 'Changer' : 'Téléverser'}
 									<input
 										type="file"
@@ -1766,7 +1766,7 @@
 										type="button"
 										onclick={markRecThumbnailRemove}
 										disabled={recSaving}
-										class="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-500 transition-colors hover:border-red-200 hover:text-red-600 disabled:opacity-50"
+										class="border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 transition-colors hover:border-red-200 hover:text-red-600 disabled:opacity-50"
 									>
 										Retirer
 									</button>
@@ -1806,7 +1806,7 @@
 							</div>
 
 							{#if recThumbnailError}
-								<p class="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{recThumbnailError}</p>
+								<p class="bg-red-50 px-3 py-2 text-xs text-red-700">{recThumbnailError}</p>
 							{/if}
 						</div>
 					</div>
@@ -1818,7 +1818,7 @@
 						type="button"
 						onclick={cancelRecordingEdit}
 						disabled={recSaving}
-						class="rounded-lg px-3 py-2 text-sm font-medium text-stone-500 hover:bg-stone-100 hover:text-stone-700 disabled:opacity-50"
+						class="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500 hover:bg-stone-100 hover:text-stone-700 disabled:opacity-50"
 					>
 						Annuler
 					</button>
@@ -1826,7 +1826,7 @@
 						type="button"
 						onclick={() => saveRecordingMetadata(editingRec)}
 						disabled={recSaving}
-						class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-missionnaire-600 disabled:opacity-50"
+						class="bg-primary px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-white hover:bg-missionnaire-600 disabled:opacity-50"
 					>
 						{recSaving ? 'Enregistrement…' : 'Enregistrer'}
 					</button>

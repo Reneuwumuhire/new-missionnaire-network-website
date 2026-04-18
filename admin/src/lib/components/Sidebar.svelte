@@ -43,7 +43,7 @@
 <!-- Mobile hamburger (only visible when sidebar is closed) -->
 {#if !mobileOpen}
 	<button
-		class="fixed left-4 top-4 z-40 flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-md lg:hidden"
+		class="fixed left-4 top-4 z-40 flex h-10 w-10 items-center justify-center bg-white shadow-md lg:hidden"
 		onclick={() => (mobileOpen = true)}
 		aria-label="Menu"
 	>
@@ -64,10 +64,10 @@
 			<img
 				src="/icons/logo.webp"
 				alt="Missionnaire"
-				class="h-10 w-10 rounded-xl object-contain"
+				class="h-10 w-10 object-contain"
 			/>
 			<div>
-				<h2 class="font-display text-[17px] font-bold leading-tight text-stone-800">
+				<h2 class="font-display text-[17px] font-semibold leading-tight text-stone-800">
 					Missionnaire
 				</h2>
 				<span class="text-[10px] font-semibold tracking-[0.2em] text-earth/60 uppercase">
@@ -96,12 +96,12 @@
 				<a
 					href={item.href}
 					onclick={() => (mobileOpen = false)}
-					class="group flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-[13px] font-medium transition-all
+					class="group flex items-center gap-3 px-3.5 py-2.5 text-[13px] font-medium transition-all
 					{active
 						? 'bg-primary/10 text-primary'
 						: 'text-stone-500 hover:bg-stone-50 hover:text-stone-700'}"
 				>
-					<span class="flex h-8 w-8 items-center justify-center rounded-lg transition-colors
+					<span class="flex h-8 w-8 items-center justify-center transition-colors
 						{active
 							? 'bg-primary text-white shadow-sm shadow-primary/25'
 							: 'bg-stone-100/80 text-stone-400 group-hover:bg-stone-200/60 group-hover:text-stone-500'}">
@@ -151,9 +151,9 @@
 	<!-- User info -->
 	<div class="mx-5 h-px bg-gradient-to-r from-transparent via-stone-200 to-transparent"></div>
 	<div class="px-4 py-4">
-		<a href="/settings" onclick={() => (mobileOpen = false)} class="flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-stone-50">
+		<a href="/settings" onclick={() => (mobileOpen = false)} class="flex items-center gap-3 px-2 py-2 transition-colors hover:bg-stone-50">
 			<div
-				class="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-missionnaire-100 font-display text-sm font-bold text-primary"
+				class="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-missionnaire-100 font-display text-sm font-semibold text-primary"
 			>
 				{user.name.charAt(0).toUpperCase()}
 			</div>
@@ -165,7 +165,7 @@
 		<form action="/logout" method="POST" class="mt-2">
 			<button
 				type="submit"
-				class="flex w-full items-center gap-2.5 rounded-xl px-3.5 py-2 text-[13px] font-medium text-stone-400 transition-colors hover:bg-red-50 hover:text-red-500"
+				class="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] font-medium text-stone-400 transition-colors hover:bg-red-50 hover:text-red-500"
 			>
 				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
