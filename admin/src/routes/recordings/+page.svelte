@@ -3,6 +3,8 @@
 	import { invalidateAll } from '$app/navigation';
 	import type { PageData } from './$types';
 	import type { Recording, RecordingStatus } from '$lib/models/recording';
+	import { confirmDialog } from '$lib/stores/confirm-dialog';
+	import { toast } from '$lib/stores/toast';
 
 	let { data }: { data: PageData } = $props();
 
@@ -13,12 +15,168 @@
 	const icecast: IcecastSnapshot = $derived(data.icecast);
 	const broadcast = $derived(data.broadcast);
 	const subscriberCount = $derived(data.subscriberCount);
+	// Current admin email — used to decide whether stopping someone else's
+	// session needs a confirmation (soft lock). Falls back to empty string
+	// so the "different admin" check never mistakenly matches.
+	const currentUserEmail = $derived(data.user?.email ?? '');
+	const broadcastStartedBy = $derived(broadcast.started_by ?? null);
+	const broadcastStartedByName = $derived(broadcast.started_by_name ?? null);
+	const recordingStartedBy = $derived(
+		recorder.available && 'recording' in recorder && recorder.recording
+			? (recorder.createdBy ?? null)
+			: null
+	);
+	const recordingStartedByName = $derived(
+		recorder.available && 'recording' in recorder && recorder.recording
+			? (recorder.createdByName ?? null)
+			: null
+	);
+
+	/** Prefer a stored full name; fall back to the local-part of the email.
+	 *  Shown everywhere we mention who started/created a session. */
+	function displayName(name: string | null | undefined, email: string | null | undefined): string {
+		const trimmed = name?.trim();
+		if (trimmed) return trimmed;
+		if (!email) return '—';
+		const at = email.indexOf('@');
+		return at > 0 ? email.slice(0, at) : email;
+	}
+
+	/** Ask for confirmation when the actor is not the original starter. Returns
+	 *  true if the action should proceed. */
+	async function confirmOverride(
+		startedBy: string | null,
+		startedByName: string | null,
+		label: string
+	): Promise<boolean> {
+		if (!startedBy || startedBy === currentUserEmail) return true;
+		return confirmDialog.ask({
+			title: `${label} : démarré par quelqu'un d'autre`,
+			message: `${displayName(startedByName, startedBy)} a démarré ${label.toLowerCase()}. Voulez-vous vraiment l'arrêter à sa place ?`,
+			confirmLabel: 'Arrêter quand même',
+			cancelLabel: 'Annuler',
+			tone: 'warning'
+		});
+	}
 	let elapsed = $state(0);
 	let broadcastElapsed = $state(0);
 	let busy = $state(false);
 	let broadcastBusy = $state(false);
 	let actionError = $state<string | null>(null);
-	let confirmDelete = $state<string | null>(null);
+	// ── Search + multi-select (recordings table) ──────────────────────
+	let searchQuery = $state('');
+	let statusFilter = $state<'all' | RecordingStatus>('all');
+	let publishedFilter = $state<'all' | 'published' | 'unpublished'>('all');
+	let selectedIds = $state<Set<string>>(new Set());
+	let bulkDeleting = $state(false);
+
+	const hasActiveFilters = $derived(
+		Boolean(searchQuery.trim()) || statusFilter !== 'all' || publishedFilter !== 'all'
+	);
+
+	function resetFilters() {
+		searchQuery = '';
+		statusFilter = 'all';
+		publishedFilter = 'all';
+	}
+
+	// Thumbnails from S3 can 404 (deleted object, expired URL, wrong key). Track
+	// which ones failed to load so the UI swaps in a neutral placeholder instead
+	// of the browser's default broken-image icon.
+	let failedThumbnails = $state<Set<string>>(new Set());
+	function markThumbnailFailed(id: string) {
+		if (failedThumbnails.has(id)) return;
+		const next = new Set(failedThumbnails);
+		next.add(id);
+		failedThumbnails = next;
+	}
+	let broadcastThumbnailBroken = $state(false);
+	// Per-modal flag for the recording edit preview — when the existing thumbnail
+	// URL 403s inside the edit modal, swap to the "no thumbnail" placeholder so
+	// the admin can upload a replacement without the browser's broken-image icon.
+	let recEditThumbnailBroken = $state(false);
+
+	const filteredRecordings = $derived.by(() => {
+		const q = searchQuery.trim().toLowerCase();
+		return data.recordings.filter((rec) => {
+			if (q) {
+				const haystack = [rec.title, rec.created_by, rec.created_by_name, rec.description]
+					.filter(Boolean)
+					.join(' ')
+					.toLowerCase();
+				if (!haystack.includes(q)) return false;
+			}
+			if (statusFilter !== 'all' && rec.status !== statusFilter) return false;
+			if (publishedFilter === 'published' && !rec.published) return false;
+			if (publishedFilter === 'unpublished' && rec.published) return false;
+			return true;
+		});
+	});
+
+	const filteredIds = $derived(filteredRecordings.map((r) => r._id!).filter(Boolean));
+	const allFilteredSelected = $derived(
+		filteredIds.length > 0 && filteredIds.every((id) => selectedIds.has(id))
+	);
+	const someFilteredSelected = $derived(
+		filteredIds.some((id) => selectedIds.has(id)) && !allFilteredSelected
+	);
+
+	function toggleSelection(id: string) {
+		const next = new Set(selectedIds);
+		if (next.has(id)) next.delete(id);
+		else next.add(id);
+		selectedIds = next;
+	}
+
+	function toggleSelectAllFiltered() {
+		if (allFilteredSelected) {
+			const next = new Set(selectedIds);
+			for (const id of filteredIds) next.delete(id);
+			selectedIds = next;
+		} else {
+			const next = new Set(selectedIds);
+			for (const id of filteredIds) next.add(id);
+			selectedIds = next;
+		}
+	}
+
+	function clearSelection() {
+		selectedIds = new Set();
+	}
+
+	async function bulkDelete() {
+		if (bulkDeleting || selectedIds.size === 0) return;
+		const count = selectedIds.size;
+		const ok = await confirmDialog.ask({
+			title: `Supprimer ${count} enregistrement${count > 1 ? 's' : ''} ?`,
+			message:
+				'Les fichiers audio et les vignettes associés seront également supprimés de S3. Cette action est irréversible.',
+			confirmLabel: 'Supprimer',
+			cancelLabel: 'Annuler',
+			tone: 'danger'
+		});
+		if (!ok) return;
+		bulkDeleting = true;
+		try {
+			const res = await fetch('/api/recordings/bulk', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ action: 'delete', ids: Array.from(selectedIds) })
+			});
+			const payload = (await res.json()) as { data?: { deleted: number }; error?: string };
+			if (!res.ok || payload.error) {
+				toast.error(payload.error ?? `Erreur ${res.status}`);
+				return;
+			}
+			toast.success(`${payload.data?.deleted ?? count} enregistrement${(payload.data?.deleted ?? count) > 1 ? 's supprimés' : ' supprimé'}`);
+			clearSelection();
+			await invalidateAll();
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : 'Suppression en masse échouée');
+		} finally {
+			bulkDeleting = false;
+		}
+	}
 
 	// ── Per-recording edit state (only one row editable at a time) ────
 	let editingRecordingId = $state<string | null>(null);
@@ -36,6 +194,7 @@
 		recThumbnailFile = null;
 		recThumbnailAction = 'keep';
 		recThumbnailError = null;
+		recEditThumbnailBroken = false;
 		recDraftTitle = rec.title ?? '';
 		recDraftDescription = rec.description ?? '';
 		editingRecordingId = rec._id!;
@@ -80,6 +239,7 @@
 	function recPreviewSrc(rec: Recording): string | null {
 		if (recThumbnailPreviewUrl) return recThumbnailPreviewUrl;
 		if (recThumbnailAction === 'remove') return null;
+		if (recEditThumbnailBroken) return null;
 		return rec.thumbnail_url ?? null;
 	}
 
@@ -113,7 +273,12 @@
 				};
 				const uploadRes = await fetch(uploadUrl, {
 					method: 'PUT',
-					headers: { 'Content-Type': recThumbnailFile.type },
+					// x-amz-acl must match the header the server signed. Without it
+					// the object is uploaded private and <img src=…> would 403.
+					headers: {
+						'Content-Type': recThumbnailFile.type,
+						'x-amz-acl': 'public-read'
+					},
 					body: recThumbnailFile
 				});
 				if (!uploadRes.ok) {
@@ -243,6 +408,7 @@
 
 	async function stop() {
 		if (busy) return;
+		if (!(await confirmOverride(recordingStartedBy, recordingStartedByName, "L'enregistrement"))) return;
 		busy = true;
 		actionError = null;
 		try {
@@ -262,11 +428,18 @@
 		if (broadcastBusy) return;
 		const willNotify = notifyOnGoLive && subscriberCount > 0;
 		const msg = willNotify
-			? `Cela enverra une notification à ${subscriberCount} abonné${subscriberCount > 1 ? 's' : ''}. Continuer ?`
+			? `Cela enverra une notification à ${subscriberCount} abonné${subscriberCount > 1 ? 's' : ''}.`
 			: notifyOnGoLive
 				? 'Aucun abonné aux notifications pour l\'instant. Aller en direct quand même ?'
-				: 'Aller en direct SANS notifier les abonnés ?';
-		if (!confirm(msg)) return;
+				: 'Aller en direct SANS notifier les abonnés.';
+		const ok = await confirmDialog.ask({
+			title: 'Aller en direct',
+			message: msg,
+			confirmLabel: willNotify ? 'Diffuser et notifier' : 'Aller en direct',
+			cancelLabel: 'Annuler',
+			tone: willNotify ? 'default' : 'warning'
+		});
+		if (!ok) return;
 		broadcastBusy = true;
 		actionError = null;
 		try {
@@ -287,7 +460,15 @@
 
 	async function endLive() {
 		if (broadcastBusy) return;
-		if (!confirm('Terminer le direct ? Le site public ne montrera plus le lecteur en direct.')) return;
+		if (!(await confirmOverride(broadcastStartedBy, broadcastStartedByName, 'Le direct'))) return;
+		const ok = await confirmDialog.ask({
+			title: 'Terminer le direct',
+			message: 'Le site public ne montrera plus le lecteur en direct.',
+			confirmLabel: 'Terminer le direct',
+			cancelLabel: 'Annuler',
+			tone: 'warning'
+		});
+		if (!ok) return;
 		broadcastBusy = true;
 		actionError = null;
 		try {
@@ -369,6 +550,7 @@
 	const previewSrc = $derived.by(() => {
 		if (thumbnailPreviewUrl) return thumbnailPreviewUrl;
 		if (thumbnailAction === 'remove') return null;
+		if (broadcastThumbnailBroken) return null;
 		return broadcast.thumbnail_url;
 	});
 
@@ -403,7 +585,10 @@
 				};
 				const uploadRes = await fetch(uploadUrl, {
 					method: 'PUT',
-					headers: { 'Content-Type': thumbnailFile.type },
+					headers: {
+						'Content-Type': thumbnailFile.type,
+						'x-amz-acl': 'public-read'
+					},
 					body: thumbnailFile
 				});
 				if (!uploadRes.ok) {
@@ -477,7 +662,16 @@
 	 *  recording (which triggers the S3 upload). Single confirmation for both. */
 	async function stopBoth() {
 		if (broadcastBusy || busy) return;
-		if (!confirm('Terminer le direct ET arrêter l\'enregistrement ?')) return;
+		if (!(await confirmOverride(broadcastStartedBy, broadcastStartedByName, 'Le direct'))) return;
+		if (!(await confirmOverride(recordingStartedBy, recordingStartedByName, "L'enregistrement"))) return;
+		const ok = await confirmDialog.ask({
+			title: 'Tout arrêter',
+			message: 'Terminer le direct ET arrêter l\'enregistrement en cours ?',
+			confirmLabel: 'Tout arrêter',
+			cancelLabel: 'Annuler',
+			tone: 'warning'
+		});
+		if (!ok) return;
 		broadcastBusy = true;
 		busy = true;
 		actionError = null;
@@ -504,9 +698,15 @@
 	async function startBoth() {
 		if (broadcastBusy || busy) return;
 		const msg = subscriberCount > 0
-			? `Aller en direct ET démarrer l'enregistrement ? Une notification sera envoyée à ${subscriberCount} abonné${subscriberCount > 1 ? 's' : ''}.`
-			: 'Aller en direct ET démarrer l\'enregistrement ?';
-		if (!confirm(msg)) return;
+			? `Aller en direct ET démarrer l'enregistrement. Une notification sera envoyée à ${subscriberCount} abonné${subscriberCount > 1 ? 's' : ''}.`
+			: 'Aller en direct ET démarrer l\'enregistrement.';
+		const ok = await confirmDialog.ask({
+			title: 'Tout démarrer',
+			message: msg,
+			confirmLabel: 'Tout démarrer',
+			cancelLabel: 'Annuler'
+		});
+		if (!ok) return;
 		broadcastBusy = true;
 		busy = true;
 		actionError = null;
@@ -548,9 +748,21 @@
 	}
 
 	async function remove(id: string) {
+		const ok = await confirmDialog.ask({
+			title: 'Supprimer cet enregistrement ?',
+			message:
+				"Le fichier audio et la vignette associés seront également supprimés de S3. Cette action est irréversible.",
+			confirmLabel: 'Supprimer',
+			cancelLabel: 'Annuler',
+			tone: 'danger'
+		});
+		if (!ok) return;
 		const res = await fetch(`/api/recordings/${id}`, { method: 'DELETE' });
-		if (!res.ok) actionError = await res.text();
-		confirmDelete = null;
+		if (!res.ok) {
+			toast.error((await res.text()) || `Erreur ${res.status}`);
+			return;
+		}
+		toast.success('Enregistrement supprimé');
 		await invalidateAll();
 	}
 
@@ -658,15 +870,28 @@
 					<p class="text-xs text-stone-500">
 						Audience en direct · capture en cours vers S3
 					</p>
+					{#if broadcastStartedBy || recordingStartedBy}
+						<p class="mt-0.5 text-[11px] text-stone-400">
+							{#if broadcastStartedBy && recordingStartedBy && broadcastStartedBy === recordingStartedBy}
+								Démarré par <span class="font-medium text-stone-600">{displayName(broadcastStartedByName, broadcastStartedBy)}</span>
+							{:else}
+								{#if broadcastStartedBy}Direct : <span class="font-medium text-stone-600">{displayName(broadcastStartedByName, broadcastStartedBy)}</span>{/if}
+								{#if broadcastStartedBy && recordingStartedBy} · {/if}
+								{#if recordingStartedBy}Enreg. : <span class="font-medium text-stone-600">{displayName(recordingStartedByName, recordingStartedBy)}</span>{/if}
+							{/if}
+						</p>
+					{/if}
 				{:else if broadcast.is_live}
 					<p class="font-display text-lg font-semibold text-red-700">En direct</p>
 					<p class="text-xs text-stone-500">
 						Démarré à {formatTime(broadcast.started_at)} · {icecast.listeners} auditeur{icecast.listeners !== 1 ? 's' : ''}
+						{#if broadcastStartedBy} · par <span class="font-medium text-stone-600">{displayName(broadcastStartedByName, broadcastStartedBy)}</span>{/if}
 					</p>
 				{:else if isRecording}
 					<p class="font-display text-lg font-semibold text-stone-800">Enregistrement seul</p>
 					<p class="text-xs text-stone-500">
 						Capture silencieuse · audience hors ligne
+						{#if recordingStartedBy} · par <span class="font-medium text-stone-600">{displayName(recordingStartedByName, recordingStartedBy)}</span>{/if}
 					</p>
 				{:else}
 					<p class="font-display text-lg font-semibold text-stone-800">Prêt à diffuser</p>
@@ -682,11 +907,12 @@
 			</div>
 		</div>
 
-		<!-- Live timers (shown only for active states) -->
+		<!-- Live timers (shown only for active states). Full-width on mobile so
+		     both timers split the row evenly; right-aligned block on desktop. -->
 		{#if broadcast.is_live || isRecording}
-			<div class="flex items-center gap-5">
+			<div class="flex w-full items-start gap-6 sm:w-auto sm:items-center sm:gap-5">
 				{#if broadcast.is_live}
-					<div class="flex flex-col items-end">
+					<div class="flex flex-1 flex-col sm:flex-initial sm:items-end">
 						<span class="text-[9px] font-bold uppercase tracking-[0.2em] text-red-600">Direct</span>
 						<span class="font-mono text-2xl font-semibold text-red-700 tabular-nums leading-tight">
 							{formatElapsed(broadcastElapsed)}
@@ -694,7 +920,7 @@
 					</div>
 				{/if}
 				{#if isRecording}
-					<div class="flex flex-col items-end">
+					<div class="flex flex-1 flex-col sm:flex-initial sm:items-end">
 						<span class="text-[9px] font-bold uppercase tracking-[0.2em] text-stone-500">Enregistrement</span>
 						<span class="font-mono text-2xl font-semibold text-stone-700 tabular-nums leading-tight">
 							{formatElapsed(elapsed)}
@@ -706,7 +932,7 @@
 	</div>
 
 	<!-- Actions -->
-	<div class="mt-5 flex flex-wrap gap-2.5 border-t border-stone-100 pt-5">
+	<div class="mt-5 border-t border-stone-100 pt-5">
 		{#if !icecast.sourceActive && !broadcast.is_live && !isRecording}
 			<span class="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm font-medium text-stone-400">
 				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -714,75 +940,119 @@
 				</svg>
 				En attente d'un flux audio… (démarrez OBS)
 			</span>
-		{:else}
-			<!-- Broadcast controls. Stays visible when recording is active even if
-			     the Icecast probe momentarily flips to inactive — recording running
-			     means audio is flowing, so going live should remain available. -->
-			{#if broadcast.is_live}
+		{:else if broadcast.is_live && isRecording}
+			<!-- All three actions stay visible, equal-height, each with a distinct
+			     tonal identity at rest so they're recognizable at a glance:
+			     stone = direct, rose = enregistrement, red-700 = session totale. -->
+			<p class="mb-2.5 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400">
+				Contrôles de session
+			</p>
+			<div class="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
 				<button
 					onclick={endLive}
 					disabled={broadcastBusy}
-					class="inline-flex items-center gap-2 rounded-xl bg-stone-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-stone-800 disabled:opacity-50"
+					class="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-300 bg-stone-100 px-4 py-3 text-sm font-semibold text-stone-800 transition-all hover:border-stone-900 hover:bg-stone-900 hover:text-white disabled:opacity-50 sm:order-1"
 				>
 					{@render iconStop()}
-					{broadcastBusy ? '…' : 'Terminer le direct'}
+					<span>{broadcastBusy ? '…' : 'Terminer le direct'}</span>
 				</button>
-			{:else if icecast.sourceActive || isRecording}
-				<button
-					onclick={goLive}
-					disabled={broadcastBusy}
-					class="inline-flex items-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-50"
-				>
-					{@render iconBroadcast()}
-					{broadcastBusy ? '…' : isRecording ? 'Aller en direct aussi' : 'Aller en direct'}
-				</button>
-			{/if}
-
-			<!-- Recording controls. Stays visible when broadcast is live even if the
-			     Icecast probe momentarily flips to inactive. -->
-			{#if isRecording}
 				<button
 					onclick={stop}
 					disabled={busy}
-					class="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+					class="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 transition-all hover:border-rose-600 hover:bg-rose-600 hover:text-white disabled:opacity-50 sm:order-2"
 				>
 					{@render iconStop()}
-					{busy ? 'Arrêt…' : 'Arrêter l\'enregistrement'}
+					<span>{busy ? 'Arrêt…' : 'Arrêter l\'enregistrement'}</span>
 				</button>
-			{:else if icecast.sourceActive || broadcast.is_live}
-				<button
-					onclick={start}
-					disabled={busy || !recorder.available || ('pendingOrphans' in recorder && recorder.pendingOrphans > 0)}
-					class="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-missionnaire-600 disabled:opacity-50"
-				>
-					{@render iconRecord()}
-					{busy ? 'Démarrage…' : broadcast.is_live ? 'Démarrer l\'enregistrement aussi' : 'Démarrer l\'enregistrement'}
-				</button>
-			{/if}
-
-			<!-- Combined start (only when nothing is active) -->
-			{#if !broadcast.is_live && !isRecording && icecast.sourceActive}
-				<button
-					onclick={startBoth}
-					disabled={broadcastBusy || busy || !recorder.available || ('pendingOrphans' in recorder && recorder.pendingOrphans > 0)}
-					class="inline-flex items-center gap-2 rounded-xl border-2 border-stone-800 bg-stone-800 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-stone-900 disabled:opacity-50"
-				>
-					{@render iconBoth()}
-					Tout démarrer
-				</button>
-			{/if}
-
-			<!-- Combined stop (only when both are active) — pushed to the far right -->
-			{#if broadcast.is_live && isRecording}
 				<button
 					onclick={stopBoth}
 					disabled={broadcastBusy || busy}
-					class="ml-auto inline-flex items-center gap-2 rounded-xl border-2 border-stone-800 bg-stone-800 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-stone-900 disabled:opacity-50"
+					class="order-first inline-flex items-center justify-center gap-2 rounded-xl bg-red-700 px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-red-700/30 ring-1 ring-red-700/60 transition-all hover:bg-red-800 hover:shadow-md hover:shadow-red-700/40 disabled:opacity-50 sm:order-3"
 				>
 					{@render iconStop()}
-					Tout arrêter
+					<span>{(broadcastBusy || busy) ? 'Arrêt…' : 'Tout arrêter'}</span>
 				</button>
-			{/if}
+			</div>
+		{:else if !broadcast.is_live && !isRecording && icecast.sourceActive}
+			<!-- Mirror of the stop cluster: stone = direct, orange = enregistrement,
+			     emerald = session complète. -->
+			<p class="mb-2.5 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400">
+				Démarrer la session
+			</p>
+			<div class="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+				<button
+					onclick={goLive}
+					disabled={broadcastBusy}
+					class="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-300 bg-stone-100 px-4 py-3 text-sm font-semibold text-stone-800 transition-all hover:border-stone-900 hover:bg-stone-900 hover:text-white disabled:opacity-50 sm:order-1"
+				>
+					{@render iconBroadcast()}
+					<span>{broadcastBusy ? '…' : 'Aller en direct'}</span>
+				</button>
+				<button
+					onclick={start}
+					disabled={busy || !recorder.available || ('pendingOrphans' in recorder && recorder.pendingOrphans > 0)}
+					class="inline-flex items-center justify-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-semibold text-primary transition-all hover:border-primary hover:bg-primary hover:text-white disabled:opacity-50 sm:order-2"
+				>
+					{@render iconRecord()}
+					<span>{busy ? '…' : 'Enregistrer'}</span>
+				</button>
+				<button
+					onclick={startBoth}
+					disabled={broadcastBusy || busy || !recorder.available || ('pendingOrphans' in recorder && recorder.pendingOrphans > 0)}
+					class="order-first inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-emerald-600/30 ring-1 ring-emerald-600/50 transition-all hover:bg-emerald-700 hover:shadow-md hover:shadow-emerald-600/40 disabled:opacity-50 sm:order-3"
+				>
+					{@render iconBoth()}
+					<span>{(broadcastBusy || busy) ? 'Démarrage…' : 'Tout démarrer'}</span>
+				</button>
+			</div>
+		{:else if broadcast.is_live}
+			<!-- Direct seul : arrêt du direct (tonalité stone) + démarrage de
+			     l'enregistrement (tonalité orange). -->
+			<p class="mb-2.5 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400">
+				Contrôles de session
+			</p>
+			<div class="grid gap-2 sm:grid-cols-2">
+				<button
+					onclick={endLive}
+					disabled={broadcastBusy}
+					class="inline-flex items-center justify-center gap-2 rounded-xl bg-stone-800 px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-stone-900/20 ring-1 ring-stone-900/40 transition-all hover:bg-stone-900 hover:shadow-md hover:shadow-stone-900/30 disabled:opacity-50"
+				>
+					{@render iconStop()}
+					<span>{broadcastBusy ? 'Arrêt…' : 'Terminer le direct'}</span>
+				</button>
+				<button
+					onclick={start}
+					disabled={busy || !recorder.available || ('pendingOrphans' in recorder && recorder.pendingOrphans > 0)}
+					class="inline-flex items-center justify-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-semibold text-primary transition-all hover:border-primary hover:bg-primary hover:text-white disabled:opacity-50"
+				>
+					{@render iconRecord()}
+					<span>{busy ? 'Démarrage…' : 'Démarrer l\'enregistrement'}</span>
+				</button>
+			</div>
+		{:else if isRecording}
+			<!-- Enregistrement seul : arrêt (tonalité rose) + passage en direct
+			     (tonalité stone pour le domaine broadcast). -->
+			<p class="mb-2.5 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400">
+				Contrôles de session
+			</p>
+			<div class="grid gap-2 sm:grid-cols-2">
+				<button
+					onclick={stop}
+					disabled={busy}
+					class="inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-rose-600/30 ring-1 ring-rose-600/50 transition-all hover:bg-rose-700 hover:shadow-md hover:shadow-rose-600/40 disabled:opacity-50"
+				>
+					{@render iconStop()}
+					<span>{busy ? 'Arrêt…' : 'Arrêter l\'enregistrement'}</span>
+				</button>
+				<button
+					onclick={goLive}
+					disabled={broadcastBusy}
+					class="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-300 bg-stone-100 px-4 py-3 text-sm font-semibold text-stone-800 transition-all hover:border-stone-900 hover:bg-stone-900 hover:text-white disabled:opacity-50"
+				>
+					{@render iconBroadcast()}
+					<span>{broadcastBusy ? '…' : 'Aller en direct'}</span>
+				</button>
+			</div>
 		{/if}
 	</div>
 
@@ -820,14 +1090,6 @@
 				<p class="mt-1 text-[10px] text-stone-400">
 					Persiste entre les directs — modifiable à tout moment.
 				</p>
-				<div class="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2">
-					<svg class="h-3.5 w-3.5 shrink-0 text-amber-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.2 16c-.77 1.33.2 3 1.73 3z" />
-					</svg>
-					<p class="text-[11px] leading-snug text-amber-800">
-						<strong>Avant chaque direct</strong>, pensez à mettre à jour ces informations pour que les auditeurs aient le bon titre, la description et la vignette dès le début de la diffusion.
-					</p>
-				</div>
 			</div>
 			<button
 				type="button"
@@ -838,11 +1100,22 @@
 			</button>
 		</div>
 
+		<!-- Full-width reminder banner — spans under the label/button row so the
+		     message reads comfortably regardless of viewport size. -->
+		<div class="mb-4 flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50/80 px-3.5 py-2.5">
+			<svg class="h-4 w-4 shrink-0 text-amber-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.2 16c-.77 1.33.2 3 1.73 3z" />
+			</svg>
+			<p class="text-[11px] leading-snug text-amber-800 sm:text-xs">
+				<strong>Avant chaque direct</strong>, pensez à mettre à jour ces informations pour que les auditeurs aient le bon titre, la description et la vignette dès le début de la diffusion.
+			</p>
+		</div>
+
 		<div class="flex flex-col gap-5 sm:flex-row sm:items-start">
 			<!-- Thumbnail (view-only, click to expand) -->
 			<div class="flex flex-col gap-2">
 				<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Vignette</span>
-				{#if broadcast.thumbnail_url}
+				{#if broadcast.thumbnail_url && !broadcastThumbnailBroken}
 					<button
 						type="button"
 						onclick={openThumbnail}
@@ -852,6 +1125,7 @@
 						<img
 							src={broadcast.thumbnail_url}
 							alt="Vignette du direct"
+							onerror={() => (broadcastThumbnailBroken = true)}
 							class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
 						/>
 						<span class="pointer-events-none absolute inset-0 flex items-end justify-end p-1.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
@@ -905,11 +1179,234 @@
 	</div>
 </div>
 
-<!-- Recordings table -->
-<div class="overflow-hidden rounded-2xl border border-stone-200/60 bg-white">
+<!-- Search + filters toolbar -->
+<div class="mb-3 flex flex-wrap items-center gap-2 sm:gap-3">
+	<div class="relative min-w-[220px] flex-1 basis-full sm:basis-auto">
+		<svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+			<path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z" />
+		</svg>
+		<input
+			type="search"
+			bind:value={searchQuery}
+			placeholder="Rechercher par titre, auteur, description…"
+			class="admin-input w-full !pl-10 text-sm"
+		/>
+	</div>
+
+	<select
+		bind:value={statusFilter}
+		aria-label="Filtrer par statut"
+		class="admin-input !w-auto !py-2 text-sm"
+	>
+		<option value="all">Tous statuts</option>
+		<option value="ready">Prêt</option>
+		<option value="recording">En cours</option>
+		<option value="uploading">Téléversement</option>
+		<option value="failed">Échec</option>
+	</select>
+
+	<select
+		bind:value={publishedFilter}
+		aria-label="Filtrer par publication"
+		class="admin-input !w-auto !py-2 text-sm"
+	>
+		<option value="all">Tous</option>
+		<option value="published">Publiés</option>
+		<option value="unpublished">Non publiés</option>
+	</select>
+
+	{#if hasActiveFilters}
+		<button
+			type="button"
+			onclick={resetFilters}
+			class="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-stone-500 transition-colors hover:border-stone-400 hover:text-stone-700"
+		>
+			<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+			</svg>
+			Réinitialiser
+		</button>
+	{/if}
+
+	<span class="ml-auto text-xs text-stone-400">
+		{#if hasActiveFilters}
+			{filteredRecordings.length} / {data.recordings.length}
+		{:else}
+			{data.recordings.length} total
+		{/if}
+	</span>
+</div>
+
+<!-- Mobile + tablet cards (< lg). Editorial catalog layout: thumbnail + serif
+     title + meta chips + action row. Each recording is a self-contained card
+     so no information needs to be hidden on small screens. -->
+<div class="space-y-2.5 lg:hidden">
+	{#if filteredRecordings.length > 0}
+		<div class="flex items-center gap-2.5 px-1 pb-1">
+			<input
+				type="checkbox"
+				checked={allFilteredSelected}
+				indeterminate={someFilteredSelected}
+				onchange={toggleSelectAllFiltered}
+				disabled={filteredIds.length === 0}
+				aria-label="Tout sélectionner"
+				class="h-4 w-4 cursor-pointer rounded border-stone-300 text-primary focus:ring-primary"
+			/>
+			<span class="text-[11px] font-semibold uppercase tracking-wider text-stone-500">
+				{allFilteredSelected ? 'Tout désélectionner' : 'Tout sélectionner'}
+			</span>
+			<span class="ml-auto text-[11px] text-stone-400 tabular-nums">
+				{filteredRecordings.length} {filteredRecordings.length > 1 ? 'enregistrements' : 'enregistrement'}
+			</span>
+		</div>
+	{/if}
+
+	{#each filteredRecordings as rec}
+		{@const isEditing = editingRecordingId === rec._id}
+		{@const isSelected = selectedIds.has(rec._id!)}
+		<article
+			class="group overflow-hidden rounded-2xl border bg-white transition-all {isSelected ? 'border-primary/50 bg-orange-50/30 shadow-sm shadow-primary/10' : 'border-stone-200/70'}"
+		>
+			<!-- Header: checkbox + thumbnail + title block -->
+			<div class="flex items-start gap-3 p-4">
+				<input
+					type="checkbox"
+					checked={isSelected}
+					onchange={() => toggleSelection(rec._id!)}
+					aria-label="Sélectionner {rec.title}"
+					class="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-stone-300 text-primary focus:ring-primary"
+				/>
+
+				{#if rec.thumbnail_url && !failedThumbnails.has(rec._id!)}
+					<img
+						src={rec.thumbnail_url}
+						alt=""
+						onerror={() => markThumbnailFailed(rec._id!)}
+						class="h-14 w-20 shrink-0 rounded-lg object-cover border border-stone-200/60"
+					/>
+				{:else}
+					<div class="flex h-14 w-20 shrink-0 items-center justify-center rounded-lg border border-stone-200/60 bg-cream/60 text-stone-300" aria-hidden="true">
+						<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M4 6h16v12H4V6z" />
+						</svg>
+					</div>
+				{/if}
+
+				<div class="min-w-0 flex-1 pt-0.5">
+					<h3 class="font-display text-[15px] font-semibold leading-snug text-stone-800 line-clamp-2">
+						{rec.title}
+					</h3>
+					<p class="mt-1 text-[11px] leading-tight text-stone-500">
+						<span class="font-medium text-stone-600">{displayName(rec.created_by_name, rec.created_by)}</span>
+						<span class="text-stone-300"> · </span>
+						<span>{formatDateTime(rec.started_at)}</span>
+					</p>
+				</div>
+			</div>
+
+			<!-- Meta row: status · duration · size · publish toggle -->
+			<div class="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-stone-100 bg-stone-50/30 px-4 py-2.5">
+				<span class="inline-flex rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {statusClass(rec.status)}">
+					{statusLabel[rec.status]}
+				</span>
+				<span class="font-mono text-[11px] tabular-nums text-stone-600">
+					{formatDuration(rec.duration_sec)}
+				</span>
+				<span class="text-[11px] text-stone-400">
+					{formatBytes(rec.size_bytes)}
+				</span>
+				<div class="ml-auto flex items-center gap-1.5">
+					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Publié</span>
+					<button
+						onclick={() => togglePublish(rec)}
+						disabled={rec.status !== 'ready'}
+						aria-label={rec.published ? 'Dépublier' : 'Publier'}
+						title={rec.published ? 'Dépublier' : 'Publier'}
+						class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors {rec.published ? 'bg-primary' : 'bg-stone-200'} disabled:opacity-40"
+					>
+						<span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform {rec.published ? 'translate-x-4' : 'translate-x-0.5'}"></span>
+					</button>
+				</div>
+			</div>
+
+			<!-- Audio player (ready recordings only) -->
+			{#if rec.status === 'ready' && rec.s3_url}
+				<div class="border-t border-stone-100 px-4 py-3">
+					<audio src={rec.s3_url} controls preload="none" class="h-9 w-full"></audio>
+				</div>
+			{/if}
+
+			<!-- Action row: edit · retry · delete -->
+			<div class="flex flex-wrap items-center gap-2 border-t border-stone-100 px-4 py-2.5">
+				{#if rec.status === 'failed'}
+					<button
+						onclick={() => retryUpload(rec._id!)}
+						class="rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-200"
+					>
+						Réessayer l'envoi
+					</button>
+				{/if}
+				{#if rec.status === 'ready' || rec.status === 'failed'}
+					<button
+						onclick={() => (isEditing ? cancelRecordingEdit() : enterRecordingEdit(rec))}
+						class="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-primary hover:text-primary"
+					>
+						<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+						</svg>
+						{isEditing ? 'Fermer' : 'Modifier'}
+					</button>
+				{/if}
+				<button
+					onclick={() => remove(rec._id!)}
+					class="ml-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600"
+					title="Supprimer"
+				>
+					<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
+					</svg>
+					Supprimer
+				</button>
+			</div>
+		</article>
+	{/each}
+
+	{#if filteredRecordings.length === 0}
+		<div class="rounded-2xl border border-dashed border-stone-200 bg-white px-5 py-14 text-center">
+			<p class="font-display text-sm text-stone-500">
+				{#if data.recordings.length === 0}
+					Aucun enregistrement pour l'instant.
+				{:else if hasActiveFilters}
+					Aucun enregistrement ne correspond aux filtres actifs.
+				{:else}
+					Aucun enregistrement.
+				{/if}
+			</p>
+			{#if hasActiveFilters}
+				<button type="button" onclick={resetFilters} class="mt-3 text-xs font-medium text-primary underline-offset-4 hover:underline">
+					Réinitialiser les filtres
+				</button>
+			{/if}
+		</div>
+	{/if}
+</div>
+
+<!-- Recordings table (≥ lg). Original dense layout unchanged. -->
+<div class="hidden overflow-hidden rounded-2xl border border-stone-200/60 bg-white lg:block">
 	<table class="w-full text-left text-sm">
 		<thead>
 			<tr class="border-b border-stone-100 bg-cream/50">
+				<th class="w-10 px-5 py-3.5">
+					<input
+						type="checkbox"
+						checked={allFilteredSelected}
+						indeterminate={someFilteredSelected}
+						onchange={toggleSelectAllFiltered}
+						disabled={filteredIds.length === 0}
+						aria-label="Tout sélectionner"
+						class="h-4 w-4 cursor-pointer rounded border-stone-300 text-primary focus:ring-primary"
+					/>
+				</th>
 				<th class="px-5 py-3.5 font-medium text-stone-500">Titre</th>
 				<th class="px-5 py-3.5 font-medium text-stone-500">Date</th>
 				<th class="px-5 py-3.5 font-medium text-stone-500">Durée</th>
@@ -920,19 +1417,41 @@
 			</tr>
 		</thead>
 		<tbody>
-			{#each data.recordings as rec}
+			{#each filteredRecordings as rec}
 				{@const isEditing = editingRecordingId === rec._id}
-				<tr class="border-b border-stone-50">
+				{@const isSelected = selectedIds.has(rec._id!)}
+				<tr class="border-b border-stone-50 {isSelected ? 'bg-primary/5' : ''}">
+					<td class="px-5 py-4">
+						<input
+							type="checkbox"
+							checked={isSelected}
+							onchange={() => toggleSelection(rec._id!)}
+							aria-label="Sélectionner {rec.title}"
+							class="h-4 w-4 cursor-pointer rounded border-stone-300 text-primary focus:ring-primary"
+						/>
+					</td>
 					<td class="px-5 py-4">
 						<div class="flex items-center gap-3">
-							{#if rec.thumbnail_url}
+							{#if rec.thumbnail_url && !failedThumbnails.has(rec._id!)}
 								<img
 									src={rec.thumbnail_url}
 									alt=""
+									onerror={() => markThumbnailFailed(rec._id!)}
 									class="h-9 w-14 shrink-0 rounded object-cover border border-stone-200/60"
 								/>
+							{:else}
+								<div class="flex h-9 w-14 shrink-0 items-center justify-center rounded border border-stone-200/60 bg-cream/60 text-stone-300" aria-hidden="true">
+									<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M4 6h16v12H4V6z" />
+									</svg>
+								</div>
 							{/if}
-							<span class="font-medium text-stone-700">{rec.title}</span>
+							<div class="min-w-0 flex-1">
+								<span class="block font-medium text-stone-700">{rec.title}</span>
+								<span class="block text-[11px] text-stone-400">
+									{displayName(rec.created_by_name, rec.created_by)}
+								</span>
+							</div>
 						</div>
 					</td>
 					<td class="px-5 py-4 text-stone-500">{formatDateTime(rec.started_at)}</td>
@@ -964,7 +1483,7 @@
 									Réessayer
 								</button>
 							{/if}
-							{#if rec.status === 'ready'}
+							{#if rec.status === 'ready' || rec.status === 'failed'}
 								<button
 									onclick={() => (isEditing ? cancelRecordingEdit() : enterRecordingEdit(rec))}
 									class="rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs font-medium text-stone-600 hover:border-primary hover:text-primary"
@@ -972,34 +1491,56 @@
 									{isEditing ? 'Fermer' : 'Modifier'}
 								</button>
 							{/if}
-							{#if confirmDelete === rec._id}
-								<button onclick={() => remove(rec._id!)} class="rounded-lg bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-200">
-									Confirmer
-								</button>
-								<button onclick={() => (confirmDelete = null)} class="rounded-lg px-2 py-1 text-xs text-stone-400 hover:text-stone-600">
-									Annuler
-								</button>
-							{:else}
-								<button onclick={() => (confirmDelete = rec._id!)} class="rounded-lg px-2 py-1.5 text-xs text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600" title="Supprimer">
-									<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-										<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
-									</svg>
-								</button>
-							{/if}
+							<button onclick={() => remove(rec._id!)} class="rounded-lg px-2 py-1.5 text-xs text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600" title="Supprimer">
+								<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
+								</svg>
+							</button>
 						</div>
 					</td>
 				</tr>
 				{/each}
-			{#if data.recordings.length === 0}
+			{#if filteredRecordings.length === 0}
 				<tr>
-					<td colspan="7" class="px-5 py-12 text-center text-stone-400">
-						Aucun enregistrement pour l'instant. Démarrez le premier ci-dessus.
+					<td colspan="8" class="px-5 py-12 text-center text-stone-400">
+						{#if data.recordings.length === 0}
+							Aucun enregistrement pour l'instant. Démarrez le premier ci-dessus.
+						{:else if hasActiveFilters}
+							Aucun enregistrement ne correspond aux filtres actifs.
+							<button type="button" onclick={resetFilters} class="ml-1 font-medium text-primary underline-offset-4 hover:underline">
+								Réinitialiser
+							</button>
+						{:else}
+							Aucun enregistrement.
+						{/if}
 					</td>
 				</tr>
 			{/if}
 		</tbody>
 	</table>
 </div>
+
+<!-- Bulk action bar — sticky footer appears while anything is selected -->
+{#if selectedIds.size > 0}
+	<div class="sticky bottom-4 z-20 mx-auto mt-4 w-fit animate-[page-in_0.2s_ease] rounded-2xl border border-stone-200 bg-white px-6 py-3 shadow-lg">
+		<div class="flex items-center gap-4">
+			<span class="text-sm font-medium text-stone-700">
+				{selectedIds.size} sélectionné{selectedIds.size > 1 ? 's' : ''}
+			</span>
+			<div class="h-5 w-px bg-stone-200"></div>
+			<button
+				onclick={bulkDelete}
+				disabled={bulkDeleting}
+				class="admin-btn-danger py-1.5 text-xs"
+			>
+				{bulkDeleting ? 'Suppression…' : 'Supprimer'}
+			</button>
+			<button onclick={clearSelection} class="text-xs text-stone-400 hover:text-stone-600">
+				Désélectionner
+			</button>
+		</div>
+	</div>
+{/if}
 
 <svelte:window onkeydown={onLightboxKeydown} />
 
@@ -1038,7 +1579,14 @@
 						<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Vignette</span>
 						{#if previewSrc}
 							<div class="relative aspect-video w-48 overflow-hidden rounded-xl border border-stone-300 bg-cream/40">
-								<img src={previewSrc} alt="" class="h-full w-full object-cover" />
+								<img
+									src={previewSrc}
+									alt=""
+									onerror={() => {
+										if (!thumbnailPreviewUrl) broadcastThumbnailBroken = true;
+									}}
+									class="h-full w-full object-cover"
+								/>
 								{#if metadataSaving && thumbnailAction === 'replace'}
 									<div class="absolute inset-0 flex items-center justify-center bg-white/80 text-xs font-medium text-stone-600">
 										Téléversement…
@@ -1177,7 +1725,16 @@
 							<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Vignette</span>
 							{#if recPreviewSrc(editingRec)}
 								<div class="relative aspect-video w-48 overflow-hidden rounded-xl border border-stone-300 bg-cream/40">
-									<img src={recPreviewSrc(editingRec)} alt="" class="h-full w-full object-cover" />
+									<img
+										src={recPreviewSrc(editingRec)}
+										alt=""
+										onerror={() => {
+											// Only flip the flag for the stored URL — a just-picked local
+											// file (blob:) would never 403, so don't mask upload issues.
+											if (!recThumbnailPreviewUrl) recEditThumbnailBroken = true;
+										}}
+										class="h-full w-full object-cover"
+									/>
 									{#if recSaving && recThumbnailAction === 'replace'}
 										<div class="absolute inset-0 flex items-center justify-center bg-white/80 text-xs font-medium text-stone-600">
 											Téléversement…
@@ -1279,7 +1836,7 @@
 	{/if}
 {/if}
 
-{#if thumbnailExpanded && broadcast.thumbnail_url}
+{#if thumbnailExpanded && broadcast.thumbnail_url && !broadcastThumbnailBroken}
 	<!-- Lightbox: click backdrop or press Escape to close. -->
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-lightbox-in"
@@ -1303,6 +1860,10 @@
 		<img
 			src={broadcast.thumbnail_url}
 			alt={broadcast.title || 'Vignette du direct'}
+			onerror={() => {
+				broadcastThumbnailBroken = true;
+				closeThumbnail();
+			}}
 			class="max-h-[90vh] max-w-[90vw] object-contain shadow-2xl"
 		/>
 	</div>

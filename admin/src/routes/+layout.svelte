@@ -2,6 +2,7 @@
 	import '../app.css';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import Toast from '$lib/components/Toast.svelte';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import type { LayoutData } from './$types';
 	import type { Snippet } from 'svelte';
 
@@ -10,6 +11,7 @@
 </script>
 
 <Toast />
+<ConfirmDialog />
 
 {#if isLoggedIn && data.user}
 	<div class="min-h-screen bg-cream">

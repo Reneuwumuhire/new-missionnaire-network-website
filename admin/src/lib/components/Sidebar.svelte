@@ -17,9 +17,9 @@
 
 	const navItems: NavItem[] = $derived([
 		{ href: '/', label: 'Tableau de bord', icon: 'home' },
+		...(user.canManageRecordings ? [{ href: '/recordings', label: 'Enregistrements', icon: 'recordings' }] : []),
 		{ href: '/audio', label: 'Bibliothèque audio', icon: 'music' },
 		{ href: '/audio/new', label: 'Importer', icon: 'upload' },
-		...(user.canManageRecordings ? [{ href: '/recordings', label: 'Enregistrements', icon: 'recordings' }] : []),
 		...(user.role === 'superadmin' ? [{ href: '/users', label: 'Utilisateurs', icon: 'users' }] : []),
 		{ href: '/settings', label: 'Paramètres', icon: 'settings' }
 	]);

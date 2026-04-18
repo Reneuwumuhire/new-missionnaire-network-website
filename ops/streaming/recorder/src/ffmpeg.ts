@@ -22,6 +22,7 @@ interface ActiveRecording {
 	title: string;
 	startedAt: Date;
 	createdBy: string;
+	createdByName: string | null;
 	proc: ChildProcess;
 	safetyTimer: NodeJS.Timeout;
 	stopping: boolean;
@@ -42,11 +43,13 @@ export function currentStatus() {
 		title: active.title,
 		startedAt: active.startedAt.toISOString(),
 		elapsedSec: Math.floor((Date.now() - active.startedAt.getTime()) / 1000),
-		stopping: active.stopping
+		stopping: active.stopping,
+		createdBy: active.createdBy,
+		createdByName: active.createdByName
 	} as const;
 }
 
-export async function startRecording(params: { createdBy: string }): Promise<{ id: string; startedAt: string; title: string }> {
+export async function startRecording(params: { createdBy: string; createdByName?: string | null }): Promise<{ id: string; startedAt: string; title: string }> {
 	if (active) throw new Error('Another recording is already active');
 	await ensureRecordingsDir();
 
@@ -54,15 +57,17 @@ export async function startRecording(params: { createdBy: string }): Promise<{ i
 	const id = new ObjectId();
 	const idStr = id.toHexString();
 	const title = buildDownloadFilename(startedAt).replace(/\.mp3$/, '');
+	const createdByName = params.createdByName?.trim() || null;
 
 	await writeSidecar({
 		id: idStr,
 		title,
 		startedAt: startedAt.toISOString(),
-		createdBy: params.createdBy
+		createdBy: params.createdBy,
+		createdByName
 	});
 
-	await insertRecordingStarting({ id, title, startedAt, createdBy: params.createdBy });
+	await insertRecordingStarting({ id, title, startedAt, createdBy: params.createdBy, createdByName });
 
 	const args = [
 		'-nostdin',
@@ -102,6 +107,7 @@ export async function startRecording(params: { createdBy: string }): Promise<{ i
 		title,
 		startedAt,
 		createdBy: params.createdBy,
+		createdByName,
 		proc,
 		safetyTimer,
 		stopping: false,

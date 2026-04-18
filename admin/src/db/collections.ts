@@ -506,6 +506,32 @@ export async function deleteRecording(id: string): Promise<{ s3_key: string | nu
 	return { s3_key: (doc.s3_key as string | null | undefined) ?? null };
 }
 
+/** Bulk-delete recordings and return every S3 key (mp3 + thumbnail) the caller
+ *  should purge from object storage. DB rows are removed atomically; S3 cleanup
+ *  happens in the route handler so a partial S3 failure can be logged without
+ *  leaving orphan DB rows. */
+export async function deleteRecordingBulk(
+	ids: string[]
+): Promise<{ deleted: number; s3_keys: string[] }> {
+	if (ids.length === 0) return { deleted: 0, s3_keys: [] };
+	const db = await getDb();
+	const objectIds = ids.map((id) => new ObjectId(id));
+	const docs = await db
+		.collection('recordings')
+		.find({ _id: { $in: objectIds } })
+		.project({ s3_key: 1, thumbnail_s3_key: 1 })
+		.toArray();
+	const s3_keys: string[] = [];
+	for (const d of docs) {
+		const s3Key = d.s3_key as string | null | undefined;
+		const thumbKey = d.thumbnail_s3_key as string | null | undefined;
+		if (s3Key) s3_keys.push(s3Key);
+		if (thumbKey) s3_keys.push(thumbKey);
+	}
+	const result = await db.collection('recordings').deleteMany({ _id: { $in: objectIds } });
+	return { deleted: result.deletedCount, s3_keys };
+}
+
 export async function countRecordingsByStatus(status: RecordingStatus): Promise<number> {
 	const db = await getDb();
 	return db.collection('recordings').countDocuments({ status });
@@ -521,6 +547,7 @@ export type BroadcastAdminState = {
 	started_at: string | null;
 	ended_at: string | null;
 	started_by: string | null;
+	started_by_name: string | null;
 	icecast_offline_since: string | null;
 	notification_pending: boolean;
 	title: string | null;
@@ -535,6 +562,7 @@ const BROADCAST_DEFAULT: BroadcastAdminState = {
 	started_at: null,
 	ended_at: null,
 	started_by: null,
+	started_by_name: null,
 	icecast_offline_since: null,
 	notification_pending: false,
 	title: null,
@@ -555,6 +583,7 @@ export async function getBroadcastAdminState(): Promise<BroadcastAdminState> {
 		started_at: (doc.started_at as string | null) ?? null,
 		ended_at: (doc.ended_at as string | null) ?? null,
 		started_by: (doc.started_by as string | null) ?? null,
+		started_by_name: (doc.started_by_name as string | null) ?? null,
 		icecast_offline_since: (doc.icecast_offline_since as string | null) ?? null,
 		notification_pending: Boolean(doc.notification_pending),
 		title: (doc.title as string | null) ?? null,

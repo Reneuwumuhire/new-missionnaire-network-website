@@ -6,9 +6,10 @@
 	$: rec = data.recording;
 
 	let thumbnailExpanded = false;
+	let thumbnailBroken = false;
 
 	function openThumbnail() {
-		if (!rec.thumbnail_url) return;
+		if (!rec.thumbnail_url || thumbnailBroken) return;
 		thumbnailExpanded = true;
 	}
 	function closeThumbnail() {
@@ -87,7 +88,7 @@
 		<div class="flex flex-col md:flex-row md:items-stretch gap-4">
 			<!-- Thumbnail (click to expand) -->
 			<div class="md:w-64 md:shrink-0">
-				{#if rec.thumbnail_url}
+				{#if rec.thumbnail_url && !thumbnailBroken}
 					<button
 						type="button"
 						on:click={openThumbnail}
@@ -97,6 +98,7 @@
 						<img
 							src={rec.thumbnail_url}
 							alt=""
+							on:error={() => (thumbnailBroken = true)}
 							class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
 							loading="eager"
 						/>
@@ -168,7 +170,7 @@
 	</div>
 </section>
 
-{#if thumbnailExpanded && rec.thumbnail_url}
+{#if thumbnailExpanded && rec.thumbnail_url && !thumbnailBroken}
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-lightbox-in"
 		on:click={onBackdropClick}
@@ -191,6 +193,10 @@
 		<img
 			src={rec.thumbnail_url}
 			alt={rec.title}
+			on:error={() => {
+				thumbnailBroken = true;
+				closeThumbnail();
+			}}
 			class="max-h-[90vh] max-w-[90vw] object-contain shadow-2xl"
 		/>
 	</div>

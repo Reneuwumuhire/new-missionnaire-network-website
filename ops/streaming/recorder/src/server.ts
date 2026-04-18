@@ -26,6 +26,7 @@ app.get('/status', async () => ({
 
 interface StartBody {
 	createdBy?: string;
+	createdByName?: string | null;
 }
 
 app.post('/start', async (req, reply) => {
@@ -37,8 +38,9 @@ app.post('/start', async (req, reply) => {
 	}
 	const body = (req.body ?? {}) as StartBody;
 	const createdBy = body.createdBy?.toString().trim() || 'unknown';
+	const createdByName = body.createdByName?.toString().trim() || null;
 	try {
-		const result = await startRecording({ createdBy });
+		const result = await startRecording({ createdBy, createdByName });
 		return reply.send(result);
 	} catch (err) {
 		req.log.error(err, 'start failed');

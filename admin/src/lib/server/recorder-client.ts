@@ -7,6 +7,8 @@ export interface RecorderStatus {
 	startedAt?: string;
 	elapsedSec?: number;
 	stopping?: boolean;
+	createdBy?: string;
+	createdByName?: string | null;
 	pendingOrphans: number;
 	recovering: boolean;
 }
@@ -54,10 +56,13 @@ export function recorderStatus(): Promise<RecorderStatus> {
 	return call<RecorderStatus>('/status', { method: 'GET' });
 }
 
-export function recorderStart(createdBy: string): Promise<StartResult> {
+export function recorderStart(
+	createdBy: string,
+	createdByName?: string | null
+): Promise<StartResult> {
 	return call<StartResult>('/start', {
 		method: 'POST',
-		body: JSON.stringify({ createdBy })
+		body: JSON.stringify({ createdBy, createdByName: createdByName ?? null })
 	});
 }
 

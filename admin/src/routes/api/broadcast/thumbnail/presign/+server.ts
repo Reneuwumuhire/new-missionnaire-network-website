@@ -29,7 +29,9 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 	// Key prefix sits beside recordings/ and music-audio/ in the same bucket.
 	const key = `broadcast-thumbnails/${Date.now()}-${crypto.randomUUID()}.${ext}`;
-	const uploadUrl = await generatePresignedUploadUrl(key, contentType);
+	// Thumbnails are rendered via <img src={s3_url}> on the public site, so the
+	// object must be GETtable without credentials.
+	const uploadUrl = await generatePresignedUploadUrl(key, contentType, { publicRead: true });
 	const publicUrl = getS3Url(key);
 
 	return json({ uploadUrl, key, publicUrl });

@@ -7,9 +7,16 @@
 	$: totalPages = Math.max(1, Math.ceil(data.total / data.pageSize));
 
 	let expandedThumb: PublishedRecording | null = null;
+	// Thumbnails can 403 if a past upload was private. Track failed IDs so the
+	// default logo fallback replaces the broken-image icon.
+	let failedThumbs = new Set<string>();
+	function markThumbFailed(id: string | undefined) {
+		if (!id || failedThumbs.has(id)) return;
+		failedThumbs = new Set(failedThumbs).add(id);
+	}
 
 	function openThumb(rec: PublishedRecording, event: MouseEvent) {
-		if (!rec.thumbnail_url) return;
+		if (!rec.thumbnail_url || failedThumbs.has(rec.id)) return;
 		// Prevent the row-wrapping <a> from navigating to detail page.
 		event.preventDefault();
 		event.stopPropagation();
@@ -95,10 +102,11 @@
 								aria-label={rec.thumbnail_url ? 'Agrandir la vignette' : 'Vignette par défaut'}
 								class="relative h-14 w-24 sm:h-16 sm:w-28 shrink-0 overflow-hidden border border-stone-200/60 bg-stone-100 {rec.thumbnail_url ? 'cursor-zoom-in' : 'cursor-default'} focus:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
 							>
-								{#if rec.thumbnail_url}
+								{#if rec.thumbnail_url && !failedThumbs.has(rec.id)}
 									<img
 										src={rec.thumbnail_url}
 										alt=""
+										on:error={() => markThumbFailed(rec.id)}
 										class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
 										width="192"
 										height="108"
@@ -164,7 +172,7 @@
 	</div>
 </section>
 
-{#if expandedThumb && expandedThumb.thumbnail_url}
+{#if expandedThumb && expandedThumb.thumbnail_url && !failedThumbs.has(expandedThumb.id)}
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-lightbox-in"
 		on:click={onLightboxBackdropClick}
@@ -187,6 +195,10 @@
 		<img
 			src={expandedThumb.thumbnail_url}
 			alt={expandedThumb.title}
+			on:error={() => {
+				markThumbFailed(expandedThumb!.id);
+				closeThumb();
+			}}
 			class="max-h-[90vh] max-w-[90vw] object-contain shadow-2xl"
 		/>
 	</div>

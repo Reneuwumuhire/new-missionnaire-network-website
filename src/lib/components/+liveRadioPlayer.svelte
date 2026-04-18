@@ -30,6 +30,7 @@
 	let broadcastTitle: string | null = null;
 	let broadcastDescription: string | null = null;
 	let broadcastThumbnail: string | null = null;
+	let broadcastThumbnailBroken = false;
 	let thumbnailExpanded = false;
 	let descriptionExpanded = false;
 
@@ -235,7 +236,9 @@
 			};
 			broadcastTitle = data.title ?? null;
 			broadcastDescription = data.description ?? null;
-			broadcastThumbnail = data.thumbnailUrl ?? null;
+			const nextThumb = data.thumbnailUrl ?? null;
+			if (nextThumb !== broadcastThumbnail) broadcastThumbnailBroken = false;
+			broadcastThumbnail = nextThumb;
 			handleStatusEvent(data.isLive, data.checkedAt, data.listeners, data.streamUrl);
 		} catch {
 			// Network error — keep current state, will retry next interval
@@ -699,7 +702,7 @@
 
 			{#if showLive}
 				<div class="md:w-56 md:shrink-0 order-first md:order-last">
-					{#if broadcastThumbnail}
+					{#if broadcastThumbnail && !broadcastThumbnailBroken}
 						<button
 							type="button"
 							on:click={openThumbnail}
@@ -709,6 +712,7 @@
 							<img
 								src={broadcastThumbnail}
 								alt={broadcastTitle || 'Vignette du direct'}
+								on:error={() => (broadcastThumbnailBroken = true)}
 								class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
 								loading="eager"
 							/>
@@ -865,7 +869,7 @@
 
 <svelte:window on:keydown={handleLightboxKeydown} />
 
-{#if thumbnailExpanded && broadcastThumbnail}
+{#if thumbnailExpanded && broadcastThumbnail && !broadcastThumbnailBroken}
 	<!-- Lightbox: click backdrop or press Escape to close. Image inside
 	     stops propagation so clicking the image itself doesn't dismiss. -->
 	<div
@@ -890,6 +894,10 @@
 		<img
 			src={broadcastThumbnail}
 			alt={broadcastTitle || 'Vignette du direct'}
+			on:error={() => {
+				broadcastThumbnailBroken = true;
+				closeThumbnail();
+			}}
 			class="max-h-[90vh] max-w-[90vw] object-contain shadow-2xl"
 		/>
 	</div>

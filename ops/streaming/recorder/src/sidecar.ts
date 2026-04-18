@@ -7,6 +7,7 @@ export interface Sidecar {
 	title: string;
 	startedAt: string; // ISO
 	createdBy: string;
+	createdByName?: string | null;
 }
 
 export function mp3Path(id: string): string {

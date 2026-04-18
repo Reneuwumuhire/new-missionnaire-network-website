@@ -34,6 +34,7 @@ export interface RecordingDoc {
 	status: 'recording' | 'uploading' | 'ready' | 'failed';
 	published: boolean;
 	created_by: string;
+	created_by_name: string | null;
 	failure_reason: string | null;
 	/** Snapshot of broadcast_admin_state.thumbnail_url at recording-save time. */
 	thumbnail_url: string | null;
@@ -71,6 +72,7 @@ export async function insertRecordingStarting(params: {
 	title: string;
 	startedAt: Date;
 	createdBy: string;
+	createdByName?: string | null;
 }): Promise<void> {
 	const db = await getDb();
 	await db.collection<RecordingDoc>('recordings').insertOne({
@@ -85,6 +87,7 @@ export async function insertRecordingStarting(params: {
 		status: 'recording',
 		published: false,
 		created_by: params.createdBy,
+		created_by_name: params.createdByName ?? null,
 		failure_reason: null,
 		thumbnail_url: null,
 		description: null,

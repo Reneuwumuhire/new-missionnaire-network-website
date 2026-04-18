@@ -3,6 +3,14 @@
 
 	export let recordings: PublishedRecording[] = [];
 
+	// Legacy thumbnails uploaded before the ACL fix return 403. Track failed
+	// IDs so the default logo fallback replaces the broken-image icon.
+	let failedThumbs = new Set<string>();
+	function markThumbFailed(id: string) {
+		if (failedThumbs.has(id)) return;
+		failedThumbs = new Set(failedThumbs).add(id);
+	}
+
 	function formatDate(iso: string): string {
 		return new Date(iso).toLocaleDateString('fr-FR', {
 			day: 'numeric',
@@ -42,10 +50,11 @@
 						class="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-missionnaire/5 group"
 					>
 						<div class="relative h-14 w-20 shrink-0 overflow-hidden border border-stone-200/60 bg-stone-100">
-							{#if rec.thumbnail_url}
+							{#if rec.thumbnail_url && !failedThumbs.has(rec.id)}
 								<img
 									src={rec.thumbnail_url}
 									alt=""
+									on:error={() => markThumbFailed(rec.id)}
 									class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
 									width="160"
 									height="90"

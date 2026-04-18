@@ -9,7 +9,7 @@ export const POST: RequestHandler = async ({ locals, getClientAddress }) => {
 	if (!getPermissions(user).can_manage_recordings) throw error(403, 'Accès refusé');
 
 	try {
-		const result = await recorderStart(user.email);
+		const result = await recorderStart(user.email, user.name || null);
 		await logAudit({
 			user_id: user.email,
 			user_email: user.email,

@@ -34,6 +34,7 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		started_at: startedAt,
 		ended_at: null,
 		started_by: locals.user.email,
+		started_by_name: locals.user.name || null,
 		icecast_offline_since: null,
 		// Picked up by the main-site radio-poll endpoint, which fires the actual
 		// push notification (VAPID keys + web-push live there, not in admin).
