@@ -102,6 +102,7 @@ export async function GET({ url, setHeaders }) {
 		listeners,
 		streamUrl: status?.streamUrl,
 		title: adminGate.title,
+		description: adminGate.description,
 		thumbnailUrl: adminGate.thumbnail_url
 	});
 }

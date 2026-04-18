@@ -37,12 +37,15 @@ export interface RecordingDoc {
 	failure_reason: string | null;
 	/** Snapshot of broadcast_admin_state.thumbnail_url at recording-save time. */
 	thumbnail_url: string | null;
+	/** Snapshot of broadcast_admin_state.description at recording-save time. */
+	description: string | null;
 	updated_at: Date;
 }
 
 /** Minimal shape of the broadcast admin state doc for snapshot reads. */
 interface BroadcastAdminStateSnapshot {
 	title: string | null;
+	description: string | null;
 	thumbnail_url: string | null;
 }
 
@@ -54,11 +57,12 @@ export async function getBroadcastSnapshot(): Promise<BroadcastAdminStateSnapsho
 			.findOne({ _id: 'current' as unknown as ObjectId })) as BroadcastAdminStateSnapshot | null;
 		return {
 			title: doc?.title ?? null,
+			description: doc?.description ?? null,
 			thumbnail_url: doc?.thumbnail_url ?? null
 		};
 	} catch (err) {
 		console.error('[recorder/mongo] failed to read broadcast snapshot:', err);
-		return { title: null, thumbnail_url: null };
+		return { title: null, description: null, thumbnail_url: null };
 	}
 }
 
@@ -83,6 +87,7 @@ export async function insertRecordingStarting(params: {
 		created_by: params.createdBy,
 		failure_reason: null,
 		thumbnail_url: null,
+		description: null,
 		updated_at: new Date()
 	});
 }
@@ -105,6 +110,7 @@ export async function markRecordingReady(
 		sizeBytes: number;
 		thumbnailUrl: string | null;
 		title: string | null;
+		description: string | null;
 	}
 ) {
 	const db = await getDb();
@@ -114,6 +120,7 @@ export async function markRecordingReady(
 		s3_url: params.s3Url,
 		size_bytes: params.sizeBytes,
 		thumbnail_url: params.thumbnailUrl,
+		description: params.description,
 		failure_reason: null,
 		updated_at: new Date()
 	};

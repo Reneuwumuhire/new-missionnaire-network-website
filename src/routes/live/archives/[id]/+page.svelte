@@ -137,6 +137,17 @@
 				Télécharger
 			</a>
 		</div>
+
+		{#if rec.description}
+			<div class="mt-10 border border-stone-200/60 bg-white/40 p-6">
+				<p class="text-[10px] font-bold uppercase tracking-[0.25em] text-missionnaire/80 font-body mb-3">
+					À propos de ce direct
+				</p>
+				<p class="text-sm text-stone-700 font-body leading-relaxed whitespace-pre-wrap">
+					{rec.description}
+				</p>
+			</div>
+		{/if}
 	</div>
 </section>
 

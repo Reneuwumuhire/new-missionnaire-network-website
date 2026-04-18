@@ -159,7 +159,8 @@ async function finalizeUpload(rec: Pick<ActiveRecording, 'id' | 'idStr' | 'start
 			s3Url,
 			sizeBytes,
 			thumbnailUrl: snap.thumbnail_url,
-			title: snap.title
+			title: snap.title,
+			description: snap.description
 		});
 		await removeRecordingFiles(rec.idStr);
 		console.log(`[recorder] uploaded ${rec.idStr} -> ${s3Key}`);

@@ -28,8 +28,10 @@
 	let listenerCount = 0;
 	let keepLiveUi = false;
 	let broadcastTitle: string | null = null;
+	let broadcastDescription: string | null = null;
 	let broadcastThumbnail: string | null = null;
 	let thumbnailExpanded = false;
+	let descriptionExpanded = false;
 
 	function openThumbnail() {
 		if (!broadcastThumbnail) return;
@@ -223,9 +225,11 @@
 				listeners: number;
 				streamUrl?: string;
 				title?: string | null;
+				description?: string | null;
 				thumbnailUrl?: string | null;
 			};
 			broadcastTitle = data.title ?? null;
+			broadcastDescription = data.description ?? null;
 			broadcastThumbnail = data.thumbnailUrl ?? null;
 			handleStatusEvent(data.isLive, data.checkedAt, data.listeners, data.streamUrl);
 		} catch {
@@ -786,6 +790,31 @@
 		{/if}
 	</div>
 
+	<!-- Description (YouTube-style expandable block under the player) -->
+	{#if showLive && broadcastDescription}
+		{@const isLong = broadcastDescription.length > 280 || (broadcastDescription.match(/\n/g)?.length ?? 0) >= 3}
+		<div class="border border-stone-200/60 bg-white/40 p-5 md:p-6">
+			<p class="text-[10px] font-bold uppercase tracking-[0.25em] text-missionnaire/80 font-body mb-3">
+				À propos de ce direct
+			</p>
+			<div
+				class="text-sm text-stone-700 font-body leading-relaxed whitespace-pre-wrap"
+				class:description-collapsed={isLong && !descriptionExpanded}
+			>
+				{broadcastDescription}
+			</div>
+			{#if isLong}
+				<button
+					type="button"
+					on:click={() => (descriptionExpanded = !descriptionExpanded)}
+					class="mt-3 text-[11px] font-bold uppercase tracking-[0.15em] font-body text-missionnaire hover:text-missionnaire-dark transition-colors"
+				>
+					{descriptionExpanded ? 'Voir moins ↑' : 'Voir plus ↓'}
+				</button>
+			{/if}
+		</div>
+	{/if}
+
 	<!-- Offline info card -->
 	{#if !showLive}
 		<div class="border border-stone-200/60 bg-white/40 p-5 md:p-6">
@@ -916,5 +945,14 @@
 		background:
 			radial-gradient(circle at 30% 20%, rgba(255, 136, 12, 0.08), transparent 60%),
 			linear-gradient(135deg, #FAF6F1 0%, #F1EAE0 100%);
+	}
+
+	/* Collapsed description: show first ~3 lines then fade, expand on click */
+	.description-collapsed {
+		display: -webkit-box;
+		-webkit-line-clamp: 3;
+		line-clamp: 3;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
 	}
 </style>

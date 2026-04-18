@@ -8,8 +8,19 @@ import {
 	logAudit
 } from '../../../../db/collections';
 
-export const POST: RequestHandler = async ({ locals, getClientAddress }) => {
+export const POST: RequestHandler = async ({ locals, request, getClientAddress }) => {
 	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
+
+	// `notify` is optional: defaults to true (normal behavior = fire push).
+	// Pass `false` from admin UI to go live silently (local testing, re-broadcasts
+	// after a technical glitch, etc.).
+	let notify = true;
+	try {
+		const body = (await request.json().catch(() => ({}))) as { notify?: unknown };
+		if (body.notify === false) notify = false;
+	} catch {
+		// Empty body is fine — stay with default `true`.
+	}
 
 	const current = await getBroadcastAdminState();
 	if (current.is_live) {
@@ -26,7 +37,7 @@ export const POST: RequestHandler = async ({ locals, getClientAddress }) => {
 		icecast_offline_since: null,
 		// Picked up by the main-site radio-poll endpoint, which fires the actual
 		// push notification (VAPID keys + web-push live there, not in admin).
-		notification_pending: true
+		notification_pending: notify
 	});
 
 	// Ping the main-site radio-poll once so the push fires immediately, even if
@@ -52,9 +63,9 @@ export const POST: RequestHandler = async ({ locals, getClientAddress }) => {
 		action: 'create',
 		target_collection: 'broadcast_admin_state',
 		target_id: 'current',
-		changes: { is_live: { old: false, new: true } },
+		changes: { is_live: { old: false, new: true }, notify: { old: null, new: notify } },
 		ip_address: getClientAddress()
 	});
 
-	return json({ ok: true, startedAt });
+	return json({ ok: true, startedAt, notify });
 };

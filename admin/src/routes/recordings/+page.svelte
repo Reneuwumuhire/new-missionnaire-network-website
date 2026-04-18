@@ -133,14 +133,21 @@
 
 	async function goLive() {
 		if (broadcastBusy) return;
-		const msg = subscriberCount > 0
+		const willNotify = notifyOnGoLive && subscriberCount > 0;
+		const msg = willNotify
 			? `Cela enverra une notification à ${subscriberCount} abonné${subscriberCount > 1 ? 's' : ''}. Continuer ?`
-			: 'Aucun abonné aux notifications pour l\'instant. Aller en direct quand même ?';
+			: notifyOnGoLive
+				? 'Aucun abonné aux notifications pour l\'instant. Aller en direct quand même ?'
+				: 'Aller en direct SANS notifier les abonnés ?';
 		if (!confirm(msg)) return;
 		broadcastBusy = true;
 		actionError = null;
 		try {
-			const res = await fetch('/api/broadcast/go-live', { method: 'POST' });
+			const res = await fetch('/api/broadcast/go-live', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ notify: notifyOnGoLive })
+			});
 			if (!res.ok) {
 				const text = await res.text();
 				actionError = text || `Erreur ${res.status}`;
@@ -168,13 +175,142 @@
 		}
 	}
 
-	// ── Broadcast metadata (title + thumbnail) ──────────────────────
+	// ── Broadcast metadata (single unified edit mode) ─────────────────
+	// One "Modifier" puts the whole section into edit mode; one "Enregistrer"
+	// commits title + description + thumbnail changes in a single flow.
+	let metadataEditing = $state(false);
+	let metadataSaving = $state(false);
 	let titleDraft = $state<string>('');
-	let titleEditing = $state(false);
-	let titleSaving = $state(false);
-	let thumbnailUploading = $state(false);
+	let descriptionDraft = $state<string>('');
+	// Thumbnail staging — upload deferred to Save so cancel doesn't leave orphans.
+	let thumbnailFile = $state<File | null>(null);
+	let thumbnailPreviewUrl = $state<string | null>(null);
+	let thumbnailAction = $state<'keep' | 'replace' | 'remove'>('keep');
 	let thumbnailError = $state<string | null>(null);
 	let thumbnailExpanded = $state(false);
+	// Default ON: normal broadcasts notify. Uncheck for silent tests/re-broadcasts.
+	let notifyOnGoLive = $state(true);
+
+	function enterEditMode() {
+		titleDraft = broadcast.title ?? '';
+		descriptionDraft = broadcast.description ?? '';
+		thumbnailFile = null;
+		thumbnailAction = 'keep';
+		if (thumbnailPreviewUrl) URL.revokeObjectURL(thumbnailPreviewUrl);
+		thumbnailPreviewUrl = null;
+		thumbnailError = null;
+		metadataEditing = true;
+	}
+
+	function cancelEditMode() {
+		if (thumbnailPreviewUrl) URL.revokeObjectURL(thumbnailPreviewUrl);
+		thumbnailPreviewUrl = null;
+		thumbnailFile = null;
+		thumbnailAction = 'keep';
+		thumbnailError = null;
+		metadataEditing = false;
+	}
+
+	function onThumbnailFileChange(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		if (!file) return;
+		if (!file.type.startsWith('image/')) {
+			thumbnailError = 'Sélectionnez un fichier image';
+			return;
+		}
+		if (file.size > 5 * 1024 * 1024) {
+			thumbnailError = 'Image trop volumineuse (max 5 Mo)';
+			return;
+		}
+		thumbnailError = null;
+		if (thumbnailPreviewUrl) URL.revokeObjectURL(thumbnailPreviewUrl);
+		thumbnailFile = file;
+		thumbnailPreviewUrl = URL.createObjectURL(file);
+		thumbnailAction = 'replace';
+	}
+
+	function markThumbnailForRemoval() {
+		if (thumbnailPreviewUrl) URL.revokeObjectURL(thumbnailPreviewUrl);
+		thumbnailPreviewUrl = null;
+		thumbnailFile = null;
+		thumbnailAction = 'remove';
+	}
+
+	/** Returns the image URL to show in the preview slot during edit mode. */
+	const previewSrc = $derived.by(() => {
+		if (thumbnailPreviewUrl) return thumbnailPreviewUrl;
+		if (thumbnailAction === 'remove') return null;
+		return broadcast.thumbnail_url;
+	});
+
+	async function saveMetadata() {
+		if (metadataSaving) return;
+		metadataSaving = true;
+		thumbnailError = null;
+		try {
+			const patch: Record<string, unknown> = {};
+
+			// Title / description — only send changed fields.
+			const nextTitle = titleDraft.trim() || null;
+			if (nextTitle !== (broadcast.title ?? null)) patch.title = nextTitle;
+			const nextDescription = descriptionDraft.trim() || null;
+			if (nextDescription !== (broadcast.description ?? null)) patch.description = nextDescription;
+
+			// Thumbnail — upload only if a new file was picked; remove or keep otherwise.
+			if (thumbnailAction === 'replace' && thumbnailFile) {
+				const presignRes = await fetch('/api/broadcast/thumbnail/presign', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ contentType: thumbnailFile.type, size: thumbnailFile.size })
+				});
+				if (!presignRes.ok) {
+					thumbnailError = (await presignRes.text()) || `Erreur ${presignRes.status}`;
+					return;
+				}
+				const { uploadUrl, key, publicUrl } = (await presignRes.json()) as {
+					uploadUrl: string;
+					key: string;
+					publicUrl: string;
+				};
+				const uploadRes = await fetch(uploadUrl, {
+					method: 'PUT',
+					headers: { 'Content-Type': thumbnailFile.type },
+					body: thumbnailFile
+				});
+				if (!uploadRes.ok) {
+					thumbnailError = 'Échec du téléversement vers S3';
+					return;
+				}
+				patch.thumbnail_url = publicUrl;
+				patch.thumbnail_s3_key = key;
+			} else if (thumbnailAction === 'remove') {
+				patch.thumbnail_url = null;
+				patch.thumbnail_s3_key = null;
+			}
+
+			if (Object.keys(patch).length === 0) {
+				// Nothing changed — just exit edit mode.
+				cancelEditMode();
+				return;
+			}
+
+			const res = await fetch('/api/broadcast/metadata', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(patch)
+			});
+			if (!res.ok) {
+				thumbnailError = (await res.text()) || `Erreur ${res.status}`;
+				return;
+			}
+			cancelEditMode();
+			await invalidateAll();
+		} finally {
+			metadataSaving = false;
+		}
+	}
 
 	function openThumbnail() {
 		if (!broadcast.thumbnail_url) return;
@@ -188,107 +324,6 @@
 	}
 	function onBackdropClick(e: MouseEvent) {
 		if (e.target === e.currentTarget) closeThumbnail();
-	}
-
-	$effect(() => {
-		if (!titleEditing) titleDraft = broadcast.title ?? '';
-	});
-
-	async function saveBroadcastTitle() {
-		const value = titleDraft.trim();
-		if (value === (broadcast.title ?? '')) {
-			titleEditing = false;
-			return;
-		}
-		titleSaving = true;
-		try {
-			const res = await fetch('/api/broadcast/metadata', {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ title: value || null })
-			});
-			if (!res.ok) {
-				thumbnailError = (await res.text()) || `Erreur ${res.status}`;
-			} else {
-				titleEditing = false;
-				await invalidateAll();
-			}
-		} finally {
-			titleSaving = false;
-		}
-	}
-
-	async function uploadThumbnail(file: File) {
-		thumbnailError = null;
-		if (!file.type.startsWith('image/')) {
-			thumbnailError = 'Sélectionnez un fichier image';
-			return;
-		}
-		thumbnailUploading = true;
-		try {
-			const presignRes = await fetch('/api/broadcast/thumbnail/presign', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ contentType: file.type, size: file.size })
-			});
-			if (!presignRes.ok) {
-				thumbnailError = (await presignRes.text()) || `Erreur ${presignRes.status}`;
-				return;
-			}
-			const { uploadUrl, key, publicUrl } = (await presignRes.json()) as {
-				uploadUrl: string;
-				key: string;
-				publicUrl: string;
-			};
-			const uploadRes = await fetch(uploadUrl, {
-				method: 'PUT',
-				headers: { 'Content-Type': file.type },
-				body: file
-			});
-			if (!uploadRes.ok) {
-				thumbnailError = 'Échec du téléversement vers S3';
-				return;
-			}
-			const commitRes = await fetch('/api/broadcast/metadata', {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ thumbnail_url: publicUrl, thumbnail_s3_key: key })
-			});
-			if (!commitRes.ok) {
-				thumbnailError = (await commitRes.text()) || `Erreur ${commitRes.status}`;
-				return;
-			}
-			await invalidateAll();
-		} finally {
-			thumbnailUploading = false;
-		}
-	}
-
-	async function clearThumbnail() {
-		if (!confirm('Retirer la vignette actuelle ?')) return;
-		thumbnailError = null;
-		thumbnailUploading = true;
-		try {
-			const res = await fetch('/api/broadcast/metadata', {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ thumbnail_url: null, thumbnail_s3_key: null })
-			});
-			if (!res.ok) {
-				thumbnailError = (await res.text()) || `Erreur ${res.status}`;
-			} else {
-				await invalidateAll();
-			}
-		} finally {
-			thumbnailUploading = false;
-		}
-	}
-
-	function onThumbnailFileChange(event: Event) {
-		const input = event.target as HTMLInputElement;
-		const file = input.files?.[0];
-		if (file) uploadThumbnail(file);
-		input.value = '';
 	}
 
 	/** End the live broadcast AND stop the recording in one click. Order matters:
@@ -644,35 +679,74 @@
 		</span>
 	</div>
 
-	<!-- Broadcast metadata: title + thumbnail shown on the public /live page -->
+	<!-- Broadcast metadata: title + description + thumbnail shown on the public /live page -->
 	<div class="mt-5 border-t border-stone-100 pt-5">
-		<p class="mb-3 text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500">
-			Informations affichées pendant le direct
-		</p>
-		<div class="flex flex-col gap-4 sm:flex-row sm:items-start">
-			<!-- Thumbnail upload -->
-			<div class="flex flex-col gap-2">
-				<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Vignette</span>
-				{#if broadcast.thumbnail_url}
+		<div class="mb-4 flex items-start justify-between gap-4">
+			<div>
+				<p class="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500">
+					Informations affichées pendant le direct
+				</p>
+				<p class="mt-1 text-[10px] text-stone-400">
+					Persiste entre les directs — modifiable à tout moment.
+				</p>
+			</div>
+			{#if !metadataEditing}
+				<button
+					type="button"
+					onclick={enterEditMode}
+					class="shrink-0 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-primary hover:text-primary"
+				>
+					Modifier
+				</button>
+			{:else}
+				<div class="shrink-0 flex items-center gap-2">
 					<button
 						type="button"
-						onclick={openThumbnail}
-						aria-label="Agrandir la vignette"
-						class="relative h-28 w-44 overflow-hidden rounded-xl border border-stone-300 bg-cream/40 cursor-zoom-in transition-all hover:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 group"
+						onclick={saveMetadata}
+						disabled={metadataSaving}
+						class="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-missionnaire-600 disabled:opacity-50"
+					>
+						{metadataSaving ? 'Enregistrement…' : 'Enregistrer'}
+					</button>
+					<button
+						type="button"
+						onclick={cancelEditMode}
+						disabled={metadataSaving}
+						class="rounded-lg px-2 py-1.5 text-xs text-stone-400 hover:text-stone-600 disabled:opacity-50"
+					>
+						Annuler
+					</button>
+				</div>
+			{/if}
+		</div>
+
+		<div class="flex flex-col gap-5 sm:flex-row sm:items-start">
+			<!-- Thumbnail -->
+			<div class="flex flex-col gap-2">
+				<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Vignette</span>
+				{#if previewSrc}
+					<button
+						type="button"
+						onclick={metadataEditing ? undefined : openThumbnail}
+						aria-label={metadataEditing ? 'Vignette' : 'Agrandir la vignette'}
+						disabled={metadataEditing}
+						class="relative h-28 w-44 overflow-hidden rounded-xl border border-stone-300 bg-cream/40 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 group disabled:cursor-default {metadataEditing ? '' : 'cursor-zoom-in hover:border-primary'}"
 					>
 						<img
-							src={broadcast.thumbnail_url}
+							src={previewSrc}
 							alt="Vignette du direct"
-							class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+							class="h-full w-full object-cover transition-transform duration-300 {metadataEditing ? '' : 'group-hover:scale-105'}"
 						/>
-						<span class="pointer-events-none absolute inset-0 flex items-end justify-end p-1.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-							<span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/90 shadow">
-								<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-stone-700">
-									<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
-								</svg>
+						{#if !metadataEditing}
+							<span class="pointer-events-none absolute inset-0 flex items-end justify-end p-1.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+								<span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/90 shadow">
+									<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-stone-700">
+										<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+									</svg>
+								</span>
 							</span>
-						</span>
-						{#if thumbnailUploading}
+						{/if}
+						{#if metadataSaving && thumbnailAction === 'replace'}
 							<div class="absolute inset-0 flex items-center justify-center bg-white/80 text-xs font-medium text-stone-600">
 								Téléversement…
 							</div>
@@ -697,92 +771,80 @@
 						<span class="absolute bottom-1 left-1 rounded-sm bg-stone-900/70 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wider text-white">
 							Défaut
 						</span>
-						{#if thumbnailUploading}
-							<div class="absolute inset-0 flex items-center justify-center bg-white/80 text-xs font-medium text-stone-600">
-								Téléversement…
-							</div>
-						{/if}
 					</div>
 				{/if}
-				<div class="flex gap-2">
-					<label class="cursor-pointer rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-primary hover:text-primary">
-						{broadcast.thumbnail_url ? 'Changer' : 'Téléverser'}
-						<input
-							type="file"
-							accept="image/jpeg,image/png,image/webp,image/gif"
-							class="hidden"
-							onchange={onThumbnailFileChange}
-							disabled={thumbnailUploading}
-						/>
-					</label>
-					{#if broadcast.thumbnail_url}
-						<button
-							type="button"
-							onclick={clearThumbnail}
-							disabled={thumbnailUploading}
-							class="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-500 transition-colors hover:border-red-200 hover:text-red-600 disabled:opacity-50"
-						>
-							Retirer
-						</button>
-					{/if}
-				</div>
-				<p class="text-[10px] text-stone-400">JPEG, PNG, WebP ou GIF · 5 Mo max</p>
+				{#if metadataEditing}
+					<div class="flex gap-2">
+						<label class="cursor-pointer rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-primary hover:text-primary">
+							{previewSrc ? 'Changer' : 'Téléverser'}
+							<input
+								type="file"
+								accept="image/jpeg,image/png,image/webp,image/gif"
+								class="hidden"
+								onchange={onThumbnailFileChange}
+								disabled={metadataSaving}
+							/>
+						</label>
+						{#if previewSrc}
+							<button
+								type="button"
+								onclick={markThumbnailForRemoval}
+								disabled={metadataSaving}
+								class="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-500 transition-colors hover:border-red-200 hover:text-red-600 disabled:opacity-50"
+							>
+								Retirer
+							</button>
+						{/if}
+					</div>
+					<p class="text-[10px] text-stone-400">JPEG, PNG, WebP ou GIF · 5 Mo max</p>
+				{/if}
 			</div>
 
-			<!-- Title -->
-			<div class="flex flex-1 flex-col gap-2">
-				<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Titre du direct</span>
-				{#if titleEditing}
-					<div class="flex gap-2">
+			<!-- Title + Description (stacked) -->
+			<div class="flex flex-1 flex-col gap-4">
+				<div class="flex flex-col gap-2">
+					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Titre du direct</span>
+					{#if metadataEditing}
 						<input
 							type="text"
 							bind:value={titleDraft}
 							placeholder="Ex. Prédication du mercredi"
 							maxlength="120"
-							class="admin-input flex-1 text-sm"
-							onkeydown={(e) => {
-								if (e.key === 'Enter') saveBroadcastTitle();
-								if (e.key === 'Escape') titleEditing = false;
-							}}
+							disabled={metadataSaving}
+							class="admin-input text-sm"
 						/>
-						<button
-							type="button"
-							onclick={saveBroadcastTitle}
-							disabled={titleSaving}
-							class="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-missionnaire-600 disabled:opacity-50"
-						>
-							{titleSaving ? '…' : 'Enregistrer'}
-						</button>
-						<button
-							type="button"
-							onclick={() => (titleEditing = false)}
-							class="rounded-lg px-2 py-1.5 text-xs text-stone-400 hover:text-stone-600"
-						>
-							Annuler
-						</button>
-					</div>
-				{:else}
-					<div class="flex items-center gap-3">
-						<span class="flex-1 text-sm {broadcast.title ? 'text-stone-700' : 'text-stone-400 italic'}">
+					{:else}
+						<p class="text-sm {broadcast.title ? 'text-stone-700' : 'text-stone-400 italic'}">
 							{broadcast.title || 'Aucun titre (le site affichera «\u00a0Audio en direct\u00a0»)'}
-						</span>
-						<button
-							type="button"
-							onclick={() => {
-								titleDraft = broadcast.title ?? '';
-								titleEditing = true;
-							}}
-							class="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 hover:border-primary hover:text-primary"
-						>
-							Modifier
-						</button>
+						</p>
+					{/if}
+				</div>
+
+				<div class="flex flex-col gap-2">
+					<div class="flex items-baseline justify-between">
+						<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Description</span>
+						{#if metadataEditing}
+							<span class="text-[10px] text-stone-400 tabular-nums">{descriptionDraft.length} / 2000</span>
+						{/if}
 					</div>
-				{/if}
-				<p class="text-[10px] text-stone-400">
-					Persiste entre les directs — modifiable à tout moment.
-				</p>
+					{#if metadataEditing}
+						<textarea
+							bind:value={descriptionDraft}
+							placeholder="Décrivez ce direct : sujet, orateur, texte biblique…"
+							maxlength="2000"
+							rows="4"
+							disabled={metadataSaving}
+							class="admin-input text-sm resize-y min-h-[96px]"
+						></textarea>
+					{:else}
+						<p class="text-sm whitespace-pre-wrap {broadcast.description ? 'text-stone-700' : 'text-stone-400 italic'}">
+							{broadcast.description || 'Aucune description'}
+						</p>
+					{/if}
+				</div>
 			</div>
 		</div>
+
 		{#if thumbnailError}
 			<p class="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{thumbnailError}</p>
 		{/if}

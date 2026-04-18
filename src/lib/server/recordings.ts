@@ -8,6 +8,7 @@ export interface PublishedRecording {
 	s3_url: string;
 	size_bytes: number | null;
 	thumbnail_url: string | null;
+	description: string | null;
 }
 
 interface RecordingRow {
@@ -18,6 +19,7 @@ interface RecordingRow {
 	s3_url?: string | null;
 	size_bytes?: number | null;
 	thumbnail_url?: string | null;
+	description?: string | null;
 }
 
 function toPublic(doc: RecordingRow): PublishedRecording {
@@ -29,7 +31,8 @@ function toPublic(doc: RecordingRow): PublishedRecording {
 		duration_sec: doc.duration_sec ?? null,
 		s3_url: doc.s3_url ?? '',
 		size_bytes: doc.size_bytes ?? null,
-		thumbnail_url: doc.thumbnail_url ?? null
+		thumbnail_url: doc.thumbnail_url ?? null,
+		description: doc.description ?? null
 	};
 }
 

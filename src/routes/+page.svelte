@@ -546,49 +546,6 @@
 </main>
 
 <style>
-	/* ── Section-level CTA links (Tout voir, En savoir plus, etc.) ── */
-	.section-cta {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.5rem 1rem;
-		border: 1px solid rgba(255, 136, 12, 0.25);
-		color: #FF880C;
-		font-family: var(--font-body, inherit);
-		font-size: 11px;
-		font-weight: 600;
-		letter-spacing: 0.2em;
-		text-transform: uppercase;
-		border-radius: 9999px;
-		transition: background-color 220ms ease, border-color 220ms ease, color 220ms ease;
-	}
-	.section-cta:hover {
-		background-color: #FF880C;
-		border-color: #FF880C;
-		color: #ffffff;
-	}
-	.section-cta:focus-visible {
-		outline: none;
-		box-shadow: 0 0 0 3px rgba(255, 136, 12, 0.3);
-	}
-	.section-cta-arrow {
-		display: inline-block;
-		transition: transform 220ms ease;
-	}
-	.section-cta:hover .section-cta-arrow {
-		transform: translateX(3px);
-	}
-	.section-cta-label {
-		/* So the text can never wrap on small viewports */
-		white-space: nowrap;
-	}
-	/* Mobile variant: centered and full width under the grid */
-	.section-cta-mobile {
-		justify-content: center;
-		margin-left: auto;
-		margin-right: auto;
-	}
-
 	/* ── Grain texture ── */
 	.grain-texture {
 		background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");

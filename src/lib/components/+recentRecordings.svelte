@@ -28,11 +28,9 @@
 				</p>
 				<h2 class="font-display text-xl font-semibold text-stone-900">Directs précédents</h2>
 			</div>
-			<a
-				href="/live/archives"
-				class="text-[11px] font-bold uppercase tracking-[0.15em] font-body text-missionnaire/80 hover:text-missionnaire transition-colors"
-			>
-				Voir tout →
+			<a href="/live/archives" class="section-cta">
+				<span class="section-cta-label">Voir tout</span>
+				<span class="section-cta-arrow" aria-hidden="true">→</span>
 			</a>
 		</div>
 

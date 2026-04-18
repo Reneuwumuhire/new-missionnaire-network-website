@@ -192,3 +192,47 @@ img {
 .skeleton-stagger {
 	animation: skeleton-fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+
+/* ── Section-level CTA pill (Tout voir, En savoir plus, Voir tous les directs…) ── */
+.section-cta {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.5rem 1rem;
+	border: 1px solid rgba(255, 136, 12, 0.25);
+	color: #FF880C;
+	font-family: var(--font-body, inherit);
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.2em;
+	text-transform: uppercase;
+	border-radius: 9999px;
+	transition:
+		background-color 220ms ease,
+		border-color 220ms ease,
+		color 220ms ease;
+}
+.section-cta:hover {
+	background-color: #ff880c;
+	border-color: #ff880c;
+	color: #ffffff;
+}
+.section-cta:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 3px rgba(255, 136, 12, 0.3);
+}
+.section-cta-arrow {
+	display: inline-block;
+	transition: transform 220ms ease;
+}
+.section-cta:hover .section-cta-arrow {
+	transform: translateX(3px);
+}
+.section-cta-label {
+	white-space: nowrap;
+}
+.section-cta-mobile {
+	justify-content: center;
+	margin-left: auto;
+	margin-right: auto;
+}

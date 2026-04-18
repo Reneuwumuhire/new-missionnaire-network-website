@@ -29,6 +29,15 @@ export interface PushPayload {
 }
 
 export async function sendPushToAll(payload: PushPayload): Promise<void> {
+	// Global kill-switch for push delivery. Set PUSH_NOTIFICATIONS_ENABLED=false
+	// in main-site .env.local during local dev so test "Aller en direct" clicks
+	// don't spam real subscribers. Production should leave this unset (defaults
+	// to enabled).
+	if (env.PUSH_NOTIFICATIONS_ENABLED === 'false') {
+		console.log(`[Push] Disabled via PUSH_NOTIFICATIONS_ENABLED — would have sent: "${payload.title}"`);
+		return;
+	}
+
 	if (!ensureVapidConfigured()) return;
 
 	const subscriptions = await getAllPushSubscriptions();

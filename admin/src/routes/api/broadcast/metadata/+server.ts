@@ -9,18 +9,21 @@ import {
 import { deleteObject } from '$lib/server/s3';
 
 const MAX_TITLE_LEN = 120;
+const MAX_DESCRIPTION_LEN = 2000;
 
 export const PATCH: RequestHandler = async ({ locals, request, getClientAddress }) => {
 	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
 
 	const body = (await request.json()) as {
 		title?: unknown;
+		description?: unknown;
 		thumbnail_url?: unknown;
 		thumbnail_s3_key?: unknown;
 	};
 
 	const updates: {
 		title?: string | null;
+		description?: string | null;
 		thumbnail_url?: string | null;
 		thumbnail_s3_key?: string | null;
 	} = {};
@@ -36,6 +39,21 @@ export const PATCH: RequestHandler = async ({ locals, request, getClientAddress 
 			updates.title = trimmed || null;
 		} else {
 			throw error(400, 'Titre invalide');
+		}
+	}
+
+	if ('description' in body) {
+		if (body.description === null || body.description === '') {
+			updates.description = null;
+		} else if (typeof body.description === 'string') {
+			// Normalize line endings but preserve paragraph breaks.
+			const normalized = body.description.replaceAll('\r\n', '\n').trim();
+			if (normalized.length > MAX_DESCRIPTION_LEN) {
+				throw error(400, `Description trop longue (max ${MAX_DESCRIPTION_LEN} caractères)`);
+			}
+			updates.description = normalized || null;
+		} else {
+			throw error(400, 'Description invalide');
 		}
 	}
 

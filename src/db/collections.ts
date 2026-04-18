@@ -874,6 +874,7 @@ export type BroadcastAdminState = {
 	icecast_offline_since: string | null;
 	notification_pending: boolean;
 	title: string | null;
+	description: string | null;
 	thumbnail_url: string | null;
 	thumbnail_s3_key: string | null;
 	updated_at: string;
@@ -887,6 +888,7 @@ const BROADCAST_DEFAULT: BroadcastAdminState = {
 	icecast_offline_since: null,
 	notification_pending: false,
 	title: null,
+	description: null,
 	thumbnail_url: null,
 	thumbnail_s3_key: null,
 	updated_at: new Date(0).toISOString()
@@ -907,6 +909,7 @@ export async function getBroadcastAdminState(): Promise<BroadcastAdminState> {
 			icecast_offline_since: (doc.icecast_offline_since as string | null) ?? null,
 			notification_pending: Boolean(doc.notification_pending),
 			title: (doc.title as string | null) ?? null,
+			description: (doc.description as string | null) ?? null,
 			thumbnail_url: (doc.thumbnail_url as string | null) ?? null,
 			thumbnail_s3_key: (doc.thumbnail_s3_key as string | null) ?? null,
 			updated_at: (doc.updated_at as string) ?? new Date(0).toISOString()
