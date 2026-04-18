@@ -21,17 +21,30 @@
 	// `null` = indeterminate (no Content-Length), number = 0–100 percent.
 	let downloadPercent = writable<number | null>(0);
 	let isDownloading = writable(false);
+	let downloadController: AbortController | null = null;
 
 	const downloadAudio = async (audio: AudioAsset) => {
+		// Second tap on an in-flight download = cancel.
+		if (downloadController) {
+			downloadController.abort();
+			return;
+		}
+		const controller = new AbortController();
+		downloadController = controller;
 		isDownloading.set(true);
 		downloadPercent.set(0);
 		try {
 			await downloadAudioFile(audio.url, audio.title, {
+				signal: controller.signal,
 				onProgress: (p) => downloadPercent.set(p.percent)
 			});
 		} catch (error) {
-			console.error('There was an error downloading the audio:', error);
+			// Silent on user-initiated aborts; log anything else.
+			if (!controller.signal.aborted) {
+				console.error('There was an error downloading the audio:', error);
+			}
 		} finally {
+			downloadController = null;
 			isDownloading.set(false);
 			downloadPercent.set(0);
 		}
@@ -58,7 +71,15 @@
 				</button>
 			{/if}
 			{#if $isDownloading}
-				<div class="flex items-center justify-center w-8 h-8 relative" title={$downloadPercent !== null ? `Téléchargement ${$downloadPercent}%` : 'Téléchargement en cours…'}>
+				<button
+					type="button"
+					class="group flex items-center justify-center w-8 h-8 relative focus:outline-none"
+					on:click={() => downloadAudio(audio)}
+					title={$downloadPercent !== null
+						? `Annuler (${$downloadPercent}%)`
+						: 'Annuler le téléchargement'}
+					aria-label="Annuler le téléchargement"
+				>
 					{#if $downloadPercent !== null}
 						<svg
 							class="h-8 w-8 text-missionnaire"
@@ -94,7 +115,15 @@
 							<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-dasharray="42 62" />
 						</svg>
 					{/if}
-				</div>
+					<!-- Hover hint on pointer devices: swap the ring for an X so
+					     the cancel affordance is explicit. On touch, the tooltip
+					     + aria-label carry the same message. -->
+					<span class="absolute inset-0 hidden items-center justify-center bg-missionnaire/90 group-hover:flex">
+						<svg class="h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+							<path d="M6 6l12 12M6 18L18 6" />
+						</svg>
+					</span>
+				</button>
 			{:else}
 				<button
 					class="flex flex-row items-center space-x-1 hover:text-missionnaire"

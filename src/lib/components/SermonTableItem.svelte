@@ -26,9 +26,11 @@
 	// Background-download state: when the listener clicks the cloud icon we
 	// stream the mp3 and save it via a blob URL instead of navigating away
 	// via window.open. Progress shows as a circular indicator in place of the
-	// icon (or a pulsing dot when Content-Length isn't known).
+	// icon (or a pulsing dot when Content-Length isn't known). Tapping the
+	// progress ring a second time cancels the in-flight request.
 	let isDownloading = false;
 	let downloadPercent: number | null = 0;
+	let downloadController: AbortController | null = null;
 	const desktopSermonGrid = 'md:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.35fr)_110px_80px_120px]';
 
 	$: isActive = isSermonActive(sermon, $selectAudio);
@@ -97,21 +99,30 @@
 	}
 
 	async function downloadMp3() {
-		if (isDownloading) return;
+		// Second tap while a download is in flight = cancel.
+		if (isDownloading && downloadController) {
+			downloadController.abort();
+			return;
+		}
 		const url = language === 'english' ? sermon.english_audio_url : sermon.mp3_url;
 		if (!url) return;
 		const title = language === 'english'
 			? sermon.english_title || 'sermon'
 			: sermon.french_title || sermon.english_title || 'sermon';
+		const controller = new AbortController();
+		downloadController = controller;
 		isDownloading = true;
 		downloadPercent = 0;
 		try {
 			await downloadAudioFile(url, title, {
+				signal: controller.signal,
 				onProgress: (p) => (downloadPercent = p.percent)
 			});
 		} catch (err) {
-			console.error('[sermon/download]', err);
+			// Swallow user-initiated cancellation; log other failures.
+			if (!controller.signal.aborted) console.error('[sermon/download]', err);
 		} finally {
+			downloadController = null;
 			isDownloading = false;
 			setTimeout(() => {
 				if (!isDownloading) downloadPercent = 0;
@@ -241,14 +252,17 @@
 
 		{#if (language === 'english' && sermon.english_audio_url) || (language !== 'english' && sermon.mp3_url)}
 			<button
-				class="relative p-2 text-gray-400 hover:text-orange-600 transition-colors disabled:cursor-default"
+				class="group relative p-2 text-gray-400 hover:text-orange-600 transition-colors"
 				on:click|stopPropagation={downloadMp3}
 				title={isDownloading
-					? downloadPercent !== null ? `Téléchargement ${downloadPercent}%` : 'Téléchargement en cours…'
+					? downloadPercent !== null
+						? `Annuler (${downloadPercent}%)`
+						: 'Annuler le téléchargement'
 					: 'Télécharger MP3'}
-				disabled={isDownloading}
 				aria-label={isDownloading
-					? downloadPercent !== null ? `Téléchargement ${downloadPercent}%` : 'Téléchargement en cours'
+					? downloadPercent !== null
+						? `Annuler le téléchargement (${downloadPercent}%)`
+						: 'Annuler le téléchargement'
 					: 'Télécharger le MP3'}
 			>
 				{#if isDownloading}
@@ -275,6 +289,12 @@
 								<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="42 62" />
 							</svg>
 						{/if}
+						<!-- Hover hint: swap ring for X so cancel is obvious on pointer devices. -->
+						<span class="absolute inset-0 hidden items-center justify-center rounded-full bg-orange-600 group-hover:flex">
+							<svg class="h-3 w-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+								<path d="M6 6l12 12M6 18L18 6" />
+							</svg>
+						</span>
 					</span>
 				{:else}
 					<Icon src={IoCloudDownloadOutline} size="20" />

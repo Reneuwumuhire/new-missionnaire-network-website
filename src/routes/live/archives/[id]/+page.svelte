@@ -17,6 +17,7 @@
 	let downloadPercent: number | null = 0;
 	let downloadLoaded = 0;
 	let downloadError = '';
+	let downloadController: AbortController | null = null;
 
 	function formatDownloadedBytes(bytes: number): string {
 		if (bytes < 1024) return `${bytes} o`;
@@ -25,13 +26,21 @@
 	}
 
 	async function downloadAudio() {
-		if (isDownloading || !rec.s3_url) return;
+		if (!rec.s3_url) return;
+		// Click while in-flight = cancel.
+		if (isDownloading && downloadController) {
+			downloadController.abort();
+			return;
+		}
+		const controller = new AbortController();
+		downloadController = controller;
 		isDownloading = true;
 		downloadPercent = 0;
 		downloadLoaded = 0;
 		downloadError = '';
 		try {
 			await downloadAudioFile(rec.s3_url, rec.title, {
+				signal: controller.signal,
 				totalBytesHint: rec.size_bytes ?? 0,
 				onProgress: (p) => {
 					downloadPercent = p.percent;
@@ -39,9 +48,13 @@
 				}
 			});
 		} catch (err) {
-			console.error('[archive/download]', err);
-			downloadError = 'Téléchargement impossible. Réessayez dans un instant.';
+			// User-cancelled: leave row state clean, skip the error banner.
+			if (!controller.signal.aborted) {
+				console.error('[archive/download]', err);
+				downloadError = 'Téléchargement impossible. Réessayez dans un instant.';
+			}
 		} finally {
+			downloadController = null;
 			isDownloading = false;
 			setTimeout(() => {
 				if (!isDownloading) {
@@ -190,13 +203,12 @@
 				<button
 					type="button"
 					on:click={downloadAudio}
-					disabled={isDownloading}
 					aria-label={isDownloading
 						? downloadPercent !== null
-							? `Téléchargement en cours ${downloadPercent}%`
-							: `Téléchargement en cours — ${formatDownloadedBytes(downloadLoaded)}`
+							? `Annuler le téléchargement (${downloadPercent}%)`
+							: `Annuler le téléchargement — ${formatDownloadedBytes(downloadLoaded)}`
 						: 'Télécharger le direct'}
-					class="download-row group relative flex items-center justify-center gap-2 border-t border-stone-200/60 px-5 py-3 text-[11px] font-bold uppercase tracking-[0.2em] font-body text-stone-600 transition-colors hover:bg-missionnaire hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40 disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-stone-600"
+					class="download-row group relative flex items-center justify-center gap-2 border-t border-stone-200/60 px-5 py-3 text-[11px] font-bold uppercase tracking-[0.2em] font-body text-stone-600 transition-colors hover:bg-missionnaire hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
 					style={isDownloading && downloadPercent !== null ? `--progress: ${downloadPercent}%` : ''}
 				>
 					{#if isDownloading}
@@ -206,10 +218,15 @@
 							<span class="download-fill download-fill-indeterminate" aria-hidden="true"></span>
 						{/if}
 						<span class="relative z-10 flex items-center gap-2">
-							<svg class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-								<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-dasharray="42 62" stroke-linecap="round" />
+							<!-- Stop square: the spinner next to "Téléchargement" doubles as
+							     a cancel indicator since the entire row is now clickable to
+							     abort. Hover fills the row red to reinforce the cancel intent. -->
+							<svg class="h-3 w-3 animate-spin group-hover:animate-none" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+								<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-dasharray="42 62" stroke-linecap="round" class="group-hover:hidden" />
+								<rect x="7" y="7" width="10" height="10" fill="currentColor" class="hidden group-hover:block" />
 							</svg>
-							Téléchargement
+							<span class="group-hover:hidden">Téléchargement</span>
+							<span class="hidden group-hover:inline">Annuler</span>
 							{#if downloadPercent !== null}
 								<span class="tabular-nums">{downloadPercent}%</span>
 							{:else}
@@ -297,6 +314,12 @@
 	   grows from left to right driven by the --progress CSS variable. */
 	.download-row {
 		overflow: hidden;
+	}
+	/* Cancel affordance on hover during download: flip the whole row to a
+	   stop-red so "Annuler" reads unambiguously. */
+	.download-row:hover .download-fill,
+	.download-row:hover .download-fill-indeterminate {
+		background: rgba(220, 38, 38, 0.25);
 	}
 	.download-fill {
 		position: absolute;

@@ -43,6 +43,13 @@
 	let isAudioReady = false;
 	let shouldAutoplayOnLoad = false;
 
+	// Tracks the listener's *intent* to play, separate from whether the audio
+	// element is actually producing sound. Critical for resuming after system
+	// interruptions (phone calls, Siri, another app grabbing the audio focus)
+	// because iOS fires `pause` on the element but doesn't auto-resume once
+	// the interruption ends.
+	let userWantsToPlay = false;
+
 	function getDisplayTitle(item: any): string {
 		if (!item) return 'Chargement...';
 		if ('french_title' in item) return item.french_title || item.english_title || 'Sans titre';
@@ -233,12 +240,19 @@
 			audio.addEventListener('timeupdate', updateAudioTime);
 			audio.addEventListener('timeupdate', updateIndicator);
 			audio.addEventListener('play', () => {
+				userWantsToPlay = true;
 				isPlaying.set(true);
 				if ('mediaSession' in navigator) {
 					navigator.mediaSession.playbackState = 'playing';
 				}
 			});
 			audio.addEventListener('pause', () => {
+				// Note: we do NOT clear userWantsToPlay here. A `pause` event
+				// can come from the listener tapping pause OR from the OS
+				// interrupting (phone call, Siri, another app). Only togglePlay
+				// clears the intent flag, so this handler stays neutral and
+				// the visibilitychange/focus listeners can resume when the
+				// interruption ends.
 				isPlaying.set(false);
 				if ('mediaSession' in navigator) {
 					navigator.mediaSession.playbackState = 'paused';
@@ -270,6 +284,7 @@
 	$: if (browser && audio && $isPlaying !== undefined) {
 		if ($isPlaying && audio.paused) {
 			console.log("[AudioPlayer] Sync: Playing");
+			userWantsToPlay = true;
 			audio.play().catch(e => {
 				console.error("[AudioPlayer] Sync: Play failed:", e);
 				isPlaying.set(false);
@@ -339,16 +354,16 @@
 		}
 	};
 
-	const seekForward = () => {
+	const seekForward = (seconds: number = 5) => {
 		if (!audio) return;
-		audio.currentTime += 5;
+		audio.currentTime += seconds;
 		updateAudioTime();
 		updateIndicator();
 	};
 
-	const seekBackward = () => {
+	const seekBackward = (seconds: number = 5) => {
 		if (!audio) return;
-		audio.currentTime -= 5;
+		audio.currentTime -= seconds;
 		updateAudioTime();
 		updateIndicator();
 	};
@@ -358,11 +373,13 @@
 
 		try {
 			if (audio.paused) {
+				userWantsToPlay = true;
 				if (audio.duration && audio.currentTime >= audio.duration) {
 					audio.currentTime = 0;
 				}
 				await audio.play();
 			} else {
+				userWantsToPlay = false;
 				audio.pause();
 			}
 			// isPlaying will be updated via listeners
@@ -376,6 +393,7 @@
 			currentTime = audio.currentTime;
 			duration = audio.duration;
 			progressBarWidth = (currentTime / duration) * 100;
+			pushMediaSessionPosition();
 		}
 	};
 	const updateIndicator = () => {
@@ -430,33 +448,139 @@
 
 	// Add your audio file path
 
+	/** Try to resume playback silently. Called when the app regains focus after
+	 *  a phone-call / Siri / another-app audio interruption. Only re-attempts
+	 *  when the listener had pressed play before the interruption. */
+	function tryResumeAfterInterruption() {
+		if (!browser || !audio) return;
+		if (!userWantsToPlay) return;
+		if (!audio.paused) return;
+		// iOS quirk: poke currentTime so the element refreshes its audio
+		// context after an interruption, otherwise play() resolves but no
+		// sound comes out.
+		try {
+			audio.currentTime = audio.currentTime;
+		} catch {
+			/* ignore */
+		}
+		audio.play().catch((err) => {
+			console.warn('[AudioPlayer] Resume-after-interruption failed:', err);
+		});
+	}
+
 	onMount(() => {
-		// No need to init audio here, the reactive statement handles it
+		if (!browser) return;
+
+		const onVisibility = () => {
+			if (document.visibilityState === 'visible') tryResumeAfterInterruption();
+		};
+		const onFocus = () => tryResumeAfterInterruption();
+		const onPageShow = () => tryResumeAfterInterruption();
+
+		document.addEventListener('visibilitychange', onVisibility);
+		window.addEventListener('focus', onFocus);
+		window.addEventListener('pageshow', onPageShow);
+
+		return () => {
+			document.removeEventListener('visibilitychange', onVisibility);
+			window.removeEventListener('focus', onFocus);
+			window.removeEventListener('pageshow', onPageShow);
+		};
 	});
 
-	// Media Session API for Hardware Keys & Metadata
+	// ── Media Session API (Bluetooth / lockscreen / car controls) ──
+	// Register action handlers ONCE on mount — some platforms (iOS Safari
+	// especially) only wire up hardware keys if the handlers exist at the
+	// moment audio starts playing, and reactive re-binding is unreliable.
+	// Metadata is still updated reactively below, and positionState is
+	// pushed on every timeupdate so the lock-screen seek bar tracks
+	// progress accurately.
+	onMount(() => {
+		if (!browser || !('mediaSession' in navigator)) return;
+		try {
+			navigator.mediaSession.setActionHandler('play', () => {
+				userWantsToPlay = true;
+				audio?.play().catch(() => { /* ignore autoplay rejections */ });
+			});
+			navigator.mediaSession.setActionHandler('pause', () => {
+				userWantsToPlay = false;
+				audio?.pause();
+			});
+			navigator.mediaSession.setActionHandler('previoustrack', playPrevious);
+			navigator.mediaSession.setActionHandler('nexttrack', playNext);
+			navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+				seekBackward(details.seekOffset ?? 10);
+			});
+			navigator.mediaSession.setActionHandler('seekforward', (details) => {
+				seekForward(details.seekOffset ?? 10);
+			});
+			// `seekto` lets the car / lock screen scrub the timeline directly.
+			navigator.mediaSession.setActionHandler('seekto', (details) => {
+				if (!audio || details.seekTime == null) return;
+				if (details.fastSeek && 'fastSeek' in audio) {
+					audio.fastSeek(details.seekTime);
+				} else {
+					audio.currentTime = details.seekTime;
+				}
+			});
+			navigator.mediaSession.setActionHandler('stop', () => {
+				userWantsToPlay = false;
+				if (audio) {
+					audio.pause();
+					audio.currentTime = 0;
+				}
+			});
+		} catch (err) {
+			console.warn('[AudioPlayer] MediaSession handler registration failed:', err);
+		}
+	});
+
+	/** Pull the right artwork URL for a track so the car/lockscreen shows
+	 *  something meaningful instead of the app logo every time. */
+	function getArtworkUrl(item: PlayableAudio | null): string {
+		if (!item) return '/icons/pwa-512x512.png';
+		const anyItem = item as { thumbnail_url?: string; cover_url?: string };
+		return anyItem.thumbnail_url || anyItem.cover_url || '/icons/pwa-512x512.png';
+	}
+
+	// Reactive metadata updates — whenever the selected track changes, the
+	// car/lock screen reads the new title/artist/album/artwork.
 	$: if (browser && $selectAudio && 'mediaSession' in navigator) {
 		const current = $selectAudio;
 		const isMusic = 'category' in current;
 		const isSermon = 'mp3_url' in current;
-		
+		const artworkUrl = getArtworkUrl(current as PlayableAudio);
+
 		navigator.mediaSession.metadata = new MediaMetadata({
 			title: ('title' in current ? current.title : (isSermon ? (current as Sermon).french_title || (current as Sermon).english_title : 'Sans titre')) || 'Sans titre',
 			artist: isMusic ? (current as MusicAudio).artist || 'Artiste inconnu' : (isSermon ? (current as Sermon).author : 'Missionnaire'),
-			album: isMusic 
+			album: isMusic
 				? (current as MusicAudio).book_full_name || (current as MusicAudio).category || 'Missionnaire'
 				: (isSermon ? (current as Sermon).iso_date || 'Prédication' : 'Media'),
 			artwork: [
-				{ src: '/icons/logo.png', sizes: '512x512', type: 'image/png' },
+				{ src: artworkUrl, sizes: '96x96', type: 'image/png' },
+				{ src: artworkUrl, sizes: '192x192', type: 'image/png' },
+				{ src: artworkUrl, sizes: '512x512', type: 'image/png' }
 			]
 		});
+	}
 
-		navigator.mediaSession.setActionHandler('play', togglePlay);
-		navigator.mediaSession.setActionHandler('pause', togglePlay);
-		navigator.mediaSession.setActionHandler('previoustrack', playPrevious);
-		navigator.mediaSession.setActionHandler('nexttrack', playNext);
-		navigator.mediaSession.setActionHandler('seekbackward', () => seekBackward());
-		navigator.mediaSession.setActionHandler('seekforward', () => seekForward());
+	/** Push the current playback position to the OS so the lock-screen /
+	 *  car head-unit seek bar can animate accurately. Called on every
+	 *  `timeupdate` via updateAudioTime below. */
+	function pushMediaSessionPosition() {
+		if (!browser || !('mediaSession' in navigator) || !audio) return;
+		const dur = Number.isFinite(audio.duration) ? audio.duration : 0;
+		if (dur <= 0) return;
+		try {
+			navigator.mediaSession.setPositionState({
+				duration: dur,
+				playbackRate: audio.playbackRate || 1,
+				position: Math.min(audio.currentTime, dur)
+			});
+		} catch {
+			/* setPositionState isn't supported on older Safari — ignore */
+		}
 	}
 
 	// Keyboard shortcuts
@@ -596,7 +720,7 @@
 						<Icon src={BsSkipStartFill} size="22" />
 					</button>
 
-					<button on:click={seekBackward} class="hidden md:block p-2 text-stone-300 hover:text-missionnaire transition-colors" title="-5s">
+					<button on:click={() => seekBackward()} class="hidden md:block p-2 text-stone-300 hover:text-missionnaire transition-colors" title="-5s">
 						<Icon src={BsSkipBackwardFill} size="16" />
 					</button>
 
@@ -608,7 +732,7 @@
 						{/if}
 					</button>
 
-					<button on:click={seekForward} class="hidden md:block p-2 text-stone-300 hover:text-missionnaire transition-colors" title="+5s">
+					<button on:click={() => seekForward()} class="hidden md:block p-2 text-stone-300 hover:text-missionnaire transition-colors" title="+5s">
 						<Icon src={BsSkipForwardFill} size="16" />
 					</button>
 
