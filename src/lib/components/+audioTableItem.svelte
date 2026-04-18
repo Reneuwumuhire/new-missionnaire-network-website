@@ -8,6 +8,7 @@
 	import { setContext } from 'svelte';
 	import type { AudioAsset } from '$lib/models/media-assets';
 	import { writable } from 'svelte/store';
+	import { downloadAudioFile } from '../../utils/downloadAudio';
 	let showDropContents = false;
 
 	export let audio: AudioAsset;
@@ -17,72 +18,22 @@
 		currentIndex.set(index);
 		isPlaying.set(true);
 	};
-	let downloadProgress = writable(0);
+	// `null` = indeterminate (no Content-Length), number = 0–100 percent.
+	let downloadPercent = writable<number | null>(0);
 	let isDownloading = writable(false);
 
 	const downloadAudio = async (audio: AudioAsset) => {
 		isDownloading.set(true);
-		downloadProgress.set(0);
+		downloadPercent.set(0);
 		try {
-			const response = await fetch(audio.url);
-			if (!response.ok) {
-				throw new Error('Network response was not ok');
-			}
-
-			const contentLength = response.headers.get('content-length');
-			if (!contentLength) {
-				throw new Error('Content-Length response header missing');
-			}
-
-			const total = parseInt(contentLength, 10);
-			let loaded = 0;
-
-			const reader = response.body?.getReader();
-			const stream = new ReadableStream({
-				start(controller) {
-					function read() {
-						reader
-							?.read()
-							.then(({ done, value }) => {
-								if (done) {
-									controller.close();
-									return;
-								}
-								loaded += value.length;
-								downloadProgress.set(Math.round((loaded / total) * 100));
-								controller.enqueue(value);
-								read();
-							})
-							.catch((error) => {
-								console.error('Stream reading error:', error);
-								controller.error(error);
-							});
-					}
-					read();
-				}
+			await downloadAudioFile(audio.url, audio.title, {
+				onProgress: (p) => downloadPercent.set(p.percent)
 			});
-
-			const blob = await new Response(stream).blob();
-			const url = window.URL.createObjectURL(blob);
-			const a = document.createElement('a');
-			a.href = url;
-
-			// Ensure the filename has an extension
-			let filename = audio.title || 'audio';
-			if (!filename.endsWith('.mp3')) {
-				filename += '.mp3';
-			}
-			a.download = filename;
-
-			document.body.appendChild(a); // Append anchor to the body to ensure it works in all browsers
-			a.click();
-			document.body.removeChild(a); // Remove anchor from the body
-			window.URL.revokeObjectURL(url);
-			downloadProgress.set(0); // Reset progress after download
 		} catch (error) {
 			console.error('There was an error downloading the audio:', error);
 		} finally {
 			isDownloading.set(false);
+			downloadPercent.set(0);
 		}
 	};
 </script>
@@ -107,35 +58,42 @@
 				</button>
 			{/if}
 			{#if $isDownloading}
-				<div class="flex items-center justify-center w-8 h-8 relative">
-					<svg
-						class="h-8 w-8 text-missionnaire"
-						xmlns="http://www.w3.org/2000/svg"
-						viewBox="0 0 24 24"
-						fill="none"
-					>
-						<circle
-							class="text-gray-300"
-							cx="12"
-							cy="12"
-							r="10"
-							stroke="currentColor"
-							stroke-width="4"
-						/>
-						<circle
-							class="text-missionnaire"
-							cx="12"
-							cy="12"
-							r="10"
-							stroke="currentColor"
-							stroke-width="4"
-							stroke-dasharray="62.83185307179586"
-							stroke-dashoffset={62.83185307179586 - (62.83185307179586 * $downloadProgress) / 100}
-							stroke-linecap="round"
-							transform="rotate(-90 12 12)"
-						/>
-					</svg>
-					<span class="absolute text-xs font-semibold text-missionnaire">{$downloadProgress}%</span>
+				<div class="flex items-center justify-center w-8 h-8 relative" title={$downloadPercent !== null ? `Téléchargement ${$downloadPercent}%` : 'Téléchargement en cours…'}>
+					{#if $downloadPercent !== null}
+						<svg
+							class="h-8 w-8 text-missionnaire"
+							xmlns="http://www.w3.org/2000/svg"
+							viewBox="0 0 24 24"
+							fill="none"
+						>
+							<circle
+								class="text-gray-300"
+								cx="12"
+								cy="12"
+								r="10"
+								stroke="currentColor"
+								stroke-width="4"
+							/>
+							<circle
+								class="text-missionnaire"
+								cx="12"
+								cy="12"
+								r="10"
+								stroke="currentColor"
+								stroke-width="4"
+								stroke-dasharray="62.83185307179586"
+								stroke-dashoffset={62.83185307179586 - (62.83185307179586 * $downloadPercent) / 100}
+								stroke-linecap="round"
+								transform="rotate(-90 12 12)"
+							/>
+						</svg>
+						<span class="absolute text-xs font-semibold text-missionnaire">{$downloadPercent}%</span>
+					{:else}
+						<svg class="h-8 w-8 animate-spin text-missionnaire" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+							<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" class="opacity-25" />
+							<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-dasharray="42 62" />
+						</svg>
+					{/if}
 				</div>
 			{:else}
 				<button

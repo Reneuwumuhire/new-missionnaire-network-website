@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
+	import { downloadAudioFile } from '../../../../utils/downloadAudio';
 
 	export let data: PageData;
 
@@ -7,6 +8,49 @@
 
 	let thumbnailExpanded = false;
 	let thumbnailBroken = false;
+
+	// ── Download state ─────────────────────────────────────────────
+	// Background fetch: stream the mp3, track bytes loaded, hand the
+	// assembled blob to a synthetic <a download> so the browser saves
+	// it without navigating away. Logic lives in utils/downloadAudio.ts.
+	let isDownloading = false;
+	let downloadPercent: number | null = 0;
+	let downloadLoaded = 0;
+	let downloadError = '';
+
+	function formatDownloadedBytes(bytes: number): string {
+		if (bytes < 1024) return `${bytes} o`;
+		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} Ko`;
+		return `${(bytes / 1024 / 1024).toFixed(1)} Mo`;
+	}
+
+	async function downloadAudio() {
+		if (isDownloading || !rec.s3_url) return;
+		isDownloading = true;
+		downloadPercent = 0;
+		downloadLoaded = 0;
+		downloadError = '';
+		try {
+			await downloadAudioFile(rec.s3_url, rec.title, {
+				totalBytesHint: rec.size_bytes ?? 0,
+				onProgress: (p) => {
+					downloadPercent = p.percent;
+					downloadLoaded = p.loaded;
+				}
+			});
+		} catch (err) {
+			console.error('[archive/download]', err);
+			downloadError = 'Téléchargement impossible. Réessayez dans un instant.';
+		} finally {
+			isDownloading = false;
+			setTimeout(() => {
+				if (!isDownloading) {
+					downloadPercent = 0;
+					downloadLoaded = 0;
+				}
+			}, 800);
+		}
+	}
 
 	function openThumbnail() {
 		if (!rec.thumbnail_url || thumbnailBroken) return;
@@ -143,18 +187,50 @@
 						Votre navigateur ne prend pas en charge l'audio HTML5.
 					</audio>
 				</div>
-				<a
-					href={rec.s3_url}
-					class="group flex items-center justify-center gap-2 border-t border-stone-200/60 px-5 py-3 text-[11px] font-bold uppercase tracking-[0.2em] font-body text-stone-600 transition-colors hover:bg-missionnaire hover:text-white"
+				<button
+					type="button"
+					on:click={downloadAudio}
+					disabled={isDownloading}
+					aria-label={isDownloading
+						? downloadPercent !== null
+							? `Téléchargement en cours ${downloadPercent}%`
+							: `Téléchargement en cours — ${formatDownloadedBytes(downloadLoaded)}`
+						: 'Télécharger le direct'}
+					class="download-row group relative flex items-center justify-center gap-2 border-t border-stone-200/60 px-5 py-3 text-[11px] font-bold uppercase tracking-[0.2em] font-body text-stone-600 transition-colors hover:bg-missionnaire hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40 disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-stone-600"
+					style={isDownloading && downloadPercent !== null ? `--progress: ${downloadPercent}%` : ''}
 				>
-					<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 4v12m0 0l-4-4m4 4l4-4" />
-					</svg>
-					Télécharger
-					{#if rec.size_bytes}
-						<span class="font-normal tracking-normal text-stone-400 group-hover:text-white/80">· {formatBytes(rec.size_bytes)}</span>
+					{#if isDownloading}
+						{#if downloadPercent !== null}
+							<span class="download-fill" aria-hidden="true"></span>
+						{:else}
+							<span class="download-fill download-fill-indeterminate" aria-hidden="true"></span>
+						{/if}
+						<span class="relative z-10 flex items-center gap-2">
+							<svg class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+								<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-dasharray="42 62" stroke-linecap="round" />
+							</svg>
+							Téléchargement
+							{#if downloadPercent !== null}
+								<span class="tabular-nums">{downloadPercent}%</span>
+							{:else}
+								<span class="tabular-nums">{formatDownloadedBytes(downloadLoaded)}</span>
+							{/if}
+						</span>
+					{:else}
+						<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 4v12m0 0l-4-4m4 4l4-4" />
+						</svg>
+						Télécharger
+						{#if rec.size_bytes}
+							<span class="font-normal tracking-normal text-stone-400 group-hover:text-white/80">· {formatBytes(rec.size_bytes)}</span>
+						{/if}
 					{/if}
-				</a>
+				</button>
+				{#if downloadError}
+					<p class="border-t border-red-200 bg-red-50 px-5 py-2 text-[11px] text-red-600 font-body text-center">
+						{downloadError}
+					</p>
+				{/if}
 			</div>
 		</div>
 
@@ -215,5 +291,30 @@
 	@keyframes lightbox-fade {
 		from { opacity: 0; }
 		to { opacity: 1; }
+	}
+
+	/* Download button doubles as an inline progress bar: a pseudo-fill
+	   grows from left to right driven by the --progress CSS variable. */
+	.download-row {
+		overflow: hidden;
+	}
+	.download-fill {
+		position: absolute;
+		inset: 0;
+		width: var(--progress, 0%);
+		background: rgba(255, 136, 12, 0.18);
+		transition: width 0.25s ease-out;
+		pointer-events: none;
+	}
+	/* Indeterminate mode (Content-Length unknown): a 30% wide band
+	   slides back and forth so the listener still sees movement. */
+	.download-fill-indeterminate {
+		width: 30%;
+		animation: download-slide 1.3s ease-in-out infinite;
+	}
+	@keyframes download-slide {
+		0%   { transform: translateX(-110%); }
+		50%  { transform: translateX(250%); }
+		100% { transform: translateX(-110%); }
 	}
 </style>

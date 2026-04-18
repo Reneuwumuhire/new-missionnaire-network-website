@@ -13,6 +13,7 @@
 	import { formatTime } from '../../utils/FormatTime';
 	import { createPlayableSermon } from '../../utils/audioPlayback';
 	import { getAudioDuration } from '../../utils/audioDuration';
+	import { downloadAudioFile } from '../../utils/downloadAudio';
 
 	export let sermon: Sermon;
 	export let index: number;
@@ -21,6 +22,13 @@
 	let resolvedDuration: number | null = sermon.duration ?? null;
 	let isDurationLoading = false;
 	let requestedDurationUrl = '';
+
+	// Background-download state: when the listener clicks the cloud icon we
+	// stream the mp3 and save it via a blob URL instead of navigating away
+	// via window.open. Progress shows as a circular indicator in place of the
+	// icon (or a pulsing dot when Content-Length isn't known).
+	let isDownloading = false;
+	let downloadPercent: number | null = 0;
 	const desktopSermonGrid = 'md:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.35fr)_110px_80px_120px]';
 
 	$: isActive = isSermonActive(sermon, $selectAudio);
@@ -88,10 +96,26 @@
 		}
 	}
 
-	function downloadMp3() {
+	async function downloadMp3() {
+		if (isDownloading) return;
 		const url = language === 'english' ? sermon.english_audio_url : sermon.mp3_url;
-		if (url) {
-			window.open(url, '_blank');
+		if (!url) return;
+		const title = language === 'english'
+			? sermon.english_title || 'sermon'
+			: sermon.french_title || sermon.english_title || 'sermon';
+		isDownloading = true;
+		downloadPercent = 0;
+		try {
+			await downloadAudioFile(url, title, {
+				onProgress: (p) => (downloadPercent = p.percent)
+			});
+		} catch (err) {
+			console.error('[sermon/download]', err);
+		} finally {
+			isDownloading = false;
+			setTimeout(() => {
+				if (!isDownloading) downloadPercent = 0;
+			}, 800);
 		}
 	}
 
@@ -217,11 +241,44 @@
 
 		{#if (language === 'english' && sermon.english_audio_url) || (language !== 'english' && sermon.mp3_url)}
 			<button
-				class="p-2 text-gray-400 hover:text-orange-600 transition-colors"
+				class="relative p-2 text-gray-400 hover:text-orange-600 transition-colors disabled:cursor-default"
 				on:click|stopPropagation={downloadMp3}
-				title="Télécharger MP3"
+				title={isDownloading
+					? downloadPercent !== null ? `Téléchargement ${downloadPercent}%` : 'Téléchargement en cours…'
+					: 'Télécharger MP3'}
+				disabled={isDownloading}
+				aria-label={isDownloading
+					? downloadPercent !== null ? `Téléchargement ${downloadPercent}%` : 'Téléchargement en cours'
+					: 'Télécharger le MP3'}
 			>
-				<Icon src={IoCloudDownloadOutline} size="20" />
+				{#if isDownloading}
+					<span class="relative flex h-5 w-5 items-center justify-center">
+						{#if downloadPercent !== null}
+							<svg class="absolute inset-0 h-5 w-5 -rotate-90" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+								<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="text-gray-200" />
+								<circle
+									cx="12"
+									cy="12"
+									r="10"
+									stroke="currentColor"
+									stroke-width="3"
+									stroke-linecap="round"
+									stroke-dasharray={2 * Math.PI * 10}
+									stroke-dashoffset={(1 - downloadPercent / 100) * 2 * Math.PI * 10}
+									class="text-orange-500 transition-[stroke-dashoffset] duration-200"
+								/>
+							</svg>
+							<span class="text-[7px] font-bold text-orange-600 tabular-nums">{downloadPercent}</span>
+						{:else}
+							<svg class="h-5 w-5 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+								<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25" />
+								<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="42 62" />
+							</svg>
+						{/if}
+					</span>
+				{:else}
+					<Icon src={IoCloudDownloadOutline} size="20" />
+				{/if}
 			</button>
 		{/if}
 
