@@ -47,17 +47,12 @@ export function getS3Url(key: string): string {
 
 export async function generatePresignedUploadUrl(
 	key: string,
-	contentType: string,
-	options: { publicRead?: boolean } = {}
+	contentType: string
 ): Promise<string> {
 	const command = new PutObjectCommand({
 		Bucket: AWS_S3_BUCKET,
 		Key: key,
-		ContentType: contentType,
-		// Thumbnails are served directly from S3 via <img src=…>. Without
-		// public-read ACL the browser GET returns 403 when the bucket policy
-		// doesn't cover this prefix. Callers opt in per-upload.
-		...(options.publicRead ? { ACL: 'public-read' as const } : {})
+		ContentType: contentType
 	});
 	return getSignedUrl(s3, command, { expiresIn: 900 }); // 15 minutes
 }

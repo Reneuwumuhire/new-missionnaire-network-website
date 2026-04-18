@@ -28,10 +28,10 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	}
 
 	// Key prefix sits beside recordings/ and music-audio/ in the same bucket.
+	// Public GET is granted by a bucket policy on broadcast-thumbnails/*
+	// (not a per-object ACL), so no ACL is set here.
 	const key = `broadcast-thumbnails/${Date.now()}-${crypto.randomUUID()}.${ext}`;
-	// Thumbnails are rendered via <img src={s3_url}> on the public site, so the
-	// object must be GETtable without credentials.
-	const uploadUrl = await generatePresignedUploadUrl(key, contentType, { publicRead: true });
+	const uploadUrl = await generatePresignedUploadUrl(key, contentType);
 	const publicUrl = getS3Url(key);
 
 	return json({ uploadUrl, key, publicUrl });

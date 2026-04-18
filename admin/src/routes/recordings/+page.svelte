@@ -273,12 +273,7 @@
 				};
 				const uploadRes = await fetch(uploadUrl, {
 					method: 'PUT',
-					// x-amz-acl must match the header the server signed. Without it
-					// the object is uploaded private and <img src=…> would 403.
-					headers: {
-						'Content-Type': recThumbnailFile.type,
-						'x-amz-acl': 'public-read'
-					},
+					headers: { 'Content-Type': recThumbnailFile.type },
 					body: recThumbnailFile
 				});
 				if (!uploadRes.ok) {
@@ -585,10 +580,7 @@
 				};
 				const uploadRes = await fetch(uploadUrl, {
 					method: 'PUT',
-					headers: {
-						'Content-Type': thumbnailFile.type,
-						'x-amz-acl': 'public-read'
-					},
+					headers: { 'Content-Type': thumbnailFile.type },
 					body: thumbnailFile
 				});
 				if (!uploadRes.ok) {
