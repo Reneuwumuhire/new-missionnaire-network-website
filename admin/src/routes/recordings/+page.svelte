@@ -715,7 +715,9 @@
 				En attente d'un flux audio… (démarrez OBS)
 			</span>
 		{:else}
-			<!-- Broadcast controls -->
+			<!-- Broadcast controls. Stays visible when recording is active even if
+			     the Icecast probe momentarily flips to inactive — recording running
+			     means audio is flowing, so going live should remain available. -->
 			{#if broadcast.is_live}
 				<button
 					onclick={endLive}
@@ -725,7 +727,7 @@
 					{@render iconStop()}
 					{broadcastBusy ? '…' : 'Terminer le direct'}
 				</button>
-			{:else if icecast.sourceActive}
+			{:else if icecast.sourceActive || isRecording}
 				<button
 					onclick={goLive}
 					disabled={broadcastBusy}
@@ -736,7 +738,8 @@
 				</button>
 			{/if}
 
-			<!-- Recording controls -->
+			<!-- Recording controls. Stays visible when broadcast is live even if the
+			     Icecast probe momentarily flips to inactive. -->
 			{#if isRecording}
 				<button
 					onclick={stop}
@@ -746,7 +749,7 @@
 					{@render iconStop()}
 					{busy ? 'Arrêt…' : 'Arrêter l\'enregistrement'}
 				</button>
-			{:else if icecast.sourceActive}
+			{:else if icecast.sourceActive || broadcast.is_live}
 				<button
 					onclick={start}
 					disabled={busy || !recorder.available || ('pendingOrphans' in recorder && recorder.pendingOrphans > 0)}
