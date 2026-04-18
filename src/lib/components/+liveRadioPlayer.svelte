@@ -62,7 +62,12 @@
 	let bufferStart = 0;
 	let liveEdge = 0;
 	let isSeeking = false;
-	const LIVE_THRESHOLD_SEC = 3;
+	// True once the user has deliberately scrubbed backward. The button label
+	// is driven by this flag, not by a live-edge time delta — otherwise the
+	// browser's buffer-ahead (5-15s on Icecast) makes the label oscillate
+	// between "En direct" and "Revenir au direct" as playback catches up.
+	let userSeeked = false;
+	const DVR_THRESHOLD_SEC = 3;
 
 	let probeReachable = false;
 	let confirmedLive = false;
@@ -108,7 +113,7 @@
 	$: canPlay = probeReachable || confirmedLive || playbackFailed;
 	$: statusMessage = STATUS_MESSAGES[statusKey] || '';
 	$: behindLiveSec = Math.max(0, liveEdge - currentTime);
-	$: isAtLive = behindLiveSec < LIVE_THRESHOLD_SEC;
+	$: isAtLive = !userSeeked;
 	$: hasSeekableRange =
 		Number.isFinite(liveEdge) && Number.isFinite(bufferStart) && liveEdge > bufferStart + 1;
 	$: behindLiveLabel = formatBehindLive(behindLiveSec);
@@ -423,6 +428,7 @@
 		statusKey = 'connecting';
 		hasError = false;
 		reconnectAttempts = 0;
+		userSeeked = false;
 		// Reset local tracking so we start a fresh window
 		currentTime = 0;
 		bufferStart = 0;
@@ -502,6 +508,10 @@
 		try {
 			audio.currentTime = value;
 			currentTime = value;
+			// Enter DVR mode only when the user drops the scrubber meaningfully
+			// behind the buffered live edge. Scrubbing forward to near the edge
+			// exits DVR mode.
+			userSeeked = liveEdge - value > DVR_THRESHOLD_SEC;
 		} catch {
 			// ignore
 		}
@@ -749,7 +759,7 @@
 				<div class="flex items-center gap-3">
 					<input
 						type="range"
-						class="live-scrubber flex-1 max-w-[50%]"
+						class="live-scrubber flex-1 min-w-0"
 						min={bufferStart}
 						max={liveEdge}
 						step="0.1"
@@ -779,7 +789,8 @@
 							</span>
 							En direct
 						{:else}
-							Revenir au direct
+							<span class="hidden sm:inline">Revenir au direct</span>
+							<span class="sm:hidden">Au direct</span>
 						{/if}
 					</button>
 				</div>
