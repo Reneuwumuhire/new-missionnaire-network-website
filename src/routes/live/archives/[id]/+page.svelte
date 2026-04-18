@@ -134,27 +134,28 @@
 				{/if}
 			</div>
 
-			<!-- Audio player -->
-			<div class="flex-1 border border-stone-200/60 bg-white/40 p-6 flex items-center">
-				<audio controls preload="metadata" class="w-full" src={rec.s3_url}>
-					Votre navigateur ne prend pas en charge l'audio HTML5.
-				</audio>
+			<!-- Player + download (one card, download is a divided footer row so
+			     the player stretches to match the thumbnail height without leaving
+			     dead space around the audio element). -->
+			<div class="flex-1 flex flex-col border border-stone-200/60 bg-white/40">
+				<div class="flex-1 flex items-center px-4 py-4 md:px-5">
+					<audio controls preload="metadata" class="w-full" src={rec.s3_url}>
+						Votre navigateur ne prend pas en charge l'audio HTML5.
+					</audio>
+				</div>
+				<a
+					href={rec.s3_url}
+					class="group flex items-center justify-center gap-2 border-t border-stone-200/60 px-5 py-3 text-[11px] font-bold uppercase tracking-[0.2em] font-body text-stone-600 transition-colors hover:bg-missionnaire hover:text-white"
+				>
+					<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 4v12m0 0l-4-4m4 4l4-4" />
+					</svg>
+					Télécharger
+					{#if rec.size_bytes}
+						<span class="font-normal tracking-normal text-stone-400 group-hover:text-white/80">· {formatBytes(rec.size_bytes)}</span>
+					{/if}
+				</a>
 			</div>
-		</div>
-
-		<div class="mt-6 text-center">
-			<a
-				href={rec.s3_url}
-				class="inline-flex items-center gap-2 border border-stone-200/60 bg-white/40 px-5 py-3 text-[13px] font-semibold text-stone-700 hover:border-missionnaire/30 hover:text-missionnaire transition-colors"
-			>
-				<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 4v12m0 0l-4-4m4 4l4-4" />
-				</svg>
-				Télécharger
-				{#if rec.size_bytes}
-					<span class="text-stone-400 font-normal">· {formatBytes(rec.size_bytes)}</span>
-				{/if}
-			</a>
 		</div>
 
 		{#if rec.description}
