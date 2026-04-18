@@ -1,22 +1,26 @@
 {
 	"name": "Missionnaire Network",
 	"short_name": "Missionnaire",
-	"description": "Predications, cantiques et transcriptions du Message de l'Heure",
+	"description": "Prédications, cantiques, littérature et transcriptions du Message de l'Heure",
 	"start_url": "/",
+	"scope": "/",
 	"display": "standalone",
-	"background_color": "#ffffff",
-	"theme_color": "#f97316",
+	"display_override": ["standalone", "minimal-ui"],
+	"background_color": "#FAF8F3",
+	"theme_color": "#FF880C",
 	"orientation": "any",
 	"icons": [
 		{
 			"src": "/icons/pwa-192x192.png",
 			"sizes": "192x192",
-			"type": "image/png"
+			"type": "image/png",
+			"purpose": "any"
 		},
 		{
 			"src": "/icons/pwa-512x512.png",
 			"sizes": "512x512",
-			"type": "image/png"
+			"type": "image/png",
+			"purpose": "any"
 		},
 		{
 			"src": "/icons/pwa-512x512.png",

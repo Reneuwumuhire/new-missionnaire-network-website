@@ -8,8 +8,9 @@
 		<link rel="apple-touch-icon" href="%sveltekit.assets%/icons/apple-touch-icon.png" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<link rel="preload" as="image" type="image/webp" href="/img/eglise_inside.webp" fetchpriority="high" />
-		<meta name="theme-color" content="#f97316" />
+		<meta name="theme-color" content="#FF880C" />
 		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="mobile-web-app-capable" content="yes" />
 		<meta name="apple-mobile-web-app-status-bar-style" content="default" />
 		<meta name="apple-mobile-web-app-title" content="Missionnaire" />
 		<meta
@@ -42,9 +43,119 @@
 			content="Découvrez les prédications, cantiques et transcriptions du Message de l'Heure. Ressources spirituelles pour les croyants du monde entier."
 		/>
 		<meta name="twitter:image" content="https://missionnaire.net/og-image.png" />
+
+		<!-- PWA launch helpers (run BEFORE SvelteKit boots) ───────────────────
+		     1. Tag <html> if running in installed-app (standalone) mode — the
+		        splash and any other PWA-only styles key off this.
+		     2. Restore the listener's last visited path so tapping the home-
+		        screen icon resumes where they left off instead of always
+		        dropping them at "/". 24h freshness window; one-shot redirect
+		        uses location.replace so it doesn't pollute history. -->
+		<script>
+			(function () {
+				try {
+					var standalone =
+						window.matchMedia('(display-mode: standalone)').matches ||
+						window.navigator.standalone === true;
+					if (standalone) document.documentElement.classList.add('pwa-standalone');
+
+					// Path restoration — only inside the installed app, only when
+					// landing on the bare "/" root, and only for recent sessions.
+					if (
+						standalone &&
+						window.location.pathname === '/' &&
+						!window.location.search &&
+						!window.location.hash
+					) {
+						var saved = localStorage.getItem('missionnaire:last-path');
+						var savedAt = parseInt(localStorage.getItem('missionnaire:last-path-at') || '0', 10);
+						var FRESH_MS = 24 * 60 * 60 * 1000;
+						if (saved && saved !== '/' && Date.now() - savedAt < FRESH_MS) {
+							// Clear first so a failed redirect doesn't loop forever.
+							localStorage.removeItem('missionnaire:last-path');
+							window.location.replace(saved);
+						}
+					}
+				} catch (e) {
+					/* localStorage unavailable (private mode) — ignore */
+				}
+			})();
+		</script>
+
+		<!-- Branded splash screen — only rendered in PWA standalone mode so
+		     regular web visitors never see it. Inline CSS so it paints before
+		     any external stylesheet loads and bridges the black-screen gap. -->
+		<style>
+			.app-splash {
+				display: none;
+			}
+			.pwa-standalone .app-splash {
+				position: fixed;
+				inset: 0;
+				z-index: 99999;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				gap: 28px;
+				background: #faf8f3;
+				pointer-events: none;
+				animation: app-splash-fade 0.45s ease-out 0.45s forwards;
+			}
+			.pwa-standalone.pwa-ready .app-splash {
+				animation: app-splash-fade 0.3s ease-out forwards;
+			}
+			.app-splash__logo {
+				width: 136px;
+				height: auto;
+				animation: app-splash-enter 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+			}
+			.app-splash__spinner {
+				width: 26px;
+				height: 26px;
+				border-radius: 50%;
+				border: 2px solid rgba(255, 136, 12, 0.2);
+				border-top-color: #ff880c;
+				animation: app-splash-spin 0.8s linear infinite;
+			}
+			.app-splash__brand {
+				font-family: 'Cormorant Garamond', Georgia, serif;
+				font-size: 11px;
+				font-weight: 600;
+				letter-spacing: 0.35em;
+				text-transform: uppercase;
+				color: rgba(139, 115, 85, 0.6);
+			}
+			@keyframes app-splash-fade {
+				to { opacity: 0; visibility: hidden; }
+			}
+			@keyframes app-splash-enter {
+				from { opacity: 0; transform: translateY(10px) scale(0.96); }
+				to   { opacity: 1; transform: none; }
+			}
+			@keyframes app-splash-spin {
+				to { transform: rotate(360deg); }
+			}
+			/* Respect reduced-motion users — keep the splash static. */
+			@media (prefers-reduced-motion: reduce) {
+				.pwa-standalone .app-splash,
+				.app-splash__logo,
+				.app-splash__spinner {
+					animation: none;
+				}
+			}
+		</style>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover" class="scrollbar-custom">
+		<div class="app-splash" aria-hidden="true">
+			<picture>
+				<source srcset="/icons/logo.webp" type="image/webp" />
+				<img class="app-splash__logo" src="/icons/logo.png" alt="" width="150" height="64" />
+			</picture>
+			<div class="app-splash__spinner" aria-hidden="true"></div>
+			<span class="app-splash__brand">Missionnaire</span>
+		</div>
 		<div class="app-container">%sveltekit.body%</div>
 	</body>
 </html>

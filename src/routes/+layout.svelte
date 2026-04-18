@@ -11,8 +11,9 @@
 	import type { LayoutData } from './$types';
 	import { QueryClientProvider } from '@tanstack/svelte-query';
 	import { navigating, page } from '$app/stores';
+	import { afterNavigate } from '$app/navigation';
 	import { browser } from '$app/environment';
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, tick } from 'svelte';
 	import { radioIsLive } from '$lib/stores/global';
 	export let data: LayoutData;
 	const SITE_URL = 'https://missionnaire.net';
@@ -91,6 +92,37 @@
 			link.rel = 'stylesheet';
 			link.href = fontUrl;
 			document.head.appendChild(link);
+		}
+	});
+
+	// ── PWA resume & splash handoff ─────────────────────────────────
+	// Once Svelte has hydrated we flip a flag on <html> so the inline
+	// splash in app.html fades out immediately (faster than the CSS
+	// animation delay alone). Then record every path the listener
+	// visits so a subsequent PWA launch can resume there.
+	onMount(async () => {
+		if (!browser) return;
+		await tick();
+		document.documentElement.classList.add('pwa-ready');
+		// Give the fade a moment to finish before yanking the node so
+		// users don't see an abrupt cut — but also never leave it in the
+		// DOM longer than a couple seconds.
+		setTimeout(() => {
+			document.querySelector('.app-splash')?.remove();
+		}, 700);
+	});
+
+	afterNavigate(({ to }) => {
+		if (!browser || !to) return;
+		try {
+			const path = to.url.pathname + to.url.search;
+			// Don't record bare "/" or error routes — those are fallbacks, not
+			// destinations the listener wanted to return to.
+			if (path === '/' || path.startsWith('/__')) return;
+			localStorage.setItem('missionnaire:last-path', path);
+			localStorage.setItem('missionnaire:last-path-at', Date.now().toString());
+		} catch {
+			/* localStorage unavailable */
 		}
 	});
 </script>
