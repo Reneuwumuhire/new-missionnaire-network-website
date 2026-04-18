@@ -37,6 +37,12 @@ sw.addEventListener('fetch', (event) => {
 
 	const url = new URL(event.request.url);
 
+	// Only handle same-origin requests. Cross-origin (e.g. S3 thumbnails) must
+	// go through the browser directly — routing them through respondWith()
+	// makes DevTools mislabel any failure as "from service worker" and can
+	// break opaque responses.
+	if (url.origin !== sw.location.origin) return;
+
 	// Skip API routes and auth-related requests
 	if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/login') || url.pathname.startsWith('/logout')) {
 		return;

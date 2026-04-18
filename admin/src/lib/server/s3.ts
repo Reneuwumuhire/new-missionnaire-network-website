@@ -18,7 +18,12 @@ const s3 = new S3Client({
 	credentials: {
 		accessKeyId: AWS_ACCESS_KEY_ID,
 		secretAccessKey: AWS_SECRET_ACCESS_KEY
-	}
+	},
+	// AWS SDK v3.729+ adds a CRC32 checksum to PutObject by default. For
+	// presigned URLs this bakes x-amz-checksum-crc32=AAAAAA== (empty-body
+	// placeholder) into the signed query string, so the browser PUT fails
+	// with 403 because the real body's CRC32 doesn't match.
+	requestChecksumCalculation: 'WHEN_REQUIRED'
 });
 
 function sanitizeFilename(name: string): string {
