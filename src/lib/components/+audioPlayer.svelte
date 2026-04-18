@@ -50,6 +50,13 @@
 	// the interruption ends.
 	let userWantsToPlay = false;
 
+	/** Timestamp when the audio last went into paused state (via user, OS,
+	 *  or lock-screen control). Used to decide whether to reload before
+	 *  playing — iOS loses the Bluetooth audio route after a long pause so
+	 *  a plain `audio.play()` resumes playback silently on Bluetooth. */
+	let audioPausedAt = 0;
+	const PAUSE_RELOAD_THRESHOLD_MS = 1500;
+
 	function getDisplayTitle(item: any): string {
 		if (!item) return 'Chargement...';
 		if ('french_title' in item) return item.french_title || item.english_title || 'Sans titre';
@@ -241,6 +248,7 @@
 			audio.addEventListener('timeupdate', updateIndicator);
 			audio.addEventListener('play', () => {
 				userWantsToPlay = true;
+				audioPausedAt = 0;
 				isPlaying.set(true);
 				if ('mediaSession' in navigator) {
 					navigator.mediaSession.playbackState = 'playing';
@@ -253,6 +261,11 @@
 				// clears the intent flag, so this handler stays neutral and
 				// the visibilitychange/focus listeners can resume when the
 				// interruption ends.
+				//
+				// We do stamp `audioPausedAt` so safePlay() knows how long
+				// the pause lasted — long-enough pauses need an audio-session
+				// reload to restore Bluetooth output routing.
+				audioPausedAt = Date.now();
 				isPlaying.set(false);
 				if ('mediaSession' in navigator) {
 					navigator.mediaSession.playbackState = 'paused';
@@ -285,10 +298,7 @@
 		if ($isPlaying && audio.paused) {
 			console.log("[AudioPlayer] Sync: Playing");
 			userWantsToPlay = true;
-			audio.play().catch(e => {
-				console.error("[AudioPlayer] Sync: Play failed:", e);
-				isPlaying.set(false);
-			});
+			safePlay('auto');
 		} else if (!$isPlaying && !audio.paused) {
 			console.log("[AudioPlayer] Sync: Pausing");
 			audio.pause();
@@ -377,7 +387,9 @@
 				if (audio.duration && audio.currentTime >= audio.duration) {
 					audio.currentTime = 0;
 				}
-				await audio.play();
+				// Route through safePlay so a long paused interval on screen-
+				// lock reloads the audio session before playback resumes.
+				safePlay('auto');
 			} else {
 				userWantsToPlay = false;
 				audio.pause();
@@ -449,53 +461,55 @@
 	// Add your audio file path
 
 	/** Timestamp (ms) recorded when the document last went hidden. Used to
-	 *  distinguish quick tab-switches from long interruptions like phone
-	 *  calls, which need a different resume strategy on iOS. */
+	 *  coerce the same audio-session reload on return-from-background for
+	 *  platforms that only fire `focus` (not `visibilitychange`). */
 	let appHiddenAt = 0;
 
-	/** Try to resume playback silently. Called when the app regains focus after
-	 *  a phone-call / Siri / another-app audio interruption. Only re-attempts
-	 *  when the listener had pressed play before the interruption.
+	/** Core play helper. Every pathway that resumes playback — lock-screen
+	 *  MediaSession button, on-screen togglePlay, visibility-change handler,
+	 *  the `$isPlaying` sync block — routes through here so the Bluetooth
+	 *  output route is consistently restored.
 	 *
-	 *  iOS gotcha: after a phone call, calling `audio.play()` *may* succeed
-	 *  (the promise resolves, `playing` event fires) but the audio session's
-	 *  output route can still be pointed at nowhere — listener hears silence
-	 *  on their Bluetooth earphones. Calling `audio.load()` first forces
-	 *  iOS to re-bind the audio session to the current output device, then
-	 *  we restore the playback position and play once the element is ready.
+	 *  iOS bug we're working around: when the audio element has been paused
+	 *  for more than a second or two (phone call, lock-screen pause, Siri,
+	 *  another app grabbing the audio focus), iOS tears down the audio
+	 *  session's output route. A subsequent `audio.play()` resolves cleanly
+	 *  and even advances `currentTime`, but no bytes reach the Bluetooth
+	 *  sink — the listener hears silence.
 	 *
-	 *  We only pay that reload cost for interruptions longer than 1.5s —
-	 *  quick tab-switches don't break routing and would waste a second of
-	 *  silence on a gratuitous reload. */
-	function tryResumeAfterInterruption(hiddenMs: number = 0) {
+	 *  Calling `audio.load()` before play() forces iOS to rebuild the audio
+	 *  session and rebind it to the *currently active* output device (the
+	 *  user's Bluetooth earphones), restoring sound. We only pay that
+	 *  ~1-2s reload cost when the pause was long enough to warrant it. */
+	function safePlay(reasonHint: 'short' | 'long' | 'auto' = 'auto') {
 		if (!browser || !audio) return;
-		if (!userWantsToPlay) return;
-		if (!audio.paused) return;
 
-		// Short absence: just play. No routing issue to clean up.
-		if (hiddenMs < 1500) {
+		const pausedMs = audioPausedAt > 0 ? Date.now() - audioPausedAt : 0;
+		const needsReload =
+			reasonHint === 'long' ||
+			(reasonHint === 'auto' && pausedMs >= PAUSE_RELOAD_THRESHOLD_MS);
+
+		if (!needsReload) {
 			audio.play().catch((err) => {
-				console.warn('[AudioPlayer] Quick resume failed:', err);
+				console.warn('[AudioPlayer] play() failed:', err);
 			});
 			return;
 		}
 
-		// Long absence: full audio-session reload so Bluetooth/route is
-		// re-established before we ask for playback.
 		const savedTime = audio.currentTime;
 		const savedSrc = audio.src;
 		let settled = false;
 		const finish = () => {
 			if (settled) return;
 			settled = true;
-			if (!userWantsToPlay || !audio.paused || audio.src !== savedSrc) return;
+			if (!audio || audio.src !== savedSrc) return;
 			try {
 				audio.currentTime = savedTime;
 			} catch {
-				/* currentTime may reject until metadata is loaded — ignore */
+				/* metadata may not be loaded yet — ignore */
 			}
 			audio.play().catch((err) => {
-				console.warn('[AudioPlayer] Post-interruption play failed:', err);
+				console.warn('[AudioPlayer] Post-reload play() failed:', err);
 			});
 		};
 		audio.addEventListener('canplay', finish, { once: true });
@@ -504,9 +518,16 @@
 		try {
 			audio.load();
 		} catch (err) {
-			console.warn('[AudioPlayer] audio.load() after interruption failed:', err);
+			console.warn('[AudioPlayer] audio.load() failed:', err);
 			finish();
 		}
+	}
+
+	/** Resume playback after an interruption only if the listener had asked
+	 *  for it. Called on visibility/focus/pageshow events. */
+	function tryResumeAfterInterruption(hiddenMs: number = 0) {
+		if (!userWantsToPlay || !audio || !audio.paused) return;
+		safePlay(hiddenMs >= PAUSE_RELOAD_THRESHOLD_MS ? 'long' : 'short');
 	}
 
 	onMount(() => {
@@ -522,8 +543,7 @@
 			}
 		};
 		// `focus` and `pageshow` on iOS can fire without a preceding
-		// `visibilitychange` (e.g. returning from control-center). Use
-		// appHiddenAt if set, otherwise assume short absence.
+		// `visibilitychange` (e.g. returning from control-center).
 		const onFocus = () => {
 			const elapsed = appHiddenAt > 0 ? Date.now() - appHiddenAt : 0;
 			appHiddenAt = 0;
@@ -558,7 +578,11 @@
 		try {
 			navigator.mediaSession.setActionHandler('play', () => {
 				userWantsToPlay = true;
-				audio?.play().catch(() => { /* ignore autoplay rejections */ });
+				// Lock-screen / Bluetooth play: route through safePlay so a
+				// long paused-on-lockscreen window reloads the audio session
+				// before attempting playback. Without this, play() resumes
+				// silently over Bluetooth after a few seconds of pause.
+				safePlay('auto');
 			});
 			navigator.mediaSession.setActionHandler('pause', () => {
 				userWantsToPlay = false;
