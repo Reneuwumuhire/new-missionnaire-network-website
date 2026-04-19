@@ -1,7 +1,8 @@
 import { ObjectId } from 'mongodb';
 import { findRecording, markRecordingStopping } from './mongo.js';
-import { listOrphanIds, mp3Exists, readSidecar, removeRecordingFiles } from './sidecar.js';
+import { listOrphanIds, mp3Exists, mp3Path, readSidecar, removeRecordingFiles } from './sidecar.js';
 import { retryUpload } from './ffmpeg.js';
+import { probeDurationSec } from './probe.js';
 
 let pending = 0;
 let running = false;
@@ -12,6 +13,43 @@ export function pendingOrphans(): number {
 
 export function isRecovering(): boolean {
 	return running;
+}
+
+async function recoverOne(id: string): Promise<void> {
+	if (!ObjectId.isValid(id)) {
+		console.warn(`[recorder] skipping orphan with invalid id: ${id}`);
+		await removeRecordingFiles(id);
+		return;
+	}
+	const sidecar = await readSidecar(id);
+	if (!(await mp3Exists(id))) {
+		console.warn(`[recorder] orphan ${id} has no mp3, cleaning up`);
+		await removeRecordingFiles(id);
+		return;
+	}
+
+	const objectId = new ObjectId(id);
+	const doc = await findRecording(objectId);
+	const startedAt = sidecar ? new Date(sidecar.startedAt) : (doc?.started_at ?? new Date());
+
+	if (doc?.status === 'recording') {
+		await finalizeOrphanDuration(id, objectId, startedAt);
+	}
+
+	await retryUpload({ id, startedAt });
+}
+
+async function finalizeOrphanDuration(id: string, objectId: ObjectId, startedAt: Date): Promise<void> {
+	const endedAt = new Date();
+	const wallClockSec = Math.max(0, Math.floor((endedAt.getTime() - startedAt.getTime()) / 1000));
+	const probedSec = await probeDurationSec(mp3Path(id));
+	const durationSec = probedSec ?? wallClockSec;
+	if (probedSec !== null && wallClockSec - probedSec > 30) {
+		console.warn(
+			`[recorder] orphan ${id} audio is ${wallClockSec - probedSec}s shorter than wall clock (probed=${probedSec}s, wall=${wallClockSec}s)`
+		);
+	}
+	await markRecordingStopping(objectId, endedAt, durationSec);
 }
 
 export async function recoverOrphans(): Promise<void> {
@@ -26,33 +64,7 @@ export async function recoverOrphans(): Promise<void> {
 
 		for (const id of ids) {
 			try {
-				if (!ObjectId.isValid(id)) {
-					console.warn(`[recorder] skipping orphan with invalid id: ${id}`);
-					await removeRecordingFiles(id);
-					continue;
-				}
-				const sidecar = await readSidecar(id);
-				const hasMp3 = await mp3Exists(id);
-				if (!hasMp3) {
-					console.warn(`[recorder] orphan ${id} has no mp3, cleaning up`);
-					await removeRecordingFiles(id);
-					continue;
-				}
-
-				const objectId = new ObjectId(id);
-				const doc = await findRecording(objectId);
-				const startedAt = sidecar ? new Date(sidecar.startedAt) : (doc?.started_at ?? new Date());
-
-				if (doc && doc.status === 'recording') {
-					const endedAt = new Date();
-					const durationSec = Math.max(
-						0,
-						Math.floor((endedAt.getTime() - startedAt.getTime()) / 1000)
-					);
-					await markRecordingStopping(objectId, endedAt, durationSec);
-				}
-
-				await retryUpload({ id, startedAt });
+				await recoverOne(id);
 			} catch (err) {
 				console.error(`[recorder] orphan recovery failed for ${id}`, err);
 			} finally {

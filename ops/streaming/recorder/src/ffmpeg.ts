@@ -15,6 +15,7 @@ import {
 	markRecordingStopping
 } from './mongo.js';
 import { buildDownloadFilename, uploadRecording } from './upload.js';
+import { probeDurationSec } from './probe.js';
 
 interface ActiveRecording {
 	id: ObjectId;
@@ -80,8 +81,16 @@ export async function startRecording(params: { createdBy: string; createdByName?
 		'1',
 		'-reconnect_at_eof',
 		'1',
+		'-reconnect_on_network_error',
+		'1',
+		'-reconnect_on_http_error',
+		'4xx,5xx',
 		'-reconnect_delay_max',
-		'30',
+		'5',
+		// 10s I/O read timeout (microseconds) — surfaces a stalled TCP socket fast
+		// after a network switch (e.g. Wi-Fi → hotspot) so reconnect logic can fire.
+		'-rw_timeout',
+		'10000000',
 		'-i',
 		ENV.ICECAST_URL,
 		'-c',
@@ -132,7 +141,16 @@ export async function stopRecording(): Promise<{ id: string }> {
 
 	await rec.exitPromise;
 	const endedAt = new Date();
-	const durationSec = Math.max(0, Math.floor((endedAt.getTime() - rec.startedAt.getTime()) / 1000));
+	const wallClockSec = Math.max(0, Math.floor((endedAt.getTime() - rec.startedAt.getTime()) / 1000));
+	const probedSec = await probeDurationSec(mp3Path(rec.idStr));
+	// Prefer the actual audio duration so the UI matches the file. Fall back to
+	// wall-clock only if ffprobe couldn't read the file.
+	const durationSec = probedSec ?? wallClockSec;
+	if (probedSec !== null && wallClockSec - probedSec > 30) {
+		console.warn(
+			`[recorder] ${rec.idStr} audio is ${wallClockSec - probedSec}s shorter than wall clock (probed=${probedSec}s, wall=${wallClockSec}s) — likely network loss during recording`
+		);
+	}
 
 	try {
 		await markRecordingStopping(rec.id, endedAt, durationSec);
