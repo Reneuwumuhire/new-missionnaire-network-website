@@ -57,6 +57,20 @@
 	let audioPausedAt = 0;
 	const PAUSE_RELOAD_THRESHOLD_MS = 1500;
 
+	/** Watchdog that retries play() after an OS interruption (phone call,
+	 *  Siri, another app grabbing audio focus). iOS doesn't fire any DOM
+	 *  event when AVAudioSession ends an interruption — and for banner-style
+	 *  calls the PWA never even goes hidden — so visibility/focus listeners
+	 *  alone are insufficient. We poll audio.play() instead: it silently
+	 *  rejects during the interruption, then succeeds the moment iOS
+	 *  releases the session. The 'play' event listener clears the watchdog. */
+	let resumeWatchdog: ReturnType<typeof setInterval> | null = null;
+	let resumeWatchdogStartedAt = 0;
+	let resumeWatchdogAttempts = 0;
+	const RESUME_RETRY_INTERVAL_MS = 1500;
+	const RESUME_MAX_DURATION_MS = 5 * 60 * 1000;
+	const RESUME_RELOAD_EVERY_N_ATTEMPTS = 20;
+
 	function getDisplayTitle(item: any): string {
 		if (!item) return 'Chargement...';
 		if ('french_title' in item) return item.french_title || item.english_title || 'Sans titre';
@@ -249,6 +263,7 @@
 			audio.addEventListener('play', () => {
 				userWantsToPlay = true;
 				audioPausedAt = 0;
+				stopResumeWatchdog();
 				isPlaying.set(true);
 				if ('mediaSession' in navigator) {
 					navigator.mediaSession.playbackState = 'playing';
@@ -269,6 +284,13 @@
 				isPlaying.set(false);
 				if ('mediaSession' in navigator) {
 					navigator.mediaSession.playbackState = 'paused';
+				}
+				// If the pause was NOT user-initiated (togglePlay / MediaSession
+				// pause clear userWantsToPlay *before* calling audio.pause()),
+				// start the watchdog. It polls play() until iOS lifts the
+				// AVAudioSession interruption (phone call / Siri / focus grab).
+				if (userWantsToPlay) {
+					startResumeWatchdog();
 				}
 			});
 			audio.addEventListener('loadedmetadata', () => {
@@ -530,6 +552,42 @@
 		safePlay(hiddenMs >= PAUSE_RELOAD_THRESHOLD_MS ? 'long' : 'short');
 	}
 
+	function stopResumeWatchdog() {
+		if (resumeWatchdog !== null) {
+			clearInterval(resumeWatchdog);
+			resumeWatchdog = null;
+		}
+		resumeWatchdogAttempts = 0;
+	}
+
+	function startResumeWatchdog() {
+		if (!browser || !audio) return;
+		if (resumeWatchdog !== null) return;
+		resumeWatchdogStartedAt = Date.now();
+		resumeWatchdogAttempts = 0;
+		resumeWatchdog = setInterval(() => {
+			if (!browser || !audio) return stopResumeWatchdog();
+			if (!userWantsToPlay || !audio.paused) return stopResumeWatchdog();
+			if (Date.now() - resumeWatchdogStartedAt > RESUME_MAX_DURATION_MS) {
+				return stopResumeWatchdog();
+			}
+			resumeWatchdogAttempts++;
+			// First attempt and every ~30s afterwards does a full reload to
+			// rebuild the audio session / Bluetooth route. Intermediate ticks
+			// just probe with plain play() — cheap, no data usage on reject.
+			if (
+				resumeWatchdogAttempts === 1 ||
+				resumeWatchdogAttempts % RESUME_RELOAD_EVERY_N_ATTEMPTS === 0
+			) {
+				safePlay('long');
+			} else {
+				audio.play().catch(() => {
+					/* interruption still active — next tick will retry */
+				});
+			}
+		}, RESUME_RETRY_INTERVAL_MS);
+	}
+
 	onMount(() => {
 		if (!browser) return;
 
@@ -698,6 +756,7 @@
 
 	// Ensure audio is stopped when the component is unmounted
 	onDestroy(() => {
+		stopResumeWatchdog();
 		if (audio) {
 			audio.pause();
 			audio.removeEventListener('ended', handleEnded);
