@@ -71,6 +71,14 @@
 	const RESUME_MAX_DURATION_MS = 5 * 60 * 1000;
 	const RESUME_RELOAD_EVERY_N_ATTEMPTS = 20;
 
+	/** Guards against concurrent audio.load() calls. When the watchdog and
+	 *  a visibility/focus handler both trigger safePlay('long') on resume,
+	 *  overlapping load() operations corrupt the buffer and create glitches:
+	 *  each call captures its own savedTime closure, the second captures 0
+	 *  (because the first load already reset currentTime), and the racing
+	 *  canplay handlers seek to different positions then each call play(). */
+	let isReloadingSession = false;
+
 	function getDisplayTitle(item: any): string {
 		if (!item) return 'Chargement...';
 		if ('french_title' in item) return item.french_title || item.english_title || 'Sans titre';
@@ -512,18 +520,28 @@
 			(reasonHint === 'auto' && pausedMs >= PAUSE_RELOAD_THRESHOLD_MS);
 
 		if (!needsReload) {
+			// Don't probe with play() while a reload is in flight — the
+			// in-flight finish() will play() once the session is rebuilt.
+			if (isReloadingSession) return;
 			audio.play().catch((err) => {
 				console.warn('[AudioPlayer] play() failed:', err);
 			});
 			return;
 		}
 
+		// Skip if a reload is already running. The in-flight finish() will
+		// restore position and start playback — a second load() would abort
+		// the first, corrupt buffers, and capture a bogus savedTime (0).
+		if (isReloadingSession) return;
+
 		const savedTime = audio.currentTime;
 		const savedSrc = audio.src;
+		isReloadingSession = true;
 		let settled = false;
 		const finish = () => {
 			if (settled) return;
 			settled = true;
+			isReloadingSession = false;
 			if (!audio || audio.src !== savedSrc) return;
 			try {
 				audio.currentTime = savedTime;
@@ -549,6 +567,10 @@
 	 *  for it. Called on visibility/focus/pageshow events. */
 	function tryResumeAfterInterruption(hiddenMs: number = 0) {
 		if (!userWantsToPlay || !audio || !audio.paused) return;
+		// Visibility/focus is the authoritative resume signal — stop the
+		// polling watchdog so it can't fire a competing reload or play()
+		// probe that races with the session rebuild below.
+		stopResumeWatchdog();
 		safePlay(hiddenMs >= PAUSE_RELOAD_THRESHOLD_MS ? 'long' : 'short');
 	}
 
@@ -571,6 +593,9 @@
 			if (Date.now() - resumeWatchdogStartedAt > RESUME_MAX_DURATION_MS) {
 				return stopResumeWatchdog();
 			}
+			// While a reload is rebuilding the session, don't probe — the
+			// in-flight finish() will start playback once canplay fires.
+			if (isReloadingSession) return;
 			resumeWatchdogAttempts++;
 			// First attempt and every ~30s afterwards does a full reload to
 			// rebuild the audio session / Bluetooth route. Intermediate ticks
