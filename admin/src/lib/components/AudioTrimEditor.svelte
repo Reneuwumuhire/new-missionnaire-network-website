@@ -18,7 +18,7 @@
 
 	// Four discrete zoom levels — capped so a long recording can't be zoomed
 	// into a tiny slice by accident. 0 = fit, then three progressive zooms.
-	const ZOOM_LEVELS = [0, 25, 75, 150] as const;
+	const ZOOM_LEVELS = [0, 10, 30, 60] as const;
 
 	let {
 		recording,
