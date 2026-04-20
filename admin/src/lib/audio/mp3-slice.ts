@@ -116,7 +116,13 @@ function readFrameHeader(bytes: Uint8Array, offset: number): FrameHeader | null 
 
 	const bitrate = bitrateKbps * 1000;
 
-	const { samplesPerFrame, frameSize } = computeFrameGeometry(layer, version, bitrate, sampleRate, padding);
+	const { samplesPerFrame, frameSize } = computeFrameGeometry(
+		layer,
+		version,
+		bitrate,
+		sampleRate,
+		padding
+	);
 	if (frameSize < 4) return null;
 
 	return {
@@ -132,6 +138,7 @@ function readFrameHeader(bytes: Uint8Array, offset: number): FrameHeader | null 
 }
 
 /**
+ *
  * Skip ID3v2 tag if present. Returns the byte offset of the first audio byte.
  * ID3v2: "ID3" + 2 bytes version + 1 byte flags + 4 bytes synchsafe size.
  */
