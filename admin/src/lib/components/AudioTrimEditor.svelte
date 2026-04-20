@@ -10,10 +10,15 @@
 	type Region = {
 		start: number;
 		end: number;
-		setOptions: (opts: { start?: number; end?: number }) => void;
+		element: HTMLElement;
+		setOptions: (opts: { start?: number; end?: number; color?: string }) => void;
 		on: (event: string, cb: () => void) => void;
 		remove: () => void;
 	};
+
+	// Four discrete zoom levels — capped so a long recording can't be zoomed
+	// into a tiny slice by accident. 0 = fit, then three progressive zooms.
+	const ZOOM_LEVELS = [0, 25, 75, 150] as const;
 
 	let {
 		recording,
@@ -30,6 +35,10 @@
 	let ws: WaveSurfer | undefined;
 	let regionsPlugin: ReturnType<typeof RegionsPlugin.create> | undefined;
 	let region: Region | undefined;
+	// Two non-interactive "shadow" regions rendered beneath the keep region
+	// that tint the cut-away portions red — the YouTube Studio look.
+	let dimBefore: Region | undefined;
+	let dimAfter: Region | undefined;
 
 	// Playback (streaming via audio element) and the slicer ArrayBuffer are
 	// tracked independently. The audio element plays immediately from S3 via
@@ -49,7 +58,7 @@
 	let startSec = $state(0);
 	let endSec = $state(0);
 
-	let zoom = $state(0); // pixels per second; 0 = fit
+	let zoomIdx = $state(0); // index into ZOOM_LEVELS
 	let saving = $state(false);
 	let uploadPct = $state<number | null>(null);
 	let saveError = $state<string | null>(null);
@@ -115,11 +124,158 @@
 		return buf;
 	}
 
+	/** Paint diagonal red hatching over a dim (cut-away) region element.
+	 *  We apply it as an inline style directly — Svelte's scoped CSS can't
+	 *  always reach these plugin-owned nodes reliably. */
+	function styleDimRegion(el: HTMLElement | undefined) {
+		if (!el) return;
+		// Two-layer hatch: coarse darker stripes over a soft red wash, so the
+		// cut-away region reads clearly even on a dark waveform background.
+		el.style.backgroundImage = [
+			'repeating-linear-gradient(45deg, rgba(220, 38, 38, 0.42) 0 2px, transparent 2px 8px)',
+			'linear-gradient(rgba(220, 38, 38, 0.08), rgba(220, 38, 38, 0.08))'
+		].join(', ');
+		el.style.borderTop = '1px dashed rgba(220, 38, 38, 0.7)';
+		el.style.borderBottom = '1px dashed rgba(220, 38, 38, 0.7)';
+		// Sit under the keep region so its pills (which overflow into this
+		// area) can paint on top of the hatching.
+		el.style.zIndex = '1';
+		const handles = el.querySelectorAll<HTMLElement>(
+			'[part~="region-handle-left"], [part~="region-handle-right"]'
+		);
+		handles.forEach((h) => (h.style.display = 'none'));
+	}
+
+	// Cap geometry is shared between the initial styler and the runtime
+	// sync helper that flips caps inward when the selection hits an edge.
+	const CAP_W = 12;
+	const CAP_RADIUS = 6;
+	const EDGE_EPSILON = 0.01; // seconds — "touching the edge" tolerance
+
+	/** Style the keep region as a sharp-cornered blue slab with darker-blue
+	 *  rounded "caps" at each end. The caps provide the rounded-corner look
+	 *  only on their outer side (away from the middle), acting as visible
+	 *  handles flush with the selection. The real wavesurfer handle divs
+	 *  stay as wider invisible drag targets on top. */
+	function styleKeepRegion(el: HTMLElement | undefined) {
+		if (!el) return;
+		el.style.borderRadius = '0';
+		el.style.boxShadow = '0 2px 12px rgba(37, 99, 235, 0.35)';
+		el.style.overflow = 'visible';
+		el.style.border = 'none';
+		// Above the dim (hatched) regions so the caps and drag handles paint
+		// on top rather than being hidden behind the hatching.
+		el.style.zIndex = '2';
+
+		const makeCap = (side: 'left' | 'right') => {
+			const cap = document.createElement('div');
+			cap.className = `trim-cap trim-cap-${side}`;
+			cap.style.position = 'absolute';
+			cap.style.top = '0';
+			cap.style.bottom = '0';
+			cap.style.width = `${CAP_W}px`;
+			cap.style.backgroundColor = 'rgba(30, 58, 138, 0.95)';
+			cap.style.borderRadius =
+				side === 'left' ? `${CAP_RADIUS}px 0 0 ${CAP_RADIUS}px` : `0 ${CAP_RADIUS}px ${CAP_RADIUS}px 0`;
+			cap.style.pointerEvents = 'none';
+			cap.style.zIndex = '3';
+
+			// Small centered white grip — the visible "grab here" hint.
+			const grip = document.createElement('div');
+			grip.style.position = 'absolute';
+			grip.style.top = '50%';
+			grip.style.left = '50%';
+			grip.style.transform = 'translate(-50%, -50%)';
+			grip.style.width = '3px';
+			grip.style.height = '36%';
+			grip.style.backgroundColor = '#ffffff';
+			grip.style.borderRadius = '2px';
+			grip.style.boxShadow = '0 1px 2px rgba(15, 23, 42, 0.25)';
+			cap.appendChild(grip);
+
+			el.appendChild(cap);
+		};
+		makeCap('left');
+		makeCap('right');
+
+		// Drag hit zones — wider transparent overlays centered on each cap.
+		// The cap itself is pointer-events:none so the hit zone catches drags.
+		const leftHandle = el.querySelector<HTMLElement>('[part~="region-handle-left"]');
+		const rightHandle = el.querySelector<HTMLElement>('[part~="region-handle-right"]');
+		for (const h of [leftHandle, rightHandle]) {
+			if (!h) continue;
+			h.style.width = `${CAP_W + 6}px`;
+			h.style.backgroundColor = 'transparent';
+			h.style.border = 'none';
+			h.style.borderRadius = '0';
+			h.style.cursor = 'ew-resize';
+			h.style.zIndex = '4';
+		}
+
+		// Place caps + hit zones for the initial state.
+		syncCapPositions();
+	}
+
+	/** Position the caps OUTSIDE the selection normally, but flip them
+	 *  INSIDE when the selection touches a timeline edge — otherwise the
+	 *  caps would sit outside the waveform container and get clipped,
+	 *  making the selection handle invisible before any trimming happens. */
+	function syncCapPositions() {
+		if (!region) return;
+		const el = region.element;
+		if (!el) return;
+		const atStart = region.start <= EDGE_EPSILON;
+		const atEnd = totalSec > 0 && region.end >= totalSec - EDGE_EPSILON;
+
+		const leftCap = el.querySelector<HTMLElement>('.trim-cap-left');
+		const rightCap = el.querySelector<HTMLElement>('.trim-cap-right');
+		if (leftCap) leftCap.style.left = atStart ? '0' : `-${CAP_W}px`;
+		if (rightCap) rightCap.style.right = atEnd ? '0' : `-${CAP_W}px`;
+
+		const leftHandle = el.querySelector<HTMLElement>('[part~="region-handle-left"]');
+		const rightHandle = el.querySelector<HTMLElement>('[part~="region-handle-right"]');
+		if (leftHandle) leftHandle.style.left = atStart ? '0' : `-${CAP_W}px`;
+		if (rightHandle) rightHandle.style.right = atEnd ? '0' : `-${CAP_W}px`;
+	}
+
+	/** Add a rounded knob on top of the wavesurfer playhead so the cursor
+	 *  reads as a "lollipop" marker. Wavesurfer renders the cursor inside
+	 *  its shadow DOM (class .cursor), so we go through ws.getWrapper() to
+	 *  reach it — querySelector from outside the shadow root won't find it. */
+	function decorateCursor() {
+		if (!ws) return;
+		const wrapper = ws.getWrapper();
+		if (!wrapper) return;
+		const cursor = wrapper.querySelector<HTMLElement>('.cursor');
+		if (!cursor) return;
+		if (cursor.querySelector('.trim-cursor-knob')) return;
+		cursor.style.overflow = 'visible';
+
+		const knob = document.createElement('div');
+		knob.className = 'trim-cursor-knob';
+		knob.style.position = 'absolute';
+		// Pull the knob up so the bottom of the circle just kisses the
+		// cursor's top edge — gives a clean "pin" silhouette.
+		knob.style.top = '-7px';
+		knob.style.left = '50%';
+		knob.style.transform = 'translateX(-50%)';
+		knob.style.width = '14px';
+		knob.style.height = '14px';
+		knob.style.borderRadius = '50%';
+		knob.style.backgroundColor = '#2563eb';
+		knob.style.border = '2px solid #ffffff';
+		knob.style.boxShadow = '0 2px 5px rgba(15, 23, 42, 0.45)';
+		knob.style.pointerEvents = 'none';
+		cursor.appendChild(knob);
+	}
+
 	async function initWaveSurfer(peaks: number[][], duration: number) {
 		if (!waveformEl || !audioEl) return;
 
 		regionsPlugin = RegionsPlugin.create();
-		const timeline = TimelinePlugin.create({ height: 18 });
+		// Place the timeline above the waveform so the time labels live
+		// outside the trim selection area entirely.
+		const timeline = TimelinePlugin.create({ height: 18, insertPosition: 'beforebegin' });
 
 		// Passing `media: audioEl` + precomputed `peaks` + `duration` tells
 		// wavesurfer to skip its internal fetch/decode entirely — it uses our
@@ -130,8 +286,8 @@
 			peaks,
 			duration,
 			waveColor: '#d6d3d1',
-			progressColor: '#a8a29e',
-			cursorColor: '#7c3f2f',
+			progressColor: '#93c5fd', // blue-300 — played portion tinted blue to match the region frame
+			cursorColor: '#2563eb', // blue-600 — playhead matches the trim handles
 			cursorWidth: 2,
 			height: 96,
 			barWidth: 2,
@@ -144,17 +300,42 @@
 			totalSec = duration;
 			startSec = 0;
 			endSec = totalSec;
+			// Add the dim overlays FIRST so the keep region renders on top of
+			// them in the DOM. They're non-interactive shadow regions — we tag
+			// them via a class so the CSS knows to suppress handles + clicks.
+			const EPS = 0.0001; // wavesurfer needs a non-zero span to render
+			dimBefore = regionsPlugin!.addRegion({
+				start: 0,
+				end: EPS,
+				color: 'rgba(220, 38, 38, 0.18)', // red tint base; JS layers diagonal stripes on top
+				drag: false,
+				resize: false
+			}) as unknown as Region;
+			dimAfter = regionsPlugin!.addRegion({
+				start: totalSec - EPS,
+				end: totalSec,
+				color: 'rgba(220, 38, 38, 0.18)',
+				drag: false,
+				resize: false
+			}) as unknown as Region;
+			styleDimRegion(dimBefore.element);
+			styleDimRegion(dimAfter.element);
+
 			region = regionsPlugin!.addRegion({
 				start: 0,
 				end: totalSec,
-				color: 'rgba(34, 139, 87, 0.18)',
+				color: 'rgba(37, 99, 235, 0.55)', // saturated blue overlay — waveform peeks through
 				drag: true,
 				resize: true
 			}) as unknown as Region;
+			styleKeepRegion(region.element);
+			decorateCursor();
 			region.on('update-end', () => {
 				if (!region) return;
 				startSec = region.start;
 				endSec = region.end;
+				syncDimRegions();
+				syncCapPositions();
 				if (currentSec < startSec || currentSec > endSec) ws?.setTime(startSec);
 			});
 			ready = true;
@@ -199,11 +380,22 @@
 		ws.setTime(next);
 	}
 
+	/** Keep the two dim shadow regions glued to the current keep range.
+	 *  Wavesurfer won't render zero-width regions, so we keep a tiny epsilon
+	 *  when the keep range touches either edge of the timeline. */
+	function syncDimRegions() {
+		const EPS = 0.0001;
+		dimBefore?.setOptions({ start: 0, end: Math.max(EPS, startSec) });
+		dimAfter?.setOptions({ start: Math.min(totalSec - EPS, endSec), end: totalSec });
+	}
+
 	function resetRange() {
 		if (!region) return;
 		region.setOptions({ start: 0, end: totalSec });
 		startSec = 0;
 		endSec = totalSec;
+		syncDimRegions();
+		syncCapPositions();
 		ws?.setTime(0);
 	}
 
@@ -241,6 +433,8 @@
 		const clamped = Math.max(0, Math.min(v, endSec - 0.1));
 		startSec = clamped;
 		region?.setOptions({ start: clamped });
+		syncDimRegions();
+		syncCapPositions();
 	}
 
 	function onEndInput(e: Event) {
@@ -249,11 +443,14 @@
 		const clamped = Math.max(startSec + 0.1, Math.min(v, totalSec));
 		endSec = clamped;
 		region?.setOptions({ end: clamped });
+		syncDimRegions();
+		syncCapPositions();
 	}
 
-	function applyZoom(px: number) {
-		zoom = px;
-		ws?.zoom(px);
+	function applyZoom(idx: number) {
+		const clamped = Math.max(0, Math.min(ZOOM_LEVELS.length - 1, idx));
+		zoomIdx = clamped;
+		ws?.zoom(ZOOM_LEVELS[clamped]);
 	}
 
 	function putWithProgress(url: string, blob: Blob, contentType: string): Promise<void> {
@@ -431,7 +628,10 @@
 
 			<div class="flex flex-col gap-4" class:hidden={!ready}>
 				<!-- Waveform -->
-				<div class="border border-stone-200 bg-stone-50 p-3">
+				<div class="relative border border-stone-200 bg-stone-50 p-3">
+					<div class="pointer-events-none absolute right-3 top-3 z-10 bg-blue-600 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-white shadow">
+						Nouvelle durée&nbsp;: <span class="tabular-nums">{formatTime(Math.max(0, endSec - startSec)).replace(/\.\d+$/, '')}</span>
+					</div>
 					<div bind:this={waveformEl} class="min-h-[120px]"></div>
 				</div>
 
@@ -474,19 +674,40 @@
 						</span>
 					</div>
 
-					<div class="flex items-center gap-2 text-[10px] uppercase tracking-wider text-stone-500">
-						<span>Zoom</span>
-						<input
-							type="range"
-							min="0"
-							max="200"
-							step="5"
-							value={zoom}
-							oninput={(e) => applyZoom(Number((e.target as HTMLInputElement).value))}
-							disabled={saving}
-							class="h-1 w-32 cursor-pointer appearance-none bg-stone-200"
-							aria-label="Zoom"
-						/>
+					<div class="flex items-center gap-2">
+						<button
+							type="button"
+							onclick={() => applyZoom(zoomIdx - 1)}
+							disabled={saving || zoomIdx === 0}
+							class="flex h-7 w-7 items-center justify-center text-stone-500 transition-colors hover:text-primary disabled:opacity-30"
+							aria-label="Zoom arrière"
+							title="Zoom arrière"
+						>
+							<svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 21l-4.35-4.35M8 11h6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+						</button>
+						<div class="trim-zoom relative flex h-7 w-32 items-center">
+							<input
+								type="range"
+								min="0"
+								max={ZOOM_LEVELS.length - 1}
+								step="1"
+								value={zoomIdx}
+								oninput={(e) => applyZoom(Number((e.target as HTMLInputElement).value))}
+								disabled={saving}
+								class="trim-zoom-input relative z-10 h-7 w-full cursor-pointer appearance-none bg-transparent"
+								aria-label="Zoom"
+							/>
+						</div>
+						<button
+							type="button"
+							onclick={() => applyZoom(zoomIdx + 1)}
+							disabled={saving || zoomIdx === ZOOM_LEVELS.length - 1}
+							class="flex h-7 w-7 items-center justify-center text-stone-500 transition-colors hover:text-primary disabled:opacity-30"
+							aria-label="Zoom avant"
+							title="Zoom avant"
+						>
+							<svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 21l-4.35-4.35M8 11h6M11 8v6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+						</button>
 					</div>
 				</div>
 
@@ -586,44 +807,66 @@
 </div>
 
 <style>
-	/* Make wavesurfer region handles obvious — YouTube Studio-style
-	   grippy vertical bars at the start and end of the keep range. The
-	   Regions plugin injects the handles with inline styles, so we
-	   need !important to override its 6px hairline default. */
-	:global(div[part="region"] [data-resize]),
-	:global(div[part="region"] [part="region-handle-left"]),
-	:global(div[part="region"] [part="region-handle-right"]) {
-		width: 12px !important;
-		background-color: #7c3f2f !important;
-		border: none !important;
-		opacity: 1 !important;
-		box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9);
-	}
-	:global(div[part="region"] [data-resize="left"]) {
-		cursor: ew-resize !important;
-		border-radius: 3px 0 0 3px !important;
-	}
-	:global(div[part="region"] [data-resize="right"]) {
-		cursor: ew-resize !important;
-		border-radius: 0 3px 3px 0 !important;
-	}
-	/* Gripper dots on the handles so they read as draggable. */
-	:global(div[part="region"] [data-resize])::before {
+	/* Trim region styling is applied via inline JS in styleKeepRegion /
+	   styleDimRegion — Svelte's scoped CSS can't reliably reach wavesurfer
+	   plugin-owned DOM, so we set styles directly on the elements. */
+
+	/* Zoom slider: thin grey track with four evenly-spaced tick dots and a
+	   solid dark thumb. The tick dots are drawn by the wrapper so they
+	   render beneath the native input's thumb at every step position. */
+	.trim-zoom::before {
 		content: '';
 		position: absolute;
-		left: 50%;
+		left: 6px;
+		right: 6px;
 		top: 50%;
-		width: 2px;
-		height: 18px;
-		background-image: radial-gradient(circle, rgba(255, 255, 255, 0.9) 1px, transparent 1px);
-		background-size: 2px 4px;
-		background-repeat: repeat-y;
-		transform: translate(-50%, -50%);
+		height: 2px;
+		background: #d6d3d1;
+		transform: translateY(-50%);
 	}
-	/* Region fill a touch more saturated so start/end edges stand out. */
-	:global(div[part="region"]) {
-		background-color: rgba(34, 139, 87, 0.22) !important;
-		border-left: 2px solid #228b57;
-		border-right: 2px solid #228b57;
+	.trim-zoom::after {
+		content: '';
+		position: absolute;
+		left: 6px;
+		right: 6px;
+		top: 50%;
+		height: 6px;
+		transform: translateY(-50%);
+		/* Four tick dots at the exact stop positions — thumb snaps to each
+		   via step="1" on the input, so the thumb always lands on a dot. */
+		background-image:
+			radial-gradient(circle, #a8a29e 2.5px, transparent 2.5px),
+			radial-gradient(circle, #a8a29e 2.5px, transparent 2.5px),
+			radial-gradient(circle, #a8a29e 2.5px, transparent 2.5px),
+			radial-gradient(circle, #a8a29e 2.5px, transparent 2.5px);
+		background-size: 6px 6px;
+		background-position: 0% center, 33.333% center, 66.666% center, 100% center;
+		background-repeat: no-repeat;
+	}
+	.trim-zoom-input::-webkit-slider-runnable-track {
+		height: 2px;
+		background: transparent;
+	}
+	.trim-zoom-input::-webkit-slider-thumb {
+		appearance: none;
+		width: 12px;
+		height: 12px;
+		margin-top: -5px;
+		border-radius: 50%;
+		background: #1c1917;
+		cursor: pointer;
+		border: none;
+	}
+	.trim-zoom-input::-moz-range-track {
+		height: 2px;
+		background: transparent;
+	}
+	.trim-zoom-input::-moz-range-thumb {
+		width: 12px;
+		height: 12px;
+		border-radius: 50%;
+		background: #1c1917;
+		cursor: pointer;
+		border: none;
 	}
 </style>
