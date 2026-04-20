@@ -84,10 +84,13 @@ export const PATCH: RequestHandler = async ({ locals, request, getClientAddress 
 	const oldKey = current.thumbnail_s3_key;
 	const isReplacingThumbnail =
 		'thumbnail_s3_key' in updates && oldKey && updates.thumbnail_s3_key !== oldKey;
+	// Don't delete the old key if it's still referenced by the stored default
+	// thumbnail — otherwise future "Use defaults" clicks would 404.
+	const oldKeyStillInUse = oldKey && oldKey === current.default_thumbnail_s3_key;
 
 	await setBroadcastAdminState(updates);
 
-	if (isReplacingThumbnail) {
+	if (isReplacingThumbnail && !oldKeyStillInUse) {
 		// Best-effort cleanup — don't fail the request if S3 delete fails.
 		deleteObject(oldKey).catch((err) =>
 			console.error('[broadcast/metadata] old thumbnail delete failed:', err)

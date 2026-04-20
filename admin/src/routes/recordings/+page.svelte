@@ -186,6 +186,10 @@
 	let recThumbnailPreviewUrl = $state<string | null>(null);
 	let recThumbnailAction = $state<'keep' | 'replace' | 'remove'>('keep');
 	let recThumbnailError = $state<string | null>(null);
+	let recAudioFile = $state<File | null>(null);
+	let recAudioDurationSec = $state<number | null>(null);
+	let recAudioError = $state<string | null>(null);
+	let recAudioUploadPct = $state<number | null>(null);
 	let recSaving = $state(false);
 
 	function enterRecordingEdit(rec: Recording) {
@@ -195,6 +199,10 @@
 		recThumbnailAction = 'keep';
 		recThumbnailError = null;
 		recEditThumbnailBroken = false;
+		recAudioFile = null;
+		recAudioDurationSec = null;
+		recAudioError = null;
+		recAudioUploadPct = null;
 		recDraftTitle = rec.title ?? '';
 		recDraftDescription = rec.description ?? '';
 		editingRecordingId = rec._id!;
@@ -206,7 +214,87 @@
 		recThumbnailFile = null;
 		recThumbnailAction = 'keep';
 		recThumbnailError = null;
+		recAudioFile = null;
+		recAudioDurationSec = null;
+		recAudioError = null;
+		recAudioUploadPct = null;
 		editingRecordingId = null;
+	}
+
+	function readAudioDuration(file: File): Promise<number> {
+		return new Promise((resolve, reject) => {
+			const url = URL.createObjectURL(file);
+			const audio = document.createElement('audio');
+			audio.preload = 'metadata';
+			audio.onloadedmetadata = () => {
+				const d = audio.duration;
+				URL.revokeObjectURL(url);
+				if (!Number.isFinite(d) || d <= 0) reject(new Error('Invalid duration'));
+				else resolve(Math.floor(d));
+			};
+			audio.onerror = () => {
+				URL.revokeObjectURL(url);
+				reject(new Error('Audio metadata read failed'));
+			};
+			audio.src = url;
+		});
+	}
+
+	async function onRecAudioFileChange(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		if (!file) return;
+		const isMp3 = file.type === 'audio/mpeg' || file.type === 'audio/mp3' || file.name.toLowerCase().endsWith('.mp3');
+		if (!isMp3) {
+			recAudioError = 'Sélectionnez un fichier MP3';
+			return;
+		}
+		if (file.size > 2 * 1024 * 1024 * 1024) {
+			recAudioError = 'Fichier trop volumineux (max 2 Go)';
+			return;
+		}
+		try {
+			recAudioDurationSec = await readAudioDuration(file);
+		} catch {
+			recAudioError = 'Impossible de lire la durée du fichier — vérifiez que le MP3 est valide';
+			return;
+		}
+		recAudioError = null;
+		recAudioFile = file;
+	}
+
+	function clearRecAudio() {
+		recAudioFile = null;
+		recAudioDurationSec = null;
+		recAudioError = null;
+		recAudioUploadPct = null;
+		recAudioUploadPct = null;
+	}
+
+	/** PUT a file to S3 via XHR so upload progress events are observable
+	 *  (fetch() has no equivalent). Resolves on 2xx, rejects otherwise. */
+	function putWithProgress(
+		url: string,
+		file: File,
+		contentType: string,
+		onProgress: (pct: number) => void
+	): Promise<void> {
+		return new Promise((resolve, reject) => {
+			const xhr = new XMLHttpRequest();
+			xhr.open('PUT', url);
+			xhr.setRequestHeader('Content-Type', contentType);
+			xhr.upload.onprogress = (e) => {
+				if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+			};
+			xhr.onload = () => {
+				if (xhr.status >= 200 && xhr.status < 300) resolve();
+				else reject(new Error(`Upload failed (${xhr.status})`));
+			};
+			xhr.onerror = () => reject(new Error('Erreur réseau pendant le téléversement'));
+			xhr.onabort = () => reject(new Error('Téléversement interrompu'));
+			xhr.send(file);
+		});
 	}
 
 	function onRecThumbnailFileChange(event: Event) {
@@ -287,20 +375,59 @@
 				patch.thumbnail_s3_key = null;
 			}
 
-			if (Object.keys(patch).length === 0) {
+			if (Object.keys(patch).length > 0) {
+				const res = await fetch(`/api/recordings/${rec._id}`, {
+					method: 'PATCH',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify(patch)
+				});
+				if (!res.ok) {
+					recThumbnailError = (await res.text()) || `Erreur ${res.status}`;
+					return;
+				}
+			}
+
+			// Replace audio last — if the file upload fails, metadata edits above
+			// still landed. Admin can retry audio on next open.
+			if (recAudioFile && recAudioDurationSec) {
+				const presign = await fetch(`/api/recordings/${rec._id}/audio/upload-url`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ contentType: 'audio/mpeg' })
+				});
+				if (!presign.ok) {
+					recAudioError = (await presign.text()) || `Erreur ${presign.status}`;
+					return;
+				}
+				const { uploadUrl, s3Key } = (await presign.json()) as { uploadUrl: string; s3Key: string };
+				recAudioUploadPct = 0;
+				try {
+					await putWithProgress(uploadUrl, recAudioFile, 'audio/mpeg', (pct) => {
+						recAudioUploadPct = pct;
+					});
+				} catch (err) {
+					recAudioError = err instanceof Error ? err.message : 'Échec du téléversement vers S3';
+					recAudioUploadPct = null;
+					return;
+				}
+				const finalize = await fetch(`/api/recordings/${rec._id}/audio/finalize`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						s3_key: s3Key,
+						size_bytes: recAudioFile.size,
+						duration_sec: recAudioDurationSec
+					})
+				});
+				if (!finalize.ok) {
+					recAudioError = (await finalize.text()) || `Erreur ${finalize.status}`;
+					return;
+				}
+			} else if (Object.keys(patch).length === 0) {
 				cancelRecordingEdit();
 				return;
 			}
 
-			const res = await fetch(`/api/recordings/${rec._id}`, {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(patch)
-			});
-			if (!res.ok) {
-				recThumbnailError = (await res.text()) || `Erreur ${res.status}`;
-				return;
-			}
 			cancelRecordingEdit();
 			await invalidateAll();
 		} finally {
@@ -512,6 +639,72 @@
 		thumbnailAction = 'keep';
 		thumbnailError = null;
 		metadataEditing = false;
+	}
+
+	function berlinDateYmd(d: Date): string {
+		const parts = new Intl.DateTimeFormat('en-CA', {
+			timeZone: 'Europe/Berlin',
+			year: 'numeric',
+			month: '2-digit',
+			day: '2-digit'
+		}).formatToParts(d);
+		const y = parts.find((p) => p.type === 'year')?.value ?? '';
+		const m = parts.find((p) => p.type === 'month')?.value ?? '';
+		const day = parts.find((p) => p.type === 'day')?.value ?? '';
+		return `${y}-${m}-${day}`;
+	}
+
+	// Applies stored defaults directly — no modal. Defaults are managed from
+	// the settings page; this button just pushes them to the live broadcast.
+	let applyingDefaults = $state(false);
+	let applyDefaultsError = $state<string | null>(null);
+
+	const FALLBACK_DEFAULT_TITLE = '{date} Missionnaire Network Live audio';
+	const FALLBACK_DEFAULT_DESCRIPTION =
+		'Rediffusion du direct de Missionnaire Network — prédications, enseignements et louanges.';
+
+	function renderTitleTemplate(template: string): string {
+		const date = berlinDateYmd(new Date());
+		// If the template uses {date}, substitute; otherwise prepend so we never
+		// end up with a dateless title (the original spec requires it at start).
+		return template.includes('{date}') ? template.replaceAll('{date}', date) : `${date} ${template}`;
+	}
+
+	async function applyDefaultsDirectly() {
+		if (applyingDefaults) return;
+		applyingDefaults = true;
+		applyDefaultsError = null;
+		try {
+			const storedTitle = broadcast.default_title?.trim();
+			const storedDesc = broadcast.default_description?.trim();
+			const patch: Record<string, unknown> = {
+				title: renderTitleTemplate(storedTitle || FALLBACK_DEFAULT_TITLE),
+				description: storedDesc || FALLBACK_DEFAULT_DESCRIPTION
+			};
+			// Point the live broadcast at the stored default thumbnail (no
+			// re-upload — we reuse the existing S3 object). If no default is
+			// set, clear any live thumbnail so the placeholder shows instead.
+			if (broadcast.default_thumbnail_url && broadcast.default_thumbnail_s3_key) {
+				patch.thumbnail_url = broadcast.default_thumbnail_url;
+				patch.thumbnail_s3_key = broadcast.default_thumbnail_s3_key;
+			} else if (broadcast.thumbnail_url) {
+				patch.thumbnail_url = null;
+				patch.thumbnail_s3_key = null;
+			}
+
+			const res = await fetch('/api/broadcast/metadata', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(patch)
+			});
+			if (!res.ok) {
+				applyDefaultsError = (await res.text()) || `Erreur ${res.status}`;
+				return;
+			}
+			await invalidateAll();
+		} finally {
+			applyingDefaults = false;
+		}
 	}
 
 	function onThumbnailFileChange(event: Event) {
@@ -1083,14 +1276,29 @@
 					Persiste entre les directs — modifiable à tout moment.
 				</p>
 			</div>
-			<button
-				type="button"
-				onclick={enterEditMode}
-				class="shrink-0 border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-stone-600 transition-colors hover:border-primary hover:text-primary"
-			>
-				Modifier
-			</button>
+			<div class="flex shrink-0 items-center gap-2">
+				<button
+					type="button"
+					onclick={applyDefaultsDirectly}
+					disabled={applyingDefaults}
+					title="Appliquer les valeurs par défaut au direct actuel"
+					class="border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-stone-600 transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
+				>
+					{applyingDefaults ? 'Application…' : 'Défauts'}
+				</button>
+				<button
+					type="button"
+					onclick={enterEditMode}
+					class="border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-stone-600 transition-colors hover:border-primary hover:text-primary"
+				>
+					Modifier
+				</button>
+			</div>
 		</div>
+
+		{#if applyDefaultsError}
+			<p class="mb-3 bg-red-50 px-3 py-2 text-xs text-red-700">{applyDefaultsError}</p>
+		{/if}
 
 		<!-- Full-width reminder banner — spans under the label/button row so the
 		     message reads comfortably regardless of viewport size. -->
@@ -1802,6 +2010,65 @@
 							{/if}
 						</div>
 					</div>
+
+					<!-- Audio replace — destructive: overwrites the published MP3 -->
+					<div class="mt-6 border-t border-stone-100 pt-5">
+						<div class="flex flex-col gap-2">
+							<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Fichier audio</span>
+							{#if recAudioFile && recAudioDurationSec}
+								<div class="flex items-center justify-between gap-3 border border-amber-200 bg-amber-50/60 px-3 py-2">
+									<div class="min-w-0 flex-1">
+										<p class="truncate text-xs font-medium text-stone-700">{recAudioFile.name}</p>
+										<p class="text-[10px] text-stone-500 tabular-nums">
+											{formatBytes(recAudioFile.size)} · {formatDuration(recAudioDurationSec)}
+										</p>
+									</div>
+									<button
+										type="button"
+										onclick={clearRecAudio}
+										disabled={recSaving}
+										class="text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 hover:text-red-600 disabled:opacity-50"
+									>
+										Retirer
+									</button>
+								</div>
+								<p class="text-[10px] text-amber-700">
+									L'ancien fichier audio sera définitivement remplacé à l'enregistrement.
+								</p>
+								{#if recAudioUploadPct !== null}
+									<div class="flex flex-col gap-1">
+										<div class="flex items-center justify-between text-[10px] font-mono text-stone-500 tabular-nums">
+											<span>{recAudioUploadPct < 100 ? 'Téléversement…' : 'Finalisation…'}</span>
+											<span>{recAudioUploadPct}%</span>
+										</div>
+										<div class="h-1.5 w-full overflow-hidden rounded-full bg-stone-200">
+											<div
+												class="h-full bg-primary transition-[width] duration-150 ease-out"
+												style:width="{recAudioUploadPct}%"
+											></div>
+										</div>
+									</div>
+								{/if}
+							{:else}
+								<div class="flex items-center gap-2">
+									<label class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary">
+										Remplacer l'audio
+										<input
+											type="file"
+											accept="audio/mpeg,audio/mp3,.mp3"
+											class="hidden"
+											onchange={onRecAudioFileChange}
+											disabled={recSaving}
+										/>
+									</label>
+									<p class="text-[10px] text-stone-400">MP3 uniquement · 2 Go max</p>
+								</div>
+							{/if}
+							{#if recAudioError}
+								<p class="bg-red-50 px-3 py-2 text-xs text-red-700">{recAudioError}</p>
+							{/if}
+						</div>
+					</div>
 				</div>
 
 				<!-- Modal footer -->
@@ -1827,6 +2094,7 @@
 		</div>
 	{/if}
 {/if}
+
 
 {#if thumbnailExpanded && broadcast.thumbnail_url && !broadcastThumbnailBroken}
 	<!-- Lightbox: click backdrop or press Escape to close. -->

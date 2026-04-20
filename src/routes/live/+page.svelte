@@ -51,7 +51,7 @@
 			</p>
 			<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">Écoute en direct</h1>
 			<p class="mt-3 text-[15px] text-stone-400 font-body font-light max-w-md mx-auto leading-relaxed">
-				La page se met à jour automatiquement. Dès que le direct audio commence, appuyez sur Lecture.
+				La page se met à jour automatiquement. Dès que le direct audio commence, la lecture démarre toute seule.
 			</p>
 		</div>
 

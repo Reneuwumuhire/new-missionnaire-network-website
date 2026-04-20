@@ -7,7 +7,7 @@
  * disk without navigating away from the page.
  *
  * Used by:
- * - /live/archives/[id]  (recording download row)
+ * - /live/rediffusions/[id]  (recording download row)
  * - SermonTableItem      (prédications list)
  * - +audioTableItem      (music library — shares the same streaming pattern)
  */

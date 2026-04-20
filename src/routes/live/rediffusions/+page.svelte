@@ -54,7 +54,7 @@
 <svelte:head>
 	<title>Directs précédents - Missionnaire Network</title>
 	<meta name="description" content="Réécoutez les directs audio précédents de Missionnaire Network." />
-	<link rel="canonical" href="https://missionnaire.net/live/archives" />
+	<link rel="canonical" href="https://missionnaire.net/live/rediffusions" />
 </svelte:head>
 
 <svelte:window on:keydown={onLightboxKeydown} />
@@ -132,7 +132,7 @@
 
 							<!-- Title + meta — row navigation -->
 							<a
-								href="/live/archives/{rec.id}"
+								href="/live/rediffusions/{rec.id}"
 								class="min-w-0 flex-1 outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40 rounded"
 							>
 								<p class="font-display text-[15px] sm:text-base font-medium text-stone-800 group-hover:text-missionnaire transition-colors leading-snug line-clamp-2">
@@ -145,7 +145,7 @@
 
 							<!-- Listen affordance (desktop only) -->
 							<a
-								href="/live/archives/{rec.id}"
+								href="/live/rediffusions/{rec.id}"
 								aria-hidden="true"
 								tabindex="-1"
 								class="hidden sm:inline-flex shrink-0 text-[11px] font-bold uppercase tracking-[0.15em] font-body text-stone-300 group-hover:text-missionnaire transition-colors"

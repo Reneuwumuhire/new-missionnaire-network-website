@@ -8,7 +8,7 @@
 		listening: 'Vous écoutez le direct audio',
 		connecting: 'Connexion en cours...',
 		reconnecting: 'Reconnexion en cours...',
-		availablePressPlay: 'Direct audio disponible. Appuyez sur Lecture.',
+		availablePressPlay: 'Direct audio disponible. Touchez l\'écran pour démarrer.',
 		waiting: 'En attente du signal audio...',
 		cannotPlay: 'Impossible de lire le direct pour le moment',
 		unavailable: 'Le direct audio est indisponible pour le moment'
@@ -90,11 +90,13 @@
 	const OFFLINE_THRESHOLD = 6;
 	const NO_AUDIO_GRACE_MS = 30_000;
 
-	// Attempt browser autoplay exactly once when the broadcast is reachable.
-	// Browsers block `play()` without prior user interaction, so this is a
-	// best-effort: if it succeeds the listener hears the stream immediately,
-	// if it fails we silently fall back to the normal "press Lecture" UI.
+	// Attempt browser autoplay when the broadcast becomes reachable.
+	// Browsers block `play()` without a prior user gesture (opening a page
+	// doesn't count), so on failure we install a document-wide one-shot
+	// listener: the listener's *first* tap/click/keypress anywhere on the
+	// page starts playback. They never have to find the Lecture button.
 	let hasAttemptedAutoplay = false;
+	let autoplayGestureAttached = false;
 
 	// Stable session ID for listener tracking — survives page refresh
 	// but not tab close, so the DB record is reused on refresh.
@@ -173,11 +175,11 @@
 		}, NO_AUDIO_GRACE_MS);
 	}
 
-	/** Silently try browser autoplay the first time the stream becomes
-	 *  reachable. Most browsers block autoplay with sound without a prior
-	 *  user gesture — we catch that rejection and reset state so the UI
-	 *  stays on the normal "Lecture" prompt. No error toasts, no status
-	 *  flicker: either it plays or the listener taps Lecture like usual. */
+	/** Try browser autoplay the first time the stream becomes reachable.
+	 *  Most browsers block autoplay with sound without a prior user gesture
+	 *  — we catch that rejection and install a document-wide one-shot
+	 *  gesture listener so the listener's first tap anywhere on the page
+	 *  starts playback. No error toasts, no status flicker. */
 	async function tryAutoplay() {
 		if (hasAttemptedAutoplay) return;
 		if (!browser || !audio) return;
@@ -193,9 +195,11 @@
 		try {
 			await audio.play();
 			// handlePlay will flip isPlaying / statusKey = 'listening'.
+			detachAutoplayGestureListener();
 		} catch {
 			// Autoplay blocked (no user gesture yet). Restore the "ready"
-			// state without surfacing an error to the user.
+			// state and arm the gesture listener so the next interaction
+			// — anywhere on the page — starts playback.
 			userWantsToPlay = false;
 			isBuffering = false;
 			if (audio) {
@@ -203,7 +207,34 @@
 				audio.load();
 			}
 			statusKey = 'availablePressPlay';
+			attachAutoplayGestureListener();
 		}
+	}
+
+	/** Fired by the listener's first tap/click/keypress after autoplay was
+	 *  blocked. We must call audio.play() *synchronously* inside this stack
+	 *  so it inherits the user activation flag (required by iOS Safari);
+	 *  tryAutoplay() does the synchronous src + load + play before any await,
+	 *  so calling it here is safe. */
+	function handleAutoplayGesture() {
+		detachAutoplayGestureListener();
+		if (!probeReachable || isPlaying || isBuffering || userWantsToPlay) return;
+		hasAttemptedAutoplay = false;
+		void tryAutoplay();
+	}
+
+	function attachAutoplayGestureListener() {
+		if (autoplayGestureAttached || !browser) return;
+		autoplayGestureAttached = true;
+		document.addEventListener('pointerdown', handleAutoplayGesture, { capture: true });
+		document.addEventListener('keydown', handleAutoplayGesture, { capture: true });
+	}
+
+	function detachAutoplayGestureListener() {
+		if (!autoplayGestureAttached || !browser) return;
+		autoplayGestureAttached = false;
+		document.removeEventListener('pointerdown', handleAutoplayGesture, { capture: true });
+		document.removeEventListener('keydown', handleAutoplayGesture, { capture: true });
 	}
 
 	function handleStatusEvent(liveNow: boolean, checkedAt: string, listeners: number, streamUrl?: string) {
@@ -252,6 +283,10 @@
 				playbackFailed = false; // Reset — confirmed offline, clean slate
 				hasError = false;
 				statusKey = 'offline';
+				// Reset autoplay state so the next live cycle gets a fresh
+				// attempt (and doesn't sit on a dangling gesture listener).
+				hasAttemptedAutoplay = false;
+				detachAutoplayGestureListener();
 				stopPlayback();
 			} else if (!isPlaying && !isBuffering && !playbackFailed) {
 				statusKey = 'waiting';
@@ -314,6 +349,7 @@
 		stopPolling();
 		clearReconnectTimer();
 		clearNoAudioGraceTimer();
+		detachAutoplayGestureListener();
 		if (browser) {
 			document.removeEventListener('visibilitychange', handleVisibilityChange);
 			// Notify server to remove listener
@@ -573,6 +609,9 @@
 	// ── Audio element event handlers ───────────────────────────────
 
 	const handlePlay = () => {
+		// Playback started by any path (autoplay, gesture-retry, manual
+		// Lecture button) — we no longer need the gesture listener.
+		detachAutoplayGestureListener();
 		cancelNoAudioGrace();
 		isPlaying = true;
 		isBuffering = false;

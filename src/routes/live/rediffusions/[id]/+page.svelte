@@ -112,7 +112,7 @@
 <svelte:head>
 	<title>{rec.title} - Missionnaire Network</title>
 	<meta name="description" content="Réécoutez le direct audio du {formatDate(rec.started_at)}." />
-	<link rel="canonical" href="https://missionnaire.net/live/archives/{rec.id}" />
+	<link rel="canonical" href="https://missionnaire.net/live/rediffusions/{rec.id}" />
 	{#if rec.thumbnail_url}
 		<meta property="og:image" content={rec.thumbnail_url} />
 	{/if}
@@ -124,7 +124,7 @@
 	<div class="max-w-3xl mx-auto">
 		<div class="mb-8">
 			<a
-				href="/live/archives"
+				href="/live/rediffusions"
 				class="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.15em] font-body text-missionnaire/80 hover:text-missionnaire transition-colors"
 			>
 				← Tous les directs

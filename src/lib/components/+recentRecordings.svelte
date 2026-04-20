@@ -32,11 +32,11 @@
 		<div class="flex items-end justify-between mb-5">
 			<div>
 				<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-1 font-body">
-					Archives
+					Rediffusions
 				</p>
 				<h2 class="font-display text-xl font-semibold text-stone-900">Directs précédents</h2>
 			</div>
-			<a href="/live/archives" class="section-cta">
+			<a href="/live/rediffusions" class="section-cta">
 				<span class="section-cta-label">Voir tout</span>
 				<span class="section-cta-arrow" aria-hidden="true">→</span>
 			</a>
@@ -46,7 +46,7 @@
 			{#each recordings as rec}
 				<li>
 					<a
-						href="/live/archives/{rec.id}"
+						href="/live/rediffusions/{rec.id}"
 						class="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-missionnaire/5 group"
 					>
 						<div class="relative h-14 w-20 shrink-0 overflow-hidden border border-stone-200/60 bg-stone-100">

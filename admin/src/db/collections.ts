@@ -483,7 +483,17 @@ export async function getRecordingById(id: string): Promise<Recording | null> {
 
 export async function updateRecording(
 	id: string,
-	updates: Partial<{ title: string; published: boolean }>
+	updates: Partial<{
+		title: string;
+		published: boolean;
+		description: string | null;
+		thumbnail_url: string | null;
+		thumbnail_s3_key: string | null;
+		s3_key: string;
+		s3_url: string;
+		size_bytes: number;
+		duration_sec: number;
+	}>
 ): Promise<boolean> {
 	const db = await getDb();
 	const result = await db.collection('recordings').updateOne(
@@ -554,6 +564,10 @@ export type BroadcastAdminState = {
 	description: string | null;
 	thumbnail_url: string | null;
 	thumbnail_s3_key: string | null;
+	default_title: string | null;
+	default_description: string | null;
+	default_thumbnail_url: string | null;
+	default_thumbnail_s3_key: string | null;
 	updated_at: string;
 };
 
@@ -569,6 +583,10 @@ const BROADCAST_DEFAULT: BroadcastAdminState = {
 	description: null,
 	thumbnail_url: null,
 	thumbnail_s3_key: null,
+	default_title: null,
+	default_description: null,
+	default_thumbnail_url: null,
+	default_thumbnail_s3_key: null,
 	updated_at: new Date(0).toISOString()
 };
 
@@ -590,6 +608,10 @@ export async function getBroadcastAdminState(): Promise<BroadcastAdminState> {
 		description: (doc.description as string | null) ?? null,
 		thumbnail_url: (doc.thumbnail_url as string | null) ?? null,
 		thumbnail_s3_key: (doc.thumbnail_s3_key as string | null) ?? null,
+		default_title: (doc.default_title as string | null) ?? null,
+		default_description: (doc.default_description as string | null) ?? null,
+		default_thumbnail_url: (doc.default_thumbnail_url as string | null) ?? null,
+		default_thumbnail_s3_key: (doc.default_thumbnail_s3_key as string | null) ?? null,
 		updated_at: (doc.updated_at as string) ?? new Date(0).toISOString()
 	};
 }

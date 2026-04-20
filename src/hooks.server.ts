@@ -1,7 +1,7 @@
 import { connect, getDb } from './db/mongo';
 import { checkAndIngestLiveStream } from './lib/server/youtube-poller';
 import { ensureWebSubSubscription } from '$lib/server/youtube-websub';
-import type { Handle } from '@sveltejs/kit';
+import { redirect, type Handle } from '@sveltejs/kit';
 import { getFullCountryName } from './utils/countries';
 
 // Initialize MongoDB on server start, then:
@@ -102,6 +102,14 @@ async function trackMissedRoute(event: any, response: Response, isPageRequest: b
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const { pathname } = event.url;
+
+	// Old /live/archives URLs were renamed to /live/rediffusions. Preserve
+	// inbound links (bookmarks, search results) with a permanent redirect.
+	if (pathname === '/live/archives' || pathname.startsWith('/live/archives/')) {
+		const target = pathname.replace('/live/archives', '/live/rediffusions') + event.url.search;
+		throw redirect(308, target);
+	}
+
 	const userAgent = event.request.headers.get('user-agent') || 'unknown';
 	const isVercelBot =
 		userAgent.includes('vercel-screenshot') || userAgent.includes('vercel-favicon/1.0');
