@@ -5,6 +5,7 @@
 	import type { Recording, RecordingStatus } from '$lib/models/recording';
 	import { confirmDialog } from '$lib/stores/confirm-dialog';
 	import { toast } from '$lib/stores/toast';
+	import AudioTrimEditor from '$lib/components/AudioTrimEditor.svelte';
 
 	let { data }: { data: PageData } = $props();
 
@@ -191,6 +192,22 @@
 	let recAudioError = $state<string | null>(null);
 	let recAudioUploadPct = $state<number | null>(null);
 	let recSaving = $state(false);
+
+	// Audio trim editor — opens as a separate modal so it can coexist with
+	// the metadata edit flow without entangling its state.
+	let trimEditorRecordingId = $state<string | null>(null);
+	const trimEditorRecording = $derived.by(() =>
+		trimEditorRecordingId
+			? (data.recordings.find((r) => r._id === trimEditorRecordingId) ?? null)
+			: null
+	);
+	async function closeTrimEditor(saved: boolean) {
+		trimEditorRecordingId = null;
+		if (saved) {
+			toast.success('Audio enregistré');
+			await invalidateAll();
+		}
+	}
 
 	function enterRecordingEdit(rec: Recording) {
 		if (recThumbnailPreviewUrl) URL.revokeObjectURL(recThumbnailPreviewUrl);
@@ -1557,6 +1574,18 @@
 						{isEditing ? 'Fermer' : 'Modifier'}
 					</button>
 				{/if}
+				{#if rec.status === 'ready' && rec.s3_url}
+					<button
+						onclick={() => (trimEditorRecordingId = rec._id!)}
+						class="inline-flex items-center gap-1.5 border border-stone-200 bg-white/60 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary"
+						title="Éditer l'audio (couper début/fin)"
+					>
+						<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M6 20l3.5-3.5M18 20l-3.5-3.5M6 4l12 12M18 4L6 16" />
+						</svg>
+						Éditer l'audio
+					</button>
+				{/if}
 				<button
 					onclick={() => remove(rec._id!)}
 					class="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600"
@@ -1689,6 +1718,15 @@
 									class="border border-stone-200 bg-white/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 hover:border-primary hover:text-primary"
 								>
 									{isEditing ? 'Fermer' : 'Modifier'}
+								</button>
+							{/if}
+							{#if rec.status === 'ready' && rec.s3_url}
+								<button
+									onclick={() => (trimEditorRecordingId = rec._id!)}
+									class="border border-stone-200 bg-white/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 hover:border-primary hover:text-primary"
+									title="Éditer l'audio (couper début/fin)"
+								>
+									Éditer l'audio
 								</button>
 							{/if}
 							<button onclick={() => remove(rec._id!)} class="px-2 py-1.5 text-xs text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600" title="Supprimer">
@@ -2093,6 +2131,14 @@
 			</div>
 		</div>
 	{/if}
+{/if}
+
+{#if trimEditorRecording}
+	<AudioTrimEditor
+		recording={trimEditorRecording}
+		onClose={() => closeTrimEditor(false)}
+		onSaved={() => closeTrimEditor(true)}
+	/>
 {/if}
 
 

@@ -493,6 +493,8 @@ export async function updateRecording(
 		s3_url: string;
 		size_bytes: number;
 		duration_sec: number;
+		peaks: number[] | null;
+		peaks_duration_sec: number | null;
 	}>
 ): Promise<boolean> {
 	const db = await getDb();

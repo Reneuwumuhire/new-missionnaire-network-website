@@ -28,6 +28,12 @@ export const RecordingSchema = z.object({
 	thumbnail_s3_key: z.string().nullable().optional(),
 	/** Auto-snapshot of broadcast_admin_state.description at recording-save time. */
 	description: z.string().nullable().optional(),
+	/** Precomputed mono waveform peaks (0..1 magnitude, ~4000 bins). Generated
+	 *  by the recorder service at upload time and refreshed whenever the MP3
+	 *  is replaced or trimmed. Lets the admin editor render the waveform
+	 *  instantly without re-downloading and decoding the full MP3. */
+	peaks: z.array(z.number()).nullable().optional(),
+	peaks_duration_sec: z.number().nullable().optional(),
 	updated_at: z
 		.union([z.instanceof(Date), z.string()])
 		.transform((val) => new Date(val))

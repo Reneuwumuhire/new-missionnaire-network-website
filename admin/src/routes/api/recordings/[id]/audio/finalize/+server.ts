@@ -11,6 +11,25 @@ import { deleteObject, getS3Url, updateDownloadFilename } from '$lib/server/s3';
 const MAX_SIZE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB hard cap
 const MAX_DURATION_SEC = 12 * 60 * 60; // 12 h hard cap
 
+/** Validate optional peaks payload from the client. Returns null if the
+ *  client didn't send peaks; throws a 400-shaped error on malformed input. */
+function parsePeaks(
+	rawPeaks: unknown,
+	rawPeaksDuration: unknown,
+	fallbackDuration: number
+): { peaks: number[]; peaksDurationSec: number } | null {
+	if (!Array.isArray(rawPeaks)) return null;
+	if (rawPeaks.length > 8000) throw error(400, 'Peaks trop volumineux');
+	if (!rawPeaks.every((v) => typeof v === 'number' && Number.isFinite(v))) {
+		throw error(400, 'Peaks invalides');
+	}
+	const peaksDurationSec =
+		typeof rawPeaksDuration === 'number' && Number.isFinite(rawPeaksDuration)
+			? rawPeaksDuration
+			: fallbackDuration;
+	return { peaks: rawPeaks as number[], peaksDurationSec };
+}
+
 export const POST: RequestHandler = async ({ locals, params, request, getClientAddress }) => {
 	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
 
@@ -24,6 +43,8 @@ export const POST: RequestHandler = async ({ locals, params, request, getClientA
 		s3_key?: unknown;
 		size_bytes?: unknown;
 		duration_sec?: unknown;
+		peaks?: unknown;
+		peaks_duration_sec?: unknown;
 	};
 
 	const s3Key = typeof body.s3_key === 'string' ? body.s3_key : '';
@@ -44,12 +65,22 @@ export const POST: RequestHandler = async ({ locals, params, request, getClientA
 		throw error(400, 'Durée invalide');
 	}
 
+	// Optional: precomputed waveform peaks from the client (e.g. the trim
+	// editor already decoded the sliced MP3). Stored inline so the admin
+	// editor can render the waveform instantly on future opens.
+	const parsed = parsePeaks(body.peaks, body.peaks_duration_sec, durationSec);
+
 	const s3Url = getS3Url(s3Key);
+	// Audio changed — always set peaks fields (to the fresh values if the
+	// client sent them, otherwise to null) so the admin editor never
+	// renders a stale waveform that doesn't match the new bytes.
 	const ok = await updateRecording(id, {
 		s3_key: s3Key,
 		s3_url: s3Url,
 		size_bytes: sizeBytes,
-		duration_sec: durationSec
+		duration_sec: durationSec,
+		peaks: parsed?.peaks ?? null,
+		peaks_duration_sec: parsed?.peaksDurationSec ?? null
 	});
 	if (!ok) throw error(500, 'Mise à jour échouée');
 

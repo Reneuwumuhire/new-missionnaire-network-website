@@ -16,6 +16,7 @@ import {
 } from './mongo.js';
 import { buildDownloadFilename, uploadRecording } from './upload.js';
 import { probeDurationSec } from './probe.js';
+import { generatePeaks } from './peaks.js';
 
 interface ActiveRecording {
 	id: ObjectId;
@@ -174,22 +175,38 @@ async function finalizeUpload(rec: Pick<ActiveRecording, 'id' | 'idStr' | 'start
 		// at save time — matches what the audience actually saw during the broadcast.
 		// Fetched before upload so the title can be baked into Content-Disposition.
 		const snap = await getBroadcastSnapshot();
-		const { s3Key, s3Url, sizeBytes } = await uploadRecording({
-			id: rec.idStr,
-			filePath: mp3Path(rec.idStr),
-			startedAt: rec.startedAt,
-			title: snap.title
-		});
+		const localPath = mp3Path(rec.idStr);
+		// Upload and peaks generation both read the file — run in parallel so
+		// the admin sees `ready` as soon as both network + peaks finish instead
+		// of paying them serially. A peaks failure is non-fatal: the admin
+		// editor falls back to client-side decode.
+		const probedSec = (await probeDurationSec(localPath)) ?? 0;
+		const [uploadResult, peaksResult] = await Promise.all([
+			uploadRecording({
+				id: rec.idStr,
+				filePath: localPath,
+				startedAt: rec.startedAt,
+				title: snap.title
+			}),
+			generatePeaks(localPath, probedSec).catch((err) => {
+				console.warn(`[recorder] peaks generation failed for ${rec.idStr}:`, err);
+				return null;
+			})
+		]);
+		const { s3Key, s3Url, sizeBytes } = uploadResult;
 		await markRecordingReady(rec.id, {
 			s3Key,
 			s3Url,
 			sizeBytes,
 			thumbnailUrl: snap.thumbnail_url,
 			title: snap.title,
-			description: snap.description
+			description: snap.description,
+			peaks: peaksResult?.peaks ?? null,
+			peaksDurationSec: peaksResult?.durationSec ?? null
 		});
 		await removeRecordingFiles(rec.idStr);
-		console.log(`[recorder] uploaded ${rec.idStr} -> ${s3Key}`);
+		const peaksNote = peaksResult ? ` (peaks: ${peaksResult.peaks.length} bins)` : '';
+		console.log(`[recorder] uploaded ${rec.idStr} -> ${s3Key}${peaksNote}`);
 	} catch (err) {
 		const reason = err instanceof Error ? err.message : String(err);
 		await markRecordingFailed(rec.id, reason).catch((e) =>

@@ -40,6 +40,10 @@ export interface RecordingDoc {
 	thumbnail_url: string | null;
 	/** Snapshot of broadcast_admin_state.description at recording-save time. */
 	description: string | null;
+	/** Precomputed mono waveform peaks (0..1 magnitude, ~4000 bins). Set by
+	 *  the recorder after upload and refreshed when the admin trims audio. */
+	peaks: number[] | null;
+	peaks_duration_sec: number | null;
 	updated_at: Date;
 }
 
@@ -91,6 +95,8 @@ export async function insertRecordingStarting(params: {
 		failure_reason: null,
 		thumbnail_url: null,
 		description: null,
+		peaks: null,
+		peaks_duration_sec: null,
 		updated_at: new Date()
 	});
 }
@@ -114,6 +120,8 @@ export async function markRecordingReady(
 		thumbnailUrl: string | null;
 		title: string | null;
 		description: string | null;
+		peaks: number[] | null;
+		peaksDurationSec: number | null;
 	}
 ) {
 	const db = await getDb();
@@ -124,6 +132,8 @@ export async function markRecordingReady(
 		size_bytes: params.sizeBytes,
 		thumbnail_url: params.thumbnailUrl,
 		description: params.description,
+		peaks: params.peaks,
+		peaks_duration_sec: params.peaksDurationSec,
 		failure_reason: null,
 		updated_at: new Date()
 	};
