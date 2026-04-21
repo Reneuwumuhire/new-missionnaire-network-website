@@ -8,6 +8,7 @@
 		currentIndex,
 		isPlaying
 	} from '$lib/stores/global';
+	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
 	import type { MusicAudio } from '$lib/models/music-audio';
 	import { derived } from 'svelte/store';
 
@@ -54,8 +55,9 @@
 
 	function playRecording() {
 		if ($isCurrent) {
-			// Same track — toggle play/pause on the active element.
-			isPlaying.update((v) => !v);
+			// Same track — let the mounted player toggle itself so the
+			// audio element stays the single source of truth.
+			dispatchAudioPlayerAction('toggle');
 			return;
 		}
 		const single = [playable] as unknown as MusicAudio[];
@@ -284,7 +286,7 @@
 							: $isCurrent
 								? 'Reprendre la lecture'
 								: 'Écouter ce direct'}
-						class="play-cta group inline-flex items-center gap-3 bg-missionnaire px-6 py-3 text-sm font-bold uppercase tracking-[0.2em] font-body text-white transition-all hover:bg-missionnaire/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40 active:scale-95"
+						class="play-cta group inline-flex w-full max-w-[18rem] items-center justify-center gap-3 whitespace-nowrap bg-missionnaire px-6 py-3 text-sm font-bold uppercase tracking-[0.2em] font-body text-white transition-colors hover:bg-missionnaire/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
 					>
 						{#if $isCurrent && $isPlaying}
 							<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

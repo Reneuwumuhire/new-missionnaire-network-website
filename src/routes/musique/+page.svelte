@@ -21,6 +21,7 @@
 	import BsHeart from 'svelte-icons-pack/bs/BsHeart';
 	import BsClockHistory from 'svelte-icons-pack/bs/BsClockHistory';
 	import { formatTime } from '../../utils/FormatTime';
+	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
 	import { addToRecentlyPlayed, toggleFavorite, isFavorite, recentlyPlayed, favorites } from '$lib/stores/musicHistory';
 	export let data;
 
@@ -411,7 +412,7 @@
 				<div class="flex items-center gap-2">
 					<button
 						class="flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-bold text-missionnaire shadow-sm transition-colors hover:bg-stone-200"
-						on:click={() => isPlaying.update((value) => !value)}
+						on:click={() => dispatchAudioPlayerAction('toggle')}
 						title={$isPlaying ? 'Pause' : 'Lire'}
 					>
 						<Icon src={$isPlaying ? IoPauseCircle : IoPlayCircle} size="18" />
@@ -702,7 +703,7 @@
 							class="hover:scale-110 active:scale-95 transition-all p-2 {isActive ? 'text-missionnaire' : 'text-missionnaire'}"
 							on:click|stopPropagation={() => {
 								if (isActive) {
-									isPlaying.update(v => !v);
+									dispatchAudioPlayerAction('toggle');
 								} else {
 									playSong(song);
 								}

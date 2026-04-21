@@ -12,6 +12,7 @@
 	import { buildSermonSlug } from '../../utils/sermonSlug';
 	import { formatTime } from '../../utils/FormatTime';
 	import { createPlayableSermon } from '../../utils/audioPlayback';
+	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
 	import { getAudioDuration } from '../../utils/audioDuration';
 	import { downloadAudioFile } from '../../utils/downloadAudio';
 
@@ -90,7 +91,7 @@
 		if (!audioUrl) return;
 
 		if (isActive) {
-			isPlaying.update((v) => !v);
+			dispatchAudioPlayerAction('toggle');
 		} else {
 			currentIndex.set(index);
 			selectAudio.set(playbackSermon);

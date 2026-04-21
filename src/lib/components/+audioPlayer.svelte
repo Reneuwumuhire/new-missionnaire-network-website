@@ -42,6 +42,40 @@
 	let audioSrc: string = '';
 	let isAudioReady = false;
 	let shouldAutoplayOnLoad = false;
+	let playerShell: HTMLDivElement | null = null;
+	let playerResizeObserver: ResizeObserver | null = null;
+	let lastPlayerInset = 0;
+	let pendingPlaybackIntent: 'play' | 'pause' | null = null;
+
+	function setPendingPlaybackIntent(intent: 'play' | 'pause' | null) {
+		pendingPlaybackIntent = intent;
+	}
+
+	function playCurrentAudio() {
+		if (!audio) return;
+		setPendingPlaybackIntent('play');
+		userWantsToPlay = true;
+		if (audio.duration && audio.currentTime >= audio.duration) {
+			audio.currentTime = 0;
+		}
+		safePlay('auto');
+	}
+
+	function pauseCurrentAudio() {
+		if (!audio || audio.paused) return;
+		setPendingPlaybackIntent('pause');
+		userWantsToPlay = false;
+		audio.pause();
+	}
+
+	function handleExternalToggle() {
+		if (!audio) return;
+		if (audio.paused) {
+			playCurrentAudio();
+			return;
+		}
+		pauseCurrentAudio();
+	}
 
 	// Tracks the listener's *intent* to play, separate from whether the audio
 	// element is actually producing sound. Critical for resuming after system
@@ -78,6 +112,26 @@
 	 *  (because the first load already reset currentTime), and the racing
 	 *  canplay handlers seek to different positions then each call play(). */
 	let isReloadingSession = false;
+
+	function syncPlayerInset() {
+		if (!browser) return;
+		if (!playerShell) {
+			lastPlayerInset = 0;
+			document.documentElement.style.setProperty('--audio-player-height', '0px');
+			return;
+		}
+
+		// Keep the reserved bottom inset stable across rapid play/pause toggles.
+		// `getBoundingClientRect()` can wobble by a sub-pixel and make the page
+		// shimmy even though the player's real layout height did not change.
+		const shellHeight = playerShell.offsetHeight;
+		const topOverflow = progressBarElement ? Math.round(progressBarElement.offsetHeight / 2) : 0;
+		const nextInset = shellHeight + topOverflow;
+
+		if (nextInset === lastPlayerInset) return;
+		lastPlayerInset = nextInset;
+		document.documentElement.style.setProperty('--audio-player-height', `${nextInset}px`);
+	}
 
 	function getDisplayTitle(item: any): string {
 		if (!item) return 'Chargement...';
@@ -257,6 +311,8 @@
 		duration = 0;
 		progressBarWidth = 0;
 		indicatorPosition = 0;
+		const shouldResumePlayback = shouldAutoplayOnLoad || $isPlaying || userWantsToPlay;
+		shouldAutoplayOnLoad = shouldResumePlayback;
 
 		if (audio) {
 			audio.pause();
@@ -268,18 +324,20 @@
 			audio.addEventListener('ended', handleEnded);
 			audio.addEventListener('timeupdate', updateAudioTime);
 			audio.addEventListener('timeupdate', updateIndicator);
-			audio.addEventListener('play', () => {
-				userWantsToPlay = true;
-				audioPausedAt = 0;
-				stopResumeWatchdog();
+				audio.addEventListener('play', () => {
+					setPendingPlaybackIntent(null);
+					userWantsToPlay = true;
+					audioPausedAt = 0;
+					stopResumeWatchdog();
 				isPlaying.set(true);
 				if ('mediaSession' in navigator) {
 					navigator.mediaSession.playbackState = 'playing';
 				}
 			});
-			audio.addEventListener('pause', () => {
-				// Note: we do NOT clear userWantsToPlay here. A `pause` event
-				// can come from the listener tapping pause OR from the OS
+				audio.addEventListener('pause', () => {
+					setPendingPlaybackIntent(null);
+					// Note: we do NOT clear userWantsToPlay here. A `pause` event
+					// can come from the listener tapping pause OR from the OS
 				// interrupting (phone call, Siri, another app). Only togglePlay
 				// clears the intent flag, so this handler stays neutral and
 				// the visibilitychange/focus listeners can resume when the
@@ -305,33 +363,52 @@
 				duration = audio.duration;
 				console.log("[AudioPlayer] Metadata loaded, duration:", duration);
 			});
-			audio.addEventListener('canplay', () => {
-				isAudioReady = true;
-				if (shouldAutoplayOnLoad || $isPlaying) {
-					audio.play().catch((e) => {
-						console.error('[AudioPlayer] Autoplay on load failed:', e);
-						isPlaying.set(false);
-					});
-				}
-				shouldAutoplayOnLoad = false;
-			});
-			audio.addEventListener('error', (e) => {
-				console.error("[AudioPlayer] Audio error:", e);
-				isPlaying.set(false);
-				isAudioReady = false;
+				audio.addEventListener('canplay', () => {
+					isAudioReady = true;
+					if (shouldAutoplayOnLoad || $isPlaying) {
+						setPendingPlaybackIntent('play');
+						audio.play().catch((e) => {
+							setPendingPlaybackIntent(null);
+							console.error('[AudioPlayer] Autoplay on load failed:', e);
+							isPlaying.set(false);
+						});
+					}
+					shouldAutoplayOnLoad = false;
+				});
+				audio.addEventListener('error', (e) => {
+					setPendingPlaybackIntent(null);
+					console.error("[AudioPlayer] Audio error:", e);
+					isPlaying.set(false);
+					isAudioReady = false;
 				shouldAutoplayOnLoad = false;
 			});
 		}
 	}
 
+	// Reactive sync: keep the audio element's actual play/pause state in
+	// lockstep with the $isPlaying store. The `pendingPlaybackIntent`
+	// guard defuses a race that otherwise spawns two audio sessions on
+	// iOS: when the user taps pause (or play), we call audio.pause()
+	// (or .play()) synchronously, which triggers the corresponding DOM
+	// event, which flips isPlaying — then this reactive block sees the
+	// "new" mismatch and fires a *second* command before the first has
+	// settled. Two overlapping play() calls leave a ghost audio element
+	// playing in the background with no UI bound to it. Bailing out when
+	// the intent is already in-flight keeps this single-track.
+	//
+	// NB: `return` is illegal inside a Svelte reactive block (it
+	// compiles to a bare statement, not a function), so the guard is
+	// expressed as nested if/else.
 	$: if (browser && audio && $isPlaying !== undefined) {
 		if ($isPlaying && audio.paused) {
-			console.log("[AudioPlayer] Sync: Playing");
-			userWantsToPlay = true;
-			safePlay('auto');
+			if (pendingPlaybackIntent !== 'pause') {
+				userWantsToPlay = true;
+				safePlay('auto');
+			}
 		} else if (!$isPlaying && !audio.paused) {
-			console.log("[AudioPlayer] Sync: Pausing");
-			audio.pause();
+			if (pendingPlaybackIntent !== 'play') {
+				audio.pause();
+			}
 		}
 	}
 
@@ -412,18 +489,7 @@
 		if (!audio) return;
 
 		try {
-			if (audio.paused) {
-				userWantsToPlay = true;
-				if (audio.duration && audio.currentTime >= audio.duration) {
-					audio.currentTime = 0;
-				}
-				// Route through safePlay so a long paused interval on screen-
-				// lock reloads the audio session before playback resumes.
-				safePlay('auto');
-			} else {
-				userWantsToPlay = false;
-				audio.pause();
-			}
+			handleExternalToggle();
 			// isPlaying will be updated via listeners
 		} catch (error) {
 			console.error('Playback failed:', error);
@@ -780,6 +846,32 @@
 	}
 
 	// Ensure audio is stopped when the component is unmounted
+	onMount(() => {
+		if (!browser) return;
+
+		syncPlayerInset();
+		window.addEventListener('resize', syncPlayerInset);
+		window.addEventListener('missionnaire-audio-toggle', handleExternalToggle);
+		window.addEventListener('missionnaire-audio-play', playCurrentAudio);
+		window.addEventListener('missionnaire-audio-pause', pauseCurrentAudio);
+
+		if (typeof ResizeObserver !== 'undefined' && playerShell) {
+			playerResizeObserver = new ResizeObserver(syncPlayerInset);
+			playerResizeObserver.observe(playerShell);
+		}
+
+		return () => {
+			window.removeEventListener('resize', syncPlayerInset);
+			window.removeEventListener('missionnaire-audio-toggle', handleExternalToggle);
+			window.removeEventListener('missionnaire-audio-play', playCurrentAudio);
+			window.removeEventListener('missionnaire-audio-pause', pauseCurrentAudio);
+			playerResizeObserver?.disconnect();
+			playerResizeObserver = null;
+			lastPlayerInset = 0;
+			document.documentElement.style.setProperty('--audio-player-height', '0px');
+		};
+	});
+
 	onDestroy(() => {
 		stopResumeWatchdog();
 		if (audio) {
@@ -788,6 +880,8 @@
 			audio.removeEventListener('timeupdate', updateAudioTime);
 			audio.removeEventListener('timeupdate', updateIndicator);
 		}
+		lastPlayerInset = 0;
+		document.documentElement.style.setProperty('--audio-player-height', '0px');
 	});
 </script>
 
@@ -800,13 +894,16 @@
 />
 
 {#if $selectAudio}
-<div class="fixed z-[100] bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-stone-200 shadow-[0_-4px_20px_rgb(0,0,0,0.06)] pb-safe pt-2 md:pt-4 md:pb-4 transition-all duration-300">
+<div
+	bind:this={playerShell}
+	class="fixed z-[100] bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-stone-200 shadow-[0_-4px_20px_rgb(0,0,0,0.06)] pb-safe pt-2 md:pt-4 md:pb-4"
+>
 	<!-- Top Progress Bar -->
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <!-- svelte-ignore a11y-no-static-element-interactions -->
 <div
 	bind:this={progressBarElement}
-	class="absolute top-0 left-0 w-full h-8 -translate-y-1/2 cursor-pointer group/progress flex items-center justify-start z-50 touch-none select-none transition-all"
+	class="absolute top-0 left-0 w-full h-8 -translate-y-1/2 cursor-pointer group/progress flex items-center justify-start z-50 touch-none select-none"
 	on:mousedown={startDrag}
 	on:touchstart|nonpassive={startDrag}
 	on:click={seekTo}
@@ -829,7 +926,7 @@
 	<div class="px-5 md:px-10 max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:gap-8">
 		<!-- Info Row -->
 		<div class="flex items-center justify-between mb-3 md:mb-0 md:flex-1 md:min-w-0">
-			<div class="flex-1 min-w-0">
+			<div class="flex-1 min-w-0 min-h-[2.75rem] md:min-h-[3rem]">
 				<div class="text-[10px] uppercase tracking-[0.2em] font-bold text-missionnaire mb-0.5 opacity-80">Lecture en cours</div>
 				<div class="font-black text-sm md:text-lg text-stone-900 truncate pr-4" title={getDisplayTitle($selectAudio)}>
 					{getDisplayTitle($selectAudio)}
@@ -890,7 +987,7 @@
 						<Icon src={BsSkipBackwardFill} size="16" />
 					</button>
 
-					<button on:click={togglePlay} class="relative flex items-center justify-center w-14 h-14 md:w-12 md:h-12 bg-missionnaire text-white rounded-full hover:scale-105 transition-transform shadow-lg shadow-missionnaire/20 active:scale-95">
+					<button on:click={togglePlay} class="relative flex items-center justify-center w-14 h-14 md:w-12 md:h-12 bg-missionnaire text-white rounded-full hover:scale-105 transition-transform shadow-lg shadow-missionnaire/20">
 						{#if $isPlaying}
 							<Icon src={BsPauseCircleFill} size="32" />
 						{:else}

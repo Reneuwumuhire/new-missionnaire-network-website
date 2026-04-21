@@ -2,6 +2,7 @@
 	import type { PageData } from './$types';
 	import type { Sermon } from '$lib/models/sermon';
 	import { basePlaylist, currentIndex, isPlaying, playlist, selectAudio } from '$lib/stores/global';
+	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
 	import { onMount } from 'svelte';
 	import Breadcrumbs from '$lib/components/+breadcrumbs.svelte';
 
@@ -56,7 +57,7 @@
 		if (!targetUrl) return;
 
 		if (currentSelectedUrl === targetUrl) {
-			isPlaying.update((v) => !v);
+			dispatchAudioPlayerAction('toggle');
 			return;
 		}
 
