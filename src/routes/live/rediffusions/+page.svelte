@@ -53,13 +53,16 @@
 
 <svelte:head>
 	<title>Directs précédents - Missionnaire Network</title>
-	<meta name="description" content="Réécoutez les directs audio précédents de Missionnaire Network." />
+	<meta
+		name="description"
+		content="Réécoutez les directs audio précédents de Missionnaire Network."
+	/>
 	<link rel="canonical" href="https://missionnaire.net/live/rediffusions" />
 </svelte:head>
 
 <svelte:window on:keydown={onLightboxKeydown} />
 
-<section class="w-full py-14 md:py-20 px-6">
+<section class="w-full py-10 px-6">
 	<div class="max-w-3xl mx-auto">
 		<!-- Header -->
 		<div class="text-center mb-12">
@@ -69,7 +72,9 @@
 			<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">
 				Directs précédents
 			</h1>
-			<p class="mt-3 text-[15px] text-stone-400 font-body font-light max-w-md mx-auto leading-relaxed">
+			<p
+				class="mt-3 text-[15px] text-stone-400 font-body font-light max-w-md mx-auto leading-relaxed"
+			>
 				Retrouvez les enregistrements des directs audio passés.
 			</p>
 		</div>
@@ -94,13 +99,17 @@
 			<ul class="divide-y divide-stone-100 border border-stone-200/60 bg-white/40">
 				{#each data.recordings as rec}
 					<li>
-						<div class="group relative flex items-center gap-4 px-4 py-4 transition-colors hover:bg-missionnaire/5">
+						<div
+							class="group relative flex items-center gap-4 px-4 py-4 transition-colors hover:bg-missionnaire/5"
+						>
 							<!-- Thumbnail — clickable to expand, separate from row nav -->
 							<button
 								type="button"
 								on:click={(e) => openThumb(rec, e)}
 								aria-label={rec.thumbnail_url ? 'Agrandir la vignette' : 'Vignette par défaut'}
-								class="relative h-14 w-24 sm:h-16 sm:w-28 shrink-0 overflow-hidden border border-stone-200/60 bg-stone-100 {rec.thumbnail_url ? 'cursor-zoom-in' : 'cursor-default'} focus:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
+								class="relative h-14 w-24 sm:h-16 sm:w-28 shrink-0 overflow-hidden border border-stone-200/60 bg-stone-100 {rec.thumbnail_url
+									? 'cursor-zoom-in'
+									: 'cursor-default'} focus:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
 							>
 								{#if rec.thumbnail_url && !failedThumbs.has(rec.id)}
 									<img
@@ -135,7 +144,9 @@
 								href="/live/rediffusions/{rec.id}"
 								class="min-w-0 flex-1 outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40 rounded"
 							>
-								<p class="font-display text-[15px] sm:text-base font-medium text-stone-800 group-hover:text-missionnaire transition-colors leading-snug line-clamp-2">
+								<p
+									class="font-display text-[15px] sm:text-base font-medium text-stone-800 group-hover:text-missionnaire transition-colors leading-snug line-clamp-2"
+								>
 									{rec.title}
 								</p>
 								<p class="mt-1 text-xs text-stone-400 font-body">
@@ -160,11 +171,15 @@
 			{#if totalPages > 1}
 				<div class="mt-8 flex items-center justify-center gap-4 text-sm">
 					{#if data.pageNumber > 1}
-						<a href="?page={data.pageNumber - 1}" class="text-missionnaire hover:underline">← Précédent</a>
+						<a href="?page={data.pageNumber - 1}" class="text-missionnaire hover:underline"
+							>← Précédent</a
+						>
 					{/if}
 					<span class="text-stone-400">Page {data.pageNumber} / {totalPages}</span>
 					{#if data.pageNumber < totalPages}
-						<a href="?page={data.pageNumber + 1}" class="text-missionnaire hover:underline">Suivant →</a>
+						<a href="?page={data.pageNumber + 1}" class="text-missionnaire hover:underline"
+							>Suivant →</a
+						>
 					{/if}
 				</div>
 			{/if}
@@ -188,7 +203,16 @@
 			aria-label="Fermer"
 			class="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
 		>
-			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+			<svg
+				width="18"
+				height="18"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
 				<path d="M6 6l12 12M6 18L18 6" />
 			</svg>
 		</button>
@@ -208,13 +232,17 @@
 	.default-thumbnail {
 		background:
 			radial-gradient(circle at 30% 20%, rgba(255, 136, 12, 0.08), transparent 60%),
-			linear-gradient(135deg, #FAF6F1 0%, #F1EAE0 100%);
+			linear-gradient(135deg, #faf6f1 0%, #f1eae0 100%);
 	}
 	.animate-lightbox-in {
 		animation: lightbox-fade 0.18s ease-out;
 	}
 	@keyframes lightbox-fade {
-		from { opacity: 0; }
-		to { opacity: 1; }
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
 	}
 </style>

@@ -10,14 +10,20 @@
 
 <svelte:head>
 	<title>Audio en direct - Missionnaire Network</title>
-	<meta name="description" content="Écoutez Missionnaire Network en direct audio. Prédications et cantiques du Message de l'Heure en streaming continu." />
+	<meta
+		name="description"
+		content="Écoutez Missionnaire Network en direct audio. Prédications et cantiques du Message de l'Heure en streaming continu."
+	/>
 	<link rel="canonical" href="https://missionnaire.net/live" />
 	<meta property="og:title" content="Audio en direct - Missionnaire Network" />
-	<meta property="og:description" content="Écoutez Missionnaire Network en direct audio. Prédications et cantiques du Message de l'Heure en streaming continu." />
+	<meta
+		property="og:description"
+		content="Écoutez Missionnaire Network en direct audio. Prédications et cantiques du Message de l'Heure en streaming continu."
+	/>
 	<meta property="og:url" content="https://missionnaire.net/live" />
 </svelte:head>
 
-<section class="w-full py-14 md:py-20 px-6">
+<section class="w-full py-10 px-6">
 	<div class="max-w-2xl mx-auto">
 		<!-- Header -->
 		<div class="text-center mb-12">
@@ -49,9 +55,14 @@
 			<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body">
 				Direct Audio
 			</p>
-			<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">Écoute en direct</h1>
-			<p class="mt-3 text-[15px] text-stone-400 font-body font-light max-w-md mx-auto leading-relaxed">
-				La page se met à jour automatiquement. Dès que le direct audio commence, la lecture démarre toute seule.
+			<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">
+				Écoute en direct
+			</h1>
+			<p
+				class="mt-3 text-[15px] text-stone-400 font-body font-light max-w-md mx-auto leading-relaxed"
+			>
+				La page se met à jour automatiquement. Dès que le direct audio commence, la lecture démarre
+				toute seule.
 			</p>
 		</div>
 
@@ -68,9 +79,10 @@
 				? 'border-missionnaire/30 bg-missionnaire/5'
 				: 'border-stone-200/60 bg-white/40 hover:border-missionnaire/30 hover:bg-missionnaire/5 hover:-translate-y-0.5 hover:shadow-sm'}"
 		>
-			<div class="w-10 h-10 flex items-center justify-center shrink-0 border transition-colors duration-300 {bellRef?.isSubscribed
-				? 'border-missionnaire/30 text-missionnaire'
-				: 'border-stone-200/60 text-stone-400 group-hover:border-missionnaire/30 group-hover:text-missionnaire'}"
+			<div
+				class="w-10 h-10 flex items-center justify-center shrink-0 border transition-colors duration-300 {bellRef?.isSubscribed
+					? 'border-missionnaire/30 text-missionnaire'
+					: 'border-stone-200/60 text-stone-400 group-hover:border-missionnaire/30 group-hover:text-missionnaire'}"
 			>
 				<NotificationBell bind:this={bellRef} />
 			</div>
@@ -79,13 +91,21 @@
 					<p class="text-sm font-semibold text-missionnaire">Notifications activées</p>
 					<p class="text-[11px] text-stone-400 mt-0.5">Cliquez pour désactiver</p>
 				{:else}
-					<p class="text-sm font-semibold text-stone-700 group-hover:text-missionnaire transition-colors">Activer les notifications</p>
-					<p class="text-[11px] text-stone-400 mt-0.5">Soyez alerté quand le direct audio commence</p>
+					<p
+						class="text-sm font-semibold text-stone-700 group-hover:text-missionnaire transition-colors"
+					>
+						Activer les notifications
+					</p>
+					<p class="text-[11px] text-stone-400 mt-0.5">
+						Soyez alerté quand le direct audio commence
+					</p>
 				{/if}
 			</div>
-			<span class="text-[11px] font-bold uppercase tracking-[0.15em] font-body shrink-0 transition-colors duration-300 {bellRef?.isSubscribed
-				? 'text-missionnaire/60'
-				: 'text-stone-300 group-hover:text-missionnaire'}">
+			<span
+				class="text-[11px] font-bold uppercase tracking-[0.15em] font-body shrink-0 transition-colors duration-300 {bellRef?.isSubscribed
+					? 'text-missionnaire/60'
+					: 'text-stone-300 group-hover:text-missionnaire'}"
+			>
 				{bellRef?.isSubscribed ? 'Activé' : 'Activer →'}
 			</span>
 		</button>
@@ -93,12 +113,19 @@
 		<!-- Info when offline -->
 		<div class="mt-8 text-center">
 			<p class="ornament-line text-stone-200 mb-6">
-				<svg width="10" height="10" viewBox="0 0 14 14" fill="none"><path d="M7 0L8.5 5.5L14 7L8.5 8.5L7 14L5.5 8.5L0 7L5.5 5.5L7 0Z" fill="currentColor"/></svg>
+				<svg width="10" height="10" viewBox="0 0 14 14" fill="none"
+					><path
+						d="M7 0L8.5 5.5L14 7L8.5 8.5L7 14L5.5 8.5L0 7L5.5 5.5L7 0Z"
+						fill="currentColor"
+					/></svg
+				>
 			</p>
 			<p class="font-display text-lg italic text-stone-400 leading-relaxed">
 				« Voici, je me tiens à la porte, et je frappe. »
 			</p>
-			<p class="text-[11px] font-bold uppercase tracking-[0.25em] text-missionnaire/60 mt-2 font-body">
+			<p
+				class="text-[11px] font-bold uppercase tracking-[0.25em] text-missionnaire/60 mt-2 font-body"
+			>
 				— Apocalypse 3:20
 			</p>
 		</div>

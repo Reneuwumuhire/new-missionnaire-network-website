@@ -120,7 +120,7 @@
 
 <svelte:window on:keydown={onLightboxKeydown} />
 
-<section class="w-full py-14 md:py-20 px-6">
+<section class="w-full py-10 px-6">
 	<div class="max-w-3xl mx-auto">
 		<div class="mb-8">
 			<a
@@ -159,16 +159,32 @@
 							class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
 							loading="eager"
 						/>
-						<span class="pointer-events-none absolute inset-0 flex items-end justify-end p-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-							<span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/90 shadow">
-								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-stone-700">
+						<span
+							class="pointer-events-none absolute inset-0 flex items-end justify-end p-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+						>
+							<span
+								class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/90 shadow"
+							>
+								<svg
+									width="14"
+									height="14"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									class="text-stone-700"
+								>
 									<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
 								</svg>
 							</span>
 						</span>
 					</button>
 				{:else}
-					<div class="default-thumbnail relative aspect-video w-full overflow-hidden border border-stone-200/60">
+					<div
+						class="default-thumbnail relative aspect-video w-full overflow-hidden border border-stone-200/60"
+					>
 						<div class="absolute inset-0 flex flex-col items-center justify-center gap-2">
 							<picture>
 								<source srcset="/icons/logo.webp" type="image/webp" />
@@ -180,11 +196,18 @@
 									height="64"
 								/>
 							</picture>
-							<span class="text-[9px] font-bold uppercase tracking-[0.25em] text-missionnaire/70 font-body">
+							<span
+								class="text-[9px] font-bold uppercase tracking-[0.25em] text-missionnaire/70 font-body"
+							>
 								Archive
 							</span>
 						</div>
-						<svg class="absolute top-2 right-2 h-3 w-3 text-missionnaire/30" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
+						<svg
+							class="absolute top-2 right-2 h-3 w-3 text-missionnaire/30"
+							viewBox="0 0 14 14"
+							fill="currentColor"
+							aria-hidden="true"
+						>
 							<path d="M7 0L8.5 5.5L14 7L8.5 8.5L7 14L5.5 8.5L0 7L5.5 5.5L7 0Z" />
 						</svg>
 					</div>
@@ -221,9 +244,30 @@
 							<!-- Stop square: the spinner next to "Téléchargement" doubles as
 							     a cancel indicator since the entire row is now clickable to
 							     abort. Hover fills the row red to reinforce the cancel intent. -->
-							<svg class="h-3 w-3 animate-spin group-hover:animate-none" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-								<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-dasharray="42 62" stroke-linecap="round" class="group-hover:hidden" />
-								<rect x="7" y="7" width="10" height="10" fill="currentColor" class="hidden group-hover:block" />
+							<svg
+								class="h-3 w-3 animate-spin group-hover:animate-none"
+								viewBox="0 0 24 24"
+								fill="none"
+								aria-hidden="true"
+							>
+								<circle
+									cx="12"
+									cy="12"
+									r="10"
+									stroke="currentColor"
+									stroke-width="3"
+									stroke-dasharray="42 62"
+									stroke-linecap="round"
+									class="group-hover:hidden"
+								/>
+								<rect
+									x="7"
+									y="7"
+									width="10"
+									height="10"
+									fill="currentColor"
+									class="hidden group-hover:block"
+								/>
 							</svg>
 							<span class="group-hover:hidden">Téléchargement</span>
 							<span class="hidden group-hover:inline">Annuler</span>
@@ -234,17 +278,33 @@
 							{/if}
 						</span>
 					{:else}
-						<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 4v12m0 0l-4-4m4 4l4-4" />
+						<svg
+							width="13"
+							height="13"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							aria-hidden="true"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 4v12m0 0l-4-4m4 4l4-4"
+							/>
 						</svg>
 						Télécharger
 						{#if rec.size_bytes}
-							<span class="font-normal tracking-normal text-stone-400 group-hover:text-white/80">· {formatBytes(rec.size_bytes)}</span>
+							<span class="font-normal tracking-normal text-stone-400 group-hover:text-white/80"
+								>· {formatBytes(rec.size_bytes)}</span
+							>
 						{/if}
 					{/if}
 				</button>
 				{#if downloadError}
-					<p class="border-t border-red-200 bg-red-50 px-5 py-2 text-[11px] text-red-600 font-body text-center">
+					<p
+						class="border-t border-red-200 bg-red-50 px-5 py-2 text-[11px] text-red-600 font-body text-center"
+					>
 						{downloadError}
 					</p>
 				{/if}
@@ -253,7 +313,9 @@
 
 		{#if rec.description}
 			<div class="mt-10 border border-stone-200/60 bg-white/40 p-6">
-				<p class="text-[10px] font-bold uppercase tracking-[0.25em] text-missionnaire/80 font-body mb-3">
+				<p
+					class="text-[10px] font-bold uppercase tracking-[0.25em] text-missionnaire/80 font-body mb-3"
+				>
 					À propos de ce direct
 				</p>
 				<p class="text-sm text-stone-700 font-body leading-relaxed whitespace-pre-wrap">
@@ -280,7 +342,16 @@
 			aria-label="Fermer"
 			class="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
 		>
-			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+			<svg
+				width="18"
+				height="18"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
 				<path d="M6 6l12 12M6 18L18 6" />
 			</svg>
 		</button>
@@ -300,14 +371,18 @@
 	.default-thumbnail {
 		background:
 			radial-gradient(circle at 30% 20%, rgba(255, 136, 12, 0.08), transparent 60%),
-			linear-gradient(135deg, #FAF6F1 0%, #F1EAE0 100%);
+			linear-gradient(135deg, #faf6f1 0%, #f1eae0 100%);
 	}
 	.animate-lightbox-in {
 		animation: lightbox-fade 0.18s ease-out;
 	}
 	@keyframes lightbox-fade {
-		from { opacity: 0; }
-		to { opacity: 1; }
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
 	}
 
 	/* Download button doubles as an inline progress bar: a pseudo-fill
@@ -336,8 +411,14 @@
 		animation: download-slide 1.3s ease-in-out infinite;
 	}
 	@keyframes download-slide {
-		0%   { transform: translateX(-110%); }
-		50%  { transform: translateX(250%); }
-		100% { transform: translateX(-110%); }
+		0% {
+			transform: translateX(-110%);
+		}
+		50% {
+			transform: translateX(250%);
+		}
+		100% {
+			transform: translateX(-110%);
+		}
 	}
 </style>
