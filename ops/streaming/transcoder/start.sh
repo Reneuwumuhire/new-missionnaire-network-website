@@ -8,7 +8,7 @@ echo "Waiting for OBS stream on ${RTMP_URL}"
 while true; do
 	ffmpeg -nostdin -hide_banner -loglevel info \
 		-i "${RTMP_URL}" \
-		-vn -c:a libmp3lame -b:a 128k -ar 48000 -ac 2 \
+		-vn -c:a libmp3lame -b:a 96k -ar 48000 -ac 1 \
 		-content_type audio/mpeg \
 		-f mp3 "${ICECAST_URL}"
 
