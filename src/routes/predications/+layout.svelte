@@ -1,9 +1,8 @@
 <script lang="ts">
-	import AudioPlayer from '$lib/components/+audioPlayer.svelte';
 	import AndroidBanner from '$lib/components/+androidBanner.svelte';
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
-	import { selectAudio, searchQuery } from '$lib/stores/global';
+	import { searchQuery } from '$lib/stores/global';
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 
@@ -81,10 +80,6 @@
 		<slot />
 	</div>
 </div>
-
-{#if $selectAudio}
-	<AudioPlayer />
-{/if}
 
 <style>
 	.header-predications {

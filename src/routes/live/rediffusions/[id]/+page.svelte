@@ -1,6 +1,15 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { downloadAudioFile } from '../../../../utils/downloadAudio';
+	import {
+		selectAudio,
+		playlist,
+		basePlaylist,
+		currentIndex,
+		isPlaying
+	} from '$lib/stores/global';
+	import type { MusicAudio } from '$lib/models/music-audio';
+	import { derived } from 'svelte/store';
 
 	export let data: PageData;
 
@@ -8,6 +17,54 @@
 
 	let thumbnailExpanded = false;
 	let thumbnailBroken = false;
+
+	// ── Audio player ───────────────────────────────────────────────
+	// Route playback through the global AudioPlayer (bottom bar) so
+	// listeners get the same experience as the music/predications
+	// pages: ±5s skip buttons, keyboard shortcuts, MediaSession
+	// controls on lock-screen/Bluetooth/car head-unit, and the OS
+	// resume-after-interruption logic. The rediffusion is shaped as a
+	// single-item MusicAudio-compatible entry so it plugs into the
+	// existing selectAudio/playlist stores without special-casing.
+	$: playable = {
+		_id: rec.id,
+		book: null,
+		book_full_name: null,
+		number: null,
+		title: rec.title,
+		artist: 'Missionnaire Network',
+		category: 'Direct',
+		s3_key: '',
+		s3_url: rec.s3_url,
+		file_size: rec.size_bytes ?? 0,
+		duration: rec.duration_sec ?? undefined,
+		format: 'mp3',
+		uploaded_at: new Date(rec.started_at),
+		thumbnail_url: rec.thumbnail_url ?? undefined
+	} satisfies MusicAudio & { thumbnail_url?: string };
+
+	// Is *this* recording currently loaded into the global player? Used
+	// to flip the button label between "Écouter" and the play/pause
+	// state the bottom bar is showing.
+	const isCurrent = derived(selectAudio, ($sel) => {
+		if (!$sel) return false;
+		const url = 's3_url' in $sel ? $sel.s3_url : '';
+		return url === rec?.s3_url;
+	});
+
+	function playRecording() {
+		if ($isCurrent) {
+			// Same track — toggle play/pause on the active element.
+			isPlaying.update((v) => !v);
+			return;
+		}
+		const single = [playable] as unknown as MusicAudio[];
+		basePlaylist.set(single);
+		playlist.set(single);
+		currentIndex.set(0);
+		selectAudio.set(playable as unknown as MusicAudio);
+		isPlaying.set(true);
+	}
 
 	// ── Download state ─────────────────────────────────────────────
 	// Background fetch: stream the mp3, track bytes loaded, hand the
@@ -218,10 +275,30 @@
 			     the player stretches to match the thumbnail height without leaving
 			     dead space around the audio element). -->
 			<div class="flex-1 flex flex-col border border-stone-200/60 bg-white/40">
-				<div class="flex-1 flex items-center px-4 py-4 md:px-5">
-					<audio controls preload="metadata" class="w-full" src={rec.s3_url}>
-						Votre navigateur ne prend pas en charge l'audio HTML5.
-					</audio>
+				<div class="flex-1 flex items-center justify-center px-4 py-6 md:px-5">
+					<button
+						type="button"
+						on:click={playRecording}
+						aria-label={$isCurrent && $isPlaying
+							? 'Mettre en pause'
+							: $isCurrent
+								? 'Reprendre la lecture'
+								: 'Écouter ce direct'}
+						class="play-cta group inline-flex items-center gap-3 bg-missionnaire px-6 py-3 text-sm font-bold uppercase tracking-[0.2em] font-body text-white transition-all hover:bg-missionnaire/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40 active:scale-95"
+					>
+						{#if $isCurrent && $isPlaying}
+							<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+								<rect x="6" y="5" width="4" height="14" rx="1" />
+								<rect x="14" y="5" width="4" height="14" rx="1" />
+							</svg>
+							<span>En lecture — pause</span>
+						{:else}
+							<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+								<path d="M8 5v14l11-7z" />
+							</svg>
+							<span>{$isCurrent ? 'Reprendre' : 'Écouter'}</span>
+						{/if}
+					</button>
 				</div>
 				<button
 					type="button"

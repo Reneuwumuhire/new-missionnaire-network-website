@@ -1,5 +1,4 @@
 <script lang="ts">
-	import AudioPlayer from '$lib/components/+audioPlayer.svelte';
 	import AndroidBanner from '$lib/components/+androidBanner.svelte';
 	import AudioTableItem from '$lib/components/+audioTableItem.svelte';
 	import { getContext, onDestroy, onMount } from 'svelte';
@@ -7,7 +6,6 @@
 	import { page } from '$app/stores';
 	import type { AudioAsset } from '$lib/models/media-assets';
 	import type { MusicAudio } from '$lib/models/music-audio';
-	import { selectAudio } from '$lib/stores/global.js';
 	import { goto } from '$app/navigation';
 
 	export let data;
@@ -103,10 +101,6 @@
 		<slot />
 	</div>
 </div>
-
-{#if $selectAudio}
-	<AudioPlayer />
-{/if}
 
 <style>
 	.header-predications {

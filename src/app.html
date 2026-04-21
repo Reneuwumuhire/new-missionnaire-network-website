@@ -57,7 +57,16 @@
 					var standalone =
 						window.matchMedia('(display-mode: standalone)').matches ||
 						window.navigator.standalone === true;
-					if (standalone) document.documentElement.classList.add('pwa-standalone');
+					if (standalone) {
+						document.documentElement.classList.add('pwa-standalone');
+						// Failsafe: if hydration never fires pwa-ready (JS bundle
+						// failed to load, SW offline with no cache, etc.) don't
+						// trap the user behind the splash forever — force it off
+						// after 6s so at least something renders.
+						setTimeout(function () {
+							document.documentElement.classList.add('pwa-ready');
+						}, 6000);
+					}
 
 					// Path restoration — only inside the installed app, only when
 					// landing on the bare "/" root, and only for recent sessions.
@@ -100,8 +109,11 @@
 				gap: 28px;
 				background: #faf8f3;
 				pointer-events: none;
-				animation: app-splash-fade 0.45s ease-out 0.45s forwards;
 			}
+			/* Splash only fades once the app signals it's hydrated
+			   (see +layout.svelte). Previously the splash faded on a
+			   timer regardless of hydration state, which left a white
+			   screen when the network was slow to serve the shell. */
 			.pwa-standalone.pwa-ready .app-splash {
 				animation: app-splash-fade 0.3s ease-out forwards;
 			}

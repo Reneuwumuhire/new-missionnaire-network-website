@@ -159,10 +159,39 @@ sw.addEventListener('fetch', (event) => {
 				if (cached) return cached;
 			}
 
-			// For pages, try network first, fall back to cache
+			// Navigation requests (HTML pages): stale-while-revalidate so the
+			// installed app paints instantly from cache on launch instead of
+			// waiting on a slow network — the cache is refreshed in the
+			// background so the next visit sees fresh content. Eliminates the
+			// "white screen on reopen" issue on flaky connections.
+			if (event.request.mode === 'navigate') {
+				const cached = await cache.match(event.request);
+				const networkFetch = fetch(event.request)
+					.then((response) => {
+						if (response.status === 200) {
+							cache.put(event.request, response.clone());
+						}
+						return response;
+					})
+					.catch(() => null);
+
+				if (cached) {
+					// Don't await — let the revalidation finish in the background.
+					void networkFetch;
+					return cached;
+				}
+
+				const fresh = await networkFetch;
+				if (fresh) return fresh;
+
+				const cachedIndex = await cache.match('/');
+				if (cachedIndex) return cachedIndex;
+				return new Response('Offline', { status: 503 });
+			}
+
+			// Subresources: network-first, fall back to cache on failure.
 			try {
 				const response = await fetch(event.request);
-				// Cache successful page responses
 				if (response.status === 200) {
 					cache.put(event.request, response.clone());
 				}
@@ -170,13 +199,6 @@ sw.addEventListener('fetch', (event) => {
 			} catch {
 				const cached = await cache.match(event.request);
 				if (cached) return cached;
-
-				// If it's a navigation request and nothing is cached, return the offline page
-				if (event.request.mode === 'navigate') {
-					const cachedIndex = await cache.match('/');
-					if (cachedIndex) return cachedIndex;
-				}
-
 				return new Response('Offline', { status: 503 });
 			}
 		})()

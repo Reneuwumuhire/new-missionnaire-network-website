@@ -8,6 +8,8 @@
 	import InstallPrompt from '$lib/components/+installPrompt.svelte';
 	import OfflineIndicator from '$lib/components/+offlineIndicator.svelte';
 	import PullToRefresh from '$lib/components/+pullToRefresh.svelte';
+	import AudioPlayer from '$lib/components/+audioPlayer.svelte';
+	import { selectAudio } from '$lib/stores/global';
 	import type { LayoutData } from './$types';
 	import { QueryClientProvider } from '@tanstack/svelte-query';
 	import { navigating, page } from '$app/stores';
@@ -181,4 +183,12 @@
 	<InstallPrompt />
 	<OfflineIndicator />
 	<PullToRefresh />
+	<!-- Global audio player. Mounted at the root so the bottom bar
+	     persists across every navigation — listeners can browse the
+	     site while a sermon or rediffusion keeps playing. Previously
+	     mounted per-section (/musique, /predications), which meant
+	     navigating out of the section unmounted the bar mid-playback. -->
+	{#if $selectAudio}
+		<AudioPlayer />
+	{/if}
 </QueryClientProvider>
