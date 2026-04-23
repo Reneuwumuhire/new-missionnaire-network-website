@@ -54,9 +54,6 @@ jobs:
   deploy-admin:
     name: Deploy admin
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./admin
     env:
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_ADMIN }}
     steps:
