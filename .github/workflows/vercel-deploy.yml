@@ -36,6 +36,9 @@ jobs:
           node-version: 20
           cache: pnpm
 
+      - name: Enable Corepack
+        run: corepack enable
+
       - name: Install Vercel CLI
         run: pnpm add -g vercel@latest
 
@@ -77,6 +80,9 @@ jobs:
           node-version: 20
           cache: pnpm
           cache-dependency-path: admin/pnpm-lock.yaml
+
+      - name: Enable Corepack
+        run: corepack enable
 
       - name: Install Vercel CLI
         run: pnpm add -g vercel@latest
