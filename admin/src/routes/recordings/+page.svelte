@@ -6,6 +6,8 @@
 	import { confirmDialog } from '$lib/stores/confirm-dialog';
 	import { toast } from '$lib/stores/toast';
 	import AudioTrimEditor from '$lib/components/AudioTrimEditor.svelte';
+	import BlurUpImage from '$lib/components/BlurUpImage.svelte';
+	import { vercelImage, vercelImageSrcSet, vercelImagePlaceholder } from '$lib/utils/vercelImage';
 
 	let { data }: { data: PageData } = $props();
 
@@ -1440,11 +1442,17 @@
 						aria-label="Agrandir la vignette"
 						class="relative h-28 w-44 overflow-hidden border border-stone-300 bg-cream/40 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 group cursor-zoom-in hover:border-primary"
 					>
-						<img
-							src={broadcast.thumbnail_url}
+						<BlurUpImage
+							src={vercelImage(broadcast.thumbnail_url, 384)}
+							srcset={vercelImageSrcSet(broadcast.thumbnail_url, 192)}
+							placeholderSrc={vercelImagePlaceholder(broadcast.thumbnail_url)}
 							alt="Vignette du direct"
-							onerror={() => (broadcastThumbnailBroken = true)}
+							width={176}
+							height={112}
+							loading="eager"
+							fetchpriority="high"
 							class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+							on:error={() => (broadcastThumbnailBroken = true)}
 						/>
 						<span class="pointer-events-none absolute inset-0 flex items-end justify-end p-1.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
 							<span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/90 shadow">
@@ -1618,12 +1626,19 @@
 				/>
 
 				{#if rec.thumbnail_url && !failedThumbnails.has(rec._id!)}
-					<img
-						src={rec.thumbnail_url}
-						alt=""
-						onerror={() => markThumbnailFailed(rec._id!)}
-						class="h-14 w-20 shrink-0 object-cover border border-stone-200/60"
-					/>
+					<div class="h-14 w-20 shrink-0 border border-stone-200/60 overflow-hidden">
+						<BlurUpImage
+							src={vercelImage(rec.thumbnail_url, 192)}
+							srcset={vercelImageSrcSet(rec.thumbnail_url, 96)}
+							placeholderSrc={vercelImagePlaceholder(rec.thumbnail_url)}
+							alt=""
+							width={80}
+							height={56}
+							loading="lazy"
+							class="h-full w-full object-cover"
+							on:error={() => markThumbnailFailed(rec._id!)}
+						/>
+					</div>
 				{:else}
 					<div class="flex h-14 w-20 shrink-0 items-center justify-center border border-stone-200/60 bg-cream/60 text-stone-300" aria-hidden="true">
 						<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
@@ -1799,12 +1814,19 @@
 					<td class="px-5 py-4">
 						<div class="flex items-center gap-3">
 							{#if rec.thumbnail_url && !failedThumbnails.has(rec._id!)}
-								<img
-									src={rec.thumbnail_url}
-									alt=""
-									onerror={() => markThumbnailFailed(rec._id!)}
-									class="h-9 w-14 shrink-0 rounded object-cover border border-stone-200/60"
-								/>
+								<div class="h-9 w-14 shrink-0 rounded border border-stone-200/60 overflow-hidden">
+									<BlurUpImage
+										src={vercelImage(rec.thumbnail_url, 192)}
+										srcset={vercelImageSrcSet(rec.thumbnail_url, 96)}
+										placeholderSrc={vercelImagePlaceholder(rec.thumbnail_url)}
+										alt=""
+										width={56}
+										height={36}
+										loading="lazy"
+										class="h-full w-full object-cover"
+										on:error={() => markThumbnailFailed(rec._id!)}
+									/>
+								</div>
 							{:else}
 								<div class="flex h-9 w-14 shrink-0 items-center justify-center rounded border border-stone-200/60 bg-cream/60 text-stone-300" aria-hidden="true">
 									<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
@@ -2360,8 +2382,10 @@
 				<path d="M6 6l12 12M6 18L18 6" />
 			</svg>
 		</button>
+		<!-- Lightbox: skip BlurUpImage here — the image IS the focus, so a
+		     blur-up distracts. Just request the largest optimized variant. -->
 		<img
-			src={broadcast.thumbnail_url}
+			src={vercelImage(broadcast.thumbnail_url, 1920, 85)}
 			alt={broadcast.title || 'Vignette du direct'}
 			onerror={() => {
 				broadcastThumbnailBroken = true;
