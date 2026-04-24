@@ -2,14 +2,6 @@
 	"buildCommand": "pnpm run build",
 	"installCommand": "pnpm install",
 	"framework": "sveltekit",
-	"images": {
-		"sizes": [24, 96, 192, 256, 384, 512, 1080, 1920],
-		"formats": ["image/avif", "image/webp"],
-		"minimumCacheTTL": 2592000,
-		"remotePatterns": [
-			{ "protocol": "https", "hostname": "**.amazonaws.com" }
-		]
-	},
 	"redirects": [
 		{
 			"source": "/:path*",
