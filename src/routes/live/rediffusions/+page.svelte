@@ -190,6 +190,12 @@
 			<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">
 				Directs précédents
 			</h1>
+			{#if data.allTotal > 0}
+				<p class="mt-4 font-body text-stone-500 text-base">
+					<span class="font-display text-missionnaire text-2xl md:text-3xl font-semibold align-middle tabular-nums">{data.allTotal}</span>
+					<span class="align-middle">enregistrement{data.allTotal > 1 ? 's' : ''} disponible{data.allTotal > 1 ? 's' : ''}</span>
+				</p>
+			{/if}
 			<p
 				class="mt-3 text-[15px] text-stone-400 font-body font-light max-w-md mx-auto leading-relaxed"
 			>

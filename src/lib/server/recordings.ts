@@ -130,6 +130,26 @@ export async function listPublished(options: {
 const YEARS_TTL_MS = 10 * 60 * 1000;
 let yearsCache: { value: number[]; expires: number } | null = null;
 
+// Total count of published+ready recordings. Used for the page header, so
+// stale-within-minutes is fine — new recordings appear on the next refresh.
+const TOTAL_TTL_MS = 5 * 60 * 1000;
+let totalCache: { value: number; expires: number } | null = null;
+
+export async function getPublishedTotal(): Promise<number> {
+	if (totalCache && totalCache.expires > Date.now()) return totalCache.value;
+	try {
+		const db = await getDb();
+		const total = await db
+			.collection('recordings')
+			.countDocuments({ published: true, status: 'ready' });
+		totalCache = { value: total, expires: Date.now() + TOTAL_TTL_MS };
+		return total;
+	} catch (err) {
+		console.error('[recordings] getPublishedTotal failed', err);
+		return totalCache?.value ?? 0;
+	}
+}
+
 export async function getAvailableYears(): Promise<number[]> {
 	if (yearsCache && yearsCache.expires > Date.now()) return yearsCache.value;
 	try {

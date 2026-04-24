@@ -1,4 +1,4 @@
-import { getAvailableYears, listPublished } from '$lib/server/recordings';
+import { getAvailableYears, getPublishedTotal, listPublished } from '$lib/server/recordings';
 import type { PageServerLoad } from './$types';
 
 const PAGE_SIZE = 20;
@@ -16,14 +16,16 @@ export const load: PageServerLoad = async ({ url }) => {
 	const year = parseIntParam(url.searchParams.get('year'), 1970, 3000);
 	const month = parseIntParam(url.searchParams.get('month'), 1, 12);
 
-	const [{ data, total }, years] = await Promise.all([
+	const [{ data, total }, years, allTotal] = await Promise.all([
 		listPublished({ limit: PAGE_SIZE, pageNumber, q: q || undefined, year, month: year ? month : undefined }),
-		getAvailableYears()
+		getAvailableYears(),
+		getPublishedTotal()
 	]);
 
 	return {
 		recordings: data,
 		total,
+		allTotal,
 		pageNumber,
 		pageSize: PAGE_SIZE,
 		filters: { q, year: year ?? null, month: year ? month ?? null : null },
