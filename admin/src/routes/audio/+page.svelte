@@ -57,12 +57,20 @@
 		<p class="mt-1 text-sm text-stone-500">{data.total} piste{data.total !== 1 ? 's' : ''} au total</p>
 	</div>
 	{#if perms.can_add}
-	<a href="/audio/new" class="admin-btn-primary">
-		<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-			<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-		</svg>
-		Importer
-	</a>
+	<div class="flex gap-2">
+		<a href="/audio/bulk-new" class="admin-btn-secondary">
+			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M3 7l2-2h4l2 2h10a2 2 0 012 2v9a2 2 0 01-2 2H3a2 2 0 01-2-2V9a2 2 0 012-2z" />
+			</svg>
+			Importer en lot
+		</a>
+		<a href="/audio/new" class="admin-btn-primary">
+			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+			</svg>
+			Importer
+		</a>
+	</div>
 	{/if}
 </div>
 

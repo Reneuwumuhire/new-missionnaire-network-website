@@ -19,7 +19,6 @@
 		{ href: '/', label: 'Tableau de bord', icon: 'home' },
 		...(user.canManageRecordings ? [{ href: '/recordings', label: 'Enregistrements', icon: 'recordings' }] : []),
 		{ href: '/audio', label: 'Bibliothèque audio', icon: 'music' },
-		{ href: '/audio/new', label: 'Importer', icon: 'upload' },
 		...(user.role === 'superadmin' ? [{ href: '/users', label: 'Utilisateurs', icon: 'users' }] : []),
 		{ href: '/settings', label: 'Paramètres', icon: 'settings' }
 	]);
@@ -112,10 +111,6 @@
 						{:else if item.icon === 'music'}
 							<svg class="h-[15px] w-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 								<path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-							</svg>
-						{:else if item.icon === 'upload'}
-							<svg class="h-[15px] w-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
 							</svg>
 						{:else if item.icon === 'users'}
 							<svg class="h-[15px] w-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
