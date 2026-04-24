@@ -11,6 +11,8 @@
 	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
 	import type { MusicAudio } from '$lib/models/music-audio';
 	import { derived } from 'svelte/store';
+	import { vercelImage, vercelImagePlaceholder } from '$lib/utils/vercelImage';
+	import BlurUpImage from '$lib/components/BlurUpImage.svelte';
 
 	export let data: PageData;
 
@@ -183,7 +185,7 @@
 	<div class="max-w-3xl mx-auto">
 		<div class="mb-8">
 			<a
-				href="/live/rediffusions"
+				href={data.backHref}
 				class="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.15em] font-body text-missionnaire/80 hover:text-missionnaire transition-colors"
 			>
 				← Tous les directs
@@ -211,12 +213,18 @@
 						aria-label="Agrandir la vignette"
 						class="group relative aspect-video w-full overflow-hidden border border-stone-200/60 bg-stone-100 cursor-zoom-in transition-all duration-300 hover:border-missionnaire/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
 					>
-						<img
-							src={rec.thumbnail_url}
+						<BlurUpImage
+							src={vercelImage(rec.thumbnail_url, 512)}
+							srcset={`${vercelImage(rec.thumbnail_url, 256)} 256w, ${vercelImage(rec.thumbnail_url, 512)} 512w, ${vercelImage(rec.thumbnail_url, 1080)} 1080w`}
+							sizes="(min-width: 768px) 256px, 100vw"
+							placeholderSrc={vercelImagePlaceholder(rec.thumbnail_url)}
 							alt=""
-							on:error={() => (thumbnailBroken = true)}
-							class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+							width={256}
+							height={144}
 							loading="eager"
+							fetchpriority="high"
+							class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+							on:error={() => (thumbnailBroken = true)}
 						/>
 						<span
 							class="pointer-events-none absolute inset-0 flex items-end justify-end p-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
@@ -435,7 +443,7 @@
 			</svg>
 		</button>
 		<img
-			src={rec.thumbnail_url}
+			src={vercelImage(rec.thumbnail_url, 1920, 85)}
 			alt={rec.title}
 			on:error={() => {
 				thumbnailBroken = true;

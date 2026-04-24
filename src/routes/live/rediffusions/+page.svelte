@@ -1,14 +1,133 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import type { PublishedRecording } from '$lib/server/recordings';
+	import { goto } from '$app/navigation';
+	import { navigating } from '$app/stores';
+	import { vercelImage, vercelImageSrcSet, vercelImagePlaceholder } from '$lib/utils/vercelImage';
+	import BlurUpImage from '$lib/components/BlurUpImage.svelte';
+	// @ts-ignore — svelte-icons-pack has no types
+	import Icon from 'svelte-icons-pack/Icon.svelte';
+	import IoReload from 'svelte-icons-pack/io/IoReload';
 
 	export let data: PageData;
 
 	$: totalPages = Math.max(1, Math.ceil(data.total / data.pageSize));
 
+	// ── Filter state ───────────────────────────────────────────────
+	// Local copies of the URL-backed filters so the inputs feel responsive.
+	// Submitting (or debounced search) calls `applyFilters` which updates
+	// the URL and triggers a server reload.
+	let searchInput = data.filters.q;
+	let yearInput: number | '' = data.filters.year ?? '';
+	let monthInput: number | '' = data.filters.month ?? '';
+
+	// Re-sync when SvelteKit reloads with new data (e.g. back/forward nav).
+	$: searchInput = data.filters.q;
+	$: yearInput = data.filters.year ?? '';
+	$: monthInput = data.filters.month ?? '';
+
+	const MONTHS: Array<{ value: number; label: string }> = [
+		{ value: 1, label: 'Janvier' },
+		{ value: 2, label: 'Février' },
+		{ value: 3, label: 'Mars' },
+		{ value: 4, label: 'Avril' },
+		{ value: 5, label: 'Mai' },
+		{ value: 6, label: 'Juin' },
+		{ value: 7, label: 'Juillet' },
+		{ value: 8, label: 'Août' },
+		{ value: 9, label: 'Septembre' },
+		{ value: 10, label: 'Octobre' },
+		{ value: 11, label: 'Novembre' },
+		{ value: 12, label: 'Décembre' }
+	];
+
+	function buildQuery(overrides: Partial<{ page: number; q: string; year: number | ''; month: number | '' }>): string {
+		const q = overrides.q !== undefined ? overrides.q : data.filters.q;
+		const year = overrides.year !== undefined ? overrides.year : (data.filters.year ?? '');
+		const month = overrides.month !== undefined ? overrides.month : (data.filters.month ?? '');
+		const pageN = overrides.page !== undefined ? overrides.page : data.pageNumber;
+
+		const params = new URLSearchParams();
+		if (pageN > 1) params.set('page', String(pageN));
+		if (q) params.set('q', q);
+		if (year) params.set('year', String(year));
+		if (year && month) params.set('month', String(month));
+		const qs = params.toString();
+		return qs ? `?${qs}` : '';
+	}
+
+	function listHref(pageN: number): string {
+		return `/live/rediffusions${buildQuery({ page: pageN })}`;
+	}
+
+	// Link to a recording, carrying the current list state so the detail
+	// page can rebuild the exact same "Tous les directs" URL.
+	function detailHref(id: string): string {
+		const current = buildQuery({}).replace(/^\?/, '');
+		const suffix = current ? `?from=${encodeURIComponent(current)}` : '';
+		return `/live/rediffusions/${id}${suffix}`;
+	}
+
+	// Debounced search: 350ms after the last keystroke, push the new URL.
+	// `replaceState: true` on search keeps browser history clean — typing
+	// shouldn't bury the previous page under 12 history entries.
+	let searchTimer: ReturnType<typeof setTimeout> | null = null;
+	function onSearchInput() {
+		if (searchTimer) clearTimeout(searchTimer);
+		searchTimer = setTimeout(() => {
+			const target = `/live/rediffusions${buildQuery({ q: searchInput, page: 1 })}`;
+			goto(target, { keepFocus: true, replaceState: true, noScroll: true });
+		}, 350);
+	}
+
+	function onFilterChange() {
+		// Year cleared → month must clear too (a month without a year is ambiguous).
+		const year = yearInput === '' ? '' : Number(yearInput);
+		const month = year === '' ? '' : monthInput === '' ? '' : Number(monthInput);
+		goto(`/live/rediffusions${buildQuery({ year, month, page: 1 })}`, {
+			keepFocus: true,
+			noScroll: true
+		});
+	}
+
+	function resetFilters() {
+		searchInput = '';
+		yearInput = '';
+		monthInput = '';
+		goto('/live/rediffusions', { noScroll: true });
+	}
+
+	$: hasActiveFilters = Boolean(data.filters.q || data.filters.year);
+
+	// ── Pagination shape ───────────────────────────────────────────
+	// Produces [1, '…', 4, 5, 6, '…', 12] with the current page and its
+	// neighbours always visible, plus the first and last.
+	// Window of pages shown on each side of the current page, in addition to
+	// the first and last anchors. `siblings = 2` renders e.g. `1 … 17 18 [19] 20 21`.
+	const PAGINATION_SIBLINGS = 2;
+
+	function buildPageList(current: number, total: number): Array<number | '…'> {
+		// If the full list fits within what we'd otherwise render, just show it.
+		const maxInline = PAGINATION_SIBLINGS * 2 + 5; // siblings on each side + first + last + current + 2 ellipses
+		if (total <= maxInline) {
+			return Array.from({ length: total }, (_, i) => i + 1);
+		}
+		const anchors = new Set<number>([1, total]);
+		for (let offset = -PAGINATION_SIBLINGS; offset <= PAGINATION_SIBLINGS; offset++) {
+			anchors.add(current + offset);
+		}
+		const sorted = [...anchors].filter((p) => p >= 1 && p <= total).sort((a, b) => a - b);
+		const result: Array<number | '…'> = [];
+		for (let i = 0; i < sorted.length; i++) {
+			if (i > 0 && sorted[i] - sorted[i - 1] > 1) result.push('…');
+			result.push(sorted[i]);
+		}
+		return result;
+	}
+
+	$: pageList = buildPageList(data.pageNumber, totalPages);
+
 	let expandedThumb: PublishedRecording | null = null;
-	// Thumbnails can 403 if a past upload was private. Track failed IDs so the
-	// default logo fallback replaces the broken-image icon.
 	let failedThumbs = new Set<string>();
 	function markThumbFailed(id: string | undefined) {
 		if (!id || failedThumbs.has(id)) return;
@@ -17,7 +136,6 @@
 
 	function openThumb(rec: PublishedRecording, event: MouseEvent) {
 		if (!rec.thumbnail_url || failedThumbs.has(rec.id)) return;
-		// Prevent the row-wrapping <a> from navigating to detail page.
 		event.preventDefault();
 		event.stopPropagation();
 		expandedThumb = rec;
@@ -80,7 +198,7 @@
 		</div>
 
 		<!-- Back to live -->
-		<div class="mb-8 text-center">
+		<div class="mb-6 text-center">
 			<a
 				href="/live"
 				class="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.15em] font-body text-missionnaire/80 hover:text-missionnaire transition-colors"
@@ -89,13 +207,120 @@
 			</a>
 		</div>
 
-		{#if data.recordings.length === 0}
-			<div class="text-center py-16">
-				<p class="font-display text-lg italic text-stone-400">
-					Aucun enregistrement disponible pour le moment.
-				</p>
+		<!-- Filters: search + year + month. Progressive-enhancement form so
+		     it still submits on non-JS clients. -->
+		<form
+			method="GET"
+			action="/live/rediffusions"
+			on:submit|preventDefault={() => onSearchInput()}
+			class="mb-6 border border-stone-200/60 bg-white/40 p-3 sm:p-4"
+		>
+			<div class="flex flex-col sm:flex-row gap-2 sm:gap-3">
+				<label class="relative flex-1">
+					<span class="sr-only">Rechercher un titre</span>
+					<svg
+						aria-hidden="true"
+						class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<circle cx="11" cy="11" r="7" />
+						<path d="m21 21-4.3-4.3" />
+					</svg>
+					<input
+						type="search"
+						name="q"
+						placeholder="Rechercher un titre…"
+						bind:value={searchInput}
+						on:input={onSearchInput}
+						class="w-full border border-stone-200/80 bg-white pl-9 pr-3 py-2 text-sm font-body text-stone-800 placeholder:text-stone-400 focus:border-missionnaire/40 focus:outline-none focus:ring-1 focus:ring-missionnaire/30"
+					/>
+				</label>
+
+				<select
+					name="year"
+					bind:value={yearInput}
+					on:change={onFilterChange}
+					disabled={$navigating ? true : false}
+					class="border border-stone-200/80 bg-white px-3 py-2 text-sm font-body text-stone-800 disabled:opacity-50 disabled:cursor-not-allowed focus:border-missionnaire/40 focus:outline-none focus:ring-1 focus:ring-missionnaire/30"
+					aria-label="Filtrer par année"
+				>
+					<option value="">Toutes les années</option>
+					{#each data.availableYears as year}
+						<option value={year}>{year}</option>
+					{/each}
+				</select>
+
+				<select
+					name="month"
+					bind:value={monthInput}
+					on:change={onFilterChange}
+					disabled={!yearInput || !!$navigating}
+					class="border border-stone-200/80 bg-white px-3 py-2 text-sm font-body text-stone-800 disabled:opacity-50 disabled:cursor-not-allowed focus:border-missionnaire/40 focus:outline-none focus:ring-1 focus:ring-missionnaire/30"
+					aria-label="Filtrer par mois"
+				>
+					<option value="">Tous les mois</option>
+					{#each MONTHS as m}
+						<option value={m.value}>{m.label}</option>
+					{/each}
+				</select>
 			</div>
-		{:else}
+
+			{#if hasActiveFilters}
+				<div class="mt-3 flex items-center justify-between text-[11px] font-body text-stone-500">
+					<span>
+						{data.total} résultat{data.total > 1 ? 's' : ''}
+					</span>
+					<button
+						type="button"
+						on:click={resetFilters}
+						class="font-bold uppercase tracking-[0.15em] text-missionnaire/80 hover:text-missionnaire transition-colors"
+					>
+						Réinitialiser
+					</button>
+				</div>
+			{/if}
+
+			<!-- Non-JS fallback: a visible submit preserves the form for crawlers
+			     and users without JS. Hidden visually but accessible. -->
+			<noscript>
+				<button type="submit" class="mt-3 w-full bg-missionnaire text-white py-2 text-sm">
+					Appliquer
+				</button>
+			</noscript>
+		</form>
+
+		<!-- Results: overlay a spinner while SvelteKit is loading a new filter/page. -->
+		<div class="relative min-h-[200px]">
+			{#if $navigating}
+				<div
+					class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-20 flex items-center justify-center transition-all duration-300"
+				>
+					<div class="flex flex-col items-center gap-4">
+						<div class="text-missionnaire animate-spin">
+							<Icon src={IoReload} size="32" />
+						</div>
+						<span
+							class="text-[10px] font-semibold uppercase tracking-[0.25em] text-missionnaire animate-pulse"
+							>Chargement...</span
+						>
+					</div>
+				</div>
+			{/if}
+
+			{#if data.recordings.length === 0}
+				<div class="text-center py-16">
+					<p class="font-display text-lg italic text-stone-400">
+						{hasActiveFilters
+							? 'Aucun enregistrement ne correspond à votre recherche.'
+							: 'Aucun enregistrement disponible pour le moment.'}
+					</p>
+				</div>
+			{:else}
 			<ul class="divide-y divide-stone-100 border border-stone-200/60 bg-white/40">
 				{#each data.recordings as rec}
 					<li>
@@ -112,15 +337,17 @@
 									: 'cursor-default'} focus:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
 							>
 								{#if rec.thumbnail_url && !failedThumbs.has(rec.id)}
-									<img
-										src={rec.thumbnail_url}
+									<BlurUpImage
+										src={vercelImage(rec.thumbnail_url, 192)}
+										srcset={vercelImageSrcSet(rec.thumbnail_url, 96)}
+										placeholderSrc={vercelImagePlaceholder(rec.thumbnail_url)}
 										alt=""
-										on:error={() => markThumbFailed(rec.id)}
-										class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-										width="192"
-										height="108"
+										width={96}
+										height={54}
 										loading="lazy"
-										decoding="async"
+										fetchpriority="low"
+										class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+										on:error={() => markThumbFailed(rec.id)}
 									/>
 								{:else}
 									<div class="default-thumbnail absolute inset-0 flex items-center justify-center">
@@ -141,7 +368,7 @@
 
 							<!-- Title + meta — row navigation -->
 							<a
-								href="/live/rediffusions/{rec.id}"
+								href={detailHref(rec.id)}
 								class="min-w-0 flex-1 outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40 rounded"
 							>
 								<p
@@ -156,7 +383,7 @@
 
 							<!-- Listen affordance (desktop only) -->
 							<a
-								href="/live/rediffusions/{rec.id}"
+								href={detailHref(rec.id)}
 								aria-hidden="true"
 								tabindex="-1"
 								class="hidden sm:inline-flex shrink-0 text-[11px] font-bold uppercase tracking-[0.15em] font-body text-stone-300 group-hover:text-missionnaire transition-colors"
@@ -169,21 +396,67 @@
 			</ul>
 
 			{#if totalPages > 1}
-				<div class="mt-8 flex items-center justify-center gap-4 text-sm">
+				<nav class="mt-8 flex flex-wrap items-center justify-center gap-1 text-sm font-body" aria-label="Pagination">
 					{#if data.pageNumber > 1}
-						<a href="?page={data.pageNumber - 1}" class="text-missionnaire hover:underline"
-							>← Précédent</a
+						<a
+							href={listHref(data.pageNumber - 1)}
+							data-sveltekit-preload-data="hover"
+						class="inline-flex items-center justify-center h-9 min-w-9 px-3 border border-stone-200/80 text-stone-600 hover:border-missionnaire hover:text-missionnaire transition-colors"
+							aria-label="Page précédente"
 						>
+							‹
+						</a>
+					{:else}
+						<span
+							class="inline-flex items-center justify-center h-9 min-w-9 px-3 border border-stone-100 text-stone-300 cursor-not-allowed"
+							aria-hidden="true"
+						>
+							‹
+						</span>
 					{/if}
-					<span class="text-stone-400">Page {data.pageNumber} / {totalPages}</span>
+
+					{#each pageList as item}
+						{#if item === '…'}
+							<span class="inline-flex items-center justify-center h-9 min-w-9 px-2 text-stone-400" aria-hidden="true">…</span>
+						{:else if item === data.pageNumber}
+							<span
+								aria-current="page"
+								class="inline-flex items-center justify-center h-9 min-w-9 px-3 border border-missionnaire bg-missionnaire text-white font-semibold tabular-nums"
+							>
+								{item}
+							</span>
+						{:else}
+							<a
+								href={listHref(item)}
+								class="inline-flex items-center justify-center h-9 min-w-9 px-3 border border-stone-200/80 text-stone-600 hover:border-missionnaire hover:text-missionnaire transition-colors tabular-nums"
+								aria-label="Page {item}"
+							>
+								{item}
+							</a>
+						{/if}
+					{/each}
+
 					{#if data.pageNumber < totalPages}
-						<a href="?page={data.pageNumber + 1}" class="text-missionnaire hover:underline"
-							>Suivant →</a
+						<a
+							href={listHref(data.pageNumber + 1)}
+							data-sveltekit-preload-data="hover"
+						class="inline-flex items-center justify-center h-9 min-w-9 px-3 border border-stone-200/80 text-stone-600 hover:border-missionnaire hover:text-missionnaire transition-colors"
+							aria-label="Page suivante"
 						>
+							›
+						</a>
+					{:else}
+						<span
+							class="inline-flex items-center justify-center h-9 min-w-9 px-3 border border-stone-100 text-stone-300 cursor-not-allowed"
+							aria-hidden="true"
+						>
+							›
+						</span>
 					{/if}
-				</div>
+				</nav>
 			{/if}
 		{/if}
+		</div>
 	</div>
 </section>
 
@@ -217,7 +490,7 @@
 			</svg>
 		</button>
 		<img
-			src={expandedThumb.thumbnail_url}
+			src={vercelImage(expandedThumb.thumbnail_url, 1920, 85)}
 			alt={expandedThumb.title}
 			on:error={() => {
 				markThumbFailed(expandedThumb!.id);

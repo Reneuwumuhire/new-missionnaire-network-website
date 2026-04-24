@@ -1,5 +1,7 @@
 <script lang="ts">
 	import type { PublishedRecording } from '$lib/server/recordings';
+	import { vercelImage, vercelImageSrcSet, vercelImagePlaceholder } from '$lib/utils/vercelImage';
+	import BlurUpImage from '$lib/components/BlurUpImage.svelte';
 
 	export let recordings: PublishedRecording[] = [];
 
@@ -51,15 +53,17 @@
 					>
 						<div class="relative h-14 w-20 shrink-0 overflow-hidden border border-stone-200/60 bg-stone-100">
 							{#if rec.thumbnail_url && !failedThumbs.has(rec.id)}
-								<img
-									src={rec.thumbnail_url}
+								<BlurUpImage
+									src={vercelImage(rec.thumbnail_url, 160)}
+									srcset={vercelImageSrcSet(rec.thumbnail_url, 80)}
+									placeholderSrc={vercelImagePlaceholder(rec.thumbnail_url)}
 									alt=""
-									on:error={() => markThumbFailed(rec.id)}
-									class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-									width="160"
-									height="90"
+									width={80}
+									height={56}
 									loading="lazy"
-									decoding="async"
+									fetchpriority="low"
+									class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+									on:error={() => markThumbFailed(rec.id)}
 								/>
 							{:else}
 								<div class="recent-default-thumb absolute inset-0 flex items-center justify-center">

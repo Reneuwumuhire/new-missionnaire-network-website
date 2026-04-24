@@ -1,5 +1,30 @@
 import { getDb } from '../../db/mongo';
 
+// Indexes we want on the `recordings` collection. Created lazily on first
+// query so we never ship a migration step; Mongo's createIndex is a no-op
+// when the index already exists, so the cost is a single metadata round-trip
+// on cold start.
+let indexesEnsured: Promise<void> | null = null;
+async function ensureIndexes(): Promise<void> {
+	if (indexesEnsured !== null) return indexesEnsured;
+	indexesEnsured = (async () => {
+		try {
+			const db = await getDb();
+			await db.collection('recordings').createIndex(
+				{ published: 1, status: 1, started_at: -1 },
+				{ name: 'pub_status_startedAt_desc' }
+			);
+		} catch (err) {
+			// Retry next call: reset the latch so a transient failure doesn't
+			// permanently disable indexes (e.g. if the DB is briefly unavailable
+			// during the first request).
+			indexesEnsured = null;
+			console.error('[recordings] ensureIndexes failed', err);
+		}
+	})();
+	return indexesEnsured;
+}
+
 export interface PublishedRecording {
 	id: string;
 	title: string;
@@ -55,11 +80,38 @@ export async function getRecentPublished(limit = 5): Promise<PublishedRecording[
 export async function listPublished(options: {
 	limit?: number;
 	pageNumber?: number;
+	q?: string;
+	year?: number;
+	month?: number; // 1-12
 } = {}): Promise<{ data: PublishedRecording[]; total: number }> {
-	const { limit = 20, pageNumber = 1 } = options;
+	const { limit = 20, pageNumber = 1, q, year, month } = options;
 	try {
+		await ensureIndexes();
 		const db = await getDb();
-		const query = { published: true, status: 'ready' };
+		const query: Record<string, unknown> = { published: true, status: 'ready' };
+
+		if (q && q.trim().length > 0) {
+			// Escape regex metacharacters so user input is treated literally.
+			const escaped = q.trim().replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+			query.title = { $regex: escaped, $options: 'i' };
+		}
+
+		if (year) {
+			// Date-only range so the compound index `(published, status, started_at)`
+			// can seek directly and emit results in sorted order. Mixing in a
+			// string-type $or branch breaks that: Mongo would need two separate
+			// IXSCANs and an in-memory merge-sort. We assume started_at is stored
+			// as a BSON Date — the legacy `Date | string` typing is defensive but
+			// live data uses Date.
+			const from = month
+				? new Date(Date.UTC(year, month - 1, 1))
+				: new Date(Date.UTC(year, 0, 1));
+			const to = month
+				? new Date(Date.UTC(year, month, 1))
+				: new Date(Date.UTC(year + 1, 0, 1));
+			query.started_at = { $gte: from, $lt: to };
+		}
+
 		const skip = (pageNumber - 1) * limit;
 		const [rows, total] = await Promise.all([
 			db.collection('recordings').find(query).sort({ started_at: -1 }).skip(skip).limit(limit).toArray(),
@@ -69,6 +121,38 @@ export async function listPublished(options: {
 	} catch (err) {
 		console.error('[recordings] listPublished failed', err);
 		return { data: [], total: 0 };
+	}
+}
+
+// Years change roughly once a year; a short in-process TTL eliminates a full
+// scan from the hot path of every filter change. Module-scoped so it survives
+// between requests on the same server instance.
+const YEARS_TTL_MS = 10 * 60 * 1000;
+let yearsCache: { value: number[]; expires: number } | null = null;
+
+export async function getAvailableYears(): Promise<number[]> {
+	if (yearsCache && yearsCache.expires > Date.now()) return yearsCache.value;
+	try {
+		const db = await getDb();
+		// Projection keeps the payload small (~8 bytes/doc). The in-process TTL
+		// cache below is what actually makes this cheap — this query only runs
+		// on cold start or cache expiry. Avoided an aggregation with $toDate
+		// because it's noticeably slower per-doc than a simple projection.
+		const rows = (await db
+			.collection('recordings')
+			.find({ published: true, status: 'ready' }, { projection: { started_at: 1 } })
+			.toArray()) as unknown as Array<{ started_at: Date | string }>;
+		const years = new Set<number>();
+		for (const row of rows) {
+			const d = row.started_at instanceof Date ? row.started_at : new Date(row.started_at);
+			if (!Number.isNaN(d.getTime())) years.add(d.getUTCFullYear());
+		}
+		const sorted = [...years].sort((a, b) => b - a);
+		yearsCache = { value: sorted, expires: Date.now() + YEARS_TTL_MS };
+		return sorted;
+	} catch (err) {
+		console.error('[recordings] getAvailableYears failed', err);
+		return yearsCache?.value ?? [];
 	}
 }
 
