@@ -202,24 +202,56 @@ export interface RecordingTranscript {
 	size: number;
 }
 
+/** Find the `videos._id` for a recording — prefers the stored YouTube id,
+ *  falls back to date-based title match so recordings created by the live
+ *  broadcast recorder (which never sets `source_video_id`) still resolve. */
+async function findVideoObjectIdForRecording(
+	db: Awaited<ReturnType<typeof getDb>>,
+	sourceVideoId: string | null,
+	startedAt: string | null
+): Promise<unknown> {
+	// 1) Direct lookup by stored YouTube id.
+	if (sourceVideoId) {
+		const v = await db
+			.collection('videos')
+			.findOne({ id: sourceVideoId }, { projection: { _id: 1 } });
+		if (v) return v._id;
+	}
+	// 2) Fallback: pick the video whose title begins with the recording's
+	//    YYYY-MM-DD. Older channel entries also have the date mid-title with
+	//    stray whitespace ("[ZURICH] - 2023 -11 - 15"), so we search unanchored
+	//    and tolerate spaces around hyphens.
+	if (!startedAt) return null;
+	const day = startedAt.slice(0, 10);
+	if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+	const [y, mo, d] = day.split('-');
+	const flexible = String.raw`${y}\s*-\s*${mo}\s*-\s*${d}`;
+	const v = await db
+		.collection('videos')
+		.findOne({ title: { $regex: flexible } }, { projection: { _id: 1 } });
+	return v?._id ?? null;
+}
+
 /** Resolve the PDF transcription for a recording. The `pdfs` collection keys
- *  to `videos._id` (ObjectId), but recordings store the YouTube id string
- *  (`source_video_id`), so we hop through `videos` to translate. Returns null
- *  if there's no matching video on the channel or no PDF has been published. */
-export async function getTranscriptForYoutubeVideoId(
-	youtubeVideoId: string | null
-): Promise<RecordingTranscript | null> {
-	if (!youtubeVideoId) return null;
+ *  to `videos._id` (ObjectId); we bridge via either the stored YouTube id or
+ *  a title-date match so live-broadcast-created rows (no `source_video_id`)
+ *  still surface their transcription. */
+export async function getTranscriptForRecording(recording: {
+	source_video_id: string | null;
+	started_at: string | null;
+}): Promise<RecordingTranscript | null> {
 	try {
 		const db = await getDb();
-		const video = await db
-			.collection('videos')
-			.findOne({ id: youtubeVideoId }, { projection: { _id: 1 } });
-		if (!video) return null;
+		const videoObjectId = await findVideoObjectIdForRecording(
+			db,
+			recording.source_video_id,
+			recording.started_at
+		);
+		if (!videoObjectId) return null;
 		const pdf = await db
 			.collection('pdfs')
 			.findOne(
-				{ videoId: video._id },
+				{ videoId: videoObjectId },
 				{ projection: { url: 1, filename: 1, size: 1 } }
 			);
 		if (!pdf?.url) return null;
@@ -229,7 +261,7 @@ export async function getTranscriptForYoutubeVideoId(
 			size: (pdf.size as number) ?? 0
 		};
 	} catch (err) {
-		console.error('[recordings] getTranscriptForYoutubeVideoId failed', err);
+		console.error('[recordings] getTranscriptForRecording failed', err);
 		return null;
 	}
 }
