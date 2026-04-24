@@ -3,6 +3,8 @@ import { checkAndIngestLiveStream } from './lib/server/youtube-poller';
 import { ensureWebSubSubscription } from '$lib/server/youtube-websub';
 import { redirect, type Handle } from '@sveltejs/kit';
 import { getFullCountryName } from './utils/countries';
+import { classifyDevice } from './utils/botDetection';
+import { getTodayInKigali } from './utils/time';
 
 // Initialize MongoDB on server start, then:
 // 1. Run an initial YouTube check (self-throttled via DB lock)
@@ -35,7 +37,7 @@ async function trackAnalytics(event: any, isPageRequest: boolean) {
 		} catch (e) {
 			console.warn('[Tracking] Could not determine client IP:', e);
 		}
-		const today = new Date().toISOString().split('T')[0];
+		const today = getTodayInKigali();
 
 		const countryCode =
 			event.request.headers.get('cf-ipcountry') ||
@@ -44,14 +46,7 @@ async function trackAnalytics(event: any, isPageRequest: boolean) {
 		const countryFull = getFullCountryName(countryCode);
 		const city = event.request.headers.get('x-vercel-ip-city') || 'Unknown';
 
-		let device = 'Desktop';
-		if (/mobile|android|iphone|phone/i.test(userAgent)) {
-			device = 'Mobile';
-		} else if (/tablet|ipad/i.test(userAgent)) {
-			device = 'Tablet';
-		} else if (/bot|spider|crawl/i.test(userAgent)) {
-			device = 'Bot';
-		}
+		const device = classifyDevice(userAgent);
 
 		const now = Date.now();
 		await analytics.updateOne(

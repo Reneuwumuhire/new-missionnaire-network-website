@@ -105,7 +105,7 @@
 						</div>
 						<div class="border border-stone-200/60 bg-white/40 p-6 card-lift flex flex-col space-y-2">
 							<span class="text-sm font-medium text-stone-500 font-body uppercase tracking-wider"
-								>Visiteurs Uniques</span
+								>Visiteurs Cumulés</span
 							>
 							<span class="text-3xl font-black text-stone-900">{stats.totalVisitors}</span>
 						</div>
