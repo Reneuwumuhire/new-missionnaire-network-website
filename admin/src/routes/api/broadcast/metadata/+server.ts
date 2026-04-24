@@ -19,6 +19,7 @@ export const PATCH: RequestHandler = async ({ locals, request, getClientAddress 
 		description?: unknown;
 		thumbnail_url?: unknown;
 		thumbnail_s3_key?: unknown;
+		youtube_url?: unknown;
 	};
 
 	const updates: {
@@ -26,6 +27,7 @@ export const PATCH: RequestHandler = async ({ locals, request, getClientAddress 
 		description?: string | null;
 		thumbnail_url?: string | null;
 		thumbnail_s3_key?: string | null;
+		youtube_url?: string | null;
 	} = {};
 
 	if ('title' in body) {
@@ -54,6 +56,28 @@ export const PATCH: RequestHandler = async ({ locals, request, getClientAddress 
 			updates.description = normalized || null;
 		} else {
 			throw error(400, 'Description invalide');
+		}
+	}
+
+	if ('youtube_url' in body) {
+		// More permissive than the per-recording field: a broadcast may use
+		// the channel-live URL (no specific video id yet). Just sanity-check
+		// it parses as an http(s) URL; admins can paste channel or watch URLs.
+		if (body.youtube_url === null || body.youtube_url === '') {
+			updates.youtube_url = null;
+		} else if (typeof body.youtube_url === 'string') {
+			const trimmed = body.youtube_url.trim();
+			try {
+				const u = new URL(trimmed);
+				if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+					throw new Error('not http');
+				}
+				updates.youtube_url = trimmed;
+			} catch {
+				throw error(400, 'URL YouTube invalide');
+			}
+		} else {
+			throw error(400, 'URL YouTube invalide');
 		}
 	}
 

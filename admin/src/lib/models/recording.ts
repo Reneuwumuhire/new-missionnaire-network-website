@@ -34,6 +34,11 @@ export const RecordingSchema = z.object({
 	 *  instantly without re-downloading and decoding the full MP3. */
 	peaks: z.array(z.number()).nullable().optional(),
 	peaks_duration_sec: z.number().nullable().optional(),
+	/** YouTube video id (e.g. "MgoAxBWkG-s") linking this recording to the
+	 *  corresponding VOD on our channel. Lets the public audio detail page
+	 *  surface a YouTube link + pull the transcription PDF associated with
+	 *  that video. Admin-editable. */
+	source_video_id: z.string().nullable().optional(),
 	updated_at: z
 		.union([z.instanceof(Date), z.string()])
 		.transform((val) => new Date(val))

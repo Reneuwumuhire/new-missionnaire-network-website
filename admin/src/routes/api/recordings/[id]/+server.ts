@@ -12,6 +12,34 @@ import { deleteObject, updateDownloadFilename } from '$lib/server/s3';
 const MAX_TITLE_LEN = 200;
 const MAX_DESCRIPTION_LEN = 2000;
 
+/** Extract the 11-char YouTube video id from any of the common URL shapes
+ *  admins might paste (watch?v=, youtu.be/, /live/, /shorts/, /embed/), or
+ *  from the bare 11-char id itself. Returns null for anything we can't
+ *  confidently identify. */
+function extractYoutubeVideoId(input: string): string | null {
+	const trimmed = input.trim();
+	if (!trimmed) return null;
+	// Bare id: [A-Za-z0-9_-]{11}
+	if (/^[A-Za-z0-9_-]{11}$/.test(trimmed)) return trimmed;
+	try {
+		const u = new URL(trimmed);
+		const host = u.hostname.replace(/^www\./, '');
+		if (host === 'youtu.be') {
+			const id = u.pathname.slice(1).split('/')[0];
+			return /^[A-Za-z0-9_-]{11}$/.test(id) ? id : null;
+		}
+		if (host === 'youtube.com' || host.endsWith('.youtube.com')) {
+			const v = u.searchParams.get('v');
+			if (v && /^[A-Za-z0-9_-]{11}$/.test(v)) return v;
+			const m = u.pathname.match(/^\/(?:live|shorts|embed)\/([A-Za-z0-9_-]{11})/);
+			if (m) return m[1];
+		}
+		return null;
+	} catch {
+		return null;
+	}
+}
+
 export const PATCH: RequestHandler = async ({ locals, params, request, getClientAddress }) => {
 	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
 
@@ -24,6 +52,7 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 		description?: unknown;
 		thumbnail_url?: unknown;
 		thumbnail_s3_key?: unknown;
+		youtube_url?: unknown;
 	};
 	const updates: {
 		title?: string;
@@ -31,6 +60,7 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 		description?: string | null;
 		thumbnail_url?: string | null;
 		thumbnail_s3_key?: string | null;
+		source_video_id?: string | null;
 	} = {};
 
 	if (typeof body.title === 'string' && body.title.trim()) {
@@ -54,6 +84,18 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 			updates.description = normalized || null;
 		} else {
 			throw error(400, 'Description invalide');
+		}
+	}
+
+	if ('youtube_url' in body) {
+		if (body.youtube_url === null || body.youtube_url === '') {
+			updates.source_video_id = null;
+		} else if (typeof body.youtube_url === 'string') {
+			const videoId = extractYoutubeVideoId(body.youtube_url);
+			if (!videoId) throw error(400, 'URL YouTube invalide');
+			updates.source_video_id = videoId;
+		} else {
+			throw error(400, 'URL YouTube invalide');
 		}
 	}
 

@@ -538,6 +538,7 @@ export async function updateRecording(
 		duration_sec: number;
 		peaks: number[] | null;
 		peaks_duration_sec: number | null;
+		source_video_id: string | null;
 	}>
 ): Promise<boolean> {
 	const db = await getDb();
@@ -597,6 +598,12 @@ export async function countRecordingsByStatus(status: RecordingStatus): Promise<
 // ══════════════════════════════════════
 // Mirrors the helpers in main src/db/collections.ts. Same collection + shape.
 
+/** Channel-wide YouTube live URL used as the default whenever the admin
+ *  hasn't pinned a specific video URL on a broadcast. The public live page
+ *  uses this for the "Voir sur YouTube" link before/during a live, since
+ *  the actual VOD id isn't known until the live ends. */
+export const YOUTUBE_CHANNEL_LIVE_URL = 'https://www.youtube.com/@MissionnaireNetwork/live';
+
 export type BroadcastAdminState = {
 	is_live: boolean;
 	started_at: string | null;
@@ -609,10 +616,12 @@ export type BroadcastAdminState = {
 	description: string | null;
 	thumbnail_url: string | null;
 	thumbnail_s3_key: string | null;
+	youtube_url: string | null;
 	default_title: string | null;
 	default_description: string | null;
 	default_thumbnail_url: string | null;
 	default_thumbnail_s3_key: string | null;
+	default_youtube_url: string | null;
 	updated_at: string;
 };
 
@@ -628,10 +637,12 @@ const BROADCAST_DEFAULT: BroadcastAdminState = {
 	description: null,
 	thumbnail_url: null,
 	thumbnail_s3_key: null,
+	youtube_url: null,
 	default_title: null,
 	default_description: null,
 	default_thumbnail_url: null,
 	default_thumbnail_s3_key: null,
+	default_youtube_url: null,
 	updated_at: new Date(0).toISOString()
 };
 
@@ -653,10 +664,12 @@ export async function getBroadcastAdminState(): Promise<BroadcastAdminState> {
 		description: (doc.description as string | null) ?? null,
 		thumbnail_url: (doc.thumbnail_url as string | null) ?? null,
 		thumbnail_s3_key: (doc.thumbnail_s3_key as string | null) ?? null,
+		youtube_url: (doc.youtube_url as string | null) ?? null,
 		default_title: (doc.default_title as string | null) ?? null,
 		default_description: (doc.default_description as string | null) ?? null,
 		default_thumbnail_url: (doc.default_thumbnail_url as string | null) ?? null,
 		default_thumbnail_s3_key: (doc.default_thumbnail_s3_key as string | null) ?? null,
+		default_youtube_url: (doc.default_youtube_url as string | null) ?? null,
 		updated_at: (doc.updated_at as string) ?? new Date(0).toISOString()
 	};
 }

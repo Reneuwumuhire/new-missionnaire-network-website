@@ -244,6 +244,8 @@
 	let editingRecordingId = $state<string | null>(null);
 	let recDraftTitle = $state<string>('');
 	let recDraftDescription = $state<string>('');
+	let recDraftYoutubeUrl = $state<string>('');
+	let recYoutubeError = $state<string | null>(null);
 	let recThumbnailFile = $state<File | null>(null);
 	let recThumbnailPreviewUrl = $state<string | null>(null);
 	let recThumbnailAction = $state<'keep' | 'replace' | 'remove'>('keep');
@@ -283,6 +285,10 @@
 		recAudioUploadPct = null;
 		recDraftTitle = rec.title ?? '';
 		recDraftDescription = rec.description ?? '';
+		recDraftYoutubeUrl = rec.source_video_id
+			? `https://www.youtube.com/watch?v=${rec.source_video_id}`
+			: '';
+		recYoutubeError = null;
 		editingRecordingId = rec._id!;
 	}
 
@@ -422,6 +428,17 @@
 			const nextDescription = recDraftDescription.trim() || null;
 			if (nextDescription !== (rec.description ?? null)) patch.description = nextDescription;
 
+			// YouTube link: send raw URL string; server parses to source_video_id.
+			// Empty string = clear. Server returns 400 on unparseable input so we
+			// surface that as an inline error instead of blowing up the whole save.
+			const nextYoutube = recDraftYoutubeUrl.trim();
+			const currentYoutube = rec.source_video_id
+				? `https://www.youtube.com/watch?v=${rec.source_video_id}`
+				: '';
+			if (nextYoutube !== currentYoutube) {
+				patch.youtube_url = nextYoutube;
+			}
+
 			if (recThumbnailAction === 'replace' && recThumbnailFile) {
 				const presignRes = await fetch('/api/broadcast/thumbnail/presign', {
 					method: 'POST',
@@ -460,9 +477,14 @@
 					body: JSON.stringify(patch)
 				});
 				if (!res.ok) {
-					recThumbnailError = (await res.text()) || `Erreur ${res.status}`;
+					const msg = (await res.text()) || `Erreur ${res.status}`;
+					// Route the YouTube-URL validation error to its inline slot
+					// instead of the thumbnail error area.
+					if (msg.includes('YouTube')) recYoutubeError = msg;
+					else recThumbnailError = msg;
 					return;
 				}
+				recYoutubeError = null;
 			}
 
 			// Replace audio last — if the file upload fails, metadata edits above
@@ -690,6 +712,9 @@
 	let metadataSaving = $state(false);
 	let titleDraft = $state<string>('');
 	let descriptionDraft = $state<string>('');
+	let youtubeUrlDraft = $state<string>('');
+	let broadcastYoutubeError = $state<string | null>(null);
+	const YOUTUBE_CHANNEL_LIVE_URL = 'https://www.youtube.com/@MissionnaireNetwork/live';
 	// Thumbnail staging — upload deferred to Save so cancel doesn't leave orphans.
 	let thumbnailFile = $state<File | null>(null);
 	let thumbnailPreviewUrl = $state<string | null>(null);
@@ -702,6 +727,11 @@
 	function enterEditMode() {
 		titleDraft = broadcast.title ?? '';
 		descriptionDraft = broadcast.description ?? '';
+		// Pre-fill with the channel-live URL when nothing's set, so admin
+		// rarely has to type — they can just paste a specific video URL
+		// once the live ends and the VOD is published.
+		youtubeUrlDraft = broadcast.youtube_url ?? YOUTUBE_CHANNEL_LIVE_URL;
+		broadcastYoutubeError = null;
 		thumbnailFile = null;
 		thumbnailAction = 'keep';
 		if (thumbnailPreviewUrl) URL.revokeObjectURL(thumbnailPreviewUrl);
@@ -833,6 +863,13 @@
 			const nextDescription = descriptionDraft.trim() || null;
 			if (nextDescription !== (broadcast.description ?? null)) patch.description = nextDescription;
 
+			// YouTube URL: send raw string; server validates as http(s) URL.
+			// Empty clears (the read side falls back to the channel-live URL).
+			const nextYoutube = youtubeUrlDraft.trim() || null;
+			if (nextYoutube !== (broadcast.youtube_url ?? null)) {
+				patch.youtube_url = nextYoutube;
+			}
+
 			// Thumbnail — upload only if a new file was picked; remove or keep otherwise.
 			if (thumbnailAction === 'replace' && thumbnailFile) {
 				const presignRes = await fetch('/api/broadcast/thumbnail/presign', {
@@ -877,9 +914,12 @@
 				body: JSON.stringify(patch)
 			});
 			if (!res.ok) {
-				thumbnailError = (await res.text()) || `Erreur ${res.status}`;
+				const msg = (await res.text()) || `Erreur ${res.status}`;
+				if (msg.includes('YouTube')) broadcastYoutubeError = msg;
+				else thumbnailError = msg;
 				return;
 			}
+			broadcastYoutubeError = null;
 			cancelEditMode();
 			await invalidateAll();
 		} finally {
@@ -1991,6 +2031,27 @@
 							<span class="self-end text-[10px] text-stone-400 tabular-nums">{descriptionDraft.length} / 2000</span>
 						</div>
 
+						<!-- YouTube link for the live. Defaults to the channel /live URL
+						     when nothing's stored — admin can replace with a specific
+						     video URL once the live ends and YouTube assigns the VOD id. -->
+						<div class="flex flex-col gap-1.5">
+							<label for="edit-broadcast-youtube" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Lien YouTube</label>
+							<input
+								id="edit-broadcast-youtube"
+								type="url"
+								bind:value={youtubeUrlDraft}
+								placeholder={YOUTUBE_CHANNEL_LIVE_URL}
+								disabled={metadataSaving}
+								class="admin-input text-sm"
+							/>
+							<span class="text-[10px] text-stone-400">
+								Par défaut : URL de la chaîne /live. Remplacez par l'URL de la vidéo précise une fois publiée.
+							</span>
+							{#if broadcastYoutubeError}
+								<p class="bg-red-50 px-3 py-2 text-xs text-red-700">{broadcastYoutubeError}</p>
+							{/if}
+						</div>
+
 						{#if thumbnailError}
 							<p class="bg-red-50 px-3 py-2 text-xs text-red-700">{thumbnailError}</p>
 						{/if}
@@ -2138,6 +2199,28 @@
 									class="admin-input text-sm resize-y min-h-[120px]"
 								></textarea>
 								<span class="self-end text-[10px] text-stone-400 tabular-nums">{recDraftDescription.length} / 2000</span>
+							</div>
+
+							<!-- YouTube link. Server parses to source_video_id (11-char id),
+							     which powers the "Voir sur YouTube" button and the
+							     transcription-PDF lookup on the public detail page. Empty
+							     clears the link. -->
+							<div class="flex flex-col gap-1.5">
+								<label for="edit-rec-youtube" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Lien YouTube</label>
+								<input
+									id="edit-rec-youtube"
+									type="url"
+									bind:value={recDraftYoutubeUrl}
+									placeholder="https://www.youtube.com/watch?v=…"
+									disabled={recSaving}
+									class="admin-input text-sm"
+								/>
+								<span class="text-[10px] text-stone-400">
+									Collez l'URL YouTube de la vidéo correspondante. Laissez vide pour ne pas lier de vidéo.
+								</span>
+								{#if recYoutubeError}
+									<p class="bg-red-50 px-3 py-2 text-xs text-red-700">{recYoutubeError}</p>
+								{/if}
 							</div>
 
 							{#if recThumbnailError}
