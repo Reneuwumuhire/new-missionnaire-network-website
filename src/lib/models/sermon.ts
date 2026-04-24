@@ -13,6 +13,11 @@ export const SermonSchema = z.object({
 	mp3_url: z.string().url().nullable().optional(),
 	pdf_url: z.string().url().nullable().optional(),
 	duration: z.number().nullable().optional(),
+	/** Duration of the English-language audio (english_audio_url), in seconds.
+	 *  Stored separately from `duration` (French) because translations usually
+	 *  have different runtimes than the original. Populated by the backfill
+	 *  script: admin/scripts/backfill-sermon-durations.ts */
+	english_duration: z.number().nullable().optional(),
 	translations: z.string().array().optional(),
 	updated_at: z.string().optional()
 });

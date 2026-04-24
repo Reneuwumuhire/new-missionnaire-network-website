@@ -1126,6 +1126,24 @@ export async function querySermons(options: {
 	}
 }
 
+/** Distinct authors that actually have at least one sermon in the DB.
+ *  Used by the Prédications page to hide filter buttons for authors with
+ *  no curated sermons — avoids the misleading "Aucun sermon trouvé" state. */
+export async function getSermonAuthors(): Promise<string[]> {
+	try {
+		const db = await getDb();
+		const authors = await db.collection('sermons').distinct('author', {
+			author: { $ne: null, $nin: ['', undefined] }
+		});
+		return (authors as string[])
+			.filter((a): a is string => typeof a === 'string' && a.trim().length > 0)
+			.sort((a, b) => a.localeCompare(b, 'fr'));
+	} catch (error) {
+		console.error('[DB] Error in getSermonAuthors:', error);
+		return [];
+	}
+}
+
 export async function getSermonYears(): Promise<string[]> {
 	try {
 		const db = await getDb();

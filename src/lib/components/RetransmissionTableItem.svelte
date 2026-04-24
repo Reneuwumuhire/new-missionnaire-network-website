@@ -1,74 +1,53 @@
 <script lang="ts">
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import IoCloudDownloadOutline from 'svelte-icons-pack/io/IoCloudDownloadOutline';
-	import BsFileEarmarkPdfFill from 'svelte-icons-pack/bs/BsFileEarmarkPdfFill';
 	import IoPlayCircle from 'svelte-icons-pack/io/IoPlayCircle';
 	import IoPauseCircle from 'svelte-icons-pack/io/IoPauseCircle';
 	import { selectAudio, isPlaying, currentIndex } from '../stores/global';
-	import type { Sermon } from '$lib/models/sermon';
+	import type { PublishedRecording } from '$lib/server/recordings';
 	import type { AudioAsset } from '$lib/models/media-assets';
 	import type { MusicAudio } from '$lib/models/music-audio';
-	import { buildSermonSlug } from '../../utils/sermonSlug';
+	import type { Sermon } from '$lib/models/sermon';
 	import { formatTime } from '../../utils/FormatTime';
-	import { createPlayableSermon } from '../../utils/audioPlayback';
 	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
 	import { downloadAudioFile } from '../../utils/downloadAudio';
 
-	export let sermon: Sermon;
+	export let recording: PublishedRecording;
 	export let index: number;
 	export let absoluteIndex: number;
-	export let language: string = 'french';
-	let resolvedDuration: number | null = sermon.duration ?? null;
-	let isDurationLoading = false;
 
-	// Background-download state: when the listener clicks the cloud icon we
-	// stream the mp3 and save it via a blob URL instead of navigating away
-	// via window.open. Progress shows as a circular indicator in place of the
-	// icon (or a pulsing dot when Content-Length isn't known). Tapping the
-	// progress ring a second time cancels the in-flight request.
-	let isDownloading = false;
-	let downloadPercent: number | null = 0;
-	let downloadController: AbortController | null = null;
 	const desktopSermonGrid = 'md:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.35fr)_110px_80px_120px]';
 
-	$: isActive = isSermonActive(sermon, $selectAudio);
-	$: sermonHref = `/predications/${buildSermonSlug(sermon)}`;
-	$: durationAudioUrl = language === 'english' ? sermon.english_audio_url : sermon.mp3_url;
-	$: hasDurationAudio = Boolean(durationAudioUrl);
-	// Only show the stored duration. We used to probe every row's audio via
-	// `<audio preload="metadata" src=url>` to extract its duration, but that
-	// kicked off a full network download per row (the browser fetches the
-	// moov atom which for m4a often requires the whole file). With ~100
-	// sermons per page that was ~40MB+ of wasted bandwidth on page load.
-	// Rows without a stored duration now render "--:--"; backfill them with
-	// admin/scripts/backfill-sermon-durations.ts. Each language has its own
-	// stored duration because translations usually run a different length.
-	$: resolvedDuration =
-		(language === 'english' ? sermon.english_duration : sermon.duration) ?? null;
+	// Shape the recording as a MusicAudio-compatible entry so it slots into
+	// the same global audio-player stores the sermon + music pages use.
+	$: playable = {
+		_id: recording.id,
+		book: null,
+		book_full_name: null,
+		number: null,
+		title: recording.title,
+		artist: 'Missionnaire Network',
+		category: 'Direct',
+		s3_key: '',
+		s3_url: recording.s3_url,
+		file_size: recording.size_bytes ?? 0,
+		duration: recording.duration_sec ?? undefined,
+		format: 'mp3',
+		uploaded_at: new Date(recording.started_at),
+		thumbnail_url: recording.thumbnail_url ?? undefined
+	} satisfies MusicAudio & { thumbnail_url?: string };
 
-	function isSermonActive(s: Sermon, current: Sermon | AudioAsset | MusicAudio | null) {
-		// Check for specific english audio URL match
-		if (language === 'english') {
-			if (!s.english_audio_url) return false;
-			// Check if current is null before using 'in' operator
-			if (!current) return false;
-			const currentUrl =
-				'mp3_url' in current
-					? current.mp3_url
-					: 's3_url' in current
-					? current.s3_url
-					: (current as any).url;
-			return currentUrl === s.english_audio_url;
-		}
+	$: isActive = isRecordingActive($selectAudio);
 
-		if (!current || !s.mp3_url) return false;
+	function isRecordingActive(current: Sermon | AudioAsset | MusicAudio | null): boolean {
+		if (!current) return false;
 		const currentUrl =
 			'mp3_url' in current
 				? current.mp3_url
 				: 's3_url' in current
-				? current.s3_url
-				: (current as any).url;
-		return currentUrl === s.mp3_url;
+					? current.s3_url
+					: null;
+		return currentUrl === recording.s3_url;
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -79,46 +58,39 @@
 	}
 
 	function togglePlay() {
-		const playbackSermon = createPlayableSermon(
-			sermon,
-			language === 'english' ? 'english' : 'french'
-		);
-		const audioUrl = playbackSermon.mp3_url;
-
-		if (!audioUrl) return;
-
+		if (!recording.s3_url) return;
 		if (isActive) {
 			dispatchAudioPlayerAction('toggle');
-		} else {
-			currentIndex.set(index);
-			selectAudio.set(playbackSermon);
-			isPlaying.set(true);
+			return;
 		}
+		currentIndex.set(index);
+		selectAudio.set(playable as unknown as MusicAudio);
+		isPlaying.set(true);
 	}
 
+	// Download state mirrors SermonTableItem so the row visual is identical.
+	let isDownloading = false;
+	let downloadPercent: number | null = 0;
+	let downloadController: AbortController | null = null;
+
 	async function downloadMp3() {
-		// Second tap while a download is in flight = cancel.
 		if (isDownloading && downloadController) {
 			downloadController.abort();
 			return;
 		}
-		const url = language === 'english' ? sermon.english_audio_url : sermon.mp3_url;
-		if (!url) return;
-		const title = language === 'english'
-			? sermon.english_title || 'sermon'
-			: sermon.french_title || sermon.english_title || 'sermon';
+		if (!recording.s3_url) return;
 		const controller = new AbortController();
 		downloadController = controller;
 		isDownloading = true;
 		downloadPercent = 0;
 		try {
-			await downloadAudioFile(url, title, {
+			await downloadAudioFile(recording.s3_url, recording.title, {
 				signal: controller.signal,
+				totalBytesHint: recording.size_bytes ?? 0,
 				onProgress: (p) => (downloadPercent = p.percent)
 			});
 		} catch (err) {
-			// Swallow user-initiated cancellation; log other failures.
-			if (!controller.signal.aborted) console.error('[sermon/download]', err);
+			if (!controller.signal.aborted) console.error('[retransmission/download]', err);
 		} finally {
 			downloadController = null;
 			isDownloading = false;
@@ -128,25 +100,14 @@
 		}
 	}
 
-	function downloadPdf() {
-		const url = language === 'english' ? sermon.english_pdf_url : sermon.pdf_url;
-		if (url) {
-			window.open(url, '_blank');
-		}
+	function formatDateCode(iso: string): string {
+		// Compact dd.mm.yyyy matching the `full_date_code` style used by the
+		// sermon row, so the Date column lines up visually across both views.
+		const d = new Date(iso);
+		const day = String(d.getUTCDate()).padStart(2, '0');
+		const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+		return `${day}.${month}.${d.getUTCFullYear()}`;
 	}
-
-	function formatDuration(value: number | null) {
-		if (!hasDurationAudio) {
-			return '';
-		}
-
-		if (value !== null && value !== undefined) {
-			return formatTime(value);
-		}
-
-		return isDurationLoading ? '...' : '--:--';
-	}
-
 </script>
 
 <!-- svelte-ignore a11y-no-noninteractive-tabindex -->
@@ -158,9 +119,8 @@
 	on:keydown={handleKeydown}
 	role="button"
 	tabindex="0"
-	aria-label="Lire la prédication {sermon.french_title || sermon.english_title}"
+	aria-label="Lire la retransmission {recording.title}"
 >
-	<!-- Index -->
 	<div
 		class="text-center text-[10px] md:text-xs font-bold {isActive
 			? 'text-orange-600'
@@ -169,75 +129,59 @@
 		{absoluteIndex}
 	</div>
 
-	<!-- Title and Mobile Metadata -->
 	<div class="flex flex-col min-w-0">
 		<a
-			href={sermonHref}
+			href={`/live/rediffusions/${recording.id}`}
 			class="text-sm font-bold line-clamp-1 transition-colors {isActive
 				? 'text-orange-600'
 				: 'text-gray-800 group-hover:text-orange-600'} hover:underline underline-offset-2"
 			on:click|stopPropagation
 		>
-			{#if language === 'english'}
-				{sermon.english_title || 'Untitled'}
-			{:else}
-				{sermon.french_title || sermon.english_title || 'Sans titre'}
-			{/if}
+			{recording.title}
 		</a>
 		<div
 			class="flex flex-row items-center gap-2 md:hidden overflow-hidden text-ellipsis whitespace-nowrap"
 		>
 			<span class="text-[10px] font-medium {isActive ? 'text-orange-400' : 'text-gray-500'}">
-				{sermon.full_date_code}
+				{formatDateCode(recording.started_at)}
 			</span>
-			{#if hasDurationAudio}
+			{#if recording.duration_sec}
 				<span class="text-[10px] text-gray-300">•</span>
 				<span class="text-[10px] font-mono {isActive ? 'text-orange-300' : 'text-gray-400'}">
-					{formatDuration(resolvedDuration)}
+					{formatTime(recording.duration_sec)}
 				</span>
 			{/if}
 			<span class="text-[10px] text-gray-300">•</span>
 			<span class="text-[10px] font-medium italic {isActive ? 'text-orange-300' : 'text-gray-400'}">
-				{sermon.author}
+				Ewald Frank
 			</span>
 		</div>
 	</div>
 
-	<!-- Desktop Author -->
 	<div
 		class="hidden md:block text-xs font-medium line-clamp-1 {isActive
 			? 'text-orange-400'
 			: 'text-gray-500'}"
 	>
-		{sermon.author}
+		Ewald Frank
 	</div>
 
-	<!-- Desktop Date -->
 	<div
 		class="hidden md:block text-xs font-medium line-clamp-1 italic {isActive
 			? 'text-orange-300'
 			: 'text-gray-400'}"
 	>
-		{sermon.full_date_code}
+		{formatDateCode(recording.started_at)}
 	</div>
 
-	<div class="hidden md:block text-center text-xs font-mono {isActive ? 'text-orange-600' : 'text-gray-400'}">
-		{formatDuration(resolvedDuration)}
+	<div
+		class="hidden md:block text-center text-xs font-mono {isActive ? 'text-orange-600' : 'text-gray-400'}"
+	>
+		{recording.duration_sec ? formatTime(recording.duration_sec) : '--:--'}
 	</div>
 
-	<!-- Actions -->
 	<div class="flex w-full items-center justify-center gap-1 md:gap-2">
-		{#if (language === 'english' && sermon.english_pdf_url) || (language !== 'english' && sermon.pdf_url)}
-			<button
-				class="p-2 text-gray-400 hover:text-red-500 transition-colors"
-				on:click|stopPropagation={downloadPdf}
-				title="Télécharger PDF"
-			>
-				<Icon src={BsFileEarmarkPdfFill} size="18" />
-			</button>
-		{/if}
-
-		{#if (language === 'english' && sermon.english_audio_url) || (language !== 'english' && sermon.mp3_url)}
+		{#if recording.s3_url}
 			<button
 				class="group relative p-2 text-gray-400 hover:text-orange-600 transition-colors"
 				on:click|stopPropagation={downloadMp3}
@@ -246,11 +190,7 @@
 						? `Annuler (${downloadPercent}%)`
 						: 'Annuler le téléchargement'
 					: 'Télécharger MP3'}
-				aria-label={isDownloading
-					? downloadPercent !== null
-						? `Annuler le téléchargement (${downloadPercent}%)`
-						: 'Annuler le téléchargement'
-					: 'Télécharger le MP3'}
+				aria-label={isDownloading ? 'Annuler le téléchargement' : 'Télécharger le MP3'}
 			>
 				{#if isDownloading}
 					<span class="relative flex h-5 w-5 items-center justify-center">
@@ -276,7 +216,6 @@
 								<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="42 62" />
 							</svg>
 						{/if}
-						<!-- Hover hint: swap ring for X so cancel is obvious on pointer devices. -->
 						<span class="absolute inset-0 hidden items-center justify-center rounded-full bg-orange-600 group-hover:flex">
 							<svg class="h-3 w-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
 								<path d="M6 6l12 12M6 18L18 6" />
@@ -289,11 +228,9 @@
 			</button>
 		{/if}
 
-		{#if (language === 'english' && sermon.english_audio_url) || (language !== 'english' && sermon.mp3_url)}
+		{#if recording.s3_url}
 			<button
-				class="hover:scale-110 active:scale-95 transition-all p-2 {isActive
-					? 'text-orange-600'
-					: 'text-orange-600'}"
+				class="hover:scale-110 active:scale-95 transition-all p-2 text-orange-600"
 				on:click|stopPropagation={togglePlay}
 				title={isActive && $isPlaying ? 'Pause' : 'Lire'}
 			>

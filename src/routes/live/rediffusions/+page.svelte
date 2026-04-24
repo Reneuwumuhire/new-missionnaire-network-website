@@ -5,6 +5,7 @@
 	import { navigating } from '$app/stores';
 	import { vercelImage, vercelImageSrcSet, vercelImagePlaceholder } from '$lib/utils/vercelImage';
 	import BlurUpImage from '$lib/components/BlurUpImage.svelte';
+	import Pagination from '$lib/components/Pagination.svelte';
 	// @ts-ignore — svelte-icons-pack has no types
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import IoReload from 'svelte-icons-pack/io/IoReload';
@@ -98,34 +99,6 @@
 	}
 
 	$: hasActiveFilters = Boolean(data.filters.q || data.filters.year);
-
-	// ── Pagination shape ───────────────────────────────────────────
-	// Produces [1, '…', 4, 5, 6, '…', 12] with the current page and its
-	// neighbours always visible, plus the first and last.
-	// Window of pages shown on each side of the current page, in addition to
-	// the first and last anchors. `siblings = 2` renders e.g. `1 … 17 18 [19] 20 21`.
-	const PAGINATION_SIBLINGS = 2;
-
-	function buildPageList(current: number, total: number): Array<number | '…'> {
-		// If the full list fits within what we'd otherwise render, just show it.
-		const maxInline = PAGINATION_SIBLINGS * 2 + 5; // siblings on each side + first + last + current + 2 ellipses
-		if (total <= maxInline) {
-			return Array.from({ length: total }, (_, i) => i + 1);
-		}
-		const anchors = new Set<number>([1, total]);
-		for (let offset = -PAGINATION_SIBLINGS; offset <= PAGINATION_SIBLINGS; offset++) {
-			anchors.add(current + offset);
-		}
-		const sorted = [...anchors].filter((p) => p >= 1 && p <= total).sort((a, b) => a - b);
-		const result: Array<number | '…'> = [];
-		for (let i = 0; i < sorted.length; i++) {
-			if (i > 0 && sorted[i] - sorted[i - 1] > 1) result.push('…');
-			result.push(sorted[i]);
-		}
-		return result;
-	}
-
-	$: pageList = buildPageList(data.pageNumber, totalPages);
 
 	let expandedThumb: PublishedRecording | null = null;
 	let failedThumbs = new Set<string>();
@@ -401,66 +374,9 @@
 				{/each}
 			</ul>
 
-			{#if totalPages > 1}
-				<nav class="mt-8 flex flex-wrap items-center justify-center gap-1 text-sm font-body" aria-label="Pagination">
-					{#if data.pageNumber > 1}
-						<a
-							href={listHref(data.pageNumber - 1)}
-							data-sveltekit-preload-data="hover"
-						class="inline-flex items-center justify-center h-9 min-w-9 px-3 border border-stone-200/80 text-stone-600 hover:border-missionnaire hover:text-missionnaire transition-colors"
-							aria-label="Page précédente"
-						>
-							‹
-						</a>
-					{:else}
-						<span
-							class="inline-flex items-center justify-center h-9 min-w-9 px-3 border border-stone-100 text-stone-300 cursor-not-allowed"
-							aria-hidden="true"
-						>
-							‹
-						</span>
-					{/if}
-
-					{#each pageList as item}
-						{#if item === '…'}
-							<span class="inline-flex items-center justify-center h-9 min-w-9 px-2 text-stone-400" aria-hidden="true">…</span>
-						{:else if item === data.pageNumber}
-							<span
-								aria-current="page"
-								class="inline-flex items-center justify-center h-9 min-w-9 px-3 border border-missionnaire bg-missionnaire text-white font-semibold tabular-nums"
-							>
-								{item}
-							</span>
-						{:else}
-							<a
-								href={listHref(item)}
-								class="inline-flex items-center justify-center h-9 min-w-9 px-3 border border-stone-200/80 text-stone-600 hover:border-missionnaire hover:text-missionnaire transition-colors tabular-nums"
-								aria-label="Page {item}"
-							>
-								{item}
-							</a>
-						{/if}
-					{/each}
-
-					{#if data.pageNumber < totalPages}
-						<a
-							href={listHref(data.pageNumber + 1)}
-							data-sveltekit-preload-data="hover"
-						class="inline-flex items-center justify-center h-9 min-w-9 px-3 border border-stone-200/80 text-stone-600 hover:border-missionnaire hover:text-missionnaire transition-colors"
-							aria-label="Page suivante"
-						>
-							›
-						</a>
-					{:else}
-						<span
-							class="inline-flex items-center justify-center h-9 min-w-9 px-3 border border-stone-100 text-stone-300 cursor-not-allowed"
-							aria-hidden="true"
-						>
-							›
-						</span>
-					{/if}
-				</nav>
-			{/if}
+			<div class="mt-8">
+				<Pagination current={data.pageNumber} total={totalPages} getHref={listHref} />
+			</div>
 		{/if}
 		</div>
 	</div>

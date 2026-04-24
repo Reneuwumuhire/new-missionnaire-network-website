@@ -181,6 +181,77 @@ export async function getAvailableYears(): Promise<number[]> {
 	}
 }
 
+/** List recordings whose title matches a retransmission-like keyword
+ *  ("Retransmission", "Frank", or "Ewald", case-insensitive). Used by the
+ *  Prédications page to surface live-broadcast archives alongside curated
+ *  sermons when the Ewald Frank / "Tous" author filter is active. Shares
+ *  the `(published, status, started_at)` compound index created in
+ *  ensureIndexes() — the regex only filters the already-indexed result set. */
+export async function listRetransmissions(options: {
+	limit?: number;
+	pageNumber?: number;
+	q?: string;
+	year?: number;
+	sortField?: string; // 'title' | 'started_at' | 'duration_sec'
+	sortOrder?: 'asc' | 'desc';
+} = {}): Promise<{ data: PublishedRecording[]; total: number }> {
+	const {
+		limit = 12,
+		pageNumber = 1,
+		q,
+		year,
+		sortField = 'started_at',
+		sortOrder = 'desc'
+	} = options;
+	try {
+		await ensureIndexes();
+		const db = await getDb();
+		const query: Record<string, unknown> = {
+			published: true,
+			status: 'ready',
+			title: { $regex: 'retransmission|frank|ewald', $options: 'i' }
+		};
+
+		if (q && q.trim().length > 0) {
+			const escaped = q.trim().replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+			// Combine with the retransmission regex via $and so both conditions
+			// apply without clobbering each other.
+			query.$and = [
+				{ title: { $regex: 'retransmission|frank|ewald', $options: 'i' } },
+				{ title: { $regex: escaped, $options: 'i' } }
+			];
+			delete query.title;
+		}
+
+		if (year) {
+			query.started_at = {
+				$gte: new Date(Date.UTC(year, 0, 1)),
+				$lt: new Date(Date.UTC(year + 1, 0, 1))
+			};
+		}
+
+		const allowedSorts = new Set(['title', 'started_at', 'duration_sec']);
+		const safeSortField = allowedSorts.has(sortField) ? sortField : 'started_at';
+		const sort: Record<string, 1 | -1> = { [safeSortField]: sortOrder === 'asc' ? 1 : -1 };
+
+		const skip = (pageNumber - 1) * limit;
+		const [rows, total] = await Promise.all([
+			db
+				.collection('recordings')
+				.find(query)
+				.sort(sort)
+				.skip(skip)
+				.limit(limit)
+				.toArray(),
+			db.collection('recordings').countDocuments(query)
+		]);
+		return { data: (rows as unknown as RecordingRow[]).map(toPublic), total };
+	} catch (err) {
+		console.error('[recordings] listRetransmissions failed', err);
+		return { data: [], total: 0 };
+	}
+}
+
 export async function getPublishedById(id: string): Promise<PublishedRecording | null> {
 	try {
 		const { ObjectId } = await import('mongodb');

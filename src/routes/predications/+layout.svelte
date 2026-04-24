@@ -58,13 +58,40 @@
 						class="flex w-full max-w-xl border border-white/25 bg-white/90 backdrop-blur-sm overflow-hidden"
 						on:submit|preventDefault={handleHeroSearch}
 					>
-						<input
-							id="hero-search"
-							type="text"
-							class="flex-1 bg-transparent text-stone-800 px-5 py-3.5 text-sm font-body outline-none placeholder:text-stone-400"
-							placeholder="Rechercher par titre, année, prédicateur..."
-							bind:value={heroSearchValue}
-						/>
+						<div class="relative flex-1">
+							<input
+								id="hero-search"
+								type="text"
+								class="w-full bg-transparent text-stone-800 px-5 py-3.5 pr-10 text-sm font-body outline-none placeholder:text-stone-400"
+								placeholder="Rechercher par titre, année, prédicateur..."
+								bind:value={heroSearchValue}
+							/>
+							{#if heroSearchValue}
+								<button
+									type="button"
+									aria-label="Effacer la recherche"
+									title="Effacer"
+									class="absolute right-2 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full text-stone-400 hover:bg-stone-200 hover:text-stone-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
+									on:click={() => {
+										heroSearchValue = '';
+									}}
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"
+									>
+										<path d="M6 6l12 12M6 18L18 6" />
+									</svg>
+								</button>
+							{/if}
+						</div>
 						<button type="submit" class="bg-missionnaire hover:bg-missionnaire/90 text-white px-6 py-3.5 text-[11px] font-bold uppercase tracking-[0.15em] font-body transition-colors shrink-0">
 							Rechercher
 						</button>
@@ -75,7 +102,7 @@
 	</header>
 </div>
 
-<div class="flex flex-row justify-center h-auto w-full pt-20 pb-32 md:py-16">
+<div class="flex flex-row justify-center h-auto w-full pt-8 pb-16 md:py-10">
 	<div class="flex flex-col w-full max-w-7xl px-2 md:px-5">
 		<slot />
 	</div>
