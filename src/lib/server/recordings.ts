@@ -34,6 +34,9 @@ export interface PublishedRecording {
 	size_bytes: number | null;
 	thumbnail_url: string | null;
 	description: string | null;
+	/** YouTube video id (e.g. "MgoAxBWkG-s") when the import script matched
+	 *  this recording to a video on our channel. */
+	source_video_id: string | null;
 }
 
 interface RecordingRow {
@@ -45,6 +48,7 @@ interface RecordingRow {
 	size_bytes?: number | null;
 	thumbnail_url?: string | null;
 	description?: string | null;
+	source_video_id?: string | null;
 }
 
 function toPublic(doc: RecordingRow): PublishedRecording {
@@ -57,7 +61,8 @@ function toPublic(doc: RecordingRow): PublishedRecording {
 		s3_url: doc.s3_url ?? '',
 		size_bytes: doc.size_bytes ?? null,
 		thumbnail_url: doc.thumbnail_url ?? null,
-		description: doc.description ?? null
+		description: doc.description ?? null,
+		source_video_id: doc.source_video_id ?? null
 	};
 }
 
@@ -187,6 +192,44 @@ export async function getPublishedById(id: string): Promise<PublishedRecording |
 		return row ? toPublic(row) : null;
 	} catch (err) {
 		console.error('[recordings] getPublishedById failed', err);
+		return null;
+	}
+}
+
+export interface RecordingTranscript {
+	url: string;
+	filename: string;
+	size: number;
+}
+
+/** Resolve the PDF transcription for a recording. The `pdfs` collection keys
+ *  to `videos._id` (ObjectId), but recordings store the YouTube id string
+ *  (`source_video_id`), so we hop through `videos` to translate. Returns null
+ *  if there's no matching video on the channel or no PDF has been published. */
+export async function getTranscriptForYoutubeVideoId(
+	youtubeVideoId: string | null
+): Promise<RecordingTranscript | null> {
+	if (!youtubeVideoId) return null;
+	try {
+		const db = await getDb();
+		const video = await db
+			.collection('videos')
+			.findOne({ id: youtubeVideoId }, { projection: { _id: 1 } });
+		if (!video) return null;
+		const pdf = await db
+			.collection('pdfs')
+			.findOne(
+				{ videoId: video._id },
+				{ projection: { url: 1, filename: 1, size: 1 } }
+			);
+		if (!pdf?.url) return null;
+		return {
+			url: pdf.url as string,
+			filename: (pdf.filename as string) ?? 'transcription.pdf',
+			size: (pdf.size as number) ?? 0
+		};
+	} catch (err) {
+		console.error('[recordings] getTranscriptForYoutubeVideoId failed', err);
 		return null;
 	}
 }

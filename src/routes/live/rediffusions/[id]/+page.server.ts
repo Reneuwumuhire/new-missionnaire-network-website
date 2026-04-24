@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { getPublishedById } from '$lib/server/recordings';
+import { getPublishedById, getTranscriptForYoutubeVideoId } from '$lib/server/recordings';
 import type { PageServerLoad } from './$types';
 
 const ALLOWED_BACK_PARAMS = new Set(['page', 'q', 'year', 'month']);
@@ -26,5 +26,6 @@ export const load: PageServerLoad = async ({ params, url }) => {
 	const recording = await getPublishedById(params.id);
 	if (!recording) throw error(404, 'Enregistrement introuvable');
 	const backHref = sanitizeFrom(url.searchParams.get('from'));
-	return { recording, backHref };
+	const transcript = await getTranscriptForYoutubeVideoId(recording.source_video_id);
+	return { recording, backHref, transcript };
 };

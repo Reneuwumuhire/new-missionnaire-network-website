@@ -17,6 +17,10 @@
 	export let data: PageData;
 
 	$: rec = data.recording;
+	$: transcript = data.transcript;
+	$: youtubeUrl = rec.source_video_id
+		? `https://www.youtube.com/watch?v=${rec.source_video_id}`
+		: null;
 
 	let thumbnailExpanded = false;
 	let thumbnailBroken = false;
@@ -394,6 +398,47 @@
 					>
 						{downloadError}
 					</p>
+				{/if}
+				{#if transcript}
+					<a
+						href={transcript.url}
+						target="_blank"
+						rel="noopener noreferrer"
+						class="group flex items-center justify-center gap-2 border-t border-stone-200/60 px-5 py-3 text-[11px] font-bold uppercase tracking-[0.2em] font-body text-stone-600 transition-colors hover:bg-missionnaire hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
+					>
+						<svg
+							width="13"
+							height="13"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+							<polyline points="14 2 14 8 20 8" />
+							<line x1="9" y1="13" x2="15" y2="13" />
+							<line x1="9" y1="17" x2="15" y2="17" />
+						</svg>
+						Transcription PDF
+					</a>
+				{/if}
+				{#if youtubeUrl}
+					<a
+						href={youtubeUrl}
+						target="_blank"
+						rel="noopener noreferrer"
+						class="group flex items-center justify-center gap-2 border-t border-stone-200/60 px-5 py-3 text-[11px] font-bold uppercase tracking-[0.2em] font-body text-stone-600 transition-colors hover:bg-missionnaire hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
+					>
+						<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+							<path
+								d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"
+							/>
+						</svg>
+						Voir sur YouTube
+					</a>
 				{/if}
 			</div>
 		</div>
