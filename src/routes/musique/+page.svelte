@@ -5,6 +5,7 @@
 	import type { AudioAsset } from '$lib/models/media-assets';
 	import type { Sermon } from '$lib/models/sermon';
 	import { selectAudio, basePlaylist, playlist, currentIndex, autoNext, isShuffle, isPlaying } from '$lib/stores/global';
+	import Pagination from '$lib/components/Pagination.svelte';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import BsSearch from 'svelte-icons-pack/bs/BsSearch';
@@ -187,29 +188,6 @@
 		
 		params.set('sort', `${property}:${nextOrder}`);
 		params.set('page', '1');
-		goto(`?${params.toString()}`);
-	}
-
-	$: paginationPages = (() => {
-		const pages = [];
-		const maxVisible = 5;
-		let start = Math.max(1, currentPage - 2);
-		let end = Math.min(totalPages, start + maxVisible - 1);
-		
-		if (end - start < maxVisible - 1) {
-			start = Math.max(1, end - maxVisible + 1);
-		}
-		
-		for (let i = start; i <= end; i++) {
-			pages.push(i);
-		}
-		return pages;
-	})();
-
-	function goToPage(p: number) {
-		if (p < 1 || p > totalPages) return;
-		const params = new URLSearchParams($page.url.searchParams);
-		params.set('page', p.toString());
 		goto(`?${params.toString()}`);
 	}
 
@@ -725,17 +703,18 @@
 		</div>
 	</div>
 
-	<!-- Pagination -->
+	<!-- Pagination (shared component — same shape as /predications and
+	     /live/rediffusions). Lignes selector stays as music-list chrome;
+	     pagination itself sits on its own row to avoid wrap collisions. -->
 	{#if totalPages > 1}
-		<div class="flex flex-col md:flex-row justify-between items-center mt-12 py-6 gap-6 text-[10px] md:text-xs font-bold text-stone-400 tracking-widest uppercase border-t border-stone-200/60">
-			<div class="hidden md:block">
-				Affichage de {musicList.length} sur {totalSongs} chants
-			</div>
-			
-			<div class="flex flex-col md:flex-row items-center gap-6 md:gap-8 w-full md:w-auto">
+		<div class="mt-12 py-6 border-t border-stone-200/60 flex flex-col gap-6">
+			<div class="flex flex-col sm:flex-row items-center sm:justify-between gap-4 text-[10px] md:text-xs font-bold text-stone-400 tracking-widest uppercase">
+				<div class="hidden md:block">
+					Affichage de {musicList.length} sur {totalSongs} chants
+				</div>
 				<div class="flex items-center gap-3">
 					<span class="opacity-60">Lignes:</span>
-					<select 
+					<select
 						class="bg-stone-100 rounded-lg px-3 py-1.5 outline-none text-stone-800 focus:ring-2 focus:ring-missionnaire/20 transition-all cursor-pointer"
 						value={limit}
 						on:change={(e) => {
@@ -751,44 +730,16 @@
 						<option value="100">100</option>
 					</select>
 				</div>
-
-				<div class="flex items-center gap-2">
-					<div class="flex items-center gap-1 bg-white p-1 rounded-xl border border-stone-200">
-						<button 
-							class="px-3 py-1.5 rounded-lg hover:bg-stone-100 disabled:opacity-20 transition-all text-[10px] md:text-xs font-bold"
-							disabled={currentPage === 1}
-							on:click={() => goToPage(currentPage - 1)}
-						>
-							Précédent
-						</button>
-						
-						{#if paginationPages[0] > 1}
-							<button class="w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-lg text-stone-400" disabled>...</button>
-						{/if}
-
-						{#each paginationPages as p}
-							<button 
-								class="w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-lg transition-all text-[10px] md:text-xs font-bold {currentPage === p ? 'bg-stone-900 text-white ' : 'hover:bg-stone-50 text-stone-600'}"
-								on:click={() => goToPage(p)}
-							>
-								{p}
-							</button>
-						{/each}
-
-						{#if paginationPages[paginationPages.length - 1] < totalPages}
-							<button class="w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-lg text-stone-400" disabled>...</button>
-						{/if}
-
-						<button 
-							class="px-3 py-1.5 rounded-lg hover:bg-stone-100 disabled:opacity-20 transition-all text-[10px] md:text-xs font-bold"
-							disabled={currentPage === totalPages}
-							on:click={() => goToPage(currentPage + 1)}
-						>
-							Suivant
-						</button>
-					</div>
-				</div>
 			</div>
+			<Pagination
+				current={currentPage}
+				total={totalPages}
+				getHref={(p) => {
+					const params = new URLSearchParams($page.url.searchParams);
+					params.set('page', String(p));
+					return `?${params.toString()}`;
+				}}
+			/>
 		</div>
 	{/if}
 </div>
