@@ -7,7 +7,6 @@
 	import ArticleParagraph from '$lib/components/+articleParagraph.svelte';
 	import { EgliseParagraph1 } from './paragraphs';
 	import ContactCard from '$lib/components/+contactCard.svelte';
-	// import MapComponent from '$lib/components/+mapComponent.svelte';
 	import { onMount } from 'svelte';
 
 	let stats: {
@@ -66,8 +65,6 @@
 			{#each EgliseParagraph1 as paragraph, index}
 				<ArticleParagraph text={paragraph.text} />
 			{/each}
-			<!-- <h2 class="font-display text-2xl md:text-3xl text-stone-900">Location</h2>
-			<MapComponent /> -->
 			<h2 class="font-display text-2xl md:text-3xl font-semibold text-stone-900">Contacter</h2>
 			<ContactCard />
 			{#if statsLoading}
