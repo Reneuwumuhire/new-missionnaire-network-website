@@ -105,6 +105,13 @@ export async function GET() {
 			}
 		)
 		.toArray();
+	const recordings = await db
+		.collection('recordings')
+		.find(
+			{ published: true, status: 'ready' },
+			{ projection: { _id: 1, started_at: 1, updated_at: 1, updatedAt: 1 } }
+		)
+		.toArray();
 
 	const generatedAt = new Date().toISOString().split('T')[0];
 	const baseUrl = 'https://missionnaire.net';
@@ -159,6 +166,21 @@ ${buildUrlEntry({
 	),
 	changefreq: 'weekly',
 	priority: '0.5'
+})}`
+		)
+		.join('')}
+  ${recordings
+		.map(
+			(r) => `
+${buildUrlEntry({
+	loc: `${baseUrl}/live/rediffusions/${String(r._id)}`,
+	lastmod: pickLastmod(
+		r as SitemapDoc,
+		['updated_at', 'updatedAt', 'started_at'],
+		generatedAt
+	),
+	changefreq: 'weekly',
+	priority: '0.6'
 })}`
 		)
 		.join('')}
