@@ -54,8 +54,8 @@
 						<div class="relative h-14 w-20 shrink-0 overflow-hidden border border-stone-200/60 bg-stone-100">
 							{#if rec.thumbnail_url && !failedThumbs.has(rec.id)}
 								<BlurUpImage
-									src={vercelImage(rec.thumbnail_url, 160)}
-									srcset={vercelImageSrcSet(rec.thumbnail_url, 80)}
+									src={vercelImage(rec.thumbnail_url, 192)}
+									srcset={vercelImageSrcSet(rec.thumbnail_url, 96)}
 									placeholderSrc={vercelImagePlaceholder(rec.thumbnail_url)}
 									alt=""
 									width={80}
