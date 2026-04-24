@@ -14,7 +14,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	const [{ data: recordings, total }, statusResult, icecast, broadcast, subscriberCount] =
 		await Promise.all([
-			listRecordings({ limit: 100 }),
+			// Initial paint just shows the 5 most recent recordings — the rest
+			// are fetched on demand via /api/recordings/list (search / load
+			// more) so the page TTFB stays fast even as the archive grows.
+			listRecordings({ limit: 5 }),
 			recorderStatus().catch((err: unknown) => {
 				const message = err instanceof RecorderError ? err.message : (err as Error).message;
 				return { error: message } as const;

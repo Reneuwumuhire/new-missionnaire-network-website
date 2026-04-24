@@ -1,5 +1,5 @@
 import { getDb } from './mongo';
-import { ObjectId, type Document, type Filter, type Sort } from 'mongodb';
+import { ObjectId, type Document, type Filter } from 'mongodb';
 import type { MusicAudio } from '$lib/models/music-audio';
 import type { AdminUser } from '$lib/models/admin-user';
 import type { AdminSession } from '$lib/models/session';
@@ -74,7 +74,14 @@ export async function queryMusicAudio(options: {
 	pageNumber?: number;
 	orderBy?: string;
 }): Promise<{ data: MusicAudio[]; total: number }> {
-	const { category, search, artist, limit = 20, pageNumber = 1, orderBy = 'uploaded_at:desc' } = options;
+	const {
+		category,
+		search,
+		artist,
+		limit = 20,
+		pageNumber = 1,
+		orderBy = 'uploaded_at:desc'
+	} = options;
 
 	const db = await getDb();
 	const conditions: Filter<Document>[] = [];
@@ -196,13 +203,19 @@ export async function deleteMusicAudioBulk(ids: string[]): Promise<{ s3_keys: st
 	return { s3_keys };
 }
 
-export async function bulkUpdateCategory(ids: string[], category: string, updatedBy: string): Promise<number> {
+export async function bulkUpdateCategory(
+	ids: string[],
+	category: string,
+	updatedBy: string
+): Promise<number> {
 	const db = await getDb();
 	const objectIds = ids.map((id) => new ObjectId(id));
-	const result = await db.collection('music_audio').updateMany(
-		{ _id: { $in: objectIds } },
-		{ $set: { category, updated_at: new Date(), updated_by: updatedBy } }
-	);
+	const result = await db
+		.collection('music_audio')
+		.updateMany(
+			{ _id: { $in: objectIds } },
+			{ $set: { category, updated_at: new Date(), updated_by: updatedBy } }
+		);
 	return result.modifiedCount;
 }
 
@@ -231,11 +244,7 @@ export async function checkDuplicateAudio(
 		{ $and: [{ title }, ...(artist ? [{ artist }] : [])] },
 		{ $and: [{ file_size: fileSize }, { format }] }
 	];
-	const docs = await db
-		.collection('music_audio')
-		.find({ $or: conditions })
-		.limit(5)
-		.toArray();
+	const docs = await db.collection('music_audio').find({ $or: conditions }).limit(5).toArray();
 	return docs.map((doc) => serializeDocument<MusicAudio>(doc));
 }
 
@@ -259,25 +268,25 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 	const now = new Date();
 	const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-	const [totalTracks, totalStorageResult, uploadsThisMonth, missingMetadata, categoryDistribution, recentUploads] =
-		await Promise.all([
-			collection.countDocuments(),
-			collection
-				.aggregate([{ $group: { _id: null, total: { $sum: '$file_size' } } }])
-				.toArray(),
-			collection.countDocuments({ uploaded_at: { $gte: firstOfMonth } }),
-			collection.countDocuments({
-				$or: [
-					{ title: { $in: [null, ''] } },
-					{ artist: { $in: [null, ''] } },
-					{ duration: null }
-				]
-			}),
-			collection
-				.aggregate([{ $group: { _id: '$category', count: { $sum: 1 } } }, { $sort: { count: -1 } }])
-				.toArray(),
-			collection.find().sort({ uploaded_at: -1 }).limit(10).toArray()
-		]);
+	const [
+		totalTracks,
+		totalStorageResult,
+		uploadsThisMonth,
+		missingMetadata,
+		categoryDistribution,
+		recentUploads
+	] = await Promise.all([
+		collection.countDocuments(),
+		collection.aggregate([{ $group: { _id: null, total: { $sum: '$file_size' } } }]).toArray(),
+		collection.countDocuments({ uploaded_at: { $gte: firstOfMonth } }),
+		collection.countDocuments({
+			$or: [{ title: { $in: [null, ''] } }, { artist: { $in: [null, ''] } }, { duration: null }]
+		}),
+		collection
+			.aggregate([{ $group: { _id: '$category', count: { $sum: 1 } } }, { $sort: { count: -1 } }])
+			.toArray(),
+		collection.find().sort({ uploaded_at: -1 }).limit(10).toArray()
+	]);
 
 	return {
 		totalTracks,
@@ -350,11 +359,7 @@ export async function createAdminUser(user: {
 
 export async function getAllAdminUsers(): Promise<AdminUser[]> {
 	const db = await getDb();
-	const docs = await db
-		.collection('admin_users')
-		.find()
-		.sort({ created_at: -1 })
-		.toArray();
+	const docs = await db.collection('admin_users').find().sort({ created_at: -1 }).toArray();
 	return docs.map((doc) => serializeDocument<AdminUser>(doc));
 }
 
@@ -444,7 +449,12 @@ export async function logAudit(entry: {
 
 export async function getRecentAuditLogs(limit: number = 20): Promise<AuditLog[]> {
 	const db = await getDb();
-	const docs = await db.collection('audit_log').find().sort({ timestamp: -1 }).limit(limit).toArray();
+	const docs = await db
+		.collection('audit_log')
+		.find()
+		.sort({ timestamp: -1 })
+		.limit(limit)
+		.toArray();
 	return docs.map((doc) => serializeDocument<AuditLog>(doc));
 }
 
@@ -452,14 +462,47 @@ export async function getRecentAuditLogs(limit: number = 20): Promise<AuditLog[]
 //  RECORDINGS (live broadcast archive)
 // ══════════════════════════════════════
 
-export async function listRecordings(options: {
-	limit?: number;
-	pageNumber?: number;
-	publishedOnly?: boolean;
-} = {}): Promise<{ data: Recording[]; total: number }> {
-	const { limit = 50, pageNumber = 1, publishedOnly = false } = options;
+export async function listRecordings(
+	options: {
+		limit?: number;
+		pageNumber?: number;
+		publishedOnly?: boolean;
+		/** Free-text search on title/description/created_by (case-insensitive). */
+		q?: string;
+		/** Optional exact status filter. */
+		status?: 'recording' | 'uploading' | 'ready' | 'failed';
+		/** Optional publication filter — server-side narrowing for the admin
+		 *  page so the same view can paginate "Published only", "Drafts only",
+		 *  or both. */
+		publishedFilter?: 'all' | 'published' | 'unpublished';
+	} = {}
+): Promise<{ data: Recording[]; total: number }> {
+	const {
+		limit = 50,
+		pageNumber = 1,
+		publishedOnly = false,
+		q,
+		status,
+		publishedFilter = 'all'
+	} = options;
 	const db = await getDb();
-	const query: Filter<Document> = publishedOnly ? { published: true, status: 'ready' } : {};
+	const conditions: Filter<Document>[] = [];
+	if (publishedOnly) conditions.push({ published: true, status: 'ready' });
+	if (status) conditions.push({ status });
+	if (publishedFilter === 'published') conditions.push({ published: true });
+	else if (publishedFilter === 'unpublished') conditions.push({ published: false });
+	if (q && q.trim()) {
+		const escaped = q.trim().replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+		conditions.push({
+			$or: [
+				{ title: { $regex: escaped, $options: 'i' } },
+				{ description: { $regex: escaped, $options: 'i' } },
+				{ created_by: { $regex: escaped, $options: 'i' } },
+				{ created_by_name: { $regex: escaped, $options: 'i' } }
+			]
+		});
+	}
+	const query: Filter<Document> = conditions.length > 0 ? { $and: conditions } : {};
 	const skip = (pageNumber - 1) * limit;
 	const total = await db.collection('recordings').countDocuments(query);
 	const data = await db
@@ -618,15 +661,15 @@ export async function getBroadcastAdminState(): Promise<BroadcastAdminState> {
 	};
 }
 
-export async function setBroadcastAdminState(
-	updates: Partial<BroadcastAdminState>
-): Promise<void> {
+export async function setBroadcastAdminState(updates: Partial<BroadcastAdminState>): Promise<void> {
 	const db = await getDb();
-	await db.collection('broadcast_admin_state').updateOne(
-		{ _id: 'current' as unknown as ObjectId },
-		{ $set: { ...updates, updated_at: new Date().toISOString() } },
-		{ upsert: true }
-	);
+	await db
+		.collection('broadcast_admin_state')
+		.updateOne(
+			{ _id: 'current' as unknown as ObjectId },
+			{ $set: { ...updates, updated_at: new Date().toISOString() } },
+			{ upsert: true }
+		);
 }
 
 export async function countPushSubscriptions(): Promise<number> {

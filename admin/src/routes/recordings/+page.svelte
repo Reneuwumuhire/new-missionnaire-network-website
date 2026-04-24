@@ -65,15 +65,89 @@
 	let broadcastBusy = $state(false);
 	let actionError = $state<string | null>(null);
 	// ── Search + multi-select (recordings table) ──────────────────────
+	// The initial 5 most recent recordings are streamed in via the page
+	// loader; everything else (search, "load more") goes through
+	// /api/recordings/list. Client-side filtering is gone — it would only
+	// see the 5 loaded rows, not the full archive, which is misleading.
 	let searchQuery = $state('');
 	let statusFilter = $state<'all' | RecordingStatus>('all');
 	let publishedFilter = $state<'all' | 'published' | 'unpublished'>('all');
 	let selectedIds = $state<Set<string>>(new Set());
 	let bulkDeleting = $state(false);
 
+	const PAGE_SIZE = 5;
+	let recordings = $state<typeof data.recordings>(data.recordings);
+	let total = $state<number>(data.total);
+	let currentPage = $state(1);
+	let isFetching = $state(false);
+	let fetchError = $state<string | null>(null);
+
+	const hasMore = $derived(recordings.length < total);
 	const hasActiveFilters = $derived(
 		Boolean(searchQuery.trim()) || statusFilter !== 'all' || publishedFilter !== 'all'
 	);
+
+	function buildListUrl(page: number): string {
+		const params = new URLSearchParams();
+		params.set('limit', String(PAGE_SIZE));
+		params.set('page', String(page));
+		if (searchQuery.trim()) params.set('q', searchQuery.trim());
+		if (statusFilter !== 'all') params.set('status', statusFilter);
+		if (publishedFilter !== 'all') params.set('published', publishedFilter);
+		return `/api/recordings/list?${params}`;
+	}
+
+	async function fetchRecordings(append: boolean) {
+		isFetching = true;
+		fetchError = null;
+		const targetPage = append ? currentPage + 1 : 1;
+		try {
+			const res = await fetch(buildListUrl(targetPage));
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			const body = (await res.json()) as { data: typeof data.recordings; total: number };
+			if (append) {
+				recordings = [...recordings, ...body.data];
+				currentPage = targetPage;
+			} else {
+				recordings = body.data;
+				total = body.total;
+				currentPage = 1;
+				// Drop selections that no longer exist in the new result set.
+				const surviving = new Set(body.data.map((r) => r._id!).filter(Boolean));
+				if (selectedIds.size > 0) {
+					selectedIds = new Set([...selectedIds].filter((id) => surviving.has(id)));
+				}
+			}
+		} catch (err) {
+			fetchError = (err as Error).message || 'Erreur réseau';
+		} finally {
+			isFetching = false;
+		}
+	}
+
+	function loadMore() {
+		if (!isFetching && hasMore) void fetchRecordings(true);
+	}
+
+	// Filter changes refetch from the server. searchQuery is debounced (300ms);
+	// the dropdowns refetch immediately. Skip the very first effect run so we
+	// don't double-fetch on initial mount (the loader already gave us page 1).
+	let didMount = false;
+	let searchDebounce: ReturnType<typeof setTimeout> | null = null;
+	$effect(() => {
+		// Track all three so any change re-runs this block.
+		searchQuery;
+		statusFilter;
+		publishedFilter;
+		if (!didMount) {
+			didMount = true;
+			return;
+		}
+		if (searchDebounce) clearTimeout(searchDebounce);
+		searchDebounce = setTimeout(() => {
+			void fetchRecordings(false);
+		}, 300);
+	});
 
 	function resetFilters() {
 		searchQuery = '';
@@ -97,23 +171,10 @@
 	// the admin can upload a replacement without the browser's broken-image icon.
 	let recEditThumbnailBroken = $state(false);
 
-	const filteredRecordings = $derived.by(() => {
-		const q = searchQuery.trim().toLowerCase();
-		return data.recordings.filter((rec) => {
-			if (q) {
-				const haystack = [rec.title, rec.created_by, rec.created_by_name, rec.description]
-					.filter(Boolean)
-					.join(' ')
-					.toLowerCase();
-				if (!haystack.includes(q)) return false;
-			}
-			if (statusFilter !== 'all' && rec.status !== statusFilter) return false;
-			if (publishedFilter === 'published' && !rec.published) return false;
-			if (publishedFilter === 'unpublished' && rec.published) return false;
-			return true;
-		});
-	});
-
+	// All filter narrowing happens server-side now (see fetchRecordings).
+	// Keeping the same names so the rest of the template (select-all
+	// checkbox, bulk action bar, etc.) doesn't have to change.
+	const filteredRecordings = $derived(recordings);
 	const filteredIds = $derived(filteredRecordings.map((r) => r._id!).filter(Boolean));
 	const allFilteredSelected = $derived(
 		filteredIds.length > 0 && filteredIds.every((id) => selectedIds.has(id))
@@ -1446,13 +1507,18 @@
 	{/if}
 
 	<span class="ml-auto text-xs text-stone-400">
-		{#if hasActiveFilters}
-			{filteredRecordings.length} / {data.recordings.length}
+		{#if isFetching}
+			Chargement…
 		{:else}
-			{data.recordings.length} total
+			{recordings.length} affichés / {total} {hasActiveFilters ? 'résultats' : 'total'}
 		{/if}
 	</span>
 </div>
+{#if fetchError}
+	<p class="mb-3 border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+		Erreur lors du chargement: {fetchError}
+	</p>
+{/if}
 
 <!-- Mobile + tablet cards (< lg). Editorial catalog layout: thumbnail + serif
      title + meta chips + action row. Each recording is a self-contained card
@@ -1600,15 +1666,13 @@
 		</article>
 	{/each}
 
-	{#if filteredRecordings.length === 0}
+	{#if filteredRecordings.length === 0 && !isFetching}
 		<div class="border border-dashed border-stone-200 bg-white/40 px-5 py-14 text-center">
 			<p class="font-display text-sm text-stone-500">
-				{#if data.recordings.length === 0}
-					Aucun enregistrement pour l'instant.
-				{:else if hasActiveFilters}
+				{#if hasActiveFilters}
 					Aucun enregistrement ne correspond aux filtres actifs.
 				{:else}
-					Aucun enregistrement.
+					Aucun enregistrement pour l'instant.
 				{/if}
 			</p>
 			{#if hasActiveFilters}
@@ -1616,6 +1680,22 @@
 					Réinitialiser les filtres
 				</button>
 			{/if}
+		</div>
+	{/if}
+	{#if hasMore || isFetching}
+		<div class="mt-4 flex justify-center">
+			<button
+				type="button"
+				onclick={loadMore}
+				disabled={isFetching || !hasMore}
+				class="inline-flex items-center gap-2 border border-stone-300 bg-white px-5 py-2 text-xs font-semibold uppercase tracking-[0.15em] text-stone-700 transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+			>
+				{#if isFetching}
+					Chargement…
+				{:else}
+					Charger plus ({total - recordings.length} restants)
+				{/if}
+			</button>
 		</div>
 	{/if}
 </div>
@@ -1757,6 +1837,23 @@
 		</tbody>
 	</table>
 </div>
+
+{#if hasMore || isFetching}
+	<div class="mt-4 hidden lg:flex justify-center">
+		<button
+			type="button"
+			onclick={loadMore}
+			disabled={isFetching || !hasMore}
+			class="inline-flex items-center gap-2 border border-stone-300 bg-white px-5 py-2 text-xs font-semibold uppercase tracking-[0.15em] text-stone-700 transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+		>
+			{#if isFetching}
+				Chargement…
+			{:else}
+				Charger plus ({total - recordings.length} restants)
+			{/if}
+		</button>
+	</div>
+{/if}
 
 <!-- Bulk action bar — sticky footer appears while anything is selected -->
 {#if selectedIds.size > 0}
