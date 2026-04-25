@@ -4,7 +4,15 @@
 	import type { MusicAudio } from '$lib/models/music-audio';
 	import type { AudioAsset } from '$lib/models/media-assets';
 	import type { Sermon } from '$lib/models/sermon';
-	import { selectAudio, basePlaylist, playlist, currentIndex, autoNext, isShuffle, isPlaying } from '$lib/stores/global';
+	import {
+		selectAudio,
+		basePlaylist,
+		playlist,
+		currentIndex,
+		autoNext,
+		isShuffle,
+		isPlaying
+	} from '$lib/stores/global';
 	import Pagination from '$lib/components/Pagination.svelte';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
@@ -23,7 +31,13 @@
 	import BsClockHistory from 'svelte-icons-pack/bs/BsClockHistory';
 	import { formatTime } from '../../utils/FormatTime';
 	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
-	import { addToRecentlyPlayed, toggleFavorite, isFavorite, recentlyPlayed, favorites } from '$lib/stores/musicHistory';
+	import {
+		addToRecentlyPlayed,
+		toggleFavorite,
+		isFavorite,
+		recentlyPlayed,
+		favorites
+	} from '$lib/stores/musicHistory';
 	// ── BEGIN: cached filter imports (added) ──────────────────────
 	import { onMount } from 'svelte';
 	import { cachedUrls, refreshCachedUrls, isUrlCached } from '$lib/audioCache';
@@ -72,10 +86,25 @@
 	// in recently-played (last 20) or favorites.
 	$: cachedSongs = (() => {
 		const set = $cachedUrls;
-		if (set.size === 0) return [] as Array<{ id: string; title: string; artist?: string; category?: string; s3_url?: string; song?: MusicAudio }>;
+		if (set.size === 0)
+			return [] as Array<{
+				id: string;
+				title: string;
+				artist?: string;
+				category?: string;
+				s3_url?: string;
+				song?: MusicAudio;
+			}>;
 
 		const seen = new Set<string>();
-		const out: Array<{ id: string; title: string; artist?: string; category?: string; s3_url?: string; song?: MusicAudio }> = [];
+		const out: Array<{
+			id: string;
+			title: string;
+			artist?: string;
+			category?: string;
+			s3_url?: string;
+			song?: MusicAudio;
+		}> = [];
 
 		const pushIfCached = (
 			id: string,
@@ -154,19 +183,25 @@
 	}
 
 	$: cachedPlayableCount = cachedSongs.reduce(
-		(n, item) => n + (item.song ?? findSongById(musicPlaylist, item.id) ? 1 : 0),
+		(n, item) => n + ((item.song ?? findSongById(musicPlaylist, item.id)) ? 1 : 0),
 		0
 	);
 	// ── END: play all cached ──────────────────────────────────────
-	$: filteredArtists = artists.filter((a: string) => a.toLowerCase().includes(artistSearch.toLowerCase()));
+	$: filteredArtists = artists.filter((a: string) =>
+		a.toLowerCase().includes(artistSearch.toLowerCase())
+	);
 	$: playlistIndexByUrl = new Map<string, number>(
 		(musicPlaylist || []).map((song: MusicAudio, index: number) => [song.s3_url, index])
 	);
 	$: activeMusicSong = isMusicAudio($selectAudio) ? $selectAudio : null;
-	$: activeMusicSongIndex = activeMusicSong ? (playlistIndexByUrl.get(activeMusicSong.s3_url) ?? -1) : -1;
+	$: activeMusicSongIndex = activeMusicSong
+		? (playlistIndexByUrl.get(activeMusicSong.s3_url) ?? -1)
+		: -1;
 	$: isActiveMusicSongVisible =
-		!!activeMusicSong && (musicList || []).some((song: MusicAudio) => song.s3_url === activeMusicSong.s3_url);
-	$: activeMusicSongPage = activeMusicSongIndex >= 0 ? Math.floor(activeMusicSongIndex / limit) + 1 : null;
+		!!activeMusicSong &&
+		(musicList || []).some((song: MusicAudio) => song.s3_url === activeMusicSong.s3_url);
+	$: activeMusicSongPage =
+		activeMusicSongIndex >= 0 ? Math.floor(activeMusicSongIndex / limit) + 1 : null;
 
 	let searchInput = currentSearch;
 
@@ -191,7 +226,7 @@
 		'Kolwezi'
 	];
 	const desktopMusicGrid =
-		'md:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.2fr)_minmax(0,1fr)_80px_32px_40px_40px]';
+		'md:grid-cols-[28px_minmax(0,2fr)_minmax(0,0.95fr)_minmax(0,0.85fr)_58px_28px_36px_36px] lg:grid-cols-[30px_minmax(0,2.2fr)_minmax(0,1.05fr)_minmax(0,0.95fr)_68px_32px_40px_40px] xl:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.2fr)_minmax(0,1fr)_80px_32px_40px_40px]';
 
 	// Sync playlist when songs are loaded
 	$: if (musicPlaylist) {
@@ -245,14 +280,14 @@
 		params.set('category', category);
 		params.delete('artist');
 		params.set('page', '1');
-		
+
 		// If switching to 'All' (Tout Voir), remove explicit sort to allow default random shuffle
 		if (category === 'All') {
 			params.delete('sort');
 		} else {
-			// For specific categories, default to recent uploads if no sort exists, 
-			// or keep existing sort? 
-			// Better to keep existing sort if user chose one? 
+			// For specific categories, default to recent uploads if no sort exists,
+			// or keep existing sort?
+			// Better to keep existing sort if user chose one?
 			// Or maybe reset to default (uploaded_at) for cleaner UX?
 			// Let's just remove sort for 'All' which triggers the +page.ts default 'random'.
 			// For others, if we keep sort, it might be random?
@@ -267,7 +302,7 @@
 			// Common pattern: Category change resets sort to default.
 			params.delete('sort');
 		}
-		
+
 		goto(`?${params.toString()}`);
 	}
 
@@ -275,15 +310,16 @@
 		const params = new URLSearchParams($page.url.searchParams);
 		const current = params.get('sort') || 'uploaded_at:desc';
 		const [currentProp, currentOrder] = current.split(':');
-		
+
 		let nextOrder = 'desc';
 		if (currentProp === property) {
 			nextOrder = currentOrder === 'desc' ? 'asc' : 'desc';
 		} else {
 			// Default to ASC for Titre and Artiste, DESC for everything else (dates, duration)
-			nextOrder = (property === 'title' || property === 'artist' || property === 'category') ? 'asc' : 'desc';
+			nextOrder =
+				property === 'title' || property === 'artist' || property === 'category' ? 'asc' : 'desc';
 		}
-		
+
 		params.set('sort', `${property}:${nextOrder}`);
 		params.set('page', '1');
 		goto(`?${params.toString()}`);
@@ -334,8 +370,8 @@
 			's3_url' in current
 				? current.s3_url
 				: 'mp3_url' in current
-				? current.mp3_url
-				: (current as any).url;
+					? current.mp3_url
+					: (current as any).url;
 		const songUrl = 's3_url' in song ? song.s3_url : (song as any).url;
 		return activeUrl === songUrl;
 	}
@@ -343,25 +379,42 @@
 
 <svelte:head>
 	<title>Cantiques et Louanges - Missionnaire Network | Musique du Message</title>
-	<meta name="description" content="Ecoutez les cantiques, louanges et adorations du Message de l'Heure sur Missionnaire Network. Une collection riche pour votre adoration quotidienne." />
-	<meta property="og:title" content="Cantiques et Louanges - Missionnaire Network | Musique du Message" />
-	<meta property="og:description" content="Ecoutez les cantiques, louanges et adorations du Message de l'Heure sur Missionnaire Network. Une collection riche pour votre adoration quotidienne." />
+	<meta
+		name="description"
+		content="Ecoutez les cantiques, louanges et adorations du Message de l'Heure sur Missionnaire Network. Une collection riche pour votre adoration quotidienne."
+	/>
+	<meta
+		property="og:title"
+		content="Cantiques et Louanges - Missionnaire Network | Musique du Message"
+	/>
+	<meta
+		property="og:description"
+		content="Ecoutez les cantiques, louanges et adorations du Message de l'Heure sur Missionnaire Network. Une collection riche pour votre adoration quotidienne."
+	/>
 </svelte:head>
 
-<div class="max-w-6xl mx-auto px-6 py-8">
+<div class="w-full min-w-0 max-w-6xl mx-auto px-4 md:px-6 py-8">
 	<!-- Page Header -->
 	<div class="mb-10">
-		<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body">Cantiques & Louange</p>
+		<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body">
+			Cantiques & Louange
+		</p>
 		<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">Musique</h1>
 	</div>
 
 	<!-- Alpha Filter -->
 	<div class="mb-10">
-		<h2 class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.35em] mb-4 font-body">Par ordre alphabétique</h2>
+		<h2
+			class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.35em] mb-4 font-body"
+		>
+			Par ordre alphabétique
+		</h2>
 		<div class="flex flex-wrap gap-x-4 gap-y-2">
 			{#each alphabet as letter}
-				<button 
-					class="text-[11px] font-body font-bold transition-all {currentAlpha === letter ? 'text-missionnaire font-semibold' : 'text-stone-400 hover:text-missionnaire'}"
+				<button
+					class="text-[11px] font-body font-bold transition-all {currentAlpha === letter
+						? 'text-missionnaire font-semibold'
+						: 'text-stone-400 hover:text-missionnaire'}"
 					on:click={() => handleAlphaChange(letter)}
 				>
 					{letter}
@@ -371,11 +424,21 @@
 	</div>
 
 	<div class="mb-12">
-		<h2 class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.35em] mb-4 font-body">Recueils</h2>
-		<div class="flex overflow-x-auto pb-4 gap-3 no-scrollbar -mx-4 px-4 md:mx-0 md:px-0 md:pb-0" style="scrollbar-width: none; -ms-overflow-style: none;">
+		<h2
+			class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.35em] mb-4 font-body"
+		>
+			Recueils
+		</h2>
+		<div
+			class="flex overflow-x-auto pb-4 gap-2.5 md:gap-3 no-scrollbar -mx-4 px-4 md:mx-0 md:px-0 md:pb-0"
+			style="scrollbar-width: none; -ms-overflow-style: none;"
+		>
 			{#each categories as category}
-				<button 
-					class="flex-shrink-0 px-5 py-2.5 text-[11px] font-bold uppercase tracking-wider transition-all border {currentCategory === category ? 'border-missionnaire text-missionnaire bg-missionnaire/5' : 'bg-white/40 text-stone-500 border-stone-200/60 hover:border-missionnaire hover:text-missionnaire'}"
+				<button
+					class="flex-shrink-0 px-4 md:px-5 py-2 md:py-2.5 text-[10px] md:text-[11px] font-bold uppercase tracking-[0.16em] md:tracking-wider transition-all border {currentCategory ===
+					category
+						? 'border-missionnaire text-missionnaire bg-missionnaire/5'
+						: 'bg-white/40 text-stone-500 border-stone-200/60 hover:border-missionnaire hover:text-missionnaire'}"
 					on:click={() => handleCategoryChange(category)}
 				>
 					{category === 'All' ? 'Tout Voir' : category}
@@ -390,9 +453,9 @@
 			<h2 class="font-display text-3xl font-bold text-stone-900">List</h2>
 			<!-- Mobile Artist Filter Toggle -->
 			<div class="relative md:hidden">
-				<button 
+				<button
 					class="flex items-center gap-2 bg-white border border-stone-200 text-stone-600 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm active:scale-95 transition-transform"
-					on:click|stopPropagation={() => isArtistMenuOpen = !isArtistMenuOpen}
+					on:click|stopPropagation={() => (isArtistMenuOpen = !isArtistMenuOpen)}
 				>
 					<Icon src={BsSearch} size="12" />
 					Artiste
@@ -400,36 +463,47 @@
 				{#if isArtistMenuOpen}
 					<!-- svelte-ignore a11y-no-static-element-interactions -->
 					<!-- svelte-ignore a11y-click-events-have-key-events -->
-					<div 
+					<div
 						class="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-stone-200 p-3 z-50 normal-case tracking-normal"
 						on:click|stopPropagation
 					>
 						<div class="flex items-center gap-2 bg-stone-50 px-2 py-1.5 rounded-lg mb-2">
 							<Icon src={BsSearch} size="12" color="#999" />
-							<input 
-								type="text" 
-								placeholder="Rechercher un artiste..." 
+							<input
+								type="text"
+								placeholder="Rechercher un artiste..."
 								class="bg-transparent border-none outline-none text-xs w-full text-stone-700 placeholder:text-stone-400"
 								bind:value={artistSearch}
 							/>
 						</div>
-						
+
 						<div class="max-h-60 overflow-y-auto space-y-1 custom-scrollbar">
 							{#if filteredArtists.length === 0}
 								<div class="px-3 py-4 text-xs text-stone-400 text-center italic">
 									Aucun artiste trouvé
 								</div>
 							{:else}
-								<button 
-									class="w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-colors {!currentArtist ? 'bg-stone-100 text-missionnaire' : 'text-stone-500 hover:bg-stone-50'}"
-									on:click={() => { handleArtistChange(''); isArtistMenuOpen = false; }}
+								<button
+									class="w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-colors {!currentArtist
+										? 'bg-stone-100 text-missionnaire'
+										: 'text-stone-500 hover:bg-stone-50'}"
+									on:click={() => {
+										handleArtistChange('');
+										isArtistMenuOpen = false;
+									}}
 								>
 									Tous les artistes
 								</button>
 								{#each filteredArtists as artist}
-									<button 
-										class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-colors {currentArtist === artist ? 'bg-stone-100 text-missionnaire font-bold' : 'text-stone-600 hover:bg-stone-50'}"
-										on:click={() => { handleArtistChange(artist); isArtistMenuOpen = false; }}
+									<button
+										class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-colors {currentArtist ===
+										artist
+											? 'bg-stone-100 text-missionnaire font-bold'
+											: 'text-stone-600 hover:bg-stone-50'}"
+										on:click={() => {
+											handleArtistChange(artist);
+											isArtistMenuOpen = false;
+										}}
 									>
 										{artist}
 									</button>
@@ -440,12 +514,12 @@
 				{/if}
 			</div>
 		</div>
-		
+
 		<!-- Active Filters (Mobile Only) -->
-		{#if (currentArtist || (currentCategory && currentCategory !== 'All'))}
+		{#if currentArtist || (currentCategory && currentCategory !== 'All')}
 			<div class="md:hidden flex flex-wrap gap-2">
 				{#if currentCategory && currentCategory !== 'All'}
-					<button 
+					<button
 						class="flex items-center gap-1.5 bg-stone-200 text-missionnaire px-3 py-1.5 rounded-full text-xs font-semibold"
 						on:click={() => handleCategoryChange('All')}
 					>
@@ -454,7 +528,7 @@
 					</button>
 				{/if}
 				{#if currentArtist}
-					<button 
+					<button
 						class="flex items-center gap-1.5 bg-stone-200 text-missionnaire px-3 py-1.5 rounded-full text-xs font-semibold"
 						on:click={() => handleArtistChange('')}
 					>
@@ -477,7 +551,10 @@
 						{activeMusicSong.title || 'Sans titre'}
 					</div>
 					<div class="mt-1 text-[11px] font-medium text-stone-500">
-						{activeMusicSong.artist || activeMusicSong.book_full_name || activeMusicSong.category || 'Missionnaire'}
+						{activeMusicSong.artist ||
+							activeMusicSong.book_full_name ||
+							activeMusicSong.category ||
+							'Missionnaire'}
 						{#if activeMusicSongPage}
 							<span class="mx-1 text-stone-300">•</span>
 							<span>Page {activeMusicSongPage}</span>
@@ -507,32 +584,50 @@
 
 	<!-- Favorites & Recently Played (collapsed by default) -->
 	{#if $favorites.length > 0 || $recentlyPlayed.length > 0 || cachedCount > 0}
-		<div class="flex flex-wrap gap-2 mb-4">
+		<div class="flex flex-wrap gap-1.5 md:gap-2 mb-4">
 			{#if $favorites.length > 0}
 				<button
-					class="flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-bold uppercase tracking-wider transition-colors {showFavorites ? 'border-red-200 bg-red-50 text-red-600' : 'border-stone-200 bg-white text-stone-500 hover:border-red-200 hover:text-red-500'}"
-					on:click={() => { showFavorites = !showFavorites; showRecent = false; showCached = false; }}
+					class="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-full border text-[10px] md:text-xs font-bold uppercase tracking-[0.12em] md:tracking-wider transition-colors whitespace-nowrap {showFavorites
+						? 'border-red-200 bg-red-50 text-red-600'
+						: 'border-stone-200 bg-white text-stone-500 hover:border-red-200 hover:text-red-500'}"
+					on:click={() => {
+						showFavorites = !showFavorites;
+						showRecent = false;
+						showCached = false;
+					}}
 				>
-					<Icon src={BsHeartFill} size="12" />
+					<Icon src={BsHeartFill} size="11" />
 					Favoris ({$favorites.length})
 				</button>
 			{/if}
 			{#if $recentlyPlayed.length > 0}
 				<button
-					class="flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-bold uppercase tracking-wider transition-colors {showRecent ? 'border-stone-300 bg-stone-100 text-missionnaire' : 'border-stone-200 bg-white text-stone-500 hover:border-stone-300 hover:text-missionnaire'}"
-					on:click={() => { showRecent = !showRecent; showFavorites = false; showCached = false; }}
+					class="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-full border text-[10px] md:text-xs font-bold uppercase tracking-[0.12em] md:tracking-wider transition-colors whitespace-nowrap {showRecent
+						? 'border-stone-300 bg-stone-100 text-missionnaire'
+						: 'border-stone-200 bg-white text-stone-500 hover:border-stone-300 hover:text-missionnaire'}"
+					on:click={() => {
+						showRecent = !showRecent;
+						showFavorites = false;
+						showCached = false;
+					}}
 				>
-					<Icon src={BsClockHistory} size="12" />
+					<Icon src={BsClockHistory} size="11" />
 					Recents ({$recentlyPlayed.length})
 				</button>
 			{/if}
 			<!-- ── BEGIN: cached filter button (added) ─────────────── -->
 			{#if cachedCount > 0}
 				<button
-					class="flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-bold uppercase tracking-wider transition-colors {showCached ? 'border-emerald-200 bg-emerald-50 text-emerald-600' : 'border-stone-200 bg-white text-stone-500 hover:border-emerald-200 hover:text-emerald-600'}"
-					on:click={() => { showCached = !showCached; showFavorites = false; showRecent = false; }}
+					class="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-full border text-[10px] md:text-xs font-bold uppercase tracking-[0.12em] md:tracking-wider transition-colors whitespace-nowrap {showCached
+						? 'border-emerald-200 bg-emerald-50 text-emerald-600'
+						: 'border-stone-200 bg-white text-stone-500 hover:border-emerald-200 hover:text-emerald-600'}"
+					on:click={() => {
+						showCached = !showCached;
+						showFavorites = false;
+						showRecent = false;
+					}}
 				>
-					<Icon src={IoCloudDoneOutline} size="14" />
+					<Icon src={IoCloudDoneOutline} size="12" />
 					En cache ({cachedCount})
 				</button>
 			{/if}
@@ -541,9 +636,12 @@
 
 		{#if showFavorites && $favorites.length > 0}
 			<div class="bg-white/40 border border-stone-200/60 mb-6 overflow-hidden">
-				<div class="flex items-center justify-between px-4 py-3 border-b border-stone-200 bg-stone-50/50">
+				<div
+					class="flex items-center justify-between px-4 py-3 border-b border-stone-200 bg-stone-50/50"
+				>
 					<span class="text-[10px] font-bold uppercase tracking-widest text-stone-400">
-						Favoris — {$favorites.length} {$favorites.length > 1 ? 'chants' : 'chant'}
+						Favoris — {$favorites.length}
+						{$favorites.length > 1 ? 'chants' : 'chant'}
 					</span>
 					<button
 						class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-900 hover:bg-stone-800 text-white text-[10px] font-bold uppercase tracking-wider transition-colors"
@@ -556,13 +654,21 @@
 				<div class="divide-y divide-stone-50 max-h-[300px] overflow-y-auto">
 					{#each $favorites as fav, i}
 						{@const favSong = findSongById(musicPlaylist, fav.id)}
-						<div class="flex items-center gap-3 px-4 py-2.5 hover:bg-stone-100/50 transition-colors group">
+						<div
+							class="flex items-center gap-3 px-4 py-2.5 hover:bg-stone-100/50 transition-colors group"
+						>
 							<span class="text-[10px] font-bold text-stone-300 w-5 text-center">{i + 1}</span>
 							<button
 								class="flex-1 min-w-0 text-left"
-								on:click={() => { if (favSong) playSong(favSong); }}
+								on:click={() => {
+									if (favSong) playSong(favSong);
+								}}
 							>
-								<div class="text-sm font-bold text-stone-800 group-hover:text-missionnaire transition-colors truncate">{fav.title}</div>
+								<div
+									class="text-sm font-bold text-stone-800 group-hover:text-missionnaire transition-colors truncate"
+								>
+									{fav.title}
+								</div>
 								<div class="flex items-center gap-2">
 									{#if fav.artist}
 										<span class="text-[10px] text-stone-400">{fav.artist}</span>
@@ -576,7 +682,13 @@
 							<!-- svelte-ignore a11y-no-static-element-interactions -->
 							<div
 								class="text-red-300 hover:text-red-500 p-1 cursor-pointer transition-colors"
-								on:click|stopPropagation={() => toggleFavorite({ _id: fav.id, title: fav.title, artist: fav.artist, s3_url: fav.s3_url })}
+								on:click|stopPropagation={() =>
+									toggleFavorite({
+										_id: fav.id,
+										title: fav.title,
+										artist: fav.artist,
+										s3_url: fav.s3_url
+									})}
 								title="Retirer des favoris"
 							>
 								<Icon src={BsX} size="14" />
@@ -597,13 +709,21 @@
 				<div class="divide-y divide-stone-50 max-h-[300px] overflow-y-auto">
 					{#each $recentlyPlayed as recent, i}
 						{@const recentSong = findSongById(musicPlaylist, recent.id)}
-						<div class="flex items-center gap-3 px-4 py-2.5 hover:bg-stone-100/50 transition-colors group">
+						<div
+							class="flex items-center gap-3 px-4 py-2.5 hover:bg-stone-100/50 transition-colors group"
+						>
 							<span class="text-[10px] font-bold text-stone-300 w-5 text-center">{i + 1}</span>
 							<button
 								class="flex-1 min-w-0 text-left"
-								on:click={() => { if (recentSong) playSong(recentSong); }}
+								on:click={() => {
+									if (recentSong) playSong(recentSong);
+								}}
 							>
-								<div class="text-sm font-bold text-stone-800 group-hover:text-missionnaire transition-colors truncate">{recent.title}</div>
+								<div
+									class="text-sm font-bold text-stone-800 group-hover:text-missionnaire transition-colors truncate"
+								>
+									{recent.title}
+								</div>
 								{#if recent.artist}
 									<span class="text-[10px] text-stone-400">{recent.artist}</span>
 								{/if}
@@ -617,10 +737,15 @@
 		<!-- ── BEGIN: cached panel (added) ────────────────────────── -->
 		{#if showCached && cachedCount > 0}
 			<div class="bg-white/40 border border-stone-200/60 mb-6 overflow-hidden">
-				<div class="flex items-center justify-between px-4 py-3 border-b border-stone-200 bg-stone-50/50">
-					<span class="text-[10px] font-bold uppercase tracking-widest text-stone-400 flex items-center gap-2">
+				<div
+					class="flex items-center justify-between px-4 py-3 border-b border-stone-200 bg-stone-50/50"
+				>
+					<span
+						class="text-[10px] font-bold uppercase tracking-widest text-stone-400 flex items-center gap-2"
+					>
 						<span class="text-emerald-600"><Icon src={IoCloudDoneOutline} size="12" /></span>
-						En cache — {cachedCount} {cachedCount > 1 ? 'chants disponibles hors ligne' : 'chant disponible hors ligne'}
+						En cache — {cachedCount}
+						{cachedCount > 1 ? 'chants disponibles hors ligne' : 'chant disponible hors ligne'}
 					</span>
 					<button
 						class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-900 hover:bg-stone-800 text-white text-[10px] font-bold uppercase tracking-wider transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-stone-900"
@@ -635,15 +760,23 @@
 				<div class="divide-y divide-stone-50 max-h-[300px] overflow-y-auto">
 					{#each cachedSongs as item, i}
 						{@const cachedSong = item.song ?? findSongById(musicPlaylist, item.id)}
-						<div class="flex items-center gap-3 px-4 py-2.5 hover:bg-stone-100/50 transition-colors group">
+						<div
+							class="flex items-center gap-3 px-4 py-2.5 hover:bg-stone-100/50 transition-colors group"
+						>
 							<span class="text-[10px] font-bold text-stone-300 w-5 text-center">{i + 1}</span>
 							<button
 								class="flex-1 min-w-0 text-left"
-								on:click={() => { if (cachedSong) playSong(cachedSong); }}
+								on:click={() => {
+									if (cachedSong) playSong(cachedSong);
+								}}
 								disabled={!cachedSong}
 								title={cachedSong ? '' : 'Rechargez la liste pour rejouer ce chant'}
 							>
-								<div class="text-sm font-bold text-stone-800 group-hover:text-missionnaire transition-colors truncate">{item.title}</div>
+								<div
+									class="text-sm font-bold text-stone-800 group-hover:text-missionnaire transition-colors truncate"
+								>
+									{item.title}
+								</div>
 								<div class="flex items-center gap-2">
 									{#if item.artist}
 										<span class="text-[10px] text-stone-400">{item.artist}</span>
@@ -662,74 +795,96 @@
 	{/if}
 
 	<!-- Songs List -->
-		<div class="bg-white/40 border border-stone-200/60 min-h-[500px] flex flex-col">
-		<div class="grid grid-cols-[30px_1fr_auto_auto] {desktopMusicGrid} gap-2 md:gap-4 px-3 md:px-4 py-3 border-b border-stone-200/60 text-[10px] md:text-[11px] font-bold text-stone-400 uppercase tracking-widest bg-white/40">
+	<div class="bg-white/40 border border-stone-200/60 min-h-[500px] flex flex-col overflow-hidden">
+		<div
+			class="grid grid-cols-[30px_1fr_auto_auto] {desktopMusicGrid} gap-2 md:gap-3 lg:gap-4 px-3 md:px-3 lg:px-4 py-3 border-b border-stone-200/60 text-[10px] md:text-[11px] font-bold text-stone-400 uppercase tracking-widest bg-white/40"
+		>
 			<div class="text-center">#</div>
-			<button class="text-left flex items-center gap-1.5 hover:text-missionnaire transition-colors" on:click={() => handleSortChange('title')}>
+			<button
+				class="min-w-0 text-left flex items-center gap-1.5 hover:text-missionnaire transition-colors"
+				on:click={() => handleSortChange('title')}
+			>
 				{#if currentSort.startsWith('title')}
 					<span class="text-missionnaire">
 						<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
 					</span>
 				{/if}
-				Titre
+				<span class="truncate">Titre</span>
 			</button>
-			<button class="hidden md:flex text-left items-center gap-1.5 hover:text-missionnaire transition-colors" on:click={() => handleSortChange('category')}>
+			<button
+				class="hidden md:flex min-w-0 text-left items-center gap-1.5 hover:text-missionnaire transition-colors"
+				on:click={() => handleSortChange('category')}
+			>
 				{#if currentSort.startsWith('category')}
 					<span class="text-missionnaire">
 						<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
 					</span>
 				{/if}
-				Recueil
+				<span class="truncate">Recueil</span>
 			</button>
-			<div class="hidden md:flex relative items-center gap-1.5">
-				<button 
-					class="hover:text-missionnaire transition-colors flex items-center gap-1.5"
-					on:click={() => isArtistMenuOpen = !isArtistMenuOpen}
+			<div class="hidden md:flex relative min-w-0 items-center gap-1.5">
+				<button
+					class="min-w-0 hover:text-missionnaire transition-colors flex items-center gap-1.5"
+					on:click={() => (isArtistMenuOpen = !isArtistMenuOpen)}
 				>
 					{#if currentSort.startsWith('artist')}
 						<span class="text-missionnaire font-bold">
 							<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
 						</span>
 					{/if}
-					Artiste
+					<span class="truncate">Artiste</span>
 					{#if currentArtist}
-						<span class="ml-1 bg-stone-200 text-missionnaire px-1.5 py-0.5 rounded-md text-[9px] lowercase">filtré</span>
+						<span
+							class="ml-1 bg-stone-200 text-missionnaire px-1.5 py-0.5 rounded-md text-[9px] lowercase"
+							>filtré</span
+						>
 					{/if}
 				</button>
 
 				{#if isArtistMenuOpen}
 					<!-- svelte-ignore a11y-no-static-element-interactions -->
 					<!-- svelte-ignore a11y-click-events-have-key-events -->
-					<div 
+					<div
 						class="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-stone-200 p-3 z-50 normal-case tracking-normal"
 						on:click|stopPropagation
 					>
 						<div class="flex items-center gap-2 bg-stone-50 px-2 py-1.5 rounded-lg mb-2">
 							<Icon src={BsSearch} size="12" color="#999" />
-							<input 
-								type="text" 
-								placeholder="Rechercher un artiste..." 
+							<input
+								type="text"
+								placeholder="Rechercher un artiste..."
 								class="bg-transparent border-none outline-none text-xs w-full text-stone-700 placeholder:text-stone-400"
 								bind:value={artistSearch}
 							/>
 						</div>
-						
+
 						<div class="max-h-60 overflow-y-auto space-y-1 custom-scrollbar">
 							{#if filteredArtists.length === 0}
 								<div class="px-3 py-4 text-xs text-stone-400 text-center italic">
 									Aucun artiste trouvé
 								</div>
 							{:else}
-								<button 
-									class="w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-colors {!currentArtist ? 'bg-stone-100 text-missionnaire' : 'text-stone-500 hover:bg-stone-50'}"
-									on:click={() => { handleArtistChange(''); isArtistMenuOpen = false; }}
+								<button
+									class="w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-colors {!currentArtist
+										? 'bg-stone-100 text-missionnaire'
+										: 'text-stone-500 hover:bg-stone-50'}"
+									on:click={() => {
+										handleArtistChange('');
+										isArtistMenuOpen = false;
+									}}
 								>
 									Tous les artistes
 								</button>
 								{#each filteredArtists as artist}
-									<button 
-										class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-colors {currentArtist === artist ? 'bg-stone-100 text-missionnaire font-bold' : 'text-stone-600 hover:bg-stone-50'}"
-										on:click={() => { handleArtistChange(artist); isArtistMenuOpen = false; }}
+									<button
+										class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-colors {currentArtist ===
+										artist
+											? 'bg-stone-100 text-missionnaire font-bold'
+											: 'text-stone-600 hover:bg-stone-50'}"
+										on:click={() => {
+											handleArtistChange(artist);
+											isArtistMenuOpen = false;
+										}}
 									>
 										{artist}
 									</button>
@@ -740,22 +895,27 @@
 					<!-- Backdrop -->
 					<!-- svelte-ignore a11y-no-static-element-interactions -->
 					<!-- svelte-ignore a11y-click-events-have-key-events -->
-					<div class="fixed inset-0 z-40" on:click={() => isArtistMenuOpen = false}></div>
+					<div class="fixed inset-0 z-40" on:click={() => (isArtistMenuOpen = false)}></div>
 				{/if}
 			</div>
-			<button class="hidden md:flex text-center items-center justify-center gap-1.5 hover:text-missionnaire transition-colors" on:click={() => handleSortChange('duration')}>
+			<button
+				class="hidden md:flex min-w-0 text-center items-center justify-center gap-1.5 hover:text-missionnaire transition-colors"
+				on:click={() => handleSortChange('duration')}
+			>
 				{#if currentSort.startsWith('duration')}
 					<span class="text-missionnaire">
 						<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
 					</span>
 				{/if}
-				Durée
+				<span class="truncate">Durée</span>
 			</button>
-			<div class="w-8 hidden md:block"></div>
-			<div class="w-10 text-center"></div>
-			<div class="w-10 text-center flex items-center justify-center">
-				<button 
-					class="hover:scale-110 active:scale-95 transition-all {currentSort.startsWith('random') ? 'text-missionnaire' : 'text-stone-300 hover:text-missionnaire/60'}"
+			<div class="w-7 lg:w-8 hidden md:block"></div>
+			<div class="w-9 lg:w-10 text-center"></div>
+			<div class="w-9 lg:w-10 text-center flex items-center justify-center">
+				<button
+					class="hover:scale-110 active:scale-95 transition-all {currentSort.startsWith('random')
+						? 'text-missionnaire'
+						: 'text-stone-300 hover:text-missionnaire/60'}"
 					on:click={() => handleSortChange('random')}
 					title="Mélanger la liste"
 				>
@@ -769,25 +929,45 @@
 				{@const isActive = isSongActive(song, $selectAudio)}
 				<!-- svelte-ignore a11y-click-events-have-key-events -->
 				<!-- svelte-ignore a11y-no-static-element-interactions -->
-				<div 
-					class="grid grid-cols-[30px_1fr_auto_auto] {desktopMusicGrid} gap-2 md:gap-4 px-3 md:px-4 py-3 md:py-4 items-center transition-all group cursor-pointer {isActive ? 'bg-missionnaire/5 border-l-4 border-l-missionnaire' : 'hover:bg-white/60'}"
+				<div
+					class="grid grid-cols-[30px_1fr_auto_auto] {desktopMusicGrid} gap-2 md:gap-3 lg:gap-4 px-3 md:px-3 lg:px-4 py-3 md:py-4 items-center transition-all group cursor-pointer {isActive
+						? 'bg-missionnaire/5 border-l-4 border-l-missionnaire'
+						: 'hover:bg-white/60'}"
 					on:click={() => playSong(song)}
 				>
-					<div class="text-center text-[10px] md:text-xs font-bold {isActive ? 'text-missionnaire' : 'text-stone-300'}">
+					<div
+						class="text-center text-[10px] md:text-xs font-bold {isActive
+							? 'text-missionnaire'
+							: 'text-stone-300'}"
+					>
 						{i + 1 + (currentPage - 1) * limit}
 					</div>
 					<div class="flex flex-col min-w-0">
-						<div class="text-sm font-bold line-clamp-1 transition-colors {isActive ? 'text-missionnaire' : 'text-stone-800 group-hover:text-missionnaire'}">
+						<div
+							class="text-sm font-bold line-clamp-1 transition-colors {isActive
+								? 'text-missionnaire'
+								: 'text-stone-800 group-hover:text-missionnaire'}"
+						>
 							{song.title || 'Sans titre'}
 						</div>
-						<div class="flex flex-row items-center gap-2 md:hidden overflow-hidden text-ellipsis whitespace-nowrap">
-							<span class="text-[10px] font-medium {isActive ? 'text-missionnaire/60' : 'text-stone-500'}">
+						<div
+							class="flex flex-row items-center gap-2 md:hidden overflow-hidden text-ellipsis whitespace-nowrap"
+						>
+							<span
+								class="text-[10px] font-medium {isActive
+									? 'text-missionnaire/60'
+									: 'text-stone-500'}"
+							>
 								{song.book_full_name || song.category || '-'}
 							</span>
 							{#if song.artist}
 								<span class="text-[10px] text-stone-300">•</span>
-								<button 
-									class="text-[10px] font-medium italic transition-colors {isActive ? 'text-missionnaire/40 hover:text-missionnaire' : 'text-stone-400 hover:text-missionnaire'} {currentArtist === song.artist ? 'text-missionnaire underline' : ''}"
+								<button
+									class="text-[10px] font-medium italic transition-colors {isActive
+										? 'text-missionnaire/40 hover:text-missionnaire'
+										: 'text-stone-400 hover:text-missionnaire'} {currentArtist === song.artist
+										? 'text-missionnaire underline'
+										: ''}"
 									on:click|stopPropagation={() => handleArtistChange(song.artist || '')}
 								>
 									{song.artist}
@@ -795,13 +975,24 @@
 							{/if}
 						</div>
 					</div>
-					<div class="hidden md:block text-xs font-medium line-clamp-1 {isActive ? 'text-missionnaire/60' : 'text-stone-500'}">
+					<div
+						class="hidden md:block min-w-0 truncate text-xs font-medium {isActive
+							? 'text-missionnaire/60'
+							: 'text-stone-500'}"
+					>
 						{song.book_full_name || song.category || '-'}
 					</div>
-					<div class="hidden md:block text-xs font-medium line-clamp-1 italic {isActive ? 'text-missionnaire/40' : 'text-stone-400'}">
+					<div
+						class="hidden md:block min-w-0 truncate text-xs font-medium italic {isActive
+							? 'text-missionnaire/40'
+							: 'text-stone-400'}"
+					>
 						{#if song.artist}
-							<button 
-								class="hover:text-missionnaire transition-colors cursor-pointer {currentArtist === song.artist ? 'text-missionnaire font-bold underline' : ''}"
+							<button
+								class="block max-w-full truncate hover:text-missionnaire transition-colors cursor-pointer {currentArtist ===
+								song.artist
+									? 'text-missionnaire font-bold underline'
+									: ''}"
 								on:click|stopPropagation={() => handleArtistChange(song.artist || '')}
 							>
 								{song.artist}
@@ -810,30 +1001,45 @@
 							-
 						{/if}
 					</div>
-					<div class="hidden md:block text-center text-xs font-mono {isActive ? 'text-missionnaire' : 'text-stone-400'}">
+					<div
+						class="hidden md:block text-center text-[11px] lg:text-xs font-mono {isActive
+							? 'text-missionnaire'
+							: 'text-stone-400'}"
+					>
 						{song['duration'] ? formatTime(song['duration']) : '--:--'}
 					</div>
-					<div class="w-8 text-center hidden md:block">
+					<div class="w-7 lg:w-8 text-center hidden md:block">
 						<button
-							class="transition-colors p-1.5 {isFavorite(song._id || song.s3_url, $favorites) ? 'text-red-500' : 'text-stone-300 hover:text-red-400'}"
+							class="transition-colors p-1 md:p-1.5 {isFavorite(song._id || song.s3_url, $favorites)
+								? 'text-red-500'
+								: 'text-stone-300 hover:text-red-400'}"
 							on:click|stopPropagation={() => toggleFavorite(song)}
-							title={isFavorite(song._id || song.s3_url, $favorites) ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+							title={isFavorite(song._id || song.s3_url, $favorites)
+								? 'Retirer des favoris'
+								: 'Ajouter aux favoris'}
 						>
-							<Icon src={isFavorite(song._id || song.s3_url, $favorites) ? BsHeartFill : BsHeart} size="14" />
+							<Icon
+								src={isFavorite(song._id || song.s3_url, $favorites) ? BsHeartFill : BsHeart}
+								size="13"
+							/>
 						</button>
 					</div>
-					<div class="w-10 text-center">
+					<div class="w-9 lg:w-10 text-center">
 						<button
-							class="transition-colors p-2 {isActive ? 'text-missionnaire/60 hover:text-missionnaire' : 'text-stone-400 hover:text-missionnaire'}"
+							class="transition-colors p-1.5 md:p-2 {isActive
+								? 'text-missionnaire/60 hover:text-missionnaire'
+								: 'text-stone-400 hover:text-missionnaire'}"
 							on:click|stopPropagation={() => downloadSong(song)}
 							title="Télécharger"
 						>
-							<Icon src={IoCloudDownloadOutline} size="20" />
+							<Icon src={IoCloudDownloadOutline} size="18" />
 						</button>
 					</div>
-					<div class="w-10 text-center">
+					<div class="w-9 lg:w-10 text-center">
 						<button
-							class="hover:scale-110 active:scale-95 transition-all p-2 {isActive ? 'text-missionnaire' : 'text-missionnaire'}"
+							class="hover:scale-110 active:scale-95 transition-all p-1.5 md:p-2 {isActive
+								? 'text-missionnaire'
+								: 'text-missionnaire'}"
 							on:click|stopPropagation={() => {
 								if (isActive) {
 									dispatchAudioPlayerAction('toggle');
@@ -843,7 +1049,7 @@
 							}}
 							title={isActive && $isPlaying ? 'Pause' : 'Lire'}
 						>
-							<Icon src={isActive && $isPlaying ? IoPauseCircle : IoPlayCircle} size="24" />
+							<Icon src={isActive && $isPlaying ? IoPauseCircle : IoPlayCircle} size="22" />
 						</button>
 					</div>
 				</div>
@@ -852,7 +1058,9 @@
 					<div class="text-stone-200 mb-4 flex justify-center">
 						<Icon src={BsSearch} size="64" />
 					</div>
-					<p class="text-stone-400 font-bold uppercase tracking-widest text-sm">Aucun chant trouvé</p>
+					<p class="text-stone-400 font-bold uppercase tracking-widest text-sm">
+						Aucun chant trouvé
+					</p>
 				</div>
 			{/each}
 		</div>
@@ -863,7 +1071,9 @@
 	     pagination itself sits on its own row to avoid wrap collisions. -->
 	{#if totalPages > 1}
 		<div class="mt-12 py-6 border-t border-stone-200/60 flex flex-col gap-6">
-			<div class="flex flex-col sm:flex-row items-center sm:justify-between gap-4 text-[10px] md:text-xs font-bold text-stone-400 tracking-widest uppercase">
+			<div
+				class="flex flex-col sm:flex-row items-center sm:justify-between gap-4 text-[10px] md:text-xs font-bold text-stone-400 tracking-widest uppercase"
+			>
 				<div class="hidden md:block">
 					Affichage de {musicList.length} sur {totalSongs} chants
 				</div>
@@ -907,7 +1117,7 @@
 
 	/* Hide scrollbar for IE, Edge and Firefox */
 	.no-scrollbar {
-		-ms-overflow-style: none;  /* IE and Edge */
-		scrollbar-width: none;  /* Firefox */
+		-ms-overflow-style: none; /* IE and Edge */
+		scrollbar-width: none; /* Firefox */
 	}
 </style>
