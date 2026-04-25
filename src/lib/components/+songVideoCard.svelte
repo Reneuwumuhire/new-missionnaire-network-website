@@ -15,7 +15,7 @@
 	export let videoData: YoutubeVideo;
 
 	let showFullDescription = false;
-	const maxDescriptionLength = 80;
+	const maxDescriptionLength = 90;
 	let isPlaying = false;
 
 	$: truncatedDescription =
@@ -25,14 +25,16 @@
 
 	function formatDate(dateStr: string) {
 		if (!dateStr) return '';
-		// Format YYYYMMDD to DD/MM/YYYY
+		// YYYYMMDD → DD/MM/YYYY
 		return dateStr.replace(/^(\d{4})(\d{2})(\d{2})$/, '$3/$2/$1');
 	}
 </script>
 
-<div class="group relative bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-500 border border-gray-100/50 hover:border-orange-200/50 flex flex-col h-full transform hover:-translate-y-1">
-	<!-- Video/Thumbnail Container -->
-	<div class="relative aspect-video overflow-hidden bg-gray-900 group-hover:bg-black transition-colors duration-500">
+<div
+	class="group relative bg-white/40 border border-stone-200/60 hover:border-missionnaire/40 transition-colors duration-300 flex flex-col h-full"
+>
+	<!-- Video / Thumbnail -->
+	<div class="relative aspect-video overflow-hidden bg-stone-900">
 		{#if isPlaying}
 			<iframe
 				class="w-full h-full"
@@ -43,46 +45,50 @@
 				frameborder="0"
 			/>
 		{:else}
-			<!-- Custom Thumbnail -->
-			<button 
+			<button
 				class="w-full h-full relative cursor-pointer"
-				on:click={() => isPlaying = true}
+				on:click={() => (isPlaying = true)}
 			>
-				<img 
-					src={videoData.thumbnail} 
+				<img
+					src={videoData.thumbnail}
 					alt={videoData.title}
-					class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-90 group-hover:opacity-100"
+					loading="lazy"
+					class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
 				/>
-				<!-- Gradient Overlay -->
-				<div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity"></div>
-				
-				<!-- Play Button Overlays -->
-				<div class="absolute inset-0 flex items-center justify-center gap-4">
+				<!-- Subtle bottom gradient for caption legibility -->
+				<div
+					class="absolute inset-0 bg-gradient-to-t from-stone-900/70 via-stone-900/10 to-transparent"
+				></div>
+
+				<!-- Play overlays (revealed on hover) -->
+				<div class="absolute inset-0 flex items-center justify-center gap-3">
 					<div
 						role="button"
 						tabindex="0"
-						class="bg-white/90 text-orange-600 p-4 rounded-full shadow-2xl transform translate-y-4 group-hover:translate-y-0 opacity-0 group-hover:opacity-100 transition-all duration-300 backdrop-blur-sm hover:scale-110 active:scale-95"
-						on:click|stopPropagation={() => isPlaying = true}
+						class="bg-white/95 text-missionnaire p-3 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:scale-105 active:scale-95"
+						on:click|stopPropagation={() => (isPlaying = true)}
 						on:keydown|stopPropagation={(e) => e.key === 'Enter' && (isPlaying = true)}
 						title="Lire cette vidéo"
 					>
-						<Icon src={IoPlayCircle} size="32" />
+						<Icon src={IoPlayCircle} size="28" />
 					</div>
 					<div
 						role="button"
 						tabindex="0"
-						class="bg-orange-500 text-white p-4 rounded-full shadow-2xl transform translate-y-4 group-hover:translate-y-0 opacity-0 group-hover:opacity-100 transition-all duration-300 delay-75 hover:scale-110 active:scale-95"
+						class="bg-missionnaire text-white p-3 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75 hover:scale-105 active:scale-95"
 						on:click|stopPropagation={() => dispatch('playPlaylist')}
 						on:keydown|stopPropagation={(e) => e.key === 'Enter' && dispatch('playPlaylist')}
 						title="Lire en playlist à partir d'ici"
 					>
-						<Icon src={BsShuffle} size="24" />
+						<Icon src={BsShuffle} size="20" />
 					</div>
 				</div>
 
 				<!-- Duration Badge -->
 				{#if videoData.duration}
-					<div class="absolute bottom-3 right-3 bg-black/70 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded-md border border-white/10">
+					<div
+						class="absolute bottom-2.5 right-2.5 bg-stone-900/75 backdrop-blur-sm text-white text-[10px] font-bold tracking-wider px-2 py-0.5 font-body"
+					>
 						{formatTime(videoData.duration)}
 					</div>
 				{/if}
@@ -92,47 +98,58 @@
 
 	<!-- Content -->
 	<div class="p-5 flex flex-col flex-grow">
-		<h3 class="text-lg font-black text-gray-800 line-clamp-2 leading-tight mb-3 group-hover:text-orange-600 transition-colors">
+		<h3
+			class="font-display text-lg md:text-xl font-semibold text-stone-900 leading-snug mb-3 line-clamp-2 group-hover:text-missionnaire transition-colors"
+		>
 			{videoData.title}
 		</h3>
 
 		<div class="flex-grow">
-			<p class="text-sm text-gray-500 font-medium leading-relaxed mb-4">
+			<p class="text-sm text-stone-500 font-body leading-relaxed mb-4">
 				{showFullDescription ? videoData.description : truncatedDescription}
 				{#if videoData.description.length > maxDescriptionLength}
 					<button
-						class="text-orange-600 hover:text-orange-600 font-bold ml-1 text-xs uppercase tracking-wider"
+						class="text-missionnaire hover:text-missionnaire/80 font-bold ml-1 text-[10px] uppercase tracking-[0.18em] font-body transition-colors"
 						on:click|stopPropagation={() => (showFullDescription = !showFullDescription)}
 					>
-						{showFullDescription ? 'Moins' : 'Plus...'}
+						{showFullDescription ? 'Moins' : 'Plus'}
 					</button>
 				{/if}
 			</p>
 		</div>
 
 		<!-- Footer Info -->
-		<div class="pt-4 mt-auto border-t border-gray-50 flex items-center justify-between">
+		<div class="pt-4 mt-auto border-t border-stone-200/60 flex items-center justify-between">
 			<div class="flex items-center gap-3">
-				<div class="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-					<Icon src={IoTimeOutline} size="14" />
+				<div
+					class="flex items-center gap-1.5 text-[10px] font-bold text-stone-400 uppercase tracking-[0.18em] font-body"
+				>
+					<Icon src={IoTimeOutline} size="13" />
 					<span>{formatTime(videoData.duration)}</span>
 				</div>
-				<span class="w-1 h-1 bg-gray-200 rounded-full"></span>
-				<div class="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-					<Icon src={IoCalendarOutline} size="14" />
+				<span class="w-0.5 h-0.5 bg-stone-300 rounded-full"></span>
+				<div
+					class="flex items-center gap-1.5 text-[10px] font-bold text-stone-400 uppercase tracking-[0.18em] font-body"
+				>
+					<Icon src={IoCalendarOutline} size="13" />
 					<span>{formatDate(videoData.upload_date)}</span>
 				</div>
 			</div>
-			
-			<div class="opacity-0 group-hover:opacity-100 transition-opacity">
-				<span class="text-[10px] font-black text-orange-600 uppercase tracking-[0.2em]">Lire</span>
-			</div>
+
+			<button
+				type="button"
+				class="flex items-center gap-1.5 text-[10px] font-bold text-stone-400 group-hover:text-missionnaire hover:text-missionnaire uppercase tracking-[0.2em] transition-colors font-body active:scale-95"
+				on:click|stopPropagation={() => (isPlaying = true)}
+				title="Lire cette vidéo"
+			>
+				<Icon src={IoPlayCircle} size="14" />
+				Lire
+			</button>
 		</div>
 	</div>
 </div>
 
 <style>
-	/* Custom line clamp if needed for older browsers, though Tailwind handles it */
 	.line-clamp-2 {
 		display: -webkit-box;
 		-webkit-line-clamp: 2;
