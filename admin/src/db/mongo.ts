@@ -6,27 +6,17 @@ let isConnecting = false;
 let connectionPromise: Promise<MongoClient> | null = null;
 
 export async function connect() {
+	// Reuse the existing client when present. The driver maintains its own
+	// heartbeat / pool — pinging on every getDb() call adds an unnecessary
+	// round trip to every server load. Connection-level errors clear `client`
+	// via the 'close'/'error' listeners below, so the next call reconnects.
+	if (client) return client;
+
 	if (isConnecting && connectionPromise) {
 		return connectionPromise;
 	}
 
 	try {
-		if (
-			client &&
-			(await client
-				.db()
-				.admin()
-				.command({ ping: 1 })
-				.catch(() => false))
-		) {
-			return client;
-		}
-
-		if (client) {
-			await client.close(true);
-			client = null;
-		}
-
 		isConnecting = true;
 		connectionPromise = new Promise((resolve, reject) => {
 			console.log('[MongoDB Admin] Attempting to connect...');

@@ -160,6 +160,7 @@ export async function createMusicAudio(data: {
 		updated_at: null,
 		updated_by: null
 	});
+	invalidateMusicCatalogCache();
 	return result.insertedId.toString();
 }
 
@@ -179,6 +180,7 @@ export async function updateMusicAudio(
 			}
 		}
 	);
+	if (result.modifiedCount > 0) invalidateMusicCatalogCache();
 	return result.modifiedCount > 0;
 }
 
@@ -187,6 +189,7 @@ export async function deleteMusicAudio(id: string): Promise<{ s3_key: string } |
 	const doc = await db.collection('music_audio').findOne({ _id: new ObjectId(id) });
 	if (!doc) return null;
 	await db.collection('music_audio').deleteOne({ _id: new ObjectId(id) });
+	invalidateMusicCatalogCache();
 	return { s3_key: doc.s3_key as string };
 }
 
@@ -200,6 +203,7 @@ export async function deleteMusicAudioBulk(ids: string[]): Promise<{ s3_keys: st
 		.toArray();
 	const s3_keys = docs.map((d) => d.s3_key as string);
 	await db.collection('music_audio').deleteMany({ _id: { $in: objectIds } });
+	invalidateMusicCatalogCache();
 	return { s3_keys };
 }
 
@@ -216,21 +220,48 @@ export async function bulkUpdateCategory(
 			{ _id: { $in: objectIds } },
 			{ $set: { category, updated_at: new Date(), updated_by: updatedBy } }
 		);
+	if (result.modifiedCount > 0) invalidateMusicCatalogCache();
 	return result.modifiedCount;
 }
 
+// Distinct artists/categories rarely change but are read on every audio listing
+// load and every debounced search keystroke. A short per-process TTL cache cuts
+// the duplicate `distinct()` queries to roughly one per minute. Mutations
+// (create/delete/bulk-update) call invalidateMusicCatalogCache() so freshly
+// added artists/categories show up in filter dropdowns without delay.
+const MUSIC_CATALOG_TTL_MS = 60_000;
+let cachedArtists: { value: string[]; cachedAt: number } | null = null;
+let cachedCategories: { value: string[]; cachedAt: number } | null = null;
+
+export function invalidateMusicCatalogCache(): void {
+	cachedArtists = null;
+	cachedCategories = null;
+}
+
 export async function getMusicArtists(): Promise<string[]> {
+	if (cachedArtists && Date.now() - cachedArtists.cachedAt < MUSIC_CATALOG_TTL_MS) {
+		return cachedArtists.value;
+	}
 	const db = await getDb();
 	const artists = await db.collection('music_audio').distinct('artist', {
 		artist: { $ne: null, $exists: true }
 	});
-	return artists.filter((a): a is string => typeof a === 'string' && a.length > 0).sort();
+	const value = artists.filter((a): a is string => typeof a === 'string' && a.length > 0).sort();
+	cachedArtists = { value, cachedAt: Date.now() };
+	return value;
 }
 
 export async function getMusicCategories(): Promise<string[]> {
+	if (cachedCategories && Date.now() - cachedCategories.cachedAt < MUSIC_CATALOG_TTL_MS) {
+		return cachedCategories.value;
+	}
 	const db = await getDb();
 	const categories = await db.collection('music_audio').distinct('category');
-	return categories.filter((c): c is string => typeof c === 'string' && c.length > 0).sort();
+	const value = categories
+		.filter((c): c is string => typeof c === 'string' && c.length > 0)
+		.sort();
+	cachedCategories = { value, cachedAt: Date.now() };
+	return value;
 }
 
 export async function checkDuplicateAudio(
@@ -646,13 +677,29 @@ const BROADCAST_DEFAULT: BroadcastAdminState = {
 	updated_at: new Date(0).toISOString()
 };
 
+// The broadcast doc is read by every layout load (sidebar live indicator),
+// every dashboard load, and every recordings page load. It mutates only on
+// admin go-live / end-live / metadata edits — all of which call
+// setBroadcastAdminState below. A 3-second TTL is short enough that admin
+// actions reflect immediately (the action handler invalidates explicitly via
+// setBroadcastAdminState) and long enough to coalesce the burst of 2-4 reads
+// that happens during a single navigation.
+const BROADCAST_TTL_MS = 3_000;
+let cachedBroadcast: { value: BroadcastAdminState; cachedAt: number } | null = null;
+
 export async function getBroadcastAdminState(): Promise<BroadcastAdminState> {
+	if (cachedBroadcast && Date.now() - cachedBroadcast.cachedAt < BROADCAST_TTL_MS) {
+		return cachedBroadcast.value;
+	}
 	const db = await getDb();
 	const doc = await db
 		.collection('broadcast_admin_state')
 		.findOne({ _id: 'current' as unknown as ObjectId });
-	if (!doc) return BROADCAST_DEFAULT;
-	return {
+	if (!doc) {
+		cachedBroadcast = { value: BROADCAST_DEFAULT, cachedAt: Date.now() };
+		return BROADCAST_DEFAULT;
+	}
+	const value: BroadcastAdminState = {
 		is_live: Boolean(doc.is_live),
 		started_at: (doc.started_at as string | null) ?? null,
 		ended_at: (doc.ended_at as string | null) ?? null,
@@ -672,9 +719,12 @@ export async function getBroadcastAdminState(): Promise<BroadcastAdminState> {
 		default_youtube_url: (doc.default_youtube_url as string | null) ?? null,
 		updated_at: (doc.updated_at as string) ?? new Date(0).toISOString()
 	};
+	cachedBroadcast = { value, cachedAt: Date.now() };
+	return value;
 }
 
 export async function setBroadcastAdminState(updates: Partial<BroadcastAdminState>): Promise<void> {
+	cachedBroadcast = null;
 	const db = await getDb();
 	await db
 		.collection('broadcast_admin_state')

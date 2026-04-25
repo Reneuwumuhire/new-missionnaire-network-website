@@ -63,6 +63,34 @@
 	let uploadPct = $state<number | null>(null);
 	let saveError = $state<string | null>(null);
 
+	// Lock background scroll while the modal is open. Lock both <html> and
+	// <body> because either can be the scroll container depending on layout.
+	onMount(() => {
+		const docEl = document.documentElement;
+		const prevHtml = docEl.style.overflow;
+		const prevBody = document.body.style.overflow;
+		docEl.style.overflow = 'hidden';
+		document.body.style.overflow = 'hidden';
+		return () => {
+			docEl.style.overflow = prevHtml;
+			document.body.style.overflow = prevBody;
+		};
+	});
+
+	/** Portal action — mounts the node as a direct child of <body> so the
+	 *  dialog escapes any ancestor that has become a containing block for
+	 *  `position: fixed` (e.g. a parent with `transform`, `filter`, or an
+	 *  animation referencing those). Without this the modal would be pinned
+	 *  to the main content area instead of the viewport. */
+	function portal(node: HTMLElement) {
+		document.body.appendChild(node);
+		return {
+			destroy() {
+				node.remove();
+			}
+		};
+	}
+
 	onMount(async () => {
 		if (!recording.s3_url || !recording.s3_key) {
 			loadError = 'Enregistrement sans fichier audio';
@@ -565,6 +593,7 @@
 </script>
 
 <div
+	use:portal
 	class="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/50 p-4"
 	role="dialog"
 	aria-modal="true"

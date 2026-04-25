@@ -5,8 +5,30 @@
 	import type { Recording, RecordingStatus } from '$lib/models/recording';
 	import { confirmDialog } from '$lib/stores/confirm-dialog';
 	import { toast } from '$lib/stores/toast';
-	import AudioTrimEditor from '$lib/components/AudioTrimEditor.svelte';
+	import type { Component } from 'svelte';
 	import BlurUpImage from '$lib/components/BlurUpImage.svelte';
+
+	// AudioTrimEditor pulls in wavesurfer.js + plugins (~120 kB minified). It's
+	// only used when the admin opens the trim modal, so we load it on demand
+	// and keep the rest of the recordings page lean for first paint.
+	type AudioTrimEditorProps = {
+		recording: Recording;
+		onClose: () => void;
+		onSaved: () => void;
+	};
+	let AudioTrimEditor = $state<Component<AudioTrimEditorProps> | null>(null);
+	async function ensureTrimEditorLoaded(): Promise<void> {
+		if (AudioTrimEditor) return;
+		const mod = await import('$lib/components/AudioTrimEditor.svelte');
+		AudioTrimEditor = mod.default as unknown as Component<AudioTrimEditorProps>;
+	}
+	function openTrimEditor(id: string): void {
+		// Kick off the dynamic import without blocking the click handler — the
+		// {#if AudioTrimEditor && trimEditorRecording} block below renders as
+		// soon as both are ready (typically within a single network round trip).
+		void ensureTrimEditorLoaded();
+		trimEditorRecordingId = id;
+	}
 	import { vercelImage, vercelImageSrcSet, vercelImagePlaceholder } from '$lib/utils/vercelImage';
 
 	let { data }: { data: PageData } = $props();
@@ -14,8 +36,17 @@
 	type RecorderSnapshot = PageData['recorder'];
 	type IcecastSnapshot = PageData['icecast'];
 
-	const recorder: RecorderSnapshot = $derived(data.recorder);
-	const icecast: IcecastSnapshot = $derived(data.icecast);
+	// Recorder + icecast are polled every 5s. Mirror them in local state so the
+	// poll can update just these two fields via a lightweight /api/recordings/status
+	// fetch instead of invalidating the whole page (which would re-run the full
+	// MongoDB load — list, broadcast, push subs count). $effect resyncs when
+	// `data` changes after action-driven invalidateAll() calls.
+	let recorder = $state<RecorderSnapshot>(data.recorder);
+	let icecast = $state<IcecastSnapshot>(data.icecast);
+	$effect(() => {
+		recorder = data.recorder;
+		icecast = data.icecast;
+	});
 	const broadcast = $derived(data.broadcast);
 	const subscriberCount = $derived(data.subscriberCount);
 	// Current admin email — used to decide whether stopping someone else's
@@ -546,8 +577,25 @@
 	);
 
 	async function refreshStatus() {
-		// Re-runs the page's load fn, which updates `data.recorder` and `data.icecast`.
-		await invalidateAll();
+		// Hot path: this fires every 5s. Hit a dedicated lightweight endpoint
+		// instead of invalidateAll(), which would re-run the full page+layout
+		// load (recordings list, broadcast doc, push subscriptions count) for
+		// data that doesn't change between polls. Update local mirrors only.
+		try {
+			const res = await fetch('/api/recordings/status', {
+				headers: { Accept: 'application/json' }
+			});
+			if (res.ok) {
+				const body = (await res.json()) as {
+					recorder: RecorderSnapshot;
+					icecast: IcecastSnapshot;
+				};
+				recorder = body.recorder;
+				icecast = body.icecast;
+			}
+		} catch {
+			// Transient network error — next tick will retry.
+		}
 		recomputeElapsed();
 	}
 
@@ -1714,7 +1762,7 @@
 				{/if}
 				{#if rec.status === 'ready' && rec.s3_url}
 					<button
-						onclick={() => (trimEditorRecordingId = rec._id!)}
+						onclick={() => openTrimEditor(rec._id!)}
 						class="inline-flex items-center gap-1.5 border border-stone-200 bg-white/60 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary"
 						title="Éditer l'audio (couper début/fin)"
 					>
@@ -1881,7 +1929,7 @@
 							{/if}
 							{#if rec.status === 'ready' && rec.s3_url}
 								<button
-									onclick={() => (trimEditorRecordingId = rec._id!)}
+									onclick={() => openTrimEditor(rec._id!)}
 									class="border border-stone-200 bg-white/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 hover:border-primary hover:text-primary"
 									title="Éditer l'audio (couper début/fin)"
 								>
@@ -2352,7 +2400,7 @@
 	{/if}
 {/if}
 
-{#if trimEditorRecording}
+{#if trimEditorRecording && AudioTrimEditor}
 	<AudioTrimEditor
 		recording={trimEditorRecording}
 		onClose={() => closeTrimEditor(false)}
