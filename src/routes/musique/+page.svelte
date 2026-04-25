@@ -24,6 +24,11 @@
 	import { formatTime } from '../../utils/FormatTime';
 	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
 	import { addToRecentlyPlayed, toggleFavorite, isFavorite, recentlyPlayed, favorites } from '$lib/stores/musicHistory';
+	// ── BEGIN: cached filter imports (added) ──────────────────────
+	import { onMount } from 'svelte';
+	import { cachedUrls, refreshCachedUrls, isUrlCached } from '$lib/audioCache';
+	import IoCloudDoneOutline from 'svelte-icons-pack/io/IoCloudDoneOutline';
+	// ── END: cached filter imports ────────────────────────────────
 	export let data;
 
 	$: musicList = (data as any).musicAudio;
@@ -43,6 +48,74 @@
 	let artistSearch = '';
 	let showFavorites = false;
 	let showRecent = false;
+	// ── BEGIN: cached filter state (added) ────────────────────────
+	let showCached = false;
+
+	onMount(() => {
+		void refreshCachedUrls();
+	});
+
+	// Re-check the cache every time a track starts playing — gives the
+	// SW a moment to write the response, then surfaces the new entry in
+	// the "En cache" panel without a manual refresh.
+	let cacheRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+	$: if ($selectAudio) {
+		if (cacheRefreshTimer) clearTimeout(cacheRefreshTimer);
+		cacheRefreshTimer = setTimeout(() => void refreshCachedUrls(), 1500);
+	}
+
+	// Build a deduplicated list of cached songs by combining metadata
+	// sources we have (favorites, recently played, current page) and
+	// keeping only those whose URL is in the cache. Songs cached but
+	// missing from all three sources won't appear — but in practice a
+	// song must be played to be cached, so it's almost always either
+	// in recently-played (last 20) or favorites.
+	$: cachedSongs = (() => {
+		const set = $cachedUrls;
+		if (set.size === 0) return [] as Array<{ id: string; title: string; artist?: string; category?: string; s3_url?: string; song?: MusicAudio }>;
+
+		const seen = new Set<string>();
+		const out: Array<{ id: string; title: string; artist?: string; category?: string; s3_url?: string; song?: MusicAudio }> = [];
+
+		const pushIfCached = (
+			id: string,
+			title: string,
+			s3_url: string | null | undefined,
+			artist: string | null | undefined,
+			category: string | null | undefined,
+			song?: MusicAudio
+		) => {
+			if (!id || seen.has(id)) return;
+			if (!s3_url || !isUrlCached(s3_url, set)) return;
+			seen.add(id);
+			out.push({
+				id,
+				title,
+				artist: artist ?? undefined,
+				category: category ?? undefined,
+				s3_url,
+				song
+			});
+		};
+
+		// Favorites first (most intentionally retained), then recents,
+		// then current page — preserves a sensible default ordering.
+		for (const fav of $favorites) {
+			pushIfCached(fav.id, fav.title, fav.s3_url, fav.artist, fav.category);
+		}
+		for (const rec of $recentlyPlayed) {
+			pushIfCached(rec.id, rec.title, rec.s3_url, rec.artist, rec.category);
+		}
+		for (const song of (musicPlaylist || []) as MusicAudio[]) {
+			const id = song._id || song.s3_url || '';
+			pushIfCached(id, song.title || 'Sans titre', song.s3_url, song.artist, song.category, song);
+		}
+
+		return out;
+	})();
+
+	$: cachedCount = cachedSongs.length;
+	// ── END: cached filter state ──────────────────────────────────
 
 	function findSongById(list: MusicAudio[], id: string): MusicAudio | undefined {
 		return list.find((s) => (s._id || s.s3_url) === id);
@@ -60,6 +133,31 @@
 		isPlaying.set(true);
 		addToRecentlyPlayed(favSongs[0] as any);
 	}
+
+	// ── BEGIN: play all cached (added) ────────────────────────────
+	// Resolves each cached entry to its full MusicAudio (either from
+	// the row itself or via the current page's playlist) and plays
+	// them as a temporary playlist. Same constraint as Favoris "Tout
+	// lire": entries whose full song record isn't currently loaded
+	// are skipped — they'd need their playlist page to be visited.
+	function playAllCached() {
+		const songs = cachedSongs
+			.map((item) => item.song ?? findSongById(musicPlaylist, item.id))
+			.filter(Boolean) as MusicAudio[];
+		if (songs.length === 0) return;
+		basePlaylist.set(songs);
+		playlist.set(songs);
+		currentIndex.set(0);
+		selectAudio.set(songs[0]);
+		isPlaying.set(true);
+		addToRecentlyPlayed(songs[0] as any);
+	}
+
+	$: cachedPlayableCount = cachedSongs.reduce(
+		(n, item) => n + (item.song ?? findSongById(musicPlaylist, item.id) ? 1 : 0),
+		0
+	);
+	// ── END: play all cached ──────────────────────────────────────
 	$: filteredArtists = artists.filter((a: string) => a.toLowerCase().includes(artistSearch.toLowerCase()));
 	$: playlistIndexByUrl = new Map<string, number>(
 		(musicPlaylist || []).map((song: MusicAudio, index: number) => [song.s3_url, index])
@@ -408,12 +506,12 @@
 	{/if}
 
 	<!-- Favorites & Recently Played (collapsed by default) -->
-	{#if $favorites.length > 0 || $recentlyPlayed.length > 0}
-		<div class="flex gap-2 mb-4">
+	{#if $favorites.length > 0 || $recentlyPlayed.length > 0 || cachedCount > 0}
+		<div class="flex flex-wrap gap-2 mb-4">
 			{#if $favorites.length > 0}
 				<button
 					class="flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-bold uppercase tracking-wider transition-colors {showFavorites ? 'border-red-200 bg-red-50 text-red-600' : 'border-stone-200 bg-white text-stone-500 hover:border-red-200 hover:text-red-500'}"
-					on:click={() => { showFavorites = !showFavorites; showRecent = false; }}
+					on:click={() => { showFavorites = !showFavorites; showRecent = false; showCached = false; }}
 				>
 					<Icon src={BsHeartFill} size="12" />
 					Favoris ({$favorites.length})
@@ -422,12 +520,23 @@
 			{#if $recentlyPlayed.length > 0}
 				<button
 					class="flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-bold uppercase tracking-wider transition-colors {showRecent ? 'border-stone-300 bg-stone-100 text-missionnaire' : 'border-stone-200 bg-white text-stone-500 hover:border-stone-300 hover:text-missionnaire'}"
-					on:click={() => { showRecent = !showRecent; showFavorites = false; }}
+					on:click={() => { showRecent = !showRecent; showFavorites = false; showCached = false; }}
 				>
 					<Icon src={BsClockHistory} size="12" />
 					Recents ({$recentlyPlayed.length})
 				</button>
 			{/if}
+			<!-- ── BEGIN: cached filter button (added) ─────────────── -->
+			{#if cachedCount > 0}
+				<button
+					class="flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-bold uppercase tracking-wider transition-colors {showCached ? 'border-emerald-200 bg-emerald-50 text-emerald-600' : 'border-stone-200 bg-white text-stone-500 hover:border-emerald-200 hover:text-emerald-600'}"
+					on:click={() => { showCached = !showCached; showFavorites = false; showRecent = false; }}
+				>
+					<Icon src={IoCloudDoneOutline} size="14" />
+					En cache ({cachedCount})
+				</button>
+			{/if}
+			<!-- ── END: cached filter button ─────────────────────────── -->
 		</div>
 
 		{#if showFavorites && $favorites.length > 0}
@@ -504,6 +613,52 @@
 				</div>
 			</div>
 		{/if}
+
+		<!-- ── BEGIN: cached panel (added) ────────────────────────── -->
+		{#if showCached && cachedCount > 0}
+			<div class="bg-white/40 border border-stone-200/60 mb-6 overflow-hidden">
+				<div class="flex items-center justify-between px-4 py-3 border-b border-stone-200 bg-stone-50/50">
+					<span class="text-[10px] font-bold uppercase tracking-widest text-stone-400 flex items-center gap-2">
+						<span class="text-emerald-600"><Icon src={IoCloudDoneOutline} size="12" /></span>
+						En cache — {cachedCount} {cachedCount > 1 ? 'chants disponibles hors ligne' : 'chant disponible hors ligne'}
+					</span>
+					<button
+						class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-900 hover:bg-stone-800 text-white text-[10px] font-bold uppercase tracking-wider transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-stone-900"
+						on:click={() => playAllCached()}
+						disabled={cachedPlayableCount === 0}
+						title={cachedPlayableCount === 0 ? 'Aucun chant jouable sur cette page' : ''}
+					>
+						<Icon src={BsPlayFill} size="10" />
+						Tout lire
+					</button>
+				</div>
+				<div class="divide-y divide-stone-50 max-h-[300px] overflow-y-auto">
+					{#each cachedSongs as item, i}
+						{@const cachedSong = item.song ?? findSongById(musicPlaylist, item.id)}
+						<div class="flex items-center gap-3 px-4 py-2.5 hover:bg-stone-100/50 transition-colors group">
+							<span class="text-[10px] font-bold text-stone-300 w-5 text-center">{i + 1}</span>
+							<button
+								class="flex-1 min-w-0 text-left"
+								on:click={() => { if (cachedSong) playSong(cachedSong); }}
+								disabled={!cachedSong}
+								title={cachedSong ? '' : 'Rechargez la liste pour rejouer ce chant'}
+							>
+								<div class="text-sm font-bold text-stone-800 group-hover:text-missionnaire transition-colors truncate">{item.title}</div>
+								<div class="flex items-center gap-2">
+									{#if item.artist}
+										<span class="text-[10px] text-stone-400">{item.artist}</span>
+									{/if}
+									{#if item.category}
+										<span class="text-[10px] text-stone-300">{item.category}</span>
+									{/if}
+								</div>
+							</button>
+						</div>
+					{/each}
+				</div>
+			</div>
+		{/if}
+		<!-- ── END: cached panel ──────────────────────────────────── -->
 	{/if}
 
 	<!-- Songs List -->

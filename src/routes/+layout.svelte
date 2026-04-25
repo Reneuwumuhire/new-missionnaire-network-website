@@ -114,6 +114,22 @@
 		}, 700);
 	});
 
+	// ── BEGIN: service worker registration (added) ──────────────────
+	// SvelteKit auto-registers `src/service-worker.ts` in production
+	// builds; this explicit hook is a belt-and-braces fallback so the
+	// audio cache layer also activates in environments where the auto-
+	// registration might be disabled (custom adapters, dev preview).
+	// `register('/service-worker.js')` is idempotent — the browser
+	// dedupes by scope URL, so registering twice is a no-op.
+	onMount(() => {
+		if (!browser) return;
+		if (!('serviceWorker' in navigator)) return;
+		navigator.serviceWorker.register('/service-worker.js', { scope: '/' }).catch((err) => {
+			console.warn('[SW] registration failed:', err);
+		});
+	});
+	// ── END: service worker registration ────────────────────────────
+
 	afterNavigate(({ to }) => {
 		if (!browser || !to) return;
 		try {

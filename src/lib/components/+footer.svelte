@@ -40,6 +40,50 @@
 	];
 
 	import { onMount, onDestroy } from 'svelte';
+	// ── BEGIN: audio cache controls (added) ───────────────────────
+	import { browser } from '$app/environment';
+	import { clearCache, getCacheSize } from '$lib/audioCache';
+
+	let audioCacheSize = '0 B';
+	let audioCacheBytes = 0;
+	let isClearingCache = false;
+	let clearedToast = false;
+	let clearedToastTimer: ReturnType<typeof setTimeout> | null = null;
+
+	async function refreshAudioCacheSize() {
+		if (!browser) return;
+		const formatted = await getCacheSize();
+		audioCacheSize = formatted;
+		// Hide the button when there's nothing to clear. We treat any
+		// human-readable value starting with "0 " as empty — covers
+		// "0 B" (and any future unit) without re-parsing the string.
+		audioCacheBytes = formatted.startsWith('0 ') ? 0 : 1;
+	}
+
+	async function handleClearCache() {
+		if (isClearingCache) return;
+		isClearingCache = true;
+		try {
+			await clearCache();
+			await refreshAudioCacheSize();
+			clearedToast = true;
+			if (clearedToastTimer) clearTimeout(clearedToastTimer);
+			clearedToastTimer = setTimeout(() => {
+				clearedToast = false;
+			}, 2000);
+		} finally {
+			isClearingCache = false;
+		}
+	}
+
+	onMount(() => {
+		void refreshAudioCacheSize();
+	});
+
+	onDestroy(() => {
+		if (clearedToastTimer) clearTimeout(clearedToastTimer);
+	});
+	// ── END: audio cache controls ─────────────────────────────────
 
 	const bibleVerses = [
 		{ text: 'Car la parole de Dieu est vivante et efficace, plus tranchante qu\u2019une épée quelconque à deux tranchants.', ref: 'Hébreux 4:12' },
@@ -174,6 +218,27 @@
 				</div>
 			{/each}
 		</div>
+
+		<!-- ── BEGIN: audio cache row (added) ──────────────────────── -->
+		{#if audioCacheBytes > 0 || clearedToast}
+			<div class="flex items-center justify-center gap-3 pt-6 text-[11px] text-stone-500">
+				{#if clearedToast}
+					<span class="text-emerald-400" role="status" aria-live="polite">Cache vidé</span>
+				{:else if audioCacheBytes > 0}
+					<span class="text-stone-400">Cache audio : <span class="text-stone-300 font-medium">{audioCacheSize}</span></span>
+					<span class="text-stone-700">·</span>
+					<button
+						type="button"
+						on:click={handleClearCache}
+						disabled={isClearingCache}
+						class="text-missionnaire hover:text-orange-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed underline-offset-2 hover:underline"
+					>
+						{isClearingCache ? 'Suppression…' : 'Vider'}
+					</button>
+				{/if}
+			</div>
+		{/if}
+		<!-- ── END: audio cache row ────────────────────────────────── -->
 
 		<!-- Bottom bar -->
 		<div class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-8">

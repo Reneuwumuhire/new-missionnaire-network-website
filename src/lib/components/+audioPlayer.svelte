@@ -28,6 +28,10 @@
 		type PlayableAudio
 	} from '../../utils/audioPlayback';
 	import { toggleFavorite, isFavorite, favorites } from '../stores/musicHistory';
+	// ── BEGIN: cache indicator imports (added) ────────────────────
+	import { isCached } from '$lib/audioCache';
+	import { isOnline } from '$lib/onlineStatus';
+	// ── END: cache indicator imports ──────────────────────────────
 
 	let audio: HTMLAudioElement;
 	let currentTime = 0;
@@ -159,6 +163,45 @@
 
 	$: currentFavId = getAudioFavId($selectAudio);
 	$: isCurrentFavorite = isFavorite(currentFavId, $favorites);
+
+	// ── BEGIN: cache indicator state (added) ──────────────────────
+	// Tracks whether the currently playing track has been cached by
+	// the service worker. `null` while we don't know yet (initial
+	// load / between tracks); boolean once isCached() resolves.
+	let isCurrentTrackCached: boolean | null = null;
+	let cacheCheckToken = 0;
+
+	async function refreshCachedFlag(url: string, token: number) {
+		if (!url) {
+			isCurrentTrackCached = null;
+			return;
+		}
+		const result = await isCached(url);
+		// Drop the result if a newer track was selected mid-flight.
+		if (token !== cacheCheckToken) return;
+		isCurrentTrackCached = result;
+	}
+
+	// Re-check the cache flag whenever the selected track changes OR
+	// whenever it starts playing (so a freshly fetched-and-cached track
+	// flips its badge from "not cached" to "cached" without a refresh).
+	$: if (browser && $selectAudio) {
+		const url = getPlayableAudioUrl($selectAudio as PlayableAudio);
+		isCurrentTrackCached = null;
+		cacheCheckToken++;
+		void refreshCachedFlag(url, cacheCheckToken);
+	}
+
+	$: if (browser && $isPlaying && $selectAudio) {
+		const url = getPlayableAudioUrl($selectAudio as PlayableAudio);
+		const token = ++cacheCheckToken;
+		// Small delay: let the SW finish writing the response to cache
+		// before we re-check, otherwise the first poll always misses.
+		setTimeout(() => void refreshCachedFlag(url, token), 1500);
+	}
+
+	$: showOfflineUnavailable = browser && !$isOnline && isCurrentTrackCached === false;
+	// ── END: cache indicator state ────────────────────────────────
 
 	function handleEnded() {
 		if (!$autoNext || $playlist.length === 0) {
@@ -927,7 +970,42 @@
 		<!-- Info Row -->
 		<div class="flex items-center justify-between mb-3 md:mb-0 md:flex-1 md:min-w-0">
 			<div class="flex-1 min-w-0 min-h-[2.75rem] md:min-h-[3rem]">
-				<div class="text-[10px] uppercase tracking-[0.2em] font-bold text-missionnaire mb-0.5 opacity-80">Lecture en cours</div>
+				<div class="text-[10px] uppercase tracking-[0.2em] font-bold text-missionnaire mb-0.5 opacity-80 flex items-center gap-2">
+					<span>Lecture en cours</span>
+					<!-- ── BEGIN: cache indicator badge (added) ──────────── -->
+					{#if isCurrentTrackCached === true}
+						<span
+							class="inline-flex items-center gap-1 text-[9px] font-semibold tracking-normal normal-case text-emerald-600"
+							title="Disponible hors ligne"
+							aria-label="Piste en cache"
+						>
+							<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+								<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+								<polyline points="9 14 11 16 15 12"/>
+							</svg>
+							<span>En cache</span>
+						</span>
+					{/if}
+					{#if showOfflineUnavailable}
+						<span
+							class="inline-flex items-center gap-1 text-[9px] font-semibold tracking-normal normal-case text-amber-600"
+							title="Hors ligne — cette piste n'est pas en cache"
+							aria-label="Piste indisponible hors ligne"
+						>
+							<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+								<line x1="1" y1="1" x2="23" y2="23"/>
+								<path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
+								<path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
+								<path d="M10.71 5.05A16 16 0 0 1 22.58 9"/>
+								<path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
+								<path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+								<line x1="12" y1="20" x2="12.01" y2="20"/>
+							</svg>
+							<span>Hors ligne</span>
+						</span>
+					{/if}
+					<!-- ── END: cache indicator badge ────────────────────── -->
+				</div>
 				<div class="font-black text-sm md:text-lg text-stone-900 truncate pr-4" title={getDisplayTitle($selectAudio)}>
 					{getDisplayTitle($selectAudio)}
 				</div>
