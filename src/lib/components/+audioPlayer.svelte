@@ -29,7 +29,7 @@
 	} from '../../utils/audioPlayback';
 	import { toggleFavorite, isFavorite, favorites } from '../stores/musicHistory';
 	// ── BEGIN: cache indicator imports (added) ────────────────────
-	import { isCached } from '$lib/audioCache';
+	import { isCached, prefetchAudio } from '$lib/audioCache';
 	import { isOnline } from '$lib/onlineStatus';
 	// ── END: cache indicator imports ──────────────────────────────
 
@@ -117,6 +117,16 @@
 	 *  canplay handlers seek to different positions then each call play(). */
 	let isReloadingSession = false;
 
+	/** Set true when onDestroy has run. Every code path that could call
+	 *  audio.play() — the pause-event-driven watchdog, safePlay's deferred
+	 *  finish(), the reactive $isPlaying sync block — checks this flag
+	 *  before touching the audio element. Without this guard, Vite HMR
+	 *  on a playing component leaks the old <audio>: pause() fires the
+	 *  pause listener which (seeing userWantsToPlay === true) starts a
+	 *  fresh watchdog interval on the orphaned element, and play() keeps
+	 *  resuming it 1.5s later — overlapping the new component's playback. */
+	let destroyed = false;
+
 	function syncPlayerInset() {
 		if (!browser) return;
 		if (!playerShell) {
@@ -201,6 +211,39 @@
 	}
 
 	$: showOfflineUnavailable = browser && !$isOnline && isCurrentTrackCached === false;
+
+	// ── Adjacent-track prefetch (added) ──────────────────────────
+	// On 3G the audio element still has to wait for the first bytes
+	// of each track to arrive over the wire. Warming the NEXT track
+	// in the playlist while the current one plays makes "Next" feel
+	// instant even when the network is slow. The fetch flows through
+	// the SW, which writes the body into `audio-cache-v1`, so by the
+	// time the listener hits the next track its file is already on
+	// disk and only needs slicing for the Range request.
+	//
+	// Delay before kicking off so the current track gets first call
+	// on the connection — on a slow link, racing the prefetch against
+	// the active stream would slow down both. 4 s is enough for the
+	// audio element to have its initial buffer; we then quietly
+	// prefetch the next URL with `priority: 'low'`.
+	let prefetchTimer: ReturnType<typeof setTimeout> | null = null;
+	$: if (browser && $selectAudio && $playlist.length > 1) {
+		if (prefetchTimer) clearTimeout(prefetchTimer);
+		const nextIndex = findAdjacentPlayableIndex(
+			$playlist as PlayableAudio[],
+			$currentIndex,
+			1,
+			false
+		);
+		const nextUrl = nextIndex >= 0 ? getPlayableAudioUrl($playlist[nextIndex] as PlayableAudio) : '';
+		if (nextUrl) {
+			prefetchTimer = setTimeout(() => void prefetchAudio(nextUrl), 4000);
+		}
+	}
+
+	onDestroy(() => {
+		if (prefetchTimer) clearTimeout(prefetchTimer);
+	});
 	// ── END: cache indicator state ────────────────────────────────
 
 	function handleEnded() {
@@ -442,7 +485,7 @@
 	// NB: `return` is illegal inside a Svelte reactive block (it
 	// compiles to a bare statement, not a function), so the guard is
 	// expressed as nested if/else.
-	$: if (browser && audio && $isPlaying !== undefined) {
+	$: if (browser && audio && !destroyed && $isPlaying !== undefined) {
 		if ($isPlaying && audio.paused) {
 			if (pendingPlaybackIntent !== 'pause') {
 				userWantsToPlay = true;
@@ -622,6 +665,9 @@
 	 *  ~1-2s reload cost when the pause was long enough to warrant it. */
 	function safePlay(reasonHint: 'short' | 'long' | 'auto' = 'auto') {
 		if (!browser || !audio) return;
+		// HMR / unmount safety — never resume a destroyed component's
+		// audio. The deferred `finish()` setTimeout below also rechecks.
+		if (destroyed) return;
 
 		const pausedMs = audioPausedAt > 0 ? Date.now() - audioPausedAt : 0;
 		const needsReload =
@@ -651,6 +697,9 @@
 			if (settled) return;
 			settled = true;
 			isReloadingSession = false;
+			// The 2s safety-net timeout below can fire after the component
+			// has been destroyed (HMR, navigation away). Don't resume.
+			if (destroyed) return;
 			if (!audio || audio.src !== savedSrc) return;
 			try {
 				audio.currentTime = savedTime;
@@ -693,6 +742,11 @@
 
 	function startResumeWatchdog() {
 		if (!browser || !audio) return;
+		// Critical for HMR: the pause event handler calls us when
+		// userWantsToPlay is true, which is true at the moment onDestroy
+		// runs audio.pause(). Without this guard a fresh interval would
+		// start on the about-to-be-orphaned audio element.
+		if (destroyed) return;
 		if (resumeWatchdog !== null) return;
 		resumeWatchdogStartedAt = Date.now();
 		resumeWatchdogAttempts = 0;
@@ -916,13 +970,34 @@
 	});
 
 	onDestroy(() => {
+		// Order matters. Set `destroyed` first so every guarded code
+		// path bails — including the pause-event handler that runs
+		// synchronously inside audio.pause() below. Then clear
+		// userWantsToPlay so even an unguarded call to startResumeWatchdog
+		// would no-op. Only after that do we touch the audio element.
+		destroyed = true;
+		userWantsToPlay = false;
+		shouldAutoplayOnLoad = false;
 		stopResumeWatchdog();
 		if (audio) {
-			audio.pause();
+			try {
+				audio.pause();
+				// Detach the source and force the media pipeline to release.
+				// Without this, the orphaned audio element keeps its network
+				// stream alive and can resume when the new component mounts.
+				audio.removeAttribute('src');
+				audio.load();
+			} catch {
+				/* ignore — element may already be in a dead state */
+			}
 			audio.removeEventListener('ended', handleEnded);
 			audio.removeEventListener('timeupdate', updateAudioTime);
 			audio.removeEventListener('timeupdate', updateIndicator);
 		}
+		// Drop the reference so any stray async callback that escaped
+		// the destroyed guard finds nothing to play on.
+		audio = null as unknown as HTMLAudioElement;
+		isPlaying.set(false);
 		lastPlayerInset = 0;
 		document.documentElement.style.setProperty('--audio-player-height', '0px');
 	});
@@ -1031,7 +1106,7 @@
 			</button>
 
 			<button
-				class="bg-stone-50 hover:bg-stone-100 text-stone-400 hover:text-stone-800 p-2 rounded-full transition-colors md:hidden"
+				class="bg-gray-900 hover:bg-black text-white p-2 rounded-full transition-colors md:hidden"
 				on:click={() => {
 					selectAudio.set(null);
 					if (audio) audio.pause();
@@ -1048,9 +1123,10 @@
 			<div class="flex items-center justify-center gap-4 md:gap-6">
 				<!-- Repeat/Auto-next on mobile side -->
 				<div class="flex md:hidden items-center gap-1">
-					<button 
-						on:click={toggleShuffle} 
-						class="p-2 transition-all {$isShuffle ? 'text-missionnaire' : 'text-stone-300'}"
+					<button
+						on:click={toggleShuffle}
+						class="p-2.5 rounded-full transition-all flex items-center gap-2 {$isShuffle ? 'bg-missionnaire text-white shadow-md shadow-missionnaire/20' : 'bg-stone-50 text-stone-400 hover:bg-stone-100 hover:text-stone-600'}"
+						title={$isShuffle ? 'Aléatoire activé' : 'Aléatoire désactivé'}
 					>
 						<Icon src={BsShuffle} size="16" />
 					</button>
@@ -1084,9 +1160,9 @@
 
 				<!-- Auto-Next Side -->
 				<div class="flex md:hidden items-center gap-1">
-					<button 
-						on:click={toggleAutoNext} 
-						class="p-2 transition-all {$autoNext ? 'text-missionnaire bg-orange-50 rounded-lg' : 'text-stone-300'}"
+					<button
+						on:click={toggleAutoNext}
+						class="p-2.5 rounded-full transition-all flex items-center gap-2 {$autoNext ? 'bg-missionnaire text-white shadow-md shadow-missionnaire/20' : 'bg-stone-50 text-stone-400 hover:bg-stone-100 hover:text-stone-600'}"
 						title={$autoNext ? 'Lecture auto activée' : 'Lecture auto désactivée'}
 					>
 						<Icon src={RiMediaPlayList2Fill} size="18" />
