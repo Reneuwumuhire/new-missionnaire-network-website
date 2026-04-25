@@ -227,17 +227,36 @@
 	// audio element to have its initial buffer; we then quietly
 	// prefetch the next URL with `priority: 'low'`.
 	let prefetchTimer: ReturnType<typeof setTimeout> | null = null;
+
+	// Sermons (predications) are 30–120 MB long-form files we deliberately
+	// keep out of the cache, so don't prefetch the next track when the
+	// current one is a sermon either. Detection: Sermon has `mp3_url` and
+	// not `s3_url`; MusicAudio has `s3_url`; AudioAsset has neither.
+	function isSermonItem(item: unknown): boolean {
+		return !!item && typeof item === 'object' && 'mp3_url' in item && !('s3_url' in item);
+	}
+
 	$: if (browser && $selectAudio && $playlist.length > 1) {
 		if (prefetchTimer) clearTimeout(prefetchTimer);
-		const nextIndex = findAdjacentPlayableIndex(
-			$playlist as PlayableAudio[],
-			$currentIndex,
-			1,
-			false
-		);
-		const nextUrl = nextIndex >= 0 ? getPlayableAudioUrl($playlist[nextIndex] as PlayableAudio) : '';
-		if (nextUrl) {
-			prefetchTimer = setTimeout(() => void prefetchAudio(nextUrl), 4000);
+
+		if (isSermonItem($selectAudio)) {
+			// No-op: skip prefetch entirely while a sermon is playing.
+		} else {
+			const nextIndex = findAdjacentPlayableIndex(
+				$playlist as PlayableAudio[],
+				$currentIndex,
+				1,
+				false
+			);
+			const nextItem = nextIndex >= 0 ? $playlist[nextIndex] : null;
+			// Also skip if the *next* track is a sermon — no point warming it.
+			const nextUrl =
+				nextItem && !isSermonItem(nextItem)
+					? getPlayableAudioUrl(nextItem as PlayableAudio)
+					: '';
+			if (nextUrl) {
+				prefetchTimer = setTimeout(() => void prefetchAudio(nextUrl), 4000);
+			}
 		}
 	}
 

@@ -12,6 +12,7 @@
 	// ── BEGIN: PWA update banner (added) ────────────────────────────
 	import UpdateBanner from '$lib/components/+updateBanner.svelte';
 	// ── END: PWA update banner ──────────────────────────────────────
+	import ResumeRecorder from '$lib/components/+resumeRecorder.svelte';
 	import { selectAudio } from '$lib/stores/global';
 	import type { LayoutData } from './$types';
 	import { QueryClientProvider } from '@tanstack/svelte-query';
@@ -216,4 +217,5 @@
 	{#if $selectAudio}
 		<AudioPlayer />
 	{/if}
+	<ResumeRecorder />
 </QueryClientProvider>

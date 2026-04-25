@@ -19,6 +19,27 @@ const APP_SHELL_CACHE = `app-shell-${version}`;
 const AUDIO_CACHE_NAME = 'audio-cache-v1';
 const AUDIO_EXTENSIONS = ['.mp3', '.ogg', '.wav', '.flac', '.aac', '.m4a'];
 
+// Hard ceiling on what we'll write to the audio cache. Sermons run
+// 30–120 MB; music tracks are 3–7 MB. Anything bigger than this is
+// almost certainly long-form content that would drain device storage
+// quickly, so we serve it directly from the network without caching.
+const MAX_AUDIO_CACHE_BYTES = 25 * 1024 * 1024;
+
+// Pages whose audio playback should never populate the cache. Matches
+// /predications and /predications/[slug] — sermons originate there.
+const NO_CACHE_REFERRER_PREFIXES = ['/predications'];
+
+function isFromNoCachePage(request: Request): boolean {
+	const referrer = request.referrer;
+	if (!referrer) return false;
+	try {
+		const refUrl = new URL(referrer);
+		return NO_CACHE_REFERRER_PREFIXES.some((prefix) => refUrl.pathname.startsWith(prefix));
+	} catch {
+		return false;
+	}
+}
+
 // ── YouTube thumbnails cache (version-independent) ────────────────
 const YT_THUMB_CACHE = 'yt-thumbnails';
 
@@ -379,6 +400,14 @@ async function handleAudioFetch(event: FetchEvent): Promise<Response> {
 		return response;
 	}
 
+	// Skip the cache write for audio originating on the predications
+	// pages — sermons are 30–120 MB and would fill device storage
+	// quickly. Cache HITS still serve from disk if a previously-stored
+	// entry exists; we just stop adding new ones from this lane.
+	if (isFromNoCachePage(request)) {
+		return response;
+	}
+
 	const responseForCache = response.clone();
 	// Extend the SW's lifetime until the cache write settles; without
 	// `waitUntil` the worker may be killed before the body finishes
@@ -403,6 +432,10 @@ async function capturePassthroughForCache(
 ): Promise<void> {
 	try {
 		if (response.status === 200) {
+			// Skip oversized 200s (large podcast/sermon files) — content-length
+			// is the cheapest possible discriminator and avoids buffering a
+			// 100 MB blob into memory just to discover we shouldn't store it.
+			if (exceedsMaxCacheSize(response.headers.get('content-length'))) return;
 			await cache.put(cacheKey, response);
 			return;
 		}
@@ -418,9 +451,14 @@ async function capturePassthroughForCache(
 		const total = Number.parseInt(match[3], 10);
 
 		if (start === 0 && end === total - 1) {
-			// Full file delivered as 206 — buffer into a fresh 200 so the
-			// cache always stores complete, sliceable bodies.
+			// Full file delivered as 206. Bail before buffering if the total
+			// size is over the cap — same reasoning as the 200 branch.
+			if (Number.isFinite(total) && total > MAX_AUDIO_CACHE_BYTES) return;
+
+			// Buffer into a fresh 200 so the cache always stores complete,
+			// sliceable bodies.
 			const buffer = await response.arrayBuffer();
+			if (buffer.byteLength > MAX_AUDIO_CACHE_BYTES) return;
 			const headers = copyResponseHeaders(response, {
 				'Content-Length': String(buffer.byteLength)
 			});
@@ -440,15 +478,22 @@ async function capturePassthroughForCache(
 	}
 }
 
+function exceedsMaxCacheSize(contentLengthHeader: string | null): boolean {
+	if (!contentLengthHeader) return false;
+	const size = Number.parseInt(contentLengthHeader, 10);
+	if (!Number.isFinite(size)) return false;
+	return size > MAX_AUDIO_CACHE_BYTES;
+}
+
 const warmupInFlight = new Set<string>();
 async function warmCacheInBackground(cache: Cache, cacheKey: Request): Promise<void> {
 	if (warmupInFlight.has(cacheKey.url)) return;
 	warmupInFlight.add(cacheKey.url);
 	try {
 		const response = await fetch(cacheKey);
-		if (response.ok && response.status === 200) {
-			await cache.put(cacheKey, response);
-		}
+		if (!response.ok || response.status !== 200) return;
+		if (exceedsMaxCacheSize(response.headers.get('content-length'))) return;
+		await cache.put(cacheKey, response);
 	} catch {
 		/* network failed — the next play will warm again */
 	} finally {

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import AndroidBanner from '$lib/components/+androidBanner.svelte';
+	import ResumeToast from '$lib/components/+resumeToast.svelte';
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
 	import { searchQuery } from '$lib/stores/global';
@@ -107,6 +108,8 @@
 		<slot />
 	</div>
 </div>
+
+<ResumeToast />
 
 <style>
 	.header-predications {
