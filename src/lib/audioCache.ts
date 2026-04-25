@@ -54,6 +54,74 @@ export function isUrlCached(url: string, set: Set<string>): boolean {
 	}
 }
 
+// ── Prefetching ────────────────────────────────────────────────────
+// Pulling the next track into the audio cache while the current one
+// plays makes "Next" feel instant on slow connections. Uses a plain
+// `fetch()` so the request flows through the SW's audio handler and
+// lands in `audio-cache-v1` automatically — no special path needed.
+
+const prefetchInFlight = new Set<string>();
+
+interface NetworkInformation {
+	saveData?: boolean;
+	effectiveType?: '4g' | '3g' | '2g' | 'slow-2g';
+}
+
+function getConnection(): NetworkInformation | null {
+	if (!browser) return null;
+	const conn = (navigator as Navigator & { connection?: NetworkInformation }).connection;
+	return conn ?? null;
+}
+
+/** Skip on Save-Data or extremely slow links (2g, slow-2g). Unknown
+ *  / missing API → prefetch (sensible default for desktop browsers
+ *  that don't expose Network Information). */
+function shouldPrefetchOverConnection(): boolean {
+	const conn = getConnection();
+	if (!conn) return true;
+	if (conn.saveData) return false;
+	if (conn.effectiveType === '2g' || conn.effectiveType === 'slow-2g') return false;
+	return true;
+}
+
+/** Warm the audio cache for `url` in the background. Resolves once the
+ *  fetch completes (or is skipped). Safe to call repeatedly — already-
+ *  cached URLs and in-flight prefetches are deduplicated. */
+export async function prefetchAudio(url: string): Promise<void> {
+	if (!browser || !url) return;
+	if (prefetchInFlight.has(url)) return;
+	if (!shouldPrefetchOverConnection()) return;
+
+	try {
+		if (await isCached(url)) return;
+	} catch {
+		/* fall through and try prefetching anyway */
+	}
+
+	prefetchInFlight.add(url);
+	try {
+		// `priority: 'low'` keeps the prefetch from competing with the
+		// audio element's high-priority Range fetch on the current
+		// track — supported in Chromium-based browsers, ignored elsewhere.
+		// `priority: 'low'` keeps the prefetch from competing with the
+		// audio element's high-priority Range fetch on the current
+		// track — Chromium honours it, others silently ignore.
+		await fetch(url, {
+			method: 'GET',
+			mode: 'cors',
+			credentials: 'omit',
+			priority: 'low'
+		} as RequestInit & { priority: 'low' });
+		// Refresh the reactive set so subscribers (the music page's
+		// "En cache" panel, the player's badge) see the new entry.
+		void refreshCachedUrls();
+	} catch {
+		/* network failed — next play retries */
+	} finally {
+		prefetchInFlight.delete(url);
+	}
+}
+
 /** Returns true if the given URL has a cached response in the audio cache. */
 export async function isCached(url: string): Promise<boolean> {
 	if (!browser || typeof caches === 'undefined' || !url) return false;
