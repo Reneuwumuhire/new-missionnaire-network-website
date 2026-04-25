@@ -45,14 +45,16 @@ body {
 }
 
 /* ── Smooth page transitions ── */
-.page-transition-enter {
-	animation: page-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+.page-transition-enter,
+.page-fade-in {
+	animation: page-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+	will-change: opacity, transform;
 }
 
 @keyframes page-in {
 	from {
 		opacity: 0;
-		transform: translateY(8px);
+		transform: translateY(6px);
 	}
 	to {
 		opacity: 1;
@@ -60,21 +62,43 @@ body {
 	}
 }
 
+@media (prefers-reduced-motion: reduce) {
+	.page-transition-enter,
+	.page-fade-in {
+		animation: none !important;
+	}
+}
+
 /* ── Navigation progress bar ── */
 @keyframes progress {
 	0% {
-		width: 0%;
+		transform: translateX(-100%);
 	}
-	50% {
-		width: 70%;
+	40% {
+		transform: translateX(-25%);
 	}
 	100% {
-		width: 95%;
+		transform: translateX(-5%);
 	}
 }
 
 .animate-progress {
-	animation: progress 2s ease-out forwards;
+	animation: progress 1.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+	transform-origin: left center;
+	background: linear-gradient(
+		90deg,
+		transparent 0%,
+		var(--color-missionnaire, #b08a3e) 25%,
+		var(--color-missionnaire, #b08a3e) 75%,
+		transparent 100%
+	);
+	box-shadow: 0 0 8px rgba(176, 138, 62, 0.45);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.animate-progress {
+		animation: none !important;
+	}
 }
 
 /* ── Global link hover accent ── */

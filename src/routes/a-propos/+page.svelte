@@ -8,6 +8,7 @@
 	import { EgliseParagraph1 } from './paragraphs';
 	import ContactCard from '$lib/components/+contactCard.svelte';
 	import { onMount } from 'svelte';
+	import LoadingRing from '$lib/components/LoadingRing.svelte';
 
 	let stats: {
 		totalVisitors: number;
@@ -71,7 +72,7 @@
 				<h2 class="font-display text-2xl md:text-3xl font-semibold text-stone-900">Statistiques</h2>
 				<div class="w-full bg-stone-50 border border-stone-100 p-8 flex items-center justify-center">
 					<div class="flex items-center gap-3 text-stone-400">
-						<div class="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-missionnaire"></div>
+						<LoadingRing size={20} className="text-missionnaire" />
 						<span class="text-sm font-medium">Chargement des statistiques...</span>
 					</div>
 				</div>

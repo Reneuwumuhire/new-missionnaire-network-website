@@ -410,12 +410,25 @@
 
 					{#if $videoPlaylist.length < $videoPlaylistTotal}
 						<div class="p-4 flex justify-center border-t border-white/5">
-							<button 
+							<button
 								on:click={loadMore}
 								disabled={isFetchingMore}
-								class="w-full py-3 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-all disabled:opacity-50"
+								class="w-full py-3 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-2"
 							>
 								{#if isFetchingMore}
+									<span class="animate-spin inline-flex">
+										<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none">
+											<circle
+												cx="12"
+												cy="12"
+												r="10"
+												stroke="currentColor"
+												stroke-width="2"
+												stroke-dasharray="40 60"
+												stroke-linecap="round"
+											/>
+										</svg>
+									</span>
 									Chargement...
 								{:else}
 									Charger plus de vidéos

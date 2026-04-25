@@ -190,9 +190,11 @@
 	onMount(() => {
 		if (!browser) return;
 		if (!('serviceWorker' in navigator)) return;
-		navigator.serviceWorker.register('/service-worker.js', { scope: '/' }).catch((err) => {
+		navigator.serviceWorker
+			.register('/service-worker.js', { scope: '/', type: 'module' })
+			.catch((err) => {
 			console.warn('[SW] registration failed:', err);
-		});
+			});
 	});
 	// ── END: service worker registration ────────────────────────────
 
@@ -242,8 +244,8 @@
 </svelte:head>
 
 {#if $navigating}
-	<div class="fixed top-0 left-0 right-0 z-[9999] h-[2px]">
-		<div class="h-full bg-missionnaire animate-progress"></div>
+	<div class="fixed top-0 left-0 right-0 z-[9999] h-[2px] overflow-hidden">
+		<div class="h-full w-full animate-progress"></div>
 	</div>
 {/if}
 
@@ -257,7 +259,11 @@
 			<NavBar />
 		</div>
 		<div class="relative mt-[120px]" style={browser ? `margin-top: ${headerHeight}px;` : undefined}>
-			<slot />
+			{#key $page.url.pathname}
+				<div class="page-fade-in">
+					<slot />
+				</div>
+			{/key}
 		</div>
 	</div>
 	<Footer />

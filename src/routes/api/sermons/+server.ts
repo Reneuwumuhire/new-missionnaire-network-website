@@ -8,6 +8,8 @@ export async function GET({ url }: RequestEvent) {
 		const search = url.searchParams.get('search') ?? undefined;
 		const alpha = url.searchParams.get('alpha') ?? undefined;
 		const year = url.searchParams.get('year') ?? undefined;
+		const hasAudio = url.searchParams.get('hasAudio') === 'true';
+		const language = url.searchParams.get('language') ?? 'french';
 		const limit = Number.parseInt(url.searchParams.get('limit') || '20');
 		const pageNumber = Number.parseInt(url.searchParams.get('pageNumber') || '1');
 		const sort = url.searchParams.get('sort') || 'iso_date:desc';
@@ -17,6 +19,8 @@ export async function GET({ url }: RequestEvent) {
 			search,
 			alpha,
 			year,
+			hasAudio,
+			language,
 			limit,
 			pageNumber,
 			orderBy: sort

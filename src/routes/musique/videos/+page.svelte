@@ -3,12 +3,13 @@
 	import { page } from '$app/stores';
 	import type { YoutubeVideo } from '$lib/models/youtube';
 	import SongVideoCard from '$lib/components/+songVideoCard.svelte';
+	import LoadingRing from '$lib/components/LoadingRing.svelte';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import BsSearch from 'svelte-icons-pack/bs/BsSearch';
 	import BsX from 'svelte-icons-pack/bs/BsX';
 	import { browser } from '$app/environment';
-	import { onMount } from 'svelte';
+	import { onDestroy } from 'svelte';
 	import {
 		isVideoPlaylistActive,
 		videoPlaylist,
@@ -19,39 +20,140 @@
 	} from '$lib/stores/global';
 	import BsPlayCircleFill from 'svelte-icons-pack/bs/BsPlayCircleFill';
 	import BsShuffle from 'svelte-icons-pack/bs/BsShuffle';
+	import {
+		getVideosCache,
+		isVideosCacheFresh,
+		setVideosCache,
+		type VideosPageCacheEntry
+	} from './listCache';
 
 	export let data;
 
 	let loadedVideos: YoutubeVideo[] = [];
+	let total = 0;
 	let skipCount = 0;
-	let isLoading = false;
 	let hasMore = true;
+	let isLoading = false;
+	let isInitialLoading = false;
+	let initialLoadError = '';
+	let hasResolved = false;
+	let abortController: AbortController | null = null;
+	let currentToken = 0;
+	let lastHandledKey: string | null = null;
+
 	let searchInput = '';
 	let lastSearch = '';
+	let isSearchLoading = false;
 
-	// Sync with server-side data on initial load or search/navigation change
-	$: if (data) {
-		if (data.search !== lastSearch || loadedVideos.length === 0) {
-			console.log('[Videos] Data context changed, syncing', {
-				search: data.search,
-				count: data.videos?.length
+	$: initialVideos = ((data as any).videos || []) as YoutubeVideo[];
+	$: initialTotal = ((data as any).total || 0) as number;
+	$: currentSearch = ((data as any).search || '') as string;
+	$: isDeferredData = Boolean((data as any).deferred);
+	$: requestKey = currentSearch;
+
+	function abortRequest() {
+		abortController?.abort();
+		abortController = null;
+	}
+
+	function applyData(payload: VideosPageCacheEntry) {
+		loadedVideos = payload.videos;
+		total = payload.total;
+		skipCount = payload.skipCount;
+		hasMore = payload.hasMore;
+		lastSearch = currentSearch;
+		searchInput = currentSearch;
+		isSearchLoading = false;
+		hasResolved = true;
+	}
+
+	async function loadInitial(options?: { showLoading?: boolean }) {
+		const showLoading = options?.showLoading ?? true;
+		const key = requestKey;
+		const token = ++currentToken;
+		const controller = new AbortController();
+		abortRequest();
+		abortController = controller;
+		if (showLoading || !hasResolved) isInitialLoading = true;
+
+		try {
+			const queryParams = new URLSearchParams({
+				type: 'song',
+				search: currentSearch,
+				maxResults: '20',
+				skip: '0'
 			});
-			lastSearch = data.search || '';
-			loadedVideos = [...(data.videos || [])];
-			skipCount = loadedVideos.length;
-			hasMore = loadedVideos.length < data.total;
-			searchInput = lastSearch;
+
+			const response = await fetch(`/api/yt/videos?${queryParams.toString()}`, {
+				signal: controller.signal
+			});
+
+			if (token !== currentToken || key !== requestKey) return;
+			if (!response.ok) throw new Error('Impossible de charger les vidéos');
+
+			const result = await response.json();
+			const videos = (result.data || []) as YoutubeVideo[];
+			const totalCount = (result.total || 0) as number;
+			const cached = setVideosCache(key, {
+				videos,
+				total: totalCount,
+				skipCount: videos.length,
+				hasMore: videos.length < totalCount
+			});
+			applyData(cached);
+			initialLoadError = '';
+		} catch (error) {
+			if ((error as Error).name === 'AbortError') return;
+			if (token !== currentToken || key !== requestKey) return;
+			initialLoadError =
+				error instanceof Error ? error.message : 'Impossible de charger les vidéos';
+		} finally {
+			if (token === currentToken) isInitialLoading = false;
+			if (abortController === controller) abortController = null;
 		}
 	}
 
+	$: if (requestKey !== lastHandledKey) {
+		lastHandledKey = requestKey;
+		initialLoadError = '';
+
+		const cachedEntry = getVideosCache(requestKey);
+
+		if (!isDeferredData) {
+			const seeded = setVideosCache(requestKey, {
+				videos: initialVideos,
+				total: initialTotal,
+				skipCount: initialVideos.length,
+				hasMore: initialVideos.length < initialTotal
+			});
+			abortRequest();
+			applyData(seeded);
+			isInitialLoading = false;
+		} else if (cachedEntry) {
+			applyData(cachedEntry);
+			if (!isVideosCacheFresh(cachedEntry)) {
+				void loadInitial({ showLoading: false });
+			}
+		} else {
+			abortRequest();
+			loadedVideos = [];
+			total = 0;
+			skipCount = 0;
+			hasMore = true;
+			hasResolved = false;
+			searchInput = currentSearch;
+			lastSearch = currentSearch;
+			void loadInitial({ showLoading: true });
+		}
+	}
+
+	onDestroy(() => {
+		abortRequest();
+		if (searchTimeout) clearTimeout(searchTimeout);
+	});
+
 	async function loadMoreVideos() {
 		if (isLoading || !hasMore) return;
-
-		console.log('[Videos] Attempting to load more...', {
-			skip: skipCount,
-			currentCount: loadedVideos.length,
-			total: data.total
-		});
 		isLoading = true;
 
 		try {
@@ -66,28 +168,34 @@
 			if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
 			const result = await response.json();
-			console.log('[Videos] API response received', {
-				itemsCount: result.data?.length,
-				total: result.total
-			});
 
 			if (result.data && result.data.length > 0) {
-				// Avoid duplicates based on _id
 				const newVideos = result.data.filter(
 					(v: YoutubeVideo) => !loadedVideos.some((ev) => ev._id === v._id)
 				);
 
 				if (newVideos.length > 0) {
 					loadedVideos = [...loadedVideos, ...newVideos];
-					skipCount += result.data.length; // Use total returned count for skip
+					skipCount += result.data.length;
 					hasMore = loadedVideos.length < result.total;
 				} else {
-					console.log('[Videos] All items received were already in list');
-					hasMore = false; // Stop if we get only duplicates
+					hasMore = false;
 				}
+
+				setVideosCache(lastSearch, {
+					videos: loadedVideos,
+					total: result.total ?? total,
+					skipCount,
+					hasMore
+				});
 			} else {
-				console.log('[Videos] No items returned');
 				hasMore = false;
+				setVideosCache(lastSearch, {
+					videos: loadedVideos,
+					total,
+					skipCount,
+					hasMore: false
+				});
 			}
 		} catch (error) {
 			console.error('[Videos] Error loading more videos:', error);
@@ -97,32 +205,34 @@
 		}
 	}
 
-	let searchTimeout: any;
+	let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
 	function handleSearch(immediate = false) {
 		if (searchTimeout) clearTimeout(searchTimeout);
 
 		const performSearch = () => {
-			if (searchInput === lastSearch) return;
-			console.log('[Videos] Performing search', { searchInput });
+			if (searchInput === lastSearch) {
+				isSearchLoading = false;
+				return;
+			}
+			isSearchLoading = true;
 			goto(`?search=${encodeURIComponent(searchInput)}`, { keepFocus: true, noScroll: true });
 		};
 
 		if (immediate) {
 			performSearch();
 		} else {
+			isSearchLoading = true;
 			searchTimeout = setTimeout(performSearch, 400);
 		}
 	}
 
 	function intersectionObserver(node: HTMLElement) {
 		if (!browser) return;
-		console.log('[Videos] Observer attached to node');
 
 		const observer = new IntersectionObserver(
 			(entries) => {
 				if (entries[0].isIntersecting) {
-					console.log('[Videos] Element in view', { hasMore, isLoading });
 					if (hasMore && !isLoading) {
 						loadMoreVideos();
 					}
@@ -135,7 +245,6 @@
 
 		return {
 			destroy() {
-				console.log('[Videos] Observer detached');
 				observer.disconnect();
 			}
 		};
@@ -146,7 +255,7 @@
 		videoPlaylist.set([...loadedVideos]);
 		videoPlaylistIndex.set(0);
 		videoPlaylistSearch.set(lastSearch);
-		videoPlaylistTotal.set(data.total);
+		videoPlaylistTotal.set(total);
 		isVideoShuffle.set(false);
 		isVideoPlaylistActive.set(true);
 	}
@@ -155,7 +264,7 @@
 		videoPlaylist.set([...loadedVideos]);
 		videoPlaylistIndex.set(index);
 		videoPlaylistSearch.set(lastSearch);
-		videoPlaylistTotal.set(data.total);
+		videoPlaylistTotal.set(total);
 		isVideoShuffle.set(false);
 		isVideoPlaylistActive.set(true);
 	}
@@ -170,7 +279,7 @@
 		videoPlaylist.set(list);
 		videoPlaylistIndex.set(0);
 		videoPlaylistSearch.set(lastSearch);
-		videoPlaylistTotal.set(data.total);
+		videoPlaylistTotal.set(total);
 		isVideoShuffle.set(true);
 		isVideoPlaylistActive.set(true);
 	}
@@ -189,102 +298,173 @@
 	/>
 </svelte:head>
 
-<div class="container mx-auto px-2 md:px-4 py-8 max-w-7xl">
-	<div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-		<div class="flex flex-col gap-2 w-full md:w-auto">
-			<h2 class="text-3xl font-black text-gray-800">Chants en Vidéo</h2>
-			<div class="flex items-center gap-6">
-				<button
-					on:click={playAll}
-					class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-orange-600 hover:text-orange-600 transition-all active:scale-95"
+<div class="w-full min-w-0 max-w-6xl mx-auto px-4 md:px-6 py-8">
+	<!-- Page Header -->
+	<div class="mb-10">
+		<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body">
+			Cantiques & Vidéo
+		</p>
+		<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">
+			Chants en Vidéo
+		</h1>
+		{#if hasResolved && total}
+			<p class="mt-2 text-[12px] text-stone-400 font-body">
+				<span
+					class="font-display text-missionnaire text-base font-semibold align-middle tabular-nums"
+					>{total}</span
 				>
-					<Icon src={BsPlayCircleFill} size="16" />
-					Tout Lire
-				</button>
-				<button
-					on:click={shuffleAll}
-					class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-orange-600 transition-all active:scale-95"
-				>
-					<Icon src={BsShuffle} size="14" />
-					Aléatoire
-				</button>
-			</div>
+				vidéo{total > 1 ? 's' : ''} disponible{total > 1 ? 's' : ''}
+			</p>
+		{:else if !hasResolved}
+			<p class="mt-2">
+				<span class="inline-block h-3 w-32 rounded-full bg-stone-200 animate-pulse"></span>
+			</p>
+		{/if}
+	</div>
+
+	<!-- Controls Row -->
+	<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+		<div class="flex items-center gap-6">
+			<button
+				on:click={playAll}
+				class="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-missionnaire hover:text-missionnaire/80 transition-colors active:scale-95 font-body disabled:opacity-50 disabled:cursor-not-allowed"
+				disabled={loadedVideos.length === 0}
+			>
+				<Icon src={BsPlayCircleFill} size="14" />
+				Tout Lire
+			</button>
+			<button
+				on:click={shuffleAll}
+				class="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-400 hover:text-missionnaire transition-colors active:scale-95 font-body disabled:opacity-50 disabled:cursor-not-allowed"
+				disabled={loadedVideos.length === 0}
+			>
+				<Icon src={BsShuffle} size="13" />
+				Aléatoire
+			</button>
 		</div>
 
-		<div
-			class="flex items-center gap-2 bg-white border border-gray-200 px-4 py-2 rounded-xl shadow-sm w-full md:w-96"
-		>
-			<Icon src={BsSearch} size="16" color="#94a3b8" />
+		<div class="relative w-full md:w-96">
+			<div class="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400">
+				<Icon src={BsSearch} size="14" />
+			</div>
 			<input
 				type="text"
 				placeholder="Rechercher une vidéo..."
-				class="bg-transparent border-none outline-none text-sm w-full text-gray-700"
+				class="w-full border border-stone-200/80 bg-white pl-9 pr-24 py-2.5 text-sm font-body text-stone-800 placeholder:text-stone-400 focus:border-missionnaire/40 focus:outline-none focus:ring-1 focus:ring-missionnaire/30 transition-colors"
 				bind:value={searchInput}
 				on:input={() => handleSearch()}
 			/>
-			{#if searchInput}
+			{#if isSearchLoading}
+				<LoadingRing
+					size={16}
+					className="absolute right-2.5 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center text-missionnaire/90"
+				/>
+			{:else if searchInput}
 				<button
+					class="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-missionnaire transition-colors p-1"
 					on:click={() => {
 						searchInput = '';
 						handleSearch(true);
 					}}
+					aria-label="Effacer la recherche"
 				>
-					<Icon src={BsX} size="18" color="#94a3b8" />
+					<Icon src={BsX} size="16" />
 				</button>
 			{/if}
 		</div>
 	</div>
 
-	{#if loadedVideos.length > 0}
-		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+	{#if isInitialLoading && !hasResolved}
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+			{#each Array.from({ length: 9 }) as _}
+				<div class="animate-pulse">
+					<div class="aspect-video bg-stone-200 rounded"></div>
+					<div class="mt-3 space-y-2">
+						<div class="h-4 w-3/4 rounded-full bg-stone-200"></div>
+						<div class="h-3 w-1/2 rounded-full bg-stone-100"></div>
+					</div>
+				</div>
+			{/each}
+		</div>
+	{:else if initialLoadError && !hasResolved}
+		<div class="py-20 text-center bg-white/40 border border-stone-200/60">
+			<div class="text-stone-200 mb-4 flex justify-center">
+				<Icon src={BsSearch} size="56" />
+			</div>
+			<p class="text-stone-500 font-bold uppercase tracking-widest text-sm">
+				La liste n'a pas pu charger
+			</p>
+			<p class="mt-2 text-xs text-stone-400">{initialLoadError}</p>
+			<button
+				class="mt-5 inline-flex items-center rounded-full border border-missionnaire px-4 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-missionnaire transition-colors hover:bg-missionnaire/5"
+				on:click={() => void loadInitial({ showLoading: true })}
+			>
+				Réessayer
+			</button>
+		</div>
+	{:else if loadedVideos.length > 0}
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 			{#each loadedVideos as video, i (video._id)}
 				<SongVideoCard videoData={video} on:playPlaylist={() => playFromIndex(i)} />
 			{/each}
 		</div>
 
 		{#if hasMore}
-			<div use:intersectionObserver class="flex flex-col items-center justify-center py-12 gap-4">
+			<div use:intersectionObserver class="flex flex-col items-center justify-center py-12 gap-3">
 				{#if isLoading}
-					<div
-						class="animate-spin rounded-full h-10 w-10 border-t-4 border-b-4 border-orange-500"
-					/>
-					<p class="text-[10px] font-black text-orange-600 uppercase tracking-widest">
+					<div class="text-missionnaire animate-spin">
+						<svg class="h-6 w-6" viewBox="0 0 24 24" fill="none">
+							<circle
+								cx="12"
+								cy="12"
+								r="10"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-dasharray="40 60"
+								stroke-linecap="round"
+							/>
+						</svg>
+					</div>
+					<p
+						class="text-[10px] font-semibold uppercase tracking-[0.25em] text-missionnaire font-body"
+					>
 						Chargement...
 					</p>
 				{:else}
-					<!-- Manual fallback button just in case -->
 					<button
 						on:click={loadMoreVideos}
-						class="text-[10px] font-black text-gray-400 hover:text-orange-600 uppercase tracking-widest transition-colors"
+						class="text-[10px] font-bold text-stone-400 hover:text-missionnaire uppercase tracking-[0.18em] transition-colors font-body"
 					>
 						Charger plus de vidéos
 					</button>
 				{/if}
 			</div>
 		{:else}
-			<div class="text-center w-full py-20 border-t border-gray-50 mt-12">
-				<p class="text-[10px] font-black text-gray-300 uppercase tracking-[0.4em]">
+			<div class="text-center py-16 mt-10 border-t border-stone-200/60">
+				<p class="text-[10px] font-bold text-stone-300 uppercase tracking-[0.4em] font-body">
 					Fin de la collection
 				</p>
 			</div>
 		{/if}
-	{:else if !isLoading}
-		<div class="py-40 text-center">
-			<div class="text-gray-200 mb-6 flex justify-center">
-				<Icon src={BsSearch} size="80" />
+	{:else}
+		<div class="py-32 text-center bg-white/40 border border-stone-200/60">
+			<div class="text-stone-200 mb-5 flex justify-center">
+				<Icon src={BsSearch} size="56" />
 			</div>
-			<p class="text-gray-400 font-black uppercase tracking-[0.2em] text-sm">
-				Aucune vidéo trouvée pour "{lastSearch}"
+			<p class="text-stone-500 font-bold uppercase tracking-[0.2em] text-sm font-body">
+				{lastSearch ? `Aucune vidéo trouvée pour "${lastSearch}"` : 'Aucune vidéo trouvée'}
 			</p>
-			<button
-				on:click={() => {
-					searchInput = '';
-					handleSearch();
-				}}
-				class="mt-6 text-orange-600 font-bold hover:underline"
-			>
-				Voir tout
-			</button>
+			{#if lastSearch}
+				<button
+					on:click={() => {
+						searchInput = '';
+						handleSearch(true);
+					}}
+					class="mt-5 inline-flex items-center rounded-full border border-missionnaire px-4 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-missionnaire transition-colors hover:bg-missionnaire/5 font-body"
+				>
+					Voir tout
+				</button>
+			{/if}
 		</div>
 	{/if}
 </div>

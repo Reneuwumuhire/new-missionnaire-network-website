@@ -89,7 +89,16 @@
 	$: currentPage = (data as any).page;
 	$: limit = (data as any).limit;
 	$: isDeferredData = Boolean((data as any).deferred);
-	$: musicRequestKey = buildMusicRequestKey();
+	$: musicRequestKey = JSON.stringify({
+		category: currentCategory || 'All',
+		search: currentSearch || '',
+		alpha: currentAlpha || '',
+		artist: currentArtist || '',
+		pageNumber: currentPage || 1,
+		limit: limit || 100,
+		sort: currentSort || 'uploaded_at:desc',
+		seed: currentSeed || ''
+	});
 	$: totalPages = Math.ceil(totalSongs / limit);
 
 	let isArtistMenuOpen = false;
@@ -115,10 +124,6 @@
 		}
 
 		return params;
-	}
-
-	function buildMusicRequestKey() {
-		return buildMusicRequestParams().toString();
 	}
 
 	function abortMusicListRequest() {

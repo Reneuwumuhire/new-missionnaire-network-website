@@ -5,13 +5,22 @@
 	import { page } from '$app/stores';
 	import { searchQuery } from '$lib/stores/global';
 	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
+	import LoadingRing from '$lib/components/LoadingRing.svelte';
 
 	export let data;
 	let heroSearchValue = (data as any).search || '';
 	let debounceTimer: NodeJS.Timeout;
+	let isHeroSearchLoading = false;
+	let lastSyncedSearch = '';
 
-	function handleHeroSearch() {
+	$: currentSearch = $page.url.searchParams.get('search') || '';
+	$: if (currentSearch !== lastSyncedSearch) {
+		heroSearchValue = currentSearch;
+		lastSyncedSearch = currentSearch;
+	}
+
+	async function handleHeroSearch() {
 		if (!browser) return;
 		const params = new URLSearchParams($page.url.searchParams);
 		if (heroSearchValue.trim()) {
@@ -22,16 +31,19 @@
 		params.set('page', '1');
 		params.delete('alpha');
 		params.delete('year');
-		goto(`?${params.toString()}`, { keepFocus: true, noScroll: true });
+		isHeroSearchLoading = true;
+		await goto(`?${params.toString()}`, { keepFocus: true, noScroll: true });
 	}
 
 	$: if (browser) {
 		if (heroSearchValue !== undefined) {
 			clearTimeout(debounceTimer);
 			debounceTimer = setTimeout(() => {
-				const currentSearch = $page.url.searchParams.get('search') || '';
 				if (heroSearchValue.trim() !== currentSearch) {
-					handleHeroSearch();
+					isHeroSearchLoading = true;
+					void handleHeroSearch();
+				} else {
+					isHeroSearchLoading = false;
 				}
 			}, 300);
 		}
@@ -40,6 +52,10 @@
 	onMount(() => {
 		// Sync global search query if needed
 		searchQuery.set(heroSearchValue);
+	});
+
+	onDestroy(() => {
+		clearTimeout(debounceTimer);
 	});
 </script>
 
@@ -63,16 +79,21 @@
 							<input
 								id="hero-search"
 								type="text"
-								class="w-full bg-transparent text-stone-800 px-5 py-3.5 pr-10 text-sm font-body outline-none placeholder:text-stone-400"
+								class="w-full bg-transparent text-stone-800 px-5 py-3.5 pr-24 text-sm font-body outline-none placeholder:text-stone-400"
 								placeholder="Rechercher par titre, année, prédicateur..."
 								bind:value={heroSearchValue}
 							/>
-							{#if heroSearchValue}
+							{#if isHeroSearchLoading}
+								<LoadingRing
+									size={16}
+									className="absolute right-2.5 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center text-missionnaire/90"
+								/>
+							{:else if heroSearchValue}
 								<button
 									type="button"
 									aria-label="Effacer la recherche"
 									title="Effacer"
-									class="absolute right-2 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full text-stone-400 hover:bg-stone-200 hover:text-stone-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
+									class="absolute right-2.5 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full text-stone-400 hover:bg-stone-200 hover:text-stone-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
 									on:click={() => {
 										heroSearchValue = '';
 									}}

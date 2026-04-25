@@ -9,11 +9,7 @@
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import HiSolidMenuAlt3 from 'svelte-icons-pack/hi/HiSolidMenuAlt3';
 	import IoCloseSharp from 'svelte-icons-pack/io/IoCloseSharp';
-	import SearchNormal1 from 'iconsax-svelte/SearchNormal1.svelte';
-	import CloseCircle from 'iconsax-svelte/CloseCircle.svelte';
 	import HeaderMenuLinkMobo from './+headerMenuLinkMobo.svelte';
-	import { searchTerm } from '$lib/stores/videoStore';
-	import { goto } from '$app/navigation';
 
 	const languages = { en, fr };
 	let currentLang = 'en';
@@ -70,42 +66,6 @@
 		}
 	};
 
-	let isHovered = false;
-	let isFocused = false;
-
-	const searchablePages = [
-		'/videos',
-		'/predications',
-		'/musique',
-		'/literature',
-		'/transcriptions'
-	];
-	$: showSearch = searchablePages.some((p) => $page.url.pathname.startsWith(p));
-
-	$: shouldExpand = isHovered || isFocused || $searchTerm.trim().length > 0;
-	$: showClearButton = $searchTerm.trim().length > 0;
-	$: showPlaceholder = shouldExpand;
-
-	function handleSubmit() {
-		if ($searchTerm.trim()) {
-			goto(`/videos?search=${encodeURIComponent($searchTerm.trim())}`);
-		}
-		if (showMoboNav) {
-			toggleMobileNav();
-		}
-	}
-
-	function handleSearchInput() {
-		// Search is handled on submit
-	}
-
-	function clearInput() {
-		searchTerm.set('');
-		if (showMoboNav) {
-			toggleMobileNav();
-		}
-	}
-
 	import { onMount } from 'svelte';
 	onMount(() => {
 		const mediaQuery = window.matchMedia('(min-width: 1024px)');
@@ -140,47 +100,6 @@
 
 		<!-- Desktop nav -->
 		<div class="hidden lg:flex items-center gap-1">
-			{#if showSearch}
-				<!-- svelte-ignore a11y-no-static-element-interactions -->
-				<div
-					class="relative mr-2"
-					on:mouseenter={() => (isHovered = true)}
-					on:mouseleave={() => (isHovered = false)}
-				>
-					<form on:submit|preventDefault={handleSubmit}>
-						<div
-							class="flex items-center h-9 border outline-none ring-0 transition-all duration-300 ease-out {shouldExpand ? 'w-60 bg-white/60 border-stone-300/80' : 'w-9 bg-transparent border-transparent hover:border-stone-200/40'}"
-						>
-							<div class="flex items-center justify-center w-9 shrink-0">
-								<SearchNormal1 size={14} color={shouldExpand ? '#78716c' : '#a8a29e'} variant="Linear" />
-							</div>
-							{#if shouldExpand}
-								<input
-									type="text"
-									placeholder="Rechercher..."
-									aria-label="Rechercher"
-									bind:value={$searchTerm}
-									class="w-full pr-3 py-1.5 text-[13px] text-stone-700 bg-transparent outline-none ring-0 border-none font-body placeholder:text-stone-400/70 focus:outline-none focus:ring-0"
-									on:focus={() => (isFocused = true)}
-									on:blur={() => (isFocused = false)}
-									on:input={handleSearchInput}
-								/>
-								{#if showClearButton}
-									<button
-										type="button"
-										class="flex items-center justify-center w-7 h-7 shrink-0 mr-1 hover:opacity-70 transition-opacity"
-										on:click={clearInput}
-										aria-label="Effacer la recherche"
-									>
-										<CloseCircle size={14} color="#a8a29e" variant="Linear" />
-									</button>
-								{/if}
-							{/if}
-						</div>
-					</form>
-				</div>
-			{/if}
-
 			<div class="flex items-center gap-0.5">
 				{#each NavigationLinkList as link, index}
 					<HeaderMenuLink
@@ -222,44 +141,6 @@
 	{#if showMoboNav}
 		<div class="mobo-menu absolute left-0 right-0 top-full z-50 bg-[#FAF8F3] overflow-y-auto border-t border-stone-100 h-screen">
 			<div class="flex flex-col px-6 py-8 max-w-lg mx-auto pb-32">
-				{#if showSearch}
-					<!-- svelte-ignore a11y-no-static-element-interactions -->
-					<div
-						class="mb-8"
-						on:mouseenter={() => (isHovered = true)}
-						on:mouseleave={() => (isHovered = false)}
-					>
-						<form on:submit|preventDefault={handleSubmit}>
-							<div
-								class="flex items-center h-11 border border-stone-200/60 bg-white/40 outline-none ring-0"
-							>
-								<div class="flex items-center justify-center w-11 shrink-0">
-									<SearchNormal1 size={16} color="#a8a29e" variant="Linear" />
-								</div>
-								<input
-									type="text"
-									placeholder="Rechercher..."
-									aria-label="Rechercher"
-									bind:value={$searchTerm}
-									class="w-full pr-4 py-2 text-sm text-stone-700 bg-transparent outline-none ring-0 border-none font-body placeholder:text-stone-400/70 focus:outline-none focus:ring-0"
-									on:focus={() => (isFocused = true)}
-									on:blur={() => (isFocused = false)}
-								/>
-								{#if showClearButton}
-									<button
-										type="button"
-										class="flex items-center justify-center w-9 h-9 shrink-0 mr-1"
-										on:click={clearInput}
-										aria-label="Effacer la recherche"
-									>
-										<CloseCircle size={20} color="#FF880C" variant="Linear" />
-									</button>
-								{/if}
-							</div>
-						</form>
-					</div>
-				{/if}
-
 				<div class="flex flex-col gap-1">
 					{#each NavigationLinkList as link, index}
 						<HeaderMenuLinkMobo

@@ -1,7 +1,17 @@
+import { browser } from '$app/environment';
 import type { YoutubeVideo } from '$lib/models/youtube';
 
 export const load = async ({ fetch, url }) => {
 	const search = url.searchParams.get('search') || '';
+
+	if (browser) {
+		return {
+			videos: [] as YoutubeVideo[],
+			total: 0,
+			search,
+			deferred: true
+		};
+	}
 
 	const queryParams = new URLSearchParams({
 		type: 'song',
@@ -16,6 +26,7 @@ export const load = async ({ fetch, url }) => {
 	return {
 		videos: (result.data || []) as YoutubeVideo[],
 		total: (result.total || 0) as number,
-		search
+		search,
+		deferred: false
 	};
 };

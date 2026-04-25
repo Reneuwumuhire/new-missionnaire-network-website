@@ -30,10 +30,19 @@
 
 {#if isVisible}
 <div class="w-full max-w-3xl mx-auto px-4 pointer-events-none">
-	<div class="pointer-events-auto relative overflow-hidden rounded-2xl border border-white/20 bg-white/70 backdrop-blur-xl shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] transition-all hover:shadow-[0_8px_32px_0_rgba(31,38,135,0.15)] flex items-center justify-between px-4 py-3 md:px-6 md:py-4 gap-4">
+	<div class="pointer-events-auto relative isolate overflow-hidden rounded-[24px] border border-white/70 bg-[#fffaf5]/95 backdrop-blur-lg ring-1 ring-stone-200/70 shadow-[0_22px_60px_-26px_rgba(15,23,42,0.35)] transition-all hover:shadow-[0_28px_72px_-28px_rgba(15,23,42,0.45)] flex items-center justify-between px-4 py-3 md:px-6 md:py-4 gap-4">
+		<div
+			class="absolute inset-0"
+			style="background: linear-gradient(135deg, rgba(255,255,255,0.96), rgba(255,247,237,0.94));"
+		></div>
+		<div
+			class="absolute inset-0"
+			style="background: radial-gradient(circle at top left, rgba(249,115,22,0.16), transparent 38%), radial-gradient(circle at bottom right, rgba(59,130,246,0.08), transparent 36%);"
+		></div>
+		<div class="absolute inset-x-0 top-0 h-px bg-white/80"></div>
 		<!-- Left side - Branding & Content -->
-		<div class="flex items-center gap-3 md:gap-5 flex-1 min-w-0">
-			<div class="hidden sm:flex bg-orange-500/10 p-2 rounded-xl shrink-0">
+		<div class="relative z-10 flex items-center gap-3 md:gap-5 flex-1 min-w-0">
+			<div class="hidden sm:flex bg-orange-500/12 p-2 rounded-xl shrink-0">
 				<Icon src={FaBrandsAndroid} size="22" color="#f97316" />
 			</div>
 			
@@ -53,7 +62,7 @@
 		</div>
 
 		<!-- Action & Close -->
-		<div class="flex items-center gap-2 md:gap-4 shrink-0">
+		<div class="relative z-10 flex items-center gap-2 md:gap-4 shrink-0">
 			<a 
 				href={downloadUrl}
 				target="_blank" rel="noopener noreferrer"
@@ -74,7 +83,7 @@
 		</div>
 
 		<!-- Glassy Shine Effect -->
-		<div class="absolute -inset-full h-full w-1/2 z-[-1] block transform -skew-x-12 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-40 animate-[shine_5s_infinite]"></div>
+		<div class="absolute -inset-full h-full w-1/2 z-0 block transform -skew-x-12 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-60 animate-[shine_5s_infinite]"></div>
 	</div>
 </div>
 {/if}

@@ -3,80 +3,206 @@
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { formatFileSize } from '../../utils/FormatTime';
 	import DocumentText1 from 'iconsax-svelte/DocumentText1.svelte';
 	import Export from 'iconsax-svelte/Export.svelte';
 	import VideoPlay from 'iconsax-svelte/VideoPlay.svelte';
 	import ArrowDown2 from 'iconsax-svelte/ArrowDown2.svelte';
 	import ArrowUp2 from 'iconsax-svelte/ArrowUp2.svelte';
+	import Pagination from '$lib/components/Pagination.svelte';
 	import { writable } from 'svelte/store';
+	import LoadingRing from '$lib/components/LoadingRing.svelte';
+	import type { SerializedTranscription } from '$lib/server/transcriptions';
+	import {
+		getTranscriptionsCache,
+		isTranscriptionsCacheFresh,
+		setTranscriptionsCache,
+		type TranscriptionsPageCacheEntry
+	} from './listCache';
 
 	export let data: PageData;
-	let selectedDocument: (typeof data.documents)[0] | null = null;
+	let selectedDocument: SerializedTranscription | null = null;
 	const isDocumentOpen = writable(false);
 	let searchTerm = '';
-	let sortOrder = data.sort || 'desc';
-	let selectedYear = data.selectedYear || '';
 	let isSearching = false;
 	let searchInput: HTMLInputElement;
-	let typingTimeout: NodeJS.Timeout;
+	let typingTimeout: ReturnType<typeof setTimeout>;
 	let lastSearch = '';
+	let lastSyncedSearch = '';
 
-	$: currentPage = data.pagination.page;
-	$: totalPages = Math.ceil(data.pagination.total / data.pagination.limit);
-	$: visiblePages = getVisiblePages(currentPage, totalPages);
-	$: filteredDocuments = data.documents;
-	$: showPagination = data.pagination.total > 10;
+	let documents: SerializedTranscription[] = [];
+	let total = 0;
+	let years: number[] = [];
+	let isListLoading = false;
+	let listLoadError = '';
+	let hasResolvedList = false;
+	let abortController: AbortController | null = null;
+	let currentRequestToken = 0;
+	let lastHandledKey = '';
 
-	function handleSearch(value: string) {
+	$: initialDocuments = ((data as any).documents || []) as SerializedTranscription[];
+	$: initialTotal = (data.pagination?.total || 0) as number;
+	$: initialYears = ((data as any).years || []) as number[];
+	$: loadedSearch = ((data as any).search || '') as string;
+	$: currentPageNumber = Number($page.url.searchParams.get('page')) || data.pagination.page || 1;
+	$: currentLimit = data.pagination.limit;
+	$: sortOrder = (($page.url.searchParams.get('sort') === 'asc'
+		? 'asc'
+		: $page.url.searchParams.get('sort') === 'desc'
+			? 'desc'
+			: data.sort || 'desc') as 'asc' | 'desc');
+	$: selectedYear = $page.url.searchParams.get('year') || data.selectedYear || '';
+	$: currentSearch = $page.url.searchParams.get('search') || loadedSearch || '';
+	$: isDeferredData = Boolean((data as any).deferred);
+	$: requestKey = JSON.stringify({
+		page: currentPageNumber,
+		limit: currentLimit,
+		sort: sortOrder,
+		year: selectedYear || '',
+		search: currentSearch || ''
+	});
+	$: dataRequestKey = JSON.stringify({
+		page: data.pagination.page,
+		limit: currentLimit,
+		sort: (data.sort || 'desc') as 'asc' | 'desc',
+		year: data.selectedYear || '',
+		search: loadedSearch || ''
+	});
+	$: totalPages = Math.ceil(total / currentLimit);
+	$: showPagination = total > 10;
+	$: if (currentSearch !== lastSyncedSearch) {
+		searchTerm = currentSearch;
+		lastSearch = currentSearch;
+		lastSyncedSearch = currentSearch;
+	}
+
+	function abortRequest() {
+		abortController?.abort();
+		abortController = null;
+	}
+
+	function applyData(payload: TranscriptionsPageCacheEntry) {
+		documents = payload.documents;
+		total = payload.total;
+		years = payload.years;
+		isSearching = false;
+		hasResolvedList = true;
+	}
+
+	async function loadInBackground(options?: { showLoading?: boolean }) {
+		const showLoading = options?.showLoading ?? true;
+		const key = requestKey;
+		const token = ++currentRequestToken;
+		const controller = new AbortController();
+		abortRequest();
+		abortController = controller;
+		if (showLoading || !hasResolvedList) isListLoading = true;
+
+		try {
+			const params = new URLSearchParams({
+				page: String(currentPageNumber),
+				limit: String(currentLimit),
+				sort: sortOrder
+			});
+			if (selectedYear) params.set('year', selectedYear);
+			if (currentSearch) params.set('search', currentSearch);
+
+			const res = await fetch(`/api/transcriptions?${params.toString()}`, {
+				signal: controller.signal
+			});
+
+			if (token !== currentRequestToken || key !== requestKey) return;
+			if (!res.ok) throw new Error('Impossible de charger les transcriptions');
+
+			const r = await res.json();
+			const cached = setTranscriptionsCache(key, {
+				documents: (r.data || []) as SerializedTranscription[],
+				total: (r.total || 0) as number,
+				years: (r.years || years || []) as number[]
+			});
+			applyData(cached);
+			listLoadError = '';
+		} catch (error) {
+			if ((error as Error).name === 'AbortError') return;
+			if (token !== currentRequestToken || key !== requestKey) return;
+			listLoadError =
+				error instanceof Error ? error.message : 'Impossible de charger les transcriptions';
+			isSearching = false;
+		} finally {
+			if (token === currentRequestToken) isListLoading = false;
+			if (abortController === controller) abortController = null;
+		}
+	}
+
+	$: if (requestKey && requestKey !== lastHandledKey) {
+		lastHandledKey = requestKey;
+		listLoadError = '';
+
+		const cachedEntry = getTranscriptionsCache(requestKey);
+
+		if (!isDeferredData && dataRequestKey === requestKey) {
+			const seeded = setTranscriptionsCache(requestKey, {
+				documents: initialDocuments,
+				total: initialTotal,
+				years: initialYears
+			});
+			abortRequest();
+			applyData(seeded);
+			isListLoading = false;
+		} else if (cachedEntry) {
+			applyData(cachedEntry);
+			void loadInBackground({ showLoading: !isTranscriptionsCacheFresh(cachedEntry) });
+		} else {
+			abortRequest();
+			documents = [];
+			hasResolvedList = false;
+			void loadInBackground({ showLoading: true });
+		}
+	}
+
+	async function runSearch(value: string) {
+		const trimmed = value.trim();
+		const url = new URL(window.location.href);
+		if (trimmed) {
+			url.searchParams.set('search', trimmed);
+		} else {
+			url.searchParams.delete('search');
+		}
+		url.searchParams.set('page', '1');
+		try {
+			await goto(url.toString(), { keepFocus: true });
+		} catch {
+			isSearching = false;
+		}
+	}
+
+	function handleSearch(value: string, options?: { immediate?: boolean }) {
 		if (!browser) return;
-
 		clearTimeout(typingTimeout);
-
-		// Don't search if the value hasn't changed from last search
-		if (value.trim() === lastSearch) return;
-
-		typingTimeout = setTimeout(async () => {
-			isSearching = true;
-			const url = new URL(window.location.href);
-
-			if (value.trim()) {
-				url.searchParams.set('search', value.trim());
-			} else {
-				url.searchParams.delete('search');
-			}
-
-			url.searchParams.set('page', '1');
-			lastSearch = value.trim();
-
-			try {
-				await goto(url.toString(), { keepFocus: true });
-			} finally {
-				isSearching = false;
-			}
-		}, 500); // Reduced debounce time for better responsiveness
+		const trimmed = value.trim();
+		if (trimmed === lastSearch) {
+			isSearching = false;
+			return;
+		}
+		isSearching = true;
+		if (options?.immediate) {
+			void runSearch(value);
+			return;
+		}
+		typingTimeout = setTimeout(() => {
+			void runSearch(value);
+		}, 500);
 	}
 
 	function handleFocus(event: FocusEvent) {
-		// Don't select all text on focus, more like YouTube behavior
 		const input = event.target as HTMLInputElement;
 		input.focus();
-	}
-
-	// Handle other navigation without forcing focus
-	function handlePageChange(newPage: number) {
-		if (browser) {
-			const url = new URL(window.location.href);
-			url.searchParams.set('page', newPage.toString());
-			goto(url.toString());
-		}
 	}
 
 	function handleSort() {
 		if (browser) {
 			const newSort = sortOrder === 'asc' ? 'desc' : 'asc';
-			sortOrder = newSort;
 			const url = new URL(window.location.href);
 			url.searchParams.set('sort', newSort);
 			goto(url.toString());
@@ -97,7 +223,7 @@
 		}
 	}
 
-	function handleSelectDocument(doc: (typeof data.documents)[0]) {
+	function handleSelectDocument(doc: SerializedTranscription) {
 		selectedDocument = doc;
 		isDocumentOpen.set(true);
 	}
@@ -107,7 +233,6 @@
 			const url = new URL(window.location.href);
 			searchTerm = url.searchParams.get('search') || '';
 			lastSearch = searchTerm;
-			// Only focus on initial load if there's a search term
 			if (searchTerm && searchInput) {
 				searchInput.focus();
 			}
@@ -115,41 +240,7 @@
 		window.scrollTo(0, 0);
 	});
 
-	function getVisiblePages(current: number, total: number): number[] {
-		if (total <= 7) {
-			return Array.from({ length: total }, (_, i) => i + 1);
-		}
-
-		const pages: number[] = [];
-
-		// Always show first page
-		pages.push(1);
-
-		if (current <= 4) {
-			// Near start: 1 2 3 4 5 ... last
-			for (let i = 2; i <= 5; i++) {
-				pages.push(i);
-			}
-			pages.push(-1);
-			pages.push(total);
-		} else if (current >= total - 3) {
-			// Near end: 1 ... last-4 last-3 last-2 last-1 last
-			pages.push(-1);
-			for (let i = total - 4; i <= total; i++) {
-				pages.push(i);
-			}
-		} else {
-			// Middle: 1 ... current-1 current current+1 ... last
-			pages.push(-1);
-			for (let i = current - 1; i <= current + 1; i++) {
-				pages.push(i);
-			}
-			pages.push(-1);
-			pages.push(total);
-		}
-
-		return pages;
-	}
+	onDestroy(() => abortRequest());
 </script>
 
 <svelte:head>
@@ -170,38 +261,74 @@
 	<div class="relative mb-4 sm:mb-8">
 		<div class="flex flex-row items-center justify-center">
 			<div class="w-full max-w-4xl text-center">
-				<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body">Transcriptions</p>
-				<h1 class="font-display text-2xl sm:text-3xl font-semibold text-stone-900 mb-2">Transcriptions</h1>
+				<p
+					class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body"
+				>
+					Transcriptions
+				</p>
+				<h1 class="font-display text-2xl sm:text-3xl font-semibold text-stone-900 mb-2">
+					Transcriptions
+				</h1>
 				<p class="text-sm text-stone-500 font-body mb-2">
 					Trouvez les transcriptions des prédications
 				</p>
 				<p class="text-[12px] text-stone-400 font-body mb-6">
-					{data.pagination.total} transcription{data.pagination.total > 1 ? 's' : ''} disponible{data
-						.pagination.total > 1
-						? 's'
-						: ''}
+					{#if hasResolvedList}
+						{total} transcription{total > 1 ? 's' : ''} disponible{total > 1 ? 's' : ''}
+					{:else}
+						<span class="inline-block h-3 w-32 rounded-full bg-stone-200 animate-pulse"></span>
+					{/if}
 				</p>
-				<form class="flex w-full max-w-xl mx-auto border border-stone-200/60 bg-white/40 overflow-hidden" on:submit|preventDefault>
+				<form
+					class="flex w-full max-w-xl mx-auto border border-stone-200/60 bg-white/40 overflow-hidden"
+					on:submit|preventDefault={() =>
+						handleSearch(searchInput?.value ?? searchTerm, { immediate: true })}
+				>
 					<div class="relative flex-1">
 						<input
 							type="text"
-							class="w-full bg-transparent text-stone-800 px-5 py-3.5 text-sm font-body outline-none placeholder:text-stone-400"
+							class="w-full bg-transparent text-stone-800 px-5 py-3.5 pr-24 text-sm font-body outline-none placeholder:text-stone-400"
 							placeholder="Rechercher par titre..."
 							bind:value={searchTerm}
 							bind:this={searchInput}
 							on:focus={handleFocus}
-							on:input={() => handleSearch(searchTerm)}
+							on:input={(event) =>
+								handleSearch((event.currentTarget as HTMLInputElement).value)}
 						/>
 						{#if isSearching}
-							<div class="absolute right-3 top-1/2 -translate-y-1/2">
-								<div
-									class="animate-spin h-4 w-4 border-t-2 border-b-2 border-missionnaire"
-								></div>
-							</div>
+							<LoadingRing
+								size={16}
+								className="absolute right-2.5 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center text-missionnaire/90"
+							/>
+						{:else if searchTerm}
+							<button
+								type="button"
+								aria-label="Effacer la recherche"
+								title="Effacer"
+								class="absolute right-2.5 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full text-stone-400 hover:bg-stone-200 hover:text-stone-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
+								on:click={() => {
+									searchTerm = '';
+									handleSearch('', { immediate: true });
+								}}
+							>
+								<svg
+									width="14"
+									height="14"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<path d="M6 6l12 12M6 18L18 6" />
+								</svg>
+							</button>
 						{/if}
 					</div>
 					<button
-						type="button"
+						type="submit"
 						class="bg-missionnaire hover:bg-missionnaire/90 text-white px-6 py-3.5 text-[11px] font-bold uppercase tracking-[0.15em] font-body transition-colors shrink-0"
 					>
 						Rechercher
@@ -220,7 +347,6 @@
 			<div
 				class="flex flex-col sm:flex-row justify-end mb-4 items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 px-2 sm:px-0"
 			>
-				<!-- Year Filter -->
 				<div class="flex items-center space-x-2 w-full sm:w-auto">
 					<label for="year-filter" class="text-sm text-gray-600">Année:</label>
 					<select
@@ -230,13 +356,12 @@
 						on:change={handleYearChange}
 					>
 						<option value="">Toutes les années</option>
-						{#each data.years as year}
+						{#each years as year}
 							<option value={year}>{year}</option>
 						{/each}
 					</select>
 				</div>
 
-				<!-- Sort Button -->
 				<button
 					on:click={handleSort}
 					class="flex items-center justify-center space-x-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-900 w-full sm:w-auto border sm:border-0 border-gray-300 rounded-md sm:rounded-none"
@@ -250,13 +375,48 @@
 				</button>
 			</div>
 
-			{#if filteredDocuments.length === 0}
+			{#if isListLoading && !hasResolvedList}
+				<div class="border border-gray-300 shadow rounded-md mx-2 sm:mx-0 divide-y divide-gray-200">
+					{#each Array.from({ length: 8 }) as _}
+						<div class="flex items-center p-3 sm:p-4 animate-pulse">
+							<div class="flex-shrink-0 pt-1 mr-2 sm:mr-4">
+								<div class="h-4 w-4 rounded bg-stone-200"></div>
+							</div>
+							<div class="flex-1 min-w-0 space-y-2">
+								<div class="h-4 w-3/4 rounded-full bg-stone-200"></div>
+								<div class="h-3 w-1/3 rounded-full bg-stone-100"></div>
+							</div>
+							<div class="flex items-center space-x-2 px-2 sm:px-4">
+								<div class="h-5 w-5 rounded bg-stone-100"></div>
+								<div class="h-5 w-5 rounded bg-stone-100"></div>
+							</div>
+						</div>
+					{/each}
+				</div>
+			{:else if listLoadError && !hasResolvedList}
+				<div class="text-center py-12">
+					<p class="text-stone-500 text-sm sm:text-base">{listLoadError}</p>
+					<button
+						class="mt-4 inline-flex items-center rounded-full border border-missionnaire px-4 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-missionnaire transition-colors hover:bg-missionnaire/5"
+						on:click={() => void loadInBackground({ showLoading: true })}
+					>
+						Réessayer
+					</button>
+				</div>
+			{:else if documents.length === 0}
 				<div class="text-center py-12">
 					<p class="text-gray-600 text-sm sm:text-base">Aucun document trouvé</p>
 				</div>
 			{:else}
+				{#if isListLoading}
+					<div
+						class="mx-2 sm:mx-0 mb-2 border border-stone-200/60 bg-stone-50/70 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400"
+					>
+						Mise à jour de la liste...
+					</div>
+				{/if}
 				<div class="border border-gray-300 shadow rounded-md mx-2 sm:mx-0">
-					{#each filteredDocuments as document}
+					{#each documents as document (document._id)}
 						<div
 							class="flex items-center border-b border-gray-200 last:border-b-0 hover:bg-gray-50"
 						>
@@ -288,7 +448,8 @@
 								{#if document.videoDisplayId}
 									<a
 										href={`https://www.youtube.com/watch?v=${document.videoDisplayId}`}
-										target="_blank" rel="noopener noreferrer"
+										target="_blank"
+										rel="noopener noreferrer"
 										class="p-1 sm:p-2 text-gray-500 hover:text-missionnaire transition-colors"
 										title="Voir la vidéo"
 									>
@@ -308,46 +469,17 @@
 					{/each}
 				</div>
 
-				<!-- Pagination -->
 				{#if showPagination && totalPages > 1}
-					<div class="flex justify-center mt-4 sm:mt-8 gap-1 sm:gap-2 px-2 sm:px-0">
-						<button
-							class="px-2 sm:px-4 py-2 text-xs sm:text-sm rounded-md transition-colors duration-200 {currentPage ===
-							1
-								? 'bg-gray-100 text-gray-400'
-								: 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
-							disabled={currentPage === 1}
-							on:click={() => handlePageChange(currentPage - 1)}
-						>
-							Précédent
-						</button>
-
-						{#each visiblePages as pageNum}
-							{#if pageNum === -1}
-								<span class="px-2 py-2 text-gray-500">...</span>
-							{:else}
-								<button
-									class="min-w-[32px] px-2 sm:px-3 py-2 text-xs sm:text-sm rounded-md transition-colors duration-200 {currentPage ===
-									pageNum
-										? 'bg-missionnaire text-white'
-										: 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
-									on:click={() => handlePageChange(pageNum)}
-								>
-									{pageNum}
-								</button>
-							{/if}
-						{/each}
-
-						<button
-							class="px-2 sm:px-4 py-2 text-xs sm:text-sm rounded-md transition-colors duration-200 {currentPage ===
-							totalPages
-								? 'bg-gray-100 text-gray-400'
-								: 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
-							disabled={currentPage === totalPages}
-							on:click={() => handlePageChange(currentPage + 1)}
-						>
-							Suivant
-						</button>
+					<div class="mt-6 sm:mt-8">
+						<Pagination
+							current={currentPageNumber}
+							total={totalPages}
+							getHref={(p) => {
+								const params = new URLSearchParams($page.url.searchParams);
+								params.set('page', String(p));
+								return `?${params.toString()}`;
+							}}
+						/>
 					</div>
 				{/if}
 			{/if}
@@ -366,6 +498,7 @@
 						<button
 							class="text-gray-400 hover:text-gray-500"
 							on:click={() => isDocumentOpen.set(false)}
+							aria-label="Fermer"
 						>
 							<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path
@@ -410,7 +543,8 @@
 							<div class="mt-4 sm:mt-6 flex flex-col gap-2 sm:gap-4 w-full px-4">
 								<a
 									href={selectedDocument.url}
-									target="_blank" rel="noopener noreferrer"
+									target="_blank"
+									rel="noopener noreferrer"
 									class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-xs sm:text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-missionnaire w-full"
 								>
 									<svg
@@ -441,7 +575,8 @@
 								{#if selectedDocument.videoDisplayId}
 									<a
 										href={`https://www.youtube.com/watch?v=${selectedDocument.videoDisplayId}`}
-										target="_blank" rel="noopener noreferrer"
+										target="_blank"
+										rel="noopener noreferrer"
 										class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-xs sm:text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-missionnaire w-full"
 									>
 										<div class="mr-2">

@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { page, navigating } from '$app/stores';
+	import { page } from '$app/stores';
 	import type { Sermon } from '$lib/models/sermon';
+	import type { PublishedRecording } from '$lib/server/recordings';
 	import { basePlaylist, playlist, isShuffle } from '$lib/stores/global';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
@@ -9,63 +10,296 @@
 	import BsX from 'svelte-icons-pack/bs/BsX';
 	import BsArrowUp from 'svelte-icons-pack/bs/BsArrowUp';
 	import BsArrowDown from 'svelte-icons-pack/bs/BsArrowDown';
-	import BsShuffle from 'svelte-icons-pack/bs/BsShuffle';
 	import SermonTableItem from '$lib/components/SermonTableItem.svelte';
 	import IoPlayCircle from 'svelte-icons-pack/io/IoPlayCircle';
-	import IoReload from 'svelte-icons-pack/io/IoReload';
 	import { createPlayableSermon } from '../../utils/audioPlayback';
 	import RetransmissionTableItem from '$lib/components/RetransmissionTableItem.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
+	import { onDestroy } from 'svelte';
+	import {
+		areAuthorsFresh,
+		areYearsFresh,
+		getCachedAuthors,
+		getCachedYears,
+		getPredicationsPageCache,
+		isPredicationsPageCacheFresh,
+		setCachedAuthors,
+		setCachedYears,
+		setPredicationsPageCache,
+		type PredicationsPageCacheEntry
+	} from './listCache';
 
 	export let data;
 
-	$: sermons = data.sermons || [];
-	$: recordings = data.recordings || [];
-	$: filterType = data.filterType || 'sermon';
-	$: totalSermons = data.total || 0;
-	$: years = data.years || [];
-	$: currentAuthor = data.author;
-	$: currentSearch = data.search;
-	$: currentAlpha = data.alpha;
-	$: currentYear = data.year;
-	$: currentHasAudio = data.hasAudio;
-	$: currentSort = data.sort || 'iso_date:desc';
-	$: currentPage = data.page;
-	$: limit = data.limit;
-	$: currentLanguage = data.language || 'french';
+	let sermons: Sermon[] = [];
+	let recordings: PublishedRecording[] = [];
+	let recordingsTotal = 0;
+	let showBlendedRetransmissions = false;
+	let totalSermons = 0;
+	let years: string[] = [];
+	let availableAuthors: string[] = [];
+	let filterType: 'sermon' | 'retransmission' = 'sermon';
+	let isListLoading = false;
+	let listLoadError = '';
+	let hasResolvedList = false;
+	let abortController: AbortController | null = null;
+	let currentRequestToken = 0;
+	let lastHandledKey = '';
+
+	$: initialSermons = ((data as any).sermons || []) as Sermon[];
+	$: initialRecordings = ((data as any).recordings || []) as PublishedRecording[];
+	$: initialRecordingsTotal = ((data as any).recordingsTotal || 0) as number;
+	$: initialShowBlended = Boolean((data as any).showBlendedRetransmissions);
+	$: initialTotal = ((data as any).total || 0) as number;
+	$: initialYears = ((data as any).years || []) as string[];
+	$: initialAuthors = ((data as any).availableAuthors || []) as string[];
+	$: initialFilterType = ((data as any).filterType || 'sermon') as 'sermon' | 'retransmission';
+	$: currentAuthor = (data as any).author;
+	$: currentSearch = (data as any).search;
+	$: currentAlpha = (data as any).alpha;
+	$: currentYear = (data as any).year;
+	$: currentHasAudio = (data as any).hasAudio;
+	$: currentSort = (data as any).sort || 'iso_date:desc';
+	$: currentPage = (data as any).page;
+	$: limit = (data as any).limit;
+	$: currentLanguage = (data as any).language || 'french';
+	$: isDeferredData = Boolean((data as any).deferred);
+	$: requestKey = JSON.stringify({
+		author: currentAuthor || 'Tous',
+		search: currentSearch || '',
+		alpha: currentAlpha || '',
+		year: currentYear || '',
+		hasAudio: !!currentHasAudio,
+		sort: currentSort || 'iso_date:desc',
+		language: currentLanguage || 'french',
+		page: currentPage || 1,
+		limit: limit || 100
+	});
 	$: totalPages = Math.ceil(totalSermons / limit);
-	// True when we're on a sermon-view filter but the sermons query returned
-	// nothing AND the blended retransmissions preview has results — in that
-	// case we hide the sermon-specific chrome (empty table, alphabet scroller,
-	// language/audio options) and let the retransmission section be the page.
 	$: blendedOnly =
 		filterType === 'sermon' &&
 		sermons.length === 0 &&
-		Boolean(data.showBlendedRetransmissions) &&
+		showBlendedRetransmissions &&
 		recordings.length > 0;
-	// Only sermons participate in the sermon-playback playlist sync. Retransmission
-	// playback is self-contained via the RetransmissionTableItem's own selectAudio
-	// dispatch, so the playlist stays as whatever the previous sermon view set.
 	$: playlistSermons =
 		filterType === 'sermon'
 			? sermons.map((sermon: Sermon) =>
 					createPlayableSermon(sermon, currentLanguage === 'english' ? 'english' : 'french')
 				)
 			: [];
+
 	const desktopSermonGrid = 'md:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.35fr)_110px_80px_120px]';
-
 	const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-	// Only show author filters that have sermons in the DB (computed in the
-	// page loader). "Tous" always leads, "Retransmissions" always trails —
-	// it's a type filter, not an author filter.
-	$: authors = ['Tous', ...(data.availableAuthors ?? []), 'Retransmissions'];
+	$: authors = ['Tous', ...(availableAuthors ?? []), 'Retransmissions'];
 
-	// Sync playlist when sermons are loaded
+	function abortRequest() {
+		abortController?.abort();
+		abortController = null;
+	}
+
+	function applyData(payload: PredicationsPageCacheEntry) {
+		filterType = payload.filterType;
+		sermons = payload.sermons;
+		recordings = payload.recordings;
+		recordingsTotal = payload.recordingsTotal;
+		showBlendedRetransmissions = payload.showBlendedRetransmissions;
+		totalSermons = payload.total;
+		years = payload.years;
+		availableAuthors = payload.availableAuthors;
+		hasResolvedList = true;
+	}
+
+	function sermonSortToRecordingSort(sort: string) {
+		const [property, order] = sort.split(':');
+		const dir = order === 'asc' ? 'asc' : 'desc';
+		switch (property) {
+			case 'french_title':
+				return { field: 'title', order: dir };
+			case 'iso_date':
+				return { field: 'started_at', order: dir };
+			case 'duration':
+				return { field: 'duration_sec', order: dir };
+			default:
+				return { field: 'started_at', order: 'desc' as 'asc' | 'desc' };
+		}
+	}
+
+	async function loadInBackground(options?: { showLoading?: boolean }) {
+		const showLoading = options?.showLoading ?? true;
+		const key = requestKey;
+		const token = ++currentRequestToken;
+		const isRetransmissions = currentAuthor === 'Retransmissions';
+		const isBlendedSearch = currentAuthor === 'Tous' && (currentSearch || '').trim().length > 0;
+
+		const sermonParams = new URLSearchParams({
+			author: currentAuthor || 'Tous',
+			search: currentSearch || '',
+			alpha: currentAlpha || '',
+			year: currentYear || '',
+			hasAudio: String(!!currentHasAudio),
+			language: currentLanguage || 'french',
+			pageNumber: String(currentPage || 1),
+			limit: String(limit || 100),
+			sort: currentSort || 'iso_date:desc'
+		});
+
+		const sortMapped = sermonSortToRecordingSort(currentSort);
+		const retransmissionLimit = isRetransmissions ? Number(limit || 100) : 12;
+		const retransmissionPage = isRetransmissions ? Number(currentPage || 1) : 1;
+		const retransmissionParams = new URLSearchParams({
+			limit: String(retransmissionLimit),
+			pageNumber: String(retransmissionPage),
+			sortField: sortMapped.field,
+			sortOrder: sortMapped.order
+		});
+		if (currentSearch) retransmissionParams.set('q', currentSearch);
+		if (currentYear) retransmissionParams.set('year', currentYear);
+
+		const fetchAuthors = !areAuthorsFresh() || availableAuthors.length === 0;
+		const fetchYears = !areYearsFresh() || years.length === 0;
+		const wantsSermons = !isRetransmissions;
+		const wantsRetransmissions = isRetransmissions || isBlendedSearch;
+
+		const controller = new AbortController();
+		abortRequest();
+		abortController = controller;
+		if (showLoading || !hasResolvedList) isListLoading = true;
+
+		try {
+			const [sermonRes, retransmissionRes, yearsRes, authorsRes] = await Promise.all([
+				wantsSermons
+					? fetch(`/api/sermons?${sermonParams.toString()}`, { signal: controller.signal })
+					: Promise.resolve(null),
+				wantsRetransmissions
+					? fetch(`/api/retransmissions?${retransmissionParams.toString()}`, {
+							signal: controller.signal
+						})
+					: Promise.resolve(null),
+				fetchYears
+					? fetch('/api/sermon-years', { signal: controller.signal })
+					: Promise.resolve(null),
+				fetchAuthors
+					? fetch('/api/sermon-authors', { signal: controller.signal })
+					: Promise.resolve(null)
+			]);
+
+			if (token !== currentRequestToken || key !== requestKey) return;
+
+			let nextSermons: Sermon[] = [];
+			let nextSermonTotal = 0;
+			if (sermonRes) {
+				if (!sermonRes.ok) throw new Error('Impossible de charger les prédications');
+				const r = await sermonRes.json();
+				nextSermons = (r.data || []) as Sermon[];
+				nextSermonTotal = (r.total || 0) as number;
+			}
+
+			let nextRecordings: PublishedRecording[] = [];
+			let nextRecordingsTotal = 0;
+			if (retransmissionRes) {
+				if (!retransmissionRes.ok) throw new Error('Impossible de charger les retransmissions');
+				const r = await retransmissionRes.json();
+				nextRecordings = (r.data || []) as PublishedRecording[];
+				nextRecordingsTotal = (r.total || 0) as number;
+			}
+
+			let nextYears = getCachedYears() || years;
+			if (yearsRes) {
+				if (yearsRes.ok) {
+					const r = await yearsRes.json();
+					nextYears = setCachedYears((r.data || []) as string[]);
+				}
+			}
+
+			let nextAuthors = getCachedAuthors() || availableAuthors;
+			if (authorsRes) {
+				if (authorsRes.ok) {
+					const r = await authorsRes.json();
+					nextAuthors = setCachedAuthors((r.data || []) as string[]);
+				}
+			}
+
+			const cached = setPredicationsPageCache(key, {
+				filterType: isRetransmissions ? 'retransmission' : 'sermon',
+				sermons: nextSermons,
+				recordings: nextRecordings,
+				recordingsTotal: nextRecordingsTotal,
+				showBlendedRetransmissions: isBlendedSearch,
+				total: isRetransmissions ? nextRecordingsTotal : nextSermonTotal,
+				availableAuthors: nextAuthors,
+				years: nextYears
+			});
+
+			applyData(cached);
+			listLoadError = '';
+		} catch (error) {
+			if ((error as Error).name === 'AbortError') return;
+			if (token !== currentRequestToken || key !== requestKey) return;
+			listLoadError =
+				error instanceof Error ? error.message : 'Impossible de charger les prédications';
+			if (!hasResolvedList) {
+				sermons = [];
+				recordings = [];
+				totalSermons = 0;
+			}
+		} finally {
+			if (token === currentRequestToken) isListLoading = false;
+			if (abortController === controller) abortController = null;
+		}
+	}
+
+	$: if (requestKey && requestKey !== lastHandledKey) {
+		lastHandledKey = requestKey;
+		listLoadError = '';
+
+		const cachedAuthors = getCachedAuthors() || [];
+		const cachedYears = getCachedYears() || [];
+		const cachedEntry = getPredicationsPageCache(requestKey);
+
+		if (!isDeferredData) {
+			const nextAuthors = initialAuthors.length > 0 ? initialAuthors : cachedAuthors;
+			const nextYears = initialYears.length > 0 ? initialYears : cachedYears;
+			const seeded = setPredicationsPageCache(requestKey, {
+				filterType: initialFilterType,
+				sermons: initialSermons,
+				recordings: initialRecordings,
+				recordingsTotal: initialRecordingsTotal,
+				showBlendedRetransmissions: initialShowBlended,
+				total: initialTotal,
+				availableAuthors: nextAuthors,
+				years: nextYears
+			});
+			if (nextAuthors.length > 0) setCachedAuthors(nextAuthors, seeded.fetchedAt);
+			if (nextYears.length > 0) setCachedYears(nextYears, seeded.fetchedAt);
+			abortRequest();
+			applyData(seeded);
+			isListLoading = false;
+		} else if (cachedEntry) {
+			applyData({
+				...cachedEntry,
+				availableAuthors:
+					cachedEntry.availableAuthors.length > 0 ? cachedEntry.availableAuthors : cachedAuthors,
+				years: cachedEntry.years.length > 0 ? cachedEntry.years : cachedYears
+			});
+			void loadInBackground({ showLoading: !isPredicationsPageCacheFresh(cachedEntry) });
+		} else {
+			abortRequest();
+			sermons = [];
+			recordings = [];
+			recordingsTotal = 0;
+			totalSermons = 0;
+			availableAuthors = cachedAuthors;
+			years = cachedYears;
+			hasResolvedList = false;
+			void loadInBackground({ showLoading: true });
+		}
+	}
+
+	onDestroy(() => abortRequest());
+
 	$: if (playlistSermons.length > 0) {
 		basePlaylist.set(playlistSermons);
-		if (!$isShuffle) {
-			playlist.set(playlistSermons);
-		}
+		if (!$isShuffle) playlist.set(playlistSermons);
 	}
 
 	function handleAuthorChange(author: string) {
@@ -126,7 +360,6 @@
 		params.set('page', '1');
 		goto(`?${params.toString()}`);
 	}
-
 </script>
 
 <svelte:head>
@@ -145,10 +378,32 @@
 <div class="max-w-6xl mx-auto px-6 py-8">
 	<!-- Page Header -->
 	<div class="mb-5 md:mb-6">
-		<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body">Prédications</p>
+		<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body">
+			Prédications
+		</p>
 		<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">Prédications</h1>
-		<a href="/videos" class="inline-flex items-center gap-2 mt-2 text-[12px] font-semibold text-stone-400 hover:text-missionnaire uppercase tracking-[0.15em] font-body transition-colors">
-			<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+		<a
+			href="/videos"
+			class="inline-flex items-center gap-2 mt-2 text-[12px] font-semibold text-stone-400 hover:text-missionnaire uppercase tracking-[0.15em] font-body transition-colors"
+		>
+			<svg
+				width="14"
+				height="14"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				><polygon points="23 7 16 12 23 17 23 7" /><rect
+					x="1"
+					y="5"
+					width="15"
+					height="14"
+					rx="2"
+					ry="2"
+				/></svg
+			>
 			Voir en vidéo →
 		</a>
 	</div>
@@ -193,11 +448,8 @@
 							!currentAuthor) ||
 						currentAuthor === author
 							? 'border-missionnaire text-missionnaire bg-missionnaire/5'
-							: 'bg-white/40 text-stone-500 border-stone-200/60 hover:border-missionnaire hover:text-missionnaire'} {$navigating
-							? 'opacity-50 cursor-not-allowed'
-							: ''}"
-						on:click={() => !$navigating && handleAuthorChange(author)}
-						disabled={$navigating ? true : false}
+							: 'bg-white/40 text-stone-500 border-stone-200/60 hover:border-missionnaire hover:text-missionnaire'}"
+						on:click={() => handleAuthorChange(author)}
 					>
 						{author === 'Tous' ? 'Tout Voir' : author}
 					</button>
@@ -205,9 +457,6 @@
 			</div>
 		</div>
 
-		<!-- Language and Audio Filters — hidden on the Retransmissions view
-		     because recordings are kinyarwanda-only and always have audio,
-		     so the toggles have no effect. Shown for every sermon filter. -->
 		{#if currentAuthor !== 'Retransmissions' && !blendedOnly}
 			<div>
 				<h2
@@ -219,7 +468,6 @@
 					class="flex flex-col md:flex-row gap-4 items-center justify-between bg-white/40 p-4 border border-stone-200/60"
 				>
 					<div class="flex items-center gap-4 w-full md:w-auto">
-						<!-- Language Toggle -->
 						<div class="flex bg-stone-100 rounded-lg p-1">
 							<button
 								class="px-3 py-1.5 rounded-md text-xs font-bold transition-all {currentLanguage ===
@@ -247,8 +495,7 @@
 							class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all {currentHasAudio
 								? 'bg-stone-100 text-missionnaire border border-stone-300'
 								: 'bg-stone-50 text-stone-500 border border-transparent hover:bg-stone-100'}"
-							on:click={() => !$navigating && handleAudioFilterToggle()}
-							disabled={$navigating ? true : false}
+							on:click={() => handleAudioFilterToggle()}
 						>
 							<Icon src={IoPlayCircle} size="16" />
 							Audio Uniquement
@@ -260,8 +507,7 @@
 	</div>
 
 	<div class="flex flex-col md:flex-row gap-8">
-		<!-- Sidebar: Years -->
-		{#if sermons.length > 0}
+		{#if (sermons.length > 0 || (isListLoading && !hasResolvedList)) && years.length > 0}
 			<aside class="w-full md:w-56 flex-shrink-0">
 				<div class="bg-white/40 border border-stone-200/60 p-5 md:sticky md:top-24">
 					<h2
@@ -275,11 +521,8 @@
 								class="px-3 py-2 rounded-lg text-[11px] font-bold transition-all border text-center {currentYear ===
 								year
 									? 'border-missionnaire text-missionnaire bg-missionnaire/5'
-									: 'bg-white/40 text-stone-400 border-stone-200/60 hover:border-missionnaire hover:text-missionnaire'} {$navigating
-									? 'opacity-50 cursor-not-allowed'
-									: ''}"
-								on:click={() => !$navigating && handleYearChange(year)}
-								disabled={$navigating ? true : false}
+									: 'bg-white/40 text-stone-400 border-stone-200/60 hover:border-missionnaire hover:text-missionnaire'}"
+								on:click={() => handleYearChange(year)}
 							>
 								{year}
 							</button>
@@ -289,23 +532,7 @@
 			</aside>
 		{/if}
 
-		<!-- Main Content: Sermons List -->
 		<div class="flex-1 min-w-0 relative">
-			{#if $navigating}
-				<div
-					class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-20 flex items-center justify-center transition-all duration-300"
-				>
-					<div class="flex flex-col items-center gap-4">
-						<div class="text-missionnaire animate-spin">
-							<Icon src={IoReload} size="32" />
-						</div>
-						<span
-							class="text-[10px] font-semibold uppercase tracking-[0.25em] text-missionnaire animate-pulse"
-							>Chargement...</span
-						>
-					</div>
-				</div>
-			{/if}
 			{#if currentSearch || currentAlpha || currentYear || currentHasAudio || (currentAuthor && currentAuthor !== 'Tous')}
 				<div class="mb-3 flex justify-end">
 					<button
@@ -319,114 +546,152 @@
 				</div>
 			{/if}
 			{#if !blendedOnly}
-			<div class="bg-white/40 border border-stone-200/60 min-h-[500px] flex flex-col">
-				<div
-					class="relative grid grid-cols-[30px_1fr_auto_auto] {desktopSermonGrid} gap-2 md:gap-4 px-3 md:px-4 py-3 border-b border-stone-200/60 text-[10px] md:text-[11px] font-bold text-stone-400 uppercase tracking-widest bg-white/40 items-center"
-				>
-					<div class="text-center">#</div>
-					<button
-						class="text-left flex items-center gap-1.5 hover:text-missionnaire transition-colors"
-						on:click={() => handleSortChange('french_title')}
+				<div class="bg-white/40 border border-stone-200/60 min-h-[500px] flex flex-col">
+					<div
+						class="relative grid grid-cols-[30px_1fr_auto_auto] {desktopSermonGrid} gap-2 md:gap-4 px-3 md:px-4 py-3 border-b border-stone-200/60 text-[10px] md:text-[11px] font-bold text-stone-400 uppercase tracking-widest bg-white/40 items-center"
 					>
-						{#if currentSort.startsWith('french_title')}
-							<span class="text-missionnaire">
-								<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
-							</span>
+						<div class="text-center">#</div>
+						<button
+							class="text-left flex items-center gap-1.5 hover:text-missionnaire transition-colors"
+							on:click={() => handleSortChange('french_title')}
+						>
+							{#if currentSort.startsWith('french_title')}
+								<span class="text-missionnaire">
+									<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
+								</span>
+							{/if}
+							Titre
+						</button>
+						<button
+							class="hidden md:flex text-left items-center gap-1.5 hover:text-missionnaire transition-colors"
+							on:click={() => handleSortChange('author')}
+						>
+							{#if currentSort.startsWith('author')}
+								<span class="text-missionnaire">
+									<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
+								</span>
+							{/if}
+							Prédicateur
+						</button>
+						<button
+							class="hidden md:flex text-left items-center gap-1.5 hover:text-missionnaire transition-colors"
+							on:click={() => handleSortChange('iso_date')}
+						>
+							{#if currentSort.startsWith('iso_date')}
+								<span class="text-missionnaire">
+									<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
+								</span>
+							{/if}
+							Date
+						</button>
+						<button
+							class="hidden md:flex text-center items-center justify-center gap-1.5 hover:text-missionnaire transition-colors"
+							on:click={() => handleSortChange('duration')}
+						>
+							{#if currentSort.startsWith('duration')}
+								<span class="text-missionnaire">
+									<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
+								</span>
+							{/if}
+							Durée
+						</button>
+						<div class="flex items-center justify-center text-center">
+							<span class="hidden md:inline">Actions</span>
+						</div>
+					</div>
+
+					<div class="divide-y divide-stone-100 [&>*]:hover:bg-white/60">
+						{#if isListLoading && !hasResolvedList}
+							{#each Array.from({ length: 8 }) as _, i}
+								<div
+									class="grid grid-cols-[30px_1fr_auto_auto] {desktopSermonGrid} gap-2 md:gap-4 px-3 md:px-4 py-3 md:py-4 items-center animate-pulse"
+								>
+									<div class="mx-auto h-3 w-4 rounded-full bg-stone-200"></div>
+									<div class="space-y-2 min-w-0">
+										<div class="h-4 w-3/4 rounded-full bg-stone-200"></div>
+										<div class="h-3 w-1/2 rounded-full bg-stone-100 md:hidden"></div>
+									</div>
+									<div class="hidden md:block h-3 w-2/3 rounded-full bg-stone-100"></div>
+									<div class="hidden md:block h-3 w-1/2 rounded-full bg-stone-100"></div>
+									<div class="hidden md:block mx-auto h-3 w-10 rounded-full bg-stone-100"></div>
+									<div class="mx-auto h-7 w-7 rounded-full bg-stone-200"></div>
+								</div>
+							{/each}
+						{:else if listLoadError && !hasResolvedList}
+							<div class="py-20 px-6 text-center">
+								<div class="text-stone-200 mb-4 flex justify-center">
+									<Icon src={BsSearch} size="64" />
+								</div>
+								<p class="text-stone-500 font-bold uppercase tracking-widest text-sm">
+									La liste n'a pas pu charger
+								</p>
+								<p class="mt-2 text-xs text-stone-400">{listLoadError}</p>
+								<button
+									class="mt-5 inline-flex items-center rounded-full border border-missionnaire px-4 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-missionnaire transition-colors hover:bg-missionnaire/5"
+									on:click={() => void loadInBackground({ showLoading: true })}
+								>
+									Réessayer
+								</button>
+							</div>
+						{:else}
+							{#if isListLoading}
+								<div
+									class="border-b border-stone-200/60 bg-stone-50/70 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400"
+								>
+									Mise à jour de la liste...
+								</div>
+							{/if}
+							{#if filterType === 'retransmission'}
+								{#each recordings as recording, i (recording.id)}
+									<RetransmissionTableItem
+										{recording}
+										index={i}
+										absoluteIndex={i + 1 + (currentPage - 1) * limit}
+									/>
+								{:else}
+									<div class="py-24 text-center">
+										<div
+											class="bg-stone-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-stone-200"
+										>
+											<Icon src={BsSearch} size="32" />
+										</div>
+										<h3 class="text-xl font-bold text-stone-800 mb-2">
+											Aucune retransmission trouvée
+										</h3>
+										<p class="text-stone-400 text-sm">
+											Essayez de modifier vos filtres ou votre recherche.
+										</p>
+									</div>
+								{/each}
+							{:else}
+								{#each sermons as sermon, i (sermon._id)}
+									<SermonTableItem
+										{sermon}
+										index={i}
+										absoluteIndex={i + 1 + (currentPage - 1) * limit}
+										language={currentLanguage}
+									/>
+								{:else}
+									<div class="py-24 text-center">
+										<div
+											class="bg-stone-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-stone-200"
+										>
+											<Icon src={BsSearch} size="32" />
+										</div>
+										<h3 class="text-xl font-bold text-stone-800 mb-2">Aucun sermon trouvé</h3>
+										<p class="text-stone-400 text-sm">
+											Essayez de modifier vos filtres ou votre recherche.
+										</p>
+									</div>
+								{/each}
+							{/if}
 						{/if}
-						Titre
-					</button>
-					<button
-						class="hidden md:flex text-left items-center gap-1.5 hover:text-missionnaire transition-colors"
-						on:click={() => handleSortChange('author')}
-					>
-						{#if currentSort.startsWith('author')}
-							<span class="text-missionnaire">
-								<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
-							</span>
-						{/if}
-						Prédicateur
-					</button>
-					<button
-						class="hidden md:flex text-left items-center gap-1.5 hover:text-missionnaire transition-colors"
-						on:click={() => handleSortChange('iso_date')}
-					>
-						{#if currentSort.startsWith('iso_date')}
-							<span class="text-missionnaire">
-								<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
-							</span>
-						{/if}
-						Date
-					</button>
-					<button
-						class="hidden md:flex text-center items-center justify-center gap-1.5 hover:text-missionnaire transition-colors"
-						on:click={() => handleSortChange('duration')}
-					>
-						{#if currentSort.startsWith('duration')}
-							<span class="text-missionnaire">
-								<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
-							</span>
-						{/if}
-						Durée
-					</button>
-					<div class="flex items-center justify-center text-center">
-						<span class="hidden md:inline">Actions</span>
 					</div>
 				</div>
-
-				<div class="divide-y divide-stone-100 [&>*]:hover:bg-white/60">
-					{#if filterType === 'retransmission'}
-						{#each recordings as recording, i (recording.id)}
-							<RetransmissionTableItem
-								{recording}
-								index={i}
-								absoluteIndex={i + 1 + (currentPage - 1) * limit}
-							/>
-						{:else}
-							<div class="py-24 text-center">
-								<div
-									class="bg-stone-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-stone-200"
-								>
-									<Icon src={BsSearch} size="32" />
-								</div>
-								<h3 class="text-xl font-bold text-stone-800 mb-2">Aucune retransmission trouvée</h3>
-								<p class="text-stone-400 text-sm">
-									Essayez de modifier vos filtres ou votre recherche.
-								</p>
-							</div>
-						{/each}
-					{:else}
-						{#each sermons as sermon, i (sermon._id)}
-							<SermonTableItem
-								{sermon}
-								index={i}
-								absoluteIndex={i + 1 + (currentPage - 1) * limit}
-								language={currentLanguage}
-							/>
-						{:else}
-							<div class="py-24 text-center">
-								<div
-									class="bg-stone-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-stone-200"
-								>
-									<Icon src={BsSearch} size="32" />
-								</div>
-								<h3 class="text-xl font-bold text-stone-800 mb-2">Aucun sermon trouvé</h3>
-								<p class="text-stone-400 text-sm">
-									Essayez de modifier vos filtres ou votre recherche.
-								</p>
-							</div>
-						{/each}
-					{/if}
-				</div>
-			</div>
 			{/if}
 
-			<!-- Pagination (shared component across /predications and
-			     /live/rediffusions so users get the same ‹ 1 2 3 … 12 13 14 ›
-			     shape everywhere on the site). The Lignes selector + count stay
-			     as sermon-list chrome; pagination itself is unified. -->
-			{#if totalPages > 1}
+			{#if hasResolvedList && totalPages > 1}
 				<div class="mt-12 py-6 border-t border-stone-200/60 flex flex-col gap-6">
-					<!-- Row 1: count (desktop only) + Lignes selector. -->
 					<div
 						class="flex flex-col sm:flex-row items-center sm:justify-between gap-4 text-[10px] md:text-xs font-bold text-stone-400 tracking-widest uppercase"
 					>
@@ -452,8 +717,6 @@
 							</select>
 						</div>
 					</div>
-					<!-- Row 2: Pagination gets its own full-width row so the
-					     ‹ 1 2 3 … n-2 n-1 n › sequence never wraps mid-list. -->
 					<Pagination
 						current={currentPage}
 						total={totalPages}
@@ -466,12 +729,7 @@
 				</div>
 			{/if}
 
-			<!-- Blended search: when the user searches on "Tout Voir" the server
-			     also hits the recordings collection so results from retransmissions
-			     aren't hidden behind a filter switch. Preview is capped at 12; a
-			     "voir tout" link switches to the Retransmissions filter with the
-			     same query to show the full paginated list. -->
-			{#if data.showBlendedRetransmissions && recordings.length > 0}
+			{#if showBlendedRetransmissions && recordings.length > 0}
 				<section class="mt-12">
 					<div class="mb-4 flex items-baseline justify-between gap-4">
 						<h2
@@ -479,10 +737,10 @@
 						>
 							Retransmissions correspondant à « {currentSearch} »
 							<span class="ml-2 normal-case tracking-normal text-stone-400 font-normal"
-								>{data.recordingsTotal ?? recordings.length}</span
+								>{recordingsTotal ?? recordings.length}</span
 							>
 						</h2>
-						{#if (data.recordingsTotal ?? 0) > recordings.length}
+						{#if (recordingsTotal ?? 0) > recordings.length}
 							<a
 								href={(() => {
 									const p = new URLSearchParams($page.url.searchParams);
@@ -498,16 +756,11 @@
 					</div>
 					<div class="divide-y divide-stone-100 border border-stone-200/60 bg-white/40">
 						{#each recordings as recording, i (recording.id)}
-							<RetransmissionTableItem
-								{recording}
-								index={i}
-								absoluteIndex={i + 1}
-							/>
+							<RetransmissionTableItem {recording} index={i} absoluteIndex={i + 1} />
 						{/each}
 					</div>
 				</section>
 			{/if}
-
 		</div>
 	</div>
 </div>
