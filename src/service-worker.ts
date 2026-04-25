@@ -223,7 +223,7 @@ sw.addEventListener('fetch', (event) => {
 	// Lane 1: Audio — cache-first with Range support. Lives in its own
 	// versioned cache so deploys don't wipe the listener's library.
 	if (isAudioRequest(url)) {
-		event.respondWith(handleAudioFetch(event.request));
+		event.respondWith(handleAudioFetch(event));
 		return;
 	}
 
@@ -337,7 +337,8 @@ function buildAudioCacheKey(request: Request): Request {
 	return new Request(request.url, { method: 'GET' });
 }
 
-async function handleAudioFetch(request: Request): Promise<Response> {
+async function handleAudioFetch(event: FetchEvent): Promise<Response> {
+	const request = event.request;
 	const cache = await caches.open(AUDIO_CACHE_NAME);
 	const cacheKey = buildAudioCacheKey(request);
 	const rangeHeader = request.headers.get('range');
@@ -358,40 +359,100 @@ async function handleAudioFetch(request: Request): Promise<Response> {
 		}
 	}
 
-	// Cache miss. Fetch the full body (no Range header) so we can store
-	// the complete file and serve any future range from it. If the network
-	// fails, surface a 503 so the audio element fires its `error` event
-	// instead of hanging forever on a stalled request.
-	let fullResponse: Response;
+	// Cache miss — pass the ORIGINAL request through to the network so
+	// the audio element receives the same streaming response it would
+	// without the SW (no buffering, no first-byte penalty). The body is
+	// teed via `response.clone()` and inspected in the background; if
+	// the response covers the full file (the common "Range: bytes=0-"
+	// reply that S3 returns as 206 with the entire file), we promote
+	// it to a 200 and write it to cache. If it's a partial response
+	// (a seek mid-file), we kick off a background full-file fetch.
+	let response: Response;
 	try {
-		fullResponse = await fetch(cacheKey);
+		response = await fetch(request);
 	} catch {
 		return new Response('Offline', { status: 503, statusText: 'Offline' });
 	}
 
-	if (!fullResponse.ok || fullResponse.status !== 200) {
-		// Don't poison the cache with a non-200 (e.g. 403, 404, 206). Pass
-		// the response straight back — the audio element will surface the
-		// failure normally.
-		return fullResponse;
+	if (response.status !== 200 && response.status !== 206) {
+		// 4xx/5xx — surface the failure to the audio element directly.
+		return response;
 	}
 
-	// Store a clone, then build the response the player asked for.
+	const responseForCache = response.clone();
+	// Extend the SW's lifetime until the cache write settles; without
+	// `waitUntil` the worker may be killed before the body finishes
+	// buffering into the cache.
+	event.waitUntil(capturePassthroughForCache(cache, cacheKey, responseForCache));
+
+	return response;
+}
+
+/** Inspects a passed-through network response and writes it to cache
+ *  when it represents the complete file. Bandwidth-conscious:
+ *  - 200 OK → stored directly (no extra fetch).
+ *  - 206 covering bytes 0..total-1 → converted to 200 and stored
+ *    (this is what S3 returns for the browser's initial "bytes=0-"
+ *    probe, so the FIRST play warms the cache for free).
+ *  - 206 partial (seek/probe) → schedules ONE background full-file
+ *    fetch so the next play is served from cache. */
+async function capturePassthroughForCache(
+	cache: Cache,
+	cacheKey: Request,
+	response: Response
+): Promise<void> {
 	try {
-		await cache.put(cacheKey, fullResponse.clone());
+		if (response.status === 200) {
+			await cache.put(cacheKey, response);
+			return;
+		}
+
+		if (response.status !== 206) return;
+
+		const contentRange = response.headers.get('content-range');
+		const match = contentRange ? /^bytes\s+(\d+)-(\d+)\/(\d+)$/i.exec(contentRange.trim()) : null;
+		if (!match) return;
+
+		const start = Number.parseInt(match[1], 10);
+		const end = Number.parseInt(match[2], 10);
+		const total = Number.parseInt(match[3], 10);
+
+		if (start === 0 && end === total - 1) {
+			// Full file delivered as 206 — buffer into a fresh 200 so the
+			// cache always stores complete, sliceable bodies.
+			const buffer = await response.arrayBuffer();
+			const headers = copyResponseHeaders(response, {
+				'Content-Length': String(buffer.byteLength)
+			});
+			await cache.put(
+				cacheKey,
+				new Response(buffer, { status: 200, statusText: 'OK', headers })
+			);
+			return;
+		}
+
+		// Partial — fetch the rest in the background so future plays hit cache.
+		await warmCacheInBackground(cache, cacheKey);
 	} catch {
-		// QuotaExceededError or similar — keep playback working even if
-		// caching failed.
+		// Cache writes are best-effort. A partial-stream hangup, quota
+		// exhaustion, or opaque-response rejection here just means the
+		// next play will warm the cache instead.
 	}
+}
 
-	if (!rangeHeader) return fullResponse;
-
+const warmupInFlight = new Set<string>();
+async function warmCacheInBackground(cache: Cache, cacheKey: Request): Promise<void> {
+	if (warmupInFlight.has(cacheKey.url)) return;
+	warmupInFlight.add(cacheKey.url);
 	try {
-		return await sliceCachedToRange(fullResponse, rangeHeader);
+		const response = await fetch(cacheKey);
+		if (response.ok && response.status === 200) {
+			await cache.put(cacheKey, response);
+		}
 	} catch {
-		// If we can't slice (unparseable Range etc.), give the full body —
-		// the browser will still play, just without partial-content semantics.
-		return fullResponse;
+		/* network failed — the next play will warm again */
+	} finally {
+		warmupInFlight.delete(cacheKey.url);
 	}
 }
 
