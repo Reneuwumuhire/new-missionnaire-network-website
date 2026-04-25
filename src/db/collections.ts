@@ -117,7 +117,10 @@ export async function getCollection(
 					{
 						$addFields: {
 							sortDate: {
-								$ifNull: ['$titleSortDate', { $ifNull: ['$publishedAt', '$releaseTimestampSortDate'] }]
+								$ifNull: [
+									'$titleSortDate',
+									{ $ifNull: ['$publishedAt', '$releaseTimestampSortDate'] }
+								]
 							}
 						}
 					},
@@ -409,6 +412,35 @@ function buildFuzzySearchPattern(search: string): string {
 	return pattern;
 }
 
+function hashSeed(seed: string): number {
+	let hash = 2166136261;
+	for (let i = 0; i < seed.length; i++) {
+		hash ^= seed.charCodeAt(i);
+		hash = Math.imul(hash, 16777619);
+	}
+	return hash >>> 0;
+}
+
+function createSeededRandom(seed: string): () => number {
+	let state = hashSeed(seed) || 1;
+	return () => {
+		state += 0x6d2b79f5;
+		let t = state;
+		t = Math.imul(t ^ (t >>> 15), t | 1);
+		t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+	};
+}
+
+function seededShuffle<T>(items: T[], seed: string): T[] {
+	const random = createSeededRandom(seed);
+	for (let i = items.length - 1; i > 0; i--) {
+		const j = Math.floor(random() * (i + 1));
+		[items[i], items[j]] = [items[j], items[i]];
+	}
+	return items;
+}
+
 export async function queryMusicAudio(options: {
 	category?: string;
 	search?: string;
@@ -418,6 +450,7 @@ export async function queryMusicAudio(options: {
 	limit?: number;
 	pageNumber?: number;
 	orderBy?: string;
+	seed?: string;
 }): Promise<{ data: MusicAudio[]; total: number }> {
 	const {
 		category,
@@ -427,7 +460,8 @@ export async function queryMusicAudio(options: {
 		number,
 		limit = 20,
 		pageNumber = 1,
-		orderBy = 'uploaded_at:desc'
+		orderBy = 'uploaded_at:desc',
+		seed
 	} = options;
 
 	try {
@@ -479,10 +513,16 @@ export async function queryMusicAudio(options: {
 
 		let data;
 		if (property === 'random') {
-			data = await db
-				.collection('music_audio')
-				.aggregate([{ $match: query }, { $sample: { size: limit } }])
-				.toArray();
+			if (seed) {
+				const allData = await db.collection('music_audio').find(query).sort({ _id: 1 }).toArray();
+				const shuffled = seededShuffle(allData, seed);
+				data = shuffled.slice(skip, skip + limit);
+			} else {
+				data = await db
+					.collection('music_audio')
+					.aggregate([{ $match: query }, { $sample: { size: limit } }])
+					.toArray();
+			}
 		} else {
 			const sort: Sort = {};
 			sort[property] = order === 'asc' ? 1 : -1;
@@ -606,7 +646,9 @@ async function ensureLockIndex() {
 		for (const dupe of dupes) {
 			if (dupe.removeIds.length > 0) {
 				await col.deleteMany({ _id: { $in: dupe.removeIds } });
-				console.log(`[NotifLock] Cleaned ${dupe.removeIds.length} duplicate(s) for type "${dupe._id}"`);
+				console.log(
+					`[NotifLock] Cleaned ${dupe.removeIds.length} duplicate(s) for type "${dupe._id}"`
+				);
 			}
 		}
 		await col.createIndex({ type: 1 }, { unique: true });
@@ -630,10 +672,7 @@ async function ensureLockIndex() {
  * Uses a unique index on `type` + atomic findOneAndUpdate so that
  * only one serverless instance can win the race, even across cold starts.
  */
-export async function claimNotificationSlot(
-	type: string,
-	cooldownMs: number
-): Promise<boolean> {
+export async function claimNotificationSlot(type: string, cooldownMs: number): Promise<boolean> {
 	await ensureLockIndex();
 
 	const db = await getDb();
@@ -644,10 +683,7 @@ export async function claimNotificationSlot(
 		const result = await col.findOneAndUpdate(
 			{
 				type,
-				$or: [
-					{ lastSentAt: { $exists: false } },
-					{ lastSentAt: { $lt: now - cooldownMs } }
-				]
+				$or: [{ lastSentAt: { $exists: false } }, { lastSentAt: { $lt: now - cooldownMs } }]
 			},
 			{ $set: { lastSentAt: now } },
 			{ upsert: true, returnDocument: 'after' }
@@ -759,10 +795,7 @@ export async function claimCheckSlot(type: string, intervalMs: number): Promise<
 		const result = await col.findOneAndUpdate(
 			{
 				type,
-				$or: [
-					{ lastCheckAt: { $exists: false } },
-					{ lastCheckAt: { $lt: now - intervalMs } }
-				]
+				$or: [{ lastCheckAt: { $exists: false } }, { lastCheckAt: { $lt: now - intervalMs } }]
 			},
 			{ $set: { lastCheckAt: now } },
 			{ upsert: true, returnDocument: 'after' }
@@ -792,7 +825,9 @@ export type YouTubeCachedStatus = {
 export async function getYouTubeCachedStatus(): Promise<YouTubeCachedStatus | null> {
 	try {
 		const db = await getDb();
-		const doc = await db.collection('youtube_live_cache').findOne({ _id: 'current' as unknown as ObjectId });
+		const doc = await db
+			.collection('youtube_live_cache')
+			.findOne({ _id: 'current' as unknown as ObjectId });
 		if (!doc) return null;
 		return {
 			isLive: doc.isLive,
@@ -813,11 +848,13 @@ export async function getYouTubeCachedStatus(): Promise<YouTubeCachedStatus | nu
 export async function setYouTubeCachedStatus(status: YouTubeCachedStatus): Promise<void> {
 	try {
 		const db = await getDb();
-		await db.collection('youtube_live_cache').updateOne(
-			{ _id: 'current' as unknown as ObjectId },
-			{ $set: { ...status } },
-			{ upsert: true }
-		);
+		await db
+			.collection('youtube_live_cache')
+			.updateOne(
+				{ _id: 'current' as unknown as ObjectId },
+				{ $set: { ...status } },
+				{ upsert: true }
+			);
 	} catch (e) {
 		console.error('[YouTubeCache] setYouTubeCachedStatus error:', e);
 	}
@@ -834,7 +871,9 @@ export type RadioCachedStatus = {
 export async function getRadioCachedStatus(): Promise<RadioCachedStatus | null> {
 	try {
 		const db = await getDb();
-		const doc = await db.collection('radio_status_cache').findOne({ _id: 'current' as unknown as ObjectId });
+		const doc = await db
+			.collection('radio_status_cache')
+			.findOne({ _id: 'current' as unknown as ObjectId });
 		if (!doc) return null;
 		return {
 			isLive: doc.isLive,
@@ -850,11 +889,13 @@ export async function getRadioCachedStatus(): Promise<RadioCachedStatus | null> 
 export async function setRadioCachedStatus(status: RadioCachedStatus): Promise<void> {
 	try {
 		const db = await getDb();
-		await db.collection('radio_status_cache').updateOne(
-			{ _id: 'current' as unknown as ObjectId },
-			{ $set: { ...status } },
-			{ upsert: true }
-		);
+		await db
+			.collection('radio_status_cache')
+			.updateOne(
+				{ _id: 'current' as unknown as ObjectId },
+				{ $set: { ...status } },
+				{ upsert: true }
+			);
 	} catch (e) {
 		console.error('[RadioCache] setRadioCachedStatus error:', e);
 	}
@@ -923,16 +964,16 @@ export async function getBroadcastAdminState(): Promise<BroadcastAdminState> {
 	}
 }
 
-export async function setBroadcastAdminState(
-	updates: Partial<BroadcastAdminState>
-): Promise<void> {
+export async function setBroadcastAdminState(updates: Partial<BroadcastAdminState>): Promise<void> {
 	try {
 		const db = await getDb();
-		await db.collection('broadcast_admin_state').updateOne(
-			{ _id: 'current' as unknown as ObjectId },
-			{ $set: { ...updates, updated_at: new Date().toISOString() } },
-			{ upsert: true }
-		);
+		await db
+			.collection('broadcast_admin_state')
+			.updateOne(
+				{ _id: 'current' as unknown as ObjectId },
+				{ $set: { ...updates, updated_at: new Date().toISOString() } },
+				{ upsert: true }
+			);
 	} catch (e) {
 		console.error('[BroadcastAdminState] set error:', e);
 	}

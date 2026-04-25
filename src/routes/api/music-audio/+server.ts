@@ -13,6 +13,7 @@ export async function GET({ url }: RequestEvent) {
 		const pageNumber = Number.parseInt(url.searchParams.get('pageNumber') || '1');
 		const sort = url.searchParams.get('sort') || 'uploaded_at:desc';
 		const artist = url.searchParams.get('artist') ?? undefined;
+		const seed = url.searchParams.get('seed') ?? undefined;
 
 		const result = await queryMusicAudio({
 			category,
@@ -22,7 +23,8 @@ export async function GET({ url }: RequestEvent) {
 			number,
 			limit,
 			pageNumber,
-			orderBy: sort
+			orderBy: sort,
+			seed
 		});
 
 		return json({

@@ -52,6 +52,7 @@
 	$: currentSearch = (data as any).search;
 	$: currentAlpha = (data as any).alpha;
 	$: currentSort = (data as any).sort || 'uploaded_at:desc';
+	$: currentSeed = (data as any).seed || '';
 	$: currentArtist = (data as any).artist;
 	$: totalSongs = (data as any).total;
 	$: currentPage = (data as any).page;
@@ -227,6 +228,7 @@
 	];
 	const desktopMusicGrid =
 		'md:grid-cols-[28px_minmax(0,2fr)_minmax(0,0.95fr)_minmax(0,0.85fr)_58px_28px_36px_36px] lg:grid-cols-[30px_minmax(0,2.2fr)_minmax(0,1.05fr)_minmax(0,0.95fr)_68px_32px_40px_40px] xl:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.2fr)_minmax(0,1fr)_80px_32px_40px_40px]';
+	$: isRandomListOrder = currentSort.split(/[: ,]/)[0] === 'random';
 
 	// Sync playlist when songs are loaded
 	$: if (musicPlaylist) {
@@ -234,6 +236,35 @@
 		if (!$isShuffle) {
 			playlist.set(musicPlaylist);
 		}
+	}
+
+	function createPlaylistSeed() {
+		return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+	}
+
+	function getEffectiveSort(params: URLSearchParams) {
+		const explicitSort = params.get('sort');
+		if (explicitSort) return explicitSort;
+
+		const nextCategory = params.get('category') || currentCategory || 'All';
+		const nextSearch = params.get('search') || '';
+		const nextAlpha = params.get('alpha') || '';
+		const nextArtist = params.get('artist') || '';
+
+		if (nextCategory === 'All' && !nextSearch && !nextAlpha && !nextArtist) {
+			return 'random';
+		}
+
+		return 'uploaded_at:desc';
+	}
+
+	function syncSeedParam(params: URLSearchParams) {
+		if (getEffectiveSort(params).split(/[: ,]/)[0] === 'random') {
+			params.set('seed', params.get('seed') || currentSeed || createPlaylistSeed());
+			return;
+		}
+
+		params.delete('seed');
 	}
 
 	function handleSearch() {
@@ -246,6 +277,7 @@
 		params.delete('alpha'); // Search clears alphabetical filter
 		params.delete('artist'); // Search clears artist filter
 		params.set('page', '1');
+		syncSeedParam(params);
 		goto(`?${params.toString()}`);
 	}
 
@@ -259,6 +291,7 @@
 		params.delete('search');
 		params.delete('alpha');
 		params.set('page', '1');
+		syncSeedParam(params);
 		goto(`?${params.toString()}`);
 	}
 
@@ -272,6 +305,7 @@
 		params.delete('search'); // Alphabetical filter clears search
 		params.delete('artist'); // Alphabetical filter clears artist
 		params.set('page', '1');
+		syncSeedParam(params);
 		goto(`?${params.toString()}`);
 	}
 
@@ -303,11 +337,21 @@
 			params.delete('sort');
 		}
 
+		syncSeedParam(params);
 		goto(`?${params.toString()}`);
 	}
 
 	function handleSortChange(property: string) {
 		const params = new URLSearchParams($page.url.searchParams);
+
+		if (property === 'random') {
+			params.set('sort', 'random');
+			params.set('seed', createPlaylistSeed());
+			params.set('page', '1');
+			goto(`?${params.toString()}`);
+			return;
+		}
+
 		const current = params.get('sort') || 'uploaded_at:desc';
 		const [currentProp, currentOrder] = current.split(':');
 
@@ -321,6 +365,15 @@
 		}
 
 		params.set('sort', `${property}:${nextOrder}`);
+		params.set('page', '1');
+		syncSeedParam(params);
+		goto(`?${params.toString()}`);
+	}
+
+	function refreshRandomList() {
+		const params = new URLSearchParams($page.url.searchParams);
+		params.set('sort', 'random');
+		params.set('seed', createPlaylistSeed());
 		params.set('page', '1');
 		goto(`?${params.toString()}`);
 	}
@@ -341,6 +394,7 @@
 		if (!activeMusicSongPage || activeMusicSongPage === currentPage) return;
 		const params = new URLSearchParams($page.url.searchParams);
 		params.set('page', activeMusicSongPage.toString());
+		syncSeedParam(params);
 		goto(`?${params.toString()}`);
 	}
 
@@ -449,69 +503,92 @@
 
 	<!-- List Title and Mobile Filters -->
 	<div class="flex flex-col gap-2 mb-6">
-		<div class="flex items-center justify-between">
-			<h2 class="font-display text-3xl font-bold text-stone-900">List</h2>
-			<!-- Mobile Artist Filter Toggle -->
-			<div class="relative md:hidden">
-				<button
-					class="flex items-center gap-2 bg-white border border-stone-200 text-stone-600 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm active:scale-95 transition-transform"
-					on:click|stopPropagation={() => (isArtistMenuOpen = !isArtistMenuOpen)}
-				>
-					<Icon src={BsSearch} size="12" />
-					Artiste
-				</button>
-				{#if isArtistMenuOpen}
-					<!-- svelte-ignore a11y-no-static-element-interactions -->
-					<!-- svelte-ignore a11y-click-events-have-key-events -->
-					<div
-						class="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-stone-200 p-3 z-50 normal-case tracking-normal"
-						on:click|stopPropagation
+		<div class="flex items-center justify-between gap-3">
+			<div class="flex items-center gap-2">
+				<h2 class="font-display text-3xl font-bold text-stone-900">List</h2>
+				{#if isRandomListOrder}
+					<button
+						class="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-stone-500 transition-colors hover:border-missionnaire hover:text-missionnaire"
+						on:click={refreshRandomList}
+						title="Rafraîchir l'ordre aléatoire"
 					>
-						<div class="flex items-center gap-2 bg-stone-50 px-2 py-1.5 rounded-lg mb-2">
-							<Icon src={BsSearch} size="12" color="#999" />
-							<input
-								type="text"
-								placeholder="Rechercher un artiste..."
-								class="bg-transparent border-none outline-none text-xs w-full text-stone-700 placeholder:text-stone-400"
-								bind:value={artistSearch}
-							/>
-						</div>
+						<Icon src={BsShuffle} size="11" />
+						Rafraîchir
+					</button>
+				{/if}
+			</div>
+			<!-- Mobile Artist Filter Toggle -->
+			<div class="flex items-center gap-2">
+				{#if isRandomListOrder}
+					<button
+						class="sm:hidden inline-flex items-center justify-center rounded-full border border-stone-200 bg-white p-2 text-stone-500 transition-colors hover:border-missionnaire hover:text-missionnaire"
+						on:click={refreshRandomList}
+						title="Rafraîchir l'ordre aléatoire"
+					>
+						<Icon src={BsShuffle} size="13" />
+					</button>
+				{/if}
+				<div class="relative md:hidden">
+					<button
+						class="flex items-center gap-2 bg-white border border-stone-200 text-stone-600 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm active:scale-95 transition-transform"
+						on:click|stopPropagation={() => (isArtistMenuOpen = !isArtistMenuOpen)}
+					>
+						<Icon src={BsSearch} size="12" />
+						Artiste
+					</button>
+					{#if isArtistMenuOpen}
+						<!-- svelte-ignore a11y-no-static-element-interactions -->
+						<!-- svelte-ignore a11y-click-events-have-key-events -->
+						<div
+							class="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-stone-200 p-3 z-50 normal-case tracking-normal"
+							on:click|stopPropagation
+						>
+							<div class="flex items-center gap-2 bg-stone-50 px-2 py-1.5 rounded-lg mb-2">
+								<Icon src={BsSearch} size="12" color="#999" />
+								<input
+									type="text"
+									placeholder="Rechercher un artiste..."
+									class="bg-transparent border-none outline-none text-xs w-full text-stone-700 placeholder:text-stone-400"
+									bind:value={artistSearch}
+								/>
+							</div>
 
-						<div class="max-h-60 overflow-y-auto space-y-1 custom-scrollbar">
-							{#if filteredArtists.length === 0}
-								<div class="px-3 py-4 text-xs text-stone-400 text-center italic">
-									Aucun artiste trouvé
-								</div>
-							{:else}
-								<button
-									class="w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-colors {!currentArtist
-										? 'bg-stone-100 text-missionnaire'
-										: 'text-stone-500 hover:bg-stone-50'}"
-									on:click={() => {
-										handleArtistChange('');
-										isArtistMenuOpen = false;
-									}}
-								>
-									Tous les artistes
-								</button>
-								{#each filteredArtists as artist}
+							<div class="max-h-60 overflow-y-auto space-y-1 custom-scrollbar">
+								{#if filteredArtists.length === 0}
+									<div class="px-3 py-4 text-xs text-stone-400 text-center italic">
+										Aucun artiste trouvé
+									</div>
+								{:else}
 									<button
-										class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-colors {currentArtist ===
-										artist
-											? 'bg-stone-100 text-missionnaire font-bold'
-											: 'text-stone-600 hover:bg-stone-50'}"
+										class="w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-colors {!currentArtist
+											? 'bg-stone-100 text-missionnaire'
+											: 'text-stone-500 hover:bg-stone-50'}"
 										on:click={() => {
-											handleArtistChange(artist);
+											handleArtistChange('');
 											isArtistMenuOpen = false;
 										}}
 									>
-										{artist}
+										Tous les artistes
 									</button>
-								{/each}
-							{/if}
+									{#each filteredArtists as artist}
+										<button
+											class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-colors {currentArtist ===
+											artist
+												? 'bg-stone-100 text-missionnaire font-bold'
+												: 'text-stone-600 hover:bg-stone-50'}"
+											on:click={() => {
+												handleArtistChange(artist);
+												isArtistMenuOpen = false;
+											}}
+										>
+											{artist}
+										</button>
+									{/each}
+								{/if}
+							</div>
 						</div>
-					</div>
-				{/if}
+					{/if}
+				</div>
 			</div>
 		</div>
 
@@ -913,11 +990,11 @@
 			<div class="w-9 lg:w-10 text-center"></div>
 			<div class="w-9 lg:w-10 text-center flex items-center justify-center">
 				<button
-					class="hover:scale-110 active:scale-95 transition-all {currentSort.startsWith('random')
+					class="hover:scale-110 active:scale-95 transition-all {isRandomListOrder
 						? 'text-missionnaire'
 						: 'text-stone-300 hover:text-missionnaire/60'}"
-					on:click={() => handleSortChange('random')}
-					title="Mélanger la liste"
+					on:click={refreshRandomList}
+					title={isRandomListOrder ? "Rafraîchir l'ordre aléatoire" : 'Mélanger la liste'}
 				>
 					<Icon src={BsShuffle} size="16" />
 				</button>
@@ -1086,6 +1163,7 @@
 							const params = new URLSearchParams($page.url.searchParams);
 							params.set('limit', e.currentTarget.value);
 							params.set('page', '1');
+							syncSeedParam(params);
 							goto(`?${params.toString()}`);
 						}}
 					>
@@ -1102,6 +1180,7 @@
 				getHref={(p) => {
 					const params = new URLSearchParams($page.url.searchParams);
 					params.set('page', String(p));
+					syncSeedParam(params);
 					return `?${params.toString()}`;
 				}}
 			/>

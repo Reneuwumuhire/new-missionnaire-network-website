@@ -17,7 +17,7 @@
 	import type { LayoutData } from './$types';
 	import { QueryClientProvider } from '@tanstack/svelte-query';
 	import { navigating, page } from '$app/stores';
-	import { afterNavigate } from '$app/navigation';
+	import { afterNavigate, goto } from '$app/navigation';
 	import { browser } from '$app/environment';
 	import { onMount, onDestroy, tick } from 'svelte';
 	import { radioIsLive } from '$lib/stores/global';
@@ -26,9 +26,59 @@
 	const DEFAULT_SEO_DESCRIPTION =
 		"Prédications, cantiques, littérature et transcriptions du Message de l'Heure pour l'édification spirituelle.";
 	const DEFAULT_SEO_TITLE = 'Missionnaire Network | Prédications et Cantiques du Message';
+	const LAST_MUSIC_PATH_KEY = 'missionnaire:last-music-path';
 	let headerRef: HTMLDivElement | null = null;
 	let headerHeight = 120;
 	let resizeObserver: ResizeObserver | null = null;
+
+	function rememberMusicPath(url: URL) {
+		if (!browser || url.pathname !== '/musique') return;
+		const seed = url.searchParams.get('seed') || '';
+		if (!seed) return;
+		try {
+			localStorage.setItem(LAST_MUSIC_PATH_KEY, `${url.pathname}${url.search}`);
+		} catch {
+			/* localStorage unavailable */
+		}
+	}
+
+	function getRememberedMusicPath() {
+		if (!browser) return '';
+		try {
+			return localStorage.getItem(LAST_MUSIC_PATH_KEY) || '';
+		} catch {
+			return '';
+		}
+	}
+
+	function handleRememberedMusicLinkClick(event: MouseEvent) {
+		if (!browser || event.defaultPrevented) return;
+		if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+			return;
+
+		const anchor = event
+			.composedPath()
+			.find(
+				(node): node is HTMLAnchorElement =>
+					node instanceof HTMLAnchorElement && node.hasAttribute('href')
+			);
+		if (!(anchor instanceof HTMLAnchorElement)) return;
+		if (anchor.target && anchor.target !== '_self') return;
+
+		const href = anchor.getAttribute('href');
+		if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:'))
+			return;
+
+		const destination = new URL(anchor.href, window.location.href);
+		if (destination.origin !== window.location.origin) return;
+		if (destination.pathname !== '/musique' || destination.search) return;
+
+		const rememberedPath = getRememberedMusicPath();
+		if (!rememberedPath || rememberedPath === '/musique') return;
+
+		event.preventDefault();
+		void goto(rememberedPath);
+	}
 
 	if (browser) {
 		(window as any).onYouTubeIframeAPIReady = () => {
@@ -76,7 +126,9 @@
 			if (!res.ok) return;
 			const status = (await res.json()) as { isLive: boolean };
 			radioIsLive.set(status.isLive);
-		} catch { /* ignore */ }
+		} catch {
+			/* ignore */
+		}
 	}
 
 	onMount(() => {
@@ -92,7 +144,8 @@
 	// Load Google Fonts globally (non-render-blocking)
 	onMount(() => {
 		if (!browser) return;
-		const fontUrl = 'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Outfit:wght@300;400;500;600;700&display=swap';
+		const fontUrl =
+			'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Outfit:wght@300;400;500;600;700&display=swap';
 		if (!document.querySelector(`link[href="${fontUrl}"]`)) {
 			const link = document.createElement('link');
 			link.rel = 'stylesheet';
@@ -117,6 +170,14 @@
 		setTimeout(() => {
 			document.querySelector('.app-splash')?.remove();
 		}, 700);
+	});
+
+	onMount(() => {
+		if (!browser) return;
+		document.addEventListener('click', handleRememberedMusicLinkClick, true);
+		return () => {
+			document.removeEventListener('click', handleRememberedMusicLinkClick, true);
+		};
 	});
 
 	// ── BEGIN: service worker registration (added) ──────────────────
@@ -144,6 +205,7 @@
 			if (path === '/' || path.startsWith('/__')) return;
 			localStorage.setItem('missionnaire:last-path', path);
 			localStorage.setItem('missionnaire:last-path-at', Date.now().toString());
+			rememberMusicPath(to.url);
 		} catch {
 			/* localStorage unavailable */
 		}
@@ -187,14 +249,14 @@
 
 <QueryClientProvider client={data.queryClient}>
 	<div class="relative">
-		<div bind:this={headerRef} class="flex flex-col fixed top-0 z-40 bg-[#FAF8F3]/95 backdrop-blur-sm w-full">
+		<div
+			bind:this={headerRef}
+			class="flex flex-col fixed top-0 z-40 bg-[#FAF8F3]/95 backdrop-blur-sm w-full"
+		>
 			<SocialMediaAbove />
 			<NavBar />
 		</div>
-		<div
-			class="relative mt-[120px]"
-			style={browser ? `margin-top: ${headerHeight}px;` : undefined}
-		>
+		<div class="relative mt-[120px]" style={browser ? `margin-top: ${headerHeight}px;` : undefined}>
 			<slot />
 		</div>
 	</div>
