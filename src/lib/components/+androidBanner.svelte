@@ -29,78 +29,60 @@
 </script>
 
 {#if isVisible}
-<div class="w-full max-w-3xl mx-auto px-4 pointer-events-none">
-	<div class="pointer-events-auto relative isolate overflow-hidden rounded-[24px] border border-white/70 bg-[#fffaf5]/95 backdrop-blur-lg ring-1 ring-stone-200/70 shadow-[0_22px_60px_-26px_rgba(15,23,42,0.35)] transition-all hover:shadow-[0_28px_72px_-28px_rgba(15,23,42,0.45)] flex items-center justify-between px-4 py-3 md:px-6 md:py-4 gap-4">
-		<div
-			class="absolute inset-0"
-			style="background: linear-gradient(135deg, rgba(255,255,255,0.96), rgba(255,247,237,0.94));"
-		></div>
-		<div
-			class="absolute inset-0"
-			style="background: radial-gradient(circle at top left, rgba(249,115,22,0.16), transparent 38%), radial-gradient(circle at bottom right, rgba(59,130,246,0.08), transparent 36%);"
-		></div>
-		<div class="absolute inset-x-0 top-0 h-px bg-white/80"></div>
-		<!-- Left side - Branding & Content -->
-		<div class="relative z-10 flex items-center gap-3 md:gap-5 flex-1 min-w-0">
-			<div class="hidden sm:flex bg-orange-500/12 p-2 rounded-xl shrink-0">
-				<Icon src={FaBrandsAndroid} size="22" color="#f97316" />
-			</div>
-			
-			<div class="flex flex-col min-w-0">
-				<div class="flex items-center gap-2">
-					<span class="sm:hidden flex bg-orange-500/10 p-1 rounded-md">
-						<Icon src={FaBrandsAndroid} size="14" color="#f97316" />
-					</span>
-					<h3 class="text-sm md:text-base font-black text-gray-900 leading-tight truncate">
-						Application Android
-					</h3>
+	<div class="w-full max-w-3xl mx-auto px-4 pointer-events-none">
+		<div class="pointer-events-auto relative isolate overflow-hidden border border-stone-200/70 bg-[#faf6ef]/96 shadow-[0_20px_52px_-30px_rgba(41,37,36,0.3)] backdrop-blur-md transition-all hover:-translate-y-0.5 hover:shadow-[0_26px_64px_-32px_rgba(41,37,36,0.36)]">
+			<div class="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.78),rgba(250,246,239,0.98))]"></div>
+			<div class="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-missionnaire/10 via-missionnaire/4 to-transparent"></div>
+			<div class="absolute -left-10 top-1/2 h-24 w-24 -translate-y-1/2 rounded-full bg-missionnaire/10 blur-3xl"></div>
+			<div class="absolute left-6 right-6 top-0 h-px bg-gradient-to-r from-transparent via-missionnaire/60 to-transparent"></div>
+
+			<div class="relative z-10 flex items-center justify-between gap-4 px-5 py-3.5 md:px-6">
+				<div class="flex min-w-0 items-center gap-3.5">
+					<div class="flex h-11 w-11 shrink-0 items-center justify-center border border-missionnaire/15 bg-white/80 shadow-sm shadow-missionnaire/5">
+						<Icon src={FaBrandsAndroid} size="20" color="#FF880C" />
+					</div>
+
+					<div class="min-w-0">
+						<p class="mb-1 text-[9px] font-bold uppercase tracking-[0.35em] text-missionnaire font-body">
+							Cantiques &amp; louange
+						</p>
+						<h3 class="font-display text-lg font-semibold leading-none text-stone-900 md:text-[1.55rem]">
+							Application Android
+						</h3>
+						<p class="mt-1 max-w-[22rem] text-[11px] leading-relaxed text-stone-500 font-body md:max-w-[26rem] md:text-[12px]">
+							Retrouvez plus de <span class="font-semibold text-missionnaire">1 500 cantiques</span> sur votre téléphone.
+						</p>
+					</div>
 				</div>
-				<p class="text-gray-500 text-[11px] md:text-[12px] font-medium leading-tight mt-0.5 max-w-md truncate md:whitespace-normal">
-					Retrouvez plus de <span class="text-orange-600 font-bold">1500 cantiques</span> sur votre téléphone.
-				</p>
+
+				<div class="flex shrink-0 items-center gap-2.5">
+					<a
+						href={downloadUrl}
+						target="_blank"
+						rel="noopener noreferrer"
+						class="inline-flex h-10 items-center gap-2 border border-missionnaire bg-missionnaire px-4 text-[10px] font-bold uppercase tracking-[0.16em] text-white font-body transition-colors hover:bg-missionnaire/90 md:px-5"
+					>
+						<Icon src={IoCloudDownloadOutline} size="14" />
+						<span>Télécharger</span>
+					</a>
+
+					<button
+						on:click={dismiss}
+						class="flex h-10 w-10 items-center justify-center border border-stone-200/70 bg-white/70 text-stone-400 transition-colors hover:border-stone-300 hover:text-stone-700"
+						aria-label="Fermer la bannière Android"
+					>
+						<Icon src={IoClose} size="16" />
+					</button>
+				</div>
 			</div>
 		</div>
-
-		<!-- Action & Close -->
-		<div class="relative z-10 flex items-center gap-2 md:gap-4 shrink-0">
-			<a 
-				href={downloadUrl}
-				target="_blank" rel="noopener noreferrer"
-				class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 md:px-5 md:py-2.5 rounded-xl font-bold transition-all shadow-sm hover:shadow-md flex items-center gap-2 text-[10px] md:text-[11px] tracking-wide uppercase whitespace-nowrap"
-			>
-				<Icon src={IoCloudDownloadOutline} size="14" />
-				<span class="hidden xs:inline">Télécharger</span>
-				<span class="xs:hidden">Installer</span>
-			</a>
-
-			<button 
-				on:click={dismiss}
-				class="p-1 md:p-1.5 rounded-lg hover:bg-gray-200/50 text-gray-500 hover:text-gray-900 transition-colors"
-				aria-label="Dismiss banner"
-			>
-				<Icon src={IoClose} size="20" />
-			</button>
-		</div>
-
-		<!-- Glassy Shine Effect -->
-		<div class="absolute -inset-full h-full w-1/2 z-0 block transform -skew-x-12 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-60 animate-[shine_5s_infinite]"></div>
 	</div>
-</div>
 {/if}
 
 <style>
-	@keyframes shine {
-		0% { transform: translateX(-100%) skewX(-12deg); }
-		100% { transform: translateX(300%) skewX(-12deg); }
-	}
-
-	/* Custom breakpoints for the banner */
-	@media (max-width: 400px) {
-		.xs\:hidden { display: inline; }
-		.xs\:inline { display: none; }
-	}
-	@media (min-width: 401px) {
-		.xs\:hidden { display: none; }
-		.xs\:inline { display: inline; }
+	@media (max-width: 640px) {
+		a[href] {
+			letter-spacing: 0.14em;
+		}
 	}
 </style>
