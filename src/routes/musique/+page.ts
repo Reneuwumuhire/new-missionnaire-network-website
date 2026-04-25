@@ -1,3 +1,4 @@
+import { browser } from '$app/environment';
 import type { MusicAudio } from '$lib/models/music-audio';
 import { redirect } from '@sveltejs/kit';
 
@@ -16,6 +17,8 @@ export const load = async ({ fetch, url }) => {
 	const artist = url.searchParams.get('artist') || '';
 	const pageNumber = url.searchParams.get('page') || '1';
 	const limit = url.searchParams.get('limit') || '100';
+	const parsedPageNumber = Number.parseInt(pageNumber);
+	const parsedLimit = Number.parseInt(limit);
 
 	// Default to random sort for "All" category if no specific sort is requested
 	let defaultSort = 'uploaded_at:desc';
@@ -33,17 +36,22 @@ export const load = async ({ fetch, url }) => {
 		throw redirect(307, `${redirectUrl.pathname}?${redirectUrl.searchParams.toString()}`);
 	}
 
-	let artists: string[] = [];
-	try {
-		const artistResponse = await fetch('/api/music-artists');
-		if (artistResponse.ok) {
-			const artistResult = await artistResponse.json();
-			artists = artistResult.data || [];
-		} else {
-			console.error('[Load] Failed to fetch artists:', artistResponse.status);
-		}
-	} catch (e) {
-		console.error('[Load] Error fetching artists:', e);
+	if (browser) {
+		return {
+			musicAudio: [] as MusicAudio[],
+			playlistAudio: [] as MusicAudio[],
+			artists: [] as string[],
+			total: 0,
+			category,
+			search,
+			alpha,
+			artist,
+			sort,
+			seed,
+			page: parsedPageNumber,
+			limit: parsedLimit,
+			deferred: true
+		};
 	}
 
 	const queryParams = new URLSearchParams({
@@ -59,36 +67,27 @@ export const load = async ({ fetch, url }) => {
 		queryParams.set('seed', seed);
 	}
 
-	const response = await fetch(`/api/music-audio?${queryParams.toString()}`);
+	const [artistResponse, response] = await Promise.all([
+		fetch('/api/music-artists'),
+		fetch(`/api/music-audio?${queryParams.toString()}`)
+	]);
+
+	let artists: string[] = [];
+	try {
+		if (artistResponse.ok) {
+			const artistResult = await artistResponse.json();
+			artists = artistResult.data || [];
+		} else {
+			console.error('[Load] Failed to fetch artists:', artistResponse.status);
+		}
+	} catch (e) {
+		console.error('[Load] Error fetching artists:', e);
+	}
+
 	const result = await response.json();
 	const musicAudio = result.data as MusicAudio[];
 	const total = result.total as number;
-	let playlistAudio = musicAudio;
-
-	if (total > musicAudio.length) {
-		const playlistParams = new URLSearchParams({
-			category,
-			search,
-			alpha,
-			artist,
-			pageNumber: '1',
-			limit: total.toString(),
-			sort
-		});
-		if (seed) {
-			playlistParams.set('seed', seed);
-		}
-
-		try {
-			const playlistResponse = await fetch(`/api/music-audio?${playlistParams.toString()}`);
-			if (playlistResponse.ok) {
-				const playlistResult = await playlistResponse.json();
-				playlistAudio = (playlistResult.data as MusicAudio[]) || musicAudio;
-			}
-		} catch (e) {
-			console.error('[Load] Error fetching full music playlist:', e);
-		}
-	}
+	const playlistAudio = musicAudio;
 
 	return {
 		musicAudio,
@@ -101,7 +100,8 @@ export const load = async ({ fetch, url }) => {
 		artist,
 		sort,
 		seed,
-		page: Number.parseInt(pageNumber),
-		limit: Number.parseInt(limit)
+		page: parsedPageNumber,
+		limit: parsedLimit,
+		deferred: false
 	};
 };

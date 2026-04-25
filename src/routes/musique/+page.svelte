@@ -39,24 +39,57 @@
 		favorites
 	} from '$lib/stores/musicHistory';
 	// ── BEGIN: cached filter imports (added) ──────────────────────
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { cachedUrls, refreshCachedUrls, isUrlCached } from '$lib/audioCache';
 	import IoCloudDoneOutline from 'svelte-icons-pack/io/IoCloudDoneOutline';
+	import {
+		areMusicArtistsCached,
+		getMusicArtistsCache,
+		getMusicPageCache,
+		isMusicPageCacheFresh,
+		setMusicArtistsCache,
+		setMusicPageCache
+	} from './listCache';
 	// ── END: cached filter imports ────────────────────────────────
+
+	type MusicAudioApiResponse = {
+		data: MusicAudio[];
+		total: number;
+		error?: string | null;
+	};
+
+	type MusicArtistsApiResponse = {
+		data: string[];
+		error?: string | null;
+	};
+
 	export let data;
 
-	$: musicList = (data as any).musicAudio;
-	$: musicPlaylist = (data as any).playlistAudio || musicList;
-	$: artists = (data as any).artists || [];
+	let musicList: MusicAudio[] = [];
+	let musicPlaylist: MusicAudio[] = [];
+	let artists: string[] = [];
+	let totalSongs = 0;
+	let isListLoading = false;
+	let listLoadError = '';
+	let hasResolvedMusicList = false;
+	let musicListAbortController: AbortController | null = null;
+	let currentListRequestToken = 0;
+	let lastHandledMusicRequestKey = '';
+
+	$: initialMusicList = ((data as any).musicAudio || []) as MusicAudio[];
+	$: initialPlaylist = (((data as any).playlistAudio || initialMusicList) || []) as MusicAudio[];
+	$: initialArtists = ((data as any).artists || []) as string[];
+	$: initialTotalSongs = ((data as any).total || 0) as number;
 	$: currentCategory = (data as any).category;
 	$: currentSearch = (data as any).search;
 	$: currentAlpha = (data as any).alpha;
 	$: currentSort = (data as any).sort || 'uploaded_at:desc';
 	$: currentSeed = (data as any).seed || '';
 	$: currentArtist = (data as any).artist;
-	$: totalSongs = (data as any).total;
 	$: currentPage = (data as any).page;
 	$: limit = (data as any).limit;
+	$: isDeferredData = Boolean((data as any).deferred);
+	$: musicRequestKey = buildMusicRequestKey();
 	$: totalPages = Math.ceil(totalSongs / limit);
 
 	let isArtistMenuOpen = false;
@@ -66,8 +99,175 @@
 	// ── BEGIN: cached filter state (added) ────────────────────────
 	let showCached = false;
 
+	function buildMusicRequestParams() {
+		const params = new URLSearchParams({
+			category: currentCategory || 'All',
+			search: currentSearch || '',
+			alpha: currentAlpha || '',
+			artist: currentArtist || '',
+			pageNumber: String(currentPage || 1),
+			limit: String(limit || 100),
+			sort: currentSort || 'uploaded_at:desc'
+		});
+
+		if (currentSeed) {
+			params.set('seed', currentSeed);
+		}
+
+		return params;
+	}
+
+	function buildMusicRequestKey() {
+		return buildMusicRequestParams().toString();
+	}
+
+	function abortMusicListRequest() {
+		musicListAbortController?.abort();
+		musicListAbortController = null;
+	}
+
+	function applyMusicData(payload: {
+		musicAudio: MusicAudio[];
+		playlistAudio?: MusicAudio[];
+		artists?: string[];
+		total: number;
+	}) {
+		musicList = payload.musicAudio;
+		musicPlaylist = payload.playlistAudio || payload.musicAudio;
+		artists = payload.artists || [];
+		totalSongs = payload.total;
+		hasResolvedMusicList = true;
+	}
+
+	async function loadMusicListInBackground(options?: { showLoading?: boolean }) {
+		const showLoading = options?.showLoading ?? true;
+		const requestKey = musicRequestKey;
+		const requestToken = ++currentListRequestToken;
+		const requestParams = buildMusicRequestParams();
+		const shouldFetchArtists = !areMusicArtistsCached() || artists.length === 0;
+		const controller = new AbortController();
+
+		abortMusicListRequest();
+		musicListAbortController = controller;
+		if (showLoading || !hasResolvedMusicList) {
+			isListLoading = true;
+		}
+
+		try {
+			const musicResponsePromise = fetch(`/api/music-audio?${requestParams.toString()}`, {
+				signal: controller.signal
+			});
+			const artistsResponsePromise = shouldFetchArtists
+				? fetch('/api/music-artists', { signal: controller.signal })
+				: Promise.resolve(null);
+			const [musicResponse, artistsResponse] = await Promise.all([
+				musicResponsePromise,
+				artistsResponsePromise
+			]);
+
+			if (!musicResponse.ok) {
+				throw new Error('Impossible de charger la liste de musique');
+			}
+
+			const musicResult = (await musicResponse.json()) as MusicAudioApiResponse;
+			if (musicResult.error) {
+				throw new Error(musicResult.error);
+			}
+
+			let nextArtists = getMusicArtistsCache() || artists;
+			if (artistsResponse) {
+				if (!artistsResponse.ok) {
+					throw new Error('Impossible de charger les artistes');
+				}
+
+				const artistsResult = (await artistsResponse.json()) as MusicArtistsApiResponse;
+				if (artistsResult.error) {
+					throw new Error(artistsResult.error);
+				}
+
+				nextArtists = setMusicArtistsCache(artistsResult.data || []);
+			}
+
+			if (requestToken !== currentListRequestToken || requestKey !== musicRequestKey) return;
+
+			const cachedEntry = setMusicPageCache(requestKey, {
+				musicAudio: musicResult.data || [],
+				playlistAudio: musicResult.data || [],
+				artists: nextArtists || [],
+				total: musicResult.total || 0
+			});
+
+			applyMusicData(cachedEntry);
+			listLoadError = '';
+		} catch (error) {
+			if ((error as Error).name === 'AbortError') return;
+			if (requestToken !== currentListRequestToken || requestKey !== musicRequestKey) return;
+
+			listLoadError =
+				error instanceof Error ? error.message : 'Impossible de charger la liste de musique';
+
+			if (!hasResolvedMusicList) {
+				musicList = [];
+				musicPlaylist = [];
+				totalSongs = 0;
+			}
+		} finally {
+			if (requestToken === currentListRequestToken) {
+				isListLoading = false;
+			}
+			if (musicListAbortController === controller) {
+				musicListAbortController = null;
+			}
+		}
+	}
+
+	$: if (musicRequestKey && musicRequestKey !== lastHandledMusicRequestKey) {
+		lastHandledMusicRequestKey = musicRequestKey;
+		listLoadError = '';
+
+		const cachedArtists = getMusicArtistsCache() || [];
+		const cachedEntry = getMusicPageCache(musicRequestKey);
+
+		if (!isDeferredData) {
+			const nextArtists = initialArtists.length > 0 ? initialArtists : cachedArtists;
+			const seededEntry = setMusicPageCache(musicRequestKey, {
+				musicAudio: initialMusicList,
+				playlistAudio: initialPlaylist,
+				artists: nextArtists,
+				total: initialTotalSongs
+			});
+
+			if (nextArtists.length > 0) {
+				setMusicArtistsCache(nextArtists, seededEntry.fetchedAt);
+			}
+
+			abortMusicListRequest();
+			applyMusicData(seededEntry);
+			isListLoading = false;
+		} else if (cachedEntry) {
+			applyMusicData({
+				...cachedEntry,
+				artists: cachedEntry.artists.length > 0 ? cachedEntry.artists : cachedArtists
+			});
+			void loadMusicListInBackground({ showLoading: !isMusicPageCacheFresh(cachedEntry) });
+		} else {
+			abortMusicListRequest();
+			musicList = [];
+			musicPlaylist = [];
+			artists = cachedArtists;
+			totalSongs = 0;
+			hasResolvedMusicList = false;
+			void loadMusicListInBackground({ showLoading: true });
+		}
+	}
+
 	onMount(() => {
 		void refreshCachedUrls();
+	});
+
+	onDestroy(() => {
+		if (cacheRefreshTimer) clearTimeout(cacheRefreshTimer);
+		abortMusicListRequest();
 	});
 
 	// Re-check the cache every time a track starts playing — gives the
@@ -231,10 +431,16 @@
 	$: isRandomListOrder = currentSort.split(/[: ,]/)[0] === 'random';
 
 	// Sync playlist when songs are loaded
-	$: if (musicPlaylist) {
+	$: if (hasResolvedMusicList) {
 		basePlaylist.set(musicPlaylist);
 		if (!$isShuffle) {
 			playlist.set(musicPlaylist);
+			if (activeMusicSong) {
+				const nextIndex = playlistIndexByUrl.get(activeMusicSong.s3_url);
+				if (nextIndex !== undefined) {
+					currentIndex.set(nextIndex);
+				}
+			}
 		}
 	}
 
@@ -1002,151 +1208,194 @@
 		</div>
 
 		<div class="divide-y divide-stone-100">
-			{#each musicList as song, i (song.s3_url || i)}
-				{@const isActive = isSongActive(song, $selectAudio)}
-				<!-- svelte-ignore a11y-click-events-have-key-events -->
-				<!-- svelte-ignore a11y-no-static-element-interactions -->
-				<div
-					class="grid grid-cols-[30px_1fr_auto_auto] {desktopMusicGrid} gap-2 md:gap-3 lg:gap-4 px-3 md:px-3 lg:px-4 py-3 md:py-4 items-center transition-all group cursor-pointer {isActive
-						? 'bg-missionnaire/5 border-l-4 border-l-missionnaire'
-						: 'hover:bg-white/60'}"
-					on:click={() => playSong(song)}
-				>
+			{#if isListLoading && !hasResolvedMusicList}
+				{#each Array.from({ length: 8 }) as _, i}
 					<div
-						class="text-center text-[10px] md:text-xs font-bold {isActive
-							? 'text-missionnaire'
-							: 'text-stone-300'}"
+						class="grid grid-cols-[30px_1fr_auto_auto] {desktopMusicGrid} gap-2 md:gap-3 lg:gap-4 px-3 md:px-3 lg:px-4 py-3 md:py-4 items-center animate-pulse"
 					>
-						{i + 1 + (currentPage - 1) * limit}
+						<div class="mx-auto h-3 w-4 rounded-full bg-stone-200"></div>
+						<div class="space-y-2 min-w-0">
+							<div class="h-4 w-3/4 rounded-full bg-stone-200"></div>
+							<div class="h-3 w-1/2 rounded-full bg-stone-100 md:hidden"></div>
+						</div>
+						<div class="hidden md:block h-3 w-2/3 rounded-full bg-stone-100"></div>
+						<div class="hidden md:block h-3 w-1/2 rounded-full bg-stone-100"></div>
+						<div class="hidden md:block mx-auto h-3 w-10 rounded-full bg-stone-100"></div>
+						<div class="hidden md:block mx-auto h-6 w-6 rounded-full bg-stone-100"></div>
+						<div class="mx-auto h-7 w-7 rounded-full bg-stone-100"></div>
+						<div class="mx-auto h-7 w-7 rounded-full bg-stone-200"></div>
 					</div>
-					<div class="flex flex-col min-w-0">
+				{/each}
+			{:else if listLoadError && !hasResolvedMusicList}
+				<div class="py-20 px-6 text-center">
+					<div class="text-stone-200 mb-4 flex justify-center">
+						<Icon src={BsSearch} size="64" />
+					</div>
+					<p class="text-stone-500 font-bold uppercase tracking-widest text-sm">
+						La liste n'a pas pu charger
+					</p>
+					<p class="mt-2 text-xs text-stone-400">{listLoadError}</p>
+					<button
+						class="mt-5 inline-flex items-center rounded-full border border-missionnaire px-4 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-missionnaire transition-colors hover:bg-missionnaire/5"
+						on:click={() => void loadMusicListInBackground({ showLoading: true })}
+					>
+						Réessayer
+					</button>
+				</div>
+			{:else}
+				{#if isListLoading}
+					<div
+						class="border-b border-stone-200/60 bg-stone-50/70 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400"
+					>
+						Mise à jour de la liste...
+					</div>
+				{/if}
+				{#each musicList as song, i (song.s3_url || i)}
+					{@const isActive = isSongActive(song, $selectAudio)}
+					<!-- svelte-ignore a11y-click-events-have-key-events -->
+					<!-- svelte-ignore a11y-no-static-element-interactions -->
+					<div
+						class="grid grid-cols-[30px_1fr_auto_auto] {desktopMusicGrid} gap-2 md:gap-3 lg:gap-4 px-3 md:px-3 lg:px-4 py-3 md:py-4 items-center transition-all group cursor-pointer {isActive
+							? 'bg-missionnaire/5 border-l-4 border-l-missionnaire'
+							: 'hover:bg-white/60'}"
+						on:click={() => playSong(song)}
+					>
 						<div
-							class="text-sm font-bold line-clamp-1 transition-colors {isActive
+							class="text-center text-[10px] md:text-xs font-bold {isActive
 								? 'text-missionnaire'
-								: 'text-stone-800 group-hover:text-missionnaire'}"
+								: 'text-stone-300'}"
 						>
-							{song.title || 'Sans titre'}
+							{i + 1 + (currentPage - 1) * limit}
+						</div>
+						<div class="flex flex-col min-w-0">
+							<div
+								class="text-sm font-bold line-clamp-1 transition-colors {isActive
+									? 'text-missionnaire'
+									: 'text-stone-800 group-hover:text-missionnaire'}"
+							>
+								{song.title || 'Sans titre'}
+							</div>
+							<div
+								class="flex flex-row items-center gap-2 md:hidden overflow-hidden text-ellipsis whitespace-nowrap"
+							>
+								<span
+									class="text-[10px] font-medium {isActive
+										? 'text-missionnaire/60'
+										: 'text-stone-500'}"
+								>
+									{song.book_full_name || song.category || '-'}
+								</span>
+								{#if song.artist}
+									<span class="text-[10px] text-stone-300">•</span>
+									<button
+										class="text-[10px] font-medium italic transition-colors {isActive
+											? 'text-missionnaire/40 hover:text-missionnaire'
+											: 'text-stone-400 hover:text-missionnaire'} {currentArtist === song.artist
+											? 'text-missionnaire underline'
+											: ''}"
+										on:click|stopPropagation={() => handleArtistChange(song.artist || '')}
+									>
+										{song.artist}
+									</button>
+								{/if}
+							</div>
 						</div>
 						<div
-							class="flex flex-row items-center gap-2 md:hidden overflow-hidden text-ellipsis whitespace-nowrap"
+							class="hidden md:block min-w-0 truncate text-xs font-medium {isActive
+								? 'text-missionnaire/60'
+								: 'text-stone-500'}"
 						>
-							<span
-								class="text-[10px] font-medium {isActive
-									? 'text-missionnaire/60'
-									: 'text-stone-500'}"
-							>
-								{song.book_full_name || song.category || '-'}
-							</span>
+							{song.book_full_name || song.category || '-'}
+						</div>
+						<div
+							class="hidden md:block min-w-0 truncate text-xs font-medium italic {isActive
+								? 'text-missionnaire/40'
+								: 'text-stone-400'}"
+						>
 							{#if song.artist}
-								<span class="text-[10px] text-stone-300">•</span>
 								<button
-									class="text-[10px] font-medium italic transition-colors {isActive
-										? 'text-missionnaire/40 hover:text-missionnaire'
-										: 'text-stone-400 hover:text-missionnaire'} {currentArtist === song.artist
-										? 'text-missionnaire underline'
+									class="block max-w-full truncate hover:text-missionnaire transition-colors cursor-pointer {currentArtist ===
+									song.artist
+										? 'text-missionnaire font-bold underline'
 										: ''}"
 									on:click|stopPropagation={() => handleArtistChange(song.artist || '')}
 								>
 									{song.artist}
 								</button>
+							{:else}
+								-
 							{/if}
 						</div>
-					</div>
-					<div
-						class="hidden md:block min-w-0 truncate text-xs font-medium {isActive
-							? 'text-missionnaire/60'
-							: 'text-stone-500'}"
-					>
-						{song.book_full_name || song.category || '-'}
-					</div>
-					<div
-						class="hidden md:block min-w-0 truncate text-xs font-medium italic {isActive
-							? 'text-missionnaire/40'
-							: 'text-stone-400'}"
-					>
-						{#if song.artist}
-							<button
-								class="block max-w-full truncate hover:text-missionnaire transition-colors cursor-pointer {currentArtist ===
-								song.artist
-									? 'text-missionnaire font-bold underline'
-									: ''}"
-								on:click|stopPropagation={() => handleArtistChange(song.artist || '')}
-							>
-								{song.artist}
-							</button>
-						{:else}
-							-
-						{/if}
-					</div>
-					<div
-						class="hidden md:block text-center text-[11px] lg:text-xs font-mono {isActive
-							? 'text-missionnaire'
-							: 'text-stone-400'}"
-					>
-						{song['duration'] ? formatTime(song['duration']) : '--:--'}
-					</div>
-					<div class="w-7 lg:w-8 text-center hidden md:block">
-						<button
-							class="transition-colors p-1 md:p-1.5 {isFavorite(song._id || song.s3_url, $favorites)
-								? 'text-red-500'
-								: 'text-stone-300 hover:text-red-400'}"
-							on:click|stopPropagation={() => toggleFavorite(song)}
-							title={isFavorite(song._id || song.s3_url, $favorites)
-								? 'Retirer des favoris'
-								: 'Ajouter aux favoris'}
-						>
-							<Icon
-								src={isFavorite(song._id || song.s3_url, $favorites) ? BsHeartFill : BsHeart}
-								size="13"
-							/>
-						</button>
-					</div>
-					<div class="w-9 lg:w-10 text-center">
-						<button
-							class="transition-colors p-1.5 md:p-2 {isActive
-								? 'text-missionnaire/60 hover:text-missionnaire'
-								: 'text-stone-400 hover:text-missionnaire'}"
-							on:click|stopPropagation={() => downloadSong(song)}
-							title="Télécharger"
-						>
-							<Icon src={IoCloudDownloadOutline} size="18" />
-						</button>
-					</div>
-					<div class="w-9 lg:w-10 text-center">
-						<button
-							class="hover:scale-110 active:scale-95 transition-all p-1.5 md:p-2 {isActive
+						<div
+							class="hidden md:block text-center text-[11px] lg:text-xs font-mono {isActive
 								? 'text-missionnaire'
-								: 'text-missionnaire'}"
-							on:click|stopPropagation={() => {
-								if (isActive) {
-									dispatchAudioPlayerAction('toggle');
-								} else {
-									playSong(song);
-								}
-							}}
-							title={isActive && $isPlaying ? 'Pause' : 'Lire'}
+								: 'text-stone-400'}"
 						>
-							<Icon src={isActive && $isPlaying ? IoPauseCircle : IoPlayCircle} size="22" />
-						</button>
+							{song['duration'] ? formatTime(song['duration']) : '--:--'}
+						</div>
+						<div class="w-7 lg:w-8 text-center hidden md:block">
+							<button
+								class="transition-colors p-1 md:p-1.5 {isFavorite(song._id || song.s3_url, $favorites)
+									? 'text-red-500'
+									: 'text-stone-300 hover:text-red-400'}"
+								on:click|stopPropagation={() => toggleFavorite(song)}
+								title={isFavorite(song._id || song.s3_url, $favorites)
+									? 'Retirer des favoris'
+									: 'Ajouter aux favoris'}
+							>
+								<Icon
+									src={isFavorite(song._id || song.s3_url, $favorites) ? BsHeartFill : BsHeart}
+									size="13"
+								/>
+							</button>
+						</div>
+						<div class="w-9 lg:w-10 text-center">
+							<button
+								class="transition-colors p-1.5 md:p-2 {isActive
+									? 'text-missionnaire/60 hover:text-missionnaire'
+									: 'text-stone-400 hover:text-missionnaire'}"
+								on:click|stopPropagation={() => downloadSong(song)}
+								title="Télécharger"
+							>
+								<Icon src={IoCloudDownloadOutline} size="18" />
+							</button>
+						</div>
+						<div class="w-9 lg:w-10 text-center">
+							<button
+								class="hover:scale-110 active:scale-95 transition-all p-1.5 md:p-2 {isActive
+									? 'text-missionnaire'
+									: 'text-missionnaire'}"
+								on:click|stopPropagation={() => {
+									if (isActive) {
+										dispatchAudioPlayerAction('toggle');
+									} else {
+										playSong(song);
+									}
+								}}
+								title={isActive && $isPlaying ? 'Pause' : 'Lire'}
+							>
+								<Icon src={isActive && $isPlaying ? IoPauseCircle : IoPlayCircle} size="22" />
+							</button>
+						</div>
 					</div>
-				</div>
-			{:else}
-				<div class="py-20 text-center">
-					<div class="text-stone-200 mb-4 flex justify-center">
-						<Icon src={BsSearch} size="64" />
+				{:else}
+					<div class="py-20 text-center">
+						<div class="text-stone-200 mb-4 flex justify-center">
+							<Icon src={BsSearch} size="64" />
+						</div>
+						<p class="text-stone-400 font-bold uppercase tracking-widest text-sm">
+							Aucun chant trouvé
+						</p>
 					</div>
-					<p class="text-stone-400 font-bold uppercase tracking-widest text-sm">
-						Aucun chant trouvé
-					</p>
-				</div>
-			{/each}
+				{/each}
+			{/if}
 		</div>
 	</div>
 
 	<!-- Pagination (shared component — same shape as /predications and
 	     /live/rediffusions). Lignes selector stays as music-list chrome;
 	     pagination itself sits on its own row to avoid wrap collisions. -->
-	{#if totalPages > 1}
+	{#if hasResolvedMusicList && totalPages > 1}
 		<div class="mt-12 py-6 border-t border-stone-200/60 flex flex-col gap-6">
 			<div
 				class="flex flex-col sm:flex-row items-center sm:justify-between gap-4 text-[10px] md:text-xs font-bold text-stone-400 tracking-widest uppercase"

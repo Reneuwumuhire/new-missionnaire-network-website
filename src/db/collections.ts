@@ -441,6 +441,68 @@ function seededShuffle<T>(items: T[], seed: string): T[] {
 	return items;
 }
 
+const RANDOM_MUSIC_CACHE_TTL_MS = 60_000;
+const MAX_RANDOM_MUSIC_CACHE_ENTRIES = 20;
+const randomMusicOrderCache = new Map<
+	string,
+	{ data: MusicAudio[]; fetchedAt: number }
+>();
+
+function buildRandomMusicCacheKey(options: {
+	category?: string;
+	search?: string;
+	alpha?: string;
+	artist?: string;
+	number?: number;
+	seed: string;
+}): string {
+	return JSON.stringify({
+		category: options.category ?? '',
+		search: options.search?.trim() ?? '',
+		alpha: options.alpha ?? '',
+		artist: options.artist ?? '',
+		number: options.number ?? null,
+		seed: options.seed
+	});
+}
+
+function pruneRandomMusicOrderCache(now = Date.now()) {
+	for (const [key, entry] of randomMusicOrderCache) {
+		if (now - entry.fetchedAt >= RANDOM_MUSIC_CACHE_TTL_MS) {
+			randomMusicOrderCache.delete(key);
+		}
+	}
+
+	if (randomMusicOrderCache.size <= MAX_RANDOM_MUSIC_CACHE_ENTRIES) return;
+
+	const oldestEntries = [...randomMusicOrderCache.entries()]
+		.sort((a, b) => a[1].fetchedAt - b[1].fetchedAt)
+		.slice(0, randomMusicOrderCache.size - MAX_RANDOM_MUSIC_CACHE_ENTRIES);
+
+	for (const [key] of oldestEntries) {
+		randomMusicOrderCache.delete(key);
+	}
+}
+
+function getRandomMusicOrderFromCache(key: string): MusicAudio[] | null {
+	const cachedEntry = randomMusicOrderCache.get(key);
+	if (!cachedEntry) return null;
+
+	if (Date.now() - cachedEntry.fetchedAt >= RANDOM_MUSIC_CACHE_TTL_MS) {
+		randomMusicOrderCache.delete(key);
+		return null;
+	}
+
+	return cachedEntry.data;
+}
+
+function setRandomMusicOrderCache(key: string, data: MusicAudio[]): MusicAudio[] {
+	const fetchedAt = Date.now();
+	randomMusicOrderCache.set(key, { data, fetchedAt });
+	pruneRandomMusicOrderCache(fetchedAt);
+	return data;
+}
+
 export async function queryMusicAudio(options: {
 	category?: string;
 	search?: string;
@@ -505,39 +567,62 @@ export async function queryMusicAudio(options: {
 		}
 
 		const skip = (pageNumber - 1) * limit;
-		const total = await db.collection('music_audio').countDocuments(query, {
-			collation: { locale: 'fr', strength: 1 }
-		});
-
 		const [property, order] = orderBy.split(/[: ,]/);
 
-		let data;
-		if (property === 'random') {
-			if (seed) {
-				const allData = await db.collection('music_audio').find(query).sort({ _id: 1 }).toArray();
-				const shuffled = seededShuffle(allData, seed);
-				data = shuffled.slice(skip, skip + limit);
-			} else {
-				data = await db
-					.collection('music_audio')
-					.aggregate([{ $match: query }, { $sample: { size: limit } }])
-					.toArray();
-			}
+		let total = 0;
+		let data: MusicAudio[];
+		if (property === 'random' && seed) {
+			const cacheKey = buildRandomMusicCacheKey({
+				category,
+				search,
+				alpha,
+				artist,
+				number,
+				seed
+			});
+			const cachedOrder = getRandomMusicOrderFromCache(cacheKey);
+			const orderedData =
+				cachedOrder ??
+				setRandomMusicOrderCache(
+					cacheKey,
+					seededShuffle(
+						await db.collection('music_audio').find(query).sort({ _id: 1 }).toArray(),
+						seed
+					).map((doc) => serializeDocument<MusicAudio>(doc))
+				);
+
+			total = orderedData.length;
+			data = orderedData.slice(skip, skip + limit);
 		} else {
-			const sort: Sort = {};
-			sort[property] = order === 'asc' ? 1 : -1;
-			data = await db
-				.collection('music_audio')
-				.find(query)
-				.sort(sort)
-				.collation({ locale: 'fr', numericOrdering: true })
-				.skip(skip)
-				.limit(limit)
-				.toArray();
+			total = await db.collection('music_audio').countDocuments(query, {
+				collation: { locale: 'fr', strength: 1 }
+			});
+
+			if (property === 'random') {
+				data = (
+					await db
+						.collection('music_audio')
+						.aggregate([{ $match: query }, { $sample: { size: limit } }])
+						.toArray()
+				).map((doc) => serializeDocument<MusicAudio>(doc));
+			} else {
+				const sort: Sort = {};
+				sort[property] = order === 'asc' ? 1 : -1;
+				data = (
+					await db
+						.collection('music_audio')
+						.find(query)
+						.sort(sort)
+						.collation({ locale: 'fr', numericOrdering: true })
+						.skip(skip)
+						.limit(limit)
+						.toArray()
+				).map((doc) => serializeDocument<MusicAudio>(doc));
+			}
 		}
 
 		return {
-			data: data.map((doc) => serializeDocument<MusicAudio>(doc)),
+			data,
 			total
 		};
 	} catch (error) {

@@ -14,6 +14,14 @@ export interface HistoryItem {
 	addedAt: number;
 }
 
+interface HistorySource {
+	_id?: string | null;
+	title?: string | null;
+	artist?: string | null;
+	category?: string | null;
+	s3_url?: string | null;
+}
+
 function loadFromStorage(key: string): HistoryItem[] {
 	if (!browser) return [];
 	try {
@@ -36,7 +44,7 @@ function saveToStorage(key: string, items: HistoryItem[]) {
 // Recently Played
 export const recentlyPlayed = writable<HistoryItem[]>(loadFromStorage(RECENT_KEY));
 
-export function addToRecentlyPlayed(song: { _id?: string; title?: string; artist?: string; category?: string; s3_url?: string }) {
+export function addToRecentlyPlayed(song: HistorySource) {
 	const id = song._id || song.s3_url || '';
 	if (!id) return;
 
@@ -45,9 +53,9 @@ export function addToRecentlyPlayed(song: { _id?: string; title?: string; artist
 		const entry: HistoryItem = {
 			id,
 			title: song.title || 'Sans titre',
-			artist: song.artist,
-			category: song.category,
-			s3_url: song.s3_url,
+			artist: song.artist ?? undefined,
+			category: song.category ?? undefined,
+			s3_url: song.s3_url ?? undefined,
 			addedAt: Date.now()
 		};
 		const updated = [entry, ...filtered].slice(0, MAX_RECENT);
@@ -59,7 +67,7 @@ export function addToRecentlyPlayed(song: { _id?: string; title?: string; artist
 // Favorites
 export const favorites = writable<HistoryItem[]>(loadFromStorage(FAVORITES_KEY));
 
-export function toggleFavorite(song: { _id?: string; title?: string; artist?: string; category?: string; s3_url?: string }) {
+export function toggleFavorite(song: HistorySource) {
 	const id = song._id || song.s3_url || '';
 	if (!id) return;
 
@@ -72,9 +80,9 @@ export function toggleFavorite(song: { _id?: string; title?: string; artist?: st
 			updated = [{
 				id,
 				title: song.title || 'Sans titre',
-				artist: song.artist,
-				category: song.category,
-				s3_url: song.s3_url,
+				artist: song.artist ?? undefined,
+				category: song.category ?? undefined,
+				s3_url: song.s3_url ?? undefined,
 				addedAt: Date.now()
 			}, ...items];
 		}
