@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="fr">
+	<head>
+		<meta charset="utf-8" />
+		<title>Hors ligne — Missionnaire Network</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="theme-color" content="#FF880C" />
+		<link rel="icon" href="/favicon.ico" />
+		<link rel="manifest" href="/manifest.json" />
+		<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+		<style>
+			* { box-sizing: border-box; }
+			html, body {
+				margin: 0;
+				padding: 0;
+				min-height: 100%;
+				background-color: #FAF8F3;
+				color: #292524;
+				font-family: 'Outfit', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+				-webkit-font-smoothing: antialiased;
+				-moz-osx-font-smoothing: grayscale;
+			}
+			.offline-shell {
+				min-height: 100vh;
+				min-height: 100dvh;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				padding: 32px 24px;
+				text-align: center;
+			}
+			.offline-card {
+				max-width: 520px;
+				width: 100%;
+				padding: 48px 32px;
+				background: #FFFFFF;
+				border: 1px solid rgba(139, 115, 85, 0.12);
+				border-radius: 4px;
+				box-shadow: 0 24px 48px -24px rgba(41, 37, 36, 0.12);
+			}
+			.offline-logo {
+				width: 96px;
+				height: auto;
+				margin: 0 auto 28px;
+				display: block;
+			}
+			.offline-eyebrow {
+				font-size: 11px;
+				font-weight: 600;
+				letter-spacing: 0.35em;
+				text-transform: uppercase;
+				color: #FF880C;
+				margin: 0 0 16px;
+			}
+			.offline-title {
+				font-family: 'Cormorant Garamond', Georgia, serif;
+				font-size: 32px;
+				font-weight: 600;
+				line-height: 1.2;
+				color: #292524;
+				margin: 0 0 12px;
+			}
+			.offline-subtitle {
+				font-size: 15px;
+				line-height: 1.6;
+				color: #57534E;
+				margin: 0 0 28px;
+			}
+			.offline-verse {
+				font-family: 'Cormorant Garamond', Georgia, serif;
+				font-style: italic;
+				font-size: 16px;
+				line-height: 1.6;
+				color: #44403C;
+				padding: 20px 16px;
+				margin: 0 0 32px;
+				border-top: 1px solid rgba(139, 115, 85, 0.18);
+				border-bottom: 1px solid rgba(139, 115, 85, 0.18);
+			}
+			.offline-verse-ref {
+				display: block;
+				margin-top: 10px;
+				font-family: 'Outfit', system-ui, sans-serif;
+				font-style: normal;
+				font-size: 10px;
+				font-weight: 600;
+				letter-spacing: 0.25em;
+				text-transform: uppercase;
+				color: #FF880C;
+			}
+			.offline-actions {
+				display: flex;
+				flex-direction: column;
+				gap: 10px;
+				align-items: stretch;
+			}
+			.offline-btn {
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				gap: 10px;
+				padding: 12px 24px;
+				font-size: 14px;
+				font-weight: 600;
+				letter-spacing: 0.05em;
+				text-decoration: none;
+				border-radius: 2px;
+				transition: transform 0.15s ease, background-color 0.15s ease;
+				cursor: pointer;
+				border: none;
+				font-family: inherit;
+			}
+			.offline-btn-primary {
+				background: #FF880C;
+				color: #FFFFFF;
+			}
+			.offline-btn-primary:hover {
+				background: #E5790B;
+			}
+			.offline-btn-secondary {
+				background: transparent;
+				color: #57534E;
+				border: 1px solid rgba(139, 115, 85, 0.25);
+			}
+			.offline-btn-secondary:hover {
+				border-color: #FF880C;
+				color: #FF880C;
+			}
+			.offline-status {
+				margin-top: 24px;
+				font-size: 12px;
+				color: #A8A29E;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				gap: 8px;
+			}
+			.offline-dot {
+				width: 8px;
+				height: 8px;
+				border-radius: 50%;
+				background: #DC2626;
+				animation: offline-pulse 1.6s ease-in-out infinite;
+			}
+			.offline-status.is-online .offline-dot {
+				background: #16A34A;
+				animation: none;
+			}
+			@keyframes offline-pulse {
+				0%, 100% { opacity: 1; }
+				50% { opacity: 0.4; }
+			}
+			@media (min-width: 480px) {
+				.offline-actions {
+					flex-direction: row;
+					justify-content: center;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<div class="offline-shell">
+			<div class="offline-card">
+				<picture>
+					<source srcset="/icons/logo.webp" type="image/webp" />
+					<img class="offline-logo" src="/icons/logo.png" alt="Missionnaire Network" width="96" height="42" />
+				</picture>
+
+				<p class="offline-eyebrow">Hors ligne</p>
+				<h1 class="offline-title">Vous êtes hors ligne</h1>
+				<p class="offline-subtitle">
+					Aucune connexion internet détectée. Les pages déjà visitées et les pistes audio téléchargées restent disponibles.
+				</p>
+
+				<blockquote class="offline-verse">
+					« Ne crains point, car je suis avec toi ; ne t'effraie point, car je suis ton Dieu. »
+					<span class="offline-verse-ref">Ésaïe 41:10</span>
+				</blockquote>
+
+				<div class="offline-actions">
+					<button class="offline-btn offline-btn-primary" onclick="window.location.reload()">
+						Réessayer
+					</button>
+					<a class="offline-btn offline-btn-secondary" href="/">
+						Retour à l'accueil
+					</a>
+				</div>
+
+				<div id="offline-status" class="offline-status">
+					<span class="offline-dot" aria-hidden="true"></span>
+					<span id="offline-status-text">Aucune connexion</span>
+				</div>
+			</div>
+		</div>
+
+		<script>
+			(function () {
+				var statusEl = document.getElementById('offline-status');
+				var statusText = document.getElementById('offline-status-text');
+				function update() {
+					if (navigator.onLine) {
+						statusEl.classList.add('is-online');
+						statusText.textContent = 'Connexion rétablie — rechargement…';
+						setTimeout(function () { window.location.reload(); }, 600);
+					} else {
+						statusEl.classList.remove('is-online');
+						statusText.textContent = 'Aucune connexion';
+					}
+				}
+				window.addEventListener('online', update);
+				window.addEventListener('offline', update);
+				update();
+			})();
+		</script>
+	</body>
+</html>

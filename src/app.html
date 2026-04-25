@@ -91,14 +91,24 @@
 			})();
 		</script>
 
-		<!-- Branded splash screen — only rendered in PWA standalone mode so
-		     regular web visitors never see it. Inline CSS so it paints before
-		     any external stylesheet loads and bridges the black-screen gap. -->
+		<!-- ── Pure-HTML/CSS splash + anti-flash background ─────────────────
+		     Paints the warm cream background and a branded splash the
+		     instant the document is parsed — before any JS runs, before
+		     SvelteKit hydrates, before the service worker takes control.
+		     This is the core fix for the white-screen-on-first-load gap.
+		     The splash is hidden via the `pwa-ready` class added by
+		     +layout.svelte once Svelte mounts. No JavaScript involved
+		     in the rendering path. -->
 		<style>
-			.app-splash {
-				display: none;
+			/* Lock the page background to the app cream so there is no
+			   white flash before app.css loads or before hydration. */
+			html, body {
+				background-color: #FAF8F3;
+				margin: 0;
+				min-height: 100%;
 			}
-			.pwa-standalone .app-splash {
+
+			.app-splash {
 				position: fixed;
 				inset: 0;
 				z-index: 99999;
@@ -107,16 +117,20 @@
 				align-items: center;
 				justify-content: center;
 				gap: 28px;
-				background: #faf8f3;
+				background: #FAF8F3;
 				pointer-events: none;
+				/* Default fade — applied once <html> gets the
+				   `pwa-ready` class from +layout.svelte (post-hydration). */
+				opacity: 1;
+				visibility: visible;
+				transition: opacity 0.3s ease-out, visibility 0s linear 0.3s;
 			}
-			/* Splash only fades once the app signals it's hydrated
-			   (see +layout.svelte). Previously the splash faded on a
-			   timer regardless of hydration state, which left a white
-			   screen when the network was slow to serve the shell. */
-			.pwa-standalone.pwa-ready .app-splash {
-				animation: app-splash-fade 0.3s ease-out forwards;
+			.pwa-ready .app-splash {
+				opacity: 0;
+				visibility: hidden;
 			}
+			/* In installed PWA mode, the splash also serves as a native-
+			   feel launch screen, so its branding is unchanged here. */
 			.app-splash__logo {
 				width: 136px;
 				height: auto;
@@ -138,9 +152,6 @@
 				text-transform: uppercase;
 				color: rgba(139, 115, 85, 0.6);
 			}
-			@keyframes app-splash-fade {
-				to { opacity: 0; visibility: hidden; }
-			}
 			@keyframes app-splash-enter {
 				from { opacity: 0; transform: translateY(10px) scale(0.96); }
 				to   { opacity: 1; transform: none; }
@@ -150,10 +161,11 @@
 			}
 			/* Respect reduced-motion users — keep the splash static. */
 			@media (prefers-reduced-motion: reduce) {
-				.pwa-standalone .app-splash,
+				.app-splash,
 				.app-splash__logo,
 				.app-splash__spinner {
 					animation: none;
+					transition: none;
 				}
 			}
 		</style>

@@ -9,6 +9,9 @@
 	import OfflineIndicator from '$lib/components/+offlineIndicator.svelte';
 	import PullToRefresh from '$lib/components/+pullToRefresh.svelte';
 	import AudioPlayer from '$lib/components/+audioPlayer.svelte';
+	// ── BEGIN: PWA update banner (added) ────────────────────────────
+	import UpdateBanner from '$lib/components/+updateBanner.svelte';
+	// ── END: PWA update banner ──────────────────────────────────────
 	import { selectAudio } from '$lib/stores/global';
 	import type { LayoutData } from './$types';
 	import { QueryClientProvider } from '@tanstack/svelte-query';
@@ -99,12 +102,13 @@
 
 	// ── PWA resume & splash handoff ─────────────────────────────────
 	// Once Svelte has hydrated we flip a flag on <html> so the inline
-	// splash in app.html fades out immediately (faster than the CSS
-	// animation delay alone). Then record every path the listener
-	// visits so a subsequent PWA launch can resume there.
+	// splash in app.html fades out immediately. Then record every path
+	// the listener visits so a subsequent PWA launch can resume there.
 	onMount(async () => {
 		if (!browser) return;
 		await tick();
+		// ▶︎ THIS is the single line that hides the inline splash from
+		//   app.html (the `.pwa-ready .app-splash` rule fades + hides it).
 		document.documentElement.classList.add('pwa-ready');
 		// Give the fade a moment to finish before yanking the node so
 		// users don't see an abrupt cut — but also never leave it in the
@@ -199,6 +203,11 @@
 	<InstallPrompt />
 	<OfflineIndicator />
 	<PullToRefresh />
+	<!-- ── BEGIN: PWA update banner (added) ─────────────────────────
+	     Shown only when a new service worker is waiting. The user
+	     clicks "Recharger" to apply the update; no forced reloads. -->
+	<UpdateBanner />
+	<!-- ── END: PWA update banner ──────────────────────────────── -->
 	<!-- Global audio player. Mounted at the root so the bottom bar
 	     persists across every navigation — listeners can browse the
 	     site while a sermon or rediffusion keeps playing. Previously
