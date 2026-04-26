@@ -202,7 +202,7 @@
 						{#if user.role === 'superadmin'}
 							<span class="text-xs text-stone-400 italic">Accès complet</span>
 						{:else}
-							<div class="flex items-center gap-1.5">
+							<div class="flex flex-wrap items-center gap-1.5">
 								<span class="inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {ep.can_add ? 'bg-green-100 text-green-700' : 'bg-stone-100 text-stone-400'}">
 									Ajout
 								</span>
@@ -214,6 +214,15 @@
 								</span>
 								<span class="inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {ep.can_manage_recordings ? 'bg-purple-100 text-purple-700' : 'bg-stone-100 text-stone-400'}">
 									Enreg.
+								</span>
+								<span class="inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {ep.can_view_questions ? 'bg-orange-100 text-orange-700' : 'bg-stone-100 text-stone-400'}">
+									Q voir
+								</span>
+								<span class="inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {ep.can_answer_questions ? 'bg-emerald-100 text-emerald-700' : 'bg-stone-100 text-stone-400'}">
+									Q répondre
+								</span>
+								<span class="inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {ep.can_moderate_questions ? 'bg-amber-100 text-amber-700' : 'bg-stone-100 text-stone-400'}">
+									Q modérer
 								</span>
 								<button
 									onclick={() => permissionsEmail = permissionsEmail === user.email ? null : user.email}
@@ -386,6 +395,45 @@
 									<div>
 										<span class="text-sm font-medium text-stone-700">Gérer les enregistrements</span>
 										<p class="text-[10px] text-stone-400">Démarrer / arrêter et publier les directs</p>
+									</div>
+								</label>
+
+								<label class="flex cursor-pointer items-center gap-2 border border-stone-200 bg-white px-3 py-2 transition-colors has-[:checked]:border-orange-300 has-[:checked]:bg-orange-50">
+									<input
+										type="checkbox"
+										name="can_view_questions"
+										checked={ep.can_view_questions}
+										class="h-4 w-4 rounded border-stone-300 text-orange-600 focus:ring-orange-500/30"
+									/>
+									<div>
+										<span class="text-sm font-medium text-stone-700">Voir Questions</span>
+										<p class="text-[10px] text-stone-400">Accéder aux pages Q&amp;R admin</p>
+									</div>
+								</label>
+
+								<label class="flex cursor-pointer items-center gap-2 border border-stone-200 bg-white px-3 py-2 transition-colors has-[:checked]:border-emerald-300 has-[:checked]:bg-emerald-50">
+									<input
+										type="checkbox"
+										name="can_answer_questions"
+										checked={ep.can_answer_questions}
+										class="h-4 w-4 rounded border-stone-300 text-emerald-600 focus:ring-emerald-500/30"
+									/>
+									<div>
+										<span class="text-sm font-medium text-stone-700">Répondre aux questions</span>
+										<p class="text-[10px] text-stone-400">Publier réponses pastorales et références</p>
+									</div>
+								</label>
+
+								<label class="flex cursor-pointer items-center gap-2 border border-stone-200 bg-white px-3 py-2 transition-colors has-[:checked]:border-amber-300 has-[:checked]:bg-amber-50">
+									<input
+										type="checkbox"
+										name="can_moderate_questions"
+										checked={ep.can_moderate_questions}
+										class="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500/30"
+									/>
+									<div>
+										<span class="text-sm font-medium text-stone-700">Modérer les questions</span>
+										<p class="text-[10px] text-stone-400">Approuver, masquer, verrouiller, traiter rapports</p>
 									</div>
 								</label>
 

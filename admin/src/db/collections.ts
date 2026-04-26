@@ -417,6 +417,9 @@ export async function updateAdminPermissions(
 		can_edit: boolean;
 		can_delete: boolean;
 		can_manage_recordings: boolean;
+		can_view_questions: boolean;
+		can_answer_questions: boolean;
+		can_moderate_questions: boolean;
 	}
 ): Promise<boolean> {
 	const db = await getDb();

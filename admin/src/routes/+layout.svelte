@@ -30,7 +30,8 @@
 				name: data.user.name,
 				email: data.user.email,
 				role: data.user.role,
-				canManageRecordings: data.user.permissions.can_manage_recordings
+				canManageRecordings: data.user.permissions.can_manage_recordings,
+				canViewQuestions: data.user.permissions.can_view_questions
 			}}
 			broadcastIsLive={data.broadcastIsLive}
 		/>

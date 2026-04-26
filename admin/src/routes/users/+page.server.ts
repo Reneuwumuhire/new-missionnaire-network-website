@@ -150,6 +150,9 @@ export const actions: Actions = {
 		const canEdit = formData.get('can_edit') === 'on';
 		const canDelete = formData.get('can_delete') === 'on';
 		const canManageRecordings = formData.get('can_manage_recordings') === 'on';
+		const canViewQuestions = formData.get('can_view_questions') === 'on';
+		const canAnswerQuestions = formData.get('can_answer_questions') === 'on';
+		const canModerateQuestions = formData.get('can_moderate_questions') === 'on';
 
 		if (!email) {
 			return fail(400, { permError: 'Email requis' });
@@ -159,7 +162,10 @@ export const actions: Actions = {
 			can_add: canAdd,
 			can_edit: canEdit,
 			can_delete: canDelete,
-			can_manage_recordings: canManageRecordings
+			can_manage_recordings: canManageRecordings,
+			can_view_questions: canViewQuestions,
+			can_answer_questions: canAnswerQuestions,
+			can_moderate_questions: canModerateQuestions
 		};
 
 		await updateAdminPermissions(email, nextPermissions);
