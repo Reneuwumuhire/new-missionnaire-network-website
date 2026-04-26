@@ -40,8 +40,12 @@ export async function connect() {
 					deprecationErrors: true
 				},
 				maxPoolSize: 10,
-				minPoolSize: 5,
-				serverSelectionTimeoutMS: 5000,
+				// minPoolSize=0 (driver default): open sockets lazily as
+				// queries arrive instead of eagerly filling 5 on startup.
+				// Eager fill could overwhelm Atlas M0's connection-handshake
+				// throttle when the admin process was already opening
+				// sockets, causing ServerSelectionTimeout / ReplicaSetNoPrimary.
+				serverSelectionTimeoutMS: 30000,
 				socketTimeoutMS: 45000,
 				connectTimeoutMS: 10000
 			});

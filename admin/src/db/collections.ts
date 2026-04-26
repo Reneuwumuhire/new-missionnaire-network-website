@@ -687,8 +687,13 @@ const BROADCAST_DEFAULT: BroadcastAdminState = {
 const BROADCAST_TTL_MS = 3_000;
 let cachedBroadcast: { value: BroadcastAdminState; cachedAt: number } | null = null;
 
-export async function getBroadcastAdminState(): Promise<BroadcastAdminState> {
-	if (cachedBroadcast && Date.now() - cachedBroadcast.cachedAt < BROADCAST_TTL_MS) {
+export async function getBroadcastAdminState(opts?: {
+	fresh?: boolean;
+}): Promise<BroadcastAdminState> {
+	// Mutating handlers (go-live / end-live) gate on `is_live` and must never
+	// short-circuit on a stale cache — a stale `is_live: true` would skip the
+	// notification_pending write and the push would never fire.
+	if (!opts?.fresh && cachedBroadcast && Date.now() - cachedBroadcast.cachedAt < BROADCAST_TTL_MS) {
 		return cachedBroadcast.value;
 	}
 	const db = await getDb();
@@ -724,7 +729,6 @@ export async function getBroadcastAdminState(): Promise<BroadcastAdminState> {
 }
 
 export async function setBroadcastAdminState(updates: Partial<BroadcastAdminState>): Promise<void> {
-	cachedBroadcast = null;
 	const db = await getDb();
 	await db
 		.collection('broadcast_admin_state')
@@ -733,6 +737,9 @@ export async function setBroadcastAdminState(updates: Partial<BroadcastAdminStat
 			{ $set: { ...updates, updated_at: new Date().toISOString() } },
 			{ upsert: true }
 		);
+	// Invalidate after the write so a concurrent in-flight read can't refill
+	// the cache with the pre-write value.
+	cachedBroadcast = null;
 }
 
 export async function countPushSubscriptions(): Promise<number> {
