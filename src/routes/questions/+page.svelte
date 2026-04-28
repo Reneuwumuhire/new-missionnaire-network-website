@@ -31,6 +31,22 @@
 		});
 	}
 
+	function formatShortDate(value: string | null): string {
+		if (!value) return '-';
+		return new Date(value).toLocaleDateString('fr-FR', {
+			day: 'numeric',
+			month: 'short'
+		});
+	}
+
+	function activityDateValue(question: Question): string {
+		return formatShortDate(question.answeredAt ?? question.approvedAt ?? question.createdAt);
+	}
+
+	function activityDateLabel(question: Question): string {
+		return question.answeredAt ? 'Répondu' : 'Publié';
+	}
+
 	function getPageHref(page: number): string {
 		const params = new URLSearchParams();
 		if (data.search) params.set('search', data.search);
@@ -183,7 +199,7 @@
 							</h2>
 							<p class="mt-2 line-clamp-2 text-sm leading-6 text-stone-600">{stripRichTextFormatting(question.body)}</p>
 						</div>
-						<div class="grid grid-cols-3 gap-2 text-center md:w-56 md:shrink-0">
+						<div class="grid grid-cols-3 gap-2 text-center md:w-64 md:shrink-0">
 							<div class="border border-stone-100 bg-cream/60 px-3 py-2">
 								<p class="text-lg font-semibold text-stone-800">{question.replyCount}</p>
 								<p class="text-[10px] uppercase tracking-wider text-stone-400">Réponses</p>
@@ -192,11 +208,11 @@
 								<p class="text-lg font-semibold text-stone-800">{question.viewCount}</p>
 								<p class="text-[10px] uppercase tracking-wider text-stone-400">Vues</p>
 							</div>
-							<div class="border border-stone-100 bg-cream/60 px-3 py-2">
-								<p class="text-lg font-semibold text-stone-800">
-									{question.answeredAt ? formatDate(question.answeredAt).split(' ')[0] : '-'}
+							<div class="border border-stone-100 bg-cream/60 px-2 py-2">
+								<p class="whitespace-nowrap text-sm font-semibold leading-6 text-stone-800">
+									{activityDateValue(question)}
 								</p>
-								<p class="text-[10px] uppercase tracking-wider text-stone-400">Jour</p>
+								<p class="text-[10px] uppercase tracking-wider text-stone-400">{activityDateLabel(question)}</p>
 							</div>
 						</div>
 					</div>

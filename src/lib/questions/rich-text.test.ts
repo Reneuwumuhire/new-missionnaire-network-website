@@ -3,12 +3,14 @@ import { parseRichText, stripRichTextFormatting } from './rich-text';
 
 describe('rich text formatting', () => {
 	it('parses supported inline formatting safely', () => {
-		expect(parseRichText('Un **mot** __souligne__ et ~~barre~~.')).toEqual([
+		expect(parseRichText('Un **mot** *italique* __souligne__ et ~~barre~~.')).toEqual([
 			{
 				type: 'paragraph',
 				children: [
 					{ type: 'text', text: 'Un ' },
 					{ type: 'bold', children: [{ type: 'text', text: 'mot' }] },
+					{ type: 'text', text: ' ' },
+					{ type: 'italic', children: [{ type: 'text', text: 'italique' }] },
 					{ type: 'text', text: ' ' },
 					{ type: 'underline', children: [{ type: 'text', text: 'souligne' }] },
 					{ type: 'text', text: ' et ' },
@@ -42,7 +44,40 @@ describe('rich text formatting', () => {
 		]);
 	});
 
+	it('parses safe markdown links and pasted urls', () => {
+		expect(
+			parseRichText('Voir [la vidéo](https://www.youtube.com/watch?v=abc123) et https://cdn.example.org/transcription.pdf.')
+		).toEqual([
+			{
+				type: 'paragraph',
+				children: [
+					{ type: 'text', text: 'Voir ' },
+					{
+						type: 'link',
+						href: 'https://www.youtube.com/watch?v=abc123',
+						children: [{ type: 'text', text: 'la vidéo' }]
+					},
+					{ type: 'text', text: ' et ' },
+					{
+						type: 'link',
+						href: 'https://cdn.example.org/transcription.pdf',
+						children: [{ type: 'text', text: 'https://cdn.example.org/transcription.pdf' }]
+					},
+					{ type: 'text', text: '.' }
+				]
+			}
+		]);
+	});
+
+	it('keeps unsafe markdown links as text', () => {
+		expect(parseRichText('[piège](javascript:alert(1))')).toEqual([
+			{ type: 'paragraph', children: [{ type: 'text', text: '[piège](javascript:alert(1))' }] }
+		]);
+	});
+
 	it('strips markers for metadata snippets', () => {
-		expect(stripRichTextFormatting('> **Jean 14:6**\n- __Je suis__\n1. ~~ici~~')).toBe('Jean 14:6\nJe suis\nici');
+		expect(stripRichTextFormatting('> **Jean 14:6**\n- __Je suis__\n1. ~~ici~~\n[PDF](https://example.org/a.pdf)')).toBe(
+			'Jean 14:6\nJe suis\nici\nPDF'
+		);
 	});
 });

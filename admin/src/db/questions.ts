@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { ObjectId, type Document, type Filter, type Sort } from 'mongodb';
 import { getDb } from './mongo';
 import { canAnswerQuestions } from '$lib/models/admin-user';
@@ -72,7 +73,9 @@ export async function ensureQuestionIndexes(): Promise<void> {
 			db.collection('questions').createIndex({ category: 1, status: 1, lastActivityAt: -1 }),
 			db.collection('questions').createIndex({ contentFingerprint: 1, authorId: 1, createdAt: -1 }),
 			db.collection('questions').createIndex({ title: 'text', body: 'text', tags: 'text' }),
-			db.collection('questionReplies').createIndex({ questionId: 1, visibilityStatus: 1, createdAt: 1 }),
+			db
+				.collection('questionReplies')
+				.createIndex({ questionId: 1, visibilityStatus: 1, createdAt: 1 }),
 			db.collection('questionReplies').createIndex({ authorId: 1, createdAt: -1 }),
 			db.collection('questionReports').createIndex({ status: 1, createdAt: -1 }),
 			db
@@ -80,7 +83,9 @@ export async function ensureQuestionIndexes(): Promise<void> {
 				.createIndex({ targetType: 1, targetId: 1, reporterId: 1 }, { unique: true }),
 			db.collection('questionReferences').createIndex({ questionId: 1, replyId: 1 }),
 			db.collection('moderationActions').createIndex({ targetType: 1, targetId: 1, createdAt: -1 }),
-			db.collection('notifications').createIndex({ recipientType: 1, recipientId: 1, readAt: 1, createdAt: -1 })
+			db
+				.collection('notifications')
+				.createIndex({ recipientType: 1, recipientId: 1, readAt: 1, createdAt: -1 })
 		]);
 	})();
 	return indexesReady;
@@ -126,7 +131,9 @@ function buildAdminQuestionQuery(options: {
 	search?: string;
 	answered?: string;
 }): Filter<Document> {
-	const conditions: Filter<Document>[] = [];
+	const conditions: Filter<Document>[] = [
+		{ $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }] }
+	];
 	if (options.status && options.status !== 'all') {
 		conditions.push({ status: options.status });
 	}
@@ -146,7 +153,7 @@ function buildAdminQuestionQuery(options: {
 			]
 		});
 	}
-	return conditions.length ? { $and: conditions } : {};
+	return { $and: conditions };
 }
 
 export async function listAdminQuestions(options: {
@@ -176,9 +183,15 @@ export async function listAdminQuestions(options: {
 			.limit(limit)
 			.toArray(),
 		db.collection('questions').countDocuments(query),
-		db.collection('questions').countDocuments({ status: 'pending' }),
+		db.collection('questions').countDocuments({
+			status: 'pending',
+			$or: [{ deletedAt: null }, { deletedAt: { $exists: false } }]
+		}),
 		db.collection('questionReports').countDocuments({ status: 'open' }),
-		db.collection('questions').countDocuments({ status: 'hidden' })
+		db.collection('questions').countDocuments({
+			status: 'hidden',
+			$or: [{ deletedAt: null }, { deletedAt: { $exists: false } }]
+		})
 	]);
 
 	return {
@@ -203,9 +216,21 @@ export async function getQuestionAdminDetail(id: string): Promise<{
 	const question = serializeDocument<Question>(questionDoc);
 
 	const [replyDocs, referenceDocs, reportDocs, actionDocs] = await Promise.all([
-		db.collection('questionReplies').find({ questionId: question._id }).sort({ createdAt: 1 }).toArray(),
-		db.collection('questionReferences').find({ questionId: question._id }).sort({ createdAt: 1 }).toArray(),
-		db.collection('questionReports').find({ questionId: question._id }).sort({ createdAt: -1 }).toArray(),
+		db
+			.collection('questionReplies')
+			.find({ questionId: question._id })
+			.sort({ createdAt: 1 })
+			.toArray(),
+		db
+			.collection('questionReferences')
+			.find({ questionId: question._id })
+			.sort({ createdAt: 1 })
+			.toArray(),
+		db
+			.collection('questionReports')
+			.find({ questionId: question._id })
+			.sort({ createdAt: -1 })
+			.toArray(),
 		db
 			.collection('moderationActions')
 			.find({ targetId: question._id })
@@ -248,17 +273,21 @@ export async function updateQuestionModeration(input: {
 	if (input.action === 'approve') {
 		set.status = question.officialAnswerId ? 'answered' : 'approved';
 		set.approvedAt = question.approvedAt ?? now;
+		set.deletedAt = null;
 	} else if (input.action === 'reject') {
 		set.status = 'rejected';
 	} else if (input.action === 'hide') {
 		set.status = 'hidden';
 	} else if (input.action === 'unhide') {
 		set.status = question.officialAnswerId ? 'answered' : 'approved';
+		set.deletedAt = null;
 	} else if (input.action === 'archive') {
 		set.status = 'archived';
 	} else if (input.action === 'soft_delete') {
 		set.status = 'hidden';
 		set.deletedAt = now;
+		set.featured = false;
+		set.locked = true;
 	} else if (input.action === 'lock') {
 		set.locked = true;
 	} else if (input.action === 'unlock') {
@@ -279,6 +308,34 @@ export async function updateQuestionModeration(input: {
 		action: input.action,
 		reason: input.reason
 	});
+}
+
+export async function permanentlyDeleteQuestion(input: {
+	id: string;
+	moderator: AdminUser;
+	reason: string | null;
+}): Promise<void> {
+	await ensureQuestionIndexes();
+	const db = await getDb();
+	const questionId = idFromString(input.id);
+	const question = await db.collection('questions').findOne({ _id: questionId });
+	if (!question) throw new Error('Question introuvable');
+
+	await recordModerationAction({
+		targetType: 'question',
+		targetId: input.id,
+		moderator: input.moderator,
+		action: 'permanent_delete',
+		reason: input.reason
+	});
+
+	await Promise.all([
+		db.collection('questions').deleteOne({ _id: questionId }),
+		db.collection('questionReplies').deleteMany({ questionId: input.id }),
+		db.collection('questionReferences').deleteMany({ questionId: input.id }),
+		db.collection('questionReports').deleteMany({ questionId: input.id }),
+		db.collection('notifications').deleteMany({ href: `/questions/${String(question.slug || '')}` })
+	]);
 }
 
 export async function editQuestionForModeration(input: {
@@ -329,7 +386,9 @@ export async function setReplyVisibility(input: {
 	if (input.visibilityStatus === 'deleted') set.deletedAt = now;
 	else set.deletedAt = null;
 
-	await db.collection('questionReplies').updateOne({ _id: idFromString(input.replyId) }, { $set: set });
+	await db
+		.collection('questionReplies')
+		.updateOne({ _id: idFromString(input.replyId) }, { $set: set });
 	await recordModerationAction({
 		targetType: 'reply',
 		targetId: input.replyId,
@@ -347,7 +406,9 @@ export async function upsertOfficialAnswer(input: {
 	await ensureQuestionIndexes();
 	const db = await getDb();
 	const now = new Date();
-	const question = await db.collection('questions').findOne({ _id: idFromString(input.questionId) });
+	const question = await db
+		.collection('questions')
+		.findOne({ _id: idFromString(input.questionId) });
 	if (!question) throw new Error('Question introuvable');
 
 	let replyId = question.officialAnswerId as string | null;
@@ -416,7 +477,7 @@ export async function upsertOfficialAnswer(input: {
 }
 
 function optionFromDoc(type: QuestionReferenceType, doc: Document): ReferenceOption | null {
-	if (type === 'bible') return null;
+	if (type === 'bible' || type === 'text') return null;
 	const id = doc._id?.toString?.();
 	if (!id) return null;
 
@@ -437,7 +498,9 @@ function optionFromDoc(type: QuestionReferenceType, doc: Document): ReferenceOpt
 
 	if (type === 'video') {
 		const youtubeId = String(doc.id || doc.display_id || '');
-		const href = String(doc.webpage_url || (youtubeId ? `https://www.youtube.com/watch?v=${youtubeId}` : ''));
+		const href = String(
+			doc.webpage_url || (youtubeId ? `https://www.youtube.com/watch?v=${youtubeId}` : '')
+		);
 		if (!href) return null;
 		return {
 			id,
@@ -466,7 +529,9 @@ function optionFromDoc(type: QuestionReferenceType, doc: Document): ReferenceOpt
 		};
 	}
 
-	const href = String(doc.pdf_url || doc.mp3_url || doc.english_pdf_url || doc.english_audio_url || '');
+	const href = String(
+		doc.pdf_url || doc.mp3_url || doc.english_pdf_url || doc.english_audio_url || ''
+	);
 	if (!href) return null;
 	return {
 		id,
@@ -481,34 +546,56 @@ function optionFromDoc(type: QuestionReferenceType, doc: Document): ReferenceOpt
 	};
 }
 
-export async function listReferenceOptions(search = ''): Promise<Record<QuestionReferenceType, ReferenceOption[]>> {
+export async function listReferenceOptions(
+	search = '',
+	limit = 25
+): Promise<Record<QuestionReferenceType, ReferenceOption[]>> {
 	const db = await getDb();
 	const escaped = search.trim() ? escapeRegex(search.trim()) : '';
 	const regex = escaped ? { $regex: escaped, $options: 'i' } : undefined;
-	const [pdfs, videos, music, sermons] = await Promise.all([
+	const resultLimit = Math.min(Math.max(limit, 1), 50);
+	const [pdfs, videos, sermons] = await Promise.all([
 		db
 			.collection('pdfs')
-			.find(regex ? { filename: regex } : {})
+			.find(regex ? { $or: [{ filename: regex }, { url: regex }] } : {})
 			.sort({ publishedOn: -1 })
-			.limit(12)
+			.limit(resultLimit)
 			.toArray(),
 		db
 			.collection('videos')
-			.find(regex ? { title: regex } : {})
+			.find(
+				regex
+					? {
+							$or: [
+								{ title: regex },
+								{ fulltitle: regex },
+								{ display_id: regex },
+								{ webpage_url: regex }
+							]
+						}
+					: {}
+			)
 			.sort({ release_timestamp: -1 })
-			.limit(12)
-			.toArray(),
-		db
-			.collection('music_audio')
-			.find(regex ? { title: regex } : {})
-			.sort({ uploaded_at: -1 })
-			.limit(12)
+			.limit(resultLimit)
 			.toArray(),
 		db
 			.collection('sermons')
-			.find(regex ? { $or: [{ french_title: regex }, { english_title: regex }, { full_date_code: regex }] } : {})
+			.find(
+				regex
+					? {
+							$or: [
+								{ french_title: regex },
+								{ english_title: regex },
+								{ full_date_code: regex },
+								{ author: regex },
+								{ pdf_url: regex },
+								{ mp3_url: regex }
+							]
+						}
+					: {}
+			)
 			.sort({ iso_date: -1 })
-			.limit(12)
+			.limit(resultLimit)
 			.toArray()
 	]);
 
@@ -517,15 +604,16 @@ export async function listReferenceOptions(search = ''): Promise<Record<Question
 		.filter((option): option is ReferenceOption => Boolean(option));
 
 	return {
-		pdf: pdfs.map((doc) => optionFromDoc('pdf', doc)).filter((option): option is ReferenceOption => Boolean(option)),
+		pdf: pdfs
+			.map((doc) => optionFromDoc('pdf', doc))
+			.filter((option): option is ReferenceOption => Boolean(option)),
 		video: videos
 			.map((doc) => optionFromDoc('video', doc))
 			.filter((option): option is ReferenceOption => Boolean(option)),
-		music: music
-			.map((doc) => optionFromDoc('music', doc))
-			.filter((option): option is ReferenceOption => Boolean(option)),
 		sermon: sermonOptions,
 		audio: sermonOptions.map((option) => ({ ...option, type: 'audio' })),
+		text: [],
+		music: [],
 		bible: []
 	};
 }
@@ -534,7 +622,9 @@ async function resolveReferenceOption(
 	type: QuestionReferenceType,
 	referencedContentId: string
 ): Promise<ReferenceOption> {
-	if (type === 'bible') throw new Error('Les références bibliques sont ajoutées manuellement');
+	if (type === 'bible' || type === 'text') {
+		throw new Error('Cette référence est ajoutée manuellement');
+	}
 	const db = await getDb();
 	const collectionName =
 		type === 'pdf'
@@ -544,7 +634,9 @@ async function resolveReferenceOption(
 				: type === 'music'
 					? 'music_audio'
 					: 'sermons';
-	const doc = await db.collection(collectionName).findOne({ _id: idFromString(referencedContentId) });
+	const doc = await db
+		.collection(collectionName)
+		.findOne({ _id: idFromString(referencedContentId) });
 	const option = doc ? optionFromDoc(type, doc) : null;
 	if (!option) throw new Error('Référence introuvable');
 	return option;
@@ -613,13 +705,52 @@ export async function addBibleQuestionReference(input: {
 	});
 }
 
+export async function addManualQuestionReference(input: {
+	questionId: string;
+	replyId: string | null;
+	type: Exclude<QuestionReferenceType, 'bible' | 'music'>;
+	title: string;
+	href: string;
+	note: string | null;
+	moderator: AdminUser;
+}): Promise<void> {
+	await ensureQuestionIndexes();
+	const db = await getDb();
+	const referencedContentId = `manual:${createHash('sha1').update(`${input.type}:${input.href}`).digest('hex')}`;
+	await db.collection('questionReferences').insertOne({
+		questionId: input.questionId,
+		replyId: input.replyId,
+		type: input.type,
+		referencedContentId,
+		title: input.title,
+		href: input.href,
+		metadata: {
+			manual: true,
+			text: input.note
+		},
+		createdAt: new Date(),
+		createdBy: input.moderator.email
+	});
+	await recordModerationAction({
+		targetType: 'question',
+		targetId: input.questionId,
+		moderator: input.moderator,
+		action: 'add_reference',
+		reason: input.title
+	});
+}
+
 export async function removeQuestionReference(input: {
 	referenceId: string;
 	questionId: string;
 	moderator: AdminUser;
 }): Promise<void> {
 	const db = await getDb();
-	await db.collection('questionReferences').deleteOne({ _id: idFromString(input.referenceId) });
+	const result = await db.collection('questionReferences').deleteOne({
+		_id: idFromString(input.referenceId),
+		questionId: input.questionId
+	});
+	if (result.deletedCount === 0) throw new Error('Référence introuvable');
 	await recordModerationAction({
 		targetType: 'question',
 		targetId: input.questionId,
@@ -652,7 +783,10 @@ export async function listOpenReports(options: {
 		.filter((id) => ObjectId.isValid(id))
 		.map((id) => new ObjectId(id));
 	const questionDocs = questionIds.length
-		? await db.collection('questions').find({ _id: { $in: questionIds } }).toArray()
+		? await db
+				.collection('questions')
+				.find({ _id: { $in: questionIds } })
+				.toArray()
 		: [];
 	const questions = Object.fromEntries(
 		questionDocs.map((doc) => {

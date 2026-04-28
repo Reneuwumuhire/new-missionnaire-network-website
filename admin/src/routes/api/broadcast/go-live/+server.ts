@@ -22,7 +22,9 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		// Empty body is fine — stay with default `true`.
 	}
 
-	const current = await getBroadcastAdminState();
+	// Bypass the per-process cache — a stale `is_live: true` here would skip
+	// the notification_pending write below and the push would never fire.
+	const current = await getBroadcastAdminState({ fresh: true });
 	if (current.is_live) {
 		// Idempotent: already live → just return current state without re-firing the push.
 		return json({ ok: true, alreadyLive: true, state: current });

@@ -10,7 +10,7 @@ export const QUESTION_STATUSES = [
 
 export type QuestionStatus = (typeof QUESTION_STATUSES)[number];
 
-export const QUESTION_REFERENCE_TYPES = ['pdf', 'audio', 'video', 'sermon', 'music', 'bible'] as const;
+export const QUESTION_REFERENCE_TYPES = ['pdf', 'audio', 'video', 'sermon', 'text', 'music', 'bible'] as const;
 export type QuestionReferenceType = (typeof QUESTION_REFERENCE_TYPES)[number];
 
 export interface Question {

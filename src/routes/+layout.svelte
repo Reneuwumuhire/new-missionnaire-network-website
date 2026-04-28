@@ -9,16 +9,14 @@
 	import OfflineIndicator from '$lib/components/+offlineIndicator.svelte';
 	import PullToRefresh from '$lib/components/+pullToRefresh.svelte';
 	import AudioPlayer from '$lib/components/+audioPlayer.svelte';
-	// ── BEGIN: PWA update banner (added) ────────────────────────────
 	import UpdateBanner from '$lib/components/+updateBanner.svelte';
-	// ── END: PWA update banner ──────────────────────────────────────
 	import ResumeRecorder from '$lib/components/+resumeRecorder.svelte';
 	import { selectAudio } from '$lib/stores/global';
 	import type { LayoutData } from './$types';
 	import { QueryClientProvider } from '@tanstack/svelte-query';
 	import { navigating, page } from '$app/stores';
 	import { afterNavigate, goto } from '$app/navigation';
-	import { browser } from '$app/environment';
+	import { browser, dev } from '$app/environment';
 	import { onMount, onDestroy, tick } from 'svelte';
 	import { radioIsLive } from '$lib/stores/global';
 	export let data: LayoutData;
@@ -180,23 +178,33 @@
 		};
 	});
 
-	// ── BEGIN: service worker registration (added) ──────────────────
 	// SvelteKit auto-registers `src/service-worker.ts` in production
 	// builds; this explicit hook is a belt-and-braces fallback so the
 	// audio cache layer also activates in environments where the auto-
-	// registration might be disabled (custom adapters, dev preview).
+	// registration might be disabled (custom adapters, preview builds).
 	// `register('/service-worker.js')` is idempotent — the browser
 	// dedupes by scope URL, so registering twice is a no-op.
 	onMount(() => {
 		if (!browser) return;
 		if (!('serviceWorker' in navigator)) return;
+		if (dev) {
+			navigator.serviceWorker.getRegistrations?.().then((registrations) => {
+				registrations
+					.filter((registration) => registration.scope === `${window.location.origin}/`)
+					.forEach((registration) => {
+						registration.unregister().catch(() => {
+							/* ignore dev cleanup failures */
+						});
+					});
+			});
+			return;
+		}
 		navigator.serviceWorker
 			.register('/service-worker.js', { scope: '/', type: 'module' })
 			.catch((err) => {
-			console.warn('[SW] registration failed:', err);
+				console.warn('[SW] registration failed:', err);
 			});
 	});
-	// ── END: service worker registration ────────────────────────────
 
 	afterNavigate(({ to }) => {
 		if (!browser || !to) return;
@@ -272,11 +280,7 @@
 	<InstallPrompt />
 	<OfflineIndicator />
 	<PullToRefresh />
-	<!-- ── BEGIN: PWA update banner (added) ─────────────────────────
-	     Shown only when a new service worker is waiting. The user
-	     clicks "Recharger" to apply the update; no forced reloads. -->
 	<UpdateBanner />
-	<!-- ── END: PWA update banner ──────────────────────────────── -->
 	<!-- Global audio player. Mounted at the root so the bottom bar
 	     persists across every navigation — listeners can browse the
 	     site while a sermon or rediffusion keeps playing. Previously

@@ -3,6 +3,7 @@ import {
 	normalizeForDuplicateCheck,
 	sanitizePlainText,
 	slugifyQuestionTitle,
+	validateGuestName,
 	validateQuestionInput,
 	validateReplyInput,
 	validateReportInput
@@ -36,5 +37,10 @@ describe('question validation', () => {
 		expect(validateReplyInput({ body: 'Amen' }).ok).toBe(false);
 		expect(validateReplyInput({ body: 'Merci pour cette réponse.' }).ok).toBe(true);
 		expect(validateReportInput({ reason: 'spam' }).ok).toBe(true);
+	});
+
+	it('validates guest display names', () => {
+		expect(validateGuestName('  Anne Demo  ').value).toBe('Anne Demo');
+		expect(validateGuestName('!').ok).toBe(false);
 	});
 });

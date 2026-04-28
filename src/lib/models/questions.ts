@@ -13,7 +13,7 @@ export type QuestionStatus = (typeof QUESTION_STATUSES)[number];
 export const REPLY_VISIBILITY_STATUSES = ['visible', 'hidden', 'deleted'] as const;
 export type ReplyVisibilityStatus = (typeof REPLY_VISIBILITY_STATUSES)[number];
 
-export const QUESTION_REFERENCE_TYPES = ['pdf', 'audio', 'video', 'sermon', 'music', 'bible'] as const;
+export const QUESTION_REFERENCE_TYPES = ['pdf', 'audio', 'video', 'sermon', 'text', 'music', 'bible'] as const;
 export type QuestionReferenceType = (typeof QUESTION_REFERENCE_TYPES)[number];
 
 export const QUESTION_REPORT_TARGET_TYPES = ['question', 'reply'] as const;

@@ -9,7 +9,30 @@
 	export let form: ActionData;
 
 	let submitting = false;
-	$: formDisabled = !data.user;
+	$: isAdminUser = data.user?.role === 'superadmin' || data.user?.role === 'editor';
+	$: displayName = form?.values?.displayName ?? (!isAdminUser && data.user ? data.user.name : '');
+
+	const statusLabels: Record<string, string> = {
+		pending: 'En attente',
+		approved: 'Publiée',
+		answered: 'Répondue',
+		rejected: 'Non retenue',
+		hidden: 'Masquée',
+		archived: 'Archivée'
+	};
+
+	function formatDate(value: string | null): string {
+		if (!value) return '';
+		return new Date(value).toLocaleDateString('fr-FR', {
+			day: 'numeric',
+			month: 'short',
+			year: 'numeric'
+		});
+	}
+
+	function isPublicQuestion(status: string): boolean {
+		return status === 'approved' || status === 'answered';
+	}
 </script>
 
 <svelte:head>
@@ -39,30 +62,61 @@
 			Poser une question
 		</h1>
 		<p class="mt-3 max-w-2xl text-sm leading-7 text-stone-600 md:text-base">
-			Les questions sont relues avant publication afin de garder un espace paisible et utile à
-			l'édification.
+			Aucun compte n'est nécessaire. Vous pouvez indiquer un nom public ou rester anonyme ; ce
+			navigateur gardera vos questions pour vous aider à suivre les réponses et à demander une
+			précision.
 		</p>
 	</section>
 
 	{#if data.submitted}
 		<div class="mb-6 border border-green-200 bg-green-50 p-5 text-sm text-green-800">
-			Votre question a été envoyée. Elle sera visible après validation par un modérateur.
+			Votre question a été envoyée. Elle sera visible après validation par un modérateur, et vous
+			pourrez la retrouver ici depuis ce même navigateur.
 		</div>
 	{/if}
 
-	{#if !data.user}
-		<div class="mb-6 border border-amber-200 bg-amber-50 p-6">
-			<h2 class="font-display text-2xl font-semibold text-stone-800">Connexion requise</h2>
-			<p class="mt-2 text-sm leading-6 text-stone-600">
-				Le formulaire est affiché ci-dessous pour montrer le parcours. La soumission sera activée
-				dès qu'une session utilisateur publique sera branchée.
-			</p>
+	{#if data.myQuestions.length > 0}
+		<div class="mb-6 border border-stone-200/70 bg-white/55 p-5">
+			<div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+				<div>
+					<p class="text-[11px] font-bold uppercase tracking-[0.18em] text-missionnaire">Suivi</p>
+					<h2 class="font-display text-2xl font-semibold text-stone-900">Mes questions</h2>
+				</div>
+				<p class="text-xs text-stone-500">Gardées sur ce navigateur</p>
+			</div>
+			<div class="grid gap-3">
+				{#each data.myQuestions as question}
+					<article class="border border-stone-100 bg-white p-4">
+						<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+							<div>
+								<p class="text-[11px] font-semibold uppercase tracking-[0.16em] {question.status === 'answered' ? 'text-green-700' : 'text-stone-500'}">
+									{statusLabels[question.status] ?? question.status}
+								</p>
+								<h3 class="mt-1 font-display text-xl font-semibold text-stone-900">{question.title}</h3>
+								<p class="mt-1 text-xs text-stone-500">
+									Posée le {formatDate(question.createdAt)}
+									{#if question.answeredAt}
+										- Réponse le {formatDate(question.answeredAt)}
+									{/if}
+								</p>
+							</div>
+							{#if isPublicQuestion(question.status)}
+								<a href={`/questions/${question.slug}`} class="text-xs font-bold uppercase tracking-[0.16em] text-missionnaire hover:text-stone-900">
+									Ouvrir
+								</a>
+							{:else}
+								<span class="text-xs text-stone-400">En relecture</span>
+							{/if}
+						</div>
+					</article>
+				{/each}
+			</div>
 		</div>
 	{/if}
 
 	<form
 		method="POST"
-		class="border border-stone-200/70 bg-white/60 p-5 md:p-7 {formDisabled ? 'opacity-75' : ''}"
+		class="border border-stone-200/70 bg-white/60 p-5 md:p-7"
 		use:enhance={() => {
 			submitting = true;
 			return async ({ update }) => {
@@ -78,13 +132,29 @@
 		{/if}
 
 		<div class="grid gap-5">
+			{#if !isAdminUser}
+				<div>
+					<label for="displayName" class="mb-2 block text-sm font-semibold text-stone-700">Nom à afficher <span class="font-normal text-stone-400">(optionnel)</span></label>
+					<input
+						id="displayName"
+						name="displayName"
+						maxlength="60"
+						value={displayName}
+						class="w-full border border-stone-200 bg-white px-4 py-3 text-stone-800 outline-none transition focus:border-missionnaire focus:ring-2 focus:ring-missionnaire/20"
+						placeholder="Ex: Marie K. ou laisser vide"
+					/>
+					<p class="mt-2 text-xs leading-5 text-stone-500">
+						Laissez vide pour publier sous un nom anonyme généré et gardé sur ce navigateur.
+					</p>
+				</div>
+			{/if}
+
 			<div>
 				<label for="title" class="mb-2 block text-sm font-semibold text-stone-700">Titre</label>
 				<input
 					id="title"
 					name="title"
 					required
-					disabled={formDisabled}
 					minlength="8"
 					maxlength="140"
 					value={form?.values?.title ?? ''}
@@ -99,8 +169,7 @@
 					<select
 						id="category"
 						name="category"
-						disabled={formDisabled}
-						class="w-full border border-stone-200 bg-white px-4 py-3 text-stone-800 outline-none transition focus:border-missionnaire focus:ring-2 focus:ring-missionnaire/20 disabled:bg-stone-50 disabled:text-stone-500"
+						class="w-full border border-stone-200 bg-white px-4 py-3 text-stone-800 outline-none transition focus:border-missionnaire focus:ring-2 focus:ring-missionnaire/20"
 					>
 						<option value="">Choisir une catégorie</option>
 						{#each data.categories as category}
@@ -113,9 +182,8 @@
 					<input
 						id="tags"
 						name="tags"
-						disabled={formDisabled}
 						value={form?.values?.tags ?? ''}
-						class="w-full border border-stone-200 bg-white px-4 py-3 text-stone-800 outline-none transition focus:border-missionnaire focus:ring-2 focus:ring-missionnaire/20 disabled:bg-stone-50 disabled:text-stone-500"
+						class="w-full border border-stone-200 bg-white px-4 py-3 text-stone-800 outline-none transition focus:border-missionnaire focus:ring-2 focus:ring-missionnaire/20"
 						placeholder="foi, baptême, prière"
 					/>
 				</div>
@@ -127,11 +195,10 @@
 					id="body"
 					name="body"
 					required
-					disabled={formDisabled}
 					minlength="20"
 					maxlength="4000"
 					rows="10"
-					class="w-full resize-y border border-stone-200 bg-white px-4 py-3 text-stone-800 outline-none transition focus:border-missionnaire focus:ring-2 focus:ring-missionnaire/20 disabled:bg-stone-50 disabled:text-stone-500"
+					class="w-full resize-y border border-stone-200 bg-white px-4 py-3 text-stone-800 outline-none transition focus:border-missionnaire focus:ring-2 focus:ring-missionnaire/20"
 					placeholder="Écrivez votre question avec le contexte utile."
 				>{form?.values?.body ?? ''}</textarea>
 			</div>
@@ -140,14 +207,14 @@
 		<div class="mt-6 flex flex-col gap-3 border-t border-stone-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
 			<p class="text-xs text-stone-500">
 				{#if data.user}
-					Connecté en tant que {data.user.name}
+					{data.user.isGuest ? `Nom gardé : ${data.user.name}` : `Connecté en tant que ${data.user.name}`}
 				{:else}
-					Connexion requise pour envoyer la question.
+					Aucun compte requis.
 				{/if}
 			</p>
 			<button
 				type="submit"
-				disabled={submitting || formDisabled}
+				disabled={submitting}
 				class="bg-missionnaire px-6 py-3 text-xs font-bold uppercase tracking-[0.18em] text-white transition hover:bg-missionnaire-600 disabled:cursor-not-allowed disabled:opacity-60"
 			>
 				{submitting ? 'Envoi...' : 'Envoyer la question'}

@@ -1,20 +1,38 @@
 <script lang="ts">
-	// ── BEGIN: PWA update banner (new file) ──────────────────────────
 	// Non-intrusive bottom-right banner shown when a new service worker
 	// is waiting to take over. Clicking "Recharger" sends SKIP_WAITING
 	// to the waiting SW; the controllerchange listener then reloads the
 	// page to pick up the new bundle. No forced or surprise reloads —
 	// the listener is always the one who triggers it.
 
-	import { browser } from '$app/environment';
+	import { browser, dev } from '$app/environment';
 	import { onMount } from 'svelte';
+
+	const DISMISSED_KEY = 'missionnaire:update-dismissed-this-session';
 
 	let updateAvailable = false;
 	let waitingWorker: ServiceWorker | null = null;
 	let reloading = false;
 
+	function isDismissed() {
+		try {
+			return sessionStorage.getItem(DISMISSED_KEY) === 'true';
+		} catch {
+			return false;
+		}
+	}
+
+	function clearDismissal() {
+		try {
+			sessionStorage.removeItem(DISMISSED_KEY);
+		} catch {
+			/* sessionStorage unavailable */
+		}
+	}
+
 	function promoteWaiting(reg: ServiceWorkerRegistration) {
 		if (!reg.waiting) return;
+		if (isDismissed()) return;
 		waitingWorker = reg.waiting;
 		updateAvailable = true;
 	}
@@ -26,6 +44,7 @@
 			// Only flag an update when there's already a controller —
 			// otherwise this is a first install (no banner needed).
 			if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+				if (isDismissed()) return;
 				waitingWorker = installing;
 				updateAvailable = true;
 			}
@@ -40,13 +59,19 @@
 
 	function dismiss() {
 		updateAvailable = false;
+		try {
+			sessionStorage.setItem(DISMISSED_KEY, 'true');
+		} catch {
+			/* sessionStorage unavailable */
+		}
 	}
 
 	onMount(() => {
-		if (!browser || !('serviceWorker' in navigator)) return;
+		if (!browser || dev || !('serviceWorker' in navigator)) return;
 
 		let reloaded = false;
 		const onControllerChange = () => {
+			if (!reloading) return;
 			if (reloaded) return;
 			reloaded = true;
 			window.location.reload();
@@ -61,7 +86,10 @@
 				promoteWaiting(reg);
 				trackInstalling(reg);
 
-				reg.addEventListener('updatefound', () => trackInstalling(reg));
+				reg.addEventListener('updatefound', () => {
+					clearDismissal();
+					trackInstalling(reg);
+				});
 			} catch {
 				/* SW unsupported or registration unavailable — silently skip. */
 			}
@@ -71,7 +99,6 @@
 			navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
 		};
 	});
-	// ── END: PWA update banner ───────────────────────────────────────
 </script>
 
 {#if updateAvailable}
@@ -80,9 +107,7 @@
 		<button class="update-banner__btn" on:click={applyUpdate} disabled={reloading}>
 			{reloading ? 'Rechargement…' : 'Recharger'}
 		</button>
-		<button class="update-banner__dismiss" on:click={dismiss} aria-label="Plus tard">
-			×
-		</button>
+		<button class="update-banner__dismiss" on:click={dismiss} aria-label="Plus tard"> × </button>
 	</div>
 {/if}
 
@@ -144,8 +169,14 @@
 		color: #f5f5f4;
 	}
 	@keyframes update-banner-in {
-		from { opacity: 0; transform: translate(-50%, 12px); }
-		to   { opacity: 1; transform: translate(-50%, 0); }
+		from {
+			opacity: 0;
+			transform: translate(-50%, 12px);
+		}
+		to {
+			opacity: 1;
+			transform: translate(-50%, 0);
+		}
 	}
 	@media (prefers-reduced-motion: reduce) {
 		.update-banner {

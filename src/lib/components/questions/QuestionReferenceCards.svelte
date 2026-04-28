@@ -15,6 +15,7 @@
 		audio: 'Audio',
 		video: 'Vidéo',
 		sermon: 'Prédication',
+		text: 'Texte',
 		music: 'Cantique',
 		bible: 'Bible'
 	};
@@ -24,6 +25,7 @@
 		audio: IoPlayCircleOutline,
 		video: IoVideocamOutline,
 		sermon: IoBookOutline,
+		text: IoDocumentTextOutline,
 		music: IoMusicalNotesOutline,
 		bible: IoBookOutline
 	};
@@ -39,27 +41,27 @@
 		return parts.join(' - ');
 	}
 
-	function bibleText(reference: QuestionReference): string {
+	function referenceText(reference: QuestionReference): string {
 		return typeof reference.metadata.text === 'string' ? reference.metadata.text : '';
 	}
 </script>
 
 {#if references.length > 0}
-	<div class="grid gap-3 sm:grid-cols-2">
+	<div class="grid gap-2 sm:grid-cols-2">
 		{#each references as reference}
 			<svelte:element
 				this={reference.href ? 'a' : 'article'}
 				href={reference.href || undefined}
 				target={reference.href ? '_blank' : undefined}
 				rel={reference.href ? 'noreferrer' : undefined}
-				class="group border border-stone-200/70 bg-white/70 p-4 transition-all hover:border-missionnaire/40 hover:bg-white focus-visible:outline-missionnaire"
+				class="group border border-stone-200/70 bg-white/70 p-3 transition-all hover:border-missionnaire/40 hover:bg-white focus-visible:outline-missionnaire"
 			>
-				<div class="flex items-start gap-3">
+				<div class="flex items-start gap-2.5">
 					<span
-						class="flex h-10 w-10 shrink-0 items-center justify-center bg-missionnaire-50 text-missionnaire"
+						class="flex h-8 w-8 shrink-0 items-center justify-center bg-missionnaire-50 text-missionnaire"
 						aria-hidden="true"
 					>
-						<Icon src={typeIcon[reference.type] ?? IoDocumentTextOutline} className="h-5 w-5" />
+						<Icon src={typeIcon[reference.type] ?? IoDocumentTextOutline} className="h-4 w-4" />
 					</span>
 					<div class="min-w-0">
 						<p class="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-missionnaire">
@@ -71,9 +73,9 @@
 						{#if metadataLine(reference)}
 							<p class="mt-1 line-clamp-1 text-xs text-stone-500">{metadataLine(reference)}</p>
 						{/if}
-						{#if reference.type === 'bible' && bibleText(reference)}
-							<p class="mt-2 line-clamp-3 text-xs leading-5 text-stone-600">
-								{bibleText(reference)}
+						{#if referenceText(reference)}
+							<p class="mt-1.5 line-clamp-3 whitespace-pre-line text-xs leading-5 text-stone-600">
+								{referenceText(reference)}
 							</p>
 						{/if}
 					</div>

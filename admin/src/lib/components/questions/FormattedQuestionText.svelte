@@ -5,6 +5,10 @@
 	export let proseClass = '';
 
 	$: blocks = parseRichText(text);
+
+	function isExternalHref(href: string): boolean {
+		return /^https?:\/\//i.test(href);
+	}
 </script>
 
 {#snippet inline(nodes: InlineNode[])}
@@ -13,8 +17,19 @@
 			{node.text}
 		{:else if node.type === 'bold'}
 			<strong>{@render inline(node.children)}</strong>
+		{:else if node.type === 'italic'}
+			<em>{@render inline(node.children)}</em>
 		{:else if node.type === 'underline'}
 			<u>{@render inline(node.children)}</u>
+		{:else if node.type === 'link'}
+			<a
+				href={node.href}
+				target={isExternalHref(node.href) ? '_blank' : undefined}
+				rel={isExternalHref(node.href) ? 'noopener noreferrer' : undefined}
+				class="font-semibold text-primary underline decoration-primary/35 underline-offset-4 transition hover:text-stone-900"
+			>
+				{@render inline(node.children)}
+			</a>
 		{:else}
 			<s>{@render inline(node.children)}</s>
 		{/if}

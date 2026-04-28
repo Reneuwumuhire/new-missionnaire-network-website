@@ -10,7 +10,9 @@ import {
 export const POST: RequestHandler = async ({ locals, getClientAddress }) => {
 	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
 
-	const current = await getBroadcastAdminState();
+	// Bypass cache so a stale `is_live: false` doesn't make us skip the
+	// is_live=false write that End Live needs to perform.
+	const current = await getBroadcastAdminState({ fresh: true });
 	if (!current.is_live) {
 		return json({ ok: true, alreadyOffline: true, state: current });
 	}

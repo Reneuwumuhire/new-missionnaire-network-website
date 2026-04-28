@@ -1,18 +1,19 @@
 import { createHash } from 'crypto';
 import { fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { createQuestion } from '../../../db/questions';
-import { ADMIN_SESSION_COOKIE, getQaUserFromToken } from '$lib/server/qa-auth';
-import { QUESTION_CATEGORIES, validateQuestionInput } from '$lib/questions/validation';
+import { createQuestion, listQuestionsForAuthor } from '../../../db/questions';
+import { ensurePublicQaUser, getCurrentQaUser, resolveQaDisplayName } from '$lib/server/qa-auth';
+import { QUESTION_CATEGORIES, validateGuestName, validateQuestionInput } from '$lib/questions/validation';
 
 function clientKey(ip: string, userAgent: string | null): string {
 	return createHash('sha256').update(`${ip}:${userAgent ?? ''}`).digest('hex');
 }
 
 export const load: PageServerLoad = async ({ cookies, url }) => {
-	const user = await getQaUserFromToken(cookies.get(ADMIN_SESSION_COOKIE));
+	const user = await getCurrentQaUser(cookies);
 	return {
 		user,
+		myQuestions: user ? await listQuestionsForAuthor(user.email) : [],
 		categories: QUESTION_CATEGORIES,
 		submitted: url.searchParams.get('submitted') === '1'
 	};
@@ -20,15 +21,8 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
 
 export const actions: Actions = {
 	default: async ({ request, cookies, getClientAddress }) => {
-		const user = await getQaUserFromToken(cookies.get(ADMIN_SESSION_COOKIE));
-		if (!user) {
-			return fail(401, {
-				error: 'Vous devez être connecté pour poser une question.',
-				values: { title: '', body: '', category: '', tags: '' }
-			});
-		}
-
 		const formData = await request.formData();
+		const currentUser = await getCurrentQaUser(cookies);
 		const parsed = validateQuestionInput({
 			title: formData.get('title'),
 			body: formData.get('body'),
@@ -37,6 +31,7 @@ export const actions: Actions = {
 		});
 
 		const values = {
+			displayName: formData.get('displayName')?.toString() ?? '',
 			title: formData.get('title')?.toString() ?? '',
 			body: formData.get('body')?.toString() ?? '',
 			category: formData.get('category')?.toString() ?? '',
@@ -47,9 +42,20 @@ export const actions: Actions = {
 			return fail(400, { error: parsed.error, values });
 		}
 
+		let author = currentUser;
+		if (!author || author.isGuest) {
+			const parsedName = validateGuestName(
+				resolveQaDisplayName(formData.get('displayName'), currentUser?.name)
+			);
+			if (!parsedName.ok || !parsedName.value) {
+				return fail(400, { error: parsedName.error, values });
+			}
+			author = await ensurePublicQaUser(cookies, parsedName.value);
+		}
+
 		const result = await createQuestion({
 			...parsed.value,
-			author: user,
+			author,
 			clientKey: clientKey(getClientAddress(), request.headers.get('user-agent'))
 		});
 

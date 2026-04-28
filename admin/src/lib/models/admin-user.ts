@@ -67,3 +67,8 @@ export function canAnswerQuestions(user: AdminUser): boolean {
 export function canModerateQuestions(user: AdminUser): boolean {
 	return getPermissions(user).can_moderate_questions;
 }
+
+export function canDeleteQuestions(user: AdminUser): boolean {
+	const permissions = getPermissions(user);
+	return permissions.can_moderate_questions && permissions.can_delete;
+}

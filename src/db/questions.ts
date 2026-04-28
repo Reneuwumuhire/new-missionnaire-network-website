@@ -9,7 +9,7 @@ import type {
 	QuestionReportTargetType
 } from '$lib/models/questions';
 import type { QaUser } from '$lib/server/qa-auth';
-import { normalizeForDuplicateCheck, slugifyQuestionTitle } from '$lib/questions/validation';
+import { normalizeForDuplicateCheck } from '$lib/questions/validation';
 
 const PUBLIC_STATUSES = ['approved', 'answered'] as const;
 const QUESTION_PAGE_LIMIT_MAX = 30;
@@ -76,7 +76,9 @@ async function ensureQuestionIndexes(): Promise<void> {
 				.createIndex({ targetType: 1, targetId: 1, reporterId: 1 }, { unique: true }),
 			db.collection('questionReferences').createIndex({ questionId: 1, replyId: 1 }),
 			db.collection('moderationActions').createIndex({ targetType: 1, targetId: 1, createdAt: -1 }),
-			db.collection('notifications').createIndex({ recipientType: 1, recipientId: 1, readAt: 1, createdAt: -1 })
+			db.collection('notifications').createIndex({ recipientType: 1, recipientId: 1, readAt: 1, createdAt: -1 }),
+			db.collection('questionGuests').createIndex({ tokenHash: 1 }, { unique: true }),
+			db.collection('questionGuests').createIndex({ authorId: 1 }, { unique: true })
 		]);
 	})();
 	return indexesReady;
@@ -98,16 +100,8 @@ async function createQuestionNotification(notification: {
 	});
 }
 
-async function buildUniqueSlug(title: string): Promise<string> {
-	const db = await getDb();
-	const base = slugifyQuestionTitle(title);
-	let slug = base;
-	for (let suffix = 2; suffix < 1000; suffix += 1) {
-		const existing = await db.collection('questions').findOne({ slug }, { projection: { _id: 1 } });
-		if (!existing) return slug;
-		slug = `${base}-${suffix}`;
-	}
-	return `${base}-${Date.now()}`;
+function questionSlugFromId(id: ObjectId): string {
+	return `q-${id.toHexString()}`;
 }
 
 function buildPublicQuestionQuery(options: {
@@ -201,6 +195,26 @@ export async function listPublicQuestions(options: {
 	};
 }
 
+export async function listQuestionsForAuthor(
+	authorId: string,
+	options: { limit?: number } = {}
+): Promise<Question[]> {
+	await ensureQuestionIndexes();
+	const db = await getDb();
+	const limit = Math.min(Math.max(options.limit ?? 8, 1), 30);
+	const docs = await db
+		.collection('questions')
+		.find({
+			authorId,
+			deletedAt: null,
+			status: { $nin: ['hidden'] }
+		})
+		.sort({ createdAt: -1, _id: -1 })
+		.limit(limit)
+		.toArray();
+	return docs.map((doc) => serializeDocument<Question>(doc));
+}
+
 export async function getPublicQuestionDetail(
 	slug: string,
 	options: { incrementView?: boolean } = {}
@@ -288,8 +302,10 @@ export async function createQuestion(input: {
 		return { ok: false, error: 'Une question très similaire a déjà été envoyée.' };
 	}
 
-	const slug = await buildUniqueSlug(input.title);
+	const questionId = new ObjectId();
+	const slug = questionSlugFromId(questionId);
 	const result = await db.collection('questions').insertOne({
+		_id: questionId,
 		slug,
 		title: input.title,
 		body: input.body,

@@ -16,6 +16,7 @@ const MAX_TITLE_LENGTH = 140;
 const MAX_QUESTION_BODY_LENGTH = 4000;
 const MAX_REPLY_BODY_LENGTH = 2500;
 const MAX_REPORT_NOTES_LENGTH = 800;
+const MAX_GUEST_NAME_LENGTH = 60;
 
 export interface ValidationResult<T> {
 	ok: boolean;
@@ -85,6 +86,17 @@ export function validateQuestionInput(input: {
 			: [];
 
 	return { ok: true, value: { title, body, category, tags } };
+}
+
+export function validateGuestName(value: unknown): ValidationResult<string> {
+	const name = sanitizePlainText(value, MAX_GUEST_NAME_LENGTH).replace(/\s+/g, ' ');
+	if (name.length < 2) {
+		return { ok: false, error: "Laissez le nom vide ou indiquez au moins 2 caractères." };
+	}
+	if (!/[A-Za-zÀ-ÖØ-öø-ÿ0-9]/.test(name)) {
+		return { ok: false, error: 'Indiquez un nom lisible.' };
+	}
+	return { ok: true, value: name };
 }
 
 export function validateReplyInput(input: { body: unknown }): ValidationResult<{ body: string }> {

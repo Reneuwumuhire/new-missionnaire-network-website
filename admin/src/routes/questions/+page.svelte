@@ -1,8 +1,11 @@
 <script lang="ts">
+	import { loadingSubmit } from '$lib/actions/loadingSubmit';
 	import { stripRichTextFormatting } from '$lib/questions/rich-text';
+	import { confirmDialog } from '$lib/stores/confirm-dialog';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
+	const confirmedPermanentDeleteForms = new WeakSet<HTMLFormElement>();
 
 	const statuses = [
 		{ value: 'all', label: 'Toutes' },
@@ -21,6 +24,34 @@
 		hidden: 'Masquée',
 		archived: 'Archivée'
 	};
+
+	async function confirmPermanentDelete(event: SubmitEvent) {
+		const form = event.currentTarget instanceof HTMLFormElement ? event.currentTarget : null;
+		const submitter =
+			event.submitter instanceof HTMLButtonElement || event.submitter instanceof HTMLInputElement
+				? event.submitter
+				: null;
+		if (!form) return;
+
+		if (confirmedPermanentDeleteForms.has(form)) {
+			confirmedPermanentDeleteForms.delete(form);
+			return;
+		}
+
+		event.preventDefault();
+		const ok = await confirmDialog.ask({
+			title: 'Supprimer définitivement ?',
+			message:
+				'Cette question sera retirée avec ses réponses, références et signalements. Cette action est irréversible.',
+			confirmLabel: 'Supprimer',
+			cancelLabel: 'Annuler',
+			tone: 'danger'
+		});
+		if (!ok) return;
+
+		confirmedPermanentDeleteForms.add(form);
+		form.requestSubmit(submitter ?? undefined);
+	}
 
 	function formatDate(value: string | null): string {
 		if (!value) return '-';
@@ -57,34 +88,75 @@
 	</div>
 	{#if data.canModerate}
 		<div class="flex flex-wrap gap-2">
-			<a href="/questions/pending" class="admin-btn-secondary py-2">En attente ({data.stats.pending})</a>
-			<a href="/questions/reports" class="admin-btn-secondary py-2">Signalements ({data.stats.openReports})</a>
+			<a href="/questions/pending" class="admin-btn-secondary py-2"
+				>En attente ({data.stats.pending})</a
+			>
+			<a href="/questions/reports" class="admin-btn-secondary py-2"
+				>Signalements ({data.stats.openReports})</a
+			>
 		</div>
 	{/if}
 </div>
 
 <div class="mb-6 grid gap-3 sm:grid-cols-3">
-	<div class="border border-stone-200/60 bg-white/50 p-4">
+	<a
+		href="/questions?status=pending"
+		aria-current={data.status === 'pending' ? 'page' : undefined}
+		class="group border p-4 transition-colors hover:border-primary hover:bg-orange-50/40 {data.status ===
+		'pending'
+			? 'border-primary bg-orange-50/50'
+			: 'border-stone-200/60 bg-white/50'}"
+	>
 		<p class="text-xs uppercase tracking-[0.16em] text-stone-400">En attente</p>
-		<p class="mt-1 text-2xl font-semibold text-stone-800">{data.stats.pending}</p>
-	</div>
-	<div class="border border-stone-200/60 bg-white/50 p-4">
+		<div class="mt-1 flex items-end justify-between gap-3">
+			<p class="text-2xl font-semibold text-stone-800">{data.stats.pending}</p>
+			<span
+				class="text-[10px] font-bold uppercase tracking-[0.16em] text-primary opacity-0 transition-opacity group-hover:opacity-100"
+			>
+				Filtrer
+			</span>
+		</div>
+	</a>
+	<a
+		href="/questions/reports"
+		class="group border border-stone-200/60 bg-white/50 p-4 transition-colors hover:border-primary hover:bg-orange-50/40"
+	>
 		<p class="text-xs uppercase tracking-[0.16em] text-stone-400">Signalements ouverts</p>
-		<p class="mt-1 text-2xl font-semibold text-stone-800">{data.stats.openReports}</p>
-	</div>
-	<div class="border border-stone-200/60 bg-white/50 p-4">
+		<div class="mt-1 flex items-end justify-between gap-3">
+			<p class="text-2xl font-semibold text-stone-800">{data.stats.openReports}</p>
+			<span
+				class="text-[10px] font-bold uppercase tracking-[0.16em] text-primary opacity-0 transition-opacity group-hover:opacity-100"
+			>
+				Revoir
+			</span>
+		</div>
+	</a>
+	<a
+		href="/questions?status=hidden"
+		aria-current={data.status === 'hidden' ? 'page' : undefined}
+		class="group border p-4 transition-colors hover:border-primary hover:bg-orange-50/40 {data.status ===
+		'hidden'
+			? 'border-primary bg-orange-50/50'
+			: 'border-stone-200/60 bg-white/50'}"
+	>
 		<p class="text-xs uppercase tracking-[0.16em] text-stone-400">Masquées</p>
-		<p class="mt-1 text-2xl font-semibold text-stone-800">{data.stats.hidden}</p>
-	</div>
+		<div class="mt-1 flex items-end justify-between gap-3">
+			<p class="text-2xl font-semibold text-stone-800">{data.stats.hidden}</p>
+			<span
+				class="text-[10px] font-bold uppercase tracking-[0.16em] text-primary opacity-0 transition-opacity group-hover:opacity-100"
+			>
+				Filtrer
+			</span>
+		</div>
+	</a>
 </div>
 
-<form method="GET" class="mb-6 grid gap-3 border border-stone-200/60 bg-white/40 p-4 md:grid-cols-[1fr_170px_170px_auto]">
-	<input
-		name="search"
-		value={data.search}
-		placeholder="Rechercher"
-		class="admin-input"
-	/>
+<form
+	method="GET"
+	class="mb-6 grid gap-3 border border-stone-200/60 bg-white/40 p-4 md:grid-cols-[1fr_170px_170px_auto]"
+	use:loadingSubmit
+>
+	<input name="search" value={data.search} placeholder="Rechercher" class="admin-input" />
 	<select name="status" class="admin-input">
 		{#each statuses as status}
 			<option value={status.value} selected={data.status === status.value}>{status.label}</option>
@@ -110,23 +182,30 @@
 					<th class="px-5 py-3.5 font-medium text-stone-500">Question</th>
 					<th class="px-5 py-3.5 font-medium text-stone-500">Statut</th>
 					<th class="px-5 py-3.5 font-medium text-stone-500">Activité</th>
-					<th class="px-5 py-3.5 text-right font-medium text-stone-500">Actions</th>
+					<th class="w-[235px] px-4 py-3.5 text-right font-medium text-stone-500">Actions</th>
 				</tr>
 			</thead>
 			<tbody>
 				{#each data.questions as question}
 					<tr class="border-b border-stone-50 align-top transition-colors hover:bg-cream/30">
 						<td class="px-5 py-4">
-							<a href={`/questions/${question._id}`} class="font-medium text-stone-800 hover:text-primary">
+							<a
+								href={`/questions/${question._id}`}
+								class="font-medium text-stone-800 hover:text-primary"
+							>
 								{question.title}
 							</a>
-							<p class="mt-1 line-clamp-2 text-xs leading-5 text-stone-500">{stripRichTextFormatting(question.body)}</p>
+							<p class="mt-1 line-clamp-2 text-xs leading-5 text-stone-500">
+								{stripRichTextFormatting(question.body)}
+							</p>
 							<p class="mt-2 text-[11px] text-stone-400">
 								{question.authorDisplayName} - {formatDate(question.createdAt)}
 							</p>
 						</td>
 						<td class="px-5 py-4">
-							<span class="inline-flex bg-stone-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-stone-600">
+							<span
+								class="inline-flex bg-stone-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-stone-600"
+							>
 								{statusLabels[question.status] ?? question.status}
 							</span>
 							{#if question.locked}
@@ -141,23 +220,67 @@
 							<p>{question.viewCount} vues</p>
 							<p>{question.reportCount} signalements</p>
 						</td>
-						<td class="px-5 py-4">
-							<div class="flex flex-wrap justify-end gap-2">
-								<a href={`/questions/${question._id}`} class="admin-btn-secondary px-3 py-2 text-[10px]">
+						<td class="w-[235px] px-4 py-4">
+							<div class="flex flex-nowrap justify-end gap-1.5 whitespace-nowrap">
+								<a
+									href={`/questions/${question._id}`}
+									class="admin-btn-secondary shrink-0 px-2.5 py-1.5 text-[9px] leading-none tracking-[0.12em]"
+								>
 									Ouvrir
 								</a>
 								{#if data.canModerate && question.status === 'pending'}
-									<form method="POST" action="?/moderate">
+									<form method="POST" action="?/moderate" use:loadingSubmit>
 										<input type="hidden" name="id" value={question._id} />
 										<input type="hidden" name="actionName" value="approve" />
-										<button class="admin-btn-primary px-3 py-2 text-[10px]">Approuver</button>
+										<button
+											class="admin-btn-primary shrink-0 px-2.5 py-1.5 text-[9px] leading-none tracking-[0.12em]"
+											>Approuver</button
+										>
 									</form>
 								{/if}
 								{#if data.canModerate && question.status !== 'hidden'}
-									<form method="POST" action="?/moderate">
+									<form method="POST" action="?/moderate" use:loadingSubmit>
 										<input type="hidden" name="id" value={question._id} />
 										<input type="hidden" name="actionName" value="hide" />
-										<button class="admin-btn-secondary px-3 py-2 text-[10px]">Masquer</button>
+										<button
+											class="admin-btn-secondary shrink-0 px-2.5 py-1.5 text-[9px] leading-none tracking-[0.12em]"
+											>Masquer</button
+										>
+									</form>
+								{/if}
+								{#if data.canDelete && !data.canDeletePermanently}
+									<form method="POST" action="?/moderate" use:loadingSubmit>
+										<input type="hidden" name="id" value={question._id} />
+										<input type="hidden" name="actionName" value="soft_delete" />
+										<input type="hidden" name="reason" value="Suppression depuis la liste admin" />
+										<button
+											class="admin-btn-danger shrink-0 px-2.5 py-1.5 text-[9px] leading-none tracking-[0.12em]"
+											data-loading-label="Suppression..."
+										>
+											Supprimer
+										</button>
+									</form>
+								{/if}
+								{#if data.canDeletePermanently}
+									<form
+										method="POST"
+										action="?/moderate"
+										use:loadingSubmit
+										onsubmit={confirmPermanentDelete}
+									>
+										<input type="hidden" name="id" value={question._id} />
+										<input type="hidden" name="actionName" value="permanent_delete" />
+										<input
+											type="hidden"
+											name="reason"
+											value="Suppression définitive depuis la liste admin"
+										/>
+										<button
+											class="admin-btn-danger shrink-0 px-2.5 py-1.5 text-[9px] leading-none tracking-[0.12em]"
+											data-loading-label="Suppression..."
+										>
+											Définitif
+										</button>
 									</form>
 								{/if}
 							</div>
@@ -170,11 +293,21 @@
 
 	{#if totalPages > 1}
 		<nav class="mt-6 flex items-center justify-between text-sm">
-			<a class="text-stone-500 hover:text-primary {data.page <= 1 ? 'pointer-events-none opacity-40' : ''}" href={pageHref(data.page - 1)}>
+			<a
+				class="text-stone-500 hover:text-primary {data.page <= 1
+					? 'pointer-events-none opacity-40'
+					: ''}"
+				href={pageHref(data.page - 1)}
+			>
 				Précédent
 			</a>
 			<span class="text-stone-500">Page {data.page} / {totalPages}</span>
-			<a class="text-stone-500 hover:text-primary {data.page >= totalPages ? 'pointer-events-none opacity-40' : ''}" href={pageHref(data.page + 1)}>
+			<a
+				class="text-stone-500 hover:text-primary {data.page >= totalPages
+					? 'pointer-events-none opacity-40'
+					: ''}"
+				href={pageHref(data.page + 1)}
+			>
 				Suivant
 			</a>
 		</nav>

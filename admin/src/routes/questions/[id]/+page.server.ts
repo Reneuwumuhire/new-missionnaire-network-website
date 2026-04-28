@@ -1,18 +1,21 @@
-import { error, fail, type Actions } from '@sveltejs/kit';
+import { error, fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { toggleAdminUserActive, logAudit } from '../../../db/collections';
 import {
 	canAnswerQuestions,
+	canDeleteQuestions,
 	canModerateQuestions,
 	canViewQuestionsAdmin
 } from '$lib/models/admin-user';
 import {
 	addBibleQuestionReference,
+	addManualQuestionReference,
 	addQuestionReference,
 	canPublishOfficialAnswer,
 	editQuestionForModeration,
 	getQuestionAdminDetail,
 	listReferenceOptions,
+	permanentlyDeleteQuestion,
 	removeQuestionReference,
 	resolveQuestionReport,
 	setReplyVisibility,
@@ -23,39 +26,66 @@ import type { QuestionReferenceType } from '$lib/models/questions';
 import {
 	validateBibleReference,
 	validateEditedQuestion,
+	validateManualReference,
 	validateModerationReason,
 	validateOfficialAnswer
 } from '$lib/questions/validation';
 
-const REFERENCE_TYPES: QuestionReferenceType[] = ['pdf', 'audio', 'video', 'sermon', 'music', 'bible'];
+const REFERENCE_TYPES: QuestionReferenceType[] = [
+	'pdf',
+	'audio',
+	'video',
+	'sermon',
+	'text',
+	'bible'
+];
 
 export const load: PageServerLoad = async ({ params, locals, url }) => {
 	if (!canViewQuestionsAdmin(locals.user)) throw error(403, 'Accès refusé');
 	const detail = await getQuestionAdminDetail(params.id);
 	if (!detail) throw error(404, 'Question introuvable');
 	const referenceSearch = url.searchParams.get('referenceSearch') ?? '';
+	const referenceTypeParam = url.searchParams.get('referenceType');
+	const referenceType = REFERENCE_TYPES.includes(referenceTypeParam as QuestionReferenceType)
+		? (referenceTypeParam as QuestionReferenceType)
+		: 'sermon';
 	return {
 		...detail,
 		canPublishOfficial: canPublishOfficialAnswer(locals.user),
 		canAnswer: canAnswerQuestions(locals.user),
 		canModerate: canModerateQuestions(locals.user),
+		canDelete: canDeleteQuestions(locals.user),
+		canDeletePermanently: locals.user.role === 'superadmin',
 		canManageUsers: locals.user.role === 'superadmin',
-		referenceOptions: await listReferenceOptions(referenceSearch),
+		referenceOptions: await listReferenceOptions(referenceSearch, 25),
+		referenceType,
 		referenceSearch
 	};
 };
 
 export const actions: Actions = {
 	moderate: async ({ request, params, locals }) => {
-		if (!canModerateQuestions(locals.user)) throw error(403, 'Accès refusé');
 		if (!params.id) return fail(400, { error: 'Question invalide' });
 		const formData = await request.formData();
 		const action = formData.get('actionName')?.toString();
 		if (!action) return fail(400, { error: 'Action invalide' });
+		const reason = validateModerationReason(formData.get('reason'));
+
+		if (action === 'permanent_delete') {
+			if (locals.user.role !== 'superadmin') throw error(403, 'Accès refusé');
+			await permanentlyDeleteQuestion({ id: params.id, reason, moderator: locals.user });
+			throw redirect(303, '/questions');
+		}
+
+		if (action === 'soft_delete' && !canDeleteQuestions(locals.user)) {
+			throw error(403, 'Accès refusé');
+		}
+		if (!canModerateQuestions(locals.user)) throw error(403, 'Accès refusé');
+
 		await updateQuestionModeration({
 			id: params.id,
 			action,
-			reason: validateModerationReason(formData.get('reason')),
+			reason,
 			moderator: locals.user
 		});
 		return { success: true };
@@ -92,7 +122,11 @@ export const actions: Actions = {
 		const formData = await request.formData();
 		const parsed = validateOfficialAnswer(formData.get('body'));
 		if (!parsed.ok) return fail(400, { officialError: parsed.error });
-		await upsertOfficialAnswer({ questionId: params.id, body: parsed.body, moderator: locals.user });
+		await upsertOfficialAnswer({
+			questionId: params.id,
+			body: parsed.body,
+			moderator: locals.user
+		});
 		return { officialSuccess: true };
 	},
 
@@ -120,6 +154,7 @@ export const actions: Actions = {
 		const type = formData.get('type')?.toString() as QuestionReferenceType;
 		const referencedContentId = formData.get('referencedContentId')?.toString();
 		const replyIdValue = formData.get('replyId')?.toString();
+		const referenceMode = formData.get('referenceMode')?.toString() || 'existing';
 		if (!REFERENCE_TYPES.includes(type)) {
 			return fail(400, { referenceError: 'Référence invalide' });
 		}
@@ -136,6 +171,25 @@ export const actions: Actions = {
 				passage: parsed.passage,
 				text: parsed.text,
 				translation: parsed.translation,
+				moderator: locals.user
+			});
+			return { referenceSuccess: true };
+		}
+		if (referenceMode === 'manual') {
+			const parsed = validateManualReference({
+				title: formData.get('manualTitle'),
+				href: formData.get('manualHref'),
+				note: formData.get('manualNote'),
+				type
+			});
+			if (!parsed.ok) return fail(400, { referenceError: parsed.error });
+			await addManualQuestionReference({
+				questionId: params.id,
+				replyId: replyIdValue || null,
+				type: type as Exclude<QuestionReferenceType, 'bible' | 'music'>,
+				title: parsed.title,
+				href: parsed.href,
+				note: parsed.note,
 				moderator: locals.user
 			});
 			return { referenceSuccess: true };

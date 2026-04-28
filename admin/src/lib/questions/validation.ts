@@ -35,6 +35,38 @@ export function validateBibleReference(input: {
 	return { ok: true, passage, text, translation };
 }
 
+function normalizeReferenceHref(value: unknown): string {
+	const href = sanitizePlainText(value, 600);
+	if (!href) return '';
+
+	if (href.startsWith('/') && !href.startsWith('//') && !/\s/.test(href)) {
+		return href;
+	}
+
+	try {
+		const parsed = new URL(/^https?:\/\//i.test(href) ? href : `https://${href}`);
+		return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.toString() : '';
+	} catch {
+		return '';
+	}
+}
+
+export function validateManualReference(input: {
+	title: unknown;
+	href: unknown;
+	note?: unknown;
+	type?: unknown;
+}): { ok: true; title: string; href: string; note: string | null } | { ok: false; error: string } {
+	const title = sanitizePlainText(input.title, 140);
+	const href = normalizeReferenceHref(input.href);
+	const note = sanitizePlainText(input.note, 1600) || null;
+	const type = sanitizePlainText(input.type, 30);
+	if (title.length < 2) return { ok: false, error: 'Indiquez un titre lisible pour la référence.' };
+	if (!href) return { ok: false, error: 'Indiquez un lien valide en http(s) ou un lien interne commençant par /.' };
+	if (type === 'text' && !note) return { ok: false, error: 'Collez le texte cité pour cette référence.' };
+	return { ok: true, title, href, note };
+}
+
 export function validateEditedQuestion(input: {
 	title: unknown;
 	body: unknown;
