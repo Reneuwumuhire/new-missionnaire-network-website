@@ -162,11 +162,11 @@
 		navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
 
 		(async () => {
-				try {
-					const reg = await navigator.serviceWorker.getRegistration();
-					if (disposed) return;
-					if (!reg) return;
-					registration = reg;
+			try {
+				const reg = await navigator.serviceWorker.getRegistration();
+				if (disposed) return;
+				if (!reg) return;
+				registration = reg;
 
 				promoteWaiting(reg);
 				trackInstalling(reg);
