@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { getContext, onDestroy, onMount } from 'svelte';
+	import { get } from 'svelte/store';
+	import { pendingPlaybackSeek } from '$lib/utils/audioResume';
 	import { formatTime } from '../../utils/FormatTime';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
@@ -750,8 +752,25 @@
 		if (destroyed) return;
 
 		const pausedMs = audioPausedAt > 0 ? Date.now() - audioPausedAt : 0;
+
+		// Cold-load rehydration sets `pendingPlaybackSeek` so the first
+		// user-tap-play after a snapshot restore lands at the saved time.
+		// iOS clamps bare `currentTime` assignments to 0 before metadata is
+		// fully loaded, so we route through the load() + canplay-driven
+		// seek path which is reliable. Match by URL: a leftover hint from
+		// a previous session is ignored once the user picks a new track.
+		const seekHint = get(pendingPlaybackSeek);
+		const sel = get(selectAudio);
+		const currentSelUrl = sel ? getPlayableAudioUrl(sel as PlayableAudio) : '';
+		const hasOverrideSeek =
+			!!seekHint &&
+			seekHint.url === currentSelUrl &&
+			Number.isFinite(seekHint.time) &&
+			seekHint.time > 0;
+
 		const needsReload =
 			reasonHint === 'long' ||
+			hasOverrideSeek ||
 			(reasonHint === 'auto' && pausedMs >= PAUSE_RELOAD_THRESHOLD_MS);
 
 		if (!needsReload) {
@@ -767,9 +786,17 @@
 		// Skip if a reload is already running. The in-flight finish() will
 		// restore position and start playback — a second load() would abort
 		// the first, corrupt buffers, and capture a bogus savedTime (0).
+		// Don't consume the override hint yet: we haven't actually used it.
 		if (isReloadingSession) return;
 
-		const savedTime = audio.currentTime;
+		// Consume the override now that we're committed to the reload path.
+		// Doing this only after the early-return guards above ensures a hint
+		// isn't wasted if we bail out without using it.
+		if (hasOverrideSeek) {
+			pendingPlaybackSeek.set(null);
+		}
+
+		const savedTime = hasOverrideSeek ? seekHint.time : audio.currentTime;
 		const savedSrc = audio.src;
 		isReloadingSession = true;
 		let settled = false;

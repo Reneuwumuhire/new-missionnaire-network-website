@@ -3,6 +3,18 @@ import { browser } from '$app/environment';
 
 export const activeAudioElement = writable<HTMLAudioElement | null>(null);
 
+// Hint that the next user-initiated play() should seek to a specific time
+// before starting playback. Set by the resume recorder right after a cold-
+// load rehydration: iOS routinely clamps `currentTime` assignments to 0
+// when metadata isn't fully loaded yet, so a loadedmetadata-driven seek
+// alone isn't reliable. The AudioPlayer's safePlay path consumes this and
+// forces a full load() + canplay-driven seek + play(), which always lands
+// at the right position.
+//
+// The URL is included so a hint left over from a previous track is ignored
+// once the user navigates to something else — the seek is per-track.
+export const pendingPlaybackSeek = writable<{ url: string; time: number } | null>(null);
+
 const STORAGE_KEY = 'missionnaire:audio-resume';
 const PLAYER_SNAPSHOT_KEY = 'missionnaire:player-snapshot';
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;

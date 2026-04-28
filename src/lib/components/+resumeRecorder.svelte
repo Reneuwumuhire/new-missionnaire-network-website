@@ -9,6 +9,7 @@
 		END_THRESHOLD_SECONDS,
 		ensureAudioMonitorInstalled,
 		MIN_RESUME_SECONDS,
+		pendingPlaybackSeek,
 		readPlayerSnapshot,
 		writePlayerSnapshot,
 		writeResumeState,
@@ -18,7 +19,6 @@
 		autoNext,
 		basePlaylist,
 		currentIndex,
-		isPlaying,
 		isShuffle,
 		playbackIntent,
 		playlist,
@@ -90,14 +90,19 @@
 		// left alone; on cold load the `intendsToPlay` gate decides whether to
 		// surface it.
 		if (!sel) return;
+		// No live audio element yet — rehydration just primed the stores but
+		// the AudioPlayer hasn't created the <audio> element. Saving now would
+		// clobber the previous snapshot's currentTime with 0 (and intendsToPlay
+		// with the still-default false), which would break the next reload.
+		const el = currentAudio;
+		if (!el) return;
 
 		const now = Date.now();
 		if (!force && now - lastSnapshotAt < SAVE_INTERVAL_MS) return;
 		lastSnapshotAt = now;
 
-		const el = currentAudio;
-		const time = el ? el.currentTime : 0;
-		const duration = el && Number.isFinite(el.duration) ? el.duration : 0;
+		const time = el.currentTime;
+		const duration = Number.isFinite(el.duration) ? el.duration : 0;
 
 		// Treat near-end as "done" — clearing avoids resurrecting a track at
 		// 99% which would auto-advance to the next-or-stop the moment the
@@ -156,6 +161,14 @@
 		if (!pendingRehydrationSeek) return;
 		const el = currentAudio;
 		if (!el) return;
+		// User has already started playback (likely via the safePlay-driven
+		// load+seek+play path). Don't yank them back to the saved position —
+		// that landing has already happened, and overwriting currentTime now
+		// would feel like a stutter.
+		if (!el.paused) {
+			pendingRehydrationSeek = false;
+			return;
+		}
 		if (!Number.isFinite(el.duration) || el.duration <= 0) return;
 		try {
 			el.currentTime = rehydrationSeekTime;
@@ -253,14 +266,26 @@
 			return;
 		}
 
-		// Schedule a seek for when the new <audio>'s metadata loads. The
-		// AudioPlayer's reactive block will create the element as soon as we
-		// set `selectAudio` below; activeAudioElement updates synchronously
-		// via the patched constructor, our subscriber attaches listeners,
-		// and `loadedmetadata` (or `attachListeners`'s already-loaded check)
-		// triggers the seek.
+		// Two seek paths cooperate:
+		//
+		// 1. `pendingRehydrationSeek` (in-memory, applied on loadedmetadata)
+		//    keeps the progress-bar UI showing the saved position even before
+		//    the user taps play. It's a UX nicety, not a correctness signal.
+		// 2. `pendingPlaybackSeek` (global store, consumed by safePlay) makes
+		//    the first user-tap-play actually land at the saved position. iOS
+		//    silently clamps `currentTime` to 0 when metadata isn't fully
+		//    loaded; the safePlay path issues `audio.load()` and seeks inside
+		//    the resulting `canplay` handler, where the seek is reliable.
+		//
+		// Without (2), the loadedmetadata seek can race against the play
+		// command and the user hears the track restart from 0.
 		rehydrationSeekTime = Math.max(0, snap.currentTime);
 		pendingRehydrationSeek = rehydrationSeekTime > 0;
+
+		const seekUrl = getPlayableAudioUrl(snap.selectAudio as PlayableAudio) || '';
+		if (rehydrationSeekTime > 0 && seekUrl) {
+			pendingPlaybackSeek.set({ url: seekUrl, time: rehydrationSeekTime });
+		}
 
 		const list = Array.isArray(snap.playlist) ? snap.playlist : [];
 		const baseList = Array.isArray(snap.basePlaylist) && snap.basePlaylist.length > 0
