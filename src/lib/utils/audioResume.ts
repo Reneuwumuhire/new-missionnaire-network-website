@@ -4,6 +4,7 @@ import { browser } from '$app/environment';
 export const activeAudioElement = writable<HTMLAudioElement | null>(null);
 
 const STORAGE_KEY = 'missionnaire:audio-resume';
+const PLAYER_SNAPSHOT_KEY = 'missionnaire:player-snapshot';
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 export const MIN_RESUME_SECONDS = 10;
 export const END_THRESHOLD_SECONDS = 10;
@@ -19,6 +20,27 @@ export type ResumeState = {
 	// record because the runtime payload includes optional fields beyond the
 	// Sermon schema and we don't want to be strict about its shape on read.
 	sermon: Record<string, unknown>;
+};
+
+// Generic player snapshot for cold-load rehydration. Unlike `ResumeState`
+// (sermon-only, drives the explicit "Reprendre l'écoute" toast), this
+// captures the entire player state — selected track, playlist, index,
+// shuffle/auto-next flags — so the bottom bar can come back transparently
+// after iOS reloads the PWA mid-listen (phone calls, OS audio interruption,
+// memory pressure). Saved for music + sermons + assets; the rehydration
+// gate reads `intendsToPlay` so we only restore when the user was actively
+// listening, never when they had paused or closed the player.
+export type PlayerSnapshot = {
+	selectAudio: Record<string, unknown>;
+	playlist: Record<string, unknown>[];
+	basePlaylist: Record<string, unknown>[];
+	currentIndex: number;
+	currentTime: number;
+	duration: number;
+	intendsToPlay: boolean;
+	autoNext: boolean;
+	isShuffle: boolean;
+	savedAt: number;
 };
 
 let monitorInstalled = false;
@@ -123,4 +145,51 @@ export function isResumeEligible(
 	if (state.duration > 0 && state.duration - state.time < END_THRESHOLD_SECONDS) return false;
 	if (Date.now() - state.savedAt > MAX_AGE_MS) return false;
 	return true;
+}
+
+export function readPlayerSnapshot(): PlayerSnapshot | null {
+	if (!browser) return null;
+	try {
+		const raw = localStorage.getItem(PLAYER_SNAPSHOT_KEY);
+		if (!raw) return null;
+		const parsed = JSON.parse(raw) as PlayerSnapshot;
+		if (
+			!parsed ||
+			typeof parsed !== 'object' ||
+			!parsed.selectAudio ||
+			typeof parsed.selectAudio !== 'object' ||
+			!Array.isArray(parsed.playlist) ||
+			!Array.isArray(parsed.basePlaylist) ||
+			typeof parsed.currentIndex !== 'number' ||
+			typeof parsed.currentTime !== 'number' ||
+			typeof parsed.savedAt !== 'number'
+		) {
+			return null;
+		}
+		if (Date.now() - parsed.savedAt > MAX_AGE_MS) {
+			localStorage.removeItem(PLAYER_SNAPSHOT_KEY);
+			return null;
+		}
+		return parsed;
+	} catch {
+		return null;
+	}
+}
+
+export function writePlayerSnapshot(state: PlayerSnapshot) {
+	if (!browser) return;
+	try {
+		localStorage.setItem(PLAYER_SNAPSHOT_KEY, JSON.stringify(state));
+	} catch {
+		// quota or disabled storage — ignore
+	}
+}
+
+export function clearPlayerSnapshot() {
+	if (!browser) return;
+	try {
+		localStorage.removeItem(PLAYER_SNAPSHOT_KEY);
+	} catch {
+		// no-op
+	}
 }

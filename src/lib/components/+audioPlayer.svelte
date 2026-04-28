@@ -14,7 +14,7 @@
 	import BsShuffle from 'svelte-icons-pack/bs/BsShuffle';
 	import BsHeartFill from 'svelte-icons-pack/bs/BsHeartFill';
 	import BsHeart from 'svelte-icons-pack/bs/BsHeart';
-	import { selectAudio, playlist, basePlaylist, currentIndex, autoNext, isShuffle, isPlaying } from '../stores/global';
+	import { selectAudio, playlist, basePlaylist, currentIndex, autoNext, isShuffle, isPlaying, playbackIntent } from '../stores/global';
 	import type { AudioAsset } from '$lib/models/media-assets';
 	import type { MusicAudio } from '$lib/models/music-audio';
 	import type { Sermon } from '$lib/models/sermon';
@@ -58,7 +58,7 @@
 	function playCurrentAudio() {
 		if (!audio) return;
 		setPendingPlaybackIntent('play');
-		userWantsToPlay = true;
+		setUserWantsToPlay(true);
 		if (audio.duration && audio.currentTime >= audio.duration) {
 			audio.currentTime = 0;
 		}
@@ -68,7 +68,7 @@
 	function pauseCurrentAudio() {
 		if (!audio || audio.paused) return;
 		setPendingPlaybackIntent('pause');
-		userWantsToPlay = false;
+		setUserWantsToPlay(false);
 		audio.pause();
 	}
 
@@ -87,6 +87,26 @@
 	// because iOS fires `pause` on the element but doesn't auto-resume once
 	// the interruption ends.
 	let userWantsToPlay = false;
+
+	function setUserWantsToPlay(v: boolean) {
+		userWantsToPlay = v;
+		// Mirror to the global store so the resume recorder can read intent
+		// when deciding whether to rehydrate the player on a cold reload.
+		// Without this, an OS-initiated pause (phone call, Siri) right
+		// before iOS kills the PWA would persist `isPlaying: false` and
+		// the player wouldn't come back, even though the user was actively
+		// listening when interrupted.
+		playbackIntent.set(v);
+	}
+
+	// True when the currently loaded track was paused by the OS (phone call,
+	// Siri, audio focus grab) at any point. We rebuild the audio session
+	// before auto-advancing to the next track in that case — without it,
+	// iOS's degraded session can leave the next track silent or stuttering
+	// (the symptom users describe as "the next song doesn't play immediately"
+	// or "the audio feels corrupted until I refresh"). Reset on every track
+	// switch.
+	let currentTrackInterrupted = false;
 
 	/** Timestamp when the audio last went into paused state (via user, OS,
 	 *  or lock-screen control). Used to decide whether to reload before
@@ -296,6 +316,12 @@
 		// first and without waiting for the async `canplay` event (which the
 		// reactive-statement path relies on). Pausing or deferring play() breaks
 		// background playback when the screen is locked.
+		//
+		// Exception: if the previous track was interrupted by the OS (phone
+		// call, Siri), the audio session is in a degraded state. A bare
+		// play() can leave the next track silent or stuttering ("corrupted
+		// until refresh"). In that case we mirror safePlay('long') — call
+		// load() to rebuild the session, then play() once canplay fires.
 		if (audio) {
 			const encodedUrl = encodeURI(nextUrl);
 			audioSrc = nextUrl; // prevents the reactive $: block from re-loading
@@ -305,13 +331,41 @@
 			progressBarWidth = 0;
 			indicatorPosition = 0;
 
+			const wasInterrupted = currentTrackInterrupted;
+			currentTrackInterrupted = false;
+
 			audio.src = encodedUrl;
-			const playPromise = audio.play();
-			if (playPromise) {
-				playPromise.catch((e) => {
-					console.error('[AudioPlayer] Autoplay next failed:', e);
-					isPlaying.set(false);
-				});
+
+			if (wasInterrupted) {
+				let settled = false;
+				const playWhenReady = () => {
+					if (settled) return;
+					settled = true;
+					if (destroyed || !audio) return;
+					if (audio.src !== encodedUrl) return;
+					audio.play().catch((e) => {
+						console.warn('[AudioPlayer] Post-interruption next-track play failed:', e);
+						isPlaying.set(false);
+					});
+				};
+				audio.addEventListener('canplay', playWhenReady, { once: true });
+				// Safety net if `canplay` never fires (slow network, cached
+				// edge case). Mirrors the 2 s safety in safePlay().
+				setTimeout(playWhenReady, 2000);
+				try {
+					audio.load();
+				} catch (err) {
+					console.warn('[AudioPlayer] handleEnded load() failed:', err);
+					playWhenReady();
+				}
+			} else {
+				const playPromise = audio.play();
+				if (playPromise) {
+					playPromise.catch((e) => {
+						console.error('[AudioPlayer] Autoplay next failed:', e);
+						isPlaying.set(false);
+					});
+				}
 			}
 
 			if ('mediaSession' in navigator) {
@@ -408,9 +462,11 @@
 
 	function updateAudioSource(url: string) {
 		if (!url) return;
-		
+
 		const encodedUrl = encodeURI(url);
 		console.log("[AudioPlayer] Updating source to:", encodedUrl);
+		// New track — drop any "previous track was interrupted" carry-over.
+		currentTrackInterrupted = false;
 		isAudioReady = false;
 		currentTime = 0;
 		duration = 0;
@@ -431,7 +487,7 @@
 			audio.addEventListener('timeupdate', updateIndicator);
 				audio.addEventListener('play', () => {
 					setPendingPlaybackIntent(null);
-					userWantsToPlay = true;
+					setUserWantsToPlay(true);
 					audioPausedAt = 0;
 					stopResumeWatchdog();
 				isPlaying.set(true);
@@ -460,7 +516,12 @@
 				// pause clear userWantsToPlay *before* calling audio.pause()),
 				// start the watchdog. It polls play() until iOS lifts the
 				// AVAudioSession interruption (phone call / Siri / focus grab).
+				// Also flag the current track as interrupted so handleEnded
+				// rebuilds the audio session before auto-advancing — without
+				// that rebuild, the post-interruption iOS session can leave
+				// the next track silent or stuttering until a manual refresh.
 				if (userWantsToPlay) {
+					currentTrackInterrupted = true;
 					startResumeWatchdog();
 				}
 			});
@@ -507,7 +568,7 @@
 	$: if (browser && audio && !destroyed && $isPlaying !== undefined) {
 		if ($isPlaying && audio.paused) {
 			if (pendingPlaybackIntent !== 'pause') {
-				userWantsToPlay = true;
+				setUserWantsToPlay(true);
 				safePlay('auto');
 			}
 		} else if (!$isPlaying && !audio.paused) {
@@ -842,7 +903,7 @@
 		if (!browser || !('mediaSession' in navigator)) return;
 		try {
 			navigator.mediaSession.setActionHandler('play', () => {
-				userWantsToPlay = true;
+				setUserWantsToPlay(true);
 				// Lock-screen / Bluetooth play: route through safePlay so a
 				// long paused-on-lockscreen window reloads the audio session
 				// before attempting playback. Without this, play() resumes
@@ -850,7 +911,7 @@
 				safePlay('auto');
 			});
 			navigator.mediaSession.setActionHandler('pause', () => {
-				userWantsToPlay = false;
+				setUserWantsToPlay(false);
 				audio?.pause();
 			});
 			navigator.mediaSession.setActionHandler('previoustrack', playPrevious);
@@ -871,7 +932,7 @@
 				}
 			});
 			navigator.mediaSession.setActionHandler('stop', () => {
-				userWantsToPlay = false;
+				setUserWantsToPlay(false);
 				if (audio) {
 					audio.pause();
 					audio.currentTime = 0;
@@ -995,7 +1056,7 @@
 		// userWantsToPlay so even an unguarded call to startResumeWatchdog
 		// would no-op. Only after that do we touch the audio element.
 		destroyed = true;
-		userWantsToPlay = false;
+		setUserWantsToPlay(false);
 		shouldAutoplayOnLoad = false;
 		stopResumeWatchdog();
 		if (audio) {

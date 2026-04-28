@@ -13,6 +13,13 @@ export const currentIndex = writable<number>(0);
 export const autoNext = writable<boolean>(true);
 export const isShuffle = writable<boolean>(false);
 export const isPlaying = writable<boolean>(false);
+// User's expressed intent to play, decoupled from `isPlaying` (which flips
+// to false on every OS-initiated pause: phone calls, Siri, audio focus
+// grabs). The resume recorder reads this when deciding whether to
+// rehydrate the player on a cold reload — if the user was actively
+// listening when iOS killed the PWA, we restore; if they had paused,
+// we leave the page clean.
+export const playbackIntent = writable<boolean>(false);
 export const isLoading = writable<boolean>(false);
 export const searchQuery = writable<string>('');
 export const currentViewingVideo = writable<YoutubeVideo>();
