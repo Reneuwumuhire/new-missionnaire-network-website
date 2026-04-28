@@ -135,7 +135,11 @@ sw.addEventListener('message', (event) => {
 		sw.skipWaiting();
 	}
 	if (event.data.type === 'GET_VERSION' && event.source) {
-		(event.source as Client).postMessage({ type: 'VERSION', version });
+		(event.source as Client).postMessage({
+			type: 'VERSION',
+			version,
+			requestId: event.data.requestId
+		});
 	}
 });
 
@@ -164,7 +168,10 @@ sw.addEventListener('push', (event) => {
 
 		const tag = payload.url || 'missionnaire-notification';
 
-		const options: NotificationOptions & { renotify?: boolean; actions?: { action: string; title: string; icon?: string }[] } = {
+		const options: NotificationOptions & {
+			renotify?: boolean;
+			actions?: { action: string; title: string; icon?: string }[];
+		} = {
 			body: payload.body,
 			icon: payload.icon || '/favicon.png',
 			badge: '/favicon.png',
@@ -211,9 +218,9 @@ sw.addEventListener('notificationclick', (event) => {
 			// Focus any existing tab on the same origin and navigate it
 			for (const client of clients) {
 				if (new URL(client.url).origin === sw.location.origin && 'focus' in client) {
-					return client.focus().then((c) =>
-						'navigate' in c ? c.navigate(url) : sw.clients.openWindow(url)
-					);
+					return client
+						.focus()
+						.then((c) => ('navigate' in c ? c.navigate(url) : sw.clients.openWindow(url)));
 				}
 			}
 			// Otherwise open a new window
@@ -302,6 +309,23 @@ async function handleAppShellFetch(request: Request, url: URL): Promise<Response
 	// waiting on a slow network. The cache is refreshed in the
 	// background so the next visit sees fresh content.
 	if (request.mode === 'navigate') {
+		const cacheControl = request.headers.get('cache-control') || '';
+		const wantsFreshHtml = request.cache === 'reload' || cacheControl.includes('no-cache');
+
+		if (wantsFreshHtml) {
+			try {
+				const response = await fetch(request);
+				if (response.status === 200) {
+					cache.put(request, response.clone());
+				}
+				return response;
+			} catch {
+				const cached = await cache.match(request);
+				if (cached) return cached;
+				return offlineResponse(cache);
+			}
+		}
+
 		const cached = await cache.match(request);
 		const networkFetch = fetch(request)
 			.then((response) => {
@@ -462,10 +486,7 @@ async function capturePassthroughForCache(
 			const headers = copyResponseHeaders(response, {
 				'Content-Length': String(buffer.byteLength)
 			});
-			await cache.put(
-				cacheKey,
-				new Response(buffer, { status: 200, statusText: 'OK', headers })
-			);
+			await cache.put(cacheKey, new Response(buffer, { status: 200, statusText: 'OK', headers }));
 			return;
 		}
 
