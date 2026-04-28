@@ -16,7 +16,16 @@
 	import BsShuffle from 'svelte-icons-pack/bs/BsShuffle';
 	import BsHeartFill from 'svelte-icons-pack/bs/BsHeartFill';
 	import BsHeart from 'svelte-icons-pack/bs/BsHeart';
-	import { selectAudio, playlist, basePlaylist, currentIndex, autoNext, isShuffle, isPlaying, playbackIntent } from '../stores/global';
+	import {
+		selectAudio,
+		playlist,
+		basePlaylist,
+		currentIndex,
+		autoNext,
+		isShuffle,
+		isPlaying,
+		playbackIntent
+	} from '../stores/global';
 	import type { AudioAsset } from '$lib/models/media-assets';
 	import type { MusicAudio } from '$lib/models/music-audio';
 	import type { Sermon } from '$lib/models/sermon';
@@ -52,6 +61,10 @@
 	let playerResizeObserver: ResizeObserver | null = null;
 	let lastPlayerInset = 0;
 	let pendingPlaybackIntent: 'play' | 'pause' | null = null;
+	let lastKnownPlaybackTime = 0;
+	let lastKnownPlaybackDuration = 0;
+	let pendingSessionResumeTime: number | null = null;
+	let isChangingSource = false;
 
 	function setPendingPlaybackIntent(intent: 'play' | 'pause' | null) {
 		pendingPlaybackIntent = intent;
@@ -71,7 +84,58 @@
 		if (!audio || audio.paused) return;
 		setPendingPlaybackIntent('pause');
 		setUserWantsToPlay(false);
+		rememberPlaybackPosition();
 		audio.pause();
+	}
+
+	function rememberPlaybackPosition(
+		time = audio?.currentTime ?? 0,
+		mediaDuration = audio?.duration ?? 0
+	) {
+		if (!Number.isFinite(time) || time < 0) return;
+		lastKnownPlaybackTime = time;
+		if (Number.isFinite(mediaDuration) && mediaDuration > 0) {
+			lastKnownPlaybackDuration = mediaDuration;
+		}
+	}
+
+	function resetRememberedPlaybackPosition() {
+		lastKnownPlaybackTime = 0;
+		lastKnownPlaybackDuration = 0;
+		pendingSessionResumeTime = null;
+	}
+
+	function getReliablePlaybackTime() {
+		if (!audio) return 0;
+		const liveTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+		// audio.load() can temporarily report 0 during an OS interruption. Keep
+		// the last real playback position so the next play() does not restart.
+		if (liveTime <= 0.25 && lastKnownPlaybackTime > 0.25) {
+			return lastKnownPlaybackTime;
+		}
+		return Math.max(0, liveTime);
+	}
+
+	function restorePlaybackPosition(time: number) {
+		if (!audio || !Number.isFinite(time) || time <= 0) return false;
+		try {
+			audio.currentTime = time;
+			currentTime = time;
+			const mediaDuration =
+				Number.isFinite(audio.duration) && audio.duration > 0
+					? audio.duration
+					: lastKnownPlaybackDuration;
+			if (mediaDuration > 0) {
+				duration = mediaDuration;
+				progressBarWidth = (time / mediaDuration) * 100;
+				indicatorPosition = progressBarWidth;
+			}
+			rememberPlaybackPosition(time, mediaDuration);
+			return true;
+		} catch {
+			// metadata may not be loaded yet — keep the pending time for canplay
+			return false;
+		}
 	}
 
 	function handleExternalToggle() {
@@ -273,9 +337,7 @@
 			const nextItem = nextIndex >= 0 ? $playlist[nextIndex] : null;
 			// Also skip if the *next* track is a sermon — no point warming it.
 			const nextUrl =
-				nextItem && !isSermonItem(nextItem)
-					? getPlayableAudioUrl(nextItem as PlayableAudio)
-					: '';
+				nextItem && !isSermonItem(nextItem) ? getPlayableAudioUrl(nextItem as PlayableAudio) : '';
 			if (nextUrl) {
 				prefetchTimer = setTimeout(() => void prefetchAudio(nextUrl), 4000);
 			}
@@ -332,6 +394,7 @@
 			duration = 0;
 			progressBarWidth = 0;
 			indicatorPosition = 0;
+			resetRememberedPlaybackPosition();
 
 			const wasInterrupted = currentTrackInterrupted;
 			currentTrackInterrupted = false;
@@ -385,25 +448,31 @@
 	};
 
 	function toggleShuffle() {
-		isShuffle.update(shuffle => {
+		isShuffle.update((shuffle) => {
 			const newShuffle = !shuffle;
 			if (newShuffle) {
 				// Shuffle logic
 				const currentSong = $selectAudio;
 				const list = [...$playlist];
-				
+
 				// Fisher-Yates shuffle
 				for (let i = list.length - 1; i > 0; i--) {
 					const j = Math.floor(Math.random() * (i + 1));
 					[list[i], list[j]] = [list[j], list[i]];
 				}
-				
+
 				// Ensure current song is at its new position and update index
 				playlist.set(list);
 				if (currentSong) {
-					const newIndex = list.findIndex(s => {
-						const url = 's3_url' in s ? s.s3_url : ('mp3_url' in s ? s.mp3_url : (s as AudioAsset).url);
-						const currentUrl = 's3_url' in currentSong ? currentSong.s3_url : ('mp3_url' in currentSong ? currentSong.mp3_url : (currentSong as AudioAsset).url);
+					const newIndex = list.findIndex((s) => {
+						const url =
+							's3_url' in s ? s.s3_url : 'mp3_url' in s ? s.mp3_url : (s as AudioAsset).url;
+						const currentUrl =
+							's3_url' in currentSong
+								? currentSong.s3_url
+								: 'mp3_url' in currentSong
+									? currentSong.mp3_url
+									: (currentSong as AudioAsset).url;
 						return url === currentUrl;
 					});
 					if (newIndex !== -1) currentIndex.set(newIndex);
@@ -413,11 +482,17 @@
 				const currentSong = $selectAudio;
 				const originalList = $basePlaylist;
 				playlist.set(originalList);
-				
+
 				if (currentSong) {
-					const newIndex = originalList.findIndex(s => {
-						const url = 's3_url' in s ? s.s3_url : ('mp3_url' in s ? s.mp3_url : (s as AudioAsset).url);
-						const currentUrl = 's3_url' in currentSong ? currentSong.s3_url : ('mp3_url' in currentSong ? currentSong.mp3_url : (currentSong as AudioAsset).url);
+					const newIndex = originalList.findIndex((s) => {
+						const url =
+							's3_url' in s ? s.s3_url : 'mp3_url' in s ? s.mp3_url : (s as AudioAsset).url;
+						const currentUrl =
+							's3_url' in currentSong
+								? currentSong.s3_url
+								: 'mp3_url' in currentSong
+									? currentSong.mp3_url
+									: (currentSong as AudioAsset).url;
 						return url === currentUrl;
 					});
 					if (newIndex !== -1) currentIndex.set(newIndex);
@@ -442,7 +517,12 @@
 	function playNext() {
 		if ($playlist.length === 0) return;
 
-		const nextIndex = findAdjacentPlayableIndex($playlist as PlayableAudio[], $currentIndex, 1, true);
+		const nextIndex = findAdjacentPlayableIndex(
+			$playlist as PlayableAudio[],
+			$currentIndex,
+			1,
+			true
+		);
 		if (nextIndex !== -1) {
 			selectPlaylistItem(nextIndex, true);
 		}
@@ -466,7 +546,7 @@
 		if (!url) return;
 
 		const encodedUrl = encodeURI(url);
-		console.log("[AudioPlayer] Updating source to:", encodedUrl);
+		console.log('[AudioPlayer] Updating source to:', encodedUrl);
 		// New track — drop any "previous track was interrupted" carry-over.
 		currentTrackInterrupted = false;
 		isAudioReady = false;
@@ -478,29 +558,42 @@
 		shouldAutoplayOnLoad = shouldResumePlayback;
 
 		if (audio) {
-			audio.pause();
+			isChangingSource = true;
+			try {
+				audio.pause();
+			} finally {
+				isChangingSource = false;
+			}
+			resetRememberedPlaybackPosition();
 			audio.src = encodedUrl;
 			audio.load();
 		} else {
+			resetRememberedPlaybackPosition();
 			audio = new Audio(encodedUrl);
 			audio.crossOrigin = 'anonymous';
 			audio.addEventListener('ended', handleEnded);
 			audio.addEventListener('timeupdate', updateAudioTime);
 			audio.addEventListener('timeupdate', updateIndicator);
-				audio.addEventListener('play', () => {
-					setPendingPlaybackIntent(null);
-					setUserWantsToPlay(true);
-					audioPausedAt = 0;
-					stopResumeWatchdog();
+			audio.addEventListener('play', () => {
+				setPendingPlaybackIntent(null);
+				setUserWantsToPlay(true);
+				if (pendingSessionResumeTime !== null) {
+					const restored = restorePlaybackPosition(pendingSessionResumeTime);
+					if (restored) pendingSessionResumeTime = null;
+				}
+				audioPausedAt = 0;
+				stopResumeWatchdog();
 				isPlaying.set(true);
 				if ('mediaSession' in navigator) {
 					navigator.mediaSession.playbackState = 'playing';
 				}
 			});
-				audio.addEventListener('pause', () => {
-					setPendingPlaybackIntent(null);
-					// Note: we do NOT clear userWantsToPlay here. A `pause` event
-					// can come from the listener tapping pause OR from the OS
+			audio.addEventListener('pause', () => {
+				if (isChangingSource) return;
+				setPendingPlaybackIntent(null);
+				rememberPlaybackPosition();
+				// Note: we do NOT clear userWantsToPlay here. A `pause` event
+				// can come from the listener tapping pause OR from the OS
 				// interrupting (phone call, Siri, another app). Only togglePlay
 				// clears the intent flag, so this handler stays neutral and
 				// the visibilitychange/focus listeners can resume when the
@@ -529,25 +622,31 @@
 			});
 			audio.addEventListener('loadedmetadata', () => {
 				duration = audio.duration;
-				console.log("[AudioPlayer] Metadata loaded, duration:", duration);
+				if (pendingSessionResumeTime !== null) {
+					restorePlaybackPosition(pendingSessionResumeTime);
+				}
+				console.log('[AudioPlayer] Metadata loaded, duration:', duration);
 			});
-				audio.addEventListener('canplay', () => {
-					isAudioReady = true;
-					if (shouldAutoplayOnLoad || $isPlaying) {
-						setPendingPlaybackIntent('play');
-						audio.play().catch((e) => {
-							setPendingPlaybackIntent(null);
-							console.error('[AudioPlayer] Autoplay on load failed:', e);
-							isPlaying.set(false);
-						});
-					}
-					shouldAutoplayOnLoad = false;
-				});
-				audio.addEventListener('error', (e) => {
-					setPendingPlaybackIntent(null);
-					console.error("[AudioPlayer] Audio error:", e);
-					isPlaying.set(false);
-					isAudioReady = false;
+			audio.addEventListener('canplay', () => {
+				isAudioReady = true;
+				if (pendingSessionResumeTime !== null) {
+					restorePlaybackPosition(pendingSessionResumeTime);
+				}
+				if (shouldAutoplayOnLoad || $isPlaying) {
+					setPendingPlaybackIntent('play');
+					audio.play().catch((e) => {
+						setPendingPlaybackIntent(null);
+						console.error('[AudioPlayer] Autoplay on load failed:', e);
+						isPlaying.set(false);
+					});
+				}
+				shouldAutoplayOnLoad = false;
+			});
+			audio.addEventListener('error', (e) => {
+				setPendingPlaybackIntent(null);
+				console.error('[AudioPlayer] Audio error:', e);
+				isPlaying.set(false);
+				isAudioReady = false;
 				shouldAutoplayOnLoad = false;
 			});
 		}
@@ -583,8 +682,8 @@
 	$: if ($selectAudio && browser) {
 		const newSelected = $selectAudio;
 		const rawUrl = getPlayableAudioUrl(newSelected as PlayableAudio);
-		console.log("[AudioPlayer] Selected audio change, raw URL:", rawUrl);
-		
+		console.log('[AudioPlayer] Selected audio change, raw URL:', rawUrl);
+
 		if (rawUrl && rawUrl !== audioSrc) {
 			audioSrc = rawUrl;
 			updateAudioSource(rawUrl);
@@ -620,28 +719,30 @@
 		// Get clientX from mouse or touch
 		const clientX = 'touches' in event ? event.touches[0].clientX : event.clientX;
 		const rect = progressBarElement.getBoundingClientRect();
-		
+
 		// Calculate percentage
 		let percentage = (clientX - rect.left) / rect.width;
 		percentage = Math.max(0, Math.min(1, percentage));
-		
+
 		// Update UI immediately for smoothness
 		// Also update indicatorPosition so the knob follows the simplified logic
 		progressBarWidth = percentage * 100;
-		indicatorPosition = progressBarWidth; 
-		
+		indicatorPosition = progressBarWidth;
+
 		// Update audio
 		if (audio) {
 			const newTime = percentage * duration;
 			if (Math.abs(audio.currentTime - newTime) > 0.1) {
 				audio.currentTime = newTime;
 			}
+			rememberPlaybackPosition(newTime, duration);
 		}
 	};
 
 	const seekForward = (seconds: number = 5) => {
 		if (!audio) return;
 		audio.currentTime += seconds;
+		rememberPlaybackPosition();
 		updateAudioTime();
 		updateIndicator();
 	};
@@ -649,6 +750,7 @@
 	const seekBackward = (seconds: number = 5) => {
 		if (!audio) return;
 		audio.currentTime -= seconds;
+		rememberPlaybackPosition();
 		updateAudioTime();
 		updateIndicator();
 	};
@@ -668,6 +770,7 @@
 		if (audio) {
 			currentTime = audio.currentTime;
 			duration = audio.duration;
+			rememberPlaybackPosition(currentTime, duration);
 			progressBarWidth = (currentTime / duration) * 100;
 			pushMediaSessionPosition();
 		}
@@ -695,6 +798,7 @@
 		}
 
 		audio.currentTime = newPosition;
+		rememberPlaybackPosition(newPosition, duration);
 		updateAudioTime();
 		indicatorPosition = (currentTime / duration) * 100;
 	};
@@ -714,6 +818,7 @@
 		}
 
 		audio.currentTime = newPosition;
+		rememberPlaybackPosition(newPosition, duration);
 		updateAudioTime();
 		const delta = clickX - initialClickX;
 		indicatorPosition = Math.min(
@@ -777,6 +882,11 @@
 			// Don't probe with play() while a reload is in flight — the
 			// in-flight finish() will play() once the session is rebuilt.
 			if (isReloadingSession) return;
+			if (pendingSessionResumeTime !== null) {
+				restorePlaybackPosition(pendingSessionResumeTime);
+			} else if (audio.currentTime <= 0.25 && lastKnownPlaybackTime > 0.25) {
+				restorePlaybackPosition(lastKnownPlaybackTime);
+			}
 			audio.play().catch((err) => {
 				console.warn('[AudioPlayer] play() failed:', err);
 			});
@@ -796,8 +906,11 @@
 			pendingPlaybackSeek.set(null);
 		}
 
-		const savedTime = hasOverrideSeek ? seekHint.time : audio.currentTime;
+		const savedTime = hasOverrideSeek ? seekHint.time : getReliablePlaybackTime();
 		const savedSrc = audio.src;
+		if (savedTime > 0.25) {
+			pendingSessionResumeTime = savedTime;
+		}
 		isReloadingSession = true;
 		let settled = false;
 		const finish = () => {
@@ -808,11 +921,7 @@
 			// has been destroyed (HMR, navigation away). Don't resume.
 			if (destroyed) return;
 			if (!audio || audio.src !== savedSrc) return;
-			try {
-				audio.currentTime = savedTime;
-			} catch {
-				/* metadata may not be loaded yet — ignore */
-			}
+			restorePlaybackPosition(pendingSessionResumeTime ?? savedTime);
 			audio.play().catch((err) => {
 				console.warn('[AudioPlayer] Post-reload play() failed:', err);
 			});
@@ -957,6 +1066,7 @@
 				} else {
 					audio.currentTime = details.seekTime;
 				}
+				rememberPlaybackPosition(details.seekTime, audio.duration);
 			});
 			navigator.mediaSession.setActionHandler('stop', () => {
 				setUserWantsToPlay(false);
@@ -964,6 +1074,7 @@
 					audio.pause();
 					audio.currentTime = 0;
 				}
+				resetRememberedPlaybackPosition();
 			});
 		} catch (err) {
 			console.warn('[AudioPlayer] MediaSession handler registration failed:', err);
@@ -987,11 +1098,24 @@
 		const artworkUrl = getArtworkUrl(current as PlayableAudio);
 
 		navigator.mediaSession.metadata = new MediaMetadata({
-			title: ('title' in current ? current.title : (isSermon ? (current as Sermon).french_title || (current as Sermon).english_title : 'Sans titre')) || 'Sans titre',
-			artist: isMusic ? (current as MusicAudio).artist || 'Artiste inconnu' : (isSermon ? (current as Sermon).author : 'Missionnaire'),
+			title:
+				('title' in current
+					? current.title
+					: isSermon
+						? (current as Sermon).french_title || (current as Sermon).english_title
+						: 'Sans titre') || 'Sans titre',
+			artist: isMusic
+				? (current as MusicAudio).artist || 'Artiste inconnu'
+				: isSermon
+					? (current as Sermon).author
+					: 'Missionnaire',
 			album: isMusic
-				? (current as MusicAudio).book_full_name || (current as MusicAudio).category || 'Missionnaire'
-				: (isSermon ? (current as Sermon).iso_date || 'Prédication' : 'Media'),
+				? (current as MusicAudio).book_full_name ||
+					(current as MusicAudio).category ||
+					'Missionnaire'
+				: isSermon
+					? (current as Sermon).iso_date || 'Prédication'
+					: 'Media',
 			artwork: [
 				{ src: artworkUrl, sizes: '96x96', type: 'image/png' },
 				{ src: artworkUrl, sizes: '192x192', type: 'image/png' },
@@ -1110,8 +1234,8 @@
 	});
 </script>
 
-<svelte:window 
-	on:keydown={handleKeydown} 
+<svelte:window
+	on:keydown={handleKeydown}
 	on:mousemove={handleDrag}
 	on:touchmove={handleDrag}
 	on:mouseup={endDrag}
@@ -1119,213 +1243,272 @@
 />
 
 {#if $selectAudio}
-<div
-	bind:this={playerShell}
-	class="fixed z-[100] bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-stone-200 shadow-[0_-4px_20px_rgb(0,0,0,0.06)] pb-safe pt-2 md:pt-4 md:pb-4"
->
-	<!-- Top Progress Bar -->
-<!-- svelte-ignore a11y-click-events-have-key-events -->
-<!-- svelte-ignore a11y-no-static-element-interactions -->
-<div
-	bind:this={progressBarElement}
-	class="absolute top-0 left-0 w-full h-8 -translate-y-1/2 cursor-pointer group/progress flex items-center justify-start z-50 touch-none select-none"
-	on:mousedown={startDrag}
-	on:touchstart|nonpassive={startDrag}
-	on:click={seekTo}
->
-	<!-- Visual Track -->
-	<div class="w-full h-[4px] bg-stone-200 relative overflow-visible rounded-full">
-		<!-- Active Progress -->
-		<div 
-			class="h-full bg-missionnaire rounded-full relative" 
-			style="width: {progressBarWidth}%"
+	<div
+		bind:this={playerShell}
+		class="fixed z-[100] bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-stone-200 shadow-[0_-4px_20px_rgb(0,0,0,0.06)] pb-safe pt-2 md:pt-4 md:pb-4"
+	>
+		<!-- Top Progress Bar -->
+		<!-- svelte-ignore a11y-click-events-have-key-events -->
+		<!-- svelte-ignore a11y-no-static-element-interactions -->
+		<div
+			bind:this={progressBarElement}
+			class="absolute top-0 left-0 w-full h-8 -translate-y-1/2 cursor-pointer group/progress flex items-center justify-start z-50 touch-none select-none"
+			on:mousedown={startDrag}
+			on:touchstart|nonpassive={startDrag}
+			on:click={seekTo}
 		>
-			<!-- Indicator Knob -->
-			<div 
-				class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-4 h-4 bg-missionnaire border-[3px] border-white rounded-full shadow-md transform transition-transform duration-100 {isDragging ? 'scale-125' : 'scale-100'} md:scale-0 md:group-hover/progress:scale-100"
-			></div>
-		</div>
-	</div>
-</div>
-
-	<div class="px-5 md:px-10 max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:gap-8">
-		<!-- Info Row -->
-		<div class="flex items-center justify-between mb-3 md:mb-0 md:flex-1 md:min-w-0">
-			<div class="flex-1 min-w-0 min-h-[2.75rem] md:min-h-[3rem]">
-				<div class="text-[10px] uppercase tracking-[0.2em] font-bold text-missionnaire mb-0.5 opacity-80 flex items-center gap-2">
-					<span>Lecture en cours</span>
-					<!-- ── BEGIN: cache indicator badge (added) ──────────── -->
-					{#if isCurrentTrackCached === true}
-						<span
-							class="inline-flex items-center gap-1 text-[9px] font-semibold tracking-normal normal-case text-emerald-600"
-							title="Disponible hors ligne"
-							aria-label="Piste en cache"
-						>
-							<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-								<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
-								<polyline points="9 14 11 16 15 12"/>
-							</svg>
-							<span>En cache</span>
-						</span>
-					{/if}
-					{#if showOfflineUnavailable}
-						<span
-							class="inline-flex items-center gap-1 text-[9px] font-semibold tracking-normal normal-case text-amber-600"
-							title="Hors ligne — cette piste n'est pas en cache"
-							aria-label="Piste indisponible hors ligne"
-						>
-							<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-								<line x1="1" y1="1" x2="23" y2="23"/>
-								<path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
-								<path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
-								<path d="M10.71 5.05A16 16 0 0 1 22.58 9"/>
-								<path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
-								<path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
-								<line x1="12" y1="20" x2="12.01" y2="20"/>
-							</svg>
-							<span>Hors ligne</span>
-						</span>
-					{/if}
-					<!-- ── END: cache indicator badge ────────────────────── -->
-				</div>
-				<div class="font-black text-sm md:text-lg text-stone-900 truncate pr-4" title={getDisplayTitle($selectAudio)}>
-					{getDisplayTitle($selectAudio)}
-				</div>
-				{#if !isAudioReady}
-					<div class="text-[10px] font-medium uppercase tracking-[0.15em] text-stone-400 mt-1">
-						Chargement...
-					</div>
-				{/if}
-				<div class="flex items-center gap-2 mt-0.5 md:hidden">
-					<span class="text-[10px] font-medium text-stone-400">{formatTime(currentTime)}</span>
-					<div class="w-1 h-1 rounded-full bg-stone-200"></div>
-					<span class="text-[10px] font-medium text-stone-400">{formatTime(duration)}</span>
+			<!-- Visual Track -->
+			<div class="w-full h-[4px] bg-stone-200 relative overflow-visible rounded-full">
+				<!-- Active Progress -->
+				<div
+					class="h-full bg-missionnaire rounded-full relative"
+					style="width: {progressBarWidth}%"
+				>
+					<!-- Indicator Knob -->
+					<div
+						class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-4 h-4 bg-missionnaire border-[3px] border-white rounded-full shadow-md transform transition-transform duration-100 {isDragging
+							? 'scale-125'
+							: 'scale-100'} md:scale-0 md:group-hover/progress:scale-100"
+					></div>
 				</div>
 			</div>
-
-			<button
-				class="p-2 rounded-full transition-colors flex-shrink-0 {isCurrentFavorite ? 'text-red-500 hover:text-red-600' : 'text-stone-300 hover:text-red-400'}"
-				on:click={handleToggleFavorite}
-				aria-label={isCurrentFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
-				title={isCurrentFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
-			>
-				<Icon src={isCurrentFavorite ? BsHeartFill : BsHeart} size="18" />
-			</button>
-
-			<button
-				class="bg-gray-900 hover:bg-black text-white p-2 rounded-full transition-colors md:hidden"
-				on:click={() => {
-					selectAudio.set(null);
-					if (audio) audio.pause();
-				}}
-				aria-label="Fermer le lecteur"
-			>
-				<Icon src={BsX} size="20" />
-			</button>
 		</div>
 
-		<!-- Controls & Time Row -->
-		<div class="flex flex-col items-center md:flex-row md:gap-6 w-full md:w-auto">
-			<!-- Main Playback Controls -->
-			<div class="flex items-center justify-center gap-4 md:gap-6">
-				<!-- Repeat/Auto-next on mobile side -->
-				<div class="flex md:hidden items-center gap-1">
-					<button
-						on:click={toggleShuffle}
-						class="p-2.5 rounded-full transition-all flex items-center gap-2 {$isShuffle ? 'bg-missionnaire text-white shadow-md shadow-missionnaire/20' : 'bg-stone-50 text-stone-400 hover:bg-stone-100 hover:text-stone-600'}"
-						title={$isShuffle ? 'Aléatoire activé' : 'Aléatoire désactivé'}
+		<div class="px-5 md:px-10 max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:gap-8">
+			<!-- Info Row -->
+			<div class="flex items-center justify-between mb-3 md:mb-0 md:flex-1 md:min-w-0">
+				<div class="flex-1 min-w-0 min-h-[2.75rem] md:min-h-[3rem]">
+					<div
+						class="text-[10px] uppercase tracking-[0.2em] font-bold text-missionnaire mb-0.5 opacity-80 flex items-center gap-2"
 					>
-						<Icon src={BsShuffle} size="16" />
-					</button>
-				</div>
-
-				<div class="flex items-center gap-1 md:gap-3">
-					<button on:click={playPrevious} class="p-2 text-stone-600 hover:text-missionnaire transition-colors" title="Précédent">
-						<Icon src={BsSkipStartFill} size="22" />
-					</button>
-
-					<button on:click={() => seekBackward()} class="hidden md:block p-2 text-stone-300 hover:text-missionnaire transition-colors" title="-5s">
-						<Icon src={BsSkipBackwardFill} size="16" />
-					</button>
-
-					<button on:click={togglePlay} class="relative flex items-center justify-center w-14 h-14 md:w-12 md:h-12 bg-missionnaire text-white rounded-full hover:scale-105 transition-transform shadow-lg shadow-missionnaire/20">
-						{#if $isPlaying}
-							<Icon src={BsPauseCircleFill} size="32" />
-						{:else}
-							<Icon src={BsPlayCircleFill} size="32" />
+						<span>Lecture en cours</span>
+						<!-- ── BEGIN: cache indicator badge (added) ──────────── -->
+						{#if isCurrentTrackCached === true}
+							<span
+								class="inline-flex items-center gap-1 text-[9px] font-semibold tracking-normal normal-case text-emerald-600"
+								title="Disponible hors ligne"
+								aria-label="Piste en cache"
+							>
+								<svg
+									width="12"
+									height="12"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2.5"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
+									<polyline points="9 14 11 16 15 12" />
+								</svg>
+								<span>En cache</span>
+							</span>
 						{/if}
-					</button>
-
-					<button on:click={() => seekForward()} class="hidden md:block p-2 text-stone-300 hover:text-missionnaire transition-colors" title="+5s">
-						<Icon src={BsSkipForwardFill} size="16" />
-					</button>
-
-					<button on:click={playNext} class="p-2 text-stone-600 hover:text-missionnaire transition-colors" title="Suivant">
-						<Icon src={BsSkipEndFill} size="22" />
-					</button>
-				</div>
-
-				<!-- Auto-Next Side -->
-				<div class="flex md:hidden items-center gap-1">
-					<button
-						on:click={toggleAutoNext}
-						class="p-2.5 rounded-full transition-all flex items-center gap-2 {$autoNext ? 'bg-missionnaire text-white shadow-md shadow-missionnaire/20' : 'bg-stone-50 text-stone-400 hover:bg-stone-100 hover:text-stone-600'}"
-						title={$autoNext ? 'Lecture auto activée' : 'Lecture auto désactivée'}
+						{#if showOfflineUnavailable}
+							<span
+								class="inline-flex items-center gap-1 text-[9px] font-semibold tracking-normal normal-case text-amber-600"
+								title="Hors ligne — cette piste n'est pas en cache"
+								aria-label="Piste indisponible hors ligne"
+							>
+								<svg
+									width="12"
+									height="12"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2.5"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<line x1="1" y1="1" x2="23" y2="23" />
+									<path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55" />
+									<path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39" />
+									<path d="M10.71 5.05A16 16 0 0 1 22.58 9" />
+									<path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88" />
+									<path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+									<line x1="12" y1="20" x2="12.01" y2="20" />
+								</svg>
+								<span>Hors ligne</span>
+							</span>
+						{/if}
+						<!-- ── END: cache indicator badge ────────────────────── -->
+					</div>
+					<div
+						class="font-black text-sm md:text-lg text-stone-900 truncate pr-4"
+						title={getDisplayTitle($selectAudio)}
 					>
-						<Icon src={RiMediaPlayList2Fill} size="18" />
-					</button>
+						{getDisplayTitle($selectAudio)}
+					</div>
+					{#if !isAudioReady}
+						<div class="text-[10px] font-medium uppercase tracking-[0.15em] text-stone-400 mt-1">
+							Chargement...
+						</div>
+					{/if}
+					<div class="flex items-center gap-2 mt-0.5 md:hidden">
+						<span class="text-[10px] font-medium text-stone-400">{formatTime(currentTime)}</span>
+						<div class="w-1 h-1 rounded-full bg-stone-200"></div>
+						<span class="text-[10px] font-medium text-stone-400">{formatTime(duration)}</span>
+					</div>
 				</div>
+
+				<button
+					class="p-2 rounded-full transition-colors flex-shrink-0 {isCurrentFavorite
+						? 'text-red-500 hover:text-red-600'
+						: 'text-stone-300 hover:text-red-400'}"
+					on:click={handleToggleFavorite}
+					aria-label={isCurrentFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+					title={isCurrentFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+				>
+					<Icon src={isCurrentFavorite ? BsHeartFill : BsHeart} size="18" />
+				</button>
+
+				<button
+					class="bg-gray-900 hover:bg-black text-white p-2 rounded-full transition-colors md:hidden"
+					on:click={() => {
+						selectAudio.set(null);
+						if (audio) audio.pause();
+					}}
+					aria-label="Fermer le lecteur"
+				>
+					<Icon src={BsX} size="20" />
+				</button>
 			</div>
 
-			<!-- Time & Extra Controls (Desktop) -->
-			<div class="hidden md:flex items-center gap-6">
-				<div class="flex items-center gap-1.5 font-bold text-[13px] text-stone-500 min-w-[90px]">
-					<span class="text-stone-500">{formatTime(currentTime)}</span>
-					<span class="text-stone-300">/</span>
-					<span>{formatTime(duration)}</span>
-				</div>
-
-				<div class="flex items-center gap-2 border-l border-stone-100 pl-6">
-					<button 
-						on:click={toggleShuffle} 
-						class="p-2.5 rounded-full transition-all flex items-center gap-2 {$isShuffle ? 'bg-missionnaire text-white' : 'bg-stone-50 text-stone-400 hover:bg-stone-100 hover:text-stone-600'}"
-						title={$isShuffle ? 'Aléatoire activé' : 'Aléatoire désactivé'}
-					>
-						<Icon src={BsShuffle} size="16" />
-					</button>
-
-					<button 
-						on:click={toggleAutoNext} 
-						class="p-2.5 rounded-full transition-all flex items-center gap-2 {$autoNext ? 'bg-missionnaire text-white shadow-md shadow-missionnaire/20' : 'bg-stone-50 text-stone-400 hover:bg-stone-100'}"
-						title={$autoNext ? 'Lecture auto activée' : 'Lecture auto désactivée'}
-					>
-						<Icon src={RiMediaPlayList2Fill} size="18" />
-					</button>
-
-					<div class="flex items-center gap-2 ml-2">
-						<button on:click={toggleMute} class="p-2 text-stone-400 hover:text-missionnaire transition-colors">
-							{#if !isMuted}
-								<Icon src={BsVolumeUpFill} size="20" />
-							{:else}
-								<Icon src={BsVolumeMuteFill} size="20" />
-							{/if}
+			<!-- Controls & Time Row -->
+			<div class="flex flex-col items-center md:flex-row md:gap-6 w-full md:w-auto">
+				<!-- Main Playback Controls -->
+				<div class="flex items-center justify-center gap-4 md:gap-6">
+					<!-- Repeat/Auto-next on mobile side -->
+					<div class="flex md:hidden items-center gap-1">
+						<button
+							on:click={toggleShuffle}
+							class="p-2.5 rounded-full transition-all flex items-center gap-2 {$isShuffle
+								? 'bg-missionnaire text-white shadow-md shadow-missionnaire/20'
+								: 'bg-stone-50 text-stone-400 hover:bg-stone-100 hover:text-stone-600'}"
+							title={$isShuffle ? 'Aléatoire activé' : 'Aléatoire désactivé'}
+						>
+							<Icon src={BsShuffle} size="16" />
 						</button>
 					</div>
 
-					<button
-						class="ml-4 bg-gray-900 text-white p-2 rounded-full hover:bg-black transition-colors"
-						on:click={() => {
-							selectAudio.set(null);
-							if (audio) audio.pause();
-						}}
-					>
-						<Icon src={BsX} size="20" />
-					</button>
+					<div class="flex items-center gap-1 md:gap-3">
+						<button
+							on:click={playPrevious}
+							class="p-2 text-stone-600 hover:text-missionnaire transition-colors"
+							title="Précédent"
+						>
+							<Icon src={BsSkipStartFill} size="22" />
+						</button>
+
+						<button
+							on:click={() => seekBackward()}
+							class="hidden md:block p-2 text-stone-300 hover:text-missionnaire transition-colors"
+							title="-5s"
+						>
+							<Icon src={BsSkipBackwardFill} size="16" />
+						</button>
+
+						<button
+							on:click={togglePlay}
+							class="relative flex items-center justify-center w-14 h-14 md:w-12 md:h-12 bg-missionnaire text-white rounded-full hover:scale-105 transition-transform shadow-lg shadow-missionnaire/20"
+						>
+							{#if $isPlaying}
+								<Icon src={BsPauseCircleFill} size="32" />
+							{:else}
+								<Icon src={BsPlayCircleFill} size="32" />
+							{/if}
+						</button>
+
+						<button
+							on:click={() => seekForward()}
+							class="hidden md:block p-2 text-stone-300 hover:text-missionnaire transition-colors"
+							title="+5s"
+						>
+							<Icon src={BsSkipForwardFill} size="16" />
+						</button>
+
+						<button
+							on:click={playNext}
+							class="p-2 text-stone-600 hover:text-missionnaire transition-colors"
+							title="Suivant"
+						>
+							<Icon src={BsSkipEndFill} size="22" />
+						</button>
+					</div>
+
+					<!-- Auto-Next Side -->
+					<div class="flex md:hidden items-center gap-1">
+						<button
+							on:click={toggleAutoNext}
+							class="p-2.5 rounded-full transition-all flex items-center gap-2 {$autoNext
+								? 'bg-missionnaire text-white shadow-md shadow-missionnaire/20'
+								: 'bg-stone-50 text-stone-400 hover:bg-stone-100 hover:text-stone-600'}"
+							title={$autoNext ? 'Lecture auto activée' : 'Lecture auto désactivée'}
+						>
+							<Icon src={RiMediaPlayList2Fill} size="18" />
+						</button>
+					</div>
+				</div>
+
+				<!-- Time & Extra Controls (Desktop) -->
+				<div class="hidden md:flex items-center gap-6">
+					<div class="flex items-center gap-1.5 font-bold text-[13px] text-stone-500 min-w-[90px]">
+						<span class="text-stone-500">{formatTime(currentTime)}</span>
+						<span class="text-stone-300">/</span>
+						<span>{formatTime(duration)}</span>
+					</div>
+
+					<div class="flex items-center gap-2 border-l border-stone-100 pl-6">
+						<button
+							on:click={toggleShuffle}
+							class="p-2.5 rounded-full transition-all flex items-center gap-2 {$isShuffle
+								? 'bg-missionnaire text-white'
+								: 'bg-stone-50 text-stone-400 hover:bg-stone-100 hover:text-stone-600'}"
+							title={$isShuffle ? 'Aléatoire activé' : 'Aléatoire désactivé'}
+						>
+							<Icon src={BsShuffle} size="16" />
+						</button>
+
+						<button
+							on:click={toggleAutoNext}
+							class="p-2.5 rounded-full transition-all flex items-center gap-2 {$autoNext
+								? 'bg-missionnaire text-white shadow-md shadow-missionnaire/20'
+								: 'bg-stone-50 text-stone-400 hover:bg-stone-100'}"
+							title={$autoNext ? 'Lecture auto activée' : 'Lecture auto désactivée'}
+						>
+							<Icon src={RiMediaPlayList2Fill} size="18" />
+						</button>
+
+						<div class="flex items-center gap-2 ml-2">
+							<button
+								on:click={toggleMute}
+								class="p-2 text-stone-400 hover:text-missionnaire transition-colors"
+							>
+								{#if !isMuted}
+									<Icon src={BsVolumeUpFill} size="20" />
+								{:else}
+									<Icon src={BsVolumeMuteFill} size="20" />
+								{/if}
+							</button>
+						</div>
+
+						<button
+							class="ml-4 bg-gray-900 text-white p-2 rounded-full hover:bg-black transition-colors"
+							on:click={() => {
+								selectAudio.set(null);
+								if (audio) audio.pause();
+							}}
+						>
+							<Icon src={BsX} size="20" />
+						</button>
+					</div>
 				</div>
 			</div>
 		</div>
 	</div>
-</div>
 {/if}
 
 <style>

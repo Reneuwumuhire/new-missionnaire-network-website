@@ -35,6 +35,9 @@
 	let isPredication = false;
 	let lastSavedAt = 0;
 	let lastSnapshotAt = 0;
+	let snapshotUrl: string | null = null;
+	let lastKnownSnapshotTime = 0;
+	let lastKnownSnapshotDuration = 0;
 
 	// Cold-load rehydration state. When we restore the player from a saved
 	// snapshot, the audio element doesn't exist yet — we set it up via the
@@ -60,8 +63,9 @@
 		const el = currentAudio;
 		if (!el) return;
 
-		const time = el.currentTime;
-		const duration = Number.isFinite(el.duration) ? el.duration : 0;
+		const selectedUrl = getSelectedAudioUrl();
+		const time = getReliableSnapshotTime(el, selectedUrl);
+		const duration = getReliableSnapshotDuration(el, selectedUrl);
 
 		if (duration > 0 && duration - time < END_THRESHOLD_SECONDS) {
 			clearResumeState();
@@ -80,6 +84,63 @@
 			savedAt: now,
 			sermon: trackedSermon
 		});
+	}
+
+	function getSelectedAudioUrl() {
+		const sel = get(selectAudio);
+		return sel ? getPlayableAudioUrl(sel as PlayableAudio) || null : null;
+	}
+
+	function resetSnapshotPosition(url: string | null) {
+		snapshotUrl = url;
+		lastKnownSnapshotTime = 0;
+		lastKnownSnapshotDuration = 0;
+	}
+
+	function rememberSnapshotPosition(allowZero = false) {
+		const el = currentAudio;
+		if (!el) return;
+		const url = getSelectedAudioUrl();
+		if (!url) return;
+		if (url !== snapshotUrl) resetSnapshotPosition(url);
+
+		const time = Number.isFinite(el.currentTime) ? el.currentTime : 0;
+		const duration = Number.isFinite(el.duration) ? el.duration : 0;
+
+		// During an iOS interruption, audio.load() can report currentTime = 0
+		// before the session is usable again. Do not let that transient 0 erase
+		// the timestamp we already observed while the track was playing.
+		if (time <= 0.25 && allowZero && el.readyState < 2 && lastKnownSnapshotTime >= MIN_RESUME_SECONDS) {
+			return;
+		}
+		if (time > 0.25 || allowZero || lastKnownSnapshotTime <= 0.25) {
+			lastKnownSnapshotTime = Math.max(0, time);
+		}
+		if (duration > 0) {
+			lastKnownSnapshotDuration = duration;
+		}
+	}
+
+	function getReliableSnapshotTime(el: HTMLAudioElement, url: string | null) {
+		const liveTime = Number.isFinite(el.currentTime) ? el.currentTime : 0;
+		if (
+			url &&
+			url === snapshotUrl &&
+			liveTime <= 0.25 &&
+			lastKnownSnapshotTime >= MIN_RESUME_SECONDS
+		) {
+			return lastKnownSnapshotTime;
+		}
+		return Math.max(0, liveTime);
+	}
+
+	function getReliableSnapshotDuration(el: HTMLAudioElement, url: string | null) {
+		const liveDuration = Number.isFinite(el.duration) ? el.duration : 0;
+		if (liveDuration > 0) return liveDuration;
+		if (url && url === snapshotUrl && lastKnownSnapshotDuration > 0) {
+			return lastKnownSnapshotDuration;
+		}
+		return 0;
 	}
 
 	function snapshotPlayer(force: boolean) {
@@ -101,8 +162,9 @@
 		if (!force && now - lastSnapshotAt < SAVE_INTERVAL_MS) return;
 		lastSnapshotAt = now;
 
-		const time = el.currentTime;
-		const duration = Number.isFinite(el.duration) ? el.duration : 0;
+		const selectedUrl = getSelectedAudioUrl();
+		const time = getReliableSnapshotTime(el, selectedUrl);
+		const duration = getReliableSnapshotDuration(el, selectedUrl);
 
 		// Treat near-end as "done" — clearing avoids resurrecting a track at
 		// 99% which would auto-advance to the next-or-stop the moment the
@@ -137,13 +199,20 @@
 	function handleTimeUpdate() {
 		const el = currentAudio;
 		if (!el || el.paused) return;
+		rememberSnapshotPosition(false);
 		saveProgress(false);
 		snapshotPlayer(false);
+	}
+
+	function handleSeeked() {
+		rememberSnapshotPosition(true);
+		snapshotPlayer(true);
 	}
 
 	function handlePause() {
 		// Flush immediately so a fast tab close after pause keeps the position
 		// even if the next 5-second tick never fires.
+		rememberSnapshotPosition(false);
 		saveProgress(true);
 		snapshotPlayer(true);
 	}
@@ -186,6 +255,7 @@
 		if (attachedAudio === el) return;
 		if (attachedAudio) {
 			attachedAudio.removeEventListener('timeupdate', handleTimeUpdate);
+			attachedAudio.removeEventListener('seeked', handleSeeked);
 			attachedAudio.removeEventListener('pause', handlePause);
 			attachedAudio.removeEventListener('ended', handleEnded);
 			attachedAudio.removeEventListener('loadedmetadata', handleLoadedMetadata);
@@ -193,6 +263,7 @@
 		attachedAudio = el;
 		if (el) {
 			el.addEventListener('timeupdate', handleTimeUpdate);
+			el.addEventListener('seeked', handleSeeked);
 			el.addEventListener('pause', handlePause);
 			el.addEventListener('ended', handleEnded);
 			el.addEventListener('loadedmetadata', handleLoadedMetadata);
@@ -213,12 +284,17 @@
 	const selectAudioUnsub = selectAudio.subscribe((value) => {
 		isPredication = looksLikePredication(value);
 		trackedUrl = isPredication ? getPlayableAudioUrl(value) || null : null;
+		const currentUrl = value ? getPlayableAudioUrl(value as PlayableAudio) || null : null;
+		if (currentUrl !== snapshotUrl) {
+			resetSnapshotPosition(currentUrl);
+		}
 		// Snapshot the sermon so the toast can re-prime $selectAudio after a
 		// full reload. JSON round-trip strips any non-serializable bits and
 		// detaches us from later in-place mutations of the live object.
-		trackedSermon = isPredication && value
-			? (JSON.parse(JSON.stringify(value)) as Record<string, unknown>)
-			: null;
+		trackedSermon =
+			isPredication && value
+				? (JSON.parse(JSON.stringify(value)) as Record<string, unknown>)
+				: null;
 		// Reset the save throttle so the first save after a track switch
 		// happens promptly rather than waiting out the previous track's tick.
 		lastSavedAt = 0;
@@ -231,12 +307,14 @@
 	});
 
 	function handlePageHide() {
+		rememberSnapshotPosition(false);
 		saveProgress(true);
 		snapshotPlayer(true);
 	}
 
 	function handleVisibilityChange() {
 		if (document.visibilityState === 'hidden') {
+			rememberSnapshotPosition(false);
 			saveProgress(true);
 			snapshotPlayer(true);
 		}
@@ -258,10 +336,7 @@
 		if (!snap.intendsToPlay) return;
 
 		// Already at the end of the saved track — nothing meaningful to resume.
-		if (
-			snap.duration > 0 &&
-			snap.duration - snap.currentTime < END_THRESHOLD_SECONDS
-		) {
+		if (snap.duration > 0 && snap.duration - snap.currentTime < END_THRESHOLD_SECONDS) {
 			clearPlayerSnapshot();
 			return;
 		}
@@ -288,9 +363,8 @@
 		}
 
 		const list = Array.isArray(snap.playlist) ? snap.playlist : [];
-		const baseList = Array.isArray(snap.basePlaylist) && snap.basePlaylist.length > 0
-			? snap.basePlaylist
-			: list;
+		const baseList =
+			Array.isArray(snap.basePlaylist) && snap.basePlaylist.length > 0 ? snap.basePlaylist : list;
 
 		basePlaylist.set(baseList as PlayableAudio[]);
 		playlist.set(list as PlayableAudio[]);
