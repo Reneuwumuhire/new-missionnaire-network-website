@@ -3,6 +3,7 @@
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import Toast from '$lib/components/Toast.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+	import PullToRefresh from '$lib/components/PullToRefresh.svelte';
 	import type { LayoutData } from './$types';
 	import type { Snippet } from 'svelte';
 	import { navigating } from '$app/state';
@@ -13,6 +14,7 @@
 
 <Toast />
 <ConfirmDialog />
+<PullToRefresh />
 
 <!-- Navigation indicator. Sits at the top of the viewport so admins get
      instant feedback when clicking a sidebar link — same visual contract as
