@@ -15,6 +15,12 @@
 	let isHeroSearchLoading = false;
 	let lastSyncedSearch = '';
 
+	// Total song count for the hero copy. Loaded async on mount so the page
+	// renders immediately with a fallback string — if the count endpoint is
+	// slow or unreachable, the hero stays useful instead of blocking on it.
+	let totalSongs: number | null = null;
+	const formattedTotal = (n: number) => n.toLocaleString('fr-FR');
+
 	$: currentSearch = $page.url.searchParams.get('search') || '';
 	$: if (currentSearch !== lastSyncedSearch) {
 		heroSearchValue = currentSearch;
@@ -59,10 +65,24 @@
 	onDestroy(() => {
 		clearTimeout(debounceTimer);
 	});
+
+	onMount(async () => {
+		if (!browser) return;
+		try {
+			const res = await fetch('/api/music-audio/count');
+			if (!res.ok) return;
+			const result = await res.json();
+			if (typeof result.count === 'number' && result.count > 0) {
+				totalSongs = result.count;
+			}
+		} catch {
+			// network failure — keep the fallback hero copy
+		}
+	});
 </script>
 
 <div class="flex flex-col">
-	<header>
+	<header class="relative">
 		<div class="relative header-predications flex flex-col items-center justify-center w-full min-h-[340px] md:min-h-[400px]">
 			<div class="absolute inset-0 overlay-predications flex items-center justify-center px-5 py-12">
 				<div class="flex flex-col items-center text-white w-full max-w-3xl text-center">
@@ -71,7 +91,11 @@
 					</p>
 					<h1 class="font-display text-3xl md:text-5xl font-semibold leading-tight">Louange et Adoration</h1>
 					<p class="text-sm text-white/60 font-body mt-3 mb-8 max-w-lg leading-relaxed">
-						Trouvez ici les cantiques.
+						{#if totalSongs !== null}
+							Trouvez ici <span class="font-semibold text-white">{formattedTotal(totalSongs)}</span> cantiques.
+						{:else}
+							Trouvez ici les cantiques.
+						{/if}
 					</p>
 					<form
 						class="flex w-full max-w-xl border border-white/25 bg-white/90 backdrop-blur-sm overflow-hidden"
@@ -136,15 +160,18 @@
 					</div>
 				</div>
 			</div>
+		</div>
 
-			<!-- Floating Banner -->
-			<div class="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-full max-w-2xl px-2 md:px-5 z-10">
-				<AndroidBanner />
-			</div>
+		<!-- Banner: inline below hero on mobile (so it doesn't overlap the
+		     Audio/Vidéos toggle), absolute floating on desktop where there's
+		     room. Single render — duplicating it would split the dismiss
+		     state across two instances. -->
+		<div class="md:absolute md:bottom-0 md:left-1/2 md:-translate-x-1/2 md:translate-y-1/2 w-full max-w-2xl mx-auto px-2 md:px-5 z-10 mt-4 md:mt-0">
+			<AndroidBanner />
 		</div>
 	</header>
 </div>
-<div class="flex flex-row justify-center h-auto w-full pt-20 pb-32 md:py-16 overflow-x-hidden">
+<div class="flex flex-row justify-center h-auto w-full pt-8 pb-32 md:pt-16 md:pb-16 overflow-x-hidden">
 	<div class=" flex flex-col w-full max-w-7xl px-2 md:px-5">
 		<slot />
 	</div>
