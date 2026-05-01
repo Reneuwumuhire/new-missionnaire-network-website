@@ -9,25 +9,25 @@ SvelteKit app for the Missionnaire Network website (Vite + TypeScript).
 
 ## Quick start (local)
 
-0) If you cloned without submodules and see missing `mn-lib` errors, initialize them:
+0. If you cloned without submodules and see missing `mn-lib` errors, initialize them:
 
 ```bash
 git submodule update --init --recursive
 ```
 
-1) Install dependencies:
+1. Install dependencies:
 
 ```bash
 pnpm install
 ```
 
-2) Create your local env file:
+2. Create your local env file:
 
 ```bash
 cp .env-example .env.local
 ```
 
-3) Edit `.env.local` and add the required variables (see table below), then start the dev server:
+3. Edit `.env.local` and add the required variables (see table below), then start the dev server:
 
 ```bash
 pnpm dev -- --open
@@ -41,13 +41,14 @@ This project uses SvelteKit `$env/static/*`, which means these variables must ex
 
 Keep secrets in `.env.local` (it’s ignored by git).
 
-| Name | Type | Required | Example | Notes |
-| --- | --- | --- | --- | --- |
-| `PUBLIC_MAIN_URL` | public | yes | `http://localhost:8080/` | Base URL used to build internal API URLs. |
-| `PUBLIC_LIVE_STREAM_URL` | public | yes | `https://…` | Live radio stream URL. Set to an empty string (`""`) to hide the player. |
-| `MONGODB_URI` | private | yes | `mongodb://127.0.0.1:27017` | Used for analytics + other server routes. Provide a real connection string to avoid Mongo connection errors on startup. |
-| `YOUTUBE_API_KEY` | private | yes | `AIza…` | Used by the YouTube poller. Set to `""` to disable polling (it will skip the check). |
-| `LIVE_AUDIO_SOURCE_URL` | private | no | `http://localhost:8000/radio.mp3` | Upstream audio source for the live radio proxy. Only needed if testing live streaming. |
+| Name                      | Type    | Required | Example                           | Notes                                                                                                                   |
+| ------------------------- | ------- | -------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `PUBLIC_MAIN_URL`         | public  | yes      | `http://localhost:8080/`          | Base URL used to build internal API URLs.                                                                               |
+| `PUBLIC_LIVE_STREAM_URL`  | public  | yes      | `https://…`                       | Live radio stream URL. Set to an empty string (`""`) to hide the player.                                                |
+| `MONGODB_URI`             | private | yes      | `mongodb://127.0.0.1:27017`       | Used for analytics + other server routes. Provide a real connection string to avoid Mongo connection errors on startup. |
+| `YOUTUBE_API_KEY`         | private | yes      | `AIza…`                           | Used by the YouTube poller. Set to `""` to disable polling (it will skip the check).                                    |
+| `LIVE_AUDIO_SOURCE_URL`   | private | no       | `http://localhost:8000/radio.mp3` | Upstream audio source for the live radio proxy. Only needed if testing live streaming.                                  |
+| `LYRICS_MATCHES_CSV_PATH` | private | no       | `lyrics-matches.csv`              | Optional CSV path for the temporary admin lyrics review workflow.                                                       |
 
 Example `.env.local` (safe defaults for local dev):
 
@@ -86,6 +87,7 @@ OBS (RTMP) --> MediaMTX --> FFmpeg transcoder --> Icecast --> /api/live/audio --
 ```
 
 Three containers run locally:
+
 - **mediamtx** — receives RTMP from OBS on port 1935
 - **audio-transcoder** — strips video with FFmpeg, outputs audio-only
 - **icecast** — serves the MP3 stream on port 8000
@@ -139,7 +141,7 @@ See `ops/streaming/README.md` for detailed configuration and `ops/fly/streaming/
 
 ## YouTube Data API routes
 
-API endpoints for the *@MissionnaireNetwork* YouTube channel live under `src/routes/api/yt`.
+API endpoints for the _@MissionnaireNetwork_ YouTube channel live under `src/routes/api/yt`.
 See `src/routes/api/yt/README.md` for usage.
 
 ## Troubleshooting

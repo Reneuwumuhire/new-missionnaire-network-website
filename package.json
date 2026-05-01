@@ -13,7 +13,8 @@
 		"format": "prettier --write .",
 		"stream:up": "docker compose -f ops/streaming/docker-compose.yml up -d --build",
 		"stream:down": "docker compose -f ops/streaming/docker-compose.yml down",
-		"stream:logs": "docker compose -f ops/streaming/docker-compose.yml logs -f --tail=100"
+		"stream:logs": "docker compose -f ops/streaming/docker-compose.yml logs -f --tail=100",
+		"lyrics:match": "node scripts/create-lyrics-match-list.mjs"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^3.3.1",
