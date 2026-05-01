@@ -16,7 +16,7 @@
 	import BsShuffle from 'svelte-icons-pack/bs/BsShuffle';
 	import BsHeartFill from 'svelte-icons-pack/bs/BsHeartFill';
 	import BsHeart from 'svelte-icons-pack/bs/BsHeart';
-	import BsMoonStars from 'svelte-icons-pack/bs/BsMoonStars';
+	import BsThreeDotsVertical from 'svelte-icons-pack/bs/BsThreeDotsVertical';
 	import {
 		selectAudio,
 		playlist,
@@ -1536,18 +1536,18 @@
 					<button
 						type="button"
 						class="relative p-2 rounded-full transition-colors {sleepTimerEndsAt !== null
-							? 'bg-missionnaire text-white hover:bg-missionnaire/90'
+							? 'bg-stone-900 text-white hover:bg-black'
 							: 'text-stone-300 hover:bg-stone-100 hover:text-missionnaire'}"
 						on:click|stopPropagation={() => (isSleepTimerOpen = !isSleepTimerOpen)}
 						aria-label={sleepTimerEndsAt !== null
-							? `Minuterie active, arrêt dans ${sleepTimerRemainingLabel}`
-							: 'Minuterie de sommeil'}
+							? `Options du lecteur, minuterie active, arrêt dans ${sleepTimerRemainingLabel}`
+							: 'Options du lecteur'}
 						aria-expanded={isSleepTimerOpen}
 						title={sleepTimerEndsAt !== null
-							? `Arrêt dans ${sleepTimerRemainingLabel}`
-							: 'Minuterie de sommeil'}
+							? `Options · arrêt dans ${sleepTimerRemainingLabel}`
+							: 'Options'}
 					>
-						<Icon src={BsMoonStars} size="18" />
+						<Icon src={BsThreeDotsVertical} size="18" />
 						{#if sleepTimerEndsAt !== null}
 							<span
 								class="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-white"
@@ -1566,13 +1566,13 @@
 							<div class="mb-3 flex items-center justify-between gap-3">
 								<div class="min-w-0">
 									<div class="text-[10px] font-bold uppercase tracking-[0.22em] text-missionnaire">
-										Minuterie
+										Options
 									</div>
 									<div class="mt-0.5 text-xs font-semibold text-stone-500">
 										{#if sleepTimerEndsAt !== null}
-											Arrêt à {sleepTimerEndLabel} · {sleepTimerRemainingLabel}
+											Minuterie · arrêt à {sleepTimerEndLabel} · {sleepTimerRemainingLabel}
 										{:else}
-											Désactivée
+											Minuterie désactivée
 										{/if}
 									</div>
 								</div>
@@ -1587,6 +1587,9 @@
 								{/if}
 							</div>
 
+							<div class="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-400">
+								Minuterie de sommeil
+							</div>
 							<div class="grid grid-cols-3 gap-2">
 								{#each sleepTimerOptions as minutes}
 									<button
