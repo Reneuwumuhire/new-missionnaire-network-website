@@ -2,7 +2,11 @@
 	import { browser } from '$app/environment';
 	import { getContext, onDestroy, onMount } from 'svelte';
 	import { get } from 'svelte/store';
-	import { pendingPlaybackSeek } from '$lib/utils/audioResume';
+	import {
+		clearPlayerSnapshot,
+		clearResumeState,
+		pendingPlaybackSeek
+	} from '$lib/utils/audioResume';
 	import { formatTime } from '../../utils/FormatTime';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
@@ -25,12 +29,13 @@
 		autoNext,
 		isShuffle,
 		isPlaying,
-		playbackIntent
+		playbackIntent,
+		repeatOne
 	} from '../stores/global';
 	import type { AudioAsset } from '$lib/models/media-assets';
 	import type { MusicAudio } from '$lib/models/music-audio';
 	import type { Sermon } from '$lib/models/sermon';
-	import IoRepeat from 'svelte-icons-pack/io/IoRepeat';
+	import RiMediaRepeatOneLine from 'svelte-icons-pack/ri/RiMediaRepeatOneLine';
 	import RiMediaPlayList2Fill from 'svelte-icons-pack/ri/RiMediaPlayList2Fill';
 	import BsSkipStartFill from 'svelte-icons-pack/bs/BsSkipStartFill';
 	import BsSkipEndFill from 'svelte-icons-pack/bs/BsSkipEndFill';
@@ -119,6 +124,24 @@
 		if ('mediaSession' in navigator) {
 			navigator.mediaSession.playbackState = 'paused';
 		}
+	}
+
+	function closeAudioPlayer() {
+		setUserWantsToPlay(false);
+		shouldAutoplayOnLoad = false;
+		stopResumeWatchdog();
+
+		if (audio && !audio.paused) {
+			setPendingPlaybackIntent('pause');
+			rememberPlaybackPosition();
+			audio.pause();
+		}
+
+		selectAudio.set(null);
+		isPlaying.set(false);
+		pendingPlaybackSeek.set(null);
+		clearResumeState();
+		clearPlayerSnapshot();
 	}
 
 	function formatSleepTimerRemaining(ms: number) {
@@ -478,8 +501,41 @@
 	});
 	// ── END: cache indicator state ────────────────────────────────
 
+	function clearFinishedPlayerSnapshot() {
+		setUserWantsToPlay(false);
+		clearResumeState();
+		clearPlayerSnapshot();
+	}
+
 	function handleEnded() {
+		if ($repeatOne && audio) {
+			currentTime = 0;
+			progressBarWidth = 0;
+			indicatorPosition = 0;
+			resetRememberedPlaybackPosition();
+
+			try {
+				audio.currentTime = 0;
+			} catch {
+				/* ignore seek failure at end of media */
+			}
+
+			setPendingPlaybackIntent('play');
+			setUserWantsToPlay(true);
+			const playPromise = audio.play();
+			if (playPromise) {
+				playPromise.catch((e) => {
+					setPendingPlaybackIntent(null);
+					console.error('[AudioPlayer] Repeat failed:', e);
+					isPlaying.set(false);
+				});
+			}
+			isPlaying.set(true);
+			return;
+		}
+
 		if (!$autoNext || $playlist.length === 0) {
+			clearFinishedPlayerSnapshot();
 			isPlaying.set(false);
 			return;
 		}
@@ -492,6 +548,7 @@
 		);
 
 		if (nextIndex === -1) {
+			clearFinishedPlayerSnapshot();
 			isPlaying.set(false);
 			return;
 		}
@@ -500,6 +557,7 @@
 		const nextUrl = getPlayableAudioUrl(nextItem as PlayableAudio);
 
 		if (!nextUrl) {
+			clearFinishedPlayerSnapshot();
 			isPlaying.set(false);
 			return;
 		}
@@ -574,6 +632,10 @@
 
 	const toggleAutoNext = () => {
 		autoNext.update((v) => !v);
+	};
+
+	const toggleRepeatOne = () => {
+		repeatOne.update((v) => !v);
 	};
 
 	function toggleShuffle() {
@@ -1587,6 +1649,29 @@
 								{/if}
 							</div>
 
+							<button
+								type="button"
+								class="mb-3 flex w-full items-center justify-between gap-3 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-left transition-colors hover:border-missionnaire hover:bg-missionnaire/5"
+								on:click={toggleRepeatOne}
+								aria-pressed={$repeatOne}
+							>
+								<span class="inline-flex min-w-0 items-center gap-2">
+									<Icon
+										src={RiMediaRepeatOneLine}
+										size="17"
+										className={$repeatOne ? 'text-missionnaire' : 'text-stone-400'}
+									/>
+									<span class="truncate text-xs font-bold text-stone-700">Répéter la piste</span>
+								</span>
+								<span
+									class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] {$repeatOne
+										? 'bg-missionnaire text-white'
+										: 'bg-white text-stone-400'}"
+								>
+									{$repeatOne ? 'On' : 'Off'}
+								</span>
+							</button>
+
 							<div class="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-400">
 								Minuterie de sommeil
 							</div>
@@ -1634,10 +1719,7 @@
 
 				<button
 					class="bg-gray-900 hover:bg-black text-white p-2 rounded-full transition-colors md:hidden"
-					on:click={() => {
-						selectAudio.set(null);
-						if (audio) audio.pause();
-					}}
+					on:click={closeAudioPlayer}
 					aria-label="Fermer le lecteur"
 				>
 					<Icon src={BsX} size="20" />
@@ -1749,6 +1831,16 @@
 							<Icon src={RiMediaPlayList2Fill} size="18" />
 						</button>
 
+						<button
+							on:click={toggleRepeatOne}
+							class="p-2.5 rounded-full transition-all flex items-center gap-2 {$repeatOne
+								? 'bg-missionnaire text-white shadow-md shadow-missionnaire/20'
+								: 'bg-stone-50 text-stone-400 hover:bg-stone-100'}"
+							title={$repeatOne ? 'Répéter activé' : 'Répéter désactivé'}
+						>
+							<Icon src={RiMediaRepeatOneLine} size="20" />
+						</button>
+
 						<div class="flex items-center gap-2 ml-2">
 							<button
 								on:click={toggleMute}
@@ -1764,10 +1856,7 @@
 
 						<button
 							class="ml-4 bg-gray-900 text-white p-2 rounded-full hover:bg-black transition-colors"
-							on:click={() => {
-								selectAudio.set(null);
-								if (audio) audio.pause();
-							}}
+							on:click={closeAudioPlayer}
 						>
 							<Icon src={BsX} size="20" />
 						</button>

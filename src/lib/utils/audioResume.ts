@@ -37,11 +37,10 @@ export type ResumeState = {
 // Generic player snapshot for cold-load rehydration. Unlike `ResumeState`
 // (sermon-only, drives the explicit "Reprendre l'écoute" toast), this
 // captures the entire player state — selected track, playlist, index,
-// shuffle/auto-next flags — so the bottom bar can come back transparently
-// after iOS reloads the PWA mid-listen (phone calls, OS audio interruption,
-// memory pressure). Saved for music + sermons + assets; the rehydration
-// gate reads `intendsToPlay` so we only restore when the user was actively
-// listening, never when they had paused or closed the player.
+// shuffle/repeat/auto-next flags — so the bottom bar can come back
+// transparently after iOS reloads the PWA mid-listen (phone calls, OS
+// audio interruption, memory pressure), or after the user returns to an
+// open-but-paused player. Explicit close and natural end clear this snapshot.
 export type PlayerSnapshot = {
 	selectAudio: Record<string, unknown>;
 	playlist: Record<string, unknown>[];
@@ -52,6 +51,7 @@ export type PlayerSnapshot = {
 	intendsToPlay: boolean;
 	autoNext: boolean;
 	isShuffle: boolean;
+	repeatOne?: boolean;
 	savedAt: number;
 };
 

@@ -12,6 +12,7 @@ export const basePlaylist = writable<(AudioAsset | MusicAudio | Sermon)[]>([]);
 export const currentIndex = writable<number>(0);
 export const autoNext = writable<boolean>(true);
 export const isShuffle = writable<boolean>(false);
+export const repeatOne = writable<boolean>(false);
 export const isPlaying = writable<boolean>(false);
 // User's expressed intent to play, decoupled from `isPlaying` (which flips
 // to false on every OS-initiated pause: phone calls, Siri, audio focus

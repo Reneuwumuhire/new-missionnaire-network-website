@@ -22,6 +22,7 @@
 		isShuffle,
 		playbackIntent,
 		playlist,
+		repeatOne,
 		selectAudio
 	} from '$lib/stores/global';
 	import { getPlayableAudioUrl, type PlayableAudio } from '../../utils/audioPlayback';
@@ -110,7 +111,12 @@
 		// During an iOS interruption, audio.load() can report currentTime = 0
 		// before the session is usable again. Do not let that transient 0 erase
 		// the timestamp we already observed while the track was playing.
-		if (time <= 0.25 && allowZero && el.readyState < 2 && lastKnownSnapshotTime >= MIN_RESUME_SECONDS) {
+		if (
+			time <= 0.25 &&
+			allowZero &&
+			el.readyState < 2 &&
+			lastKnownSnapshotTime >= MIN_RESUME_SECONDS
+		) {
 			return;
 		}
 		if (time > 0.25 || allowZero || lastKnownSnapshotTime <= 0.25) {
@@ -188,6 +194,7 @@
 				intendsToPlay: get(playbackIntent),
 				autoNext: get(autoNext),
 				isShuffle: get(isShuffle),
+				repeatOne: get(repeatOne),
 				savedAt: now
 			};
 			writePlayerSnapshot(snapshot);
@@ -306,6 +313,12 @@
 		if (value) snapshotPlayer(true);
 	});
 
+	const controlsUnsubs = [
+		autoNext.subscribe(() => snapshotPlayer(true)),
+		isShuffle.subscribe(() => snapshotPlayer(true)),
+		repeatOne.subscribe(() => snapshotPlayer(true))
+	];
+
 	function handlePageHide() {
 		rememberSnapshotPosition(false);
 		saveProgress(true);
@@ -329,11 +342,6 @@
 
 		const snap = readPlayerSnapshot();
 		if (!snap) return;
-
-		// Only restore the player if the user was actively listening when the
-		// snapshot was saved. If they had paused or closed it, leave the page
-		// clean — they've signaled they're done.
-		if (!snap.intendsToPlay) return;
 
 		// Already at the end of the saved track — nothing meaningful to resume.
 		if (snap.duration > 0 && snap.duration - snap.currentTime < END_THRESHOLD_SECONDS) {
@@ -371,6 +379,7 @@
 		currentIndex.set(typeof snap.currentIndex === 'number' ? snap.currentIndex : 0);
 		autoNext.set(snap.autoNext !== false);
 		isShuffle.set(!!snap.isShuffle);
+		repeatOne.set(!!snap.repeatOne);
 		// Setting selectAudio LAST mounts the AudioPlayer and triggers the
 		// audio-element creation. We deliberately do NOT set isPlaying or
 		// playbackIntent — iOS blocks autoplay without a user gesture, and
@@ -397,5 +406,6 @@
 		attachListeners(null);
 		audioUnsub();
 		selectAudioUnsub();
+		controlsUnsubs.forEach((unsub) => unsub());
 	});
 </script>
