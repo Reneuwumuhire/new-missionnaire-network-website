@@ -77,7 +77,7 @@
 	let lastHandledMusicRequestKey = '';
 
 	$: initialMusicList = ((data as any).musicAudio || []) as MusicAudio[];
-	$: initialPlaylist = (((data as any).playlistAudio || initialMusicList) || []) as MusicAudio[];
+	$: initialPlaylist = ((data as any).playlistAudio || initialMusicList || []) as MusicAudio[];
 	$: initialArtists = ((data as any).artists || []) as string[];
 	$: initialTotalSongs = ((data as any).total || 0) as number;
 	$: currentCategory = (data as any).category;
@@ -437,13 +437,17 @@
 
 	// Sync playlist when songs are loaded
 	$: if (hasResolvedMusicList) {
-		basePlaylist.set(musicPlaylist);
-		if (!$isShuffle) {
-			playlist.set(musicPlaylist);
-			if (activeMusicSong) {
-				const nextIndex = playlistIndexByUrl.get(activeMusicSong.s3_url);
-				if (nextIndex !== undefined) {
-					currentIndex.set(nextIndex);
+		const shouldPreserveActiveQueue =
+			(!!$selectAudio && !activeMusicSong) || (!!activeMusicSong && !isActiveMusicSongVisible);
+		if (!shouldPreserveActiveQueue) {
+			basePlaylist.set(musicPlaylist);
+			if (!$isShuffle) {
+				playlist.set(musicPlaylist);
+				if (activeMusicSong) {
+					const nextIndex = playlistIndexByUrl.get(activeMusicSong.s3_url);
+					if (nextIndex !== undefined) {
+						currentIndex.set(nextIndex);
+					}
 				}
 			}
 		}
@@ -1340,7 +1344,10 @@
 						</div>
 						<div class="w-7 lg:w-8 text-center hidden md:block">
 							<button
-								class="transition-colors p-1 md:p-1.5 {isFavorite(song._id || song.s3_url, $favorites)
+								class="transition-colors p-1 md:p-1.5 {isFavorite(
+									song._id || song.s3_url,
+									$favorites
+								)
 									? 'text-red-500'
 									: 'text-stone-300 hover:text-red-400'}"
 								on:click|stopPropagation={() => toggleFavorite(song)}

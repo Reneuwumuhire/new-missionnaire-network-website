@@ -16,6 +16,7 @@
 	import BsShuffle from 'svelte-icons-pack/bs/BsShuffle';
 	import BsHeartFill from 'svelte-icons-pack/bs/BsHeartFill';
 	import BsHeart from 'svelte-icons-pack/bs/BsHeart';
+	import BsMoonStars from 'svelte-icons-pack/bs/BsMoonStars';
 	import {
 		selectAudio,
 		playlist,
@@ -65,6 +66,19 @@
 	let lastKnownPlaybackDuration = 0;
 	let pendingSessionResumeTime: number | null = null;
 	let isChangingSource = false;
+	const SLEEP_TIMER_STORAGE_KEY = 'missionnaire:sleep-timer-ends-at';
+	const sleepTimerOptions = [15, 30, 45, 60, 90];
+	let isSleepTimerOpen = false;
+	let sleepTimerEndsAt: number | null = null;
+	let sleepTimerRemainingMs = 0;
+	let sleepTimerTimeout: ReturnType<typeof setTimeout> | null = null;
+	let sleepTimerTick: ReturnType<typeof setInterval> | null = null;
+	let customSleepTime = '';
+
+	$: sleepTimerRemainingLabel =
+		sleepTimerEndsAt !== null ? formatSleepTimerRemaining(sleepTimerRemainingMs) : '';
+	$: sleepTimerEndLabel =
+		sleepTimerEndsAt !== null ? formatSleepTimerEndTime(sleepTimerEndsAt) : '';
 
 	function setPendingPlaybackIntent(intent: 'play' | 'pause' | null) {
 		pendingPlaybackIntent = intent;
@@ -86,6 +100,120 @@
 		setUserWantsToPlay(false);
 		rememberPlaybackPosition();
 		audio.pause();
+	}
+
+	function stopAudioForSleepTimer() {
+		setUserWantsToPlay(false);
+		shouldAutoplayOnLoad = false;
+		stopResumeWatchdog();
+		rememberPlaybackPosition();
+
+		if (audio && !audio.paused) {
+			setPendingPlaybackIntent('pause');
+			audio.pause();
+		} else {
+			setPendingPlaybackIntent(null);
+			isPlaying.set(false);
+		}
+
+		if ('mediaSession' in navigator) {
+			navigator.mediaSession.playbackState = 'paused';
+		}
+	}
+
+	function formatSleepTimerRemaining(ms: number) {
+		const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+		const hours = Math.floor(totalSeconds / 3600);
+		const minutes = Math.floor((totalSeconds % 3600) / 60);
+		const seconds = totalSeconds % 60;
+
+		if (hours > 0) return `${hours}h ${minutes.toString().padStart(2, '0')}m`;
+		if (minutes > 0) return `${minutes}m ${seconds.toString().padStart(2, '0')}s`;
+		return `${seconds}s`;
+	}
+
+	function formatSleepTimerEndTime(timestamp: number) {
+		return new Intl.DateTimeFormat('fr-FR', {
+			hour: '2-digit',
+			minute: '2-digit'
+		}).format(new Date(timestamp));
+	}
+
+	function clearSleepTimer(options: { persist?: boolean; closeMenu?: boolean } = {}) {
+		const persist = options.persist ?? true;
+		if (sleepTimerTimeout) {
+			clearTimeout(sleepTimerTimeout);
+			sleepTimerTimeout = null;
+		}
+		if (sleepTimerTick) {
+			clearInterval(sleepTimerTick);
+			sleepTimerTick = null;
+		}
+		sleepTimerEndsAt = null;
+		sleepTimerRemainingMs = 0;
+		customSleepTime = '';
+		if (options.closeMenu) {
+			isSleepTimerOpen = false;
+		}
+		if (persist && browser) {
+			localStorage.removeItem(SLEEP_TIMER_STORAGE_KEY);
+		}
+	}
+
+	function handleSleepTimerFinished() {
+		if (sleepTimerEndsAt === null) return;
+		clearSleepTimer({ closeMenu: true });
+		stopAudioForSleepTimer();
+	}
+
+	function refreshSleepTimerRemaining() {
+		if (sleepTimerEndsAt === null) return;
+		const remaining = sleepTimerEndsAt - Date.now();
+		if (remaining <= 0) {
+			handleSleepTimerFinished();
+			return;
+		}
+		sleepTimerRemainingMs = remaining;
+	}
+
+	function scheduleSleepTimer(endsAt: number, options: { persist?: boolean } = {}) {
+		if (!Number.isFinite(endsAt)) return;
+
+		clearSleepTimer({ persist: false });
+		sleepTimerEndsAt = endsAt;
+		isSleepTimerOpen = false;
+		refreshSleepTimerRemaining();
+
+		if (sleepTimerEndsAt === null) return;
+
+		if ((options.persist ?? true) && browser) {
+			localStorage.setItem(SLEEP_TIMER_STORAGE_KEY, String(endsAt));
+		}
+
+		const delay = Math.max(0, endsAt - Date.now());
+		sleepTimerTimeout = setTimeout(handleSleepTimerFinished, Math.min(delay, 2_147_483_647));
+		sleepTimerTick = setInterval(refreshSleepTimerRemaining, 1000);
+	}
+
+	function setSleepTimerForMinutes(minutes: number) {
+		if (!Number.isFinite(minutes) || minutes <= 0) return;
+		scheduleSleepTimer(Date.now() + minutes * 60 * 1000);
+	}
+
+	function setSleepTimerForClockTime(value: string) {
+		const match = /^(\d{2}):(\d{2})$/.exec(value);
+		if (!match) return;
+
+		const hours = Number(match[1]);
+		const minutes = Number(match[2]);
+		if (hours > 23 || minutes > 59) return;
+
+		const target = new Date();
+		target.setHours(hours, minutes, 0, 0);
+		if (target.getTime() <= Date.now() + 1000) {
+			target.setDate(target.getDate() + 1);
+		}
+		scheduleSleepTimer(target.getTime());
 	}
 
 	function rememberPlaybackPosition(
@@ -212,6 +340,7 @@
 	 *  fresh watchdog interval on the orphaned element, and play() keeps
 	 *  resuming it 1.5s later — overlapping the new component's playback. */
 	let destroyed = false;
+	let isPageLifecycleTeardown = false;
 
 	function syncPlayerInset() {
 		if (!browser) return;
@@ -995,10 +1124,17 @@
 	onMount(() => {
 		if (!browser) return;
 
+		const markPageLifecycleTeardown = () => {
+			isPageLifecycleTeardown = true;
+		};
+		const clearPageLifecycleTeardown = () => {
+			isPageLifecycleTeardown = false;
+		};
 		const onVisibility = () => {
 			if (document.visibilityState === 'hidden') {
 				appHiddenAt = Date.now();
 			} else {
+				clearPageLifecycleTeardown();
 				const elapsed = appHiddenAt > 0 ? Date.now() - appHiddenAt : 0;
 				appHiddenAt = 0;
 				tryResumeAfterInterruption(elapsed);
@@ -1020,11 +1156,15 @@
 		document.addEventListener('visibilitychange', onVisibility);
 		window.addEventListener('focus', onFocus);
 		window.addEventListener('pageshow', onPageShow);
+		window.addEventListener('pagehide', markPageLifecycleTeardown);
+		window.addEventListener('beforeunload', markPageLifecycleTeardown);
 
 		return () => {
 			document.removeEventListener('visibilitychange', onVisibility);
 			window.removeEventListener('focus', onFocus);
 			window.removeEventListener('pageshow', onPageShow);
+			window.removeEventListener('pagehide', markPageLifecycleTeardown);
+			window.removeEventListener('beforeunload', markPageLifecycleTeardown);
 		};
 	});
 
@@ -1144,6 +1284,11 @@
 
 	// Keyboard shortcuts
 	function handleKeydown(event: KeyboardEvent) {
+		if (event.key === 'Escape' && isSleepTimerOpen) {
+			isSleepTimerOpen = false;
+			return;
+		}
+
 		// Don't trigger if user is typing in an input or textarea
 		const target = event.target as HTMLElement;
 		if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
@@ -1178,7 +1323,19 @@
 		if (!browser) return;
 
 		syncPlayerInset();
+		const closeSleepTimerMenu = () => {
+			isSleepTimerOpen = false;
+		};
+
+		const savedSleepTimer = Number(localStorage.getItem(SLEEP_TIMER_STORAGE_KEY));
+		if (Number.isFinite(savedSleepTimer) && savedSleepTimer > Date.now()) {
+			scheduleSleepTimer(savedSleepTimer, { persist: false });
+		} else {
+			localStorage.removeItem(SLEEP_TIMER_STORAGE_KEY);
+		}
+
 		window.addEventListener('resize', syncPlayerInset);
+		window.addEventListener('click', closeSleepTimerMenu);
 		window.addEventListener('missionnaire-audio-toggle', handleExternalToggle);
 		window.addEventListener('missionnaire-audio-play', playCurrentAudio);
 		window.addEventListener('missionnaire-audio-pause', pauseCurrentAudio);
@@ -1190,6 +1347,7 @@
 
 		return () => {
 			window.removeEventListener('resize', syncPlayerInset);
+			window.removeEventListener('click', closeSleepTimerMenu);
 			window.removeEventListener('missionnaire-audio-toggle', handleExternalToggle);
 			window.removeEventListener('missionnaire-audio-play', playCurrentAudio);
 			window.removeEventListener('missionnaire-audio-pause', pauseCurrentAudio);
@@ -1203,12 +1361,21 @@
 	onDestroy(() => {
 		// Order matters. Set `destroyed` first so every guarded code
 		// path bails — including the pause-event handler that runs
-		// synchronously inside audio.pause() below. Then clear
-		// userWantsToPlay so even an unguarded call to startResumeWatchdog
-		// would no-op. Only after that do we touch the audio element.
+		// synchronously inside audio.pause() below. On explicit closes we
+		// clear userWantsToPlay, but during page/app teardown we preserve it
+		// so the resume recorder can rehydrate the player after a cold return.
+		// Only after that do we touch the audio element.
+		const preservePlaybackIntent =
+			browser &&
+			userWantsToPlay &&
+			(isPageLifecycleTeardown || document.visibilityState === 'hidden');
+
 		destroyed = true;
-		setUserWantsToPlay(false);
+		if (!preservePlaybackIntent) {
+			setUserWantsToPlay(false);
+		}
 		shouldAutoplayOnLoad = false;
+		clearSleepTimer({ persist: false });
 		stopResumeWatchdog();
 		if (audio) {
 			try {
@@ -1364,6 +1531,103 @@
 				>
 					<Icon src={isCurrentFavorite ? BsHeartFill : BsHeart} size="18" />
 				</button>
+
+				<div class="relative flex-shrink-0">
+					<button
+						type="button"
+						class="relative p-2 rounded-full transition-colors {sleepTimerEndsAt !== null
+							? 'bg-missionnaire text-white hover:bg-missionnaire/90'
+							: 'text-stone-300 hover:bg-stone-100 hover:text-missionnaire'}"
+						on:click|stopPropagation={() => (isSleepTimerOpen = !isSleepTimerOpen)}
+						aria-label={sleepTimerEndsAt !== null
+							? `Minuterie active, arrêt dans ${sleepTimerRemainingLabel}`
+							: 'Minuterie de sommeil'}
+						aria-expanded={isSleepTimerOpen}
+						title={sleepTimerEndsAt !== null
+							? `Arrêt dans ${sleepTimerRemainingLabel}`
+							: 'Minuterie de sommeil'}
+					>
+						<Icon src={BsMoonStars} size="18" />
+						{#if sleepTimerEndsAt !== null}
+							<span
+								class="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-white"
+								aria-hidden="true"
+							></span>
+						{/if}
+					</button>
+
+					{#if isSleepTimerOpen}
+						<!-- svelte-ignore a11y-click-events-have-key-events -->
+						<!-- svelte-ignore a11y-no-static-element-interactions -->
+						<div
+							class="absolute right-0 bottom-full z-[120] mb-3 w-72 max-w-[calc(100vw-2rem)] border border-stone-200 bg-white p-3 shadow-2xl rounded-lg"
+							on:click|stopPropagation={() => undefined}
+						>
+							<div class="mb-3 flex items-center justify-between gap-3">
+								<div class="min-w-0">
+									<div class="text-[10px] font-bold uppercase tracking-[0.22em] text-missionnaire">
+										Minuterie
+									</div>
+									<div class="mt-0.5 text-xs font-semibold text-stone-500">
+										{#if sleepTimerEndsAt !== null}
+											Arrêt à {sleepTimerEndLabel} · {sleepTimerRemainingLabel}
+										{:else}
+											Désactivée
+										{/if}
+									</div>
+								</div>
+								{#if sleepTimerEndsAt !== null}
+									<button
+										type="button"
+										class="shrink-0 rounded-full border border-stone-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-stone-500 transition-colors hover:border-missionnaire hover:text-missionnaire"
+										on:click={() => clearSleepTimer({ closeMenu: true })}
+									>
+										Annuler
+									</button>
+								{/if}
+							</div>
+
+							<div class="grid grid-cols-3 gap-2">
+								{#each sleepTimerOptions as minutes}
+									<button
+										type="button"
+										class="rounded-lg border border-stone-200 bg-stone-50 px-2 py-2 text-xs font-bold text-stone-700 transition-colors hover:border-missionnaire hover:bg-missionnaire/5 hover:text-missionnaire"
+										on:click={() => setSleepTimerForMinutes(minutes)}
+									>
+										{minutes} min
+									</button>
+								{/each}
+							</div>
+
+							<div class="mt-3 border-t border-stone-100 pt-3">
+								<label
+									for="sleep-timer-time"
+									class="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.18em] text-stone-400"
+								>
+									Arrêter à
+								</label>
+								<div class="flex items-center gap-2">
+									<input
+										id="sleep-timer-time"
+										type="time"
+										bind:value={customSleepTime}
+										class="min-w-0 flex-1 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-700 outline-none transition-colors focus:border-missionnaire"
+									/>
+									<button
+										type="button"
+										disabled={!customSleepTime}
+										class="rounded-lg bg-stone-900 px-3 py-2 text-xs font-bold uppercase tracking-[0.12em] text-white transition-colors {!customSleepTime
+											? 'cursor-not-allowed opacity-40'
+											: 'hover:bg-black'}"
+										on:click={() => setSleepTimerForClockTime(customSleepTime)}
+									>
+										OK
+									</button>
+								</div>
+							</div>
+						</div>
+					{/if}
+				</div>
 
 				<button
 					class="bg-gray-900 hover:bg-black text-white p-2 rounded-full transition-colors md:hidden"
