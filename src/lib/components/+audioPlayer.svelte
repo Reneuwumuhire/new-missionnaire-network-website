@@ -84,6 +84,9 @@
 		sleepTimerEndsAt !== null ? formatSleepTimerRemaining(sleepTimerRemainingMs) : '';
 	$: sleepTimerEndLabel =
 		sleepTimerEndsAt !== null ? formatSleepTimerEndTime(sleepTimerEndsAt) : '';
+	$: if (browser && isSleepTimerOpen && !customSleepTime) {
+		setDefaultSleepTimerClockTime();
+	}
 
 	function setPendingPlaybackIntent(intent: 'play' | 'pause' | null) {
 		pendingPlaybackIntent = intent;
@@ -221,6 +224,13 @@
 	function setSleepTimerForMinutes(minutes: number) {
 		if (!Number.isFinite(minutes) || minutes <= 0) return;
 		scheduleSleepTimer(Date.now() + minutes * 60 * 1000);
+	}
+
+	function setDefaultSleepTimerClockTime() {
+		const target = new Date(Date.now() + 10 * 60 * 1000);
+		const hours = target.getHours().toString().padStart(2, '0');
+		const minutes = target.getMinutes().toString().padStart(2, '0');
+		customSleepTime = `${hours}:${minutes}`;
 	}
 
 	function setSleepTimerForClockTime(value: string) {
