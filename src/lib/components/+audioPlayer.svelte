@@ -26,7 +26,6 @@
 		playlist,
 		basePlaylist,
 		currentIndex,
-		autoNext,
 		isShuffle,
 		isPlaying,
 		playbackIntent,
@@ -36,7 +35,6 @@
 	import type { MusicAudio } from '$lib/models/music-audio';
 	import type { Sermon } from '$lib/models/sermon';
 	import RiMediaRepeatOneLine from 'svelte-icons-pack/ri/RiMediaRepeatOneLine';
-	import RiMediaPlayList2Fill from 'svelte-icons-pack/ri/RiMediaPlayList2Fill';
 	import BsSkipStartFill from 'svelte-icons-pack/bs/BsSkipStartFill';
 	import BsSkipEndFill from 'svelte-icons-pack/bs/BsSkipEndFill';
 	import {
@@ -544,7 +542,7 @@
 			return;
 		}
 
-		if (!$autoNext || $playlist.length === 0) {
+		if ($playlist.length === 0) {
 			clearFinishedPlayerSnapshot();
 			isPlaying.set(false);
 			return;
@@ -554,10 +552,10 @@
 			$playlist as PlayableAudio[],
 			$currentIndex,
 			1,
-			false
+			$playlist.length > 1
 		);
 
-		if (nextIndex === -1) {
+		if (nextIndex === -1 || nextIndex === $currentIndex) {
 			clearFinishedPlayerSnapshot();
 			isPlaying.set(false);
 			return;
@@ -639,10 +637,6 @@
 		selectAudio.set(nextItem);
 		isPlaying.set(true);
 	}
-
-	const toggleAutoNext = () => {
-		autoNext.update((v) => !v);
-	};
 
 	const toggleRepeatOne = () => {
 		repeatOne.update((v) => !v);
@@ -1669,7 +1663,7 @@
 									<Icon
 										src={RiMediaRepeatOneLine}
 										size="17"
-										className={$repeatOne ? 'text-missionnaire' : 'text-stone-400'}
+										color={$repeatOne ? '#FF880C' : '#a8a29e'}
 									/>
 									<span class="truncate text-xs font-bold text-stone-700">Répéter la piste</span>
 								</span>
@@ -1737,10 +1731,12 @@
 			</div>
 
 			<!-- Controls & Time Row -->
-			<div class="flex flex-col items-center md:flex-row md:gap-6 w-full md:w-auto">
+			<div
+				class="flex -translate-y-[5px] flex-col items-center md:translate-y-0 md:flex-row md:gap-6 w-full md:w-auto"
+			>
 				<!-- Main Playback Controls -->
 				<div class="flex items-center justify-center gap-4 md:gap-6">
-					<!-- Repeat/Auto-next on mobile side -->
+					<!-- Shuffle on mobile side -->
 					<div class="flex md:hidden items-center gap-1">
 						<button
 							on:click={toggleShuffle}
@@ -1798,16 +1794,20 @@
 						</button>
 					</div>
 
-					<!-- Auto-Next Side -->
+					<!-- Repeat on mobile side -->
 					<div class="flex md:hidden items-center gap-1">
 						<button
-							on:click={toggleAutoNext}
-							class="p-2.5 rounded-full transition-all flex items-center gap-2 {$autoNext
+							on:click={toggleRepeatOne}
+							class="p-2.5 rounded-full transition-all flex items-center gap-2 {$repeatOne
 								? 'bg-missionnaire text-white shadow-md shadow-missionnaire/20'
 								: 'bg-stone-50 text-stone-400 hover:bg-stone-100 hover:text-stone-600'}"
-							title={$autoNext ? 'Lecture auto activée' : 'Lecture auto désactivée'}
+							title={$repeatOne ? 'Répéter activé' : 'Répéter désactivé'}
 						>
-							<Icon src={RiMediaPlayList2Fill} size="18" />
+							<Icon
+								src={RiMediaRepeatOneLine}
+								size="20"
+								color={$repeatOne ? '#ffffff' : '#a8a29e'}
+							/>
 						</button>
 					</div>
 				</div>
@@ -1832,23 +1832,17 @@
 						</button>
 
 						<button
-							on:click={toggleAutoNext}
-							class="p-2.5 rounded-full transition-all flex items-center gap-2 {$autoNext
-								? 'bg-missionnaire text-white shadow-md shadow-missionnaire/20'
-								: 'bg-stone-50 text-stone-400 hover:bg-stone-100'}"
-							title={$autoNext ? 'Lecture auto activée' : 'Lecture auto désactivée'}
-						>
-							<Icon src={RiMediaPlayList2Fill} size="18" />
-						</button>
-
-						<button
 							on:click={toggleRepeatOne}
 							class="p-2.5 rounded-full transition-all flex items-center gap-2 {$repeatOne
 								? 'bg-missionnaire text-white shadow-md shadow-missionnaire/20'
 								: 'bg-stone-50 text-stone-400 hover:bg-stone-100'}"
 							title={$repeatOne ? 'Répéter activé' : 'Répéter désactivé'}
 						>
-							<Icon src={RiMediaRepeatOneLine} size="20" />
+							<Icon
+								src={RiMediaRepeatOneLine}
+								size="20"
+								color={$repeatOne ? '#ffffff' : '#a8a29e'}
+							/>
 						</button>
 
 						<div class="flex items-center gap-2 ml-2">
