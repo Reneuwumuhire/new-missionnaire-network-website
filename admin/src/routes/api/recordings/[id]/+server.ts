@@ -1,6 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { getPermissions } from '$lib/models/admin-user';
+import { canDeleteRecordings, getPermissions } from '$lib/models/admin-user';
 import {
 	deleteRecording,
 	getRecordingById,
@@ -166,7 +166,9 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 };
 
 export const DELETE: RequestHandler = async ({ locals, params, getClientAddress }) => {
-	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
+	if (!canDeleteRecordings(locals.user)) {
+		throw error(403, "Vous n'avez pas la permission de supprimer des enregistrements");
+	}
 
 	const { id } = params;
 	if (!id) throw error(400, 'ID manquant');

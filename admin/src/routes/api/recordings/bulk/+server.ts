@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { z } from 'zod';
 import type { RequestEvent } from './$types';
-import { getPermissions } from '$lib/models/admin-user';
+import { canDeleteRecordings } from '$lib/models/admin-user';
 import { deleteObjects } from '$lib/server/s3';
 import { deleteRecordingBulk, logAudit } from '../../../../db/collections';
 
@@ -13,9 +13,11 @@ const BulkActionSchema = z.discriminatedUnion('action', [
 ]);
 
 export async function POST({ request, locals, getClientAddress }: RequestEvent) {
-	const perms = getPermissions(locals.user);
-	if (!perms.can_manage_recordings) {
-		return json({ data: null, error: 'Accès refusé' }, { status: 403 });
+	if (!canDeleteRecordings(locals.user)) {
+		return json(
+			{ data: null, error: "Vous n'avez pas la permission de supprimer des enregistrements" },
+			{ status: 403 }
+		);
 	}
 
 	const body = await request.json().catch(() => null);

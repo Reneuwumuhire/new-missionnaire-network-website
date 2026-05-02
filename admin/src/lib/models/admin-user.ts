@@ -72,3 +72,8 @@ export function canDeleteQuestions(user: AdminUser): boolean {
 	const permissions = getPermissions(user);
 	return permissions.can_moderate_questions && permissions.can_delete;
 }
+
+export function canDeleteRecordings(user: AdminUser): boolean {
+	const permissions = getPermissions(user);
+	return permissions.can_manage_recordings && permissions.can_delete;
+}

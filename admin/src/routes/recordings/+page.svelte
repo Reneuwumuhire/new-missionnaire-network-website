@@ -60,6 +60,9 @@
 	// session needs a confirmation (soft lock). Falls back to empty string
 	// so the "different admin" check never mistakenly matches.
 	const currentUserEmail = $derived(data.user?.email ?? '');
+	const canDeleteRecordings = $derived(
+		Boolean(data.user?.permissions.can_manage_recordings && data.user?.permissions.can_delete)
+	);
 	const broadcastStartedBy = $derived(broadcast.started_by ?? null);
 	const broadcastStartedByName = $derived(broadcast.started_by_name ?? null);
 	const recordingStartedBy = $derived(
@@ -114,6 +117,9 @@
 	let publishedFilter = $state<'all' | 'published' | 'unpublished'>('all');
 	let selectedIds = $state<Set<string>>(new Set());
 	let bulkDeleting = $state(false);
+	$effect(() => {
+		if (!canDeleteRecordings && selectedIds.size > 0) selectedIds = new Set();
+	});
 
 	const PAGE_SIZE = 5;
 	let recordings = $state<typeof data.recordings>(data.recordings);
@@ -224,6 +230,7 @@
 	);
 
 	function toggleSelection(id: string) {
+		if (!canDeleteRecordings) return;
 		const next = new Set(selectedIds);
 		if (next.has(id)) next.delete(id);
 		else next.add(id);
@@ -231,6 +238,7 @@
 	}
 
 	function toggleSelectAllFiltered() {
+		if (!canDeleteRecordings) return;
 		if (allFilteredSelected) {
 			const next = new Set(selectedIds);
 			for (const id of filteredIds) next.delete(id);
@@ -248,6 +256,11 @@
 
 	async function bulkDelete() {
 		if (bulkDeleting || selectedIds.size === 0) return;
+		if (!canDeleteRecordings) {
+			clearSelection();
+			toast.error("Vous n'avez pas la permission de supprimer des enregistrements");
+			return;
+		}
 		const count = selectedIds.size;
 		const ok = await confirmDialog.ask({
 			title: `Supprimer ${count} enregistrement${count > 1 ? 's' : ''} ?`,
@@ -1243,6 +1256,10 @@
 	}
 
 	async function remove(id: string) {
+		if (!canDeleteRecordings) {
+			toast.error("Vous n'avez pas la permission de supprimer des enregistrements");
+			return;
+		}
 		const ok = await confirmDialog.ask({
 			title: 'Supprimer cet enregistrement ?',
 			message:
@@ -1779,7 +1796,7 @@
      title + meta chips + action row. Each recording is a self-contained card
      so no information needs to be hidden on small screens. -->
 <div class="space-y-2.5 lg:hidden">
-	{#if filteredRecordings.length > 0}
+	{#if filteredRecordings.length > 0 && canDeleteRecordings}
 		<div class="flex items-center gap-2.5 px-1 pb-1">
 			<input
 				type="checkbox"
@@ -1807,13 +1824,15 @@
 		>
 			<!-- Header: checkbox + thumbnail + title block -->
 			<div class="flex items-start gap-3 p-4">
-				<input
-					type="checkbox"
-					checked={isSelected}
-					onchange={() => toggleSelection(rec._id!)}
-					aria-label="Sélectionner {rec.title}"
-					class="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-stone-300 text-primary focus:ring-primary"
-				/>
+				{#if canDeleteRecordings}
+					<input
+						type="checkbox"
+						checked={isSelected}
+						onchange={() => toggleSelection(rec._id!)}
+						aria-label="Sélectionner {rec.title}"
+						class="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-stone-300 text-primary focus:ring-primary"
+					/>
+				{/if}
 
 				{#if rec.thumbnail_url && !failedThumbnails.has(rec._id!)}
 					<div class="h-14 w-20 shrink-0 border border-stone-200/60 overflow-hidden">
@@ -1881,50 +1900,54 @@
 				</div>
 			{/if}
 
-			<!-- Action row: edit · retry · delete -->
-			<div class="flex flex-wrap items-center gap-2 border-t border-stone-100 px-4 py-2.5">
-				{#if rec.status === 'failed'}
-					<button
-						onclick={() => retryUpload(rec._id!)}
-						class="bg-amber-100 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-700 transition-colors hover:bg-amber-200"
-					>
-						Réessayer l'envoi
-					</button>
-				{/if}
-				{#if rec.status === 'ready' || rec.status === 'failed'}
-					<button
-						onclick={() => (isEditing ? cancelRecordingEdit() : enterRecordingEdit(rec))}
-						class="inline-flex items-center gap-1.5 border border-stone-200 bg-white/60 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary"
-					>
-						<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-						</svg>
-						{isEditing ? 'Fermer' : 'Modifier'}
-					</button>
-				{/if}
-				{#if rec.status === 'ready' && rec.s3_url}
-					<button
-						onclick={() => openTrimEditor(rec._id!)}
-						class="inline-flex items-center gap-1.5 border border-stone-200 bg-white/60 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary"
-						title="Éditer l'audio (couper début/fin)"
-					>
-						<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M6 20l3.5-3.5M18 20l-3.5-3.5M6 4l12 12M18 4L6 16" />
-						</svg>
-						Éditer l'audio
-					</button>
-				{/if}
-				<button
-					onclick={() => remove(rec._id!)}
-					class="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600"
-					title="Supprimer"
-				>
-					<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
-					</svg>
-					Supprimer
-				</button>
-			</div>
+			{#if rec.status === 'ready' || rec.status === 'failed' || canDeleteRecordings}
+				<!-- Action row: edit · retry · delete -->
+				<div class="flex flex-wrap items-center gap-2 border-t border-stone-100 px-4 py-2.5">
+					{#if rec.status === 'failed'}
+						<button
+							onclick={() => retryUpload(rec._id!)}
+							class="bg-amber-100 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-700 transition-colors hover:bg-amber-200"
+						>
+							Réessayer l'envoi
+						</button>
+					{/if}
+					{#if rec.status === 'ready' || rec.status === 'failed'}
+						<button
+							onclick={() => (isEditing ? cancelRecordingEdit() : enterRecordingEdit(rec))}
+							class="inline-flex items-center gap-1.5 border border-stone-200 bg-white/60 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary"
+						>
+							<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+							</svg>
+							{isEditing ? 'Fermer' : 'Modifier'}
+						</button>
+					{/if}
+					{#if rec.status === 'ready' && rec.s3_url}
+						<button
+							onclick={() => openTrimEditor(rec._id!)}
+							class="inline-flex items-center gap-1.5 border border-stone-200 bg-white/60 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary"
+							title="Éditer l'audio (couper début/fin)"
+						>
+							<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M6 20l3.5-3.5M18 20l-3.5-3.5M6 4l12 12M18 4L6 16" />
+							</svg>
+							Éditer l'audio
+						</button>
+					{/if}
+					{#if canDeleteRecordings}
+						<button
+							onclick={() => remove(rec._id!)}
+							class="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600"
+							title="Supprimer"
+						>
+							<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
+							</svg>
+							Supprimer
+						</button>
+					{/if}
+				</div>
+			{/if}
 		</article>
 	{/each}
 
@@ -1967,17 +1990,19 @@
 	<table class="w-full text-left text-sm">
 		<thead>
 			<tr class="border-b border-stone-100 bg-cream/50">
-				<th class="w-10 px-5 py-3.5">
-					<input
-						type="checkbox"
-						checked={allFilteredSelected}
-						indeterminate={someFilteredSelected}
-						onchange={toggleSelectAllFiltered}
-						disabled={filteredIds.length === 0}
-						aria-label="Tout sélectionner"
-						class="h-4 w-4 cursor-pointer rounded border-stone-300 text-primary focus:ring-primary"
-					/>
-				</th>
+				{#if canDeleteRecordings}
+					<th class="w-10 px-5 py-3.5">
+						<input
+							type="checkbox"
+							checked={allFilteredSelected}
+							indeterminate={someFilteredSelected}
+							onchange={toggleSelectAllFiltered}
+							disabled={filteredIds.length === 0}
+							aria-label="Tout sélectionner"
+							class="h-4 w-4 cursor-pointer rounded border-stone-300 text-primary focus:ring-primary"
+						/>
+					</th>
+				{/if}
 				<th class="px-5 py-3.5 font-medium text-stone-500">Titre</th>
 				<th class="px-5 py-3.5 font-medium text-stone-500">Date</th>
 				<th class="px-5 py-3.5 font-medium text-stone-500">Durée</th>
@@ -1992,15 +2017,17 @@
 				{@const isEditing = editingRecordingId === rec._id}
 				{@const isSelected = selectedIds.has(rec._id!)}
 				<tr class="border-b border-stone-50 {isSelected ? 'bg-primary/5' : ''}">
-					<td class="px-5 py-4">
-						<input
-							type="checkbox"
-							checked={isSelected}
-							onchange={() => toggleSelection(rec._id!)}
-							aria-label="Sélectionner {rec.title}"
-							class="h-4 w-4 cursor-pointer rounded border-stone-300 text-primary focus:ring-primary"
-						/>
-					</td>
+					{#if canDeleteRecordings}
+						<td class="px-5 py-4">
+							<input
+								type="checkbox"
+								checked={isSelected}
+								onchange={() => toggleSelection(rec._id!)}
+								aria-label="Sélectionner {rec.title}"
+								class="h-4 w-4 cursor-pointer rounded border-stone-300 text-primary focus:ring-primary"
+							/>
+						</td>
+					{/if}
 					<td class="px-5 py-4">
 						<div class="flex items-center gap-3">
 							{#if rec.thumbnail_url && !failedThumbnails.has(rec._id!)}
@@ -2078,18 +2105,20 @@
 									Éditer l'audio
 								</button>
 							{/if}
-							<button onclick={() => remove(rec._id!)} class="px-2 py-1.5 text-xs text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600" title="Supprimer">
-								<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
-								</svg>
-							</button>
+							{#if canDeleteRecordings}
+								<button onclick={() => remove(rec._id!)} class="px-2 py-1.5 text-xs text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600" title="Supprimer">
+									<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
+									</svg>
+								</button>
+							{/if}
 						</div>
 					</td>
 				</tr>
 				{/each}
 			{#if filteredRecordings.length === 0}
 				<tr>
-					<td colspan="8" class="px-5 py-12 text-center text-stone-400">
+					<td colspan={canDeleteRecordings ? 8 : 7} class="px-5 py-12 text-center text-stone-400">
 						{#if data.recordings.length === 0}
 							Aucun enregistrement pour l'instant. Démarrez le premier ci-dessus.
 						{:else if hasActiveFilters}
@@ -2125,7 +2154,7 @@
 {/if}
 
 <!-- Bulk action bar — sticky footer appears while anything is selected -->
-{#if selectedIds.size > 0}
+{#if canDeleteRecordings && selectedIds.size > 0}
 	<div class="sticky bottom-4 z-20 mx-auto mt-4 w-fit animate-[page-in_0.2s_ease] rounded-sm border border-stone-200 bg-white px-6 py-3 shadow-lg">
 		<div class="flex items-center gap-4">
 			<span class="text-sm font-medium text-stone-700">
