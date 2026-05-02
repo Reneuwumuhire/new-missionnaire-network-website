@@ -3,7 +3,7 @@
 	import IoCloudDownloadOutline from 'svelte-icons-pack/io/IoCloudDownloadOutline';
 	import IoPlayCircle from 'svelte-icons-pack/io/IoPlayCircle';
 	import IoPauseCircle from 'svelte-icons-pack/io/IoPauseCircle';
-	import { selectAudio, isPlaying, currentIndex } from '../stores/global';
+	import { selectAudio, isPlaying, currentIndex, playlist, basePlaylist } from '../stores/global';
 	import type { PublishedRecording } from '$lib/server/recordings';
 	import type { AudioAsset } from '$lib/models/media-assets';
 	import type { MusicAudio } from '$lib/models/music-audio';
@@ -13,7 +13,6 @@
 	import { downloadAudioFile } from '../../utils/downloadAudio';
 
 	export let recording: PublishedRecording;
-	export let index: number;
 	export let absoluteIndex: number;
 
 	const desktopSermonGrid = 'md:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.35fr)_110px_80px_120px]';
@@ -63,7 +62,10 @@
 			dispatchAudioPlayerAction('toggle');
 			return;
 		}
-		currentIndex.set(index);
+		const singleRecordingPlaylist = [playable as unknown as MusicAudio];
+		basePlaylist.set(singleRecordingPlaylist);
+		playlist.set(singleRecordingPlaylist);
+		currentIndex.set(0);
 		selectAudio.set(playable as unknown as MusicAudio);
 		isPlaying.set(true);
 	}

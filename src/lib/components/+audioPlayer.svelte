@@ -77,13 +77,18 @@
 	let sleepTimerTimeout: ReturnType<typeof setTimeout> | null = null;
 	let sleepTimerTick: ReturnType<typeof setInterval> | null = null;
 	let customSleepTime = '';
+	let hasPlaylistNavigation = false;
 
+	$: hasPlaylistNavigation = $playlist.length > 1;
 	$: sleepTimerRemainingLabel =
 		sleepTimerEndsAt !== null ? formatSleepTimerRemaining(sleepTimerRemainingMs) : '';
 	$: sleepTimerEndLabel =
 		sleepTimerEndsAt !== null ? formatSleepTimerEndTime(sleepTimerEndsAt) : '';
 	$: if (browser && isSleepTimerOpen && !customSleepTime) {
 		setDefaultSleepTimerClockTime();
+	}
+	$: if (!hasPlaylistNavigation && $isShuffle) {
+		isShuffle.set(false);
 	}
 
 	function setPendingPlaybackIntent(intent: 'play' | 'pause' | null) {
@@ -643,6 +648,7 @@
 	};
 
 	function toggleShuffle() {
+		if (!hasPlaylistNavigation) return;
 		isShuffle.update((shuffle) => {
 			const newShuffle = !shuffle;
 			if (newShuffle) {
@@ -710,7 +716,7 @@
 	}
 
 	function playNext() {
-		if ($playlist.length === 0) return;
+		if (!hasPlaylistNavigation) return;
 
 		const nextIndex = findAdjacentPlayableIndex(
 			$playlist as PlayableAudio[],
@@ -724,7 +730,7 @@
 	}
 
 	function playPrevious() {
-		if ($playlist.length === 0) return;
+		if (!hasPlaylistNavigation) return;
 
 		const prevIndex = findAdjacentPlayableIndex(
 			$playlist as PlayableAudio[],
@@ -1235,12 +1241,27 @@
 	});
 
 	// ── Media Session API (Bluetooth / lockscreen / car controls) ──
-	// Register action handlers ONCE on mount — some platforms (iOS Safari
-	// especially) only wire up hardware keys if the handlers exist at the
-	// moment audio starts playing, and reactive re-binding is unreliable.
-	// Metadata is still updated reactively below, and positionState is
-	// pushed on every timeupdate so the lock-screen seek bar tracks
-	// progress accurately.
+	// Register core action handlers on mount — some platforms (iOS Safari
+	// especially) only wire up hardware keys if handlers exist when audio
+	// starts. Playlist handlers are synced separately so single-track
+	// playback does not expose previous/next controls.
+	function syncMediaSessionPlaylistHandlers(canNavigate = hasPlaylistNavigation) {
+		if (!browser || !('mediaSession' in navigator)) return;
+		try {
+			navigator.mediaSession.setActionHandler(
+				'previoustrack',
+				canNavigate ? playPrevious : null
+			);
+			navigator.mediaSession.setActionHandler('nexttrack', canNavigate ? playNext : null);
+		} catch (err) {
+			console.warn('[AudioPlayer] MediaSession playlist handler sync failed:', err);
+		}
+	}
+
+	$: if (browser) {
+		syncMediaSessionPlaylistHandlers(hasPlaylistNavigation);
+	}
+
 	onMount(() => {
 		if (!browser || !('mediaSession' in navigator)) return;
 		try {
@@ -1256,8 +1277,7 @@
 				setUserWantsToPlay(false);
 				audio?.pause();
 			});
-			navigator.mediaSession.setActionHandler('previoustrack', playPrevious);
-			navigator.mediaSession.setActionHandler('nexttrack', playNext);
+			syncMediaSessionPlaylistHandlers();
 			navigator.mediaSession.setActionHandler('seekbackward', (details) => {
 				seekBackward(details.seekOffset ?? 10);
 			});
@@ -1363,10 +1383,10 @@
 
 		switch (key) {
 			case 'n': // Next
-				playNext();
+				if (hasPlaylistNavigation) playNext();
 				break;
 			case 'p': // Previous
-				playPrevious();
+				if (hasPlaylistNavigation) playPrevious();
 				break;
 			case 'arrowright': // Seek Forward
 				seekForward();
@@ -1478,7 +1498,7 @@
 {#if $selectAudio}
 	<div
 		bind:this={playerShell}
-		class="fixed z-[100] bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-stone-200 shadow-[0_-4px_20px_rgb(0,0,0,0.06)] pb-safe pt-2 md:pt-4 md:pb-4"
+		class="audio-player-shell fixed z-[100] bottom-0 left-0 right-0 w-full bg-white/95 backdrop-blur-md border-t border-stone-200 shadow-[0_-4px_20px_rgb(0,0,0,0.06)] pt-2 md:pt-4"
 	>
 		<!-- Top Progress Bar -->
 		<!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -1737,26 +1757,38 @@
 				<!-- Main Playback Controls -->
 				<div class="flex items-center justify-center gap-4 md:gap-6">
 					<!-- Shuffle on mobile side -->
-					<div class="flex md:hidden items-center gap-1">
-						<button
-							on:click={toggleShuffle}
-							class="p-2.5 rounded-full transition-all flex items-center gap-2 {$isShuffle
-								? 'bg-missionnaire text-white shadow-md shadow-missionnaire/20'
-								: 'bg-stone-50 text-stone-400 hover:bg-stone-100 hover:text-stone-600'}"
-							title={$isShuffle ? 'Aléatoire activé' : 'Aléatoire désactivé'}
-						>
-							<Icon src={BsShuffle} size="16" />
-						</button>
-					</div>
+					{#if hasPlaylistNavigation}
+						<div class="flex md:hidden items-center gap-1">
+							<button
+								on:click={toggleShuffle}
+								class="p-2.5 rounded-full transition-all flex items-center gap-2 {$isShuffle
+									? 'bg-missionnaire text-white shadow-md shadow-missionnaire/20'
+									: 'bg-stone-50 text-stone-400 hover:bg-stone-100 hover:text-stone-600'}"
+								title={$isShuffle ? 'Aléatoire activé' : 'Aléatoire désactivé'}
+							>
+								<Icon src={BsShuffle} size="16" />
+							</button>
+						</div>
+					{/if}
 
 					<div class="flex items-center gap-1 md:gap-3">
-						<button
-							on:click={playPrevious}
-							class="p-2 text-stone-600 hover:text-missionnaire transition-colors"
-							title="Précédent"
-						>
-							<Icon src={BsSkipStartFill} size="22" />
-						</button>
+						{#if hasPlaylistNavigation}
+							<button
+								on:click={playPrevious}
+								class="p-2 text-stone-600 hover:text-missionnaire transition-colors"
+								title="Précédent"
+							>
+								<Icon src={BsSkipStartFill} size="22" />
+							</button>
+						{:else}
+							<button
+								on:click={() => seekBackward()}
+								class="flex h-11 w-11 items-center justify-center rounded-full bg-stone-50 text-stone-400 transition-colors hover:bg-stone-100 hover:text-missionnaire md:hidden"
+								title="-5s"
+							>
+								<Icon src={BsSkipBackwardFill} size="18" />
+							</button>
+						{/if}
 
 						<button
 							on:click={() => seekBackward()}
@@ -1785,31 +1817,43 @@
 							<Icon src={BsSkipForwardFill} size="16" />
 						</button>
 
-						<button
-							on:click={playNext}
-							class="p-2 text-stone-600 hover:text-missionnaire transition-colors"
-							title="Suivant"
-						>
-							<Icon src={BsSkipEndFill} size="22" />
-						</button>
+						{#if hasPlaylistNavigation}
+							<button
+								on:click={playNext}
+								class="p-2 text-stone-600 hover:text-missionnaire transition-colors"
+								title="Suivant"
+							>
+								<Icon src={BsSkipEndFill} size="22" />
+							</button>
+						{:else}
+							<button
+								on:click={() => seekForward()}
+								class="flex h-11 w-11 items-center justify-center rounded-full bg-stone-50 text-stone-400 transition-colors hover:bg-stone-100 hover:text-missionnaire md:hidden"
+								title="+5s"
+							>
+								<Icon src={BsSkipForwardFill} size="18" />
+							</button>
+						{/if}
 					</div>
 
 					<!-- Repeat on mobile side -->
-					<div class="flex md:hidden items-center gap-1">
-						<button
-							on:click={toggleRepeatOne}
-							class="p-2.5 rounded-full transition-all flex items-center gap-2 {$repeatOne
-								? 'bg-missionnaire text-white shadow-md shadow-missionnaire/20'
-								: 'bg-stone-50 text-stone-400 hover:bg-stone-100 hover:text-stone-600'}"
-							title={$repeatOne ? 'Répéter activé' : 'Répéter désactivé'}
-						>
-							<Icon
-								src={RiMediaRepeatOneLine}
-								size="20"
-								color={$repeatOne ? '#ffffff' : '#a8a29e'}
-							/>
-						</button>
-					</div>
+					{#if hasPlaylistNavigation}
+						<div class="flex md:hidden items-center gap-1">
+							<button
+								on:click={toggleRepeatOne}
+								class="p-2.5 rounded-full transition-all flex items-center gap-2 {$repeatOne
+									? 'bg-missionnaire text-white shadow-md shadow-missionnaire/20'
+									: 'bg-stone-50 text-stone-400 hover:bg-stone-100 hover:text-stone-600'}"
+								title={$repeatOne ? 'Répéter activé' : 'Répéter désactivé'}
+							>
+								<Icon
+									src={RiMediaRepeatOneLine}
+									size="20"
+									color={$repeatOne ? '#ffffff' : '#a8a29e'}
+								/>
+							</button>
+						</div>
+					{/if}
 				</div>
 
 				<!-- Time & Extra Controls (Desktop) -->
@@ -1821,15 +1865,17 @@
 					</div>
 
 					<div class="flex items-center gap-2 border-l border-stone-100 pl-6">
-						<button
-							on:click={toggleShuffle}
-							class="p-2.5 rounded-full transition-all flex items-center gap-2 {$isShuffle
-								? 'bg-missionnaire text-white'
-								: 'bg-stone-50 text-stone-400 hover:bg-stone-100 hover:text-stone-600'}"
-							title={$isShuffle ? 'Aléatoire activé' : 'Aléatoire désactivé'}
-						>
-							<Icon src={BsShuffle} size="16" />
-						</button>
+						{#if hasPlaylistNavigation}
+							<button
+								on:click={toggleShuffle}
+								class="p-2.5 rounded-full transition-all flex items-center gap-2 {$isShuffle
+									? 'bg-missionnaire text-white'
+									: 'bg-stone-50 text-stone-400 hover:bg-stone-100 hover:text-stone-600'}"
+								title={$isShuffle ? 'Aléatoire activé' : 'Aléatoire désactivé'}
+							>
+								<Icon src={BsShuffle} size="16" />
+							</button>
+						{/if}
 
 						<button
 							on:click={toggleRepeatOne}
@@ -1872,4 +1918,19 @@
 {/if}
 
 <style>
+	.audio-player-shell {
+		position: fixed;
+		inset-inline: 0;
+		bottom: 0;
+		max-width: 100vw;
+		padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+		-webkit-backface-visibility: hidden;
+		backface-visibility: hidden;
+	}
+
+	@media (min-width: 768px) {
+		.audio-player-shell {
+			padding-bottom: 1rem;
+		}
+	}
 </style>

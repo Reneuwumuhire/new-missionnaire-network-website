@@ -12,12 +12,14 @@
 	--font-display: 'Cormorant Garamond', Georgia, serif;
 	--font-body: 'Outfit', system-ui, sans-serif;
 	--color-missionnaire: #FF880C;
+	--audio-player-height: 0px;
 	scroll-behavior: smooth;
 }
 
 /* ── Base typography ── */
 html {
 	overflow-x: hidden;
+	scroll-padding-bottom: var(--audio-player-height);
 	font-family: var(--font-body);
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
@@ -27,6 +29,7 @@ html {
 body {
 	color: #292524; /* stone-800 — warmer than pure black */
 	background-color: #FAF8F3; /* cream — warm editorial base */
+	padding-bottom: var(--audio-player-height);
 }
 
 /* ── Selection highlight ── */

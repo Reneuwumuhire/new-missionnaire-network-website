@@ -645,7 +645,6 @@
 								{#each recordings as recording, i (recording.id)}
 									<RetransmissionTableItem
 										{recording}
-										index={i}
 										absoluteIndex={i + 1 + (currentPage - 1) * limit}
 									/>
 								{:else}
@@ -756,7 +755,7 @@
 					</div>
 					<div class="divide-y divide-stone-100 border border-stone-200/60 bg-white/40">
 						{#each recordings as recording, i (recording.id)}
-							<RetransmissionTableItem {recording} index={i} absoluteIndex={i + 1} />
+							<RetransmissionTableItem {recording} absoluteIndex={i + 1} />
 						{/each}
 					</div>
 				</section>
