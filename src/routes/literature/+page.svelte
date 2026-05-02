@@ -133,7 +133,7 @@
 	/>
 </svelte:head>
 
-<div class="container mx-auto px-4 md:px-8 py-10 max-w-7xl">
+<div class="container mx-auto px-4 pt-4 pb-10 md:px-8 md:pt-6 max-w-7xl">
 	<!-- Hero Section -->
 	<div class="mb-12 text-left">
 		<h1 class="text-4xl md:text-5xl font-black text-gray-900 mb-4">Littérature</h1>
@@ -342,7 +342,8 @@
 								{#if item.pdf_url}
 									<a
 										href={item.pdf_url}
-										target="_blank" rel="noopener noreferrer"
+										target="_blank"
+										rel="noopener noreferrer"
 										class="flex items-center gap-2 px-6 py-3 bg-white text-orange-600 rounded-full font-bold shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-all"
 									>
 										<Icon src={IoCloudDownloadOutline} size="20" />
@@ -503,7 +504,8 @@
 								{#if item.pdf_url}
 									<a
 										href={item.pdf_url}
-										target="_blank" rel="noopener noreferrer"
+										target="_blank"
+										rel="noopener noreferrer"
 										class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-100 rounded-lg text-xs font-bold text-gray-600 hover:bg-orange-500 hover:text-white hover:border-orange-500 shadow-sm transition-all active:scale-95"
 									>
 										<Icon src={IoCloudDownloadOutline} size="16" />

@@ -298,15 +298,13 @@
 	/>
 </svelte:head>
 
-<div class="w-full min-w-0 max-w-6xl mx-auto px-4 md:px-6 py-8">
+<div class="w-full min-w-0 max-w-6xl mx-auto px-4 pt-0 pb-8 md:px-6">
 	<!-- Page Header -->
 	<div class="mb-10">
 		<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body">
 			Cantiques & Vidéo
 		</p>
-		<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">
-			Chants en Vidéo
-		</h1>
+		<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">Chants en Vidéo</h1>
 		{#if hasResolved && total}
 			<p class="mt-2 text-[12px] text-stone-400 font-body">
 				<span

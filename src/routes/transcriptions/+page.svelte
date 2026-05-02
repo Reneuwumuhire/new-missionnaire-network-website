@@ -47,11 +47,13 @@
 	$: loadedSearch = ((data as any).search || '') as string;
 	$: currentPageNumber = Number($page.url.searchParams.get('page')) || data.pagination.page || 1;
 	$: currentLimit = data.pagination.limit;
-	$: sortOrder = (($page.url.searchParams.get('sort') === 'asc'
-		? 'asc'
-		: $page.url.searchParams.get('sort') === 'desc'
-			? 'desc'
-			: data.sort || 'desc') as 'asc' | 'desc');
+	$: sortOrder = (
+		$page.url.searchParams.get('sort') === 'asc'
+			? 'asc'
+			: $page.url.searchParams.get('sort') === 'desc'
+				? 'desc'
+				: data.sort || 'desc'
+	) as 'asc' | 'desc';
 	$: selectedYear = $page.url.searchParams.get('year') || data.selectedYear || '';
 	$: currentSearch = $page.url.searchParams.get('search') || loadedSearch || '';
 	$: isDeferredData = Boolean((data as any).deferred);
@@ -256,7 +258,7 @@
 	/>
 </svelte:head>
 
-<div class="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
+<div class="container mx-auto px-2 pt-4 pb-4 sm:px-4 sm:pt-6 sm:pb-8">
 	<!-- Search Header -->
 	<div class="relative mb-4 sm:mb-8">
 		<div class="flex flex-row items-center justify-center">
@@ -292,8 +294,7 @@
 							bind:value={searchTerm}
 							bind:this={searchInput}
 							on:focus={handleFocus}
-							on:input={(event) =>
-								handleSearch((event.currentTarget as HTMLInputElement).value)}
+							on:input={(event) => handleSearch((event.currentTarget as HTMLInputElement).value)}
 						/>
 						{#if isSearching}
 							<LoadingRing

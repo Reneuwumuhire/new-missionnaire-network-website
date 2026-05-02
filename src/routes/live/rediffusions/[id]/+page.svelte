@@ -1,13 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { downloadAudioFile } from '../../../../utils/downloadAudio';
-	import {
-		selectAudio,
-		playlist,
-		basePlaylist,
-		currentIndex,
-		isPlaying
-	} from '$lib/stores/global';
+	import { selectAudio, playlist, basePlaylist, currentIndex, isPlaying } from '$lib/stores/global';
 	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
 	import type { MusicAudio } from '$lib/models/music-audio';
 	import { derived } from 'svelte/store';
@@ -185,7 +179,7 @@
 
 <svelte:window on:keydown={onLightboxKeydown} />
 
-<section class="w-full py-10 px-6">
+<section class="w-full px-6 pt-4 pb-10 md:pt-6">
 	<div class="max-w-3xl mx-auto">
 		<div class="mb-8">
 			<a
@@ -301,13 +295,25 @@
 						class="play-cta group inline-flex w-full max-w-[18rem] items-center justify-center gap-3 whitespace-nowrap bg-missionnaire px-6 py-3 text-sm font-bold uppercase tracking-[0.2em] font-body text-white transition-colors hover:bg-missionnaire/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
 					>
 						{#if $isCurrent && $isPlaying}
-							<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+							<svg
+								width="14"
+								height="14"
+								viewBox="0 0 24 24"
+								fill="currentColor"
+								aria-hidden="true"
+							>
 								<rect x="6" y="5" width="4" height="14" rx="1" />
 								<rect x="14" y="5" width="4" height="14" rx="1" />
 							</svg>
 							<span>En lecture — pause</span>
 						{:else}
-							<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+							<svg
+								width="14"
+								height="14"
+								viewBox="0 0 24 24"
+								fill="currentColor"
+								aria-hidden="true"
+							>
 								<path d="M8 5v14l11-7z" />
 							</svg>
 							<span>{$isCurrent ? 'Reprendre' : 'Écouter'}</span>

@@ -375,7 +375,7 @@
 	/>
 </svelte:head>
 
-<div class="max-w-6xl mx-auto px-6 py-8">
+<div class="max-w-6xl mx-auto px-6 pt-0 pb-8">
 	<!-- Page Header -->
 	<div class="mb-5 md:mb-6">
 		<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body">

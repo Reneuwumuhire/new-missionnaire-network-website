@@ -23,7 +23,7 @@
 	<meta property="og:url" content="https://missionnaire.net/live" />
 </svelte:head>
 
-<section class="w-full py-10 px-6">
+<section class="w-full px-6 pt-4 pb-10 md:pt-6">
 	<div class="max-w-2xl mx-auto">
 		<!-- Header -->
 		<div class="text-center mb-12">

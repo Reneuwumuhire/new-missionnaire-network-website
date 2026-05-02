@@ -42,7 +42,9 @@
 		{ value: 12, label: 'Décembre' }
 	];
 
-	function buildQuery(overrides: Partial<{ page: number; q: string; year: number | ''; month: number | '' }>): string {
+	function buildQuery(
+		overrides: Partial<{ page: number; q: string; year: number | ''; month: number | '' }>
+	): string {
 		const q = overrides.q !== undefined ? overrides.q : data.filters.q;
 		const year = overrides.year !== undefined ? overrides.year : (data.filters.year ?? '');
 		const month = overrides.month !== undefined ? overrides.month : (data.filters.month ?? '');
@@ -153,7 +155,7 @@
 
 <svelte:window on:keydown={onLightboxKeydown} />
 
-<section class="w-full py-10 px-6">
+<section class="w-full px-6 pt-4 pb-10 md:pt-6">
 	<div class="max-w-3xl mx-auto">
 		<!-- Header -->
 		<div class="text-center mb-12">
@@ -165,8 +167,15 @@
 			</h1>
 			{#if data.allTotal > 0}
 				<p class="mt-4 font-body text-stone-500 text-base">
-					<span class="font-display text-missionnaire text-2xl md:text-3xl font-semibold align-middle tabular-nums">{data.allTotal}</span>
-					<span class="align-middle">enregistrement{data.allTotal > 1 ? 's' : ''} disponible{data.allTotal > 1 ? 's' : ''}</span>
+					<span
+						class="font-display text-missionnaire text-2xl md:text-3xl font-semibold align-middle tabular-nums"
+						>{data.allTotal}</span
+					>
+					<span class="align-middle"
+						>enregistrement{data.allTotal > 1 ? 's' : ''} disponible{data.allTotal > 1
+							? 's'
+							: ''}</span
+					>
 				</p>
 			{/if}
 			<p
@@ -300,84 +309,86 @@
 					</p>
 				</div>
 			{:else}
-			<ul class="divide-y divide-stone-100 border border-stone-200/60 bg-white/40">
-				{#each data.recordings as rec}
-					<li>
-						<div
-							class="group relative flex items-center gap-4 px-4 py-4 transition-colors hover:bg-missionnaire/5"
-						>
-							<!-- Thumbnail — clickable to expand, separate from row nav -->
-							<button
-								type="button"
-								on:click={(e) => openThumb(rec, e)}
-								aria-label={rec.thumbnail_url ? 'Agrandir la vignette' : 'Vignette par défaut'}
-								class="relative h-14 w-24 sm:h-16 sm:w-28 shrink-0 overflow-hidden border border-stone-200/60 bg-stone-100 {rec.thumbnail_url
-									? 'cursor-zoom-in'
-									: 'cursor-default'} focus:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
+				<ul class="divide-y divide-stone-100 border border-stone-200/60 bg-white/40">
+					{#each data.recordings as rec}
+						<li>
+							<div
+								class="group relative flex items-center gap-4 px-4 py-4 transition-colors hover:bg-missionnaire/5"
 							>
-								{#if rec.thumbnail_url && !failedThumbs.has(rec.id)}
-									<BlurUpImage
-										src={vercelImage(rec.thumbnail_url, 192)}
-										srcset={vercelImageSrcSet(rec.thumbnail_url, 96)}
-										placeholderSrc={vercelImagePlaceholder(rec.thumbnail_url)}
-										alt=""
-										width={96}
-										height={54}
-										loading="lazy"
-										fetchpriority="low"
-										class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-										on:error={() => markThumbFailed(rec.id)}
-									/>
-								{:else}
-									<div class="default-thumbnail absolute inset-0 flex items-center justify-center">
-										<picture>
-											<source srcset="/icons/logo.webp" type="image/webp" />
-											<img
-												src="/icons/logo.png"
-												alt=""
-												class="h-4 w-auto opacity-80"
-												width="150"
-												height="64"
-												loading="lazy"
-											/>
-										</picture>
-									</div>
-								{/if}
-							</button>
-
-							<!-- Title + meta — row navigation -->
-							<a
-								href={detailHref(rec.id)}
-								class="min-w-0 flex-1 outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40 rounded"
-							>
-								<p
-									class="font-display text-[15px] sm:text-base font-medium text-stone-800 group-hover:text-missionnaire transition-colors leading-snug line-clamp-2"
+								<!-- Thumbnail — clickable to expand, separate from row nav -->
+								<button
+									type="button"
+									on:click={(e) => openThumb(rec, e)}
+									aria-label={rec.thumbnail_url ? 'Agrandir la vignette' : 'Vignette par défaut'}
+									class="relative h-14 w-24 sm:h-16 sm:w-28 shrink-0 overflow-hidden border border-stone-200/60 bg-stone-100 {rec.thumbnail_url
+										? 'cursor-zoom-in'
+										: 'cursor-default'} focus:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
 								>
-									{rec.title}
-								</p>
-								<p class="mt-1 text-xs text-stone-400 font-body">
-									{formatDate(rec.started_at)} · {formatDuration(rec.duration_sec)}
-								</p>
-							</a>
+									{#if rec.thumbnail_url && !failedThumbs.has(rec.id)}
+										<BlurUpImage
+											src={vercelImage(rec.thumbnail_url, 192)}
+											srcset={vercelImageSrcSet(rec.thumbnail_url, 96)}
+											placeholderSrc={vercelImagePlaceholder(rec.thumbnail_url)}
+											alt=""
+											width={96}
+											height={54}
+											loading="lazy"
+											fetchpriority="low"
+											class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+											on:error={() => markThumbFailed(rec.id)}
+										/>
+									{:else}
+										<div
+											class="default-thumbnail absolute inset-0 flex items-center justify-center"
+										>
+											<picture>
+												<source srcset="/icons/logo.webp" type="image/webp" />
+												<img
+													src="/icons/logo.png"
+													alt=""
+													class="h-4 w-auto opacity-80"
+													width="150"
+													height="64"
+													loading="lazy"
+												/>
+											</picture>
+										</div>
+									{/if}
+								</button>
 
-							<!-- Listen affordance (desktop only) -->
-							<a
-								href={detailHref(rec.id)}
-								aria-hidden="true"
-								tabindex="-1"
-								class="hidden sm:inline-flex shrink-0 text-[11px] font-bold uppercase tracking-[0.15em] font-body text-stone-300 group-hover:text-missionnaire transition-colors"
-							>
-								Écouter →
-							</a>
-						</div>
-					</li>
-				{/each}
-			</ul>
+								<!-- Title + meta — row navigation -->
+								<a
+									href={detailHref(rec.id)}
+									class="min-w-0 flex-1 outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40 rounded"
+								>
+									<p
+										class="font-display text-[15px] sm:text-base font-medium text-stone-800 group-hover:text-missionnaire transition-colors leading-snug line-clamp-2"
+									>
+										{rec.title}
+									</p>
+									<p class="mt-1 text-xs text-stone-400 font-body">
+										{formatDate(rec.started_at)} · {formatDuration(rec.duration_sec)}
+									</p>
+								</a>
 
-			<div class="mt-8">
-				<Pagination current={data.pageNumber} total={totalPages} getHref={listHref} />
-			</div>
-		{/if}
+								<!-- Listen affordance (desktop only) -->
+								<a
+									href={detailHref(rec.id)}
+									aria-hidden="true"
+									tabindex="-1"
+									class="hidden sm:inline-flex shrink-0 text-[11px] font-bold uppercase tracking-[0.15em] font-body text-stone-300 group-hover:text-missionnaire transition-colors"
+								>
+									Écouter →
+								</a>
+							</div>
+						</li>
+					{/each}
+				</ul>
+
+				<div class="mt-8">
+					<Pagination current={data.pageNumber} total={totalPages} getHref={listHref} />
+				</div>
+			{/if}
 		</div>
 	</div>
 </section>
