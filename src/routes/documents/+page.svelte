@@ -107,7 +107,7 @@
 	/>
 </svelte:head>
 
-<div class="container mx-auto px-4 py-8">
+<div class="container mx-auto px-4 pt-4 pb-8 md:pt-6">
 	<!-- Search Header -->
 	<div class="relative mb-8">
 		<div class="flex flex-row items-center justify-center">
@@ -134,7 +134,11 @@
 
 	<div class="flex w-full h-full">
 		<!-- List Panel -->
-		<div class="flex-1 min-w-0 {$isDocumentOpen ? 'hidden md:block md:w-1/2' : 'w-full'} transition-all duration-300">
+		<div
+			class="flex-1 min-w-0 {$isDocumentOpen
+				? 'hidden md:block md:w-1/2'
+				: 'w-full'} transition-all duration-300"
+		>
 			<!-- Sort and Filter Controls -->
 			<div class="flex justify-end mb-4 items-center space-x-4">
 				<!-- Year Filter -->
@@ -203,7 +207,8 @@
 								{#if document.videoDisplayId}
 									<a
 										href={`https://www.youtube.com/watch?v=${document.videoDisplayId}`}
-										target="_blank" rel="noopener noreferrer"
+										target="_blank"
+										rel="noopener noreferrer"
 										class="p-2 text-gray-500 hover:text-missionnaire transition-colors"
 										title="Voir la vidéo"
 									>
@@ -261,7 +266,9 @@
 
 		<!-- Document Preview Panel -->
 		{#if $isDocumentOpen && selectedDocument}
-			<div class="fixed inset-0 z-50 bg-white p-6 overflow-y-auto md:static md:inset-auto md:z-auto md:w-1/2 md:border-l md:border-gray-200 md:min-h-screen">
+			<div
+				class="fixed inset-0 z-50 bg-white p-6 overflow-y-auto md:static md:inset-auto md:z-auto md:w-1/2 md:border-l md:border-gray-200 md:min-h-screen"
+			>
 				<div class="flex flex-col h-full">
 					<div class="flex justify-between items-start mb-6">
 						<h2 class="text-xl font-semibold text-gray-900">{selectedDocument.filename}</h2>
@@ -310,7 +317,8 @@
 							<div class="mt-6 flex flex-col gap-4">
 								<a
 									href={selectedDocument.url}
-									target="_blank" rel="noopener noreferrer"
+									target="_blank"
+									rel="noopener noreferrer"
 									class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-missionnaire"
 								>
 									<svg
@@ -341,7 +349,8 @@
 								{#if selectedDocument.videoDisplayId}
 									<a
 										href={`https://www.youtube.com/watch?v=${selectedDocument.videoDisplayId}`}
-										target="_blank" rel="noopener noreferrer"
+										target="_blank"
+										rel="noopener noreferrer"
 										class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-missionnaire"
 									>
 										<div class="mr-2">

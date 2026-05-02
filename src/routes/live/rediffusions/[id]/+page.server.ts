@@ -27,6 +27,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
 	if (!recording) throw error(404, 'Enregistrement introuvable');
 	const backHref = sanitizeFrom(url.searchParams.get('from'));
 	const transcript = await getTranscriptForRecording({
+		transcript_pdf_id: recording.transcript_pdf_id,
 		source_video_id: recording.source_video_id,
 		started_at: recording.started_at
 	});

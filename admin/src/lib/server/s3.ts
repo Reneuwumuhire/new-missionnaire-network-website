@@ -35,14 +35,27 @@ function sanitizeFilename(name: string): string {
 		.toLowerCase();
 }
 
+function sanitizePdfFilename(name: string): string {
+	const basename = name.split(/[\\/]/).pop() || name;
+	const cleaned = basename.replace(/[\x00-\x1F\x7F]/g, '').trim();
+	return cleaned || 'transcription.pdf';
+}
+
 export function generateS3Key(category: string, filename: string): string {
 	const timestamp = Date.now();
 	const sanitized = sanitizeFilename(filename);
 	return `music-audio/${category}/${timestamp}-${sanitized}`;
 }
 
+export function generatePdfS3Key(filename: string, date = new Date()): string {
+	const year = date.getUTCFullYear();
+	const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+	return `pdf/${year}/${month}/${sanitizePdfFilename(filename)}`;
+}
+
 export function getS3Url(key: string): string {
-	return `https://${AWS_S3_BUCKET}.s3.${AWS_S3_REGION}.amazonaws.com/${key}`;
+	const encodedKey = key.split('/').map(encodeURIComponent).join('/');
+	return `https://${AWS_S3_BUCKET}.s3.${AWS_S3_REGION}.amazonaws.com/${encodedKey}`;
 }
 
 export async function generatePresignedUploadUrl(

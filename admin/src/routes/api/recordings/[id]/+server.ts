@@ -8,37 +8,14 @@ import {
 	updateRecording
 } from '../../../../db/collections';
 import { deleteObject, updateDownloadFilename } from '$lib/server/s3';
+import {
+	ensureVideoForRecording,
+	extractYoutubeVideoId,
+	getFirstTranscriptPdfForVideo
+} from '$lib/server/video-sync';
 
 const MAX_TITLE_LEN = 200;
 const MAX_DESCRIPTION_LEN = 2000;
-
-/** Extract the 11-char YouTube video id from any of the common URL shapes
- *  admins might paste (watch?v=, youtu.be/, /live/, /shorts/, /embed/), or
- *  from the bare 11-char id itself. Returns null for anything we can't
- *  confidently identify. */
-function extractYoutubeVideoId(input: string): string | null {
-	const trimmed = input.trim();
-	if (!trimmed) return null;
-	// Bare id: [A-Za-z0-9_-]{11}
-	if (/^[A-Za-z0-9_-]{11}$/.test(trimmed)) return trimmed;
-	try {
-		const u = new URL(trimmed);
-		const host = u.hostname.replace(/^www\./, '');
-		if (host === 'youtu.be') {
-			const id = u.pathname.slice(1).split('/')[0];
-			return /^[A-Za-z0-9_-]{11}$/.test(id) ? id : null;
-		}
-		if (host === 'youtube.com' || host.endsWith('.youtube.com')) {
-			const v = u.searchParams.get('v');
-			if (v && /^[A-Za-z0-9_-]{11}$/.test(v)) return v;
-			const m = u.pathname.match(/^\/(?:live|shorts|embed)\/([A-Za-z0-9_-]{11})/);
-			if (m) return m[1];
-		}
-		return null;
-	} catch {
-		return null;
-	}
-}
 
 export const PATCH: RequestHandler = async ({ locals, params, request, getClientAddress }) => {
 	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
@@ -61,7 +38,9 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 		thumbnail_url?: string | null;
 		thumbnail_s3_key?: string | null;
 		source_video_id?: string | null;
+		transcript_pdf_id?: string | null;
 	} = {};
+	let nextSourceVideoId: string | null | undefined;
 
 	if (typeof body.title === 'string' && body.title.trim()) {
 		const trimmed = body.title.trim();
@@ -94,6 +73,7 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 			const videoId = extractYoutubeVideoId(body.youtube_url);
 			if (!videoId) throw error(400, 'URL YouTube invalide');
 			updates.source_video_id = videoId;
+			nextSourceVideoId = videoId;
 		} else {
 			throw error(400, 'URL YouTube invalide');
 		}
@@ -118,12 +98,35 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 
 	if (Object.keys(updates).length === 0) throw error(400, 'Aucune modification valide');
 
+	let currentRecording = null as Awaited<ReturnType<typeof getRecordingById>>;
+	async function loadCurrentRecording() {
+		currentRecording ??= await getRecordingById(id);
+		if (!currentRecording) throw error(404, 'Enregistrement introuvable');
+		return currentRecording;
+	}
+
 	// If replacing or removing the thumbnail, delete the previous S3 object.
 	const isThumbnailChange = 'thumbnail_s3_key' in updates;
 	let oldThumbnailKey: string | null = null;
 	if (isThumbnailChange) {
-		const current = await getRecordingById(id);
+		const current = await loadCurrentRecording();
 		oldThumbnailKey = current?.thumbnail_s3_key ?? null;
+	}
+
+	if (nextSourceVideoId) {
+		const current = await loadCurrentRecording();
+		const { videoObjectId } = await ensureVideoForRecording({
+			videoId: nextSourceVideoId,
+			title: updates.title ?? current.title,
+			description: Object.hasOwn(updates, 'description')
+				? updates.description ?? null
+				: current.description,
+			thumbnailUrl: updates.thumbnail_url ?? current.thumbnail_url,
+			startedAt: current.started_at,
+			durationSec: current.duration_sec
+		});
+		const existingTranscript = await getFirstTranscriptPdfForVideo(videoObjectId);
+		updates.transcript_pdf_id = existingTranscript?._id ?? null;
 	}
 
 	const ok = await updateRecording(id, updates);

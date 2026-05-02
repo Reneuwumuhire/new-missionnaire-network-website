@@ -1,3 +1,4 @@
+import { ObjectId } from 'mongodb';
 import { getDb } from '../../db/mongo';
 
 // Indexes we want on the `recordings` collection. Created lazily on first
@@ -37,6 +38,8 @@ export interface PublishedRecording {
 	/** YouTube video id (e.g. "MgoAxBWkG-s") when the import script matched
 	 *  this recording to a video on our channel. */
 	source_video_id: string | null;
+	/** Preferred transcript PDF explicitly attached from admin. */
+	transcript_pdf_id: string | null;
 }
 
 interface RecordingRow {
@@ -49,6 +52,7 @@ interface RecordingRow {
 	thumbnail_url?: string | null;
 	description?: string | null;
 	source_video_id?: string | null;
+	transcript_pdf_id?: string | null;
 }
 
 function toPublic(doc: RecordingRow): PublishedRecording {
@@ -62,7 +66,8 @@ function toPublic(doc: RecordingRow): PublishedRecording {
 		size_bytes: doc.size_bytes ?? null,
 		thumbnail_url: doc.thumbnail_url ?? null,
 		description: doc.description ?? null,
-		source_video_id: doc.source_video_id ?? null
+		source_video_id: doc.source_video_id ?? null,
+		transcript_pdf_id: doc.transcript_pdf_id ?? null
 	};
 }
 
@@ -308,21 +313,39 @@ async function findVideoObjectIdForRecording(
  *  a title-date match so live-broadcast-created rows (no `source_video_id`)
  *  still surface their transcription. */
 export async function getTranscriptForRecording(recording: {
+	transcript_pdf_id?: string | null;
 	source_video_id: string | null;
 	started_at: string | null;
 }): Promise<RecordingTranscript | null> {
 	try {
 		const db = await getDb();
+		if (recording.transcript_pdf_id && ObjectId.isValid(recording.transcript_pdf_id)) {
+			const attached = await db
+				.collection('pdfs')
+				.findOne(
+					{ _id: new ObjectId(recording.transcript_pdf_id) },
+					{ projection: { url: 1, filename: 1, size: 1 } }
+				);
+			if (attached?.url) {
+				return {
+					url: attached.url as string,
+					filename: (attached.filename as string) ?? 'transcription.pdf',
+					size: (attached.size as number) ?? 0
+				};
+			}
+		}
+
 		const videoObjectId = await findVideoObjectIdForRecording(
 			db,
 			recording.source_video_id,
 			recording.started_at
 		);
 		if (!videoObjectId) return null;
+		const videoObjectIdString = String(videoObjectId);
 		const pdf = await db
 			.collection('pdfs')
 			.findOne(
-				{ videoId: videoObjectId },
+				{ $or: [{ videoId: videoObjectId }, { videoId: videoObjectIdString }] },
 				{ projection: { url: 1, filename: 1, size: 1 } }
 			);
 		if (!pdf?.url) return null;

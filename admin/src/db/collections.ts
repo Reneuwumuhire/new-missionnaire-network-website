@@ -570,6 +570,7 @@ export async function updateRecording(
 		peaks: number[] | null;
 		peaks_duration_sec: number | null;
 		source_video_id: string | null;
+		transcript_pdf_id: string | null;
 	}>
 ): Promise<boolean> {
 	const db = await getDb();

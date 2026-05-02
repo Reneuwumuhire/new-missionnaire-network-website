@@ -39,6 +39,9 @@ export const RecordingSchema = z.object({
 	 *  surface a YouTube link + pull the transcription PDF associated with
 	 *  that video. Admin-editable. */
 	source_video_id: z.string().nullable().optional(),
+	/** Preferred PDF transcription attached to this recording. Usually this is
+	 *  auto-filled from an already-uploaded PDF on the linked YouTube video. */
+	transcript_pdf_id: z.string().nullable().optional(),
 	updated_at: z
 		.union([z.instanceof(Date), z.string()])
 		.transform((val) => new Date(val))

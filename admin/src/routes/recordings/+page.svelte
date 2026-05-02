@@ -16,6 +16,13 @@
 		onClose: () => void;
 		onSaved: () => void;
 	};
+	type RecordingTranscript = {
+		_id: string;
+		url: string;
+		filename: string;
+		size: number;
+		publishedOn?: string;
+	};
 	let AudioTrimEditor = $state<Component<AudioTrimEditorProps> | null>(null);
 	async function ensureTrimEditorLoaded(): Promise<void> {
 		if (AudioTrimEditor) return;
@@ -287,6 +294,13 @@
 	let recAudioDurationSec = $state<number | null>(null);
 	let recAudioError = $state<string | null>(null);
 	let recAudioUploadPct = $state<number | null>(null);
+	let recPdfFile = $state<File | null>(null);
+	let recPdfError = $state<string | null>(null);
+	let recPdfUploadPct = $state<number | null>(null);
+	let recExistingTranscript = $state<RecordingTranscript | null>(null);
+	let recTranscriptLoading = $state(false);
+	let recTranscriptUploadOpen = $state(false);
+	let recPdfMode = $state<'add' | 'replace'>('add');
 	let recSaving = $state(false);
 
 	// Audio trim editor — opens as a separate modal so it can coexist with
@@ -316,6 +330,13 @@
 		recAudioDurationSec = null;
 		recAudioError = null;
 		recAudioUploadPct = null;
+		recPdfFile = null;
+		recPdfError = null;
+		recPdfUploadPct = null;
+		recExistingTranscript = null;
+		recTranscriptLoading = false;
+		recTranscriptUploadOpen = false;
+		recPdfMode = 'add';
 		recDraftTitle = rec.title ?? '';
 		recDraftDescription = rec.description ?? '';
 		recDraftYoutubeUrl = rec.source_video_id
@@ -323,6 +344,7 @@
 			: '';
 		recYoutubeError = null;
 		editingRecordingId = rec._id!;
+		void loadExistingRecordingTranscript(rec._id!);
 	}
 
 	function cancelRecordingEdit() {
@@ -335,6 +357,13 @@
 		recAudioDurationSec = null;
 		recAudioError = null;
 		recAudioUploadPct = null;
+		recPdfFile = null;
+		recPdfError = null;
+		recPdfUploadPct = null;
+		recExistingTranscript = null;
+		recTranscriptLoading = false;
+		recTranscriptUploadOpen = false;
+		recPdfMode = 'add';
 		editingRecordingId = null;
 	}
 
@@ -389,6 +418,49 @@
 		recAudioUploadPct = null;
 	}
 
+	function onRecPdfFileChange(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		if (!file) return;
+		const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+		if (!isPdf) {
+			recPdfError = 'Sélectionnez un fichier PDF';
+			return;
+		}
+		if (file.size > 100 * 1024 * 1024) {
+			recPdfError = 'PDF trop volumineux (max 100 Mo)';
+			return;
+		}
+		recPdfError = null;
+		recPdfUploadPct = null;
+		recPdfFile = file;
+	}
+
+	function clearRecPdf() {
+		recPdfFile = null;
+		recPdfError = null;
+		recPdfUploadPct = null;
+		recTranscriptUploadOpen = false;
+		recPdfMode = 'add';
+	}
+
+	async function loadExistingRecordingTranscript(id: string) {
+		recTranscriptLoading = true;
+		try {
+			const res = await fetch(`/api/recordings/${id}/transcript`);
+			if (!res.ok) return;
+			const body = (await res.json()) as { data: RecordingTranscript | null };
+			if (editingRecordingId === id) {
+				recExistingTranscript = body.data;
+			}
+		} catch {
+			// Non-blocking convenience lookup; saving still works without it.
+		} finally {
+			if (editingRecordingId === id) recTranscriptLoading = false;
+		}
+	}
+
 	/** PUT a file to S3 via XHR so upload progress events are observable
 	 *  (fetch() has no equivalent). Resolves on 2xx, rejects otherwise. */
 	function putWithProgress(
@@ -412,6 +484,66 @@
 			xhr.onabort = () => reject(new Error('Téléversement interrompu'));
 			xhr.send(file);
 		});
+	}
+
+	async function uploadRecordingTranscript(rec: Recording): Promise<boolean> {
+		if (!recPdfFile) return true;
+		const hasYoutubeLink = Boolean(recDraftYoutubeUrl.trim() || rec.source_video_id);
+		if (!hasYoutubeLink) {
+			recPdfError = 'Ajoutez un lien YouTube avant de rattacher une transcription PDF';
+			return false;
+		}
+
+		recPdfError = null;
+		const uploadUrlRes = await fetch(`/api/recordings/${rec._id}/transcript/upload-url`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				fileName: recPdfFile.name,
+				contentType: recPdfFile.type || 'application/pdf',
+				size: recPdfFile.size
+			})
+		});
+		if (!uploadUrlRes.ok) {
+			recPdfError = (await uploadUrlRes.text()) || `Erreur ${uploadUrlRes.status}`;
+			return false;
+		}
+		const { uploadUrl, s3Key, s3Url } = (await uploadUrlRes.json()) as {
+			uploadUrl: string;
+			s3Key: string;
+			s3Url: string;
+		};
+
+		recPdfUploadPct = 0;
+		try {
+			await putWithProgress(uploadUrl, recPdfFile, 'application/pdf', (pct) => {
+				recPdfUploadPct = pct;
+			});
+		} catch (err) {
+			recPdfError = err instanceof Error ? err.message : 'Échec du téléversement PDF vers S3';
+			recPdfUploadPct = null;
+			return false;
+		}
+
+		const finalizeRes = await fetch(`/api/recordings/${rec._id}/transcript/finalize`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				fileName: recPdfFile.name,
+				s3Key,
+				s3Url,
+				size: recPdfFile.size,
+				replacePdfId:
+					recPdfMode === 'replace' && recExistingTranscript ? recExistingTranscript._id : null
+			})
+		});
+		if (!finalizeRes.ok) {
+			recPdfError = (await finalizeRes.text()) || `Erreur ${finalizeRes.status}`;
+			return false;
+		}
+
+		recPdfUploadPct = 100;
+		return true;
 	}
 
 	function onRecThumbnailFileChange(event: Event) {
@@ -503,7 +635,9 @@
 				patch.thumbnail_s3_key = null;
 			}
 
-			if (Object.keys(patch).length > 0) {
+			const hasMetadataPatch = Object.keys(patch).length > 0;
+
+			if (hasMetadataPatch) {
 				const res = await fetch(`/api/recordings/${rec._id}`, {
 					method: 'PATCH',
 					headers: { 'Content-Type': 'application/json' },
@@ -518,6 +652,11 @@
 					return;
 				}
 				recYoutubeError = null;
+			}
+
+			if (recPdfFile) {
+				const uploaded = await uploadRecordingTranscript(rec);
+				if (!uploaded) return;
 			}
 
 			// Replace audio last — if the file upload fails, metadata edits above
@@ -556,11 +695,14 @@
 					recAudioError = (await finalize.text()) || `Erreur ${finalize.status}`;
 					return;
 				}
-			} else if (Object.keys(patch).length === 0) {
+			} else if (!hasMetadataPatch && !recPdfFile) {
 				cancelRecordingEdit();
 				return;
 			}
 
+			if (recPdfFile) {
+				toast.success(recPdfMode === 'replace' ? 'Transcription PDF remplacée' : 'Transcription PDF ajoutée');
+			}
 			cancelRecordingEdit();
 			await invalidateAll();
 		} finally {
@@ -2173,7 +2315,7 @@
 	{#if editingRec}
 		<!-- Recording metadata edit modal — focused editing with thumbnail + title + description. -->
 		<div
-			class="fixed inset-0 z-40 flex items-center justify-center bg-stone-900/60 p-4 backdrop-blur-sm animate-lightbox-in overflow-y-auto"
+			class="fixed inset-0 z-40 flex items-center justify-center overflow-y-auto overflow-x-hidden bg-stone-900/60 p-3 backdrop-blur-sm animate-lightbox-in sm:p-4"
 			onclick={onEditModalBackdropClick}
 			onkeydown={onLightboxKeydown}
 			role="dialog"
@@ -2181,10 +2323,10 @@
 			aria-labelledby="edit-rec-title"
 			tabindex="-1"
 		>
-			<div class="w-full max-w-3xl rounded-sm bg-white shadow-2xl my-8">
+			<div class="my-4 w-full max-w-3xl overflow-hidden rounded-sm bg-white shadow-2xl sm:my-8">
 				<!-- Modal header -->
-				<div class="flex items-center justify-between border-b border-stone-100 px-6 py-4">
-					<h2 id="edit-rec-title" class="font-display text-lg font-semibold text-stone-800">
+				<div class="flex items-center justify-between gap-3 border-b border-stone-100 px-4 py-4 sm:px-6">
+					<h2 id="edit-rec-title" class="min-w-0 truncate font-display text-lg font-semibold text-stone-800">
 						Modifier l'enregistrement
 					</h2>
 					<button
@@ -2201,10 +2343,10 @@
 				</div>
 
 				<!-- Modal body -->
-				<div class="px-6 py-6">
-					<div class="flex flex-col gap-5 sm:flex-row sm:items-start">
+				<div class="overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6">
+					<div class="flex min-w-0 flex-col gap-5 sm:flex-row sm:items-start">
 						<!-- Thumbnail editor -->
-						<div class="flex flex-col gap-2 shrink-0">
+						<div class="flex w-full max-w-[12rem] shrink-0 flex-col gap-2 sm:w-48">
 							<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Vignette</span>
 							{#if recPreviewSrc(editingRec)}
 								<div class="relative aspect-video w-48 overflow-hidden border border-stone-300 bg-cream/40">
@@ -2233,7 +2375,7 @@
 									<span class="text-[8px] font-bold uppercase tracking-[0.2em] text-stone-500">Aucune vignette</span>
 								</div>
 							{/if}
-							<div class="flex gap-2">
+							<div class="flex flex-wrap gap-2">
 								<label class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary">
 									{recPreviewSrc(editingRec) ? 'Changer' : 'Téléverser'}
 									<input
@@ -2259,7 +2401,7 @@
 						</div>
 
 						<!-- Title + Description -->
-						<div class="flex flex-1 flex-col gap-4">
+						<div class="flex min-w-0 flex-1 flex-col gap-4">
 							<div class="flex flex-col gap-1.5">
 								<label for="edit-rec-title-input" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Titre</label>
 								<input
@@ -2310,6 +2452,134 @@
 								{/if}
 							</div>
 
+							<div class="flex min-w-0 flex-col gap-2 overflow-hidden border border-stone-100 bg-stone-50/40 p-3">
+								<div class="flex flex-col gap-1">
+									<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Transcription PDF</span>
+									<span class="text-[10px] text-stone-400">
+										Si la vidéo liée possède déjà un PDF, il est attaché ici automatiquement.
+									</span>
+								</div>
+								{#if recTranscriptLoading}
+									<div class="border border-stone-200 bg-white px-3 py-2 text-xs text-stone-500">
+										Recherche d'une transcription déjà téléversée…
+									</div>
+								{:else if recExistingTranscript && !recPdfFile && !recTranscriptUploadOpen}
+									<div class="flex min-w-0 items-center justify-between gap-3 overflow-hidden border border-green-200 bg-green-50/70 px-3 py-2">
+										<div class="min-w-0 flex-1">
+											<p class="truncate text-xs font-medium text-green-900">{recExistingTranscript.filename}</p>
+											<p class="truncate text-[10px] text-green-700 tabular-nums">
+												{formatBytes(recExistingTranscript.size)}
+												{#if recExistingTranscript.publishedOn}
+													· {formatDateTime(recExistingTranscript.publishedOn)}
+												{/if}
+											</p>
+										</div>
+										<a
+											href={recExistingTranscript.url}
+											target="_blank"
+											rel="noopener noreferrer"
+											class="shrink-0 text-[10px] font-semibold uppercase tracking-[0.15em] text-green-700 hover:text-green-900"
+										>
+											Ouvrir
+										</a>
+									</div>
+									<div class="flex flex-wrap items-center gap-2">
+										<span class="text-[10px] text-stone-400">Aucun nouveau téléversement nécessaire.</span>
+										<button
+											type="button"
+											onclick={() => {
+												recPdfMode = 'replace';
+												recTranscriptUploadOpen = true;
+											}}
+											disabled={recSaving}
+											class="text-[10px] font-semibold uppercase tracking-[0.15em] text-primary hover:underline disabled:opacity-50"
+										>
+											Remplacer ce PDF
+										</button>
+										<button
+											type="button"
+											onclick={() => {
+												recPdfMode = 'add';
+												recTranscriptUploadOpen = true;
+											}}
+											disabled={recSaving}
+											class="text-[10px] font-semibold uppercase tracking-[0.15em] text-primary hover:underline disabled:opacity-50"
+										>
+											Ajouter un autre PDF
+										</button>
+									</div>
+								{/if}
+								{#if recPdfFile}
+									<div class="flex min-w-0 items-center justify-between gap-3 overflow-hidden border border-stone-200 bg-white px-3 py-2">
+										<div class="min-w-0 flex-1">
+											<p class="truncate text-xs font-medium text-stone-700">{recPdfFile.name}</p>
+											<p class="truncate text-[10px] text-stone-500 tabular-nums">
+												{formatBytes(recPdfFile.size)}
+												{#if recPdfMode === 'replace' && recExistingTranscript}
+													· remplacera {recExistingTranscript.filename}
+												{/if}
+											</p>
+										</div>
+										<button
+											type="button"
+											onclick={clearRecPdf}
+											disabled={recSaving}
+											class="shrink-0 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 hover:text-red-600 disabled:opacity-50"
+										>
+											Retirer
+										</button>
+									</div>
+									{#if recPdfUploadPct !== null}
+										<div class="flex flex-col gap-1">
+											<div class="flex items-center justify-between text-[10px] font-mono text-stone-500 tabular-nums">
+												<span>{recPdfUploadPct < 100 ? 'Téléversement PDF…' : 'Finalisation…'}</span>
+												<span>{recPdfUploadPct}%</span>
+											</div>
+											<div class="h-1.5 w-full overflow-hidden rounded-full bg-stone-200">
+												<div
+													class="h-full bg-primary transition-[width] duration-150 ease-out"
+													style:width="{recPdfUploadPct}%"
+												></div>
+											</div>
+										</div>
+									{/if}
+								{:else if !recTranscriptLoading && (!recExistingTranscript || recTranscriptUploadOpen)}
+									<div class="flex flex-wrap items-center gap-2">
+										<label class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary">
+											{recExistingTranscript && recPdfMode === 'replace'
+												? 'Choisir le PDF de remplacement'
+												: recExistingTranscript
+													? 'Choisir un autre PDF'
+													: 'Ajouter un PDF'}
+											<input
+												type="file"
+												accept="application/pdf,.pdf"
+												class="hidden"
+												onchange={onRecPdfFileChange}
+												disabled={recSaving}
+											/>
+										</label>
+										<p class="text-[10px] text-stone-400">PDF uniquement · 100 Mo max</p>
+										{#if recExistingTranscript}
+											<button
+												type="button"
+												onclick={() => {
+													recTranscriptUploadOpen = false;
+													recPdfMode = 'add';
+												}}
+												disabled={recSaving}
+												class="text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 hover:text-stone-700 disabled:opacity-50"
+											>
+												Garder l'existant
+											</button>
+										{/if}
+									</div>
+								{/if}
+								{#if recPdfError}
+									<p class="bg-red-50 px-3 py-2 text-xs text-red-700">{recPdfError}</p>
+								{/if}
+							</div>
+
 							{#if recThumbnailError}
 								<p class="bg-red-50 px-3 py-2 text-xs text-red-700">{recThumbnailError}</p>
 							{/if}
@@ -2317,11 +2587,11 @@
 					</div>
 
 					<!-- Audio replace — destructive: overwrites the published MP3 -->
-					<div class="mt-6 border-t border-stone-100 pt-5">
+					<div class="mt-6 min-w-0 border-t border-stone-100 pt-5">
 						<div class="flex flex-col gap-2">
 							<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Fichier audio</span>
 							{#if recAudioFile && recAudioDurationSec}
-								<div class="flex items-center justify-between gap-3 border border-amber-200 bg-amber-50/60 px-3 py-2">
+								<div class="flex min-w-0 items-center justify-between gap-3 overflow-hidden border border-amber-200 bg-amber-50/60 px-3 py-2">
 									<div class="min-w-0 flex-1">
 										<p class="truncate text-xs font-medium text-stone-700">{recAudioFile.name}</p>
 										<p class="text-[10px] text-stone-500 tabular-nums">
@@ -2377,7 +2647,7 @@
 				</div>
 
 				<!-- Modal footer -->
-				<div class="flex items-center justify-end gap-2 border-t border-stone-100 px-6 py-4">
+				<div class="flex flex-wrap items-center justify-end gap-2 border-t border-stone-100 px-4 py-4 sm:px-6">
 					<button
 						type="button"
 						onclick={cancelRecordingEdit}
