@@ -42,9 +42,9 @@ export async function connect() {
 				maxPoolSize: 10,
 				// minPoolSize=0 (driver default): open sockets lazily as
 				// queries arrive instead of eagerly filling 5 on startup.
-				// Eager fill could overwhelm Atlas M0's connection-handshake
-				// throttle when the admin process was already opening
-				// sockets, causing ServerSelectionTimeout / ReplicaSetNoPrimary.
+				// Eager fill overwhelms Atlas M0's connection-handshake
+				// throttle when the admin process is also opening sockets,
+				// which surfaces as ServerSelectionTimeout / ReplicaSetNoPrimary.
 				serverSelectionTimeoutMS: 30000,
 				socketTimeoutMS: 45000,
 				connectTimeoutMS: 10000
@@ -109,4 +109,22 @@ export async function isConnected() {
 	} catch {
 		return false;
 	}
+}
+
+// Vite HMR: when this module is replaced during dev (or when an importer is
+// invalidated and re-evaluates this module), close the old MongoClient so its
+// pool sockets don't accumulate against Atlas's connection cap. Without this,
+// hours of dev with HMR can leak hundreds of half-open sockets and cause
+// ReplicaSetNoPrimary timeouts on new connection attempts.
+if (import.meta.hot) {
+	import.meta.hot.dispose(async () => {
+		if (client) {
+			try {
+				await client.close(true);
+			} catch (err) {
+				console.error('[MongoDB] HMR dispose close error:', err);
+			}
+			client = null;
+		}
+	});
 }

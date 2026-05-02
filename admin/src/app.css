@@ -147,3 +147,25 @@ body {
 .admin-btn-danger {
 	@apply inline-flex items-center gap-2 rounded-none bg-red-700 px-6 py-3 font-body text-[12px] font-semibold uppercase tracking-[0.2em] text-white transition-all hover:bg-red-800 focus:ring-2 focus:ring-red-300 active:scale-[0.98];
 }
+
+.admin-btn-primary:disabled,
+.admin-btn-secondary:disabled,
+.admin-btn-danger:disabled {
+	@apply cursor-wait opacity-65 hover:transform-none active:scale-100;
+}
+
+.admin-submit-loading::before {
+	content: '';
+	width: 0.9em;
+	height: 0.9em;
+	border: 2px solid currentColor;
+	border-right-color: transparent;
+	border-radius: 999px;
+	animation: admin-submit-spin 0.7s linear infinite;
+}
+
+@keyframes admin-submit-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}

@@ -11,12 +11,19 @@
 		user,
 		broadcastIsLive = false
 	}: {
-		user: { name: string; email: string; role?: string; canManageRecordings?: boolean };
+		user: {
+			name: string;
+			email: string;
+			role?: string;
+			canManageRecordings?: boolean;
+			canViewQuestions?: boolean;
+		};
 		broadcastIsLive?: boolean;
 	} = $props();
 
 	const navItems: NavItem[] = $derived([
 		{ href: '/', label: 'Tableau de bord', icon: 'home' },
+		...(user.canViewQuestions ? [{ href: '/questions', label: 'Questions', icon: 'questions' }] : []),
 		...(user.canManageRecordings ? [{ href: '/recordings', label: 'Enregistrements', icon: 'recordings' }] : []),
 		{ href: '/audio', label: 'Bibliothèque audio', icon: 'music' },
 		...(user.role === 'superadmin' ? [{ href: '/users', label: 'Utilisateurs', icon: 'users' }] : []),
@@ -115,6 +122,10 @@
 						{:else if item.icon === 'users'}
 							<svg class="h-[15px] w-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 								<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+							</svg>
+						{:else if item.icon === 'questions'}
+							<svg class="h-[15px] w-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M8 10h8M8 14h5m8-2a9 9 0 11-4.219-7.62L21 3v5h-5" />
 							</svg>
 						{:else if item.icon === 'recordings'}
 							<svg class="h-[15px] w-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">

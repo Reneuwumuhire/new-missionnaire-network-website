@@ -72,3 +72,21 @@ export async function getDb() {
 	const connectedClient = await connect();
 	return connectedClient.db('youtube_data');
 }
+
+// Vite HMR: when this module is replaced during dev (or when an importer is
+// invalidated and re-evaluates this module), close the old MongoClient so its
+// pool sockets don't accumulate against Atlas's connection cap. Without this,
+// hours of dev with HMR can leak hundreds of half-open sockets and cause
+// ReplicaSetNoPrimary timeouts on new connection attempts.
+if (import.meta.hot) {
+	import.meta.hot.dispose(async () => {
+		if (client) {
+			try {
+				await client.close(true);
+			} catch (err) {
+				console.error('[MongoDB Admin] HMR dispose close error:', err);
+			}
+			client = null;
+		}
+	});
+}

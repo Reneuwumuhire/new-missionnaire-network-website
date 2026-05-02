@@ -112,6 +112,13 @@ export async function GET() {
 			{ projection: { _id: 1, started_at: 1, updated_at: 1, updatedAt: 1 } }
 		)
 		.toArray();
+	const questions = await db
+		.collection('questions')
+		.find(
+			{ status: { $in: ['approved', 'answered'] }, deletedAt: null },
+			{ projection: { slug: 1, updatedAt: 1, answeredAt: 1, createdAt: 1 } }
+		)
+		.toArray();
 
 	const generatedAt = new Date().toISOString().split('T')[0];
 	const baseUrl = 'https://missionnaire.net';
@@ -127,6 +134,7 @@ export async function GET() {
 		'/william-branham/biographie',
 		'/videos',
 		'/live',
+		'/questions',
 		'/literature'
 	];
 
@@ -179,6 +187,17 @@ ${buildUrlEntry({
 		['updated_at', 'updatedAt', 'started_at'],
 		generatedAt
 	),
+	changefreq: 'weekly',
+	priority: '0.6'
+})}`
+		)
+		.join('')}
+  ${questions
+		.map(
+			(q) => `
+${buildUrlEntry({
+	loc: `${baseUrl}/questions/${String(q.slug)}`,
+	lastmod: pickLastmod(q as SitemapDoc, ['updatedAt', 'answeredAt', 'createdAt'], generatedAt),
 	changefreq: 'weekly',
 	priority: '0.6'
 })}`

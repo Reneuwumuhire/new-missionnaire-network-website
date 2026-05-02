@@ -86,18 +86,42 @@
 	// ── END: audio cache controls ─────────────────────────────────
 
 	const bibleVerses = [
-		{ text: 'Car la parole de Dieu est vivante et efficace, plus tranchante qu\u2019une épée quelconque à deux tranchants.', ref: 'Hébreux 4:12' },
-		{ text: 'Ainsi la foi vient de ce qu\u2019on entend, et ce qu\u2019on entend vient de la parole de Christ.', ref: 'Romains 10:17' },
-		{ text: 'Ta parole est une lampe à mes pieds, et une lumière sur mon sentier.', ref: 'Psaume 119:105' },
+		{
+			text: 'Car la parole de Dieu est vivante et efficace, plus tranchante qu\u2019une épée quelconque à deux tranchants.',
+			ref: 'Hébreux 4:12'
+		},
+		{
+			text: 'Ainsi la foi vient de ce qu\u2019on entend, et ce qu\u2019on entend vient de la parole de Christ.',
+			ref: 'Romains 10:17'
+		},
+		{
+			text: 'Ta parole est une lampe à mes pieds, et une lumière sur mon sentier.',
+			ref: 'Psaume 119:105'
+		},
 		{ text: 'Veillez donc, car vous ne savez ni le jour, ni l\u2019heure.', ref: 'Matthieu 25:13' },
-		{ text: 'Voici, je viens bientôt. Heureux celui qui garde les paroles de la prophétie de ce livre.', ref: 'Apocalypse 22:7' },
-		{ text: 'Ne crains point, car je suis avec toi ; ne t\u2019effraie point, car je suis ton Dieu.', ref: 'Ésaïe 41:10' },
+		{
+			text: 'Voici, je viens bientôt. Heureux celui qui garde les paroles de la prophétie de ce livre.',
+			ref: 'Apocalypse 22:7'
+		},
+		{
+			text: 'Ne crains point, car je suis avec toi ; ne t\u2019effraie point, car je suis ton Dieu.',
+			ref: 'Ésaïe 41:10'
+		},
 		{ text: 'Je puis tout par celui qui me fortifie.', ref: 'Philippiens 4:13' },
 		{ text: 'L\u2019Éternel est mon berger : je ne manquerai de rien.', ref: 'Psaume 23:1' },
-		{ text: 'Celui qui a commencé en vous cette bonne œuvre la rendra parfaite pour le jour de Jésus-Christ.', ref: 'Philippiens 1:6' },
-		{ text: 'Je suis le chemin, la vérité, et la vie. Nul ne vient au Père que par moi.', ref: 'Jean 14:6' },
-		{ text: 'Voici, je me tiens à la porte, et je frappe. Si quelqu\u2019un entend ma voix et ouvre la porte, j\u2019entrerai.', ref: 'Apocalypse 3:20' },
-		{ text: 'Car Dieu a tant aimé le monde qu\u2019il a donné son Fils unique.', ref: 'Jean 3:16' },
+		{
+			text: 'Celui qui a commencé en vous cette bonne œuvre la rendra parfaite pour le jour de Jésus-Christ.',
+			ref: 'Philippiens 1:6'
+		},
+		{
+			text: 'Je suis le chemin, la vérité, et la vie. Nul ne vient au Père que par moi.',
+			ref: 'Jean 14:6'
+		},
+		{
+			text: 'Voici, je me tiens à la porte, et je frappe. Si quelqu\u2019un entend ma voix et ouvre la porte, j\u2019entrerai.',
+			ref: 'Apocalypse 3:20'
+		},
+		{ text: 'Car Dieu a tant aimé le monde qu\u2019il a donné son Fils unique.', ref: 'Jean 3:16' }
 	];
 
 	let verseIndex = 0;
@@ -139,18 +163,24 @@
 
 <footer class="footer relative bg-stone-900 text-stone-400 overflow-hidden">
 	<!-- Decorative top accent line -->
-	<div class="h-px w-full bg-gradient-to-r from-transparent via-missionnaire/40 to-transparent"></div>
+	<div
+		class="h-px w-full bg-gradient-to-r from-transparent via-missionnaire/40 to-transparent"
+	></div>
 
 	<!-- Bible verse rotator -->
 	<div class="border-b border-stone-800 py-6">
 		<div class="max-w-5xl mx-auto px-6 text-center" style="min-height: 5rem;">
 			<div
-				style="opacity: {verseVisible ? 1 : 0}; transform: translateY({verseVisible ? '0' : '6px'}); transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);"
+				style="opacity: {verseVisible ? 1 : 0}; transform: translateY({verseVisible
+					? '0'
+					: '6px'}); transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);"
 			>
 				<p class="font-display text-xl md:text-2xl italic text-stone-300 leading-relaxed">
 					« {bibleVerses[verseIndex].text} »
 				</p>
-				<p class="text-[12px] font-semibold uppercase tracking-[0.25em] text-missionnaire mt-3 font-body">
+				<p
+					class="text-[12px] font-semibold uppercase tracking-[0.25em] text-missionnaire mt-3 font-body"
+				>
 					{bibleVerses[verseIndex].ref}
 				</p>
 			</div>
@@ -159,9 +189,11 @@
 
 	<div class="max-w-5xl mx-auto px-6 pt-16 pb-8">
 		<!-- Top section: Logo + Nav columns -->
-		<div class="grid grid-cols-2 md:grid-cols-12 gap-10 md:gap-8 pb-12 border-b border-stone-800">
+		<div
+			class="grid gap-10 border-b border-stone-800 pb-12 sm:grid-cols-2 md:grid-cols-[minmax(0,1.35fr)_repeat(3,minmax(0,1fr))] md:gap-10 lg:gap-12"
+		>
 			<!-- Brand column -->
-			<div class="col-span-2 md:col-span-4">
+			<div class="sm:col-span-2 md:col-span-1">
 				<div class="flex items-center gap-3 mb-5">
 					<picture>
 						<source srcset="/icons/logo.webp" type="image/webp" />
@@ -176,7 +208,8 @@
 					</picture>
 				</div>
 				<p class="text-sm leading-relaxed text-stone-400 max-w-xs">
-					Prédications, cantiques et ressources du Message de l'Heure pour l'édification des croyants.
+					Prédications, cantiques et ressources du Message de l'Heure pour l'édification des
+					croyants.
 				</p>
 
 				<!-- Social icons -->
@@ -197,7 +230,7 @@
 
 			<!-- Nav columns -->
 			{#each navColumns as column}
-				<div class="col-span-1 md:col-span-2 {column.title === 'Informations' ? 'md:col-start-11 md:col-span-2' : ''}">
+				<div>
 					<p class="text-[10px] font-semibold uppercase tracking-[0.25em] text-stone-400 mb-4">
 						{column.title}
 					</p>
@@ -225,7 +258,9 @@
 				{#if clearedToast}
 					<span class="text-emerald-400" role="status" aria-live="polite">Cache vidé</span>
 				{:else if audioCacheBytes > 0}
-					<span class="text-stone-400">Cache audio : <span class="text-stone-300 font-medium">{audioCacheSize}</span></span>
+					<span class="text-stone-400"
+						>Cache audio : <span class="text-stone-300 font-medium">{audioCacheSize}</span></span
+					>
 					<span class="text-stone-700">·</span>
 					<button
 						type="button"
@@ -247,7 +282,14 @@
 			</p>
 
 			<!-- Decorative cross -->
-			<svg width="16" height="22" viewBox="0 0 16 22" fill="none" class="opacity-20 hidden sm:block" aria-hidden="true">
+			<svg
+				width="16"
+				height="22"
+				viewBox="0 0 16 22"
+				fill="none"
+				class="opacity-20 hidden sm:block"
+				aria-hidden="true"
+			>
 				<rect x="5.5" y="0" width="5" height="22" rx="1" fill="#FF880C" />
 				<rect x="0" y="5" width="16" height="5" rx="1" fill="#FF880C" />
 			</svg>
@@ -258,4 +300,3 @@
 		</div>
 	</div>
 </footer>
-

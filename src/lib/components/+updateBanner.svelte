@@ -1,12 +1,11 @@
 <script lang="ts">
-	// ── BEGIN: PWA update banner (new file) ──────────────────────────
 	// Non-intrusive bottom-right banner shown when a new service worker
 	// is waiting to take over. Clicking "Recharger" sends SKIP_WAITING
 	// to the waiting SW; the controllerchange listener then reloads the
 	// page to pick up the new bundle. No forced or surprise reloads —
 	// the listener is always the one who triggers it.
 
-	import { browser } from '$app/environment';
+	import { browser, dev } from '$app/environment';
 	import { onMount } from 'svelte';
 
 	const DISMISSED_VERSION_KEY = 'missionnaire:sw-dismissed-version';
@@ -147,13 +146,14 @@
 	}
 
 	onMount(() => {
-		if (!browser || !('serviceWorker' in navigator)) return;
+		if (!browser || dev || !('serviceWorker' in navigator)) return;
 
 		let reloaded = false;
 		let disposed = false;
 		let registration: ServiceWorkerRegistration | null = null;
 		let onUpdateFound: (() => void) | null = null;
 		const onControllerChange = () => {
+			if (!reloading) return;
 			if (reloaded) return;
 			reloaded = true;
 			clearApplyingVersion();
@@ -186,7 +186,6 @@
 			}
 		};
 	});
-	// ── END: PWA update banner ───────────────────────────────────────
 </script>
 
 {#if updateAvailable}

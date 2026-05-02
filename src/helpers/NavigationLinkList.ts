@@ -120,16 +120,21 @@ export const NavigationLinkList: NavigationLink[] = [
 	},
 	{
 		id: 6,
+		menuName: 'Questions',
+		link: '/questions'
+	},
+	{
+		id: 7,
 		menuName: 'Direct',
 		link: '/live'
 	},
 	{
-		id: 7,
+		id: 8,
 		menuName: "L'église",
 		link: '/eglise'
 	},
 	{
-		id: 8,
+		id: 9,
 		menuName: 'À propos',
 		link: '/a-propos'
 	}
