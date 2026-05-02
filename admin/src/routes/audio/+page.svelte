@@ -10,6 +10,7 @@
 	let { data }: { data: PageData } = $props();
 
 	const perms = $derived($page.data.user?.permissions ?? { can_add: false, can_edit: false, can_delete: false });
+	const canSelectAudio = $derived(perms.can_edit || perms.can_delete);
 
 	function formatBytes(bytes: number): string {
 		if (bytes === 0) return '0 B';
@@ -38,6 +39,7 @@
 	const allSelected = $derived($selection.size > 0 && allIds.every((id) => $selection.has(id)));
 
 	function toggleAll() {
+		if (!canSelectAudio) return;
 		if (allSelected) {
 			selection.clear();
 		} else {
@@ -85,14 +87,16 @@
 		<table class="w-full text-left text-sm">
 			<thead>
 				<tr class="border-b border-stone-100 bg-cream/50">
-					<th class="w-10 px-4 py-3">
-						<input
-							type="checkbox"
-							checked={allSelected}
-							onchange={toggleAll}
-							class="h-4 w-4 rounded border-stone-300 text-primary focus:ring-primary/30"
-						/>
-					</th>
+					{#if canSelectAudio}
+						<th class="w-10 px-4 py-3">
+							<input
+								type="checkbox"
+								checked={allSelected}
+								onchange={toggleAll}
+								class="h-4 w-4 rounded border-stone-300 text-primary focus:ring-primary/30"
+							/>
+						</th>
+					{/if}
 					<th class="w-10 px-2 py-3"></th>
 					<th class="px-4 py-3 font-medium text-stone-500">Titre</th>
 					<th class="px-4 py-3 font-medium text-stone-500">Artiste</th>
@@ -106,24 +110,30 @@
 				{#each data.audioList as audio}
 					{@const id = audio._id ?? ''}
 					<tr class="border-b border-stone-50 transition-colors hover:bg-cream/40">
-						<td class="px-4 py-3">
-							<input
-								type="checkbox"
-								checked={$selection.has(id)}
-								onchange={() => selection.toggle(id)}
-								class="h-4 w-4 rounded border-stone-300 text-primary focus:ring-primary/30"
-							/>
-						</td>
+						{#if canSelectAudio}
+							<td class="px-4 py-3">
+								<input
+									type="checkbox"
+									checked={$selection.has(id)}
+									onchange={() => selection.toggle(id)}
+									class="h-4 w-4 rounded border-stone-300 text-primary focus:ring-primary/30"
+								/>
+							</td>
+						{/if}
 						<td class="px-2 py-3">
 							<AudioPreviewPlayer src={audio.s3_url} />
 						</td>
 						<td class="max-w-[240px] px-4 py-3">
-							<a
-								href="/audio/{id}"
-								class="block truncate font-medium text-stone-700 hover:text-primary"
-							>
-								{audio.title || 'Sans titre'}
-							</a>
+							{#if canSelectAudio}
+								<a
+									href="/audio/{id}"
+									class="block truncate font-medium text-stone-700 hover:text-primary"
+								>
+									{audio.title || 'Sans titre'}
+								</a>
+							{:else}
+								<span class="block truncate font-medium text-stone-700">{audio.title || 'Sans titre'}</span>
+							{/if}
 							{#if audio.book}
 								<span class="text-xs text-stone-400">{audio.book_full_name || audio.book}</span>
 							{/if}
@@ -141,7 +151,7 @@
 				{/each}
 				{#if data.audioList.length === 0}
 					<tr>
-						<td colspan="8" class="px-4 py-12 text-center text-stone-400">
+						<td colspan={canSelectAudio ? 8 : 7} class="px-4 py-12 text-center text-stone-400">
 							Aucun audio trouvé
 						</td>
 					</tr>
@@ -158,5 +168,5 @@
 
 <!-- Bulk actions -->
 {#if perms.can_delete || perms.can_edit}
-<BulkActionBar categories={data.categories} />
+<BulkActionBar categories={data.categories} canDelete={perms.can_delete} canEdit={perms.can_edit} />
 {/if}

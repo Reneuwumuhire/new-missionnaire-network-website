@@ -1,8 +1,13 @@
 import { json } from '@sveltejs/kit';
 import { queryMusicAudio } from '../../../db/collections';
+import { canManageMusicAudio } from '$lib/models/admin-user';
 import type { RequestEvent } from './$types';
 
-export async function GET({ url }: RequestEvent) {
+export async function GET({ locals, url }: RequestEvent) {
+	if (!canManageMusicAudio(locals.user)) {
+		return json({ data: [], total: 0, error: 'Accès refusé' }, { status: 403 });
+	}
+
 	try {
 		const category = url.searchParams.get('category') ?? undefined;
 		const search = url.searchParams.get('search') ?? undefined;

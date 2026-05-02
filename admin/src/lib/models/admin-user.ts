@@ -77,3 +77,18 @@ export function canDeleteRecordings(user: AdminUser): boolean {
 	const permissions = getPermissions(user);
 	return permissions.can_manage_recordings && permissions.can_delete;
 }
+
+export function canManageMusicAudio(user: AdminUser): boolean {
+	const permissions = getPermissions(user);
+	return permissions.can_add || permissions.can_edit || permissions.can_delete;
+}
+
+export function canEditOrDeleteMusicAudio(user: AdminUser): boolean {
+	const permissions = getPermissions(user);
+	return permissions.can_edit || permissions.can_delete;
+}
+
+export function canViewDashboard(user: AdminUser): boolean {
+	const permissions = getPermissions(user);
+	return user.role === 'superadmin' || permissions.can_manage_recordings || canManageMusicAudio(user);
+}

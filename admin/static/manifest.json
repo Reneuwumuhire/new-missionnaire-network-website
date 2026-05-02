@@ -1,7 +1,7 @@
 {
 	"name": "Missionnaire Admin",
 	"short_name": "MN Admin",
-	"description": "Panneau d'administration Missionnaire Network",
+	"description": "Panneau d'administration Missionnaire Network pour les contenus, les directs et les questions-réponses",
 	"start_url": "/",
 	"display": "standalone",
 	"background_color": "#FAF8F3",

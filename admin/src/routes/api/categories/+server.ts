@@ -1,8 +1,13 @@
 import { json } from '@sveltejs/kit';
 import { getMusicCategories } from '../../../db/collections';
+import { canManageMusicAudio } from '$lib/models/admin-user';
 import type { RequestEvent } from './$types';
 
-export async function GET(_event: RequestEvent) {
+export async function GET({ locals }: RequestEvent) {
+	if (!canManageMusicAudio(locals.user)) {
+		return json({ data: [], error: 'Accès refusé' }, { status: 403 });
+	}
+
 	try {
 		const categories = await getMusicCategories();
 		return json({ data: categories, error: null });

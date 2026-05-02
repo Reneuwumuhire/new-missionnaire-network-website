@@ -1,7 +1,7 @@
 {
 	"name": "Missionnaire Network",
 	"short_name": "Missionnaire",
-	"description": "Prédications, cantiques, littérature et transcriptions du Message de l'Heure",
+	"description": "Prédications, cantiques, questions-réponses, littérature et transcriptions du Message de l'Heure",
 	"start_url": "/",
 	"scope": "/",
 	"display": "standalone",

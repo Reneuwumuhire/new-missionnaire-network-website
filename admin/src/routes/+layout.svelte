@@ -32,6 +32,16 @@
 				name: data.user.name,
 				email: data.user.email,
 				role: data.user.role,
+				canViewDashboard:
+					data.user.role === 'superadmin' ||
+					data.user.permissions.can_manage_recordings ||
+					data.user.permissions.can_add ||
+					data.user.permissions.can_edit ||
+					data.user.permissions.can_delete,
+				canManageAudio:
+					data.user.permissions.can_add ||
+					data.user.permissions.can_edit ||
+					data.user.permissions.can_delete,
 				canManageRecordings: data.user.permissions.can_manage_recordings,
 				canViewQuestions: data.user.permissions.can_view_questions
 			}}

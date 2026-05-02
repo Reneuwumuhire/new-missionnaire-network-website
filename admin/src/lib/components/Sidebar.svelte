@@ -15,6 +15,8 @@
 			name: string;
 			email: string;
 			role?: string;
+			canViewDashboard?: boolean;
+			canManageAudio?: boolean;
 			canManageRecordings?: boolean;
 			canViewQuestions?: boolean;
 		};
@@ -22,10 +24,10 @@
 	} = $props();
 
 	const navItems: NavItem[] = $derived([
-		{ href: '/', label: 'Tableau de bord', icon: 'home' },
+		...(user.canViewDashboard ? [{ href: '/', label: 'Tableau de bord', icon: 'home' }] : []),
 		...(user.canViewQuestions ? [{ href: '/questions', label: 'Questions', icon: 'questions' }] : []),
 		...(user.canManageRecordings ? [{ href: '/recordings', label: 'Enregistrements', icon: 'recordings' }] : []),
-		{ href: '/audio', label: 'Bibliothèque audio', icon: 'music' },
+		...(user.canManageAudio ? [{ href: '/audio', label: 'Bibliothèque audio', icon: 'music' }] : []),
 		...(user.role === 'superadmin' ? [{ href: '/users', label: 'Utilisateurs', icon: 'users' }] : []),
 		{ href: '/settings', label: 'Paramètres', icon: 'settings' }
 	]);

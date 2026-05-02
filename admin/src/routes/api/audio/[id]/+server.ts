@@ -1,11 +1,15 @@
 import { json } from '@sveltejs/kit';
 import { getMusicAudioById, updateMusicAudio, deleteMusicAudio, logAudit } from '../../../../db/collections';
 import { UpdateMusicAudioSchema } from '$lib/models/music-audio';
-import { getPermissions } from '$lib/models/admin-user';
+import { canManageMusicAudio, getPermissions } from '$lib/models/admin-user';
 import { deleteObject } from '$lib/server/s3';
 import type { RequestEvent } from './$types';
 
-export async function GET({ params }: RequestEvent) {
+export async function GET({ locals, params }: RequestEvent) {
+	if (!canManageMusicAudio(locals.user)) {
+		return json({ data: null, error: 'Accès refusé' }, { status: 403 });
+	}
+
 	try {
 		const audio = await getMusicAudioById(params.id);
 		if (!audio) {

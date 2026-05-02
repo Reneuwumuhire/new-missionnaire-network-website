@@ -1,7 +1,11 @@
+import { error } from '@sveltejs/kit';
 import { queryMusicAudio, getMusicArtists, getMusicCategories } from '../../db/collections';
+import { canManageMusicAudio } from '$lib/models/admin-user';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ url }) => {
+export const load: PageServerLoad = async ({ locals, url }) => {
+	if (!canManageMusicAudio(locals.user)) throw error(403, 'Accès refusé');
+
 	const category = url.searchParams.get('category') ?? undefined;
 	const search = url.searchParams.get('search') ?? undefined;
 	const artist = url.searchParams.get('artist') ?? undefined;

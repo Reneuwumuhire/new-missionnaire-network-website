@@ -1,11 +1,18 @@
+import { redirect } from '@sveltejs/kit';
 import { getDashboardStats, getRecentAuditLogs, getBroadcastAdminState } from '../db/collections';
-import { getPermissions } from '$lib/models/admin-user';
+import { canViewDashboard, getPermissions } from '$lib/models/admin-user';
 import { recorderStatus, RecorderError } from '$lib/server/recorder-client';
 import { getIcecastSnapshot } from '$lib/server/icecast';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
-	const canManageRecordings = getPermissions(locals.user).can_manage_recordings;
+	const permissions = getPermissions(locals.user);
+	if (!canViewDashboard(locals.user)) {
+		if (permissions.can_view_questions) throw redirect(303, '/questions');
+		throw redirect(303, '/settings');
+	}
+
+	const canManageRecordings = permissions.can_manage_recordings;
 
 	const [stats, recentActivity, recorder, icecast, broadcast] = await Promise.all([
 		getDashboardStats(),
@@ -31,5 +38,12 @@ export const load: PageServerLoad = async ({ locals }) => {
 		canManageRecordings && icecast?.sourceActive && !isRecording
 	);
 
-	return { stats, recentActivity, liveButNotBroadcasting, liveButNotRecording };
+	return {
+		stats,
+		recentActivity,
+		liveButNotBroadcasting,
+		liveButNotRecording,
+		canAddAudio: permissions.can_add,
+		canManageAudio: permissions.can_add || permissions.can_edit || permissions.can_delete
+	};
 };

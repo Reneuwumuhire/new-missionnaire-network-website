@@ -133,9 +133,13 @@
 		Boolean(searchQuery.trim()) || statusFilter !== 'all' || publishedFilter !== 'all'
 	);
 
-	function buildListUrl(page: number): string {
+	const RECORDING_LIST_UPLOAD_REFRESH_MS = 5 * 60 * 1000;
+	let watchedRecordingId = $state<string | null>(null);
+	let watchedRecordingRefreshUntil = $state(0);
+
+	function buildListUrl(page: number, limit = PAGE_SIZE): string {
 		const params = new URLSearchParams();
-		params.set('limit', String(PAGE_SIZE));
+		params.set('limit', String(limit));
 		params.set('page', String(page));
 		if (searchQuery.trim()) params.set('q', searchQuery.trim());
 		if (statusFilter !== 'all') params.set('status', statusFilter);
@@ -143,12 +147,17 @@
 		return `/api/recordings/list?${params}`;
 	}
 
-	async function fetchRecordings(append: boolean) {
-		isFetching = true;
-		fetchError = null;
+	async function fetchRecordings(
+		append: boolean,
+		options: { limit?: number; showLoading?: boolean; silentErrors?: boolean } = {}
+	) {
+		const limit = options.limit ?? PAGE_SIZE;
+		const showLoading = options.showLoading ?? true;
+		if (showLoading) isFetching = true;
+		if (!options.silentErrors) fetchError = null;
 		const targetPage = append ? currentPage + 1 : 1;
 		try {
-			const res = await fetch(buildListUrl(targetPage));
+			const res = await fetch(buildListUrl(targetPage, limit));
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
 			const body = (await res.json()) as { data: typeof data.recordings; total: number };
 			if (append) {
@@ -157,7 +166,7 @@
 			} else {
 				recordings = body.data;
 				total = body.total;
-				currentPage = 1;
+				currentPage = Math.max(1, Math.ceil(body.data.length / PAGE_SIZE));
 				// Drop selections that no longer exist in the new result set.
 				const surviving = new Set(body.data.map((r) => r._id!).filter(Boolean));
 				if (selectedIds.size > 0) {
@@ -165,9 +174,45 @@
 				}
 			}
 		} catch (err) {
-			fetchError = (err as Error).message || 'Erreur réseau';
+			if (!options.silentErrors) fetchError = (err as Error).message || 'Erreur réseau';
 		} finally {
-			isFetching = false;
+			if (showLoading) isFetching = false;
+		}
+	}
+
+	async function refreshVisibleRecordings() {
+		const visiblePages = Math.max(1, Math.ceil(recordings.length / PAGE_SIZE));
+		const visibleLimit = Math.min(100, visiblePages * PAGE_SIZE);
+		await fetchRecordings(false, {
+			limit: visibleLimit,
+			showLoading: false,
+			silentErrors: true
+		});
+	}
+
+	function watchRecordingList(id: string | null | undefined) {
+		if (!id) return;
+		watchedRecordingId = id;
+		watchedRecordingRefreshUntil = Date.now() + RECORDING_LIST_UPLOAD_REFRESH_MS;
+	}
+
+	async function readRecordingId(res: Response): Promise<string | null> {
+		const body = (await res.json().catch(() => null)) as { id?: unknown } | null;
+		return typeof body?.id === 'string' ? body.id : null;
+	}
+
+	async function refreshWatchedRecordingList() {
+		if (!watchedRecordingId) return;
+		if (Date.now() > watchedRecordingRefreshUntil) {
+			watchedRecordingId = null;
+			watchedRecordingRefreshUntil = 0;
+			return;
+		}
+		await refreshVisibleRecordings();
+		const watched = recordings.find((r) => r._id === watchedRecordingId);
+		if (watched && (watched.status === 'ready' || watched.status === 'failed')) {
+			watchedRecordingId = null;
+			watchedRecordingRefreshUntil = 0;
 		}
 	}
 
@@ -285,7 +330,7 @@
 			}
 			toast.success(`${payload.data?.deleted ?? count} enregistrement${(payload.data?.deleted ?? count) > 1 ? 's supprimés' : ' supprimé'}`);
 			clearSelection();
-			await invalidateAll();
+			await refreshVisibleRecordings();
 		} catch (err) {
 			toast.error(err instanceof Error ? err.message : 'Suppression en masse échouée');
 		} finally {
@@ -321,14 +366,14 @@
 	let trimEditorRecordingId = $state<string | null>(null);
 	const trimEditorRecording = $derived.by(() =>
 		trimEditorRecordingId
-			? (data.recordings.find((r) => r._id === trimEditorRecordingId) ?? null)
+			? (recordings.find((r) => r._id === trimEditorRecordingId) ?? null)
 			: null
 	);
 	async function closeTrimEditor(saved: boolean) {
 		trimEditorRecordingId = null;
 		if (saved) {
 			toast.success('Audio enregistré');
-			await invalidateAll();
+			await refreshVisibleRecordings();
 		}
 	}
 
@@ -717,7 +762,7 @@
 				toast.success(recPdfMode === 'replace' ? 'Transcription PDF remplacée' : 'Transcription PDF ajoutée');
 			}
 			cancelRecordingEdit();
-			await invalidateAll();
+			await refreshVisibleRecordings();
 		} finally {
 			recSaving = false;
 		}
@@ -752,6 +797,7 @@
 			// Transient network error — next tick will retry.
 		}
 		recomputeElapsed();
+		await refreshWatchedRecordingList();
 	}
 
 	function recomputeElapsed() {
@@ -825,9 +871,11 @@
 			if (!res.ok) {
 				const text = await res.text();
 				actionError = text || `Erreur ${res.status}`;
+			} else {
+				await readRecordingId(res);
 			}
 			await refreshStatus();
-			await invalidateAll();
+			await refreshVisibleRecordings();
 		} finally {
 			busy = false;
 		}
@@ -838,14 +886,18 @@
 		if (!(await confirmOverride(recordingStartedBy, recordingStartedByName, "L'enregistrement"))) return;
 		busy = true;
 		actionError = null;
+		let stoppedRecording = false;
 		try {
 			const res = await fetch('/api/recordings/stop', { method: 'POST' });
 			if (!res.ok) {
 				const text = await res.text();
 				actionError = text || `Erreur ${res.status}`;
+			} else {
+				stoppedRecording = true;
+				watchRecordingList(await readRecordingId(res));
 			}
 			await refreshStatus();
-			await invalidateAll();
+			if (stoppedRecording && !watchedRecordingId) await refreshVisibleRecordings();
 		} finally {
 			busy = false;
 		}
@@ -1162,7 +1214,7 @@
 	}
 	function getEditingRecording(): Recording | null {
 		if (!editingRecordingId) return null;
-		return data.recordings.find((r) => r._id === editingRecordingId) ?? null;
+		return recordings.find((r) => r._id === editingRecordingId) ?? null;
 	}
 
 	/** End the live broadcast AND stop the recording in one click. Order matters:
@@ -1183,6 +1235,7 @@
 		broadcastBusy = true;
 		busy = true;
 		actionError = null;
+		let stoppedRecording = false;
 		try {
 			const liveRes = await fetch('/api/broadcast/end-live', { method: 'POST' });
 			if (!liveRes.ok) {
@@ -1192,7 +1245,12 @@
 			if (!recRes.ok) {
 				const recErr = (await recRes.text()) || `${recRes.status}`;
 				actionError = actionError ? `${actionError} · arrêt enregistrement: ${recErr}` : `Arrêt enregistrement: ${recErr}`;
+			} else {
+				stoppedRecording = true;
+				watchRecordingList(await readRecordingId(recRes));
 			}
+			await refreshStatus();
+			if (stoppedRecording && !watchedRecordingId) await refreshVisibleRecordings();
 			await invalidateAll();
 		} finally {
 			broadcastBusy = false;
@@ -1227,7 +1285,11 @@
 			const recRes = await fetch('/api/recordings/start', { method: 'POST' });
 			if (!recRes.ok) {
 				actionError = `Direct démarré, mais échec de l'enregistrement: ${(await recRes.text()) || recRes.status}`;
+			} else {
+				await readRecordingId(recRes);
 			}
+			await refreshStatus();
+			await refreshVisibleRecordings();
 			await invalidateAll();
 		} finally {
 			broadcastBusy = false;
@@ -1246,13 +1308,13 @@
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ published: !rec.published })
 		});
-		await invalidateAll();
+		await refreshVisibleRecordings();
 	}
 
 	async function retryUpload(id: string) {
 		const res = await fetch(`/api/recordings/retry/${id}`, { method: 'POST' });
 		if (!res.ok) actionError = await res.text();
-		await invalidateAll();
+		await refreshVisibleRecordings();
 	}
 
 	async function remove(id: string) {
@@ -1275,7 +1337,7 @@
 			return;
 		}
 		toast.success('Enregistrement supprimé');
-		await invalidateAll();
+		await refreshVisibleRecordings();
 	}
 
 	const statusLabel: Record<RecordingStatus, string> = {
@@ -2119,7 +2181,7 @@
 			{#if filteredRecordings.length === 0}
 				<tr>
 					<td colspan={canDeleteRecordings ? 8 : 7} class="px-5 py-12 text-center text-stone-400">
-						{#if data.recordings.length === 0}
+						{#if total === 0}
 							Aucun enregistrement pour l'instant. Démarrez le premier ci-dessus.
 						{:else if hasActiveFilters}
 							Aucun enregistrement ne correspond aux filtres actifs.

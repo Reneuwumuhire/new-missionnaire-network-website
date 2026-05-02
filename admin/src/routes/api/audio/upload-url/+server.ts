@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { z } from 'zod';
 import { generatePresignedUploadUrl, generateS3Key, getS3Url } from '$lib/server/s3';
+import { getPermissions } from '$lib/models/admin-user';
 import type { RequestEvent } from './$types';
 
 const UploadUrlSchema = z.object({
@@ -9,7 +10,11 @@ const UploadUrlSchema = z.object({
 	category: z.string().min(1)
 });
 
-export async function POST({ request }: RequestEvent) {
+export async function POST({ locals, request }: RequestEvent) {
+	if (!getPermissions(locals.user).can_add) {
+		return json({ data: null, error: "Vous n'avez pas la permission d'ajouter des audios" }, { status: 403 });
+	}
+
 	try {
 		const body = await request.json();
 		const parsed = UploadUrlSchema.safeParse(body);

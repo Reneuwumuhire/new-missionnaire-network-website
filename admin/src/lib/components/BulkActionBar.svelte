@@ -3,7 +3,11 @@
 	import { toast } from '$lib/stores/toast';
 	import { invalidateAll } from '$app/navigation';
 
-	let { categories = [] }: { categories: string[] } = $props();
+	let {
+		categories = [],
+		canDelete = false,
+		canEdit = false
+	}: { categories: string[]; canDelete?: boolean; canEdit?: boolean } = $props();
 	let showCategoryPicker = $state(false);
 	let confirmDelete = $state(false);
 	let loading = $state(false);
@@ -66,47 +70,51 @@
 
 			<div class="h-5 w-px bg-stone-200"></div>
 
-			<!-- Change category -->
-			<div class="relative">
-				<button
-					onclick={() => { showCategoryPicker = !showCategoryPicker; confirmDelete = false; }}
-					class="admin-btn-secondary py-1.5 text-xs"
-				>
-					Changer catégorie
-				</button>
-				{#if showCategoryPicker}
-					<div class="absolute bottom-full left-0 mb-2 w-48 rounded-sm border border-stone-200 bg-white p-2 shadow-lg">
-						{#each categories as cat}
-							<button
-								onclick={() => bulkUpdateCategory(cat)}
-								disabled={loading}
-								class="w-full rounded-none px-3 py-1.5 text-left text-sm text-stone-600 transition-colors hover:bg-cream"
-							>
-								{cat}
-							</button>
-						{/each}
-					</div>
-				{/if}
-			</div>
+			{#if canEdit}
+				<!-- Change category -->
+				<div class="relative">
+					<button
+						onclick={() => { showCategoryPicker = !showCategoryPicker; confirmDelete = false; }}
+						class="admin-btn-secondary py-1.5 text-xs"
+					>
+						Changer catégorie
+					</button>
+					{#if showCategoryPicker}
+						<div class="absolute bottom-full left-0 mb-2 w-48 rounded-sm border border-stone-200 bg-white p-2 shadow-lg">
+							{#each categories as cat}
+								<button
+									onclick={() => bulkUpdateCategory(cat)}
+									disabled={loading}
+									class="w-full rounded-none px-3 py-1.5 text-left text-sm text-stone-600 transition-colors hover:bg-cream"
+								>
+									{cat}
+								</button>
+							{/each}
+						</div>
+					{/if}
+				</div>
+			{/if}
 
 			<!-- Delete -->
-			{#if confirmDelete}
-				<div class="flex items-center gap-2">
-					<span class="text-xs text-red-600">Confirmer ?</span>
-					<button onclick={bulkDelete} disabled={loading} class="admin-btn-danger py-1.5 text-xs">
-						{loading ? 'Suppression...' : 'Oui, supprimer'}
+			{#if canDelete}
+				{#if confirmDelete}
+					<div class="flex items-center gap-2">
+						<span class="text-xs text-red-600">Confirmer ?</span>
+						<button onclick={bulkDelete} disabled={loading} class="admin-btn-danger py-1.5 text-xs">
+							{loading ? 'Suppression...' : 'Oui, supprimer'}
+						</button>
+						<button onclick={() => (confirmDelete = false)} class="text-xs text-stone-500 hover:text-stone-700">
+							Annuler
+						</button>
+					</div>
+				{:else}
+					<button
+						onclick={() => { confirmDelete = true; showCategoryPicker = false; }}
+						class="admin-btn-danger py-1.5 text-xs"
+					>
+						Supprimer
 					</button>
-					<button onclick={() => (confirmDelete = false)} class="text-xs text-stone-500 hover:text-stone-700">
-						Annuler
-					</button>
-				</div>
-			{:else}
-				<button
-					onclick={() => { confirmDelete = true; showCategoryPicker = false; }}
-					class="admin-btn-danger py-1.5 text-xs"
-				>
-					Supprimer
-				</button>
+				{/if}
 			{/if}
 
 			<button onclick={() => selection.clear()} class="text-xs text-stone-400 hover:text-stone-600">
