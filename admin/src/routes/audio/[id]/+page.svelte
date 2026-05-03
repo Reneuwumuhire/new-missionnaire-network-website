@@ -4,6 +4,17 @@
 	import AudioPreviewPlayer from '$lib/components/AudioPreviewPlayer.svelte';
 	import type { PageData } from './$types';
 
+	type PublishedLyrics = {
+		lyrics_status?: string;
+		lines?: unknown[];
+		source_book?: string;
+		source_number?: string;
+		source_title?: string;
+		synced_at?: string;
+		synced_by?: string;
+		timeline_status?: string;
+	};
+
 	let { data }: { data: PageData } = $props();
 
 	// Editable fields — reset when data changes (e.g. after invalidateAll)
@@ -26,6 +37,10 @@
 	let saving = $state(false);
 	let confirmDelete = $state(false);
 	let deleting = $state(false);
+	let lyricsTextOverride = $state<string | null>(null);
+	let lyricsSaving = $state(false);
+	let lyrics = $derived((data.lyrics as PublishedLyrics | null) ?? null);
+	let lyricsText = $derived(lyricsTextOverride ?? buildLyricsText(lyrics?.lines));
 
 	function formatBytes(bytes: number): string {
 		if (bytes === 0) return '0 B';
@@ -50,6 +65,64 @@
 			hour: '2-digit',
 			minute: '2-digit'
 		});
+	}
+
+	function lineText(line: unknown) {
+		if (typeof line === 'string') return line.trim();
+		if (!line || typeof line !== 'object') return '';
+		const record = line as { kind?: string; text?: unknown };
+		if (record.kind === 'heading') return '';
+		return String(record.text ?? '').trim();
+	}
+
+	function lineRole(line: unknown) {
+		if (!line || typeof line !== 'object') return '';
+		return String((line as { role?: unknown }).role ?? '');
+	}
+
+	function formatLineForEditing(line: unknown) {
+		const text = lineText(line);
+		if (!text || typeof line !== 'object' || line === null) return text;
+		const verseNumber = Number((line as { verse_number?: unknown }).verse_number);
+		return Number.isFinite(verseNumber) && verseNumber > 0 ? `${verseNumber}. ${text}` : text;
+	}
+
+	function buildLyricsText(lines: unknown[] | undefined) {
+		const blocks: string[][] = [];
+		let inRefrain = false;
+
+		for (const line of lines ?? []) {
+			const text = formatLineForEditing(line);
+			if (!text) continue;
+
+			if (lineRole(line) === 'refrain') {
+				if (!inRefrain) {
+					blocks.push(['Refrain']);
+					inRefrain = true;
+				}
+				blocks[blocks.length - 1].push(text);
+				continue;
+			}
+
+			blocks.push([text]);
+			inRefrain = false;
+		}
+
+		return blocks.map((block) => block.join('\n')).join('\n\n');
+	}
+
+	function lyricLineCount(lines: unknown[] | undefined) {
+		return (lines ?? []).filter((line) => lineText(line)).length;
+	}
+
+	function lyricsSourceLabel(currentLyrics: PublishedLyrics | null) {
+		if (!currentLyrics) return '';
+		return [
+			currentLyrics.source_book,
+			currentLyrics.source_number ? `#${currentLyrics.source_number}` : ''
+		]
+			.filter(Boolean)
+			.join(' ');
 	}
 
 	async function saveChanges() {
@@ -96,6 +169,39 @@
 			deleting = false;
 		}
 	}
+
+	async function publishLyrics() {
+		if (!data.canPublishLyrics || !data.audio._id) return;
+		if (!lyricsText.trim()) {
+			toast.error('Ajoutez les paroles avant de publier');
+			return;
+		}
+
+		lyricsSaving = true;
+		try {
+			const res = await fetch(`/api/audio/${data.audio._id}/lyrics`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					lyricsText,
+					sourceBook: bookFullName || book || category,
+					sourceNumber: number ? String(number) : '',
+					sourceTitle: title || data.audio.title || '',
+					title: title || data.audio.title || ''
+				})
+			});
+			const result = await res.json();
+			if (result.error) throw new Error(result.error);
+
+			toast.success('Paroles publiées sur le site');
+			await invalidateAll();
+			lyricsTextOverride = null;
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : 'Erreur lors de la publication des paroles');
+		} finally {
+			lyricsSaving = false;
+		}
+	}
 </script>
 
 <svelte:head>
@@ -104,7 +210,10 @@
 
 <!-- Header -->
 <div class="mb-8">
-	<a href="/audio" class="mb-4 inline-flex items-center gap-1 text-sm text-stone-500 transition-colors hover:text-primary">
+	<a
+		href="/audio"
+		class="mb-4 inline-flex items-center gap-1 text-sm text-stone-500 transition-colors hover:text-primary"
+	>
 		<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 			<path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
 		</svg>
@@ -124,12 +233,25 @@
 			<div class="grid gap-5 sm:grid-cols-2">
 				<div class="sm:col-span-2">
 					<label for="title" class="admin-label">Titre</label>
-					<input id="title" type="text" class="admin-input" bind:value={title} disabled={!data.canEdit} />
+					<input
+						id="title"
+						type="text"
+						class="admin-input"
+						bind:value={title}
+						disabled={!data.canEdit}
+					/>
 				</div>
 
 				<div>
 					<label for="artist" class="admin-label">Artiste</label>
-					<input id="artist" type="text" class="admin-input" bind:value={artist} list="artist-list" disabled={!data.canEdit} />
+					<input
+						id="artist"
+						type="text"
+						class="admin-input"
+						bind:value={artist}
+						list="artist-list"
+						disabled={!data.canEdit}
+					/>
 					<datalist id="artist-list">
 						{#each data.artists as a}
 							<option value={a}></option>
@@ -148,12 +270,24 @@
 
 				<div>
 					<label for="book" class="admin-label">Livre (abrégé)</label>
-					<input id="book" type="text" class="admin-input" bind:value={book} disabled={!data.canEdit} />
+					<input
+						id="book"
+						type="text"
+						class="admin-input"
+						bind:value={book}
+						disabled={!data.canEdit}
+					/>
 				</div>
 
 				<div>
 					<label for="bookFullName" class="admin-label">Livre (nom complet)</label>
-					<input id="bookFullName" type="text" class="admin-input" bind:value={bookFullName} disabled={!data.canEdit} />
+					<input
+						id="bookFullName"
+						type="text"
+						class="admin-input"
+						bind:value={bookFullName}
+						disabled={!data.canEdit}
+					/>
 				</div>
 
 				<div>
@@ -174,17 +308,100 @@
 
 			<div class="mt-6 flex items-center gap-3">
 				{#if data.canEdit}
-					<button onclick={saveChanges} disabled={saving} class="admin-btn-primary disabled:opacity-50">
+					<button
+						onclick={saveChanges}
+						disabled={saving}
+						class="admin-btn-primary disabled:opacity-50"
+					>
 						{#if saving}
 							<svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-								<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-								<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+								<circle
+									class="opacity-25"
+									cx="12"
+									cy="12"
+									r="10"
+									stroke="currentColor"
+									stroke-width="4"
+								/>
+								<path
+									class="opacity-75"
+									fill="currentColor"
+									d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+								/>
 							</svg>
 						{/if}
 						Enregistrer
 					</button>
 				{/if}
 				<a href="/audio" class="admin-btn-secondary">Annuler</a>
+			</div>
+		</div>
+
+		<div class="mt-6 border border-stone-200/60 bg-white/40 p-6">
+			<div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+				<div>
+					<p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">Paroles</p>
+					<h2 class="mt-1 font-display text-lg font-semibold text-stone-700">
+						Publier les paroles de cet audio
+					</h2>
+					{#if lyrics}
+						<p class="mt-1 text-sm text-stone-500">
+							{lyricLineCount(lyrics.lines)} lignes publiées{lyrics.synced_at
+								? ` le ${formatDate(lyrics.synced_at)}`
+								: ''}{lyrics.synced_by ? ` par ${lyrics.synced_by}` : ''}
+						</p>
+					{:else}
+						<p class="mt-1 text-sm text-stone-500">
+							Collez les paroles ici pour les rendre visibles sur le site.
+						</p>
+					{/if}
+				</div>
+				{#if lyrics}
+					<span
+						class="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800"
+					>
+						Publié
+					</span>
+				{/if}
+			</div>
+
+			<label for="lyricsText" class="admin-label">Texte des paroles</label>
+			<textarea
+				id="lyricsText"
+				class="admin-input min-h-72 resize-y leading-7"
+				bind:value={lyricsText}
+				disabled={!data.canPublishLyrics}
+				placeholder={`Collez les paroles de ${title || 'cet audio'} ici...`}
+			></textarea>
+			<p class="mt-2 text-xs text-stone-500">
+				Un couplet par paragraphe fonctionne bien. Écrivez "Refrain" seul sur une ligne pour marquer
+				le refrain.
+			</p>
+
+			<div class="mt-5 flex flex-wrap items-center gap-3">
+				{#if data.canPublishLyrics}
+					<button
+						onclick={publishLyrics}
+						disabled={lyricsSaving || !lyricsText.trim()}
+						class="admin-btn-primary disabled:opacity-50"
+					>
+						{lyricsSaving
+							? 'Publication...'
+							: lyrics
+								? 'Republier les paroles'
+								: 'Publier les paroles'}
+					</button>
+				{/if}
+				{#if lyrics && data.canReviewLyrics && data.audio._id}
+					<a href={`/lyrics-review/timing/${data.audio._id}`} class="admin-btn-secondary">
+						Ajouter le timing
+					</a>
+				{/if}
+				{#if lyricsSourceLabel(lyrics)}
+					<span class="text-xs font-semibold text-stone-500">
+						Source: {lyricsSourceLabel(lyrics)}
+					</span>
+				{/if}
 			</div>
 		</div>
 	</div>
@@ -239,23 +456,42 @@
 		{#if data.canDelete}
 			<!-- Danger zone -->
 			<div class="border border-red-200/60 bg-white/40 p-6">
-				<h3 class="mb-3 text-sm font-medium text-red-600 uppercase tracking-wider">Zone dangereuse</h3>
+				<h3 class="mb-3 text-sm font-medium text-red-600 uppercase tracking-wider">
+					Zone dangereuse
+				</h3>
 				<p class="mb-4 text-sm text-stone-500">
-					Supprimer cet audio définitivement. Le fichier sera retiré du serveur et de la base de données.
+					Supprimer cet audio définitivement. Le fichier sera retiré du serveur et de la base de
+					données.
 				</p>
 				{#if confirmDelete}
 					<div class="flex items-center gap-2">
 						<button onclick={deleteAudio} disabled={deleting} class="admin-btn-danger text-xs">
 							{deleting ? 'Suppression...' : 'Confirmer la suppression'}
 						</button>
-						<button onclick={() => (confirmDelete = false)} class="text-xs text-stone-500 hover:text-stone-700">
+						<button
+							onclick={() => (confirmDelete = false)}
+							class="text-xs text-stone-500 hover:text-stone-700"
+						>
 							Annuler
 						</button>
 					</div>
 				{:else}
-					<button onclick={() => (confirmDelete = true)} class="admin-btn-danger w-full justify-center">
-						<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+					<button
+						onclick={() => (confirmDelete = true)}
+						class="admin-btn-danger w-full justify-center"
+					>
+						<svg
+							class="h-4 w-4"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+							/>
 						</svg>
 						Supprimer cet audio
 					</button>

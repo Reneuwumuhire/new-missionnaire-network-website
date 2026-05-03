@@ -1,6 +1,38 @@
 import { json } from '@sveltejs/kit';
+import { ObjectId } from 'mongodb';
 import { queryMusicAudio } from '../../../db/collections';
+import { getDb } from '../../../db/mongo';
 import type { RequestEvent } from './$types';
+
+type LyricsAudioIdRow = { audio_id?: string | ObjectId };
+
+/** Query music_lyrics once for the page's audio IDs and return the set of
+ *  IDs that have a published lyrics doc. Powers the small "has lyrics"
+ *  indicator next to titles in the music list. One DB round-trip per page. */
+async function lyricsAvailableIds(audioIds: string[]): Promise<Set<string>> {
+	if (audioIds.length === 0) return new Set();
+	const objectIds = audioIds
+		.filter((id) => ObjectId.isValid(id))
+		.map((id) => new ObjectId(id));
+	const db = await getDb();
+	const rows = await db
+		.collection<LyricsAudioIdRow>('music_lyrics')
+		.find(
+			{
+				audio_id: { $in: [...audioIds, ...objectIds] },
+				lyrics_status: 'published'
+			},
+			{ projection: { _id: 0, audio_id: 1 } }
+		)
+		.toArray();
+	const result = new Set<string>();
+	for (const row of rows) {
+		const id = row.audio_id;
+		if (id instanceof ObjectId) result.add(id.toString());
+		else if (typeof id === 'string') result.add(id);
+	}
+	return result;
+}
 
 export async function GET({ url }: RequestEvent) {
 	try {
@@ -27,8 +59,17 @@ export async function GET({ url }: RequestEvent) {
 			seed
 		});
 
+		const ids = result.data
+			.map((row) => (typeof row._id === 'string' ? row._id : ''))
+			.filter(Boolean);
+		const lyricsSet = await lyricsAvailableIds(ids);
+		const enriched = result.data.map((row) => ({
+			...row,
+			has_lyrics: typeof row._id === 'string' ? lyricsSet.has(row._id) : false
+		}));
+
 		return json({
-			data: result.data,
+			data: enriched,
 			total: result.total,
 			error: null
 		});

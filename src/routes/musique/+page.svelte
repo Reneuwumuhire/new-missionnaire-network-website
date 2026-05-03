@@ -1303,12 +1303,33 @@
 							{i + 1 + (currentPage - 1) * limit}
 						</div>
 						<div class="flex flex-col min-w-0">
-							<div
-								class="text-sm font-bold line-clamp-1 transition-colors {isActive
-									? 'text-missionnaire'
-									: 'text-stone-800 group-hover:text-missionnaire'}"
-							>
-								{song.title || 'Sans titre'}
+							<div class="flex items-center gap-1.5 min-w-0">
+								<div
+									class="text-sm font-bold truncate min-w-0 transition-colors {isActive
+										? 'text-missionnaire'
+										: 'text-stone-800 group-hover:text-missionnaire'}"
+								>
+									{song.title || 'Sans titre'}
+								</div>
+								{#if song.has_lyrics}
+									<!-- Slight clue: this song has published lyrics. Three text-line
+									     glyph (matches the lyrics-review icon vocabulary). Stone-300
+									     at rest, missionnaire when row is active or on hover. -->
+									<svg
+										class="lyrics-clue h-3 w-3 flex-shrink-0 transition-colors {isActive
+											? 'text-missionnaire'
+											: 'text-stone-300 group-hover:text-missionnaire/70'}"
+										viewBox="0 0 12 12"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="1.4"
+										stroke-linecap="round"
+										aria-label="Paroles disponibles"
+									>
+										<title>Paroles disponibles</title>
+										<path d="M2 3.25h7M2 6h7M2 8.75h5" />
+									</svg>
+								{/if}
 							</div>
 							<div
 								class="flex flex-row items-center gap-2 md:hidden overflow-hidden text-ellipsis whitespace-nowrap"

@@ -21,6 +21,7 @@
 	let book = $state('');
 	let bookFullName = $state('');
 	let number: number | null = $state(null);
+	let lyricsText = $state('');
 	let saving = $state(false);
 
 	function onFileSelected(f: File) {
@@ -33,10 +34,7 @@
 		// Auto-fill title from filename
 		const nameWithoutExt = f.name.replace(/\.[^/.]+$/, '');
 		if (!title) {
-			title = nameWithoutExt
-				.replace(/[-_]/g, ' ')
-				.replace(/\s+/g, ' ')
-				.trim();
+			title = nameWithoutExt.replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
 		}
 	}
 
@@ -147,8 +145,30 @@
 				toast.info(result.data.duplicateWarning);
 			}
 
-			toast.success('Audio enregistré avec succès');
-			goto(`/audio/${result.data._id}`);
+			const audioId = result.data._id;
+			if (lyricsText.trim()) {
+				const lyricsRes = await fetch(`/api/audio/${audioId}/lyrics`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						lyricsText,
+						sourceBook: bookFullName || book || category,
+						sourceNumber: number ? String(number) : '',
+						sourceTitle: title || file.name,
+						title: title || file.name
+					})
+				});
+				const lyricsResult = await lyricsRes.json();
+				if (lyricsResult.error) {
+					toast.error(lyricsResult.error);
+				} else {
+					toast.success('Audio et paroles enregistrés avec succès');
+				}
+			} else {
+				toast.success('Audio enregistré avec succès');
+			}
+
+			goto(`/audio/${audioId}`);
 		} catch (err) {
 			toast.error(err instanceof Error ? err.message : "Erreur lors de l'enregistrement");
 		} finally {
@@ -166,7 +186,10 @@
 
 <!-- Header -->
 <div class="mb-8">
-	<a href="/audio" class="mb-4 inline-flex items-center gap-1 text-sm text-stone-500 transition-colors hover:text-primary">
+	<a
+		href="/audio"
+		class="mb-4 inline-flex items-center gap-1 text-sm text-stone-500 transition-colors hover:text-primary"
+	>
 		<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 			<path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
 		</svg>
@@ -174,9 +197,16 @@
 	</a>
 	<div class="flex items-end justify-between gap-4">
 		<h1 class="font-display text-3xl font-semibold text-stone-800">Importer un audio</h1>
-		<a href="/audio/bulk-new" class="inline-flex items-center gap-1 text-sm text-primary hover:underline">
+		<a
+			href="/audio/bulk-new"
+			class="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+		>
 			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M3 7l2-2h4l2 2h10a2 2 0 012 2v9a2 2 0 01-2 2H3a2 2 0 01-2-2V9a2 2 0 012-2z" />
+				<path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					d="M3 7l2-2h4l2 2h10a2 2 0 012 2v9a2 2 0 01-2 2H3a2 2 0 01-2-2V9a2 2 0 012-2z"
+				/>
 			</svg>
 			Plusieurs fichiers ? Importer en lot
 		</a>
@@ -197,12 +227,25 @@
 		<div class="grid gap-5 sm:grid-cols-2">
 			<div class="sm:col-span-2">
 				<label for="title" class="admin-label">Titre *</label>
-				<input id="title" type="text" class="admin-input" bind:value={title} placeholder="Titre du cantique" />
+				<input
+					id="title"
+					type="text"
+					class="admin-input"
+					bind:value={title}
+					placeholder="Titre du cantique"
+				/>
 			</div>
 
 			<div>
 				<label for="artist" class="admin-label">Artiste</label>
-				<input id="artist" type="text" class="admin-input" bind:value={artist} list="artist-list" placeholder="Nom de l'artiste" />
+				<input
+					id="artist"
+					type="text"
+					class="admin-input"
+					bind:value={artist}
+					list="artist-list"
+					placeholder="Nom de l'artiste"
+				/>
 				<datalist id="artist-list">
 					{#each data.artists as a}
 						<option value={a}></option>
@@ -236,7 +279,13 @@
 
 			<div>
 				<label for="bookFullName" class="admin-label">Livre (nom complet)</label>
-				<input id="bookFullName" type="text" class="admin-input" bind:value={bookFullName} placeholder="Ex: Cantiques" />
+				<input
+					id="bookFullName"
+					type="text"
+					class="admin-input"
+					bind:value={bookFullName}
+					placeholder="Ex: Cantiques"
+				/>
 			</div>
 
 			<div>
@@ -256,9 +305,26 @@
 		</div>
 	</div>
 
-	<!-- Step 3: Upload & Save -->
+	<!-- Step 3: Optional lyrics -->
 	<div class="mb-8 border border-stone-200/60 bg-white/40 p-6">
-		<h2 class="mb-5 font-display text-lg font-semibold text-stone-700">3. Import</h2>
+		<h2 class="mb-3 font-display text-lg font-semibold text-stone-700">
+			3. Paroles <span class="text-sm font-normal text-stone-400">(optionnel)</span>
+		</h2>
+		<label for="lyricsText" class="admin-label">Texte des paroles</label>
+		<textarea
+			id="lyricsText"
+			class="admin-input min-h-64 resize-y leading-7"
+			bind:value={lyricsText}
+			placeholder="Collez les paroles ici si vous les avez déjà..."
+		></textarea>
+		<p class="mt-2 text-xs text-stone-500">
+			Vous pourrez aussi ajouter ou corriger les paroles après l'import depuis la fiche audio.
+		</p>
+	</div>
+
+	<!-- Step 4: Upload & Save -->
+	<div class="mb-8 border border-stone-200/60 bg-white/40 p-6">
+		<h2 class="mb-5 font-display text-lg font-semibold text-stone-700">4. Import</h2>
 
 		{#if !uploaded}
 			<!-- Upload progress -->
@@ -277,23 +343,50 @@
 				</div>
 			{/if}
 
-			<button onclick={uploadToS3} disabled={!canUpload} class="admin-btn-primary w-full justify-center disabled:opacity-50">
+			<button
+				onclick={uploadToS3}
+				disabled={!canUpload}
+				class="admin-btn-primary w-full justify-center disabled:opacity-50"
+			>
 				{#if uploading}
 					<svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+						<circle
+							class="opacity-25"
+							cx="12"
+							cy="12"
+							r="10"
+							stroke="currentColor"
+							stroke-width="4"
+						/>
+						<path
+							class="opacity-75"
+							fill="currentColor"
+							d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+						/>
 					</svg>
 					Import en cours...
 				{:else}
-					<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+					<svg
+						class="h-4 w-4"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+						/>
 					</svg>
 					Importer le fichier sur le serveur
 				{/if}
 			</button>
 
 			{#if !file}
-				<p class="mt-2 text-center text-xs text-stone-400">Sélectionnez un fichier et une catégorie d'abord</p>
+				<p class="mt-2 text-center text-xs text-stone-400">
+					Sélectionnez un fichier et une catégorie d'abord
+				</p>
 			{/if}
 		{:else}
 			<!-- Save record -->
@@ -301,15 +394,36 @@
 				Fichier importé avec succès. Enregistrez les métadonnées pour finaliser.
 			</div>
 
-			<button onclick={saveRecord} disabled={!canSave} class="admin-btn-primary w-full justify-center disabled:opacity-50">
+			<button
+				onclick={saveRecord}
+				disabled={!canSave}
+				class="admin-btn-primary w-full justify-center disabled:opacity-50"
+			>
 				{#if saving}
 					<svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+						<circle
+							class="opacity-25"
+							cx="12"
+							cy="12"
+							r="10"
+							stroke="currentColor"
+							stroke-width="4"
+						/>
+						<path
+							class="opacity-75"
+							fill="currentColor"
+							d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+						/>
 					</svg>
 					Enregistrement...
 				{:else}
-					<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+					<svg
+						class="h-4 w-4"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+						stroke-width="2"
+					>
 						<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 					</svg>
 					Enregistrer l'audio

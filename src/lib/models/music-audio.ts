@@ -13,7 +13,11 @@ export const MusicAudioSchema = z.object({
 	file_size: z.number(),
 	duration: z.number().nullable().optional(),
 	format: z.string(),
-	uploaded_at: z.union([z.instanceof(Date), z.string()]).transform((val) => new Date(val))
+	uploaded_at: z.union([z.instanceof(Date), z.string()]).transform((val) => new Date(val)),
+	/** Computed at the API layer (joined from music_lyrics). True when this
+	 *  song has a published lyrics doc — drives the small in-list indicator
+	 *  next to the title in /musique. Not persisted on music_audio docs. */
+	has_lyrics: z.boolean().optional()
 });
 
 export type MusicAudio = z.infer<typeof MusicAudioSchema>;

@@ -2240,8 +2240,41 @@
 			flex-shrink: 0;
 			border-top: 0;
 			background: transparent;
-			padding: calc(2rem + env(safe-area-inset-top, 0px)) 1.25rem 0.65rem;
+			/* 0.75rem above the safe-area is enough breathing room — the
+			   previous 2rem combined with the iPhone notch was eating
+			   ~85px and pushing the title + buttons off-screen. */
+			padding: calc(0.75rem + env(safe-area-inset-top, 0px)) 1rem 0.4rem;
 			box-shadow: none;
+		}
+
+		/* Title block: tighten label, brighten title, drop the redundant
+		   time display (the progress bar at top + lyrics drawer give the
+		   user enough context — saving vertical space). */
+		.audio-player-shell.lyrics-open .player-main > div:first-child {
+			margin-bottom: 0.6rem;
+			gap: 0.5rem;
+		}
+
+		.audio-player-shell.lyrics-open .player-main .font-black {
+			font-size: 0.92rem;
+			font-weight: 700;
+			letter-spacing: 0;
+		}
+
+		.audio-player-shell.lyrics-open .player-main .text-missionnaire.opacity-80 {
+			opacity: 0.7;
+			font-size: 9px;
+		}
+
+		/* Hide the lyrics-toggle button in the player header when lyrics are
+		   already open — the FERMER button in the drawer handles closing.
+		   Same for the sleep-timer button: not critical when the user is
+		   actively reading lyrics. Heart + close X stay visible. The X close
+		   doesn't get matched: its aria-label has "lecteur" but no
+		   aria-expanded attribute. */
+		.audio-player-shell.lyrics-open .player-main button[aria-label*='paroles'],
+		.audio-player-shell.lyrics-open .player-main button[aria-label*='lecteur'][aria-expanded] {
+			display: none;
 		}
 
 		.audio-player-shell.lyrics-open .player-main .text-missionnaire {

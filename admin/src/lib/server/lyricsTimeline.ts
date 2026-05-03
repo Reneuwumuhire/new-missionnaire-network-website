@@ -62,6 +62,69 @@ export async function syncLyricsForAudioIds(audioIds: string[], syncedBy: string
 	return results;
 }
 
+export async function publishManualLyricsForAudio(options: {
+	audioId: string;
+	lyricsText: string;
+	sourceBook?: string;
+	sourceNumber?: string;
+	sourceTitle?: string;
+	sourceUrl?: string;
+	title?: string;
+	updatedBy: string;
+}) {
+	const audioId = options.audioId.trim();
+	if (!audioId) {
+		throw new Error('audioId is required');
+	}
+
+	const audio = await findMusicAudio(audioId);
+	if (!audio) {
+		throw new Error('Audio not found');
+	}
+
+	const sections = createManualLyricSections(options.lyricsText, {
+		sourceNumber: options.sourceNumber,
+		title: options.sourceTitle || options.title || String(audio.title ?? '')
+	});
+	const lines = flattenLyricSections(sections);
+	const timableLineCount = lines.filter((line) => line.kind === 'line').length;
+	if (timableLineCount === 0) {
+		throw new Error('Add at least one lyric line before publishing');
+	}
+
+	const row: LyricsReviewRow = {
+		audio_id: audioId,
+		audio_artist: String(audio.artist ?? ''),
+		audio_book: String(audio.book ?? ''),
+		audio_book_full_name: String(audio.book_full_name ?? ''),
+		audio_category: String(audio.category ?? ''),
+		audio_duration_seconds: String(audio.duration ?? ''),
+		audio_number: String(audio.number ?? ''),
+		audio_s3_key: String(audio.s3_key ?? ''),
+		audio_title: String(audio.title ?? options.title ?? ''),
+		audio_url: String(audio.s3_url ?? ''),
+		audio_version: '',
+		source_book: options.sourceBook?.trim() || String(audio.book_full_name ?? audio.book ?? ''),
+		source_number: options.sourceNumber?.trim() || String(audio.number ?? ''),
+		source_title: options.sourceTitle?.trim() || options.title?.trim() || String(audio.title ?? ''),
+		source_url: options.sourceUrl?.trim() || ''
+	};
+
+	const result = await upsertLyricsDocument({
+		audio,
+		lines,
+		row,
+		sections,
+		syncedBy: options.updatedBy,
+		title: options.title?.trim() || row.source_title
+	});
+
+	return {
+		...result,
+		lyrics: (await getLyricsTimelineDetail(audioId)).lyrics
+	};
+}
+
 export async function getLyricsTimelineDetail(audioId: string) {
 	if (!audioId.trim()) {
 		throw new Error('audioId is required');
@@ -317,58 +380,78 @@ export async function resetLyricsLineBreaks(options: { audioId: string; updatedB
 }
 
 async function syncLyricsFromReviewRow(row: LyricsReviewRow, syncedBy: string) {
-	if (row.review_status !== 'ready_for_sync') {
-		throw new Error('Only rows marked Ready can be synced');
+	if (row.review_status !== 'ready_for_sync' && row.review_status !== 'approved') {
+		throw new Error('Approve the match before publishing lyrics');
 	}
 	if (!row.source_url) {
 		throw new Error('This match does not have a source URL');
 	}
 
-	const db = await getDb();
 	const audio = await findMusicAudio(row.audio_id);
 	const extracted = await extractLyricsFromUrl(row.source_url, {
 		audioTitle: row.audio_title,
 		versionLabel: row.audio_version
 	});
 	const lines = flattenLyricSections(extracted.sections);
-	const timableLineCount = lines.filter((line) => line.kind === 'line').length;
+	return upsertLyricsDocument({
+		audio,
+		lines,
+		row,
+		sections: extracted.sections,
+		syncedBy,
+		title: extracted.title || row.source_title
+	});
+}
+
+async function upsertLyricsDocument(options: {
+	audio: Record<string, unknown> | null;
+	lines: LyricsLine[];
+	row: LyricsReviewRow;
+	sections: LyricSection[];
+	syncedBy: string;
+	title: string;
+}) {
+	const timableLineCount = options.lines.filter((line) => line.kind === 'line').length;
 	if (timableLineCount === 0) {
-		throw new Error('No lyric lines were found for this source');
+		throw new Error('No lyric lines were found');
 	}
 
-	const existing = await db.collection(LYRICS_COLLECTION).findOne({ audio_id: row.audio_id });
-	const lyricsHash = hashLyrics(lines);
+	const db = await getDb();
+	const existing = await db
+		.collection(LYRICS_COLLECTION)
+		.findOne({ audio_id: options.row.audio_id });
+	const lyricsHash = hashLyrics(options.lines);
 	const resetTimeline = existing?.lyrics_hash && existing.lyrics_hash !== lyricsHash;
 	const now = new Date();
 
 	const update: Record<string, unknown> = {
-		audio_id: row.audio_id,
-		audio_title: row.audio_title,
-		audio_artist: row.audio_artist,
-		audio_book: row.audio_book,
-		audio_book_full_name: row.audio_book_full_name,
-		audio_category: row.audio_category,
-		audio_number: numberOrNull(row.audio_number),
-		audio_version: row.audio_version,
-		audio_duration_seconds: numberOrNull(row.audio_duration_seconds),
-		audio_s3_key: row.audio_s3_key,
-		audio_url: row.audio_url || audio?.s3_url || '',
+		audio_id: options.row.audio_id,
+		audio_title: options.row.audio_title,
+		audio_artist: options.row.audio_artist,
+		audio_book: options.row.audio_book,
+		audio_book_full_name: options.row.audio_book_full_name,
+		audio_category: options.row.audio_category,
+		audio_number: numberOrNull(options.row.audio_number),
+		audio_version: options.row.audio_version,
+		audio_duration_seconds: numberOrNull(options.row.audio_duration_seconds),
+		audio_s3_key: options.row.audio_s3_key,
+		audio_url: options.row.audio_url || String(options.audio?.s3_url ?? ''),
 		lyrics_status: 'published',
-		source_book: row.source_book,
-		source_number: row.source_number,
-		source_title: row.source_title,
-		source_url: row.source_url,
-		title: extracted.title || row.source_title,
-		sections: extracted.sections,
-		lines,
+		source_book: options.row.source_book,
+		source_number: options.row.source_number,
+		source_title: options.row.source_title,
+		source_url: options.row.source_url,
+		title: options.title,
+		sections: options.sections,
+		lines: options.lines,
 		lyrics_hash: lyricsHash,
 		synced_at: now,
-		synced_by: syncedBy,
+		synced_by: options.syncedBy,
 		updated_at: now
 	};
 
-	if (audio?._id) {
-		update.audio_object_id = audio._id;
+	if (options.audio?._id) {
+		update.audio_object_id = options.audio._id;
 	}
 
 	if (resetTimeline) {
@@ -376,16 +459,16 @@ async function syncLyricsFromReviewRow(row: LyricsReviewRow, syncedBy: string) {
 		update.timeline_published = [];
 		update.timeline_status = '';
 		update.timeline_updated_at = now;
-		update.timeline_updated_by = syncedBy;
+		update.timeline_updated_by = options.syncedBy;
 	}
 
 	const result = await db.collection(LYRICS_COLLECTION).updateOne(
-		{ audio_id: row.audio_id },
+		{ audio_id: options.row.audio_id },
 		{
 			$set: update,
 			$setOnInsert: {
 				created_at: now,
-				created_by: syncedBy,
+				created_by: options.syncedBy,
 				timeline_draft: [],
 				timeline_published: [],
 				timeline_status: ''
@@ -395,11 +478,82 @@ async function syncLyricsFromReviewRow(row: LyricsReviewRow, syncedBy: string) {
 	);
 
 	return {
-		audioId: row.audio_id,
+		audioId: options.row.audio_id,
 		created: Boolean(result.upsertedId),
-		lineCount: lines.length,
+		lineCount: options.lines.length,
 		timableLineCount
 	};
+}
+
+function createManualLyricSections(
+	lyricsText: string,
+	options: { sourceNumber?: string; title?: string }
+): LyricSection[] {
+	const blocks = lyricsText
+		.replace(/\r/g, '')
+		.split(/\n\s*\n/g)
+		.map((block) => block.trim())
+		.filter(Boolean);
+
+	if (blocks.length === 0) {
+		throw new Error('Lyrics text is required');
+	}
+
+	const sections: LyricSection[] = [];
+	let pendingHeading: { label: string; role: LyricSourceLine['role'] } | null = null;
+
+	blocks.forEach((block) => {
+		const rawLines = block
+			.split('\n')
+			.map((line) => normalizeManualLine(line))
+			.filter(Boolean);
+		const heading = rawLines[0] ?? '';
+		const headingRole = getManualHeadingRole(heading);
+		if (rawLines.length === 1 && headingRole !== null) {
+			pendingHeading = { label: heading, role: headingRole };
+			return;
+		}
+
+		const hasStandaloneHeading = rawLines.length > 1 && headingRole !== null;
+		const lyricLines = hasStandaloneHeading ? rawLines.slice(1) : rawLines;
+		const role = hasStandaloneHeading ? headingRole : pendingHeading?.role;
+		const headingLabel = hasStandaloneHeading ? heading : pendingHeading?.label;
+		const sectionIndex = sections.length;
+
+		sections.push({
+			label:
+				sectionIndex === 0 && !hasStandaloneHeading && !pendingHeading
+					? String(options.sourceNumber ?? '').trim()
+					: headingLabel
+						? headingLabel
+						: '',
+			title:
+				sectionIndex === 0 && !hasStandaloneHeading && !pendingHeading
+					? String(options.title ?? '').trim()
+					: '',
+			lines: lyricLines.map((line) => ({
+				role: role ?? detectManualLineRole(line),
+				text: line
+			}))
+		});
+		pendingHeading = null;
+	});
+
+	return sections;
+}
+
+function normalizeManualLine(value: string) {
+	return value.replace(/\s+/g, ' ').trim();
+}
+
+function getManualHeadingRole(value: string): LyricSourceLine['role'] | null {
+	if (/^(refrain|chorus|choeur|chœur|coro|korasi)\s*:?\s*$/i.test(value)) return 'refrain';
+	if (/^(couplet|verse)\s*\d*\s*:?\s*$/i.test(value)) return 'verse';
+	return null;
+}
+
+function detectManualLineRole(value: string): LyricSourceLine['role'] {
+	return /\b(refrain|chorus|choeur|chœur|coro|korasi)\b/i.test(value) ? 'refrain' : 'line';
 }
 
 function flattenLyricSections(sections: LyricSection[]) {
@@ -591,6 +745,7 @@ function serializeLyricsDocument(doc: Record<string, unknown>) {
 		timeline_published: Array.isArray(doc.timeline_published) ? doc.timeline_published : [],
 		timeline_status: String(doc.timeline_status ?? ''),
 		synced_at: dateToString(doc.synced_at),
+		synced_by: String(doc.synced_by ?? ''),
 		timeline_updated_at: dateToString(doc.timeline_updated_at),
 		timeline_published_at: dateToString(doc.timeline_published_at)
 	};

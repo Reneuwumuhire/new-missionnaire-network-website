@@ -58,6 +58,7 @@
 	let reviewFilter = 'all';
 	let selectedAudioId = '';
 	let lyricsByRow: Record<string, LyricsState> = {};
+	let manualLyricsByRow: Record<string, string> = {};
 	let exporting = false;
 	let bulkSaving = false;
 	let selectedAudioIds = new Set<string>();
@@ -95,11 +96,18 @@
 		const matchesReviewFilter =
 			reviewFilter === 'all' ||
 			(reviewFilter === 'pending' && !row.review_status) ||
-			row.review_status === reviewFilter;
+			(reviewFilter === 'approved' &&
+				(row.review_status === 'approved' || row.review_status === 'ready_for_sync')) ||
+			(reviewFilter === 'rejected' && row.review_status === 'rejected') ||
+			(reviewFilter === 'lyrics_published' &&
+				(row.lyrics_sync_status === 'published' || Boolean(row.lyrics_synced_at))) ||
+			(reviewFilter === 'timing' &&
+				(row.timeline_status === 'published' || row.timeline_status === 'draft'));
 
 		return matchesSearch && matchesMatchFilter && matchesReviewFilter;
 	});
 	$: selectedLyrics = selectedRow ? lyricsByRow[selectedRow.audio_id] : null;
+	$: selectedManualLyrics = selectedRow ? (manualLyricsByRow[selectedRow.audio_id] ?? '') : '';
 	$: selectedCount = selectedAudioIds.size;
 	$: visibleSelectedCount = filteredRows.filter((row) => selectedAudioIds.has(row.audio_id)).length;
 	$: allVisibleSelected =
@@ -208,10 +216,11 @@
 		}
 	}
 
-	function setReviewNotes(row: ReviewRow, value: string) {
-		rows = rows.map((item) =>
-			item.audio_id === row.audio_id ? { ...item, review_notes: value } : item
-		);
+	function setManualLyrics(row: ReviewRow, value: string) {
+		manualLyricsByRow = {
+			...manualLyricsByRow,
+			[row.audio_id]: value
+		};
 	}
 
 	async function saveReview(row: ReviewRow, reviewStatus: ReviewStatus) {
@@ -242,12 +251,15 @@
 				rows = rows.map((item) =>
 					item.audio_id === row.audio_id ? { ...item, ...payload.row, saving: false } : item
 				);
+				return payload.row as ReviewRow;
 			}
+			return null;
 		} catch (caughtError) {
 			error = caughtError instanceof Error ? caughtError.message : 'Could not save review';
 			rows = rows.map((item) =>
 				item.audio_id === row.audio_id ? { ...item, saving: false } : item
 			);
+			return null;
 		}
 	}
 
@@ -299,8 +311,118 @@
 		}
 	}
 
-	async function syncLyrics(row: ReviewRow) {
-		if (!canSyncLyrics(row)) return;
+	/** Bulk publish lyrics for every currently-selected row. Skips rows that
+	 *  aren't eligible (no source URL, or not yet confirmed) — never silently
+	 *  publishes something that wasn't ready. Updates each row live so status
+	 *  badges flip "Synchronisé" as each call completes. Shows a final summary
+	 *  in the error slot only if anything was skipped or failed. */
+	let bulkPublishCurrent = 0;
+	let bulkPublishTotal = 0;
+
+	async function bulkPublishLyrics() {
+		const audioIds = [...selectedAudioIds];
+		if (audioIds.length === 0) return;
+
+		bulkSaving = true;
+		error = '';
+		bulkPublishCurrent = 0;
+		bulkPublishTotal = audioIds.length;
+
+		let published = 0;
+		let skipped = 0;
+		let failed = 0;
+		const reasons: string[] = [];
+
+		for (const audioId of audioIds) {
+			bulkPublishCurrent += 1;
+			const row = rows.find((item) => item.audio_id === audioId);
+			if (!row) {
+				skipped += 1;
+				continue;
+			}
+			if (!row.source_url) {
+				skipped += 1;
+				reasons.push(`${row.audio_title || row.audio_id} : pas de source`);
+				continue;
+			}
+			if (row.review_status !== 'approved' && row.review_status !== 'ready_for_sync') {
+				skipped += 1;
+				reasons.push(`${row.audio_title || row.audio_id} : non confirmé`);
+				continue;
+			}
+
+			// syncLyrics writes to the global `error` on failure — clear before
+			// each call and inspect after to determine outcome without polluting
+			// the bulk summary mid-loop.
+			error = '';
+			try {
+				await syncLyrics(row, true);
+				if (error) {
+					failed += 1;
+					reasons.push(`${row.audio_title || row.audio_id} : ${error}`);
+					error = '';
+				} else {
+					published += 1;
+				}
+			} catch (caughtError) {
+				failed += 1;
+				reasons.push(
+					`${row.audio_title || row.audio_id} : ${caughtError instanceof Error ? caughtError.message : 'erreur'}`
+				);
+			}
+		}
+
+		bulkSaving = false;
+		bulkPublishCurrent = 0;
+		bulkPublishTotal = 0;
+
+		const parts: string[] = [];
+		if (published > 0) parts.push(`${published} publié${published > 1 ? 's' : ''}`);
+		if (skipped > 0) parts.push(`${skipped} ignoré${skipped > 1 ? 's' : ''}`);
+		if (failed > 0) parts.push(`${failed} échec${failed > 1 ? 's' : ''}`);
+
+		if (failed > 0 || skipped > 0) {
+			// Surface up to 3 reasons so the user can act on them.
+			const sample = reasons.slice(0, 3).join(' · ');
+			const more = reasons.length > 3 ? ` · +${reasons.length - 3} autres` : '';
+			error = `${parts.join(' · ')}${reasons.length ? ` — ${sample}${more}` : ''}`;
+		}
+
+		// Only clear selection on full success; on partial failure leave the
+		// selection so the user can see which rows are still un-published.
+		if (failed === 0 && skipped === 0) {
+			selectedAudioIds = new Set();
+		}
+	}
+
+	async function publishLyrics(row: ReviewRow) {
+		const manualLyrics = (manualLyricsByRow[row.audio_id] ?? '').trim();
+		if (manualLyrics) {
+			if (row.review_status !== 'approved' && row.review_status !== 'ready_for_sync') {
+				const savedRow = await saveReview(row, 'approved');
+				if (!savedRow) return;
+				row = savedRow;
+			}
+			await publishManualLyrics(row, manualLyrics);
+			return;
+		}
+
+		if (!row.source_url) {
+			error = 'Ajoutez les bonnes paroles avant de publier cet audio.';
+			return;
+		}
+
+		const current = rows.find((item) => item.audio_id === row.audio_id) ?? row;
+		if (current.review_status !== 'approved' && current.review_status !== 'ready_for_sync') {
+			error = 'Confirmez la correspondance avant de publier les paroles.';
+			return;
+		}
+
+		await syncLyrics(current, true);
+	}
+
+	async function syncLyrics(row: ReviewRow, force = false) {
+		if (!force && !canSyncLyrics(row)) return;
 
 		rows = rows.map((item) => (item.audio_id === row.audio_id ? { ...item, syncing: true } : item));
 		error = '';
@@ -345,6 +467,67 @@
 			);
 		} catch (caughtError) {
 			error = caughtError instanceof Error ? caughtError.message : 'Could not sync lyrics';
+			rows = rows.map((item) =>
+				item.audio_id === row.audio_id ? { ...item, syncing: false } : item
+			);
+		}
+	}
+
+	async function publishManualLyrics(row: ReviewRow, lyricsText: string) {
+		rows = rows.map((item) => (item.audio_id === row.audio_id ? { ...item, syncing: true } : item));
+		error = '';
+
+		try {
+			const response = await fetch(`/api/audio/${row.audio_id}/lyrics`, {
+				body: JSON.stringify({
+					lyricsText,
+					sourceBook: row.source_book || row.audio_book_full_name || row.audio_book,
+					sourceNumber: row.source_number || row.audio_number,
+					sourceTitle: row.source_title || row.audio_title,
+					title: row.source_title || row.audio_title
+				}),
+				headers: {
+					'content-type': 'application/json'
+				},
+				method: 'POST'
+			});
+			const payload = await response.json();
+
+			if (!response.ok) {
+				throw new Error(payload.error ?? 'Could not publish lyrics');
+			}
+
+			const lyrics = payload.data?.lyrics ?? {};
+			const sync = payload.data ?? {};
+			const lineCount = String(sync.timableLineCount ?? countTimableLines(lyrics.lines) ?? '');
+
+			rows = rows.map((item) =>
+				item.audio_id === row.audio_id
+					? {
+							...item,
+							lyrics_sync_status: lyrics.lyrics_status || 'published',
+							lyrics_synced_at: lyrics.synced_at ?? item.lyrics_synced_at ?? '',
+							lyrics_synced_by: lyrics.synced_by ?? item.lyrics_synced_by ?? '',
+							review_status: item.review_status || 'approved',
+							syncing: false,
+							timeline_line_count: lineCount,
+							timeline_status: lyrics.timeline_status ?? item.timeline_status ?? '',
+							timeline_timed_line_count: String(
+								(lyrics.timeline_status === 'published'
+									? lyrics.timeline_published?.length
+									: lyrics.timeline_draft?.length) ??
+									item.timeline_timed_line_count ??
+									''
+							)
+						}
+					: item
+			);
+			manualLyricsByRow = {
+				...manualLyricsByRow,
+				[row.audio_id]: ''
+			};
+		} catch (caughtError) {
+			error = caughtError instanceof Error ? caughtError.message : 'Could not publish lyrics';
 			rows = rows.map((item) =>
 				item.audio_id === row.audio_id ? { ...item, syncing: false } : item
 			);
@@ -416,7 +599,7 @@
 	}
 
 	function statusLabel(status: string) {
-		if (status === 'approved') return 'Approuvé';
+		if (status === 'approved') return 'Confirmé';
 		if (status === 'rejected') return 'Rejeté';
 		if (status === 'ready_for_sync') return 'Prêt';
 		return 'En attente';
@@ -460,7 +643,18 @@
 	}
 
 	function canSyncLyrics(row: ReviewRow) {
-		return row.review_status === 'ready_for_sync' && !row.syncing;
+		return (
+			(row.review_status === 'approved' || row.review_status === 'ready_for_sync') &&
+			Boolean(row.source_url) &&
+			!row.syncing
+		);
+	}
+
+	function canPublishLyrics(row: ReviewRow) {
+		return (
+			!row.syncing &&
+			(Boolean((manualLyricsByRow[row.audio_id] ?? '').trim()) || canSyncLyrics(row))
+		);
 	}
 
 	function lyricsPublishLabel(row: ReviewRow) {
@@ -574,9 +768,10 @@
 					<select class="admin-input" bind:value={reviewFilter}>
 						<option value="all">Tous</option>
 						<option value="pending">En attente</option>
-						<option value="approved">Approuvé</option>
+						<option value="approved">Confirmé</option>
+						<option value="lyrics_published">Republier paroles</option>
+						<option value="timing">Timing</option>
 						<option value="rejected">Rejeté</option>
-						<option value="ready_for_sync">Prêt</option>
 					</select>
 				</label>
 
@@ -636,7 +831,7 @@
 								on:click={() => saveBulkReview('approved')}
 								type="button"
 							>
-								Approuver
+								Confirmer
 							</button>
 							<button
 								class="inline-flex min-h-9 items-center bg-emerald-600 px-3 text-xs font-semibold text-white disabled:cursor-wait disabled:opacity-60"
@@ -645,6 +840,17 @@
 								type="button"
 							>
 								Prêt
+							</button>
+							<button
+								class="inline-flex min-h-9 items-center bg-missionnaire px-3 text-xs font-semibold text-white shadow-sm shadow-missionnaire/20 disabled:cursor-wait disabled:opacity-60"
+								disabled={bulkSaving}
+								on:click={bulkPublishLyrics}
+								type="button"
+								title="Publier les paroles pour les chants confirmés sélectionnés"
+							>
+								{bulkPublishTotal > 0
+									? `Publication ${bulkPublishCurrent}/${bulkPublishTotal}…`
+									: 'Publier paroles'}
 							</button>
 							<button
 								class="inline-flex min-h-9 items-center bg-red-700 px-3 text-xs font-semibold text-white disabled:cursor-wait disabled:opacity-60"
@@ -837,72 +1043,47 @@
 										: ''}
 								</p>
 							{/if}
-
-							<div
-								class="mt-3 grid gap-2 {canOpenTiming(selectedRow) ? 'grid-cols-2' : 'grid-cols-1'}"
-							>
-								<button
-									class="min-h-10 bg-stone-900 px-3 text-sm font-semibold text-white transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
-									disabled={!canSyncLyrics(selectedRow)}
-									on:click={() => syncLyrics(selectedRow)}
-									type="button"
-								>
-									{lyricsPublishLabel(selectedRow)}
-								</button>
-								{#if canOpenTiming(selectedRow)}
-									<a
-										class="inline-flex min-h-10 items-center justify-center border border-stone-300 bg-white/70 px-3 text-sm font-semibold text-stone-800 transition-colors hover:border-primary hover:text-primary"
-										href={`/lyrics-review/timing/${selectedRow.audio_id}`}
-									>
-										Timeline
-									</a>
-								{/if}
-							</div>
 						</div>
 
-						<div class="mt-4 grid grid-cols-2 gap-2">
+						<div
+							class="mt-4 grid gap-2 {canOpenTiming(selectedRow)
+								? 'sm:grid-cols-3'
+								: 'sm:grid-cols-2'}"
+						>
 							<button
-								class="min-h-10 bg-blue-600 px-3 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-60"
+								class="min-h-11 bg-blue-600 px-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"
 								disabled={selectedRow.saving}
 								on:click={() => saveReview(selectedRow, 'approved')}
 								type="button"
 							>
-								Approuvé
+								{selectedRow.review_status === 'approved' ||
+								selectedRow.review_status === 'ready_for_sync'
+									? 'Confirmé'
+									: 'Confirmer'}
 							</button>
 							<button
-								class="min-h-10 bg-emerald-600 px-3 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-60"
-								disabled={selectedRow.saving}
-								on:click={() => saveReview(selectedRow, 'ready_for_sync')}
+								class="min-h-11 bg-emerald-600 px-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+								disabled={selectedRow.saving || !canPublishLyrics(selectedRow)}
+								on:click={() => publishLyrics(selectedRow)}
 								type="button"
 							>
-								Prêt
+								{lyricsPublishLabel(selectedRow)}
 							</button>
-							<button
-								class="min-h-10 bg-red-700 px-3 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-60"
-								disabled={selectedRow.saving}
-								on:click={() => saveReview(selectedRow, 'rejected')}
-								type="button"
-							>
-								Rejeté
-							</button>
-							<button
-								class="min-h-10 border border-stone-300 bg-white/70 px-3 text-sm font-semibold text-stone-800 disabled:cursor-wait disabled:opacity-60"
-								disabled={selectedRow.saving}
-								on:click={() => saveReview(selectedRow, '')}
-								type="button"
-							>
-								Effacer
-							</button>
+							{#if canOpenTiming(selectedRow)}
+								<a
+									class="inline-flex min-h-11 items-center justify-center border border-stone-300 bg-white/70 px-3 text-sm font-semibold text-stone-800 transition-colors hover:border-primary hover:text-primary"
+									href={`/lyrics-review/timing/${selectedRow.audio_id}`}
+								>
+									Timing
+								</a>
+							{/if}
 						</div>
 
-						<label class="mt-4 block">
-							<span class="admin-label">Notes</span>
-							<textarea
-								class="admin-input min-h-24 resize-y"
-								value={selectedRow.review_notes}
-								on:input={(event) => setReviewNotes(selectedRow, event.currentTarget.value)}
-							></textarea>
-						</label>
+						{#if !selectedManualLyrics.trim() && selectedRow.source_url && !canSyncLyrics(selectedRow)}
+							<p class="mt-2 text-xs font-semibold text-stone-500">
+								Confirmez d'abord la correspondance, puis publiez les paroles.
+							</p>
+						{/if}
 					</div>
 
 					<div class="p-5">
@@ -927,6 +1108,19 @@
 								Source
 							</a>
 						</div>
+
+						<label class="mt-4 block">
+							<span class="admin-label">Remplacer les paroles</span>
+							<textarea
+								class="admin-input min-h-32 resize-y leading-7"
+								value={selectedManualLyrics}
+								on:input={(event) => setManualLyrics(selectedRow, event.currentTarget.value)}
+								placeholder="Si la source ne correspond pas, collez les bonnes paroles ici puis publiez."
+							></textarea>
+						</label>
+						<p class="mt-2 text-xs text-stone-500">
+							Si ce champ reste vide, la publication utilise la source candidate ci-dessous.
+						</p>
 
 						<div class="mt-4 max-h-[48vh] overflow-auto border border-stone-200/70 bg-white/55 p-4">
 							{#if selectedLyrics?.loading}
