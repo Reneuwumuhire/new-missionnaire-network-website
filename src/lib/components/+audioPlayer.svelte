@@ -2124,6 +2124,10 @@
 	}
 
 	@media (max-width: 767px) {
+		/* Warm espresso base — same brand-warmth as the cream theme, just
+		   pulled into shadow. Deliberate dark, not "art bleeding through
+		   black". The artwork is atmospheric texture (low opacity), not
+		   the dominant color. */
 		.audio-player-shell.lyrics-open {
 			top: 0;
 			height: 100dvh;
@@ -2131,8 +2135,8 @@
 			flex-direction: column;
 			overflow: hidden;
 			padding-top: 0;
-			background: rgb(24, 22, 19);
-			color: white;
+			background: #1a130c;
+			color: #efe5d0;
 		}
 
 		.audio-player-shell.lyrics-open::before {
@@ -2141,12 +2145,12 @@
 			inset: -2rem;
 			z-index: -2;
 			background-image:
-				linear-gradient(180deg, rgba(24, 22, 19, 0.62), rgba(24, 22, 19, 0.94)),
+				linear-gradient(180deg, rgba(26, 19, 12, 0.74), rgba(20, 14, 8, 0.96)),
 				var(--lyrics-artwork);
 			background-position: center;
 			background-size: cover;
-			filter: blur(24px) saturate(1.05);
-			opacity: 0.68;
+			filter: blur(36px) saturate(0.92);
+			opacity: 0.32;
 			transform: scale(1.08);
 		}
 
@@ -2156,8 +2160,8 @@
 			inset: 0;
 			z-index: -1;
 			background:
-				radial-gradient(circle at 50% 8%, rgba(255, 136, 12, 0.24), transparent 32%),
-				linear-gradient(180deg, rgba(0, 0, 0, 0.08), rgba(21, 19, 17, 0.86) 54%);
+				radial-gradient(circle at 50% 6%, rgba(255, 136, 12, 0.14), transparent 28%),
+				linear-gradient(180deg, rgba(26, 19, 12, 0.18), rgba(16, 11, 6, 0.78) 62%);
 			pointer-events: none;
 		}
 
@@ -2170,13 +2174,16 @@
 			display: flex;
 			flex-direction: column;
 			margin-top: 0.45rem;
-			border: 1px solid rgba(255, 255, 255, 0.08);
+			/* Hairline cream rule — picks up the cream text instead of cool grey */
+			border: 1px solid rgba(239, 229, 208, 0.08);
 			border-bottom: 0;
 			border-radius: 2rem 2rem 0 0;
-			background: rgba(76, 66, 61, 0.9);
-			box-shadow: 0 -22px 70px rgba(0, 0, 0, 0.38);
+			/* Warm dark espresso surface, slightly translucent so the artwork
+			   atmosphere reads through subtly without dominating */
+			background: rgba(35, 25, 16, 0.82);
+			box-shadow: 0 -22px 70px rgba(0, 0, 0, 0.45);
 			padding: 0.9rem 1.25rem 1rem;
-			backdrop-filter: blur(22px);
+			backdrop-filter: blur(28px) saturate(1.1);
 		}
 
 		.audio-player-shell.lyrics-open .lyrics-drawer-content {
@@ -2196,33 +2203,33 @@
 		}
 
 		.audio-player-shell.lyrics-open .lyrics-drawer-header .text-missionnaire\/90 {
-			color: rgba(255, 255, 255, 0.96);
+			color: #efe5d0;
 			letter-spacing: 0;
 			text-transform: none;
 			font-size: 0.95rem;
 		}
 
 		.audio-player-shell.lyrics-open .lyrics-drawer-header .text-stone-500 {
-			color: rgba(255, 255, 255, 0.52);
+			color: rgba(239, 229, 208, 0.5);
 		}
 
 		.audio-player-shell.lyrics-open .lyrics-sheet-handle {
 			width: 3.35rem;
 			height: 0.24rem;
 			margin-bottom: 1rem;
-			background: rgba(255, 255, 255, 0.86);
+			background: rgba(239, 229, 208, 0.7);
 		}
 
 		.audio-player-shell.lyrics-open .lyrics-close-btn {
-			border-color: rgba(255, 255, 255, 0.12);
-			background: rgba(255, 255, 255, 0.08);
-			color: rgba(255, 255, 255, 0.8);
+			border-color: rgba(239, 229, 208, 0.16);
+			background: rgba(239, 229, 208, 0.06);
+			color: rgba(239, 229, 208, 0.78);
 		}
 
 		.audio-player-shell.lyrics-open .lyrics-close-btn:hover {
-			border-color: rgba(255, 255, 255, 0.28);
-			background: rgba(255, 255, 255, 0.14);
-			color: white;
+			border-color: rgba(255, 190, 119, 0.45);
+			background: rgba(255, 136, 12, 0.12);
+			color: #ffbe77;
 		}
 
 		.audio-player-shell.lyrics-open .player-main {
@@ -2238,25 +2245,25 @@
 		}
 
 		.audio-player-shell.lyrics-open .player-main .text-missionnaire {
-			color: rgba(255, 190, 119, 0.86);
+			color: #ffbe77;
 		}
 
 		.audio-player-shell.lyrics-open .player-main .text-stone-900,
 		.audio-player-shell.lyrics-open .player-main .text-stone-500 {
-			color: white;
+			color: #efe5d0;
 		}
 
 		.audio-player-shell.lyrics-open .player-main .text-stone-400 {
-			color: rgba(255, 255, 255, 0.58);
+			color: rgba(239, 229, 208, 0.62);
 		}
 
 		.audio-player-shell.lyrics-open .player-main .text-stone-300 {
-			color: rgba(255, 255, 255, 0.48);
+			color: rgba(239, 229, 208, 0.5);
 		}
 
 		.audio-player-shell.lyrics-open .player-main .bg-stone-50,
 		.audio-player-shell.lyrics-open .player-main .bg-stone-100 {
-			background: rgba(255, 255, 255, 0.1);
+			background: rgba(239, 229, 208, 0.08);
 		}
 
 		.audio-player-shell.lyrics-open .player-main .bg-gray-900 {

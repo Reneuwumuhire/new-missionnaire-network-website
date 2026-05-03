@@ -173,82 +173,85 @@
 		{@const heading = isHeading(line)}
 		{@const chorus = isChorus(line)}
 		{@const verseNumber = getVerseNumber(line)}
-		{#if start !== null}
+		{#if heading}
+			<div
+				bind:this={lineElements[index]}
+				class="lyric-section"
+				class:chorus={chorus}
+				class:past={activeLineIndex >= 0 && index < activeLineIndex}
+				class:future={activeLineIndex >= 0 && index > activeLineIndex}
+			>
+				<span class="lyric-section-rule" aria-hidden="true"></span>
+				{#if chorus}
+					<span class="lyric-section-ornament" aria-hidden="true"></span>
+				{/if}
+				<span class="lyric-section-label">{text}</span>
+				{#if chorus}
+					<span class="lyric-section-ornament" aria-hidden="true"></span>
+				{/if}
+				<span class="lyric-section-rule" aria-hidden="true"></span>
+			</div>
+		{:else if start !== null}
 			<button
 				type="button"
 				bind:this={lineElements[index]}
-				class="lyric-line lyric-row timed"
+				class="lyric-line timed"
 				class:active={index === activeLineIndex}
-				class:chorus-line={chorus}
+				class:chorus={chorus}
 				class:past={activeLineIndex >= 0 && index < activeLineIndex}
 				class:future={activeLineIndex >= 0 && index > activeLineIndex}
 				on:click={() => seekToLine(line)}
 				aria-current={index === activeLineIndex ? 'true' : undefined}
+				aria-label={verseNumber !== null
+					? `Couplet ${verseNumber}, ${formatTime(start)} : ${text}`
+					: `${formatTime(start)} : ${text}`}
+				title={`${formatTime(start)} — cliquez pour écouter`}
 			>
-				<span class="lyric-time">{formatTime(start)}</span>
-				{#if verseNumber !== null}
-					<span class="lyric-marker has-number" aria-label={`Couplet ${verseNumber}`}>
-						{verseNumber}
-					</span>
-				{:else if !chorus}
-					<span class="lyric-marker" aria-hidden="true"></span>
-				{/if}
-				<span class="lyric-copy">
-					{#if chorus}
-						<span class="chorus-label">Refrain</span>
-					{/if}
-					<span>{text}</span>
-				</span>
+				<span class="lyric-text">{text}</span>
 			</button>
-		{:else if heading}
-			<div
-				bind:this={lineElements[index]}
-				class="lyric-line lyric-heading"
-				class:chorus-line={chorus}
-				class:past={activeLineIndex >= 0 && index < activeLineIndex}
-				class:future={activeLineIndex >= 0 && index > activeLineIndex}
-			>
-				{text}
-			</div>
 		{:else}
 			<div
 				bind:this={lineElements[index]}
-				class="lyric-line lyric-row untimed"
-				class:chorus-line={chorus}
+				class="lyric-line untimed"
+				class:chorus={chorus}
 				class:past={activeLineIndex >= 0 && index < activeLineIndex}
 				class:future={activeLineIndex >= 0 && index > activeLineIndex}
+				aria-label={verseNumber !== null ? `Couplet ${verseNumber} : ${text}` : text}
 			>
-				<span class="lyric-time" aria-hidden="true"></span>
-				{#if verseNumber !== null}
-					<span class="lyric-marker has-number" aria-label={`Couplet ${verseNumber}`}>
-						{verseNumber}
-					</span>
-				{:else if !chorus}
-					<span class="lyric-marker" aria-hidden="true"></span>
-				{/if}
-				<span class="lyric-copy">
-					{#if chorus}
-						<span class="chorus-label">Refrain</span>
-					{/if}
-					<span>{text}</span>
-				</span>
+				<span class="lyric-text">{text}</span>
 			</div>
 		{/if}
 	{/each}
 </div>
 
 <style>
+	/* ─── Editorial / hymnal lyric view ─────────────────────────────────────
+	   Typography-first. No card chrome. The active line is the visual focus —
+	   warm glow + serif weight bump + subtle scale. Past/future fade away.
+	   Theme: light cream by default; inverts to a darker palette when used in
+	   the fullscreen mobile drawer (artwork-blurred backdrop). */
+
 	.lyrics-panel {
+		--lyric-color-active: rgb(28 25 23); /* warm stone-900 */
+		--lyric-color-default: rgb(120 113 108); /* warm stone-500 */
+		--lyric-color-chorus-default: #9a5a1f; /* warm sienna — chorus reads warmer at rest */
+		--lyric-color-accent: #c2640c; /* deeper sienna — chorus active state */
+		--lyric-chorus-bg: rgba(255, 136, 12, 0.045);
+		--lyric-chorus-bg-active: rgba(255, 136, 12, 0.085);
+		--lyric-glow-active: rgba(255, 136, 12, 0.32);
+		--lyric-rule-color: rgba(120, 113, 108, 0.42);
+		--lyric-rule-chorus: rgba(194, 100, 12, 0.65);
+
 		max-height: 42vh;
 		overflow-y: auto;
 		overscroll-behavior: contain;
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
-		padding: 0.25rem 0.125rem 1rem;
-		scroll-padding-block: 35%;
+		gap: 0;
+		padding: 0.5rem 0.5rem 1.25rem;
+		scroll-padding-block: 38%;
 		scrollbar-width: thin;
-		scrollbar-color: rgba(168, 162, 158, 0.45) transparent;
+		scrollbar-color: rgba(168, 162, 158, 0.4) transparent;
 	}
 
 	.lyrics-panel::-webkit-scrollbar {
@@ -256,307 +259,306 @@
 	}
 
 	.lyrics-panel::-webkit-scrollbar-thumb {
-		background: rgba(168, 162, 158, 0.45);
+		background: rgba(168, 162, 158, 0.4);
 		border-radius: 999px;
 	}
 
-	.lyric-row {
-		position: relative;
-		display: grid;
-		grid-template-areas:
-			'. time marker .'
-			'copy copy copy copy';
-		grid-template-columns: 1fr auto auto 1fr;
-		column-gap: 0.45rem;
-		row-gap: 0.55rem;
-		align-items: center;
+	/* ─── Each lyric line ─────────────────────────────────────────────────
+	   The wrapper holds background + scale; opacity dimming happens on the
+	   inner .lyric-text so chorus background tints stay legible even when
+	   their text is faded. That preserves the song's macro structure when
+	   you're scrolling through past/future content. */
+	.lyric-line {
+		display: block;
 		width: 100%;
-		border: 1px solid transparent;
-		border-radius: 1.1rem;
+		margin-top: 0.35rem;
+		border: 0;
 		background: transparent;
-		padding: 0.95rem 1rem;
-		color: rgb(120 113 108);
+		padding: 0.45rem 1rem;
+		color: var(--lyric-color-default);
 		text-align: center;
+		cursor: default;
 		transition:
-			background-color 180ms ease,
-			border-color 180ms ease,
-			box-shadow 180ms ease,
-			color 180ms ease,
-			transform 180ms ease;
+			color 480ms cubic-bezier(0.16, 1, 0.3, 1),
+			background-color 480ms cubic-bezier(0.16, 1, 0.3, 1),
+			transform 600ms cubic-bezier(0.16, 1, 0.3, 1),
+			text-shadow 600ms cubic-bezier(0.16, 1, 0.3, 1);
 	}
 
-	.lyric-row.timed {
+	.lyric-line:first-child {
+		margin-top: 0;
+	}
+
+	.lyric-line.timed {
 		cursor: pointer;
 	}
 
-	.lyric-row.timed:hover {
-		background: rgba(255, 255, 255, 0.72);
-		color: rgb(68 64 60);
-	}
-
-	.lyric-row.chorus-line {
-		border-color: rgba(245, 158, 11, 0.12);
-		background: rgba(255, 251, 235, 0.56);
-	}
-
-	.lyric-row.active {
-		border-color: rgba(255, 136, 12, 0.2);
-		background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(255, 247, 237, 0.94));
-		box-shadow: 0 18px 45px rgba(120, 113, 108, 0.14);
-		color: rgb(28 25 23);
-		transform: translateY(-1px);
-	}
-
-	.lyric-row.chorus-line.active {
-		background: linear-gradient(135deg, rgba(255, 251, 235, 0.98), rgba(255, 237, 213, 0.92));
-	}
-
-	.lyric-time {
-		grid-area: time;
-		color: rgb(168 162 158);
-		font-size: 0.68rem;
-		font-weight: 800;
-		font-variant-numeric: tabular-nums;
-		line-height: 1;
-	}
-
-	.lyric-row.active .lyric-time {
-		color: rgb(194 100 12);
-	}
-
-	.untimed .lyric-time {
-		display: none;
-	}
-
-	.lyric-marker {
-		grid-area: marker;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 1.85rem;
-		height: 1.85rem;
-		border: 1px solid rgb(231 229 228);
-		border-radius: 999px;
-		background: rgba(250, 250, 249, 0.95);
-		color: rgb(120 113 108);
-		font-size: 0.78rem;
-		font-weight: 900;
-		line-height: 1;
-		transition:
-			background-color 180ms ease,
-			border-color 180ms ease,
-			color 180ms ease,
-			transform 180ms ease;
-	}
-
-	.lyric-marker:not(.has-number)::after {
-		content: '';
-		display: block;
-		width: 0.48rem;
-		height: 0.48rem;
-		border-radius: 999px;
-		background: rgb(214 211 209);
-	}
-
-	.chorus-line .lyric-marker {
-		border-color: rgba(251, 146, 60, 0.28);
-		background: rgba(255, 237, 213, 0.8);
-		color: rgb(154 83 8);
-	}
-
-	.chorus-line .lyric-marker:not(.has-number)::after {
-		background: rgb(245 158 11);
-	}
-
-	.lyric-row.active .lyric-marker {
-		border-color: rgb(139 115 85);
-		background: rgb(139 115 85);
-		color: white;
-		transform: scale(1.08);
-	}
-
-	.lyric-row.active .lyric-marker:not(.has-number)::after {
-		background: white;
-	}
-
-	.lyric-copy {
-		grid-area: copy;
-		min-width: 0;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 0.45rem;
-		width: min(100%, 44rem);
-		margin: 0 auto;
-		color: inherit;
-		font-size: 1rem;
-		font-weight: 600;
-		line-height: 1.75;
-	}
-
-	.lyric-row.active .lyric-copy {
-		font-weight: 700;
-	}
-
-	.chorus-label {
-		align-self: center;
-		border: 1px solid rgba(251, 146, 60, 0.2);
-		border-radius: 999px;
-		background: rgba(255, 255, 255, 0.7);
-		padding: 0.2rem 0.5rem;
-		color: rgb(194 100 12);
-		font-size: 0.62rem;
-		font-weight: 900;
-		letter-spacing: 0.14em;
-		line-height: 1;
-		text-transform: uppercase;
-	}
-
-	.lyric-heading {
-		margin: 0.45rem 0 0.25rem;
-		border-radius: 1rem;
-		background: linear-gradient(135deg, rgba(250, 250, 249, 0.95), rgba(245, 245, 244, 0.92));
-		padding: 0.95rem 1rem;
-		color: rgb(87 83 78);
-		text-align: center;
-		font-size: 0.82rem;
-		font-weight: 900;
-		letter-spacing: 0.18em;
+	.lyric-text {
+		display: inline-block;
+		max-width: min(100%, 38rem);
+		/* Cormorant Garamond is the site's display serif — gives lyrics a
+		   hymnal/liturgical character that distinguishes this from a generic
+		   sans-serif music app. Letter-spacing nudged up for breathing room
+		   at large weights. */
+		font-family: var(--font-display, 'Cormorant Garamond', Georgia, serif);
+		font-size: 1.4rem;
+		font-weight: 500;
 		line-height: 1.5;
-		text-transform: uppercase;
-	}
-
-	.lyric-heading.chorus-line {
-		background: rgba(255, 237, 213, 0.68);
-		color: rgb(194 100 12);
+		letter-spacing: 0.005em;
+		font-feature-settings: 'liga', 'dlig', 'kern';
+		transition: opacity 480ms cubic-bezier(0.16, 1, 0.3, 1);
 	}
 
 	@media (min-width: 768px) {
-		.lyric-copy {
-			font-size: 1.0625rem;
+		.lyric-text {
+			font-size: 1.625rem;
+			line-height: 1.55;
 		}
 	}
 
+	/* ─── Past/future dimming applies to text only, not wrapper ──────────
+	   So the chorus background tint persists, keeping song structure
+	   visible at any scroll position. */
+	.lyric-line.past .lyric-text {
+		opacity: 0.34;
+	}
+
+	.lyric-line.future .lyric-text {
+		opacity: 0.62;
+	}
+
+	.lyric-line.timed:hover:not(.active) {
+		color: var(--lyric-color-active);
+	}
+
+	.lyric-line.timed:hover:not(.active) .lyric-text {
+		opacity: 0.92;
+	}
+
+	/* ─── Refrain (chorus) lines: italic, warmer color, tinted backdrop ──
+	   Adjacent chorus lines merge into one continuous block by collapsing
+	   the inter-line margin and rounding only the block's outer corners. */
+	.lyric-line.chorus {
+		color: var(--lyric-color-chorus-default);
+		background-color: var(--lyric-chorus-bg);
+	}
+
+	.lyric-line.chorus .lyric-text {
+		font-style: italic;
+	}
+
+	/* Merge consecutive chorus lines into a single visual block */
+	.lyric-line.chorus + .lyric-line.chorus {
+		margin-top: 0;
+	}
+
+	/* Round only the top corners of the FIRST chorus line in a run */
+	.lyric-line.chorus:first-child,
+	.lyric-line:not(.chorus) + .lyric-line.chorus,
+	.lyric-section + .lyric-line.chorus {
+		border-top-left-radius: 0.6rem;
+		border-top-right-radius: 0.6rem;
+	}
+
+	/* Round only the bottom corners of the LAST chorus line in a run */
+	.lyric-line.chorus:last-child,
+	.lyric-line.chorus:has(+ .lyric-line:not(.chorus)),
+	.lyric-line.chorus:has(+ .lyric-section) {
+		border-bottom-left-radius: 0.6rem;
+		border-bottom-right-radius: 0.6rem;
+	}
+
+	/* ─── The current line gets the spotlight ──────────────
+	   Scale + weight + warm orange glow. Karaoke moment. */
+	.lyric-line.active {
+		color: var(--lyric-color-active);
+		transform: scale(1.025);
+		text-shadow:
+			0 0 22px var(--lyric-glow-active),
+			0 0 1px rgba(255, 136, 12, 0.18);
+	}
+
+	.lyric-line.active .lyric-text {
+		opacity: 1;
+		font-weight: 600;
+	}
+
+	.lyric-line.active.chorus {
+		color: var(--lyric-color-accent);
+		background-color: var(--lyric-chorus-bg-active);
+		text-shadow:
+			0 0 24px rgba(255, 136, 12, 0.45),
+			0 0 1px rgba(255, 136, 12, 0.32);
+	}
+
+	/* ─── Section dividers (Refrain, Couplet N) ───────────────────────────
+	   Editorial small-caps with hairline rules either side — hymnal style.
+	   Chorus dividers get a heavier rule + sienna ornament so the eye
+	   instantly catches "here's the refrain block coming up". */
+	.lyric-section {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.7rem;
+		margin: 1.25rem auto 0.4rem;
+		max-width: 26rem;
+		padding: 0 1rem;
+		text-transform: uppercase;
+		transition:
+			opacity 480ms cubic-bezier(0.16, 1, 0.3, 1),
+			color 480ms cubic-bezier(0.16, 1, 0.3, 1);
+	}
+
+	.lyric-section.past {
+		opacity: 0.34;
+	}
+
+	.lyric-section.future {
+		opacity: 0.72;
+	}
+
+	.lyric-section-rule {
+		flex: 1;
+		height: 1px;
+		background: linear-gradient(
+			to right,
+			transparent,
+			var(--lyric-rule-color) 50%,
+			transparent
+		);
+	}
+
+	.lyric-section-label {
+		flex: 0 0 auto;
+		font-family: var(--font-body, 'Outfit', system-ui, sans-serif);
+		font-size: 0.62rem;
+		font-weight: 800;
+		letter-spacing: 0.28em;
+		color: var(--lyric-color-default);
+	}
+
+	/* CSS-drawn diamond — small rotated square, guaranteed to render
+	   identically across platforms (no font subset gamble). Sits flanking
+	   the "Refrain" label as a hymnal-style fleuron. */
+	.lyric-section-ornament {
+		flex: 0 0 auto;
+		display: inline-block;
+		width: 5px;
+		height: 5px;
+		background: var(--lyric-color-accent);
+		opacity: 0.7;
+		transform: rotate(45deg);
+	}
+
+	.lyric-section.chorus {
+		margin-top: 1.5rem; /* a touch more breathing room above refrains */
+	}
+
+	.lyric-section.chorus .lyric-section-label {
+		color: var(--lyric-color-accent);
+		font-size: 0.68rem;
+		letter-spacing: 0.32em;
+	}
+
+	.lyric-section.chorus .lyric-section-rule {
+		height: 1.5px;
+		background: linear-gradient(
+			to right,
+			transparent,
+			var(--lyric-rule-chorus) 50%,
+			transparent
+		);
+	}
+
+	/* ─── Mobile fullscreen overlay theme (dark) ──────────────────────────
+	   Inherits all the structure above; just inverts the palette for the
+	   blurred-artwork backdrop. */
 	@media (max-width: 767px) {
+		/* Dark mobile theme: warm cream + espresso, NOT generic white-on-black.
+		   Verse text is the same #efe5d0 cream as the rest of the site (just
+		   in shadow). Chorus tint uses the brand orange directly so it reads
+		   against the warm espresso drawer surface — not blocked by warm
+		   artwork bleed. */
 		.lyrics-panel.fullscreen-mobile {
+			--lyric-color-active: #fffaf0; /* warm cream nearly-white for spotlight */
+			--lyric-color-default: rgba(239, 229, 208, 0.78); /* warm cream at rest */
+			--lyric-color-chorus-default: #f4b988; /* warm peach — chorus reads as different hue */
+			--lyric-color-accent: #ffa64d; /* saturated brand orange — chorus active */
+			--lyric-chorus-bg: rgba(255, 136, 12, 0.1); /* visible against espresso */
+			--lyric-chorus-bg-active: rgba(255, 136, 12, 0.18);
+			--lyric-glow-active: rgba(255, 168, 64, 0.42);
+			--lyric-rule-color: rgba(239, 229, 208, 0.24);
+			--lyric-rule-chorus: rgba(255, 168, 64, 0.6);
+
 			max-height: none;
 			min-height: 0;
 			flex: 1 1 auto;
-			gap: 0.35rem;
-			padding: 0.35rem 0 2.75rem;
+			padding: 0.5rem 0 3rem;
 			scroll-padding-block: 42%;
-			scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+			scrollbar-color: rgba(239, 229, 208, 0.18) transparent;
 		}
 
 		.lyrics-panel.fullscreen-mobile::-webkit-scrollbar-thumb {
-			background: rgba(255, 255, 255, 0.18);
+			background: rgba(239, 229, 208, 0.18);
 		}
 
-		.lyrics-panel.fullscreen-mobile .lyric-row {
-			column-gap: 0.4rem;
-			row-gap: 0.42rem;
-			border-radius: 1.1rem;
-			border-color: transparent;
-			background: transparent;
-			padding: 0.95rem 0.55rem;
-			color: rgba(255, 255, 255, 0.56);
-			box-shadow: none;
+		.lyrics-panel.fullscreen-mobile .lyric-line {
+			margin-top: 0.25rem;
+			padding: 0.55rem 0.85rem;
 		}
 
-		.lyrics-panel.fullscreen-mobile .lyric-row.timed:hover {
-			background: rgba(255, 255, 255, 0.07);
-			color: rgba(255, 255, 255, 0.78);
+		.lyrics-panel.fullscreen-mobile .lyric-line:first-child {
+			margin-top: 0;
 		}
 
-		.lyrics-panel.fullscreen-mobile .lyric-line.past {
-			opacity: 0.62;
+		.lyrics-panel.fullscreen-mobile .lyric-line.chorus + .lyric-line.chorus {
+			margin-top: 0;
 		}
 
-		.lyrics-panel.fullscreen-mobile .lyric-line.future {
-			opacity: 0.42;
+		.lyrics-panel.fullscreen-mobile .lyric-line.past .lyric-text {
+			opacity: 0.24;
 		}
 
-		.lyrics-panel.fullscreen-mobile .lyric-row.active {
-			border-color: rgba(255, 255, 255, 0.12);
-			background: rgba(255, 255, 255, 0.08);
-			box-shadow: none;
-			color: rgb(255, 255, 255);
-			opacity: 1;
-			transform: none;
+		.lyrics-panel.fullscreen-mobile .lyric-line.future .lyric-text {
+			opacity: 0.55;
 		}
 
-		.lyrics-panel.fullscreen-mobile .lyric-row.chorus-line {
-			border-color: transparent;
-			background: rgba(255, 255, 255, 0.035);
+		.lyrics-panel.fullscreen-mobile .lyric-line.timed:hover:not(.active) {
+			color: rgba(255, 250, 240, 0.95);
 		}
 
-		.lyrics-panel.fullscreen-mobile .lyric-row.chorus-line.active {
-			background: rgba(255, 136, 12, 0.12);
+		.lyrics-panel.fullscreen-mobile .lyric-line.timed:hover:not(.active) .lyric-text {
+			opacity: 0.92;
 		}
 
-		.lyrics-panel.fullscreen-mobile .lyric-time {
-			color: rgba(255, 255, 255, 0.42);
-			font-size: 0.64rem;
+		.lyrics-panel.fullscreen-mobile .lyric-line.active {
+			text-shadow:
+				0 0 28px var(--lyric-glow-active),
+				0 0 2px rgba(255, 168, 64, 0.32);
 		}
 
-		.lyrics-panel.fullscreen-mobile .lyric-row.active .lyric-time {
-			color: rgba(255, 214, 169, 0.78);
+		.lyrics-panel.fullscreen-mobile .lyric-line.active.chorus {
+			text-shadow:
+				0 0 30px rgba(255, 168, 64, 0.6),
+				0 0 2px rgba(255, 168, 64, 0.42);
 		}
 
-		.lyrics-panel.fullscreen-mobile .lyric-marker {
-			border-color: rgba(255, 255, 255, 0.18);
-			background: rgba(255, 255, 255, 0.08);
-			color: rgba(255, 255, 255, 0.72);
-		}
-
-		.lyrics-panel.fullscreen-mobile .lyric-marker:not(.has-number)::after {
-			background: rgba(255, 255, 255, 0.34);
-		}
-
-		.lyrics-panel.fullscreen-mobile .lyric-row.active .lyric-marker {
-			border-color: rgba(255, 136, 12, 0.9);
-			background: rgb(255, 136, 12);
-			color: white;
-		}
-
-		.lyrics-panel.fullscreen-mobile .lyric-copy {
-			width: min(100%, 21rem);
-			color: inherit;
-			font-size: 1.08rem;
-			font-weight: 600;
-			line-height: 1.62;
-		}
-
-		.lyrics-panel.fullscreen-mobile .lyric-row.active .lyric-copy {
-			font-weight: 700;
-		}
-
-		.lyrics-panel.fullscreen-mobile .chorus-label {
-			border-color: rgba(255, 255, 255, 0.14);
-			background: rgba(255, 255, 255, 0.1);
-			color: rgba(255, 222, 186, 0.92);
-		}
-
-		.lyrics-panel.fullscreen-mobile .lyric-heading {
-			margin: 0.6rem 0 0.25rem;
-			border: 1px solid rgba(255, 255, 255, 0.08);
-			border-radius: 1rem;
-			background: rgba(255, 255, 255, 0.07);
-			padding: 0.85rem 0.9rem;
-			color: rgba(255, 255, 255, 0.7);
-			font-size: 0.75rem;
-			letter-spacing: 0.14em;
-		}
-
-		.lyrics-panel.fullscreen-mobile .lyric-heading.chorus-line {
-			background: rgba(255, 136, 12, 0.1);
-			color: rgba(255, 222, 186, 0.88);
+		.lyrics-panel.fullscreen-mobile .lyric-text {
+			font-size: 1.45rem;
+			line-height: 1.5;
 		}
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.lyric-line {
-			transition: none;
+		.lyric-line,
+		.lyric-section {
+			transition:
+				color 0ms,
+				opacity 0ms;
+		}
+
+		.lyric-line.active {
+			transform: none;
 		}
 	}
 </style>
