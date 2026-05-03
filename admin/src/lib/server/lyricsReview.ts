@@ -2,6 +2,12 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { env } from '$env/dynamic/private';
 import { getDb } from '../../db/mongo';
+// Build-time CSV fallback. Vercel serverless functions can't read arbitrary
+// repo files at runtime (process.cwd() is the read-only Lambda bundle), so we
+// inline the CSV as a string. In dev, fs.readFile takes precedence so script
+// regenerations are picked up without rebuilding. Bundle cost: ~650 KB for
+// any function that imports lyricsReview.
+import bundledCsv from '../../../lyrics-matches.csv?raw';
 
 export type LyricsReviewRow = Record<string, string>;
 
@@ -247,9 +253,22 @@ export async function extractLyricsFromUrl(
 	};
 }
 
-async function readLyricsCsvRows() {
+async function readCsvText(): Promise<string> {
 	const csvPath = getCsvPath();
-	const text = await fs.readFile(csvPath, 'utf8');
+	try {
+		return await fs.readFile(csvPath, 'utf8');
+	} catch (err) {
+		// On Vercel the file isn't on the function FS — fall back to the
+		// build-time inlined CSV. Other I/O errors propagate.
+		if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+			return bundledCsv;
+		}
+		throw err;
+	}
+}
+
+async function readLyricsCsvRows() {
+	const text = await readCsvText();
 	const { headers, rows } = parseCsv(text);
 	const mergedHeaders = mergeHeaders(headers, BASE_HEADERS);
 
@@ -385,6 +404,10 @@ async function tryUpdateCsvReviews(reviews: LyricsReviewRow[]) {
 	try {
 		const reviewMap = new Map(reviews.map((review) => [review.audio_id, review]));
 		const csvPath = getCsvPath();
+		// Read directly from disk here (no bundled fallback) — the goal is to
+		// rewrite the on-disk CSV to mirror review state in dev. On serverless,
+		// this throws ENOENT and the catch below logs + returns false, which
+		// is the intended behavior (writes are read-only there anyway).
 		const text = await fs.readFile(csvPath, 'utf8');
 		const parsed = parseCsv(text);
 		const headers = mergeHeaders(parsed.headers, BASE_HEADERS);
