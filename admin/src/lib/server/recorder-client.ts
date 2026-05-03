@@ -10,7 +10,15 @@ export interface RecorderStatus {
 	createdBy?: string;
 	createdByName?: string | null;
 	pendingOrphans: number;
+	/** Orphan recovery (post-restart upload backfill) is running. */
 	recovering: boolean;
+	/** ffmpeg died unexpectedly mid-broadcast; recorder is between
+	 *  restart attempts. UI should show "reconnecting…". */
+	sourceRecovering?: boolean;
+	/** How many segments the recording is composed of so far. >1 means
+	 *  the upstream dropped at least once; the segments will be concat'd
+	 *  on Stop. */
+	segmentCount?: number;
 }
 
 export interface StartResult {

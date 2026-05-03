@@ -75,6 +75,22 @@
 			? (recorder.createdByName ?? null)
 			: null
 	);
+	// Surfaced when the recorder's ffmpeg died unexpectedly (streamer dropout)
+	// and we're between auto-restart attempts. The recording is still active —
+	// the operator just needs to know audio is paused while the source recovers.
+	const sourceRecovering = $derived(
+		recorder.available && 'recording' in recorder && recorder.recording
+			? Boolean(recorder.sourceRecovering)
+			: false
+	);
+	// >1 means the upstream dropped at least once and we've started a new
+	// segment. All segments are concat'd into a single MP3 on Stop, but the
+	// operator should know the recording isn't a single take.
+	const segmentCount = $derived(
+		recorder.available && 'recording' in recorder && recorder.recording
+			? (recorder.segmentCount ?? 1)
+			: 1
+	);
 
 	/** Prefer a stored full name; fall back to the local-part of the email.
 	 *  Shown everywhere we mention who started/created a session. */
@@ -1414,6 +1430,17 @@
 		<rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor" />
 	</svg>
 {/snippet}
+{#snippet iconRecordStop()}
+	<svg class="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
+		<circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.75" />
+		<circle cx="12" cy="12" r="3.75" fill="currentColor" />
+	</svg>
+{/snippet}
+{#snippet iconLiveStop()}
+	<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+		<path stroke-linecap="round" stroke-linejoin="round" d="M12 3v9M5.5 8a8 8 0 1013 0" />
+	</svg>
+{/snippet}
 {#snippet iconBoth()}
 	<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
 		<circle cx="9" cy="12" r="3" fill="currentColor" stroke="none" />
@@ -1495,10 +1522,24 @@
 				{/if}
 				{#if isRecording}
 					<div class="flex flex-1 flex-col sm:flex-initial sm:items-end">
-						<span class="text-[9px] font-bold uppercase tracking-[0.2em] text-stone-500">Enregistrement</span>
-						<span class="font-mono text-2xl font-semibold text-stone-700 tabular-nums leading-tight">
+						<span class="text-[9px] font-bold uppercase tracking-[0.2em] {sourceRecovering ? 'text-amber-600' : 'text-stone-500'}">Enregistrement</span>
+						<span class="font-mono text-2xl font-semibold {sourceRecovering ? 'text-amber-700' : 'text-stone-700'} tabular-nums leading-tight">
 							{formatElapsed(elapsed)}
 						</span>
+						{#if sourceRecovering}
+							<span class="mt-1 inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-700">
+								<span class="relative inline-flex h-1.5 w-1.5">
+									<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500 opacity-75"></span>
+									<span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+								</span>
+								Reconnexion en cours
+								{#if segmentCount > 1} · {segmentCount} segments{/if}
+							</span>
+						{:else if segmentCount > 1}
+							<span class="mt-1 text-[10px] text-stone-500">
+								{segmentCount} segments · fusion à l'arrêt
+							</span>
+						{/if}
 					</div>
 				{/if}
 			</div>
@@ -1527,7 +1568,7 @@
 					disabled={broadcastBusy}
 					class="inline-flex items-center justify-center gap-2 border border-stone-300 bg-stone-100 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-stone-800 transition-all hover:border-stone-900 hover:bg-stone-900 hover:text-white disabled:opacity-50 sm:order-1"
 				>
-					{@render iconStop()}
+					{@render iconLiveStop()}
 					<span>{broadcastBusy ? '…' : 'Terminer le direct'}</span>
 				</button>
 				<button
@@ -1535,7 +1576,7 @@
 					disabled={busy}
 					class="inline-flex items-center justify-center gap-2 border border-rose-200 bg-rose-50 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-rose-700 transition-all hover:border-rose-600 hover:bg-rose-600 hover:text-white disabled:opacity-50 sm:order-2"
 				>
-					{@render iconStop()}
+					{@render iconRecordStop()}
 					<span>{busy ? 'Arrêt…' : 'Arrêter l\'enregistrement'}</span>
 				</button>
 				<button
@@ -1591,7 +1632,7 @@
 					disabled={broadcastBusy}
 					class="inline-flex items-center justify-center gap-2 bg-stone-800 px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white shadow-sm shadow-stone-900/20 ring-1 ring-stone-900/40 transition-all hover:bg-stone-900 hover:shadow-md hover:shadow-stone-900/30 disabled:opacity-50"
 				>
-					{@render iconStop()}
+					{@render iconLiveStop()}
 					<span>{broadcastBusy ? 'Arrêt…' : 'Terminer le direct'}</span>
 				</button>
 				<button
@@ -1615,7 +1656,7 @@
 					disabled={busy}
 					class="inline-flex items-center justify-center gap-2 bg-rose-600 px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white shadow-sm shadow-rose-600/30 ring-1 ring-rose-600/50 transition-all hover:bg-rose-700 hover:shadow-md hover:shadow-rose-600/40 disabled:opacity-50"
 				>
-					{@render iconStop()}
+					{@render iconRecordStop()}
 					<span>{busy ? 'Arrêt…' : 'Arrêter l\'enregistrement'}</span>
 				</button>
 				<button
