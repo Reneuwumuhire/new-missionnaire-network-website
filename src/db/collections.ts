@@ -989,8 +989,9 @@ export async function setRadioCachedStatus(status: RadioCachedStatus): Promise<v
 // ── Broadcast admin gate state ─────────────────────────────────
 // Single document controlling whether the public site shows "live" — toggled
 // by an admin via the /recordings page. Independent from Icecast detection.
-// `icecast_offline_since` powers the 60s auto-end safety net implemented in
-// the radio-poll endpoint.
+// `icecast_offline_since` powers the auto-end safety net implemented in the
+// radio-poll endpoint (window configurable via ICECAST_OFFLINE_AUTO_END_MS,
+// default 5 min — gives streamers on poor uplinks room to reconnect).
 
 export type BroadcastAdminState = {
 	is_live: boolean;

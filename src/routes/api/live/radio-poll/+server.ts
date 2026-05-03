@@ -1,4 +1,5 @@
 import { json } from '@sveltejs/kit';
+import { env } from '$env/dynamic/private';
 import { probeLiveAudio, getLiveAudioSourceUrl } from '$lib/server/live-audio';
 import {
 	claimCheckSlot,
@@ -14,7 +15,16 @@ import { checkAndIngestLiveStream } from '$lib/server/youtube-poller';
 import { sendPushToAll, radioLivePayload } from '$lib/server/push-notifications';
 
 const RADIO_PROBE_INTERVAL = 10_000; // 10 seconds between probes
-const ICECAST_OFFLINE_AUTO_END_MS = 60_000; // 60s grace before auto-ending the broadcast
+
+// Grace window before the auto-end safety closes the broadcast gate when
+// Icecast goes offline. Tolerates streamer uplink dropouts on poor networks
+// without prematurely ending the broadcast (and stranding the in-flight
+// recording, which the Fly.io recorder finalizes when its Icecast read EOFs).
+// Override via ICECAST_OFFLINE_AUTO_END_MS env var.
+const ICECAST_OFFLINE_AUTO_END_MS = (() => {
+	const raw = Number(env.ICECAST_OFFLINE_AUTO_END_MS);
+	return Number.isFinite(raw) && raw > 0 ? raw : 300_000;
+})();
 
 export async function GET({ url, setHeaders }) {
 	const sid = url.searchParams.get('sid');
@@ -108,9 +118,10 @@ export async function GET({ url, setHeaders }) {
 }
 
 /**
- * If the admin gate is open but Icecast has been offline for >60s, close the gate.
- * Tracks the start of the offline window in `broadcast_admin_state.icecast_offline_since`.
- * Resets that timestamp whenever Icecast is detected live again.
+ * If the admin gate is open but Icecast has been offline longer than
+ * ICECAST_OFFLINE_AUTO_END_MS, close the gate. Tracks the start of the
+ * offline window in `broadcast_admin_state.icecast_offline_since`. Resets
+ * that timestamp whenever Icecast is detected live again.
  *
  * Returns the (possibly updated) admin gate state.
  */
@@ -146,7 +157,9 @@ async function applyAutoEndSafety(
 
 	const offlineFor = now - new Date(current.icecast_offline_since).getTime();
 	if (offlineFor >= ICECAST_OFFLINE_AUTO_END_MS) {
-		console.log('[RadioPoll] Auto-ending broadcast: Icecast offline >60s with gate open');
+		console.log(
+			`[RadioPoll] Auto-ending broadcast: Icecast offline >${Math.round(ICECAST_OFFLINE_AUTO_END_MS / 1000)}s with gate open`
+		);
 		await setBroadcastAdminState({
 			is_live: false,
 			ended_at: new Date(now).toISOString(),
