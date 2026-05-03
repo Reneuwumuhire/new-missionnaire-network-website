@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
-	import { getContext, onDestroy, onMount } from 'svelte';
+	import { getContext, onDestroy, onMount, tick } from 'svelte';
 	import { get } from 'svelte/store';
 	import {
 		clearPlayerSnapshot,
@@ -21,6 +21,8 @@
 	import BsHeartFill from 'svelte-icons-pack/bs/BsHeartFill';
 	import BsHeart from 'svelte-icons-pack/bs/BsHeart';
 	import BsThreeDotsVertical from 'svelte-icons-pack/bs/BsThreeDotsVertical';
+	import BsMusicNoteList from 'svelte-icons-pack/bs/BsMusicNoteList';
+	import SyncedLyrics from '$lib/components/SyncedLyrics.svelte';
 	import {
 		selectAudio,
 		playlist,
@@ -47,6 +49,8 @@
 	import { isCached, prefetchAudio } from '$lib/audioCache';
 	import { isOnline } from '$lib/onlineStatus';
 	// ── END: cache indicator imports ──────────────────────────────
+
+	type LyricLine = string | Record<string, unknown>;
 
 	let audio: HTMLAudioElement;
 	let currentTime = 0;
@@ -78,6 +82,11 @@
 	let sleepTimerTick: ReturnType<typeof setInterval> | null = null;
 	let customSleepTime = '';
 	let hasPlaylistNavigation = false;
+	let lyricsLines: LyricLine[] = [];
+	let lyricsPanelOpen = false;
+	let hasLyrics = false;
+	let lyricsFetchToken = 0;
+	let lastLyricsAudioId = '';
 
 	$: hasPlaylistNavigation = $playlist.length > 1;
 	$: sleepTimerRemainingLabel =
@@ -410,6 +419,54 @@
 		return String(item._id || item.s3_url || item.mp3_url || '');
 	}
 
+	function getLyricsAudioId(item: unknown): string {
+		if (!item || typeof item !== 'object' || !('s3_url' in item)) return '';
+		const id = (item as { _id?: unknown })._id;
+		return typeof id === 'string' && id.trim() ? id.trim() : '';
+	}
+
+	function resetLyricsState() {
+		lyricsLines = [];
+		lyricsPanelOpen = false;
+	}
+
+	async function loadLyricsForAudio(audioId: string, token: number) {
+		lyricsLines = [];
+		lyricsPanelOpen = false;
+
+		try {
+			const response = await fetch(`/api/music-audio/${encodeURIComponent(audioId)}/lyrics`);
+			if (token !== lyricsFetchToken) return;
+
+			if (!response.ok) {
+				resetLyricsState();
+				return;
+			}
+
+			const payload = (await response.json()) as {
+				data?: { lines?: LyricLine[]; timeline_published?: unknown } | null;
+			};
+			lyricsLines = Array.isArray(payload.data?.lines) ? payload.data.lines : [];
+		} catch (error) {
+			if (token === lyricsFetchToken) {
+				console.warn('[AudioPlayer] Lyrics load failed:', error);
+				resetLyricsState();
+			}
+		}
+	}
+
+	function toggleLyricsPanel() {
+		if (lyricsLines.length === 0) return;
+		lyricsPanelOpen = !lyricsPanelOpen;
+	}
+
+	function handleLyricsSeek(event: CustomEvent<{ time: number }>) {
+		if (!audio || !Number.isFinite(event.detail.time)) return;
+		audio.currentTime = Math.max(0, event.detail.time);
+		rememberPlaybackPosition(audio.currentTime, audio.duration);
+		updateAudioTime();
+	}
+
 	function handleToggleFavorite() {
 		if (!$selectAudio) return;
 		const audio = $selectAudio as any;
@@ -424,6 +481,20 @@
 
 	$: currentFavId = getAudioFavId($selectAudio);
 	$: isCurrentFavorite = isFavorite(currentFavId, $favorites);
+	$: hasLyrics = lyricsLines.length > 0;
+
+	$: if (browser) {
+		const lyricsAudioId = getLyricsAudioId($selectAudio);
+		if (lyricsAudioId !== lastLyricsAudioId) {
+			lastLyricsAudioId = lyricsAudioId;
+			lyricsFetchToken++;
+			if (lyricsAudioId) {
+				void loadLyricsForAudio(lyricsAudioId, lyricsFetchToken);
+			} else {
+				resetLyricsState();
+			}
+		}
+	}
 
 	// ── BEGIN: cache indicator state (added) ──────────────────────
 	// Tracks whether the currently playing track has been cached by
@@ -1248,10 +1319,7 @@
 	function syncMediaSessionPlaylistHandlers(canNavigate = hasPlaylistNavigation) {
 		if (!browser || !('mediaSession' in navigator)) return;
 		try {
-			navigator.mediaSession.setActionHandler(
-				'previoustrack',
-				canNavigate ? playPrevious : null
-			);
+			navigator.mediaSession.setActionHandler('previoustrack', canNavigate ? playPrevious : null);
 			navigator.mediaSession.setActionHandler('nexttrack', canNavigate ? playNext : null);
 		} catch (err) {
 			console.warn('[AudioPlayer] MediaSession playlist handler sync failed:', err);
@@ -1315,6 +1383,11 @@
 		return anyItem.thumbnail_url || anyItem.cover_url || '/icons/pwa-512x512.png';
 	}
 
+	function getLyricsArtworkStyle(item: PlayableAudio | null): string {
+		const safeUrl = encodeURI(getArtworkUrl(item)).replace(/"/g, '%22');
+		return `--lyrics-artwork: url("${safeUrl}")`;
+	}
+
 	// Reactive metadata updates — whenever the selected track changes, the
 	// car/lock screen reads the new title/artist/album/artwork.
 	$: if (browser && $selectAudio && 'mediaSession' in navigator) {
@@ -1372,6 +1445,10 @@
 	function handleKeydown(event: KeyboardEvent) {
 		if (event.key === 'Escape' && isSleepTimerOpen) {
 			isSleepTimerOpen = false;
+			return;
+		}
+		if (event.key === 'Escape' && lyricsPanelOpen) {
+			lyricsPanelOpen = false;
 			return;
 		}
 
@@ -1444,6 +1521,12 @@
 		};
 	});
 
+	$: if (browser && playerShell) {
+		lyricsPanelOpen;
+		lyricsLines.length;
+		void tick().then(syncPlayerInset);
+	}
+
 	onDestroy(() => {
 		// Order matters. Set `destroyed` first so every guarded code
 		// path bails — including the pause-event handler that runs
@@ -1498,8 +1581,43 @@
 {#if $selectAudio}
 	<div
 		bind:this={playerShell}
+		class:lyrics-open={lyricsPanelOpen && hasLyrics}
 		class="audio-player-shell fixed z-[100] bottom-0 left-0 right-0 w-full bg-white/95 backdrop-blur-md border-t border-stone-200 shadow-[0_-4px_20px_rgb(0,0,0,0.06)] pt-2 md:pt-4"
+		style={lyricsPanelOpen && hasLyrics
+			? getLyricsArtworkStyle($selectAudio as PlayableAudio)
+			: undefined}
 	>
+		{#if lyricsPanelOpen && hasLyrics}
+			<div class="lyrics-drawer px-4 pb-3 pt-2 md:px-10 md:pb-4">
+				<div class="lyrics-drawer-content mx-auto max-w-4xl">
+					<div class="lyrics-sheet-handle" aria-hidden="true"></div>
+					<div class="lyrics-drawer-header mb-3 flex items-center justify-between gap-3">
+						<div class="min-w-0">
+							<div class="text-[10px] font-bold uppercase tracking-[0.22em] text-missionnaire/90">
+								Paroles disponibles
+							</div>
+							<div class="mt-0.5 truncate text-sm font-semibold text-stone-500">
+								{getDisplayTitle($selectAudio)}
+							</div>
+						</div>
+						<button
+							type="button"
+							class="lyrics-close-btn"
+							on:click={() => (lyricsPanelOpen = false)}
+						>
+							Fermer
+						</button>
+					</div>
+					<SyncedLyrics
+						lines={lyricsLines}
+						{currentTime}
+						fullscreenMobile={true}
+						on:seek={handleLyricsSeek}
+					/>
+				</div>
+			</div>
+		{/if}
+
 		<!-- Top Progress Bar -->
 		<!-- svelte-ignore a11y-click-events-have-key-events -->
 		<!-- svelte-ignore a11y-no-static-element-interactions -->
@@ -1527,7 +1645,9 @@
 			</div>
 		</div>
 
-		<div class="px-5 md:px-10 max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:gap-8">
+		<div
+			class="player-main px-5 md:px-10 max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:gap-8"
+		>
 			<!-- Info Row -->
 			<div class="flex items-center justify-between mb-3 md:mb-0 md:flex-1 md:min-w-0">
 				<div class="flex-1 min-w-0 min-h-[2.75rem] md:min-h-[3rem]">
@@ -1617,6 +1737,22 @@
 				>
 					<Icon src={isCurrentFavorite ? BsHeartFill : BsHeart} size="18" />
 				</button>
+
+				{#if hasLyrics}
+					<button
+						type="button"
+						class="inline-flex flex-shrink-0 items-center gap-1.5 rounded-full px-2.5 py-2 text-xs font-bold transition-colors {lyricsPanelOpen
+							? 'bg-missionnaire text-white'
+							: 'bg-stone-50 text-stone-500 hover:bg-stone-100 hover:text-missionnaire'}"
+						on:click={toggleLyricsPanel}
+						aria-expanded={lyricsPanelOpen}
+						aria-label={lyricsPanelOpen ? 'Fermer les paroles' : 'Ouvrir les paroles'}
+						title={lyricsPanelOpen ? 'Fermer les paroles' : 'Paroles'}
+					>
+						<Icon src={BsMusicNoteList} size="17" />
+						<span class="hidden sm:inline">Paroles</span>
+					</button>
+				{/if}
 
 				<div class="relative flex-shrink-0">
 					<button
@@ -1775,10 +1911,11 @@
 						{#if hasPlaylistNavigation}
 							<button
 								on:click={playPrevious}
-								class="p-2 text-stone-600 hover:text-missionnaire transition-colors"
+								class="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-stone-500 transition-colors hover:bg-missionnaire hover:text-white"
+								aria-label="Piste précédente"
 								title="Précédent"
 							>
-								<Icon src={BsSkipStartFill} size="22" />
+								<Icon src={BsSkipStartFill} size="20" />
 							</button>
 						{:else}
 							<button
@@ -1820,10 +1957,11 @@
 						{#if hasPlaylistNavigation}
 							<button
 								on:click={playNext}
-								class="p-2 text-stone-600 hover:text-missionnaire transition-colors"
+								class="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-stone-500 transition-colors hover:bg-missionnaire hover:text-white"
+								aria-label="Piste suivante"
 								title="Suivant"
 							>
-								<Icon src={BsSkipEndFill} size="22" />
+								<Icon src={BsSkipEndFill} size="20" />
 							</button>
 						{:else}
 							<button
@@ -1919,6 +2057,7 @@
 
 <style>
 	.audio-player-shell {
+		--lyrics-artwork: none;
 		position: fixed;
 		inset-inline: 0;
 		bottom: 0;
@@ -1926,11 +2065,210 @@
 		padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
 		-webkit-backface-visibility: hidden;
 		backface-visibility: hidden;
+		isolation: isolate;
+	}
+
+	.audio-player-shell.lyrics-open {
+		background: rgba(250, 248, 243, 0.97);
+		box-shadow: 0 -18px 60px rgba(41, 37, 36, 0.12);
+	}
+
+	.lyrics-drawer {
+		border-bottom: 1px solid rgba(231, 229, 228, 0.74);
+		background: linear-gradient(180deg, rgba(255, 251, 245, 0.92), rgba(250, 248, 243, 0.68));
+	}
+
+	.lyrics-drawer-content {
+		position: relative;
+	}
+
+	.lyrics-sheet-handle {
+		width: 2.85rem;
+		height: 0.25rem;
+		margin: 0 auto 0.8rem;
+		border-radius: 999px;
+		background: rgba(120, 113, 108, 0.28);
+	}
+
+	.lyrics-close-btn {
+		flex-shrink: 0;
+		border: 1px solid rgba(214, 211, 209, 0.9);
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.74);
+		padding: 0.45rem 0.85rem;
+		color: rgb(87 83 78);
+		font-size: 0.62rem;
+		font-weight: 900;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		transition:
+			border-color 160ms ease,
+			background-color 160ms ease,
+			color 160ms ease;
+	}
+
+	.lyrics-close-btn:hover {
+		border-color: rgba(255, 136, 12, 0.55);
+		background: white;
+		color: rgb(194 100 12);
 	}
 
 	@media (min-width: 768px) {
 		.audio-player-shell {
 			padding-bottom: 1rem;
+		}
+
+		.audio-player-shell.lyrics-open .lyrics-drawer {
+			padding-top: 0.75rem;
+		}
+	}
+
+	@media (max-width: 767px) {
+		.audio-player-shell.lyrics-open {
+			top: 0;
+			height: 100dvh;
+			display: flex;
+			flex-direction: column;
+			overflow: hidden;
+			padding-top: 0;
+			background: rgb(24, 22, 19);
+			color: white;
+		}
+
+		.audio-player-shell.lyrics-open::before {
+			content: '';
+			position: absolute;
+			inset: -2rem;
+			z-index: -2;
+			background-image:
+				linear-gradient(180deg, rgba(24, 22, 19, 0.62), rgba(24, 22, 19, 0.94)),
+				var(--lyrics-artwork);
+			background-position: center;
+			background-size: cover;
+			filter: blur(24px) saturate(1.05);
+			opacity: 0.68;
+			transform: scale(1.08);
+		}
+
+		.audio-player-shell.lyrics-open::after {
+			content: '';
+			position: absolute;
+			inset: 0;
+			z-index: -1;
+			background:
+				radial-gradient(circle at 50% 8%, rgba(255, 136, 12, 0.24), transparent 32%),
+				linear-gradient(180deg, rgba(0, 0, 0, 0.08), rgba(21, 19, 17, 0.86) 54%);
+			pointer-events: none;
+		}
+
+		.audio-player-shell.lyrics-open .lyrics-drawer {
+			order: 2;
+			position: relative;
+			z-index: 1;
+			min-height: 0;
+			flex: 1 1 auto;
+			display: flex;
+			flex-direction: column;
+			margin-top: 0.45rem;
+			border: 1px solid rgba(255, 255, 255, 0.08);
+			border-bottom: 0;
+			border-radius: 2rem 2rem 0 0;
+			background: rgba(76, 66, 61, 0.9);
+			box-shadow: 0 -22px 70px rgba(0, 0, 0, 0.38);
+			padding: 0.9rem 1.25rem 1rem;
+			backdrop-filter: blur(22px);
+		}
+
+		.audio-player-shell.lyrics-open .lyrics-drawer-content {
+			min-height: 0;
+			width: 100%;
+			display: flex;
+			flex: 1 1 auto;
+			flex-direction: column;
+		}
+
+		.audio-player-shell.lyrics-open .lyrics-drawer-header {
+			border: 0;
+			border-radius: 0;
+			background: transparent;
+			padding: 0.15rem 0.2rem 0.85rem;
+			box-shadow: none;
+		}
+
+		.audio-player-shell.lyrics-open .lyrics-drawer-header .text-missionnaire\/90 {
+			color: rgba(255, 255, 255, 0.96);
+			letter-spacing: 0;
+			text-transform: none;
+			font-size: 0.95rem;
+		}
+
+		.audio-player-shell.lyrics-open .lyrics-drawer-header .text-stone-500 {
+			color: rgba(255, 255, 255, 0.52);
+		}
+
+		.audio-player-shell.lyrics-open .lyrics-sheet-handle {
+			width: 3.35rem;
+			height: 0.24rem;
+			margin-bottom: 1rem;
+			background: rgba(255, 255, 255, 0.86);
+		}
+
+		.audio-player-shell.lyrics-open .lyrics-close-btn {
+			border-color: rgba(255, 255, 255, 0.12);
+			background: rgba(255, 255, 255, 0.08);
+			color: rgba(255, 255, 255, 0.8);
+		}
+
+		.audio-player-shell.lyrics-open .lyrics-close-btn:hover {
+			border-color: rgba(255, 255, 255, 0.28);
+			background: rgba(255, 255, 255, 0.14);
+			color: white;
+		}
+
+		.audio-player-shell.lyrics-open .player-main {
+			order: 1;
+			position: relative;
+			z-index: 1;
+			width: 100%;
+			flex-shrink: 0;
+			border-top: 0;
+			background: transparent;
+			padding: calc(2rem + env(safe-area-inset-top, 0px)) 1.25rem 0.65rem;
+			box-shadow: none;
+		}
+
+		.audio-player-shell.lyrics-open .player-main .text-missionnaire {
+			color: rgba(255, 190, 119, 0.86);
+		}
+
+		.audio-player-shell.lyrics-open .player-main .text-stone-900,
+		.audio-player-shell.lyrics-open .player-main .text-stone-500 {
+			color: white;
+		}
+
+		.audio-player-shell.lyrics-open .player-main .text-stone-400 {
+			color: rgba(255, 255, 255, 0.58);
+		}
+
+		.audio-player-shell.lyrics-open .player-main .text-stone-300 {
+			color: rgba(255, 255, 255, 0.48);
+		}
+
+		.audio-player-shell.lyrics-open .player-main .bg-stone-50,
+		.audio-player-shell.lyrics-open .player-main .bg-stone-100 {
+			background: rgba(255, 255, 255, 0.1);
+		}
+
+		.audio-player-shell.lyrics-open .player-main .bg-gray-900 {
+			background: rgba(255, 255, 255, 0.12);
+		}
+
+		.audio-player-shell.lyrics-open .player-main .bg-gray-900:hover {
+			background: rgba(255, 255, 255, 0.18);
+		}
+
+		.audio-player-shell.lyrics-open .player-main .bg-stone-200 {
+			background: rgba(255, 255, 255, 0.22);
 		}
 	}
 </style>

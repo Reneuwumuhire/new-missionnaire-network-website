@@ -9,6 +9,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const permissions = getPermissions(locals.user);
 	if (!canViewDashboard(locals.user)) {
 		if (permissions.can_view_questions) throw redirect(303, '/questions');
+		if (permissions.can_review_lyrics) throw redirect(303, '/lyrics-review');
 		throw redirect(303, '/settings');
 	}
 
@@ -26,17 +27,13 @@ export const load: PageServerLoad = async ({ locals }) => {
 		canManageRecordings ? getBroadcastAdminState().catch(() => null) : Promise.resolve(null)
 	]);
 
-	const isRecording = Boolean(
-		recorder && 'recording' in recorder && recorder.recording
-	);
+	const isRecording = Boolean(recorder && 'recording' in recorder && recorder.recording);
 
 	// Two distinct states warrant a CTA banner on the dashboard:
 	const liveButNotBroadcasting = Boolean(
 		canManageRecordings && icecast?.sourceActive && broadcast && !broadcast.is_live
 	);
-	const liveButNotRecording = Boolean(
-		canManageRecordings && icecast?.sourceActive && !isRecording
-	);
+	const liveButNotRecording = Boolean(canManageRecordings && icecast?.sourceActive && !isRecording);
 
 	return {
 		stats,

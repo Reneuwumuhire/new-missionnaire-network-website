@@ -103,7 +103,9 @@ export const actions: Actions = {
 			action: 'update',
 			target_collection: 'admin_users',
 			target_id: email,
-			changes: { is_active: { old: action === 'activate' ? false : true, new: action === 'activate' } },
+			changes: {
+				is_active: { old: action === 'activate' ? false : true, new: action === 'activate' }
+			},
 			ip_address: getClientAddress()
 		});
 
@@ -150,6 +152,7 @@ export const actions: Actions = {
 		const canEdit = formData.get('can_edit') === 'on';
 		const canDelete = formData.get('can_delete') === 'on';
 		const canManageRecordings = formData.get('can_manage_recordings') === 'on';
+		const canReviewLyrics = formData.get('can_review_lyrics') === 'on';
 		const canViewQuestions = formData.get('can_view_questions') === 'on';
 		const canAnswerQuestions = formData.get('can_answer_questions') === 'on';
 		const canModerateQuestions = formData.get('can_moderate_questions') === 'on';
@@ -163,6 +166,7 @@ export const actions: Actions = {
 			can_edit: canEdit,
 			can_delete: canDelete,
 			can_manage_recordings: canManageRecordings,
+			can_review_lyrics: canReviewLyrics,
 			can_view_questions: canViewQuestions,
 			can_answer_questions: canAnswerQuestions,
 			can_moderate_questions: canModerateQuestions

@@ -593,9 +593,35 @@
 		goto(`?${params.toString()}`);
 	}
 
+	function shuffleQueueWithFirstSong(songs: MusicAudio[], firstSong: MusicAudio) {
+		const rest = songs.filter((song) => song.s3_url !== firstSong.s3_url);
+		for (let i = rest.length - 1; i > 0; i--) {
+			const j = Math.floor(Math.random() * (i + 1));
+			[rest[i], rest[j]] = [rest[j], rest[i]];
+		}
+		return [firstSong, ...rest];
+	}
+
 	function playSong(song: MusicAudio) {
-		const index = playlistIndexByUrl.get(song.s3_url) ?? 0;
-		currentIndex.set(index);
+		const queueSource =
+			musicPlaylist.length > 0 ? musicPlaylist : musicList.length > 0 ? musicList : [song];
+		const queue = queueSource.some((item) => item.s3_url === song.s3_url)
+			? queueSource
+			: [song, ...queueSource];
+
+		basePlaylist.set(queue);
+		if ($isShuffle && queue.length > 1) {
+			playlist.set(shuffleQueueWithFirstSong(queue, song));
+			currentIndex.set(0);
+		} else {
+			playlist.set(queue);
+			currentIndex.set(
+				Math.max(
+					0,
+					queue.findIndex((item) => item.s3_url === song.s3_url)
+				)
+			);
+		}
 		selectAudio.set(song);
 		isPlaying.set(true);
 		addToRecentlyPlayed(song as any);

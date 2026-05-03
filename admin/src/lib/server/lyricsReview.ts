@@ -12,9 +12,17 @@ type ReviewUpdate = {
 	reviewNotes?: string;
 };
 
-type ReviewStatus = '' | 'approved' | 'rejected' | 'ready_for_sync';
+type BulkReviewUpdate = {
+	audioIds: string[];
+	reviewStatus: ReviewStatus;
+	reviewedBy?: string;
+	reviewNotes?: string;
+};
+
+export type ReviewStatus = '' | 'approved' | 'rejected' | 'ready_for_sync';
 
 const REVIEW_COLLECTION = 'lyrics_match_reviews';
+const PUBLISHED_LYRICS_COLLECTION = 'music_lyrics';
 const DEFAULT_CSV_PATH = 'lyrics-matches.csv';
 const REVIEW_STATUSES = new Set<ReviewStatus>(['', 'approved', 'rejected', 'ready_for_sync']);
 const REVIEW_COLUMNS = ['review_status', 'reviewed_by', 'review_notes', 'reviewed_at'];
@@ -32,6 +40,7 @@ const BASE_HEADERS = [
 	'audio_book_full_name',
 	'audio_category',
 	'audio_number',
+	'audio_version',
 	'audio_duration_seconds',
 	'audio_s3_key',
 	'audio_url',
@@ -46,8 +55,17 @@ const BASE_HEADERS = [
 
 export async function loadLyricsReviewRows() {
 	const csvRows = await readLyricsCsvRows();
-	const reviewMap = await readReviewMap(csvRows.map((row) => row.audio_id).filter(Boolean));
-	const rows = csvRows.map((row) => mergeReview(row, reviewMap.get(row.audio_id)));
+	const audioIds = csvRows.map((row) => row.audio_id).filter(Boolean);
+	const [reviewMap, publishedLyricsMap] = await Promise.all([
+		readReviewMap(audioIds),
+		readPublishedLyricsMap(audioIds)
+	]);
+	const rows = csvRows.map((row) =>
+		mergePublishedLyrics(
+			mergeReview(row, reviewMap.get(row.audio_id)),
+			publishedLyricsMap.get(row.audio_id)
+		)
+	);
 
 	rows.sort(compareRowsForReview);
 
@@ -63,9 +81,7 @@ export async function saveLyricsReview(update: ReviewUpdate) {
 		throw new Error('audioId is required');
 	}
 
-	if (!REVIEW_STATUSES.has(update.reviewStatus)) {
-		throw new Error('Invalid reviewStatus');
-	}
+	validateReviewStatus(update.reviewStatus);
 
 	const reviewedAt = update.reviewStatus ? new Date().toISOString() : '';
 	const reviewFields = {
@@ -91,6 +107,58 @@ export async function saveLyricsReview(update: ReviewUpdate) {
 
 	return {
 		row,
+		savedToCsv,
+		summary
+	};
+}
+
+export async function saveLyricsReviewBulk(update: BulkReviewUpdate) {
+	const audioIds = [...new Set(update.audioIds.map((id) => id.trim()).filter(Boolean))];
+	if (audioIds.length === 0) {
+		throw new Error('audioIds are required');
+	}
+
+	validateReviewStatus(update.reviewStatus);
+
+	const reviewedAt = update.reviewStatus ? new Date().toISOString() : '';
+	const reviewUpdates = audioIds.map((audioId) => {
+		const fields: LyricsReviewRow = {
+			audio_id: audioId,
+			review_status: update.reviewStatus,
+			reviewed_by: update.reviewedBy?.trim() ?? '',
+			reviewed_at: reviewedAt
+		};
+
+		if (update.reviewNotes !== undefined) {
+			fields.review_notes = update.reviewNotes.trim();
+		}
+
+		return fields;
+	});
+
+	const db = await getDb();
+	await db.collection(REVIEW_COLLECTION).bulkWrite(
+		reviewUpdates.map((review) => ({
+			updateOne: {
+				filter: { audio_id: review.audio_id },
+				update: {
+					$set: {
+						...review,
+						updated_at: new Date()
+					}
+				},
+				upsert: true
+			}
+		}))
+	);
+
+	const savedToCsv = await tryUpdateCsvReviews(reviewUpdates);
+	const { rows, summary } = await loadLyricsReviewRows();
+	const rowSet = new Set(audioIds);
+
+	return {
+		count: audioIds.length,
+		rows: rows.filter((item) => rowSet.has(item.audio_id)),
 		savedToCsv,
 		summary
 	};
@@ -135,7 +203,10 @@ export function summarizeLyricsReviewRows(rows: LyricsReviewRow[]) {
 	return summary;
 }
 
-export async function extractLyricsFromUrl(sourceUrl: string) {
+export async function extractLyricsFromUrl(
+	sourceUrl: string,
+	options: { audioTitle?: string; versionLabel?: string } = {}
+) {
 	const url = new URL(sourceUrl);
 	if (url.hostname !== 'indirimbo-zikundwa.bi') {
 		throw new Error('Unsupported lyrics source');
@@ -153,11 +224,24 @@ export async function extractLyricsFromUrl(sourceUrl: string) {
 	}
 
 	const html = await response.text();
-	const title = extractFirstText(html, /<div class="s">\s*<div[^>]*>([\s\S]*?)<\/div>\s*<\/div>/i);
-	const lines = extractLyricLines(html);
+	const sections = extractLyricSections(html);
+	const selectedSections = selectLyricSections(sections, options);
+	const visibleSections = selectedSections.length > 0 ? selectedSections : sections;
+	const title =
+		visibleSections.length > 0
+			? visibleSections
+					.map((section) => section.title)
+					.filter(Boolean)
+					.join(' / ')
+			: extractFirstText(html, /<div class="s">\s*<div[^>]*>([\s\S]*?)<\/div>\s*<\/div>/i);
+	const lines = visibleSections.flatMap((section) => [
+		formatSectionHeading(section),
+		...section.lines.map((line) => getLyricSourceLineText(line))
+	]);
 
 	return {
 		lines,
+		sections: visibleSections,
 		title,
 		url: sourceUrl
 	};
@@ -201,7 +285,57 @@ async function readReviewMap(audioIds: string[]) {
 	return reviewMap;
 }
 
-function mergeReview(row: LyricsReviewRow, review?: LyricsReviewRow) {
+async function readPublishedLyricsMap(audioIds: string[]) {
+	const lyricsMap = new Map<string, LyricsReviewRow>();
+	if (audioIds.length === 0) return lyricsMap;
+
+	try {
+		const db = await getDb();
+		const docs = await db
+			.collection(PUBLISHED_LYRICS_COLLECTION)
+			.find({ audio_id: { $in: audioIds } })
+			.project({
+				_id: 0,
+				audio_id: 1,
+				lyrics_status: 1,
+				synced_at: 1,
+				synced_by: 1,
+				timeline_status: 1,
+				timeline_draft: 1,
+				timeline_published: 1,
+				lines: 1
+			})
+			.toArray();
+
+		for (const doc of docs) {
+			const lines = Array.isArray(doc.lines) ? doc.lines : [];
+			const timableLineCount = lines.filter((line) => line?.kind !== 'heading').length;
+			const draft = Array.isArray(doc.timeline_draft) ? doc.timeline_draft : [];
+			const published = Array.isArray(doc.timeline_published) ? doc.timeline_published : [];
+			const timelineStatus =
+				String(doc.timeline_status ?? '') ||
+				(published.length > 0 ? 'published' : draft.length > 0 ? 'draft' : '');
+
+			lyricsMap.set(String(doc.audio_id), {
+				audio_id: String(doc.audio_id),
+				lyrics_sync_status: String(doc.lyrics_status ?? 'published'),
+				lyrics_synced_at: dateToString(doc.synced_at),
+				lyrics_synced_by: String(doc.synced_by ?? ''),
+				timeline_status: timelineStatus,
+				timeline_line_count: String(timableLineCount),
+				timeline_timed_line_count: String(
+					timelineStatus === 'published' ? published.length : draft.length
+				)
+			});
+		}
+	} catch (error) {
+		console.warn('[LyricsReview] Could not load published lyrics overlay:', error);
+	}
+
+	return lyricsMap;
+}
+
+function mergeReview(row: LyricsReviewRow, review?: LyricsReviewRow): LyricsReviewRow {
 	if (!review) return row;
 
 	return {
@@ -213,20 +347,62 @@ function mergeReview(row: LyricsReviewRow, review?: LyricsReviewRow) {
 	};
 }
 
+function mergePublishedLyrics(row: LyricsReviewRow, lyrics?: LyricsReviewRow): LyricsReviewRow {
+	if (!lyrics) {
+		return {
+			...row,
+			lyrics_sync_status: row.lyrics_sync_status ?? '',
+			lyrics_synced_at: row.lyrics_synced_at ?? '',
+			lyrics_synced_by: row.lyrics_synced_by ?? '',
+			timeline_status: row.timeline_status ?? '',
+			timeline_line_count: row.timeline_line_count ?? '',
+			timeline_timed_line_count: row.timeline_timed_line_count ?? ''
+		};
+	}
+
+	return {
+		...row,
+		lyrics_sync_status: lyrics.lyrics_sync_status ?? '',
+		lyrics_synced_at: lyrics.lyrics_synced_at ?? '',
+		lyrics_synced_by: lyrics.lyrics_synced_by ?? '',
+		timeline_status: lyrics.timeline_status ?? '',
+		timeline_line_count: lyrics.timeline_line_count ?? '',
+		timeline_timed_line_count: lyrics.timeline_timed_line_count ?? ''
+	};
+}
+
+function dateToString(value: unknown) {
+	if (!value) return '';
+	if (value instanceof Date) return value.toISOString();
+	return String(value);
+}
+
 async function tryUpdateCsvReview(audioId: string, review: LyricsReviewRow) {
+	return tryUpdateCsvReviews([{ ...review, audio_id: audioId }]);
+}
+
+async function tryUpdateCsvReviews(reviews: LyricsReviewRow[]) {
 	try {
+		const reviewMap = new Map(reviews.map((review) => [review.audio_id, review]));
 		const csvPath = getCsvPath();
 		const text = await fs.readFile(csvPath, 'utf8');
 		const parsed = parseCsv(text);
 		const headers = mergeHeaders(parsed.headers, BASE_HEADERS);
 		const rows = parsed.rows.map((row) => normalizeRow(row, headers));
-		const target = rows.find((row) => row.audio_id === audioId);
+		let updatedCount = 0;
 
-		if (!target) return false;
-
-		for (const column of REVIEW_COLUMNS) {
-			target[column] = review[column] ?? '';
+		for (const row of rows) {
+			const review = reviewMap.get(row.audio_id);
+			if (!review) continue;
+			for (const column of REVIEW_COLUMNS) {
+				if (review[column] !== undefined) {
+					row[column] = review[column] ?? '';
+				}
+			}
+			updatedCount += 1;
 		}
+
+		if (updatedCount === 0) return false;
 
 		rows.sort(compareRowsForReview);
 		await fs.writeFile(csvPath, stringifyCsv(rows, headers));
@@ -234,6 +410,12 @@ async function tryUpdateCsvReview(audioId: string, review: LyricsReviewRow) {
 	} catch (error) {
 		console.warn('[LyricsReview] Could not update CSV file:', error);
 		return false;
+	}
+}
+
+function validateReviewStatus(reviewStatus: ReviewStatus) {
+	if (!REVIEW_STATUSES.has(reviewStatus)) {
+		throw new Error('Invalid reviewStatus');
 	}
 }
 
@@ -360,20 +542,171 @@ function csvCell(value: unknown) {
 	return `"${text.replace(/"/g, '""')}"`;
 }
 
-function extractLyricLines(html: string) {
-	const lines: string[] = [];
-	const contentStart = html.indexOf('<div class="s">');
-	const content = contentStart >= 0 ? html.slice(contentStart) : html;
-	const lineRegex = /<(?:li|div)\b[^>]*class="(?:zoli1|pc)"[^>]*>([\s\S]*?)<\/(?:li|div)>/gi;
+export type LyricSection = {
+	label: string;
+	lines: LyricSourceLine[];
+	title: string;
+};
 
+export type LyricSourceLine = {
+	role?: 'line' | 'refrain' | 'verse';
+	text: string;
+	verse_number?: number | null;
+};
+
+function extractLyricSections(html: string) {
+	const sections: LyricSection[] = [];
+	const tokenRegex =
+		/<div\b[^>]*class="(pc|s)"[^>]*>([\s\S]*?)<\/div>|<ol\b([^>]*)>[\s\S]*?<li\b[^>]*class="z?oli1"[^>]*>([\s\S]*?)<\/li>[\s\S]*?<\/ol>|<li\b[^>]*class="z?oli1"[^>]*>([\s\S]*?)<\/li>/gi;
+	let currentSection: LyricSection | null = null;
 	let match;
-	while ((match = lineRegex.exec(content)) !== null) {
-		const text = htmlToText(match[1]);
+
+	while ((match = tokenRegex.exec(html)) !== null) {
+		const blockClass = match[1];
+		const blockHtml = match[2] ?? match[4] ?? match[5] ?? '';
+		const text = htmlToText(blockHtml);
 		if (!text || /^\*+$/.test(text)) continue;
-		lines.push(text);
+
+		if (blockClass === 'pc') {
+			const label = normalizeSectionLabel(text);
+			if (label) {
+				currentSection = { label, lines: [], title: '' };
+				sections.push(currentSection);
+				continue;
+			}
+			if (!currentSection) {
+				currentSection = { label: '', lines: [], title: '' };
+				sections.push(currentSection);
+			}
+			currentSection.lines.push(
+				createLyricSourceLine(text, {
+					role: isRefrainBlock(blockHtml, text) ? 'refrain' : 'line'
+				})
+			);
+			continue;
+		}
+
+		if (blockClass === 's') {
+			if (!currentSection) {
+				currentSection = { label: '', lines: [], title: '' };
+				sections.push(currentSection);
+			}
+			currentSection.title = text;
+			continue;
+		}
+
+		if (!currentSection) {
+			currentSection = { label: '', lines: [], title: '' };
+			sections.push(currentSection);
+		}
+		currentSection.lines.push(
+			createLyricSourceLine(text, {
+				role: isRefrainBlock(blockHtml, text) ? 'refrain' : 'verse',
+				verseNumber: parseOlStart(match[3])
+			})
+		);
 	}
 
-	return lines;
+	return sections.filter((section) => section.title || section.lines.length > 0);
+}
+
+function createLyricSourceLine(
+	text: string,
+	options: { role?: LyricSourceLine['role']; verseNumber?: number | null } = {}
+): LyricSourceLine {
+	const parsed = parseVersePrefix(text);
+	return {
+		role: options.role ?? (parsed.verseNumber !== null ? 'verse' : 'line'),
+		text: parsed.text,
+		verse_number: options.verseNumber ?? parsed.verseNumber
+	};
+}
+
+function getLyricSourceLineText(line: LyricSourceLine | string) {
+	return typeof line === 'string' ? line : line.text;
+}
+
+function parseOlStart(attributes?: string) {
+	const match = String(attributes ?? '').match(/\bstart\s*=\s*["']?(\d{1,3})/i);
+	if (!match) return null;
+	const value = Number(match[1]);
+	return Number.isFinite(value) ? value : null;
+}
+
+function parseVersePrefix(text: string) {
+	const match = text.match(/^\s*(\d{1,3})\s*[.)]\s+(.+)$/);
+	if (!match) return { text, verseNumber: null };
+	return {
+		text: match[2].trim(),
+		verseNumber: Number(match[1])
+	};
+}
+
+function isRefrainBlock(html: string, text: string) {
+	return (
+		/\bclass=["'][^"']*\bbdit\b/i.test(html) ||
+		/<(?:i|em)\b/i.test(html) ||
+		/\b(refrain|chorus|choeur|chœur|coro|korasi)\b/i.test(text)
+	);
+}
+
+function selectLyricSections(
+	sections: LyricSection[],
+	options: { audioTitle?: string; versionLabel?: string }
+) {
+	const versionLetters = parseVersionLetters(options.versionLabel);
+	if (versionLetters.length > 0) {
+		const matches = sections.filter((section) => {
+			const sectionVersion = parseSectionVersion(section.label);
+			return sectionVersion && versionLetters.includes(sectionVersion);
+		});
+		if (matches.length > 0) return matches;
+	}
+
+	const audioTitle = normalizeText(options.audioTitle);
+	if (!audioTitle) return [];
+
+	const titleMatches = sections.filter((section) => {
+		const sectionTitle = normalizeText(section.title);
+		return sectionTitle.length >= 5 && audioTitle.includes(sectionTitle);
+	});
+
+	return titleMatches;
+}
+
+function normalizeSectionLabel(text: string) {
+	const label = text.replace(/\s+/g, '').trim();
+	return /^\d{1,4}[A-Za-z]?$/.test(label) ? label.toUpperCase() : '';
+}
+
+function parseVersionLetters(value?: string) {
+	return [
+		...new Set(
+			String(value ?? '')
+				.toUpperCase()
+				.match(/[A-Z]/g) ?? []
+		)
+	];
+}
+
+function parseSectionVersion(label: string) {
+	return label.match(/[A-Z]$/)?.[0] ?? '';
+}
+
+function formatSectionHeading(section: LyricSection) {
+	return [section.label, section.title].filter(Boolean).join(' - ');
+}
+
+function normalizeText(value?: string) {
+	return String(value ?? '')
+		.normalize('NFKD')
+		.replace(/[\u0300-\u036f]/g, '')
+		.replace(/[‘’‚‛`´]/g, "'")
+		.toLowerCase()
+		.replace(/[^a-z0-9' ]+/g, ' ')
+		.replace(/'/g, '')
+		.replace(/\s+/g, ' ')
+		.trim();
 }
 
 function extractFirstText(html: string, regex: RegExp) {

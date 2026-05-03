@@ -22,7 +22,7 @@ const DEFAULT_MIN_CONFIDENCE = 0.72;
 const BOOK_ALIASES = new Map(
 	Object.entries({
 		agakiza: ['agakiza', "indirimbo z'agakiza", 'indirimbo zagakiza'],
-		'chants de victoire': ['chants de victoire'],
+		'chants de victoire': ['chants de victoire', 'c v', 'C.V'],
 		chorus: ['chorus'],
 		'coll des cantiques': [
 			'c c',
@@ -33,21 +33,54 @@ const BOOK_ALIASES = new Map(
 			'collection cantiques',
 			'collection des cantiques'
 		],
-		'crois seulement': ['crois seulement', 'crois seulement branham'],
+		'crois seulement': ['crois seulement', 'crois seulement branham', 'c s'],
 		gushimisha: ['gushimisha', 'indirimbo zo gushimisha', 'gushimisha imana'],
 		ikirundi: ['ikirundi'],
 		impimbano: ['impimbano'],
-		'izi gisenyi': ["iz'i gisenyi", 'izi gisenyi', 'gisenyi'],
+		'izi gisenyi': ["iz'i gisenyi", 'izi gisenyi', 'i gisenyi', 'gisenyi'],
 		izindi: ['izindi'],
-		'les ailes de la foi': ['les ailes de la foi', 'sur les ailes de la foi', 'ailes de la foi'],
-		'nyimbo za mungu': ['nyimbo za mungu', 'n mungu'],
-		'nyimbo za wokovu': ['nyimbo za wokovu', 'wokovu'],
-		'tenzi za rohoni': ['tenzi za rohoni', 't rohoni'],
+		'les ailes de la foi': [
+			'les ailes de la foi',
+			'sur les ailes de la foi',
+			'ailes de la foi',
+			'a f'
+		],
+		'nyimbo za mungu': ['nyimbo za mungu', 'n mungu', 'n m'],
+		'nyimbo za wokovu': ['nyimbo za wokovu', 'wokovu', 'n w'],
+		'tenzi za rohoni': ['tenzi za rohoni', 't rohoni', 't r'],
 		umuco: ['umuco'],
 		'umuco 1': ['umuco 1'],
 		'umuco 2': ['umuco 2']
 	}).flatMap(([canonical, aliases]) => aliases.map((alias) => [normalizeText(alias), canonical]))
 );
+
+const SOURCE_BOOK_DEFINITIONS = new Map(
+	Object.entries({
+		agakiza: { book: 'Agakiza', linkPrefix: 'Agakiza' },
+		'chants de victoire': { book: 'Chants de Victoire', linkPrefix: 'C-Victoire' },
+		chorus: { book: 'Chorus', linkPrefix: 'Chorus' },
+		'coll des cantiques': { book: 'Coll. des Cantiques', linkPrefix: 'C-Cantiques' },
+		'crois seulement': { book: 'Crois Seulement', linkPrefix: 'Crois-Seulement' },
+		gushimisha: { book: 'Gushimisha', linkPrefix: 'Gushimisha' },
+		ikirundi: { book: 'Ikirundi', linkPrefix: 'Ikirundi' },
+		impimbano: { book: 'Impimbano', linkPrefix: 'Impimbano' },
+		'izi gisenyi': { book: "Iz'i Gisenyi", linkPrefix: 'Izigisenyi' },
+		izindi: { book: 'Izindi', linkPrefix: 'Izindi' },
+		'les ailes de la foi': { book: 'Les Ailes de la Foi', linkPrefix: 'A-Foi' },
+		'nyimbo za mungu': { book: 'Nyimbo za Mungu', linkPrefix: 'N-Mungu' },
+		'nyimbo za wokovu': { book: 'Wokovu', linkPrefix: 'Wokovu' },
+		'tenzi za rohoni': { book: 'Tenzi za Rohoni', linkPrefix: 'T-Rohoni' },
+		umuco: { book: 'Umuco', linkPrefix: 'Umuco' },
+		'umuco 1': { book: 'Umuco-1', linkPrefix: 'Umuco-1' },
+		'umuco 2': { book: 'Umuco-2', linkPrefix: 'Umuco-2' }
+	})
+);
+
+const BOOK_PREFIX_ALIASES = [...BOOK_ALIASES.entries()]
+	.map(([alias, canonicalBook]) => ({ alias, canonicalBook }))
+	.sort((left, right) => right.alias.length - left.alias.length);
+
+const IGNORED_AUDIO_BOOK_VALUES = new Set(['', 'all', 'autres', 'other', 'unknown']);
 
 function printHelp() {
 	console.log(`
@@ -363,16 +396,61 @@ function buildMatches(audioRows, sourceSongs, options) {
 	const sourceLookup = buildSourceLookup(sourceSongs);
 
 	return audioRows.map((audio) => {
-		const candidatePool = collectCandidatePool(audio, sourceLookup, sourceSongs);
+		const metadata = getAudioMatchMetadata(audio);
+		const candidatePool = collectCandidatePool(metadata, sourceLookup, sourceSongs);
 		const best = candidatePool
-			.map((sourceSong) => scoreCandidate(audio, sourceSong))
+			.map((sourceSong) => scoreCandidate(metadata, sourceSong))
 			.reduce((currentBest, candidate) => {
 				if (!currentBest || candidate.confidence > currentBest.confidence) return candidate;
 				return currentBest;
 			}, null);
 
-		return buildCsvRow(audio, best, options);
+		return buildCsvRow(audio, metadata, best, options);
 	});
+}
+
+function addDirectSourceCandidates(sourceSongs, audioRows, sourceUrl) {
+	const songs = [...sourceSongs];
+	const knownBookNumbers = new Set(
+		sourceSongs.map((song) => bookNumberKey(song.canonicalBook, song.number))
+	);
+	let addedCount = 0;
+
+	for (const audio of audioRows) {
+		const metadata = getAudioMatchMetadata(audio);
+		if (!metadata.number) continue;
+
+		for (const canonicalBook of metadata.canonicalBooks) {
+			const definition = SOURCE_BOOK_DEFINITIONS.get(canonicalBook);
+			if (!definition) continue;
+
+			const key = bookNumberKey(canonicalBook, metadata.number);
+			if (knownBookNumbers.has(key)) continue;
+
+			const title = getSyntheticSourceTitle(metadata, definition);
+			const numberPath = String(metadata.number).padStart(3, '0');
+			const url = new URL(`Indirimbo/${definition.linkPrefix}-${numberPath}.html`, sourceUrl).href;
+			const sourceSong = prepareSourceSong({
+				book: definition.book,
+				lyricsTextId: makeLyricsTextId(definition.book, metadata.number, title),
+				number: metadata.number,
+				source: SOURCE_ID,
+				title,
+				url
+			});
+
+			sourceSong.synthetic = true;
+			sourceSong.syntheticReason = metadata.hasExplicitBookNumberPrefix
+				? 'audio-title-prefix'
+				: 'audio-metadata';
+
+			songs.push(sourceSong);
+			knownBookNumbers.add(key);
+			addedCount += 1;
+		}
+	}
+
+	return { addedCount, songs };
 }
 
 function buildSourceLookup(sourceSongs) {
@@ -401,7 +479,7 @@ function buildSourceLookup(sourceSongs) {
 	return lookup;
 }
 
-function collectCandidatePool(audio, lookup, sourceSongs) {
+function collectCandidatePool(metadata, lookup, sourceSongs) {
 	const collected = new Map();
 	const addMany = (items = []) => {
 		for (const item of items) {
@@ -409,19 +487,16 @@ function collectCandidatePool(audio, lookup, sourceSongs) {
 		}
 	};
 
-	const audioBooks = [audio.book, audio.book_full_name, audio.category]
-		.filter(Boolean)
-		.map((value) => canonicalBookKey(String(value)));
-	const audioNumber = Number(audio.number);
+	const audioNumber = metadata.number;
 	const hasAudioNumber = Number.isFinite(audioNumber);
 
 	if (hasAudioNumber) {
-		for (const audioBook of audioBooks) {
+		for (const audioBook of metadata.canonicalBooks) {
 			addMany(lookup.byBookAndNumber.get(bookNumberKey(audioBook, audioNumber)));
 		}
 	}
 
-	for (const audioBook of audioBooks) {
+	for (const audioBook of metadata.canonicalBooks) {
 		addMany(lookup.byBook.get(audioBook));
 	}
 
@@ -429,7 +504,7 @@ function collectCandidatePool(audio, lookup, sourceSongs) {
 		addMany(lookup.byNumber.get(String(audioNumber)));
 	}
 
-	for (const token of tokenize(normalizeSongTitle(getAudioTitle(audio)))) {
+	for (const token of tokenize(normalizeSongTitle(metadata.titleForMatching))) {
 		if (token.length < 4) continue;
 		addMany(lookup.byToken.get(token));
 	}
@@ -451,13 +526,18 @@ function bookNumberKey(book, number) {
 	return `${book}:${number}`;
 }
 
-function scoreCandidate(audio, sourceSong) {
-	const audioTitle = getAudioTitle(audio);
-	const normalizedAudioTitle = normalizeSongTitle(audioTitle);
+function scoreCandidate(metadata, sourceSong) {
+	const normalizedAudioTitle = normalizeSongTitle(metadata.titleForMatching);
 	const titleScore = scoreTitle(normalizedAudioTitle, sourceSong.normalizedTitle);
-	const bookScore = scoreBook(audio, sourceSong);
-	const numberScore = scoreNumber(audio.number, sourceSong.number);
+	const bookScore = scoreBook(metadata, sourceSong);
+	const numberScore = scoreNumber(metadata.number, sourceSong.number);
 	const hasStrongBookAndNumber = numberScore === 1 && bookScore >= 0.9;
+	const prefixScore =
+		metadata.hasExplicitBookNumberPrefix &&
+		metadata.prefix?.canonicalBook === sourceSong.canonicalBook &&
+		metadata.prefix?.number === sourceSong.number
+			? 1
+			: 0;
 
 	let confidence = titleScore * 0.78 + bookScore * 0.14 + numberScore * 0.08;
 
@@ -465,6 +545,10 @@ function scoreCandidate(audio, sourceSong) {
 		const bookNumberFloor =
 			titleScore >= 0.35 ? 0.86 + titleScore * 0.09 : 0.62 + titleScore * 0.65;
 		confidence = Math.max(confidence, bookNumberFloor);
+	}
+
+	if (hasStrongBookAndNumber && prefixScore === 1) {
+		confidence = Math.max(confidence, titleScore >= 0.35 ? 0.95 : 0.9);
 	}
 
 	if (titleScore >= 0.98) {
@@ -484,12 +568,18 @@ function scoreCandidate(audio, sourceSong) {
 		bookScore,
 		confidence: clamp(confidence, 0, 1),
 		numberScore,
-		reason: buildReason({ bookScore, numberScore, titleScore }),
+		reason: buildReason({
+			bookScore,
+			numberScore,
+			prefixScore,
+			titleScore,
+			versionLabel: metadata.versionLabel
+		}),
 		titleScore
 	};
 }
 
-function buildCsvRow(audio, best, options) {
+function buildCsvRow(audio, metadata, best, options) {
 	const confidence = best?.confidence ?? 0;
 	const matchStatus =
 		confidence >= 0.9
@@ -505,12 +595,13 @@ function buildCsvRow(audio, best, options) {
 		reviewed_at: '',
 		match_status: matchStatus,
 		audio_id: audio._id,
-		audio_title: getAudioTitle(audio),
+		audio_title: metadata.originalTitle,
 		audio_artist: audio.artist ?? '',
-		audio_book: audio.book ?? '',
-		audio_book_full_name: audio.book_full_name ?? '',
+		audio_book: displayAudioValue(audio.book, metadata.bookDisplay),
+		audio_book_full_name: displayAudioValue(audio.book_full_name, metadata.bookDisplay),
 		audio_category: audio.category ?? '',
-		audio_number: audio.number ?? '',
+		audio_number: displayAudioNumber(audio.number, metadata.number),
+		audio_version: metadata.versionLabel,
 		audio_duration_seconds: audio.duration ?? '',
 		audio_s3_key: audio.s3_key ?? '',
 		audio_url: audio.s3_url ?? '',
@@ -530,6 +621,12 @@ function buildReason(scores) {
 		`book:${scores.bookScore.toFixed(2)}`,
 		`number:${scores.numberScore.toFixed(2)}`
 	];
+	if (scores.prefixScore > 0) {
+		parts.push(`prefix:${scores.prefixScore.toFixed(2)}`);
+	}
+	if (scores.versionLabel) {
+		parts.push(`version:${scores.versionLabel}`);
+	}
 	return parts.join(' ');
 }
 
@@ -550,6 +647,202 @@ function getAudioTitle(audio) {
 	return '';
 }
 
+function getAudioMatchMetadata(audio) {
+	const originalTitle = getAudioTitle(audio);
+	const titlePrefix = parseAudioBookNumberPrefix(originalTitle);
+	const filenamePrefix = parseAudioBookNumberPrefix(getAudioFilenameStem(audio));
+	const prefix = titlePrefix ?? filenamePrefix;
+	const rawBookValues = collectRawBookValues(audio);
+	const canonicalBooks = [];
+	const addCanonicalBook = (value) => {
+		if (!value || canonicalBooks.includes(value)) return;
+		canonicalBooks.push(value);
+	};
+
+	if (prefix) {
+		addCanonicalBook(prefix.canonicalBook);
+	}
+
+	for (const value of rawBookValues) {
+		addCanonicalBook(canonicalBookKey(value));
+	}
+
+	const dbNumber = parseAudioNumber(audio.number);
+	const number = prefix?.number ?? dbNumber;
+	const definition = prefix ? SOURCE_BOOK_DEFINITIONS.get(prefix.canonicalBook) : undefined;
+	const bookDisplay = definition?.book ?? firstMeaningfulAudioValue(rawBookValues);
+	const titleForMatching =
+		titlePrefix !== null && titlePrefix !== undefined
+			? titlePrefix.normalizedTitleAfterPrefix
+			: originalTitle || filenamePrefix?.normalizedTitleAfterPrefix || '';
+	const titleForDisplay =
+		titlePrefix?.titleAfterPrefix ||
+		(titlePrefix ? titlePrefix.normalizedTitleAfterPrefix : '') ||
+		originalTitle ||
+		filenamePrefix?.titleAfterPrefix ||
+		filenamePrefix?.normalizedTitleAfterPrefix ||
+		'';
+
+	return {
+		bookDisplay,
+		bookValues: rawBookValues,
+		canonicalBooks,
+		hasExplicitBookNumberPrefix: Boolean(prefix),
+		number,
+		originalTitle,
+		prefix,
+		titleForDisplay,
+		titleForMatching,
+		versionLabel: prefix?.versionLabel ?? '',
+		versionLabels: prefix?.versionLabels ?? []
+	};
+}
+
+function parseAudioBookNumberPrefix(value) {
+	const normalized = normalizeText(value);
+	if (!normalized) return null;
+
+	for (const { alias, canonicalBook } of BOOK_PREFIX_ALIASES) {
+		if (!alias || (normalized !== alias && !normalized.startsWith(`${alias} `))) continue;
+
+		const afterAlias = normalized.slice(alias.length).trim();
+		const match = /^(\d{1,4})([a-z]{0,4})(?:\s+(.*)|$)/.exec(afterAlias);
+		if (!match) continue;
+
+		const number = Number.parseInt(match[1], 10);
+		if (!Number.isInteger(number)) continue;
+		const versionLabels = splitVersionLetters(match[2]);
+		let normalizedTitleAfterPrefix = (match[3] ?? '').trim();
+
+		if (versionLabels.length > 0) {
+			let separateSuffixMatch = /^([a-z])(?:\s+(.*)|$)/.exec(normalizedTitleAfterPrefix);
+			while (separateSuffixMatch && versionLabels.length < 4) {
+				versionLabels.push(separateSuffixMatch[1].toUpperCase());
+				normalizedTitleAfterPrefix = (separateSuffixMatch[2] ?? '').trim();
+				separateSuffixMatch = /^([a-z])(?:\s+(.*)|$)/.exec(normalizedTitleAfterPrefix);
+			}
+		}
+
+		const titleAfterPrefix =
+			stripDisplayBookNumberPrefix(value, alias, number, versionLabels) ||
+			normalizedTitleAfterPrefix;
+
+		return {
+			canonicalBook,
+			number,
+			normalizedTitleAfterPrefix,
+			titleAfterPrefix,
+			versionLabel: formatVersionLabel(versionLabels),
+			versionLabels
+		};
+	}
+
+	return null;
+}
+
+function splitVersionLetters(value) {
+	return String(value ?? '')
+		.split('')
+		.filter(Boolean)
+		.map((letter) => letter.toUpperCase());
+}
+
+function formatVersionLabel(versionLabels) {
+	return versionLabels.length > 0 ? versionLabels.join('-') : '';
+}
+
+function stripDisplayBookNumberPrefix(value, alias, number, versionLabels = []) {
+	const text = String(value ?? '');
+	const chunks = [...text.matchAll(/\S+/g)];
+	const lowerVersionLabels = versionLabels.map((label) => label.toLowerCase());
+	const targets = new Set([`${alias} ${number}`]);
+
+	if (lowerVersionLabels.length > 0) {
+		const compactSuffix = lowerVersionLabels.join('');
+		const spacedSuffix = lowerVersionLabels.join(' ');
+		targets.add(`${alias} ${number}${compactSuffix}`);
+		targets.add(`${alias} ${number} ${spacedSuffix}`);
+
+		const [firstSuffix, ...remainingSuffixes] = lowerVersionLabels;
+		if (firstSuffix) {
+			targets.add(
+				[`${alias} ${number}${firstSuffix}`, ...remainingSuffixes].filter(Boolean).join(' ')
+			);
+		}
+	}
+
+	const longestTargetLength = Math.max(...[...targets].map((target) => target.length));
+
+	for (let index = 0; index < chunks.length; index += 1) {
+		const candidate = chunks
+			.slice(0, index + 1)
+			.map((chunk) => chunk[0])
+			.join(' ');
+		const normalizedCandidate = normalizeText(candidate);
+
+		if (targets.has(normalizedCandidate)) {
+			return text
+				.slice(chunks[index].index + chunks[index][0].length)
+				.replace(/^[\s._-]+/, '')
+				.trim();
+		}
+
+		if (normalizedCandidate.length > longestTargetLength + 8) break;
+	}
+
+	return '';
+}
+
+function collectRawBookValues(audio) {
+	return [audio.book, audio.book_full_name, audio.category]
+		.map((value) => String(value ?? '').trim())
+		.filter((value) => value && !isIgnoredAudioBookValue(value));
+}
+
+function firstMeaningfulAudioValue(values) {
+	return values.find((value) => value && !isIgnoredAudioBookValue(value)) ?? '';
+}
+
+function displayAudioValue(value, fallback) {
+	const text = String(value ?? '').trim();
+	if (text && !isIgnoredAudioBookValue(text)) return text;
+	return fallback ?? '';
+}
+
+function displayAudioNumber(value, fallback) {
+	const text = String(value ?? '').trim();
+	if (text) return text;
+	return fallback ?? '';
+}
+
+function isIgnoredAudioBookValue(value) {
+	const normalized = normalizeBook(value);
+	const canonical = canonicalBookKey(value);
+	return IGNORED_AUDIO_BOOK_VALUES.has(normalized) || IGNORED_AUDIO_BOOK_VALUES.has(canonical);
+}
+
+function parseAudioNumber(value) {
+	if (value === null || value === undefined || value === '') return undefined;
+	const parsed = Number.parseInt(String(value), 10);
+	return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function getAudioFilenameStem(audio) {
+	if (!audio.s3_key || !String(audio.s3_key).trim()) return '';
+	const filename = path.basename(String(audio.s3_key));
+	try {
+		return decodeURIComponent(filename).replace(/\.[A-Za-z0-9]+$/, '');
+	} catch {
+		return filename.replace(/\.[A-Za-z0-9]+$/, '');
+	}
+}
+
+function getSyntheticSourceTitle(metadata, definition) {
+	const title = metadata.titleForDisplay || metadata.titleForMatching || metadata.originalTitle;
+	if (title) return title;
+	return `${definition.book} ${metadata.number}`;
+}
+
 function scoreTitle(left, right) {
 	if (!left || !right) return 0;
 	if (left === right) return 1;
@@ -561,15 +854,12 @@ function scoreTitle(left, right) {
 	return Math.max(editScore, tokenScore, containmentScore);
 }
 
-function scoreBook(audio, sourceSong) {
+function scoreBook(metadata, sourceSong) {
 	const sourceBook = normalizeBook(sourceSong.book);
 	const sourceCanonical = canonicalBookKey(sourceSong.book);
-	const audioBooks = [audio.book, audio.book_full_name, audio.category]
-		.filter(Boolean)
-		.map((value) => String(value));
 
 	let best = 0;
-	for (const audioBook of audioBooks) {
+	for (const audioBook of metadata.bookValues) {
 		const normalizedAudioBook = normalizeBook(audioBook);
 		const audioCanonical = canonicalBookKey(audioBook);
 
@@ -593,6 +883,10 @@ function scoreBook(audio, sourceSong) {
 		}
 
 		best = Math.max(best, diceCoefficient(tokenize(normalizedAudioBook), tokenize(sourceBook)));
+	}
+
+	if (metadata.canonicalBooks.includes(sourceCanonical)) {
+		best = Math.max(best, 1);
 	}
 
 	return best;
@@ -635,7 +929,7 @@ function normalizeText(value) {
 		.replace(/&/g, ' and ')
 		.replace(/[№#]/g, ' ')
 		.toLowerCase()
-		.replace(/\b(n|no|num|numero)\b/g, ' ')
+		.replace(/\b(no|num|numero)\b/g, ' ')
 		.replace(/[^a-z0-9' ]+/g, ' ')
 		.replace(/'/g, '')
 		.replace(/\s+/g, ' ')
@@ -730,6 +1024,7 @@ async function writeCsv(rows, outPath) {
 		'audio_book_full_name',
 		'audio_category',
 		'audio_number',
+		'audio_version',
 		'audio_duration_seconds',
 		'audio_s3_key',
 		'audio_url',
@@ -809,7 +1104,14 @@ async function main() {
 	}
 
 	const audioRows = await loadMusicAudio(options);
-	const matches = buildMatches(audioRows, sourceSongs, options);
+	const expandedSourceSongs = addDirectSourceCandidates(sourceSongs, audioRows, options.sourceUrl);
+	if (expandedSourceSongs.addedCount > 0) {
+		console.log(
+			`Added ${expandedSourceSongs.addedCount} direct lyric source candidates from audio metadata`
+		);
+	}
+
+	const matches = buildMatches(audioRows, expandedSourceSongs.songs, options);
 
 	await writeCsv(matches, options.out);
 	console.log(`Wrote ${matches.length} rows to ${relativePath(options.out)}`);

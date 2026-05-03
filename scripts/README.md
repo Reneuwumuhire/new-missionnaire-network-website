@@ -11,6 +11,14 @@ The script reads `MONGODB_URI` from your shell, `.env.local`, or `.env`, then ma
 By default it writes `admin/lyrics-matches.csv` so the admin app can load it locally and in
 deployment.
 
+The CSV `audio_number` column uses `music_audio.number` when it exists, then falls back to metadata
+parsed from the audio title or S3 filename. Version suffixes such as `116A`, `116B`, or `116A-B`
+are written to `audio_version`, which lets the admin preview focus the matching lyric section. For
+matching, an explicit title/filename prefix like `Iz'i Gisenyi 142 ...` is treated as a strong signal
+even when the DB row only says `Other`. If a known book/number is missing from the source index but
+has the predictable `Indirimbo/<book>-<number>.html` URL, the script adds that direct source
+candidate for review.
+
 Review the generated CSV and set `review_status` yourself, for example:
 
 - `approved` when the source song is correct
@@ -39,7 +47,7 @@ pnpm dev
 The review page loads `admin/lyrics-matches.csv`, saves review edits to MongoDB, and exports an
 updated CSV. In local development it also attempts to update `admin/lyrics-matches.csv` on disk. In
 production, use the export button because serverless filesystems are not durable writable storage.
-Access is handled by the existing admin login.
+Access is handled by the existing admin login plus the `can_review_lyrics` admin permission.
 
 Optional deployment env vars:
 

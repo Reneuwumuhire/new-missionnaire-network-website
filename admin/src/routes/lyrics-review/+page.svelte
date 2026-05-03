@@ -16,6 +16,7 @@
 		audio_book_full_name: string;
 		audio_category: string;
 		audio_number: string;
+		audio_version: string;
 		audio_duration_seconds: string;
 		audio_s3_key: string;
 		audio_url: string;
@@ -26,13 +27,25 @@
 		source_number: string;
 		source_title: string;
 		source_url: string;
+		lyrics_sync_status?: string;
+		lyrics_synced_at?: string;
+		lyrics_synced_by?: string;
+		timeline_status?: string;
+		timeline_line_count?: string;
+		timeline_timed_line_count?: string;
 		saving?: boolean;
+		syncing?: boolean;
 	};
 
 	type LyricsState = {
 		error?: string;
 		lines?: string[];
 		loading?: boolean;
+		sections?: {
+			label: string;
+			lines: Array<string | { role?: string; text?: string; verse_number?: number | null }>;
+			title: string;
+		}[];
 		title?: string;
 	};
 
@@ -44,8 +57,10 @@
 	let matchFilter = 'all';
 	let reviewFilter = 'all';
 	let selectedAudioId = '';
-	let lyricsByUrl: Record<string, LyricsState> = {};
+	let lyricsByRow: Record<string, LyricsState> = {};
 	let exporting = false;
+	let bulkSaving = false;
+	let selectedAudioIds = new Set<string>();
 
 	onMount(() => {
 		reviewerName = localStorage.getItem('lyrics-reviewer-name') ?? '';
@@ -67,6 +82,7 @@
 				row.audio_book,
 				row.audio_book_full_name,
 				row.audio_number,
+				row.audio_version,
 				row.source_title,
 				row.source_book,
 				row.source_number
@@ -83,7 +99,11 @@
 
 		return matchesSearch && matchesMatchFilter && matchesReviewFilter;
 	});
-	$: selectedLyrics = selectedRow ? lyricsByUrl[selectedRow.source_url] : null;
+	$: selectedLyrics = selectedRow ? lyricsByRow[selectedRow.audio_id] : null;
+	$: selectedCount = selectedAudioIds.size;
+	$: visibleSelectedCount = filteredRows.filter((row) => selectedAudioIds.has(row.audio_id)).length;
+	$: allVisibleSelected =
+		filteredRows.length > 0 && filteredRows.every((row) => selectedAudioIds.has(row.audio_id));
 
 	async function loadRows() {
 		loading = true;
@@ -120,41 +140,68 @@
 		void loadLyrics(row);
 	}
 
+	function toggleRowSelection(row: ReviewRow, event: Event) {
+		const checked = (event.currentTarget as HTMLInputElement).checked;
+		const next = new Set(selectedAudioIds);
+		if (checked) next.add(row.audio_id);
+		else next.delete(row.audio_id);
+		selectedAudioIds = next;
+	}
+
+	function toggleVisibleSelection(event: Event) {
+		const checked = (event.currentTarget as HTMLInputElement).checked;
+		const next = new Set(selectedAudioIds);
+		for (const row of filteredRows) {
+			if (checked) next.add(row.audio_id);
+			else next.delete(row.audio_id);
+		}
+		selectedAudioIds = next;
+	}
+
+	function clearSelectedRows() {
+		selectedAudioIds = new Set();
+	}
+
 	async function loadLyrics(row: ReviewRow) {
 		if (
 			!row.source_url ||
-			lyricsByUrl[row.source_url]?.lines ||
-			lyricsByUrl[row.source_url]?.loading
+			lyricsByRow[row.audio_id]?.lines ||
+			lyricsByRow[row.audio_id]?.sections ||
+			lyricsByRow[row.audio_id]?.loading
 		) {
 			return;
 		}
 
-		lyricsByUrl = {
-			...lyricsByUrl,
-			[row.source_url]: { loading: true }
+		lyricsByRow = {
+			...lyricsByRow,
+			[row.audio_id]: { loading: true }
 		};
 
 		try {
-			const response = await fetch(
-				`/api/lyrics-review/lyrics?url=${encodeURIComponent(row.source_url)}`
-			);
+			const params = new URLSearchParams({
+				audioTitle: row.audio_title,
+				url: row.source_url,
+				version: row.audio_version
+			});
+			const response = await fetch(`/api/lyrics-review/lyrics?${params.toString()}`);
 			const payload = await response.json();
 
 			if (!response.ok) {
 				throw new Error(payload.error ?? 'Could not load lyrics');
 			}
 
-			lyricsByUrl = {
-				...lyricsByUrl,
-				[row.source_url]: {
+			lyricsByRow = {
+				...lyricsByRow,
+				[row.audio_id]: {
 					lines: payload.lines ?? [],
+					sections: payload.sections ?? [],
 					title: payload.title ?? row.source_title
 				}
 			};
 		} catch (caughtError) {
-			lyricsByUrl = {
-				...lyricsByUrl,
-				[row.source_url]: {
+			lyricsByRow = {
+				...lyricsByRow,
+				[row.audio_id]: {
 					error: caughtError instanceof Error ? caughtError.message : 'Could not load lyrics'
 				}
 			};
@@ -200,6 +247,106 @@
 			error = caughtError instanceof Error ? caughtError.message : 'Could not save review';
 			rows = rows.map((item) =>
 				item.audio_id === row.audio_id ? { ...item, saving: false } : item
+			);
+		}
+	}
+
+	async function saveBulkReview(reviewStatus: ReviewStatus) {
+		const audioIds = [...selectedAudioIds];
+		if (audioIds.length === 0) return;
+
+		bulkSaving = true;
+		error = '';
+		const selectedSet = new Set(audioIds);
+		rows = rows.map((item) => (selectedSet.has(item.audio_id) ? { ...item, saving: true } : item));
+
+		try {
+			const response = await fetch('/api/lyrics-review', {
+				body: JSON.stringify({
+					audioIds,
+					reviewStatus,
+					reviewedBy: reviewerName
+				}),
+				headers: {
+					'content-type': 'application/json'
+				},
+				method: 'POST'
+			});
+			const payload = await response.json();
+
+			if (!response.ok) {
+				throw new Error(payload.error ?? 'Could not save selected reviews');
+			}
+
+			const updatedRows = new Map(
+				((payload.rows ?? []) as ReviewRow[]).map((row) => [row.audio_id, row])
+			);
+			rows = rows.map((item) => {
+				const updated = updatedRows.get(item.audio_id);
+				if (updated) return { ...item, ...updated, saving: false };
+				if (selectedSet.has(item.audio_id)) return { ...item, saving: false };
+				return item;
+			});
+			selectedAudioIds = new Set();
+		} catch (caughtError) {
+			error =
+				caughtError instanceof Error ? caughtError.message : 'Could not save selected reviews';
+			rows = rows.map((item) =>
+				selectedSet.has(item.audio_id) ? { ...item, saving: false } : item
+			);
+		} finally {
+			bulkSaving = false;
+		}
+	}
+
+	async function syncLyrics(row: ReviewRow) {
+		if (!canSyncLyrics(row)) return;
+
+		rows = rows.map((item) => (item.audio_id === row.audio_id ? { ...item, syncing: true } : item));
+		error = '';
+
+		try {
+			const response = await fetch(`/api/lyrics-review/timeline/${row.audio_id}`, {
+				body: JSON.stringify({ action: 'sync' }),
+				headers: {
+					'content-type': 'application/json'
+				},
+				method: 'POST'
+			});
+			const payload = await response.json();
+
+			if (!response.ok) {
+				throw new Error(payload.error ?? 'Could not sync lyrics');
+			}
+
+			const lyrics = payload.lyrics ?? {};
+			const sync = payload.sync ?? {};
+			const lineCount = String(sync.timableLineCount ?? countTimableLines(lyrics.lines) ?? '');
+
+			rows = rows.map((item) =>
+				item.audio_id === row.audio_id
+					? {
+							...item,
+							lyrics_sync_status: lyrics.lyrics_status || 'published',
+							lyrics_synced_at: lyrics.synced_at ?? item.lyrics_synced_at ?? '',
+							lyrics_synced_by: lyrics.synced_by ?? item.lyrics_synced_by ?? '',
+							syncing: false,
+							timeline_line_count: lineCount,
+							timeline_status: lyrics.timeline_status ?? item.timeline_status ?? '',
+							timeline_timed_line_count: String(
+								(lyrics.timeline_status === 'published'
+									? lyrics.timeline_published?.length
+									: lyrics.timeline_draft?.length) ??
+									item.timeline_timed_line_count ??
+									''
+							)
+						}
+					: item
+			);
+		} catch (caughtError) {
+			error = caughtError instanceof Error ? caughtError.message : 'Could not sync lyrics';
+			rows = rows.map((item) =>
+				item.audio_id === row.audio_id ? { ...item, syncing: false } : item
 			);
 		}
 	}
@@ -269,178 +416,330 @@
 	}
 
 	function statusLabel(status: string) {
-		if (status === 'approved') return 'Approved';
-		if (status === 'rejected') return 'Rejected';
-		if (status === 'ready_for_sync') return 'Ready';
-		return 'Pending';
+		if (status === 'approved') return 'Approuvé';
+		if (status === 'rejected') return 'Rejeté';
+		if (status === 'ready_for_sync') return 'Prêt';
+		return 'En attente';
+	}
+
+	function syncStatusLabel(row: ReviewRow) {
+		if (row.lyrics_sync_status === 'published' || row.lyrics_synced_at) return 'Synchronisé';
+		if (row.review_status === 'ready_for_sync') return 'Prêt à synchroniser';
+		return 'Non synchronisé';
+	}
+
+	function syncStatusClass(row: ReviewRow) {
+		if (row.lyrics_sync_status === 'published' || row.lyrics_synced_at) {
+			return 'bg-emerald-100 text-emerald-800';
+		}
+		if (row.review_status === 'ready_for_sync') return 'bg-amber-100 text-amber-800';
+		return 'bg-stone-100 text-stone-600';
+	}
+
+	function timelineStatusLabel(row: ReviewRow) {
+		if (row.timeline_status === 'published') return 'Timeline publiée';
+		if (row.timeline_status === 'draft') return 'Timeline brouillon';
+		if (row.lyrics_sync_status === 'published' || row.lyrics_synced_at) return 'Timing requis';
+		return 'Pas de timeline';
+	}
+
+	function timelineStatusClass(row: ReviewRow) {
+		if (row.timeline_status === 'published') return 'bg-blue-100 text-blue-800';
+		if (row.timeline_status === 'draft') return 'bg-amber-100 text-amber-800';
+		if (row.lyrics_sync_status === 'published' || row.lyrics_synced_at) {
+			return 'bg-stone-100 text-stone-700';
+		}
+		return 'bg-stone-100 text-stone-500';
+	}
+
+	function timelineProgressLabel(row: ReviewRow) {
+		const total = Number(row.timeline_line_count);
+		const timed = Number(row.timeline_timed_line_count);
+		if (!Number.isFinite(total) || total <= 0) return '';
+		return `${Number.isFinite(timed) ? timed : 0}/${total} synchronisées`;
+	}
+
+	function canSyncLyrics(row: ReviewRow) {
+		return row.review_status === 'ready_for_sync' && !row.syncing;
+	}
+
+	function lyricsPublishLabel(row: ReviewRow) {
+		if (row.syncing) return 'Publication...';
+		if (row.lyrics_sync_status || row.lyrics_synced_at) return 'Republier paroles';
+		return 'Publier paroles';
+	}
+
+	function canOpenTiming(row: ReviewRow) {
+		return Boolean(row.lyrics_sync_status || row.lyrics_synced_at);
+	}
+
+	function countTimableLines(lines: unknown) {
+		if (!Array.isArray(lines)) return '';
+		return lines.filter(
+			(line) =>
+				typeof line !== 'object' || line === null || !('kind' in line) || line.kind !== 'heading'
+		).length;
+	}
+
+	function getSourceLineText(line: string | { text?: string; verse_number?: number | null }) {
+		if (typeof line === 'string') return line;
+		const text = line.text ?? '';
+		return line.verse_number ? `${line.verse_number}. ${text}` : text;
 	}
 
 	function matchLabel(status: string) {
-		if (status === 'likely') return 'Likely';
-		if (status === 'candidate') return 'Candidate';
-		return 'Needs review';
+		if (status === 'likely') return 'Probable';
+		if (status === 'candidate') return 'Candidat';
+		return 'À revoir';
+	}
+
+	function numberLabel(row: ReviewRow) {
+		return [row.audio_number, row.audio_version].filter(Boolean).join(' ');
 	}
 </script>
 
 <svelte:head>
-	<title>Lyrics Review - Missionnaire Network</title>
+	<title>Révision paroles - Missionnaire Admin</title>
 </svelte:head>
 
-<main class="min-h-screen bg-stone-50 px-4 py-8 text-stone-900 sm:px-6 lg:px-8">
-	<div class="mx-auto flex max-w-7xl flex-col gap-6">
-		<header
-			class="flex flex-col gap-4 border-b border-stone-200 pb-5 lg:flex-row lg:items-end lg:justify-between"
-		>
+<div class="flex flex-col gap-6 text-stone-900">
+	<div class="mb-2 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+		<header>
 			<div>
-				<p class="text-xs font-bold uppercase tracking-[0.18em] text-missionnaire">Lyrics Review</p>
-				<h1 class="mt-2 text-3xl font-black tracking-normal text-stone-950">
-					Music lyrics matches
+				<p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-primary">
+					Révision paroles
+				</p>
+				<h1 class="mt-2 font-display text-3xl font-semibold text-stone-800">
+					Correspondances audio/paroles
 				</h1>
-			</div>
-
-			<div class="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:min-w-[560px]">
-				<div class="rounded-md border border-stone-200 bg-white p-3">
-					<p class="text-xs font-semibold uppercase text-stone-500">Reviewed</p>
-					<p class="mt-1 text-2xl font-black">{summary.reviewed}/{summary.total}</p>
-				</div>
-				<div class="rounded-md border border-stone-200 bg-white p-3">
-					<p class="text-xs font-semibold uppercase text-stone-500">Matched</p>
-					<p class="mt-1 text-2xl font-black">{summary.matched}</p>
-				</div>
-				<div class="rounded-md border border-stone-200 bg-white p-3">
-					<p class="text-xs font-semibold uppercase text-stone-500">Ready</p>
-					<p class="mt-1 text-2xl font-black">{summary.readyForSync}</p>
-				</div>
-				<div class="rounded-md border border-stone-200 bg-white p-3">
-					<p class="text-xs font-semibold uppercase text-stone-500">Pending</p>
-					<p class="mt-1 text-2xl font-black">{summary.pending}</p>
-				</div>
+				<p class="mt-1 max-w-2xl text-sm text-stone-500">
+					Validez les correspondances, synchronisez les paroles et préparez les timelines pour le
+					lecteur public.
+				</p>
 			</div>
 		</header>
 
-		{#if error}
-			<p
-				class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"
-			>
-				{error}
-			</p>
-		{/if}
+		<div class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:min-w-[560px]">
+			<div class="card-lift border border-stone-200/60 bg-white/40 p-4">
+				<p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-400">Révisé</p>
+				<p class="mt-1 text-2xl font-semibold text-stone-800">{summary.reviewed}/{summary.total}</p>
+			</div>
+			<div class="card-lift border border-stone-200/60 bg-white/40 p-4">
+				<p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-400">Validés</p>
+				<p class="mt-1 text-2xl font-semibold text-stone-800">{summary.matched}</p>
+			</div>
+			<div class="card-lift border border-stone-200/60 bg-white/40 p-4">
+				<p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-400">Prêts</p>
+				<p class="mt-1 text-2xl font-semibold text-stone-800">{summary.readyForSync}</p>
+			</div>
+			<div class="card-lift border border-stone-200/60 bg-white/40 p-4">
+				<p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-400">
+					En attente
+				</p>
+				<p class="mt-1 text-2xl font-semibold text-stone-800">{summary.pending}</p>
+			</div>
+		</div>
+	</div>
 
-		<section class="grid gap-3 border-b border-stone-200 pb-5 lg:grid-cols-[1fr_auto] lg:items-end">
-			<div class="grid gap-3 md:grid-cols-[1fr_170px_190px_220px]">
-				<label class="flex flex-col gap-1 text-xs font-bold uppercase text-stone-500">
-					Search
+	{#if error}
+		<p class="border border-red-200 bg-red-50/80 px-4 py-3 text-sm font-semibold text-red-700">
+			{error}
+		</p>
+	{/if}
+
+	<section class="border border-stone-200/60 bg-white/40 p-4">
+		<div class="grid gap-4 xl:grid-cols-[1fr_auto] xl:items-end">
+			<div class="grid gap-4 md:grid-cols-[1fr_170px_190px_220px]">
+				<label>
+					<span class="admin-label">Recherche</span>
 					<input
-						class="min-h-11 rounded-md border border-stone-300 bg-white px-3 text-sm normal-case text-stone-900 outline-none focus:border-missionnaire"
+						class="admin-input"
 						bind:value={search}
-						placeholder="Song, book, number, lyrics title"
+						placeholder="Titre, recueil, numéro, paroles"
 					/>
 				</label>
 
-				<label class="flex flex-col gap-1 text-xs font-bold uppercase text-stone-500">
-					Match
-					<select
-						class="min-h-11 rounded-md border border-stone-300 bg-white px-3 text-sm normal-case text-stone-900 outline-none focus:border-missionnaire"
-						bind:value={matchFilter}
-					>
-						<option value="all">All</option>
-						<option value="likely">Likely</option>
-						<option value="candidate">Candidate</option>
-						<option value="needs_review">Needs review</option>
+				<label>
+					<span class="admin-label">Score</span>
+					<select class="admin-input" bind:value={matchFilter}>
+						<option value="all">Tous</option>
+						<option value="likely">Probable</option>
+						<option value="candidate">Candidat</option>
+						<option value="needs_review">À revoir</option>
 					</select>
 				</label>
 
-				<label class="flex flex-col gap-1 text-xs font-bold uppercase text-stone-500">
-					Review
-					<select
-						class="min-h-11 rounded-md border border-stone-300 bg-white px-3 text-sm normal-case text-stone-900 outline-none focus:border-missionnaire"
-						bind:value={reviewFilter}
-					>
-						<option value="all">All</option>
-						<option value="pending">Pending</option>
-						<option value="approved">Approved</option>
-						<option value="rejected">Rejected</option>
-						<option value="ready_for_sync">Ready</option>
+				<label>
+					<span class="admin-label">Statut</span>
+					<select class="admin-input" bind:value={reviewFilter}>
+						<option value="all">Tous</option>
+						<option value="pending">En attente</option>
+						<option value="approved">Approuvé</option>
+						<option value="rejected">Rejeté</option>
+						<option value="ready_for_sync">Prêt</option>
 					</select>
 				</label>
 
-				<label class="flex flex-col gap-1 text-xs font-bold uppercase text-stone-500">
-					Reviewer
+				<label>
+					<span class="admin-label">Réviseur</span>
 					<input
-						class="min-h-11 rounded-md border border-stone-300 bg-white px-3 text-sm normal-case text-stone-900 outline-none focus:border-missionnaire"
+						class="admin-input"
 						value={reviewerName}
 						on:input={(event) => setReviewerName(event.currentTarget.value)}
-						placeholder="Name"
+						placeholder="Nom"
 					/>
 				</label>
 			</div>
 
 			<button
-				class="min-h-11 rounded-md border border-stone-900 bg-stone-950 px-4 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60"
+				class="admin-btn-secondary justify-center"
 				disabled={exporting}
 				on:click={downloadCsv}
 				type="button"
 			>
-				{exporting ? 'Exporting...' : 'Export CSV'}
+				{exporting ? 'Export...' : 'Exporter CSV'}
 			</button>
-		</section>
+		</div>
+	</section>
 
-		{#if loading}
-			<div
-				class="rounded-md border border-stone-200 bg-white p-8 text-center text-sm font-semibold text-stone-500"
-			>
-				Loading review data...
-			</div>
-		{:else if rows.length > 0}
-			<section class="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(380px,0.8fr)]">
-				<div class="overflow-hidden rounded-md border border-stone-200 bg-white">
-					<div class="flex items-center justify-between border-b border-stone-200 px-4 py-3">
-						<p class="text-sm font-bold text-stone-700">{filteredRows.length} songs</p>
-						<p class="text-xs font-semibold text-stone-500">
-							{summary.likely} likely / {summary.candidate} candidate / {summary.needsReview} needs review
+	{#if loading}
+		<div
+			class="border border-stone-200/60 bg-white/40 p-8 text-center text-sm font-semibold text-stone-500"
+		>
+			Chargement des correspondances...
+		</div>
+	{:else if rows.length > 0}
+		<section class="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(390px,0.75fr)]">
+			<div class="overflow-hidden border border-stone-200/60 bg-white/40">
+				<div
+					class="flex flex-col gap-3 border-b border-stone-200/60 bg-white/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+				>
+					<div>
+						<p class="text-sm font-semibold text-stone-700">{filteredRows.length} chants</p>
+						<p class="mt-1 text-xs font-medium text-stone-500">
+							{summary.likely} probables / {summary.candidate} candidats / {summary.needsReview}
+							à revoir
 						</p>
 					</div>
 
-					<div class="max-h-[72vh] overflow-auto">
-						<table class="w-full border-collapse text-left text-sm">
-							<thead class="sticky top-0 z-10 bg-stone-100 text-xs uppercase text-stone-500">
-								<tr>
-									<th class="w-24 px-4 py-3">Score</th>
-									<th class="min-w-[260px] px-4 py-3">Audio</th>
-									<th class="min-w-[260px] px-4 py-3">Lyrics match</th>
-									<th class="w-28 px-4 py-3">Review</th>
-								</tr>
-							</thead>
-							<tbody>
-								{#each filteredRows as row (row.audio_id)}
-									<tr
-										class="cursor-pointer border-t border-stone-100 transition {selectedAudioId ===
-										row.audio_id
-											? 'bg-orange-50'
-											: 'hover:bg-stone-50'}"
-										on:click={() => selectRow(row)}
-									>
-										<td class="px-4 py-3 align-top">
-											<div class="font-black text-stone-950">{confidenceLabel(row.confidence)}</div>
-											<div class="mt-1 text-xs font-semibold text-stone-500">
-												{matchLabel(row.match_status)}
-											</div>
-										</td>
-										<td class="px-4 py-3 align-top">
-											<div class="font-bold text-stone-950">{row.audio_title}</div>
-											<div class="mt-1 text-xs text-stone-500">
-												{row.audio_book_full_name || row.audio_book} #{row.audio_number}
-											</div>
-										</td>
-										<td class="px-4 py-3 align-top">
-											<div class="font-bold text-stone-900">{row.source_title}</div>
-											<div class="mt-1 text-xs text-stone-500">
-												{row.source_book} #{row.source_number}
-											</div>
-										</td>
-										<td class="px-4 py-3 align-top">
+					{#if selectedCount > 0}
+						<div class="flex flex-wrap items-center gap-2">
+							<span class="text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-400">
+								{selectedCount} sélectionné{selectedCount > 1 ? 's' : ''}
+								{visibleSelectedCount !== selectedCount
+									? ` / ${visibleSelectedCount} visibles`
+									: ''}
+							</span>
+							<button
+								class="inline-flex min-h-9 items-center bg-blue-600 px-3 text-xs font-semibold text-white disabled:cursor-wait disabled:opacity-60"
+								disabled={bulkSaving}
+								on:click={() => saveBulkReview('approved')}
+								type="button"
+							>
+								Approuver
+							</button>
+							<button
+								class="inline-flex min-h-9 items-center bg-emerald-600 px-3 text-xs font-semibold text-white disabled:cursor-wait disabled:opacity-60"
+								disabled={bulkSaving}
+								on:click={() => saveBulkReview('ready_for_sync')}
+								type="button"
+							>
+								Prêt
+							</button>
+							<button
+								class="inline-flex min-h-9 items-center bg-red-700 px-3 text-xs font-semibold text-white disabled:cursor-wait disabled:opacity-60"
+								disabled={bulkSaving}
+								on:click={() => saveBulkReview('rejected')}
+								type="button"
+							>
+								Rejeter
+							</button>
+							<button
+								class="inline-flex min-h-9 items-center border border-stone-300 bg-white/70 px-3 text-xs font-semibold text-stone-700 disabled:cursor-wait disabled:opacity-60"
+								disabled={bulkSaving}
+								on:click={() => saveBulkReview('')}
+								type="button"
+							>
+								Effacer
+							</button>
+							<button
+								class="inline-flex min-h-9 items-center border border-stone-200 bg-white/50 px-3 text-xs font-semibold text-stone-500 hover:text-stone-800 disabled:cursor-wait disabled:opacity-60"
+								disabled={bulkSaving}
+								on:click={clearSelectedRows}
+								type="button"
+							>
+								Désélectionner
+							</button>
+						</div>
+					{/if}
+				</div>
+
+				<div class="max-h-[72vh] overflow-auto">
+					<table class="w-full border-collapse text-left text-sm">
+						<thead
+							class="sticky top-0 z-10 border-b border-stone-200/60 bg-cream/90 text-[11px] uppercase tracking-[0.12em] text-stone-500 backdrop-blur"
+						>
+							<tr>
+								<th class="w-10 px-4 py-3">
+									<input
+										aria-label="Select visible songs"
+										checked={allVisibleSelected}
+										class="h-4 w-4 rounded border-stone-300 text-primary focus:ring-primary/30"
+										disabled={filteredRows.length === 0 || bulkSaving}
+										on:change={toggleVisibleSelection}
+										type="checkbox"
+									/>
+								</th>
+								<th class="w-24 px-4 py-3">Score</th>
+								<th class="min-w-[260px] px-4 py-3">Audio</th>
+								<th class="min-w-[260px] px-4 py-3">Paroles</th>
+								<th class="w-28 px-4 py-3">Statut</th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each filteredRows as row (row.audio_id)}
+								<tr
+									class="cursor-pointer border-b border-stone-100 transition {selectedAudioId ===
+									row.audio_id
+										? 'bg-primary/5 shadow-[inset_4px_0_0_#ff880c]'
+										: 'hover:bg-cream/50'}"
+									on:click={() => selectRow(row)}
+								>
+									<td class="px-4 py-3 align-top">
+										<input
+											aria-label={`Select ${row.audio_title}`}
+											checked={selectedAudioIds.has(row.audio_id)}
+											class="h-4 w-4 rounded border-stone-300 text-primary focus:ring-primary/30"
+											disabled={bulkSaving || row.saving}
+											on:change={(event) => toggleRowSelection(row, event)}
+											on:click={(event) => event.stopPropagation()}
+											type="checkbox"
+										/>
+									</td>
+									<td class="px-4 py-3 align-top">
+										<div class="font-semibold tabular-nums text-stone-800">
+											{confidenceLabel(row.confidence)}
+										</div>
+										<div class="mt-1 text-xs font-medium text-stone-500">
+											{matchLabel(row.match_status)}
+										</div>
+									</td>
+									<td class="px-4 py-3 align-top">
+										<div class="font-semibold text-stone-800">{row.audio_title}</div>
+										<div class="mt-1 text-xs text-stone-500">
+											{row.audio_book_full_name || row.audio_book} #{numberLabel(row)}
+										</div>
+									</td>
+									<td class="px-4 py-3 align-top">
+										<div class="font-semibold text-stone-700">{row.source_title}</div>
+										<div class="mt-1 text-xs text-stone-500">
+											{row.source_book} #{row.source_number}
+										</div>
+									</td>
+									<td class="px-4 py-3 align-top">
+										<div class="flex flex-col items-start gap-1.5">
 											<span
-												class="inline-flex rounded-full px-2.5 py-1 text-xs font-black {row.review_status ===
+												class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {row.review_status ===
 												'ready_for_sync'
 													? 'bg-emerald-100 text-emerald-800'
 													: row.review_status === 'approved'
@@ -451,129 +750,229 @@
 											>
 												{statusLabel(row.review_status)}
 											</span>
-										</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
-					</div>
+											{#if row.review_status === 'ready_for_sync' || row.lyrics_sync_status || row.lyrics_synced_at}
+												<span
+													class="inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold {syncStatusClass(
+														row
+													)}"
+												>
+													{syncStatusLabel(row)}
+												</span>
+											{/if}
+											{#if row.timeline_status || row.lyrics_sync_status || row.lyrics_synced_at}
+												<span
+													class="inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold {timelineStatusClass(
+														row
+													)}"
+												>
+													{row.timeline_status === 'published'
+														? 'publiée'
+														: row.timeline_status === 'draft'
+															? 'brouillon'
+															: 'timing'}
+												</span>
+											{/if}
+										</div>
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
 				</div>
+			</div>
 
-				{#if selectedRow}
-					<aside class="rounded-md border border-stone-200 bg-white">
-						<div class="border-b border-stone-200 p-5">
-							<div class="flex items-start justify-between gap-3">
-								<div>
-									<p class="text-xs font-bold uppercase text-stone-500">Selected song</p>
-									<h2 class="mt-1 text-xl font-black text-stone-950">{selectedRow.audio_title}</h2>
-									<p class="mt-1 text-sm text-stone-500">
-										{selectedRow.audio_book_full_name || selectedRow.audio_book} #{selectedRow.audio_number}
-									</p>
-								</div>
-								<span class="rounded-full bg-stone-950 px-3 py-1 text-xs font-black text-white">
-									{confidenceLabel(selectedRow.confidence)}
-								</span>
+			{#if selectedRow}
+				<aside
+					class="overflow-hidden border border-stone-200/60 bg-white/40 xl:sticky xl:top-8 xl:self-start"
+				>
+					<div class="border-b border-stone-200/60 bg-white/35 p-5">
+						<div class="flex items-start justify-between gap-3">
+							<div>
+								<p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-400">
+									Chant sélectionné
+								</p>
+								<h2 class="mt-1 font-display text-2xl font-semibold leading-tight text-stone-800">
+									{selectedRow.audio_title}
+								</h2>
+								<p class="mt-1 text-sm text-stone-500">
+									{selectedRow.audio_book_full_name || selectedRow.audio_book} #{numberLabel(
+										selectedRow
+									)}
+								</p>
 							</div>
-
-							<audio class="mt-4 w-full" controls src={selectedRow.audio_url}></audio>
-
-							<div class="mt-4 grid grid-cols-2 gap-2">
-								<button
-									class="min-h-10 rounded-md bg-blue-600 px-3 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60"
-									disabled={selectedRow.saving}
-									on:click={() => saveReview(selectedRow, 'approved')}
-									type="button"
-								>
-									Approved
-								</button>
-								<button
-									class="min-h-10 rounded-md bg-emerald-600 px-3 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60"
-									disabled={selectedRow.saving}
-									on:click={() => saveReview(selectedRow, 'ready_for_sync')}
-									type="button"
-								>
-									Ready
-								</button>
-								<button
-									class="min-h-10 rounded-md bg-red-600 px-3 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60"
-									disabled={selectedRow.saving}
-									on:click={() => saveReview(selectedRow, 'rejected')}
-									type="button"
-								>
-									Rejected
-								</button>
-								<button
-									class="min-h-10 rounded-md border border-stone-300 bg-white px-3 text-sm font-bold text-stone-800 disabled:cursor-wait disabled:opacity-60"
-									disabled={selectedRow.saving}
-									on:click={() => saveReview(selectedRow, '')}
-									type="button"
-								>
-									Clear
-								</button>
-							</div>
-
-							<label class="mt-4 flex flex-col gap-1 text-xs font-bold uppercase text-stone-500">
-								Notes
-								<textarea
-									class="min-h-20 rounded-md border border-stone-300 bg-white px-3 py-2 text-sm normal-case text-stone-900 outline-none focus:border-missionnaire"
-									value={selectedRow.review_notes}
-									on:input={(event) => setReviewNotes(selectedRow, event.currentTarget.value)}
-								></textarea>
-							</label>
+							<span class="rounded-full bg-stone-900 px-3 py-1 text-xs font-semibold text-white">
+								{confidenceLabel(selectedRow.confidence)}
+							</span>
 						</div>
 
-						<div class="p-5">
-							<div class="flex items-start justify-between gap-3">
-								<div>
-									<p class="text-xs font-bold uppercase text-stone-500">Lyrics candidate</p>
-									<h3 class="mt-1 text-lg font-black text-stone-950">{selectedRow.source_title}</h3>
-									<p class="mt-1 text-sm text-stone-500">
-										{selectedRow.source_book} #{selectedRow.source_number}
-									</p>
-								</div>
-								<a
-									class="rounded-md border border-stone-300 px-3 py-2 text-xs font-bold text-stone-700 hover:border-missionnaire hover:text-missionnaire"
-									href={selectedRow.source_url}
-									target="_blank"
-									rel="noreferrer"
+						<audio class="mt-4 w-full" controls src={selectedRow.audio_url}></audio>
+
+						<div class="mt-4 border border-stone-200/70 bg-cream/60 p-3">
+							<div class="flex flex-wrap items-center gap-2">
+								<span
+									class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {syncStatusClass(
+										selectedRow
+									)}"
 								>
-									Source
-								</a>
+									{syncStatusLabel(selectedRow)}
+								</span>
+								<span
+									class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {timelineStatusClass(
+										selectedRow
+									)}"
+								>
+									{timelineStatusLabel(selectedRow)}
+								</span>
+								{#if timelineProgressLabel(selectedRow)}
+									<span class="text-xs font-bold text-stone-500">
+										{timelineProgressLabel(selectedRow)}
+									</span>
+								{/if}
 							</div>
 
+							{#if selectedRow.lyrics_synced_at}
+								<p class="mt-2 text-xs font-semibold text-stone-500">
+									Synced {selectedRow.lyrics_synced_at}{selectedRow.lyrics_synced_by
+										? ` by ${selectedRow.lyrics_synced_by}`
+										: ''}
+								</p>
+							{/if}
+
 							<div
-								class="mt-4 max-h-[48vh] overflow-auto rounded-md border border-stone-200 bg-stone-50 p-4"
+								class="mt-3 grid gap-2 {canOpenTiming(selectedRow) ? 'grid-cols-2' : 'grid-cols-1'}"
 							>
-								{#if selectedLyrics?.loading}
-									<p class="text-sm font-semibold text-stone-500">Loading lyrics...</p>
-								{:else if selectedLyrics?.error}
-									<p class="text-sm font-semibold text-red-700">{selectedLyrics.error}</p>
-								{:else if selectedLyrics?.lines?.length}
-									<div class="space-y-3 text-[15px] leading-7 text-stone-900">
-										{#each selectedLyrics.lines as line}
-											<p>{line}</p>
-										{/each}
-									</div>
-								{:else}
-									<button
-										class="min-h-10 rounded-md bg-stone-950 px-4 text-sm font-bold text-white"
-										on:click={() => loadLyrics(selectedRow)}
-										type="button"
+								<button
+									class="min-h-10 bg-stone-900 px-3 text-sm font-semibold text-white transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
+									disabled={!canSyncLyrics(selectedRow)}
+									on:click={() => syncLyrics(selectedRow)}
+									type="button"
+								>
+									{lyricsPublishLabel(selectedRow)}
+								</button>
+								{#if canOpenTiming(selectedRow)}
+									<a
+										class="inline-flex min-h-10 items-center justify-center border border-stone-300 bg-white/70 px-3 text-sm font-semibold text-stone-800 transition-colors hover:border-primary hover:text-primary"
+										href={`/lyrics-review/timing/${selectedRow.audio_id}`}
 									>
-										Load lyrics
-									</button>
+										Timeline
+									</a>
 								{/if}
 							</div>
 						</div>
-					</aside>
-				{/if}
-			</section>
-		{:else}
-			<div
-				class="rounded-md border border-stone-200 bg-white p-8 text-center text-sm font-semibold text-stone-500"
-			>
-				No review rows found.
-			</div>
-		{/if}
-	</div>
-</main>
+
+						<div class="mt-4 grid grid-cols-2 gap-2">
+							<button
+								class="min-h-10 bg-blue-600 px-3 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-60"
+								disabled={selectedRow.saving}
+								on:click={() => saveReview(selectedRow, 'approved')}
+								type="button"
+							>
+								Approuvé
+							</button>
+							<button
+								class="min-h-10 bg-emerald-600 px-3 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-60"
+								disabled={selectedRow.saving}
+								on:click={() => saveReview(selectedRow, 'ready_for_sync')}
+								type="button"
+							>
+								Prêt
+							</button>
+							<button
+								class="min-h-10 bg-red-700 px-3 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-60"
+								disabled={selectedRow.saving}
+								on:click={() => saveReview(selectedRow, 'rejected')}
+								type="button"
+							>
+								Rejeté
+							</button>
+							<button
+								class="min-h-10 border border-stone-300 bg-white/70 px-3 text-sm font-semibold text-stone-800 disabled:cursor-wait disabled:opacity-60"
+								disabled={selectedRow.saving}
+								on:click={() => saveReview(selectedRow, '')}
+								type="button"
+							>
+								Effacer
+							</button>
+						</div>
+
+						<label class="mt-4 block">
+							<span class="admin-label">Notes</span>
+							<textarea
+								class="admin-input min-h-24 resize-y"
+								value={selectedRow.review_notes}
+								on:input={(event) => setReviewNotes(selectedRow, event.currentTarget.value)}
+							></textarea>
+						</label>
+					</div>
+
+					<div class="p-5">
+						<div class="flex items-start justify-between gap-3">
+							<div>
+								<p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-400">
+									Paroles candidates
+								</p>
+								<h3 class="mt-1 font-display text-xl font-semibold text-stone-800">
+									{selectedLyrics?.title || selectedRow.source_title}
+								</h3>
+								<p class="mt-1 text-sm text-stone-500">
+									{selectedRow.source_book} #{selectedRow.source_number}
+								</p>
+							</div>
+							<a
+								class="border border-stone-300 bg-white/70 px-3 py-2 text-xs font-semibold text-stone-700 transition-colors hover:border-primary hover:text-primary"
+								href={selectedRow.source_url}
+								target="_blank"
+								rel="noreferrer"
+							>
+								Source
+							</a>
+						</div>
+
+						<div class="mt-4 max-h-[48vh] overflow-auto border border-stone-200/70 bg-white/55 p-4">
+							{#if selectedLyrics?.loading}
+								<p class="text-sm font-semibold text-stone-500">Chargement des paroles...</p>
+							{:else if selectedLyrics?.error}
+								<p class="text-sm font-semibold text-red-700">{selectedLyrics.error}</p>
+							{:else if selectedLyrics?.sections?.length}
+								<div class="space-y-5 text-[15px] leading-7 text-stone-900">
+									{#each selectedLyrics.sections as section}
+										<section class="border-t border-stone-200 pt-4 first:border-t-0 first:pt-0">
+											<p class="mb-2 text-xs font-black uppercase tracking-[0.14em] text-stone-500">
+												{section.label}{section.title ? ` - ${section.title}` : ''}
+											</p>
+											<div class="space-y-3">
+												{#each section.lines as line}
+													<p>{getSourceLineText(line)}</p>
+												{/each}
+											</div>
+										</section>
+									{/each}
+								</div>
+							{:else if selectedLyrics?.lines?.length}
+								<div class="space-y-3 text-[15px] leading-7 text-stone-900">
+									{#each selectedLyrics.lines as line}
+										<p>{line}</p>
+									{/each}
+								</div>
+							{:else}
+								<button
+									class="admin-btn-secondary"
+									on:click={() => loadLyrics(selectedRow)}
+									type="button"
+								>
+									Charger les paroles
+								</button>
+							{/if}
+						</div>
+					</div>
+				</aside>
+			{/if}
+		</section>
+	{:else}
+		<div
+			class="border border-stone-200/60 bg-white/40 p-8 text-center text-sm font-semibold text-stone-500"
+		>
+			Aucune correspondance trouvée.
+		</div>
+	{/if}
+</div>

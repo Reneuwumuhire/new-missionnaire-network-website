@@ -257,9 +257,7 @@ export async function getMusicCategories(): Promise<string[]> {
 	}
 	const db = await getDb();
 	const categories = await db.collection('music_audio').distinct('category');
-	const value = categories
-		.filter((c): c is string => typeof c === 'string' && c.length > 0)
-		.sort();
+	const value = categories.filter((c): c is string => typeof c === 'string' && c.length > 0).sort();
 	cachedCategories = { value, cachedAt: Date.now() };
 	return value;
 }
@@ -417,6 +415,7 @@ export async function updateAdminPermissions(
 		can_edit: boolean;
 		can_delete: boolean;
 		can_manage_recordings: boolean;
+		can_review_lyrics: boolean;
 		can_view_questions: boolean;
 		can_answer_questions: boolean;
 		can_moderate_questions: boolean;

@@ -18,6 +18,7 @@
 			canViewDashboard?: boolean;
 			canManageAudio?: boolean;
 			canManageRecordings?: boolean;
+			canReviewLyrics?: boolean;
 			canViewQuestions?: boolean;
 		};
 		broadcastIsLive?: boolean;
@@ -28,7 +29,7 @@
 		...(user.canViewQuestions ? [{ href: '/questions', label: 'Questions', icon: 'questions' }] : []),
 		...(user.canManageRecordings ? [{ href: '/recordings', label: 'Enregistrements', icon: 'recordings' }] : []),
 		...(user.canManageAudio ? [{ href: '/audio', label: 'Bibliothèque audio', icon: 'music' }] : []),
-		{ href: '/lyrics-review', label: 'Révision paroles', icon: 'lyrics' },
+		...(user.canReviewLyrics ? [{ href: '/lyrics-review', label: 'Révision paroles', icon: 'lyrics' }] : []),
 		...(user.role === 'superadmin' ? [{ href: '/users', label: 'Utilisateurs', icon: 'users' }] : []),
 		{ href: '/settings', label: 'Paramètres', icon: 'settings' }
 	]);

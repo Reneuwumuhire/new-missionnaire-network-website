@@ -38,6 +38,7 @@
 					data.user.permissions.can_add ||
 					data.user.permissions.can_edit ||
 					data.user.permissions.can_delete,
+				canReviewLyrics: data.user.permissions.can_review_lyrics,
 				canManageAudio:
 					data.user.permissions.can_add ||
 					data.user.permissions.can_edit ||

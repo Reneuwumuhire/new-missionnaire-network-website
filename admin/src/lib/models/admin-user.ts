@@ -5,6 +5,7 @@ export const PermissionsSchema = z.object({
 	can_edit: z.boolean().default(true),
 	can_delete: z.boolean().default(false),
 	can_manage_recordings: z.boolean().default(false),
+	can_review_lyrics: z.boolean().default(false),
 	can_view_questions: z.boolean().default(false),
 	can_answer_questions: z.boolean().default(false),
 	can_moderate_questions: z.boolean().default(false)
@@ -17,6 +18,7 @@ export const DEFAULT_PERMISSIONS: Permissions = {
 	can_edit: true,
 	can_delete: false,
 	can_manage_recordings: false,
+	can_review_lyrics: false,
 	can_view_questions: false,
 	can_answer_questions: false,
 	can_moderate_questions: false
@@ -27,6 +29,7 @@ export const SUPERADMIN_PERMISSIONS: Permissions = {
 	can_edit: true,
 	can_delete: true,
 	can_manage_recordings: true,
+	can_review_lyrics: true,
 	can_view_questions: true,
 	can_answer_questions: true,
 	can_moderate_questions: true
@@ -83,6 +86,10 @@ export function canManageMusicAudio(user: AdminUser): boolean {
 	return permissions.can_add || permissions.can_edit || permissions.can_delete;
 }
 
+export function canReviewLyrics(user: AdminUser): boolean {
+	return getPermissions(user).can_review_lyrics;
+}
+
 export function canEditOrDeleteMusicAudio(user: AdminUser): boolean {
 	const permissions = getPermissions(user);
 	return permissions.can_edit || permissions.can_delete;
@@ -90,5 +97,7 @@ export function canEditOrDeleteMusicAudio(user: AdminUser): boolean {
 
 export function canViewDashboard(user: AdminUser): boolean {
 	const permissions = getPermissions(user);
-	return user.role === 'superadmin' || permissions.can_manage_recordings || canManageMusicAudio(user);
+	return (
+		user.role === 'superadmin' || permissions.can_manage_recordings || canManageMusicAudio(user)
+	);
 }
