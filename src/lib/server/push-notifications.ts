@@ -26,6 +26,7 @@ export interface PushPayload {
 	body: string;
 	url?: string;
 	icon?: string;
+	image?: string;
 }
 
 export async function sendPushToAll(payload: PushPayload): Promise<void> {
@@ -88,12 +89,20 @@ export async function sendPushToAll(payload: PushPayload): Promise<void> {
 
 // Pre-built payloads
 
-export function radioLivePayload(): PushPayload {
-	return {
+export function radioLivePayload(opts?: { thumbnailUrl?: string | null }): PushPayload {
+	const payload: PushPayload = {
 		title: 'Audio en direct',
 		body: 'Missionnaire Network est en direct audio maintenant\u00a0!',
 		url: '/live',
 		icon: '/favicon.png'
 	};
+	// Only attach `image` if it's an absolute HTTPS URL \u2014 web-push silently
+	// drops anything else, and a broken image URL can suppress the whole
+	// notification on some Android builds.
+	const thumb = opts?.thumbnailUrl;
+	if (thumb && /^https:\/\//i.test(thumb)) {
+		payload.image = thumb;
+	}
+	return payload;
 }
 

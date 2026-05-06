@@ -90,7 +90,7 @@ export async function GET({ url, setHeaders }) {
 		await setBroadcastAdminState({ notification_pending: false });
 		adminGate = { ...adminGate, notification_pending: false };
 		console.log('[RadioPoll] Sending Go Live push notification (admin-triggered)');
-		sendPushToAll(radioLivePayload()).catch((e) =>
+		sendPushToAll(radioLivePayload({ thumbnailUrl: adminGate.thumbnail_url })).catch((e) =>
 			console.error('[RadioPoll] Push send failed:', e)
 		);
 	}

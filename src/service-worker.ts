@@ -169,12 +169,14 @@ sw.addEventListener('push', (event) => {
 			body: string;
 			url?: string;
 			icon?: string;
+			image?: string;
 		};
 
 		const tag = payload.url || 'missionnaire-notification';
 
 		const options: NotificationOptions & {
 			renotify?: boolean;
+			image?: string;
 			actions?: { action: string; title: string; icon?: string }[];
 		} = {
 			body: payload.body,
@@ -188,6 +190,7 @@ sw.addEventListener('push', (event) => {
 				{ action: 'dismiss', title: 'Ignorer' }
 			]
 		};
+		if (payload.image) options.image = payload.image;
 
 		event.waitUntil(
 			sw.registration.showNotification(payload.title, options).then(() => {
