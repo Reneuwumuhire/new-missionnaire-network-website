@@ -12,22 +12,16 @@ export async function connect() {
 	}
 
 	try {
-		// Check if existing client is still connected
-		if (
-			client &&
-			(await client
-				.db()
-				.admin()
-				.command({ ping: 1 })
-				.catch(() => false))
-		) {
-			return client;
-		}
-
-		// Reset client if it exists but isn't connected
+		// Reuse the existing pooled client without an explicit ping. The
+		// ping was adding a full Atlas round-trip to *every* server load,
+		// which on Vercel serverless dominates SSR latency for the
+		// homepage (videos + radio status + listeners = 3 sequential
+		// queries, each preceded by ping). The driver's connection pool
+		// already detects dead sockets via `error`/`close` events below
+		// and clears `client` on failure — the next call falls through
+		// to the reconnect branch on its own.
 		if (client) {
-			await client.close(true);
-			client = null;
+			return client;
 		}
 
 		isConnecting = true;

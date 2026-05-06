@@ -69,11 +69,16 @@ sw.addEventListener('install', (event) => {
 		(async () => {
 			const cache = await caches.open(APP_SHELL_CACHE);
 			// Use individual put() calls so a single 404 doesn't fail the
-			// whole install (cache.addAll is all-or-nothing).
+			// whole install (cache.addAll is all-or-nothing). Build
+			// artefacts are content-hashed, so the HTTP cache is always
+			// safe to share — `cache: 'reload'` was forcing every asset
+			// through the network on each SW install, slamming Vercel's
+			// edge in parallel and competing for bandwidth with the
+			// page's own resource loads on first visit after a deploy.
 			await Promise.all(
 				APP_SHELL_ASSETS.map(async (asset) => {
 					try {
-						const response = await fetch(asset, { cache: 'reload' });
+						const response = await fetch(asset);
 						if (response.ok) await cache.put(asset, response);
 					} catch {
 						/* skip individual failures — best-effort pre-cache */
