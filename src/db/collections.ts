@@ -441,11 +441,20 @@ function seededShuffle<T>(items: T[], seed: string): T[] {
 	return items;
 }
 
-const RANDOM_MUSIC_CACHE_TTL_MS = 60_000;
+// 24 hours. The cached value is the SHUFFLED ORDERING of `_id`s for a
+// given (filter + seed) combination — it doesn't include track metadata,
+// so a stale ordering only matters if the music_audio collection had a
+// document inserted/removed within the window (which is fine: the next
+// page-level $in fetch still pulls fresh metadata, and a missing _id is
+// silently skipped). Holding the ordering for a full day means a single
+// listener's seed survives every reload, back/forward, and lambda warm-
+// up across an entire session — turning what was a multi-MB per-cold-
+// lambda fetch into a one-time cost per (lambda, seed).
+const RANDOM_MUSIC_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_RANDOM_MUSIC_CACHE_ENTRIES = 20;
 const randomMusicOrderCache = new Map<
 	string,
-	{ data: MusicAudio[]; fetchedAt: number }
+	{ ids: string[]; fetchedAt: number }
 >();
 
 function buildRandomMusicCacheKey(options: {
@@ -484,7 +493,7 @@ function pruneRandomMusicOrderCache(now = Date.now()) {
 	}
 }
 
-function getRandomMusicOrderFromCache(key: string): MusicAudio[] | null {
+function getRandomMusicOrderFromCache(key: string): string[] | null {
 	const cachedEntry = randomMusicOrderCache.get(key);
 	if (!cachedEntry) return null;
 
@@ -493,14 +502,14 @@ function getRandomMusicOrderFromCache(key: string): MusicAudio[] | null {
 		return null;
 	}
 
-	return cachedEntry.data;
+	return cachedEntry.ids;
 }
 
-function setRandomMusicOrderCache(key: string, data: MusicAudio[]): MusicAudio[] {
+function setRandomMusicOrderCache(key: string, ids: string[]): string[] {
 	const fetchedAt = Date.now();
-	randomMusicOrderCache.set(key, { data, fetchedAt });
+	randomMusicOrderCache.set(key, { ids, fetchedAt });
 	pruneRandomMusicOrderCache(fetchedAt);
-	return data;
+	return ids;
 }
 
 export async function queryMusicAudio(options: {
@@ -571,7 +580,18 @@ export async function queryMusicAudio(options: {
 
 		let total = 0;
 		let data: MusicAudio[];
+		const collection = db.collection('music_audio');
 		if (property === 'random' && seed) {
+			// Random sort with stable seed: shuffle a list of `_id`s once
+			// per (filter+seed), cache the ordering, then page-fetch only
+			// the documents needed for the current page.
+			//
+			// The previous implementation read the ENTIRE filtered
+			// collection's documents into memory, shuffled them, and
+			// cached the full-document array. With ~thousands of music
+			// tracks that's multi-MB of bandwidth and serialisation work
+			// per cold lambda — and it's the default sort on /musique,
+			// so it was the dominant cold-start cost on the music page.
 			const cacheKey = buildRandomMusicCacheKey({
 				category,
 				search,
@@ -580,45 +600,62 @@ export async function queryMusicAudio(options: {
 				number,
 				seed
 			});
-			const cachedOrder = getRandomMusicOrderFromCache(cacheKey);
-			const orderedData =
-				cachedOrder ??
-				setRandomMusicOrderCache(
-					cacheKey,
-					seededShuffle(
-						await db.collection('music_audio').find(query).sort({ _id: 1 }).toArray(),
-						seed
-					).map((doc) => serializeDocument<MusicAudio>(doc))
-				);
-
-			total = orderedData.length;
-			data = orderedData.slice(skip, skip + limit);
-		} else {
-			total = await db.collection('music_audio').countDocuments(query, {
-				collation: { locale: 'fr', strength: 1 }
-			});
-
-			if (property === 'random') {
-				data = (
-					await db
-						.collection('music_audio')
-						.aggregate([{ $match: query }, { $sample: { size: limit } }])
-						.toArray()
-				).map((doc) => serializeDocument<MusicAudio>(doc));
-			} else {
-				const sort: Sort = {};
-				sort[property] = order === 'asc' ? 1 : -1;
-				data = (
-					await db
-						.collection('music_audio')
-						.find(query)
-						.sort(sort)
-						.collation({ locale: 'fr', numericOrdering: true })
-						.skip(skip)
-						.limit(limit)
-						.toArray()
-				).map((doc) => serializeDocument<MusicAudio>(doc));
+			let orderedIds = getRandomMusicOrderFromCache(cacheKey);
+			if (!orderedIds) {
+				const idDocs = await collection
+					.find(query, { projection: { _id: 1 } })
+					.sort({ _id: 1 })
+					.toArray();
+				const ids = idDocs.map((doc) => String(doc._id));
+				orderedIds = setRandomMusicOrderCache(cacheKey, seededShuffle(ids, seed));
 			}
+
+			total = orderedIds.length;
+			const pageIds = orderedIds.slice(skip, skip + limit);
+			if (pageIds.length === 0) {
+				data = [];
+			} else {
+				const objectIds = pageIds
+					.filter((id) => ObjectId.isValid(id))
+					.map((id) => new ObjectId(id));
+				const docs = await collection
+					.find({ _id: { $in: objectIds } as Filter<Document>['_id'] })
+					.toArray();
+				const docMap = new Map<string, Document>();
+				for (const doc of docs) {
+					docMap.set(String(doc._id), doc);
+				}
+				data = pageIds
+					.map((id) => docMap.get(id))
+					.filter((doc): doc is Document => doc != null)
+					.map((doc) => serializeDocument<MusicAudio>(doc));
+			}
+		} else if (property === 'random') {
+			// Random without seed: ephemeral $sample. Count + sample run
+			// in parallel — they don't depend on each other.
+			const [totalResult, sampleDocs] = await Promise.all([
+				collection.countDocuments(query, { collation: { locale: 'fr', strength: 1 } }),
+				collection.aggregate([{ $match: query }, { $sample: { size: limit } }]).toArray()
+			]);
+			total = totalResult;
+			data = sampleDocs.map((doc) => serializeDocument<MusicAudio>(doc));
+		} else {
+			// Standard sort: count + find in parallel, eliminating the
+			// "wait for count, then issue find" round-trip stall.
+			const sort: Sort = {};
+			sort[property] = order === 'asc' ? 1 : -1;
+			const [totalResult, docs] = await Promise.all([
+				collection.countDocuments(query, { collation: { locale: 'fr', strength: 1 } }),
+				collection
+					.find(query)
+					.sort(sort)
+					.collation({ locale: 'fr', numericOrdering: true })
+					.skip(skip)
+					.limit(limit)
+					.toArray()
+			]);
+			total = totalResult;
+			data = docs.map((doc) => serializeDocument<MusicAudio>(doc));
 		}
 
 		return {

@@ -34,7 +34,7 @@ async function lyricsAvailableIds(audioIds: string[]): Promise<Set<string>> {
 	return result;
 }
 
-export async function GET({ url }: RequestEvent) {
+export async function GET({ url, setHeaders }: RequestEvent) {
 	try {
 		const category = url.searchParams.get('category') ?? undefined;
 		const search = url.searchParams.get('search') ?? undefined;
@@ -46,6 +46,20 @@ export async function GET({ url }: RequestEvent) {
 		const sort = url.searchParams.get('sort') || 'uploaded_at:desc';
 		const artist = url.searchParams.get('artist') ?? undefined;
 		const seed = url.searchParams.get('seed') ?? undefined;
+
+		// Edge-cache list responses. Search results are skipped — the
+		// query space is unbounded and individual queries are unlikely
+		// to repeat at the edge often enough to be worth it. Random
+		// sort is included because the seed makes the URL stable per
+		// session (so reload + back-button benefit), and the in-memory
+		// shuffle cache helps the origin too. Browsing/filtering hits
+		// the same URLs across users, so this is where edge caching
+		// pays off the most.
+		if (!search) {
+			setHeaders({
+				'cache-control': 'public, s-maxage=30, stale-while-revalidate=300'
+			});
+		}
 
 		const result = await queryMusicAudio({
 			category,
