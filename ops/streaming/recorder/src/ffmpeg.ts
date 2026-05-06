@@ -20,6 +20,7 @@ import { buildDownloadFilename, uploadRecording } from './upload.js';
 import { probeDurationSec } from './probe.js';
 import { generatePeaks } from './peaks.js';
 import { concatSegments } from './concat.js';
+import { extractYoutubeVideoId } from './youtube.js';
 
 interface Segment {
 	path: string;
@@ -451,8 +452,10 @@ async function finalizeUpload(
 			s3Url,
 			sizeBytes,
 			thumbnailUrl: snap.thumbnail_url,
+			thumbnailS3Key: snap.thumbnail_s3_key,
 			title: snap.title,
 			description: snap.description,
+			sourceVideoId: extractYoutubeVideoId(snap.youtube_url),
 			peaks: peaksResult?.peaks ?? null,
 			peaksDurationSec: peaksResult?.durationSec ?? null
 		});

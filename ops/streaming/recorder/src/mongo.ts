@@ -38,8 +38,14 @@ export interface RecordingDoc {
 	failure_reason: string | null;
 	/** Snapshot of broadcast_admin_state.thumbnail_url at recording-save time. */
 	thumbnail_url: string | null;
+	/** Snapshot of broadcast_admin_state.thumbnail_s3_key — needed so the admin
+	 *  can later replace/delete the thumbnail without leaking the S3 object. */
+	thumbnail_s3_key: string | null;
 	/** Snapshot of broadcast_admin_state.description at recording-save time. */
 	description: string | null;
+	/** YouTube video id parsed from broadcast_admin_state.youtube_url at
+	 *  recording-save time. Mirrors what admin PATCH stores. */
+	source_video_id: string | null;
 	/** Precomputed mono waveform peaks (0..1 magnitude, ~4000 bins). Set by
 	 *  the recorder after upload and refreshed when the admin trims audio. */
 	peaks: number[] | null;
@@ -52,6 +58,8 @@ interface BroadcastAdminStateSnapshot {
 	title: string | null;
 	description: string | null;
 	thumbnail_url: string | null;
+	thumbnail_s3_key: string | null;
+	youtube_url: string | null;
 }
 
 export async function getBroadcastSnapshot(): Promise<BroadcastAdminStateSnapshot> {
@@ -63,11 +71,19 @@ export async function getBroadcastSnapshot(): Promise<BroadcastAdminStateSnapsho
 		return {
 			title: doc?.title ?? null,
 			description: doc?.description ?? null,
-			thumbnail_url: doc?.thumbnail_url ?? null
+			thumbnail_url: doc?.thumbnail_url ?? null,
+			thumbnail_s3_key: doc?.thumbnail_s3_key ?? null,
+			youtube_url: doc?.youtube_url ?? null
 		};
 	} catch (err) {
 		console.error('[recorder/mongo] failed to read broadcast snapshot:', err);
-		return { title: null, description: null, thumbnail_url: null };
+		return {
+			title: null,
+			description: null,
+			thumbnail_url: null,
+			thumbnail_s3_key: null,
+			youtube_url: null
+		};
 	}
 }
 
@@ -94,7 +110,9 @@ export async function insertRecordingStarting(params: {
 		created_by_name: params.createdByName ?? null,
 		failure_reason: null,
 		thumbnail_url: null,
+		thumbnail_s3_key: null,
 		description: null,
+		source_video_id: null,
 		peaks: null,
 		peaks_duration_sec: null,
 		updated_at: new Date()
@@ -118,8 +136,10 @@ export async function markRecordingReady(
 		s3Url: string;
 		sizeBytes: number;
 		thumbnailUrl: string | null;
+		thumbnailS3Key: string | null;
 		title: string | null;
 		description: string | null;
+		sourceVideoId: string | null;
 		peaks: number[] | null;
 		peaksDurationSec: number | null;
 	}
@@ -131,7 +151,9 @@ export async function markRecordingReady(
 		s3_url: params.s3Url,
 		size_bytes: params.sizeBytes,
 		thumbnail_url: params.thumbnailUrl,
+		thumbnail_s3_key: params.thumbnailS3Key,
 		description: params.description,
+		source_video_id: params.sourceVideoId,
 		peaks: params.peaks,
 		peaks_duration_sec: params.peaksDurationSec,
 		failure_reason: null,
