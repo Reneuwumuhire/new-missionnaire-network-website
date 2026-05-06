@@ -22,9 +22,16 @@ primary_region = "jnb"
   AWS_S3_REGION = "af-south-1"
 
 # ── Icecast (public audio stream) ──
+# Pinned always-on so the public stream stays reachable and the broadcaster's
+# RTMP source doesn't have to reconnect after an idle-stop. All three services
+# share one machine, so keeping this one alive keeps RTMP + recorder API alive
+# too.
 [[services]]
   internal_port = 8000
   protocol = "tcp"
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
 
   [[services.ports]]
     handlers = ["http"]

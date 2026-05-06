@@ -1689,7 +1689,13 @@
 			</svg>
 			Écoute du direct
 		</div>
-		<audio controls preload="none" src={data.liveStreamUrl} class="h-8 flex-1 min-w-[280px]"></audio>
+		{#if icecast.sourceActive}
+			<audio controls preload="none" src={data.liveStreamUrl} class="h-8 flex-1 min-w-[280px]"></audio>
+		{:else}
+			<div class="flex h-8 flex-1 min-w-[280px] items-center bg-stone-50 px-3 text-[11px] italic text-stone-400">
+				Aucune source connectée — le lecteur apparaîtra dès qu'un flux est diffusé.
+			</div>
+		{/if}
 		<span class="text-[11px] text-stone-400">
 			{icecast.sourceActive ? 'Flux actif' : 'Aucune source active'}
 		</span>
