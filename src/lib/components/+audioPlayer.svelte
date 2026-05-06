@@ -108,6 +108,8 @@
 		if (!audio) return;
 		setPendingPlaybackIntent('play');
 		setUserWantsToPlay(true);
+		consecutiveFailedResumes = 0;
+		audioElementRebuilt = false;
 		if (audio.duration && audio.currentTime >= audio.duration) {
 			audio.currentTime = 0;
 		}
@@ -367,6 +369,35 @@
 	const RESUME_RETRY_INTERVAL_MS = 1500;
 	const RESUME_MAX_DURATION_MS = 5 * 60 * 1000;
 	const RESUME_RELOAD_EVERY_N_ATTEMPTS = 20;
+
+	/** Bounded auto-retry. After an OS interruption (iOS phone call, macOS
+	 *  Continuity call, AirPods route swap), the audio session can be in a
+	 *  degraded state where `play()` succeeds for a fraction of a second
+	 *  before the OS pauses the element again. Without a bound, the
+	 *  watchdog resumes → OS re-pauses → watchdog resumes … cycle keeps
+	 *  going for up to RESUME_MAX_DURATION_MS and the play/pause icon
+	 *  flickers the whole time. We count consecutive "rapid re-pauses"
+	 *  (a pause within RAPID_REPAUSE_THRESHOLD_MS of the last successful
+	 *  play event) and stop restarting the watchdog after the bound is
+	 *  hit. The user breaks the latch by tapping play, hitting play on
+	 *  the lock screen, or returning to the app — all of which reset
+	 *  the counter so a fresh resume can be attempted. */
+	let lastSuccessfulPlayAt = 0;
+	let consecutiveFailedResumes = 0;
+	const RAPID_REPAUSE_THRESHOLD_MS = 2500;
+
+	/** Set true after the audio element has been torn down and rebuilt to
+	 *  break out of a rapid-repause cycle. The watchdog approach polls
+	 *  play() on the existing element, but if iOS/macOS has the audio
+	 *  session itself in a bad state (Bluetooth route teardown,
+	 *  AVAudioSession partially-released after a phone call), no number
+	 *  of play() calls on the same element will recover it — only a
+	 *  fresh element does, mirroring what reloading the page achieves.
+	 *  We rebuild ONCE per cycle so we don't loop forever if the system
+	 *  is genuinely stuck. Reset on user-initiated play, MediaSession
+	 *  play, and track changes so the next interruption gets a fresh
+	 *  budget. */
+	let audioElementRebuilt = false;
 
 	/** Guards against concurrent audio.load() calls. When the watchdog and
 	 *  a visibility/focus handler both trigger safePlay('long') on resume,
@@ -669,6 +700,9 @@
 
 			const wasInterrupted = currentTrackInterrupted;
 			currentTrackInterrupted = false;
+			consecutiveFailedResumes = 0;
+			lastSuccessfulPlayAt = 0;
+			audioElementRebuilt = false;
 
 			audio.src = encodedUrl;
 
@@ -814,6 +848,188 @@
 		}
 	}
 
+	function handleAudioPlay() {
+		setPendingPlaybackIntent(null);
+		setUserWantsToPlay(true);
+		lastSuccessfulPlayAt = Date.now();
+		if (pendingSessionResumeTime !== null) {
+			const restored = restorePlaybackPosition(pendingSessionResumeTime);
+			if (restored) pendingSessionResumeTime = null;
+		}
+		audioPausedAt = 0;
+		stopResumeWatchdog();
+		isPlaying.set(true);
+		if ('mediaSession' in navigator) {
+			navigator.mediaSession.playbackState = 'playing';
+		}
+	}
+
+	function handleAudioPause() {
+		if (isChangingSource) return;
+		setPendingPlaybackIntent(null);
+		rememberPlaybackPosition();
+		// Note: we do NOT clear userWantsToPlay here. A `pause` event
+		// can come from the listener tapping pause OR from the OS
+		// interrupting (phone call, Siri, another app). Only togglePlay
+		// clears the intent flag, so this handler stays neutral and
+		// the visibilitychange/focus listeners can resume when the
+		// interruption ends.
+		//
+		// We do stamp `audioPausedAt` so safePlay() knows how long
+		// the pause lasted — long-enough pauses need an audio-session
+		// reload to restore Bluetooth output routing.
+		audioPausedAt = Date.now();
+		isPlaying.set(false);
+		if ('mediaSession' in navigator) {
+			navigator.mediaSession.playbackState = 'paused';
+		}
+
+		if (!userWantsToPlay) return;
+		currentTrackInterrupted = true;
+
+		// Two distinct kinds of OS-driven pause:
+		//   1. Genuine fresh interruption (audio was playing for a while
+		//      before this pause). Cheap recovery — start the watchdog and
+		//      let it probe play() until the audio session reopens.
+		//   2. Rapid re-pause (pause fires within RAPID_REPAUSE_THRESHOLD_MS
+		//      of the last successful play). Means the watchdog already
+		//      managed to call play() and the OS slammed it back into
+		//      paused — the audio session is in a degraded state that
+		//      retrying play() on the same element can't fix. The only
+		//      reliable recovery is to throw away the <audio> element and
+		//      build a fresh one (mirrors what a page reload does).
+		const playedDurationMs =
+			lastSuccessfulPlayAt > 0 ? Date.now() - lastSuccessfulPlayAt : 0;
+		const isRapidRepause =
+			lastSuccessfulPlayAt > 0 && playedDurationMs < RAPID_REPAUSE_THRESHOLD_MS;
+
+		if (!isRapidRepause) {
+			// Fresh interruption — clean slate, try the cheap path first.
+			consecutiveFailedResumes = 0;
+			audioElementRebuilt = false;
+			startResumeWatchdog();
+			return;
+		}
+
+		consecutiveFailedResumes++;
+		if (!audioElementRebuilt) {
+			// First rapid re-pause this cycle — rebuild the audio element.
+			// Don't start the watchdog: the rebuild owns the resume from here.
+			audioElementRebuilt = true;
+			console.warn(
+				'[AudioPlayer] Rapid re-pause detected — rebuilding audio element to reset audio session.'
+			);
+			rebuildAudioElement();
+		} else {
+			// Rebuild already happened and the OS is STILL re-pausing within
+			// the threshold. The system is stuck. Stop auto-retrying; the
+			// user can tap play, hit play on the lock screen, or come back
+			// to the app to re-arm the rebuild path.
+			console.warn(
+				'[AudioPlayer] Audio session still rejecting playback after rebuild — giving up. Tap play to retry.'
+			);
+		}
+	}
+
+	function handleAudioLoadedMetadata() {
+		duration = audio.duration;
+		if (pendingSessionResumeTime !== null) {
+			restorePlaybackPosition(pendingSessionResumeTime);
+		}
+		console.log('[AudioPlayer] Metadata loaded, duration:', duration);
+	}
+
+	function handleAudioCanPlay() {
+		isAudioReady = true;
+		if (pendingSessionResumeTime !== null) {
+			restorePlaybackPosition(pendingSessionResumeTime);
+		}
+		if (shouldAutoplayOnLoad || $isPlaying) {
+			setPendingPlaybackIntent('play');
+			audio.play().catch((e) => {
+				setPendingPlaybackIntent(null);
+				console.error('[AudioPlayer] Autoplay on load failed:', e);
+				isPlaying.set(false);
+			});
+		}
+		shouldAutoplayOnLoad = false;
+	}
+
+	function handleAudioError(e: Event) {
+		setPendingPlaybackIntent(null);
+		console.error('[AudioPlayer] Audio error:', e);
+		isPlaying.set(false);
+		isAudioReady = false;
+		shouldAutoplayOnLoad = false;
+	}
+
+	function attachAudioListeners(el: HTMLAudioElement) {
+		el.addEventListener('ended', handleEnded);
+		el.addEventListener('timeupdate', updateAudioTime);
+		el.addEventListener('timeupdate', updateIndicator);
+		el.addEventListener('play', handleAudioPlay);
+		el.addEventListener('pause', handleAudioPause);
+		el.addEventListener('loadedmetadata', handleAudioLoadedMetadata);
+		el.addEventListener('canplay', handleAudioCanPlay);
+		el.addEventListener('error', handleAudioError);
+	}
+
+	function detachAudioListeners(el: HTMLAudioElement) {
+		el.removeEventListener('ended', handleEnded);
+		el.removeEventListener('timeupdate', updateAudioTime);
+		el.removeEventListener('timeupdate', updateIndicator);
+		el.removeEventListener('play', handleAudioPlay);
+		el.removeEventListener('pause', handleAudioPause);
+		el.removeEventListener('loadedmetadata', handleAudioLoadedMetadata);
+		el.removeEventListener('canplay', handleAudioCanPlay);
+		el.removeEventListener('error', handleAudioError);
+	}
+
+	/** Tear down the live <audio> element and build a fresh one preloaded
+	 *  to the same src and time. Used to escape a rapid-repause cycle
+	 *  caused by a degraded OS audio session — calling load()/play() on
+	 *  the existing element can't reset AVAudioSession's output route
+	 *  state, but constructing a brand-new element does (this is the
+	 *  same thing reloading the page achieves, just scoped to the
+	 *  audio). */
+	function rebuildAudioElement() {
+		if (!audio || destroyed) return;
+
+		const savedSrc = audio.src;
+		const savedTime = getReliablePlaybackTime();
+		const wantedToPlay = userWantsToPlay;
+
+		// Stop the polling watchdog and any in-flight reload before
+		// dropping references — otherwise a tick fires play() on the
+		// orphan element after we've moved on.
+		stopResumeWatchdog();
+		isReloadingSession = false;
+
+		const oldEl = audio;
+		detachAudioListeners(oldEl);
+		try {
+			oldEl.pause();
+			oldEl.removeAttribute('src');
+			oldEl.load();
+		} catch (err) {
+			console.warn('[AudioPlayer] Old element teardown failed:', err);
+		}
+
+		// Construct without src first so listeners are wired before any
+		// canplay/loadedmetadata events can fire from the load below.
+		audio = new Audio();
+		audio.crossOrigin = 'anonymous';
+		attachAudioListeners(audio);
+
+		if (savedTime > 0.25) {
+			pendingSessionResumeTime = savedTime;
+		}
+		shouldAutoplayOnLoad = wantedToPlay;
+		audioPausedAt = 0;
+		audio.src = savedSrc;
+		audio.load();
+	}
+
 	function updateAudioSource(url: string) {
 		if (!url) return;
 
@@ -821,6 +1037,9 @@
 		console.log('[AudioPlayer] Updating source to:', encodedUrl);
 		// New track — drop any "previous track was interrupted" carry-over.
 		currentTrackInterrupted = false;
+		consecutiveFailedResumes = 0;
+		lastSuccessfulPlayAt = 0;
+		audioElementRebuilt = false;
 		isAudioReady = false;
 		currentTime = 0;
 		duration = 0;
@@ -841,86 +1060,11 @@
 			audio.load();
 		} else {
 			resetRememberedPlaybackPosition();
-			audio = new Audio(encodedUrl);
+			audio = new Audio();
 			audio.crossOrigin = 'anonymous';
-			audio.addEventListener('ended', handleEnded);
-			audio.addEventListener('timeupdate', updateAudioTime);
-			audio.addEventListener('timeupdate', updateIndicator);
-			audio.addEventListener('play', () => {
-				setPendingPlaybackIntent(null);
-				setUserWantsToPlay(true);
-				if (pendingSessionResumeTime !== null) {
-					const restored = restorePlaybackPosition(pendingSessionResumeTime);
-					if (restored) pendingSessionResumeTime = null;
-				}
-				audioPausedAt = 0;
-				stopResumeWatchdog();
-				isPlaying.set(true);
-				if ('mediaSession' in navigator) {
-					navigator.mediaSession.playbackState = 'playing';
-				}
-			});
-			audio.addEventListener('pause', () => {
-				if (isChangingSource) return;
-				setPendingPlaybackIntent(null);
-				rememberPlaybackPosition();
-				// Note: we do NOT clear userWantsToPlay here. A `pause` event
-				// can come from the listener tapping pause OR from the OS
-				// interrupting (phone call, Siri, another app). Only togglePlay
-				// clears the intent flag, so this handler stays neutral and
-				// the visibilitychange/focus listeners can resume when the
-				// interruption ends.
-				//
-				// We do stamp `audioPausedAt` so safePlay() knows how long
-				// the pause lasted — long-enough pauses need an audio-session
-				// reload to restore Bluetooth output routing.
-				audioPausedAt = Date.now();
-				isPlaying.set(false);
-				if ('mediaSession' in navigator) {
-					navigator.mediaSession.playbackState = 'paused';
-				}
-				// If the pause was NOT user-initiated (togglePlay / MediaSession
-				// pause clear userWantsToPlay *before* calling audio.pause()),
-				// start the watchdog. It polls play() until iOS lifts the
-				// AVAudioSession interruption (phone call / Siri / focus grab).
-				// Also flag the current track as interrupted so handleEnded
-				// rebuilds the audio session before auto-advancing — without
-				// that rebuild, the post-interruption iOS session can leave
-				// the next track silent or stuttering until a manual refresh.
-				if (userWantsToPlay) {
-					currentTrackInterrupted = true;
-					startResumeWatchdog();
-				}
-			});
-			audio.addEventListener('loadedmetadata', () => {
-				duration = audio.duration;
-				if (pendingSessionResumeTime !== null) {
-					restorePlaybackPosition(pendingSessionResumeTime);
-				}
-				console.log('[AudioPlayer] Metadata loaded, duration:', duration);
-			});
-			audio.addEventListener('canplay', () => {
-				isAudioReady = true;
-				if (pendingSessionResumeTime !== null) {
-					restorePlaybackPosition(pendingSessionResumeTime);
-				}
-				if (shouldAutoplayOnLoad || $isPlaying) {
-					setPendingPlaybackIntent('play');
-					audio.play().catch((e) => {
-						setPendingPlaybackIntent(null);
-						console.error('[AudioPlayer] Autoplay on load failed:', e);
-						isPlaying.set(false);
-					});
-				}
-				shouldAutoplayOnLoad = false;
-			});
-			audio.addEventListener('error', (e) => {
-				setPendingPlaybackIntent(null);
-				console.error('[AudioPlayer] Audio error:', e);
-				isPlaying.set(false);
-				isAudioReady = false;
-				shouldAutoplayOnLoad = false;
-			});
+			attachAudioListeners(audio);
+			audio.src = encodedUrl;
+			audio.load();
 		}
 	}
 
@@ -1217,6 +1361,14 @@
 		// polling watchdog so it can't fire a competing reload or play()
 		// probe that races with the session rebuild below.
 		stopResumeWatchdog();
+		// Only treat a long absence as a "fresh signal" worth re-arming
+		// the rebuild path. Bare focus/visibility events fire repeatedly
+		// during a phone-call banner on macOS — resetting on every one
+		// would let the rapid-repause cycle restart indefinitely.
+		if (hiddenMs >= PAUSE_RELOAD_THRESHOLD_MS) {
+			consecutiveFailedResumes = 0;
+			audioElementRebuilt = false;
+		}
 		safePlay(hiddenMs >= PAUSE_RELOAD_THRESHOLD_MS ? 'long' : 'short');
 	}
 
@@ -1335,6 +1487,8 @@
 		try {
 			navigator.mediaSession.setActionHandler('play', () => {
 				setUserWantsToPlay(true);
+				consecutiveFailedResumes = 0;
+				audioElementRebuilt = false;
 				// Lock-screen / Bluetooth play: route through safePlay so a
 				// long paused-on-lockscreen window reloads the audio session
 				// before attempting playback. Without this, play() resumes
