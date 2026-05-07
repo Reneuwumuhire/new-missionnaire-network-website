@@ -462,17 +462,22 @@ async function upsertLyricsDocument(options: {
 		update.timeline_updated_by = options.syncedBy;
 	}
 
+	const setOnInsert: Record<string, unknown> = {
+		created_at: now,
+		created_by: options.syncedBy
+	};
+
+	if (!resetTimeline) {
+		setOnInsert.timeline_draft = [];
+		setOnInsert.timeline_published = [];
+		setOnInsert.timeline_status = '';
+	}
+
 	const result = await db.collection(LYRICS_COLLECTION).updateOne(
 		{ audio_id: options.row.audio_id },
 		{
 			$set: update,
-			$setOnInsert: {
-				created_at: now,
-				created_by: options.syncedBy,
-				timeline_draft: [],
-				timeline_published: [],
-				timeline_status: ''
-			}
+			$setOnInsert: setOnInsert
 		},
 		{ upsert: true }
 	);
