@@ -35,9 +35,6 @@ jobs:
         with:
           node-version: 20
 
-      - name: Enable Corepack
-        run: corepack enable
-
       - name: Install Vercel CLI
         run: pnpm add -g vercel@latest
 
@@ -74,9 +71,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Enable Corepack
-        run: corepack enable
 
       - name: Install Vercel CLI
         run: pnpm add -g vercel@latest
