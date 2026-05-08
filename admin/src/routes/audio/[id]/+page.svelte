@@ -10,9 +10,16 @@
 		source_book?: string;
 		source_number?: string;
 		source_title?: string;
+		source_url?: string;
 		synced_at?: string;
 		synced_by?: string;
 		timeline_status?: string;
+	};
+
+	type ExtractedSection = {
+		label: string;
+		title: string;
+		lines: Array<string | { role?: string; text?: string; verse_number?: number | null }>;
 	};
 
 	let { data }: { data: PageData } = $props();
@@ -41,6 +48,12 @@
 	let lyricsSaving = $state(false);
 	let lyrics = $derived((data.lyrics as PublishedLyrics | null) ?? null);
 	let lyricsText = $derived(lyricsTextOverride ?? buildLyricsText(lyrics?.lines));
+	let lyricsSourceUrl = $state(data.lyrics?.source_url ?? '');
+	let lyricsUrlLoading = $state(false);
+
+	$effect(() => {
+		lyricsSourceUrl = data.lyrics?.source_url ?? '';
+	});
 
 	function formatBytes(bytes: number): string {
 		if (bytes === 0) return '0 B';
@@ -170,6 +183,85 @@
 		}
 	}
 
+	async function loadLyricsFromUrl() {
+		const url = lyricsSourceUrl.trim();
+		if (!url) {
+			toast.error('Collez une URL avant de charger');
+			return;
+		}
+
+		try {
+			const parsed = new URL(url);
+			if (parsed.hostname !== 'indirimbo-zikundwa.bi') {
+				toast.error('URL non supportée — utilisez indirimbo-zikundwa.bi');
+				return;
+			}
+		} catch {
+			toast.error('URL invalide');
+			return;
+		}
+
+		lyricsUrlLoading = true;
+		try {
+			const params = new URLSearchParams({
+				url,
+				audioTitle: title || data.audio.title || ''
+			});
+			const res = await fetch(`/api/lyrics-review/lyrics?${params.toString()}`);
+			const result = await res.json();
+			if (!res.ok) throw new Error(result.error ?? 'Impossible de charger les paroles');
+
+			const formatted = formatExtractedLyrics(result.sections, result.lines);
+			if (!formatted.trim()) {
+				toast.error('Aucune parole trouvée à cette URL');
+				return;
+			}
+
+			lyricsTextOverride = formatted;
+			toast.success('Paroles chargées depuis l’URL');
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : 'Erreur lors du chargement des paroles');
+		} finally {
+			lyricsUrlLoading = false;
+		}
+	}
+
+	function formatExtractedLyrics(sections: ExtractedSection[] | undefined, lines: string[] | undefined) {
+		if (sections && sections.length > 0) {
+			const blocks: string[][] = [];
+			let inRefrain = false;
+
+			for (const section of sections) {
+				for (const sourceLine of section.lines ?? []) {
+					const text =
+						typeof sourceLine === 'string' ? sourceLine.trim() : (sourceLine.text ?? '').trim();
+					if (!text) continue;
+					const role = typeof sourceLine === 'string' ? '' : (sourceLine.role ?? '');
+					const verseNumber =
+						typeof sourceLine === 'string' ? null : (sourceLine.verse_number ?? null);
+					const formatted =
+						typeof verseNumber === 'number' && verseNumber > 0 ? `${verseNumber}. ${text}` : text;
+
+					if (role === 'refrain') {
+						if (!inRefrain) {
+							blocks.push(['Refrain']);
+							inRefrain = true;
+						}
+						blocks[blocks.length - 1].push(formatted);
+						continue;
+					}
+
+					blocks.push([formatted]);
+					inRefrain = false;
+				}
+			}
+
+			return blocks.map((block) => block.join('\n')).join('\n\n');
+		}
+
+		return (lines ?? []).filter(Boolean).join('\n\n');
+	}
+
 	async function publishLyrics() {
 		if (!data.canPublishLyrics || !data.audio._id) return;
 		if (!lyricsText.trim()) {
@@ -187,6 +279,7 @@
 					sourceBook: bookFullName || book || category,
 					sourceNumber: number ? String(number) : '',
 					sourceTitle: title || data.audio.title || '',
+					sourceUrl: lyricsSourceUrl.trim(),
 					title: title || data.audio.title || ''
 				})
 			});
@@ -364,6 +457,36 @@
 					</span>
 				{/if}
 			</div>
+
+			{#if data.canPublishLyrics}
+				<div class="mb-5 rounded border border-stone-200/70 bg-stone-50/60 p-4">
+					<label for="lyricsSourceUrl" class="admin-label">
+						Importer depuis indirimbo-zikundwa.bi
+					</label>
+					<div class="flex flex-col gap-2 sm:flex-row">
+						<input
+							id="lyricsSourceUrl"
+							type="url"
+							class="admin-input flex-1"
+							bind:value={lyricsSourceUrl}
+							placeholder="https://indirimbo-zikundwa.bi/..."
+							disabled={lyricsUrlLoading}
+						/>
+						<button
+							type="button"
+							onclick={loadLyricsFromUrl}
+							disabled={lyricsUrlLoading || !lyricsSourceUrl.trim()}
+							class="admin-btn-secondary disabled:opacity-50"
+						>
+							{lyricsUrlLoading ? 'Chargement...' : 'Charger depuis l’URL'}
+						</button>
+					</div>
+					<p class="mt-2 text-xs text-stone-500">
+						Collez l’URL de la page des paroles pour les importer automatiquement, ou laissez ce
+						champ vide et collez les paroles directement ci-dessous.
+					</p>
+				</div>
+			{/if}
 
 			<label for="lyricsText" class="admin-label">Texte des paroles</label>
 			<textarea
