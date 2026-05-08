@@ -70,6 +70,7 @@ export async function queryMusicAudio(options: {
 	category?: string;
 	search?: string;
 	artist?: string;
+	lyrics?: 'with' | 'without';
 	limit?: number;
 	pageNumber?: number;
 	orderBy?: string;
@@ -78,6 +79,7 @@ export async function queryMusicAudio(options: {
 		category,
 		search,
 		artist,
+		lyrics,
 		limit = 20,
 		pageNumber = 1,
 		orderBy = 'uploaded_at:desc'
@@ -106,6 +108,16 @@ export async function queryMusicAudio(options: {
 
 	if (artist) {
 		conditions.push({ artist });
+	}
+
+	if (lyrics === 'with' || lyrics === 'without') {
+		const lyricsAudioIds = await db
+			.collection('music_lyrics')
+			.distinct('audio_id');
+		const objectIds = lyricsAudioIds
+			.filter((value): value is string => typeof value === 'string' && ObjectId.isValid(value))
+			.map((value) => new ObjectId(value));
+		conditions.push({ _id: lyrics === 'with' ? { $in: objectIds } : { $nin: objectIds } });
 	}
 
 	const query: Filter<Document> = conditions.length > 0 ? { $and: conditions } : {};

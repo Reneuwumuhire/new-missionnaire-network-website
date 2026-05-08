@@ -39,11 +39,13 @@
 	const hasFilters = $derived(
 		$page.url.searchParams.has('search') ||
 			$page.url.searchParams.has('category') ||
-			$page.url.searchParams.has('artist')
+			$page.url.searchParams.has('artist') ||
+			$page.url.searchParams.has('lyrics')
 	);
 
 	const activeCategory = $derived($page.url.searchParams.get('category') ?? '');
 	const activeArtist = $derived($page.url.searchParams.get('artist') ?? '');
+	const activeLyrics = $derived($page.url.searchParams.get('lyrics') ?? '');
 	const activeSort = $derived($page.url.searchParams.get('sort') ?? 'uploaded_at:desc');
 </script>
 
@@ -103,6 +105,16 @@
 			{#each artists as art}
 				<option value={art}>{art}</option>
 			{/each}
+		</select>
+
+		<select
+			class="rounded-none border border-stone-200/60 bg-white/60 px-3 py-1.5 text-xs font-medium text-stone-600 transition-all hover:border-stone-300 focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none {activeLyrics ? 'border-primary/40 bg-missionnaire-50 text-primary' : ''}"
+			value={activeLyrics}
+			onchange={(e) => updateParam('lyrics', e.currentTarget.value)}
+		>
+			<option value="">Paroles</option>
+			<option value="with">Avec paroles</option>
+			<option value="without">Sans paroles</option>
 		</select>
 
 		<div class="h-4 w-px bg-stone-200"></div>
