@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
+	import { page } from '$app/stores';
 	import { toast } from '$lib/stores/toast';
 	import AudioPreviewPlayer from '$lib/components/AudioPreviewPlayer.svelte';
 	import type { PageData } from './$types';
@@ -54,6 +55,8 @@
 	$effect(() => {
 		lyricsSourceUrl = data.lyrics?.source_url ?? '';
 	});
+
+	const backHref = $derived(`/audio${$page.url.search}`);
 
 	function formatBytes(bytes: number): string {
 		if (bytes === 0) return '0 B';
@@ -175,7 +178,7 @@
 			if (result.error) throw new Error(result.error);
 
 			toast.success('Audio supprimé');
-			goto('/audio');
+			goto(backHref);
 		} catch (err) {
 			toast.error(err instanceof Error ? err.message : 'Erreur lors de la suppression');
 		} finally {
@@ -304,7 +307,7 @@
 <!-- Header -->
 <div class="mb-8">
 	<a
-		href="/audio"
+		href={backHref}
 		class="mb-4 inline-flex items-center gap-1 text-sm text-stone-500 transition-colors hover:text-primary"
 	>
 		<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -426,7 +429,7 @@
 						Enregistrer
 					</button>
 				{/if}
-				<a href="/audio" class="admin-btn-secondary">Annuler</a>
+				<a href={backHref} class="admin-btn-secondary">Annuler</a>
 			</div>
 		</div>
 

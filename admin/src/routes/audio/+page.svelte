@@ -37,6 +37,7 @@
 
 	const allIds = $derived(data.audioList.map((a) => a._id).filter((id): id is string => !!id));
 	const allSelected = $derived($selection.size > 0 && allIds.every((id) => $selection.has(id)));
+	const filterQuery = $derived($page.url.search);
 
 	function toggleAll() {
 		if (!canSelectAudio) return;
@@ -126,7 +127,7 @@
 						<td class="max-w-[240px] px-4 py-3">
 							{#if canSelectAudio}
 								<a
-									href="/audio/{id}"
+									href="/audio/{id}{filterQuery}"
 									class="block truncate font-medium text-stone-700 hover:text-primary"
 								>
 									{audio.title || 'Sans titre'}
