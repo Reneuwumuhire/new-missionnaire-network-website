@@ -17,9 +17,10 @@ export const load: PageServerLoad = async ({ url, setHeaders }) => {
 
 	// Edge-cache the rendered HTML. The homepage shows the 3 most recent
 	// videos and a radio "is live" indicator — both tolerate up to a
-	// minute of staleness (the client polls /api/live/radio-poll every
-	// 10s and overrides the SSR value via the radioIsLive store, so the
-	// indicator stays fresh even on a stale HTML hit). Without this every
+	// minute of staleness. The live banner is push-driven (Service Worker
+	// receives the Web Push and broadcasts to open tabs), and SSR via
+	// +layout.server.ts seeds the radio store on every navigation, so the
+	// indicator stays fresh even on a stale HTML hit. Without this every
 	// reload re-runs the MongoDB queries and listeners stare at the
 	// inline splash until SSR completes.
 	setHeaders({

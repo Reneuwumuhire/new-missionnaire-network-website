@@ -17,7 +17,7 @@
 	import { navigating, page } from '$app/stores';
 	import { afterNavigate, goto } from '$app/navigation';
 	import { browser, dev } from '$app/environment';
-	import { onMount, onDestroy, tick } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { radioIsLive } from '$lib/stores/global';
 	export let data: LayoutData;
 	const SITE_URL = 'https://missionnaire.net';
@@ -115,28 +115,50 @@
 	const ytPages = ['/videos', '/musique', '/predications'];
 	$: needsYouTube = ytPages.some((p) => $page.url.pathname.startsWith(p));
 
-	// Radio live status polling — runs globally so the banner works on all pages
-	let radioPollTimer: ReturnType<typeof setInterval> | null = null;
-
-	async function pollRadioStatus() {
-		try {
-			const res = await fetch('/api/live/radio-poll');
-			if (!res.ok) return;
-			const status = (await res.json()) as { isLive: boolean };
-			radioIsLive.set(status.isLive);
-		} catch {
-			/* ignore */
-		}
+	// Radio live status — push-driven, no polling.
+	// 1. SSR seeds `data.radioState` so first paint shows truth.
+	// 2. Service Worker forwards Web Push payloads (`{type:'RADIO_PUSH'}`) to
+	//    every open tab, so the banner reacts the moment admin goes live.
+	// 3. BroadcastChannel keeps multiple tabs in the same browser consistent.
+	$: if (browser && data.radioState) {
+		radioIsLive.set(data.radioState.isLive);
 	}
+
+	let radioBroadcast: BroadcastChannel | null = null;
 
 	onMount(() => {
 		if (!browser) return;
-		pollRadioStatus();
-		radioPollTimer = setInterval(pollRadioStatus, 10_000);
-	});
 
-	onDestroy(() => {
-		if (radioPollTimer) clearInterval(radioPollTimer);
+		radioIsLive.set(data.radioState?.isLive ?? false);
+
+		try {
+			radioBroadcast = new BroadcastChannel('radio-state');
+			radioBroadcast.addEventListener('message', (event) => {
+				if (event.data?.type === 'RADIO_PUSH') {
+					radioIsLive.set(true);
+				}
+			});
+		} catch {
+			// BroadcastChannel unsupported — single-tab fallback is fine
+		}
+
+		const swListener = (event: MessageEvent) => {
+			const msg = event.data;
+			if (!msg || msg.type !== 'RADIO_PUSH') return;
+			radioIsLive.set(true);
+			try {
+				radioBroadcast?.postMessage({ type: 'RADIO_PUSH', payload: msg.payload });
+			} catch {
+				/* channel closed */
+			}
+		};
+		navigator.serviceWorker?.addEventListener('message', swListener);
+
+		return () => {
+			navigator.serviceWorker?.removeEventListener('message', swListener);
+			radioBroadcast?.close();
+			radioBroadcast = null;
+		};
 	});
 
 	// Load Google Fonts globally (non-render-blocking)

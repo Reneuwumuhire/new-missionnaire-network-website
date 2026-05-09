@@ -43,20 +43,25 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		notification_pending: notify
 	});
 
-	// Ping the main-site radio-poll once so the push fires immediately, even if
-	// no public visitor has /live open. Fire-and-forget — failure here must not
-	// block the Go Live action; the flag stays pending and will be consumed by
-	// the next natural radio-poll request from any visitor.
-	if (env.MAIN_SITE_URL) {
-		fetch(`${env.MAIN_SITE_URL.replace(/\/$/, '')}/api/live/radio-poll`, {
-			method: 'GET',
-			headers: { 'Cache-Control': 'no-cache' }
+	// Ping the main-site internal broadcast-event endpoint so the push fires
+	// immediately. Fire-and-forget — failure here must not block the Go Live
+	// action; the flag stays pending and the main-site cron picks it up as a
+	// backstop on its next minute tick.
+	const internalSecret = env.INTERNAL_API_SECRET;
+	if (env.MAIN_SITE_URL && internalSecret) {
+		fetch(`${env.MAIN_SITE_URL.replace(/\/$/, '')}/api/internal/broadcast-event`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${internalSecret}`
+			},
+			body: JSON.stringify({ event: 'go-live' })
 		}).catch((err) => {
-			console.error('[broadcast/go-live] Main-site ping failed:', err);
+			console.error('[broadcast/go-live] Main-site broadcast-event ping failed:', err);
 		});
 	} else {
 		console.warn(
-			'[broadcast/go-live] MAIN_SITE_URL not set — push may be delayed until a visitor loads /live'
+			'[broadcast/go-live] MAIN_SITE_URL or INTERNAL_API_SECRET not set — push will be delayed until the main-site cron fires (≤60s)'
 		);
 	}
 

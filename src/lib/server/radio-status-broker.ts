@@ -2,8 +2,9 @@
  * Radio Status Broker (Simplified)
  *
  * Thin wrapper around the MongoDB radio status cache.
- * The actual probing is now done by the /api/live/radio-poll endpoint,
- * triggered by client polling and deduplicated via DB locks.
+ * Probing is now driven by the Vercel cron at /api/cron/radio-probe (runs
+ * every minute when the admin gate is open). This module is read-only —
+ * it just surfaces the latest cached status for SSR consumers.
  */
 
 import { getRadioCachedStatus, countActiveListeners } from '../../db/collections';
@@ -21,6 +22,8 @@ export async function getLastStatus(): Promise<RadioStatusEvent | null> {
 	let listeners = 0;
 	try {
 		listeners = await countActiveListeners();
-	} catch { /* fallback to 0 */ }
+	} catch {
+		/* fallback to 0 */
+	}
 	return { ...cached, listeners };
 }

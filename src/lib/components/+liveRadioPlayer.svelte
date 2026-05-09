@@ -4,11 +4,11 @@
 	import { radioIsLive as radioIsLiveStore } from '$lib/stores/global';
 
 	const STATUS_MESSAGES: Record<string, string> = {
-		offline: 'L\'audio en direct est hors ligne',
+		offline: "L'audio en direct est hors ligne",
 		listening: 'Vous écoutez le direct audio',
 		connecting: 'Connexion en cours...',
 		reconnecting: 'Reconnexion en cours...',
-		availablePressPlay: 'Direct audio disponible. Touchez l\'écran pour démarrer.',
+		availablePressPlay: "Direct audio disponible. Touchez l'écran pour démarrer.",
 		waiting: 'En attente du signal audio...',
 		cannotPlay: 'Impossible de lire le direct pour le moment',
 		unavailable: 'Le direct audio est indisponible pour le moment'
@@ -139,7 +139,7 @@
 				hour: '2-digit',
 				minute: '2-digit',
 				second: '2-digit'
-		  })
+			})
 		: '';
 
 	// ── SSE status handler ─────────────────────────────────────────
@@ -237,7 +237,12 @@
 		document.removeEventListener('keydown', handleAutoplayGesture, { capture: true });
 	}
 
-	function handleStatusEvent(liveNow: boolean, checkedAt: string, listeners: number, streamUrl?: string) {
+	function handleStatusEvent(
+		liveNow: boolean,
+		checkedAt: string,
+		listeners: number,
+		streamUrl?: string
+	) {
 		lastCheckedAt = checkedAt;
 		listenerCount = listeners;
 		if (streamUrl) directStreamUrl = streamUrl;
@@ -294,24 +299,36 @@
 		}
 	}
 
-	// ── Polling ───────────────────────────────────────────────────
+	// ── State refresh ─────────────────────────────────────────────
+	// No more 10-second polling. State is push-driven:
+	//  - SSR seeds initial state via the parent layout's data.
+	//  - One on-mount fetch of /api/live/radio-state hydrates this component.
+	//  - Service-Worker push events flip live state immediately, no network.
+	//  - While audio is actively playing, a slow 60s tick to /api/live/radio-state
+	//    refreshes listener count + admin-edited metadata (title, thumbnail) and
+	//    doubles as the listener heartbeat (the endpoint accepts ?sid=).
+	//  - Stopping audio or hiding the tab stops the tick entirely.
 
-	const POLL_INTERVAL = 10_000; // 10 seconds
+	const STATE_REFRESH_INTERVAL = 60_000; // 60s — only while playing + visible
 
-	async function pollRadioStatus() {
+	type RadioStatePayload = {
+		isLive: boolean;
+		checkedAt: string;
+		listeners: number;
+		streamUrl?: string;
+		title?: string | null;
+		description?: string | null;
+		thumbnailUrl?: string | null;
+	};
+
+	async function fetchRadioState(opts: { withSid?: boolean } = {}): Promise<void> {
 		try {
-			const sessionId = getSessionId();
-			const response = await fetch(`/api/live/radio-poll?sid=${encodeURIComponent(sessionId)}`);
+			const url = opts.withSid
+				? `/api/live/radio-state?sid=${encodeURIComponent(getSessionId())}`
+				: '/api/live/radio-state';
+			const response = await fetch(url);
 			if (!response.ok) return;
-			const data = (await response.json()) as {
-				isLive: boolean;
-				checkedAt: string;
-				listeners: number;
-				streamUrl?: string;
-				title?: string | null;
-				description?: string | null;
-				thumbnailUrl?: string | null;
-			};
+			const data = (await response.json()) as RadioStatePayload;
 			broadcastTitle = data.title ?? null;
 			broadcastDescription = data.description ?? null;
 			const nextThumb = data.thumbnailUrl ?? null;
@@ -319,21 +336,51 @@
 			broadcastThumbnail = nextThumb;
 			handleStatusEvent(data.isLive, data.checkedAt, data.listeners, data.streamUrl);
 		} catch {
-			// Network error — keep current state, will retry next interval
+			// Network error — keep current state.
 		}
 	}
 
-	function startPolling() {
+	function startStateRefresh() {
 		if (pollTimer) return;
-		pollRadioStatus(); // immediate first poll
-		pollTimer = setInterval(pollRadioStatus, POLL_INTERVAL);
+		pollTimer = setInterval(() => {
+			void fetchRadioState({ withSid: true });
+		}, STATE_REFRESH_INTERVAL);
 	}
 
-	function stopPolling() {
+	function stopStateRefresh() {
 		if (pollTimer) {
 			clearInterval(pollTimer);
 			pollTimer = null;
 		}
+	}
+
+	function sendListenerHeartbeat(): void {
+		const sid = getSessionId();
+		if (!sid) return;
+		fetch(`/api/live/radio-listener?sid=${encodeURIComponent(sid)}&action=heartbeat`, {
+			method: 'POST',
+			keepalive: true
+		}).catch(() => {});
+	}
+
+	// React to play/pause: only spend network while audio is actually playing
+	// and the tab is visible.
+	$: if (browser) {
+		if (isPlaying && document.visibilityState === 'visible') {
+			startStateRefresh();
+		} else {
+			stopStateRefresh();
+		}
+	}
+
+	// ── Push-driven updates (Service Worker → BroadcastChannel) ──
+	let radioBroadcast: BroadcastChannel | null = null;
+	let swMessageListener: ((event: MessageEvent) => void) | null = null;
+
+	function handleRadioPush() {
+		// A go-live push just landed. Refresh state immediately so the player
+		// flips to live with fresh metadata; no need to wait for the next tick.
+		void fetchRadioState({ withSid: true });
 	}
 
 	// ── Lifecycle ──────────────────────────────────────────────────
@@ -341,37 +388,63 @@
 	onMount(() => {
 		if (!browser) return;
 
-		startPolling();
+		// Initial paint — also registers the listener via ?sid=.
+		void fetchRadioState({ withSid: true });
+
 		document.addEventListener('visibilitychange', handleVisibilityChange);
+
+		try {
+			radioBroadcast = new BroadcastChannel('radio-state');
+			radioBroadcast.addEventListener('message', (event) => {
+				if (event.data?.type === 'RADIO_PUSH') handleRadioPush();
+			});
+		} catch {
+			/* BroadcastChannel unsupported */
+		}
+
+		swMessageListener = (event: MessageEvent) => {
+			if (event.data?.type !== 'RADIO_PUSH') return;
+			handleRadioPush();
+		};
+		navigator.serviceWorker?.addEventListener('message', swMessageListener);
 	});
 
 	onDestroy(() => {
-		stopPolling();
+		stopStateRefresh();
 		clearReconnectTimer();
 		clearNoAudioGraceTimer();
 		detachAutoplayGestureListener();
 		if (browser) {
 			document.removeEventListener('visibilitychange', handleVisibilityChange);
-			// Notify server to remove listener
+			if (swMessageListener) {
+				navigator.serviceWorker?.removeEventListener('message', swMessageListener);
+				swMessageListener = null;
+			}
+			radioBroadcast?.close();
+			radioBroadcast = null;
+			// Tell the server we're gone so the listener count drops promptly.
 			const sid = getSessionId();
 			if (sid) {
-				navigator.sendBeacon?.(`/api/live/radio-poll?sid=${encodeURIComponent(sid)}&action=disconnect`);
+				navigator.sendBeacon?.(
+					`/api/live/radio-listener?sid=${encodeURIComponent(sid)}&action=disconnect`
+				);
 			}
 		}
 	});
 
 	function handleVisibilityChange() {
 		if (document.visibilityState === 'visible') {
-			// Resume polling and trigger immediate check
-			startPolling();
-
-			// Resume audio if user was listening
+			// Tab regained focus — refresh once and (if playing) restart the tick.
+			void fetchRadioState({ withSid: true });
+			if (isPlaying) startStateRefresh();
 			if (userWantsToPlay && audio && audio.paused && !audio.ended) {
 				attemptReconnect();
 			}
 		} else {
-			// Pause polling when tab is hidden to save resources
-			stopPolling();
+			stopStateRefresh();
+			// One last heartbeat so the listener stays counted while the tab is
+			// hidden but audio keeps playing in the background (mobile lock screen).
+			if (isPlaying) sendListenerHeartbeat();
 		}
 	}
 
@@ -420,7 +493,8 @@
 		isBuffering = true;
 		statusKey = 'reconnecting';
 
-		const delay = RECONNECT_DELAYS[reconnectAttempts] ?? RECONNECT_DELAYS[RECONNECT_DELAYS.length - 1];
+		const delay =
+			RECONNECT_DELAYS[reconnectAttempts] ?? RECONNECT_DELAYS[RECONNECT_DELAYS.length - 1];
 		reconnectAttempts += 1;
 
 		clearReconnectTimer();
@@ -709,16 +783,37 @@
 		<div class="flex items-center gap-2.5 mb-4">
 			<span class="relative inline-flex h-2.5 w-2.5">
 				{#if showLive || awaitingPlay}
-					<span class="absolute inline-flex h-full w-full animate-ping rounded-full {showLive ? 'bg-red-500' : 'bg-missionnaire'} opacity-75"></span>
+					<span
+						class="absolute inline-flex h-full w-full animate-ping rounded-full {showLive
+							? 'bg-red-500'
+							: 'bg-missionnaire'} opacity-75"
+					></span>
 				{/if}
-				<span class="relative inline-flex h-2.5 w-2.5 rounded-full {showLive ? 'bg-red-500' : awaitingPlay ? 'bg-missionnaire' : 'bg-stone-300'}"></span>
+				<span
+					class="relative inline-flex h-2.5 w-2.5 rounded-full {showLive
+						? 'bg-red-500'
+						: awaitingPlay
+							? 'bg-missionnaire'
+							: 'bg-stone-300'}"
+				></span>
 			</span>
-			<span class="text-[10px] font-bold uppercase tracking-[0.25em] font-body {showLive ? 'text-red-600' : awaitingPlay ? 'text-missionnaire' : 'text-stone-400'}">
-				{showLive ? 'Audio en direct' : awaitingPlay ? 'Direct audio disponible' : 'Audio hors ligne'}
+			<span
+				class="text-[10px] font-bold uppercase tracking-[0.25em] font-body {showLive
+					? 'text-red-600'
+					: awaitingPlay
+						? 'text-missionnaire'
+						: 'text-stone-400'}"
+			>
+				{showLive
+					? 'Audio en direct'
+					: awaitingPlay
+						? 'Direct audio disponible'
+						: 'Audio hors ligne'}
 			</span>
 			{#if listenerCount > 0 && showLive}
 				<span class="text-[10px] text-red-400 font-body">
-					· {listenerCount} {listenerCount === 1 ? 'auditeur' : 'auditeurs'}
+					· {listenerCount}
+					{listenerCount === 1 ? 'auditeur' : 'auditeurs'}
 				</span>
 			{/if}
 		</div>
@@ -726,8 +821,20 @@
 		<!-- Title + thumbnail (2-column when thumbnail available) -->
 		<div class="flex flex-col md:flex-row md:items-start gap-6">
 			<div class="flex-1 min-w-0">
-				<h2 class="font-display text-2xl md:text-3xl font-semibold {showLive ? 'text-stone-900' : awaitingPlay ? 'text-stone-900' : 'text-stone-700'}">
-					{showLive && broadcastTitle ? broadcastTitle : showLive ? 'Audio en direct' : awaitingPlay ? 'Audio en direct' : 'Audio hors ligne'}
+				<h2
+					class="font-display text-2xl md:text-3xl font-semibold {showLive
+						? 'text-stone-900'
+						: awaitingPlay
+							? 'text-stone-900'
+							: 'text-stone-700'}"
+				>
+					{showLive && broadcastTitle
+						? broadcastTitle
+						: showLive
+							? 'Audio en direct'
+							: awaitingPlay
+								? 'Audio en direct'
+								: 'Audio hors ligne'}
 				</h2>
 				<p class="text-sm text-stone-500 font-body mt-1.5">
 					{statusMessage}
@@ -772,10 +879,35 @@
 						disabled={!canPlay}
 					>
 						{#if isMuted}
-							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+							<svg
+								width="16"
+								height="16"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><line
+									x1="23"
+									y1="9"
+									x2="17"
+									y2="15"
+								/><line x1="17" y1="9" x2="23" y2="15" /></svg
+							>
 							<span>Son coupé</span>
 						{:else}
-							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+							<svg
+								width="16"
+								height="16"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path
+									d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"
+								/></svg
+							>
 							<span>Couper le son</span>
 						{/if}
 					</button>
@@ -798,31 +930,63 @@
 								class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
 								loading="eager"
 							/>
-							<span class="pointer-events-none absolute inset-0 flex items-end justify-end p-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-								<span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/90 shadow">
-									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-stone-700">
+							<span
+								class="pointer-events-none absolute inset-0 flex items-end justify-end p-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+							>
+								<span
+									class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/90 shadow"
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										class="text-stone-700"
+									>
 										<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
 									</svg>
 								</span>
 							</span>
 						</button>
 					{:else}
-						<div class="default-thumbnail relative aspect-video w-full overflow-hidden border border-stone-200/60">
+						<div
+							class="default-thumbnail relative aspect-video w-full overflow-hidden border border-stone-200/60"
+						>
 							<div class="absolute inset-0 flex flex-col items-center justify-center gap-2.5">
 								<picture>
 									<source srcset="/icons/logo.webp" type="image/webp" />
-									<img src="/icons/logo.png" alt="" class="h-9 w-auto opacity-90" width="150" height="64" loading="eager" />
+									<img
+										src="/icons/logo.png"
+										alt=""
+										class="h-9 w-auto opacity-90"
+										width="150"
+										height="64"
+										loading="eager"
+									/>
 								</picture>
-								<div class="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.25em] text-red-600 font-body">
+								<div
+									class="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.25em] text-red-600 font-body"
+								>
 									<span class="relative inline-flex h-1.5 w-1.5">
-										<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"></span>
+										<span
+											class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"
+										></span>
 										<span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500"></span>
 									</span>
 									En direct
 								</div>
 							</div>
 							<!-- Decorative ornament -->
-							<svg class="absolute top-2 right-2 h-3 w-3 text-missionnaire/30" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
+							<svg
+								class="absolute top-2 right-2 h-3 w-3 text-missionnaire/30"
+								viewBox="0 0 14 14"
+								fill="currentColor"
+								aria-hidden="true"
+							>
 								<path d="M7 0L8.5 5.5L14 7L8.5 8.5L7 14L5.5 8.5L0 7L5.5 5.5L7 0Z" />
 							</svg>
 						</div>
@@ -870,7 +1034,9 @@
 					>
 						{#if isAtLive}
 							<span class="relative inline-flex h-2 w-2">
-								<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"></span>
+								<span
+									class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"
+								></span>
 								<span class="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
 							</span>
 							En direct
@@ -881,7 +1047,8 @@
 					</button>
 				</div>
 				<p class="mt-2 text-[10px] text-stone-400 font-body">
-					Vous pouvez faire glisser le curseur pour revenir en arrière dans ce que vous avez déjà écouté.
+					Vous pouvez faire glisser le curseur pour revenir en arrière dans ce que vous avez déjà
+					écouté.
 				</p>
 			</div>
 		{/if}
@@ -889,9 +1056,12 @@
 
 	<!-- Description (YouTube-style expandable block under the player) -->
 	{#if showLive && broadcastDescription}
-		{@const isLong = broadcastDescription.length > 280 || (broadcastDescription.match(/\n/g)?.length ?? 0) >= 3}
+		{@const isLong =
+			broadcastDescription.length > 280 || (broadcastDescription.match(/\n/g)?.length ?? 0) >= 3}
 		<div class="border border-stone-200/60 bg-white/40 p-5 md:p-6">
-			<p class="text-[10px] font-bold uppercase tracking-[0.25em] text-missionnaire/80 font-body mb-3">
+			<p
+				class="text-[10px] font-bold uppercase tracking-[0.25em] text-missionnaire/80 font-body mb-3"
+			>
 				À propos de ce direct
 			</p>
 			<div
@@ -919,8 +1089,8 @@
 				Information
 			</p>
 			<p class="text-sm text-stone-500 font-body leading-relaxed">
-				Cette page se met à jour automatiquement en temps réel.
-				Dès que le direct commence, le bouton
+				Cette page se met à jour automatiquement en temps réel. Dès que le direct commence, le
+				bouton
 				<span class="font-semibold text-stone-700">Lecture</span>
 				devient actif.
 			</p>
@@ -969,7 +1139,16 @@
 			aria-label="Fermer"
 			class="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
 		>
-			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+			<svg
+				width="18"
+				height="18"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
 				<path d="M6 6l12 12M6 18L18 6" />
 			</svg>
 		</button>
@@ -991,7 +1170,8 @@
 	}
 
 	@keyframes radio-glow {
-		0%, 100% {
+		0%,
+		100% {
 			box-shadow: 0 0 0 0 rgba(255, 136, 12, 0);
 		}
 		50% {
@@ -1015,7 +1195,7 @@
 		width: 11px;
 		height: 11px;
 		border-radius: 9999px;
-		background: #FF880C;
+		background: #ff880c;
 		border: 2px solid white;
 		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 		cursor: pointer;
@@ -1024,7 +1204,7 @@
 		width: 11px;
 		height: 11px;
 		border-radius: 9999px;
-		background: #FF880C;
+		background: #ff880c;
 		border: 2px solid white;
 		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 		cursor: pointer;
@@ -1037,15 +1217,19 @@
 		animation: lightbox-fade 0.18s ease-out;
 	}
 	@keyframes lightbox-fade {
-		from { opacity: 0; }
-		to { opacity: 1; }
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
 	}
 
 	/* Default live thumbnail — warm stone gradient matching the site palette */
 	.default-thumbnail {
 		background:
 			radial-gradient(circle at 30% 20%, rgba(255, 136, 12, 0.08), transparent 60%),
-			linear-gradient(135deg, #FAF6F1 0%, #F1EAE0 100%);
+			linear-gradient(135deg, #faf6f1 0%, #f1eae0 100%);
 	}
 
 	/* Collapsed description: show first ~3 lines then fade, expand on click */

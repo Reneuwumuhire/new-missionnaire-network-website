@@ -2,6 +2,24 @@
 	"buildCommand": "pnpm run build",
 	"installCommand": "pnpm install",
 	"framework": "sveltekit",
+	"crons": [
+		{
+			"path": "/api/cron/radio-probe",
+			"schedule": "* 16-21 * * 3"
+		},
+		{
+			"path": "/api/cron/radio-probe",
+			"schedule": "* 16-21 * * 6"
+		},
+		{
+			"path": "/api/cron/radio-probe",
+			"schedule": "* 6-11 * * 0"
+		},
+		{
+			"path": "/api/cron/radio-probe",
+			"schedule": "*/5 * * * *"
+		}
+	],
 	"redirects": [
 		{
 			"source": "/:path*",

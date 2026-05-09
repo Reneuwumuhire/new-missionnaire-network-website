@@ -193,9 +193,28 @@ sw.addEventListener('push', (event) => {
 		if (payload.image) options.image = payload.image;
 
 		event.waitUntil(
-			sw.registration.showNotification(payload.title, options).then(() => {
+			(async () => {
+				// Show the OS notification.
+				await sw.registration.showNotification(payload.title, options);
 				ackNotification('received', tag);
-			})
+
+				// AND broadcast the same payload to every open tab so the in-app UI
+				// (live banner, radio player, etc.) reacts immediately without any
+				// network request. Tabs that aren't subscribed to RADIO_PUSH ignore
+				// this message. Same-browser cross-tab consistency is handled by
+				// each tab forwarding onto a BroadcastChannel.
+				try {
+					const clientList = await sw.clients.matchAll({
+						type: 'window',
+						includeUncontrolled: true
+					});
+					for (const client of clientList) {
+						client.postMessage({ type: 'RADIO_PUSH', payload });
+					}
+				} catch (broadcastErr) {
+					console.error('[SW] Push client-broadcast failed:', broadcastErr);
+				}
+			})()
 		);
 	} catch (e) {
 		console.error('[SW] Error handling push event:', e);
