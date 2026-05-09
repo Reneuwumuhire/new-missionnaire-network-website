@@ -1,7 +1,15 @@
 import { json, error } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
-import { sendPushToAll, radioLivePayload } from '$lib/server/push-notifications';
-import { getBroadcastAdminState, setBroadcastAdminState } from '../../../../db/collections';
+import {
+	sendPushToAll,
+	radioLivePayload,
+	radioEndPayload
+} from '$lib/server/push-notifications';
+import {
+	getBroadcastAdminState,
+	setBroadcastAdminState,
+	setRadioCachedStatus
+} from '../../../../db/collections';
 
 // Internal cross-service endpoint. The admin app calls this immediately after
 // flipping `broadcast_admin_state.is_live = true` so the user push fires within
@@ -57,6 +65,20 @@ export async function POST({ request }) {
 		return json({ ok: true, fired: true });
 	}
 
-	// end-live: reserved for future use (e.g. "stream ended" push). No-op for now.
-	return json({ ok: true, fired: false, reason: 'end-live-no-op' });
+	// end-live: clear the cached Icecast status so any visitor whose page
+	// hasn't refreshed since admin clicked "End Live" sees `isLive: false` on
+	// next SSR / API read, then fan out an "end" push. Open tabs flip the
+	// radio store off via the SW broadcast — no reload needed.
+	await setRadioCachedStatus({
+		isLive: false,
+		checkedAt: new Date().toISOString(),
+		streamUrl: undefined
+	});
+	try {
+		await sendPushToAll(radioEndPayload());
+	} catch (e) {
+		console.error('[BroadcastEvent] sendPushToAll (end) failed:', e);
+		return json({ ok: false, fired: false, error: 'push-failed' }, { status: 502 });
+	}
+	return json({ ok: true, fired: true });
 }

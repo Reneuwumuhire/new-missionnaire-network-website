@@ -1,7 +1,6 @@
 import type { PageServerLoad } from './$types';
 import { redirect } from '@sveltejs/kit';
 import { getCollection } from '../db/collections';
-import { getLastStatus } from '$lib/server/radio-status-broker';
 
 export const load: PageServerLoad = async ({ url, setHeaders }) => {
 	const filter = url.searchParams.get('filter');
@@ -15,28 +14,20 @@ export const load: PageServerLoad = async ({ url, setHeaders }) => {
 		throw redirect(301, `/videos?${params.toString()}`);
 	}
 
-	// Edge-cache the rendered HTML. The homepage shows the 3 most recent
-	// videos and a radio "is live" indicator — both tolerate up to a
-	// minute of staleness. The live banner is push-driven (Service Worker
-	// receives the Web Push and broadcasts to open tabs), and SSR via
-	// +layout.server.ts seeds the radio store on every navigation, so the
-	// indicator stays fresh even on a stale HTML hit. Without this every
-	// reload re-runs the MongoDB queries and listeners stare at the
-	// inline splash until SSR completes.
+	// Brief edge cache so the homepage stays cheap under load without
+	// pinning a stale "live" badge for long. The banner + button both read
+	// from the layout's `radioState` (admin-gate aware), so if admin ends a
+	// broadcast within this window the next visitor (≤10s later) sees the
+	// updated state. Open tabs already in the page get an instant push via
+	// the SW broadcast for *go-live* events; *end-live* still requires a
+	// reload or in-app navigation today.
 	setHeaders({
-		'cache-control': 'public, s-maxage=60, stale-while-revalidate=600'
+		'cache-control': 'public, s-maxage=10, stale-while-revalidate=60'
 	});
 
-	const [videos, radioStatus] = await Promise.all([
-		getCollection('videos', 0, 3, 'All', ''),
-		getLastStatus()
-	]);
+	const videos = await getCollection('videos', 0, 3, 'All', '');
 
 	return {
-		data: videos,
-		radioStatus: {
-			isLive: radioStatus?.isLive ?? false,
-			sourceUrl: radioStatus?.streamUrl ?? ''
-		}
+		data: videos
 	};
 };

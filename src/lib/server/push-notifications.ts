@@ -27,6 +27,10 @@ export interface PushPayload {
 	url?: string;
 	icon?: string;
 	image?: string;
+	// Discriminator the Service Worker forwards to open tabs as the message
+	// payload. Clients use this to decide how to update local state — flipping
+	// the radio "is live" indicator on/off without doing a network round-trip.
+	event?: 'radio-live' | 'radio-end';
 }
 
 export async function sendPushToAll(payload: PushPayload): Promise<void> {
@@ -94,7 +98,8 @@ export function radioLivePayload(opts?: { thumbnailUrl?: string | null }): PushP
 		title: 'Audio en direct',
 		body: 'Missionnaire Network est en direct audio maintenant\u00a0!',
 		url: '/live',
-		icon: '/favicon.png'
+		icon: '/favicon.png',
+		event: 'radio-live'
 	};
 	// Only attach `image` if it's an absolute HTTPS URL \u2014 web-push silently
 	// drops anything else, and a broken image URL can suppress the whole
@@ -104,5 +109,15 @@ export function radioLivePayload(opts?: { thumbnailUrl?: string | null }): PushP
 		payload.image = thumb;
 	}
 	return payload;
+}
+
+export function radioEndPayload(): PushPayload {
+	return {
+		title: 'Diffusion termin\u00e9e',
+		body: 'La diffusion en direct est maintenant termin\u00e9e.',
+		url: '/',
+		icon: '/favicon.png',
+		event: 'radio-end'
+	};
 }
 

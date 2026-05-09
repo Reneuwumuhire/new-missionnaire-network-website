@@ -131,12 +131,15 @@
 
 		radioIsLive.set(data.radioState?.isLive ?? false);
 
+		const applyPushPayload = (payload: { event?: string } | undefined) => {
+			// Default to "live" for backward compat (older payloads without `event`).
+			radioIsLive.set(payload?.event !== 'radio-end');
+		};
+
 		try {
 			radioBroadcast = new BroadcastChannel('radio-state');
 			radioBroadcast.addEventListener('message', (event) => {
-				if (event.data?.type === 'RADIO_PUSH') {
-					radioIsLive.set(true);
-				}
+				if (event.data?.type === 'RADIO_PUSH') applyPushPayload(event.data.payload);
 			});
 		} catch {
 			// BroadcastChannel unsupported — single-tab fallback is fine
@@ -145,7 +148,7 @@
 		const swListener = (event: MessageEvent) => {
 			const msg = event.data;
 			if (!msg || msg.type !== 'RADIO_PUSH') return;
-			radioIsLive.set(true);
+			applyPushPayload(msg.payload);
 			try {
 				radioBroadcast?.postMessage({ type: 'RADIO_PUSH', payload: msg.payload });
 			} catch {

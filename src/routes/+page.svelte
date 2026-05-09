@@ -2,16 +2,20 @@
 	import '../app.css';
 	import { browser } from '$app/environment';
 	import { onDestroy, onMount } from 'svelte';
+	import { page } from '$app/stores';
 	import type { YoutubeVideo } from '$lib/models/youtube';
 	import NotificationBell from '$lib/components/+notificationBell.svelte';
 	import { radioIsLive as radioIsLiveStore } from '$lib/stores/global';
 
 	export let data: {
 		data: YoutubeVideo[];
-		radioStatus?: { isLive: boolean; sourceUrl: string };
 	};
 
-	$: radioIsLive = $radioIsLiveStore || (data.radioStatus?.isLive ?? false);
+	// Single source of truth: the layout's `radioState` (admin-gate aware) for
+	// SSR + initial paint, the push-driven store thereafter. Banner and button
+	// stay in sync because both pull from this same state.
+	$: ssrIsLive = $page.data?.radioState?.isLive ?? false;
+	$: radioIsLive = browser ? $radioIsLiveStore : ssrIsLive;
 	$: recentVideos = (data.data || []).slice(0, 3);
 
 	let bellRef: NotificationBell | undefined;
