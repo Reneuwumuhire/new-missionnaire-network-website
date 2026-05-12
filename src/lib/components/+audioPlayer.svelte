@@ -171,6 +171,9 @@
 		pendingPlaybackSeek.set(null);
 		clearResumeState();
 		clearPlayerSnapshot();
+		// Forget the metadata fingerprint so the next track (even the same
+		// one) re-applies metadata when selected.
+		lastMetadataKey = '';
 	}
 
 	function formatSleepTimerRemaining(ms: number) {
@@ -635,6 +638,7 @@
 	}
 
 	function handleEnded() {
+		console.log('[Audio] ended event');
 		if ($repeatOne && audio) {
 			currentTime = 0;
 			progressBarWidth = 0;
@@ -664,6 +668,9 @@
 		if ($playlist.length === 0) {
 			clearFinishedPlayerSnapshot();
 			isPlaying.set(false);
+			if ('mediaSession' in navigator) {
+				navigator.mediaSession.playbackState = 'none';
+			}
 			return;
 		}
 
@@ -677,6 +684,9 @@
 		if (nextIndex === -1 || nextIndex === $currentIndex) {
 			clearFinishedPlayerSnapshot();
 			isPlaying.set(false);
+			if ('mediaSession' in navigator) {
+				navigator.mediaSession.playbackState = 'none';
+			}
 			return;
 		}
 
@@ -861,6 +871,10 @@
 	}
 
 	function handleAudioPlay() {
+		console.log('[Audio] play event', {
+			readyState: audio?.readyState,
+			currentTime: audio?.currentTime
+		});
 		setPendingPlaybackIntent(null);
 		setUserWantsToPlay(true);
 		lastSuccessfulPlayAt = Date.now();
@@ -873,10 +887,23 @@
 		isPlaying.set(true);
 		if ('mediaSession' in navigator) {
 			navigator.mediaSession.playbackState = 'playing';
+			// Re-assert handlers now that playback has resumed. iOS's
+			// Control Center caches handler-availability against the
+			// last session metadata was applied with; if the audio
+			// session was rebuilt during background, the cached binding
+			// is stale and lock-screen buttons silently no-op. Calling
+			// setActionHandler again rebinds Control Center to the
+			// live session. Idempotent and cheap.
+			if (!mediaSessionHandlersBound) registerMediaSessionHandlers();
 		}
 	}
 
 	function handleAudioPause() {
+		console.log('[Audio] pause event', {
+			readyState: audio?.readyState,
+			currentTime: audio?.currentTime,
+			isChangingSource
+		});
 		if (isChangingSource) return;
 		setPendingPlaybackIntent(null);
 		rememberPlaybackPosition();
@@ -975,6 +1002,14 @@
 		shouldAutoplayOnLoad = false;
 	}
 
+	// Diagnostic-only listeners. Help debug iOS lock-screen / Bluetooth /
+	// AVAudioSession issues. They do not mutate state.
+	const logSuspend = () => console.log('[Audio] suspend');
+	const logWaiting = () => console.log('[Audio] waiting');
+	const logStalled = () => console.log('[Audio] stalled');
+	const logEmptied = () => console.log('[Audio] emptied');
+	const logAbort = () => console.log('[Audio] abort');
+
 	function attachAudioListeners(el: HTMLAudioElement) {
 		el.addEventListener('ended', handleEnded);
 		el.addEventListener('timeupdate', updateAudioTime);
@@ -984,6 +1019,11 @@
 		el.addEventListener('loadedmetadata', handleAudioLoadedMetadata);
 		el.addEventListener('canplay', handleAudioCanPlay);
 		el.addEventListener('error', handleAudioError);
+		el.addEventListener('suspend', logSuspend);
+		el.addEventListener('waiting', logWaiting);
+		el.addEventListener('stalled', logStalled);
+		el.addEventListener('emptied', logEmptied);
+		el.addEventListener('abort', logAbort);
 	}
 
 	function detachAudioListeners(el: HTMLAudioElement) {
@@ -995,6 +1035,11 @@
 		el.removeEventListener('loadedmetadata', handleAudioLoadedMetadata);
 		el.removeEventListener('canplay', handleAudioCanPlay);
 		el.removeEventListener('error', handleAudioError);
+		el.removeEventListener('suspend', logSuspend);
+		el.removeEventListener('waiting', logWaiting);
+		el.removeEventListener('stalled', logStalled);
+		el.removeEventListener('emptied', logEmptied);
+		el.removeEventListener('abort', logAbort);
 	}
 
 	// Auto-bind listeners whenever `audio` resolves to a new element — covers
@@ -1468,12 +1513,18 @@
 			isPageLifecycleTeardown = false;
 		};
 		const onVisibility = () => {
+			console.log('[Visibility]', document.visibilityState);
 			if (document.visibilityState === 'hidden') {
 				appHiddenAt = Date.now();
 			} else {
 				clearPageLifecycleTeardown();
 				const elapsed = appHiddenAt > 0 ? Date.now() - appHiddenAt : 0;
 				appHiddenAt = 0;
+				// iOS may have torn down the AVAudioSession while we
+				// were hidden. Re-assert the MediaSession handlers
+				// before attempting to resume so Control Center binds
+				// to the live session.
+				registerMediaSessionHandlers();
 				tryResumeAfterInterruption(elapsed);
 			}
 		};
@@ -1482,11 +1533,14 @@
 		const onFocus = () => {
 			const elapsed = appHiddenAt > 0 ? Date.now() - appHiddenAt : 0;
 			appHiddenAt = 0;
+			registerMediaSessionHandlers();
 			tryResumeAfterInterruption(elapsed);
 		};
 		const onPageShow = () => {
+			console.log('[PageShow]');
 			const elapsed = appHiddenAt > 0 ? Date.now() - appHiddenAt : 0;
 			appHiddenAt = 0;
+			registerMediaSessionHandlers();
 			tryResumeAfterInterruption(elapsed);
 		};
 
@@ -1524,41 +1578,72 @@
 		syncMediaSessionPlaylistHandlers(hasPlaylistNavigation);
 	}
 
-	onMount(() => {
+	// Idempotent registration. iOS's mediaserverd can tear down the audio
+	// session after a long background pause; Control Center caches handler
+	// availability against the *last* session metadata was applied with, so
+	// the buttons go inert until we call setActionHandler again. Re-assert
+	// on visibility return, pageshow, focus, and on the audio `play` event.
+	let mediaSessionHandlersBound = false;
+	function registerMediaSessionHandlers() {
 		if (!browser || !('mediaSession' in navigator)) return;
 		try {
-			navigator.mediaSession.setActionHandler('play', () => {
+			navigator.mediaSession.setActionHandler('play', async () => {
 				if (!audio) return;
+				console.log('[MediaSession] handler play', {
+					readyState: audio.readyState,
+					paused: audio.paused,
+					currentTime: audio.currentTime,
+					hidden: document.hidden
+				});
 				setUserWantsToPlay(true);
 				consecutiveFailedResumes = 0;
 				audioElementRebuilt = false;
 
-				// iOS rule: the play() call must originate *inside* the
+				// iOS rule: the play() call MUST originate inside the
 				// MediaSession action callback's gesture frame. Anything
-				// deferred (load() → canplay → play()) is treated as
-				// autoplay and silently dropped on the lock screen.
-				// Stamp playbackState first so the lock-screen UI flips
-				// instantly even if the play() promise is slow to resolve.
-				navigator.mediaSession.playbackState = 'playing';
+				// deferred (setTimeout, canplay listener, safePlay's
+				// load()→canplay→play() path) is treated as autoplay
+				// and silently dropped on the lock screen. All recovery
+				// in this handler stays inside this callback stack.
 				if (audio.duration && audio.currentTime >= audio.duration) {
 					audio.currentTime = 0;
 				}
+				if (audio.readyState === 0) {
+					try { audio.load(); } catch {}
+				}
 
-				const p = audio.play();
-				if (p && typeof p.catch === 'function') {
-					p.catch(() => {
-						// Direct play() rejected — Bluetooth route loss
-						// after a long pause, or the AVAudioSession has
-						// been torn down. Now we can afford the full
-						// reload path; the lock screen has already given
-						// us its gesture token via this callback and the
-						// follow-up retry happens in the same task queue.
-						safePlay('long');
-					});
+				try {
+					await audio.play();
+					navigator.mediaSession.playbackState = 'playing';
+				} catch (err) {
+					console.error('[MediaSession] play failed', err);
+					// Muted fallback — still inside the gesture frame.
+					// When iOS has torn down the AVAudioSession it will
+					// often allow a muted play() to reopen the route;
+					// we unmute the instant it succeeds.
+					try {
+						audio.muted = true;
+						await audio.play();
+						audio.muted = false;
+						navigator.mediaSession.playbackState = 'playing';
+					} catch (err2) {
+						audio.muted = false;
+						console.error('[MediaSession] muted fallback failed', err2);
+						// Surrender this gesture rather than schedule a
+						// deferred play() (which iOS would drop). The
+						// user can tap again; the watchdog can also
+						// recover when the app comes back to foreground.
+						navigator.mediaSession.playbackState = 'paused';
+					}
 				}
 			});
 			navigator.mediaSession.setActionHandler('pause', () => {
 				if (!audio) return;
+				console.log('[MediaSession] handler pause', {
+					readyState: audio.readyState,
+					paused: audio.paused,
+					currentTime: audio.currentTime
+				});
 				setUserWantsToPlay(false);
 				setPendingPlaybackIntent('pause');
 				// Stamp playbackState first for immediate lock-screen
@@ -1587,16 +1672,24 @@
 				rememberPlaybackPosition(details.seekTime, audio.duration);
 			});
 			navigator.mediaSession.setActionHandler('stop', () => {
+				console.log('[MediaSession] handler stop');
 				setUserWantsToPlay(false);
 				if (audio) {
 					audio.pause();
 					audio.currentTime = 0;
 				}
 				resetRememberedPlaybackPosition();
+				navigator.mediaSession.playbackState = 'none';
 			});
+			mediaSessionHandlersBound = true;
+			console.log('[MediaSession] handlers (re)registered');
 		} catch (err) {
 			console.warn('[AudioPlayer] MediaSession handler registration failed:', err);
 		}
+	}
+
+	onMount(() => {
+		registerMediaSessionHandlers();
 	});
 
 	/** Pull the right artwork URL for a track so the car/lockscreen shows
@@ -1617,14 +1710,48 @@
 	// audio session to *this* PWA when metadata is non-null at the moment
 	// play() resolves. The reactive `$:` below covers track changes; the
 	// imperative call inside safePlay covers cold starts.
+	//
+	// Fingerprint guard: re-assigning `mediaSession.metadata = new
+	// MediaMetadata(...)` on iOS flips playbackState back to 'none' and
+	// detaches the Now-Playing buttons' binding even though
+	// setActionHandler was never null'd. We therefore only mutate metadata
+	// when the track identity actually changes — every other reactive
+	// trigger short-circuits.
+	let lastMetadataKey = '';
+
+	function getMetadataKey(track: unknown): string {
+		if (!track || typeof track !== 'object') return '';
+		const t = track as {
+			_id?: unknown;
+			s3_url?: unknown;
+			mp3_url?: unknown;
+			url?: unknown;
+		};
+		const id = typeof t._id === 'string' ? t._id : '';
+		const src =
+			(typeof t.s3_url === 'string' && t.s3_url) ||
+			(typeof t.mp3_url === 'string' && t.mp3_url) ||
+			(typeof t.url === 'string' && t.url) ||
+			'';
+		return `${id}|${src}`;
+	}
+
 	function applyMediaSessionMetadata() {
 		if (!browser || !('mediaSession' in navigator)) return;
 		const current = $selectAudio;
 		if (!current) return;
+		const key = getMetadataKey(current);
+		if (key && key === lastMetadataKey && navigator.mediaSession.metadata) {
+			// Same track, metadata still mounted — re-assigning would only
+			// churn the lock-screen handler binding on iOS. Skip.
+			return;
+		}
+		lastMetadataKey = key;
 		const isMusic = 'category' in current;
 		const isSermon = 'mp3_url' in current;
 		const artworkUrl = getArtworkUrl(current as PlayableAudio);
 
+		console.log('[MediaSession] metadata applied', { key });
 		navigator.mediaSession.metadata = new MediaMetadata({
 			title:
 				('title' in current
