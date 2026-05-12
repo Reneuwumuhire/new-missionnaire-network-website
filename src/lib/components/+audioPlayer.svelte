@@ -141,11 +141,11 @@
 		// gesture so iOS's mediaserverd attributes the audio session to
 		// this PWA. safePlay deliberately no longer does this on its own.
 		applyMediaSessionMetadata();
-		// Start the silent-loop session keeper inside the same user
-		// gesture. iOS requires a user-gesture origin for the first
-		// .play() of any media element; piggy-backing on this one
-		// satisfies that without an extra interaction.
-		startSilentLoop();
+		// Stop the silent loop if it was running from a prior pause —
+		// main is about to take over as the active audio source. Two
+		// concurrent audio elements confuse iOS's Now-Playing state
+		// machine and trigger duplicate pause dispatches.
+		stopSilentLoop();
 		safePlay('auto');
 	}
 
@@ -154,9 +154,12 @@
 		setPendingPlaybackIntent('pause');
 		setUserWantsToPlay(false);
 		rememberPlaybackPosition();
+		// Start silent loop before pausing main so the AVAudioSession
+		// stays alive — covers the "user paused in-app then locked
+		// the device" path, where they later expect to resume from
+		// the lock screen.
+		startSilentLoop();
 		audio.pause();
-		// Note: silent loop stays running so a later resume can
-		// re-acquire the audio session reliably.
 	}
 
 	function stopAudioForSleepTimer() {
@@ -864,10 +867,9 @@
 		if (autoplay) {
 			shouldAutoplayOnLoad = true;
 			isPlaying.set(true);
-			// Catch the user gesture from playlist navigation taps so
-			// the silent loop can register without an extra interaction.
-			// Idempotent — bails if already running.
-			startSilentLoop();
+			// Make sure silent loop is OFF — new main track will be the
+			// active audio source.
+			stopSilentLoop();
 		}
 	}
 
@@ -925,10 +927,9 @@
 			// live session. Idempotent and cheap.
 			if (!mediaSessionHandlersBound) registerMediaSessionHandlers();
 		}
-		// Defensive: if the silent loop ever stops (an OS interruption
-		// can pause both elements), the main element's play event is a
-		// safe checkpoint to re-engage it. Idempotent.
-		if (!silentLoopRunning) startSilentLoop();
+		// Defensive: main is now producing audio, so silent loop must
+		// not be. Idempotent — bails if it's already stopped.
+		stopSilentLoop();
 	}
 
 	function handleAudioPause() {
@@ -1745,11 +1746,13 @@
 				setUserWantsToPlay(true);
 				consecutiveFailedResumes = 0;
 				audioElementRebuilt = false;
-				// Defensive: if the silent loop somehow stopped (e.g. an
-				// OS interruption killed it too), the lock-screen gesture
-				// is our chance to restart it inside a valid user-action
-				// frame.
-				if (!silentLoopRunning) startSilentLoop();
+				// Hand off cleanly: stop the silent loop (was running
+				// to keep AVAudioSession alive during pause) BEFORE
+				// resuming the main element. iOS's Now-Playing UI
+				// reflects exactly one active media element at a time;
+				// overlapping the two causes duplicate pause dispatches
+				// and a stuck "playing" lock-screen state.
+				stopSilentLoop();
 
 				// iOS rule: the play() call MUST originate inside the
 				// MediaSession action callback's gesture frame. Anything
@@ -1798,6 +1801,16 @@
 					ts: Date.now()
 				});
 				if (!audio) return;
+				// Idempotent guard: iOS sometimes dispatches the pause
+				// command multiple times for the same locked session
+				// (we saw this in real-device logs). Re-running the
+				// session-keeper start every time would create
+				// overlapping silent-loop starts. Skip if main is
+				// already paused.
+				if (audio.paused) {
+					navigator.mediaSession.playbackState = 'paused';
+					return;
+				}
 				setUserWantsToPlay(false);
 				setPendingPlaybackIntent('pause');
 				// Stamp playbackState first for immediate lock-screen
@@ -1806,9 +1819,13 @@
 				// audioPausedAt / rememberPlaybackPosition bookkeeping.
 				navigator.mediaSession.playbackState = 'paused';
 				rememberPlaybackPosition();
-				// Note: we do NOT stop the silent loop here. It keeps the
-				// AVAudioSession alive so the next lock-screen play can
-				// re-acquire the output route without losing audio.
+				// Start silent loop FIRST (still inside the gesture
+				// frame, before audio.pause() releases the route) so
+				// the AVAudioSession sees uninterrupted audio output
+				// across the main element's pause. Without this, iOS
+				// releases the session and the next lock-screen play
+				// can't re-acquire it from the background.
+				startSilentLoop();
 				audio.pause();
 			});
 			syncMediaSessionPlaylistHandlers();
