@@ -4,6 +4,7 @@ import { canDeleteRecordings, getPermissions } from '$lib/models/admin-user';
 import {
 	deleteRecording,
 	getRecordingById,
+	isThumbnailS3KeyReferenced,
 	logAudit,
 	updateRecording
 } from '../../../../db/collections';
@@ -133,9 +134,20 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 	if (!ok) throw error(404, 'Enregistrement introuvable');
 
 	if (isThumbnailChange && oldThumbnailKey && oldThumbnailKey !== updates.thumbnail_s3_key) {
-		deleteObject(oldThumbnailKey).catch((err) =>
-			console.error('[recordings/patch] old thumbnail delete failed:', err)
-		);
+		// The same `broadcast-thumbnails/...` key is typically shared across
+		// every recording snapshotted from the same default — and may also
+		// match the live or default broadcast thumbnail. Only delete if this
+		// row was the last reference. We exclude the current id because
+		// updateRecording above has already overwritten it, but `excludeRecordingId`
+		// keeps the helper correct if the call order ever changes.
+		const stillReferenced = await isThumbnailS3KeyReferenced(oldThumbnailKey, {
+			excludeRecordingId: id
+		});
+		if (!stillReferenced) {
+			deleteObject(oldThumbnailKey).catch((err) =>
+				console.error('[recordings/patch] old thumbnail delete failed:', err)
+			);
+		}
 	}
 
 	// When the title changes, rewrite the S3 Content-Disposition so future

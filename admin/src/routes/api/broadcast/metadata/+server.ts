@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
 import {
 	getBroadcastAdminState,
+	isThumbnailS3KeyReferenced,
 	setBroadcastAdminState,
 	logAudit
 } from '../../../../db/collections';
@@ -108,17 +109,19 @@ export const PATCH: RequestHandler = async ({ locals, request, getClientAddress 
 	const oldKey = current.thumbnail_s3_key;
 	const isReplacingThumbnail =
 		'thumbnail_s3_key' in updates && oldKey && updates.thumbnail_s3_key !== oldKey;
-	// Don't delete the old key if it's still referenced by the stored default
-	// thumbnail — otherwise future "Use defaults" clicks would 404.
-	const oldKeyStillInUse = oldKey && oldKey === current.default_thumbnail_s3_key;
 
 	await setBroadcastAdminState(updates);
 
-	if (isReplacingThumbnail && !oldKeyStillInUse) {
-		// Best-effort cleanup — don't fail the request if S3 delete fails.
-		deleteObject(oldKey).catch((err) =>
-			console.error('[broadcast/metadata] old thumbnail delete failed:', err)
-		);
+	if (isReplacingThumbnail) {
+		// Old key may still be referenced by the stored default ("Use defaults"
+		// would 404) or by past `recordings` rows (Vercel image proxy would
+		// 502 once its edge cache expires). isThumbnailS3KeyReferenced reads
+		// fresh state so the just-applied update above is visible.
+		if (!(await isThumbnailS3KeyReferenced(oldKey))) {
+			deleteObject(oldKey).catch((err) =>
+				console.error('[broadcast/metadata] old thumbnail delete failed:', err)
+			);
+		}
 	}
 
 	await logAudit({

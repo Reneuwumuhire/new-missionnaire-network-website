@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
 import {
 	getBroadcastAdminState,
+	isThumbnailS3KeyReferenced,
 	setBroadcastAdminState,
 	logAudit
 } from '../../../../db/collections';
@@ -85,10 +86,11 @@ export const PATCH: RequestHandler = async ({ locals, request, getClientAddress 
 	await setBroadcastAdminState(updates);
 
 	if (isReplacingThumbnail) {
-		// The current live broadcast may still reference this S3 key (if the
-		// admin previously picked the default as the live thumbnail). Only
-		// delete if nothing else points at it.
-		if (current.thumbnail_s3_key !== oldKey) {
+		// The old key may still be referenced by: the live broadcast thumbnail
+		// (admin picked the default as the live thumbnail), or — far more
+		// common — past `recordings` rows whose thumbnail was snapshotted from
+		// this default. Deleting it would 404 those rows on Vercel image proxy.
+		if (!(await isThumbnailS3KeyReferenced(oldKey))) {
 			deleteObject(oldKey).catch((err) =>
 				console.error('[broadcast/defaults] old default thumbnail delete failed:', err)
 			);

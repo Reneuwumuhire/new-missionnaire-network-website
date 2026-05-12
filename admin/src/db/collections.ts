@@ -608,10 +608,50 @@ export async function deleteRecording(id: string): Promise<{ s3_key: string | nu
 	return { s3_key: (doc.s3_key as string | null | undefined) ?? null };
 }
 
+/** Returns true if the given `broadcast-thumbnails/...` S3 key is still
+ *  referenced by something we don't want to break: another recording, the
+ *  current live broadcast thumbnail, or the saved default thumbnail.
+ *
+ *  Used to gate S3 `deleteObject(key)` calls — the recorder snapshots
+ *  `broadcast_admin_state.thumbnail_url` into every recording it saves, so a
+ *  single S3 key is typically shared across many rows. Deleting it blindly
+ *  when the admin swaps the default leaves every past recording pointing at
+ *  a 404 (which Vercel's image proxy then surfaces as a 502).
+ *
+ *  Pass `excludeRecordingId` when the caller is about to update or has just
+ *  updated that row so its pre-update value doesn't count as a reference. */
+export async function isThumbnailS3KeyReferenced(
+	key: string,
+	options: { excludeRecordingId?: string } = {}
+): Promise<boolean> {
+	if (!key) return false;
+	const db = await getDb();
+
+	const recordingFilter: Filter<Document> = { thumbnail_s3_key: key };
+	if (options.excludeRecordingId && ObjectId.isValid(options.excludeRecordingId)) {
+		recordingFilter._id = { $ne: new ObjectId(options.excludeRecordingId) };
+	}
+	const recordingHit = await db
+		.collection('recordings')
+		.findOne(recordingFilter, { projection: { _id: 1 } });
+	if (recordingHit) return true;
+
+	// Read fresh so a pre-write cache snapshot doesn't make us think the
+	// broadcast still owns a key it's just been replaced from.
+	const broadcast = await getBroadcastAdminState({ fresh: true });
+	if (broadcast.thumbnail_s3_key === key) return true;
+	if (broadcast.default_thumbnail_s3_key === key) return true;
+
+	return false;
+}
+
 /** Bulk-delete recordings and return every S3 key (mp3 + thumbnail) the caller
  *  should purge from object storage. DB rows are removed atomically; S3 cleanup
  *  happens in the route handler so a partial S3 failure can be logged without
- *  leaving orphan DB rows. */
+ *  leaving orphan DB rows.
+ *
+ *  Thumbnail keys still referenced by surviving recordings or by the
+ *  broadcast state are filtered out — see isThumbnailS3KeyReferenced. */
 export async function deleteRecordingBulk(
 	ids: string[]
 ): Promise<{ deleted: number; s3_keys: string[] }> {
@@ -623,15 +663,43 @@ export async function deleteRecordingBulk(
 		.find({ _id: { $in: objectIds } })
 		.project({ s3_key: 1, thumbnail_s3_key: 1 })
 		.toArray();
-	const s3_keys: string[] = [];
+
+	const audioKeys: string[] = [];
+	const candidateThumbKeys = new Set<string>();
 	for (const d of docs) {
 		const s3Key = d.s3_key as string | null | undefined;
 		const thumbKey = d.thumbnail_s3_key as string | null | undefined;
-		if (s3Key) s3_keys.push(s3Key);
-		if (thumbKey) s3_keys.push(thumbKey);
+		if (s3Key) audioKeys.push(s3Key);
+		if (thumbKey) candidateThumbKeys.add(thumbKey);
 	}
+
 	const result = await db.collection('recordings').deleteMany({ _id: { $in: objectIds } });
-	return { deleted: result.deletedCount, s3_keys };
+
+	// After the deleteMany above, "still referenced" means: another recording
+	// (not in the deleted set, which is now gone) or the broadcast state.
+	const safeThumbKeys: string[] = [];
+	if (candidateThumbKeys.size > 0) {
+		const broadcast = await getBroadcastAdminState({ fresh: true });
+		const broadcastRefs = new Set<string>();
+		if (broadcast.thumbnail_s3_key) broadcastRefs.add(broadcast.thumbnail_s3_key);
+		if (broadcast.default_thumbnail_s3_key) broadcastRefs.add(broadcast.default_thumbnail_s3_key);
+
+		const remainingRefs = await db
+			.collection('recordings')
+			.find({ thumbnail_s3_key: { $in: [...candidateThumbKeys] } })
+			.project({ thumbnail_s3_key: 1 })
+			.toArray();
+		const recordingRefs = new Set<string>();
+		for (const r of remainingRefs) {
+			if (typeof r.thumbnail_s3_key === 'string') recordingRefs.add(r.thumbnail_s3_key);
+		}
+
+		for (const k of candidateThumbKeys) {
+			if (!broadcastRefs.has(k) && !recordingRefs.has(k)) safeThumbKeys.push(k);
+		}
+	}
+
+	return { deleted: result.deletedCount, s3_keys: [...audioKeys, ...safeThumbKeys] };
 }
 
 export async function countRecordingsByStatus(status: RecordingStatus): Promise<number> {
