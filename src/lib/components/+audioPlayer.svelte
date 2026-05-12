@@ -53,6 +53,14 @@
 	type LyricLine = string | Record<string, unknown>;
 
 	let audio: HTMLAudioElement;
+	// Bumped to force Svelte to destroy + remount the <audio> element via the
+	// `{#key audioElementKey}` block in the template. Used by the rapid-repause
+	// recovery path (rebuildAudioElement) to obtain a brand-new media element,
+	// which is the only reliable way to reset a degraded iOS AVAudioSession.
+	let audioElementKey = 0;
+	// Tracks which element we've already wired listeners to, so the reactive
+	// attach block below doesn't double-bind when other state triggers a re-run.
+	let listenersBoundTo: HTMLAudioElement | null = null;
 	let currentTime = 0;
 	let duration = 0;
 	let progressBarWidth = 0;
@@ -985,14 +993,37 @@
 		el.removeEventListener('error', handleAudioError);
 	}
 
+	// Auto-bind listeners whenever `audio` resolves to a new element — covers
+	// both the initial mount and every rebuild triggered by audioElementKey++.
+	// Without this, the {#key} rebuild path would leave a fresh DOM element
+	// without any event wiring. Also catches up any pending `audioSrc` that
+	// the $selectAudio reactive block queued before bind:this had fired.
+	$: if (browser && audio && audio !== listenersBoundTo) {
+		if (listenersBoundTo) detachAudioListeners(listenersBoundTo);
+		attachAudioListeners(audio);
+		listenersBoundTo = audio;
+		if (audioSrc && !audio.src) {
+			audio.src = encodeURI(audioSrc);
+			audio.load();
+		}
+	}
+
 	/** Tear down the live <audio> element and build a fresh one preloaded
 	 *  to the same src and time. Used to escape a rapid-repause cycle
 	 *  caused by a degraded OS audio session — calling load()/play() on
 	 *  the existing element can't reset AVAudioSession's output route
 	 *  state, but constructing a brand-new element does (this is the
 	 *  same thing reloading the page achieves, just scoped to the
-	 *  audio). */
-	function rebuildAudioElement() {
+	 *  audio).
+	 *
+	 *  The element lives in the DOM (template binding) so that iOS
+	 *  attributes the audio session to *this* PWA's WebKit process —
+	 *  detached `new Audio()` instances route through the shared media
+	 *  daemon, which on iOS can cause the lock-screen Now Playing tap to
+	 *  open whichever other PWA last touched media. The rebuild now
+	 *  bumps a Svelte `{#key}` so the framework destroys+remounts the
+	 *  element for us, and the reactive attach block re-wires listeners. */
+	async function rebuildAudioElement() {
 		if (!audio || destroyed) return;
 
 		const savedSrc = audio.src;
@@ -1005,21 +1036,21 @@
 		stopResumeWatchdog();
 		isReloadingSession = false;
 
-		const oldEl = audio;
-		detachAudioListeners(oldEl);
 		try {
-			oldEl.pause();
-			oldEl.removeAttribute('src');
-			oldEl.load();
+			audio.pause();
+			audio.removeAttribute('src');
+			audio.load();
 		} catch (err) {
 			console.warn('[AudioPlayer] Old element teardown failed:', err);
 		}
 
-		// Construct without src first so listeners are wired before any
-		// canplay/loadedmetadata events can fire from the load below.
-		audio = new Audio();
-		audio.crossOrigin = 'anonymous';
-		attachAudioListeners(audio);
+		// Force Svelte to recreate the <audio> element. The reactive
+		// listener-attach block above re-binds events on the new node;
+		// `await tick()` waits for that to land before we touch `audio`.
+		audioElementKey++;
+		await tick();
+
+		if (!audio || destroyed) return;
 
 		if (savedTime > 0.25) {
 			pendingSessionResumeTime = savedTime;
@@ -1048,24 +1079,22 @@
 		const shouldResumePlayback = shouldAutoplayOnLoad || $isPlaying || userWantsToPlay;
 		shouldAutoplayOnLoad = shouldResumePlayback;
 
-		if (audio) {
-			isChangingSource = true;
-			try {
-				audio.pause();
-			} finally {
-				isChangingSource = false;
-			}
-			resetRememberedPlaybackPosition();
-			audio.src = encodedUrl;
-			audio.load();
-		} else {
-			resetRememberedPlaybackPosition();
-			audio = new Audio();
-			audio.crossOrigin = 'anonymous';
-			attachAudioListeners(audio);
-			audio.src = encodedUrl;
-			audio.load();
+		// On the very first render, the reactive $selectAudio block can fire
+		// before bind:this has wired up `audio`. In that case, store the URL
+		// on `audioSrc` (already done by the caller) and bail — the listener-
+		// attach reactive block below catches up and loads the queued src
+		// the moment the DOM-mounted element binds.
+		if (!audio) return;
+
+		isChangingSource = true;
+		try {
+			audio.pause();
+		} finally {
+			isChangingSource = false;
 		}
+		resetRememberedPlaybackPosition();
+		audio.src = encodedUrl;
+		audio.load();
 	}
 
 	// Reactive sync: keep the audio element's actual play/pause state in
@@ -1731,6 +1760,21 @@
 	on:mouseup={endDrag}
 	on:touchend={endDrag}
 />
+
+<!--
+	DOM-attached audio element. Lives outside the {#if $selectAudio} so it
+	mounts on first render and persists across track changes / player UI
+	visibility toggles. Attaching the audio to the DOM (instead of using
+	`new Audio()`) makes iOS bind the audio session unambiguously to *this*
+	PWA's WebKit process — the fix for the lock-screen Now Playing tap
+	opening the wrong installed PWA. The {#key} wrapper lets
+	rebuildAudioElement() force-recreate the element to escape a degraded
+	AVAudioSession (rapid-repause recovery). `hidden` keeps it invisible
+	without affecting playback behavior.
+-->
+{#key audioElementKey}
+	<audio bind:this={audio} crossorigin="anonymous" playsinline preload="none" hidden></audio>
+{/key}
 
 {#if $selectAudio}
 	<div
