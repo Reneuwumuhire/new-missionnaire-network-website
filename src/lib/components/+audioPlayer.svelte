@@ -1705,11 +1705,23 @@
 	// translate it into a real pause so streaming stops.
 	let inMutedPause = false;
 	let mutedPausePinAt = 0;
-	let preMutedPauseMuted = false;
 	let preMutedPauseVolume = 1;
+	let pinPlayheadTickCount = 0;
 
 	function pinPlayhead() {
 		if (!inMutedPause || !audio) return;
+		// Throttled liveness log: proves the WebView is still running JS
+		// while "paused" in background. If suspension happens, these stop.
+		pinPlayheadTickCount++;
+		if (pinPlayheadTickCount % 8 === 1) {
+			console.log('[MutedPause] alive tick', {
+				tick: pinPlayheadTickCount,
+				ct: audio.currentTime,
+				volume: audio.volume,
+				readyState: audio.readyState,
+				hidden: document.hidden
+			});
+		}
 		// Drift threshold is tight enough that listeners returning to the
 		// app see "their" position, but loose enough to avoid re-seek
 		// thrash on each timeupdate tick.
@@ -1724,14 +1736,18 @@
 
 	function enterMutedPause() {
 		if (!browser || !audio || inMutedPause) return;
-		// Snapshot real state so exit can restore it. `audio.muted` is
-		// distinct from the in-app toggleMute() flag (that one writes
-		// volume), so we don't conflict with user mute preference.
-		preMutedPauseMuted = audio.muted;
+		// Use volume=0 instead of muted=true. iOS's mediaserverd
+		// suspension check looks at whether the AVPlayer is actively
+		// decoding/producing audio bytes — `muted` short-circuits the
+		// pipeline at the output stage (no bytes produced → WKWebView
+		// suspended). `volume = 0` still flows decoded bytes through
+		// to a silent sink, which keeps the audio session "active"
+		// from iOS's perspective and the WebView running.
 		preMutedPauseVolume = audio.volume;
 		mutedPausePinAt = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+		pinPlayheadTickCount = 0;
 		inMutedPause = true;
-		audio.muted = true;
+		audio.volume = 0;
 		audio.addEventListener('timeupdate', pinPlayhead);
 		// `isPlaying` must stay TRUE while muted-paused, otherwise the
 		// reactive sync block below (`$: if (!$isPlaying && !audio.paused)
@@ -1750,7 +1766,6 @@
 		inMutedPause = false;
 		if (audio) {
 			audio.removeEventListener('timeupdate', pinPlayhead);
-			audio.muted = preMutedPauseMuted;
 			audio.volume = preMutedPauseVolume;
 		}
 		console.log('[MutedPause] exited', { reason });
