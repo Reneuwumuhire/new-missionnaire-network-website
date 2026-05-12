@@ -121,6 +121,10 @@
 		if (audio.duration && audio.currentTime >= audio.duration) {
 			audio.currentTime = 0;
 		}
+		// Cold-start path — bind MediaSession metadata inside the user
+		// gesture so iOS's mediaserverd attributes the audio session to
+		// this PWA. safePlay deliberately no longer does this on its own.
+		applyMediaSessionMetadata();
 		safePlay('auto');
 	}
 
@@ -1301,13 +1305,14 @@
 		// audio. The deferred `finish()` setTimeout below also rechecks.
 		if (destroyed) return;
 
-		// Stamp MediaSession metadata inside the gesture frame so iOS's
-		// mediaserverd binds the lock-screen "Now Playing" tile to *this*
-		// PWA's WebKit process. Without this, a cold start can resolve
-		// play() before the reactive metadata `$:` block runs, and the
-		// daemon attributes the session to whichever PWA most recently
-		// owned audio focus — which is the wrong-PWA-launch bug.
-		applyMediaSessionMetadata();
+		// Only stamp metadata if it hasn't been bound to the current track
+		// yet — assigning `mediaSession.metadata = new MediaMetadata(...)`
+		// resets playbackState to 'none' on iOS, which flickers the lock-
+		// screen tile. The reactive `$: applyMediaSessionMetadata()` block
+		// already runs on every $selectAudio change, and playCurrentAudio
+		// stamps it inside its own gesture frame for cold starts. We don't
+		// want to re-stamp on every safePlay() call (resume watchdog,
+		// visibility re-entry, lock-screen long-pause fallback).
 
 		const pausedMs = audioPausedAt > 0 ? Date.now() - audioPausedAt : 0;
 
@@ -1523,18 +1528,46 @@
 		if (!browser || !('mediaSession' in navigator)) return;
 		try {
 			navigator.mediaSession.setActionHandler('play', () => {
+				if (!audio) return;
 				setUserWantsToPlay(true);
 				consecutiveFailedResumes = 0;
 				audioElementRebuilt = false;
-				// Lock-screen / Bluetooth play: route through safePlay so a
-				// long paused-on-lockscreen window reloads the audio session
-				// before attempting playback. Without this, play() resumes
-				// silently over Bluetooth after a few seconds of pause.
-				safePlay('auto');
+
+				// iOS rule: the play() call must originate *inside* the
+				// MediaSession action callback's gesture frame. Anything
+				// deferred (load() → canplay → play()) is treated as
+				// autoplay and silently dropped on the lock screen.
+				// Stamp playbackState first so the lock-screen UI flips
+				// instantly even if the play() promise is slow to resolve.
+				navigator.mediaSession.playbackState = 'playing';
+				if (audio.duration && audio.currentTime >= audio.duration) {
+					audio.currentTime = 0;
+				}
+
+				const p = audio.play();
+				if (p && typeof p.catch === 'function') {
+					p.catch(() => {
+						// Direct play() rejected — Bluetooth route loss
+						// after a long pause, or the AVAudioSession has
+						// been torn down. Now we can afford the full
+						// reload path; the lock screen has already given
+						// us its gesture token via this callback and the
+						// follow-up retry happens in the same task queue.
+						safePlay('long');
+					});
+				}
 			});
 			navigator.mediaSession.setActionHandler('pause', () => {
+				if (!audio) return;
 				setUserWantsToPlay(false);
-				audio?.pause();
+				setPendingPlaybackIntent('pause');
+				// Stamp playbackState first for immediate lock-screen
+				// feedback — the `pause` event listener will run a tick
+				// later and is redundant for the UI, but still needed for
+				// audioPausedAt / rememberPlaybackPosition bookkeeping.
+				navigator.mediaSession.playbackState = 'paused';
+				rememberPlaybackPosition();
+				audio.pause();
 			});
 			syncMediaSessionPlaylistHandlers();
 			navigator.mediaSession.setActionHandler('seekbackward', (details) => {
