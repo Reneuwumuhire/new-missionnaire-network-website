@@ -1746,23 +1746,33 @@
 					ts: Date.now()
 				});
 				if (!audio) return;
+				// Idempotent: iOS dispatches duplicate `play` commands
+				// (we see this consistently in real-device logs). If
+				// main is already playing, the only thing left to do is
+				// re-stamp the lock-screen state — calling play() on a
+				// playing element is a no-op but the visual confirmation
+				// matters so the listener doesn't double-tap.
+				if (!audio.paused) {
+					navigator.mediaSession.playbackState = 'playing';
+					return;
+				}
 				setUserWantsToPlay(true);
 				consecutiveFailedResumes = 0;
 				audioElementRebuilt = false;
-				// ZERO-GAP TRANSITION: do NOT stop the silent loop
-				// before main.play() resolves. If we did, the
-				// microtask window between silentAudio.pause() (sync,
-				// immediate) and the main element actually producing
-				// decoded audio (async, ~100ms) leaves the
-				// AVAudioSession with no output — iOS releases it,
-				// and the subsequent play() promise resolves cleanly
-				// while AVPlayer is silently dead. Symptom in the
-				// field: currentTime stuck after the 2nd or 3rd cycle.
-				// Keep silent alive across the await; stop it ONLY
-				// once main is decoding.
+				// INSTANT VISUAL FEEDBACK: stamp playbackState BEFORE
+				// awaiting audio.play(). The play promise takes
+				// ~100-500ms to resolve; without this the lock-screen
+				// UI shows "paused" the whole time, and listeners
+				// (rationally) tap play again. We'll revert to 'paused'
+				// in the catch block if play() actually fails.
+				navigator.mediaSession.playbackState = 'playing';
 
-				// iOS rule: the play() call MUST originate inside the
-				// MediaSession action callback's gesture frame.
+				// ZERO-GAP TRANSITION: don't stop silent loop until
+				// main is decoding. iOS releases AVAudioSession in any
+				// microtask gap between silent.pause() and main play
+				// promise resolution. Keep silent alive across the
+				// await; stop it once main has confirmed play.
+
 				if (audio.duration && audio.currentTime >= audio.duration) {
 					audio.currentTime = 0;
 				}
@@ -1772,27 +1782,29 @@
 
 				try {
 					await audio.play();
-					navigator.mediaSession.playbackState = 'playing';
-					// Main is now decoding. Safe to release the silent
-					// loop; the session has continuous output the whole
-					// way through.
+					// Main is decoding. Release the silent loop.
 					stopSilentLoop();
+					// Re-stamp metadata so iOS rebinds the Now-Playing
+					// widget cleanly to main. After the silent→main
+					// handoff, iOS sometimes keeps the widget bound to
+					// the now-stopped silent element (which has no
+					// metadata) and unmounts it. Force-bypass the
+					// fingerprint memo by clearing it first.
+					lastMetadataKey = '';
+					applyMediaSessionMetadata();
+					navigator.mediaSession.playbackState = 'playing';
 				} catch (err) {
 					console.error('[MediaSession] play failed', err);
-					// Main play failed. Silent loop is still running,
-					// which is what we want — it preserves the session
-					// for a future retry. Try the muted-kick fallback.
 					try {
 						audio.muted = true;
 						await audio.play();
 						audio.muted = false;
-						navigator.mediaSession.playbackState = 'playing';
 						stopSilentLoop();
 					} catch (err2) {
 						audio.muted = false;
 						console.error('[MediaSession] muted fallback failed', err2);
-						// Leave silent loop running. User can tap play
-						// again; session stays alive.
+						// Play genuinely failed. Revert the optimistic
+						// UI stamp so the lock screen reflects reality.
 						navigator.mediaSession.playbackState = 'paused';
 					}
 				}
@@ -1808,9 +1820,6 @@
 				if (!audio) return;
 				// Idempotent guard: iOS sometimes dispatches the pause
 				// command multiple times for the same locked session.
-				// Re-running the session-keeper start every time would
-				// create overlapping silent-loop starts. Skip if main
-				// is already paused.
 				if (audio.paused) {
 					navigator.mediaSession.playbackState = 'paused';
 					return;
@@ -1819,17 +1828,16 @@
 				setPendingPlaybackIntent('pause');
 				navigator.mediaSession.playbackState = 'paused';
 				rememberPlaybackPosition();
-				// ZERO-GAP TRANSITION: await the silent loop actually
-				// decoding audio before pausing main. Without this
-				// await, there's a microtask window where main has
-				// stopped but silent hasn't started — iOS releases the
-				// AVAudioSession in that window and the next play()
-				// can't re-acquire it, leaving subsequent playback
-				// silent (this is the "currentTime stuck" symptom from
-				// the field logs). Awaiting keeps continuous decoded
-				// output flowing through the session.
+				// ZERO-GAP TRANSITION (see comment in 'play' handler).
 				await startSilentLoop();
 				audio.pause();
+				// Re-stamp metadata so iOS doesn't attribute the
+				// Now-Playing widget to the silent loop (which has no
+				// metadata) and unmount it. Force-bypass the fingerprint
+				// memo by clearing it first.
+				lastMetadataKey = '';
+				applyMediaSessionMetadata();
+				navigator.mediaSession.playbackState = 'paused';
 			});
 			syncMediaSessionPlaylistHandlers();
 			navigator.mediaSession.setActionHandler('seekbackward', (details) => {
