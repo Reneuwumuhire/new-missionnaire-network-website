@@ -6,6 +6,7 @@
 	import { vercelImage, vercelImageSrcSet, vercelImagePlaceholder } from '$lib/utils/vercelImage';
 	import BlurUpImage from '$lib/components/BlurUpImage.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
+	import { portal } from '$lib/actions/portal';
 
 	export let data: PageData;
 
@@ -467,7 +468,13 @@
 </section>
 
 {#if expandedThumb && expandedThumb.thumbnail_url && !failedThumbs.has(expandedThumb.id)}
+	<!-- Portaled to <body>: the page slot is wrapped in `.page-fade-in`, which
+	     applies a transform. A transformed ancestor becomes the containing
+	     block for fixed descendants, so without the portal `inset-0` resolves
+	     to the slot's bounds instead of the viewport — the image floats to
+	     wherever the slot's box ends instead of being screen-centered. -->
 	<div
+		use:portal
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-lightbox-in"
 		on:click={onLightboxBackdropClick}
 		on:keydown={onLightboxKeydown}
