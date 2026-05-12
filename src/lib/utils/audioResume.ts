@@ -90,7 +90,14 @@ export function ensureAudioMonitorInstalled() {
 			const originalPlay = HTMLMediaElement.prototype.play;
 			HTMLMediaElement.prototype.play = function patchedPlay(this: HTMLMediaElement) {
 				if (this instanceof HTMLAudioElement) {
-					activeAudioElement.set(this);
+					// Skip the silent-loop session keeper used by the audio
+					// player as an iOS PWA workaround. It plays a silent
+					// .mp3 alongside the real track and we don't want the
+					// resume recorder to snapshot its zero-length cursor
+					// or attach progress listeners to it.
+					if (this.dataset.role !== 'silent-loop') {
+						activeAudioElement.set(this);
+					}
 				}
 				return originalPlay.apply(this);
 			};
