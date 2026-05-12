@@ -145,7 +145,14 @@
 	}
 
 	function pauseCurrentAudio() {
-		if (!audio || audio.paused) return;
+		if (!audio) return;
+		// If we were muted-paused in background and the user tapped pause
+		// in-app before the visibility handler had a chance to translate
+		// it, exit cleanly here too.
+		if (inMutedPause) {
+			exitMutedPause('in-app-pause');
+		}
+		if (audio.paused) return;
 		setPendingPlaybackIntent('pause');
 		setUserWantsToPlay(false);
 		rememberPlaybackPosition();
@@ -156,6 +163,7 @@
 		setUserWantsToPlay(false);
 		shouldAutoplayOnLoad = false;
 		stopResumeWatchdog();
+		exitMutedPause('sleep-timer');
 		rememberPlaybackPosition();
 
 		if (audio && !audio.paused) {
@@ -175,6 +183,7 @@
 		setUserWantsToPlay(false);
 		shouldAutoplayOnLoad = false;
 		stopResumeWatchdog();
+		exitMutedPause('close');
 
 		if (audio && !audio.paused) {
 			setPendingPlaybackIntent('pause');
@@ -1144,6 +1153,10 @@
 
 		const encodedUrl = encodeURI(url);
 		console.log('[AudioPlayer] Updating source to:', encodedUrl);
+		// Exit muted-pause cleanly before swapping src — the pin listener
+		// references the old element, and a new track shouldn't inherit
+		// the mute flag.
+		exitMutedPause('track-change');
 		// New track — drop any "previous track was interrupted" carry-over.
 		currentTrackInterrupted = false;
 		consecutiveFailedResumes = 0;
@@ -1549,6 +1562,21 @@
 				clearPageLifecycleTeardown();
 				const elapsed = appHiddenAt > 0 ? Date.now() - appHiddenAt : 0;
 				appHiddenAt = 0;
+				// Translate muted-pause → real pause now that we're in
+				// the foreground. AVAudioSession.setActive(false) is safe
+				// here because re-activation succeeds from foreground if
+				// the user later taps play. This also stops the audio
+				// stream so background data isn't wasted.
+				if (inMutedPause && audio) {
+					exitMutedPause('foreground-return');
+					setPendingPlaybackIntent('pause');
+					rememberPlaybackPosition();
+					try {
+						audio.pause();
+					} catch {
+						/* ignore — element may have been replaced */
+					}
+				}
 				// iOS may have torn down the AVAudioSession while we
 				// were hidden. Re-assert the MediaSession handlers
 				// before attempting to resume so Control Center binds
@@ -1658,6 +1686,76 @@
 		syncMediaSessionPlaylistHandlers(hasPlaylistNavigation);
 	}
 
+	// ── Muted-pause (iOS standalone PWA workaround) ──
+	// Diagnosis from the field: in iOS standalone PWA mode, calling
+	// audio.pause() while the device is locked permanently releases the
+	// AVAudioSession output route. Subsequent audio.play() calls resolve
+	// successfully and the play event fires, but the underlying AVPlayer
+	// clock never advances and no bytes reach the speaker — until the user
+	// returns to the foreground app. This does not happen in browser
+	// Safari/Chrome because those have elevated audio-session privileges
+	// that standalone PWAs do not get.
+	//
+	// Workaround: when the lock-screen pause action fires while hidden,
+	// don't actually pause the element. Mute it, pin the playhead via
+	// timeupdate so currentTime doesn't drift, and stamp playbackState
+	// 'paused' for the lock-screen UI. The AVAudioSession stays alive,
+	// the next lock-screen play just unmutes — no route re-acquisition
+	// needed. When the app returns to foreground, exit muted-pause and
+	// translate it into a real pause so streaming stops.
+	let inMutedPause = false;
+	let mutedPausePinAt = 0;
+	let preMutedPauseMuted = false;
+	let preMutedPauseVolume = 1;
+
+	function pinPlayhead() {
+		if (!inMutedPause || !audio) return;
+		// Drift threshold is tight enough that listeners returning to the
+		// app see "their" position, but loose enough to avoid re-seek
+		// thrash on each timeupdate tick.
+		if (Math.abs(audio.currentTime - mutedPausePinAt) > 0.3) {
+			try {
+				audio.currentTime = mutedPausePinAt;
+			} catch {
+				/* ignore — element may have re-loaded */
+			}
+		}
+	}
+
+	function enterMutedPause() {
+		if (!browser || !audio || inMutedPause) return;
+		// Snapshot real state so exit can restore it. `audio.muted` is
+		// distinct from the in-app toggleMute() flag (that one writes
+		// volume), so we don't conflict with user mute preference.
+		preMutedPauseMuted = audio.muted;
+		preMutedPauseVolume = audio.volume;
+		mutedPausePinAt = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+		inMutedPause = true;
+		audio.muted = true;
+		audio.addEventListener('timeupdate', pinPlayhead);
+		// `isPlaying` must stay TRUE while muted-paused, otherwise the
+		// reactive sync block below (`$: if (!$isPlaying && !audio.paused)
+		// audio.pause()`) would defeat the whole workaround by issuing a
+		// real pause(). `userWantsToPlay` and `playbackState` carry the
+		// "user intends paused" signal instead.
+		console.log('[MutedPause] entered', {
+			pinAt: mutedPausePinAt,
+			hidden: document.hidden
+		});
+		rememberPlaybackPosition(mutedPausePinAt, audio.duration);
+	}
+
+	function exitMutedPause(reason: string) {
+		if (!inMutedPause) return;
+		inMutedPause = false;
+		if (audio) {
+			audio.removeEventListener('timeupdate', pinPlayhead);
+			audio.muted = preMutedPauseMuted;
+			audio.volume = preMutedPauseVolume;
+		}
+		console.log('[MutedPause] exited', { reason });
+	}
+
 	// Idempotent registration. iOS's mediaserverd can tear down the audio
 	// session after a long background pause; Control Center caches handler
 	// availability against the *last* session metadata was applied with, so
@@ -1672,12 +1770,28 @@
 					boundInstanceId: audio?.dataset.instanceId ?? null,
 					currentSeq: audioInstanceSeq,
 					hidden: document.hidden,
+					inMutedPause,
 					ts: Date.now()
 				});
 				if (!audio) return;
 				setUserWantsToPlay(true);
 				consecutiveFailedResumes = 0;
 				audioElementRebuilt = false;
+
+				// Fast path: if we're in the muted-pause workaround, the
+				// element is already playing (just muted). Unmute and
+				// stamp UI — no play() needed, no route re-acquisition,
+				// no chance of iOS dropping a deferred play().
+				if (inMutedPause) {
+					exitMutedPause('lock-screen-play');
+					navigator.mediaSession.playbackState = 'playing';
+					// `isPlaying` was kept TRUE during muted-pause to
+					// prevent the reactive sync block from issuing a
+					// real pause(). It's still TRUE here — no flip
+					// needed. Just re-stamp for safety.
+					isPlaying.set(true);
+					return;
+				}
 
 				// iOS rule: the play() call MUST originate inside the
 				// MediaSession action callback's gesture frame. Anything
@@ -1726,6 +1840,17 @@
 				});
 				if (!audio) return;
 				setUserWantsToPlay(false);
+				// Lock-screen / Bluetooth pause while the device is hidden.
+				// Real audio.pause() releases the AVAudioSession's output
+				// route on iOS standalone PWA and the next play() can't get
+				// it back — see [MutedPause] block above. Detour into the
+				// muted-playback workaround instead.
+				if (document.hidden && !audio.paused) {
+					navigator.mediaSession.playbackState = 'paused';
+					rememberPlaybackPosition();
+					enterMutedPause();
+					return;
+				}
 				setPendingPlaybackIntent('pause');
 				// Stamp playbackState first for immediate lock-screen
 				// feedback — the `pause` event listener will run a tick
@@ -2010,6 +2135,7 @@
 		shouldAutoplayOnLoad = false;
 		clearSleepTimer({ persist: false });
 		stopResumeWatchdog();
+		exitMutedPause('destroy');
 		if (audio) {
 			try {
 				audio.pause();
