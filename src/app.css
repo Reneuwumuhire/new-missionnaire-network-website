@@ -139,6 +139,22 @@ img {
 	border-radius: 2px;
 }
 
+/* ── Prevent iOS Safari focus-zoom ──
+   Safari zooms the viewport whenever a focused form field's computed
+   font-size is < 16px. We can't disable that with `user-scalable=no`
+   (bad for accessibility and ignored on modern iOS anyway), so the
+   accepted fix is to floor every interactive field at 16px. `max(...)`
+   means designed-larger fields keep their intended size. Applies on
+   desktop too (16px is a healthy input minimum) so the rule stays
+   simple and the visual sizing is consistent across breakpoints. */
+input,
+textarea,
+select,
+[contenteditable='true'],
+[contenteditable=''] {
+	font-size: max(16px, 1em);
+}
+
 /* ── Scroll-triggered reveal animation ── */
 .reveal-up {
 	opacity: 0;
