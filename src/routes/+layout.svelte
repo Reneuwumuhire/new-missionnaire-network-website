@@ -329,8 +329,15 @@
 	     site while a sermon or rediffusion keeps playing. Previously
 	     mounted per-section (/musique, /predications), which meant
 	     navigating out of the section unmounted the bar mid-playback. -->
-	{#if $selectAudio}
-		<AudioPlayer />
-	{/if}
+	<!--
+		AudioPlayer mounts unconditionally so the DOM-attached <audio> element
+		inside it exists for the lifetime of the session. The player's own
+		template uses {#if $selectAudio} internally to hide its UI when no
+		track is selected, so visually this is identical to the previous
+		conditional mount — but the audio element survives, which is what
+		iOS needs to attribute the audio session to *this* PWA's WebKit
+		process rather than the shared media daemon.
+	-->
+	<AudioPlayer />
 	<ResumeRecorder />
 </QueryClientProvider>

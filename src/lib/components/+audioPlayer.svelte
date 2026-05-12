@@ -1711,6 +1711,15 @@
 	}
 
 	onDestroy(() => {
+		// SvelteKit invokes onDestroy during SSR cleanup too. None of the
+		// teardown below is meaningful on the server — there's no audio
+		// element, no DOM, no listeners to remove — and touching `document`
+		// throws. Bail before any browser-only work.
+		if (!browser) {
+			destroyed = true;
+			return;
+		}
+
 		// Order matters. Set `destroyed` first so every guarded code
 		// path bails — including the pause-event handler that runs
 		// synchronously inside audio.pause() below. On explicit closes we
@@ -1718,7 +1727,6 @@
 		// so the resume recorder can rehydrate the player after a cold return.
 		// Only after that do we touch the audio element.
 		const preservePlaybackIntent =
-			browser &&
 			userWantsToPlay &&
 			(isPageLifecycleTeardown || document.visibilityState === 'hidden');
 
