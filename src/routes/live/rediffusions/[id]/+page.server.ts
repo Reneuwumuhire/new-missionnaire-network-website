@@ -2,7 +2,7 @@ import { error } from '@sveltejs/kit';
 import { getPublishedById, getTranscriptForRecording } from '$lib/server/recordings';
 import type { PageServerLoad } from './$types';
 
-const ALLOWED_BACK_PARAMS = new Set(['page', 'q', 'year', 'month']);
+const ALLOWED_BACK_PARAMS = new Set(['page', 'q', 'year', 'month', 'type']);
 
 // Rebuild a safe back-URL from the `from` query string. We only whitelist
 // the params the list page actually uses, so someone can't craft a link

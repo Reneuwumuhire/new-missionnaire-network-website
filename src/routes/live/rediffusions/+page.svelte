@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import type { PublishedRecording } from '$lib/server/recordings';
+	import type { PublishedRecording, RecordingType } from '$lib/server/recordings';
 	import { goto } from '$app/navigation';
-	import { navigating } from '$app/stores';
+	import { navigating, page } from '$app/stores';
 	import { vercelImage, vercelImageSrcSet, vercelImagePlaceholder } from '$lib/utils/vercelImage';
 	import BlurUpImage from '$lib/components/BlurUpImage.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
@@ -21,11 +21,13 @@
 	let searchInput = data.filters.q;
 	let yearInput: number | '' = data.filters.year ?? '';
 	let monthInput: number | '' = data.filters.month ?? '';
+	let typeInput: RecordingType | '' = data.filters.type ?? '';
 
 	// Re-sync when SvelteKit reloads with new data (e.g. back/forward nav).
 	$: searchInput = data.filters.q;
 	$: yearInput = data.filters.year ?? '';
 	$: monthInput = data.filters.month ?? '';
+	$: typeInput = data.filters.type ?? '';
 
 	const MONTHS: Array<{ value: number; label: string }> = [
 		{ value: 1, label: 'Janvier' },
@@ -43,11 +45,18 @@
 	];
 
 	function buildQuery(
-		overrides: Partial<{ page: number; q: string; year: number | ''; month: number | '' }>
+		overrides: Partial<{
+			page: number;
+			q: string;
+			year: number | '';
+			month: number | '';
+			type: RecordingType | '';
+		}>
 	): string {
 		const q = overrides.q !== undefined ? overrides.q : data.filters.q;
 		const year = overrides.year !== undefined ? overrides.year : (data.filters.year ?? '');
 		const month = overrides.month !== undefined ? overrides.month : (data.filters.month ?? '');
+		const type = overrides.type !== undefined ? overrides.type : (data.filters.type ?? '');
 		const pageN = overrides.page !== undefined ? overrides.page : data.pageNumber;
 
 		const params = new URLSearchParams();
@@ -55,13 +64,24 @@
 		if (q) params.set('q', q);
 		if (year) params.set('year', String(year));
 		if (year && month) params.set('month', String(month));
+		if (type) params.set('type', type);
 		const qs = params.toString();
 		return qs ? `?${qs}` : '';
 	}
 
-	function listHref(pageN: number): string {
-		return `/live/rediffusions${buildQuery({ page: pageN })}`;
-	}
+	// Reactive on $page so the hrefs Pagination receives stay in sync with
+	// the URL even when only the search box changes (Pagination tracks only
+	// its `getHref` prop reference — a stable function would never trigger
+	// a re-render, leaving stale page-2 links that drop the search). The
+	// $:-block depends on $page.url.searchParams, so each navigation hands
+	// Pagination a fresh function reference.
+	$: listHref = ((sp: URLSearchParams) => (pageN: number) => {
+		const params = new URLSearchParams(sp);
+		if (pageN > 1) params.set('page', String(pageN));
+		else params.delete('page');
+		const qs = params.toString();
+		return `/live/rediffusions${qs ? `?${qs}` : ''}`;
+	})($page.url.searchParams);
 
 	// Link to a recording, carrying the current list state so the detail
 	// page can rebuild the exact same "Tous les directs" URL.
@@ -93,14 +113,21 @@
 		});
 	}
 
+	function selectType(next: RecordingType | '') {
+		// Toggle off when the user clicks the active pill.
+		const value = typeInput === next ? '' : next;
+		goto(`/live/rediffusions${buildQuery({ type: value, page: 1 })}`, { noScroll: true });
+	}
+
 	function resetFilters() {
 		searchInput = '';
 		yearInput = '';
 		monthInput = '';
+		typeInput = '';
 		goto('/live/rediffusions', { noScroll: true });
 	}
 
-	$: hasActiveFilters = Boolean(data.filters.q || data.filters.year);
+	$: hasActiveFilters = Boolean(data.filters.q || data.filters.year || data.filters.type);
 
 	let expandedThumb: PublishedRecording | null = null;
 	let failedThumbs = new Set<string>();
@@ -195,14 +222,53 @@
 			</a>
 		</div>
 
-		<!-- Filters: search + year + month. Progressive-enhancement form so
-		     it still submits on non-JS clients. -->
+		<!-- Filters: type + search + year + month. Progressive-enhancement
+		     form so it still submits on non-JS clients. -->
 		<form
 			method="GET"
 			action="/live/rediffusions"
 			on:submit|preventDefault={() => onSearchInput()}
 			class="mb-6 border border-stone-200/60 bg-white/40 p-3 sm:p-4"
 		>
+			<!-- Type segmented control: Retransmission = relayed broadcast
+			     (Frank/Ewald/retransmission title), Locales = everything else
+			     (sermons recorded at this assembly, e.g. by Chauffeur). -->
+			<div class="mb-3 flex flex-wrap items-center gap-1.5" role="group" aria-label="Type de direct">
+				<button
+					type="button"
+					on:click={() => selectType('')}
+					aria-pressed={!typeInput}
+					class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] font-body border transition-colors {!typeInput
+						? 'border-missionnaire text-missionnaire bg-missionnaire/5'
+						: 'border-stone-200/80 bg-white text-stone-500 hover:border-missionnaire/60 hover:text-missionnaire'}"
+				>
+					Tous
+				</button>
+				<button
+					type="button"
+					on:click={() => selectType('retransmission')}
+					aria-pressed={typeInput === 'retransmission'}
+					class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] font-body border transition-colors {typeInput ===
+					'retransmission'
+						? 'border-missionnaire text-missionnaire bg-missionnaire/5'
+						: 'border-stone-200/80 bg-white text-stone-500 hover:border-missionnaire/60 hover:text-missionnaire'}"
+				>
+					Retransmissions
+				</button>
+				<button
+					type="button"
+					on:click={() => selectType('local')}
+					aria-pressed={typeInput === 'local'}
+					class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] font-body border transition-colors {typeInput ===
+					'local'
+						? 'border-missionnaire text-missionnaire bg-missionnaire/5'
+						: 'border-stone-200/80 bg-white text-stone-500 hover:border-missionnaire/60 hover:text-missionnaire'}"
+				>
+					Locales
+				</button>
+				<input type="hidden" name="type" value={typeInput} />
+			</div>
+
 			<div class="flex flex-col sm:flex-row gap-2 sm:gap-3">
 				<label class="relative flex-1">
 					<span class="sr-only">Rechercher un titre</span>

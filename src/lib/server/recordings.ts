@@ -87,23 +87,47 @@ export async function getRecentPublished(limit = 5): Promise<PublishedRecording[
 	}
 }
 
+/** Title pattern that identifies a "retransmission" — i.e. a broadcast
+ *  relayed from another assembly. Local recordings (sermons from the local
+ *  pastor) are everything else. Shared between listPublished's `type` filter
+ *  and listRetransmissions below so both stay in sync. */
+const RETRANSMISSION_TITLE_REGEX = 'retransmission|frank|ewald';
+
+export type RecordingType = 'retransmission' | 'local';
+
 export async function listPublished(options: {
 	limit?: number;
 	pageNumber?: number;
 	q?: string;
 	year?: number;
 	month?: number; // 1-12
+	type?: RecordingType;
 } = {}): Promise<{ data: PublishedRecording[]; total: number }> {
-	const { limit = 20, pageNumber = 1, q, year, month } = options;
+	const { limit = 20, pageNumber = 1, q, year, month, type } = options;
 	try {
 		await ensureIndexes();
 		const db = await getDb();
 		const query: Record<string, unknown> = { published: true, status: 'ready' };
 
+		// Both q (user search) and type (retransmission/local) constrain the
+		// title — combine via $and so neither clobbers the other.
+		const titleConditions: Record<string, unknown>[] = [];
 		if (q && q.trim().length > 0) {
 			// Escape regex metacharacters so user input is treated literally.
 			const escaped = q.trim().replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
-			query.title = { $regex: escaped, $options: 'i' };
+			titleConditions.push({ title: { $regex: escaped, $options: 'i' } });
+		}
+		if (type === 'retransmission') {
+			titleConditions.push({ title: { $regex: RETRANSMISSION_TITLE_REGEX, $options: 'i' } });
+		} else if (type === 'local') {
+			titleConditions.push({
+				title: { $not: { $regex: RETRANSMISSION_TITLE_REGEX, $options: 'i' } }
+			});
+		}
+		if (titleConditions.length === 1) {
+			Object.assign(query, titleConditions[0]);
+		} else if (titleConditions.length > 1) {
+			query.$and = titleConditions;
 		}
 
 		if (year) {
@@ -214,7 +238,7 @@ export async function listRetransmissions(options: {
 		const query: Record<string, unknown> = {
 			published: true,
 			status: 'ready',
-			title: { $regex: 'retransmission|frank|ewald', $options: 'i' }
+			title: { $regex: RETRANSMISSION_TITLE_REGEX, $options: 'i' }
 		};
 
 		if (q && q.trim().length > 0) {
@@ -222,7 +246,7 @@ export async function listRetransmissions(options: {
 			// Combine with the retransmission regex via $and so both conditions
 			// apply without clobbering each other.
 			query.$and = [
-				{ title: { $regex: 'retransmission|frank|ewald', $options: 'i' } },
+				{ title: { $regex: RETRANSMISSION_TITLE_REGEX, $options: 'i' } },
 				{ title: { $regex: escaped, $options: 'i' } }
 			];
 			delete query.title;
