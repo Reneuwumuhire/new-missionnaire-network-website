@@ -1301,6 +1301,14 @@
 		// audio. The deferred `finish()` setTimeout below also rechecks.
 		if (destroyed) return;
 
+		// Stamp MediaSession metadata inside the gesture frame so iOS's
+		// mediaserverd binds the lock-screen "Now Playing" tile to *this*
+		// PWA's WebKit process. Without this, a cold start can resolve
+		// play() before the reactive metadata `$:` block runs, and the
+		// daemon attributes the session to whichever PWA most recently
+		// owned audio focus — which is the wrong-PWA-launch bug.
+		applyMediaSessionMetadata();
+
 		const pausedMs = audioPausedAt > 0 ? Date.now() - audioPausedAt : 0;
 
 		// Cold-load rehydration sets `pendingPlaybackSeek` so the first
@@ -1571,10 +1579,15 @@
 		return `--lyrics-artwork: url("${safeUrl}")`;
 	}
 
-	// Reactive metadata updates — whenever the selected track changes, the
-	// car/lock screen reads the new title/artist/album/artwork.
-	$: if (browser && $selectAudio && 'mediaSession' in navigator) {
+	// Lock-screen / Bluetooth metadata. Pulled into a function so it can be
+	// re-applied right before play() in safePlay — iOS only attributes the
+	// audio session to *this* PWA when metadata is non-null at the moment
+	// play() resolves. The reactive `$:` below covers track changes; the
+	// imperative call inside safePlay covers cold starts.
+	function applyMediaSessionMetadata() {
+		if (!browser || !('mediaSession' in navigator)) return;
 		const current = $selectAudio;
+		if (!current) return;
 		const isMusic = 'category' in current;
 		const isSermon = 'mp3_url' in current;
 		const artworkUrl = getArtworkUrl(current as PlayableAudio);
@@ -1590,21 +1603,25 @@
 				? (current as MusicAudio).artist || 'Artiste inconnu'
 				: isSermon
 					? (current as Sermon).author
-					: 'Missionnaire',
+					: 'Missionnaire Network',
 			album: isMusic
 				? (current as MusicAudio).book_full_name ||
 					(current as MusicAudio).category ||
-					'Missionnaire'
+					'Missionnaire Network'
 				: isSermon
 					? (current as Sermon).iso_date || 'Prédication'
-					: 'Media',
+					: 'Missionnaire Network',
 			artwork: [
 				{ src: artworkUrl, sizes: '96x96', type: 'image/png' },
 				{ src: artworkUrl, sizes: '192x192', type: 'image/png' },
+				{ src: artworkUrl, sizes: '256x256', type: 'image/png' },
+				{ src: artworkUrl, sizes: '384x384', type: 'image/png' },
 				{ src: artworkUrl, sizes: '512x512', type: 'image/png' }
 			]
 		});
 	}
+
+	$: if (browser && $selectAudio) applyMediaSessionMetadata();
 
 	/** Push the current playback position to the OS so the lock-screen /
 	 *  car head-unit seek bar can animate accurately. Called on every
