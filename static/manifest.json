@@ -1,8 +1,9 @@
 {
+	"id": "/?source=pwa-missionnaire-network",
 	"name": "Missionnaire Network",
 	"short_name": "Missionnaire",
 	"description": "Prédications, cantiques, questions-réponses, littérature et transcriptions du Message de l'Heure",
-	"start_url": "/",
+	"start_url": "/?source=pwa-missionnaire-network",
 	"scope": "/",
 	"display": "standalone",
 	"display_override": ["standalone", "minimal-ui"],
