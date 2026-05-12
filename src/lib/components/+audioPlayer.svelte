@@ -58,6 +58,22 @@
 	// recovery path (rebuildAudioElement) to obtain a brand-new media element,
 	// which is the only reliable way to reset a degraded iOS AVAudioSession.
 	let audioElementKey = 0;
+	// Diagnostic counter — increments every time bind:this resolves to a
+	// new DOM node. Compared in logs to prove (or disprove) the hypothesis
+	// that lock-screen transport ownership is detached by element rebuilds.
+	let audioInstanceSeq = 0;
+	let audioInstanceId = '';
+	function tagAudioInstance(el: HTMLAudioElement) {
+		audioInstanceSeq++;
+		audioInstanceId = `${Date.now().toString(36)}-${audioInstanceSeq}`;
+		el.dataset.instanceId = audioInstanceId;
+		console.log('[Audio Element]', {
+			instanceId: audioInstanceId,
+			seq: audioInstanceSeq,
+			keyAtCreate: audioElementKey,
+			isConnected: el.isConnected
+		});
+	}
 	// Tracks which element we've already wired listeners to, so the reactive
 	// attach block below doesn't double-bind when other state triggers a re-run.
 	let listenersBoundTo: HTMLAudioElement | null = null;
@@ -1048,7 +1064,14 @@
 	// without any event wiring. Also catches up any pending `audioSrc` that
 	// the $selectAudio reactive block queued before bind:this had fired.
 	$: if (browser && audio && audio !== listenersBoundTo) {
-		if (listenersBoundTo) detachAudioListeners(listenersBoundTo);
+		if (listenersBoundTo) {
+			console.log('[Audio Element] node replaced', {
+				oldInstanceId: listenersBoundTo.dataset.instanceId ?? '?',
+				key: audioElementKey
+			});
+			detachAudioListeners(listenersBoundTo);
+		}
+		tagAudioInstance(audio);
 		attachAudioListeners(audio);
 		listenersBoundTo = audio;
 		if (audioSrc && !audio.src) {
@@ -1074,6 +1097,12 @@
 	 *  element for us, and the reactive attach block re-wires listeners. */
 	async function rebuildAudioElement() {
 		if (!audio || destroyed) return;
+		console.log('[Audio Element] REBUILD START — this destroys the DOM node', {
+			oldInstanceId: audio.dataset.instanceId ?? '?',
+			keyBefore: audioElementKey,
+			hidden: document.hidden,
+			ts: Date.now()
+		});
 
 		const savedSrc = audio.src;
 		const savedTime = getReliablePlaybackTime();
@@ -1544,15 +1573,46 @@
 			tryResumeAfterInterruption(elapsed);
 		};
 
+		// Page Lifecycle API: 'freeze' fires when the OS actually suspends
+		// the WKWebView process (JS event loop frozen). 'resume' fires when
+		// it's unfrozen. These are distinct from 'visibilitychange' —
+		// during a freeze, MediaSession handlers physically cannot run
+		// because JS is paused, so any lock-screen tap during this window
+		// is silently dropped. Distinguishing this from a live-but-detached
+		// transport is the whole point of the diagnosis.
+		const onFreeze = () => {
+			console.log('[Lifecycle] freeze', {
+				boundInstanceId: audio?.dataset.instanceId ?? null,
+				ts: Date.now()
+			});
+		};
+		const onResume = () => {
+			console.log('[Lifecycle] resume', {
+				boundInstanceId: audio?.dataset.instanceId ?? null,
+				ts: Date.now()
+			});
+			registerMediaSessionHandlers();
+		};
+		const onBlur = () => console.log('[Lifecycle] blur', { ts: Date.now() });
+		const onFocusLog = () => console.log('[Lifecycle] focus', { ts: Date.now() });
+
 		document.addEventListener('visibilitychange', onVisibility);
+		document.addEventListener('freeze', onFreeze);
+		document.addEventListener('resume', onResume);
 		window.addEventListener('focus', onFocus);
+		window.addEventListener('focus', onFocusLog);
+		window.addEventListener('blur', onBlur);
 		window.addEventListener('pageshow', onPageShow);
 		window.addEventListener('pagehide', markPageLifecycleTeardown);
 		window.addEventListener('beforeunload', markPageLifecycleTeardown);
 
 		return () => {
 			document.removeEventListener('visibilitychange', onVisibility);
+			document.removeEventListener('freeze', onFreeze);
+			document.removeEventListener('resume', onResume);
 			window.removeEventListener('focus', onFocus);
+			window.removeEventListener('focus', onFocusLog);
+			window.removeEventListener('blur', onBlur);
 			window.removeEventListener('pageshow', onPageShow);
 			window.removeEventListener('pagehide', markPageLifecycleTeardown);
 			window.removeEventListener('beforeunload', markPageLifecycleTeardown);
@@ -1567,8 +1627,28 @@
 	function syncMediaSessionPlaylistHandlers(canNavigate = hasPlaylistNavigation) {
 		if (!browser || !('mediaSession' in navigator)) return;
 		try {
-			navigator.mediaSession.setActionHandler('previoustrack', canNavigate ? playPrevious : null);
-			navigator.mediaSession.setActionHandler('nexttrack', canNavigate ? playNext : null);
+			navigator.mediaSession.setActionHandler(
+				'previoustrack',
+				canNavigate
+					? () => {
+							console.log('[REMOTE COMMAND RECEIVED] previoustrack', {
+								boundInstanceId: audio?.dataset.instanceId ?? null
+							});
+							playPrevious();
+						}
+					: null
+			);
+			navigator.mediaSession.setActionHandler(
+				'nexttrack',
+				canNavigate
+					? () => {
+							console.log('[REMOTE COMMAND RECEIVED] nexttrack', {
+								boundInstanceId: audio?.dataset.instanceId ?? null
+							});
+							playNext();
+						}
+					: null
+			);
 		} catch (err) {
 			console.warn('[AudioPlayer] MediaSession playlist handler sync failed:', err);
 		}
@@ -1588,13 +1668,13 @@
 		if (!browser || !('mediaSession' in navigator)) return;
 		try {
 			navigator.mediaSession.setActionHandler('play', async () => {
-				if (!audio) return;
-				console.log('[MediaSession] handler play', {
-					readyState: audio.readyState,
-					paused: audio.paused,
-					currentTime: audio.currentTime,
-					hidden: document.hidden
+				console.log('[REMOTE COMMAND RECEIVED] play', {
+					boundInstanceId: audio?.dataset.instanceId ?? null,
+					currentSeq: audioInstanceSeq,
+					hidden: document.hidden,
+					ts: Date.now()
 				});
+				if (!audio) return;
 				setUserWantsToPlay(true);
 				consecutiveFailedResumes = 0;
 				audioElementRebuilt = false;
@@ -1638,12 +1718,13 @@
 				}
 			});
 			navigator.mediaSession.setActionHandler('pause', () => {
-				if (!audio) return;
-				console.log('[MediaSession] handler pause', {
-					readyState: audio.readyState,
-					paused: audio.paused,
-					currentTime: audio.currentTime
+				console.log('[REMOTE COMMAND RECEIVED] pause', {
+					boundInstanceId: audio?.dataset.instanceId ?? null,
+					currentSeq: audioInstanceSeq,
+					hidden: document.hidden,
+					ts: Date.now()
 				});
+				if (!audio) return;
 				setUserWantsToPlay(false);
 				setPendingPlaybackIntent('pause');
 				// Stamp playbackState first for immediate lock-screen
@@ -1656,13 +1737,25 @@
 			});
 			syncMediaSessionPlaylistHandlers();
 			navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+				console.log('[REMOTE COMMAND RECEIVED] seekbackward', {
+					boundInstanceId: audio?.dataset.instanceId ?? null,
+					offset: details.seekOffset
+				});
 				seekBackward(details.seekOffset ?? 10);
 			});
 			navigator.mediaSession.setActionHandler('seekforward', (details) => {
+				console.log('[REMOTE COMMAND RECEIVED] seekforward', {
+					boundInstanceId: audio?.dataset.instanceId ?? null,
+					offset: details.seekOffset
+				});
 				seekForward(details.seekOffset ?? 10);
 			});
 			// `seekto` lets the car / lock screen scrub the timeline directly.
 			navigator.mediaSession.setActionHandler('seekto', (details) => {
+				console.log('[REMOTE COMMAND RECEIVED] seekto', {
+					boundInstanceId: audio?.dataset.instanceId ?? null,
+					seekTime: details.seekTime
+				});
 				if (!audio || details.seekTime == null) return;
 				if (details.fastSeek && 'fastSeek' in audio) {
 					audio.fastSeek(details.seekTime);
@@ -1672,7 +1765,10 @@
 				rememberPlaybackPosition(details.seekTime, audio.duration);
 			});
 			navigator.mediaSession.setActionHandler('stop', () => {
-				console.log('[MediaSession] handler stop');
+				console.log('[REMOTE COMMAND RECEIVED] stop', {
+					boundInstanceId: audio?.dataset.instanceId ?? null,
+					currentSeq: audioInstanceSeq
+				});
 				setUserWantsToPlay(false);
 				if (audio) {
 					audio.pause();
