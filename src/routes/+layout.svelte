@@ -131,6 +131,24 @@
 
 		radioIsLive.set(data.radioState?.isLive ?? false);
 
+		// Reconcile against the source of truth on every mount. The SSR HTML
+		// can be served stale by the service worker (navigate handler is
+		// stale-while-revalidate) or by the edge CDN, so a stale "live" badge
+		// can survive a broadcast end indefinitely if push events were
+		// missed. /api/live/radio-state is `no-store`, so this always
+		// reflects current DB state and corrects the banner within ~100ms
+		// of hydration.
+		fetch('/api/live/radio-state', { cache: 'no-store' })
+			.then((r) => (r.ok ? r.json() : null))
+			.then((state) => {
+				if (state && typeof state.isLive === 'boolean') {
+					radioIsLive.set(state.isLive);
+				}
+			})
+			.catch(() => {
+				/* offline or transient failure — keep SSR value */
+			});
+
 		const applyPushPayload = (payload: { event?: string } | undefined) => {
 			// Default to "live" for backward compat (older payloads without `event`).
 			radioIsLive.set(payload?.event !== 'radio-end');
