@@ -6,9 +6,6 @@
 	import { vercelImage, vercelImageSrcSet, vercelImagePlaceholder } from '$lib/utils/vercelImage';
 	import BlurUpImage from '$lib/components/BlurUpImage.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
-	// @ts-ignore — svelte-icons-pack has no types
-	import Icon from 'svelte-icons-pack/Icon.svelte';
-	import IoReload from 'svelte-icons-pack/io/IoReload';
 
 	export let data: PageData;
 
@@ -356,7 +353,17 @@
 				>
 					<div class="flex flex-col items-center gap-4">
 						<div class="text-missionnaire animate-spin">
-							<Icon src={IoReload} size="32" />
+							<svg class="h-8 w-8" viewBox="0 0 24 24" fill="none">
+								<circle
+									cx="12"
+									cy="12"
+									r="10"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-dasharray="40 60"
+									stroke-linecap="round"
+								/>
+							</svg>
 						</div>
 						<span
 							class="text-[10px] font-semibold uppercase tracking-[0.25em] text-missionnaire animate-pulse"
