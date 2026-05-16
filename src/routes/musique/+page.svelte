@@ -266,8 +266,20 @@
 		}
 	}
 
+	let recueilsScrollEl: HTMLDivElement;
+	let recueilsCanLeft = false;
+	let recueilsCanRight = true;
+
+	function updateRecueilsScrollState() {
+		if (!recueilsScrollEl) return;
+		const { scrollLeft, clientWidth, scrollWidth } = recueilsScrollEl;
+		recueilsCanLeft = scrollLeft > 4;
+		recueilsCanRight = scrollLeft + clientWidth < scrollWidth - 4;
+	}
+
 	onMount(() => {
 		void refreshCachedUrls();
+		updateRecueilsScrollState();
 	});
 
 	onDestroy(() => {
@@ -706,20 +718,28 @@
 			Recueils
 		</h2>
 		<div
-			class="flex overflow-x-auto pb-4 gap-2.5 md:gap-3 no-scrollbar -mx-4 px-4 md:mx-0 md:px-0 md:pb-0"
-			style="scrollbar-width: none; -ms-overflow-style: none;"
+			class="recueils-scroll relative -mx-4 md:mx-0"
+			class:can-scroll-left={recueilsCanLeft}
+			class:can-scroll-right={recueilsCanRight}
 		>
-			{#each categories as category}
-				<button
-					class="flex-shrink-0 px-4 md:px-5 py-2 md:py-2.5 text-[10px] md:text-[11px] font-bold uppercase tracking-[0.16em] md:tracking-wider transition-all border {currentCategory ===
-					category
-						? 'border-missionnaire text-missionnaire bg-missionnaire/5'
-						: 'bg-white/40 text-stone-500 border-stone-200/60 hover:border-missionnaire hover:text-missionnaire'}"
-					on:click={() => handleCategoryChange(category)}
-				>
-					{category === 'All' ? 'Tout Voir' : category}
-				</button>
-			{/each}
+			<div
+				bind:this={recueilsScrollEl}
+				on:scroll={updateRecueilsScrollState}
+				class="recueils-track flex overflow-x-auto pb-4 gap-2 md:gap-3 no-scrollbar px-4 md:px-0 md:pb-0 snap-x"
+				style="scrollbar-width: none; -ms-overflow-style: none;"
+			>
+				{#each categories as category}
+					<button
+						class="snap-start flex-shrink-0 px-3.5 md:px-5 py-1.5 md:py-2.5 text-[10px] md:text-[11px] font-bold uppercase tracking-[0.12em] md:tracking-wider transition-all border {currentCategory ===
+						category
+							? 'border-missionnaire text-missionnaire bg-missionnaire/5'
+							: 'bg-white/40 text-stone-500 border-stone-200/60 hover:border-missionnaire hover:text-missionnaire'}"
+						on:click={() => handleCategoryChange(category)}
+					>
+						{category === 'All' ? 'Tout Voir' : category}
+					</button>
+				{/each}
+			</div>
 		</div>
 	</div>
 
@@ -1487,5 +1507,53 @@
 	.no-scrollbar {
 		-ms-overflow-style: none; /* IE and Edge */
 		scrollbar-width: none; /* Firefox */
+	}
+
+	/* Edge-fade affordance for the horizontally scrollable Recueils row.
+	   The mask fades the track to transparent on whichever side has more
+	   content, so the row reads as "scrollable" instead of "complete". */
+	.recueils-scroll .recueils-track {
+		--fade: 28px;
+		-webkit-mask-image: linear-gradient(to right, #000 0, #000 100%);
+		mask-image: linear-gradient(to right, #000 0, #000 100%);
+	}
+	.recueils-scroll.can-scroll-right .recueils-track {
+		-webkit-mask-image: linear-gradient(
+			to right,
+			#000 0,
+			#000 calc(100% - var(--fade)),
+			transparent 100%
+		);
+		mask-image: linear-gradient(
+			to right,
+			#000 0,
+			#000 calc(100% - var(--fade)),
+			transparent 100%
+		);
+	}
+	.recueils-scroll.can-scroll-left .recueils-track {
+		-webkit-mask-image: linear-gradient(
+			to right,
+			transparent 0,
+			#000 var(--fade),
+			#000 100%
+		);
+		mask-image: linear-gradient(to right, transparent 0, #000 var(--fade), #000 100%);
+	}
+	.recueils-scroll.can-scroll-left.can-scroll-right .recueils-track {
+		-webkit-mask-image: linear-gradient(
+			to right,
+			transparent 0,
+			#000 var(--fade),
+			#000 calc(100% - var(--fade)),
+			transparent 100%
+		);
+		mask-image: linear-gradient(
+			to right,
+			transparent 0,
+			#000 var(--fade),
+			#000 calc(100% - var(--fade)),
+			transparent 100%
+		);
 	}
 </style>
