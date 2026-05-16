@@ -105,7 +105,7 @@
 							<input
 								id="hero-search"
 								type="text"
-								class="w-full bg-transparent text-stone-800 px-5 py-3.5 pr-24 text-sm font-body outline-none placeholder:text-stone-400"
+								class="w-full bg-transparent text-stone-800 px-4 py-2.5 pr-10 text-base md:px-5 md:py-3.5 md:pr-12 md:text-sm font-body outline-none placeholder:text-stone-400"
 								placeholder="Rechercher par titre..."
 								bind:value={heroSearchValue}
 							/>
@@ -140,7 +140,7 @@
 								</button>
 							{/if}
 						</div>
-						<button type="submit" class="bg-missionnaire hover:bg-missionnaire/90 text-white px-6 py-3.5 text-[11px] font-bold uppercase tracking-[0.15em] font-body transition-colors shrink-0">
+						<button type="submit" class="bg-missionnaire hover:bg-missionnaire/90 text-white px-4 py-2.5 md:px-6 md:py-3.5 text-[10px] md:text-[11px] font-bold uppercase tracking-[0.15em] font-body transition-colors shrink-0">
 							Rechercher
 						</button>
 					</form>
