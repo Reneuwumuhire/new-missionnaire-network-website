@@ -697,27 +697,6 @@
 		<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">Musique</h1>
 	</div>
 
-	<!-- Alpha Filter -->
-	<div class="mb-10">
-		<h2
-			class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.35em] mb-4 font-body"
-		>
-			Par ordre alphabétique
-		</h2>
-		<div class="flex flex-wrap gap-x-4 gap-y-2">
-			{#each alphabet as letter}
-				<button
-					class="text-[11px] font-body font-bold transition-all {currentAlpha === letter
-						? 'text-missionnaire font-semibold'
-						: 'text-stone-400 hover:text-missionnaire'}"
-					on:click={() => handleAlphaChange(letter)}
-				>
-					{letter}
-				</button>
-			{/each}
-		</div>
-	</div>
-
 	<div class="mb-12">
 		<h2
 			class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.35em] mb-4 font-body"
