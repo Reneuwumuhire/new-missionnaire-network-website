@@ -71,10 +71,18 @@
 
 					// Path restoration — only inside the installed app, only when
 					// landing on the bare "/" root, and only for recent sessions.
+					// The PWA manifest's start_url is "/?source=pwa-..." so a
+					// strict `!window.location.search` check would never fire
+					// after a home-screen launch — treat that single source param
+					// as "no real query" and still attempt the restore.
+					var params = new URLSearchParams(window.location.search);
+					var onlySourceParam =
+						params.size <= 1 &&
+						(params.size === 0 || (params.get('source') || '').indexOf('pwa-') === 0);
 					if (
 						standalone &&
 						window.location.pathname === '/' &&
-						!window.location.search &&
+						onlySourceParam &&
 						!window.location.hash
 					) {
 						var saved = localStorage.getItem('missionnaire:last-path');

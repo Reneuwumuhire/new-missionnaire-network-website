@@ -83,14 +83,14 @@
 
 <div class="flex flex-col">
 	<header class="relative">
-		<div class="relative header-predications flex flex-col items-center justify-center w-full min-h-[340px] md:min-h-[400px]">
-			<div class="absolute inset-0 overlay-predications flex items-center justify-center px-5 py-12">
+		<div class="relative header-predications flex flex-col items-center justify-center w-full min-h-[240px] md:min-h-[400px]">
+			<div class="absolute inset-0 overlay-predications flex items-center justify-center px-5 py-6 md:py-12">
 				<div class="flex flex-col items-center text-white w-full max-w-3xl text-center">
-					<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-4 font-body">
+					<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-2 md:mb-4 font-body">
 						Tous les cantiques
 					</p>
-					<h1 class="font-display text-3xl md:text-5xl font-semibold leading-tight">Louange et Adoration</h1>
-					<p class="text-sm text-white/60 font-body mt-3 mb-8 max-w-lg leading-relaxed">
+					<h1 class="font-display text-2xl md:text-5xl font-semibold leading-tight">Louange et Adoration</h1>
+					<p class="text-sm text-white/60 font-body mt-2 mb-4 md:mt-3 md:mb-8 max-w-lg leading-relaxed">
 						{#if totalSongs !== null}
 							Trouvez ici <span class="font-semibold text-white">{formattedTotal(totalSongs)}</span> cantiques.
 						{:else}
@@ -144,7 +144,7 @@
 							Rechercher
 						</button>
 					</form>
-					<div class="flex items-center gap-3 mt-6">
+					<div class="flex items-center gap-3 mt-3 md:mt-6">
 						<a
 							href="/musique"
 							class="px-5 py-2 text-[11px] font-bold uppercase tracking-[0.15em] font-body transition-all border {$page.url.pathname === '/musique' ? 'bg-missionnaire text-white border-missionnaire' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}"
@@ -171,7 +171,7 @@
 		</div>
 	</header>
 </div>
-<div class="flex flex-row justify-center h-auto w-full pt-8 pb-32 md:pt-16 md:pb-16 overflow-x-hidden">
+<div class="flex flex-row justify-center h-auto w-full pt-4 pb-32 md:pt-16 md:pb-16 overflow-x-hidden">
 	<div class=" flex flex-col w-full max-w-7xl px-2 md:px-5">
 		<slot />
 	</div>

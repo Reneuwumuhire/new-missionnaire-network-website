@@ -1,14 +1,5 @@
 import { browser } from '$app/environment';
 import type { MusicAudio } from '$lib/models/music-audio';
-import { redirect } from '@sveltejs/kit';
-
-function isRandomSort(sort: string): boolean {
-	return sort.split(/[: ,]/)[0] === 'random';
-}
-
-function createPlaylistSeed(): string {
-	return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-}
 
 export const load = async ({ fetch, url }) => {
 	const category = url.searchParams.get('category') || 'All';
@@ -27,14 +18,16 @@ export const load = async ({ fetch, url }) => {
 	}
 
 	const sort = url.searchParams.get('sort') || defaultSort;
+	// Seed is intentionally left empty when the user hasn't picked a custom
+	// shuffle: the API endpoint defaults to a daily-rotating seed so the URL
+	// stays identical across users for the whole day, which lets the edge
+	// cache and the in-memory shuffle cache both hit on virtually every
+	// request. The previous behaviour minted a unique per-session seed and
+	// 307-redirected the listener through it — fast for back/forward, but
+	// every first visit paid a redirect round-trip AND missed every cache.
+	// Users who want their own order use "Rafraîchir" which writes a
+	// per-session seed to the URL explicitly.
 	const seed = url.searchParams.get('seed') || '';
-
-	if (isRandomSort(sort) && !seed) {
-		const redirectUrl = new URL(url);
-		redirectUrl.searchParams.set('sort', sort);
-		redirectUrl.searchParams.set('seed', createPlaylistSeed());
-		throw redirect(307, `${redirectUrl.pathname}?${redirectUrl.searchParams.toString()}`);
-	}
 
 	if (browser) {
 		return {

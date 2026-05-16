@@ -475,7 +475,14 @@
 
 	function syncSeedParam(params: URLSearchParams) {
 		if (getEffectiveSort(params).split(/[: ,]/)[0] === 'random') {
-			params.set('seed', params.get('seed') || currentSeed || createPlaylistSeed());
+			// Only preserve an explicit seed the user already chose
+			// (via "Rafraîchir" or an inbound link). When no seed is
+			// present we leave the URL bare so every listener hits the
+			// same edge-cached response and the server falls back to a
+			// daily-rotating seed.
+			const existing = params.get('seed') || currentSeed;
+			if (existing) params.set('seed', existing);
+			else params.delete('seed');
 			return;
 		}
 
@@ -561,7 +568,10 @@
 
 		if (property === 'random') {
 			params.set('sort', 'random');
-			params.set('seed', createPlaylistSeed());
+			// Drop any existing seed so the server uses the shared daily
+			// seed — listeners who want a personal shuffle still get one
+			// via the explicit "Rafraîchir" button.
+			params.delete('seed');
 			params.set('page', '1');
 			goto(`?${params.toString()}`);
 			return;
@@ -689,15 +699,7 @@
 </svelte:head>
 
 <div class="w-full min-w-0 max-w-6xl mx-auto px-4 pt-0 pb-8 md:px-6">
-	<!-- Page Header -->
-	<div class="mb-10">
-		<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body">
-			Cantiques & Louange
-		</p>
-		<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">Musique</h1>
-	</div>
-
-	<div class="mb-12">
+	<div class="mb-8 md:mb-12">
 		<h2
 			class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.35em] mb-4 font-body"
 		>
@@ -722,10 +724,10 @@
 	</div>
 
 	<!-- List Title and Mobile Filters -->
-	<div class="flex flex-col gap-2 mb-6">
+	<div class="flex flex-col gap-2 mb-4 md:mb-6">
 		<div class="flex items-center justify-between gap-3">
 			<div class="flex items-center gap-2">
-				<h2 class="font-display text-3xl font-bold text-stone-900">List</h2>
+				<h2 class="font-display text-2xl md:text-3xl font-bold text-stone-900">Liste</h2>
 				{#if isRandomListOrder}
 					<button
 						class="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-stone-500 transition-colors hover:border-missionnaire hover:text-missionnaire"
