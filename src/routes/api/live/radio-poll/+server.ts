@@ -14,10 +14,10 @@ import { json } from '@sveltejs/kit';
 // Vercel — instantly cutting their function-invocation cost from
 // ~8,640 hits/day per stale user to ~1 hit/day per stale user.
 //
-// Stale clients will see a non-functional live banner until they reload —
-// the Update Banner (`+updateBanner.svelte`) is the user-visible prompt for
-// that. Once stale clients have drained (≥7 days post-deploy), this file
-// can be deleted entirely.
+// Stale clients will see a non-functional live banner until they reload.
+// `+updateBanner.svelte` now silently swaps the SW in the background, so
+// the next refresh resolves it without any user prompt. Once stale clients
+// have drained (≥7 days post-deploy), this file can be deleted entirely.
 
 const LONG_CACHE = 'public, max-age=86400, s-maxage=86400, immutable';
 
