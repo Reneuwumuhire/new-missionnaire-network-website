@@ -488,6 +488,55 @@
 		return 'Sans titre';
 	}
 
+	let titleProbeEl: HTMLSpanElement | null = null;
+	let titleViewportEl: HTMLDivElement | null = null;
+	let titleOverflows = false;
+	let titleMarqueeDuration = '18s';
+	let titleResizeObserver: ResizeObserver | null = null;
+	let titleMeasureRaf = 0;
+
+	function measureTitleOverflow() {
+		if (!browser) return;
+		cancelAnimationFrame(titleMeasureRaf);
+		titleMeasureRaf = requestAnimationFrame(() => {
+			if (!titleViewportEl || !titleProbeEl) {
+				titleOverflows = false;
+				return;
+			}
+			const viewportWidth = titleViewportEl.clientWidth;
+			const naturalWidth = titleProbeEl.getBoundingClientRect().width;
+			if (viewportWidth <= 0 || naturalWidth <= 0) return;
+			const overflows = naturalWidth > viewportWidth - 4;
+			if (overflows) {
+				// ~34px / second; clamped 12–28s so short overflows aren't a blur
+				// and very long titles don't crawl forever.
+				const seconds = Math.min(28, Math.max(12, naturalWidth / 34));
+				titleMarqueeDuration = `${seconds.toFixed(2)}s`;
+			}
+			if (overflows !== titleOverflows) titleOverflows = overflows;
+		});
+	}
+
+	function attachTitleObservers() {
+		if (!browser) return;
+		if (titleResizeObserver) titleResizeObserver.disconnect();
+		if (!titleViewportEl || !titleProbeEl) return;
+		titleResizeObserver = new ResizeObserver(measureTitleOverflow);
+		titleResizeObserver.observe(titleViewportEl);
+		titleResizeObserver.observe(titleProbeEl);
+		measureTitleOverflow();
+	}
+
+	$: if (browser && titleViewportEl && titleProbeEl) attachTitleObservers();
+	$: if (browser) {
+		// Re-measure whenever the displayed title changes.
+		const _trackTitleRefresh = $selectAudio
+			? getDisplayTitle($selectAudio)
+			: '';
+		void _trackTitleRefresh;
+		measureTitleOverflow();
+	}
+
 	function getAudioFavId(item: any): string {
 		if (!item) return '';
 		return String(item._id || item.s3_url || item.mp3_url || '');
@@ -2136,6 +2185,9 @@
 		isPlaying.set(false);
 		lastPlayerInset = 0;
 		document.documentElement.style.setProperty('--audio-player-height', '0px');
+		cancelAnimationFrame(titleMeasureRaf);
+		titleResizeObserver?.disconnect();
+		titleResizeObserver = null;
 	});
 </script>
 
@@ -2250,7 +2302,7 @@
 			class="player-main px-5 md:px-10 max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:gap-8"
 		>
 			<!-- Info Row -->
-			<div class="flex items-center justify-between mb-3 md:mb-0 md:flex-1 md:min-w-0">
+			<div class="flex items-center justify-between gap-1 mb-3 md:mb-0 md:gap-0 md:flex-1 md:min-w-0">
 				<div class="flex-1 min-w-0 min-h-[2.75rem] md:min-h-[3rem]">
 					<div
 						class="text-[10px] uppercase tracking-[0.2em] font-bold text-missionnaire mb-0.5 opacity-80 flex items-center gap-2"
@@ -2310,11 +2362,24 @@
 						{/if}
 						<!-- ── END: cache indicator badge ────────────────────── -->
 					</div>
-					<div
-						class="font-black text-sm md:text-lg text-stone-900 truncate pr-4"
-						title={getDisplayTitle($selectAudio)}
-					>
-						{getDisplayTitle($selectAudio)}
+					<div class="track-title-row pr-4 font-black text-sm md:text-lg text-stone-900">
+						<span class="track-title-probe" aria-hidden="true" bind:this={titleProbeEl}>
+							{getDisplayTitle($selectAudio)}
+						</span>
+						<div
+							class="track-title-viewport"
+							class:is-marquee={titleOverflows}
+							bind:this={titleViewportEl}
+							title={getDisplayTitle($selectAudio)}
+							style="--marquee-duration: {titleMarqueeDuration}"
+						>
+							<div class="track-title-track">
+								<span class="track-title-copy">{getDisplayTitle($selectAudio)}</span>
+								<span class="track-title-copy track-title-copy--clone" aria-hidden="true">
+									{getDisplayTitle($selectAudio)}
+								</span>
+							</div>
+						</div>
 					</div>
 					{#if !isAudioReady}
 						<div class="text-[10px] font-medium uppercase tracking-[0.15em] text-stone-400 mt-1">
@@ -2477,6 +2542,11 @@
 						</div>
 					{/if}
 				</div>
+
+				<span
+					class="ml-1.5 mr-0.5 h-6 w-px shrink-0 self-center bg-stone-200 md:hidden"
+					aria-hidden="true"
+				></span>
 
 				<button
 					class="bg-gray-900 hover:bg-black text-white p-2 rounded-full transition-colors md:hidden"
@@ -2657,6 +2727,124 @@
 {/if}
 
 <style>
+	/* ── Scrolling track title ─────────────────────────────────────────
+	   The title sits inside a fixed-width viewport. A hidden probe at the
+	   same font sizing reports the natural text width; a Svelte action
+	   compares that to the viewport and toggles `.is-marquee`. In the
+	   default state we render a single clean ellipsis. When marquee is
+	   active, a duplicated copy slides across at a length-aware pace and
+	   a `mask-image` fade hints at hidden text on the right.
+	   --------------------------------------------------------------- */
+	.track-title-row {
+		position: relative;
+		min-width: 0;
+	}
+
+	.track-title-probe {
+		position: absolute;
+		top: 0;
+		left: 0;
+		visibility: hidden;
+		pointer-events: none;
+		white-space: nowrap;
+		font: inherit;
+		letter-spacing: inherit;
+	}
+
+	.track-title-viewport {
+		position: relative;
+		overflow: hidden;
+		min-width: 0;
+		/* Bottom padding catches any descender clipping under the mask. */
+		padding-bottom: 0.05rem;
+	}
+
+	.track-title-viewport.is-marquee {
+		-webkit-mask-image: linear-gradient(
+			to right,
+			black 0,
+			black calc(100% - 1.75rem),
+			transparent 100%
+		);
+		mask-image: linear-gradient(
+			to right,
+			black 0,
+			black calc(100% - 1.75rem),
+			transparent 100%
+		);
+	}
+
+	.track-title-track {
+		display: block;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.track-title-copy {
+		/* In static (ellipsis) mode the parent handles overflow. */
+		display: inline;
+	}
+
+	.track-title-copy--clone {
+		display: none;
+	}
+
+	.track-title-viewport.is-marquee .track-title-track {
+		display: flex;
+		width: max-content;
+		overflow: visible;
+		text-overflow: clip;
+		animation: track-title-scroll var(--marquee-duration, 18s) linear infinite;
+		will-change: transform;
+	}
+
+	.track-title-viewport.is-marquee .track-title-copy {
+		flex-shrink: 0;
+		padding-right: 3.25rem;
+		display: inline-block;
+	}
+
+	.track-title-viewport.is-marquee .track-title-copy--clone {
+		display: inline-block;
+	}
+
+	.track-title-viewport.is-marquee:hover .track-title-track,
+	.track-title-viewport.is-marquee:focus-within .track-title-track {
+		animation-play-state: paused;
+	}
+
+	@keyframes track-title-scroll {
+		0%,
+		7% {
+			transform: translate3d(0, 0, 0);
+		}
+		95%,
+		100% {
+			transform: translate3d(-50%, 0, 0);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.track-title-viewport.is-marquee .track-title-track {
+			animation: none;
+		}
+		.track-title-viewport.is-marquee {
+			-webkit-mask-image: linear-gradient(
+				to right,
+				black 0,
+				black calc(100% - 1.25rem),
+				transparent 100%
+			);
+			mask-image: linear-gradient(
+				to right,
+				black 0,
+				black calc(100% - 1.25rem),
+				transparent 100%
+			);
+		}
+	}
+
 	.audio-player-shell {
 		--lyrics-artwork: none;
 		position: fixed;
