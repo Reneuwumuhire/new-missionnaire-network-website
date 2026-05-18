@@ -373,6 +373,7 @@
 		property="og:description"
 		content="Consultez les prédications de William Branham, Ewald Frank et de l'église locale."
 	/>
+	<link rel="canonical" href="https://missionnaire.net/predications" />
 </svelte:head>
 
 <div class="max-w-6xl mx-auto px-6 pt-0 pb-8">

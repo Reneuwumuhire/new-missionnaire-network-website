@@ -296,6 +296,7 @@
 		property="og:description"
 		content="Catalogue de chants en vidéo pour votre adoration quotidienne."
 	/>
+	<link rel="canonical" href="https://missionnaire.net/musique/videos" />
 </svelte:head>
 
 <div class="w-full min-w-0 max-w-6xl mx-auto px-4 pt-0 pb-8 md:px-6">

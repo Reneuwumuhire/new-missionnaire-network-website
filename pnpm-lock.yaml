@@ -17,6 +17,9 @@ importers:
       '@tanstack/svelte-query':
         specifier: ^5.35.1
         version: 5.74.3(svelte@5.55.1)
+      client-zip:
+        specifier: ^2.5.0
+        version: 2.5.0
       flowbite-svelte:
         specifier: ^0.44.20
         version: 0.44.24(rollup@4.60.1)(svelte@5.55.1)
@@ -1070,6 +1073,9 @@ packages:
   chownr@3.0.0:
     resolution: {integrity: sha512-+IxzY9BZOQd/XuYPRmrvEVjF/nqj5kgT4kEq7VofrDoM1MxoRjEWkrCC3EtLi59TVawxTAn+orJwFQcrqEN1+g==}
     engines: {node: '>=18'}
+
+  client-zip@2.5.0:
+    resolution: {integrity: sha512-ydG4nDZesbFurnNq0VVCp/yyomIBh+X/1fZPI/P24zbnG4dtC4tQAfI5uQsomigsUMeiRO2wiTPizLWQh+IAyQ==}
 
   clsx@2.1.1:
     resolution: {integrity: sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==}
@@ -3212,6 +3218,8 @@ snapshots:
       readdirp: 4.1.2
 
   chownr@3.0.0: {}
+
+  client-zip@2.5.0: {}
 
   clsx@2.1.1: {}
 

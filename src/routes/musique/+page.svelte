@@ -51,6 +51,13 @@
 		setMusicPageCache
 	} from './listCache';
 	// ── END: cached filter imports ────────────────────────────────
+	import {
+		buildDownloadFilename,
+		downloadSongsAsZip,
+		fetchAllSongsForDownload,
+		type DownloadProgress
+	} from '$lib/utils/musicDownload';
+	import { portal } from '$lib/actions/portal';
 
 	type MusicAudioApiResponse = {
 		data: MusicAudio[];
@@ -107,6 +114,102 @@
 	let showRecent = false;
 	// ── BEGIN: cached filter state (added) ────────────────────────
 	let showCached = false;
+
+	// ── Bulk download (current filter as .zip) ────────────────────
+	// Modal-driven flow: open confirms count + warns about size, Start
+	// kicks off a sequential streaming zip via `client-zip`. Cancel
+	// aborts pending fetches and the assembled blob is never saved.
+	let downloadModalOpen = false;
+	let isDownloading = false;
+	let downloadProgress: DownloadProgress = {
+		completed: 0,
+		total: 0,
+		currentTitle: '',
+		skipped: 0
+	};
+	let downloadError = '';
+	let downloadAbortController: AbortController | null = null;
+	let downloadDoneSummary: { completed: number; skipped: number } | null = null;
+	$: downloadEstimateMb = Math.round((totalSongs * 4.5) / 1) || 0;
+	$: downloadFilterLabel = (() => {
+		if (currentSearch) return `« ${currentSearch} »`;
+		if (currentArtist) return currentArtist;
+		if (currentAlpha) return `lettre ${currentAlpha}`;
+		if (currentCategory && currentCategory !== 'All') return currentCategory;
+		return 'tous les chants';
+	})();
+
+	function openDownloadModal() {
+		if (isDownloading) return;
+		downloadError = '';
+		downloadDoneSummary = null;
+		downloadModalOpen = true;
+	}
+
+	function closeDownloadModal() {
+		if (isDownloading) return;
+		downloadModalOpen = false;
+		downloadError = '';
+		downloadDoneSummary = null;
+	}
+
+	async function startDownload() {
+		if (isDownloading) return;
+		downloadError = '';
+		downloadDoneSummary = null;
+		isDownloading = true;
+		downloadProgress = { completed: 0, total: 0, currentTitle: '', skipped: 0 };
+		downloadAbortController = new AbortController();
+		const signal = downloadAbortController.signal;
+
+		try {
+			const songs = await fetchAllSongsForDownload(
+				{
+					category: currentCategory,
+					search: currentSearch,
+					alpha: currentAlpha,
+					artist: currentArtist,
+					sort: currentSort,
+					seed: currentSeed
+				},
+				signal
+			);
+			if (songs.length === 0) {
+				downloadError = 'Aucun chant à télécharger pour ce filtre.';
+				return;
+			}
+			downloadProgress = {
+				completed: 0,
+				total: songs.length,
+				currentTitle: '',
+				skipped: 0
+			};
+			const filename = buildDownloadFilename({
+				category: currentCategory,
+				search: currentSearch,
+				alpha: currentAlpha,
+				artist: currentArtist
+			});
+			const summary = await downloadSongsAsZip(
+				songs,
+				filename,
+				(p) => (downloadProgress = p),
+				signal
+			);
+			downloadDoneSummary = summary;
+		} catch (err) {
+			if ((err as Error).name !== 'AbortError') {
+				downloadError = err instanceof Error ? err.message : 'Téléchargement échoué.';
+			}
+		} finally {
+			isDownloading = false;
+			downloadAbortController = null;
+		}
+	}
+
+	function cancelDownload() {
+		downloadAbortController?.abort();
+	}
 
 	function buildMusicRequestParams() {
 		const params = new URLSearchParams({
@@ -708,6 +811,9 @@
 		property="og:description"
 		content="Ecoutez les cantiques, louanges et adorations du Message de l'Heure sur Missionnaire Network. Une collection riche pour votre adoration quotidienne."
 	/>
+	<!-- All filter/search/pagination variants (?search=, ?artist=, ?page=...)
+	     canonicalize to the bare list URL so Google indexes one version. -->
+	<link rel="canonical" href="https://missionnaire.net/musique" />
 </svelte:head>
 
 <div class="w-full min-w-0 max-w-6xl mx-auto px-4 pt-0 pb-8 md:px-6">
@@ -902,7 +1008,7 @@
 	{/if}
 
 	<!-- Favorites & Recently Played (collapsed by default) -->
-	{#if $favorites.length > 0 || $recentlyPlayed.length > 0 || cachedCount > 0}
+	{#if $favorites.length > 0 || $recentlyPlayed.length > 0 || cachedCount > 0 || totalSongs > 0}
 		<div class="flex flex-wrap gap-1.5 md:gap-2 mb-4">
 			{#if $favorites.length > 0}
 				<button
@@ -951,6 +1057,18 @@
 				</button>
 			{/if}
 			<!-- ── END: cached filter button ─────────────────────────── -->
+			<!-- Bulk download (current filtered list as .zip) -->
+			{#if totalSongs > 0}
+				<button
+					class="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-full border text-[10px] md:text-xs font-bold uppercase tracking-[0.12em] md:tracking-wider transition-colors whitespace-nowrap border-stone-200 bg-white text-stone-500 hover:border-missionnaire hover:text-missionnaire disabled:opacity-50 disabled:cursor-not-allowed"
+					on:click={openDownloadModal}
+					disabled={isDownloading}
+					title="Télécharger la liste filtrée en .zip"
+				>
+					<Icon src={IoCloudDownloadOutline} size="12" />
+					Tout télécharger
+				</button>
+			{/if}
 		</div>
 
 		{#if showFavorites && $favorites.length > 0}
@@ -1496,6 +1614,169 @@
 		</div>
 	{/if}
 </div>
+
+<!-- Bulk-download modal. Single dialog used for confirm + progress + done.
+     Portalled to <body> because `.page-fade-in` (the layout wrapper) uses
+     a CSS transform, which makes it a containing block for `position: fixed`
+     and pins the overlay to the scrolled page position instead of the
+     viewport. -->
+{#if downloadModalOpen}
+	<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+	<div
+		use:portal
+		class="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-stone-900/50 backdrop-blur-sm px-4 pb-4 sm:p-4"
+		on:click|self={closeDownloadModal}
+	>
+		<div
+			class="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-stone-200"
+			role="dialog"
+			aria-modal="true"
+			aria-label="Télécharger les chants"
+		>
+			<div class="px-5 pt-5 pb-4 border-b border-stone-100">
+				<div class="flex items-start justify-between gap-3">
+					<div class="min-w-0">
+						<p
+							class="text-[10px] font-bold uppercase tracking-[0.25em] text-missionnaire mb-1"
+						>
+							Téléchargement
+						</p>
+						<h3 class="font-display text-xl font-semibold text-stone-900 truncate">
+							{downloadFilterLabel}
+						</h3>
+					</div>
+					{#if !isDownloading}
+						<button
+							class="p-1 text-stone-400 hover:text-stone-700 transition-colors"
+							on:click={closeDownloadModal}
+							aria-label="Fermer"
+						>
+							<Icon src={BsX} size="20" />
+						</button>
+					{/if}
+				</div>
+			</div>
+
+			<div class="px-5 py-5 space-y-4">
+				{#if !isDownloading && !downloadDoneSummary && !downloadError}
+					<div class="space-y-2">
+						<p class="text-sm text-stone-700">
+							{totalSongs}
+							{totalSongs > 1 ? 'chants' : 'chant'} seront regroupés dans un seul fichier
+							<span class="font-semibold">.zip</span>.
+						</p>
+						<p class="text-xs text-stone-500 leading-relaxed">
+							Taille estimée : ~{downloadEstimateMb}&nbsp;Mo. Gardez l'onglet ouvert
+							pendant le téléchargement — fermer l'application l'interrompt.
+						</p>
+						{#if totalSongs > 200}
+							<p
+								class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2"
+							>
+								Liste volumineuse : le navigateur peut échouer si la mémoire est limitée.
+								Filtrez davantage pour un téléchargement plus sûr.
+							</p>
+						{/if}
+					</div>
+				{/if}
+
+				{#if isDownloading}
+					<div class="space-y-3">
+						<div class="flex items-center justify-between text-xs font-bold text-stone-600">
+							<span>
+								{downloadProgress.completed} / {downloadProgress.total || totalSongs}
+							</span>
+							<span class="text-stone-400">
+								{#if downloadProgress.total > 0}
+									{Math.round((downloadProgress.completed / downloadProgress.total) * 100)}%
+								{:else}
+									Préparation…
+								{/if}
+							</span>
+						</div>
+						<div class="h-2 bg-stone-100 rounded-full overflow-hidden">
+							<div
+								class="h-full bg-missionnaire transition-[width] duration-200 ease-out"
+								style="width: {downloadProgress.total > 0
+									? Math.min(
+											100,
+											Math.round(
+												(downloadProgress.completed / downloadProgress.total) * 100
+											)
+										)
+									: 0}%"
+							></div>
+						</div>
+						{#if downloadProgress.currentTitle}
+							<p class="text-xs text-stone-500 truncate">
+								En cours : {downloadProgress.currentTitle}
+							</p>
+						{/if}
+						{#if downloadProgress.skipped > 0}
+							<p class="text-xs text-amber-700">
+								{downloadProgress.skipped} ignoré(s)
+							</p>
+						{/if}
+					</div>
+				{/if}
+
+				{#if downloadDoneSummary}
+					<div class="space-y-2">
+						<p class="text-sm text-emerald-700 font-semibold">
+							Téléchargement terminé — {downloadDoneSummary.completed}
+							{downloadDoneSummary.completed > 1 ? 'chants' : 'chant'} dans le zip.
+						</p>
+						{#if downloadDoneSummary.skipped > 0}
+							<p class="text-xs text-amber-700">
+								{downloadDoneSummary.skipped} chant(s) ignoré(s) (erreur réseau).
+							</p>
+						{/if}
+					</div>
+				{/if}
+
+				{#if downloadError}
+					<p
+						class="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2"
+					>
+						{downloadError}
+					</p>
+				{/if}
+			</div>
+
+			<div class="px-5 py-4 bg-stone-50/50 border-t border-stone-100 flex items-center justify-end gap-2">
+				{#if isDownloading}
+					<button
+						class="px-4 py-2 rounded-full border border-stone-300 bg-white text-xs font-bold uppercase tracking-wider text-stone-700 hover:border-red-300 hover:text-red-600 transition-colors"
+						on:click={cancelDownload}
+					>
+						Annuler
+					</button>
+				{:else if downloadDoneSummary || downloadError}
+					<button
+						class="px-4 py-2 rounded-full bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold uppercase tracking-wider transition-colors"
+						on:click={closeDownloadModal}
+					>
+						Fermer
+					</button>
+				{:else}
+					<button
+						class="px-4 py-2 rounded-full border border-stone-300 bg-white text-xs font-bold uppercase tracking-wider text-stone-700 hover:border-stone-400 transition-colors"
+						on:click={closeDownloadModal}
+					>
+						Annuler
+					</button>
+					<button
+						class="flex items-center gap-1.5 px-4 py-2 rounded-full bg-missionnaire hover:bg-missionnaire/90 text-white text-xs font-bold uppercase tracking-wider transition-colors"
+						on:click={startDownload}
+					>
+						<Icon src={IoCloudDownloadOutline} size="12" />
+						Démarrer
+					</button>
+				{/if}
+			</div>
+		</div>
+	</div>
+{/if}
 
 <style>
 	/* Hide scrollbar for Chrome, Safari and Opera */

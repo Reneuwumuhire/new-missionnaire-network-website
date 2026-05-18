@@ -252,7 +252,17 @@
 	afterNavigate(({ to }) => {
 		if (!browser || !to) return;
 		try {
-			const path = to.url.pathname + to.url.search;
+			// Drop the random-shuffle `seed` before persisting. Seeds are
+			// per-session state — keeping one in the saved last-path means
+			// every PWA launch resumes onto a stale unique-per-user URL that
+			// bypasses both the edge cache and the daily shared seed on the
+			// server. Listeners get the fast cache-friendly URL on resume;
+			// the "Rafraîchir" button still creates a fresh seed when they
+			// want one mid-session.
+			const cleaned = new URL(to.url.toString());
+			cleaned.searchParams.delete('seed');
+			const search = cleaned.searchParams.toString();
+			const path = cleaned.pathname + (search ? `?${search}` : '');
 			// Don't record bare "/" or error routes — those are fallbacks, not
 			// destinations the listener wanted to return to.
 			if (path === '/' || path.startsWith('/__')) return;
