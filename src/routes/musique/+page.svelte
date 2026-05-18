@@ -1116,7 +1116,7 @@
 	<!-- Songs List -->
 	<div class="bg-white/40 border border-stone-200/60 min-h-[500px] flex flex-col overflow-hidden">
 		<div
-			class="grid grid-cols-[30px_1fr_auto_auto] {desktopMusicGrid} gap-2 md:gap-3 lg:gap-4 px-3 md:px-3 lg:px-4 py-3 border-b border-stone-200/60 text-[10px] md:text-[11px] font-bold text-stone-400 uppercase tracking-widest bg-white/40"
+			class="grid grid-cols-[24px_1fr_auto_auto] {desktopMusicGrid} gap-1.5 md:gap-3 lg:gap-4 px-2 md:px-3 lg:px-4 py-3 border-b border-stone-200/60 text-[10px] md:text-[11px] font-bold text-stone-400 uppercase tracking-widest bg-white/40"
 		>
 			<div class="text-center">#</div>
 			<button
@@ -1247,7 +1247,7 @@
 			{#if isListLoading && !hasResolvedMusicList}
 				{#each Array.from({ length: 8 }) as _, i}
 					<div
-						class="grid grid-cols-[30px_1fr_auto_auto] {desktopMusicGrid} gap-2 md:gap-3 lg:gap-4 px-3 md:px-3 lg:px-4 py-3 md:py-4 items-center animate-pulse"
+						class="grid grid-cols-[24px_1fr_auto_auto] {desktopMusicGrid} gap-1.5 md:gap-3 lg:gap-4 px-2 md:px-3 lg:px-4 py-3 md:py-4 items-center animate-pulse"
 					>
 						<div class="mx-auto h-3 w-4 rounded-full bg-stone-200"></div>
 						<div class="space-y-2 min-w-0">
@@ -1291,7 +1291,7 @@
 					<!-- svelte-ignore a11y-click-events-have-key-events -->
 					<!-- svelte-ignore a11y-no-static-element-interactions -->
 					<div
-						class="grid grid-cols-[30px_1fr_auto_auto] {desktopMusicGrid} gap-2 md:gap-3 lg:gap-4 px-3 md:px-3 lg:px-4 py-3 md:py-4 items-center transition-all group cursor-pointer {isActive
+						class="grid grid-cols-[24px_1fr_auto_auto] {desktopMusicGrid} gap-1.5 md:gap-3 lg:gap-4 px-2 md:px-3 lg:px-4 py-3 md:py-4 items-center transition-all group cursor-pointer {isActive
 							? 'bg-missionnaire/5 border-l-4 border-l-missionnaire'
 							: 'hover:bg-white/60'}"
 						on:click={() => playSong(song)}

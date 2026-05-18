@@ -143,16 +143,21 @@ img {
    Safari zooms the viewport whenever a focused form field's computed
    font-size is < 16px. We can't disable that with `user-scalable=no`
    (bad for accessibility and ignored on modern iOS anyway), so the
-   accepted fix is to floor every interactive field at 16px. `max(...)`
-   means designed-larger fields keep their intended size. Applies on
-   desktop too (16px is a healthy input minimum) so the rule stays
-   simple and the visual sizing is consistent across breakpoints. */
-input,
-textarea,
-select,
-[contenteditable='true'],
-[contenteditable=''] {
-	font-size: max(16px, 1em);
+   accepted fix is to floor every interactive field at 16px on mobile.
+   `!important` is required because Tailwind text utilities like
+   `text-sm` (class selector, specificity 0,1,0) would otherwise win
+   over an element selector (0,0,1). Mobile-only so desktop designs
+   that intentionally use smaller field text stay untouched —
+   desktop browsers don't auto-zoom on focus anyway. `max(16px, 1em)`
+   keeps designed-larger fields at their intended size. */
+@media (max-width: 767px) {
+	input,
+	textarea,
+	select,
+	[contenteditable='true'],
+	[contenteditable=''] {
+		font-size: max(16px, 1em) !important;
+	}
 }
 
 /* ── Scroll-triggered reveal animation ── */
