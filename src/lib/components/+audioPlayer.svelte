@@ -2235,7 +2235,7 @@
 	<div
 		bind:this={playerShell}
 		class:lyrics-open={lyricsPanelOpen && hasLyrics}
-		class="audio-player-shell fixed z-[100] bottom-0 left-0 right-0 w-full bg-white/95 backdrop-blur-md border-t border-stone-200 shadow-[0_-4px_20px_rgb(0,0,0,0.06)] pt-2 md:pt-4"
+		class="audio-player-shell fixed z-[100] bottom-0 left-0 right-0 w-full bg-white/95 backdrop-blur-md border-t border-stone-200 shadow-[0_-4px_20px_rgb(0,0,0,0.06)] pt-2 lg:pt-4"
 		style={lyricsPanelOpen && hasLyrics
 			? getLyricsArtworkStyle($selectAudio as PlayableAudio)
 			: undefined}
@@ -2299,13 +2299,13 @@
 		</div>
 
 		<div
-			class="player-main px-5 md:px-10 max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:gap-8"
+			class="player-main px-5 lg:px-10 max-w-7xl mx-auto flex flex-col lg:flex-row lg:items-center lg:gap-8"
 		>
 			<!-- Info Row -->
-			<div class="flex items-center justify-between gap-1 mb-3 md:mb-0 md:gap-0 md:flex-1 md:min-w-0">
-				<div class="flex-1 min-w-0 min-h-[2.75rem] md:min-h-[3rem]">
+			<div class="flex items-center justify-between gap-1 mb-3 lg:mb-0 lg:gap-0 lg:flex-1 lg:min-w-0">
+				<div class="flex-1 min-w-0 min-h-[2.75rem] lg:min-h-[3rem]">
 					<div
-						class="text-[10px] uppercase tracking-[0.2em] font-bold text-missionnaire mb-0.5 opacity-80 flex items-center gap-2"
+						class="text-[10px] uppercase tracking-[0.2em] font-bold text-missionnaire mb-0.5 opacity-80 flex flex-wrap items-center gap-x-2 gap-y-0.5 whitespace-nowrap"
 					>
 						<span>Lecture en cours</span>
 						<!-- ── BEGIN: cache indicator badge (added) ──────────── -->
@@ -2362,7 +2362,7 @@
 						{/if}
 						<!-- ── END: cache indicator badge ────────────────────── -->
 					</div>
-					<div class="track-title-row pr-4 font-black text-sm md:text-lg text-stone-900">
+					<div class="track-title-row pr-4 font-black text-sm lg:text-lg text-stone-900">
 						<span class="track-title-probe" aria-hidden="true" bind:this={titleProbeEl}>
 							{getDisplayTitle($selectAudio)}
 						</span>
@@ -2386,7 +2386,7 @@
 							Chargement...
 						</div>
 					{/if}
-					<div class="flex items-center gap-2 mt-0.5 md:hidden">
+					<div class="flex items-center gap-2 mt-0.5 lg:hidden">
 						<span class="text-[10px] font-medium text-stone-400">{formatTime(currentTime)}</span>
 						<div class="w-1 h-1 rounded-full bg-stone-200"></div>
 						<span class="text-[10px] font-medium text-stone-400">{formatTime(duration)}</span>
@@ -2544,12 +2544,12 @@
 				</div>
 
 				<span
-					class="ml-1.5 mr-0.5 h-6 w-px shrink-0 self-center bg-stone-200 md:hidden"
+					class="ml-1.5 mr-0.5 h-6 w-px shrink-0 self-center bg-stone-200 lg:hidden"
 					aria-hidden="true"
 				></span>
 
 				<button
-					class="bg-gray-900 hover:bg-black text-white p-2 rounded-full transition-colors md:hidden"
+					class="bg-gray-900 hover:bg-black text-white p-2 rounded-full transition-colors lg:hidden"
 					on:click={closeAudioPlayer}
 					aria-label="Fermer le lecteur"
 				>
@@ -2559,13 +2559,13 @@
 
 			<!-- Controls & Time Row -->
 			<div
-				class="flex -translate-y-[5px] flex-col items-center md:translate-y-0 md:flex-row md:gap-6 w-full md:w-auto"
+				class="flex -translate-y-[5px] flex-col items-center lg:translate-y-0 lg:flex-row lg:gap-6 w-full lg:w-auto"
 			>
 				<!-- Main Playback Controls -->
-				<div class="flex items-center justify-center gap-4 md:gap-6">
+				<div class="flex items-center justify-center gap-4 lg:gap-6">
 					<!-- Shuffle on mobile side -->
 					{#if hasPlaylistNavigation}
-						<div class="flex md:hidden items-center gap-1">
+						<div class="flex lg:hidden items-center gap-1">
 							<button
 								on:click={toggleShuffle}
 								class="p-2.5 rounded-full transition-all flex items-center gap-2 {$isShuffle
@@ -2578,7 +2578,7 @@
 						</div>
 					{/if}
 
-					<div class="flex items-center gap-1 md:gap-3">
+					<div class="flex items-center gap-1 lg:gap-3">
 						{#if hasPlaylistNavigation}
 							<button
 								on:click={playPrevious}
@@ -2591,7 +2591,7 @@
 						{:else}
 							<button
 								on:click={() => seekBackward()}
-								class="flex h-11 w-11 items-center justify-center rounded-full bg-stone-50 text-stone-400 transition-colors hover:bg-stone-100 hover:text-missionnaire md:hidden"
+								class="flex h-11 w-11 items-center justify-center rounded-full bg-stone-50 text-stone-400 transition-colors hover:bg-stone-100 hover:text-missionnaire lg:hidden"
 								title="-5s"
 							>
 								<Icon src={BsSkipBackwardFill} size="18" />
@@ -2600,7 +2600,7 @@
 
 						<button
 							on:click={() => seekBackward()}
-							class="hidden md:block p-2 text-stone-300 hover:text-missionnaire transition-colors"
+							class="hidden lg:block p-2 text-stone-300 hover:text-missionnaire transition-colors"
 							title="-5s"
 						>
 							<Icon src={BsSkipBackwardFill} size="16" />
@@ -2608,7 +2608,7 @@
 
 						<button
 							on:click={togglePlay}
-							class="relative flex items-center justify-center w-14 h-14 md:w-12 md:h-12 bg-missionnaire text-white rounded-full hover:scale-105 transition-transform shadow-lg shadow-missionnaire/20"
+							class="relative flex items-center justify-center w-14 h-14 lg:w-12 lg:h-12 bg-missionnaire text-white rounded-full hover:scale-105 transition-transform shadow-lg shadow-missionnaire/20"
 						>
 							{#if $isPlaying}
 								<Icon src={BsPauseCircleFill} size="32" />
@@ -2619,7 +2619,7 @@
 
 						<button
 							on:click={() => seekForward()}
-							class="hidden md:block p-2 text-stone-300 hover:text-missionnaire transition-colors"
+							class="hidden lg:block p-2 text-stone-300 hover:text-missionnaire transition-colors"
 							title="+5s"
 						>
 							<Icon src={BsSkipForwardFill} size="16" />
@@ -2637,7 +2637,7 @@
 						{:else}
 							<button
 								on:click={() => seekForward()}
-								class="flex h-11 w-11 items-center justify-center rounded-full bg-stone-50 text-stone-400 transition-colors hover:bg-stone-100 hover:text-missionnaire md:hidden"
+								class="flex h-11 w-11 items-center justify-center rounded-full bg-stone-50 text-stone-400 transition-colors hover:bg-stone-100 hover:text-missionnaire lg:hidden"
 								title="+5s"
 							>
 								<Icon src={BsSkipForwardFill} size="18" />
@@ -2647,7 +2647,7 @@
 
 					<!-- Repeat on mobile side -->
 					{#if hasPlaylistNavigation}
-						<div class="flex md:hidden items-center gap-1">
+						<div class="flex lg:hidden items-center gap-1">
 							<button
 								on:click={toggleRepeatOne}
 								class="p-2.5 rounded-full transition-all flex items-center gap-2 {$repeatOne
@@ -2666,7 +2666,7 @@
 				</div>
 
 				<!-- Time & Extra Controls (Desktop) -->
-				<div class="hidden md:flex items-center gap-6">
+				<div class="hidden lg:flex items-center gap-6">
 					<div class="flex items-center gap-1.5 font-bold text-[13px] text-stone-500 min-w-[90px]">
 						<span class="text-stone-500">{formatTime(currentTime)}</span>
 						<span class="text-stone-300">/</span>
