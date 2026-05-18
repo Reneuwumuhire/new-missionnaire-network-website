@@ -157,9 +157,23 @@
 		// Start silent loop before pausing main so the AVAudioSession
 		// stays alive — covers the "user paused in-app then locked
 		// the device" path, where they later expect to resume from
-		// the lock screen.
+		// the lock screen. Silent loop is iOS-PWA only (gated inside
+		// startSilentLoop).
 		startSilentLoop();
 		audio.pause();
+		if ('mediaSession' in navigator) {
+			// Re-stamp metadata so iOS doesn't attribute the Now-Playing
+			// widget to the silent loop (which has no metadata) and unmount
+			// it — symptom: lock screen shows "playing" with no audio after
+			// an in-app pause. Force-bypass the fingerprint memo first.
+			lastMetadataKey = '';
+			applyMediaSessionMetadata();
+			// Defensive: starting the silent loop can cause the browser to
+			// auto-flip playbackState back to 'playing' (silent is actively
+			// playing media on the page). Re-stamp 'paused' explicitly so
+			// the lock screen and hardware media keys see the correct state.
+			navigator.mediaSession.playbackState = 'paused';
+		}
 	}
 
 	function stopAudioForSleepTimer() {
@@ -1741,8 +1755,34 @@
 	let silentAudio: HTMLAudioElement | null = null;
 	let silentLoopRunning = false;
 
+	/** Detect iOS standalone PWA mode (installed-to-home-screen Safari).
+	 *  The silent-loop AVAudioSession workaround only applies there. */
+	function isIOSStandalonePWA(): boolean {
+		if (!browser) return false;
+		const nav = navigator as Navigator & {
+			standalone?: boolean;
+			maxTouchPoints?: number;
+		};
+		const ua = nav.userAgent || '';
+		const isIOS =
+			/iPad|iPhone|iPod/.test(ua) ||
+			(ua.includes('Mac') && (nav.maxTouchPoints ?? 0) > 1);
+		if (!isIOS) return false;
+		return nav.standalone === true;
+	}
+
 	function startSilentLoop(): Promise<void> {
 		if (!browser || !silentAudio) return Promise.resolve();
+		// The silent loop is an iOS standalone-PWA workaround for the
+		// AVAudioSession releasing its output route on audio.pause(). On
+		// macOS / desktop / Android, a hidden audio element actively
+		// playing in the background causes Chrome's hardware-media-key-
+		// handling layer to treat the page as "playing" — auto-flipping
+		// playbackState back to 'playing' even after we set 'paused'. The
+		// next press of the play/pause media key then dispatches 'pause'
+		// (a no-op since main is paused) instead of 'play', and resume
+		// feels broken. Skip the loop on those platforms.
+		if (!isIOSStandalonePWA()) return Promise.resolve();
 		if (silentLoopRunning) return Promise.resolve();
 		// `playsinline` + `muted=false` (a fully-silent file is enough —
 		// muting would tell iOS to skip decoding and we'd be back at the
