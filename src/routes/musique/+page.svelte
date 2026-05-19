@@ -97,6 +97,27 @@
 	$: currentPage = (data as any).page;
 	$: limit = (data as any).limit;
 	$: isDeferredData = Boolean((data as any).deferred);
+	// Shared-song metadata (server-fetched when ?play=<id> is present).
+	// Drives the dynamic OG/Twitter tags so WhatsApp etc. show the song
+	// title in the link preview instead of the generic site title.
+	$: sharedSong = ((data as any).sharedSong || null) as MusicAudio | null;
+	$: sharedSongId = ((data as any).playId || '') as string;
+	$: sharedSongTitle = sharedSong?.title?.trim() || '';
+	$: sharedSongArtist = sharedSong?.artist?.trim() || '';
+	$: sharedSongCategory = sharedSong?.category?.trim() || '';
+	$: sharedSongPreviewTitle = sharedSongTitle
+		? `${sharedSongTitle} — Missionnaire Network`
+		: '';
+	$: sharedSongPreviewDescription = sharedSongTitle
+		? sharedSongArtist
+			? `Écoutez « ${sharedSongTitle} » par ${sharedSongArtist} sur Missionnaire Network.`
+			: sharedSongCategory
+				? `Écoutez « ${sharedSongTitle} » (${sharedSongCategory}) sur Missionnaire Network.`
+				: `Écoutez « ${sharedSongTitle} » sur Missionnaire Network.`
+		: '';
+	$: sharedSongCanonical = sharedSongId
+		? `https://missionnaire.net/musique?play=${encodeURIComponent(sharedSongId)}`
+		: '';
 	$: musicRequestKey = JSON.stringify({
 		category: currentCategory || 'All',
 		search: currentSearch || '',
@@ -837,22 +858,38 @@
 </script>
 
 <svelte:head>
-	<title>Cantiques et Louanges - Missionnaire Network | Musique du Message</title>
-	<meta
-		name="description"
-		content="Ecoutez les cantiques, louanges et adorations du Message de l'Heure sur Missionnaire Network. Une collection riche pour votre adoration quotidienne."
-	/>
-	<meta
-		property="og:title"
-		content="Cantiques et Louanges - Missionnaire Network | Musique du Message"
-	/>
-	<meta
-		property="og:description"
-		content="Ecoutez les cantiques, louanges et adorations du Message de l'Heure sur Missionnaire Network. Une collection riche pour votre adoration quotidienne."
-	/>
-	<!-- All filter/search/pagination variants (?search=, ?artist=, ?page=...)
-	     canonicalize to the bare list URL so Google indexes one version. -->
-	<link rel="canonical" href="https://missionnaire.net/musique" />
+	{#if sharedSongTitle}
+		<!-- Shared-link preview: when ?play=<id> resolves to a song,
+		     surface its title so WhatsApp/iMessage/Slack/etc. show the
+		     song name in the link preview instead of the list page's
+		     default title. -->
+		<title>{sharedSongPreviewTitle}</title>
+		<meta name="description" content={sharedSongPreviewDescription} />
+		<meta property="og:title" content={sharedSongPreviewTitle} />
+		<meta property="og:description" content={sharedSongPreviewDescription} />
+		<meta property="og:url" content={sharedSongCanonical} />
+		<meta property="og:type" content="music.song" />
+		<meta name="twitter:title" content={sharedSongPreviewTitle} />
+		<meta name="twitter:description" content={sharedSongPreviewDescription} />
+		<link rel="canonical" href={sharedSongCanonical} />
+	{:else}
+		<title>Cantiques et Louanges - Missionnaire Network | Musique du Message</title>
+		<meta
+			name="description"
+			content="Ecoutez les cantiques, louanges et adorations du Message de l'Heure sur Missionnaire Network. Une collection riche pour votre adoration quotidienne."
+		/>
+		<meta
+			property="og:title"
+			content="Cantiques et Louanges - Missionnaire Network | Musique du Message"
+		/>
+		<meta
+			property="og:description"
+			content="Ecoutez les cantiques, louanges et adorations du Message de l'Heure sur Missionnaire Network. Une collection riche pour votre adoration quotidienne."
+		/>
+		<!-- All filter/search/pagination variants (?search=, ?artist=, ?page=...)
+		     canonicalize to the bare list URL so Google indexes one version. -->
+		<link rel="canonical" href="https://missionnaire.net/musique" />
+	{/if}
 </svelte:head>
 
 <div class="w-full min-w-0 max-w-6xl mx-auto px-4 pt-0 pb-8 md:px-6">

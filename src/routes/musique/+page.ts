@@ -8,6 +8,7 @@ export const load = async ({ fetch, url }) => {
 	const artist = url.searchParams.get('artist') || '';
 	const pageNumber = url.searchParams.get('page') || '1';
 	const limit = url.searchParams.get('limit') || '100';
+	const playId = url.searchParams.get('play') || '';
 	const parsedPageNumber = Number.parseInt(pageNumber);
 	const parsedLimit = Number.parseInt(limit);
 
@@ -43,6 +44,8 @@ export const load = async ({ fetch, url }) => {
 			seed,
 			page: parsedPageNumber,
 			limit: parsedLimit,
+			playId,
+			sharedSong: null as MusicAudio | null,
 			deferred: true
 		};
 	}
@@ -82,6 +85,24 @@ export const load = async ({ fetch, url }) => {
 	const total = result.total as number;
 	const playlistAudio = musicAudio;
 
+	// Resolve the shared song server-side so its title flows into the
+	// initial HTML's OG meta tags — that's what WhatsApp/iMessage/etc.
+	// scrape for link previews. Without this, the preview falls back to
+	// the static site title and listeners can't tell which song was
+	// shared.
+	let sharedSong: MusicAudio | null = null;
+	if (playId) {
+		try {
+			const songRes = await fetch(`/api/music-audio/${encodeURIComponent(playId)}`);
+			if (songRes.ok) {
+				const payload = (await songRes.json()) as { data?: MusicAudio | null };
+				sharedSong = payload?.data ?? null;
+			}
+		} catch (err) {
+			console.error('[Load] shared song fetch failed:', err);
+		}
+	}
+
 	return {
 		musicAudio,
 		playlistAudio,
@@ -95,6 +116,8 @@ export const load = async ({ fetch, url }) => {
 		seed,
 		page: parsedPageNumber,
 		limit: parsedLimit,
+		playId,
+		sharedSong,
 		deferred: false
 	};
 };
