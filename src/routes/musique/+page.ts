@@ -1,5 +1,6 @@
 import { browser } from '$app/environment';
 import type { MusicAudio } from '$lib/models/music-audio';
+import { songSlug } from '$lib/utils/songSlug';
 
 export const load = async ({ fetch, url }) => {
 	const category = url.searchParams.get('category') || 'All';
@@ -151,10 +152,15 @@ function buildMusiqueMeta(opts: { sharedSong: MusicAudio | null; playId: string 
 	} else if (category) {
 		description = `Écoutez « ${title} » du recueil ${category} — ${tagline}`;
 	}
+	// Always canonicalise to the slug form even when the inbound URL
+	// used an ObjectId — keeps share previews crawler-deduplicated and
+	// gives WhatsApp a prettier URL to display.
+	const slug = songSlug(title);
+	const canonicalKey = slug || opts.playId;
 	return {
 		title: `${title} — Missionnaire Network`,
 		description,
-		url: `https://missionnaire.net/musique?play=${encodeURIComponent(opts.playId)}`,
+		url: `https://missionnaire.net/musique?play=${encodeURIComponent(canonicalKey)}`,
 		type: 'music.song'
 	};
 }

@@ -39,8 +39,9 @@
 		recentlyPlayed,
 		favorites
 	} from '$lib/stores/musicHistory';
+	import { songSlug } from '$lib/utils/songSlug';
 	// ── BEGIN: cached filter imports (added) ──────────────────────
-	import { onDestroy, onMount } from 'svelte';
+	import { onDestroy, onMount, tick } from 'svelte';
 	import { cachedUrls, refreshCachedUrls, isUrlCached } from '$lib/audioCache';
 	import IoCloudDoneOutline from 'svelte-icons-pack/io/IoCloudDoneOutline';
 	import {
@@ -419,12 +420,16 @@
 		if (initialPlay) pendingPlayId = initialPlay;
 	});
 
-	async function resolveSharedSong(id: string): Promise<MusicAudio | null> {
-		const existing =
-			findSongById(musicPlaylist, id) ?? findSongById(musicList, id);
-		if (existing) return existing;
+	async function resolveSharedSong(key: string): Promise<MusicAudio | null> {
+		// The play= param can be either an ObjectId or a title slug.
+		// Look in the already-loaded list first (covers the common case
+		// where the recipient lands on a list that already contains the
+		// song) before falling back to the API endpoint that handles
+		// both shapes.
+		const fromList = findSongByIdOrSlug(musicPlaylist, key) ?? findSongByIdOrSlug(musicList, key);
+		if (fromList) return fromList;
 		try {
-			const response = await fetch(`/api/music-audio/${encodeURIComponent(id)}`);
+			const response = await fetch(`/api/music-audio/${encodeURIComponent(key)}`);
 			if (!response.ok) return null;
 			const payload = (await response.json()) as { data?: MusicAudio | null };
 			return payload?.data ?? null;
@@ -434,10 +439,24 @@
 		}
 	}
 
+	function findSongByIdOrSlug(list: MusicAudio[], key: string): MusicAudio | undefined {
+		if (!key) return undefined;
+		return list.find((s) => s._id === key || s.s3_url === key || songSlug(s.title) === key);
+	}
+
 	async function playSharedSong(id: string) {
 		const song = await resolveSharedSong(id);
 		if (!song) return;
 		playSong(song);
+		// Click-navigation from WhatsApp / iMessage / etc. carries a
+		// transient user-activation gesture into the new page, which
+		// browsers accept as permission to autoplay. After playSong()
+		// has queued the track, we explicitly fire the player's play
+		// action one tick later so the <audio> element has had a chance
+		// to mount the new src before .play() runs. If the browser ends
+		// up rejecting the play promise (cold tab / pasted URL with no
+		// gesture), the player drops to its normal "press play" state.
+		void tick().then(() => dispatchAudioPlayerAction('play'));
 	}
 
 	$: if (pendingPlayId && hasResolvedMusicList && pendingPlayId !== handledPlayId) {

@@ -22,7 +22,6 @@
 	import BsHeart from 'svelte-icons-pack/bs/BsHeart';
 	import RiSystemShareForwardLine from 'svelte-icons-pack/ri/RiSystemShareForwardLine';
 	import BsLink45deg from 'svelte-icons-pack/bs/BsLink45deg';
-	import BsThreeDotsVertical from 'svelte-icons-pack/bs/BsThreeDotsVertical';
 	import BsChevronDown from 'svelte-icons-pack/bs/BsChevronDown';
 	import BsMusicNoteList from 'svelte-icons-pack/bs/BsMusicNoteList';
 	import SyncedLyrics from '$lib/components/SyncedLyrics.svelte';
@@ -49,6 +48,7 @@
 		type PlayableAudio
 	} from '../../utils/audioPlayback';
 	import { toggleFavorite, isFavorite, favorites } from '../stores/musicHistory';
+	import { songSlug } from '$lib/utils/songSlug';
 	// ── BEGIN: cache indicator imports (added) ────────────────────
 	import { isCached, prefetchAudio } from '$lib/audioCache';
 	import { isOnline } from '$lib/onlineStatus';
@@ -621,15 +621,18 @@
 	}
 
 	// Build a shareable deep-link to the currently playing track. The
-	// /musique page reads `?play=<id>` on mount and starts that song —
-	// see the "shared-link landing" block in the page's onMount. Only
-	// MusicAudio rows (have `_id`) get a stable shareable URL; for the
-	// other selectAudio kinds (Sermon, raw AudioAsset) we return ''.
+	// /musique page reads `?play=<id-or-slug>` on mount and starts that
+	// song. We prefer a human-readable title slug — it renders nicely
+	// in WhatsApp / iMessage / address bar — but fall back to the
+	// ObjectId when the title is missing. The resolver accepts both, so
+	// older ObjectId-style shares keep working.
 	function buildShareUrl(audio: any): string {
 		if (!audio || !browser) return '';
+		const slug = songSlug(typeof audio.title === 'string' ? audio.title : '');
 		const id = typeof audio._id === 'string' ? audio._id.trim() : '';
-		if (!id) return '';
-		return `${window.location.origin}/musique?play=${encodeURIComponent(id)}`;
+		const key = slug || id;
+		if (!key) return '';
+		return `${window.location.origin}/musique?play=${encodeURIComponent(key)}`;
 	}
 
 	let shareFeedback: 'copied' | 'error' | null = null;
