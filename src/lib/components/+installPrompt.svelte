@@ -20,8 +20,11 @@
 		if (window.matchMedia('(display-mode: standalone)').matches) return;
 		if ((navigator as unknown as { standalone: boolean }).standalone === true) return;
 		if (sessionStorage.getItem('pwa-install-dismissed')) return;
-
-		isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !('MSStream' in window);
+		// Hide on phone-sized viewports — the modal covers the screen on
+		// landing and feedback was that it interrupts more than it helps.
+		// Desktop still gets the prompt where it can sit unobtrusively in
+		// the corner.
+		if (window.matchMedia('(max-width: 767px)').matches) return;
 
 		if (isIOS) {
 			showPrompt = true;
