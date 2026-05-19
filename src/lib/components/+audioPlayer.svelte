@@ -40,6 +40,7 @@
 	import BsSkipStartFill from 'svelte-icons-pack/bs/BsSkipStartFill';
 	import BsSkipEndFill from 'svelte-icons-pack/bs/BsSkipEndFill';
 	import {
+		encodeUrlPath,
 		findAdjacentPlayableIndex,
 		getPlayableAudioUrl,
 		type PlayableAudio
@@ -802,7 +803,7 @@
 		// until refresh"). In that case we mirror safePlay('long') — call
 		// load() to rebuild the session, then play() once canplay fires.
 		if (audio) {
-			const encodedUrl = encodeURI(nextUrl);
+			const encodedUrl = encodeUrlPath(nextUrl);
 			audioSrc = nextUrl; // prevents the reactive $: block from re-loading
 			isAudioReady = false;
 			currentTime = 0;
@@ -1156,7 +1157,7 @@
 		attachAudioListeners(audio);
 		listenersBoundTo = audio;
 		if (audioSrc && !audio.src) {
-			audio.src = encodeURI(audioSrc);
+			audio.src = encodeUrlPath(audioSrc);
 			audio.load();
 		}
 	}
@@ -1223,7 +1224,7 @@
 	function updateAudioSource(url: string) {
 		if (!url) return;
 
-		const encodedUrl = encodeURI(url);
+		const encodedUrl = encodeUrlPath(url);
 		console.log('[AudioPlayer] Updating source to:', encodedUrl);
 		// New track — drop any "previous track was interrupted" carry-over.
 		currentTrackInterrupted = false;

@@ -4,6 +4,7 @@
 	import type { MusicAudio } from '$lib/models/music-audio';
 	import type { AudioAsset } from '$lib/models/media-assets';
 	import type { Sermon } from '$lib/models/sermon';
+	import { getPlayableAudioUrl } from '../../utils/audioPlayback';
 	import {
 		selectAudio,
 		basePlaylist,
@@ -765,8 +766,8 @@
 	}
 
 	async function downloadSong(song: MusicAudio) {
+		const url = getPlayableAudioUrl(song);
 		try {
-			const url = song.s3_url;
 			const response = await fetch(url);
 			if (!response.ok) throw new Error('Download failed');
 			const blob = await response.blob();
@@ -781,7 +782,7 @@
 		} catch (error) {
 			console.error('Download failed, trying direct link:', error);
 			// Fallback: Open in new tab which usually triggers download or opens the file
-			window.open(song.s3_url, '_blank');
+			window.open(url, '_blank');
 		}
 	}
 	function isSongActive(song: MusicAudio, current: MusicAudio | AudioAsset | Sermon | null) {
