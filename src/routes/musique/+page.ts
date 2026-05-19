@@ -31,6 +31,13 @@ export const load = async ({ fetch, url }) => {
 	// per-session seed to the URL explicitly.
 	const seed = url.searchParams.get('seed') || '';
 
+	const isFilteredVariantClient =
+		!!playId ||
+		!!search ||
+		!!alpha ||
+		!!artist ||
+		(category && category !== 'All') ||
+		parsedPageNumber > 1;
 	if (browser) {
 		return {
 			musicAudio: [] as MusicAudio[],
@@ -47,7 +54,11 @@ export const load = async ({ fetch, url }) => {
 			limit: parsedLimit,
 			playId,
 			sharedSong: null as MusicAudio | null,
-			meta: buildMusiqueMeta({ sharedSong: null, playId }),
+			meta: buildMusiqueMeta({
+				sharedSong: null,
+				playId,
+				noindex: isFilteredVariantClient
+			}),
 			deferred: true
 		};
 	}
@@ -105,7 +116,19 @@ export const load = async ({ fetch, url }) => {
 		}
 	}
 
-	const meta = buildMusiqueMeta({ sharedSong, playId });
+	// Filter/share variants of /musique noindex themselves so Google's
+	// "Crawled — currently not indexed" report stops listing every
+	// search/page/play permutation. The canonical /musique stays
+	// indexable; share previews (WhatsApp etc.) still work because OG
+	// scrapers ignore robots meta.
+	const isFilteredVariant =
+		!!playId ||
+		!!search ||
+		!!alpha ||
+		!!artist ||
+		(category && category !== 'All') ||
+		parsedPageNumber > 1;
+	const meta = buildMusiqueMeta({ sharedSong, playId, noindex: isFilteredVariant });
 
 	return {
 		musicAudio,
@@ -130,14 +153,19 @@ export const load = async ({ fetch, url }) => {
 // Shape consumed by +layout.svelte to render the single set of og:*
 // tags. Kept tiny: title/description/url/type. The image falls back to
 // the default OG image — per-song imagery is a future iteration.
-function buildMusiqueMeta(opts: { sharedSong: MusicAudio | null; playId: string }) {
+function buildMusiqueMeta(opts: {
+	sharedSong: MusicAudio | null;
+	playId: string;
+	noindex?: boolean;
+}) {
 	const title = opts.sharedSong?.title?.trim() ?? '';
 	if (!title) {
 		return {
 			title: 'Cantiques · Missionnaire Network',
 			description:
 				"Écoutez les cantiques et adorations du Message de l'Heure sur Missionnaire Network — une collection riche pour votre adoration quotidienne.",
-			url: 'https://missionnaire.net/musique'
+			url: 'https://missionnaire.net/musique',
+			noindex: opts.noindex === true
 		};
 	}
 	const artistName = opts.sharedSong?.artist?.trim() ?? '';
@@ -161,7 +189,8 @@ function buildMusiqueMeta(opts: { sharedSong: MusicAudio | null; playId: string 
 		title: composeShareTitle(title),
 		description,
 		url: `https://missionnaire.net/musique?play=${encodeURIComponent(canonicalKey)}`,
-		type: 'music.song'
+		type: 'music.song',
+		noindex: opts.noindex === true
 	};
 }
 

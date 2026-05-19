@@ -172,6 +172,13 @@
 	<title>{rec.title} - Missionnaire Network</title>
 	<meta name="description" content="Réécoutez le direct audio du {formatDate(rec.started_at)}." />
 	<link rel="canonical" href="https://missionnaire.net/live/rediffusions/{rec.id}" />
+	<!-- Search Console reported these archive pages under "Crawled —
+	     currently not indexed": Google was hitting every rediffusion
+	     ObjectId URL and deciding the audio-heavy page didn't earn a
+	     listing on its own. Mark them noindex so the crawl budget goes
+	     to the /live/rediffusions index (which IS indexable and links
+	     to each archive). `follow` keeps the link graph intact. -->
+	<meta name="robots" content="noindex, follow" />
 	{#if rec.thumbnail_url}
 		<meta property="og:image" content={rec.thumbnail_url} />
 	{/if}

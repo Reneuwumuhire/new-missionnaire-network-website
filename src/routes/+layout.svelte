@@ -122,12 +122,14 @@
 		url?: string;
 		image?: string;
 		type?: string;
+		noindex?: boolean;
 	};
 	$: ogTitle = pageMeta.title || DEFAULT_SEO_TITLE;
 	$: ogDescription = pageMeta.description || DEFAULT_SEO_DESCRIPTION;
 	$: ogUrl = pageMeta.url || canonicalUrl;
 	$: ogImage = pageMeta.image || `${SITE_URL}/og-image.jpg`;
 	$: ogType = pageMeta.type || 'website';
+	$: pageNoIndex = pageMeta.noindex === true;
 
 	const ytPages = ['/videos', '/musique', '/predications'];
 	$: needsYouTube = ytPages.some((p) => $page.url.pathname.startsWith(p));
@@ -305,6 +307,13 @@
 		<link rel="dns-prefetch" href="https://www.youtube.com" />
 	{/if}
 	<link rel="canonical" href={canonicalUrl} />
+	{#if pageNoIndex}
+		<!-- Pages publish `meta.noindex: true` in their load when they're
+		     filter/share variants whose canonical content already lives
+		     elsewhere (e.g. /musique?search=…). Saves crawl budget and
+		     clears the "Crawled — currently not indexed" report. -->
+		<meta name="robots" content="noindex, follow" />
+	{/if}
 	<meta name="description" content={ogDescription} />
 	<meta property="og:site_name" content="Missionnaire Network" />
 	<meta property="og:type" content={ogType} />
