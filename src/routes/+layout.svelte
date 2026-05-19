@@ -126,7 +126,7 @@
 	$: ogTitle = pageMeta.title || DEFAULT_SEO_TITLE;
 	$: ogDescription = pageMeta.description || DEFAULT_SEO_DESCRIPTION;
 	$: ogUrl = pageMeta.url || canonicalUrl;
-	$: ogImage = pageMeta.image || `${SITE_URL}/og-image.png`;
+	$: ogImage = pageMeta.image || `${SITE_URL}/og-image.jpg`;
 	$: ogType = pageMeta.type || 'website';
 
 	const ytPages = ['/videos', '/musique', '/predications'];

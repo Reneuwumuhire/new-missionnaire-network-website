@@ -141,11 +141,15 @@ function buildMusiqueMeta(opts: { sharedSong: MusicAudio | null; playId: string 
 	}
 	const artistName = opts.sharedSong?.artist?.trim() ?? '';
 	const category = opts.sharedSong?.category?.trim() ?? '';
-	let description = `Écoutez « ${title} » sur Missionnaire Network.`;
+	// Target the 90-155 char window that Facebook/WhatsApp like for OG
+	// descriptions — shorter ones get padded with the URL, longer ones
+	// get truncated mid-sentence.
+	const tagline = 'un cantique du Message à écouter et partager sur Missionnaire Network.';
+	let description = `Écoutez « ${title} » — ${tagline}`;
 	if (artistName) {
-		description = `Écoutez « ${title} » par ${artistName} sur Missionnaire Network.`;
+		description = `Écoutez « ${title} » par ${artistName} — ${tagline}`;
 	} else if (category) {
-		description = `Écoutez « ${title} » (${category}) sur Missionnaire Network.`;
+		description = `Écoutez « ${title} » du recueil ${category} — ${tagline}`;
 	}
 	return {
 		title: `${title} — Missionnaire Network`,
