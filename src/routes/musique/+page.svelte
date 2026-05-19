@@ -858,38 +858,17 @@
 </script>
 
 <svelte:head>
-	{#if sharedSongTitle}
-		<!-- Shared-link preview: when ?play=<id> resolves to a song,
-		     surface its title so WhatsApp/iMessage/Slack/etc. show the
-		     song name in the link preview instead of the list page's
-		     default title. -->
-		<title>{sharedSongPreviewTitle}</title>
-		<meta name="description" content={sharedSongPreviewDescription} />
-		<meta property="og:title" content={sharedSongPreviewTitle} />
-		<meta property="og:description" content={sharedSongPreviewDescription} />
-		<meta property="og:url" content={sharedSongCanonical} />
-		<meta property="og:type" content="music.song" />
-		<meta name="twitter:title" content={sharedSongPreviewTitle} />
-		<meta name="twitter:description" content={sharedSongPreviewDescription} />
-		<link rel="canonical" href={sharedSongCanonical} />
-	{:else}
-		<title>Cantiques et Louanges - Missionnaire Network | Musique du Message</title>
-		<meta
-			name="description"
-			content="Ecoutez les cantiques, louanges et adorations du Message de l'Heure sur Missionnaire Network. Une collection riche pour votre adoration quotidienne."
-		/>
-		<meta
-			property="og:title"
-			content="Cantiques et Louanges - Missionnaire Network | Musique du Message"
-		/>
-		<meta
-			property="og:description"
-			content="Ecoutez les cantiques, louanges et adorations du Message de l'Heure sur Missionnaire Network. Une collection riche pour votre adoration quotidienne."
-		/>
-		<!-- All filter/search/pagination variants (?search=, ?artist=, ?page=...)
-		     canonicalize to the bare list URL so Google indexes one version. -->
-		<link rel="canonical" href="https://missionnaire.net/musique" />
-	{/if}
+	<!-- og:* / twitter:* meta tags live in the root +layout.svelte and
+	     read from this page's load `meta` field (see +page.ts's
+	     buildMusiqueMeta). Keeping every OG tag in one place avoids the
+	     duplicate-og:title issue where layout + page each emitted their
+	     own and crawlers picked inconsistently. Only the <title> needs
+	     to live here since the layout's <title> applies to every route. -->
+	<title>
+		{sharedSongTitle
+			? `${sharedSongTitle} — Missionnaire Network`
+			: 'Cantiques et Louanges - Missionnaire Network | Musique du Message'}
+	</title>
 </svelte:head>
 
 <div class="w-full min-w-0 max-w-6xl mx-auto px-4 pt-0 pb-8 md:px-6">

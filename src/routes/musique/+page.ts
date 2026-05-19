@@ -46,6 +46,7 @@ export const load = async ({ fetch, url }) => {
 			limit: parsedLimit,
 			playId,
 			sharedSong: null as MusicAudio | null,
+			meta: buildMusiqueMeta({ sharedSong: null, playId }),
 			deferred: true
 		};
 	}
@@ -103,6 +104,8 @@ export const load = async ({ fetch, url }) => {
 		}
 	}
 
+	const meta = buildMusiqueMeta({ sharedSong, playId });
+
 	return {
 		musicAudio,
 		playlistAudio,
@@ -118,6 +121,35 @@ export const load = async ({ fetch, url }) => {
 		limit: parsedLimit,
 		playId,
 		sharedSong,
+		meta,
 		deferred: false
 	};
 };
+
+// Shape consumed by +layout.svelte to render the single set of og:*
+// tags. Kept tiny: title/description/url/type. The image falls back to
+// the default OG image — per-song imagery is a future iteration.
+function buildMusiqueMeta(opts: { sharedSong: MusicAudio | null; playId: string }) {
+	const title = opts.sharedSong?.title?.trim() ?? '';
+	if (!title) {
+		return {
+			title: 'Cantiques et Louanges - Missionnaire Network | Musique du Message',
+			description:
+				"Ecoutez les cantiques, louanges et adorations du Message de l'Heure sur Missionnaire Network. Une collection riche pour votre adoration quotidienne.",
+			url: 'https://missionnaire.net/musique'
+		};
+	}
+	const artistName = opts.sharedSong?.artist?.trim() ?? '';
+	const category = opts.sharedSong?.category?.trim() ?? '';
+	const description = artistName
+		? `Écoutez « ${title} » par ${artistName} sur Missionnaire Network.`
+		: category
+			? `Écoutez « ${title} » (${category}) sur Missionnaire Network.`
+			: `Écoutez « ${title} » sur Missionnaire Network.`;
+	return {
+		title: `${title} — Missionnaire Network`,
+		description,
+		url: `https://missionnaire.net/musique?play=${encodeURIComponent(opts.playId)}`,
+		type: 'music.song'
+	};
+}

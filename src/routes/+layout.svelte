@@ -111,6 +111,23 @@
 	});
 
 	$: canonicalUrl = `${SITE_URL}${$page.url.pathname}`;
+	// Pages can publish per-route OG overrides through their `load`'s
+	// returned `meta` object. We surface a single set of og:* meta tags
+	// in <svelte:head> using these values so crawlers like WhatsApp
+	// never see duplicated og:title / og:description tags from layout +
+	// page (which they handle inconsistently).
+	$: pageMeta = (($page.data as any)?.meta ?? {}) as {
+		title?: string;
+		description?: string;
+		url?: string;
+		image?: string;
+		type?: string;
+	};
+	$: ogTitle = pageMeta.title || DEFAULT_SEO_TITLE;
+	$: ogDescription = pageMeta.description || DEFAULT_SEO_DESCRIPTION;
+	$: ogUrl = pageMeta.url || canonicalUrl;
+	$: ogImage = pageMeta.image || `${SITE_URL}/og-image.png`;
+	$: ogType = pageMeta.type || 'website';
 
 	const ytPages = ['/videos', '/musique', '/predications'];
 	$: needsYouTube = ytPages.some((p) => $page.url.pathname.startsWith(p));
@@ -288,20 +305,20 @@
 		<link rel="dns-prefetch" href="https://www.youtube.com" />
 	{/if}
 	<link rel="canonical" href={canonicalUrl} />
-	<meta name="description" content={DEFAULT_SEO_DESCRIPTION} />
+	<meta name="description" content={ogDescription} />
 	<meta property="og:site_name" content="Missionnaire Network" />
-	<meta property="og:type" content="website" />
-	<meta property="og:title" content={DEFAULT_SEO_TITLE} />
-	<meta property="og:description" content={DEFAULT_SEO_DESCRIPTION} />
-	<meta property="og:url" content={canonicalUrl} />
+	<meta property="og:type" content={ogType} />
+	<meta property="og:title" content={ogTitle} />
+	<meta property="og:description" content={ogDescription} />
+	<meta property="og:url" content={ogUrl} />
 	<meta property="og:logo" content="https://missionnaire.net/favicon.png" />
-	<meta property="og:image" content="https://missionnaire.net/og-image.png" />
+	<meta property="og:image" content={ogImage} />
 	<meta property="og:image:width" content="1200" />
 	<meta property="og:image:height" content="630" />
 	<meta name="twitter:card" content="summary_large_image" />
-	<meta name="twitter:title" content={DEFAULT_SEO_TITLE} />
-	<meta name="twitter:description" content={DEFAULT_SEO_DESCRIPTION} />
-	<meta name="twitter:image" content="https://missionnaire.net/og-image.png" />
+	<meta name="twitter:title" content={ogTitle} />
+	<meta name="twitter:description" content={ogDescription} />
+	<meta name="twitter:image" content={ogImage} />
 </svelte:head>
 
 {#if $navigating}
