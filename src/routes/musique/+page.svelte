@@ -381,10 +381,48 @@
 		recueilsCanRight = scrollLeft + clientWidth < scrollWidth - 4;
 	}
 
+	// Shared-link landing: when a recipient opens /musique?play=<id>,
+	// this stashes the id on mount and the resolver below either picks
+	// it out of the loaded list or fetches the single song by id once
+	// the list has settled, then starts playback. We only handle the
+	// param once per id-change so the user can still pause/skip without
+	// the page yanking the track back. The `play` query stays in the
+	// URL so the link remains re-shareable.
+	let pendingPlayId: string | null = null;
+	let handledPlayId: string | null = null;
+
 	onMount(() => {
 		void refreshCachedUrls();
 		updateRecueilsScrollState();
+		const initialPlay = $page.url.searchParams.get('play');
+		if (initialPlay) pendingPlayId = initialPlay;
 	});
+
+	async function resolveSharedSong(id: string): Promise<MusicAudio | null> {
+		const existing =
+			findSongById(musicPlaylist, id) ?? findSongById(musicList, id);
+		if (existing) return existing;
+		try {
+			const response = await fetch(`/api/music-audio/${encodeURIComponent(id)}`);
+			if (!response.ok) return null;
+			const payload = (await response.json()) as { data?: MusicAudio | null };
+			return payload?.data ?? null;
+		} catch (error) {
+			console.warn('[Musique] Failed to resolve shared song:', error);
+			return null;
+		}
+	}
+
+	async function playSharedSong(id: string) {
+		const song = await resolveSharedSong(id);
+		if (!song) return;
+		playSong(song);
+	}
+
+	$: if (pendingPlayId && hasResolvedMusicList && pendingPlayId !== handledPlayId) {
+		handledPlayId = pendingPlayId;
+		void playSharedSong(pendingPlayId);
+	}
 
 	onDestroy(() => {
 		if (cacheRefreshTimer) clearTimeout(cacheRefreshTimer);

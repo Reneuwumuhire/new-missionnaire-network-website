@@ -20,7 +20,10 @@
 	import BsShuffle from 'svelte-icons-pack/bs/BsShuffle';
 	import BsHeartFill from 'svelte-icons-pack/bs/BsHeartFill';
 	import BsHeart from 'svelte-icons-pack/bs/BsHeart';
+	import RiSystemShareForwardLine from 'svelte-icons-pack/ri/RiSystemShareForwardLine';
+	import BsLink45deg from 'svelte-icons-pack/bs/BsLink45deg';
 	import BsThreeDotsVertical from 'svelte-icons-pack/bs/BsThreeDotsVertical';
+	import BsChevronDown from 'svelte-icons-pack/bs/BsChevronDown';
 	import BsMusicNoteList from 'svelte-icons-pack/bs/BsMusicNoteList';
 	import SyncedLyrics from '$lib/components/SyncedLyrics.svelte';
 	import {
@@ -617,8 +620,92 @@
 		});
 	}
 
+	// Build a shareable deep-link to the currently playing track. The
+	// /musique page reads `?play=<id>` on mount and starts that song —
+	// see the "shared-link landing" block in the page's onMount. Only
+	// MusicAudio rows (have `_id`) get a stable shareable URL; for the
+	// other selectAudio kinds (Sermon, raw AudioAsset) we return ''.
+	function buildShareUrl(audio: any): string {
+		if (!audio || !browser) return '';
+		const id = typeof audio._id === 'string' ? audio._id.trim() : '';
+		if (!id) return '';
+		return `${window.location.origin}/musique?play=${encodeURIComponent(id)}`;
+	}
+
+	let shareFeedback: 'copied' | 'error' | null = null;
+	let shareFeedbackTimeout: ReturnType<typeof setTimeout> | null = null;
+	let isShareMenuOpen = false;
+	let hasNativeShare = false;
+	$: if (browser) {
+		hasNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+	}
+
+	function flashShareFeedback(state: 'copied' | 'error') {
+		shareFeedback = state;
+		if (shareFeedbackTimeout) clearTimeout(shareFeedbackTimeout);
+		shareFeedbackTimeout = setTimeout(() => {
+			shareFeedback = null;
+			shareFeedbackTimeout = null;
+		}, 1800);
+	}
+
+	function toggleShareMenu() {
+		if (!browser || !$selectAudio) return;
+		isShareMenuOpen = !isShareMenuOpen;
+	}
+
+	function closeShareMenu() {
+		isShareMenuOpen = false;
+	}
+
+	async function copyShareLink() {
+		closeShareMenu();
+		if (!browser || !$selectAudio) return;
+		const shareUrl = buildShareUrl($selectAudio as any);
+		if (!shareUrl) return;
+		try {
+			await navigator.clipboard.writeText(shareUrl);
+			flashShareFeedback('copied');
+		} catch {
+			flashShareFeedback('error');
+		}
+	}
+
+	async function nativeShare() {
+		closeShareMenu();
+		if (!browser || !$selectAudio) return;
+		const audio = $selectAudio as any;
+		const shareUrl = buildShareUrl(audio);
+		if (!shareUrl) return;
+
+		const title = getDisplayTitle(audio);
+		const shareData: ShareData = {
+			title,
+			text: `${title} — Missionnaire Network`,
+			url: shareUrl
+		};
+
+		try {
+			if (navigator.share && (!navigator.canShare || navigator.canShare(shareData))) {
+				await navigator.share(shareData);
+				return;
+			}
+		} catch (err) {
+			if ((err as DOMException)?.name === 'AbortError') return;
+		}
+
+		// Web Share unsupported or threw — fall back to clipboard.
+		try {
+			await navigator.clipboard.writeText(shareUrl);
+			flashShareFeedback('copied');
+		} catch {
+			flashShareFeedback('error');
+		}
+	}
+
 	$: currentFavId = getAudioFavId($selectAudio);
 	$: isCurrentFavorite = isFavorite(currentFavId, $favorites);
+	$: canShareCurrent = !!($selectAudio && ($selectAudio as any)?._id);
 	$: hasLyrics = lyricsLines.length > 0;
 
 	$: if (browser) {
@@ -2093,6 +2180,10 @@
 
 	// Keyboard shortcuts
 	function handleKeydown(event: KeyboardEvent) {
+		if (event.key === 'Escape' && isShareMenuOpen) {
+			isShareMenuOpen = false;
+			return;
+		}
 		if (event.key === 'Escape' && isSleepTimerOpen) {
 			isSleepTimerOpen = false;
 			return;
@@ -2138,6 +2229,7 @@
 		syncPlayerInset();
 		const closeSleepTimerMenu = () => {
 			isSleepTimerOpen = false;
+			isShareMenuOpen = false;
 		};
 
 		const savedSleepTimer = Number(localStorage.getItem(SLEEP_TIMER_STORAGE_KEY));
@@ -2312,6 +2404,18 @@
 			</div>
 		{/if}
 
+		<!-- Desktop close: flush to the viewport's far-right corner.
+		     Hidden on mobile where the close button lives in the title
+		     row alongside the other compact-mode actions. -->
+		<button
+			class="absolute right-3 top-3 z-[110] hidden h-9 w-9 items-center justify-center rounded-full bg-gray-900 text-white shadow-lg transition-colors hover:bg-black lg:flex"
+			on:click={closeAudioPlayer}
+			aria-label="Fermer le lecteur"
+			title="Fermer"
+		>
+			<Icon src={BsX} size="20" />
+		</button>
+
 		<!-- Top Progress Bar -->
 		<!-- svelte-ignore a11y-click-events-have-key-events -->
 		<!-- svelte-ignore a11y-no-static-element-interactions -->
@@ -2434,8 +2538,13 @@
 					</div>
 				</div>
 
+				<!-- Action cluster: favorite anchors next to the title, then the
+				     two pill actions (Paroles, Share) read as one matched set,
+				     then the options ⋮ tails out. Order chosen to match the
+				     audio-app convention: emotional toggle → content → social
+				     → utility. -->
 				<button
-					class="p-2 rounded-full transition-colors flex-shrink-0 {isCurrentFavorite
+					class="player-action-icon flex-shrink-0 {isCurrentFavorite
 						? 'text-red-500 hover:text-red-600'
 						: 'text-stone-300 hover:text-red-400'}"
 					on:click={handleToggleFavorite}
@@ -2448,9 +2557,9 @@
 				{#if hasLyrics}
 					<button
 						type="button"
-						class="inline-flex flex-shrink-0 items-center gap-1.5 rounded-full px-2.5 py-2 text-xs font-bold transition-colors {lyricsPanelOpen
-							? 'bg-missionnaire text-white'
-							: 'bg-stone-50 text-stone-500 hover:bg-stone-100 hover:text-missionnaire'}"
+						class="player-action-pill flex-shrink-0 {lyricsPanelOpen
+							? 'is-active'
+							: ''}"
 						on:click={toggleLyricsPanel}
 						aria-expanded={lyricsPanelOpen}
 						aria-label={lyricsPanelOpen ? 'Fermer les paroles' : 'Ouvrir les paroles'}
@@ -2461,25 +2570,105 @@
 					</button>
 				{/if}
 
+				{#if canShareCurrent}
+					<div class="relative flex-shrink-0">
+						<button
+							type="button"
+							class="player-action-pill {isShareMenuOpen ? 'is-active' : ''}"
+							on:click|stopPropagation={toggleShareMenu}
+							aria-haspopup="menu"
+							aria-expanded={isShareMenuOpen}
+							aria-label="Partager ce chant"
+							title="Partager ce chant"
+						>
+							<Icon src={RiSystemShareForwardLine} size="17" />
+							<span class="hidden sm:inline">Share</span>
+						</button>
+						{#if isShareMenuOpen}
+							<!-- svelte-ignore a11y-click-events-have-key-events -->
+							<!-- svelte-ignore a11y-no-static-element-interactions -->
+							<div
+								class="absolute right-0 bottom-full z-[130] mb-2 w-52 overflow-hidden rounded-lg border border-stone-200 bg-white shadow-2xl"
+								role="menu"
+								tabindex="-1"
+								on:click|stopPropagation={() => undefined}
+							>
+								{#if hasNativeShare}
+									<button
+										type="button"
+										role="menuitem"
+										class="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-stone-700 transition-colors hover:bg-stone-50 hover:text-missionnaire"
+										on:click={nativeShare}
+									>
+										<Icon src={RiSystemShareForwardLine} size="17" />
+										<span>Share…</span>
+									</button>
+								{/if}
+								<button
+									type="button"
+									role="menuitem"
+									class="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-stone-700 transition-colors hover:bg-stone-50 hover:text-missionnaire"
+									on:click={copyShareLink}
+								>
+									<Icon src={BsLink45deg} size="18" />
+									<span>Copy link</span>
+								</button>
+							</div>
+						{/if}
+						{#if shareFeedback}
+							<span
+								class="absolute right-0 bottom-full mb-2 whitespace-nowrap rounded-md bg-stone-900 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white shadow-lg pointer-events-none"
+								role="status"
+							>
+								{shareFeedback === 'copied' ? 'Lien copié' : 'Échec — copiez l’URL'}
+							</span>
+						{/if}
+					</div>
+				{/if}
+
 				<div class="relative flex-shrink-0">
 					<button
 						type="button"
-						class="relative p-2 rounded-full transition-colors {sleepTimerEndsAt !== null
-							? 'bg-stone-900 text-white hover:bg-black'
-							: 'text-stone-300 hover:bg-stone-100 hover:text-missionnaire'}"
+						class="player-action-pill player-action-pill--options {isSleepTimerOpen
+							? 'is-active'
+							: ''} {sleepTimerEndsAt !== null && !isSleepTimerOpen ? 'is-armed' : ''}"
 						on:click|stopPropagation={() => (isSleepTimerOpen = !isSleepTimerOpen)}
 						aria-label={sleepTimerEndsAt !== null
 							? `Options du lecteur, minuterie active, arrêt dans ${sleepTimerRemainingLabel}`
 							: 'Options du lecteur'}
+						aria-haspopup="menu"
 						aria-expanded={isSleepTimerOpen}
 						title={sleepTimerEndsAt !== null
 							? `Options · arrêt dans ${sleepTimerRemainingLabel}`
 							: 'Options'}
 					>
-						<Icon src={BsThreeDotsVertical} size="18" />
+						<!-- Lucide "settings-2" inlined (svelte-icons-pack has no `lu/`
+						     pack and we don't want a whole icon package for one glyph) -->
+						<svg
+							width="16"
+							height="16"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<path d="M20 7h-9" />
+							<path d="M14 17H5" />
+							<circle cx="17" cy="17" r="3" />
+							<circle cx="7" cy="7" r="3" />
+						</svg>
+						<span class="hidden sm:inline">Plus</span>
+						<Icon
+							src={BsChevronDown}
+							size="11"
+							className="player-action-pill__caret {isSleepTimerOpen ? 'is-flipped' : ''}"
+						/>
 						{#if sleepTimerEndsAt !== null}
 							<span
-								class="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-white"
+								class="player-action-pill__dot"
 								aria-hidden="true"
 							></span>
 						{/if}
@@ -2754,12 +2943,12 @@
 							</button>
 						</div>
 
-						<button
-							class="ml-4 bg-gray-900 text-white p-2 rounded-full hover:bg-black transition-colors"
-							on:click={closeAudioPlayer}
-						>
-							<Icon src={BsX} size="20" />
-						</button>
+						<!-- Desktop close button lives in the absolutely-positioned
+						     corner anchor below (just inside audio-player-shell) so
+						     it sits flush against the viewport edge rather than
+						     inside the centered max-w-7xl content row. -->
+						<!-- /removed-from-here -->
+
 					</div>
 				</div>
 			</div>
@@ -2768,6 +2957,109 @@
 {/if}
 
 <style>
+	/* ── Action cluster (favorite, Paroles, Share, ⋮) ─────────────────
+	   One small button family with two shapes: round icon and rounded
+	   pill. Both share the same hover language so they read as a set
+	   rather than four independent controls. Active state (Paroles open
+	   / Share menu open) flips to the brand colour. */
+	.player-action-icon {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0.5rem;
+		border-radius: 9999px;
+		transition: color 150ms ease, background-color 150ms ease, transform 150ms ease;
+	}
+	.player-action-icon:hover {
+		background-color: rgb(245 245 244 / 0.7);
+	}
+	.player-action-icon:active {
+		transform: scale(0.94);
+	}
+
+	.player-action-pill {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
+		padding: 0.5rem 0.625rem;
+		border-radius: 9999px;
+		font-size: 0.75rem;
+		font-weight: 700;
+		line-height: 1;
+		background-color: rgb(245 245 244 / 0.85);
+		color: rgb(120 113 108);
+		transition: background-color 160ms ease, color 160ms ease, transform 160ms ease,
+			box-shadow 160ms ease;
+	}
+	@media (min-width: 640px) {
+		.player-action-pill {
+			padding: 0.5rem 0.75rem;
+		}
+	}
+	.player-action-pill:hover {
+		background-color: rgb(231 229 228);
+		color: rgb(255 136 12);
+	}
+	.player-action-pill:active {
+		transform: scale(0.96);
+	}
+	.player-action-pill.is-active {
+		background-color: rgb(255 136 12);
+		color: white;
+		box-shadow: 0 6px 18px -8px rgb(255 136 12 / 0.55);
+	}
+	.player-action-pill.is-active:hover {
+		background-color: rgb(234 116 0);
+		color: white;
+	}
+
+	/* Options pill: same family as Paroles/Share, with a chevron that
+	   telegraphs "menu inside" — the bare three-dots variant left users
+	   unsure whether it was clickable. The caret rotates when the menu
+	   opens for an extra confirmation cue. */
+	.player-action-pill--options {
+		position: relative;
+		padding-right: 0.5rem;
+	}
+	@media (min-width: 640px) {
+		.player-action-pill--options {
+			padding-right: 0.625rem;
+		}
+	}
+	:global(.player-action-pill__caret) {
+		margin-left: 0.0625rem;
+		opacity: 0.7;
+		transition: transform 180ms ease, opacity 180ms ease;
+	}
+	.player-action-pill--options:hover :global(.player-action-pill__caret) {
+		opacity: 1;
+	}
+	:global(.player-action-pill__caret.is-flipped) {
+		transform: rotate(180deg);
+		opacity: 1;
+	}
+	.player-action-pill--options.is-armed {
+		background-color: rgb(28 25 23);
+		color: white;
+	}
+	.player-action-pill--options.is-armed:hover {
+		background-color: rgb(0 0 0);
+		color: white;
+	}
+	.player-action-pill__dot {
+		position: absolute;
+		top: -2px;
+		right: -2px;
+		height: 10px;
+		width: 10px;
+		border-radius: 9999px;
+		background-color: rgb(52 211 153);
+		box-shadow: 0 0 0 2px white, 0 0 0 3px rgb(255 255 255 / 0.6);
+	}
+	.player-action-pill--options.is-armed .player-action-pill__dot {
+		box-shadow: 0 0 0 2px rgb(28 25 23);
+	}
+
 	/* ── Scrolling track title ─────────────────────────────────────────
 	   The title sits inside a fixed-width viewport. A hidden probe at the
 	   same font sizing reports the natural text width; a Svelte action
