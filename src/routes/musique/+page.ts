@@ -134,9 +134,9 @@ function buildMusiqueMeta(opts: { sharedSong: MusicAudio | null; playId: string 
 	const title = opts.sharedSong?.title?.trim() ?? '';
 	if (!title) {
 		return {
-			title: 'Cantiques et Louanges - Missionnaire Network | Musique du Message',
+			title: 'Cantiques · Missionnaire Network',
 			description:
-				"Ecoutez les cantiques, louanges et adorations du Message de l'Heure sur Missionnaire Network. Une collection riche pour votre adoration quotidienne.",
+				"Écoutez les cantiques et adorations du Message de l'Heure sur Missionnaire Network — une collection riche pour votre adoration quotidienne.",
 			url: 'https://missionnaire.net/musique'
 		};
 	}
@@ -158,9 +158,23 @@ function buildMusiqueMeta(opts: { sharedSong: MusicAudio | null; playId: string 
 	const slug = songSlug(title);
 	const canonicalKey = slug || opts.playId;
 	return {
-		title: `${title} — Missionnaire Network`,
+		title: composeShareTitle(title),
 		description,
 		url: `https://missionnaire.net/musique?play=${encodeURIComponent(canonicalKey)}`,
 		type: 'music.song'
 	};
+}
+
+// Keep the OG title under the 60-char limit social previews truncate
+// past. We try the branded form first, drop the brand suffix when the
+// song name alone is already heavy, and only ellipsise the song name as
+// a last resort for unusually long titles.
+const OG_TITLE_LIMIT = 60;
+const BRAND_SUFFIX = ' · Missionnaire Network';
+
+function composeShareTitle(title: string): string {
+	const branded = `${title}${BRAND_SUFFIX}`;
+	if (branded.length <= OG_TITLE_LIMIT) return branded;
+	if (title.length <= OG_TITLE_LIMIT) return title;
+	return `${title.slice(0, OG_TITLE_LIMIT - 1).trimEnd()}…`;
 }
