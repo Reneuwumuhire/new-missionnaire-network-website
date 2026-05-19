@@ -857,19 +857,9 @@
 	}
 </script>
 
-<svelte:head>
-	<!-- og:* / twitter:* meta tags live in the root +layout.svelte and
-	     read from this page's load `meta` field (see +page.ts's
-	     buildMusiqueMeta). Keeping every OG tag in one place avoids the
-	     duplicate-og:title issue where layout + page each emitted their
-	     own and crawlers picked inconsistently. Only the <title> needs
-	     to live here since the layout's <title> applies to every route. -->
-	<title>
-		{sharedSongTitle
-			? `${sharedSongTitle} — Missionnaire Network`
-			: 'Cantiques et Louanges - Missionnaire Network | Musique du Message'}
-	</title>
-</svelte:head>
+<!-- All <title> / og:* / twitter:* meta lives in src/routes/+layout.svelte
+     and reads from this page's load `meta` field (see +page.ts's
+     buildMusiqueMeta) so there's exactly one tag per property. -->
 
 <div class="w-full min-w-0 max-w-6xl mx-auto px-4 pt-0 pb-8 md:px-6">
 	<div class="mb-8 md:mb-12">

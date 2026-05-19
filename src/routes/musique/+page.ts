@@ -141,11 +141,12 @@ function buildMusiqueMeta(opts: { sharedSong: MusicAudio | null; playId: string 
 	}
 	const artistName = opts.sharedSong?.artist?.trim() ?? '';
 	const category = opts.sharedSong?.category?.trim() ?? '';
-	const description = artistName
-		? `Écoutez « ${title} » par ${artistName} sur Missionnaire Network.`
-		: category
-			? `Écoutez « ${title} » (${category}) sur Missionnaire Network.`
-			: `Écoutez « ${title} » sur Missionnaire Network.`;
+	let description = `Écoutez « ${title} » sur Missionnaire Network.`;
+	if (artistName) {
+		description = `Écoutez « ${title} » par ${artistName} sur Missionnaire Network.`;
+	} else if (category) {
+		description = `Écoutez « ${title} » (${category}) sur Missionnaire Network.`;
+	}
 	return {
 		title: `${title} — Missionnaire Network`,
 		description,

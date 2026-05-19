@@ -293,7 +293,7 @@
 </script>
 
 <svelte:head>
-	<title>Missionnaire Network</title>
+	<title>{ogTitle}</title>
 	<!-- Font preconnect (global) -->
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
