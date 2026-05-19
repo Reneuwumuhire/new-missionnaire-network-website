@@ -2588,7 +2588,7 @@
 							<!-- svelte-ignore a11y-click-events-have-key-events -->
 							<!-- svelte-ignore a11y-no-static-element-interactions -->
 							<div
-								class="absolute right-0 bottom-full z-[130] mb-2 w-52 overflow-hidden rounded-lg border border-stone-200 bg-white shadow-2xl"
+								class="share-menu z-[130] w-52 overflow-hidden rounded-lg border border-stone-200 bg-white shadow-2xl"
 								role="menu"
 								tabindex="-1"
 								on:click|stopPropagation={() => undefined}
@@ -2617,7 +2617,7 @@
 						{/if}
 						{#if shareFeedback}
 							<span
-								class="absolute right-0 bottom-full mb-2 whitespace-nowrap rounded-md bg-stone-900 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white shadow-lg pointer-events-none"
+								class="absolute right-0 bottom-full z-[140] mb-2 whitespace-nowrap rounded-md bg-stone-900 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white shadow-lg pointer-events-none"
 								role="status"
 							>
 								{shareFeedback === 'copied' ? 'Lien copié' : 'Échec — copiez l’URL'}
@@ -3058,6 +3058,34 @@
 	}
 	.player-action-pill--options.is-armed .player-action-pill__dot {
 		box-shadow: 0 0 0 2px rgb(28 25 23);
+	}
+
+	/* Share dropdown placement — anchored directly above the share
+	   button on every screen. We tried fixed-positioning the menu to
+	   the player's bottom inset on mobile (to dodge an earlier clipping
+	   issue), but that anchored against the *whole* player height and
+	   left a 200-ish-px gap between the button and the menu. Absolute
+	   positioning sits the menu right on top of the button; clipping
+	   isn't a real concern because the shell sets `isolation: isolate`
+	   at z-100 and the menu lifts to z-130 inside that context. */
+	.share-menu {
+		position: absolute;
+		right: 0;
+		bottom: 100%;
+		margin-bottom: 0.5rem;
+	}
+	/* Lyrics open on mobile pins the player-main row to the TOP of the
+	   viewport (the lyrics drawer fills the rest of the 100dvh shell).
+	   Opening the menu "above" the share button would push it off the
+	   top of the screen — flip the direction so it drops INTO the
+	   lyrics drawer area where there is plenty of room. */
+	@media (max-width: 767px) {
+		.audio-player-shell.lyrics-open .share-menu {
+			top: 100%;
+			bottom: auto;
+			margin-top: 0.5rem;
+			margin-bottom: 0;
+		}
 	}
 
 	/* ── Scrolling track title ─────────────────────────────────────────
