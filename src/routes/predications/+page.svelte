@@ -377,7 +377,7 @@
 	<link rel="canonical" href="https://missionnaire.net/predications" />
 </svelte:head>
 
-<div class="max-w-6xl mx-auto px-4 pt-0 pb-8 md:px-6">
+<div class="w-full max-w-6xl mx-auto px-4 pt-0 pb-8 md:px-6">
 	<!-- Page Header -->
 	<div class="mb-5 md:mb-6">
 		<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body">
@@ -616,7 +616,7 @@
 									<div class="hidden md:block h-3 w-2/3 rounded-full bg-stone-100"></div>
 									<div class="hidden md:block h-3 w-1/2 rounded-full bg-stone-100"></div>
 									<div class="hidden md:block mx-auto h-3 w-10 rounded-full bg-stone-100"></div>
-									<div class="mx-auto h-7 w-7 rounded-full bg-stone-200"></div>
+									<div class="hidden md:block mx-auto h-7 w-7 rounded-full bg-stone-200"></div>
 								</div>
 							{/each}
 						{:else if listLoadError && !hasResolvedList}
