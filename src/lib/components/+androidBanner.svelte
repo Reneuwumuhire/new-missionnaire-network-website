@@ -3,7 +3,7 @@
 	import { browser } from '$app/environment';
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import FaBrandsAndroid from 'svelte-icons-pack/fa/FaBrandsAndroid';
-	import IoCloudDownloadOutline from 'svelte-icons-pack/io/IoCloudDownloadOutline';
+	import AiOutlineDownload from 'svelte-icons-pack/ai/AiOutlineDownload';
 	import IoClose from 'svelte-icons-pack/io/IoClose';
 
 	export let downloadUrl = "https://mega.nz/folder/VdJDxAxK#_hnoT20MlxFsaR2jgQcRXA";
@@ -70,7 +70,7 @@
 						rel="noopener noreferrer"
 						class="inline-flex h-10 flex-1 items-center justify-center gap-2 border border-missionnaire bg-missionnaire px-4 text-[10px] font-bold uppercase tracking-[0.16em] text-white font-body transition-colors hover:bg-missionnaire/90 sm:flex-none md:px-5"
 					>
-						<Icon src={IoCloudDownloadOutline} size="14" />
+						<Icon src={AiOutlineDownload} size="14" />
 						<span>Télécharger</span>
 					</a>
 

@@ -1,7 +1,7 @@
 <script lang="ts">
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
-	import BsCloudDownloadFill from 'svelte-icons-pack/bs/BsCloudDownloadFill';
+	import AiOutlineDownload from 'svelte-icons-pack/ai/AiOutlineDownload';
 	import BsFileEarmarkPdfFill from 'svelte-icons-pack/bs/BsFileEarmarkPdfFill';
 	import BsPlayCircleFill from 'svelte-icons-pack/bs/BsPlayCircleFill';
 	import { currentIndex, isPlaying, selectAudio } from '../stores/global';
@@ -129,7 +129,7 @@
 					class="flex flex-row items-center space-x-1 hover:text-missionnaire"
 					on:click={() => downloadAudio(audio)}
 				>
-					<Icon src={BsCloudDownloadFill} />
+					<Icon src={AiOutlineDownload} />
 					<span class="hidden md:block">MP3</span>
 				</button>
 			{/if}

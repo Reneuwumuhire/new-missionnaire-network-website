@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Icon from 'svelte-icons-pack/Icon.svelte';
-	import IoCloudDownloadOutline from 'svelte-icons-pack/io/IoCloudDownloadOutline';
+	import AiOutlineDownload from 'svelte-icons-pack/ai/AiOutlineDownload';
 	import IoPlayCircle from 'svelte-icons-pack/io/IoPlayCircle';
 	import IoPauseCircle from 'svelte-icons-pack/io/IoPauseCircle';
 	import { selectAudio, isPlaying, currentIndex, playlist, basePlaylist } from '../stores/global';
@@ -231,7 +231,7 @@
 						</span>
 					</span>
 				{:else}
-					<Icon src={IoCloudDownloadOutline} size="20" />
+					<Icon src={AiOutlineDownload} size="20" />
 				{/if}
 			</button>
 		{/if}

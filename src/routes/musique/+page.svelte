@@ -25,7 +25,7 @@
 	import BsX from 'svelte-icons-pack/bs/BsX';
 	import BsShuffle from 'svelte-icons-pack/bs/BsShuffle';
 
-	import IoCloudDownloadOutline from 'svelte-icons-pack/io/IoCloudDownloadOutline';
+	import AiOutlineDownload from 'svelte-icons-pack/ai/AiOutlineDownload';
 	import IoPlayCircle from 'svelte-icons-pack/io/IoPlayCircle';
 	import IoPauseCircle from 'svelte-icons-pack/io/IoPauseCircle';
 	import BsHeartFill from 'svelte-icons-pack/bs/BsHeartFill';
@@ -1144,7 +1144,7 @@
 					disabled={isDownloading}
 					title="Télécharger la liste filtrée en .zip"
 				>
-					<Icon src={IoCloudDownloadOutline} size="12" />
+					<Icon src={AiOutlineDownload} size="12" />
 					Tout télécharger
 				</button>
 			{/if}
@@ -1614,7 +1614,7 @@
 								on:click|stopPropagation={() => downloadSong(song)}
 								title="Télécharger"
 							>
-								<Icon src={IoCloudDownloadOutline} size="18" />
+								<Icon src={AiOutlineDownload} size="18" />
 							</button>
 						</div>
 						<div class="w-9 lg:w-10 text-center">
@@ -1848,7 +1848,7 @@
 						class="flex items-center gap-1.5 px-4 py-2 rounded-full bg-missionnaire hover:bg-missionnaire/90 text-white text-xs font-bold uppercase tracking-wider transition-colors"
 						on:click={startDownload}
 					>
-						<Icon src={IoCloudDownloadOutline} size="12" />
+						<Icon src={AiOutlineDownload} size="12" />
 						Démarrer
 					</button>
 				{/if}

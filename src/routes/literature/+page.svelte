@@ -9,7 +9,7 @@
 	import BsArrowUp from 'svelte-icons-pack/bs/BsArrowUp';
 	import BsArrowDown from 'svelte-icons-pack/bs/BsArrowDown';
 	import IoReload from 'svelte-icons-pack/io/IoReload';
-	import IoCloudDownloadOutline from 'svelte-icons-pack/io/IoCloudDownloadOutline';
+	import AiOutlineDownload from 'svelte-icons-pack/ai/AiOutlineDownload';
 	import IoBookOutline from 'svelte-icons-pack/io/IoBookOutline';
 	import IoCreate from 'svelte-icons-pack/io/IoCreate';
 
@@ -346,7 +346,7 @@
 										rel="noopener noreferrer"
 										class="flex items-center gap-2 px-6 py-3 bg-white text-orange-600 rounded-full font-bold shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-all"
 									>
-										<Icon src={IoCloudDownloadOutline} size="20" />
+										<Icon src={AiOutlineDownload} size="20" />
 										Télécharger
 									</a>
 								{/if}
@@ -508,7 +508,7 @@
 										rel="noopener noreferrer"
 										class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-100 rounded-lg text-xs font-bold text-gray-600 hover:bg-orange-500 hover:text-white hover:border-orange-500 shadow-sm transition-all active:scale-95"
 									>
-										<Icon src={IoCloudDownloadOutline} size="16" />
+										<Icon src={AiOutlineDownload} size="16" />
 										<span class="hidden lg:inline">Télécharger</span>
 									</a>
 								{:else}
