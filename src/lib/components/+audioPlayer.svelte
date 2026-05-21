@@ -628,8 +628,16 @@
 	// older ObjectId-style shares keep working.
 	function buildShareUrl(audio: any): string {
 		if (!audio || !browser) return '';
-		const slug = songSlug(typeof audio.title === 'string' ? audio.title : '');
 		const id = typeof audio._id === 'string' ? audio._id.trim() : '';
+		// Live rediffusions (past broadcasts) are shaped as MusicAudio with
+		// `category: 'Direct'`, but they live under /live/rediffusions/<id>,
+		// not /musique. Point their share link at the rediffusion page with
+		// `?autoplay=1` so a recipient lands straight on the recording and
+		// it starts playing.
+		if (audio.category === 'Direct' && id) {
+			return `${window.location.origin}/live/rediffusions/${id}?autoplay=1`;
+		}
+		const slug = songSlug(typeof audio.title === 'string' ? audio.title : '');
 		const key = slug || id;
 		if (!key) return '';
 		return `${window.location.origin}/musique?play=${encodeURIComponent(key)}`;
@@ -3219,6 +3227,17 @@
 		-webkit-backface-visibility: hidden;
 		backface-visibility: hidden;
 		isolation: isolate;
+	}
+
+	/* On mobile the bottom navigation bar occupies the very bottom of the
+	   viewport, so the player sits stacked directly above it. The nav
+	   already clears the safe-area inset, so the player only needs its
+	   own breathing room here. */
+	@media (max-width: 1023px) {
+		.audio-player-shell {
+			bottom: var(--bottom-nav-height, 0px);
+			padding-bottom: 0.75rem;
+		}
 	}
 
 	.audio-player-shell.lyrics-open {

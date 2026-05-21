@@ -61,14 +61,14 @@
 
 <div class="flex flex-col">
 	<header>
-		<div class="relative header-predications flex flex-col items-center justify-center w-full min-h-[340px] md:min-h-[400px]">
-			<div class="absolute inset-0 overlay-predications flex items-center justify-center px-5 py-12">
+		<div class="relative header-predications flex flex-col items-center justify-center w-full min-h-[210px] md:min-h-[400px]">
+			<div class="absolute inset-0 overlay-predications flex items-center justify-center px-5 py-6 md:py-12">
 				<div class="flex flex-col items-center text-white w-full max-w-3xl text-center">
-					<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-4 font-body">
+					<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-2 md:mb-4 font-body">
 						Tous les prédications
 					</p>
-					<h1 class="font-display text-3xl md:text-5xl font-semibold leading-tight">Branham, Ewald Frank et Locales</h1>
-					<p class="text-sm text-white/60 font-body mt-3 mb-8 max-w-xl leading-relaxed">
+					<h1 class="font-display text-2xl md:text-5xl font-semibold leading-tight">Branham, Ewald Frank et Locales</h1>
+					<p class="text-xs md:text-sm text-white/60 font-body mt-2 mb-4 md:mt-3 md:mb-8 max-w-xl leading-relaxed">
 						Trouvez les prédications de William Marrion Branham et Ewald Frank traduits en Kinyarwanda et prédications locales.
 					</p>
 					<form
@@ -79,7 +79,7 @@
 							<input
 								id="hero-search"
 								type="text"
-								class="w-full bg-transparent text-stone-800 px-5 py-3.5 pr-24 text-sm font-body outline-none placeholder:text-stone-400"
+								class="w-full bg-transparent text-stone-800 px-4 py-2.5 pr-10 text-base md:px-5 md:py-3.5 md:pr-24 md:text-sm font-body outline-none placeholder:text-stone-400"
 								placeholder="Rechercher par titre, année, prédicateur..."
 								bind:value={heroSearchValue}
 							/>
@@ -114,7 +114,7 @@
 								</button>
 							{/if}
 						</div>
-						<button type="submit" class="bg-missionnaire hover:bg-missionnaire/90 text-white px-6 py-3.5 text-[11px] font-bold uppercase tracking-[0.15em] font-body transition-colors shrink-0">
+						<button type="submit" class="bg-missionnaire hover:bg-missionnaire/90 text-white px-4 py-2.5 md:px-6 md:py-3.5 text-[10px] md:text-[11px] font-bold uppercase tracking-[0.15em] font-body transition-colors shrink-0">
 							Rechercher
 						</button>
 					</form>
@@ -124,7 +124,7 @@
 	</header>
 </div>
 
-<div class="flex flex-row justify-center h-auto w-full pt-8 pb-16 md:py-10">
+<div class="flex flex-row justify-center h-auto w-full pt-5 pb-16 md:py-10 overflow-x-hidden">
 	<div class="flex flex-col w-full max-w-7xl px-2 md:px-5">
 		<slot />
 	</div>

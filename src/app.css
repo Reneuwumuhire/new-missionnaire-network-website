@@ -13,13 +13,24 @@
 	--font-body: 'Outfit', system-ui, sans-serif;
 	--color-missionnaire: #FF880C;
 	--audio-player-height: 0px;
+	/* Height reserved for the mobile bottom navigation bar. 0 on desktop
+	   (the bar is hidden there); on mobile it matches +bottomNav.svelte's
+	   fixed height plus the safe-area inset. The audio player and page
+	   content both offset themselves by this value. */
+	--bottom-nav-height: 0px;
 	scroll-behavior: smooth;
+}
+
+@media (max-width: 1023px) {
+	:root {
+		--bottom-nav-height: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+	}
 }
 
 /* ── Base typography ── */
 html {
 	overflow-x: hidden;
-	scroll-padding-bottom: var(--audio-player-height);
+	scroll-padding-bottom: calc(var(--audio-player-height) + var(--bottom-nav-height));
 	font-family: var(--font-body);
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
@@ -29,7 +40,7 @@ html {
 body {
 	color: #292524; /* stone-800 — warmer than pure black */
 	background-color: #FAF8F3; /* cream — warm editorial base */
-	padding-bottom: var(--audio-player-height);
+	padding-bottom: calc(var(--audio-player-height) + var(--bottom-nav-height));
 }
 
 /* ── Selection highlight ── */

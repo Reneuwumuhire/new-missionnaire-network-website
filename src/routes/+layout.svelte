@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import NavBar from '$lib/components/+navBar.svelte';
+	import BottomNav from '$lib/components/+bottomNav.svelte';
 	import SocialMediaAbove from '$lib/components/+socialMediaAbove.svelte';
 	import Footer from '$lib/components/+footer.svelte';
 	import CopyButton from '$lib/components/+copyButton.svelte';
@@ -376,4 +377,8 @@
 	-->
 	<AudioPlayer />
 	<ResumeRecorder />
+	<!-- Mobile-only bottom navigation. Fixed at the viewport bottom for
+	     one-tap access to the most-visited sections; the audio player is
+	     lifted above it (see `--bottom-nav-height` in app.css). -->
+	<BottomNav />
 </QueryClientProvider>

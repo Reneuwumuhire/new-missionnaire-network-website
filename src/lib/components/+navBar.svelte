@@ -10,6 +10,9 @@
 	import HiSolidMenuAlt3 from 'svelte-icons-pack/hi/HiSolidMenuAlt3';
 	import IoCloseSharp from 'svelte-icons-pack/io/IoCloseSharp';
 	import HeaderMenuLinkMobo from './+headerMenuLinkMobo.svelte';
+	import { browser } from '$app/environment';
+	import { afterNavigate } from '$app/navigation';
+	import { onMount } from 'svelte';
 
 	const languages = { en, fr };
 	let currentLang = 'en';
@@ -42,20 +45,44 @@
 	const toggleMobileNav = () => {
 		ignoreNextClick = true;
 		showMoboNav = !showMoboNav;
-		if (showMoboNav) {
-			document.body.classList.add('overflow-hidden', 'overscroll-none');
-			document.body.style.overflow = 'hidden';
-			document.body.style.height = '100vh';
-			document.body.style.position = 'fixed';
-			document.body.style.width = '100%';
-		} else {
-			document.body.classList.remove('overflow-hidden', 'overscroll-none');
-			document.body.style.overflow = 'auto';
-			document.body.style.height = 'auto';
-			document.body.style.position = 'relative';
-			document.body.style.width = 'auto';
-		}
 	};
+
+	// Body scroll-lock, driven reactively from `showMoboNav` (see the
+	// `$:` below). Centralising it here means EVERY way the menu can
+	// close restores the body — the X button, a menu link, an outside
+	// click, a route change, the desktop breakpoint. Previously each
+	// handler locked/unlocked inline and the outside-click path forgot
+	// to, leaving the body stuck at `position:fixed` — which froze page
+	// scrolling and surfaced a stray horizontal scrollbar.
+	function syncBodyScrollLock(locked: boolean) {
+		const body = document.body;
+		if (locked) {
+			body.classList.add('overflow-hidden', 'overscroll-none');
+			body.style.overflow = 'hidden';
+			body.style.height = '100vh';
+			body.style.position = 'fixed';
+			body.style.width = '100%';
+		} else {
+			body.classList.remove('overflow-hidden', 'overscroll-none');
+			// Clear the inline styles rather than forcing values: forcing
+			// `overflow:auto` gives the body its own scroll container and a
+			// stray horizontal scrollbar; an empty string reverts each
+			// property to the stylesheet default.
+			body.style.overflow = '';
+			body.style.height = '';
+			body.style.position = '';
+			body.style.width = '';
+		}
+	}
+
+	$: if (browser) syncBodyScrollLock(showMoboNav);
+
+	// Any route change closes the menu (and so unlocks the body via the
+	// reactive statement above).
+	afterNavigate(() => {
+		showMoboNav = false;
+		openMenuIndex = null;
+	});
 
 	const toggleMenu = (index: number) => {
 		ignoreNextClick = true;
@@ -66,23 +93,30 @@
 		}
 	};
 
-	import { onMount } from 'svelte';
 	onMount(() => {
 		const mediaQuery = window.matchMedia('(min-width: 1024px)');
 		const handleMediaChange = (e: MediaQueryListEvent | MediaQueryList) => {
+			// Crossing into desktop closes the mobile menu; the reactive
+			// `syncBodyScrollLock` then restores the body.
 			if (e.matches && showMoboNav) {
 				showMoboNav = false;
-				document.body.classList.remove('overflow-hidden', 'overscroll-none');
-				document.body.style.overflow = 'auto';
-				document.body.style.height = 'auto';
-				document.body.style.position = 'relative';
-				document.body.style.width = 'auto';
 				openMenuIndex = null;
 			}
 		};
 		handleMediaChange(mediaQuery);
 		mediaQuery.addEventListener('change', handleMediaChange);
-		return () => mediaQuery.removeEventListener('change', handleMediaChange);
+
+		// The bottom navigation bar's "more" button opens this same menu —
+		// it dispatches a window event rather than reaching into NavBar's
+		// internals, so the toggle (and its body-scroll lock) stays in one
+		// place.
+		const handleExternalToggle = () => toggleMobileNav();
+		window.addEventListener('missionnaire:toggle-mobile-nav', handleExternalToggle);
+
+		return () => {
+			mediaQuery.removeEventListener('change', handleMediaChange);
+			window.removeEventListener('missionnaire:toggle-mobile-nav', handleExternalToggle);
+		};
 	});
 </script>
 

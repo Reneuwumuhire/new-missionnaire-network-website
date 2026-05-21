@@ -5,6 +5,9 @@
 	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
 	import type { MusicAudio } from '$lib/models/music-audio';
 	import { derived } from 'svelte/store';
+	import { onMount, onDestroy } from 'svelte';
+	import { browser } from '$app/environment';
+	import { page } from '$app/stores';
 	import { vercelImage, vercelImagePlaceholder } from '$lib/utils/vercelImage';
 	import BlurUpImage from '$lib/components/BlurUpImage.svelte';
 
@@ -67,6 +70,104 @@
 		selectAudio.set(playable as unknown as MusicAudio);
 		isPlaying.set(true);
 	}
+
+	// ── Share ──────────────────────────────────────────────────────
+	// Same dropdown UI as the music player: a "Partager" trigger that
+	// opens a small menu offering the native share sheet and a plain
+	// "Copier le lien". The link carries `?autoplay=1` so the recipient
+	// lands on this page and playback starts on its own (see onMount).
+	let isShareMenuOpen = false;
+	let shareFeedback: 'copied' | 'error' | null = null;
+	let shareFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
+	let shareWrapEl: HTMLElement | null = null;
+	$: hasNativeShare =
+		browser && typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+
+	function buildShareUrl(): string {
+		if (!browser) return '';
+		return `${window.location.origin}/live/rediffusions/${rec.id}?autoplay=1`;
+	}
+
+	function flashShareFeedback(state: 'copied' | 'error') {
+		shareFeedback = state;
+		if (shareFeedbackTimer) clearTimeout(shareFeedbackTimer);
+		shareFeedbackTimer = setTimeout(() => (shareFeedback = null), 2200);
+	}
+
+	function toggleShareMenu() {
+		if (browser) isShareMenuOpen = !isShareMenuOpen;
+	}
+
+	function closeShareMenu() {
+		isShareMenuOpen = false;
+	}
+
+	async function copyShareLink() {
+		closeShareMenu();
+		const url = buildShareUrl();
+		if (!url) return;
+		try {
+			await navigator.clipboard.writeText(url);
+			flashShareFeedback('copied');
+		} catch {
+			flashShareFeedback('error');
+		}
+	}
+
+	async function nativeShare() {
+		closeShareMenu();
+		const url = buildShareUrl();
+		if (!url) return;
+		const shareData: ShareData = {
+			title: rec.title,
+			text: `${rec.title} — Missionnaire Network`,
+			url
+		};
+		try {
+			if (navigator.share && (!navigator.canShare || navigator.canShare(shareData))) {
+				await navigator.share(shareData);
+				return;
+			}
+		} catch (err) {
+			// User dismissed the share sheet — not an error.
+			if ((err as DOMException)?.name === 'AbortError') return;
+		}
+		// Web Share unsupported or threw — fall back to clipboard.
+		try {
+			await navigator.clipboard.writeText(url);
+			flashShareFeedback('copied');
+		} catch {
+			flashShareFeedback('error');
+		}
+	}
+
+	function handleShareOutsideClick(event: MouseEvent) {
+		if (!isShareMenuOpen) return;
+		if (shareWrapEl && !shareWrapEl.contains(event.target as Node)) closeShareMenu();
+	}
+
+	onDestroy(() => {
+		if (shareFeedbackTimer) clearTimeout(shareFeedbackTimer);
+	});
+
+	// ── Autoplay on shared deep-link ───────────────────────────────
+	// When opened via a share link (`?autoplay=1`), load this recording
+	// into the global player and start it. The query param is then
+	// stripped so a manual refresh doesn't silently restart playback.
+	onMount(() => {
+		if (!browser) return;
+		if ($page.url.searchParams.get('autoplay') !== '1') return;
+		playRecording();
+		try {
+			window.history.replaceState(
+				window.history.state,
+				'',
+				`/live/rediffusions/${rec.id}`
+			);
+		} catch {
+			/* history API unavailable — harmless */
+		}
+	});
 
 	// ── Download state ─────────────────────────────────────────────
 	// Background fetch: stream the mp3, track bytes loaded, hand the
@@ -132,7 +233,10 @@
 		thumbnailExpanded = false;
 	}
 	function onLightboxKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') closeThumbnail();
+		if (e.key === 'Escape') {
+			closeThumbnail();
+			closeShareMenu();
+		}
 	}
 	function onBackdropClick(e: MouseEvent) {
 		if (e.target === e.currentTarget) closeThumbnail();
@@ -184,7 +288,7 @@
 	{/if}
 </svelte:head>
 
-<svelte:window on:keydown={onLightboxKeydown} />
+<svelte:window on:keydown={onLightboxKeydown} on:click={handleShareOutsideClick} />
 
 <section class="w-full px-6 pt-4 pb-10 md:pt-6">
 	<div class="max-w-3xl mx-auto">
@@ -412,6 +516,104 @@
 						{downloadError}
 					</p>
 				{/if}
+				<div class="relative" bind:this={shareWrapEl}>
+					<button
+						type="button"
+						on:click|stopPropagation={toggleShareMenu}
+						aria-haspopup="menu"
+						aria-expanded={isShareMenuOpen}
+						aria-label="Partager ce direct"
+						class="group flex w-full items-center justify-center gap-2 border-t border-stone-200/60 px-5 py-3 text-[11px] font-bold uppercase tracking-[0.2em] font-body transition-colors hover:bg-missionnaire hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40 {isShareMenuOpen
+							? 'bg-missionnaire/5 text-missionnaire'
+							: 'text-stone-600'}"
+					>
+						<svg
+							width="13"
+							height="13"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<circle cx="18" cy="5" r="3" />
+							<circle cx="6" cy="12" r="3" />
+							<circle cx="18" cy="19" r="3" />
+							<line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+							<line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+						</svg>
+						{#if shareFeedback === 'copied'}
+							Lien copié
+						{:else if shareFeedback === 'error'}
+							Échec — copiez l'URL
+						{:else}
+							Partager
+						{/if}
+					</button>
+
+					{#if isShareMenuOpen}
+						<!-- svelte-ignore a11y-click-events-have-key-events -->
+						<!-- svelte-ignore a11y-no-static-element-interactions -->
+						<div
+							class="absolute left-1/2 top-full z-[60] mt-1.5 w-56 -translate-x-1/2 overflow-hidden rounded-lg border border-stone-200 bg-white shadow-2xl"
+							role="menu"
+							tabindex="-1"
+							on:click|stopPropagation={() => undefined}
+						>
+							{#if hasNativeShare}
+								<button
+									type="button"
+									role="menuitem"
+									class="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-stone-700 transition-colors hover:bg-stone-50 hover:text-missionnaire"
+									on:click={nativeShare}
+								>
+									<svg
+										width="16"
+										height="16"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"
+									>
+										<circle cx="18" cy="5" r="3" />
+										<circle cx="6" cy="12" r="3" />
+										<circle cx="18" cy="19" r="3" />
+										<line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+										<line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+									</svg>
+									<span>Partager…</span>
+								</button>
+							{/if}
+							<button
+								type="button"
+								role="menuitem"
+								class="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-stone-700 transition-colors hover:bg-stone-50 hover:text-missionnaire"
+								on:click={copyShareLink}
+							>
+								<svg
+									width="16"
+									height="16"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+									<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+								</svg>
+								<span>Copier le lien</span>
+							</button>
+						</div>
+					{/if}
+				</div>
 				{#if transcript}
 					<a
 						href={transcript.url}
