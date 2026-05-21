@@ -73,6 +73,10 @@ function toPublic(doc: RecordingRow): PublishedRecording {
 
 export async function getRecentPublished(limit = 5): Promise<PublishedRecording[]> {
 	try {
+		// Same `(published, status, started_at desc)` compound index the other
+		// list queries rely on — ensures the once-per-day uncached /live render
+		// seeks directly instead of scanning + sorting in memory.
+		await ensureIndexes();
 		const db = await getDb();
 		const rows = (await db
 			.collection('recordings')
