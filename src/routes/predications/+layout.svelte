@@ -7,6 +7,8 @@
 	import { goto } from '$app/navigation';
 	import { onDestroy, onMount } from 'svelte';
 	import LoadingRing from '$lib/components/LoadingRing.svelte';
+	import MobileListToolbar from '$lib/components/+mobileListToolbar.svelte';
+	import { mobileSearchOpen } from '$lib/stores/mobileControls';
 
 	export let data;
 	let heroSearchValue = (data as any).search || '';
@@ -72,7 +74,7 @@
 						Trouvez les prédications de William Marrion Branham et Ewald Frank traduits en Kinyarwanda et prédications locales.
 					</p>
 					<form
-						class="flex w-full max-w-xl border border-white/25 bg-white/90 backdrop-blur-sm overflow-hidden"
+						class="hidden md:flex w-full max-w-xl border border-white/25 bg-white/90 backdrop-blur-sm overflow-hidden"
 						on:submit|preventDefault={handleHeroSearch}
 					>
 						<div class="relative flex-1">
@@ -123,6 +125,39 @@
 		</div>
 	</header>
 </div>
+
+<!-- Mobile compact toolbar: collapses the search + filters so the
+     prédications list is the first thing the listener sees. -->
+<MobileListToolbar />
+{#if $mobileSearchOpen}
+	<div class="md:hidden border-b border-stone-200 bg-cream px-4 py-3">
+		<div class="relative">
+			<!-- svelte-ignore a11y-autofocus -->
+			<input
+				type="search"
+				class="w-full rounded-lg border border-stone-200 bg-white py-2.5 pl-10 pr-3 text-base font-body text-stone-800 outline-none placeholder:text-stone-400 focus:border-missionnaire/40"
+				placeholder="Rechercher par titre, année, prédicateur..."
+				bind:value={heroSearchValue}
+				autofocus
+			/>
+			<svg
+				class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
+				width="16"
+				height="16"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2.2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<circle cx="11" cy="11" r="7" />
+				<line x1="21" y1="21" x2="16.65" y2="16.65" />
+			</svg>
+		</div>
+	</div>
+{/if}
 
 <div class="flex flex-row justify-center h-auto w-full pt-5 pb-16 md:py-10 overflow-x-hidden">
 	<div class="flex flex-col w-full max-w-7xl px-2 md:px-5">

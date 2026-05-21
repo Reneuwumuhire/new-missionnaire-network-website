@@ -14,6 +14,7 @@
 		isShuffle,
 		isPlaying
 	} from '$lib/stores/global';
+	import { mobileFiltersOpen } from '$lib/stores/mobileControls';
 	import Pagination from '$lib/components/Pagination.svelte';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
@@ -132,6 +133,15 @@
 	$: totalPages = Math.ceil(totalSongs / limit);
 
 	let isArtistMenuOpen = false;
+	let artistMenuEl: HTMLDivElement | null = null;
+
+	// Close the mobile "Artiste" dropdown on an outside tap. The desktop
+	// dropdown has its own full-screen backdrop; the mobile one didn't,
+	// so it previously only closed by tapping the toggle button again.
+	function handleArtistOutsideClick(event: MouseEvent) {
+		if (!isArtistMenuOpen || !artistMenuEl) return;
+		if (!artistMenuEl.contains(event.target as Node)) isArtistMenuOpen = false;
+	}
 	let artistSearch = '';
 	let showFavorites = false;
 	let showRecent = false;
@@ -880,8 +890,10 @@
      and reads from this page's load `meta` field (see +page.ts's
      buildMusiqueMeta) so there's exactly one tag per property. -->
 
+<svelte:window on:click={handleArtistOutsideClick} />
+
 <div class="w-full min-w-0 max-w-6xl mx-auto px-4 pt-0 pb-8 md:px-6">
-	<div class="mb-8 md:mb-12">
+	<div class="mb-8 md:mb-12 {$mobileFiltersOpen ? '' : 'hidden md:block'}">
 		<h2
 			class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.35em] mb-4 font-body"
 		>
@@ -933,19 +945,22 @@
 			<div class="flex items-center gap-2">
 				{#if isRandomListOrder}
 					<button
-						class="sm:hidden inline-flex items-center justify-center rounded-full border border-stone-200 bg-white p-2 text-stone-500 transition-colors hover:border-missionnaire hover:text-missionnaire"
+						class="sm:hidden inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-stone-500 transition-colors hover:border-missionnaire hover:text-missionnaire"
 						on:click={refreshRandomList}
 						title="Rafraîchir l'ordre aléatoire"
 					>
-						<Icon src={BsShuffle} size="13" />
+						<Icon src={BsShuffle} size="11" />
+						Rafraîchir
 					</button>
 				{/if}
-				<div class="relative md:hidden">
+				<div class="relative md:hidden" bind:this={artistMenuEl}>
 					<button
-						class="flex items-center gap-2 bg-white border border-stone-200 text-stone-600 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm active:scale-95 transition-transform"
+						class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors {isArtistMenuOpen
+							? 'border-missionnaire text-missionnaire bg-missionnaire/5'
+							: 'border-stone-200 bg-white text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
 						on:click|stopPropagation={() => (isArtistMenuOpen = !isArtistMenuOpen)}
 					>
-						<Icon src={BsSearch} size="12" />
+						<Icon src={BsSearch} size="11" />
 						Artiste
 					</button>
 					{#if isArtistMenuOpen}
@@ -1073,7 +1088,7 @@
 
 	<!-- Favorites & Recently Played (collapsed by default) -->
 	{#if $favorites.length > 0 || $recentlyPlayed.length > 0 || cachedCount > 0 || totalSongs > 0}
-		<div class="flex flex-wrap gap-1.5 md:gap-2 mb-4">
+		<div class="flex flex-wrap gap-1.5 md:gap-2 mb-4 {$mobileFiltersOpen ? '' : 'hidden md:flex'}">
 			{#if $favorites.length > 0}
 				<button
 					class="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-full border text-[10px] md:text-xs font-bold uppercase tracking-[0.12em] md:tracking-wider transition-colors whitespace-nowrap {showFavorites

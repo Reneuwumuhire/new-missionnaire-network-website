@@ -26,8 +26,8 @@
 <section class="w-full px-6 pt-4 pb-10 md:pt-6">
 	<div class="max-w-2xl mx-auto">
 		<!-- Header -->
-		<div class="text-center mb-12">
-			<div class="flex justify-center mb-5">
+		<div class="text-center mb-6 md:mb-12">
+			<div class="flex justify-center mb-3 md:mb-5">
 				<!-- Audio waveform icon -->
 				<svg width="32" height="28" viewBox="0 0 32 28" fill="none">
 					<rect x="0" y="8" width="4" height="12" rx="2" fill="#FF880C" fill-opacity="0.3">
@@ -52,14 +52,14 @@
 					</rect>
 				</svg>
 			</div>
-			<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body">
+			<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-2 md:mb-3 font-body">
 				Direct Audio
 			</p>
-			<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">
+			<h1 class="font-display text-2xl md:text-4xl font-semibold text-stone-900">
 				Écoute en direct
 			</h1>
 			<p
-				class="mt-3 text-[15px] text-stone-400 font-body font-light max-w-md mx-auto leading-relaxed"
+				class="mt-2 md:mt-3 text-[13px] md:text-[15px] text-stone-400 font-body font-light max-w-md mx-auto leading-relaxed"
 			>
 				La page se met à jour automatiquement. Dès que le direct audio commence, la lecture démarre
 				toute seule.

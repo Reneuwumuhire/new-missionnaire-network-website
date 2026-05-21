@@ -4,6 +4,7 @@
 	import type { Sermon } from '$lib/models/sermon';
 	import type { PublishedRecording } from '$lib/server/recordings';
 	import { basePlaylist, playlist, isShuffle } from '$lib/stores/global';
+	import { mobileFiltersOpen } from '$lib/stores/mobileControls';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import BsSearch from 'svelte-icons-pack/bs/BsSearch';
@@ -376,7 +377,7 @@
 	<link rel="canonical" href="https://missionnaire.net/predications" />
 </svelte:head>
 
-<div class="max-w-6xl mx-auto px-6 pt-0 pb-8">
+<div class="max-w-6xl mx-auto px-4 pt-0 pb-8 md:px-6">
 	<!-- Page Header -->
 	<div class="mb-5 md:mb-6">
 		<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body">
@@ -410,7 +411,7 @@
 	</div>
 
 	<!-- Top Filters (Alpha & Authors) -->
-	<div class="flex flex-col gap-5 md:gap-6 mb-6 md:mb-8">
+	<div class="flex flex-col gap-5 md:gap-6 mb-6 md:mb-8 {$mobileFiltersOpen ? '' : 'hidden md:flex'}">
 		{#if !blendedOnly}
 			<div>
 				<h2
@@ -509,7 +510,7 @@
 
 	<div class="flex flex-col md:flex-row gap-8">
 		{#if (sermons.length > 0 || (isListLoading && !hasResolvedList)) && years.length > 0}
-			<aside class="w-full md:w-56 flex-shrink-0">
+			<aside class="w-full md:w-56 flex-shrink-0 {$mobileFiltersOpen ? '' : 'hidden md:block'}">
 				<div class="bg-white/40 border border-stone-200/60 p-5 md:sticky md:top-24">
 					<h2
 						class="text-xs font-bold text-stone-800 uppercase tracking-widest mb-6 pb-2 border-b border-stone-200/60 font-body"
@@ -549,7 +550,7 @@
 			{#if !blendedOnly}
 				<div class="bg-white/40 border border-stone-200/60 min-h-[500px] flex flex-col">
 					<div
-						class="relative grid grid-cols-[30px_1fr_auto_auto] {desktopSermonGrid} gap-2 md:gap-4 px-3 md:px-4 py-3 border-b border-stone-200/60 text-[10px] md:text-[11px] font-bold text-stone-400 uppercase tracking-widest bg-white/40 items-center"
+						class="relative grid grid-cols-[30px_1fr_auto_auto] {desktopSermonGrid} gap-2 md:gap-4 px-4 py-3 border-b border-stone-200/60 text-[10px] md:text-[11px] font-bold text-stone-400 uppercase tracking-widest bg-white/40 items-center"
 					>
 						<div class="text-center">#</div>
 						<button
@@ -605,7 +606,7 @@
 						{#if isListLoading && !hasResolvedList}
 							{#each Array.from({ length: 8 }) as _, i}
 								<div
-									class="grid grid-cols-[30px_1fr_auto_auto] {desktopSermonGrid} gap-2 md:gap-4 px-3 md:px-4 py-3 md:py-4 items-center animate-pulse"
+									class="grid grid-cols-[30px_1fr_auto_auto] {desktopSermonGrid} gap-2 md:gap-4 px-4 py-3 md:py-4 items-center animate-pulse"
 								>
 									<div class="mx-auto h-3 w-4 rounded-full bg-stone-200"></div>
 									<div class="space-y-2 min-w-0">

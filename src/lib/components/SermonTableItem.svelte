@@ -151,7 +151,7 @@
 
 <!-- svelte-ignore a11y-no-noninteractive-tabindex -->
 <div
-	class="grid grid-cols-[30px_1fr_auto_auto] {desktopSermonGrid} gap-2 md:gap-4 px-3 md:px-4 py-3 md:py-4 items-center transition-all group cursor-pointer {isActive
+	class="grid grid-cols-[30px_1fr_auto_auto] {desktopSermonGrid} gap-2 md:gap-4 px-4 py-3 md:py-4 items-center transition-all group cursor-pointer {isActive
 		? 'bg-orange-50/80 border-l-4 border-l-orange-500'
 		: 'hover:bg-gray-50'}"
 	on:click={togglePlay}
@@ -225,8 +225,15 @@
 		{formatDuration(resolvedDuration)}
 	</div>
 
-	<!-- Actions -->
-	<div class="flex w-full items-center justify-center gap-1 md:gap-2">
+	<!-- Actions — hidden on mobile until the row is selected, so the title
+	     gets the full width. Tapping the row plays it (→ isActive), which
+	     reveals the PDF / download / play controls. Desktop always shows
+	     them (it has dedicated columns). -->
+	<div
+		class="w-full items-center justify-center gap-1 md:gap-2 {isActive
+			? 'flex'
+			: 'hidden md:flex'}"
+	>
 		{#if (language === 'english' && sermon.english_pdf_url) || (language !== 'english' && sermon.pdf_url)}
 			<button
 				class="p-2 text-gray-400 hover:text-red-500 transition-colors"

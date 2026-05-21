@@ -773,14 +773,14 @@
 <div class="space-y-4">
 	<!-- Main player card -->
 	<div
-		class="relative border p-6 md:p-8 transition-all duration-500 {showLive
+		class="relative border p-5 md:p-8 transition-all duration-500 {showLive
 			? 'border-red-200 bg-red-50/30'
 			: awaitingPlay
 				? 'border-missionnaire/40 bg-orange-50/30 radio-pulse'
 				: 'border-stone-200/60 bg-white/40'}"
 	>
 		<!-- Status indicator -->
-		<div class="flex items-center gap-2.5 mb-4">
+		<div class="flex items-center gap-2.5 mb-3 md:mb-4">
 			<span class="relative inline-flex h-2.5 w-2.5">
 				{#if showLive || awaitingPlay}
 					<span
@@ -822,7 +822,7 @@
 		<div class="flex flex-col md:flex-row md:items-start gap-6">
 			<div class="flex-1 min-w-0">
 				<h2
-					class="font-display text-2xl md:text-3xl font-semibold {showLive
+					class="font-display text-xl md:text-3xl font-semibold {showLive
 						? 'text-stone-900'
 						: awaitingPlay
 							? 'text-stone-900'
@@ -846,9 +846,9 @@
 				{/if}
 
 				<!-- Controls -->
-				<div class="flex items-center gap-3 mt-6">
+				<div class="flex items-center gap-2 md:gap-3 mt-4 md:mt-6">
 					<button
-						class="inline-flex items-center gap-2.5 px-6 py-3 text-[12px] font-bold uppercase tracking-[0.15em] font-body transition-all duration-300 {canPlay
+						class="inline-flex items-center gap-2 px-4 py-2.5 md:px-6 md:py-3 text-[12px] font-bold uppercase tracking-[0.15em] font-body whitespace-nowrap transition-all duration-300 {canPlay
 							? showLive
 								? 'bg-red-600 hover:bg-red-700 text-white'
 								: 'bg-stone-900 hover:bg-missionnaire text-white'
@@ -871,7 +871,7 @@
 					</button>
 
 					<button
-						class="inline-flex items-center gap-2 px-5 py-3 border text-[12px] font-semibold font-body transition-all duration-300 {canPlay
+						class="inline-flex items-center gap-2 px-4 py-2.5 md:px-5 md:py-3 border text-[12px] font-semibold font-body whitespace-nowrap transition-all duration-300 {canPlay
 							? 'border-stone-200/60 text-stone-600 hover:border-missionnaire hover:text-missionnaire'
 							: 'border-stone-200/40 text-stone-300 cursor-not-allowed'}"
 						on:click={toggleMute}
@@ -1082,23 +1082,15 @@
 		</div>
 	{/if}
 
-	<!-- Offline info card -->
-	{#if !showLive}
-		<div class="border border-stone-200/60 bg-white/40 p-5 md:p-6">
-			<p class="text-[10px] font-bold uppercase tracking-[0.25em] text-stone-400 font-body mb-2">
-				Information
+	<!-- Offline: only surface a message when the listener tapped Lecture
+	     while the stream is down. The "page updates automatically" copy
+	     already lives in the page header, so no full card is shown
+	     otherwise — that keeps the rediffusions list in view. -->
+	{#if !showLive && hasError}
+		<div class="border border-red-200 bg-red-50/50 px-4 py-3">
+			<p class="text-[12px] font-semibold text-red-600 font-body">
+				Le direct n'est pas encore disponible.
 			</p>
-			<p class="text-sm text-stone-500 font-body leading-relaxed">
-				Cette page se met à jour automatiquement en temps réel. Dès que le direct commence, le
-				bouton
-				<span class="font-semibold text-stone-700">Lecture</span>
-				devient actif.
-			</p>
-			{#if hasError}
-				<p class="mt-3 text-[12px] font-semibold text-red-600 font-body">
-					Le direct n'est pas encore disponible.
-				</p>
-			{/if}
 		</div>
 	{/if}
 

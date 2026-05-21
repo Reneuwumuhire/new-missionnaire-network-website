@@ -8,6 +8,8 @@
 	import type { MusicAudio } from '$lib/models/music-audio';
 	import { goto } from '$app/navigation';
 	import LoadingRing from '$lib/components/LoadingRing.svelte';
+	import MobileListToolbar from '$lib/components/+mobileListToolbar.svelte';
+	import { mobileSearchOpen } from '$lib/stores/mobileControls';
 
 	export let data;
 	let heroSearchValue = (data as any).search || '';
@@ -83,14 +85,14 @@
 
 <div class="flex flex-col">
 	<header class="relative">
-		<div class="relative header-predications flex flex-col items-center justify-center w-full min-h-[240px] md:min-h-[400px]">
-			<div class="absolute inset-0 overlay-predications flex items-center justify-center px-5 py-6 md:py-12">
+		<div class="relative header-predications flex flex-col items-center justify-center w-full min-h-[150px] md:min-h-[400px]">
+			<div class="absolute inset-0 overlay-predications flex items-center justify-center px-5 py-4 md:py-12">
 				<div class="flex flex-col items-center text-white w-full max-w-3xl text-center">
-					<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-2 md:mb-4 font-body">
+					<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-1.5 md:mb-4 font-body">
 						Tous les cantiques
 					</p>
-					<h1 class="font-display text-2xl md:text-5xl font-semibold leading-tight">Louange et Adoration</h1>
-					<p class="text-sm text-white/60 font-body mt-2 mb-4 md:mt-3 md:mb-8 max-w-lg leading-relaxed">
+					<h1 class="font-display text-xl md:text-5xl font-semibold leading-tight">Louange et Adoration</h1>
+					<p class="text-xs md:text-sm text-white/60 font-body mt-1 mb-2 md:mt-3 md:mb-8 max-w-lg leading-relaxed">
 						{#if totalSongs !== null}
 							Trouvez ici <span class="font-semibold text-white">{formattedTotal(totalSongs)}</span> cantiques.
 						{:else}
@@ -98,7 +100,7 @@
 						{/if}
 					</p>
 					<form
-						class="flex w-full max-w-xl border border-white/25 bg-white/90 backdrop-blur-sm overflow-hidden"
+						class="hidden md:flex w-full max-w-xl border border-white/25 bg-white/90 backdrop-blur-sm overflow-hidden"
 						on:submit|preventDefault={handleHeroSearch}
 					>
 						<div class="relative flex-1">
@@ -144,16 +146,16 @@
 							Rechercher
 						</button>
 					</form>
-					<div class="flex items-center gap-3 mt-3 md:mt-6">
+					<div class="flex items-center gap-3 mt-2 md:mt-6">
 						<a
 							href="/musique"
-							class="px-5 py-2 text-[11px] font-bold uppercase tracking-[0.15em] font-body transition-all border {$page.url.pathname === '/musique' ? 'bg-missionnaire text-white border-missionnaire' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}"
+							class="px-4 py-1.5 md:px-5 md:py-2 text-[11px] font-bold uppercase tracking-[0.15em] font-body transition-all border {$page.url.pathname === '/musique' ? 'bg-missionnaire text-white border-missionnaire' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}"
 						>
 							Audio
 						</a>
 						<a
 							href="/musique/videos"
-							class="px-5 py-2 text-[11px] font-bold uppercase tracking-[0.15em] font-body transition-all border {$page.url.pathname === '/musique/videos' ? 'bg-missionnaire text-white border-missionnaire' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}"
+							class="px-4 py-1.5 md:px-5 md:py-2 text-[11px] font-bold uppercase tracking-[0.15em] font-body transition-all border {$page.url.pathname === '/musique/videos' ? 'bg-missionnaire text-white border-missionnaire' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}"
 						>
 							Vidéos
 						</a>
@@ -171,6 +173,40 @@
 		</div>
 	</header>
 </div>
+
+<!-- Mobile compact toolbar: collapses the search + filters so the song
+     list is the first thing the listener sees. Desktop keeps the hero. -->
+<MobileListToolbar />
+{#if $mobileSearchOpen}
+	<div class="md:hidden border-b border-stone-200 bg-cream px-4 py-3">
+		<div class="relative">
+			<!-- svelte-ignore a11y-autofocus -->
+			<input
+				type="search"
+				class="w-full rounded-lg border border-stone-200 bg-white py-2.5 pl-10 pr-3 text-base font-body text-stone-800 outline-none placeholder:text-stone-400 focus:border-missionnaire/40"
+				placeholder="Rechercher par titre..."
+				bind:value={heroSearchValue}
+				autofocus
+			/>
+			<svg
+				class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
+				width="16"
+				height="16"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2.2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<circle cx="11" cy="11" r="7" />
+				<line x1="21" y1="21" x2="16.65" y2="16.65" />
+			</svg>
+		</div>
+	</div>
+{/if}
+
 <div class="flex flex-row justify-center h-auto w-full pt-4 pb-32 md:pt-16 md:pb-16 overflow-x-hidden">
 	<div class=" flex flex-col w-full max-w-7xl px-2 md:px-5">
 		<slot />

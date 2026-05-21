@@ -91,6 +91,10 @@
 		cancelAnimationFrame(rafId);
 		rafId = requestAnimationFrame(() => {
 			headerHeight = headerRef?.offsetHeight ?? 120;
+			// Publish the header height so sticky in-page elements (the
+			// mobile list toolbar) can offset themselves below the fixed
+			// site header.
+			document.documentElement.style.setProperty('--header-height', `${headerHeight}px`);
 		});
 	};
 

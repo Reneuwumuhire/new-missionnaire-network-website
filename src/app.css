@@ -18,6 +18,9 @@
 	   fixed height plus the safe-area inset. The audio player and page
 	   content both offset themselves by this value. */
 	--bottom-nav-height: 0px;
+	/* Fixed site-header height, kept current by the root layout. Used as
+	   the sticky offset for the mobile list toolbar. */
+	--header-height: 112px;
 	scroll-behavior: smooth;
 }
 

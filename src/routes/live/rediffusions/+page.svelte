@@ -7,6 +7,8 @@
 	import BlurUpImage from '$lib/components/BlurUpImage.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import { portal } from '$lib/actions/portal';
+	import MobileListToolbar from '$lib/components/+mobileListToolbar.svelte';
+	import { mobileSearchOpen, mobileFiltersOpen } from '$lib/stores/mobileControls';
 
 	export let data: PageData;
 
@@ -183,11 +185,11 @@
 <section class="w-full px-6 pt-4 pb-10 md:pt-6">
 	<div class="max-w-3xl mx-auto">
 		<!-- Header -->
-		<div class="text-center mb-12">
-			<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body">
+		<div class="text-center mb-6 md:mb-12">
+			<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-2 md:mb-3 font-body">
 				Archives
 			</p>
-			<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">
+			<h1 class="font-display text-2xl md:text-4xl font-semibold text-stone-900">
 				Directs précédents
 			</h1>
 			{#if data.allTotal > 0}
@@ -204,7 +206,7 @@
 				</p>
 			{/if}
 			<p
-				class="mt-3 text-[15px] text-stone-400 font-body font-light max-w-md mx-auto leading-relaxed"
+				class="mt-2 md:mt-3 text-[13px] md:text-[15px] text-stone-400 font-body font-light max-w-md mx-auto leading-relaxed"
 			>
 				Retrouvez les enregistrements des directs audio passés.
 			</p>
@@ -220,13 +222,103 @@
 			</a>
 		</div>
 
+		<!-- Mobile compact toolbar: collapses the search + filters so the
+		     rediffusions list is the priority on arrival. -->
+		<MobileListToolbar class="-mx-6 md:mx-0" />
+		{#if $mobileSearchOpen}
+			<div class="md:hidden -mx-6 border-b border-stone-200 bg-cream px-4 py-3">
+				<div class="relative">
+					<svg
+						class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2.2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
+					>
+						<circle cx="11" cy="11" r="7" />
+						<line x1="21" y1="21" x2="16.65" y2="16.65" />
+					</svg>
+					<!-- svelte-ignore a11y-autofocus -->
+					<input
+						type="search"
+						bind:value={searchInput}
+						on:input={onSearchInput}
+						placeholder="Rechercher un titre…"
+						autofocus
+						class="w-full rounded-lg border border-stone-200 bg-white py-2.5 pl-10 pr-3 text-base font-body text-stone-800 outline-none placeholder:text-stone-400 focus:border-missionnaire/40"
+					/>
+				</div>
+			</div>
+		{/if}
+		{#if $mobileFiltersOpen}
+			<div class="md:hidden -mx-6 border-b border-stone-200 bg-cream px-4 py-3 space-y-3">
+				<div class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Type de direct">
+					{#each [{ v: '', label: 'Tous' }, { v: 'retransmission', label: 'Retransmissions' }, { v: 'local', label: 'Locales' }] as opt}
+						{@const typeValue = opt.v as '' | RecordingType}
+						<button
+							type="button"
+							on:click={() => selectType(typeValue)}
+							aria-pressed={(typeInput || '') === opt.v}
+							class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] font-body border transition-colors {(typeInput ||
+								'') === opt.v
+								? 'border-missionnaire text-missionnaire bg-missionnaire/5'
+								: 'border-stone-200/80 bg-white text-stone-500'}"
+						>
+							{opt.label}
+						</button>
+					{/each}
+				</div>
+				<div class="flex gap-2">
+					<select
+						bind:value={yearInput}
+						on:change={onFilterChange}
+						aria-label="Filtrer par année"
+						class="flex-1 min-w-0 border border-stone-200/80 bg-white px-3 py-2 text-sm font-body text-stone-800 focus:border-missionnaire/40 focus:outline-none"
+					>
+						<option value="">Toutes les années</option>
+						{#each data.availableYears as year}
+							<option value={year}>{year}</option>
+						{/each}
+					</select>
+					<select
+						bind:value={monthInput}
+						on:change={onFilterChange}
+						disabled={!yearInput}
+						aria-label="Filtrer par mois"
+						class="flex-1 min-w-0 border border-stone-200/80 bg-white px-3 py-2 text-sm font-body text-stone-800 disabled:opacity-50 focus:border-missionnaire/40 focus:outline-none"
+					>
+						<option value="">Tous les mois</option>
+						{#each MONTHS as m}
+							<option value={m.value}>{m.label}</option>
+						{/each}
+					</select>
+				</div>
+				{#if hasActiveFilters}
+					<div class="flex items-center justify-between text-[11px] font-body text-stone-500">
+						<span>{data.total} résultat{data.total > 1 ? 's' : ''}</span>
+						<button
+							type="button"
+							on:click={resetFilters}
+							class="font-bold uppercase tracking-[0.15em] text-missionnaire/80 hover:text-missionnaire transition-colors"
+						>
+							Réinitialiser
+						</button>
+					</div>
+				{/if}
+			</div>
+		{/if}
+
 		<!-- Filters: type + search + year + month. Progressive-enhancement
-		     form so it still submits on non-JS clients. -->
+		     form so it still submits on non-JS clients (desktop only — the
+		     toolbar above replaces it on mobile). -->
 		<form
 			method="GET"
 			action="/live/rediffusions"
 			on:submit|preventDefault={() => onSearchInput()}
-			class="mb-6 border border-stone-200/60 bg-white/40 p-3 sm:p-4"
+			class="hidden md:block mb-6 border border-stone-200/60 bg-white/40 p-3 sm:p-4"
 		>
 			<!-- Type segmented control: Retransmission = relayed broadcast
 			     (Frank/Ewald/retransmission title), Locales = everything else

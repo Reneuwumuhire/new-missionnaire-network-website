@@ -98,12 +98,12 @@
 		</a>
 	{/each}
 
-	<!-- "More" — opens the full menu. No label by design. -->
+	<!-- "More" — opens the full hamburger menu. -->
 	<button type="button" class="bottom-nav__item" aria-label="Ouvrir le menu" on:click={openMenu}>
 		<span class="bottom-nav__icon">
 			<Icon src={CgMoreVerticalAlt} color="currentColor" className="bottom-nav__glyph" />
 		</span>
-		<span class="bottom-nav__label" aria-hidden="true"></span>
+		<span class="bottom-nav__label">Menu</span>
 	</button>
 </nav>
 
@@ -119,6 +119,10 @@
 		justify-content: space-around;
 		height: calc(3.5rem + env(safe-area-inset-bottom, 0px));
 		padding-bottom: env(safe-area-inset-bottom, 0px);
+		/* Breathing room from the screen edges so the first/last labels
+		   ("Prédications", "Menu") stay clear of rounded phone corners. */
+		padding-left: max(8px, env(safe-area-inset-left, 0px));
+		padding-right: max(8px, env(safe-area-inset-right, 0px));
 		background: rgba(255, 255, 255, 0.97);
 		backdrop-filter: blur(12px);
 		-webkit-backdrop-filter: blur(12px);
@@ -144,7 +148,7 @@
 		justify-content: center;
 		gap: 4px;
 		min-width: 0;
-		padding: 0 2px;
+		padding: 0 1px;
 		color: #a8a29e; /* stone-400 — inactive */
 		text-decoration: none;
 		transition: color 0.18s ease;

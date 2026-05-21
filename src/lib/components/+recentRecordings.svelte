@@ -30,7 +30,7 @@
 </script>
 
 {#if recordings.length > 0}
-	<section class="mt-12">
+	<section class="mt-4 md:mt-10">
 		<div class="flex items-end justify-between mb-5">
 			<div>
 				<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-1 font-body">

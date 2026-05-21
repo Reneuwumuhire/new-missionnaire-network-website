@@ -20,6 +20,8 @@
 		setTranscriptionsCache,
 		type TranscriptionsPageCacheEntry
 	} from './listCache';
+	import MobileListToolbar from '$lib/components/+mobileListToolbar.svelte';
+	import { mobileSearchOpen, mobileFiltersOpen } from '$lib/stores/mobileControls';
 
 	export let data: PageData;
 	let selectedDocument: SerializedTranscription | null = null;
@@ -274,7 +276,7 @@
 				<p class="text-sm text-stone-500 font-body mb-2">
 					Trouvez les transcriptions des prédications
 				</p>
-				<p class="text-[12px] text-stone-400 font-body mb-6">
+				<p class="text-[12px] text-stone-400 font-body mb-2 md:mb-6">
 					{#if hasResolvedList}
 						{total} transcription{total > 1 ? 's' : ''} disponible{total > 1 ? 's' : ''}
 					{:else}
@@ -282,7 +284,7 @@
 					{/if}
 				</p>
 				<form
-					class="flex w-full max-w-xl mx-auto border border-stone-200/60 bg-white/40 overflow-hidden"
+					class="hidden md:flex w-full max-w-xl mx-auto border border-stone-200/60 bg-white/40 overflow-hidden"
 					on:submit|preventDefault={() =>
 						handleSearch(searchInput?.value ?? searchTerm, { immediate: true })}
 				>
@@ -339,14 +341,53 @@
 		</div>
 	</div>
 
-	<div class="flex w-full h-full flex-col lg:flex-row">
+	<!-- Mobile compact toolbar: collapses search + filters so the
+	     transcription list is the priority on arrival. The negative
+	     margins break it out of the page container's padding; keeping it
+	     a direct child of that container gives `position: sticky` a
+	     full-height parent so the bar stays pinned down the whole list. -->
+	<MobileListToolbar class="-mx-2 sm:-mx-4" />
+	{#if $mobileSearchOpen}
+		<div class="md:hidden -mx-2 sm:-mx-4 border-b border-stone-200 bg-cream px-4 py-3">
+			<div class="relative">
+				<!-- svelte-ignore a11y-autofocus -->
+				<input
+					type="search"
+					class="w-full rounded-lg border border-stone-200 bg-white py-2.5 pl-10 pr-3 text-base font-body text-stone-800 outline-none placeholder:text-stone-400 focus:border-missionnaire/40"
+					placeholder="Rechercher par titre..."
+					bind:value={searchTerm}
+					on:input={(event) => handleSearch((event.currentTarget as HTMLInputElement).value)}
+					autofocus
+				/>
+				<svg
+					class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
+					width="16"
+					height="16"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2.2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					aria-hidden="true"
+				>
+					<circle cx="11" cy="11" r="7" />
+					<line x1="21" y1="21" x2="16.65" y2="16.65" />
+				</svg>
+			</div>
+		</div>
+	{/if}
+
+	<div class="flex w-full h-full flex-col lg:flex-row mt-4 md:mt-0">
 		<!-- List Panel -->
 		<div
 			class="flex-1 min-w-0 {$isDocumentOpen ? 'lg:w-1/2' : 'w-full'} transition-all duration-300"
 		>
 			<!-- Sort and Filter Controls -->
 			<div
-				class="flex flex-col sm:flex-row justify-end mb-4 items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 px-2 sm:px-0"
+				class="flex-col sm:flex-row justify-end mb-4 items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 px-2 sm:px-0 {$mobileFiltersOpen
+					? 'flex'
+					: 'hidden md:flex'}"
 			>
 				<div class="flex items-center space-x-2 w-full sm:w-auto">
 					<label for="year-filter" class="text-sm text-gray-600">Année:</label>
