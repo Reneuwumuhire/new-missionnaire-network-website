@@ -24,6 +24,7 @@
 	import BsLink45deg from 'svelte-icons-pack/bs/BsLink45deg';
 	import BsChevronDown from 'svelte-icons-pack/bs/BsChevronDown';
 	import BsMusicNoteList from 'svelte-icons-pack/bs/BsMusicNoteList';
+	import AiOutlineDownload from 'svelte-icons-pack/ai/AiOutlineDownload';
 	import SyncedLyrics from '$lib/components/SyncedLyrics.svelte';
 	import {
 		selectAudio,
@@ -49,6 +50,7 @@
 	} from '../../utils/audioPlayback';
 	import { toggleFavorite, isFavorite, favorites } from '../stores/musicHistory';
 	import { songSlug } from '$lib/utils/songSlug';
+	import { downloadAudioFile } from '../../utils/downloadAudio';
 	// ── BEGIN: cache indicator imports (added) ────────────────────
 	import { isCached, prefetchAudio } from '$lib/audioCache';
 	import { isOnline } from '$lib/onlineStatus';
@@ -714,9 +716,56 @@
 		}
 	}
 
+	// ── Download the currently playing track ──────────────────────
+	// Streams the file to disk (XHR blob) with live progress shown
+	// inside the pill, mirroring the download buttons in the music /
+	// sermon list rows. A second click while a download is in flight
+	// cancels it via the AbortController.
+	let isDownloading = false;
+	let downloadPercent: number | null = 0;
+	let downloadController: AbortController | null = null;
+	let downloadFeedback: 'error' | null = null;
+	let downloadFeedbackTimeout: ReturnType<typeof setTimeout> | null = null;
+
+	async function downloadCurrentAudio() {
+		if (isDownloading && downloadController) {
+			downloadController.abort();
+			return;
+		}
+		if (!browser || !$selectAudio) return;
+		const url = getPlayableAudioUrl($selectAudio as PlayableAudio);
+		if (!url) return;
+
+		const controller = new AbortController();
+		downloadController = controller;
+		isDownloading = true;
+		downloadPercent = 0;
+		try {
+			await downloadAudioFile(url, getDisplayTitle($selectAudio), {
+				signal: controller.signal,
+				onProgress: (p) => (downloadPercent = p.percent)
+			});
+		} catch (err) {
+			if (!controller.signal.aborted) {
+				console.error('[AudioPlayer] Download failed:', err);
+				downloadFeedback = 'error';
+				if (downloadFeedbackTimeout) clearTimeout(downloadFeedbackTimeout);
+				downloadFeedbackTimeout = setTimeout(() => {
+					downloadFeedback = null;
+					downloadFeedbackTimeout = null;
+				}, 2200);
+			}
+		} finally {
+			downloadController = null;
+			isDownloading = false;
+			downloadPercent = 0;
+		}
+	}
+
 	$: currentFavId = getAudioFavId($selectAudio);
 	$: isCurrentFavorite = isFavorite(currentFavId, $favorites);
 	$: canShareCurrent = !!($selectAudio && ($selectAudio as any)?._id);
+	$: canDownloadCurrent = !!getPlayableAudioUrl($selectAudio as PlayableAudio);
 	$: hasLyrics = lyricsLines.length > 0;
 
 	$: if (browser) {
@@ -818,6 +867,8 @@
 
 	onDestroy(() => {
 		if (prefetchTimer) clearTimeout(prefetchTimer);
+		if (downloadFeedbackTimeout) clearTimeout(downloadFeedbackTimeout);
+		downloadController?.abort();
 	});
 	// ── END: cache indicator state ────────────────────────────────
 
@@ -2632,6 +2683,37 @@
 								role="status"
 							>
 								{shareFeedback === 'copied' ? 'Lien copié' : 'Échec — copiez l’URL'}
+							</span>
+						{/if}
+					</div>
+				{/if}
+
+				{#if canDownloadCurrent}
+					<div class="relative flex-shrink-0">
+						<button
+							type="button"
+							class="player-action-pill {isDownloading ? 'is-active' : ''}"
+							on:click|stopPropagation={downloadCurrentAudio}
+							aria-label={isDownloading
+								? 'Annuler le téléchargement'
+								: 'Télécharger ce chant'}
+							title={isDownloading
+								? 'Téléchargement en cours — cliquez pour annuler'
+								: 'Télécharger'}
+						>
+							<Icon src={AiOutlineDownload} size="17" />
+							{#if isDownloading}
+								<span>{downloadPercent === null ? '…' : `${downloadPercent}%`}</span>
+							{:else}
+								<span class="hidden sm:inline">Download</span>
+							{/if}
+						</button>
+						{#if downloadFeedback}
+							<span
+								class="absolute right-0 bottom-full z-[140] mb-2 whitespace-nowrap rounded-md bg-stone-900 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white shadow-lg pointer-events-none"
+								role="status"
+							>
+								Échec du téléchargement
 							</span>
 						{/if}
 					</div>
