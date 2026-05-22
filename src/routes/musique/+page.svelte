@@ -107,9 +107,7 @@
 	$: sharedSongTitle = sharedSong?.title?.trim() || '';
 	$: sharedSongArtist = sharedSong?.artist?.trim() || '';
 	$: sharedSongCategory = sharedSong?.category?.trim() || '';
-	$: sharedSongPreviewTitle = sharedSongTitle
-		? `${sharedSongTitle} — Missionnaire Network`
-		: '';
+	$: sharedSongPreviewTitle = sharedSongTitle ? `${sharedSongTitle} — Missionnaire Network` : '';
 	$: sharedSongPreviewDescription = sharedSongTitle
 		? sharedSongArtist
 			? `Écoutez « ${sharedSongTitle} » par ${sharedSongArtist} sur Missionnaire Network.`
@@ -135,9 +133,8 @@
 	let isArtistMenuOpen = false;
 	let artistMenuEl: HTMLDivElement | null = null;
 
-	// Close the mobile "Artiste" dropdown on an outside tap. The desktop
-	// dropdown has its own full-screen backdrop; the mobile one didn't,
-	// so it previously only closed by tapping the toggle button again.
+	// Close the "Artiste" dropdown on an outside tap. The toggle button uses
+	// `stopPropagation`, so its own click never reaches this handler.
 	function handleArtistOutsideClick(event: MouseEvent) {
 		if (!isArtistMenuOpen || !artistMenuEl) return;
 		if (!artistMenuEl.contains(event.target as Node)) isArtistMenuOpen = false;
@@ -953,7 +950,7 @@
 						Rafraîchir
 					</button>
 				{/if}
-				<div class="relative md:hidden" bind:this={artistMenuEl}>
+				<div class="relative" bind:this={artistMenuEl}>
 					<button
 						class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors {isArtistMenuOpen
 							? 'border-missionnaire text-missionnaire bg-missionnaire/5'
@@ -1338,80 +1335,22 @@
 				{/if}
 				<span class="truncate">Recueil</span>
 			</button>
-			<div class="hidden md:flex relative min-w-0 items-center gap-1.5">
-				<button
-					class="min-w-0 hover:text-missionnaire transition-colors flex items-center gap-1.5"
-					on:click={() => (isArtistMenuOpen = !isArtistMenuOpen)}
-				>
-					{#if currentSort.startsWith('artist')}
-						<span class="text-missionnaire font-bold">
-							<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
-						</span>
-					{/if}
-					<span class="truncate">Artiste</span>
-					{#if currentArtist}
-						<span
-							class="ml-1 bg-stone-200 text-missionnaire px-1.5 py-0.5 rounded-md text-[9px] lowercase"
-							>filtré</span
-						>
-					{/if}
-				</button>
-
-				{#if isArtistMenuOpen}
-					<!-- svelte-ignore a11y-no-static-element-interactions -->
-					<!-- svelte-ignore a11y-click-events-have-key-events -->
-					<div
-						class="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-stone-200 p-3 z-50 normal-case tracking-normal"
-						on:click|stopPropagation
+			<!-- Artist column is a plain label; filtering is done via the
+			     "Artiste" chip button in the list header (works on all sizes).
+			     `normal-case` matches the sibling <button> columns, which
+			     Tailwind preflight resets to text-transform: none. -->
+			<div class="hidden md:flex min-w-0 items-center gap-1.5 normal-case">
+				{#if currentSort.startsWith('artist')}
+					<span class="text-missionnaire font-bold">
+						<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
+					</span>
+				{/if}
+				<span class="truncate">Artiste</span>
+				{#if currentArtist}
+					<span
+						class="ml-1 bg-stone-200 text-missionnaire px-1.5 py-0.5 rounded-md text-[9px] lowercase"
+						>filtré</span
 					>
-						<div class="flex items-center gap-2 bg-stone-50 px-2 py-1.5 rounded-lg mb-2">
-							<Icon src={BsSearch} size="12" color="#999" />
-							<input
-								type="text"
-								placeholder="Rechercher un artiste..."
-								class="bg-transparent border-none outline-none text-xs w-full text-stone-700 placeholder:text-stone-400"
-								bind:value={artistSearch}
-							/>
-						</div>
-
-						<div class="max-h-60 overflow-y-auto space-y-1 custom-scrollbar">
-							{#if filteredArtists.length === 0}
-								<div class="px-3 py-4 text-xs text-stone-400 text-center italic">
-									Aucun artiste trouvé
-								</div>
-							{:else}
-								<button
-									class="w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-colors {!currentArtist
-										? 'bg-stone-100 text-missionnaire'
-										: 'text-stone-500 hover:bg-stone-50'}"
-									on:click={() => {
-										handleArtistChange('');
-										isArtistMenuOpen = false;
-									}}
-								>
-									Tous les artistes
-								</button>
-								{#each filteredArtists as artist}
-									<button
-										class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-colors {currentArtist ===
-										artist
-											? 'bg-stone-100 text-missionnaire font-bold'
-											: 'text-stone-600 hover:bg-stone-50'}"
-										on:click={() => {
-											handleArtistChange(artist);
-											isArtistMenuOpen = false;
-										}}
-									>
-										{artist}
-									</button>
-								{/each}
-							{/if}
-						</div>
-					</div>
-					<!-- Backdrop -->
-					<!-- svelte-ignore a11y-no-static-element-interactions -->
-					<!-- svelte-ignore a11y-click-events-have-key-events -->
-					<div class="fixed inset-0 z-40" on:click={() => (isArtistMenuOpen = false)}></div>
 				{/if}
 			</div>
 			<button
@@ -1715,9 +1654,7 @@
 			<div class="px-5 pt-5 pb-4 border-b border-stone-100">
 				<div class="flex items-start justify-between gap-3">
 					<div class="min-w-0">
-						<p
-							class="text-[10px] font-bold uppercase tracking-[0.25em] text-missionnaire mb-1"
-						>
+						<p class="text-[10px] font-bold uppercase tracking-[0.25em] text-missionnaire mb-1">
 							Téléchargement
 						</p>
 						<h3 class="font-display text-xl font-semibold text-stone-900 truncate">
@@ -1745,15 +1682,15 @@
 							<span class="font-semibold">.zip</span>.
 						</p>
 						<p class="text-xs text-stone-500 leading-relaxed">
-							Taille estimée : ~{downloadEstimateMb}&nbsp;Mo. Gardez l'onglet ouvert
-							pendant le téléchargement — fermer l'application l'interrompt.
+							Taille estimée : ~{downloadEstimateMb}&nbsp;Mo. Gardez l'onglet ouvert pendant le
+							téléchargement — fermer l'application l'interrompt.
 						</p>
 						{#if totalSongs > 200}
 							<p
 								class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2"
 							>
-								Liste volumineuse : le navigateur peut échouer si la mémoire est limitée.
-								Filtrez davantage pour un téléchargement plus sûr.
+								Liste volumineuse : le navigateur peut échouer si la mémoire est limitée. Filtrez
+								davantage pour un téléchargement plus sûr.
 							</p>
 						{/if}
 					</div>
@@ -1779,9 +1716,7 @@
 								style="width: {downloadProgress.total > 0
 									? Math.min(
 											100,
-											Math.round(
-												(downloadProgress.completed / downloadProgress.total) * 100
-											)
+											Math.round((downloadProgress.completed / downloadProgress.total) * 100)
 										)
 									: 0}%"
 							></div>
@@ -1814,15 +1749,15 @@
 				{/if}
 
 				{#if downloadError}
-					<p
-						class="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2"
-					>
+					<p class="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
 						{downloadError}
 					</p>
 				{/if}
 			</div>
 
-			<div class="px-5 py-4 bg-stone-50/50 border-t border-stone-100 flex items-center justify-end gap-2">
+			<div
+				class="px-5 py-4 bg-stone-50/50 border-t border-stone-100 flex items-center justify-end gap-2"
+			>
 				{#if isDownloading}
 					<button
 						class="px-4 py-2 rounded-full border border-stone-300 bg-white text-xs font-bold uppercase tracking-wider text-stone-700 hover:border-red-300 hover:text-red-600 transition-colors"
@@ -1884,20 +1819,10 @@
 			#000 calc(100% - var(--fade)),
 			transparent 100%
 		);
-		mask-image: linear-gradient(
-			to right,
-			#000 0,
-			#000 calc(100% - var(--fade)),
-			transparent 100%
-		);
+		mask-image: linear-gradient(to right, #000 0, #000 calc(100% - var(--fade)), transparent 100%);
 	}
 	.recueils-scroll.can-scroll-left .recueils-track {
-		-webkit-mask-image: linear-gradient(
-			to right,
-			transparent 0,
-			#000 var(--fade),
-			#000 100%
-		);
+		-webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fade), #000 100%);
 		mask-image: linear-gradient(to right, transparent 0, #000 var(--fade), #000 100%);
 	}
 	.recueils-scroll.can-scroll-left.can-scroll-right .recueils-track {
