@@ -6,8 +6,11 @@
 	import { onDestroy, onMount } from 'svelte';
 	import { formatFileSize } from '../../utils/FormatTime';
 	import DocumentText1 from 'iconsax-svelte/DocumentText1.svelte';
-	import Export from 'iconsax-svelte/Export.svelte';
-	import VideoPlay from 'iconsax-svelte/VideoPlay.svelte';
+	// @ts-ignore
+	import Icon from 'svelte-icons-pack/Icon.svelte';
+	import AiOutlineDownload from 'svelte-icons-pack/ai/AiOutlineDownload';
+	import AiFillPlayCircle from 'svelte-icons-pack/ai/AiFillPlayCircle';
+
 	import ArrowDown2 from 'iconsax-svelte/ArrowDown2.svelte';
 	import ArrowUp2 from 'iconsax-svelte/ArrowUp2.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
@@ -486,25 +489,27 @@
 									</div>
 								</div>
 							</button>
-							<div class="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-4">
+							<div class="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4">
 								{#if document.videoDisplayId}
 									<a
 										href={`https://www.youtube.com/watch?v=${document.videoDisplayId}`}
 										target="_blank"
 										rel="noopener noreferrer"
-										class="p-1 sm:p-2 text-gray-500 hover:text-missionnaire transition-colors"
-										title="Voir la vidéo"
+										class="inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2 py-1 sm:px-2.5 sm:py-1.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-stone-600 hover:border-red-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+										title="Voir la vidéo sur YouTube"
 									>
-										<VideoPlay size={18} />
+										<Icon src={AiFillPlayCircle} size="14" />
+										<span class="hidden sm:inline">Vidéo</span>
 									</a>
 								{/if}
 								<a
 									href={document.url}
 									download
-									class="p-1 sm:p-2 text-gray-500 hover:text-missionnaire transition-colors"
-									title="Télécharger"
+									class="inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2 py-1 sm:px-2.5 sm:py-1.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-stone-600 hover:border-missionnaire hover:text-missionnaire hover:bg-missionnaire/5 transition-colors"
+									title="Télécharger le PDF"
 								>
-									<Export size={18} />
+									<Icon src={AiOutlineDownload} size="14" />
+									<span class="hidden sm:inline">PDF</span>
 								</a>
 							</div>
 						</div>
@@ -610,7 +615,7 @@
 									class="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-xs sm:text-sm font-medium text-white bg-missionnaire hover:bg-missionnaire/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-missionnaire w-full"
 								>
 									<div class="mr-2">
-										<Export size={16} />
+										<Icon src={AiOutlineDownload} size="16" />
 									</div>
 									Télécharger le document
 								</a>
@@ -622,7 +627,7 @@
 										class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-xs sm:text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-missionnaire w-full"
 									>
 										<div class="mr-2">
-											<VideoPlay size={16} />
+											<Icon src={AiFillPlayCircle} size="16" />
 										</div>
 										Voir la vidéo associée
 									</a>
