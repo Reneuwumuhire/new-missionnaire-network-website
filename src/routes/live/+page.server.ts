@@ -2,17 +2,17 @@ import { getRecentPublished } from '$lib/server/recordings';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ setHeaders }) => {
-	// Edge-cache the rendered page for up to a day. Everything time-sensitive
-	// on /live (the live banner + the radio player) is hydrated client-side:
-	// LiveRadioPlayer fetches /api/live/radio-state on mount and then streams
-	// updates via SSE, so it self-corrects within seconds even off a day-old
-	// cached document. The only server-rendered data here is the "Directs
-	// précédents" list, where stale-within-a-day is fine — a newly published
-	// recording simply appears on the next revalidation. `stale-while-revalidate`
-	// keeps every hit instant: past the day, the edge serves the cached copy
-	// and refreshes it in the background instead of blocking on the DB.
+	// Edge-cache the rendered page, but keep the freshness window short so a
+	// newly published rediffusion appears in "Directs précédents" within ~a
+	// minute rather than a day. The live banner + radio player are hydrated
+	// client-side (LiveRadioPlayer fetches /api/live/radio-state then streams
+	// SSE updates), so the only server-rendered data here is the recordings
+	// list. With s-maxage=60 the edge serves a cached copy for a minute, then
+	// `stale-while-revalidate` keeps every later hit instant — the edge returns
+	// the stale copy immediately and refreshes it in the background, so a fresh
+	// recording propagates on the next request instead of blocking on the DB.
 	setHeaders({
-		'cache-control': 'public, s-maxage=86400, stale-while-revalidate=86400'
+		'cache-control': 'public, s-maxage=60, stale-while-revalidate=600'
 	});
 
 	const recentRecordings = await getRecentPublished(5);
