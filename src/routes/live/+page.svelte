@@ -1,5 +1,6 @@
 <script lang="ts">
 	import LiveRadioPlayer from '$lib/components/+liveRadioPlayer.svelte';
+	import ShareLive from '$lib/components/+shareLive.svelte';
 	import NotificationBell from '$lib/components/+notificationBell.svelte';
 	import RecentRecordings from '$lib/components/+recentRecordings.svelte';
 	import type { PageData } from './$types';
@@ -68,6 +69,9 @@
 
 		<!-- Player -->
 		<LiveRadioPlayer />
+
+		<!-- Share the live stream with others -->
+		<ShareLive />
 
 		<!-- Recent recordings -->
 		<RecentRecordings recordings={data.recentRecordings} />
