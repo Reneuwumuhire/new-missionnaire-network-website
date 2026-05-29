@@ -43,13 +43,29 @@ export const load: PageServerLoad = async ({ setHeaders, url }) => {
 			: new URL(rawThumb, url.origin).toString()
 		: null;
 
+	const liveTitle = isLive ? adminGate.title : null;
+	const DEFAULT_TITLE = 'Audio en direct - Missionnaire Network';
+	const DEFAULT_DESC =
+		'Écoutez Missionnaire Network en direct audio. Prédications et cantiques du Message de l’Heure en streaming continu.';
+
 	return {
 		recentRecordings,
 		liveMeta: {
 			isLive,
-			title: isLive ? adminGate.title : null,
+			title: liveTitle,
 			description: isLive ? adminGate.description : null,
 			thumbnailUrl: ogImage
+		},
+		// Single source of truth for og:*/twitter:* — the root +layout.svelte
+		// renders one canonical set from `meta`. The page must NOT emit its own
+		// og:* tags or crawlers see duplicates and pick the layout default image
+		// (og-image.jpg) over the live thumbnail. Only set `image` when live so
+		// the layout falls back to the site default off-air.
+		meta: {
+			title: liveTitle ? `🔴 En direct : ${liveTitle}` : DEFAULT_TITLE,
+			description: (isLive && adminGate.description) || DEFAULT_DESC,
+			url: 'https://missionnaire.net/live',
+			...(ogImage ? { image: ogImage } : {})
 		}
 	};
 };

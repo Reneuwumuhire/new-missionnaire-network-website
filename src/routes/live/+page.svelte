@@ -8,38 +8,13 @@
 	export let data: PageData;
 	let bellRef: any;
 
-	// When a broadcast is on air, surface its title/description/thumbnail in
-	// the page metadata so a shared /live link previews the actual live —
-	// otherwise fall back to the generic live-page copy.
-	const DEFAULT_TITLE = 'Audio en direct - Missionnaire Network';
-	const DEFAULT_DESC =
-		'Écoutez Missionnaire Network en direct audio. Prédications et cantiques du Message de l’Heure en streaming continu.';
+	// og:*/twitter:*/<title>/<canonical> are rendered once by the root
+	// +layout.svelte from the `meta` object this route returns in its load —
+	// emitting them here too would duplicate the tags and let crawlers pick the
+	// layout's default image over the live thumbnail. `liveMeta` is kept only to
+	// drive the share-sheet copy below.
 	$: liveMeta = data.liveMeta;
-	$: ogTitle = liveMeta?.title ? `🔴 En direct : ${liveMeta.title}` : DEFAULT_TITLE;
-	$: ogDescription = liveMeta?.description || DEFAULT_DESC;
-	$: ogImage = liveMeta?.thumbnailUrl ?? null;
-	$: pageTitle = liveMeta?.title ? `${liveMeta.title} — En direct` : DEFAULT_TITLE;
 </script>
-
-<svelte:head>
-	<title>{pageTitle}</title>
-	<meta name="description" content={ogDescription} />
-	<link rel="canonical" href="https://missionnaire.net/live" />
-	<meta property="og:type" content="website" />
-	<meta property="og:site_name" content="Missionnaire Network" />
-	<meta property="og:title" content={ogTitle} />
-	<meta property="og:description" content={ogDescription} />
-	<meta property="og:url" content="https://missionnaire.net/live" />
-	{#if ogImage}
-		<meta property="og:image" content={ogImage} />
-		<meta name="twitter:card" content="summary_large_image" />
-		<meta name="twitter:image" content={ogImage} />
-	{:else}
-		<meta name="twitter:card" content="summary" />
-	{/if}
-	<meta name="twitter:title" content={ogTitle} />
-	<meta name="twitter:description" content={ogDescription} />
-</svelte:head>
 
 <section class="w-full px-6 pt-4 pb-10 md:pt-6">
 	<div class="max-w-2xl mx-auto">
