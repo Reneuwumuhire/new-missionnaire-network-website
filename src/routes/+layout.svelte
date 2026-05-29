@@ -126,6 +126,8 @@
 		description?: string;
 		url?: string;
 		image?: string;
+		imageWidth?: number;
+		imageHeight?: number;
 		type?: string;
 		noindex?: boolean;
 	};
@@ -135,6 +137,17 @@
 	$: ogImage = pageMeta.image || `${SITE_URL}/og-image.jpg`;
 	$: ogType = pageMeta.type || 'website';
 	$: pageNoIndex = pageMeta.noindex === true;
+	// og:image:width/height are only safe to declare when we KNOW the image's
+	// real dimensions. The default og-image.jpg is 1200×630. A page-supplied
+	// image (live thumbnail, etc.) has unknown/variable dimensions — declaring
+	// the wrong 1200×630 makes Facebook/WhatsApp mis-render or reject it, so we
+	// omit the hints and let the crawler read the real size unless the page
+	// passes explicit dimensions.
+	$: ogImageDims = pageMeta.image
+		? pageMeta.imageWidth && pageMeta.imageHeight
+			? { w: pageMeta.imageWidth, h: pageMeta.imageHeight }
+			: null
+		: { w: 1200, h: 630 };
 
 	const ytPages = ['/videos', '/musique', '/predications'];
 	$: needsYouTube = ytPages.some((p) => $page.url.pathname.startsWith(p));
@@ -327,8 +340,10 @@
 	<meta property="og:url" content={ogUrl} />
 	<meta property="og:logo" content="https://missionnaire.net/favicon.png" />
 	<meta property="og:image" content={ogImage} />
-	<meta property="og:image:width" content="1200" />
-	<meta property="og:image:height" content="630" />
+	{#if ogImageDims}
+		<meta property="og:image:width" content={String(ogImageDims.w)} />
+		<meta property="og:image:height" content={String(ogImageDims.h)} />
+	{/if}
 	<meta name="twitter:card" content="summary_large_image" />
 	<meta name="twitter:title" content={ogTitle} />
 	<meta name="twitter:description" content={ogDescription} />

@@ -43,6 +43,21 @@ export const load: PageServerLoad = async ({ setHeaders, url }) => {
 			: new URL(rawThumb, url.origin).toString()
 		: null;
 
+	// Route the thumbnail through Vercel Image Optimization. The raw S3 PNGs are
+	// ~700 KB, and WhatsApp silently drops any og:image over ~300 KB (so no
+	// preview thumbnail). `w=1080` is an allowed size in svelte.config's
+	// images.sizes (1200 is NOT — it 400s), and a low quality keeps the result
+	// well under the limit (~185 KB observed). For crawler Accept headers Vercel
+	// returns the original format (PNG), not webp/avif, so previews stay
+	// compatible. Built on `url.origin` so it points at the served, non-
+	// redirecting host. We deliberately don't pass image dimensions to `meta`:
+	// the optimizer preserves the source aspect ratio, which varies per upload,
+	// so the layout omits og:image:width/height and lets crawlers read the real
+	// size instead of mis-declaring 1200×630.
+	const ogImageOptimized = ogImage
+		? `${url.origin}/_vercel/image?url=${encodeURIComponent(ogImage)}&w=1080&q=50`
+		: null;
+
 	const liveTitle = isLive ? adminGate.title : null;
 	const DEFAULT_TITLE = 'Audio en direct - Missionnaire Network';
 	const DEFAULT_DESC =
@@ -65,7 +80,7 @@ export const load: PageServerLoad = async ({ setHeaders, url }) => {
 			title: liveTitle ? `🔴 En direct : ${liveTitle}` : DEFAULT_TITLE,
 			description: (isLive && adminGate.description) || DEFAULT_DESC,
 			url: 'https://missionnaire.net/live',
-			...(ogImage ? { image: ogImage } : {})
+			...(ogImageOptimized ? { image: ogImageOptimized } : {})
 		}
 	};
 };
