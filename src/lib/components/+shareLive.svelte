@@ -16,8 +16,12 @@
 	$: hasNativeShare =
 		browser && typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 
-	const SHARE_TITLE = 'Écoute en direct - Missionnaire Network';
-	const SHARE_TEXT = 'Écoutez Missionnaire Network en direct 🎙️';
+	// Title/text for the native share sheet — the page passes the current
+	// live's title when on air, otherwise the generic copy. (The thumbnail
+	// preview comes from the page's server-rendered og:image tags, which the
+	// share-sheet/link-preview crawlers read; it can't be set here.)
+	export let title = 'Écoute en direct - Missionnaire Network';
+	export let text = 'Écoutez Missionnaire Network en direct 🎙️';
 
 	function buildShareUrl(): string {
 		if (!browser) return '';
@@ -55,8 +59,8 @@
 		const url = buildShareUrl();
 		if (!url) return;
 		const shareData: ShareData = {
-			title: SHARE_TITLE,
-			text: SHARE_TEXT,
+			title,
+			text,
 			url
 		};
 		try {

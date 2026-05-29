@@ -7,21 +7,38 @@
 
 	export let data: PageData;
 	let bellRef: any;
+
+	// When a broadcast is on air, surface its title/description/thumbnail in
+	// the page metadata so a shared /live link previews the actual live —
+	// otherwise fall back to the generic live-page copy.
+	const DEFAULT_TITLE = 'Audio en direct - Missionnaire Network';
+	const DEFAULT_DESC =
+		'Écoutez Missionnaire Network en direct audio. Prédications et cantiques du Message de l’Heure en streaming continu.';
+	$: liveMeta = data.liveMeta;
+	$: ogTitle = liveMeta?.title ? `🔴 En direct : ${liveMeta.title}` : DEFAULT_TITLE;
+	$: ogDescription = liveMeta?.description || DEFAULT_DESC;
+	$: ogImage = liveMeta?.thumbnailUrl ?? null;
+	$: pageTitle = liveMeta?.title ? `${liveMeta.title} — En direct` : DEFAULT_TITLE;
 </script>
 
 <svelte:head>
-	<title>Audio en direct - Missionnaire Network</title>
-	<meta
-		name="description"
-		content="Écoutez Missionnaire Network en direct audio. Prédications et cantiques du Message de l'Heure en streaming continu."
-	/>
+	<title>{pageTitle}</title>
+	<meta name="description" content={ogDescription} />
 	<link rel="canonical" href="https://missionnaire.net/live" />
-	<meta property="og:title" content="Audio en direct - Missionnaire Network" />
-	<meta
-		property="og:description"
-		content="Écoutez Missionnaire Network en direct audio. Prédications et cantiques du Message de l'Heure en streaming continu."
-	/>
+	<meta property="og:type" content="website" />
+	<meta property="og:site_name" content="Missionnaire Network" />
+	<meta property="og:title" content={ogTitle} />
+	<meta property="og:description" content={ogDescription} />
 	<meta property="og:url" content="https://missionnaire.net/live" />
+	{#if ogImage}
+		<meta property="og:image" content={ogImage} />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:image" content={ogImage} />
+	{:else}
+		<meta name="twitter:card" content="summary" />
+	{/if}
+	<meta name="twitter:title" content={ogTitle} />
+	<meta name="twitter:description" content={ogDescription} />
 </svelte:head>
 
 <section class="w-full px-6 pt-4 pb-10 md:pt-6">
@@ -71,7 +88,12 @@
 		<LiveRadioPlayer />
 
 		<!-- Share the live stream with others -->
-		<ShareLive />
+		<ShareLive
+			title={liveMeta?.title ? `🔴 ${liveMeta.title}` : 'Écoute en direct - Missionnaire Network'}
+			text={liveMeta?.title
+				? `${liveMeta.title} — en direct sur Missionnaire Network 🎙️`
+				: 'Écoutez Missionnaire Network en direct 🎙️'}
+		/>
 
 		<!-- Recent recordings -->
 		<RecentRecordings recordings={data.recentRecordings} />
