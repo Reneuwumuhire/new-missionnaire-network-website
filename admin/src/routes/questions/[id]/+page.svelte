@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import FormattedQuestionText from '$lib/components/questions/FormattedQuestionText.svelte';
-	import RichTextToolbar from '$lib/components/questions/RichTextToolbar.svelte';
+	import MarkdownEditor from '$lib/components/questions/MarkdownEditor.svelte';
 	import { loadingSubmit } from '$lib/actions/loadingSubmit';
 	import { confirmDialog } from '$lib/stores/confirm-dialog';
 	import type { ActionData, PageData } from './$types';
@@ -340,8 +340,7 @@
 					</div>
 					<div>
 						<label for="body" class="admin-label">Question</label>
-						<RichTextToolbar targetId="body" />
-						<textarea id="body" name="body" rows="6" class="admin-input">{question.body}</textarea>
+						<MarkdownEditor id="body" name="body" rows={6} content={question.body} />
 					</div>
 					<div class="grid gap-3 md:grid-cols-3">
 						<div>
@@ -374,30 +373,53 @@
 		<section class="border border-stone-200/60 bg-white/50 p-4">
 			<h2 class="font-display text-xl font-semibold text-stone-800">Réponse officielle</h2>
 			{#if officialAnswer}
-				<div class="mt-3 border-l-4 border-primary bg-white p-3">
-					<p class="mb-2 text-[11px] uppercase tracking-[0.16em] text-primary">
-						{officialAnswer.authorDisplayName} - {formatDate(officialAnswer.createdAt)}
-					</p>
-					<FormattedQuestionText
-						text={officialAnswer.body}
-						proseClass="text-sm leading-6 text-stone-700"
-					/>
-				</div>
+				<details class="group mt-3 border-l-4 border-primary bg-white">
+					<summary
+						class="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-[11px] uppercase tracking-[0.16em] text-primary transition hover:bg-primary/5 [&::-webkit-details-marker]:hidden"
+					>
+						<span class="min-w-0 truncate">
+							{officialAnswer.authorDisplayName} - {formatDate(officialAnswer.createdAt)}
+						</span>
+						<span class="inline-flex items-center gap-1.5 text-stone-400">
+							<span class="text-[10px] font-bold normal-case tracking-normal group-open:hidden"
+								>Afficher</span
+							>
+							<span
+								class="hidden text-[10px] font-bold normal-case tracking-normal group-open:inline"
+								>Masquer</span
+							>
+							<svg
+								class="h-4 w-4 shrink-0 transition-transform group-open:rotate-180"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								aria-hidden="true"
+							>
+								<path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
+							</svg>
+						</span>
+					</summary>
+					<div class="border-t border-stone-100 px-3 pb-3 pt-3">
+						<FormattedQuestionText
+							text={officialAnswer.body}
+							proseClass="text-sm leading-6 text-stone-700"
+						/>
+					</div>
+				</details>
 			{:else}
 				<p class="mt-3 text-sm text-stone-500">Aucune réponse officielle publiée.</p>
 			{/if}
 
 			{#if data.canPublishOfficial}
 				<form method="POST" action="?/official" class="mt-4 grid gap-3" use:loadingSubmit>
-					<RichTextToolbar targetId="official-answer-body" />
-					<textarea
+					<MarkdownEditor
 						id="official-answer-body"
 						name="body"
-						rows="7"
-						class="admin-input"
+						rows={9}
+						content={officialAnswer?.body ?? ''}
 						placeholder="Écrire ou mettre à jour la réponse pastorale"
-						>{officialAnswer?.body ?? ''}</textarea
-					>
+					/>
 					<button
 						class="admin-btn-primary justify-self-start px-4 py-2 text-[10px] tracking-[0.16em]"
 					>

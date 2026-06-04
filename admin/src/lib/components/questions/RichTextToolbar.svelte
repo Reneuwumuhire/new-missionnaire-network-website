@@ -2,8 +2,17 @@
 	import { onMount, tick } from 'svelte';
 
 	export let targetId = '';
+	export let bare = false;
 
-	type Action = 'bold' | 'italic' | 'underline' | 'strike' | 'link' | 'quote' | 'unorderedList' | 'orderedList';
+	type Action =
+		| 'bold'
+		| 'italic'
+		| 'underline'
+		| 'strike'
+		| 'link'
+		| 'quote'
+		| 'unorderedList'
+		| 'orderedList';
 
 	const actions: Array<{ action: Action; title: string }> = [
 		{ action: 'bold', title: 'Gras' },
@@ -75,16 +84,41 @@
 		return `[${markdownLabel(text)}](${href})`;
 	}
 
-	function replaceTextareaRange(textarea: HTMLTextAreaElement, start: number, end: number, replacement: string) {
+	function replaceTextareaRange(
+		textarea: HTMLTextAreaElement,
+		start: number,
+		end: number,
+		replacement: string
+	) {
 		textarea.setRangeText(replacement, start, end, 'end');
 		textarea.focus();
 		textarea.dispatchEvent(new Event('input', { bubbles: true }));
 	}
 
 	const BLOCK_TAGS = new Set([
-		'P', 'DIV', 'SECTION', 'ARTICLE', 'HEADER', 'FOOTER', 'MAIN', 'ASIDE',
-		'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
-		'UL', 'OL', 'LI', 'BLOCKQUOTE', 'PRE', 'TABLE', 'TR', 'FIGURE', 'HR'
+		'P',
+		'DIV',
+		'SECTION',
+		'ARTICLE',
+		'HEADER',
+		'FOOTER',
+		'MAIN',
+		'ASIDE',
+		'H1',
+		'H2',
+		'H3',
+		'H4',
+		'H5',
+		'H6',
+		'UL',
+		'OL',
+		'LI',
+		'BLOCKQUOTE',
+		'PRE',
+		'TABLE',
+		'TR',
+		'FIGURE',
+		'HR'
 	]);
 
 	function isBoldStyle(el: HTMLElement): boolean {
@@ -120,7 +154,8 @@
 		const bold = tag === 'STRONG' || tag === 'B' || isBoldStyle(el);
 		const italic = tag === 'EM' || tag === 'I' || style.fontStyle === 'italic';
 		const underline = tag === 'U' || /underline/.test(decoration);
-		const strike = tag === 'S' || tag === 'STRIKE' || tag === 'DEL' || /line-through/.test(decoration);
+		const strike =
+			tag === 'S' || tag === 'STRIKE' || tag === 'DEL' || /line-through/.test(decoration);
 
 		const leading = inner.match(/^\s*/)?.[0] ?? '';
 		const trailing = inner.match(/\s*$/)?.[0] ?? '';
@@ -162,7 +197,9 @@
 			let index = 0;
 			for (const li of Array.from(el.children)) {
 				if (li.tagName !== 'LI') continue;
-				const text = inlineHtmlToMarkdown(li).replace(/\s*\n\s*/g, ' ').trim();
+				const text = inlineHtmlToMarkdown(li)
+					.replace(/\s*\n\s*/g, ' ')
+					.trim();
 				if (!text) continue;
 				index += 1;
 				lines.push(ordered ? `${index}. ${text}` : `- ${text}`);
@@ -184,20 +221,25 @@
 		}
 
 		if (/^H[1-6]$/.test(tag)) {
-			const text = inlineHtmlToMarkdown(el).replace(/\s*\n\s*/g, ' ').trim();
+			const text = inlineHtmlToMarkdown(el)
+				.replace(/\s*\n\s*/g, ' ')
+				.trim();
 			if (text) out.push(`**${text}**`);
 			return;
 		}
 
 		const hasBlockChild = Array.from(el.childNodes).some(
-			(child) => child.nodeType === Node.ELEMENT_NODE && BLOCK_TAGS.has((child as HTMLElement).tagName)
+			(child) =>
+				child.nodeType === Node.ELEMENT_NODE && BLOCK_TAGS.has((child as HTMLElement).tagName)
 		);
 		if (hasBlockChild) {
 			collectBlocks(el, out);
 			return;
 		}
 
-		const text = inlineHtmlToMarkdown(el).replace(/[ \t]+\n/g, '\n').trim();
+		const text = inlineHtmlToMarkdown(el)
+			.replace(/[ \t]+\n/g, '\n')
+			.trim();
 		if (text) out.push(text);
 	}
 
@@ -323,7 +365,12 @@
 		const start = textarea.selectionStart ?? 0;
 		const end = textarea.selectionEnd ?? start;
 		const selected = textarea.value.slice(start, end);
-		const fallback = action === 'quote' ? 'citation' : action === 'unorderedList' || action === 'orderedList' ? 'élément' : 'texte';
+		const fallback =
+			action === 'quote'
+				? 'citation'
+				: action === 'unorderedList' || action === 'orderedList'
+					? 'élément'
+					: 'texte';
 		const value = selected || fallback;
 		let replacement = value;
 		let selectionOffset = 0;
@@ -363,38 +410,86 @@
 </script>
 
 {#snippet linkIcon()}
-	<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.1" aria-hidden="true">
-		<path stroke-linecap="round" stroke-linejoin="round" d="M10 13a5 5 0 0 0 7.1.1l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1" />
-		<path stroke-linecap="round" stroke-linejoin="round" d="M14 11a5 5 0 0 0-7.1-.1l-2 2a5 5 0 0 0 7.1 7.1l1.1-1.1" />
+	<svg
+		class="h-4 w-4"
+		fill="none"
+		viewBox="0 0 24 24"
+		stroke="currentColor"
+		stroke-width="2.1"
+		aria-hidden="true"
+	>
+		<path
+			stroke-linecap="round"
+			stroke-linejoin="round"
+			d="M10 13a5 5 0 0 0 7.1.1l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"
+		/>
+		<path
+			stroke-linecap="round"
+			stroke-linejoin="round"
+			d="M14 11a5 5 0 0 0-7.1-.1l-2 2a5 5 0 0 0 7.1 7.1l1.1-1.1"
+		/>
 	</svg>
 {/snippet}
 
 {#snippet quoteIcon()}
-	<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-		<path stroke-linecap="round" stroke-linejoin="round" d="M8 10H5.5A2.5 2.5 0 0 0 3 12.5V16h5v-6Z" />
-		<path stroke-linecap="round" stroke-linejoin="round" d="M19 10h-2.5A2.5 2.5 0 0 0 14 12.5V16h5v-6Z" />
+	<svg
+		class="h-4 w-4"
+		fill="none"
+		viewBox="0 0 24 24"
+		stroke="currentColor"
+		stroke-width="2"
+		aria-hidden="true"
+	>
+		<path
+			stroke-linecap="round"
+			stroke-linejoin="round"
+			d="M8 10H5.5A2.5 2.5 0 0 0 3 12.5V16h5v-6Z"
+		/>
+		<path
+			stroke-linecap="round"
+			stroke-linejoin="round"
+			d="M19 10h-2.5A2.5 2.5 0 0 0 14 12.5V16h5v-6Z"
+		/>
 	</svg>
 {/snippet}
 
 {#snippet unorderedListIcon()}
-	<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+	<svg
+		class="h-4 w-4"
+		fill="none"
+		viewBox="0 0 24 24"
+		stroke="currentColor"
+		stroke-width="2"
+		aria-hidden="true"
+	>
 		<path stroke-linecap="round" stroke-linejoin="round" d="M9 7h11M9 12h11M9 17h11" />
 		<path stroke-linecap="round" stroke-linejoin="round" d="M4 7h.01M4 12h.01M4 17h.01" />
 	</svg>
 {/snippet}
 
 {#snippet orderedListIcon()}
-	<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+	<svg
+		class="h-4 w-4"
+		fill="none"
+		viewBox="0 0 24 24"
+		stroke="currentColor"
+		stroke-width="2"
+		aria-hidden="true"
+	>
 		<path stroke-linecap="round" stroke-linejoin="round" d="M10 7h10M10 12h10M10 17h10" />
 		<path stroke-linecap="round" stroke-linejoin="round" d="M4 6h1v4M4 10h2M4 14.5h2L4 18h2" />
 	</svg>
 {/snippet}
 
-<div class="flex flex-wrap items-center gap-1 border border-stone-200 bg-white/70 p-1.5">
+<div
+	class={bare
+		? 'flex flex-wrap items-center gap-0.5'
+		: 'flex flex-wrap items-center gap-1 border border-stone-200 bg-white/70 p-1.5'}
+>
 	{#each actions as item}
 		<button
 			type="button"
-			class="flex h-8 w-8 items-center justify-center border border-transparent text-sm font-bold text-stone-600 transition hover:border-primary/30 hover:bg-primary/10 hover:text-primary"
+			class="flex h-8 w-8 items-center justify-center border border-transparent text-stone-500 transition hover:border-primary/30 hover:bg-primary/10 hover:text-primary"
 			title={item.title}
 			aria-label={item.title}
 			onclick={() => wrapSelection(item.action)}
@@ -402,7 +497,9 @@
 			{#if item.action === 'bold'}
 				<span class="font-serif text-[15px] font-black leading-none">B</span>
 			{:else if item.action === 'underline'}
-				<span class="font-serif text-[15px] font-bold leading-none underline underline-offset-2">U</span>
+				<span class="font-serif text-[15px] font-bold leading-none underline underline-offset-2"
+					>U</span
+				>
 			{:else if item.action === 'italic'}
 				<span class="font-serif text-[15px] font-bold italic leading-none">I</span>
 			{:else if item.action === 'strike'}
@@ -429,14 +526,23 @@
 			aria-labelledby={modalId}
 		>
 			<div class="flex items-center justify-between border-b border-stone-100 px-5 py-4">
-				<h2 id={modalId} class="font-display text-xl font-semibold text-stone-900">Ajouter un lien</h2>
+				<h2 id={modalId} class="font-display text-xl font-semibold text-stone-900">
+					Ajouter un lien
+				</h2>
 				<button
 					type="button"
 					class="flex h-8 w-8 items-center justify-center text-stone-400 transition hover:bg-stone-100 hover:text-stone-900"
 					aria-label="Fermer"
 					onclick={closeLinkModal}
 				>
-					<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+					<svg
+						class="h-4 w-4"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+						stroke-width="2"
+						aria-hidden="true"
+					>
 						<path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6 6 18" />
 					</svg>
 				</button>
@@ -474,7 +580,9 @@
 					/>
 				</div>
 				<div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-					<button type="button" class="admin-btn-secondary justify-center" onclick={closeLinkModal}>Annuler</button>
+					<button type="button" class="admin-btn-secondary justify-center" onclick={closeLinkModal}
+						>Annuler</button
+					>
 					<button type="submit" class="admin-btn-primary justify-center">Insérer</button>
 				</div>
 			</form>
