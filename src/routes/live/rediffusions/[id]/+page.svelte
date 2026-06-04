@@ -169,6 +169,39 @@
 		}
 	});
 
+	// ── View counter ───────────────────────────────────────────────
+	// SSR renders the stored count (rides along on the page's findOne, so no
+	// extra read). After hydration we fire a one-shot, non-blocking POST to
+	// bump it — deduped per session so a refresh/HMR doesn't inflate the
+	// number. The page's render and TTFB are never on the hook for this.
+	let liveViewCount: number | null = null;
+	$: displayViews = liveViewCount ?? rec.view_count;
+
+	onMount(() => {
+		if (!browser) return;
+		const key = `rediff-viewed:${rec.id}`;
+		try {
+			if (sessionStorage.getItem(key) === '1') return;
+			sessionStorage.setItem(key, '1');
+		} catch {
+			/* sessionStorage blocked (private mode) — still count this view once */
+		}
+		// Optimistic bump so the listener immediately sees their view reflected.
+		liveViewCount = rec.view_count + 1;
+		fetch(`/api/recordings/${rec.id}/view`, { method: 'POST', keepalive: true })
+			.then((res) => (res.ok ? res.json() : null))
+			.then((body) => {
+				if (body && typeof body.view_count === 'number') liveViewCount = body.view_count;
+			})
+			.catch(() => {
+				/* tracking is best-effort — never surface to the listener */
+			});
+	});
+
+	function formatViews(n: number): string {
+		return n.toLocaleString('fr-FR');
+	}
+
 	// ── Download state ─────────────────────────────────────────────
 	// Background fetch: stream the mp3, track bytes loaded, hand the
 	// assembled blob to a synthetic <a download> so the browser saves
@@ -307,7 +340,8 @@
 			</p>
 			<h1 class="font-display text-2xl md:text-3xl font-semibold text-stone-900">{rec.title}</h1>
 			<p class="mt-3 text-sm text-stone-400 font-body">
-				{formatDate(rec.started_at)} · {formatDuration(rec.duration_sec)}
+				{formatDate(rec.started_at)} · {formatDuration(rec.duration_sec)} · {formatViews(displayViews)}
+				{displayViews >= 2 ? 'vues' : 'vue'}
 			</p>
 		</div>
 

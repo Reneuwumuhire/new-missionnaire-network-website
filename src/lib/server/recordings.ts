@@ -40,6 +40,10 @@ export interface PublishedRecording {
 	source_video_id: string | null;
 	/** Preferred transcript PDF explicitly attached from admin. */
 	transcript_pdf_id: string | null;
+	/** Cumulative number of views. Stored on the doc and incremented by a
+	 *  separate fire-and-forget endpoint, so reading it here costs nothing
+	 *  extra — it rides along on the findOne the page already does. */
+	view_count: number;
 }
 
 interface RecordingRow {
@@ -53,6 +57,7 @@ interface RecordingRow {
 	description?: string | null;
 	source_video_id?: string | null;
 	transcript_pdf_id?: string | null;
+	view_count?: number | null;
 }
 
 function toPublic(doc: RecordingRow): PublishedRecording {
@@ -67,7 +72,8 @@ function toPublic(doc: RecordingRow): PublishedRecording {
 		thumbnail_url: doc.thumbnail_url ?? null,
 		description: doc.description ?? null,
 		source_video_id: doc.source_video_id ?? null,
-		transcript_pdf_id: doc.transcript_pdf_id ?? null
+		transcript_pdf_id: doc.transcript_pdf_id ?? null,
+		view_count: typeof doc.view_count === 'number' && doc.view_count > 0 ? doc.view_count : 0
 	};
 }
 
@@ -296,6 +302,30 @@ export async function getPublishedById(id: string): Promise<PublishedRecording |
 		return row ? toPublic(row) : null;
 	} catch (err) {
 		console.error('[recordings] getPublishedById failed', err);
+		return null;
+	}
+}
+
+/** Atomically bump a recording's view counter. Called fire-and-forget from a
+ *  dedicated endpoint after the page has already rendered, so it never sits on
+ *  the page's critical path. Scoped to published+ready docs so hitting the
+ *  endpoint with a draft/unknown id is a no-op. Returns the new count, or null
+ *  if nothing matched. */
+export async function incrementViewCount(id: string): Promise<number | null> {
+	try {
+		if (!ObjectId.isValid(id)) return null;
+		const db = await getDb();
+		const result = await db
+			.collection('recordings')
+			.findOneAndUpdate(
+				{ _id: new ObjectId(id), published: true, status: 'ready' },
+				{ $inc: { view_count: 1 } },
+				{ returnDocument: 'after', projection: { view_count: 1 } }
+			);
+		const doc = result as { view_count?: number } | null;
+		return typeof doc?.view_count === 'number' ? doc.view_count : null;
+	} catch (err) {
+		console.error('[recordings] incrementViewCount failed', err);
 		return null;
 	}
 }
