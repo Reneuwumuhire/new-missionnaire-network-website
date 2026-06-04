@@ -569,11 +569,55 @@ export async function getRecordingById(id: string): Promise<Recording | null> {
 	return doc ? serializeDocument<Recording>(doc) : null;
 }
 
+/** Insert a manually-uploaded recording — used to backfill a live that was
+ *  missed on our platform but exists elsewhere (e.g. YouTube). The doc starts
+ *  in 'uploading' status with no audio; the audio finalize step (after the
+ *  MP3 lands in S3) promotes it to 'ready'. Mirrors the field shape the
+ *  recorder service writes for live captures. Returns the new id. */
+export async function createRecording(input: {
+	title: string;
+	started_at: Date;
+	description?: string | null;
+	thumbnail_url?: string | null;
+	thumbnail_s3_key?: string | null;
+	source_video_id?: string | null;
+	transcript_pdf_id?: string | null;
+	created_by: string;
+	created_by_name?: string | null;
+}): Promise<string> {
+	const db = await getDb();
+	const now = new Date();
+	const result = await db.collection('recordings').insertOne({
+		title: input.title,
+		started_at: input.started_at,
+		ended_at: null,
+		duration_sec: null,
+		s3_key: null,
+		s3_url: null,
+		size_bytes: null,
+		status: 'uploading',
+		published: false,
+		created_by: input.created_by,
+		created_by_name: input.created_by_name ?? null,
+		failure_reason: null,
+		thumbnail_url: input.thumbnail_url ?? null,
+		thumbnail_s3_key: input.thumbnail_s3_key ?? null,
+		description: input.description ?? null,
+		source_video_id: input.source_video_id ?? null,
+		transcript_pdf_id: input.transcript_pdf_id ?? null,
+		peaks: null,
+		peaks_duration_sec: null,
+		updated_at: now
+	});
+	return result.insertedId.toString();
+}
+
 export async function updateRecording(
 	id: string,
 	updates: Partial<{
 		title: string;
 		published: boolean;
+		status: RecordingStatus;
 		description: string | null;
 		thumbnail_url: string | null;
 		thumbnail_s3_key: string | null;

@@ -377,6 +377,275 @@
 	let recPdfMode = $state<'add' | 'replace'>('add');
 	let recSaving = $state(false);
 
+	// ── Backfill upload (manual recording for a missed live) ──────────
+	// Lets an admin add a recording for a date we didn't capture live but have
+	// elsewhere (e.g. the YouTube re-broadcast). Picks the MP3, a backdated
+	// date, and metadata; the doc is created then audio is uploaded + finalized
+	// via the same S3 flow the edit modal uses.
+	const canManageRecordings = $derived(Boolean(data.user?.permissions.can_manage_recordings));
+	let uploadModalOpen = $state(false);
+	let uploadTitle = $state('');
+	let uploadTitleDirty = $state(false);
+	let uploadStartedAt = $state(''); // datetime-local value (local time)
+	let uploadDescription = $state('');
+	let uploadYoutubeUrl = $state('');
+	let uploadYoutubeError = $state<string | null>(null);
+	let uploadThumbnailFile = $state<File | null>(null);
+	let uploadThumbnailPreviewUrl = $state<string | null>(null);
+	let uploadThumbnailError = $state<string | null>(null);
+	let uploadAudioFile = $state<File | null>(null);
+	let uploadAudioDurationSec = $state<number | null>(null);
+	let uploadAudioError = $state<string | null>(null);
+	let uploadAudioPct = $state<number | null>(null);
+	let uploadPublishNow = $state(false);
+	let uploadSaving = $state(false);
+	let uploadError = $state<string | null>(null);
+
+	function toLocalDatetimeValue(d: Date): string {
+		const pad = (n: number) => String(n).padStart(2, '0');
+		return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+	}
+
+	function renderTitleForDate(template: string, ymd: string): string {
+		return template.includes('{date}') ? template.replaceAll('{date}', ymd) : `${ymd} ${template}`;
+	}
+
+	function clearUploadThumbnail() {
+		if (uploadThumbnailPreviewUrl) URL.revokeObjectURL(uploadThumbnailPreviewUrl);
+		uploadThumbnailPreviewUrl = null;
+		uploadThumbnailFile = null;
+		uploadThumbnailError = null;
+	}
+
+	function clearUploadAudio() {
+		uploadAudioFile = null;
+		uploadAudioDurationSec = null;
+		uploadAudioError = null;
+		uploadAudioPct = null;
+	}
+
+	function openUploadModal() {
+		const now = new Date();
+		uploadStartedAt = toLocalDatetimeValue(now);
+		const ymd = uploadStartedAt.slice(0, 10);
+		const tpl = broadcast.default_title?.trim() || FALLBACK_DEFAULT_TITLE;
+		uploadTitle = renderTitleForDate(tpl, ymd);
+		uploadTitleDirty = false;
+		uploadDescription = broadcast.default_description?.trim() || '';
+		uploadYoutubeUrl = '';
+		uploadYoutubeError = null;
+		clearUploadThumbnail();
+		clearUploadAudio();
+		uploadPublishNow = false;
+		uploadError = null;
+		uploadModalOpen = true;
+	}
+
+	function closeUploadModal() {
+		if (uploadSaving) return;
+		clearUploadThumbnail();
+		clearUploadAudio();
+		uploadModalOpen = false;
+	}
+
+	// Re-render the title's date prefix when the admin changes the date, but
+	// only while they haven't hand-edited the title themselves.
+	function onUploadDateChange() {
+		if (uploadTitleDirty) return;
+		const ymd = uploadStartedAt.slice(0, 10);
+		if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return;
+		const tpl = broadcast.default_title?.trim() || FALLBACK_DEFAULT_TITLE;
+		uploadTitle = renderTitleForDate(tpl, ymd);
+	}
+
+	async function onUploadAudioChange(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		if (!file) return;
+		const isMp3 =
+			file.type === 'audio/mpeg' ||
+			file.type === 'audio/mp3' ||
+			file.name.toLowerCase().endsWith('.mp3');
+		if (!isMp3) {
+			uploadAudioError = 'Sélectionnez un fichier MP3';
+			return;
+		}
+		if (file.size > 2 * 1024 * 1024 * 1024) {
+			uploadAudioError = 'Fichier trop volumineux (max 2 Go)';
+			return;
+		}
+		try {
+			uploadAudioDurationSec = await readAudioDuration(file);
+		} catch {
+			uploadAudioError = 'Impossible de lire la durée — vérifiez que le MP3 est valide';
+			return;
+		}
+		uploadAudioError = null;
+		uploadAudioFile = file;
+	}
+
+	function onUploadThumbnailChange(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		if (!file) return;
+		if (!file.type.startsWith('image/')) {
+			uploadThumbnailError = 'Sélectionnez un fichier image';
+			return;
+		}
+		if (file.size > 5 * 1024 * 1024) {
+			uploadThumbnailError = 'Image trop volumineuse (max 5 Mo)';
+			return;
+		}
+		uploadThumbnailError = null;
+		if (uploadThumbnailPreviewUrl) URL.revokeObjectURL(uploadThumbnailPreviewUrl);
+		uploadThumbnailFile = file;
+		uploadThumbnailPreviewUrl = URL.createObjectURL(file);
+	}
+
+	async function submitUpload() {
+		if (uploadSaving) return;
+		uploadError = null;
+		uploadYoutubeError = null;
+		uploadAudioError = null;
+		uploadThumbnailError = null;
+
+		if (!uploadAudioFile || !uploadAudioDurationSec) {
+			uploadAudioError = 'Sélectionnez un fichier MP3';
+			return;
+		}
+		if (!uploadTitle.trim()) {
+			uploadError = 'Titre requis';
+			return;
+		}
+		const startedAt = new Date(uploadStartedAt);
+		if (!uploadStartedAt || Number.isNaN(startedAt.getTime())) {
+			uploadError = 'Date invalide';
+			return;
+		}
+
+		uploadSaving = true;
+		try {
+			// 1. Thumbnail (optional) — upload first so create can store its URL.
+			let thumbnail_url: string | null = null;
+			let thumbnail_s3_key: string | null = null;
+			if (uploadThumbnailFile) {
+				const presignRes = await fetch('/api/broadcast/thumbnail/presign', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						contentType: uploadThumbnailFile.type,
+						size: uploadThumbnailFile.size
+					})
+				});
+				if (!presignRes.ok) {
+					uploadThumbnailError = (await presignRes.text()) || `Erreur ${presignRes.status}`;
+					return;
+				}
+				const presign = (await presignRes.json()) as {
+					uploadUrl: string;
+					key: string;
+					publicUrl: string;
+				};
+				const putRes = await fetch(presign.uploadUrl, {
+					method: 'PUT',
+					headers: { 'Content-Type': uploadThumbnailFile.type },
+					body: uploadThumbnailFile
+				});
+				if (!putRes.ok) {
+					uploadThumbnailError = 'Échec du téléversement de la vignette';
+					return;
+				}
+				thumbnail_url = presign.publicUrl;
+				thumbnail_s3_key = presign.key;
+			}
+
+			// 2. Create the recording doc (status 'uploading').
+			const createRes = await fetch('/api/recordings/upload/create', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					title: uploadTitle.trim(),
+					started_at: startedAt.toISOString(),
+					description: uploadDescription.trim() || null,
+					youtube_url: uploadYoutubeUrl.trim() || null,
+					thumbnail_url,
+					thumbnail_s3_key
+				})
+			});
+			if (!createRes.ok) {
+				const msg = (await createRes.text()) || `Erreur ${createRes.status}`;
+				if (msg.includes('YouTube')) uploadYoutubeError = msg;
+				else uploadError = msg;
+				return;
+			}
+			const { id } = (await createRes.json()) as { id: string };
+
+			// 3. Upload the audio to S3, then finalize (promotes status → 'ready').
+			const presignRes = await fetch(`/api/recordings/${id}/audio/upload-url`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ contentType: 'audio/mpeg' })
+			});
+			if (!presignRes.ok) {
+				uploadAudioError = (await presignRes.text()) || `Erreur ${presignRes.status}`;
+				return;
+			}
+			const { uploadUrl, s3Key } = (await presignRes.json()) as {
+				uploadUrl: string;
+				s3Key: string;
+			};
+			uploadAudioPct = 0;
+			try {
+				await putWithProgress(uploadUrl, uploadAudioFile, 'audio/mpeg', (pct) => {
+					uploadAudioPct = pct;
+				});
+			} catch (err) {
+				uploadAudioError = err instanceof Error ? err.message : 'Échec du téléversement vers S3';
+				return;
+			}
+			const finalizeRes = await fetch(`/api/recordings/${id}/audio/finalize`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					s3_key: s3Key,
+					size_bytes: uploadAudioFile.size,
+					duration_sec: uploadAudioDurationSec
+				})
+			});
+			if (!finalizeRes.ok) {
+				uploadAudioError = (await finalizeRes.text()) || `Erreur ${finalizeRes.status}`;
+				return;
+			}
+
+			// 4. Publish immediately if requested.
+			if (uploadPublishNow) {
+				const pubRes = await fetch(`/api/recordings/${id}`, {
+					method: 'PATCH',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ published: true })
+				});
+				if (!pubRes.ok) {
+					toast.error('Enregistrement créé mais publication échouée — publiez-le depuis la liste.');
+				}
+			}
+
+			toast.success(
+				uploadPublishNow ? 'Enregistrement téléversé et publié' : 'Enregistrement téléversé'
+			);
+			uploadModalOpen = false;
+			clearUploadThumbnail();
+			clearUploadAudio();
+			await refreshVisibleRecordings();
+		} catch (err) {
+			uploadError = err instanceof Error ? err.message : 'Téléversement échoué';
+		} finally {
+			uploadSaving = false;
+			uploadAudioPct = null;
+		}
+	}
+
 	// Audio trim editor — opens as a separate modal so it can coexist with
 	// the metadata edit flow without entangling its state.
 	let trimEditorRecordingId = $state<string | null>(null);
@@ -1840,6 +2109,19 @@
 
 <!-- Search + filters toolbar -->
 <div class="mb-3 flex flex-wrap items-center gap-2 sm:gap-3">
+	{#if canManageRecordings}
+		<button
+			type="button"
+			onclick={openUploadModal}
+			class="inline-flex shrink-0 items-center gap-2 bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary/90"
+		>
+			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0-12l-4 4m4-4l4 4M4 20h16" />
+			</svg>
+			<span class="hidden sm:inline">Téléverser un enregistrement</span>
+			<span class="sm:hidden">Téléverser</span>
+		</button>
+	{/if}
 	<div class="relative min-w-[220px] flex-1 basis-full sm:basis-auto">
 		<svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
 			<path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -2285,6 +2567,219 @@
 {/if}
 
 <svelte:window onkeydown={onLightboxKeydown} />
+
+{#if uploadModalOpen}
+	<!-- Backfill upload modal — add a recording for a missed live (audio we have
+	     from YouTube/elsewhere). Date is backdated; audio uploads to S3. -->
+	<div
+		class="fixed inset-0 z-40 flex items-center justify-center overflow-y-auto bg-stone-900/60 p-4 backdrop-blur-sm animate-lightbox-in"
+		onclick={(e) => {
+			if (e.target === e.currentTarget) closeUploadModal();
+		}}
+		onkeydown={(e) => {
+			if (e.key === 'Escape') closeUploadModal();
+		}}
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="upload-recording-title"
+		tabindex="-1"
+	>
+		<div class="my-8 w-full max-w-2xl rounded-sm bg-white shadow-2xl">
+			<div class="flex items-center justify-between border-b border-stone-100 px-6 py-4">
+				<h2 id="upload-recording-title" class="font-display text-lg font-semibold text-stone-800">
+					Téléverser un enregistrement
+				</h2>
+				<button
+					type="button"
+					onclick={closeUploadModal}
+					disabled={uploadSaving}
+					aria-label="Fermer"
+					class="flex h-8 w-8 items-center justify-center rounded-full text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 disabled:opacity-50"
+				>
+					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<path d="M6 6l12 12M6 18L18 6" />
+					</svg>
+				</button>
+			</div>
+
+			<div class="flex flex-col gap-5 px-6 py-6">
+				<p class="text-xs text-stone-500">
+					Pour une diffusion manquée sur la plateforme mais disponible ailleurs (YouTube…).
+					Choisissez le fichier MP3 et la date réelle du direct.
+				</p>
+
+				<!-- Audio file (required) -->
+				<div class="flex flex-col gap-1.5">
+					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Fichier audio (MP3) <span class="text-red-500">*</span></span>
+					<div class="flex flex-wrap items-center gap-3">
+						<label class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary {uploadSaving ? 'pointer-events-none opacity-50' : ''}">
+							{uploadAudioFile ? 'Changer le fichier' : 'Choisir un MP3'}
+							<input
+								type="file"
+								accept="audio/mpeg,audio/mp3,.mp3"
+								class="hidden"
+								onchange={onUploadAudioChange}
+								disabled={uploadSaving}
+							/>
+						</label>
+						{#if uploadAudioFile}
+							<span class="text-xs text-stone-600">
+								{uploadAudioFile.name}
+								{#if uploadAudioDurationSec}· {formatDuration(uploadAudioDurationSec)}{/if}
+								· {formatBytes(uploadAudioFile.size)}
+							</span>
+						{/if}
+					</div>
+					{#if uploadAudioPct !== null}
+						<div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-stone-100">
+							<div class="h-full bg-primary transition-all" style="width: {uploadAudioPct}%"></div>
+						</div>
+						<span class="text-[10px] text-stone-400 tabular-nums">Téléversement {uploadAudioPct}%</span>
+					{/if}
+					{#if uploadAudioError}
+						<p class="text-xs text-red-600">{uploadAudioError}</p>
+					{/if}
+				</div>
+
+				<!-- Date / time (required) -->
+				<div class="flex flex-col gap-1.5">
+					<label for="upload-started-at" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Date et heure du direct <span class="text-red-500">*</span></label>
+					<input
+						id="upload-started-at"
+						type="datetime-local"
+						bind:value={uploadStartedAt}
+						oninput={onUploadDateChange}
+						disabled={uploadSaving}
+						class="admin-input text-sm sm:w-64"
+					/>
+					<span class="text-[10px] text-stone-400">Détermine la position de l'enregistrement dans les archives.</span>
+				</div>
+
+				<!-- Title (required) -->
+				<div class="flex flex-col gap-1.5">
+					<label for="upload-title" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Titre <span class="text-red-500">*</span></label>
+					<input
+						id="upload-title"
+						type="text"
+						bind:value={uploadTitle}
+						oninput={() => (uploadTitleDirty = true)}
+						maxlength="200"
+						disabled={uploadSaving}
+						placeholder="Ex. 2025-05-30 Missionnaire Network Live audio"
+						class="admin-input text-sm"
+					/>
+				</div>
+
+				<!-- Description -->
+				<div class="flex flex-col gap-1.5">
+					<label for="upload-description" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Description</label>
+					<textarea
+						id="upload-description"
+						bind:value={uploadDescription}
+						maxlength="2000"
+						rows="4"
+						disabled={uploadSaving}
+						placeholder="Sujet, orateur, texte biblique…"
+						class="admin-input resize-y text-sm"
+					></textarea>
+				</div>
+
+				<!-- YouTube link -->
+				<div class="flex flex-col gap-1.5">
+					<label for="upload-youtube" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Lien YouTube</label>
+					<input
+						id="upload-youtube"
+						type="url"
+						bind:value={uploadYoutubeUrl}
+						disabled={uploadSaving}
+						placeholder="https://www.youtube.com/watch?v=…"
+						class="admin-input text-sm"
+					/>
+					{#if uploadYoutubeError}
+						<p class="text-xs text-red-600">{uploadYoutubeError}</p>
+					{/if}
+				</div>
+
+				<!-- Thumbnail -->
+				<div class="flex flex-col gap-2">
+					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Vignette</span>
+					<div class="flex items-start gap-4">
+						{#if uploadThumbnailPreviewUrl}
+							<div class="relative aspect-video w-40 shrink-0 overflow-hidden border border-stone-300 bg-cream/40">
+								<img src={uploadThumbnailPreviewUrl} alt="" class="h-full w-full object-cover" />
+							</div>
+						{:else}
+							<div class="flex aspect-video w-40 shrink-0 flex-col items-center justify-center gap-1 border border-dashed border-stone-300">
+								<picture>
+									<source srcset="/icons/logo.webp" type="image/webp" />
+									<img src="/icons/logo.png" alt="" class="h-5 w-auto opacity-90" width="150" height="64" />
+								</picture>
+								<span class="text-[8px] font-bold uppercase tracking-[0.2em] text-stone-500">Aucune vignette</span>
+							</div>
+						{/if}
+						<div class="flex flex-col gap-2">
+							<div class="flex gap-2">
+								<label class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary {uploadSaving ? 'pointer-events-none opacity-50' : ''}">
+									{uploadThumbnailPreviewUrl ? 'Changer' : 'Téléverser'}
+									<input
+										type="file"
+										accept="image/jpeg,image/png,image/webp,image/gif"
+										class="hidden"
+										onchange={onUploadThumbnailChange}
+										disabled={uploadSaving}
+									/>
+								</label>
+								{#if uploadThumbnailPreviewUrl}
+									<button
+										type="button"
+										onclick={clearUploadThumbnail}
+										disabled={uploadSaving}
+										class="border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 transition-colors hover:border-red-200 hover:text-red-600 disabled:opacity-50"
+									>
+										Retirer
+									</button>
+								{/if}
+							</div>
+							<p class="text-[10px] text-stone-400">JPEG, PNG, WebP ou GIF · 5 Mo max</p>
+							{#if uploadThumbnailError}
+								<p class="text-xs text-red-600">{uploadThumbnailError}</p>
+							{/if}
+						</div>
+					</div>
+				</div>
+
+				<!-- Publish immediately -->
+				<label class="flex items-center gap-2 text-sm text-stone-700">
+					<input type="checkbox" bind:checked={uploadPublishNow} disabled={uploadSaving} class="h-4 w-4 accent-primary" />
+					Publier immédiatement (visible sur le site public)
+				</label>
+
+				{#if uploadError}
+					<p class="border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{uploadError}</p>
+				{/if}
+			</div>
+
+			<div class="flex items-center justify-end gap-3 border-t border-stone-100 px-6 py-4">
+				<button
+					type="button"
+					onclick={closeUploadModal}
+					disabled={uploadSaving}
+					class="px-4 py-2 text-sm font-medium text-stone-500 transition-colors hover:text-stone-700 disabled:opacity-50"
+				>
+					Annuler
+				</button>
+				<button
+					type="button"
+					onclick={submitUpload}
+					disabled={uploadSaving || !uploadAudioFile}
+					class="inline-flex items-center gap-2 bg-primary px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+				>
+					{uploadSaving ? 'Téléversement…' : 'Téléverser'}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
 
 {#if metadataEditing}
 	<!-- Broadcast metadata edit modal — title, description, thumbnail for the live broadcast. -->
