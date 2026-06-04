@@ -81,18 +81,164 @@
 		textarea.dispatchEvent(new Event('input', { bubbles: true }));
 	}
 
+	const BLOCK_TAGS = new Set([
+		'P', 'DIV', 'SECTION', 'ARTICLE', 'HEADER', 'FOOTER', 'MAIN', 'ASIDE',
+		'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
+		'UL', 'OL', 'LI', 'BLOCKQUOTE', 'PRE', 'TABLE', 'TR', 'FIGURE', 'HR'
+	]);
+
+	function isBoldStyle(el: HTMLElement): boolean {
+		const weight = el.style.fontWeight;
+		if (weight === 'bold' || weight === 'bolder') return true;
+		const numeric = Number.parseInt(weight, 10);
+		return Number.isFinite(numeric) && numeric >= 600;
+	}
+
+	// Convert a rich-text fragment (Word, Google Docs, web pages) into the same
+	// markdown-style syntax that parseRichText understands, so pasted formatting
+	// (bold, italic, lists, headings, links, quotes) survives in the textarea.
+	function inlineHtmlToMarkdown(node: Node): string {
+		if (node.nodeType === Node.TEXT_NODE) {
+			return (node.textContent ?? '').replace(/\s+/g, ' ');
+		}
+		if (node.nodeType !== Node.ELEMENT_NODE) return '';
+
+		const el = node as HTMLElement;
+		const tag = el.tagName;
+		if (tag === 'BR') return '\n';
+
+		const inner = Array.from(el.childNodes).map(inlineHtmlToMarkdown).join('');
+		if (!inner.trim()) return inner;
+
+		if (tag === 'A') {
+			const href = normalizeHref(el.getAttribute('href') ?? '');
+			return href ? buildMarkdownLink(inner.trim(), href) : inner;
+		}
+
+		const style = el.style;
+		const decoration = `${style.textDecorationLine || style.textDecoration || ''} ${el.getAttribute('class') ?? ''}`;
+		const bold = tag === 'STRONG' || tag === 'B' || isBoldStyle(el);
+		const italic = tag === 'EM' || tag === 'I' || style.fontStyle === 'italic';
+		const underline = tag === 'U' || /underline/.test(decoration);
+		const strike = tag === 'S' || tag === 'STRIKE' || tag === 'DEL' || /line-through/.test(decoration);
+
+		const leading = inner.match(/^\s*/)?.[0] ?? '';
+		const trailing = inner.match(/\s*$/)?.[0] ?? '';
+		let core = inner.trim();
+		if (underline) core = `__${core}__`;
+		if (strike) core = `~~${core}~~`;
+		if (italic) core = `*${core}*`;
+		if (bold) core = `**${core}**`;
+		return `${leading}${core}${trailing}`;
+	}
+
+	function collectBlocks(node: Node, out: string[]) {
+		let buffer = '';
+		const flush = () => {
+			const text = buffer.replace(/[ \t]+\n/g, '\n').trim();
+			if (text) out.push(text);
+			buffer = '';
+		};
+
+		for (const child of Array.from(node.childNodes)) {
+			if (child.nodeType === Node.ELEMENT_NODE && BLOCK_TAGS.has((child as HTMLElement).tagName)) {
+				flush();
+				appendBlock(child as HTMLElement, out);
+			} else {
+				buffer += inlineHtmlToMarkdown(child);
+			}
+		}
+		flush();
+	}
+
+	function appendBlock(el: HTMLElement, out: string[]) {
+		const tag = el.tagName;
+
+		if (tag === 'HR') return;
+
+		if (tag === 'UL' || tag === 'OL') {
+			const ordered = tag === 'OL';
+			const lines: string[] = [];
+			let index = 0;
+			for (const li of Array.from(el.children)) {
+				if (li.tagName !== 'LI') continue;
+				const text = inlineHtmlToMarkdown(li).replace(/\s*\n\s*/g, ' ').trim();
+				if (!text) continue;
+				index += 1;
+				lines.push(ordered ? `${index}. ${text}` : `- ${text}`);
+			}
+			if (lines.length) out.push(lines.join('\n'));
+			return;
+		}
+
+		if (tag === 'BLOCKQUOTE') {
+			const inner: string[] = [];
+			collectBlocks(el, inner);
+			const quoted = inner
+				.join('\n')
+				.split('\n')
+				.map((line) => `> ${line}`.trimEnd())
+				.join('\n');
+			if (quoted.trim()) out.push(quoted);
+			return;
+		}
+
+		if (/^H[1-6]$/.test(tag)) {
+			const text = inlineHtmlToMarkdown(el).replace(/\s*\n\s*/g, ' ').trim();
+			if (text) out.push(`**${text}**`);
+			return;
+		}
+
+		const hasBlockChild = Array.from(el.childNodes).some(
+			(child) => child.nodeType === Node.ELEMENT_NODE && BLOCK_TAGS.has((child as HTMLElement).tagName)
+		);
+		if (hasBlockChild) {
+			collectBlocks(el, out);
+			return;
+		}
+
+		const text = inlineHtmlToMarkdown(el).replace(/[ \t]+\n/g, '\n').trim();
+		if (text) out.push(text);
+	}
+
+	function htmlToMarkdown(html: string): string {
+		const doc = new DOMParser().parseFromString(html, 'text/html');
+		doc.querySelectorAll('style, script, meta, title, link').forEach((node) => node.remove());
+		const out: string[] = [];
+		collectBlocks(doc.body, out);
+		return out
+			.join('\n\n')
+			.replace(/[ \t]+\n/g, '\n')
+			.replace(/\n{3,}/g, '\n\n')
+			.trim();
+	}
+
 	function handleTextareaPaste(event: ClipboardEvent, textarea: HTMLTextAreaElement) {
 		const start = textarea.selectionStart ?? 0;
 		const end = textarea.selectionEnd ?? start;
-		if (start === end) return;
+		const plain = event.clipboardData?.getData('text/plain') ?? '';
 
-		const selected = textarea.value.slice(start, end).trim();
-		const pasted = event.clipboardData?.getData('text/plain') ?? '';
-		const href = normalizeHref(pasted);
-		if (!selected || selected.includes('\n') || !href) return;
+		// Pasting a URL onto a selected word turns it into a link.
+		if (start !== end) {
+			const selected = textarea.value.slice(start, end).trim();
+			const href = normalizeHref(plain);
+			if (selected && !selected.includes('\n') && href) {
+				event.preventDefault();
+				replaceTextareaRange(textarea, start, end, buildMarkdownLink(selected, href));
+				return;
+			}
+		}
 
-		event.preventDefault();
-		replaceTextareaRange(textarea, start, end, buildMarkdownLink(selected, href));
+		// Pasting formatted content (Word, Google Docs, web pages) keeps its
+		// structure by converting the HTML clipboard into our markdown syntax.
+		const html = event.clipboardData?.getData('text/html') ?? '';
+		if (html && /<\w+[\s\S]*>/.test(html)) {
+			const markdown = htmlToMarkdown(html);
+			if (markdown && markdown !== plain.trim()) {
+				event.preventDefault();
+				replaceTextareaRange(textarea, start, end, markdown);
+			}
+		}
 	}
 
 	async function readClipboardHref(): Promise<string> {

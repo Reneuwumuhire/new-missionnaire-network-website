@@ -270,7 +270,7 @@
 					</div>
 					<FormattedQuestionText
 						text={officialAnswer.body}
-						proseClass="text-sm leading-7 text-stone-800"
+						proseClass="text-[15px] leading-[1.85] text-stone-800 lg:px-8"
 					/>
 				</div>
 

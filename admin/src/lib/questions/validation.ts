@@ -1,3 +1,4 @@
+// eslint-disable-next-line no-control-regex
 const CONTROL_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
 
 export function sanitizePlainText(value: unknown, maxLength = 5000): string {
@@ -17,8 +18,11 @@ export function validateModerationReason(value: unknown): string | null {
 	return reason || null;
 }
 
-export function validateOfficialAnswer(value: unknown): { ok: true; body: string } | { ok: false; error: string } {
-	const body = sanitizePlainText(value, 5000);
+export function validateOfficialAnswer(
+	value: unknown
+): { ok: true; body: string } | { ok: false; error: string } {
+	// No upper bound: pastoral answers can be long-form.
+	const body = sanitizePlainText(value, Number.POSITIVE_INFINITY);
 	if (body.length < 10) return { ok: false, error: 'La réponse officielle est trop courte.' };
 	return { ok: true, body };
 }
@@ -27,7 +31,9 @@ export function validateBibleReference(input: {
 	passage: unknown;
 	text: unknown;
 	translation: unknown;
-}): { ok: true; passage: string; text: string | null; translation: string | null } | { ok: false; error: string } {
+}):
+	| { ok: true; passage: string; text: string | null; translation: string | null }
+	| { ok: false; error: string } {
 	const passage = sanitizePlainText(input.passage, 80);
 	const text = sanitizePlainText(input.text, 1000) || null;
 	const translation = sanitizePlainText(input.translation, 40) || null;
@@ -62,8 +68,13 @@ export function validateManualReference(input: {
 	const note = sanitizePlainText(input.note, 1600) || null;
 	const type = sanitizePlainText(input.type, 30);
 	if (title.length < 2) return { ok: false, error: 'Indiquez un titre lisible pour la référence.' };
-	if (!href) return { ok: false, error: 'Indiquez un lien valide en http(s) ou un lien interne commençant par /.' };
-	if (type === 'text' && !note) return { ok: false, error: 'Collez le texte cité pour cette référence.' };
+	if (!href)
+		return {
+			ok: false,
+			error: 'Indiquez un lien valide en http(s) ou un lien interne commençant par /.'
+		};
+	if (type === 'text' && !note)
+		return { ok: false, error: 'Collez le texte cité pour cette référence.' };
 	return { ok: true, title, href, note };
 }
 
@@ -72,7 +83,9 @@ export function validateEditedQuestion(input: {
 	body: unknown;
 	category: unknown;
 	tags: unknown;
-}): { ok: true; title: string; body: string; category: string | null; tags: string[] } | { ok: false; error: string } {
+}):
+	| { ok: true; title: string; body: string; category: string | null; tags: string[] }
+	| { ok: false; error: string } {
 	const title = sanitizePlainText(input.title, 140);
 	const body = sanitizePlainText(input.body, 4000);
 	const category = sanitizePlainText(input.category, 80) || null;
