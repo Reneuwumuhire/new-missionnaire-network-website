@@ -11,7 +11,7 @@
 	--icons-colors: #4f4f4f;
 	--font-display: 'Cormorant Garamond', Georgia, serif;
 	--font-body: 'Outfit', system-ui, sans-serif;
-	--color-missionnaire: #FF880C;
+	--color-missionnaire: #ff880c;
 	--audio-player-height: 0px;
 	/* Height reserved for the mobile bottom navigation bar. 0 on desktop
 	   (the bar is hidden there); on mobile it matches +bottomNav.svelte's
@@ -26,7 +26,11 @@
 
 @media (max-width: 1023px) {
 	:root {
-		--bottom-nav-height: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+		/* 4rem (64px) of tappable bar + the iOS home-indicator inset. Kept
+		   taller than the 56px it used to be so each tab clears Apple's
+		   44px minimum touch target and sits clear of the bottom gesture
+		   area, which was making taps unreliable on iPhones. */
+		--bottom-nav-height: calc(4rem + env(safe-area-inset-bottom, 0px));
 	}
 }
 
@@ -42,13 +46,13 @@ html {
 
 body {
 	color: #292524; /* stone-800 — warmer than pure black */
-	background-color: #FAF8F3; /* cream — warm editorial base */
+	background-color: #faf8f3; /* cream — warm editorial base */
 	padding-bottom: calc(var(--audio-player-height) + var(--bottom-nav-height));
 }
 
 /* ── Selection highlight ── */
 ::selection {
-	background-color: #FF880C;
+	background-color: #ff880c;
 	color: #fff;
 }
 
@@ -178,8 +182,9 @@ img {
 .reveal-up {
 	opacity: 0;
 	transform: translateY(28px);
-	transition: opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1),
-				transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+	transition:
+		opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+		transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .reveal-up.visible {
 	opacity: 1;
@@ -188,8 +193,9 @@ img {
 
 /* ── Card hover lift ── */
 .card-lift {
-	transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-				box-shadow 0.35s ease;
+	transition:
+		transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+		box-shadow 0.35s ease;
 }
 .card-lift:hover {
 	transform: translateY(-3px);
@@ -207,7 +213,7 @@ img {
 	content: '';
 	flex: 1;
 	height: 1px;
-	background: linear-gradient(to right, transparent, #D4C9B5, transparent);
+	background: linear-gradient(to right, transparent, #d4c9b5, transparent);
 }
 
 /* ── Image zoom on parent hover ── */
@@ -220,35 +226,35 @@ img {
 
 /* ── Skeleton shimmer loader ── */
 @keyframes shimmer {
-	0% { background-position: -400px 0; }
-	100% { background-position: 400px 0; }
+	0% {
+		background-position: -400px 0;
+	}
+	100% {
+		background-position: 400px 0;
+	}
 }
 
 .skeleton-shimmer {
-	background: linear-gradient(
-		90deg,
-		#F0ECE3 0%,
-		#FAF8F3 40%,
-		#F0ECE3 80%
-	);
+	background: linear-gradient(90deg, #f0ece3 0%, #faf8f3 40%, #f0ece3 80%);
 	background-size: 800px 100%;
 	animation: shimmer 1.8s ease-in-out infinite;
 }
 
 .skeleton-shimmer-warm {
-	background: linear-gradient(
-		90deg,
-		#FCF5ED 0%,
-		#FFE5C9 35%,
-		#FCF5ED 70%
-	);
+	background: linear-gradient(90deg, #fcf5ed 0%, #ffe5c9 35%, #fcf5ed 70%);
 	background-size: 800px 100%;
 	animation: shimmer 2s ease-in-out infinite;
 }
 
 @keyframes skeleton-fade-in {
-	from { opacity: 0; transform: translateY(6px); }
-	to { opacity: 1; transform: translateY(0); }
+	from {
+		opacity: 0;
+		transform: translateY(6px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
 }
 
 .skeleton-stagger {
@@ -262,7 +268,7 @@ img {
 	gap: 0.5rem;
 	padding: 0.5rem 1rem;
 	border: 1px solid rgba(255, 136, 12, 0.25);
-	color: #FF880C;
+	color: #ff880c;
 	font-family: var(--font-body, inherit);
 	font-size: 11px;
 	font-weight: 600;

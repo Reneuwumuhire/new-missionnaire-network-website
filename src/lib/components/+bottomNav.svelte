@@ -117,7 +117,11 @@
 		display: flex;
 		align-items: stretch;
 		justify-content: space-around;
-		height: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+		/* Single source of truth: the same var the layout uses to reserve
+		   space below page content + the audio player, so the bar height
+		   and the reserved gap can never drift apart. Fallback mirrors it
+		   in case the var isn't defined. */
+		height: var(--bottom-nav-height, calc(5rem + env(safe-area-inset-bottom, 0px)));
 		padding-bottom: env(safe-area-inset-bottom, 0px);
 		/* Breathing room from the screen edges so the first/last labels
 		   ("Prédications", "Menu") stay clear of rounded phone corners. */
