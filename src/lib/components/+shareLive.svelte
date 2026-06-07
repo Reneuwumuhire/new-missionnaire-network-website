@@ -1,11 +1,14 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
-	import { onDestroy } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 
 	// ── Share the live stream ──────────────────────────────────────
-	// Lets a listener share the live page with others. The shared link
-	// points at /live, which auto-starts playback as soon as the direct
-	// is on air — so recipients land straight on the live audio.
+	// Lets a listener share the live page with others. While a direct is on
+	// air the link is stamped with the broadcast session (`/live?live=<id>`):
+	// recipients who open it during the live land straight on the live audio,
+	// and recipients who open it AFTER the live ends are forwarded to that
+	// session's exact replay (handled in /live/+page.server.ts) instead of the
+	// generic off-air page. Off air, it's just /live.
 	// Same dropdown UI as the music player and rediffusion pages: a
 	// "Partager" trigger that opens the native share sheet and a plain
 	// "Copier le lien" fallback, with inline copy/error feedback.
@@ -22,10 +25,31 @@
 	// share-sheet/link-preview crawlers read; it can't be set here.)
 	export let title = 'Écoute en direct - Missionnaire Network';
 	export let text = 'Écoutez Missionnaire Network en direct 🎙️';
+	// Current broadcast session (epoch-ms), server-rendered as a fallback. The
+	// page is served from a short edge cache, so we refresh this from
+	// /api/live/radio-state on mount to catch a direct that started after the
+	// cached render — keeping the shared link tied to the right session.
+	export let liveSessionId: number | null = null;
+
+	onMount(() => {
+		if (!browser) return;
+		fetch('/api/live/radio-state')
+			.then((r) => (r.ok ? r.json() : null))
+			.then((state) => {
+				if (state && state.isLive && typeof state.startedAt === 'number') {
+					liveSessionId = state.startedAt;
+				} else if (state && !state.isLive) {
+					// Off air now — don't tie the link to a stale session.
+					liveSessionId = null;
+				}
+			})
+			.catch(() => {});
+	});
 
 	function buildShareUrl(): string {
 		if (!browser) return '';
-		return `${window.location.origin}/live`;
+		const base = `${window.location.origin}/live`;
+		return liveSessionId ? `${base}?live=${liveSessionId}` : base;
 	}
 
 	function flashShareFeedback(state: 'copied' | 'error') {

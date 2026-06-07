@@ -1,21 +1,9 @@
-import { getRecentPublished } from '$lib/server/recordings';
+import { redirect } from '@sveltejs/kit';
+import { getPublishedNearSession, getRecentPublished } from '$lib/server/recordings';
 import { getBroadcastAdminState, getRadioCachedStatus } from '../../db/collections';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ setHeaders, url }) => {
-	// Edge-cache the rendered page, but keep the freshness window short so a
-	// newly published rediffusion appears in "Directs précédents" within ~a
-	// minute rather than a day. The live banner + radio player are hydrated
-	// client-side (LiveRadioPlayer fetches /api/live/radio-state then streams
-	// SSE updates), so the only server-rendered data here is the recordings
-	// list. With s-maxage=60 the edge serves a cached copy for a minute, then
-	// `stale-while-revalidate` keeps every later hit instant — the edge returns
-	// the stale copy immediately and refreshes it in the background, so a fresh
-	// recording propagates on the next request instead of blocking on the DB.
-	setHeaders({
-		'cache-control': 'public, s-maxage=60, stale-while-revalidate=600'
-	});
-
 	const [recentRecordings, adminGate, status] = await Promise.all([
 		getRecentPublished(5),
 		getBroadcastAdminState(),
@@ -27,6 +15,47 @@ export const load: PageServerLoad = async ({ setHeaders, url }) => {
 	// share preview consistent with what the player shows — no "live" card when
 	// the audio isn't really flowing.
 	const isLive = (status?.isLive ?? false) && adminGate.is_live;
+
+	// ── Shared-live deep link → land on the exact rediffusion ───────────────
+	// A live share link carries the broadcast session it was created in
+	// (`?live=<started_at>`, see +shareLive.svelte). While that direct is still
+	// on air we just render /live so the recipient hears the live. Once it has
+	// ended we forward them to the replay that came out of that session so they
+	// don't land on the generic off-air page. Matched by timestamp proximity
+	// because nothing links a broadcast to its recording (see
+	// getPublishedNearSession). 307 (temporary) is essential: the SAME url must
+	// resume redirecting/not-redirecting as the broadcast state changes, so it
+	// must never be cached as a permanent redirect.
+	const liveParam = url.searchParams.get('live');
+	if (liveParam) {
+		const sessionMs = Number(liveParam);
+		if (Number.isFinite(sessionMs) && sessionMs > 0) {
+			const currentMs = adminGate.started_at ? Date.parse(adminGate.started_at) : NaN;
+			// Same session still on air? (allow a minute of skew) → render /live.
+			const sameLiveSession =
+				isLive && !Number.isNaN(currentMs) && Math.abs(currentMs - sessionMs) < 60_000;
+			if (!sameLiveSession) {
+				const rec = await getPublishedNearSession(new Date(sessionMs).toISOString());
+				if (rec) throw redirect(307, `/live/rediffusions/${rec.id}?autoplay=1`);
+			}
+		}
+		// Param present but we're rendering (same live, or replay not published
+		// yet): don't let this per-link variant pollute the shared edge cache.
+		setHeaders({ 'cache-control': 'no-store' });
+	} else {
+		// Edge-cache the rendered page, but keep the freshness window short so a
+		// newly published rediffusion appears in "Directs précédents" within ~a
+		// minute rather than a day. The live banner + radio player are hydrated
+		// client-side (LiveRadioPlayer fetches /api/live/radio-state then streams
+		// SSE updates), so the only server-rendered data here is the recordings
+		// list. With s-maxage=60 the edge serves a cached copy for a minute, then
+		// `stale-while-revalidate` keeps every later hit instant — the edge returns
+		// the stale copy immediately and refreshes it in the background, so a fresh
+		// recording propagates on the next request instead of blocking on the DB.
+		setHeaders({
+			'cache-control': 'public, s-maxage=60, stale-while-revalidate=600'
+		});
+	}
 
 	// Server-rendered Open Graph / Twitter data so link-preview crawlers
 	// (WhatsApp, Facebook, iMessage…) show the current live title + thumbnail
@@ -63,8 +92,16 @@ export const load: PageServerLoad = async ({ setHeaders, url }) => {
 	const DEFAULT_DESC =
 		'Écoutez Missionnaire Network en direct audio. Prédications et cantiques du Message de l’Heure en streaming continu.';
 
+	// The current broadcast session, used by the share button to stamp the live
+	// link (`/live?live=<session>`) so it later resolves to this exact replay.
+	// Epoch-ms for a compact URL. Server-rendered as a fallback; the share
+	// component refreshes it from /api/live/radio-state so it stays correct even
+	// when this page is served from the short edge cache.
+	const liveSessionId = isLive && adminGate.started_at ? Date.parse(adminGate.started_at) : null;
+
 	return {
 		recentRecordings,
+		liveSessionId: liveSessionId && !Number.isNaN(liveSessionId) ? liveSessionId : null,
 		liveMeta: {
 			isLive,
 			title: liveTitle,

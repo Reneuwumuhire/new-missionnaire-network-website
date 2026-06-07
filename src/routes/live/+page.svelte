@@ -45,7 +45,9 @@
 					</rect>
 				</svg>
 			</div>
-			<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-2 md:mb-3 font-body">
+			<p
+				class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-2 md:mb-3 font-body"
+			>
 				Direct Audio
 			</p>
 			<h1 class="font-display text-2xl md:text-4xl font-semibold text-stone-900">
@@ -64,6 +66,7 @@
 
 		<!-- Share the live stream with others -->
 		<ShareLive
+			liveSessionId={data.liveSessionId}
 			title={liveMeta?.title ? `🔴 ${liveMeta.title}` : 'Écoute en direct - Missionnaire Network'}
 			text={liveMeta?.title
 				? `${liveMeta.title} — en direct sur Missionnaire Network 🎙️`

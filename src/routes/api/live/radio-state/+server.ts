@@ -68,6 +68,10 @@ export async function GET({ url, fetch, setHeaders }) {
 		streamUrl: isLive ? (streamUrl ?? getLiveAudioSourceUrl()) : undefined,
 		title: adminGate.title,
 		description: adminGate.description,
-		thumbnailUrl: adminGate.thumbnail_url
+		thumbnailUrl: adminGate.thumbnail_url,
+		// Epoch-ms of the current broadcast's start, so the share button can
+		// stamp the live link with the exact session it was shared from and have
+		// it later resolve to that session's replay. Only meaningful while live.
+		startedAt: isLive && adminGate.started_at ? Date.parse(adminGate.started_at) : null
 	});
 }
