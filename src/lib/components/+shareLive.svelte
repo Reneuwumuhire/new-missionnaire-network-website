@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
-	import { onDestroy, onMount } from 'svelte';
+	import { onDestroy } from 'svelte';
 
 	// ── Share the live stream ──────────────────────────────────────
 	// Lets a listener share the live page with others. While a direct is on
@@ -25,26 +25,15 @@
 	// share-sheet/link-preview crawlers read; it can't be set here.)
 	export let title = 'Écoute en direct - Missionnaire Network';
 	export let text = 'Écoutez Missionnaire Network en direct 🎙️';
-	// Current broadcast session (epoch-ms), server-rendered as a fallback. The
-	// page is served from a short edge cache, so we refresh this from
-	// /api/live/radio-state on mount to catch a direct that started after the
-	// cached render — keeping the shared link tied to the right session.
+	// Current broadcast session (epoch-ms), server-rendered by /live's load.
+	// When set, the share link is stamped with it so it later resolves to this
+	// session's replay. We deliberately do NOT fetch /api/live/radio-state here:
+	// the player already does the single on-mount hydration the team
+	// standardised on, and a second fetch per /live load would double traffic to
+	// that no-store endpoint. The cost is that a direct which started while this
+	// page sat in the (≤60s) edge cache yields a plain /live link until the next
+	// revalidation — acceptable, since lives run far longer than that window.
 	export let liveSessionId: number | null = null;
-
-	onMount(() => {
-		if (!browser) return;
-		fetch('/api/live/radio-state')
-			.then((r) => (r.ok ? r.json() : null))
-			.then((state) => {
-				if (state && state.isLive && typeof state.startedAt === 'number') {
-					liveSessionId = state.startedAt;
-				} else if (state && !state.isLive) {
-					// Off air now — don't tie the link to a stale session.
-					liveSessionId = null;
-				}
-			})
-			.catch(() => {});
-	});
 
 	function buildShareUrl(): string {
 		if (!browser) return '';

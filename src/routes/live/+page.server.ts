@@ -3,6 +3,31 @@ import { getPublishedNearSession, getRecentPublished } from '$lib/server/recordi
 import { getBroadcastAdminState, getRadioCachedStatus } from '../../db/collections';
 import type { PageServerLoad } from './$types';
 
+// ── Shared-live deep link → land on the exact rediffusion ───────────────────
+// A live share link carries the broadcast session it was created in
+// (`?live=<started_at-ms>`, see +shareLive.svelte). While that direct is still
+// on air the recipient should just get /live (and hear the live). Once it has
+// ended we forward them to the replay that came out of that session so they
+// don't land on the generic off-air page. Matched by timestamp proximity
+// because nothing links a broadcast to its recording (see
+// getPublishedNearSession). Returns the replay path to redirect to, or null to
+// render /live normally.
+async function resolveSharedReplayPath(
+	liveParam: string,
+	isLive: boolean,
+	broadcastStartedAt: string | null
+): Promise<string | null> {
+	const sessionMs = Number(liveParam);
+	if (!Number.isFinite(sessionMs) || sessionMs <= 0) return null;
+	const currentMs = broadcastStartedAt ? Date.parse(broadcastStartedAt) : Number.NaN;
+	// Same session still on air? (allow a minute of skew) → render /live.
+	const sameLiveSession =
+		isLive && !Number.isNaN(currentMs) && Math.abs(currentMs - sessionMs) < 60_000;
+	if (sameLiveSession) return null;
+	const rec = await getPublishedNearSession(new Date(sessionMs).toISOString());
+	return rec ? `/live/rediffusions/${rec.id}?autoplay=1` : null;
+}
+
 export const load: PageServerLoad = async ({ setHeaders, url }) => {
 	const [recentRecordings, adminGate, status] = await Promise.all([
 		getRecentPublished(5),
@@ -16,29 +41,13 @@ export const load: PageServerLoad = async ({ setHeaders, url }) => {
 	// the audio isn't really flowing.
 	const isLive = (status?.isLive ?? false) && adminGate.is_live;
 
-	// ── Shared-live deep link → land on the exact rediffusion ───────────────
-	// A live share link carries the broadcast session it was created in
-	// (`?live=<started_at>`, see +shareLive.svelte). While that direct is still
-	// on air we just render /live so the recipient hears the live. Once it has
-	// ended we forward them to the replay that came out of that session so they
-	// don't land on the generic off-air page. Matched by timestamp proximity
-	// because nothing links a broadcast to its recording (see
-	// getPublishedNearSession). 307 (temporary) is essential: the SAME url must
-	// resume redirecting/not-redirecting as the broadcast state changes, so it
-	// must never be cached as a permanent redirect.
 	const liveParam = url.searchParams.get('live');
 	if (liveParam) {
-		const sessionMs = Number(liveParam);
-		if (Number.isFinite(sessionMs) && sessionMs > 0) {
-			const currentMs = adminGate.started_at ? Date.parse(adminGate.started_at) : NaN;
-			// Same session still on air? (allow a minute of skew) → render /live.
-			const sameLiveSession =
-				isLive && !Number.isNaN(currentMs) && Math.abs(currentMs - sessionMs) < 60_000;
-			if (!sameLiveSession) {
-				const rec = await getPublishedNearSession(new Date(sessionMs).toISOString());
-				if (rec) throw redirect(307, `/live/rediffusions/${rec.id}?autoplay=1`);
-			}
-		}
+		const replayPath = await resolveSharedReplayPath(liveParam, isLive, adminGate.started_at);
+		// 307 (temporary) is essential: the SAME url must resume
+		// redirecting/not-redirecting as the broadcast state changes, so it must
+		// never be cached as a permanent redirect.
+		if (replayPath) throw redirect(307, replayPath);
 		// Param present but we're rendering (same live, or replay not published
 		// yet): don't let this per-link variant pollute the shared edge cache.
 		setHeaders({ 'cache-control': 'no-store' });
