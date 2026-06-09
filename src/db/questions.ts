@@ -258,6 +258,16 @@ export async function getPublicQuestionDetail(
 		replies.find((reply) => reply.isOfficial) ??
 		null;
 
+	// Self-heal the cached reply counter: it is `$inc`-maintained and can drift
+	// (official answers were historically never counted, moderation hides never
+	// decremented it). `replies` already holds every visible, non-deleted reply.
+	if (question.replyCount !== replies.length) {
+		question.replyCount = replies.length;
+		await db
+			.collection('questions')
+			.updateOne({ _id: questionDoc._id }, { $set: { replyCount: replies.length } });
+	}
+
 	return {
 		question,
 		officialAnswer,
