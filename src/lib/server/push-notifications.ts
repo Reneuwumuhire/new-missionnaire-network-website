@@ -143,6 +143,20 @@ function formatScheduledDateFr(scheduledAtIso: string): string {
 	}
 }
 
+// Time-only variant for the "starts soon" reminder — the live begins within
+// the half hour, so repeating the full date is noise.
+function formatScheduledTimeFr(scheduledAtIso: string): string {
+	try {
+		return new Intl.DateTimeFormat('fr-FR', {
+			timeZone: 'Europe/Zurich',
+			hour: '2-digit',
+			minute: '2-digit'
+		}).format(new Date(scheduledAtIso));
+	} catch {
+		return scheduledAtIso;
+	}
+}
+
 /** Announcement fired when an admin schedules a live with "annoncer aux
  *  abonn\u00e9s" \u2014 deep-links straight to the waiting room. */
 export function liveScheduledPayload(opts: {
@@ -152,7 +166,7 @@ export function liveScheduledPayload(opts: {
 	thumbnailUrl?: string | null;
 }): PushPayload {
 	const payload: PushPayload = {
-		title: 'Live \u00e0 venir',
+		title: 'Direct \u00e0 venir',
 		body: `\u00ab\u00a0${opts.title}\u00a0\u00bb \u2014 ${formatScheduledDateFr(opts.scheduledAtIso)}`,
 		url: `/live/${opts.slug}`,
 		icon: '/favicon.png',
@@ -174,7 +188,7 @@ export function liveReminderPayload(opts: {
 }): PushPayload {
 	const payload: PushPayload = {
 		title: 'Le direct commence bient\u00f4t',
-		body: `\u00ab\u00a0${opts.title}\u00a0\u00bb \u2014 ${formatScheduledDateFr(opts.scheduledAtIso)}`,
+		body: `\u00ab\u00a0${opts.title}\u00a0\u00bb commence \u00e0 ${formatScheduledTimeFr(opts.scheduledAtIso)}.`,
 		url: `/live/${opts.slug}`,
 		icon: '/favicon.png',
 		event: 'live-reminder'
