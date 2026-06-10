@@ -1,6 +1,8 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
+import { parseSubtitleTriple } from '$lib/server/scheduled-live-validation';
+import { deleteObject } from '$lib/server/s3';
 import {
 	getBroadcastAdminState,
 	setBroadcastAdminState,
@@ -16,7 +18,7 @@ import {
 const NUDGE_STEPS_MS = new Set([1000, 5000, 30000, -1000, -5000, -30000]);
 const MAX_OFFSET_MS = 30 * 60 * 1000;
 
-type Action = 'start' | 'nudge' | 'set-offset' | 'jump-to-cue' | 'clear';
+type Action = 'attach' | 'start' | 'nudge' | 'set-offset' | 'jump-to-cue' | 'clear';
 
 export const POST: RequestHandler = async ({ locals, request, getClientAddress }) => {
 	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
@@ -27,20 +29,71 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		offsetMs?: unknown;
 		cueStartMs?: unknown;
 		atEpochMs?: unknown;
+		subtitle_srt_url?: unknown;
+		subtitle_srt_s3_key?: unknown;
+		subtitle_filename?: unknown;
 	};
 	const action = body.action as Action;
-	if (!['start', 'nudge', 'set-offset', 'jump-to-cue', 'clear'].includes(action)) {
+	if (!['attach', 'start', 'nudge', 'set-offset', 'jump-to-cue', 'clear'].includes(action)) {
 		throw error(400, 'Action invalide');
 	}
 
 	const gate = await getBroadcastAdminState({ fresh: true });
 	if (!gate.is_live) throw error(400, 'Aucun direct en cours');
-	if (action !== 'clear' && !gate.subtitle_srt_url) {
+	if (action !== 'clear' && action !== 'attach' && !gate.subtitle_srt_url) {
 		throw error(400, 'Aucune transcription attachée à ce direct');
 	}
 
 	let anchor = gate.subtitle_anchor_epoch_ms;
 	let offset = gate.subtitle_offset_ms ?? 0;
+
+	// Attach (or replace) the SRT on an already-running broadcast — covers the
+	// "stream started without subtitles" case. Writes the gate (listeners pick
+	// it up on their next radio-state poll) AND the scheduled entry (replay).
+	// The anchor resets: a new file means new timings, the operator re-syncs.
+	if (action === 'attach') {
+		const triple = parseSubtitleTriple(
+			body.subtitle_srt_url,
+			body.subtitle_srt_s3_key,
+			body.subtitle_filename
+		);
+		if (!triple.subtitle_srt_url || !triple.subtitle_srt_s3_key) {
+			throw error(400, 'Fichier .srt requis');
+		}
+		const oldKey = gate.subtitle_srt_s3_key;
+		await setBroadcastAdminState({
+			subtitle_srt_url: triple.subtitle_srt_url,
+			subtitle_srt_s3_key: triple.subtitle_srt_s3_key,
+			subtitle_anchor_epoch_ms: null,
+			subtitle_offset_ms: 0
+		});
+		if (gate.scheduled_live_id) {
+			await updateScheduledLive(gate.scheduled_live_id, {
+				subtitle_srt_url: triple.subtitle_srt_url,
+				subtitle_srt_s3_key: triple.subtitle_srt_s3_key,
+				subtitle_filename: triple.subtitle_filename,
+				subtitle_anchor_epoch_ms: null,
+				subtitle_offset_ms: 0
+			});
+		}
+		if (oldKey && oldKey !== triple.subtitle_srt_s3_key) {
+			deleteObject(oldKey).catch((err) =>
+				console.error('[broadcast/subtitles] old subtitle delete failed:', err)
+			);
+		}
+		await logAudit({
+			user_id: locals.user.email,
+			user_email: locals.user.email,
+			action: 'update',
+			target_collection: 'broadcast_admin_state',
+			target_id: 'current',
+			changes: {
+				subtitle_attached: { old: oldKey, new: triple.subtitle_srt_s3_key }
+			},
+			ip_address: getClientAddress()
+		});
+		return json({ ok: true, anchorEpochMs: null, offsetMs: 0 });
+	}
 
 	switch (action) {
 		case 'start': {
@@ -67,10 +120,14 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		}
 		case 'jump-to-cue': {
 			// "This cue is being spoken right now" — re-anchor from a known cue,
-			// for when the exact start moment was missed.
+			// for when the exact start moment was missed. Like 'start', the
+			// client's click instant rides along so request latency doesn't
+			// shift the anchor; sanity-clamped to ±60s around server time.
 			const cueStart = typeof body.cueStartMs === 'number' ? body.cueStartMs : NaN;
 			if (!Number.isFinite(cueStart) || cueStart < 0) throw error(400, 'Réplique invalide');
-			anchor = Date.now() - Math.round(cueStart);
+			const at = typeof body.atEpochMs === 'number' ? body.atEpochMs : Date.now();
+			const clickedAt = Math.abs(at - Date.now()) <= 60_000 ? at : Date.now();
+			anchor = clickedAt - Math.round(cueStart);
 			offset = 0;
 			break;
 		}

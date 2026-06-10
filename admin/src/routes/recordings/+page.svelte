@@ -230,7 +230,17 @@
 	}
 
 	async function readRecordingId(res: Response): Promise<string | null> {
-		const body = (await res.json().catch(() => null)) as { id?: unknown } | null;
+		const body = (await res.json().catch(() => null)) as {
+			id?: unknown;
+			subtitlesAnchored?: unknown;
+		} | null;
+		if (body?.subtitlesAnchored === true) {
+			// Recording start doubled as the subtitle anchor (SRT 00:00 = now).
+			toast.success(
+				'Sous-titres synchronisés au démarrage de l\'enregistrement — ajustez avec les boutons ±'
+			);
+			await invalidateAll(); // refresh the sync panel with the new anchor
+		}
 		return typeof body?.id === 'string' ? body.id : null;
 	}
 
@@ -1161,6 +1171,87 @@
 	onDestroy(() => {
 		if (pollTimer) clearInterval(pollTimer);
 		if (tickTimer) clearInterval(tickTimer);
+		monitorDisconnect();
+	});
+
+	// ── Live monitor: always at the live edge, mute-only ────────────
+	// No pause and no seeking: this is THE reference audio for syncing the
+	// subtitles — it must always be exactly what listeners hear. It connects
+	// muted as soon as a source is active (muted autoplay is allowed by
+	// browsers) and the only control is the mute toggle. Any interruption
+	// (OS pause, stream hiccup) reconnects fresh at the live edge rather
+	// than ever sitting on stale buffered audio.
+	let monitorEl = $state<HTMLAudioElement | null>(null);
+	let monitorMuted = $state(true);
+	let monitorLive = $state(false);
+	let monitorConnecting = false;
+	let monitorRetryTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function monitorConnect() {
+		if (!monitorEl || monitorConnecting || monitorLive) return;
+		monitorConnecting = true;
+		const sep = data.liveStreamUrl.includes('?') ? '&' : '?';
+		monitorEl.muted = monitorMuted;
+		monitorEl.src = `${data.liveStreamUrl}${sep}t=${Date.now()}`;
+		monitorEl.load();
+		monitorEl
+			.play()
+			.then(() => {
+				monitorConnecting = false;
+				monitorLive = true;
+			})
+			.catch(() => {
+				monitorConnecting = false;
+				scheduleMonitorRetry();
+			});
+	}
+
+	function monitorDisconnect() {
+		if (monitorRetryTimer) {
+			clearTimeout(monitorRetryTimer);
+			monitorRetryTimer = null;
+		}
+		monitorLive = false;
+		monitorConnecting = false;
+		if (monitorEl) {
+			monitorEl.pause();
+			monitorEl.removeAttribute('src');
+			monitorEl.load();
+		}
+	}
+
+	function scheduleMonitorRetry() {
+		monitorLive = false;
+		if (monitorRetryTimer) return;
+		monitorRetryTimer = setTimeout(() => {
+			monitorRetryTimer = null;
+			// sourceActive is refreshed by the 5s status poll — give up
+			// quietly once the stream is genuinely gone.
+			if (icecast.sourceActive) monitorConnect();
+		}, 4000);
+	}
+
+	function onMonitorInterrupted() {
+		// pause/ended/error while we believed we were live → reconnect fresh.
+		if (monitorLive) scheduleMonitorRetry();
+	}
+
+	function toggleMonitorMute() {
+		monitorMuted = !monitorMuted;
+		if (monitorEl) monitorEl.muted = monitorMuted;
+		// The click is a user gesture — if autoplay was blocked earlier,
+		// connect now.
+		if (!monitorMuted && !monitorLive) monitorConnect();
+	}
+
+	// Follow the source: connect when a stream appears, tear down when it ends.
+	let monitorLastSourceActive = false;
+	$effect(() => {
+		const active = icecast.sourceActive;
+		if (active === monitorLastSourceActive) return;
+		monitorLastSourceActive = active;
+		if (active) monitorConnect();
+		else monitorDisconnect();
 	});
 
 	function formatElapsed(sec: number): string {
@@ -2070,15 +2161,62 @@
 			Écoute du direct
 		</div>
 		{#if icecast.sourceActive}
-			<audio controls preload="none" src={data.liveStreamUrl} class="h-8 flex-1 min-w-[280px]"></audio>
+			<!-- No pause, no seek — always the live edge. Mute is the only
+			     control, so this stays a trustworthy sync reference. -->
+			<div class="flex h-9 flex-1 min-w-[280px] items-center gap-3 bg-stone-50 px-3">
+				{#if monitorLive}
+					<span class="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-red-600">
+						<span class="relative inline-flex h-1.5 w-1.5">
+							<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"></span>
+							<span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500"></span>
+						</span>
+						Au direct
+					</span>
+				{:else}
+					<span class="text-[11px] italic text-stone-400">Connexion au flux…</span>
+				{/if}
+				<span class="min-w-0 flex-1 truncate text-[10px] text-stone-400">
+					{monitorMuted ? 'Son coupé — activez-le pour vérifier la synchro' : 'Vous entendez ce que les auditeurs entendent'}
+				</span>
+				<button
+					type="button"
+					onclick={toggleMonitorMute}
+					class="inline-flex shrink-0 items-center gap-1.5 border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] transition-colors {monitorMuted
+						? 'border-missionnaire bg-missionnaire text-white hover:bg-missionnaire/90'
+						: 'border-stone-200 bg-white text-stone-600 hover:border-stone-900 hover:bg-stone-900 hover:text-white'}"
+				>
+					{#if monitorMuted}
+						<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+							<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+							<path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+						</svg>
+						Activer le son
+					{:else}
+						<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+							<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+							<line x1="23" y1="9" x2="17" y2="15" />
+							<line x1="17" y1="9" x2="23" y2="15" />
+						</svg>
+						Couper le son
+					{/if}
+				</button>
+			</div>
 		{:else}
-			<div class="flex h-8 flex-1 min-w-[280px] items-center bg-stone-50 px-3 text-[11px] italic text-stone-400">
-				Aucune source connectée — le lecteur apparaîtra dès qu'un flux est diffusé.
+			<div class="flex h-9 flex-1 min-w-[280px] items-center bg-stone-50 px-3 text-[11px] italic text-stone-400">
+				Aucune source connectée — l'écoute démarre dès qu'un flux est diffusé.
 			</div>
 		{/if}
 		<span class="text-[11px] text-stone-400">
 			{icecast.sourceActive ? 'Flux actif' : 'Aucune source active'}
 		</span>
+		<audio
+			bind:this={monitorEl}
+			preload="none"
+			muted
+			onpause={onMonitorInterrupted}
+			onended={onMonitorInterrupted}
+			onerror={onMonitorInterrupted}
+		></audio>
 	</div>
 
 	<!-- Broadcast metadata: title + description + thumbnail shown on the public /live page -->
@@ -2218,9 +2356,10 @@
 	</div>
 </div>
 
-<!-- Subtitle sync — only while a live with an attached SRT is on air -->
-{#if broadcast.is_live && broadcast.subtitle_srt_url}
-	<SubtitleSyncPanel {broadcast} liveStreamUrl={data.liveStreamUrl} />
+<!-- Subtitle sync — shown during any live: attach an SRT mid-broadcast if
+     the stream started without one, then sync/nudge it. -->
+{#if broadcast.is_live}
+	<SubtitleSyncPanel {broadcast} />
 {/if}
 
 <!-- Scheduled lives — YouTube-style: schedule ahead, get a stable share link

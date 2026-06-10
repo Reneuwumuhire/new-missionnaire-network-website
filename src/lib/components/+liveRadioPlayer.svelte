@@ -279,6 +279,7 @@
 
 		if (liveNow) {
 			cancelNoAudioGrace();
+			stopOfflineWatcher();
 			offlineStreak = 0;
 			probeReachable = true;
 
@@ -438,6 +439,7 @@
 
 	onDestroy(() => {
 		stopStateRefresh();
+		stopOfflineWatcher();
 		clearReconnectTimer();
 		clearNoAudioGraceTimer();
 		detachAutoplayGestureListener();
@@ -497,6 +499,88 @@
 				audio.load();
 			}
 			streamConnectEpochMs = null;
+		}
+	}
+
+	// ── Stream-drop triage ─────────────────────────────────────────
+	// When playback dies we ask the server whether the broadcast is still on
+	// air before showing any retry UI. A listener-side hiccup keeps the
+	// visible "Reconnexion en cours…" flow; a broadcast that actually ended
+	// flips straight to the calm offline card — no red card stuck on
+	// "reconnecting" while retries hammer a dead stream. A quiet background
+	// watcher keeps checking for a few minutes so a server-side blip that
+	// recovers (Icecast restart) brings the player back to life on its own.
+
+	const OFFLINE_WATCH_INTERVAL_MS = 12_000;
+	const OFFLINE_WATCH_WINDOW_MS = 3 * 60_000;
+	let offlineWatchTimer: ReturnType<typeof setInterval> | null = null;
+	let offlineWatchUntil = 0;
+	let dropCheckInFlight = false;
+
+	async function handleStreamDrop() {
+		if (dropCheckInFlight || !userWantsToPlay) return;
+		dropCheckInFlight = true;
+		try {
+			const res = await fetch('/api/live/radio-state');
+			if (!res.ok) {
+				attemptReconnect(); // can't tell — treat as a hiccup
+				return;
+			}
+			const data = (await res.json()) as { isLive: boolean };
+			if (data.isLive) {
+				attemptReconnect();
+			} else {
+				goOfflineQuietly();
+			}
+		} catch {
+			attemptReconnect();
+		} finally {
+			dropCheckInFlight = false;
+		}
+	}
+
+	/** Broadcast is over (or the source dropped server-side): reset the UI to
+	 *  the plain offline card immediately instead of flashing reconnect
+	 *  states, and watch quietly in the background for a possible return. */
+	function goOfflineQuietly() {
+		cancelNoAudioGrace();
+		stopPlayback();
+		probeReachable = false;
+		confirmedLive = false;
+		playbackFailed = false;
+		hasError = false;
+		offlineStreak = 0;
+		statusKey = 'offline';
+		// Hide the stale scrubber — its buffer window died with the stream.
+		currentTime = 0;
+		bufferStart = 0;
+		liveEdge = 0;
+		userSeeked = false;
+		// Re-arm autoplay so the background watcher can restart playback
+		// seamlessly if the stream comes back.
+		hasAttemptedAutoplay = false;
+		detachAutoplayGestureListener();
+		radioIsLiveStore.set(false);
+		startOfflineWatcher();
+	}
+
+	function startOfflineWatcher() {
+		offlineWatchUntil = Date.now() + OFFLINE_WATCH_WINDOW_MS;
+		if (offlineWatchTimer) return;
+		offlineWatchTimer = setInterval(() => {
+			if (Date.now() > offlineWatchUntil) {
+				stopOfflineWatcher();
+				return;
+			}
+			if (document.visibilityState !== 'visible') return;
+			void fetchRadioState();
+		}, OFFLINE_WATCH_INTERVAL_MS);
+	}
+
+	function stopOfflineWatcher() {
+		if (offlineWatchTimer) {
+			clearInterval(offlineWatchTimer);
+			offlineWatchTimer = null;
 		}
 	}
 
@@ -767,7 +851,7 @@
 		startNoAudioGrace();
 
 		if (userWantsToPlay) {
-			attemptReconnect();
+			void handleStreamDrop();
 		} else {
 			statusKey = 'waiting';
 		}
@@ -788,7 +872,7 @@
 			// user's initial tap, so no autoplay policy issues.
 			startNoAudioGrace();
 			playbackFailed = false; // allow UI updates during reconnect
-			attemptReconnect();
+			void handleStreamDrop();
 		} else {
 			playbackFailed = false;
 			startNoAudioGrace();
