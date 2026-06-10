@@ -1,7 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
-import { createScheduledLive, logAudit } from '../../../db/collections';
+import { createScheduledLive, getBroadcastAdminState, logAudit } from '../../../db/collections';
 import { buildWatchUrl, pingBroadcastEvent } from '$lib/server/main-site';
 import {
 	parseTitle,
@@ -25,9 +25,22 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 
 	const title = parseTitle(body.title, { required: true });
 	const description = parseDescription(body.description);
-	const thumbnail = parseThumbnailPair(body.thumbnail_url, body.thumbnail_s3_key);
+	let thumbnail = parseThumbnailPair(body.thumbnail_url, body.thumbnail_s3_key);
 	const scheduledAt = parseScheduledAt(body.scheduled_at);
 	const announce = body.announce === true;
+
+	// No thumbnail picked → fall back to the stored default so the waiting
+	// room and the share-link preview always have an image (same fallback the
+	// go-live handler applies to the broadcast gate).
+	if (!thumbnail.thumbnail_url) {
+		const gate = await getBroadcastAdminState();
+		if (gate.default_thumbnail_url && gate.default_thumbnail_s3_key) {
+			thumbnail = {
+				thumbnail_url: gate.default_thumbnail_url,
+				thumbnail_s3_key: gate.default_thumbnail_s3_key
+			};
+		}
+	}
 
 	const live = await createScheduledLive({
 		title: title as string,

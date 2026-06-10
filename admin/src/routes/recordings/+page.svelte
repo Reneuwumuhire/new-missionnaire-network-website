@@ -820,6 +820,40 @@
 		}
 	}
 
+	/** Detach the transcript PDF from the recording being edited. Stores the
+	 *  'none' sentinel so the date-based auto-match (which is how a wrong
+	 *  same-day PDF gets attached) doesn't simply re-attach it. The PDF file
+	 *  itself stays in the library — only the link to this recording goes. */
+	async function detachRecordingTranscript() {
+		const id = editingRecordingId;
+		if (!id || !recExistingTranscript) return;
+		const ok = await confirmDialog.ask({
+			title: 'Retirer la transcription PDF',
+			message: `« ${recExistingTranscript.filename} » ne sera plus proposé sur la page publique de cet enregistrement. Le fichier PDF lui-même n'est pas supprimé.`,
+			confirmLabel: 'Retirer',
+			cancelLabel: 'Annuler',
+			tone: 'warning'
+		});
+		if (!ok) return;
+		try {
+			const res = await fetch(`/api/recordings/${id}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ transcript_pdf_id: 'none' })
+			});
+			if (!res.ok) {
+				toast.error((await res.text()) || `Erreur ${res.status}`);
+				return;
+			}
+			recExistingTranscript = null;
+			recTranscriptUploadOpen = false;
+			recPdfMode = 'add';
+			toast.success('Transcription PDF retirée');
+		} catch {
+			toast.error('Échec du retrait de la transcription');
+		}
+	}
+
 	/** PUT a file to S3 via XHR so upload progress events are observable
 	 *  (fetch() has no equivalent). Resolves on 2xx, rejects otherwise. */
 	function putWithProgress(
@@ -1286,6 +1320,10 @@
 	let thumbnailAction = $state<'keep' | 'replace' | 'remove'>('keep');
 	let thumbnailError = $state<string | null>(null);
 	let thumbnailExpanded = $state(false);
+	// Also store the freshly-uploaded thumbnail as the channel default — the
+	// fallback used whenever a future live starts without its own thumbnail
+	// (go-live copies it onto the gate, so recordings snapshot it too).
+	let setAsDefaultThumbnail = $state(false);
 	// Default ON: normal broadcasts notify. Uncheck for silent tests/re-broadcasts.
 	let notifyOnGoLive = $state(true);
 
@@ -1302,6 +1340,7 @@
 		if (thumbnailPreviewUrl) URL.revokeObjectURL(thumbnailPreviewUrl);
 		thumbnailPreviewUrl = null;
 		thumbnailError = null;
+		setAsDefaultThumbnail = false;
 		metadataEditing = true;
 	}
 
@@ -1311,6 +1350,7 @@
 		thumbnailFile = null;
 		thumbnailAction = 'keep';
 		thumbnailError = null;
+		setAsDefaultThumbnail = false;
 		metadataEditing = false;
 	}
 
@@ -1484,6 +1524,26 @@
 				else thumbnailError = msg;
 				return;
 			}
+
+			// Persist the new thumbnail as the channel default too, if asked.
+			// Separate endpoint so a failure here doesn't undo the metadata save —
+			// just surface it.
+			if (setAsDefaultThumbnail && typeof patch.thumbnail_url === 'string') {
+				const defRes = await fetch('/api/broadcast/defaults', {
+					method: 'PATCH',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						default_thumbnail_url: patch.thumbnail_url,
+						default_thumbnail_s3_key: patch.thumbnail_s3_key
+					})
+				});
+				if (!defRes.ok) {
+					toast.error('Vignette enregistrée, mais échec de la définition par défaut');
+				} else {
+					toast.success('Vignette définie comme défaut');
+				}
+			}
+
 			broadcastYoutubeError = null;
 			cancelEditMode();
 			await invalidateAll();
@@ -2922,6 +2982,20 @@
 							{/if}
 						</div>
 						<p class="text-[10px] text-stone-400">JPEG, PNG, WebP ou GIF · 5 Mo max</p>
+						{#if thumbnailAction === 'replace'}
+							<label class="flex w-48 items-start gap-2 border border-stone-100 bg-stone-50/60 px-2.5 py-2">
+								<input
+									type="checkbox"
+									bind:checked={setAsDefaultThumbnail}
+									disabled={metadataSaving}
+									class="mt-0.5 accent-[#FF880C]"
+								/>
+								<span class="text-[10px] leading-snug text-stone-500">
+									<span class="font-semibold text-stone-600">Définir comme vignette par défaut</span>
+									— utilisée automatiquement quand un direct démarre sans vignette
+								</span>
+							</label>
+						{/if}
 					</div>
 
 					<div class="flex flex-1 flex-col gap-4">
@@ -3199,6 +3273,14 @@
 											class="text-[10px] font-semibold uppercase tracking-[0.15em] text-primary hover:underline disabled:opacity-50"
 										>
 											Ajouter un autre PDF
+										</button>
+										<button
+											type="button"
+											onclick={detachRecordingTranscript}
+											disabled={recSaving}
+											class="text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 transition-colors hover:text-red-600 hover:underline disabled:opacity-50"
+										>
+											Retirer ce PDF
 										</button>
 									</div>
 								{/if}

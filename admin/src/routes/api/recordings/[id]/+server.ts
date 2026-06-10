@@ -31,6 +31,7 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 		thumbnail_url?: unknown;
 		thumbnail_s3_key?: unknown;
 		youtube_url?: unknown;
+		transcript_pdf_id?: unknown;
 	};
 	const updates: {
 		title?: string;
@@ -128,6 +129,15 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 		});
 		const existingTranscript = await getFirstTranscriptPdfForVideo(videoObjectId);
 		updates.transcript_pdf_id = existingTranscript?._id ?? null;
+	}
+
+	// Explicit transcript detach. 'none' is a sentinel (not a valid ObjectId)
+	// that both transcript resolvers treat as "no PDF, and don't fall back to
+	// the date-based auto-match" — that auto-match is exactly what attaches a
+	// wrong same-day PDF in the first place, so plain null wouldn't stick.
+	// Applied after the youtube_url block so a deliberate detach wins.
+	if (body.transcript_pdf_id === 'none') {
+		updates.transcript_pdf_id = 'none';
 	}
 
 	const ok = await updateRecording(id, updates);

@@ -437,6 +437,11 @@ export async function getTranscriptForRecording(recording: {
 	started_at: string | null;
 }): Promise<RecordingTranscript | null> {
 	try {
+		// 'none' = admin explicitly detached the PDF from this recording. Skip
+		// everything, including the date-based fallback — that fallback is what
+		// attaches a wrong same-day PDF in the first place.
+		if (recording.transcript_pdf_id === 'none') return null;
+
 		const db = await getDb();
 		if (recording.transcript_pdf_id && ObjectId.isValid(recording.transcript_pdf_id)) {
 			const attached = await db

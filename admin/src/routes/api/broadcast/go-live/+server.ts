@@ -75,6 +75,17 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		});
 	}
 
+	// Effective thumbnail for this broadcast, in priority order: the scheduled
+	// entry's own → whatever is already on the gate → the stored default. The
+	// gate value is what the public live page, the push image AND the recorder
+	// snapshot (recordings list thumbnail) all read — resolving the fallback
+	// here once means none of them can end up without a thumbnail while a
+	// default exists.
+	const thumbUrl = entry.thumbnail_url ?? current.thumbnail_url ?? current.default_thumbnail_url;
+	const thumbKey = entry.thumbnail_url
+		? entry.thumbnail_s3_key
+		: (current.thumbnail_url ? current.thumbnail_s3_key : current.default_thumbnail_s3_key);
+
 	await setBroadcastAdminState({
 		is_live: true,
 		started_at: startedAt,
@@ -90,9 +101,7 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		// manually survives when the entry has none.
 		...(entry.title ? { title: entry.title } : {}),
 		...(entry.description ? { description: entry.description } : {}),
-		...(entry.thumbnail_url
-			? { thumbnail_url: entry.thumbnail_url, thumbnail_s3_key: entry.thumbnail_s3_key }
-			: {}),
+		...(thumbUrl ? { thumbnail_url: thumbUrl, thumbnail_s3_key: thumbKey ?? null } : {}),
 		// Picked up by the main-site radio-poll endpoint, which fires the actual
 		// push notification (VAPID keys + web-push live there, not in admin).
 		notification_pending: notify

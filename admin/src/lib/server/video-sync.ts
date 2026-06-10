@@ -310,6 +310,11 @@ export async function getTranscriptPdfForRecording(recording: {
 	source_video_id?: string | null;
 	started_at?: string | Date | null;
 }): Promise<LinkedTranscriptPdf | null> {
+	// 'none' = admin explicitly detached the PDF. Skip everything, including
+	// the date-based fallback below — it's that fallback that wrongly attaches
+	// a same-day PDF, which is precisely what the admin is opting out of.
+	if (recording.transcript_pdf_id === 'none') return null;
+
 	const db = await getDb();
 
 	if (recording.transcript_pdf_id && ObjectId.isValid(recording.transcript_pdf_id)) {
