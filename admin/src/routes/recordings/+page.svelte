@@ -7,6 +7,7 @@
 	import { toast } from '$lib/stores/toast';
 	import type { Component } from 'svelte';
 	import BlurUpImage from '$lib/components/BlurUpImage.svelte';
+	import ScheduledLivesPanel from '$lib/components/ScheduledLivesPanel.svelte';
 
 	// AudioTrimEditor pulls in wavesurfer.js + plugins (~120 kB minified). It's
 	// only used when the admin opens the trim modal, so we load it on demand
@@ -65,6 +66,21 @@
 	);
 	const broadcastStartedBy = $derived(broadcast.started_by ?? null);
 	const broadcastStartedByName = $derived(broadcast.started_by_name ?? null);
+	// Stable public watch link for the broadcast currently linked to a
+	// scheduled live — shareable while live, resolves to the replay after.
+	const publicWatchUrl = $derived(
+		broadcast.scheduled_live_slug ? `${data.publicBaseUrl}/live/${broadcast.scheduled_live_slug}` : null
+	);
+
+	async function copyWatchLink() {
+		if (!publicWatchUrl) return;
+		try {
+			await navigator.clipboard.writeText(publicWatchUrl);
+			toast.success('Lien copié');
+		} catch {
+			toast.error('Impossible de copier le lien');
+		}
+	}
 	const recordingStartedBy = $derived(
 		recorder.available && 'recording' in recorder && recorder.recording
 			? (recorder.createdBy ?? null)
@@ -1215,6 +1231,13 @@
 			if (!res.ok) {
 				const text = await res.text();
 				actionError = text || `Erreur ${res.status}`;
+			} else {
+				// The handler links (or back-fills) a scheduled_lives entry and
+				// returns its stable watch URL — surface it right away.
+				const payload = (await res.json().catch(() => null)) as { watchPath?: string } | null;
+				if (payload?.watchPath) {
+					toast.success(`En direct — lien public : ${data.publicBaseUrl}${payload.watchPath}`);
+				}
 			}
 			await invalidateAll();
 		} finally {
@@ -1815,6 +1838,33 @@
 		{/if}
 	</div>
 
+	<!-- Public watch link — stable URL that follows this broadcast from live to replay -->
+	{#if broadcast.is_live && publicWatchUrl}
+		<div class="mt-4 flex flex-wrap items-center gap-2 border-t border-stone-100 pt-4">
+			<span class="shrink-0 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400">
+				Lien public
+			</span>
+			<code class="min-w-0 flex-1 truncate border border-stone-200/60 bg-stone-50 px-3 py-1.5 text-[11px] text-stone-500">
+				{publicWatchUrl}
+			</code>
+			<button
+				type="button"
+				class="shrink-0 border border-stone-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-stone-600 transition-colors hover:border-primary hover:bg-primary hover:text-white"
+				onclick={copyWatchLink}
+			>
+				Copier
+			</button>
+			<a
+				href={publicWatchUrl}
+				target="_blank"
+				rel="noopener noreferrer"
+				class="shrink-0 border border-stone-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-stone-600 transition-colors hover:border-stone-900 hover:bg-stone-900 hover:text-white"
+			>
+				Ouvrir
+			</a>
+		</div>
+	{/if}
+
 	<!-- Actions -->
 	<div class="mt-5 border-t border-stone-100 pt-5">
 		{#if !icecast.sourceActive && !broadcast.is_live && !isRecording}
@@ -2106,6 +2156,16 @@
 		</div>
 	</div>
 </div>
+
+<!-- Scheduled lives — YouTube-style: schedule ahead, get a stable share link
+     (/live/<slug>) immediately, start the live from its entry when ready. -->
+<ScheduledLivesPanel
+	upcoming={data.upcomingLives}
+	past={data.pastLives}
+	{broadcast}
+	{subscriberCount}
+	publicBaseUrl={data.publicBaseUrl}
+/>
 
 <!-- Search + filters toolbar -->
 <div class="mb-3 flex flex-wrap items-center gap-2 sm:gap-3">

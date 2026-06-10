@@ -30,7 +30,9 @@ export interface PushPayload {
 	// Discriminator the Service Worker forwards to open tabs as the message
 	// payload. Clients use this to decide how to update local state — flipping
 	// the radio "is live" indicator on/off without doing a network round-trip.
-	event?: 'radio-live' | 'radio-end';
+	// Tabs ignore events they don't handle, so adding kinds here is safe
+	// without a Service Worker change.
+	event?: 'radio-live' | 'radio-end' | 'live-scheduled' | 'live-reminder';
 }
 
 export async function sendPushToAll(payload: PushPayload): Promise<void> {
@@ -93,11 +95,17 @@ export async function sendPushToAll(payload: PushPayload): Promise<void> {
 
 // Pre-built payloads
 
-export function radioLivePayload(opts?: { thumbnailUrl?: string | null }): PushPayload {
+export function radioLivePayload(opts?: {
+	thumbnailUrl?: string | null;
+	/** Stable watch URL (/live/<slug>) when the broadcast is linked to a
+	 *  scheduled live \u2014 deep-links the notification to the watch page so the
+	 *  same URL later resolves to the replay. */
+	watchPath?: string | null;
+}): PushPayload {
 	const payload: PushPayload = {
 		title: 'Audio en direct',
 		body: 'Missionnaire Network est en direct audio maintenant\u00a0!',
-		url: '/live',
+		url: opts?.watchPath || '/live',
 		icon: '/favicon.png',
 		event: 'radio-live'
 	};
@@ -119,5 +127,62 @@ export function radioEndPayload(): PushPayload {
 		icon: '/favicon.png',
 		event: 'radio-end'
 	};
+}
+
+// Broadcasts are announced/scheduled in Berlin/Zurich time (see the radio-probe
+// cron schedule) \u2014 format the push body in that zone, not the server's.
+function formatScheduledDateFr(scheduledAtIso: string): string {
+	try {
+		return new Intl.DateTimeFormat('fr-FR', {
+			timeZone: 'Europe/Zurich',
+			dateStyle: 'full',
+			timeStyle: 'short'
+		}).format(new Date(scheduledAtIso));
+	} catch {
+		return scheduledAtIso;
+	}
+}
+
+/** Announcement fired when an admin schedules a live with "annoncer aux
+ *  abonn\u00e9s" \u2014 deep-links straight to the waiting room. */
+export function liveScheduledPayload(opts: {
+	title: string;
+	scheduledAtIso: string;
+	slug: string;
+	thumbnailUrl?: string | null;
+}): PushPayload {
+	const payload: PushPayload = {
+		title: 'Live \u00e0 venir',
+		body: `\u00ab\u00a0${opts.title}\u00a0\u00bb \u2014 ${formatScheduledDateFr(opts.scheduledAtIso)}`,
+		url: `/live/${opts.slug}`,
+		icon: '/favicon.png',
+		event: 'live-scheduled'
+	};
+	const thumb = opts.thumbnailUrl;
+	if (thumb && /^https:\/\//i.test(thumb)) {
+		payload.image = thumb;
+	}
+	return payload;
+}
+
+/** Reminder fired by the cron shortly before a scheduled live starts. */
+export function liveReminderPayload(opts: {
+	title: string;
+	scheduledAtIso: string;
+	slug: string;
+	thumbnailUrl?: string | null;
+}): PushPayload {
+	const payload: PushPayload = {
+		title: 'Le direct commence bient\u00f4t',
+		body: `\u00ab\u00a0${opts.title}\u00a0\u00bb \u2014 ${formatScheduledDateFr(opts.scheduledAtIso)}`,
+		url: `/live/${opts.slug}`,
+		icon: '/favicon.png',
+		event: 'live-reminder'
+	};
+	const thumb = opts.thumbnailUrl;
+	if (thumb && /^https:\/\//i.test(thumb)) {
+		payload.image = thumb;
+	}
+	return payload;
 }
 

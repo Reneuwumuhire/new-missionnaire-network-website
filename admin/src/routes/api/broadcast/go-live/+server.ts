@@ -5,7 +5,12 @@ import { getPermissions } from '$lib/models/admin-user';
 import {
 	getBroadcastAdminState,
 	setBroadcastAdminState,
-	logAudit
+	getScheduledLiveById,
+	findLinkableScheduledLive,
+	createScheduledLive,
+	setScheduledLiveStatus,
+	logAudit,
+	type ScheduledLive
 } from '../../../../db/collections';
 
 export const POST: RequestHandler = async ({ locals, request, getClientAddress }) => {
@@ -14,12 +19,23 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 	// `notify` is optional: defaults to true (normal behavior = fire push).
 	// Pass `false` from admin UI to go live silently (local testing, re-broadcasts
 	// after a technical glitch, etc.).
+	// `scheduledLiveId` explicitly attaches this broadcast to a scheduled entry
+	// (the "Démarrer le direct" button on /directs). Without it we auto-link the
+	// nearest upcoming entry, or back-fill a new one so even ad-hoc lives get a
+	// stable watch URL.
 	let notify = true;
+	let scheduledLiveId: string | null = null;
 	try {
-		const body = (await request.json().catch(() => ({}))) as { notify?: unknown };
+		const body = (await request.json().catch(() => ({}))) as {
+			notify?: unknown;
+			scheduledLiveId?: unknown;
+		};
 		if (body.notify === false) notify = false;
+		if (typeof body.scheduledLiveId === 'string' && body.scheduledLiveId) {
+			scheduledLiveId = body.scheduledLiveId;
+		}
 	} catch {
-		// Empty body is fine — stay with default `true`.
+		// Empty body is fine — stay with defaults.
 	}
 
 	// Bypass the per-process cache — a stale `is_live: true` here would skip
@@ -31,6 +47,34 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 	}
 
 	const startedAt = new Date().toISOString();
+
+	// Resolve the scheduled_lives entry this broadcast airs.
+	let entry: ScheduledLive | null = null;
+	if (scheduledLiveId) {
+		entry = await getScheduledLiveById(scheduledLiveId);
+		if (!entry) throw error(404, 'Direct programmé introuvable');
+		if (entry.status !== 'scheduled') {
+			throw error(400, 'Ce direct programmé a déjà été diffusé ou annulé');
+		}
+	} else {
+		entry = await findLinkableScheduledLive(new Date());
+	}
+	if (!entry) {
+		// Ad-hoc live with no upcoming entry: back-fill one so the share link
+		// (/live/<slug>) exists for this broadcast too — and later resolves to
+		// its replay. Metadata mirrors what the public live page will show.
+		entry = await createScheduledLive({
+			title: current.title ?? current.default_title ?? 'Direct Missionnaire Network',
+			description: current.description ?? current.default_description ?? null,
+			thumbnail_url: current.thumbnail_url ?? current.default_thumbnail_url ?? null,
+			thumbnail_s3_key: current.thumbnail_s3_key ?? current.default_thumbnail_s3_key ?? null,
+			scheduled_at: new Date(startedAt),
+			status: 'live',
+			live_started_at: startedAt,
+			created_by: locals.user.email
+		});
+	}
+
 	await setBroadcastAdminState({
 		is_live: true,
 		started_at: startedAt,
@@ -38,10 +82,25 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		started_by: locals.user.email,
 		started_by_name: locals.user.name || null,
 		icecast_offline_since: null,
+		scheduled_live_id: entry._id,
+		scheduled_live_slug: entry.slug,
+		// A scheduled entry carries its own metadata — copy it onto the gate so
+		// the public live page / push / recorder snapshot all show it. Only
+		// overwrite fields the entry actually has, so gate metadata an admin set
+		// manually survives when the entry has none.
+		...(entry.title ? { title: entry.title } : {}),
+		...(entry.description ? { description: entry.description } : {}),
+		...(entry.thumbnail_url
+			? { thumbnail_url: entry.thumbnail_url, thumbnail_s3_key: entry.thumbnail_s3_key }
+			: {}),
 		// Picked up by the main-site radio-poll endpoint, which fires the actual
 		// push notification (VAPID keys + web-push live there, not in admin).
 		notification_pending: notify
 	});
+
+	if (entry.status !== 'live') {
+		await setScheduledLiveStatus(entry._id, 'live', { live_started_at: startedAt });
+	}
 
 	// Ping the main-site internal broadcast-event endpoint so the push fires
 	// immediately. Fire-and-forget — failure here must not block the Go Live
@@ -71,9 +130,13 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		action: 'create',
 		target_collection: 'broadcast_admin_state',
 		target_id: 'current',
-		changes: { is_live: { old: false, new: true }, notify: { old: null, new: notify } },
+		changes: {
+			is_live: { old: false, new: true },
+			notify: { old: null, new: notify },
+			scheduled_live: { old: null, new: entry._id }
+		},
 		ip_address: getClientAddress()
 	});
 
-	return json({ ok: true, startedAt, notify });
+	return json({ ok: true, startedAt, notify, watchPath: `/live/${entry.slug}` });
 };

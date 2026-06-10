@@ -1,13 +1,21 @@
 import { json, error } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { probeLiveAudio, getLiveAudioSourceUrl, applyAutoEndSafety } from '$lib/server/live-audio';
-import { sendPushToAll, radioLivePayload } from '$lib/server/push-notifications';
+import {
+	sendPushToAll,
+	radioLivePayload,
+	liveScheduledPayload,
+	liveReminderPayload
+} from '$lib/server/push-notifications';
 import { checkAndIngestLiveStream } from '$lib/server/youtube-poller';
 import {
 	getBroadcastAdminState,
 	setBroadcastAdminState,
 	getRadioCachedStatus,
-	setRadioCachedStatus
+	setRadioCachedStatus,
+	listStaleScheduledLiveAnnouncements,
+	claimScheduledLiveAnnouncement,
+	claimDueScheduledLiveReminders
 } from '../../../../db/collections';
 
 // Vercel Cron entry point. Replaces the user-driven Icecast probing that
@@ -58,9 +66,50 @@ export async function GET({ request }) {
 		await setBroadcastAdminState({ notification_pending: false });
 		adminGate = { ...adminGate, notification_pending: false };
 		console.log('[CronRadioProbe] Backstop: firing pending Go Live push');
-		sendPushToAll(radioLivePayload({ thumbnailUrl: adminGate.thumbnail_url })).catch((e) =>
-			console.error('[CronRadioProbe] Backstop push send failed:', e)
-		);
+		sendPushToAll(
+			radioLivePayload({
+				thumbnailUrl: adminGate.thumbnail_url,
+				watchPath: adminGate.scheduled_live_slug ? `/live/${adminGate.scheduled_live_slug}` : null
+			})
+		).catch((e) => console.error('[CronRadioProbe] Backstop push send failed:', e));
+	}
+
+	// Scheduled-live pushes ride on this always-on tick (every 5 min, see
+	// vercel.json) — no extra cron entry needed:
+	// 1. Announcement backstop: the admin → main-site ping failed and
+	//    announce_pending is still set a couple of minutes after creation.
+	// 2. "Starts soon" reminders for entries with reminder_enabled. Both go
+	//    through atomic claims, so an overlapping tick can't double-send.
+	try {
+		const staleAnnouncements = await listStaleScheduledLiveAnnouncements();
+		for (const entry of staleAnnouncements) {
+			const claimed = await claimScheduledLiveAnnouncement(entry._id);
+			if (!claimed) continue;
+			console.log('[CronRadioProbe] Backstop: firing scheduled-live announcement', claimed.slug);
+			sendPushToAll(
+				liveScheduledPayload({
+					title: claimed.title,
+					scheduledAtIso: claimed.scheduled_at,
+					slug: claimed.slug,
+					thumbnailUrl: claimed.thumbnail_url
+				})
+			).catch((e) => console.error('[CronRadioProbe] Announcement push failed:', e));
+		}
+
+		const dueReminders = await claimDueScheduledLiveReminders();
+		for (const entry of dueReminders) {
+			console.log('[CronRadioProbe] Firing scheduled-live reminder', entry.slug);
+			sendPushToAll(
+				liveReminderPayload({
+					title: entry.title,
+					scheduledAtIso: entry.scheduled_at,
+					slug: entry.slug,
+					thumbnailUrl: entry.thumbnail_url
+				})
+			).catch((e) => console.error('[CronRadioProbe] Reminder push failed:', e));
+		}
+	} catch (e) {
+		console.error('[CronRadioProbe] Scheduled-live sweep failed:', e);
 	}
 
 	// Fast path: gate closed → no point probing Icecast. Single DB read, done.

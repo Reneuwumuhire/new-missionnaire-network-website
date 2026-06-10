@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { getDb } from './mongo';
 import { ObjectId, type Document, type Filter } from 'mongodb';
 import type { MusicAudio } from '$lib/models/music-audio';
@@ -653,8 +654,9 @@ export async function deleteRecording(id: string): Promise<{ s3_key: string | nu
 }
 
 /** Returns true if the given `broadcast-thumbnails/...` S3 key is still
- *  referenced by something we don't want to break: another recording, the
- *  current live broadcast thumbnail, or the saved default thumbnail.
+ *  referenced by something we don't want to break: another recording, a
+ *  scheduled live, the current live broadcast thumbnail, or the saved
+ *  default thumbnail.
  *
  *  Used to gate S3 `deleteObject(key)` calls — the recorder snapshots
  *  `broadcast_admin_state.thumbnail_url` into every recording it saves, so a
@@ -663,10 +665,11 @@ export async function deleteRecording(id: string): Promise<{ s3_key: string | nu
  *  a 404 (which Vercel's image proxy then surfaces as a 502).
  *
  *  Pass `excludeRecordingId` when the caller is about to update or has just
- *  updated that row so its pre-update value doesn't count as a reference. */
+ *  updated that row so its pre-update value doesn't count as a reference.
+ *  `excludeScheduledLiveId` plays the same role for scheduled_lives edits. */
 export async function isThumbnailS3KeyReferenced(
 	key: string,
-	options: { excludeRecordingId?: string } = {}
+	options: { excludeRecordingId?: string; excludeScheduledLiveId?: string } = {}
 ): Promise<boolean> {
 	if (!key) return false;
 	const db = await getDb();
@@ -679,6 +682,15 @@ export async function isThumbnailS3KeyReferenced(
 		.collection('recordings')
 		.findOne(recordingFilter, { projection: { _id: 1 } });
 	if (recordingHit) return true;
+
+	const scheduledFilter: Filter<Document> = { thumbnail_s3_key: key };
+	if (options.excludeScheduledLiveId && ObjectId.isValid(options.excludeScheduledLiveId)) {
+		scheduledFilter._id = { $ne: new ObjectId(options.excludeScheduledLiveId) };
+	}
+	const scheduledHit = await db
+		.collection('scheduled_lives')
+		.findOne(scheduledFilter, { projection: { _id: 1 } });
+	if (scheduledHit) return true;
 
 	// Read fresh so a pre-write cache snapshot doesn't make us think the
 	// broadcast still owns a key it's just been replaced from.
@@ -728,13 +740,20 @@ export async function deleteRecordingBulk(
 		if (broadcast.thumbnail_s3_key) broadcastRefs.add(broadcast.thumbnail_s3_key);
 		if (broadcast.default_thumbnail_s3_key) broadcastRefs.add(broadcast.default_thumbnail_s3_key);
 
-		const remainingRefs = await db
-			.collection('recordings')
-			.find({ thumbnail_s3_key: { $in: [...candidateThumbKeys] } })
-			.project({ thumbnail_s3_key: 1 })
-			.toArray();
+		const [remainingRefs, scheduledRefsDocs] = await Promise.all([
+			db
+				.collection('recordings')
+				.find({ thumbnail_s3_key: { $in: [...candidateThumbKeys] } })
+				.project({ thumbnail_s3_key: 1 })
+				.toArray(),
+			db
+				.collection('scheduled_lives')
+				.find({ thumbnail_s3_key: { $in: [...candidateThumbKeys] } })
+				.project({ thumbnail_s3_key: 1 })
+				.toArray()
+		]);
 		const recordingRefs = new Set<string>();
-		for (const r of remainingRefs) {
+		for (const r of [...remainingRefs, ...scheduledRefsDocs]) {
 			if (typeof r.thumbnail_s3_key === 'string') recordingRefs.add(r.thumbnail_s3_key);
 		}
 
@@ -780,6 +799,11 @@ export type BroadcastAdminState = {
 	default_thumbnail_url: string | null;
 	default_thumbnail_s3_key: string | null;
 	default_youtube_url: string | null;
+	/** The scheduled_lives entry currently on air (or last aired). Lets the
+	 *  public watch page (/live/<slug>) know whether "live right now" is THIS
+	 *  entry, and lets the go-live push deep-link to the stable watch URL. */
+	scheduled_live_id: string | null;
+	scheduled_live_slug: string | null;
 	updated_at: string;
 };
 
@@ -801,6 +825,8 @@ const BROADCAST_DEFAULT: BroadcastAdminState = {
 	default_thumbnail_url: null,
 	default_thumbnail_s3_key: null,
 	default_youtube_url: null,
+	scheduled_live_id: null,
+	scheduled_live_slug: null,
 	updated_at: new Date(0).toISOString()
 };
 
@@ -849,6 +875,8 @@ export async function getBroadcastAdminState(opts?: {
 		default_thumbnail_url: (doc.default_thumbnail_url as string | null) ?? null,
 		default_thumbnail_s3_key: (doc.default_thumbnail_s3_key as string | null) ?? null,
 		default_youtube_url: (doc.default_youtube_url as string | null) ?? null,
+		scheduled_live_id: (doc.scheduled_live_id as string | null) ?? null,
+		scheduled_live_slug: (doc.scheduled_live_slug as string | null) ?? null,
 		updated_at: (doc.updated_at as string) ?? new Date(0).toISOString()
 	};
 	cachedBroadcast = { value, cachedAt: Date.now() };
@@ -872,4 +900,213 @@ export async function setBroadcastAdminState(updates: Partial<BroadcastAdminStat
 export async function countPushSubscriptions(): Promise<number> {
 	const db = await getDb();
 	return db.collection('push_subscriptions').countDocuments({});
+}
+
+// ══════════════════════════════════════
+//  SCHEDULED LIVES
+// ══════════════════════════════════════
+// YouTube-style scheduled broadcasts. Each entry owns an immutable random slug
+// that backs the public watch URL (/live/<slug>) — shareable from the moment
+// the live is scheduled, before it ever starts. The single
+// broadcast_admin_state gate doc stays the only source of "on air right now";
+// go-live links the gate to one of these entries via scheduled_live_id/slug.
+
+export type ScheduledLiveStatus = 'scheduled' | 'live' | 'ended' | 'cancelled';
+
+export type ScheduledLive = {
+	_id: string;
+	slug: string;
+	title: string;
+	description: string | null;
+	thumbnail_url: string | null;
+	thumbnail_s3_key: string | null;
+	scheduled_at: string; // ISO (stored as BSON Date, serialized on read)
+	status: ScheduledLiveStatus;
+	live_started_at: string | null;
+	live_ended_at: string | null;
+	recording_id: string | null;
+	announce_pending: boolean;
+	announced_at: string | null;
+	reminder_enabled: boolean;
+	reminder_sent_at: string | null;
+	created_by: string | null;
+	created_at: string;
+	updated_at: string;
+};
+
+// Lazy index creation — same no-migration pattern as the recordings indexes
+// in main src/lib/server/recordings.ts: createIndex is a no-op when present.
+let scheduledLiveIndexesEnsured: Promise<void> | null = null;
+async function ensureScheduledLiveIndexes(): Promise<void> {
+	if (scheduledLiveIndexesEnsured !== null) return scheduledLiveIndexesEnsured;
+	scheduledLiveIndexesEnsured = (async () => {
+		try {
+			const db = await getDb();
+			await db
+				.collection('scheduled_lives')
+				.createIndex({ slug: 1 }, { unique: true, name: 'slug_unique' });
+			await db
+				.collection('scheduled_lives')
+				.createIndex({ status: 1, scheduled_at: 1 }, { name: 'status_scheduledAt' });
+		} catch (err) {
+			scheduledLiveIndexesEnsured = null;
+			console.error('[scheduled_lives] ensureIndexes failed', err);
+		}
+	})();
+	return scheduledLiveIndexesEnsured;
+}
+
+/** 11-char base64url id, same alphabet/length feel as a YouTube video id. */
+function generateWatchSlug(): string {
+	return randomBytes(8).toString('base64url');
+}
+
+export async function createScheduledLive(input: {
+	title: string;
+	description?: string | null;
+	thumbnail_url?: string | null;
+	thumbnail_s3_key?: string | null;
+	scheduled_at: Date;
+	status?: 'scheduled' | 'live';
+	live_started_at?: string | null;
+	announce?: boolean;
+	reminder_enabled?: boolean;
+	created_by?: string | null;
+}): Promise<ScheduledLive> {
+	await ensureScheduledLiveIndexes();
+	const db = await getDb();
+	const now = new Date().toISOString();
+	// Retry on the (astronomically unlikely) slug collision — the unique index
+	// turns a duplicate into a write error instead of a silent overwrite.
+	for (let attempt = 0; attempt < 5; attempt++) {
+		const doc = {
+			slug: generateWatchSlug(),
+			title: input.title,
+			description: input.description ?? null,
+			thumbnail_url: input.thumbnail_url ?? null,
+			thumbnail_s3_key: input.thumbnail_s3_key ?? null,
+			scheduled_at: input.scheduled_at,
+			status: input.status ?? 'scheduled',
+			live_started_at: input.live_started_at ?? null,
+			live_ended_at: null,
+			recording_id: null,
+			announce_pending: Boolean(input.announce),
+			announced_at: null,
+			reminder_enabled: Boolean(input.reminder_enabled),
+			reminder_sent_at: null,
+			created_by: input.created_by ?? null,
+			created_at: now,
+			updated_at: now
+		};
+		try {
+			const result = await db.collection('scheduled_lives').insertOne(doc);
+			return serializeDocument<ScheduledLive>({ ...doc, _id: result.insertedId });
+		} catch (err) {
+			const isDuplicate = (err as { code?: number })?.code === 11000;
+			if (!isDuplicate || attempt === 4) throw err;
+		}
+	}
+	throw new Error('unreachable');
+}
+
+export async function getScheduledLiveById(id: string): Promise<ScheduledLive | null> {
+	if (!ObjectId.isValid(id)) return null;
+	const db = await getDb();
+	const doc = await db.collection('scheduled_lives').findOne({ _id: new ObjectId(id) });
+	return doc ? serializeDocument<ScheduledLive>(doc) : null;
+}
+
+export async function listScheduledLives(
+	options: { statuses?: ScheduledLiveStatus[]; limit?: number; ascending?: boolean } = {}
+): Promise<ScheduledLive[]> {
+	const { statuses, limit = 50, ascending = true } = options;
+	await ensureScheduledLiveIndexes();
+	const db = await getDb();
+	const query: Filter<Document> = statuses?.length ? { status: { $in: statuses } } : {};
+	const docs = await db
+		.collection('scheduled_lives')
+		.find(query)
+		.sort({ scheduled_at: ascending ? 1 : -1 })
+		.limit(limit)
+		.toArray();
+	return docs.map((doc) => serializeDocument<ScheduledLive>(doc));
+}
+
+export async function updateScheduledLive(
+	id: string,
+	updates: Partial<{
+		title: string;
+		description: string | null;
+		thumbnail_url: string | null;
+		thumbnail_s3_key: string | null;
+		scheduled_at: Date;
+		announce_pending: boolean;
+		reminder_enabled: boolean;
+	}>
+): Promise<boolean> {
+	if (!ObjectId.isValid(id)) return false;
+	const db = await getDb();
+	const result = await db
+		.collection('scheduled_lives')
+		.updateOne(
+			{ _id: new ObjectId(id) },
+			{ $set: { ...updates, updated_at: new Date().toISOString() } }
+		);
+	return result.matchedCount > 0;
+}
+
+export async function setScheduledLiveStatus(
+	id: string,
+	status: ScheduledLiveStatus,
+	extra: Partial<{ live_started_at: string; live_ended_at: string; recording_id: string }> = {}
+): Promise<boolean> {
+	if (!ObjectId.isValid(id)) return false;
+	const db = await getDb();
+	const result = await db
+		.collection('scheduled_lives')
+		.updateOne(
+			{ _id: new ObjectId(id) },
+			{ $set: { status, ...extra, updated_at: new Date().toISOString() } }
+		);
+	return result.matchedCount > 0;
+}
+
+export async function deleteScheduledLive(
+	id: string
+): Promise<{ thumbnail_s3_key: string | null } | null> {
+	if (!ObjectId.isValid(id)) return null;
+	const db = await getDb();
+	const doc = await db.collection('scheduled_lives').findOne({ _id: new ObjectId(id) });
+	if (!doc) return null;
+	await db.collection('scheduled_lives').deleteOne({ _id: new ObjectId(id) });
+	return { thumbnail_s3_key: (doc.thumbnail_s3_key as string | null | undefined) ?? null };
+}
+
+/** The scheduled entry an ad-hoc "Aller en direct" should attach to: the
+ *  nearest still-`scheduled` doc whose slot is within [now − 1h, now + 6h].
+ *  Wide on purpose — admins routinely start a bit early or late. The go-live
+ *  confirm dialog shows which entry will be linked so a mis-link is visible. */
+export async function findLinkableScheduledLive(now: Date = new Date()): Promise<ScheduledLive | null> {
+	await ensureScheduledLiveIndexes();
+	const db = await getDb();
+	const from = new Date(now.getTime() - 60 * 60 * 1000);
+	const to = new Date(now.getTime() + 6 * 60 * 60 * 1000);
+	const docs = await db
+		.collection('scheduled_lives')
+		.find({ status: 'scheduled', scheduled_at: { $gte: from, $lte: to } })
+		.sort({ scheduled_at: 1 })
+		.limit(10)
+		.toArray();
+	if (docs.length === 0) return null;
+	let best = docs[0];
+	let bestDist = Infinity;
+	for (const doc of docs) {
+		const ms = doc.scheduled_at instanceof Date ? doc.scheduled_at.getTime() : Date.parse(String(doc.scheduled_at));
+		const dist = Math.abs(ms - now.getTime());
+		if (dist < bestDist) {
+			bestDist = dist;
+			best = doc;
+		}
+	}
+	return serializeDocument<ScheduledLive>(best);
 }

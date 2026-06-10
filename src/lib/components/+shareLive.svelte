@@ -34,9 +34,14 @@
 	// page sat in the (≤60s) edge cache yields a plain /live link until the next
 	// revalidation — acceptable, since lives run far longer than that window.
 	export let liveSessionId: number | null = null;
+	// Stable watch URL (/live/<slug>) — passed by the scheduled-live watch page.
+	// Takes precedence over the session-stamped /live link: the slug URL works
+	// before, during, and after the broadcast.
+	export let shareUrl: string | null = null;
 
 	function buildShareUrl(): string {
 		if (!browser) return '';
+		if (shareUrl) return shareUrl;
 		const base = `${window.location.origin}/live`;
 		return liveSessionId ? `${base}?live=${liveSessionId}` : base;
 	}

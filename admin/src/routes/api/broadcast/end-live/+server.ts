@@ -5,6 +5,7 @@ import { getPermissions } from '$lib/models/admin-user';
 import {
 	getBroadcastAdminState,
 	setBroadcastAdminState,
+	setScheduledLiveStatus,
 	logAudit
 } from '../../../../db/collections';
 
@@ -25,6 +26,15 @@ export const POST: RequestHandler = async ({ locals, getClientAddress }) => {
 		icecast_offline_since: null,
 		notification_pending: false
 	});
+
+	// Close out the scheduled_lives entry this broadcast was linked to. The
+	// gate keeps scheduled_live_id pointing at it (harmless — overwritten on
+	// next go-live); the watch page resolves the replay lazily once published.
+	if (current.scheduled_live_id) {
+		await setScheduledLiveStatus(current.scheduled_live_id, 'ended', {
+			live_ended_at: endedAt
+		});
+	}
 
 	// Tell the main site to clear its Icecast cache and fan out an end-live
 	// push so open tabs flip their radio banner off without reloading.
