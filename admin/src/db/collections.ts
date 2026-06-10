@@ -804,6 +804,13 @@ export type BroadcastAdminState = {
 	 *  entry, and lets the go-live push deep-link to the stable watch URL. */
 	scheduled_live_id: string | null;
 	scheduled_live_slug: string | null;
+	/** Live transcript: SRT copied from the linked scheduled live at go-live.
+	 *  anchor = wall-clock ms when SRT 00:00:00 started playing on air (set by
+	 *  the admin sync button); offset = manual nudge correction in ms. */
+	subtitle_srt_url: string | null;
+	subtitle_srt_s3_key: string | null;
+	subtitle_anchor_epoch_ms: number | null;
+	subtitle_offset_ms: number;
 	updated_at: string;
 };
 
@@ -827,6 +834,10 @@ const BROADCAST_DEFAULT: BroadcastAdminState = {
 	default_youtube_url: null,
 	scheduled_live_id: null,
 	scheduled_live_slug: null,
+	subtitle_srt_url: null,
+	subtitle_srt_s3_key: null,
+	subtitle_anchor_epoch_ms: null,
+	subtitle_offset_ms: 0,
 	updated_at: new Date(0).toISOString()
 };
 
@@ -877,6 +888,12 @@ export async function getBroadcastAdminState(opts?: {
 		default_youtube_url: (doc.default_youtube_url as string | null) ?? null,
 		scheduled_live_id: (doc.scheduled_live_id as string | null) ?? null,
 		scheduled_live_slug: (doc.scheduled_live_slug as string | null) ?? null,
+		subtitle_srt_url: (doc.subtitle_srt_url as string | null) ?? null,
+		subtitle_srt_s3_key: (doc.subtitle_srt_s3_key as string | null) ?? null,
+		subtitle_anchor_epoch_ms:
+			typeof doc.subtitle_anchor_epoch_ms === 'number' ? doc.subtitle_anchor_epoch_ms : null,
+		subtitle_offset_ms:
+			typeof doc.subtitle_offset_ms === 'number' ? doc.subtitle_offset_ms : 0,
 		updated_at: (doc.updated_at as string) ?? new Date(0).toISOString()
 	};
 	cachedBroadcast = { value, cachedAt: Date.now() };
@@ -929,6 +946,14 @@ export type ScheduledLive = {
 	announced_at: string | null;
 	reminder_enabled: boolean;
 	reminder_sent_at: string | null;
+	/** Pre-made SRT transcript for the broadcast audio (uploaded with the
+	 *  schedule). anchor/offset are mirrored here on every sync action so the
+	 *  replay can recompute the transcript position after the gate is reused. */
+	subtitle_srt_url: string | null;
+	subtitle_srt_s3_key: string | null;
+	subtitle_filename: string | null;
+	subtitle_anchor_epoch_ms: number | null;
+	subtitle_offset_ms: number;
 	created_by: string | null;
 	created_at: string;
 	updated_at: string;
@@ -971,6 +996,9 @@ export async function createScheduledLive(input: {
 	live_started_at?: string | null;
 	announce?: boolean;
 	reminder_enabled?: boolean;
+	subtitle_srt_url?: string | null;
+	subtitle_srt_s3_key?: string | null;
+	subtitle_filename?: string | null;
 	created_by?: string | null;
 }): Promise<ScheduledLive> {
 	await ensureScheduledLiveIndexes();
@@ -994,6 +1022,11 @@ export async function createScheduledLive(input: {
 			announced_at: null,
 			reminder_enabled: Boolean(input.reminder_enabled),
 			reminder_sent_at: null,
+			subtitle_srt_url: input.subtitle_srt_url ?? null,
+			subtitle_srt_s3_key: input.subtitle_srt_s3_key ?? null,
+			subtitle_filename: input.subtitle_filename ?? null,
+			subtitle_anchor_epoch_ms: null,
+			subtitle_offset_ms: 0,
 			created_by: input.created_by ?? null,
 			created_at: now,
 			updated_at: now
@@ -1042,6 +1075,11 @@ export async function updateScheduledLive(
 		scheduled_at: Date;
 		announce_pending: boolean;
 		reminder_enabled: boolean;
+		subtitle_srt_url: string | null;
+		subtitle_srt_s3_key: string | null;
+		subtitle_filename: string | null;
+		subtitle_anchor_epoch_ms: number | null;
+		subtitle_offset_ms: number;
 	}>
 ): Promise<boolean> {
 	if (!ObjectId.isValid(id)) return false;
@@ -1073,13 +1111,16 @@ export async function setScheduledLiveStatus(
 
 export async function deleteScheduledLive(
 	id: string
-): Promise<{ thumbnail_s3_key: string | null } | null> {
+): Promise<{ thumbnail_s3_key: string | null; subtitle_srt_s3_key: string | null } | null> {
 	if (!ObjectId.isValid(id)) return null;
 	const db = await getDb();
 	const doc = await db.collection('scheduled_lives').findOne({ _id: new ObjectId(id) });
 	if (!doc) return null;
 	await db.collection('scheduled_lives').deleteOne({ _id: new ObjectId(id) });
-	return { thumbnail_s3_key: (doc.thumbnail_s3_key as string | null | undefined) ?? null };
+	return {
+		thumbnail_s3_key: (doc.thumbnail_s3_key as string | null | undefined) ?? null,
+		subtitle_srt_s3_key: (doc.subtitle_srt_s3_key as string | null | undefined) ?? null
+	};
 }
 
 /** The scheduled entry an ad-hoc "Aller en direct" should attach to: the

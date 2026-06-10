@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { onDestroy, onMount } from 'svelte';
-	import { radioIsLive as radioIsLiveStore } from '$lib/stores/global';
+	import { radioIsLive as radioIsLiveStore, livePlayback } from '$lib/stores/global';
+	import LiveTranscript from './+liveTranscript.svelte';
 
 	const STATUS_MESSAGES: Record<string, string> = {
 		offline: "L'audio en direct est hors ligne",
@@ -116,12 +117,39 @@
 		return `${base}${base.includes('?') ? '&' : '?'}t=${Date.now()}`;
 	}
 
+	// Wall-clock epoch at which the CURRENT stream connection was opened.
+	// On a fresh Icecast connection, audio position 0 is "live at that
+	// instant", so the wall-clock moment of what the listener hears at
+	// position t is streamConnectEpochMs + t*1000. The transcript syncs on
+	// this rather than on buffer-edge deltas, which makes pause/resume,
+	// DVR rewind and silent reconnects all correct by construction — a
+	// paused player's frozen currentTime freezes the text, and a long-pause
+	// buffer-expiry reconnect resets the epoch to "now" along with the audio.
+	let streamConnectEpochMs: number | null = null;
+
+	/** Single place every (re)connection goes through. */
+	function connectStream() {
+		if (!audio) return;
+		audio.src = getStreamUrl();
+		audio.load();
+		streamConnectEpochMs = Date.now();
+	}
+
 	$: showLive = confirmedLive || keepLiveUi;
 	$: awaitingPlay = probeReachable && !isPlaying && !isBuffering && !confirmedLive && !keepLiveUi;
 	// Button stays enabled after failure so user can manually retry
 	$: canPlay = probeReachable || confirmedLive || playbackFailed;
 	$: statusMessage = STATUS_MESSAGES[statusKey] || '';
 	$: behindLiveSec = Math.max(0, liveEdge - currentTime);
+	// Feed the transcript the wall-clock moment of what the listener is
+	// hearing right now (connection epoch + playback position). Frozen while
+	// paused (currentTime doesn't advance), shifted by DVR scrubbing, reset
+	// to "now" on every fresh reconnection — all without buffer-edge math.
+	$: livePlayback.set({
+		playing: isPlaying,
+		positionEpochMs:
+			streamConnectEpochMs === null ? null : streamConnectEpochMs + currentTime * 1000
+	});
 	$: isAtLive = !userSeeked;
 	$: hasSeekableRange =
 		Number.isFinite(liveEdge) && Number.isFinite(bufferStart) && liveEdge > bufferStart + 1;
@@ -187,8 +215,7 @@
 		if (!probeReachable) return;
 		hasAttemptedAutoplay = true;
 
-		audio.src = getStreamUrl();
-		audio.load();
+		connectStream();
 		isBuffering = true;
 		userWantsToPlay = true;
 		statusKey = 'connecting';
@@ -469,6 +496,7 @@
 				audio.removeAttribute('src');
 				audio.load();
 			}
+			streamConnectEpochMs = null;
 		}
 	}
 
@@ -487,6 +515,7 @@
 				audio.removeAttribute('src');
 				audio.load();
 			}
+			streamConnectEpochMs = null;
 			return;
 		}
 
@@ -503,8 +532,7 @@
 
 			// Fresh src — the browser reuses the audio session from the
 			// user's initial play tap, so play() works on mobile.
-			audio.src = getStreamUrl();
-			audio.load();
+			connectStream();
 			audio.play().catch(() => {
 				// play() rejected — handleError will fire and retry
 			});
@@ -519,6 +547,8 @@
 		if (!audio.paused || reconnectTimer) {
 			// Pause only — keep the audio session + buffer intact so
 			// resume plays from where the listener paused (time-shift).
+			// The transcript follows via the connection-epoch math, so a
+			// paused listener's text freezes and resumes in sync.
 			userWantsToPlay = false;
 			clearReconnectTimer();
 			reconnectAttempts = 0;
@@ -543,8 +573,7 @@
 		if (needsFreshStream) {
 			isBuffering = true;
 			statusKey = 'connecting';
-			audio.src = getStreamUrl();
-			audio.load();
+			connectStream();
 		}
 
 		try {
@@ -557,8 +586,7 @@
 				try {
 					isBuffering = true;
 					statusKey = 'reconnecting';
-					audio.src = getStreamUrl();
-					audio.load();
+					connectStream();
 					await audio.play();
 					return;
 				} catch (retryError) {
@@ -589,8 +617,7 @@
 		currentTime = 0;
 		bufferStart = 0;
 		liveEdge = 0;
-		audio.src = getStreamUrl();
-		audio.load();
+		connectStream();
 		try {
 			await audio.play();
 		} catch {
@@ -1080,6 +1107,12 @@
 				</button>
 			{/if}
 		</div>
+	{/if}
+
+	<!-- Synced transcript — renders nothing unless the broadcast has an SRT
+	     attached (the component polls radio-state itself). -->
+	{#if showLive}
+		<LiveTranscript />
 	{/if}
 
 	<!-- Offline: only surface a message when the listener tapped Lecture

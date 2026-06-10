@@ -49,6 +49,39 @@ export function parseThumbnailPair(
 	throw error(400, 'Données de vignette invalides');
 }
 
+/** Subtitle url + s3 key + filename must come as a triple (all set or all
+ *  null) — same contract as parseThumbnailPair. */
+export function parseSubtitleTriple(
+	srtUrl: unknown,
+	srtS3Key: unknown,
+	srtFilename: unknown
+): {
+	subtitle_srt_url: string | null;
+	subtitle_srt_s3_key: string | null;
+	subtitle_filename: string | null;
+} {
+	if ((srtUrl ?? null) === null && (srtS3Key ?? null) === null && (srtFilename ?? null) === null) {
+		return { subtitle_srt_url: null, subtitle_srt_s3_key: null, subtitle_filename: null };
+	}
+	if (
+		typeof srtUrl === 'string' &&
+		typeof srtS3Key === 'string' &&
+		typeof srtFilename === 'string' &&
+		srtUrl.startsWith('https://') &&
+		srtS3Key.startsWith('subtitles/') &&
+		srtS3Key.endsWith('.srt') &&
+		srtFilename.trim().length > 0 &&
+		srtFilename.length <= 300
+	) {
+		return {
+			subtitle_srt_url: srtUrl,
+			subtitle_srt_s3_key: srtS3Key,
+			subtitle_filename: srtFilename.trim()
+		};
+	}
+	throw error(400, 'Données de sous-titres invalides');
+}
+
 /** ISO datetime (UTC from the client's datetime-local conversion). Rejects
  *  past dates with a small grace window so "now-ish" scheduling works. */
 export function parseScheduledAt(value: unknown, { allowPastMs = 5 * 60 * 1000 } = {}): Date {

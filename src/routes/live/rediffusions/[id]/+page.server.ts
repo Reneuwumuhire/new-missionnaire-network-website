@@ -1,5 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { getPublishedById, getTranscriptForRecording } from '$lib/server/recordings';
+import { getScheduledLiveByRecordingId } from '../../../../db/collections';
 import type { PageServerLoad } from './$types';
 
 const ALLOWED_BACK_PARAMS = new Set(['page', 'q', 'year', 'month', 'type']);
@@ -31,5 +32,29 @@ export const load: PageServerLoad = async ({ params, url }) => {
 		source_video_id: recording.source_video_id,
 		started_at: recording.started_at
 	});
-	return { recording, backHref, transcript };
+
+	// Synced SRT transcript: if this recording's broadcast had subtitles AND
+	// the admin anchored them during the live, translate that wall-clock anchor
+	// into an offset from the recording start. The recorder captures the same
+	// Icecast output listeners heard, so recording position t was on air at
+	// started_at + t — hence SRT 00:00 sits at (anchor + offset − started_at)
+	// into the file.
+	let subtitles: { url: string; offsetIntoRecordingMs: number } | null = null;
+	const scheduled = await getScheduledLiveByRecordingId(recording.id);
+	if (
+		scheduled?.subtitle_srt_s3_key &&
+		typeof scheduled.subtitle_anchor_epoch_ms === 'number' &&
+		recording.started_at
+	) {
+		const startedMs = Date.parse(recording.started_at);
+		if (Number.isFinite(startedMs)) {
+			subtitles = {
+				url: `/api/subtitles/file?key=${encodeURIComponent(scheduled.subtitle_srt_s3_key)}`,
+				offsetIntoRecordingMs:
+					scheduled.subtitle_anchor_epoch_ms + (scheduled.subtitle_offset_ms ?? 0) - startedMs
+			};
+		}
+	}
+
+	return { recording, backHref, transcript, subtitles };
 };

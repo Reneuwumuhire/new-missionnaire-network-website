@@ -14,6 +14,7 @@ import {
 	parseTitle,
 	parseDescription,
 	parseThumbnailPair,
+	parseSubtitleTriple,
 	parseScheduledAt
 } from '$lib/server/scheduled-live-validation';
 
@@ -31,6 +32,9 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 		description?: unknown;
 		thumbnail_url?: unknown;
 		thumbnail_s3_key?: unknown;
+		subtitle_srt_url?: unknown;
+		subtitle_srt_s3_key?: unknown;
+		subtitle_filename?: unknown;
 		scheduled_at?: unknown;
 		reminder_enabled?: unknown;
 		announce?: unknown;
@@ -52,6 +56,17 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 		updates.thumbnail_s3_key = pair.thumbnail_s3_key;
 	}
 
+	if ('subtitle_srt_url' in body || 'subtitle_srt_s3_key' in body || 'subtitle_filename' in body) {
+		const triple = parseSubtitleTriple(
+			body.subtitle_srt_url,
+			body.subtitle_srt_s3_key,
+			body.subtitle_filename
+		);
+		updates.subtitle_srt_url = triple.subtitle_srt_url;
+		updates.subtitle_srt_s3_key = triple.subtitle_srt_s3_key;
+		updates.subtitle_filename = triple.subtitle_filename;
+	}
+
 	// Re-announce request: only meaningful if not already announced/pending.
 	const announce = body.announce === true && !current.announce_pending && !current.announced_at;
 	if (announce) updates.announce_pending = true;
@@ -71,6 +86,19 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 				console.error('[scheduled-lives] old thumbnail delete failed:', err)
 			);
 		}
+	}
+
+	// Replacing/clearing the SRT: delete the old object. Unlike thumbnails,
+	// subtitle files are never shared across entries, so no reference check.
+	const oldSubtitleKey = current.subtitle_srt_s3_key;
+	if (
+		'subtitle_srt_s3_key' in updates &&
+		oldSubtitleKey &&
+		updates.subtitle_srt_s3_key !== oldSubtitleKey
+	) {
+		deleteObject(oldSubtitleKey).catch((err) =>
+			console.error('[scheduled-lives] old subtitle delete failed:', err)
+		);
 	}
 
 	if (announce) {
@@ -112,6 +140,11 @@ export const DELETE: RequestHandler = async ({ locals, params, getClientAddress 
 				console.error('[scheduled-lives] thumbnail delete failed:', err)
 			);
 		}
+	}
+	if (deleted?.subtitle_srt_s3_key) {
+		deleteObject(deleted.subtitle_srt_s3_key).catch((err) =>
+			console.error('[scheduled-lives] subtitle delete failed:', err)
+		);
 	}
 
 	await logAudit({

@@ -34,7 +34,8 @@
 		isShuffle,
 		isPlaying,
 		playbackIntent,
-		repeatOne
+		repeatOne,
+		replayPlayback
 	} from '../stores/global';
 	import type { AudioAsset } from '$lib/models/media-assets';
 	import type { MusicAudio } from '$lib/models/music-audio';
@@ -608,6 +609,12 @@
 		audio.currentTime = Math.max(0, event.detail.time);
 		rememberPlaybackPosition(audio.currentTime, audio.duration);
 		updateAudioTime();
+	}
+
+	/** Same as handleLyricsSeek but for window-level events from outside the
+	 *  player (the rediffusion-page transcript). */
+	function handleExternalSeek(event: CustomEvent<{ time: number }>) {
+		handleLyricsSeek(event);
 	}
 
 	function handleToggleFavorite() {
@@ -1527,8 +1534,30 @@
 			rememberPlaybackPosition(currentTime, duration);
 			progressBarWidth = (currentTime / duration) * 100;
 			pushMediaSessionPosition();
+			publishReplayPlayback();
 		}
 	};
+
+	// Position bridge for the rediffusion-page transcript. Throttled — the
+	// transcript only needs ~2 updates/s, while timeupdate fires 4-60×/s.
+	let lastReplayPublishMs = 0;
+	function publishReplayPlayback(force = false) {
+		const now = Date.now();
+		if (!force && now - lastReplayPublishMs < 500) return;
+		lastReplayPublishMs = now;
+		replayPlayback.set({
+			trackId: ($selectAudio as { _id?: string } | null)?._id ?? null,
+			timeSec: audio?.currentTime ?? 0,
+			playing: $isPlaying
+		});
+	}
+	// Publish play/pause flips immediately (not throttled) so the transcript
+	// freezes/resumes without a half-second lag.
+	$: if (browser && audio) {
+		void $isPlaying;
+		void $selectAudio;
+		publishReplayPlayback(true);
+	}
 	const updateIndicator = () => {
 		if (!audio) return;
 
@@ -2306,6 +2335,7 @@
 		window.addEventListener('missionnaire-audio-toggle', handleExternalToggle);
 		window.addEventListener('missionnaire-audio-play', playCurrentAudio);
 		window.addEventListener('missionnaire-audio-pause', pauseCurrentAudio);
+		window.addEventListener('missionnaire-audio-seek', handleExternalSeek as EventListener);
 
 		if (typeof ResizeObserver !== 'undefined' && playerShell) {
 			playerResizeObserver = new ResizeObserver(syncPlayerInset);
@@ -2318,6 +2348,7 @@
 			window.removeEventListener('missionnaire-audio-toggle', handleExternalToggle);
 			window.removeEventListener('missionnaire-audio-play', playCurrentAudio);
 			window.removeEventListener('missionnaire-audio-pause', pauseCurrentAudio);
+			window.removeEventListener('missionnaire-audio-seek', handleExternalSeek as EventListener);
 			playerResizeObserver?.disconnect();
 			playerResizeObserver = null;
 			lastPlayerInset = 0;

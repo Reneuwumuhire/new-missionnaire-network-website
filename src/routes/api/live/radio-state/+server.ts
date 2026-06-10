@@ -68,6 +68,20 @@ export async function GET({ url, fetch, setHeaders }) {
 		streamUrl: isLive ? (streamUrl ?? getLiveAudioSourceUrl()) : undefined,
 		title: adminGate.title,
 		description: adminGate.description,
-		thumbnailUrl: adminGate.thumbnail_url
+		thumbnailUrl: adminGate.thumbnail_url,
+		// Live transcript: clients compute their SRT position locally as
+		// (now − anchorEpochMs) + offsetMs − behindLiveEdge, so the polling
+		// delay never shifts the text. serverNowMs lets them correct for
+		// client clock skew. anchorEpochMs stays null until the admin clicks
+		// "Démarrer les sous-titres".
+		subtitles:
+			adminGate.is_live && adminGate.subtitle_srt_s3_key
+				? {
+						url: `/api/subtitles/file?key=${encodeURIComponent(adminGate.subtitle_srt_s3_key)}`,
+						anchorEpochMs: adminGate.subtitle_anchor_epoch_ms,
+						offsetMs: adminGate.subtitle_offset_ms ?? 0
+					}
+				: null,
+		serverNowMs: Date.now()
 	});
 }

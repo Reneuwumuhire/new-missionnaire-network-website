@@ -10,6 +10,7 @@
 	import { page } from '$app/stores';
 	import { vercelImage, vercelImagePlaceholder } from '$lib/utils/vercelImage';
 	import BlurUpImage from '$lib/components/BlurUpImage.svelte';
+	import LiveTranscript from '$lib/components/+liveTranscript.svelte';
 
 	export let data: PageData;
 
@@ -691,6 +692,19 @@
 				{/if}
 			</div>
 		</div>
+
+		{#if data.subtitles}
+			<!-- Synced transcript — follows the global player while this recording
+			     plays; tapping a sentence seeks the audio to it. -->
+			<div class="mt-10">
+				<LiveTranscript
+					mode="replay"
+					url={data.subtitles.url}
+					offsetIntoRecordingMs={data.subtitles.offsetIntoRecordingMs}
+					trackId={rec.id}
+				/>
+			</div>
+		{/if}
 
 		{#if rec.description}
 			<div class="mt-10 border border-stone-200/60 bg-white/40 p-6">

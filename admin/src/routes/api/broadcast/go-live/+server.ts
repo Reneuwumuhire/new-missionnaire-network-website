@@ -102,6 +102,14 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		...(entry.title ? { title: entry.title } : {}),
 		...(entry.description ? { description: entry.description } : {}),
 		...(thumbUrl ? { thumbnail_url: thumbUrl, thumbnail_s3_key: thumbKey ?? null } : {}),
+		// Subtitle transcript for this broadcast: copied from the entry so the
+		// public radio-state endpoint can serve it without an extra lookup. The
+		// anchor is always reset — it's set by the admin "Start subtitles" button
+		// once the subtitled audio actually starts playing on air.
+		subtitle_srt_url: entry.subtitle_srt_url ?? null,
+		subtitle_srt_s3_key: entry.subtitle_srt_s3_key ?? null,
+		subtitle_anchor_epoch_ms: null,
+		subtitle_offset_ms: 0,
 		// Picked up by the main-site radio-poll endpoint, which fires the actual
 		// push notification (VAPID keys + web-push live there, not in admin).
 		notification_pending: notify

@@ -8,6 +8,7 @@
 	import type { Component } from 'svelte';
 	import BlurUpImage from '$lib/components/BlurUpImage.svelte';
 	import ScheduledLivesPanel from '$lib/components/ScheduledLivesPanel.svelte';
+	import SubtitleSyncPanel from '$lib/components/SubtitleSyncPanel.svelte';
 
 	// AudioTrimEditor pulls in wavesurfer.js + plugins (~120 kB minified). It's
 	// only used when the admin opens the trim modal, so we load it on demand
@@ -2216,6 +2217,11 @@
 		</div>
 	</div>
 </div>
+
+<!-- Subtitle sync — only while a live with an attached SRT is on air -->
+{#if broadcast.is_live && broadcast.subtitle_srt_url}
+	<SubtitleSyncPanel {broadcast} liveStreamUrl={data.liveStreamUrl} />
+{/if}
 
 <!-- Scheduled lives — YouTube-style: schedule ahead, get a stable share link
      (/live/<slug>) immediately, start the live from its entry when ready. -->

@@ -27,6 +27,16 @@
 	export let lines: LyricLine[] = [];
 	export let currentTime = 0;
 	export let fullscreenMobile = false;
+	// Opt-in (used by the live transcript): a deliberate user scroll pauses
+	// auto-follow so long texts can be read back; a sticky pill jumps back to
+	// the current line and resumes following. Music lyrics keep the always-
+	// follow behavior. Only wheel/touchmove count as "user scroll" — they
+	// never fire from programmatic scrollIntoView, so no flag juggling.
+	export let pauseOnUserScroll = false;
+	// Dark palette at ALL viewport widths + fill-parent sizing — for the
+	// transcript's fullscreen overlay. (fullscreenMobile only goes dark under
+	// 768px, which is what the music drawer wants; this one is unconditional.)
+	export let fullscreenDark = false;
 
 	const dispatch = createEventDispatcher<{ seek: { time: number } }>();
 
@@ -35,6 +45,20 @@
 	let activeLineIndex = -1;
 	let previousActiveLineIndex = -1;
 	let prefersReducedMotion = false;
+	let userScrolled = false;
+
+	function onUserScroll() {
+		if (pauseOnUserScroll) userScrolled = true;
+	}
+
+	function resumeAutoScroll() {
+		userScrolled = false;
+		const activeElement = lineElements[activeLineIndex];
+		activeElement?.scrollIntoView({
+			block: 'center',
+			behavior: prefersReducedMotion ? 'auto' : 'smooth'
+		});
+	}
 
 	function coerceSeconds(value: unknown): number | null {
 		if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -134,7 +158,7 @@
 
 	$: if (activeLineIndex !== previousActiveLineIndex) {
 		previousActiveLineIndex = activeLineIndex;
-		if (activeLineIndex >= 0) {
+		if (activeLineIndex >= 0 && !userScrolled) {
 			void tick().then(() => {
 				const activeElement = lineElements[activeLineIndex];
 				if (!activeElement || !panelElement) return;
@@ -164,8 +188,12 @@
 <div
 	bind:this={panelElement}
 	class:fullscreen-mobile={fullscreenMobile}
+	class:fullscreen-dark={fullscreenDark}
 	class="lyrics-panel"
+	role="group"
 	aria-label="Paroles synchronisées"
+	on:wheel={onUserScroll}
+	on:touchmove={onUserScroll}
 >
 	{#each lines as line, index}
 		{@const start = getLineStart(line)}
@@ -222,6 +250,11 @@
 			</div>
 		{/if}
 	{/each}
+	{#if pauseOnUserScroll && userScrolled && activeLineIndex >= 0}
+		<button type="button" class="resume-follow" on:click={resumeAutoScroll}>
+			↓ Revenir au passage en cours
+		</button>
+	{/if}
 </div>
 
 <style>
@@ -547,6 +580,99 @@
 			font-size: 1.45rem;
 			line-height: 1.5;
 		}
+	}
+
+	/* ─── Fullscreen overlay theme (dark, all widths) ─────────────────────
+	   Same warm cream-on-espresso palette as the mobile drawer, but applied
+	   unconditionally + fill-parent sizing, for the transcript's fullscreen
+	   reading/projection view. */
+	.lyrics-panel.fullscreen-dark {
+		--lyric-color-active: #fffaf0;
+		--lyric-color-default: rgba(239, 229, 208, 0.78);
+		--lyric-color-chorus-default: #f4b988;
+		--lyric-color-accent: #ffa64d;
+		--lyric-chorus-bg: rgba(255, 136, 12, 0.1);
+		--lyric-chorus-bg-active: rgba(255, 136, 12, 0.18);
+		--lyric-glow-active: rgba(255, 168, 64, 0.42);
+		--lyric-rule-color: rgba(239, 229, 208, 0.24);
+		--lyric-rule-chorus: rgba(255, 168, 64, 0.6);
+
+		max-height: none;
+		min-height: 0;
+		flex: 1 1 auto;
+		/* Extra bottom padding so the last lines clear the floating close bar. */
+		padding: 1rem 1rem calc(6.5rem + env(safe-area-inset-bottom, 0px));
+		scroll-padding-block: 42%;
+		scrollbar-color: rgba(239, 229, 208, 0.18) transparent;
+	}
+
+	.lyrics-panel.fullscreen-dark::-webkit-scrollbar-thumb {
+		background: rgba(239, 229, 208, 0.18);
+	}
+
+	/* Bigger type for reading at a distance (projection / across the room) */
+	.lyrics-panel.fullscreen-dark .lyric-text {
+		max-width: min(100%, 52rem);
+		font-size: 1.7rem;
+		line-height: 1.55;
+	}
+
+	@media (min-width: 768px) {
+		.lyrics-panel.fullscreen-dark .lyric-text {
+			font-size: 2.2rem;
+			line-height: 1.6;
+		}
+	}
+
+	.lyrics-panel.fullscreen-dark .lyric-line.past .lyric-text {
+		opacity: 0.24;
+	}
+
+	.lyrics-panel.fullscreen-dark .lyric-line.future .lyric-text {
+		opacity: 0.55;
+	}
+
+	.lyrics-panel.fullscreen-dark .lyric-line.timed:hover:not(.active) {
+		color: rgba(255, 250, 240, 0.95);
+	}
+
+	.lyrics-panel.fullscreen-dark .lyric-line.active {
+		text-shadow:
+			0 0 28px var(--lyric-glow-active),
+			0 0 2px rgba(255, 168, 64, 0.32);
+	}
+
+	.lyrics-panel.fullscreen-dark .resume-follow {
+		border-color: rgba(255, 168, 64, 0.5);
+		background: rgba(41, 32, 26, 0.92);
+		color: #ffa64d;
+		/* Sit above the overlay's floating "Fermer" bar. */
+		bottom: calc(4.4rem + env(safe-area-inset-bottom, 0px));
+	}
+
+	/* Floating "back to current line" pill — sticky inside the scroll
+	   container so it stays visible while the reader browses history. */
+	.resume-follow {
+		position: sticky;
+		bottom: 0.5rem;
+		align-self: center;
+		margin-top: 0.5rem;
+		border: 1px solid rgba(255, 136, 12, 0.4);
+		border-radius: 999px;
+		background: rgba(255, 251, 245, 0.95);
+		padding: 0.45rem 1.1rem;
+		font-family: var(--font-body, 'Outfit', system-ui, sans-serif);
+		font-size: 0.72rem;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		color: #c2640c;
+		box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+		cursor: pointer;
+		transition: background-color 160ms ease;
+	}
+
+	.resume-follow:hover {
+		background: rgba(255, 243, 226, 0.98);
 	}
 
 	@media (prefers-reduced-motion: reduce) {

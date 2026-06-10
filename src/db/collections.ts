@@ -1047,6 +1047,13 @@ export type BroadcastAdminState = {
 	 *  is that entry, and lets the go-live push deep-link to the watch URL. */
 	scheduled_live_id: string | null;
 	scheduled_live_slug: string | null;
+	/** Live transcript: SRT copied from the linked scheduled live at go-live.
+	 *  anchor = wall-clock ms when SRT 00:00:00 started playing on air (set by
+	 *  the admin sync button); offset = manual nudge correction in ms. */
+	subtitle_srt_url: string | null;
+	subtitle_srt_s3_key: string | null;
+	subtitle_anchor_epoch_ms: number | null;
+	subtitle_offset_ms: number;
 	updated_at: string;
 };
 
@@ -1064,6 +1071,10 @@ const BROADCAST_DEFAULT: BroadcastAdminState = {
 	thumbnail_s3_key: null,
 	scheduled_live_id: null,
 	scheduled_live_slug: null,
+	subtitle_srt_url: null,
+	subtitle_srt_s3_key: null,
+	subtitle_anchor_epoch_ms: null,
+	subtitle_offset_ms: 0,
 	updated_at: new Date(0).toISOString()
 };
 
@@ -1088,6 +1099,12 @@ export async function getBroadcastAdminState(): Promise<BroadcastAdminState> {
 			thumbnail_s3_key: (doc.thumbnail_s3_key as string | null) ?? null,
 			scheduled_live_id: (doc.scheduled_live_id as string | null) ?? null,
 			scheduled_live_slug: (doc.scheduled_live_slug as string | null) ?? null,
+			subtitle_srt_url: (doc.subtitle_srt_url as string | null) ?? null,
+			subtitle_srt_s3_key: (doc.subtitle_srt_s3_key as string | null) ?? null,
+			subtitle_anchor_epoch_ms:
+				typeof doc.subtitle_anchor_epoch_ms === 'number' ? doc.subtitle_anchor_epoch_ms : null,
+			subtitle_offset_ms:
+				typeof doc.subtitle_offset_ms === 'number' ? doc.subtitle_offset_ms : 0,
 			updated_at: (doc.updated_at as string) ?? new Date(0).toISOString()
 		};
 	} catch (e) {
@@ -1135,6 +1152,14 @@ export type ScheduledLive = {
 	announced_at: string | null;
 	reminder_enabled: boolean;
 	reminder_sent_at: string | null;
+	/** Pre-made SRT transcript for the broadcast audio. anchor/offset are
+	 *  mirrored here by the admin sync actions so the replay can recompute the
+	 *  transcript position against recording.started_at. */
+	subtitle_srt_url: string | null;
+	subtitle_srt_s3_key: string | null;
+	subtitle_filename: string | null;
+	subtitle_anchor_epoch_ms: number | null;
+	subtitle_offset_ms: number;
 	created_at: string;
 	updated_at: string;
 };
@@ -1158,6 +1183,21 @@ export async function getScheduledLiveById(id: string): Promise<ScheduledLive | 
 		return doc ? serializeDocument<ScheduledLive>(doc) : null;
 	} catch (e) {
 		console.error('[ScheduledLive] getById error:', e);
+		return null;
+	}
+}
+
+/** The scheduled live a published recording came from — lets the replay page
+ *  recover the subtitle file + sync anchor for that broadcast. */
+export async function getScheduledLiveByRecordingId(
+	recordingId: string
+): Promise<ScheduledLive | null> {
+	try {
+		const db = await getDb();
+		const doc = await db.collection('scheduled_lives').findOne({ recording_id: recordingId });
+		return doc ? serializeDocument<ScheduledLive>(doc) : null;
+	} catch (e) {
+		console.error('[ScheduledLive] getByRecordingId error:', e);
 		return null;
 	}
 }

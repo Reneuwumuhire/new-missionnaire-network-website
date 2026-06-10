@@ -3,6 +3,7 @@
 	import type { ScheduledLive } from '../../db/collections';
 	import { confirmDialog } from '$lib/stores/confirm-dialog';
 	import { toast } from '$lib/stores/toast';
+	import { parseSrt } from '$lib/utils/srt';
 
 	// Embedded in /recordings, right under the broadcast control card —
 	// scheduling lives next to the Go Live controls keeps the whole broadcast
@@ -85,6 +86,18 @@
 	let thumbnailPreviewUrl = $state<string | null>(null);
 	let thumbnailAction = $state<'keep' | 'replace' | 'remove'>('keep');
 	let existingThumbnailUrl = $state<string | null>(null);
+	// Subtitle (SRT) staging — same upload-on-save pattern as the thumbnail.
+	let subtitleFile = $state<File | null>(null);
+	let subtitleAction = $state<'keep' | 'replace' | 'remove'>('keep');
+	let existingSubtitleFilename = $state<string | null>(null);
+	let subtitleCueCount = $state<number | null>(null);
+	let subtitleDurationLabel = $state<string | null>(null);
+
+	const subtitleDisplayName = $derived.by(() => {
+		if (subtitleFile) return subtitleFile.name;
+		if (subtitleAction === 'remove') return null;
+		return existingSubtitleFilename;
+	});
 
 	const previewSrc = $derived.by(() => {
 		if (thumbnailPreviewUrl) return thumbnailPreviewUrl;
@@ -103,6 +116,11 @@
 		thumbnailFile = null;
 		thumbnailAction = 'keep';
 		existingThumbnailUrl = null;
+		subtitleFile = null;
+		subtitleAction = 'keep';
+		existingSubtitleFilename = null;
+		subtitleCueCount = null;
+		subtitleDurationLabel = null;
 		formError = null;
 	}
 
@@ -125,6 +143,7 @@
 		announceDraft = false; // already created — re-announce only if explicitly re-checked
 		reminderDraft = entry.reminder_enabled;
 		existingThumbnailUrl = entry.thumbnail_url;
+		existingSubtitleFilename = entry.subtitle_filename;
 		modalOpen = true;
 	}
 
@@ -158,6 +177,84 @@
 		thumbnailPreviewUrl = null;
 		thumbnailFile = null;
 		thumbnailAction = 'remove';
+	}
+
+	async function onSubtitleFileChange(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		if (!file) return;
+		if (!file.name.toLowerCase().endsWith('.srt')) {
+			formError = 'Sélectionnez un fichier .srt';
+			return;
+		}
+		if (file.size > 2 * 1024 * 1024) {
+			formError = 'Fichier .srt trop volumineux (max 2 Mo)';
+			return;
+		}
+		// Sanity-parse before staging: a 0-cue file would silently show nothing
+		// to listeners, better to reject it at upload time.
+		const cues = parseSrt(await file.text());
+		if (cues.length === 0) {
+			formError = 'Fichier .srt illisible (aucune réplique détectée)';
+			return;
+		}
+		formError = null;
+		subtitleFile = file;
+		subtitleAction = 'replace';
+		subtitleCueCount = cues.length;
+		const totalMin = Math.round(cues[cues.length - 1].endMs / 60_000);
+		subtitleDurationLabel =
+			totalMin >= 60 ? `${Math.floor(totalMin / 60)}h${String(totalMin % 60).padStart(2, '0')}` : `${totalMin} min`;
+	}
+
+	function markSubtitleForRemoval() {
+		subtitleFile = null;
+		subtitleAction = 'remove';
+		subtitleCueCount = null;
+		subtitleDurationLabel = null;
+	}
+
+	/** Uploads the staged SRT (or signals removal). Only called when
+	 *  subtitleAction !== 'keep'. Returns null on failure (formError is set). */
+	async function uploadSubtitleIfNeeded(): Promise<{
+		subtitle_srt_url: string | null;
+		subtitle_srt_s3_key: string | null;
+		subtitle_filename: string | null;
+	} | null> {
+		if (subtitleAction === 'remove') {
+			return { subtitle_srt_url: null, subtitle_srt_s3_key: null, subtitle_filename: null };
+		}
+		if (!subtitleFile) return null;
+		const presignRes = await fetch('/api/broadcast/subtitles/presign', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ filename: subtitleFile.name, size: subtitleFile.size })
+		});
+		if (!presignRes.ok) {
+			formError = (await presignRes.text()) || `Erreur ${presignRes.status}`;
+			return null;
+		}
+		const { uploadUrl, key, publicUrl, contentType } = (await presignRes.json()) as {
+			uploadUrl: string;
+			key: string;
+			publicUrl: string;
+			contentType: string;
+		};
+		const uploadRes = await fetch(uploadUrl, {
+			method: 'PUT',
+			headers: { 'Content-Type': contentType },
+			body: subtitleFile
+		});
+		if (!uploadRes.ok) {
+			formError = 'Échec du téléversement du fichier .srt vers S3';
+			return null;
+		}
+		return {
+			subtitle_srt_url: publicUrl,
+			subtitle_srt_s3_key: key,
+			subtitle_filename: subtitleFile.name
+		};
 	}
 
 	/** Uploads the staged file (or signals removal). Only called when
@@ -222,6 +319,14 @@
 				if (!thumb) return;
 				body.thumbnail_url = thumb.thumbnail_url;
 				body.thumbnail_s3_key = thumb.thumbnail_s3_key;
+			}
+
+			if (subtitleAction !== 'keep') {
+				const subtitle = await uploadSubtitleIfNeeded();
+				if (!subtitle) return;
+				body.subtitle_srt_url = subtitle.subtitle_srt_url;
+				body.subtitle_srt_s3_key = subtitle.subtitle_srt_s3_key;
+				body.subtitle_filename = subtitle.subtitle_filename;
 			}
 
 			if (announceDraft) body.announce = true;
@@ -444,6 +549,17 @@
 								{#if entry.reminder_enabled}
 									<span class="text-[10px] font-semibold uppercase tracking-[0.1em] text-stone-400">
 										Rappel activé
+									</span>
+								{/if}
+								{#if entry.subtitle_filename}
+									<span
+										class="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-sky-600"
+										title={entry.subtitle_filename}
+									>
+										<svg class="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h10" />
+										</svg>
+										Transcription
 									</span>
 								{/if}
 							</div>
@@ -673,6 +789,46 @@
 									type="button"
 									class="border border-transparent px-3 py-1 text-[11px] font-semibold text-stone-400 hover:text-rose-600"
 									onclick={markThumbnailForRemoval}
+								>
+									Retirer
+								</button>
+							{/if}
+						</div>
+					</div>
+				</div>
+
+				<!-- Subtitle (SRT) -->
+				<div>
+					<span class="mb-1 block text-xs font-semibold text-stone-600">
+						Transcription synchronisée (.srt)
+					</span>
+					<p class="mb-2 text-[11px] leading-relaxed text-stone-400">
+						Fichier créé avant le direct. Le texte sera affiché aux auditeurs, synchronisé avec
+						l'audio (bouton « Démarrer les sous-titres » pendant le direct).
+					</p>
+					<div class="flex items-center gap-3">
+						{#if subtitleDisplayName}
+							<div class="min-w-0 flex-1 border border-stone-200 bg-stone-50 px-3 py-2">
+								<p class="truncate text-xs font-medium text-stone-700">{subtitleDisplayName}</p>
+								{#if subtitleCueCount !== null}
+									<p class="text-[10px] text-stone-400">
+										{subtitleCueCount} répliques{subtitleDurationLabel ? ` · ${subtitleDurationLabel}` : ''}
+									</p>
+								{/if}
+							</div>
+						{/if}
+						<div class="flex shrink-0 flex-col gap-1.5">
+							<label
+								class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-center text-[11px] font-semibold text-stone-600 transition-colors hover:border-primary hover:text-primary"
+							>
+								{subtitleDisplayName ? 'Remplacer' : 'Choisir un fichier .srt'}
+								<input type="file" accept=".srt" class="hidden" onchange={onSubtitleFileChange} />
+							</label>
+							{#if subtitleDisplayName}
+								<button
+									type="button"
+									class="border border-transparent px-3 py-1 text-[11px] font-semibold text-stone-400 hover:text-rose-600"
+									onclick={markSubtitleForRemoval}
 								>
 									Retirer
 								</button>

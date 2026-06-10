@@ -24,7 +24,14 @@ export const POST: RequestHandler = async ({ locals, getClientAddress }) => {
 		is_live: false,
 		ended_at: endedAt,
 		icecast_offline_since: null,
-		notification_pending: false
+		notification_pending: false,
+		// Subtitle sync state is persisted on the scheduled_lives entry by every
+		// sync action (the replay reads it from there) — the gate copy is only
+		// for the live phase, clear it.
+		subtitle_srt_url: null,
+		subtitle_srt_s3_key: null,
+		subtitle_anchor_epoch_ms: null,
+		subtitle_offset_ms: 0
 	});
 
 	// Close out the scheduled_lives entry this broadcast was linked to. The

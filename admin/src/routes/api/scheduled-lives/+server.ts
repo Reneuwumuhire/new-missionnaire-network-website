@@ -7,6 +7,7 @@ import {
 	parseTitle,
 	parseDescription,
 	parseThumbnailPair,
+	parseSubtitleTriple,
 	parseScheduledAt
 } from '$lib/server/scheduled-live-validation';
 
@@ -18,6 +19,9 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		description?: unknown;
 		thumbnail_url?: unknown;
 		thumbnail_s3_key?: unknown;
+		subtitle_srt_url?: unknown;
+		subtitle_srt_s3_key?: unknown;
+		subtitle_filename?: unknown;
 		scheduled_at?: unknown;
 		announce?: unknown;
 		reminder_enabled?: unknown;
@@ -26,6 +30,11 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 	const title = parseTitle(body.title, { required: true });
 	const description = parseDescription(body.description);
 	let thumbnail = parseThumbnailPair(body.thumbnail_url, body.thumbnail_s3_key);
+	const subtitle = parseSubtitleTriple(
+		body.subtitle_srt_url,
+		body.subtitle_srt_s3_key,
+		body.subtitle_filename
+	);
 	const scheduledAt = parseScheduledAt(body.scheduled_at);
 	const announce = body.announce === true;
 
@@ -47,6 +56,9 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		description,
 		thumbnail_url: thumbnail.thumbnail_url,
 		thumbnail_s3_key: thumbnail.thumbnail_s3_key,
+		subtitle_srt_url: subtitle.subtitle_srt_url,
+		subtitle_srt_s3_key: subtitle.subtitle_srt_s3_key,
+		subtitle_filename: subtitle.subtitle_filename,
 		scheduled_at: scheduledAt,
 		announce,
 		reminder_enabled: body.reminder_enabled === true,
