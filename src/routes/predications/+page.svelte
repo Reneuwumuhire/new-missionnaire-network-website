@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { run } from 'svelte/legacy';
-
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import type { Sermon } from '$lib/models/sermon';
@@ -18,7 +16,7 @@
 	import { createPlayableSermon } from '../../utils/audioPlayback';
 	import RetransmissionTableItem from '$lib/components/RetransmissionTableItem.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
-	import { onDestroy } from 'svelte';
+	import { onDestroy, untrack } from 'svelte';
 	import {
 		areAuthorsFresh,
 		areYearsFresh,
@@ -251,9 +249,11 @@
 		}
 	}
 
-	run(() => {
+	$effect(() => {
 		if (requestKey && requestKey !== lastHandledKey) {
-			lastHandledKey = requestKey;
+			untrack(() => {
+				lastHandledKey = requestKey;
+			});
 			listLoadError = '';
 
 			const cachedAuthors = getCachedAuthors() || [];
@@ -302,7 +302,7 @@
 
 	onDestroy(() => abortRequest());
 
-	run(() => {
+	$effect(() => {
 		if (playlistSermons.length > 0) {
 			basePlaylist.set(playlistSermons);
 			if (!$isShuffle) playlist.set(playlistSermons);

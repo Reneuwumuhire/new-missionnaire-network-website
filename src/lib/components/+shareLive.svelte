@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { stopPropagation } from 'svelte/legacy';
-
 	import { browser } from '$app/environment';
 	import { onDestroy } from 'svelte';
 
@@ -128,7 +126,10 @@
 <div class="relative mt-4" bind:this={shareWrapEl}>
 	<button
 		type="button"
-		onclick={stopPropagation(toggleShareMenu)}
+		onclick={(e) => {
+			e.stopPropagation();
+			toggleShareMenu();
+		}}
 		aria-haspopup="menu"
 		aria-expanded={isShareMenuOpen}
 		aria-label="Partager le direct"
@@ -169,7 +170,7 @@
 			class="absolute left-1/2 top-full z-[60] mt-1.5 w-56 -translate-x-1/2 overflow-hidden rounded-lg border border-stone-200 bg-white shadow-2xl"
 			role="menu"
 			tabindex="-1"
-			onclick={stopPropagation(() => undefined)}
+			onclick={(e) => e.stopPropagation()}
 		>
 			{#if hasNativeShare}
 				<button

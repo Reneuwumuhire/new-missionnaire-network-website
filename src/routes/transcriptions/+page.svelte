@@ -1,11 +1,9 @@
 <script lang="ts">
-	import { run, preventDefault } from 'svelte/legacy';
-
 	import type { PageData } from './$types';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
-	import { onDestroy, onMount } from 'svelte';
+	import { onDestroy, onMount, untrack } from 'svelte';
 	import { formatFileSize } from '../../utils/FormatTime';
 	import DocumentText1 from 'iconsax-svelte/DocumentText1.svelte';
 	// @ts-ignore
@@ -84,11 +82,13 @@
 	}));
 	let totalPages = $derived(Math.ceil(total / currentLimit));
 	let showPagination = $derived(total > 10);
-	run(() => {
+	$effect(() => {
 		if (currentSearch !== lastSyncedSearch) {
 			searchTerm = currentSearch;
 			lastSearch = currentSearch;
-			lastSyncedSearch = currentSearch;
+			untrack(() => {
+				lastSyncedSearch = currentSearch;
+			});
 		}
 	});
 
@@ -150,9 +150,11 @@
 		}
 	}
 
-	run(() => {
+	$effect(() => {
 		if (requestKey && requestKey !== lastHandledKey) {
-			lastHandledKey = requestKey;
+			untrack(() => {
+				lastHandledKey = requestKey;
+			});
 			listLoadError = '';
 
 			const cachedEntry = getTranscriptionsCache(requestKey);
@@ -298,8 +300,10 @@
 				</p>
 				<form
 					class="hidden md:flex w-full max-w-xl mx-auto border border-stone-200/60 bg-white/40 overflow-hidden"
-					onsubmit={preventDefault(() =>
-						handleSearch(searchInput?.value ?? searchTerm, { immediate: true }))}
+					onsubmit={(e) => {
+						e.preventDefault();
+						handleSearch(searchInput?.value ?? searchTerm, { immediate: true });
+					}}
 				>
 					<div class="relative flex-1">
 						<input

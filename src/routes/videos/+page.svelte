@@ -1,9 +1,7 @@
 <script lang="ts">
-	import { run, preventDefault } from 'svelte/legacy';
-
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
-	import { onDestroy, onMount } from 'svelte';
+	import { onDestroy, onMount, untrack } from 'svelte';
 	import type { PageData } from './$types';
 	import type { YouTubeCachedStatus } from '../../db/collections';
 	import type { YoutubeVideo } from '$lib/models/youtube';
@@ -302,9 +300,11 @@
 		search: currentSearch || '',
 		videoId: currentVideoId || ''
 	}));
-	run(() => {
+	$effect(() => {
 		if (requestKey && requestKey !== lastHandledKey) {
-			lastHandledKey = requestKey;
+			untrack(() => {
+				lastHandledKey = requestKey;
+			});
 			initialLoadError = '';
 
 			const cachedEntry = getVideosPageCache(requestKey);
@@ -341,15 +341,19 @@
 	let displayVideos = $derived(activeLiveVideo
 		? [activeLiveVideo, ...loadedVideos.filter((video) => video.id !== activeLiveVideo.id)]
 		: loadedVideos);
-	run(() => {
+	$effect(() => {
 		if (currentSearch !== lastSyncedSearch) {
 			searchInput = currentSearch;
-			lastSyncedSearch = currentSearch;
+			untrack(() => {
+				lastSyncedSearch = currentSearch;
+			});
 		}
 	});
-	run(() => {
+	$effect(() => {
 		if (requestKey && requestKey !== lastResetSelectionKey) {
-			lastResetSelectionKey = requestKey;
+			untrack(() => {
+				lastResetSelectionKey = requestKey;
+			});
 			if (browser && !currentVideoId) {
 				selectedVideo.set(undefined);
 			}
@@ -406,7 +410,13 @@
 		</section>
 
 		<div class="mb-8 flex flex-col gap-4">
-			<form class="relative w-full max-w-xl" onsubmit={preventDefault(() => handleSearch(true))}>
+			<form
+				class="relative w-full max-w-xl"
+				onsubmit={(e) => {
+					e.preventDefault();
+					handleSearch(true);
+				}}
+			>
 				<div class="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400">
 					<Icon src={BsSearch} size="14" />
 				</div>

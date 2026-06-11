@@ -1,8 +1,6 @@
 <script lang="ts">
-	import { run } from 'svelte/legacy';
-
 	import { browser } from '$app/environment';
-	import { tick, onMount } from 'svelte';
+	import { tick, onMount, untrack } from 'svelte';
 	import { isVideoPlaylistActive, videoPlaylist, videoPlaylistIndex, isVideoShuffle, videoPlaylistSearch, videoPlaylistTotal } from '$lib/stores/global';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
@@ -200,14 +198,17 @@
 		player.seekTo((x / rect.width) * duration, true);
 	}
 	let currentVideo = $derived($videoPlaylist && $videoPlaylist.length > 0 ? $videoPlaylist[$videoPlaylistIndex] : null);
-	// Predictive loading: load more when near the end
-	run(() => {
+	// Predictive loading: load more when near the end. Only the playlist
+	// length/index should re-trigger this (matching the legacy `$:` static
+	// deps); untrack keeps loadMore's internal reads (isFetchingMore, search,
+	// total) from becoming dependencies and re-running the effect.
+	$effect(() => {
 		if ($videoPlaylist.length > 0 && $videoPlaylistIndex >= $videoPlaylist.length - 3) {
-			loadMore();
+			untrack(() => loadMore());
 		}
 	});
 	// Body scroll lock
-	run(() => {
+	$effect(() => {
 		if (browser) {
 			if ($isVideoPlaylistActive) {
 				document.body.style.overflow = 'hidden';
@@ -216,7 +217,7 @@
 			}
 		}
 	});
-	run(() => {
+	$effect(() => {
 		if (browser && !$isVideoPlaylistActive && player) {
 			console.log('[Playlist] Destroying player on close');
 			isPlayerReady = false;
@@ -224,7 +225,11 @@
 			player = null;
 		}
 	});
-	run(() => {
+	// Create/swap the YT player. Same dependency set as the legacy `$:` block
+	// ($isVideoPlaylistActive, ytApiReady, player, isInitializing,
+	// isPlayerReady, currentVideo); createYTPlayer's own guards make the
+	// isInitializing flip converge instead of re-creating the player.
+	$effect(() => {
 		if (browser && $isVideoPlaylistActive && ytApiReady) {
 			if (!player && !isInitializing) {
 				createYTPlayer();

@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { run } from 'svelte/legacy';
-
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import type { YoutubeVideo } from '$lib/models/youtube';
@@ -11,7 +9,7 @@
 	import BsSearch from 'svelte-icons-pack/bs/BsSearch';
 	import BsX from 'svelte-icons-pack/bs/BsX';
 	import { browser } from '$app/environment';
-	import { onDestroy } from 'svelte';
+	import { onDestroy, untrack } from 'svelte';
 	import {
 		isVideoPlaylistActive,
 		videoPlaylist,
@@ -115,9 +113,11 @@
 		}
 	}
 
-	run(() => {
+	$effect(() => {
 		if (requestKey !== lastHandledKey) {
-			lastHandledKey = requestKey;
+			untrack(() => {
+				lastHandledKey = requestKey;
+			});
 			initialLoadError = '';
 
 			const cachedEntry = getVideosCache(requestKey);

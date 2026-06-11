@@ -1,4 +1,5 @@
 <script lang="ts">
+
 	import { browser } from '$app/environment';
 	import { getContext, onDestroy, onMount, tick } from 'svelte';
 	import { get } from 'svelte/store';
@@ -59,12 +60,12 @@
 
 	type LyricLine = string | Record<string, unknown>;
 
-	let audio: HTMLAudioElement;
+	let audio: HTMLAudioElement = $state(undefined as unknown as HTMLAudioElement);
 	// Bumped to force Svelte to destroy + remount the <audio> element via the
 	// `{#key audioElementKey}` block in the template. Used by the rapid-repause
 	// recovery path (rebuildAudioElement) to obtain a brand-new media element,
 	// which is the only reliable way to reset a degraded iOS AVAudioSession.
-	let audioElementKey = 0;
+	let audioElementKey = $state(0);
 	// Diagnostic counter — increments every time bind:this resolves to a
 	// new DOM node. Compared in logs to prove (or disprove) the hypothesis
 	// that lock-screen transport ownership is detached by element rebuilds.
@@ -84,52 +85,41 @@
 	// Tracks which element we've already wired listeners to, so the reactive
 	// attach block below doesn't double-bind when other state triggers a re-run.
 	let listenersBoundTo: HTMLAudioElement | null = null;
-	let currentTime = 0;
-	let duration = 0;
-	let progressBarWidth = 0;
+	let currentTime = $state(0);
+	let duration = $state(0);
+	let progressBarWidth = $state(0);
 	let indicatorPosition = 0;
-	let isDragging = false;
+	let isDragging = $state(false);
 	let initialClickX = 0;
 	let initialIndicatorPosition = 0;
 	let volume = 1; // Initial volume (1 = full volume, 0 = mute)
-	let isMuted = false;
+	let isMuted = $state(false);
 	let audioSrc: string = '';
-	let isAudioReady = false;
+	let isAudioReady = $state(false);
 	let shouldAutoplayOnLoad = false;
-	let playerShell: HTMLDivElement | null = null;
+	let playerShell: HTMLDivElement | null = $state(null);
 	let playerResizeObserver: ResizeObserver | null = null;
 	let lastPlayerInset = 0;
-	let pendingPlaybackIntent: 'play' | 'pause' | null = null;
+	let pendingPlaybackIntent: 'play' | 'pause' | null = $state(null);
 	let lastKnownPlaybackTime = 0;
 	let lastKnownPlaybackDuration = 0;
 	let pendingSessionResumeTime: number | null = null;
 	let isChangingSource = false;
 	const SLEEP_TIMER_STORAGE_KEY = 'missionnaire:sleep-timer-ends-at';
 	const sleepTimerOptions = [15, 30, 45, 60, 90];
-	let isSleepTimerOpen = false;
-	let sleepTimerEndsAt: number | null = null;
-	let sleepTimerRemainingMs = 0;
+	let isSleepTimerOpen = $state(false);
+	let sleepTimerEndsAt: number | null = $state(null);
+	let sleepTimerRemainingMs = $state(0);
 	let sleepTimerTimeout: ReturnType<typeof setTimeout> | null = null;
 	let sleepTimerTick: ReturnType<typeof setInterval> | null = null;
-	let customSleepTime = '';
-	let hasPlaylistNavigation = false;
-	let lyricsLines: LyricLine[] = [];
-	let lyricsPanelOpen = false;
-	let hasLyrics = false;
+	let customSleepTime = $state('');
+	let hasPlaylistNavigation = $derived($playlist.length > 1);
+	let lyricsLines: LyricLine[] = $state([]);
+	let lyricsPanelOpen = $state(false);
+	let hasLyrics = $derived(lyricsLines.length > 0);
 	let lyricsFetchToken = 0;
 	let lastLyricsAudioId = '';
 
-	$: hasPlaylistNavigation = $playlist.length > 1;
-	$: sleepTimerRemainingLabel =
-		sleepTimerEndsAt !== null ? formatSleepTimerRemaining(sleepTimerRemainingMs) : '';
-	$: sleepTimerEndLabel =
-		sleepTimerEndsAt !== null ? formatSleepTimerEndTime(sleepTimerEndsAt) : '';
-	$: if (browser && isSleepTimerOpen && !customSleepTime) {
-		setDefaultSleepTimerClockTime();
-	}
-	$: if (!hasPlaylistNavigation && $isShuffle) {
-		isShuffle.set(false);
-	}
 
 	function setPendingPlaybackIntent(intent: 'play' | 'pause' | null) {
 		pendingPlaybackIntent = intent;
@@ -479,7 +469,7 @@
 	 *  pause listener which (seeing userWantsToPlay === true) starts a
 	 *  fresh watchdog interval on the orphaned element, and play() keeps
 	 *  resuming it 1.5s later — overlapping the new component's playback. */
-	let destroyed = false;
+	let destroyed = $state(false);
 	let isPageLifecycleTeardown = false;
 
 	function syncPlayerInset() {
@@ -509,10 +499,10 @@
 		return 'Sans titre';
 	}
 
-	let titleProbeEl: HTMLSpanElement | null = null;
-	let titleViewportEl: HTMLDivElement | null = null;
-	let titleOverflows = false;
-	let titleMarqueeDuration = '18s';
+	let titleProbeEl: HTMLSpanElement | null = $state(null);
+	let titleViewportEl: HTMLDivElement | null = $state(null);
+	let titleOverflows = $state(false);
+	let titleMarqueeDuration = $state('18s');
 	let titleResizeObserver: ResizeObserver | null = null;
 	let titleMeasureRaf = 0;
 
@@ -548,15 +538,6 @@
 		measureTitleOverflow();
 	}
 
-	$: if (browser && titleViewportEl && titleProbeEl) attachTitleObservers();
-	$: if (browser) {
-		// Re-measure whenever the displayed title changes.
-		const _trackTitleRefresh = $selectAudio
-			? getDisplayTitle($selectAudio)
-			: '';
-		void _trackTitleRefresh;
-		measureTitleOverflow();
-	}
 
 	function getAudioFavId(item: any): string {
 		if (!item) return '';
@@ -652,13 +633,10 @@
 		return `${window.location.origin}/musique?play=${encodeURIComponent(key)}`;
 	}
 
-	let shareFeedback: 'copied' | 'error' | null = null;
+	let shareFeedback: 'copied' | 'error' | null = $state(null);
 	let shareFeedbackTimeout: ReturnType<typeof setTimeout> | null = null;
-	let isShareMenuOpen = false;
-	let hasNativeShare = false;
-	$: if (browser) {
-		hasNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
-	}
+	let isShareMenuOpen = $state(false);
+	let hasNativeShare = $state(false);
 
 	function flashShareFeedback(state: 'copied' | 'error') {
 		shareFeedback = state;
@@ -728,10 +706,10 @@
 	// inside the pill, mirroring the download buttons in the music /
 	// sermon list rows. A second click while a download is in flight
 	// cancels it via the AbortController.
-	let isDownloading = false;
-	let downloadPercent: number | null = 0;
+	let isDownloading = $state(false);
+	let downloadPercent: number | null = $state(0);
 	let downloadController: AbortController | null = null;
-	let downloadFeedback: 'error' | null = null;
+	let downloadFeedback: 'error' | null = $state(null);
 	let downloadFeedbackTimeout: ReturnType<typeof setTimeout> | null = null;
 
 	async function downloadCurrentAudio() {
@@ -769,30 +747,13 @@
 		}
 	}
 
-	$: currentFavId = getAudioFavId($selectAudio);
-	$: isCurrentFavorite = isFavorite(currentFavId, $favorites);
-	$: canShareCurrent = !!($selectAudio && ($selectAudio as any)?._id);
-	$: canDownloadCurrent = !!getPlayableAudioUrl($selectAudio as PlayableAudio);
-	$: hasLyrics = lyricsLines.length > 0;
 
-	$: if (browser) {
-		const lyricsAudioId = getLyricsAudioId($selectAudio);
-		if (lyricsAudioId !== lastLyricsAudioId) {
-			lastLyricsAudioId = lyricsAudioId;
-			lyricsFetchToken++;
-			if (lyricsAudioId) {
-				void loadLyricsForAudio(lyricsAudioId, lyricsFetchToken);
-			} else {
-				resetLyricsState();
-			}
-		}
-	}
 
 	// ── BEGIN: cache indicator state (added) ──────────────────────
 	// Tracks whether the currently playing track has been cached by
 	// the service worker. `null` while we don't know yet (initial
 	// load / between tracks); boolean once isCached() resolves.
-	let isCurrentTrackCached: boolean | null = null;
+	let isCurrentTrackCached: boolean | null = $state(null);
 	let cacheCheckToken = 0;
 
 	async function refreshCachedFlag(url: string, token: number) {
@@ -806,25 +767,8 @@
 		isCurrentTrackCached = result;
 	}
 
-	// Re-check the cache flag whenever the selected track changes OR
-	// whenever it starts playing (so a freshly fetched-and-cached track
-	// flips its badge from "not cached" to "cached" without a refresh).
-	$: if (browser && $selectAudio) {
-		const url = getPlayableAudioUrl($selectAudio as PlayableAudio);
-		isCurrentTrackCached = null;
-		cacheCheckToken++;
-		void refreshCachedFlag(url, cacheCheckToken);
-	}
 
-	$: if (browser && $isPlaying && $selectAudio) {
-		const url = getPlayableAudioUrl($selectAudio as PlayableAudio);
-		const token = ++cacheCheckToken;
-		// Small delay: let the SW finish writing the response to cache
-		// before we re-check, otherwise the first poll always misses.
-		setTimeout(() => void refreshCachedFlag(url, token), 1500);
-	}
 
-	$: showOfflineUnavailable = browser && !$isOnline && isCurrentTrackCached === false;
 
 	// ── Adjacent-track prefetch (added) ──────────────────────────
 	// On 3G the audio element still has to wait for the first bytes
@@ -850,27 +794,6 @@
 		return !!item && typeof item === 'object' && 'mp3_url' in item && !('s3_url' in item);
 	}
 
-	$: if (browser && $selectAudio && $playlist.length > 1) {
-		if (prefetchTimer) clearTimeout(prefetchTimer);
-
-		if (isSermonItem($selectAudio)) {
-			// No-op: skip prefetch entirely while a sermon is playing.
-		} else {
-			const nextIndex = findAdjacentPlayableIndex(
-				$playlist as PlayableAudio[],
-				$currentIndex,
-				1,
-				false
-			);
-			const nextItem = nextIndex >= 0 ? $playlist[nextIndex] : null;
-			// Also skip if the *next* track is a sermon — no point warming it.
-			const nextUrl =
-				nextItem && !isSermonItem(nextItem) ? getPlayableAudioUrl(nextItem as PlayableAudio) : '';
-			if (nextUrl) {
-				prefetchTimer = setTimeout(() => void prefetchAudio(nextUrl), 4000);
-			}
-		}
-	}
 
 	onDestroy(() => {
 		if (prefetchTimer) clearTimeout(prefetchTimer);
@@ -1296,27 +1219,6 @@
 		el.removeEventListener('abort', logAbort);
 	}
 
-	// Auto-bind listeners whenever `audio` resolves to a new element — covers
-	// both the initial mount and every rebuild triggered by audioElementKey++.
-	// Without this, the {#key} rebuild path would leave a fresh DOM element
-	// without any event wiring. Also catches up any pending `audioSrc` that
-	// the $selectAudio reactive block queued before bind:this had fired.
-	$: if (browser && audio && audio !== listenersBoundTo) {
-		if (listenersBoundTo) {
-			console.log('[Audio Element] node replaced', {
-				oldInstanceId: listenersBoundTo.dataset.instanceId ?? '?',
-				key: audioElementKey
-			});
-			detachAudioListeners(listenersBoundTo);
-		}
-		tagAudioInstance(audio);
-		attachAudioListeners(audio);
-		listenersBoundTo = audio;
-		if (audioSrc && !audio.src) {
-			audio.src = encodeUrlPath(audioSrc);
-			audio.load();
-		}
-	}
 
 	/** Tear down the live <audio> element and build a fresh one preloaded
 	 *  to the same src and time. Used to escape a rapid-repause cycle
@@ -1413,43 +1315,7 @@
 		audio.load();
 	}
 
-	// Reactive sync: keep the audio element's actual play/pause state in
-	// lockstep with the $isPlaying store. The `pendingPlaybackIntent`
-	// guard defuses a race that otherwise spawns two audio sessions on
-	// iOS: when the user taps pause (or play), we call audio.pause()
-	// (or .play()) synchronously, which triggers the corresponding DOM
-	// event, which flips isPlaying — then this reactive block sees the
-	// "new" mismatch and fires a *second* command before the first has
-	// settled. Two overlapping play() calls leave a ghost audio element
-	// playing in the background with no UI bound to it. Bailing out when
-	// the intent is already in-flight keeps this single-track.
-	//
-	// NB: `return` is illegal inside a Svelte reactive block (it
-	// compiles to a bare statement, not a function), so the guard is
-	// expressed as nested if/else.
-	$: if (browser && audio && !destroyed && $isPlaying !== undefined) {
-		if ($isPlaying && audio.paused) {
-			if (pendingPlaybackIntent !== 'pause') {
-				setUserWantsToPlay(true);
-				safePlay('auto');
-			}
-		} else if (!$isPlaying && !audio.paused) {
-			if (pendingPlaybackIntent !== 'play') {
-				audio.pause();
-			}
-		}
-	}
 
-	$: if ($selectAudio && browser) {
-		const newSelected = $selectAudio;
-		const rawUrl = getPlayableAudioUrl(newSelected as PlayableAudio);
-		console.log('[AudioPlayer] Selected audio change, raw URL:', rawUrl);
-
-		if (rawUrl && rawUrl !== audioSrc) {
-			audioSrc = rawUrl;
-			updateAudioSource(rawUrl);
-		}
-	}
 
 	const toggleMute = () => {
 		if (!audio) return;
@@ -1463,7 +1329,17 @@
 		isMuted = !isMuted;
 	};
 
-	let progressBarElement: HTMLDivElement;
+	let progressBarElement: HTMLDivElement = $state(undefined as unknown as HTMLDivElement);
+
+	// touchstart must be non-passive so startDrag can preventDefault scrolling.
+	function nonpassiveTouchstart(node: HTMLElement, handler: (e: TouchEvent) => void) {
+		node.addEventListener('touchstart', handler, { passive: false });
+		return {
+			destroy() {
+				node.removeEventListener('touchstart', handler);
+			}
+		};
+	}
 
 	const startDrag = (event: TouchEvent | MouseEvent) => {
 		isDragging = true;
@@ -1550,13 +1426,6 @@
 			timeSec: audio?.currentTime ?? 0,
 			playing: $isPlaying
 		});
-	}
-	// Publish play/pause flips immediately (not throttled) so the transcript
-	// freezes/resumes without a half-second lag.
-	$: if (browser && audio) {
-		void $isPlaying;
-		void $selectAudio;
-		publishReplayPlayback(true);
 	}
 	const updateIndicator = () => {
 		if (!audio) return;
@@ -1914,9 +1783,6 @@
 		}
 	}
 
-	$: if (browser) {
-		syncMediaSessionPlaylistHandlers(hasPlaylistNavigation);
-	}
 
 	// ── Silent-loop session keeper (iOS standalone PWA workaround) ──
 	// In iOS standalone PWA mode, audio.pause() on the main element
@@ -1931,7 +1797,7 @@
 	// (not to a specific element). We start the silent loop AFTER the
 	// main element's first user-gesture play() resolves, so the user-
 	// visible "primary" media is unambiguous from iOS's perspective.
-	let silentAudio: HTMLAudioElement | null = null;
+	let silentAudio: HTMLAudioElement | null = $state(null);
 	let silentLoopRunning = false;
 
 	/** Detect iOS standalone PWA mode (installed-to-home-screen Safari).
@@ -2249,7 +2115,6 @@
 		});
 	}
 
-	$: if (browser && $selectAudio) applyMediaSessionMetadata();
 
 	/** Push the current playback position to the OS so the lock-screen /
 	 *  car head-unit seek bar can animate accurately. Called on every
@@ -2356,11 +2221,6 @@
 		};
 	});
 
-	$: if (browser && playerShell) {
-		lyricsPanelOpen;
-		lyricsLines.length;
-		void tick().then(syncPlayerInset);
-	}
 
 	onDestroy(() => {
 		// SvelteKit invokes onDestroy during SSR cleanup too. None of the
@@ -2415,14 +2275,195 @@
 		titleResizeObserver?.disconnect();
 		titleResizeObserver = null;
 	});
+	let sleepTimerRemainingLabel =
+		$derived(sleepTimerEndsAt !== null ? formatSleepTimerRemaining(sleepTimerRemainingMs) : '');
+	let sleepTimerEndLabel =
+		$derived(sleepTimerEndsAt !== null ? formatSleepTimerEndTime(sleepTimerEndsAt) : '');
+	$effect(() => {
+		if (browser && isSleepTimerOpen && !customSleepTime) {
+			setDefaultSleepTimerClockTime();
+		}
+	});
+	$effect(() => {
+		if (!hasPlaylistNavigation && $isShuffle) {
+			isShuffle.set(false);
+		}
+	});
+	$effect(() => {
+		if (browser && titleViewportEl && titleProbeEl) attachTitleObservers();
+	});
+	$effect(() => {
+		if (browser) {
+			// Re-measure whenever the displayed title changes.
+			const _trackTitleRefresh = $selectAudio
+				? getDisplayTitle($selectAudio)
+				: '';
+			void _trackTitleRefresh;
+			measureTitleOverflow();
+		}
+	});
+	$effect(() => {
+		if (browser) {
+			hasNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+		}
+	});
+	let currentFavId = $derived(getAudioFavId($selectAudio));
+	let isCurrentFavorite = $derived(isFavorite(currentFavId, $favorites));
+	let canShareCurrent = $derived(!!($selectAudio && ($selectAudio as any)?._id));
+	let canDownloadCurrent = $derived(!!getPlayableAudioUrl($selectAudio as PlayableAudio));
+	$effect(() => {
+		if (browser) {
+			const lyricsAudioId = getLyricsAudioId($selectAudio);
+			if (lyricsAudioId !== lastLyricsAudioId) {
+				lastLyricsAudioId = lyricsAudioId;
+				lyricsFetchToken++;
+				if (lyricsAudioId) {
+					void loadLyricsForAudio(lyricsAudioId, lyricsFetchToken);
+				} else {
+					resetLyricsState();
+				}
+			}
+		}
+	});
+	// Re-check the cache flag whenever the selected track changes OR
+	// whenever it starts playing (so a freshly fetched-and-cached track
+	// flips its badge from "not cached" to "cached" without a refresh).
+	$effect(() => {
+		if (browser && $selectAudio) {
+			const url = getPlayableAudioUrl($selectAudio as PlayableAudio);
+			isCurrentTrackCached = null;
+			cacheCheckToken++;
+			void refreshCachedFlag(url, cacheCheckToken);
+		}
+	});
+	$effect(() => {
+		if (browser && $isPlaying && $selectAudio) {
+			const url = getPlayableAudioUrl($selectAudio as PlayableAudio);
+			const token = ++cacheCheckToken;
+			// Small delay: let the SW finish writing the response to cache
+			// before we re-check, otherwise the first poll always misses.
+			setTimeout(() => void refreshCachedFlag(url, token), 1500);
+		}
+	});
+	let showOfflineUnavailable = $derived(browser && !$isOnline && isCurrentTrackCached === false);
+	$effect(() => {
+		if (browser && $selectAudio && $playlist.length > 1) {
+			if (prefetchTimer) clearTimeout(prefetchTimer);
+
+			if (isSermonItem($selectAudio)) {
+				// No-op: skip prefetch entirely while a sermon is playing.
+			} else {
+				const nextIndex = findAdjacentPlayableIndex(
+					$playlist as PlayableAudio[],
+					$currentIndex,
+					1,
+					false
+				);
+				const nextItem = nextIndex >= 0 ? $playlist[nextIndex] : null;
+				// Also skip if the *next* track is a sermon — no point warming it.
+				const nextUrl =
+					nextItem && !isSermonItem(nextItem) ? getPlayableAudioUrl(nextItem as PlayableAudio) : '';
+				if (nextUrl) {
+					prefetchTimer = setTimeout(() => void prefetchAudio(nextUrl), 4000);
+				}
+			}
+		}
+	});
+	$effect(() => {
+		if ($selectAudio && browser) {
+			const newSelected = $selectAudio;
+			const rawUrl = getPlayableAudioUrl(newSelected as PlayableAudio);
+			console.log('[AudioPlayer] Selected audio change, raw URL:', rawUrl);
+
+			if (rawUrl && rawUrl !== audioSrc) {
+				audioSrc = rawUrl;
+				updateAudioSource(rawUrl);
+			}
+		}
+	});
+	// Auto-bind listeners whenever `audio` resolves to a new element — covers
+	// both the initial mount and every rebuild triggered by audioElementKey++.
+	// Without this, the {#key} rebuild path would leave a fresh DOM element
+	// without any event wiring. Also catches up any pending `audioSrc` that
+	// the $selectAudio reactive block queued before bind:this had fired.
+	$effect(() => {
+		if (browser && audio && audio !== listenersBoundTo) {
+			if (listenersBoundTo) {
+				console.log('[Audio Element] node replaced', {
+					oldInstanceId: listenersBoundTo.dataset.instanceId ?? '?',
+					key: audioElementKey
+				});
+				detachAudioListeners(listenersBoundTo);
+			}
+			tagAudioInstance(audio);
+			attachAudioListeners(audio);
+			listenersBoundTo = audio;
+			if (audioSrc && !audio.src) {
+				audio.src = encodeUrlPath(audioSrc);
+				audio.load();
+			}
+		}
+	});
+	// Reactive sync: keep the audio element's actual play/pause state in
+	// lockstep with the $isPlaying store. The `pendingPlaybackIntent`
+	// guard defuses a race that otherwise spawns two audio sessions on
+	// iOS: when the user taps pause (or play), we call audio.pause()
+	// (or .play()) synchronously, which triggers the corresponding DOM
+	// event, which flips isPlaying — then this reactive block sees the
+	// "new" mismatch and fires a *second* command before the first has
+	// settled. Two overlapping play() calls leave a ghost audio element
+	// playing in the background with no UI bound to it. Bailing out when
+	// the intent is already in-flight keeps this single-track.
+	//
+	// NB: `return` is illegal inside a Svelte reactive block (it
+	// compiles to a bare statement, not a function), so the guard is
+	// expressed as nested if/else.
+	$effect(() => {
+		if (browser && audio && !destroyed && $isPlaying !== undefined) {
+			if ($isPlaying && audio.paused) {
+				if (pendingPlaybackIntent !== 'pause') {
+					setUserWantsToPlay(true);
+					safePlay('auto');
+				}
+			} else if (!$isPlaying && !audio.paused) {
+				if (pendingPlaybackIntent !== 'play') {
+					audio.pause();
+				}
+			}
+		}
+	});
+	// Publish play/pause flips immediately (not throttled) so the transcript
+	// freezes/resumes without a half-second lag.
+	$effect(() => {
+		if (browser && audio) {
+			void $isPlaying;
+			void $selectAudio;
+			publishReplayPlayback(true);
+		}
+	});
+	$effect(() => {
+		if (browser) {
+			syncMediaSessionPlaylistHandlers(hasPlaylistNavigation);
+		}
+	});
+	$effect(() => {
+		if (browser && $selectAudio) applyMediaSessionMetadata();
+	});
+	$effect(() => {
+		if (browser && playerShell) {
+			lyricsPanelOpen;
+			lyricsLines.length;
+			void tick().then(syncPlayerInset);
+		}
+	});
 </script>
 
 <svelte:window
-	on:keydown={handleKeydown}
-	on:mousemove={handleDrag}
-	on:touchmove={handleDrag}
-	on:mouseup={endDrag}
-	on:touchend={endDrag}
+	onkeydown={handleKeydown}
+	onmousemove={handleDrag}
+	ontouchmove={handleDrag}
+	onmouseup={endDrag}
+	ontouchend={endDrag}
 />
 
 <!--
@@ -2482,7 +2523,7 @@
 						<button
 							type="button"
 							class="lyrics-close-btn"
-							on:click={() => (lyricsPanelOpen = false)}
+							onclick={() => (lyricsPanelOpen = false)}
 						>
 							Fermer
 						</button>
@@ -2502,7 +2543,7 @@
 		     row alongside the other compact-mode actions. -->
 		<button
 			class="absolute right-3 top-3 z-[110] hidden h-9 w-9 items-center justify-center rounded-full bg-gray-900 text-white shadow-lg transition-colors hover:bg-black lg:flex"
-			on:click={closeAudioPlayer}
+			onclick={closeAudioPlayer}
 			aria-label="Fermer le lecteur"
 			title="Fermer"
 		>
@@ -2510,14 +2551,14 @@
 		</button>
 
 		<!-- Top Progress Bar -->
-		<!-- svelte-ignore a11y-click-events-have-key-events -->
-		<!-- svelte-ignore a11y-no-static-element-interactions -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			bind:this={progressBarElement}
 			class="absolute top-0 left-0 w-full h-8 -translate-y-1/2 cursor-pointer group/progress flex items-center justify-start z-50 touch-none select-none"
-			on:mousedown={startDrag}
-			on:touchstart|nonpassive={startDrag}
-			on:click={seekTo}
+			onmousedown={startDrag}
+			use:nonpassiveTouchstart={startDrag}
+			onclick={seekTo}
 		>
 			<!-- Visual Track -->
 			<div class="w-full h-[4px] bg-stone-200 relative overflow-visible rounded-full">
@@ -2640,7 +2681,7 @@
 					class="player-action-icon flex-shrink-0 {isCurrentFavorite
 						? 'text-red-500 hover:text-red-600'
 						: 'text-stone-300 hover:text-red-400'}"
-					on:click={handleToggleFavorite}
+					onclick={handleToggleFavorite}
 					aria-label={isCurrentFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
 					title={isCurrentFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
 				>
@@ -2653,7 +2694,7 @@
 						class="player-action-pill flex-shrink-0 {lyricsPanelOpen
 							? 'is-active'
 							: ''}"
-						on:click={toggleLyricsPanel}
+						onclick={toggleLyricsPanel}
 						aria-expanded={lyricsPanelOpen}
 						aria-label={lyricsPanelOpen ? 'Fermer les paroles' : 'Ouvrir les paroles'}
 						title={lyricsPanelOpen ? 'Fermer les paroles' : 'Paroles'}
@@ -2668,7 +2709,7 @@
 						<button
 							type="button"
 							class="player-action-pill {isShareMenuOpen ? 'is-active' : ''}"
-							on:click|stopPropagation={toggleShareMenu}
+							onclick={(e) => { e.stopPropagation(); toggleShareMenu(); }}
 							aria-haspopup="menu"
 							aria-expanded={isShareMenuOpen}
 							aria-label="Partager ce chant"
@@ -2678,20 +2719,20 @@
 							<span class="hidden sm:inline">Share</span>
 						</button>
 						{#if isShareMenuOpen}
-							<!-- svelte-ignore a11y-click-events-have-key-events -->
-							<!-- svelte-ignore a11y-no-static-element-interactions -->
+							<!-- svelte-ignore a11y_click_events_have_key_events -->
+							<!-- svelte-ignore a11y_no_static_element_interactions -->
 							<div
 								class="share-menu z-[130] w-52 overflow-hidden rounded-lg border border-stone-200 bg-white shadow-2xl"
 								role="menu"
 								tabindex="-1"
-								on:click|stopPropagation={() => undefined}
+								onclick={(e) => e.stopPropagation()}
 							>
 								{#if hasNativeShare}
 									<button
 										type="button"
 										role="menuitem"
 										class="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-stone-700 transition-colors hover:bg-stone-50 hover:text-missionnaire"
-										on:click={nativeShare}
+										onclick={nativeShare}
 									>
 										<Icon src={RiSystemShareForwardLine} size="17" />
 										<span>Share…</span>
@@ -2701,7 +2742,7 @@
 									type="button"
 									role="menuitem"
 									class="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-stone-700 transition-colors hover:bg-stone-50 hover:text-missionnaire"
-									on:click={copyShareLink}
+									onclick={copyShareLink}
 								>
 									<Icon src={BsLink45deg} size="18" />
 									<span>Copy link</span>
@@ -2724,7 +2765,7 @@
 						<button
 							type="button"
 							class="player-action-pill {isDownloading ? 'is-active' : ''}"
-							on:click|stopPropagation={downloadCurrentAudio}
+							onclick={(e) => { e.stopPropagation(); downloadCurrentAudio(); }}
 							aria-label={isDownloading
 								? 'Annuler le téléchargement'
 								: 'Télécharger ce chant'}
@@ -2756,7 +2797,7 @@
 						class="player-action-pill player-action-pill--options {isSleepTimerOpen
 							? 'is-active'
 							: ''} {sleepTimerEndsAt !== null && !isSleepTimerOpen ? 'is-armed' : ''}"
-						on:click|stopPropagation={() => (isSleepTimerOpen = !isSleepTimerOpen)}
+						onclick={(e) => { e.stopPropagation(); isSleepTimerOpen = !isSleepTimerOpen; }}
 						aria-label={sleepTimerEndsAt !== null
 							? `Options du lecteur, minuterie active, arrêt dans ${sleepTimerRemainingLabel}`
 							: 'Options du lecteur'}
@@ -2799,11 +2840,11 @@
 					</button>
 
 					{#if isSleepTimerOpen}
-						<!-- svelte-ignore a11y-click-events-have-key-events -->
-						<!-- svelte-ignore a11y-no-static-element-interactions -->
+						<!-- svelte-ignore a11y_click_events_have_key_events -->
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
 						<div
 							class="absolute right-0 bottom-full z-[120] mb-3 w-72 max-w-[calc(100vw-2rem)] border border-stone-200 bg-white p-3 shadow-2xl rounded-lg"
-							on:click|stopPropagation={() => undefined}
+							onclick={(e) => e.stopPropagation()}
 						>
 							<div class="mb-3 flex items-center justify-between gap-3">
 								<div class="min-w-0">
@@ -2822,7 +2863,7 @@
 									<button
 										type="button"
 										class="shrink-0 rounded-full border border-stone-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-stone-500 transition-colors hover:border-missionnaire hover:text-missionnaire"
-										on:click={() => clearSleepTimer({ closeMenu: true })}
+										onclick={() => clearSleepTimer({ closeMenu: true })}
 									>
 										Annuler
 									</button>
@@ -2832,7 +2873,7 @@
 							<button
 								type="button"
 								class="mb-3 flex w-full items-center justify-between gap-3 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-left transition-colors hover:border-missionnaire hover:bg-missionnaire/5"
-								on:click={toggleRepeatOne}
+								onclick={toggleRepeatOne}
 								aria-pressed={$repeatOne}
 							>
 								<span class="inline-flex min-w-0 items-center gap-2">
@@ -2860,7 +2901,7 @@
 									<button
 										type="button"
 										class="rounded-lg border border-stone-200 bg-stone-50 px-2 py-2 text-xs font-bold text-stone-700 transition-colors hover:border-missionnaire hover:bg-missionnaire/5 hover:text-missionnaire"
-										on:click={() => setSleepTimerForMinutes(minutes)}
+										onclick={() => setSleepTimerForMinutes(minutes)}
 									>
 										{minutes} min
 									</button>
@@ -2887,7 +2928,7 @@
 										class="rounded-lg bg-stone-900 px-3 py-2 text-xs font-bold uppercase tracking-[0.12em] text-white transition-colors {!customSleepTime
 											? 'cursor-not-allowed opacity-40'
 											: 'hover:bg-black'}"
-										on:click={() => setSleepTimerForClockTime(customSleepTime)}
+										onclick={() => setSleepTimerForClockTime(customSleepTime)}
 									>
 										OK
 									</button>
@@ -2904,7 +2945,7 @@
 
 				<button
 					class="bg-gray-900 hover:bg-black text-white p-2 rounded-full transition-colors lg:hidden"
-					on:click={closeAudioPlayer}
+					onclick={closeAudioPlayer}
 					aria-label="Fermer le lecteur"
 				>
 					<Icon src={BsX} size="20" />
@@ -2921,7 +2962,7 @@
 					{#if hasPlaylistNavigation}
 						<div class="flex lg:hidden items-center gap-1">
 							<button
-								on:click={toggleShuffle}
+								onclick={toggleShuffle}
 								class="p-2.5 rounded-full transition-all flex items-center gap-2 {$isShuffle
 									? 'bg-missionnaire text-white shadow-md shadow-missionnaire/20'
 									: 'bg-stone-50 text-stone-400 hover:bg-stone-100 hover:text-stone-600'}"
@@ -2935,7 +2976,7 @@
 					<div class="flex items-center gap-1 lg:gap-3">
 						{#if hasPlaylistNavigation}
 							<button
-								on:click={playPrevious}
+								onclick={playPrevious}
 								class="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-stone-500 transition-colors hover:bg-missionnaire hover:text-white"
 								aria-label="Piste précédente"
 								title="Précédent"
@@ -2944,7 +2985,7 @@
 							</button>
 						{:else}
 							<button
-								on:click={() => seekBackward()}
+								onclick={() => seekBackward()}
 								class="flex h-11 w-11 items-center justify-center rounded-full bg-stone-50 text-stone-400 transition-colors hover:bg-stone-100 hover:text-missionnaire lg:hidden"
 								title="-5s"
 							>
@@ -2953,7 +2994,7 @@
 						{/if}
 
 						<button
-							on:click={() => seekBackward()}
+							onclick={() => seekBackward()}
 							class="hidden lg:block p-2 text-stone-300 hover:text-missionnaire transition-colors"
 							title="-5s"
 						>
@@ -2961,7 +3002,7 @@
 						</button>
 
 						<button
-							on:click={togglePlay}
+							onclick={togglePlay}
 							class="relative flex items-center justify-center w-14 h-14 lg:w-12 lg:h-12 bg-missionnaire text-white rounded-full hover:scale-105 transition-transform shadow-lg shadow-missionnaire/20"
 						>
 							{#if $isPlaying}
@@ -2972,7 +3013,7 @@
 						</button>
 
 						<button
-							on:click={() => seekForward()}
+							onclick={() => seekForward()}
 							class="hidden lg:block p-2 text-stone-300 hover:text-missionnaire transition-colors"
 							title="+5s"
 						>
@@ -2981,7 +3022,7 @@
 
 						{#if hasPlaylistNavigation}
 							<button
-								on:click={playNext}
+								onclick={playNext}
 								class="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-stone-500 transition-colors hover:bg-missionnaire hover:text-white"
 								aria-label="Piste suivante"
 								title="Suivant"
@@ -2990,7 +3031,7 @@
 							</button>
 						{:else}
 							<button
-								on:click={() => seekForward()}
+								onclick={() => seekForward()}
 								class="flex h-11 w-11 items-center justify-center rounded-full bg-stone-50 text-stone-400 transition-colors hover:bg-stone-100 hover:text-missionnaire lg:hidden"
 								title="+5s"
 							>
@@ -3003,7 +3044,7 @@
 					{#if hasPlaylistNavigation}
 						<div class="flex lg:hidden items-center gap-1">
 							<button
-								on:click={toggleRepeatOne}
+								onclick={toggleRepeatOne}
 								class="p-2.5 rounded-full transition-all flex items-center gap-2 {$repeatOne
 									? 'bg-missionnaire text-white shadow-md shadow-missionnaire/20'
 									: 'bg-stone-50 text-stone-400 hover:bg-stone-100 hover:text-stone-600'}"
@@ -3030,7 +3071,7 @@
 					<div class="flex items-center gap-2 border-l border-stone-100 pl-6">
 						{#if hasPlaylistNavigation}
 							<button
-								on:click={toggleShuffle}
+								onclick={toggleShuffle}
 								class="p-2.5 rounded-full transition-all flex items-center gap-2 {$isShuffle
 									? 'bg-missionnaire text-white'
 									: 'bg-stone-50 text-stone-400 hover:bg-stone-100 hover:text-stone-600'}"
@@ -3041,7 +3082,7 @@
 						{/if}
 
 						<button
-							on:click={toggleRepeatOne}
+							onclick={toggleRepeatOne}
 							class="p-2.5 rounded-full transition-all flex items-center gap-2 {$repeatOne
 								? 'bg-missionnaire text-white shadow-md shadow-missionnaire/20'
 								: 'bg-stone-50 text-stone-400 hover:bg-stone-100'}"
@@ -3056,7 +3097,7 @@
 
 						<div class="flex items-center gap-2 ml-2">
 							<button
-								on:click={toggleMute}
+								onclick={toggleMute}
 								class="p-2 text-stone-400 hover:text-missionnaire transition-colors"
 							>
 								{#if !isMuted}

@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { run, preventDefault } from 'svelte/legacy';
-
 	import type { PageData } from './$types';
 	import type { PublishedRecording, RecordingType } from '$lib/server/recordings';
 	import { goto } from '$app/navigation';
@@ -30,16 +28,16 @@
 	let typeInput: RecordingType | '' = $state(data.filters.type ?? '');
 
 	// Re-sync when SvelteKit reloads with new data (e.g. back/forward nav).
-	run(() => {
+	$effect(() => {
 		searchInput = data.filters.q;
 	});
-	run(() => {
+	$effect(() => {
 		yearInput = data.filters.year ?? '';
 	});
-	run(() => {
+	$effect(() => {
 		monthInput = data.filters.month ?? '';
 	});
-	run(() => {
+	$effect(() => {
 		typeInput = data.filters.type ?? '';
 	});
 
@@ -331,7 +329,10 @@
 		<form
 			method="GET"
 			action="/live/rediffusions"
-			onsubmit={preventDefault(() => onSearchInput())}
+			onsubmit={(e) => {
+			e.preventDefault();
+			onSearchInput();
+		}}
 			class="hidden md:block mb-6 border border-stone-200/60 bg-white/40 p-3 sm:p-4"
 		>
 			<!-- Type segmented control: Retransmission = relayed broadcast

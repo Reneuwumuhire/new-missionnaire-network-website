@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { run } from 'svelte/legacy';
-
 	import type { PageData } from './$types';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
@@ -29,7 +27,7 @@
 	let currentPage = $derived(data.pagination.page);
 	let totalPages = $derived(Math.ceil(data.pagination.total / data.pagination.limit));
 
-	run(() => {
+	$effect(() => {
 		if (searchTerm.trim() === '') {
 			filteredDocuments = data.documents;
 		} else {

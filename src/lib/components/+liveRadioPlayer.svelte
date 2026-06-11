@@ -15,25 +15,25 @@
 		unavailable: 'Le direct audio est indisponible pour le moment'
 	};
 
-	let audio: HTMLAudioElement | null = null;
-	let isPlaying = false;
-	let isMuted = false;
-	let isBuffering = false;
-	let hasError = false;
-	let lastCheckedAt = '';
-	let statusKey = 'waiting';
+	let audio: HTMLAudioElement | null = $state(null);
+	let isPlaying = $state(false);
+	let isMuted = $state(false);
+	let isBuffering = $state(false);
+	let hasError = $state(false);
+	let lastCheckedAt = $state('');
+	let statusKey = $state('waiting');
 	let pollTimer: ReturnType<typeof setInterval> | null = null;
 	let noAudioGraceTimer: ReturnType<typeof setTimeout> | null = null;
 	let offlineStreak = 0;
 	let userWantsToPlay = false;
-	let listenerCount = 0;
-	let keepLiveUi = false;
-	let broadcastTitle: string | null = null;
-	let broadcastDescription: string | null = null;
-	let broadcastThumbnail: string | null = null;
-	let broadcastThumbnailBroken = false;
-	let thumbnailExpanded = false;
-	let descriptionExpanded = false;
+	let listenerCount = $state(0);
+	let keepLiveUi = $state(false);
+	let broadcastTitle: string | null = $state(null);
+	let broadcastDescription: string | null = $state(null);
+	let broadcastThumbnail: string | null = $state(null);
+	let broadcastThumbnailBroken = $state(false);
+	let thumbnailExpanded = $state(false);
+	let descriptionExpanded = $state(false);
 
 	function openThumbnail() {
 		if (!broadcastThumbnail) return;
@@ -60,20 +60,20 @@
 	// "liveEdge" (the highest currentTime we've seen while playing forward).
 	// We do NOT use audio.seekable or audio.duration because Icecast MP3
 	// streams report them as Infinity, which breaks arithmetic & UI.
-	let currentTime = 0;
-	let bufferStart = 0;
-	let liveEdge = 0;
-	let isSeeking = false;
+	let currentTime = $state(0);
+	let bufferStart = $state(0);
+	let liveEdge = $state(0);
+	let isSeeking = $state(false);
 	// True once the user has deliberately scrubbed backward. The button label
 	// is driven by this flag, not by a live-edge time delta — otherwise the
 	// browser's buffer-ahead (5-15s on Icecast) makes the label oscillate
 	// between "En direct" and "Revenir au direct" as playback catches up.
-	let userSeeked = false;
+	let userSeeked = $state(false);
 	const DVR_THRESHOLD_SEC = 3;
 
-	let probeReachable = false;
-	let confirmedLive = false;
-	let playbackFailed = false;
+	let probeReachable = $state(false);
+	let confirmedLive = $state(false);
+	let playbackFailed = $state(false);
 
 	// Direct URL to the audio source, received from the server via SSE.
 	// Bypasses the serverless proxy which has execution time limits.
@@ -125,7 +125,7 @@
 	// DVR rewind and silent reconnects all correct by construction — a
 	// paused player's frozen currentTime freezes the text, and a long-pause
 	// buffer-expiry reconnect resets the epoch to "now" along with the audio.
-	let streamConnectEpochMs: number | null = null;
+	let streamConnectEpochMs: number | null = $state(null);
 
 	/** Single place every (re)connection goes through. */
 	function connectStream() {
@@ -135,25 +135,30 @@
 		streamConnectEpochMs = Date.now();
 	}
 
-	$: showLive = confirmedLive || keepLiveUi;
-	$: awaitingPlay = probeReachable && !isPlaying && !isBuffering && !confirmedLive && !keepLiveUi;
+	let showLive = $derived(confirmedLive || keepLiveUi);
+	let awaitingPlay = $derived(
+		probeReachable && !isPlaying && !isBuffering && !confirmedLive && !keepLiveUi
+	);
 	// Button stays enabled after failure so user can manually retry
-	$: canPlay = probeReachable || confirmedLive || playbackFailed;
-	$: statusMessage = STATUS_MESSAGES[statusKey] || '';
-	$: behindLiveSec = Math.max(0, liveEdge - currentTime);
+	let canPlay = $derived(probeReachable || confirmedLive || playbackFailed);
+	let statusMessage = $derived(STATUS_MESSAGES[statusKey] || '');
+	let behindLiveSec = $derived(Math.max(0, liveEdge - currentTime));
 	// Feed the transcript the wall-clock moment of what the listener is
 	// hearing right now (connection epoch + playback position). Frozen while
 	// paused (currentTime doesn't advance), shifted by DVR scrubbing, reset
 	// to "now" on every fresh reconnection — all without buffer-edge math.
-	$: livePlayback.set({
-		playing: isPlaying,
-		positionEpochMs:
-			streamConnectEpochMs === null ? null : streamConnectEpochMs + currentTime * 1000
+	$effect(() => {
+		livePlayback.set({
+			playing: isPlaying,
+			positionEpochMs:
+				streamConnectEpochMs === null ? null : streamConnectEpochMs + currentTime * 1000
+		});
 	});
-	$: isAtLive = !userSeeked;
-	$: hasSeekableRange =
-		Number.isFinite(liveEdge) && Number.isFinite(bufferStart) && liveEdge > bufferStart + 1;
-	$: behindLiveLabel = formatBehindLive(behindLiveSec);
+	let isAtLive = $derived(!userSeeked);
+	let hasSeekableRange = $derived(
+		Number.isFinite(liveEdge) && Number.isFinite(bufferStart) && liveEdge > bufferStart + 1
+	);
+	let behindLiveLabel = $derived(formatBehindLive(behindLiveSec));
 
 	function formatBehindLive(sec: number): string {
 		if (!Number.isFinite(sec) || sec < 0) return '';
@@ -162,13 +167,15 @@
 		const rem = s % 60;
 		return `-${m}:${rem.toString().padStart(2, '0')}`;
 	}
-	$: checkedAtLabel = lastCheckedAt
-		? new Date(lastCheckedAt).toLocaleTimeString('fr-FR', {
-				hour: '2-digit',
-				minute: '2-digit',
-				second: '2-digit'
-			})
-		: '';
+	let checkedAtLabel = $derived(
+		lastCheckedAt
+			? new Date(lastCheckedAt).toLocaleTimeString('fr-FR', {
+					hour: '2-digit',
+					minute: '2-digit',
+					second: '2-digit'
+				})
+			: ''
+	);
 
 	// ── SSE status handler ─────────────────────────────────────────
 
@@ -393,13 +400,14 @@
 
 	// React to play/pause: only spend network while audio is actually playing
 	// and the tab is visible.
-	$: if (browser) {
+	$effect(() => {
+		if (!browser) return;
 		if (isPlaying && document.visibilityState === 'visible') {
 			startStateRefresh();
 		} else {
 			stopStateRefresh();
 		}
-	}
+	});
 
 	// ── Push-driven updates (Service Worker → BroadcastChannel) ──
 	let radioBroadcast: BroadcastChannel | null = null;
@@ -964,7 +972,7 @@
 								? 'bg-red-600 hover:bg-red-700 text-white'
 								: 'bg-stone-900 hover:bg-missionnaire text-white'
 							: 'bg-stone-200 text-stone-400 cursor-not-allowed'}"
-						on:click={togglePlay}
+						onclick={togglePlay}
 						aria-label={isPlaying ? 'Mettre en pause le direct' : 'Écouter le direct'}
 						disabled={!canPlay}
 					>
@@ -985,7 +993,7 @@
 						class="inline-flex items-center gap-2 px-4 py-2.5 md:px-5 md:py-3 border text-[12px] font-semibold font-body whitespace-nowrap transition-all duration-300 {canPlay
 							? 'border-stone-200/60 text-stone-600 hover:border-missionnaire hover:text-missionnaire'
 							: 'border-stone-200/40 text-stone-300 cursor-not-allowed'}"
-						on:click={toggleMute}
+						onclick={toggleMute}
 						aria-label={isMuted ? 'Activer le son' : 'Couper le son'}
 						disabled={!canPlay}
 					>
@@ -1030,14 +1038,14 @@
 					{#if broadcastThumbnail && !broadcastThumbnailBroken}
 						<button
 							type="button"
-							on:click={openThumbnail}
+							onclick={openThumbnail}
 							aria-label="Agrandir la vignette"
 							class="group relative aspect-video w-full overflow-hidden border border-stone-200/60 bg-stone-100 cursor-zoom-in transition-all duration-300 hover:border-missionnaire/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
 						>
 							<img
 								src={broadcastThumbnail}
 								alt={broadcastTitle || 'Vignette du direct'}
-								on:error={() => (broadcastThumbnailBroken = true)}
+								onerror={() => (broadcastThumbnailBroken = true)}
 								class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
 								loading="eager"
 							/>
@@ -1125,8 +1133,8 @@
 						max={liveEdge}
 						step="0.1"
 						value={currentTime}
-						on:input={onSeekInput}
-						on:change={onSeekCommit}
+						oninput={onSeekInput}
+						onchange={onSeekCommit}
 						aria-label="Position dans le direct"
 					/>
 					{#if !isAtLive}
@@ -1136,7 +1144,7 @@
 					{/if}
 					<button
 						type="button"
-						on:click={backToLive}
+						onclick={backToLive}
 						aria-label={isAtLive ? 'Recharger le direct' : 'Revenir au direct'}
 						title={isAtLive ? 'Recharger le direct' : 'Revenir au direct'}
 						class="inline-flex items-center gap-1.5 px-3 py-1.5 border text-[10px] font-bold uppercase tracking-[0.15em] font-body transition-all duration-200 shrink-0 {isAtLive
@@ -1184,7 +1192,7 @@
 			{#if isLong}
 				<button
 					type="button"
-					on:click={() => (descriptionExpanded = !descriptionExpanded)}
+					onclick={() => (descriptionExpanded = !descriptionExpanded)}
 					class="mt-3 text-[11px] font-bold uppercase tracking-[0.15em] font-body text-missionnaire hover:text-missionnaire-dark transition-colors"
 				>
 					{descriptionExpanded ? 'Voir moins ↑' : 'Voir plus ↓'}
@@ -1215,28 +1223,28 @@
 		<audio
 			bind:this={audio}
 			preload="none"
-			on:play={handlePlay}
-			on:pause={handlePause}
-			on:waiting={handleWaiting}
-			on:stalled={handleStalled}
-			on:canplay={handleCanPlay}
-			on:error={handleError}
-			on:ended={handleEnded}
-			on:timeupdate={handleTimeUpdate}
-			on:progress={handleProgress}
+			onplay={handlePlay}
+			onpause={handlePause}
+			onwaiting={handleWaiting}
+			onstalled={handleStalled}
+			oncanplay={handleCanPlay}
+			onerror={handleError}
+			onended={handleEnded}
+			ontimeupdate={handleTimeUpdate}
+			onprogress={handleProgress}
 		></audio>
 	{/if}
 </div>
 
-<svelte:window on:keydown={handleLightboxKeydown} />
+<svelte:window onkeydown={handleLightboxKeydown} />
 
 {#if thumbnailExpanded && broadcastThumbnail && !broadcastThumbnailBroken}
 	<!-- Lightbox: click backdrop or press Escape to close. Image inside
 	     stops propagation so clicking the image itself doesn't dismiss. -->
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-lightbox-in"
-		on:click={handleBackdropClick}
-		on:keydown={handleLightboxKeydown}
+		onclick={handleBackdropClick}
+		onkeydown={handleLightboxKeydown}
 		role="dialog"
 		aria-modal="true"
 		aria-label="Vignette du direct"
@@ -1244,7 +1252,7 @@
 	>
 		<button
 			type="button"
-			on:click={closeThumbnail}
+			onclick={closeThumbnail}
 			aria-label="Fermer"
 			class="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
 		>
@@ -1264,7 +1272,7 @@
 		<img
 			src={broadcastThumbnail}
 			alt={broadcastTitle || 'Vignette du direct'}
-			on:error={() => {
+			onerror={() => {
 				broadcastThumbnailBroken = true;
 				closeThumbnail();
 			}}

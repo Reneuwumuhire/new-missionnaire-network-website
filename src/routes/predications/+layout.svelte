@@ -1,13 +1,11 @@
 <script lang="ts">
-	import { run, preventDefault } from 'svelte/legacy';
-
 	import AndroidBanner from '$lib/components/+androidBanner.svelte';
 	import ResumeToast from '$lib/components/+resumeToast.svelte';
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
 	import { searchQuery } from '$lib/stores/global';
 	import { goto } from '$app/navigation';
-	import { onDestroy, onMount } from 'svelte';
+	import { onDestroy, onMount, untrack } from 'svelte';
 	import LoadingRing from '$lib/components/LoadingRing.svelte';
 	import MobileListToolbar from '$lib/components/+mobileListToolbar.svelte';
 	import { mobileSearchOpen } from '$lib/stores/mobileControls';
@@ -19,10 +17,12 @@
 	let lastSyncedSearch = $state('');
 
 	let currentSearch = $derived($page.url.searchParams.get('search') || '');
-	run(() => {
+	$effect(() => {
 		if (currentSearch !== lastSyncedSearch) {
 			heroSearchValue = currentSearch;
-			lastSyncedSearch = currentSearch;
+			untrack(() => {
+				lastSyncedSearch = currentSearch;
+			});
 		}
 	});
 
@@ -41,18 +41,22 @@
 		await goto(`?${params.toString()}`, { keepFocus: true, noScroll: true });
 	}
 
-	run(() => {
+	$effect(() => {
 		if (browser) {
 			if (heroSearchValue !== undefined) {
-				clearTimeout(debounceTimer);
-				debounceTimer = setTimeout(() => {
-					if (heroSearchValue.trim() !== currentSearch) {
-						isHeroSearchLoading = true;
-						void handleHeroSearch();
-					} else {
-						isHeroSearchLoading = false;
-					}
-				}, 300);
+				// Timer bookkeeping is untracked: reading + reassigning
+				// `debounceTimer` inside the effect would re-trigger it forever.
+				untrack(() => {
+					clearTimeout(debounceTimer);
+					debounceTimer = setTimeout(() => {
+						if (heroSearchValue.trim() !== currentSearch) {
+							isHeroSearchLoading = true;
+							void handleHeroSearch();
+						} else {
+							isHeroSearchLoading = false;
+						}
+					}, 300);
+				});
 			}
 		}
 	});
@@ -81,7 +85,10 @@
 					</p>
 					<form
 						class="hidden md:flex w-full max-w-xl border border-white/25 bg-white/90 backdrop-blur-sm overflow-hidden"
-						onsubmit={preventDefault(handleHeroSearch)}
+						onsubmit={(e) => {
+							e.preventDefault();
+							void handleHeroSearch();
+						}}
 					>
 						<div class="relative flex-1">
 							<input

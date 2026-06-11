@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { run } from 'svelte/legacy';
-
 	import { getImages } from './imageList';
 	import { onMount } from 'svelte';
 	import viewport from './viewport';
@@ -35,7 +33,7 @@
 		}
 	};
 
-	run(() => {
+	$effect(() => {
 		console.log(_list);
 	});
 </script>

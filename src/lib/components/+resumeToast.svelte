@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { run } from 'svelte/legacy';
-
 	import { browser } from '$app/environment';
 	import { onDestroy, onMount } from 'svelte';
 	import {
@@ -199,7 +197,7 @@
 	// Re-evaluate whenever the live URL changes. Runs on initial render, which
 	// covers the cold-load case where `currentAudioUrl` is null but a saved
 	// state exists.
-	run(() => {
+	$effect(() => {
 		if (browser) {
 			void currentAudioUrl;
 			checkEligibility();

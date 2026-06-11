@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { stopPropagation } from 'svelte/legacy';
-
 	import type { PageData } from './$types';
 	import { downloadAudioFile } from '../../../../utils/downloadAudio';
 	import { selectAudio, playlist, basePlaylist, currentIndex, isPlaying } from '$lib/stores/global';
@@ -560,7 +558,10 @@
 				<div class="relative" bind:this={shareWrapEl}>
 					<button
 						type="button"
-						onclick={stopPropagation(toggleShareMenu)}
+						onclick={(e) => {
+							e.stopPropagation();
+							toggleShareMenu();
+						}}
 						aria-haspopup="menu"
 						aria-expanded={isShareMenuOpen}
 						aria-label="Partager ce direct"
@@ -601,7 +602,7 @@
 							class="absolute left-1/2 top-full z-[60] mt-1.5 w-56 -translate-x-1/2 overflow-hidden rounded-lg border border-stone-200 bg-white shadow-2xl"
 							role="menu"
 							tabindex="-1"
-							onclick={stopPropagation(() => undefined)}
+							onclick={(e) => e.stopPropagation()}
 						>
 							{#if hasNativeShare}
 								<button

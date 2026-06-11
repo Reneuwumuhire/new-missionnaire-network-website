@@ -1,7 +1,4 @@
 <script lang="ts">
-	import { run, stopPropagation, createBubbler, self } from 'svelte/legacy';
-
-	const bubble = createBubbler();
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import type { MusicAudio } from '$lib/models/music-audio';
@@ -45,7 +42,7 @@
 	} from '$lib/stores/musicHistory';
 	import { songSlug } from '$lib/utils/songSlug';
 	// ── BEGIN: cached filter imports (added) ──────────────────────
-	import { onDestroy, onMount, tick } from 'svelte';
+	import { onDestroy, onMount, tick, untrack } from 'svelte';
 	import { cachedUrls, refreshCachedUrls, isUrlCached } from '$lib/audioCache';
 	import IoCloudDoneOutline from 'svelte-icons-pack/io/IoCloudDoneOutline';
 	import {
@@ -725,9 +722,11 @@
 		sort: currentSort || 'uploaded_at:desc',
 		seed: currentSeed || ''
 	}));
-	run(() => {
+	$effect(() => {
 		if (musicRequestKey && musicRequestKey !== lastHandledMusicRequestKey) {
-			lastHandledMusicRequestKey = musicRequestKey;
+			untrack(() => {
+				lastHandledMusicRequestKey = musicRequestKey;
+			});
 			listLoadError = '';
 
 			const cachedArtists = getMusicArtistsCache() || [];
@@ -775,16 +774,23 @@
 		if (currentCategory && currentCategory !== 'All') return currentCategory;
 		return 'tous les chants';
 	})());
-	run(() => {
+	$effect(() => {
 		if (pendingPlayId && hasResolvedMusicList && pendingPlayId !== handledPlayId) {
-			handledPlayId = pendingPlayId;
-			void playSharedSong(pendingPlayId);
+			const id = pendingPlayId;
+			untrack(() => {
+				handledPlayId = id;
+			});
+			void playSharedSong(id);
 		}
 	});
-	run(() => {
+	$effect(() => {
 		if ($selectAudio) {
-			if (cacheRefreshTimer) clearTimeout(cacheRefreshTimer);
-			cacheRefreshTimer = setTimeout(() => void refreshCachedUrls(), 1500);
+			// Timer bookkeeping only — reading/writing `cacheRefreshTimer`
+			// tracked would make this effect re-trigger itself on every run.
+			untrack(() => {
+				if (cacheRefreshTimer) clearTimeout(cacheRefreshTimer);
+				cacheRefreshTimer = setTimeout(() => void refreshCachedUrls(), 1500);
+			});
 		}
 	});
 	// Build a deduplicated list of cached songs by combining metadata
@@ -874,7 +880,7 @@
 		$derived(activeMusicSongIndex >= 0 ? Math.floor(activeMusicSongIndex / limit) + 1 : null);
 	let isRandomListOrder = $derived(currentSort.split(/[: ,]/)[0] === 'random');
 	// Sync playlist when songs are loaded
-	run(() => {
+	$effect(() => {
 		if (hasResolvedMusicList) {
 			const shouldPreserveActiveQueue =
 				(!!$selectAudio && !activeMusicSong) || (!!activeMusicSong && !isActiveMusicSongVisible);
@@ -966,7 +972,10 @@
 						class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors {isArtistMenuOpen
 							? 'border-missionnaire text-missionnaire bg-missionnaire/5'
 							: 'border-stone-200 bg-white text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
-						onclick={stopPropagation(() => (isArtistMenuOpen = !isArtistMenuOpen))}
+						onclick={(e) => {
+							e.stopPropagation();
+							isArtistMenuOpen = !isArtistMenuOpen;
+						}}
 					>
 						<Icon src={BsSearch} size="11" />
 						Artiste
@@ -976,7 +985,7 @@
 						<!-- svelte-ignore a11y_click_events_have_key_events -->
 						<div
 							class="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-stone-200 p-3 z-50 normal-case tracking-normal"
-							onclick={stopPropagation(bubble('click'))}
+							onclick={(e) => e.stopPropagation()}
 						>
 							<div class="flex items-center gap-2 bg-stone-50 px-2 py-1.5 rounded-lg mb-2">
 								<Icon src={BsSearch} size="12" color="#999" />
@@ -1206,13 +1215,15 @@
 							<!-- svelte-ignore a11y_no_static_element_interactions -->
 							<div
 								class="text-red-300 hover:text-red-500 p-1 cursor-pointer transition-colors"
-								onclick={stopPropagation(() =>
+								onclick={(e) => {
+									e.stopPropagation();
 									toggleFavorite({
 										_id: fav.id,
 										title: fav.title,
 										artist: fav.artist,
 										s3_url: fav.s3_url
-									}))}
+									});
+								}}
 								title="Retirer des favoris"
 							>
 								<Icon src={BsX} size="14" />
@@ -1497,7 +1508,10 @@
 											: 'text-stone-400 hover:text-missionnaire'} {currentArtist === song.artist
 											? 'text-missionnaire underline'
 											: ''}"
-										onclick={stopPropagation(() => handleArtistChange(song.artist || ''))}
+										onclick={(e) => {
+											e.stopPropagation();
+											handleArtistChange(song.artist || '');
+										}}
 									>
 										{song.artist}
 									</button>
@@ -1522,7 +1536,10 @@
 									song.artist
 										? 'text-missionnaire font-bold underline'
 										: ''}"
-									onclick={stopPropagation(() => handleArtistChange(song.artist || ''))}
+									onclick={(e) => {
+										e.stopPropagation();
+										handleArtistChange(song.artist || '');
+									}}
 								>
 									{song.artist}
 								</button>
@@ -1545,7 +1562,10 @@
 								)
 									? 'text-red-500'
 									: 'text-stone-300 hover:text-red-400'}"
-								onclick={stopPropagation(() => toggleFavorite(song))}
+								onclick={(e) => {
+									e.stopPropagation();
+									toggleFavorite(song);
+								}}
 								title={isFavorite(song._id || song.s3_url, $favorites)
 									? 'Retirer des favoris'
 									: 'Ajouter aux favoris'}
@@ -1561,7 +1581,10 @@
 								class="transition-colors p-1.5 md:p-2 {isActive
 									? 'text-missionnaire/60 hover:text-missionnaire'
 									: 'text-stone-400 hover:text-missionnaire'}"
-								onclick={stopPropagation(() => downloadSong(song))}
+								onclick={(e) => {
+									e.stopPropagation();
+									downloadSong(song);
+								}}
 								title="Télécharger"
 							>
 								<Icon src={AiOutlineDownload} size="18" />
@@ -1572,13 +1595,14 @@
 								class="hover:scale-110 active:scale-95 transition-all p-1.5 md:p-2 {isActive
 									? 'text-missionnaire'
 									: 'text-missionnaire'}"
-								onclick={stopPropagation(() => {
+								onclick={(e) => {
+									e.stopPropagation();
 									if (isActive) {
 										dispatchAudioPlayerAction('toggle');
 									} else {
 										playSong(song);
 									}
-								})}
+								}}
 								title={isActive && $isPlaying ? 'Pause' : 'Lire'}
 							>
 								<Icon src={isActive && $isPlaying ? IoPauseCircle : IoPlayCircle} size="22" />
@@ -1654,7 +1678,9 @@
 	<div
 		use:portal
 		class="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-stone-900/50 backdrop-blur-sm px-4 pb-4 sm:p-4"
-		onclick={self(closeDownloadModal)}
+		onclick={(e) => {
+			if (e.target === e.currentTarget) closeDownloadModal();
+		}}
 	>
 		<div
 			class="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-stone-200"

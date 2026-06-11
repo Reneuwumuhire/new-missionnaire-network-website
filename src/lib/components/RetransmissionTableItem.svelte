@@ -1,7 +1,4 @@
 <script lang="ts">
-	import { createBubbler, stopPropagation } from 'svelte/legacy';
-
-	const bubble = createBubbler();
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import AiOutlineDownload from 'svelte-icons-pack/ai/AiOutlineDownload';
 	import IoPlayCircle from 'svelte-icons-pack/io/IoPlayCircle';
@@ -144,7 +141,7 @@
 			class="text-sm font-bold line-clamp-1 transition-colors {isActive
 				? 'text-orange-600'
 				: 'text-gray-800 group-hover:text-orange-600'} hover:underline underline-offset-2"
-			onclick={stopPropagation(bubble('click'))}
+			onclick={(e) => e.stopPropagation()}
 		>
 			{recording.title}
 		</a>
@@ -199,7 +196,10 @@
 		{#if recording.s3_url}
 			<button
 				class="group relative p-2 text-gray-400 hover:text-orange-600 transition-colors"
-				onclick={stopPropagation(downloadMp3)}
+				onclick={(e) => {
+					e.stopPropagation();
+					downloadMp3();
+				}}
 				title={isDownloading
 					? downloadPercent !== null
 						? `Annuler (${downloadPercent}%)`
@@ -246,7 +246,10 @@
 		{#if recording.s3_url}
 			<button
 				class="hover:scale-110 active:scale-95 transition-all p-2 text-orange-600"
-				onclick={stopPropagation(togglePlay)}
+				onclick={(e) => {
+					e.stopPropagation();
+					togglePlay();
+				}}
 				title={isActive && $isPlaying ? 'Pause' : 'Lire'}
 			>
 				<Icon src={isActive && $isPlaying ? IoPauseCircle : IoPlayCircle} size="24" />
