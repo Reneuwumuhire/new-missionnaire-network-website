@@ -122,3 +122,19 @@ Manual browser smoke (the real safety net — no e2e in repo):
 7. **i18n**: toggle EN → chrome flips, content stays; reload → persists (brief FR flash from SW-cached HTML is expected); `<html lang>` correct; 404 page in EN.
 8. **/questions/ask**: invalid submit → screen reader announces error.
 9. **PWA**: install, update banner, offline indicator still work post-migration.
+
+---
+
+## Part 3 — Post-overhaul polish & resilience (added mid-run by user)
+
+### 3.1 Visual polish
+Cleaner look on /musique, /live, /predications and other main pages, designed for visitors with little web experience: clearer hierarchy, less visual noise, larger readable controls.
+
+### 3.2 Background-playback resilience
+Music sometimes stops (screen lock / app backgrounded) and the listener must open the phone to resume. Fix: synchronous ended→next playback (no awaits before play()), recover from OS interruptions (auto-resume when pause wasn't user-initiated and userWantsToPlay), media-session handler audit, preload=auto for the selected track.
+
+### 3.3 Vercel cost safety + faster music loading
+No deployment may spike function invocations or DB queries: cache headers (s-maxage + stale-while-revalidate) on hot read-only endpoints (/api/search etc.), verify polling/debounce budgets unchanged. Music loads faster from device storage: service-worker audio cache + next-track prefetch tuning.
+
+### Continuity
+If an API usage limit interrupts the run, resume automatically when the limit window resets and continue until the PR is open.
