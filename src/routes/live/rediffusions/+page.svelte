@@ -6,6 +6,10 @@
 	import { vercelImage, vercelImageSrcSet, vercelImagePlaceholder } from '$lib/utils/vercelImage';
 	import BlurUpImage from '$lib/components/BlurUpImage.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
+	import ListSkeleton from '$lib/components/ListSkeleton.svelte';
+	import ErrorCard from '$lib/components/ErrorCard.svelte';
+	import { t } from '../../../i18n';
+	import { invalidateAll } from '$app/navigation';
 	import { portal } from '$lib/actions/portal';
 	import MobileListToolbar from '$lib/components/+mobileListToolbar.svelte';
 	import { mobileSearchOpen, mobileFiltersOpen } from '$lib/stores/mobileControls';
@@ -453,40 +457,20 @@
 			</noscript>
 		</form>
 
-		<!-- Results: overlay a spinner while SvelteKit is loading a new filter/page. -->
+		<!-- Results: skeleton rows while SvelteKit loads a new filter/page. -->
 		<div class="relative min-h-[200px]">
-			{#if $navigating}
-				<div
-					class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-20 flex items-center justify-center transition-all duration-300"
-				>
-					<div class="flex flex-col items-center gap-4">
-						<div class="text-missionnaire animate-spin">
-							<svg class="h-8 w-8" viewBox="0 0 24 24" fill="none">
-								<circle
-									cx="12"
-									cy="12"
-									r="10"
-									stroke="currentColor"
-									stroke-width="2"
-									stroke-dasharray="40 60"
-									stroke-linecap="round"
-								/>
-							</svg>
-						</div>
-						<span
-							class="text-[10px] font-semibold uppercase tracking-[0.25em] text-missionnaire animate-pulse"
-							>Chargement...</span
-						>
-					</div>
+			{#if $navigating?.to?.url.pathname === '/live/rediffusions'}
+				<div class="border border-stone-200/60 bg-white/40">
+					<ListSkeleton rows={8} />
 				</div>
-			{/if}
-
-			{#if data.recordings.length === 0}
+			{:else if data.loadError}
+				<ErrorCard onRetry={() => void invalidateAll()} />
+			{:else if data.recordings.length === 0}
 				<div class="text-center py-16">
 					<p class="font-display text-lg italic text-stone-400">
 						{hasActiveFilters
 							? 'Aucun enregistrement ne correspond à votre recherche.'
-							: 'Aucun enregistrement disponible pour le moment.'}
+							: $t('list.empty')}
 					</p>
 				</div>
 			{:else}

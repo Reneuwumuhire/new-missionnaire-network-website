@@ -16,6 +16,9 @@
 	import { createPlayableSermon } from '../../utils/audioPlayback';
 	import RetransmissionTableItem from '$lib/components/RetransmissionTableItem.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
+	import ListSkeleton from '$lib/components/ListSkeleton.svelte';
+	import ErrorCard from '$lib/components/ErrorCard.svelte';
+	import ResultsSummary from '$lib/components/ResultsSummary.svelte';
 	import { onDestroy, untrack } from 'svelte';
 	import {
 		areAuthorsFresh,
@@ -77,6 +80,8 @@
 		limit: limit || 100
 	}));
 	let totalPages = $derived(Math.ceil(totalSermons / limit));
+	let summaryFrom = $derived(totalSermons === 0 ? 0 : (currentPage - 1) * limit + 1);
+	let summaryTo = $derived(Math.min(currentPage * limit, totalSermons));
 	let blendedOnly =
 		$derived(filterType === 'sermon' &&
 		sermons.length === 0 &&
@@ -554,6 +559,16 @@
 				</div>
 			{/if}
 			{#if !blendedOnly}
+				{#if hasResolvedList}
+					<div class="mb-2">
+						<ResultsSummary
+							from={summaryFrom}
+							to={summaryTo}
+							total={totalSermons}
+							query={currentSearch}
+						/>
+					</div>
+				{/if}
 				<div class="bg-white/40 border border-stone-200/60 min-h-[500px] flex flex-col">
 					<div
 						class="relative grid grid-cols-[30px_1fr_auto_auto] {desktopSermonGrid} gap-2 md:gap-4 px-4 py-3 border-b border-stone-200/60 text-[10px] md:text-[11px] font-bold text-stone-400 uppercase tracking-widest bg-white/40 items-center"
@@ -610,37 +625,12 @@
 
 					<div class="divide-y divide-stone-100 [&>*]:hover:bg-white/60">
 						{#if isListLoading && !hasResolvedList}
-							{#each Array.from({ length: 8 }) as _, i}
-								<div
-									class="grid grid-cols-[30px_1fr_auto_auto] {desktopSermonGrid} gap-2 md:gap-4 px-4 py-3 md:py-4 items-center animate-pulse"
-								>
-									<div class="mx-auto h-3 w-4 rounded-full bg-stone-200"></div>
-									<div class="space-y-2 min-w-0">
-										<div class="h-4 w-3/4 rounded-full bg-stone-200"></div>
-										<div class="h-3 w-1/2 rounded-full bg-stone-100 md:hidden"></div>
-									</div>
-									<div class="hidden md:block h-3 w-2/3 rounded-full bg-stone-100"></div>
-									<div class="hidden md:block h-3 w-1/2 rounded-full bg-stone-100"></div>
-									<div class="hidden md:block mx-auto h-3 w-10 rounded-full bg-stone-100"></div>
-									<div class="hidden md:block mx-auto h-7 w-7 rounded-full bg-stone-200"></div>
-								</div>
-							{/each}
+							<ListSkeleton rows={8} />
 						{:else if listLoadError && !hasResolvedList}
-							<div class="py-20 px-6 text-center">
-								<div class="text-stone-200 mb-4 flex justify-center">
-									<Icon src={BsSearch} size="64" />
-								</div>
-								<p class="text-stone-500 font-bold uppercase tracking-widest text-sm">
-									La liste n'a pas pu charger
-								</p>
-								<p class="mt-2 text-xs text-stone-400">{listLoadError}</p>
-								<button
-									class="mt-5 inline-flex items-center rounded-full border border-missionnaire px-4 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-missionnaire transition-colors hover:bg-missionnaire/5"
-									onclick={() => void loadInBackground({ showLoading: true })}
-								>
-									Réessayer
-								</button>
-							</div>
+							<ErrorCard
+								message={listLoadError}
+								onRetry={() => void loadInBackground({ showLoading: true })}
+							/>
 						{:else}
 							{#if isListLoading}
 								<div

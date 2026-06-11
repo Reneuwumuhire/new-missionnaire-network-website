@@ -16,6 +16,9 @@
 	} from '$lib/stores/global';
 	import { mobileFiltersOpen } from '$lib/stores/mobileControls';
 	import Pagination from '$lib/components/Pagination.svelte';
+	import ListSkeleton from '$lib/components/ListSkeleton.svelte';
+	import ErrorCard from '$lib/components/ErrorCard.svelte';
+	import ResultsSummary from '$lib/components/ResultsSummary.svelte';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import BsSearch from 'svelte-icons-pack/bs/BsSearch';
@@ -766,6 +769,8 @@
 		}
 	});
 	let totalPages = $derived(Math.ceil(totalSongs / limit));
+	let summaryFrom = $derived(totalSongs === 0 ? 0 : (currentPage - 1) * limit + 1);
+	let summaryTo = $derived(Math.min(currentPage * limit, totalSongs));
 	let downloadEstimateMb = $derived(Math.round((totalSongs * 4.5) / 1) || 0);
 	let downloadFilterLabel = $derived((() => {
 		if (currentSearch) return `« ${currentSearch} »`;
@@ -1330,6 +1335,11 @@
 	{/if}
 
 	<!-- Songs List -->
+	{#if hasResolvedMusicList}
+		<div class="mb-2">
+			<ResultsSummary from={summaryFrom} to={summaryTo} total={totalSongs} query={currentSearch} />
+		</div>
+	{/if}
 	<div class="bg-white/40 border border-stone-200/60 min-h-[500px] flex flex-col overflow-hidden">
 		<div
 			class="grid grid-cols-[24px_1fr_auto_auto] {desktopMusicGrid} gap-1.5 md:gap-3 lg:gap-4 px-2 md:px-3 lg:px-4 py-3 border-b border-stone-200/60 text-[10px] md:text-[11px] font-bold text-stone-400 uppercase tracking-widest bg-white/40"
@@ -1403,39 +1413,12 @@
 
 		<div class="divide-y divide-stone-100">
 			{#if isListLoading && !hasResolvedMusicList}
-				{#each Array.from({ length: 8 }) as _, i}
-					<div
-						class="grid grid-cols-[24px_1fr_auto_auto] {desktopMusicGrid} gap-1.5 md:gap-3 lg:gap-4 px-2 md:px-3 lg:px-4 py-3 md:py-4 items-center animate-pulse"
-					>
-						<div class="mx-auto h-3 w-4 rounded-full bg-stone-200"></div>
-						<div class="space-y-2 min-w-0">
-							<div class="h-4 w-3/4 rounded-full bg-stone-200"></div>
-							<div class="h-3 w-1/2 rounded-full bg-stone-100 md:hidden"></div>
-						</div>
-						<div class="hidden md:block h-3 w-2/3 rounded-full bg-stone-100"></div>
-						<div class="hidden md:block h-3 w-1/2 rounded-full bg-stone-100"></div>
-						<div class="hidden md:block mx-auto h-3 w-10 rounded-full bg-stone-100"></div>
-						<div class="hidden md:block mx-auto h-6 w-6 rounded-full bg-stone-100"></div>
-						<div class="mx-auto h-7 w-7 rounded-full bg-stone-100"></div>
-						<div class="mx-auto h-7 w-7 rounded-full bg-stone-200"></div>
-					</div>
-				{/each}
+				<ListSkeleton rows={8} />
 			{:else if listLoadError && !hasResolvedMusicList}
-				<div class="py-20 px-6 text-center">
-					<div class="text-stone-200 mb-4 flex justify-center">
-						<Icon src={BsSearch} size="64" />
-					</div>
-					<p class="text-stone-500 font-bold uppercase tracking-widest text-sm">
-						La liste n'a pas pu charger
-					</p>
-					<p class="mt-2 text-xs text-stone-400">{listLoadError}</p>
-					<button
-						class="mt-5 inline-flex items-center rounded-full border border-missionnaire px-4 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-missionnaire transition-colors hover:bg-missionnaire/5"
-						onclick={() => void loadMusicListInBackground({ showLoading: true })}
-					>
-						Réessayer
-					</button>
-				</div>
+				<ErrorCard
+					message={listLoadError}
+					onRetry={() => void loadMusicListInBackground({ showLoading: true })}
+				/>
 			{:else}
 				{#if isListLoading}
 					<div

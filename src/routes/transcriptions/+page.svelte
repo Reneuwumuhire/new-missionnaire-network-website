@@ -14,6 +14,9 @@
 	import ArrowDown2 from 'iconsax-svelte/ArrowDown2.svelte';
 	import ArrowUp2 from 'iconsax-svelte/ArrowUp2.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
+	import ListSkeleton from '$lib/components/ListSkeleton.svelte';
+	import ErrorCard from '$lib/components/ErrorCard.svelte';
+	import ResultsSummary from '$lib/components/ResultsSummary.svelte';
 	import { writable } from 'svelte/store';
 	import LoadingRing from '$lib/components/LoadingRing.svelte';
 	import type { SerializedTranscription } from '$lib/server/transcriptions';
@@ -82,6 +85,8 @@
 	}));
 	let totalPages = $derived(Math.ceil(total / currentLimit));
 	let showPagination = $derived(total > 10);
+	let summaryFrom = $derived(total === 0 ? 0 : (currentPageNumber - 1) * currentLimit + 1);
+	let summaryTo = $derived(Math.min(currentPageNumber * currentLimit, total));
 	$effect(() => {
 		if (currentSearch !== lastSyncedSearch) {
 			searchTerm = currentSearch;
@@ -435,32 +440,15 @@
 			</div>
 
 			{#if isListLoading && !hasResolvedList}
-				<div class="border border-gray-300 shadow rounded-md mx-2 sm:mx-0 divide-y divide-gray-200">
-					{#each Array.from({ length: 8 }) as _}
-						<div class="flex items-center p-3 sm:p-4 animate-pulse">
-							<div class="flex-shrink-0 pt-1 mr-2 sm:mr-4">
-								<div class="h-4 w-4 rounded bg-stone-200"></div>
-							</div>
-							<div class="flex-1 min-w-0 space-y-2">
-								<div class="h-4 w-3/4 rounded-full bg-stone-200"></div>
-								<div class="h-3 w-1/3 rounded-full bg-stone-100"></div>
-							</div>
-							<div class="flex items-center space-x-2 px-2 sm:px-4">
-								<div class="h-5 w-5 rounded bg-stone-100"></div>
-								<div class="h-5 w-5 rounded bg-stone-100"></div>
-							</div>
-						</div>
-					{/each}
+				<div class="border border-gray-300 shadow rounded-md mx-2 sm:mx-0">
+					<ListSkeleton rows={8} />
 				</div>
 			{:else if listLoadError && !hasResolvedList}
-				<div class="text-center py-12">
-					<p class="text-stone-500 text-sm sm:text-base">{listLoadError}</p>
-					<button
-						class="mt-4 inline-flex items-center rounded-full border border-missionnaire px-4 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-missionnaire transition-colors hover:bg-missionnaire/5"
-						onclick={() => void loadInBackground({ showLoading: true })}
-					>
-						Réessayer
-					</button>
+				<div class="mx-2 sm:mx-0">
+					<ErrorCard
+						message={listLoadError}
+						onRetry={() => void loadInBackground({ showLoading: true })}
+					/>
 				</div>
 			{:else if documents.length === 0}
 				<div class="text-center py-12">
@@ -474,6 +462,9 @@
 						Mise à jour de la liste...
 					</div>
 				{/if}
+				<div class="mb-2 px-2 sm:px-0">
+					<ResultsSummary from={summaryFrom} to={summaryTo} total={total} query={currentSearch} />
+				</div>
 				<div class="border border-gray-300 shadow rounded-md mx-2 sm:mx-0">
 					{#each documents as document (document._id)}
 						<div

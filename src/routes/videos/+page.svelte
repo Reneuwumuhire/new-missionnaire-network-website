@@ -8,7 +8,8 @@
 	import '../../app.css';
 	import ThumbnailVideo from '$lib/components/+thumbnailVideo.svelte';
 	import VideoView from '$lib/components/+videoView.svelte';
-	import HomepageLoadingSkelton from '$lib/components/+homepageLoadingSkelton.svelte';
+	import ListSkeleton from '$lib/components/ListSkeleton.svelte';
+	import ErrorCard from '$lib/components/ErrorCard.svelte';
 	import LoadingRing from '$lib/components/LoadingRing.svelte';
 	import { availableTypesTag } from '../../utils/data';
 	import { selectedVideo } from '$lib/stores/videoStore';
@@ -467,23 +468,12 @@
 		</div>
 
 		{#if isInitialLoading && !hasResolved}
-			<HomepageLoadingSkelton />
+			<ListSkeleton variant="cards" rows={8} />
 		{:else if initialLoadError && !hasResolved}
-			<div class="py-20 text-center bg-white/40 border border-stone-200/60">
-				<div class="text-stone-200 mb-4 flex justify-center">
-					<Icon src={BsSearch} size="56" />
-				</div>
-				<p class="text-stone-500 font-bold uppercase tracking-widest text-sm">
-					La liste n'a pas pu charger
-				</p>
-				<p class="mt-2 text-xs text-stone-400">{initialLoadError}</p>
-				<button
-					class="mt-5 inline-flex items-center rounded-full border border-missionnaire px-4 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-missionnaire transition-colors hover:bg-missionnaire/5"
-					onclick={() => void loadInitial({ showLoading: true })}
-				>
-					Réessayer
-				</button>
-			</div>
+			<ErrorCard
+				message={initialLoadError}
+				onRetry={() => void loadInitial({ showLoading: true })}
+			/>
 		{:else}
 			{#if $selectedVideo !== undefined}
 				<div class="mb-12">

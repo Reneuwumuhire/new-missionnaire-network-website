@@ -2,6 +2,7 @@ import {
 	getAvailableYears,
 	getPublishedTotal,
 	listPublished,
+	type PublishedRecording,
 	type RecordingType
 } from '$lib/server/recordings';
 import type { PageServerLoad } from './$types';
@@ -27,31 +28,50 @@ export const load: PageServerLoad = async ({ url }) => {
 	const month = parseIntParam(url.searchParams.get('month'), 1, 12);
 	const type = parseTypeParam(url.searchParams.get('type'));
 
-	const [{ data, total }, years, allTotal] = await Promise.all([
-		listPublished({
-			limit: PAGE_SIZE,
-			pageNumber,
-			q: q || undefined,
-			year,
-			month: year ? month : undefined,
-			type
-		}),
-		getAvailableYears(),
-		getPublishedTotal()
-	]);
-
-	return {
-		recordings: data,
-		total,
-		allTotal,
-		pageNumber,
-		pageSize: PAGE_SIZE,
-		filters: {
-			q,
-			year: year ?? null,
-			month: year ? month ?? null : null,
-			type: type ?? null
-		},
-		availableYears: years
+	const filters = {
+		q,
+		year: year ?? null,
+		month: year ? (month ?? null) : null,
+		type: type ?? null
 	};
+
+	try {
+		const [{ data, total }, years, allTotal] = await Promise.all([
+			listPublished({
+				limit: PAGE_SIZE,
+				pageNumber,
+				q: q || undefined,
+				year,
+				month: year ? month : undefined,
+				type
+			}),
+			getAvailableYears(),
+			getPublishedTotal()
+		]);
+
+		return {
+			recordings: data,
+			total,
+			allTotal,
+			pageNumber,
+			pageSize: PAGE_SIZE,
+			filters,
+			availableYears: years,
+			loadError: false
+		};
+	} catch (error) {
+		// Fail soft: the page renders an ErrorCard with a retry instead of
+		// bubbling up to the generic +error.svelte boundary.
+		console.error('[rediffusions] load failed:', error);
+		return {
+			recordings: [] as PublishedRecording[],
+			total: 0,
+			allTotal: 0,
+			pageNumber,
+			pageSize: PAGE_SIZE,
+			filters,
+			availableYears: [] as number[],
+			loadError: true
+		};
+	}
 };
