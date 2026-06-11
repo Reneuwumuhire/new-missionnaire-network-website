@@ -23,6 +23,7 @@
 	let recentVideos = $derived((data.data || []).slice(0, 3));
 
 	let bellRef: NotificationBell | undefined = $state();
+	let bellSubscribed = $state(false);
 
 	// Scroll-triggered reveal
 	let heroVisible = $state(false);
@@ -313,13 +314,13 @@
 
 			<button
 				onclick={() => bellRef?.toggle()}
-				class="group flex items-center gap-4 px-6 py-5 border transition-all duration-200 cursor-pointer sm:w-auto bg-white/40 {bellRef?.isSubscribed
+				class="group flex items-center gap-4 px-6 py-5 border transition-all duration-200 cursor-pointer sm:w-auto bg-white/40 {bellSubscribed
 					? 'border-missionnaire/30 bg-orange-50/40'
 					: 'border-stone-200/60 hover:border-missionnaire/30 hover:bg-white/60'}"
 			>
-				<NotificationBell bind:this={bellRef} />
+				<NotificationBell bind:this={bellRef} bind:isSubscribed={bellSubscribed} />
 				<div class="flex-1 min-w-0 text-left">
-					{#if bellRef?.isSubscribed}
+					{#if bellSubscribed}
 						<p class="text-sm font-semibold text-missionnaire font-body">Notifications activées</p>
 						<p class="text-[11px] text-stone-400 font-body mt-0.5">Cliquez pour désactiver</p>
 					{:else}

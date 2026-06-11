@@ -515,7 +515,7 @@
 											loading="lazy"
 											fetchpriority="low"
 											class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-											on:error={() => markThumbFailed(rec.id)}
+											onerror={() => markThumbFailed(rec.id)}
 										/>
 									{:else}
 										<div

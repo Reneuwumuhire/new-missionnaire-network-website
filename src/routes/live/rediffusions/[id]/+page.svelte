@@ -1,12 +1,12 @@
-<!-- @migration-task Error while migrating Svelte code: can't migrate `$: rec = data.recording;` to `$derived` because there's a variable named derived.
-     Rename the variable and try again or migrate by hand. -->
 <script lang="ts">
+	import { stopPropagation } from 'svelte/legacy';
+
 	import type { PageData } from './$types';
 	import { downloadAudioFile } from '../../../../utils/downloadAudio';
 	import { selectAudio, playlist, basePlaylist, currentIndex, isPlaying } from '$lib/stores/global';
 	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
 	import type { MusicAudio } from '$lib/models/music-audio';
-	import { derived } from 'svelte/store';
+	import { derived as derivedStore } from 'svelte/store';
 	import { onMount, onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
@@ -14,16 +14,20 @@
 	import BlurUpImage from '$lib/components/BlurUpImage.svelte';
 	import LiveTranscript from '$lib/components/+liveTranscript.svelte';
 
-	export let data: PageData;
+	interface Props {
+		data: PageData;
+	}
 
-	$: rec = data.recording;
-	$: transcript = data.transcript;
-	$: youtubeUrl = rec.source_video_id
+	let { data }: Props = $props();
+
+	let rec = $derived(data.recording);
+	let transcript = $derived(data.transcript);
+	let youtubeUrl = $derived(rec.source_video_id
 		? `https://www.youtube.com/watch?v=${rec.source_video_id}`
-		: null;
+		: null);
 
-	let thumbnailExpanded = false;
-	let thumbnailBroken = false;
+	let thumbnailExpanded = $state(false);
+	let thumbnailBroken = $state(false);
 
 	// ── Audio player ───────────────────────────────────────────────
 	// Route playback through the global AudioPlayer (bottom bar) so
@@ -33,7 +37,7 @@
 	// resume-after-interruption logic. The rediffusion is shaped as a
 	// single-item MusicAudio-compatible entry so it plugs into the
 	// existing selectAudio/playlist stores without special-casing.
-	$: playable = {
+	let playable = $derived({
 		_id: rec.id,
 		book: null,
 		book_full_name: null,
@@ -48,12 +52,12 @@
 		format: 'mp3',
 		uploaded_at: new Date(rec.started_at),
 		thumbnail_url: rec.thumbnail_url ?? undefined
-	} satisfies MusicAudio & { thumbnail_url?: string };
+	} satisfies MusicAudio & { thumbnail_url?: string });
 
 	// Is *this* recording currently loaded into the global player? Used
 	// to flip the button label between "Écouter" and the play/pause
 	// state the bottom bar is showing.
-	const isCurrent = derived(selectAudio, ($sel) => {
+	const isCurrent = derivedStore(selectAudio, ($sel) => {
 		if (!$sel) return false;
 		const url = 's3_url' in $sel ? $sel.s3_url : '';
 		return url === rec?.s3_url;
@@ -79,12 +83,12 @@
 	// opens a small menu offering the native share sheet and a plain
 	// "Copier le lien". The link carries `?autoplay=1` so the recipient
 	// lands on this page and playback starts on its own (see onMount).
-	let isShareMenuOpen = false;
-	let shareFeedback: 'copied' | 'error' | null = null;
+	let isShareMenuOpen = $state(false);
+	let shareFeedback: 'copied' | 'error' | null = $state(null);
 	let shareFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
-	let shareWrapEl: HTMLElement | null = null;
-	$: hasNativeShare =
-		browser && typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+	let shareWrapEl: HTMLElement | null = $state(null);
+	let hasNativeShare =
+		$derived(browser && typeof navigator !== 'undefined' && typeof navigator.share === 'function');
 
 	function buildShareUrl(): string {
 		if (!browser) return '';
@@ -177,8 +181,8 @@
 	// extra read). After hydration we fire a one-shot, non-blocking POST to
 	// bump it — deduped per session so a refresh/HMR doesn't inflate the
 	// number. The page's render and TTFB are never on the hook for this.
-	let liveViewCount: number | null = null;
-	$: displayViews = liveViewCount ?? rec.view_count;
+	let liveViewCount: number | null = $state(null);
+	let displayViews = $derived(liveViewCount ?? rec.view_count);
 
 	onMount(() => {
 		if (!browser) return;
@@ -209,10 +213,10 @@
 	// Background fetch: stream the mp3, track bytes loaded, hand the
 	// assembled blob to a synthetic <a download> so the browser saves
 	// it without navigating away. Logic lives in utils/downloadAudio.ts.
-	let isDownloading = false;
-	let downloadPercent: number | null = 0;
-	let downloadLoaded = 0;
-	let downloadError = '';
+	let isDownloading = $state(false);
+	let downloadPercent: number | null = $state(0);
+	let downloadLoaded = $state(0);
+	let downloadError = $state('');
 	let downloadController: AbortController | null = null;
 
 	function formatDownloadedBytes(bytes: number): string {
@@ -324,7 +328,7 @@
 	{/if}
 </svelte:head>
 
-<svelte:window on:keydown={onLightboxKeydown} on:click={handleShareOutsideClick} />
+<svelte:window onkeydown={onLightboxKeydown} onclick={handleShareOutsideClick} />
 
 <section class="w-full px-6 pt-4 pb-10 md:pt-6">
 	<div class="max-w-3xl mx-auto">
@@ -355,7 +359,7 @@
 				{#if rec.thumbnail_url && !thumbnailBroken}
 					<button
 						type="button"
-						on:click={openThumbnail}
+						onclick={openThumbnail}
 						aria-label="Agrandir la vignette"
 						class="group relative aspect-video w-full overflow-hidden border border-stone-200/60 bg-stone-100 cursor-zoom-in transition-all duration-300 hover:border-missionnaire/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
 					>
@@ -370,7 +374,7 @@
 							loading="eager"
 							fetchpriority="high"
 							class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-							on:error={() => (thumbnailBroken = true)}
+							onerror={() => (thumbnailBroken = true)}
 						/>
 						<span
 							class="pointer-events-none absolute inset-0 flex items-end justify-end p-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
@@ -434,7 +438,7 @@
 				<div class="flex-1 flex items-center justify-center px-4 py-6 md:px-5">
 					<button
 						type="button"
-						on:click={playRecording}
+						onclick={playRecording}
 						aria-label={$isCurrent && $isPlaying
 							? 'Mettre en pause'
 							: $isCurrent
@@ -470,7 +474,7 @@
 				</div>
 				<button
 					type="button"
-					on:click={downloadAudio}
+					onclick={downloadAudio}
 					aria-label={isDownloading
 						? downloadPercent !== null
 							? `Annuler le téléchargement (${downloadPercent}%)`
@@ -556,7 +560,7 @@
 				<div class="relative" bind:this={shareWrapEl}>
 					<button
 						type="button"
-						on:click|stopPropagation={toggleShareMenu}
+						onclick={stopPropagation(toggleShareMenu)}
 						aria-haspopup="menu"
 						aria-expanded={isShareMenuOpen}
 						aria-label="Partager ce direct"
@@ -591,20 +595,20 @@
 					</button>
 
 					{#if isShareMenuOpen}
-						<!-- svelte-ignore a11y-click-events-have-key-events -->
-						<!-- svelte-ignore a11y-no-static-element-interactions -->
+						<!-- svelte-ignore a11y_click_events_have_key_events -->
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
 						<div
 							class="absolute left-1/2 top-full z-[60] mt-1.5 w-56 -translate-x-1/2 overflow-hidden rounded-lg border border-stone-200 bg-white shadow-2xl"
 							role="menu"
 							tabindex="-1"
-							on:click|stopPropagation={() => undefined}
+							onclick={stopPropagation(() => undefined)}
 						>
 							{#if hasNativeShare}
 								<button
 									type="button"
 									role="menuitem"
 									class="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-stone-700 transition-colors hover:bg-stone-50 hover:text-missionnaire"
-									on:click={nativeShare}
+									onclick={nativeShare}
 								>
 									<svg
 										width="16"
@@ -630,7 +634,7 @@
 								type="button"
 								role="menuitem"
 								class="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-stone-700 transition-colors hover:bg-stone-50 hover:text-missionnaire"
-								on:click={copyShareLink}
+								onclick={copyShareLink}
 							>
 								<svg
 									width="16"
@@ -726,8 +730,8 @@
 {#if thumbnailExpanded && rec.thumbnail_url && !thumbnailBroken}
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-lightbox-in"
-		on:click={onBackdropClick}
-		on:keydown={onLightboxKeydown}
+		onclick={onBackdropClick}
+		onkeydown={onLightboxKeydown}
 		role="dialog"
 		aria-modal="true"
 		aria-label="Vignette du direct"
@@ -735,7 +739,7 @@
 	>
 		<button
 			type="button"
-			on:click={closeThumbnail}
+			onclick={closeThumbnail}
 			aria-label="Fermer"
 			class="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
 		>
@@ -755,7 +759,7 @@
 		<img
 			src={vercelImage(rec.thumbnail_url, 1920, 85)}
 			alt={rec.title}
-			on:error={() => {
+			onerror={() => {
 				thumbnailBroken = true;
 				closeThumbnail();
 			}}

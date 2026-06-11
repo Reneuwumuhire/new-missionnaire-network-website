@@ -37,7 +37,7 @@
 	const isDocumentOpen = writable(false);
 	let searchTerm = $state('');
 	let isSearching = $state(false);
-	let searchInput: HTMLInputElement = $state();
+	let searchInput: HTMLInputElement | undefined = $state();
 	let typingTimeout: ReturnType<typeof setTimeout>;
 	let lastSearch = $state('');
 	let lastSyncedSearch = $state('');

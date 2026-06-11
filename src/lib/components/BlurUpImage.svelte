@@ -1,7 +1,4 @@
 <script lang="ts">
-	import { createBubbler } from 'svelte/legacy';
-
-	const bubble = createBubbler();
 	import { onMount } from 'svelte';
 
 	// Classes applied to the real <img> so callers can keep their existing
@@ -17,6 +14,7 @@
 		loading?: 'lazy' | 'eager';
 		fetchpriority?: 'high' | 'low' | 'auto';
 		class?: string;
+		onerror?: (event: Event) => void;
 	}
 
 	let {
@@ -29,7 +27,8 @@
 		height = undefined,
 		loading = 'lazy',
 		fetchpriority = 'auto',
-		class: className = ''
+		class: className = '',
+		onerror = undefined
 	}: Props = $props();
 	
 
@@ -74,7 +73,7 @@
 		{height}
 		decoding="async"
 		onload={handleLoad}
-		onerror={bubble('error')}
+		{onerror}
 		class={className}
 		style:opacity={loaded ? 1 : 0}
 		style:transition="opacity 400ms ease-out"

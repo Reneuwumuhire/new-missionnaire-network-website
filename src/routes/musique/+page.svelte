@@ -312,7 +312,7 @@
 	}
 
 
-	let recueilsScrollEl: HTMLDivElement = $state();
+	let recueilsScrollEl: HTMLDivElement | undefined = $state();
 	let recueilsCanLeft = $state(false);
 	let recueilsCanRight = $state(true);
 
@@ -430,7 +430,7 @@
 	}
 
 
-	let searchInput = currentSearch;
+	let searchInput = $state((data as any).search);
 
 	const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 

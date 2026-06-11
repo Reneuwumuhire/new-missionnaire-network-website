@@ -54,7 +54,7 @@
 
 	const dispatch = createEventDispatcher<{ seek: { time: number } }>();
 
-	let panelElement: HTMLDivElement = $state();
+	let panelElement: HTMLDivElement | undefined = $state();
 	let lineElements: Array<HTMLButtonElement | HTMLDivElement | null> = $state([]);
 	let activeLineIndex = $state(-1);
 	let previousActiveLineIndex = $state(-1);

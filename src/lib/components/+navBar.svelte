@@ -27,7 +27,7 @@
 		showDropContents = !showDropContents;
 	};
 	let showMoboNav = $state(false);
-	let navEl: HTMLElement = $state();
+	let navEl: HTMLElement | undefined = $state();
 	let ignoreNextClick = false;
 
 	const handleWindowClick = (event: MouseEvent) => {

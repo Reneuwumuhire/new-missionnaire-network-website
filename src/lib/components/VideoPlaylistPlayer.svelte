@@ -17,7 +17,7 @@
 	import { formatTime } from '../../utils/FormatTime';
 
 	let player: any = $state();
-	let playerElement: HTMLElement = $state();
+	let playerElement: HTMLElement | undefined = $state();
 	let ytApiReady = $state(browser && !!(window as any).YT?.Player);
 	let playerState = $state(-1); 
 	let currentTime = $state(0);

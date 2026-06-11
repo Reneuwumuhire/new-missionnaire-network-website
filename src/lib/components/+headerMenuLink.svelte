@@ -29,7 +29,7 @@
 
 	const dispatch = createEventDispatcher();
 
-	let menuEl: HTMLDivElement = $state();
+	let menuEl: HTMLDivElement | undefined = $state();
 
 	function handleToggle() {
 		dispatch('toggle');

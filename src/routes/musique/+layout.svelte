@@ -15,7 +15,7 @@
 
 	let { data, children } = $props();
 	let heroSearchValue = $state((data as any).search || '');
-	let debounceTimer: NodeJS.Timeout = $state();
+	let debounceTimer: NodeJS.Timeout | undefined = $state();
 	let isHeroSearchLoading = $state(false);
 	let lastSyncedSearch = $state('');
 
