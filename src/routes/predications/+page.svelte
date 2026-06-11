@@ -431,7 +431,7 @@
 		<button
 			role="tab"
 			aria-selected={currentAuthor !== 'Retransmissions'}
-			class="px-4 md:px-6 py-3 min-h-11 text-[11px] md:text-[12px] font-bold uppercase tracking-[0.15em] font-body border-b-2 -mb-px transition-colors {currentAuthor !== 'Retransmissions'
+			class="px-4 md:px-6 py-3 min-h-11 text-[12px] md:text-[13px] font-bold uppercase tracking-[0.15em] font-body border-b-2 -mb-px transition-colors {currentAuthor !== 'Retransmissions'
 				? 'border-missionnaire text-missionnaire'
 				: 'border-transparent text-stone-400 hover:text-stone-600'}"
 			onclick={() => handleAuthorChange('Tous')}
@@ -441,7 +441,7 @@
 		<button
 			role="tab"
 			aria-selected={currentAuthor === 'Retransmissions'}
-			class="px-4 md:px-6 py-3 min-h-11 text-[11px] md:text-[12px] font-bold uppercase tracking-[0.15em] font-body border-b-2 -mb-px transition-colors {currentAuthor === 'Retransmissions'
+			class="px-4 md:px-6 py-3 min-h-11 text-[12px] md:text-[13px] font-bold uppercase tracking-[0.15em] font-body border-b-2 -mb-px transition-colors {currentAuthor === 'Retransmissions'
 				? 'border-missionnaire text-missionnaire'
 				: 'border-transparent text-stone-400 hover:text-stone-600'}"
 			onclick={() => handleAuthorChange('Retransmissions')}
@@ -451,7 +451,7 @@
 	</div>
 
 	<!-- Top Filters (Alpha & Authors) -->
-	<div class="flex flex-col gap-5 md:gap-6 mb-6 md:mb-8 {$mobileFiltersOpen ? '' : 'hidden md:flex'}">
+	<div class="flex flex-col gap-6 mb-6 md:mb-8 {$mobileFiltersOpen ? '' : 'hidden md:flex'}">
 		{#if !blendedOnly}
 			<div>
 				<h2
@@ -459,10 +459,12 @@
 				>
 					{$t('predications.alphabetical')}
 				</h2>
-				<div class="flex flex-wrap justify-center md:justify-start gap-x-4 gap-y-2">
+				<div
+					class="-mx-4 px-4 flex flex-nowrap overflow-x-auto no-scrollbar gap-x-3 md:mx-0 md:px-0 md:flex-wrap md:overflow-visible md:gap-x-4 md:gap-y-2"
+				>
 					{#each alphabet as letter}
 						<button
-							class="text-[11px] font-body font-bold transition-all {currentAlpha === letter
+							class="shrink-0 px-1.5 py-2 md:py-0 text-xs md:text-[11px] font-body font-bold transition-all {currentAlpha === letter
 								? 'text-missionnaire font-semibold'
 								: 'text-stone-400 hover:text-missionnaire'}"
 							onclick={() => handleAlphaChange(letter)}
@@ -489,7 +491,7 @@
 							'Tous' &&
 							!currentAuthor) ||
 						currentAuthor === author
-							? 'border-missionnaire text-missionnaire bg-missionnaire/5'
+							? 'border-missionnaire text-missionnaire bg-missionnaire/10'
 							: 'bg-white/40 text-stone-500 border-stone-200/60 hover:border-missionnaire hover:text-missionnaire'}"
 						onclick={() => handleAuthorChange(author)}
 					>
@@ -562,7 +564,7 @@
 							<button
 								class="px-3 py-2 rounded-lg text-[11px] font-bold transition-all border text-center {currentYear ===
 								year
-									? 'border-missionnaire text-missionnaire bg-missionnaire/5'
+									? 'border-missionnaire text-missionnaire bg-missionnaire/10'
 									: 'bg-white/40 text-stone-400 border-stone-200/60 hover:border-missionnaire hover:text-missionnaire'}"
 								onclick={() => handleYearChange(year)}
 							>

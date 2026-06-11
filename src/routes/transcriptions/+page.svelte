@@ -283,7 +283,7 @@
 
 <div class="container mx-auto px-2 pt-4 pb-4 sm:px-4 sm:pt-6 sm:pb-8">
 	<!-- Search Header -->
-	<div class="relative mb-4 sm:mb-8">
+	<div class="relative mb-6 md:mb-8">
 		<div class="flex flex-row items-center justify-center">
 			<div class="w-full max-w-4xl text-center">
 				<p
@@ -291,7 +291,7 @@
 				>
 					{$t('nav.transcriptions')}
 				</p>
-				<h1 class="font-display text-2xl sm:text-3xl font-semibold text-stone-900 mb-2">
+				<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900 mb-2">
 					{$t('nav.transcriptions')}
 				</h1>
 				<p class="text-sm text-stone-500 font-body mb-2">
@@ -307,7 +307,7 @@
 					{/if}
 				</p>
 				<form
-					class="hidden md:flex w-full max-w-xl mx-auto border border-stone-200/60 bg-white/40 overflow-hidden"
+					class="hidden md:flex w-full max-w-xl mx-auto border border-stone-200/60 bg-white/40 overflow-hidden transition-shadow focus-within:border-missionnaire/40 focus-within:ring-2 focus-within:ring-missionnaire/30"
 					onsubmit={(e) => {
 						e.preventDefault();
 						handleSearch(searchInput?.value ?? searchTerm, { immediate: true });
@@ -378,7 +378,7 @@
 				<!-- svelte-ignore a11y_autofocus -->
 				<input
 					type="search"
-					class="w-full rounded-lg border border-stone-200 bg-white py-2.5 pl-10 pr-3 text-base font-body text-stone-800 outline-none placeholder:text-stone-400 focus:border-missionnaire/40"
+					class="w-full min-h-11 rounded-lg border border-stone-200 bg-white py-2.5 pl-10 pr-3 text-base font-body text-stone-800 outline-none placeholder:text-stone-400 focus:border-missionnaire/40 focus:ring-2 focus:ring-missionnaire/30"
 					placeholder={$t('transcriptions.searchByTitle')}
 					bind:value={searchTerm}
 					oninput={(event) => handleSearch((event.currentTarget as HTMLInputElement).value)}
@@ -415,10 +415,10 @@
 					: 'hidden md:flex'}"
 			>
 				<div class="flex items-center space-x-2 w-full sm:w-auto">
-					<label for="year-filter" class="text-sm text-gray-600">{$t('transcriptions.yearLabel')}</label>
+					<label for="year-filter" class="text-sm text-stone-600 font-body">{$t('transcriptions.yearLabel')}</label>
 					<select
 						id="year-filter"
-						class="border border-gray-300 rounded-md px-3 py-1.5 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-missionnaire focus:border-transparent w-full sm:w-auto"
+						class="border border-stone-200/80 rounded-md px-3 py-2 text-sm font-body text-stone-700 bg-white focus:outline-none focus:ring-2 focus:ring-missionnaire/30 focus:border-missionnaire/40 w-full sm:w-auto"
 						value={selectedYear}
 						onchange={handleYearChange}
 					>
@@ -431,7 +431,7 @@
 
 				<button
 					onclick={handleSort}
-					class="flex items-center justify-center space-x-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-900 w-full sm:w-auto border sm:border-0 border-gray-300 rounded-md sm:rounded-none"
+					class="flex items-center justify-center space-x-2 px-4 py-2 min-h-11 text-sm font-body text-stone-600 hover:text-stone-900 w-full sm:w-auto border sm:border-0 border-stone-200/80 rounded-md sm:rounded-none"
 				>
 					<span>{$t('transcriptions.publishDate')}</span>
 					{#if sortOrder === 'desc'}
@@ -443,7 +443,7 @@
 			</div>
 
 			{#if isListLoading && !hasResolvedList}
-				<div class="border border-gray-300 shadow rounded-md mx-2 sm:mx-0">
+				<div class="border border-stone-200/60 bg-white/40 mx-2 sm:mx-0">
 					<ListSkeleton rows={8} />
 				</div>
 			{:else if listLoadError && !hasResolvedList}
@@ -454,8 +454,18 @@
 					/>
 				</div>
 			{:else if documents.length === 0}
-				<div class="text-center py-12">
-					<p class="text-gray-600 text-sm sm:text-base">{$t('transcriptions.noDocuments')}</p>
+				<div class="py-24 text-center">
+					<div
+						class="bg-stone-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-stone-200"
+					>
+						<DocumentText1 size={32} color="#e7e5e4" />
+					</div>
+					<h3 class="text-xl font-bold text-stone-800 mb-2">
+						{$t('transcriptions.noDocuments')}
+					</h3>
+					<p class="text-stone-400 text-sm">
+						{$t('list.tryAdjustFilters')}
+					</p>
 				</div>
 			{:else}
 				{#if isListLoading}
@@ -468,15 +478,15 @@
 				<div class="mb-2 px-2 sm:px-0">
 					<ResultsSummary from={summaryFrom} to={summaryTo} total={total} query={currentSearch} />
 				</div>
-				<div class="border border-gray-300 shadow rounded-md mx-2 sm:mx-0">
+				<div class="border border-stone-200/60 bg-white/40 mx-2 sm:mx-0">
 					{#each documents as document (document._id)}
 						<div
-							class="flex items-center border-b border-gray-200 last:border-b-0 hover:bg-gray-50"
+							class="flex items-center border-b border-stone-100 last:border-b-0 hover:bg-white/60"
 						>
 							<button
 								class="flex-1 p-3 sm:p-4 flex items-start space-x-2 sm:space-x-4 text-left {selectedDocument?.filename ===
 								document.filename
-									? 'bg-gray-100'
+									? 'bg-stone-100'
 									: ''}"
 								onclick={() => handleSelectDocument(document)}
 							>
@@ -484,14 +494,14 @@
 									<DocumentText1 size={18} color="#6B7280" />
 								</div>
 								<div class="flex-1 min-w-0">
-									<h3 class="text-xs sm:text-sm font-medium text-gray-900 break-words">
+									<h3 class="text-xs sm:text-sm font-medium text-stone-800 break-words">
 										{document.filename}
 									</h3>
 									<div class="mt-1 flex flex-col sm:flex-row sm:flex-wrap sm:space-x-6">
-										<div class="text-xs text-gray-500">
+										<div class="text-xs text-stone-500">
 											{formatFileSize(document.size)}
 										</div>
-										<div class="text-xs text-gray-500">
+										<div class="text-xs text-stone-500">
 											{new Date(document.publishedOn).toLocaleDateString()}
 										</div>
 									</div>

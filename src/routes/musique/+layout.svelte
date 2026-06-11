@@ -110,7 +110,7 @@
 						{/if}
 					</p>
 					<form
-						class="hidden md:flex w-full max-w-xl border border-white/25 bg-white/90 backdrop-blur-sm overflow-hidden"
+						class="hidden md:flex w-full max-w-xl border border-white/25 bg-white/90 backdrop-blur-sm overflow-hidden transition-shadow focus-within:border-missionnaire/60 focus-within:ring-2 focus-within:ring-missionnaire/40"
 						onsubmit={(e) => {
 							e.preventDefault();
 							void handleHeroSearch();
@@ -196,7 +196,7 @@
 			<!-- svelte-ignore a11y_autofocus -->
 			<input
 				type="search"
-				class="w-full rounded-lg border border-stone-200 bg-white py-2.5 pl-10 pr-3 text-base font-body text-stone-800 outline-none placeholder:text-stone-400 focus:border-missionnaire/40"
+				class="w-full min-h-11 rounded-lg border border-stone-200 bg-white py-2.5 pl-10 pr-3 text-base font-body text-stone-800 outline-none placeholder:text-stone-400 focus:border-missionnaire/40 focus:ring-2 focus:ring-missionnaire/30"
 				placeholder="Rechercher par titre..."
 				bind:value={heroSearchValue}
 				autofocus

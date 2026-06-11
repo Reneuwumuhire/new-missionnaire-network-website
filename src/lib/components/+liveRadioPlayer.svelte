@@ -973,7 +973,7 @@
 				<!-- Controls -->
 				<div class="flex items-center gap-2 md:gap-3 mt-4 md:mt-6">
 					<button
-						class="inline-flex items-center gap-2 px-4 py-2.5 md:px-6 md:py-3 text-[12px] font-bold uppercase tracking-[0.15em] font-body whitespace-nowrap transition-all duration-300 {canPlay
+						class="inline-flex items-center gap-2 px-4 py-2.5 md:px-6 md:py-3 min-h-11 text-[12px] font-bold uppercase tracking-[0.15em] font-body whitespace-nowrap transition-all duration-300 {canPlay
 							? showLive
 								? 'bg-red-600 hover:bg-red-700 text-white'
 								: 'bg-stone-900 hover:bg-missionnaire text-white'
@@ -996,7 +996,7 @@
 					</button>
 
 					<button
-						class="inline-flex items-center gap-2 px-4 py-2.5 md:px-5 md:py-3 border text-[12px] font-semibold font-body whitespace-nowrap transition-all duration-300 {canPlay
+						class="inline-flex items-center gap-2 px-4 py-2.5 md:px-5 md:py-3 min-h-11 border text-[12px] font-semibold font-body whitespace-nowrap transition-all duration-300 {canPlay
 							? 'border-stone-200/60 text-stone-600 hover:border-missionnaire hover:text-missionnaire'
 							: 'border-stone-200/40 text-stone-300 cursor-not-allowed'}"
 						onclick={toggleMute}
@@ -1174,7 +1174,7 @@
 						{/if}
 					</button>
 				</div>
-				<p class="mt-2 text-[10px] text-stone-400 font-body">
+				<p class="mt-3 text-[10px] leading-relaxed text-stone-400/90 font-body">
 					{$t('live.dvrHint')}
 				</p>
 			</div>
@@ -1185,7 +1185,7 @@
 	{#if showLive && broadcastDescription}
 		{@const isLong =
 			broadcastDescription.length > 280 || (broadcastDescription.match(/\n/g)?.length ?? 0) >= 3}
-		<div class="border border-stone-200/60 bg-white/40 p-5 md:p-6">
+		<div class="border border-stone-200/60 bg-white/40 p-5 md:p-8">
 			<p
 				class="text-[10px] font-bold uppercase tracking-[0.25em] text-missionnaire/80 font-body mb-3"
 			>

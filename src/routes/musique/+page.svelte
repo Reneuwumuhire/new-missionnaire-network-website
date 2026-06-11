@@ -913,7 +913,7 @@
 <svelte:window onclick={handleArtistOutsideClick} />
 
 <div class="w-full min-w-0 max-w-6xl mx-auto px-4 pt-0 pb-8 md:px-6">
-	<div class="mb-8 md:mb-12 {$mobileFiltersOpen ? '' : 'hidden md:block'}">
+	<div class="mb-6 md:mb-8 {$mobileFiltersOpen ? '' : 'hidden md:block'}">
 		<h2
 			class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.35em] mb-4 font-body"
 		>
@@ -932,9 +932,9 @@
 			>
 				{#each categories as category}
 					<button
-						class="snap-start flex-shrink-0 px-3.5 md:px-5 py-1.5 md:py-2.5 text-[10px] md:text-[11px] font-bold uppercase tracking-[0.12em] md:tracking-wider transition-all border {currentCategory ===
+						class="snap-start flex-shrink-0 px-3.5 md:px-5 py-2 md:py-2.5 text-[10px] md:text-[11px] font-bold uppercase tracking-[0.12em] md:tracking-wider transition-all border {currentCategory ===
 						category
-							? 'border-missionnaire text-missionnaire bg-missionnaire/5'
+							? 'border-missionnaire text-missionnaire bg-missionnaire/10'
 							: 'bg-white/40 text-stone-500 border-stone-200/60 hover:border-missionnaire hover:text-missionnaire'}"
 						onclick={() => handleCategoryChange(category)}
 					>
@@ -946,7 +946,7 @@
 	</div>
 
 	<!-- List Title and Mobile Filters -->
-	<div class="flex flex-col gap-2 mb-4 md:mb-6">
+	<div class="flex flex-col gap-2 mb-6">
 		<div class="flex items-center justify-between gap-3">
 			<div class="flex items-center gap-2">
 				<h2 class="font-display text-2xl md:text-3xl font-bold text-stone-900">{$t('music.list')}</h2>
@@ -1047,7 +1047,7 @@
 			<div class="md:hidden flex flex-wrap gap-2">
 				{#if currentCategory && currentCategory !== 'All'}
 					<button
-						class="flex items-center gap-1.5 bg-stone-200 text-missionnaire px-3 py-1.5 rounded-full text-xs font-semibold"
+						class="flex items-center gap-1.5 border border-missionnaire/40 bg-missionnaire/10 text-missionnaire px-3 py-1.5 rounded-full text-xs font-semibold"
 						onclick={() => handleCategoryChange('All')}
 					>
 						<span>{currentCategory}</span>
@@ -1056,7 +1056,7 @@
 				{/if}
 				{#if currentArtist}
 					<button
-						class="flex items-center gap-1.5 bg-stone-200 text-missionnaire px-3 py-1.5 rounded-full text-xs font-semibold"
+						class="flex items-center gap-1.5 border border-missionnaire/40 bg-missionnaire/10 text-missionnaire px-3 py-1.5 rounded-full text-xs font-semibold"
 						onclick={() => handleArtistChange('')}
 					>
 						<span class="max-w-[150px] truncate">{currentArtist}</span>
@@ -1091,7 +1091,7 @@
 
 				<div class="flex items-center gap-2">
 					<button
-						class="flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-bold text-missionnaire shadow-sm transition-colors hover:bg-stone-200"
+						class="flex items-center gap-2 rounded-full bg-white px-4 py-2 min-h-11 text-xs font-bold text-missionnaire shadow-sm transition-colors hover:bg-stone-200"
 						onclick={() => dispatchAudioPlayerAction('toggle')}
 						title={$isPlaying ? $t('player.pause') : $t('player.playAction')}
 					>
@@ -1099,7 +1099,7 @@
 						<span>{$isPlaying ? $t('player.pause') : $t('player.playAction')}</span>
 					</button>
 					<button
-						class="rounded-full border border-stone-300 bg-white px-3 py-2 text-xs font-bold text-stone-700 transition-colors hover:border-missionnaire hover:text-missionnaire"
+						class="rounded-full border border-stone-300 bg-white px-4 py-2 min-h-11 text-xs font-bold text-stone-700 transition-colors hover:border-missionnaire hover:text-missionnaire"
 						onclick={goToActiveSongPage}
 					>
 						{$t('music.showInList')}
@@ -1111,7 +1111,7 @@
 
 	<!-- Favorites & Recently Played (collapsed by default) -->
 	{#if $favorites.length > 0 || $recentlyPlayed.length > 0 || cachedCount > 0 || totalSongs > 0}
-		<div class="flex flex-wrap gap-1.5 md:gap-2 mb-4 {$mobileFiltersOpen ? '' : 'hidden md:flex'}">
+		<div class="flex flex-wrap gap-1.5 md:gap-2 mb-6 {$mobileFiltersOpen ? '' : 'hidden md:flex'}">
 			{#if $favorites.length > 0}
 				<button
 					class="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-full border text-[10px] md:text-xs font-bold uppercase tracking-[0.12em] md:tracking-wider transition-colors whitespace-nowrap {showFavorites
@@ -1594,12 +1594,17 @@
 						</div>
 					</div>
 				{:else}
-					<div class="py-20 text-center">
-						<div class="text-stone-200 mb-4 flex justify-center">
-							<Icon src={BsSearch} size="64" />
+					<div class="py-24 text-center">
+						<div
+							class="bg-stone-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-stone-200"
+						>
+							<Icon src={BsSearch} size="32" />
 						</div>
-						<p class="text-stone-400 font-bold uppercase tracking-widest text-sm">
+						<h3 class="text-xl font-bold text-stone-800 mb-2">
 							{$t('music.noSongs')}
+						</h3>
+						<p class="text-stone-400 text-sm">
+							{$t('list.tryAdjustFilters')}
 						</p>
 					</div>
 				{/each}
@@ -1783,27 +1788,27 @@
 			>
 				{#if isDownloading}
 					<button
-						class="px-4 py-2 rounded-full border border-stone-300 bg-white text-xs font-bold uppercase tracking-wider text-stone-700 hover:border-red-300 hover:text-red-600 transition-colors"
+						class="px-4 py-2 min-h-11 rounded-full border border-stone-300 bg-white text-xs font-bold uppercase tracking-wider text-stone-700 hover:border-red-300 hover:text-red-600 transition-colors"
 						onclick={cancelDownload}
 					>
 						{$t('misc.cancel')}
 					</button>
 				{:else if downloadDoneSummary || downloadError}
 					<button
-						class="px-4 py-2 rounded-full bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold uppercase tracking-wider transition-colors"
+						class="px-4 py-2 min-h-11 rounded-full bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold uppercase tracking-wider transition-colors"
 						onclick={closeDownloadModal}
 					>
 						{$t('misc.close')}
 					</button>
 				{:else}
 					<button
-						class="px-4 py-2 rounded-full border border-stone-300 bg-white text-xs font-bold uppercase tracking-wider text-stone-700 hover:border-stone-400 transition-colors"
+						class="px-4 py-2 min-h-11 rounded-full border border-stone-300 bg-white text-xs font-bold uppercase tracking-wider text-stone-700 hover:border-stone-400 transition-colors"
 						onclick={closeDownloadModal}
 					>
 						{$t('misc.cancel')}
 					</button>
 					<button
-						class="flex items-center gap-1.5 px-4 py-2 rounded-full bg-missionnaire hover:bg-missionnaire/90 text-white text-xs font-bold uppercase tracking-wider transition-colors"
+						class="flex items-center gap-1.5 px-4 py-2 min-h-11 rounded-full bg-missionnaire hover:bg-missionnaire/90 text-white text-xs font-bold uppercase tracking-wider transition-colors"
 						onclick={startDownload}
 					>
 						<Icon src={AiOutlineDownload} size="12" />

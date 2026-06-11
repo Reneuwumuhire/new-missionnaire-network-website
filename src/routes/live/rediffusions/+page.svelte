@@ -191,10 +191,10 @@
 	<div class="max-w-3xl mx-auto">
 		<!-- Header -->
 		<div class="text-center mb-6 md:mb-12">
-			<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-2 md:mb-3 font-body">
+			<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body">
 				{$t('rediffusions.archives')}
 			</p>
-			<h1 class="font-display text-2xl md:text-4xl font-semibold text-stone-900">
+			<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">
 				{$t('rediffusions.title')}
 			</h1>
 			{#if data.allTotal > 0}
@@ -253,7 +253,7 @@
 						oninput={onSearchInput}
 						placeholder={$t('rediffusions.searchTitle')}
 						autofocus
-						class="w-full rounded-lg border border-stone-200 bg-white py-2.5 pl-10 pr-3 text-base font-body text-stone-800 outline-none placeholder:text-stone-400 focus:border-missionnaire/40"
+						class="w-full min-h-11 rounded-lg border border-stone-200 bg-white py-2.5 pl-10 pr-3 text-base font-body text-stone-800 outline-none placeholder:text-stone-400 focus:border-missionnaire/40 focus:ring-2 focus:ring-missionnaire/30"
 					/>
 				</div>
 			</div>
@@ -393,7 +393,7 @@
 						placeholder={$t('rediffusions.searchTitle')}
 						bind:value={searchInput}
 						oninput={onSearchInput}
-						class="w-full border border-stone-200/80 bg-white pl-9 pr-3 py-2 text-sm font-body text-stone-800 placeholder:text-stone-400 focus:border-missionnaire/40 focus:outline-none focus:ring-1 focus:ring-missionnaire/30"
+						class="w-full min-h-11 border border-stone-200/80 bg-white pl-9 pr-3 py-2.5 text-sm font-body text-stone-800 placeholder:text-stone-400 focus:border-missionnaire/40 focus:outline-none focus:ring-2 focus:ring-missionnaire/30"
 					/>
 				</label>
 
@@ -402,7 +402,7 @@
 					bind:value={yearInput}
 					onchange={onFilterChange}
 					disabled={$navigating ? true : false}
-					class="border border-stone-200/80 bg-white px-3 py-2 text-sm font-body text-stone-800 disabled:opacity-50 disabled:cursor-not-allowed focus:border-missionnaire/40 focus:outline-none focus:ring-1 focus:ring-missionnaire/30"
+					class="border border-stone-200/80 bg-white px-3 py-2.5 min-h-11 text-sm font-body text-stone-800 disabled:opacity-50 disabled:cursor-not-allowed focus:border-missionnaire/40 focus:outline-none focus:ring-2 focus:ring-missionnaire/30"
 					aria-label={$t('rediffusions.filterByYear')}
 				>
 					<option value="">{$t('list.allYears')}</option>
@@ -416,7 +416,7 @@
 					bind:value={monthInput}
 					onchange={onFilterChange}
 					disabled={!yearInput || !!$navigating}
-					class="border border-stone-200/80 bg-white px-3 py-2 text-sm font-body text-stone-800 disabled:opacity-50 disabled:cursor-not-allowed focus:border-missionnaire/40 focus:outline-none focus:ring-1 focus:ring-missionnaire/30"
+					class="border border-stone-200/80 bg-white px-3 py-2.5 min-h-11 text-sm font-body text-stone-800 disabled:opacity-50 disabled:cursor-not-allowed focus:border-missionnaire/40 focus:outline-none focus:ring-2 focus:ring-missionnaire/30"
 					aria-label={$t('rediffusions.filterByMonth')}
 				>
 					<option value="">{$t('list.allMonths')}</option>
@@ -461,10 +461,40 @@
 			{:else if data.loadError}
 				<ErrorCard onRetry={() => void invalidateAll()} />
 			{:else if data.recordings.length === 0}
-				<div class="text-center py-16">
-					<p class="font-display text-lg italic text-stone-400">
+				<div class="py-24 text-center">
+					<div
+						class="bg-stone-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-stone-200"
+					>
+						<svg
+							width="32"
+							height="32"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<circle cx="11" cy="11" r="7" />
+							<path d="m21 21-4.3-4.3" />
+						</svg>
+					</div>
+					<h3 class="text-xl font-bold text-stone-800 mb-2">
 						{hasActiveFilters ? $t('rediffusions.noMatch') : $t('list.empty')}
-					</p>
+					</h3>
+					{#if hasActiveFilters}
+						<p class="text-stone-400 text-sm mb-6">
+							{$t('list.tryAdjustFilters')}
+						</p>
+						<button
+							type="button"
+							onclick={resetFilters}
+							class="inline-flex items-center px-5 py-2.5 min-h-11 border border-stone-200/80 bg-white text-[11px] font-bold uppercase tracking-[0.15em] font-body text-stone-600 hover:border-missionnaire hover:text-missionnaire transition-colors"
+						>
+							{$t('list.reset')}
+						</button>
+					{/if}
 				</div>
 			{:else}
 				<ul class="divide-y divide-stone-100 border border-stone-200/60 bg-white/40">
