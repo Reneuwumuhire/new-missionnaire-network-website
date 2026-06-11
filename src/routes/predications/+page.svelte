@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../../i18n';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import type { Sermon } from '$lib/models/sermon';
@@ -96,7 +97,7 @@
 
 	const desktopSermonGrid = 'md:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.35fr)_110px_80px_120px]';
 	const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-	let authors = $derived(['Tous', ...(availableAuthors ?? []), 'Retransmissions']);
+	let authors = $derived(['Tous', ...(availableAuthors ?? [])]);
 
 	function abortRequest() {
 		abortController?.abort();
@@ -419,6 +420,32 @@
 			>
 			Voir en vidéo →
 		</a>
+	</div>
+
+	<!-- Content-type tabs: classic sermons vs recorded live broadcasts.
+	     "Retransmissions" used to hide as a pseudo-author chip; non-technical
+	     visitors never found it. -->
+	<div class="flex items-center gap-0 mb-6 border-b border-stone-200/60" role="tablist" aria-label="Type de contenu">
+		<button
+			role="tab"
+			aria-selected={currentAuthor !== 'Retransmissions'}
+			class="px-4 md:px-6 py-3 min-h-11 text-[11px] md:text-[12px] font-bold uppercase tracking-[0.15em] font-body border-b-2 -mb-px transition-colors {currentAuthor !== 'Retransmissions'
+				? 'border-missionnaire text-missionnaire'
+				: 'border-transparent text-stone-400 hover:text-stone-600'}"
+			onclick={() => handleAuthorChange('Tous')}
+		>
+			{$t('misc.sermonBadge')}s
+		</button>
+		<button
+			role="tab"
+			aria-selected={currentAuthor === 'Retransmissions'}
+			class="px-4 md:px-6 py-3 min-h-11 text-[11px] md:text-[12px] font-bold uppercase tracking-[0.15em] font-body border-b-2 -mb-px transition-colors {currentAuthor === 'Retransmissions'
+				? 'border-missionnaire text-missionnaire'
+				: 'border-transparent text-stone-400 hover:text-stone-600'}"
+			onclick={() => handleAuthorChange('Retransmissions')}
+		>
+			{$t('misc.retransmissionBadge')}s
+		</button>
 	</div>
 
 	<!-- Top Filters (Alpha & Authors) -->
@@ -753,7 +780,7 @@
 					</div>
 					<div class="divide-y divide-stone-100 border border-stone-200/60 bg-white/40">
 						{#each recordings as recording, i (recording.id)}
-							<RetransmissionTableItem {recording} absoluteIndex={i + 1} />
+							<RetransmissionTableItem {recording} absoluteIndex={i + 1} showBadge />
 						{/each}
 					</div>
 				</section>

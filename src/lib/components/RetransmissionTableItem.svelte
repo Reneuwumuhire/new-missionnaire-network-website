@@ -15,9 +15,11 @@
 	interface Props {
 		recording: PublishedRecording;
 		absoluteIndex: number;
+		/** Show a small "Retransmission" pill — used when rows are blended into sermon search results. */
+		showBadge?: boolean;
 	}
 
-	let { recording, absoluteIndex }: Props = $props();
+	let { recording, absoluteIndex, showBadge = false }: Props = $props();
 
 	const desktopSermonGrid = 'md:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.35fr)_110px_80px_120px]';
 
@@ -136,15 +138,24 @@
 	</div>
 
 	<div class="flex flex-col min-w-0">
-		<a
-			href={`/live/rediffusions/${recording.id}`}
-			class="text-sm font-bold line-clamp-1 transition-colors {isActive
-				? 'text-orange-600'
-				: 'text-gray-800 group-hover:text-orange-600'} hover:underline underline-offset-2"
-			onclick={(e) => e.stopPropagation()}
-		>
-			{recording.title}
-		</a>
+		<div class="flex items-center gap-2 min-w-0">
+			{#if showBadge}
+				<span
+					class="shrink-0 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider bg-red-50 text-red-600 border border-red-200/60"
+				>
+					Retransmission
+				</span>
+			{/if}
+			<a
+				href={`/live/rediffusions/${recording.id}`}
+				class="text-sm font-bold line-clamp-1 transition-colors {isActive
+					? 'text-orange-600'
+					: 'text-gray-800 group-hover:text-orange-600'} hover:underline underline-offset-2"
+				onclick={(e) => e.stopPropagation()}
+			>
+				{recording.title}
+			</a>
+		</div>
 		<div
 			class="flex flex-row items-center gap-2 md:hidden overflow-hidden text-ellipsis whitespace-nowrap"
 		>
