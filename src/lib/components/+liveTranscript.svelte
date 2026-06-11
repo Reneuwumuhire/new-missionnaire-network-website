@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { run } from 'svelte/legacy';
-
 	import { browser } from '$app/environment';
 	import { onDestroy, onMount } from 'svelte';
 	import { livePlayback, replayPlayback } from '$lib/stores/global';
@@ -205,16 +203,16 @@
 		if (browser) document.body.style.overflow = '';
 	});
 
-	function handleSeek(event: CustomEvent<{ time: number }>) {
+	function handleSeek(detail: { time: number }) {
 		// Tapping a cue: meaningless on a live stream (can't seek the source),
 		// but on the replay it jumps the global player to that sentence.
 		if (mode !== 'replay') return;
-		dispatchAudioPlayerSeek(event.detail.time + offsetIntoRecordingMs / 1000);
+		dispatchAudioPlayerSeek(detail.time + offsetIntoRecordingMs / 1000);
 	}
 
 
 	// Lock body scroll while the overlay is open.
-	run(() => {
+	$effect(() => {
 		if (browser) {
 			document.body.style.overflow = isFullscreen ? 'hidden' : '';
 		}
@@ -222,7 +220,7 @@
 	let srtUrl = $derived(mode === 'live' ? liveUrl : url);
 	// (Re)load whenever the effective URL changes — covers the admin replacing
 	// the SRT mid-broadcast (new S3 key → new URL in the next poll).
-	run(() => {
+	$effect(() => {
 		if (browser && srtUrl && srtUrl !== loadedUrl) {
 			loadedUrl = srtUrl;
 			void loadSrt(srtUrl);
@@ -280,7 +278,7 @@
 			</div>
 		</div>
 		{#if !isFullscreen}
-			<SyncedLyrics {lines} currentTime={displayTime} pauseOnUserScroll on:seek={handleSeek} />
+			<SyncedLyrics {lines} currentTime={displayTime} pauseOnUserScroll onseek={handleSeek} />
 		{:else}
 			<p class="py-8 text-center text-xs text-stone-400 font-body">
 				Transcription affichée en plein écran
@@ -349,7 +347,7 @@
 			currentTime={displayTime}
 			pauseOnUserScroll
 			fullscreenDark
-			on:seek={handleSeek}
+			onseek={handleSeek}
 		/>
 		<!-- Thumb-zone close bar: always visible at the bottom so closing never
 		     requires reaching the top corner (the main complaint on mobile). -->

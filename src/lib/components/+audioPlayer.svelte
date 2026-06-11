@@ -2491,7 +2491,7 @@
 						lines={lyricsLines}
 						{currentTime}
 						fullscreenMobile={true}
-						on:seek={handleLyricsSeek}
+						onseek={(detail) => handleLyricsSeek(new CustomEvent('seek', { detail }))}
 					/>
 				</div>
 			</div>

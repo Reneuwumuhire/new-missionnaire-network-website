@@ -1,7 +1,4 @@
 <script lang="ts">
-	import { run, createBubbler, stopPropagation } from 'svelte/legacy';
-
-	const bubble = createBubbler();
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import AiOutlineDownload from 'svelte-icons-pack/ai/AiOutlineDownload';
 	import BsFileEarmarkPdfFill from 'svelte-icons-pack/bs/BsFileEarmarkPdfFill';
@@ -30,7 +27,6 @@
 		absoluteIndex,
 		language = 'french'
 	}: Props = $props();
-	let resolvedDuration: number | null = $state(sermon.duration ?? null);
 	let isDurationLoading = false;
 
 	// Background-download state: when the listener clicks the cloud icon we
@@ -157,10 +153,9 @@
 	// Rows without a stored duration now render "--:--"; backfill them with
 	// admin/scripts/backfill-sermon-durations.ts. Each language has its own
 	// stored duration because translations usually run a different length.
-	run(() => {
-		resolvedDuration =
-			(language === 'english' ? sermon.english_duration : sermon.duration) ?? null;
-	});
+	let resolvedDuration = $derived(
+		(language === 'english' ? sermon.english_duration : sermon.duration) ?? null
+	);
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -190,7 +185,7 @@
 			class="text-sm font-bold line-clamp-1 transition-colors {isActive
 				? 'text-orange-600'
 				: 'text-gray-800 group-hover:text-orange-600'} hover:underline underline-offset-2"
-			onclick={stopPropagation(bubble('click'))}
+			onclick={(e) => e.stopPropagation()}
 		>
 			{#if language === 'english'}
 				{sermon.english_title || 'Untitled'}
@@ -251,7 +246,7 @@
 		{#if (language === 'english' && sermon.english_pdf_url) || (language !== 'english' && sermon.pdf_url)}
 			<button
 				class="p-2 text-gray-400 hover:text-red-500 transition-colors"
-				onclick={stopPropagation(downloadPdf)}
+				onclick={(e) => { e.stopPropagation(); downloadPdf(); }}
 				title="Télécharger PDF"
 			>
 				<Icon src={BsFileEarmarkPdfFill} size="18" />
@@ -261,7 +256,7 @@
 		{#if (language === 'english' && sermon.english_audio_url) || (language !== 'english' && sermon.mp3_url)}
 			<button
 				class="group relative p-2 text-gray-400 hover:text-orange-600 transition-colors"
-				onclick={stopPropagation(downloadMp3)}
+				onclick={(e) => { e.stopPropagation(); downloadMp3(); }}
 				title={isDownloading
 					? downloadPercent !== null
 						? `Annuler (${downloadPercent}%)`
@@ -315,7 +310,7 @@
 				class="hover:scale-110 active:scale-95 transition-all p-2 {isActive
 					? 'text-orange-600'
 					: 'text-orange-600'}"
-				onclick={stopPropagation(togglePlay)}
+				onclick={(e) => { e.stopPropagation(); togglePlay(); }}
 				title={isActive && $isPlaying ? 'Pause' : 'Lire'}
 			>
 				<Icon src={isActive && $isPlaying ? IoPauseCircle : IoPlayCircle} size="24" />

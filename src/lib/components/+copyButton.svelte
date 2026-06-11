@@ -1,7 +1,4 @@
 <script lang="ts">
-	import { createBubbler, preventDefault } from 'svelte/legacy';
-
-	const bubble = createBubbler();
 	import { onMount, onDestroy } from 'svelte';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
@@ -79,7 +76,7 @@
 	<button
 		class="fixed z-[9999] flex flex-row items-center gap-1.5 bg-slate-900 rounded-full text-white text-xs font-bold px-4 py-2.5 shadow-lg -translate-x-1/2 pointer-events-auto select-none hover:bg-slate-700 transition-colors"
 		style="top: {buttonPosition.top}px; left: {buttonPosition.left}px;"
-		onmousedown={preventDefault(bubble('mousedown'))}
+		onmousedown={(e) => e.preventDefault()}
 		onclick={handleCopy}
 	>
 		<Icon src={BsClipboard2CheckFill} />

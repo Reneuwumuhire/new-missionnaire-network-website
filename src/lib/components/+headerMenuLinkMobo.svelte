@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte';
 	import { page } from '$app/stores';
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import BsChevronDown from 'svelte-icons-pack/bs/BsChevronDown';
@@ -14,6 +13,7 @@
 		active?: boolean;
 		activeClass?: string;
 		inactiveClass?: string;
+		ontoggle?: () => void;
 	}
 
 	let {
@@ -23,10 +23,9 @@
 		closeMenuFrom,
 		active = false,
 		activeClass = 'text-missionnaire',
-		inactiveClass = 'text-stone-400'
+		inactiveClass = 'text-stone-400',
+		ontoggle
 	}: Props = $props();
-
-	const dispatch = createEventDispatcher();
 
 	let isActive = $derived($page.url.pathname === link || $page.url.pathname.startsWith(link + '/'));
 </script>
@@ -36,7 +35,7 @@
 		<!-- Entire row is a single button for sub-menu items -->
 		<button
 			class="flex items-center justify-between w-full py-3.5 transition-colors duration-200 cursor-pointer"
-			onclick={() => dispatch('toggle')}
+			onclick={() => ontoggle?.()}
 		>
 			<span class="text-[15px] font-medium whitespace-nowrap {isActive ? 'text-missionnaire' : 'text-stone-700'}">
 				{menuName}

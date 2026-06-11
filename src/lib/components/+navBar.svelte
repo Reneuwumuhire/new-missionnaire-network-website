@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { run, stopPropagation } from 'svelte/legacy';
-
 	import { page } from '$app/stores';
 	import HeaderMenuLink from '$lib/components/+headerMenuLink.svelte';
 	import { dict, locale, t } from '../../i18n';
@@ -77,7 +75,7 @@
 		}
 	}
 
-	run(() => {
+	$effect(() => {
 		if (browser) syncBodyScrollLock(showMoboNav);
 	});
 
@@ -144,8 +142,8 @@
 						menuName={link.menuName}
 						link={link.link}
 						isOpen={openMenuIndex === index}
-						on:toggle={() => toggleMenu(index)}
-						on:close={() => (openMenuIndex = null)}
+						ontoggle={() => toggleMenu(index)}
+						onclose={() => (openMenuIndex = null)}
 						subMenu={link.subMenu
 							? link.subMenu.map((subLink) => ({
 									subName: subLink.subName,
@@ -163,7 +161,10 @@
 		<!-- Mobile hamburger -->
 		<button
 			class="relative lg:hidden flex items-center justify-center w-9 h-9 text-stone-700 transition-colors hover:text-missionnaire"
-			onclick={stopPropagation(toggleMobileNav)}
+			onclick={(e) => {
+				e.stopPropagation();
+				toggleMobileNav();
+			}}
 			aria-label={showMoboNav ? 'Fermer le menu' : 'Ouvrir le menu'}
 		>
 			{#if showMoboNav}
@@ -195,7 +196,7 @@
 							active={openMenuIndex === index}
 							activeClass="text-missionnaire"
 							inactiveClass="text-stone-400"
-							on:toggle={() => toggleMenu(index)}
+							ontoggle={() => toggleMenu(index)}
 							closeMenuFrom={toggleMobileNav}
 						/>
 					{/each}

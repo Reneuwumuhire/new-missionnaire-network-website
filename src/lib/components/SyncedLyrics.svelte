@@ -1,7 +1,5 @@
 <script lang="ts">
-	import { run } from 'svelte/legacy';
-
-	import { createEventDispatcher, onMount, tick } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { formatTime } from '../../utils/FormatTime';
 
 	type LyricLine =
@@ -42,6 +40,7 @@
 		pauseOnUserScroll?: boolean;
 		// 768px, which is what the music drawer wants; this one is unconditional.)
 		fullscreenDark?: boolean;
+		onseek?: (detail: { time: number }) => void;
 	}
 
 	let {
@@ -49,10 +48,9 @@
 		currentTime = 0,
 		fullscreenMobile = false,
 		pauseOnUserScroll = false,
-		fullscreenDark = false
+		fullscreenDark = false,
+		onseek
 	}: Props = $props();
-
-	const dispatch = createEventDispatcher<{ seek: { time: number } }>();
 
 	let panelElement: HTMLDivElement | undefined = $state();
 	let lineElements: Array<HTMLButtonElement | HTMLDivElement | null> = $state([]);
@@ -165,14 +163,14 @@
 	function seekToLine(line: LyricLine) {
 		const start = getLineStart(line);
 		if (start === null) return;
-		dispatch('seek', { time: start });
+		onseek?.({ time: start });
 	}
 
-	run(() => {
+	$effect(() => {
 		activeLineIndex = findActiveLineIndex(currentTime);
 	});
 
-	run(() => {
+	$effect(() => {
 		if (activeLineIndex !== previousActiveLineIndex) {
 			previousActiveLineIndex = activeLineIndex;
 			if (activeLineIndex >= 0 && !userScrolled) {

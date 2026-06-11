@@ -1,9 +1,6 @@
 <script lang="ts">
-	import { stopPropagation } from 'svelte/legacy';
-
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import BsChevronDown from 'svelte-icons-pack/bs/BsChevronDown';
-	import { createEventDispatcher } from 'svelte';
 	import type { NavigationLinkSubmenu } from '../../helpers/NavigationLinkList';
 
 
@@ -15,6 +12,8 @@
 		isOpen?: boolean;
 		activeClass?: string;
 		inactiveClass?: string;
+		ontoggle?: () => void;
+		onclose?: () => void;
 	}
 
 	let {
@@ -24,19 +23,19 @@
 		active = false,
 		isOpen = false,
 		activeClass = 'text-stone-600',
-		inactiveClass = 'text-stone-400'
+		inactiveClass = 'text-stone-400',
+		ontoggle,
+		onclose
 	}: Props = $props();
-
-	const dispatch = createEventDispatcher();
 
 	let menuEl: HTMLDivElement | undefined = $state();
 
 	function handleToggle() {
-		dispatch('toggle');
+		ontoggle?.();
 	}
 
 	function handleClose() {
-		dispatch('close');
+		onclose?.();
 	}
 </script>
 
@@ -45,7 +44,10 @@
 		<button
 			type="button"
 			class="flex items-center gap-1 px-3 py-2 whitespace-nowrap text-stone-600 hover:text-missionnaire transition-colors duration-200"
-			onclick={stopPropagation(handleToggle)}
+			onclick={(e) => {
+				e.stopPropagation();
+				handleToggle();
+			}}
 			aria-label="{menuName} - {isOpen ? 'fermer' : 'ouvrir'} le sous-menu"
 		>
 			{menuName}
@@ -68,7 +70,7 @@
 					href={subLink}
 					class="w-full flex items-center gap-4 p-3.5 transition-colors duration-200 hover:bg-stone-50"
 					onclick={() => {
-						dispatch('close');
+						onclose?.();
 					}}
 				>
 					<div class="flex-shrink-0 w-10 h-10 overflow-hidden bg-stone-100 border border-stone-200 flex items-center justify-center">

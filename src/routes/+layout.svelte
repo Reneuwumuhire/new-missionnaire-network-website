@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { run } from 'svelte/legacy';
-
 	import '../app.css';
 	import NavBar from '$lib/components/+navBar.svelte';
 	import BottomNav from '$lib/components/+bottomNav.svelte';
@@ -164,7 +162,7 @@
 	// 2. Service Worker forwards Web Push payloads (`{type:'RADIO_PUSH'}`) to
 	//    every open tab, so the banner reacts the moment admin goes live.
 	// 3. BroadcastChannel keeps multiple tabs in the same browser consistent.
-	run(() => {
+	$effect(() => {
 		if (browser && data.radioState) {
 			radioIsLive.set(data.radioState.isLive);
 		}
