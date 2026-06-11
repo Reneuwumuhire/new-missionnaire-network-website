@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { run } from 'svelte/legacy';
+
 	import { browser } from '$app/environment';
 	import { onDestroy, onMount } from 'svelte';
 	import { livePlayback, replayPlayback } from '$lib/stores/global';
@@ -19,30 +21,43 @@
 	//          live together with the audio — text and sound never diverge.
 	// replay — props carry the SRT url + the offset between the recording's
 	//          start and SRT 00:00 (computed server-side); position follows
-	//          the global audio player via the replayPlayback store.
+	
 
-	export let mode: 'live' | 'replay' = 'live';
-	/** Replay mode only — proxy URL of the SRT file. */
-	export let url: string | null = null;
-	/** Replay mode only — ms into the recording at which SRT 00:00 occurs. */
-	export let offsetIntoRecordingMs = 0;
-	/** Replay mode only — recording id; the transcript only follows the global
+	
+	
+	
+	interface Props {
+		//          the global audio player via the replayPlayback store.
+		mode?: 'live' | 'replay';
+		/** Replay mode only — proxy URL of the SRT file. */
+		url?: string | null;
+		/** Replay mode only — ms into the recording at which SRT 00:00 occurs. */
+		offsetIntoRecordingMs?: number;
+		/** Replay mode only — recording id; the transcript only follows the global
 	 *  player while this track is the one playing. */
-	export let trackId: string | null = null;
+		trackId?: string | null;
+	}
+
+	let {
+		mode = 'live',
+		url = null,
+		offsetIntoRecordingMs = 0,
+		trackId = null
+	}: Props = $props();
 
 	const LIVE_POLL_MS = 8_000; // bounds how fast admin nudges reach listeners
 	const TICK_MS = 400;
 
-	let cues: SrtCue[] = [];
-	let loadedUrl: string | null = null;
-	let srtSec: number | null = null; // null → no highlight yet
+	let cues: SrtCue[] = $state([]);
+	let loadedUrl: string | null = $state(null);
+	let srtSec: number | null = $state(null); // null → no highlight yet
 
 	// ── Live state (from radio-state polls) ────────────────────────
-	let liveUrl: string | null = null;
-	let anchorEpochMs: number | null = null;
+	let liveUrl: string | null = $state(null);
+	let anchorEpochMs: number | null = $state(null);
 	let offsetMs = 0;
 	let clockSkewMs = 0;
-	let liveActive = false; // gate open + SRT attached
+	let liveActive = $state(false); // gate open + SRT attached
 
 	let pollTimer: ReturnType<typeof setInterval> | null = null;
 	let tickTimer: ReturnType<typeof setInterval> | null = null;
@@ -50,7 +65,7 @@
 	// ── Fullscreen reading view ─────────────────────────────────
 	// Big dark overlay for comfortable reading (or projecting the text in a
 	// hall while the live audio plays). Esc or the ✕ button closes it.
-	let isFullscreen = false;
+	let isFullscreen = $state(false);
 
 	/** Re-parent the overlay to <body>: the transcript sits inside cards with
 	 *  backdrop-blur/transform, which create stacking contexts that would trap
@@ -98,19 +113,8 @@
 		swipeStartY = null;
 	}
 
-	// Lock body scroll while the overlay is open.
-	$: if (browser) {
-		document.body.style.overflow = isFullscreen ? 'hidden' : '';
-	}
 
-	$: srtUrl = mode === 'live' ? liveUrl : url;
 
-	// (Re)load whenever the effective URL changes — covers the admin replacing
-	// the SRT mid-broadcast (new S3 key → new URL in the next poll).
-	$: if (browser && srtUrl && srtUrl !== loadedUrl) {
-		loadedUrl = srtUrl;
-		void loadSrt(srtUrl);
-	}
 
 	async function loadSrt(target: string) {
 		try {
@@ -208,20 +212,35 @@
 		dispatchAudioPlayerSeek(event.detail.time + offsetIntoRecordingMs / 1000);
 	}
 
+
+	// Lock body scroll while the overlay is open.
+	run(() => {
+		if (browser) {
+			document.body.style.overflow = isFullscreen ? 'hidden' : '';
+		}
+	});
+	let srtUrl = $derived(mode === 'live' ? liveUrl : url);
+	// (Re)load whenever the effective URL changes — covers the admin replacing
+	// the SRT mid-broadcast (new S3 key → new URL in the next poll).
+	run(() => {
+		if (browser && srtUrl && srtUrl !== loadedUrl) {
+			loadedUrl = srtUrl;
+			void loadSrt(srtUrl);
+		}
+	});
 	// SyncedLyrics highlights the line whose start ≤ currentTime; -1 keeps
 	// everything unhighlighted until a position is known.
-	$: displayTime = srtSec ?? -1;
-	$: lines = cues.map((cue) => ({
+	let displayTime = $derived(srtSec ?? -1);
+	let lines = $derived(cues.map((cue) => ({
 		text: cue.text,
 		start: cue.startMs / 1000,
 		end: cue.endMs / 1000
-	}));
-
-	$: visible = mode === 'live' ? liveActive && cues.length > 0 : cues.length > 0;
-	$: waitingForSync = mode === 'live' && liveActive && cues.length > 0 && anchorEpochMs === null;
+	})));
+	let visible = $derived(mode === 'live' ? liveActive && cues.length > 0 : cues.length > 0);
+	let waitingForSync = $derived(mode === 'live' && liveActive && cues.length > 0 && anchorEpochMs === null);
 </script>
 
-<svelte:window on:keydown={handleFullscreenKeydown} />
+<svelte:window onkeydown={handleFullscreenKeydown} />
 
 {#if visible}
 	<div class="border border-stone-200/60 bg-white/40 p-5 md:p-6">
@@ -238,7 +257,7 @@
 				{/if}
 				<button
 					type="button"
-					on:click={openFullscreen}
+					onclick={openFullscreen}
 					aria-label="Afficher la transcription en plein écran"
 					title="Plein écran"
 					class="inline-flex items-center gap-1.5 border border-stone-200/60 bg-white/60 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] font-body text-stone-500 transition-colors hover:border-missionnaire hover:text-missionnaire"
@@ -289,9 +308,9 @@
 		<div
 			class="transcript-fullscreen-header flex items-center justify-between gap-3 px-4 py-3 md:px-8"
 			role="presentation"
-			on:touchstart={onHeaderTouchStart}
-			on:touchmove={onHeaderTouchMove}
-			on:touchend={onHeaderTouchEnd}
+			ontouchstart={onHeaderTouchStart}
+			ontouchmove={onHeaderTouchMove}
+			ontouchend={onHeaderTouchEnd}
 		>
 			<div class="flex items-center gap-2.5 min-w-0">
 				{#if mode === 'live'}
@@ -306,7 +325,7 @@
 			</div>
 			<button
 				type="button"
-				on:click={closeFullscreen}
+				onclick={closeFullscreen}
 				aria-label="Quitter le plein écran"
 				class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10 text-[#efe5d0] transition-colors hover:bg-white/20 active:bg-white/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
 			>
@@ -337,7 +356,7 @@
 		<div class="transcript-fullscreen-footer pointer-events-none flex justify-center px-4">
 			<button
 				type="button"
-				on:click={closeFullscreen}
+				onclick={closeFullscreen}
 				class="pointer-events-auto inline-flex min-h-11 items-center gap-2 rounded-full border border-[#efe5d0]/25 bg-[#29201a]/90 px-6 py-2.5 text-[12px] font-bold uppercase tracking-[0.18em] font-body text-[#efe5d0] shadow-lg backdrop-blur transition-colors hover:bg-[#3a2d23] active:bg-[#3a2d23]"
 			>
 				<svg

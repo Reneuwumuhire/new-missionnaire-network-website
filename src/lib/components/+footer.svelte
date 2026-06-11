@@ -44,10 +44,10 @@
 	import { browser } from '$app/environment';
 	import { clearCache, getCacheSize } from '$lib/audioCache';
 
-	let audioCacheSize = '0 B';
-	let audioCacheBytes = 0;
-	let isClearingCache = false;
-	let clearedToast = false;
+	let audioCacheSize = $state('0 B');
+	let audioCacheBytes = $state(0);
+	let isClearingCache = $state(false);
+	let clearedToast = $state(false);
 	let clearedToastTimer: ReturnType<typeof setTimeout> | null = null;
 
 	async function refreshAudioCacheSize() {
@@ -124,8 +124,8 @@
 		{ text: 'Car Dieu a tant aimé le monde qu\u2019il a donné son Fils unique.', ref: 'Jean 3:16' }
 	];
 
-	let verseIndex = 0;
-	let verseVisible = true;
+	let verseIndex = $state(0);
+	let verseVisible = $state(true);
 	let verseInterval: ReturnType<typeof setInterval>;
 
 	onMount(() => {
@@ -264,7 +264,7 @@
 					<span class="text-stone-700">·</span>
 					<button
 						type="button"
-						on:click={handleClearCache}
+						onclick={handleClearCache}
 						disabled={isClearingCache}
 						class="text-missionnaire hover:text-orange-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed underline-offset-2 hover:underline"
 					>

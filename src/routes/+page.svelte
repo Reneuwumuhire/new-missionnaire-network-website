@@ -7,23 +7,27 @@
 	import NotificationBell from '$lib/components/+notificationBell.svelte';
 	import { radioIsLive as radioIsLiveStore } from '$lib/stores/global';
 
-	export let data: {
+	interface Props {
+		data: {
 		data: YoutubeVideo[];
 	};
+	}
+
+	let { data }: Props = $props();
 
 	// Single source of truth: the layout's `radioState` (admin-gate aware) for
 	// SSR + initial paint, the push-driven store thereafter. Banner and button
 	// stay in sync because both pull from this same state.
-	$: ssrIsLive = $page.data?.radioState?.isLive ?? false;
-	$: radioIsLive = browser ? $radioIsLiveStore : ssrIsLive;
-	$: recentVideos = (data.data || []).slice(0, 3);
+	let ssrIsLive = $derived($page.data?.radioState?.isLive ?? false);
+	let radioIsLive = $derived(browser ? $radioIsLiveStore : ssrIsLive);
+	let recentVideos = $derived((data.data || []).slice(0, 3));
 
-	let bellRef: NotificationBell | undefined;
+	let bellRef: NotificationBell | undefined = $state();
 
 	// Scroll-triggered reveal
-	let heroVisible = false;
-	let sectionsVisible: Record<string, boolean> = {};
-	let scrolledPastHero = false;
+	let heroVisible = $state(false);
+	let sectionsVisible: Record<string, boolean> = $state({});
+	let scrolledPastHero = $state(false);
 
 	onMount(() => {
 		if (!browser) return;
@@ -76,8 +80,8 @@
 		{ text: 'Voici, je me tiens à la porte, et je frappe. Si quelqu\u2019un entend ma voix et ouvre la porte, j\u2019entrerai.', ref: 'Apocalypse 3:20' },
 	];
 
-	let heroVerseIndex = 0;
-	let heroVerseVisible = true;
+	let heroVerseIndex = $state(0);
+	let heroVerseVisible = $state(true);
 	let heroVerseInterval: ReturnType<typeof setInterval>;
 
 	onMount(() => {
@@ -308,7 +312,7 @@
 			</a>
 
 			<button
-				on:click={() => bellRef?.toggle()}
+				onclick={() => bellRef?.toggle()}
 				class="group flex items-center gap-4 px-6 py-5 border transition-all duration-200 cursor-pointer sm:w-auto bg-white/40 {bellRef?.isSubscribed
 					? 'border-missionnaire/30 bg-orange-50/40'
 					: 'border-stone-200/60 hover:border-missionnaire/30 hover:bg-white/60'}"

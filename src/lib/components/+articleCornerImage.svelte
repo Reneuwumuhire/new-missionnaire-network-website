@@ -1,10 +1,14 @@
 <script lang="ts">
-	export let image: string = '';
-	export let alt: string = '';
+	interface Props {
+		image?: string;
+		alt?: string;
+	}
+
+	let { image = '', alt = '' }: Props = $props();
 </script>
 
 <div class="relative w-80 h-96">
-	<div class="background-dot absolute top-0 right-0" />
+	<div class="background-dot absolute top-0 right-0"></div>
 	<img
 		src={image}
 		{alt}

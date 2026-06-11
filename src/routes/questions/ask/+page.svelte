@@ -5,12 +5,16 @@
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import IoArrowBack from 'svelte-icons-pack/io/IoArrowBack';
 
-	export let data: PageData;
-	export let form: ActionData;
+	interface Props {
+		data: PageData;
+		form: ActionData;
+	}
 
-	let submitting = false;
-	$: isAdminUser = data.user?.role === 'superadmin' || data.user?.role === 'editor';
-	$: displayName = form?.values?.displayName ?? (!isAdminUser && data.user ? data.user.name : '');
+	let { data, form }: Props = $props();
+
+	let submitting = $state(false);
+	let isAdminUser = $derived(data.user?.role === 'superadmin' || data.user?.role === 'editor');
+	let displayName = $derived(form?.values?.displayName ?? (!isAdminUser && data.user ? data.user.name : ''));
 
 	const statusLabels: Record<string, string> = {
 		pending: 'En attente',

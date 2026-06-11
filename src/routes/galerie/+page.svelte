@@ -1,9 +1,11 @@
 <script lang="ts">
+	import { run } from 'svelte/legacy';
+
 	import { getImages } from './imageList';
 	import { onMount } from 'svelte';
 	import viewport from './viewport';
 
-	let _list: string | any[] = [];
+	let _list: string | any[] = $state([]);
 
 	let FILL_SCREEN_WIDTH = true;
 
@@ -33,7 +35,9 @@
 		}
 	};
 
-	$: console.log(_list);
+	run(() => {
+		console.log(_list);
+	});
 </script>
 
 <svelte:head>
@@ -52,7 +56,7 @@
 <div class="flex flex-col">
 	<header>
 		<div class="flex flex-row items-center justify-center space-x-2">
-			<div class="header-branham flex flex-col items-center justify-center w-full" />
+			<div class="header-branham flex flex-col items-center justify-center w-full"></div>
 		</div>
 	</header>
 	<div class="relative flex flex-row justify-center h-auto w-full py-14">

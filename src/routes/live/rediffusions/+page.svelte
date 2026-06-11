@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { run, preventDefault } from 'svelte/legacy';
+
 	import type { PageData } from './$types';
 	import type { PublishedRecording, RecordingType } from '$lib/server/recordings';
 	import { goto } from '$app/navigation';
@@ -10,24 +12,36 @@
 	import MobileListToolbar from '$lib/components/+mobileListToolbar.svelte';
 	import { mobileSearchOpen, mobileFiltersOpen } from '$lib/stores/mobileControls';
 
-	export let data: PageData;
+	interface Props {
+		data: PageData;
+	}
 
-	$: totalPages = Math.max(1, Math.ceil(data.total / data.pageSize));
+	let { data }: Props = $props();
+
+	let totalPages = $derived(Math.max(1, Math.ceil(data.total / data.pageSize)));
 
 	// ── Filter state ───────────────────────────────────────────────
 	// Local copies of the URL-backed filters so the inputs feel responsive.
 	// Submitting (or debounced search) calls `applyFilters` which updates
 	// the URL and triggers a server reload.
-	let searchInput = data.filters.q;
-	let yearInput: number | '' = data.filters.year ?? '';
-	let monthInput: number | '' = data.filters.month ?? '';
-	let typeInput: RecordingType | '' = data.filters.type ?? '';
+	let searchInput = $state(data.filters.q);
+	let yearInput: number | '' = $state(data.filters.year ?? '');
+	let monthInput: number | '' = $state(data.filters.month ?? '');
+	let typeInput: RecordingType | '' = $state(data.filters.type ?? '');
 
 	// Re-sync when SvelteKit reloads with new data (e.g. back/forward nav).
-	$: searchInput = data.filters.q;
-	$: yearInput = data.filters.year ?? '';
-	$: monthInput = data.filters.month ?? '';
-	$: typeInput = data.filters.type ?? '';
+	run(() => {
+		searchInput = data.filters.q;
+	});
+	run(() => {
+		yearInput = data.filters.year ?? '';
+	});
+	run(() => {
+		monthInput = data.filters.month ?? '';
+	});
+	run(() => {
+		typeInput = data.filters.type ?? '';
+	});
 
 	const MONTHS: Array<{ value: number; label: string }> = [
 		{ value: 1, label: 'Janvier' },
@@ -75,13 +89,13 @@
 	// a re-render, leaving stale page-2 links that drop the search). The
 	// $:-block depends on $page.url.searchParams, so each navigation hands
 	// Pagination a fresh function reference.
-	$: listHref = ((sp: URLSearchParams) => (pageN: number) => {
+	let listHref = $derived(((sp: URLSearchParams) => (pageN: number) => {
 		const params = new URLSearchParams(sp);
 		if (pageN > 1) params.set('page', String(pageN));
 		else params.delete('page');
 		const qs = params.toString();
 		return `/live/rediffusions${qs ? `?${qs}` : ''}`;
-	})($page.url.searchParams);
+	})($page.url.searchParams));
 
 	// Link to a recording, carrying the current list state so the detail
 	// page can rebuild the exact same "Tous les directs" URL.
@@ -127,10 +141,10 @@
 		goto('/live/rediffusions', { noScroll: true });
 	}
 
-	$: hasActiveFilters = Boolean(data.filters.q || data.filters.year || data.filters.type);
+	let hasActiveFilters = $derived(Boolean(data.filters.q || data.filters.year || data.filters.type));
 
-	let expandedThumb: PublishedRecording | null = null;
-	let failedThumbs = new Set<string>();
+	let expandedThumb: PublishedRecording | null = $state(null);
+	let failedThumbs = $state(new Set<string>());
 	function markThumbFailed(id: string | undefined) {
 		if (!id || failedThumbs.has(id)) return;
 		failedThumbs = new Set(failedThumbs).add(id);
@@ -180,7 +194,7 @@
 	<link rel="canonical" href="https://missionnaire.net/live/rediffusions" />
 </svelte:head>
 
-<svelte:window on:keydown={onLightboxKeydown} />
+<svelte:window onkeydown={onLightboxKeydown} />
 
 <section class="w-full px-6 pt-4 pb-10 md:pt-6">
 	<div class="max-w-3xl mx-auto">
@@ -241,11 +255,11 @@
 						<circle cx="11" cy="11" r="7" />
 						<line x1="21" y1="21" x2="16.65" y2="16.65" />
 					</svg>
-					<!-- svelte-ignore a11y-autofocus -->
+					<!-- svelte-ignore a11y_autofocus -->
 					<input
 						type="search"
 						bind:value={searchInput}
-						on:input={onSearchInput}
+						oninput={onSearchInput}
 						placeholder="Rechercher un titre…"
 						autofocus
 						class="w-full rounded-lg border border-stone-200 bg-white py-2.5 pl-10 pr-3 text-base font-body text-stone-800 outline-none placeholder:text-stone-400 focus:border-missionnaire/40"
@@ -260,7 +274,7 @@
 						{@const typeValue = opt.v as '' | RecordingType}
 						<button
 							type="button"
-							on:click={() => selectType(typeValue)}
+							onclick={() => selectType(typeValue)}
 							aria-pressed={(typeInput || '') === opt.v}
 							class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] font-body border transition-colors {(typeInput ||
 								'') === opt.v
@@ -274,7 +288,7 @@
 				<div class="flex gap-2">
 					<select
 						bind:value={yearInput}
-						on:change={onFilterChange}
+						onchange={onFilterChange}
 						aria-label="Filtrer par année"
 						class="flex-1 min-w-0 border border-stone-200/80 bg-white px-3 py-2 text-sm font-body text-stone-800 focus:border-missionnaire/40 focus:outline-none"
 					>
@@ -285,7 +299,7 @@
 					</select>
 					<select
 						bind:value={monthInput}
-						on:change={onFilterChange}
+						onchange={onFilterChange}
 						disabled={!yearInput}
 						aria-label="Filtrer par mois"
 						class="flex-1 min-w-0 border border-stone-200/80 bg-white px-3 py-2 text-sm font-body text-stone-800 disabled:opacity-50 focus:border-missionnaire/40 focus:outline-none"
@@ -301,7 +315,7 @@
 						<span>{data.total} résultat{data.total > 1 ? 's' : ''}</span>
 						<button
 							type="button"
-							on:click={resetFilters}
+							onclick={resetFilters}
 							class="font-bold uppercase tracking-[0.15em] text-missionnaire/80 hover:text-missionnaire transition-colors"
 						>
 							Réinitialiser
@@ -317,7 +331,7 @@
 		<form
 			method="GET"
 			action="/live/rediffusions"
-			on:submit|preventDefault={() => onSearchInput()}
+			onsubmit={preventDefault(() => onSearchInput())}
 			class="hidden md:block mb-6 border border-stone-200/60 bg-white/40 p-3 sm:p-4"
 		>
 			<!-- Type segmented control: Retransmission = relayed broadcast
@@ -326,7 +340,7 @@
 			<div class="mb-3 flex flex-wrap items-center gap-1.5" role="group" aria-label="Type de direct">
 				<button
 					type="button"
-					on:click={() => selectType('')}
+					onclick={() => selectType('')}
 					aria-pressed={!typeInput}
 					class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] font-body border transition-colors {!typeInput
 						? 'border-missionnaire text-missionnaire bg-missionnaire/5'
@@ -336,7 +350,7 @@
 				</button>
 				<button
 					type="button"
-					on:click={() => selectType('retransmission')}
+					onclick={() => selectType('retransmission')}
 					aria-pressed={typeInput === 'retransmission'}
 					class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] font-body border transition-colors {typeInput ===
 					'retransmission'
@@ -347,7 +361,7 @@
 				</button>
 				<button
 					type="button"
-					on:click={() => selectType('local')}
+					onclick={() => selectType('local')}
 					aria-pressed={typeInput === 'local'}
 					class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] font-body border transition-colors {typeInput ===
 					'local'
@@ -380,7 +394,7 @@
 						name="q"
 						placeholder="Rechercher un titre…"
 						bind:value={searchInput}
-						on:input={onSearchInput}
+						oninput={onSearchInput}
 						class="w-full border border-stone-200/80 bg-white pl-9 pr-3 py-2 text-sm font-body text-stone-800 placeholder:text-stone-400 focus:border-missionnaire/40 focus:outline-none focus:ring-1 focus:ring-missionnaire/30"
 					/>
 				</label>
@@ -388,7 +402,7 @@
 				<select
 					name="year"
 					bind:value={yearInput}
-					on:change={onFilterChange}
+					onchange={onFilterChange}
 					disabled={$navigating ? true : false}
 					class="border border-stone-200/80 bg-white px-3 py-2 text-sm font-body text-stone-800 disabled:opacity-50 disabled:cursor-not-allowed focus:border-missionnaire/40 focus:outline-none focus:ring-1 focus:ring-missionnaire/30"
 					aria-label="Filtrer par année"
@@ -402,7 +416,7 @@
 				<select
 					name="month"
 					bind:value={monthInput}
-					on:change={onFilterChange}
+					onchange={onFilterChange}
 					disabled={!yearInput || !!$navigating}
 					class="border border-stone-200/80 bg-white px-3 py-2 text-sm font-body text-stone-800 disabled:opacity-50 disabled:cursor-not-allowed focus:border-missionnaire/40 focus:outline-none focus:ring-1 focus:ring-missionnaire/30"
 					aria-label="Filtrer par mois"
@@ -421,7 +435,7 @@
 					</span>
 					<button
 						type="button"
-						on:click={resetFilters}
+						onclick={resetFilters}
 						class="font-bold uppercase tracking-[0.15em] text-missionnaire/80 hover:text-missionnaire transition-colors"
 					>
 						Réinitialiser
@@ -484,7 +498,7 @@
 								<!-- Thumbnail — clickable to expand, separate from row nav -->
 								<button
 									type="button"
-									on:click={(e) => openThumb(rec, e)}
+									onclick={(e) => openThumb(rec, e)}
 									aria-label={rec.thumbnail_url ? 'Agrandir la vignette' : 'Vignette par défaut'}
 									class="relative h-14 w-24 sm:h-16 sm:w-28 shrink-0 overflow-hidden border border-stone-200/60 bg-stone-100 {rec.thumbnail_url
 										? 'cursor-zoom-in'
@@ -568,8 +582,8 @@
 	<div
 		use:portal
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-lightbox-in"
-		on:click={onLightboxBackdropClick}
-		on:keydown={onLightboxKeydown}
+		onclick={onLightboxBackdropClick}
+		onkeydown={onLightboxKeydown}
 		role="dialog"
 		aria-modal="true"
 		aria-label="Vignette du direct"
@@ -577,7 +591,7 @@
 	>
 		<button
 			type="button"
-			on:click={closeThumb}
+			onclick={closeThumb}
 			aria-label="Fermer"
 			class="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
 		>
@@ -597,7 +611,7 @@
 		<img
 			src={vercelImage(expandedThumb.thumbnail_url, 1920, 85)}
 			alt={expandedThumb.title}
-			on:error={() => {
+			onerror={() => {
 				markThumbFailed(expandedThumb!.id);
 				closeThumb();
 			}}

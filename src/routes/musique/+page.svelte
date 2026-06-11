@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { run, stopPropagation, createBubbler, self } from 'svelte/legacy';
+
+	const bubble = createBubbler();
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import type { MusicAudio } from '$lib/models/music-audio';
@@ -73,65 +76,22 @@
 		error?: string | null;
 	};
 
-	export let data;
+	let { data } = $props();
 
-	let musicList: MusicAudio[] = [];
-	let musicPlaylist: MusicAudio[] = [];
-	let artists: string[] = [];
-	let totalSongs = 0;
-	let isListLoading = false;
-	let listLoadError = '';
-	let hasResolvedMusicList = false;
+	let musicList: MusicAudio[] = $state([]);
+	let musicPlaylist: MusicAudio[] = $state([]);
+	let artists: string[] = $state([]);
+	let totalSongs = $state(0);
+	let isListLoading = $state(false);
+	let listLoadError = $state('');
+	let hasResolvedMusicList = $state(false);
 	let musicListAbortController: AbortController | null = null;
 	let currentListRequestToken = 0;
-	let lastHandledMusicRequestKey = '';
+	let lastHandledMusicRequestKey = $state('');
 
-	$: initialMusicList = ((data as any).musicAudio || []) as MusicAudio[];
-	$: initialPlaylist = ((data as any).playlistAudio || initialMusicList || []) as MusicAudio[];
-	$: initialArtists = ((data as any).artists || []) as string[];
-	$: initialTotalSongs = ((data as any).total || 0) as number;
-	$: currentCategory = (data as any).category;
-	$: currentSearch = (data as any).search;
-	$: currentAlpha = (data as any).alpha;
-	$: currentSort = (data as any).sort || 'uploaded_at:desc';
-	$: currentSeed = (data as any).seed || '';
-	$: currentArtist = (data as any).artist;
-	$: currentPage = (data as any).page;
-	$: limit = (data as any).limit;
-	$: isDeferredData = Boolean((data as any).deferred);
-	// Shared-song metadata (server-fetched when ?play=<id> is present).
-	// Drives the dynamic OG/Twitter tags so WhatsApp etc. show the song
-	// title in the link preview instead of the generic site title.
-	$: sharedSong = ((data as any).sharedSong || null) as MusicAudio | null;
-	$: sharedSongId = ((data as any).playId || '') as string;
-	$: sharedSongTitle = sharedSong?.title?.trim() || '';
-	$: sharedSongArtist = sharedSong?.artist?.trim() || '';
-	$: sharedSongCategory = sharedSong?.category?.trim() || '';
-	$: sharedSongPreviewTitle = sharedSongTitle ? `${sharedSongTitle} — Missionnaire Network` : '';
-	$: sharedSongPreviewDescription = sharedSongTitle
-		? sharedSongArtist
-			? `Écoutez « ${sharedSongTitle} » par ${sharedSongArtist} sur Missionnaire Network.`
-			: sharedSongCategory
-				? `Écoutez « ${sharedSongTitle} » (${sharedSongCategory}) sur Missionnaire Network.`
-				: `Écoutez « ${sharedSongTitle} » sur Missionnaire Network.`
-		: '';
-	$: sharedSongCanonical = sharedSongId
-		? `https://missionnaire.net/musique?play=${encodeURIComponent(sharedSongId)}`
-		: '';
-	$: musicRequestKey = JSON.stringify({
-		category: currentCategory || 'All',
-		search: currentSearch || '',
-		alpha: currentAlpha || '',
-		artist: currentArtist || '',
-		pageNumber: currentPage || 1,
-		limit: limit || 100,
-		sort: currentSort || 'uploaded_at:desc',
-		seed: currentSeed || ''
-	});
-	$: totalPages = Math.ceil(totalSongs / limit);
 
-	let isArtistMenuOpen = false;
-	let artistMenuEl: HTMLDivElement | null = null;
+	let isArtistMenuOpen = $state(false);
+	let artistMenuEl: HTMLDivElement | null = $state(null);
 
 	// Close the "Artiste" dropdown on an outside tap. The toggle button uses
 	// `stopPropagation`, so its own click never reaches this handler.
@@ -139,35 +99,27 @@
 		if (!isArtistMenuOpen || !artistMenuEl) return;
 		if (!artistMenuEl.contains(event.target as Node)) isArtistMenuOpen = false;
 	}
-	let artistSearch = '';
-	let showFavorites = false;
-	let showRecent = false;
+	let artistSearch = $state('');
+	let showFavorites = $state(false);
+	let showRecent = $state(false);
 	// ── BEGIN: cached filter state (added) ────────────────────────
-	let showCached = false;
+	let showCached = $state(false);
 
 	// ── Bulk download (current filter as .zip) ────────────────────
 	// Modal-driven flow: open confirms count + warns about size, Start
 	// kicks off a sequential streaming zip via `client-zip`. Cancel
 	// aborts pending fetches and the assembled blob is never saved.
-	let downloadModalOpen = false;
-	let isDownloading = false;
-	let downloadProgress: DownloadProgress = {
+	let downloadModalOpen = $state(false);
+	let isDownloading = $state(false);
+	let downloadProgress: DownloadProgress = $state({
 		completed: 0,
 		total: 0,
 		currentTitle: '',
 		skipped: 0
-	};
-	let downloadError = '';
+	});
+	let downloadError = $state('');
 	let downloadAbortController: AbortController | null = null;
-	let downloadDoneSummary: { completed: number; skipped: number } | null = null;
-	$: downloadEstimateMb = Math.round((totalSongs * 4.5) / 1) || 0;
-	$: downloadFilterLabel = (() => {
-		if (currentSearch) return `« ${currentSearch} »`;
-		if (currentArtist) return currentArtist;
-		if (currentAlpha) return `lettre ${currentAlpha}`;
-		if (currentCategory && currentCategory !== 'All') return currentCategory;
-		return 'tous les chants';
-	})();
+	let downloadDoneSummary: { completed: number; skipped: number } | null = $state(null);
 
 	function openDownloadModal() {
 		if (isDownloading) return;
@@ -359,49 +311,10 @@
 		}
 	}
 
-	$: if (musicRequestKey && musicRequestKey !== lastHandledMusicRequestKey) {
-		lastHandledMusicRequestKey = musicRequestKey;
-		listLoadError = '';
 
-		const cachedArtists = getMusicArtistsCache() || [];
-		const cachedEntry = getMusicPageCache(musicRequestKey);
-
-		if (!isDeferredData) {
-			const nextArtists = initialArtists.length > 0 ? initialArtists : cachedArtists;
-			const seededEntry = setMusicPageCache(musicRequestKey, {
-				musicAudio: initialMusicList,
-				playlistAudio: initialPlaylist,
-				artists: nextArtists,
-				total: initialTotalSongs
-			});
-
-			if (nextArtists.length > 0) {
-				setMusicArtistsCache(nextArtists, seededEntry.fetchedAt);
-			}
-
-			abortMusicListRequest();
-			applyMusicData(seededEntry);
-			isListLoading = false;
-		} else if (cachedEntry) {
-			applyMusicData({
-				...cachedEntry,
-				artists: cachedEntry.artists.length > 0 ? cachedEntry.artists : cachedArtists
-			});
-			void loadMusicListInBackground({ showLoading: !isMusicPageCacheFresh(cachedEntry) });
-		} else {
-			abortMusicListRequest();
-			musicList = [];
-			musicPlaylist = [];
-			artists = cachedArtists;
-			totalSongs = 0;
-			hasResolvedMusicList = false;
-			void loadMusicListInBackground({ showLoading: true });
-		}
-	}
-
-	let recueilsScrollEl: HTMLDivElement;
-	let recueilsCanLeft = false;
-	let recueilsCanRight = true;
+	let recueilsScrollEl: HTMLDivElement = $state();
+	let recueilsCanLeft = $state(false);
+	let recueilsCanRight = $state(true);
 
 	function updateRecueilsScrollState() {
 		if (!recueilsScrollEl) return;
@@ -417,8 +330,8 @@
 	// param once per id-change so the user can still pause/skip without
 	// the page yanking the track back. The `play` query stays in the
 	// URL so the link remains re-shareable.
-	let pendingPlayId: string | null = null;
-	let handledPlayId: string | null = null;
+	let pendingPlayId: string | null = $state(null);
+	let handledPlayId: string | null = $state(null);
 
 	onMount(() => {
 		void refreshCachedUrls();
@@ -466,10 +379,6 @@
 		void tick().then(() => dispatchAudioPlayerAction('play'));
 	}
 
-	$: if (pendingPlayId && hasResolvedMusicList && pendingPlayId !== handledPlayId) {
-		handledPlayId = pendingPlayId;
-		void playSharedSong(pendingPlayId);
-	}
 
 	onDestroy(() => {
 		if (cacheRefreshTimer) clearTimeout(cacheRefreshTimer);
@@ -479,78 +388,9 @@
 	// Re-check the cache every time a track starts playing — gives the
 	// SW a moment to write the response, then surfaces the new entry in
 	// the "En cache" panel without a manual refresh.
-	let cacheRefreshTimer: ReturnType<typeof setTimeout> | null = null;
-	$: if ($selectAudio) {
-		if (cacheRefreshTimer) clearTimeout(cacheRefreshTimer);
-		cacheRefreshTimer = setTimeout(() => void refreshCachedUrls(), 1500);
-	}
+	let cacheRefreshTimer: ReturnType<typeof setTimeout> | null = $state(null);
 
-	// Build a deduplicated list of cached songs by combining metadata
-	// sources we have (favorites, recently played, current page) and
-	// keeping only those whose URL is in the cache. Songs cached but
-	// missing from all three sources won't appear — but in practice a
-	// song must be played to be cached, so it's almost always either
-	// in recently-played (last 20) or favorites.
-	$: cachedSongs = (() => {
-		const set = $cachedUrls;
-		if (set.size === 0)
-			return [] as Array<{
-				id: string;
-				title: string;
-				artist?: string;
-				category?: string;
-				s3_url?: string;
-				song?: MusicAudio;
-			}>;
 
-		const seen = new Set<string>();
-		const out: Array<{
-			id: string;
-			title: string;
-			artist?: string;
-			category?: string;
-			s3_url?: string;
-			song?: MusicAudio;
-		}> = [];
-
-		const pushIfCached = (
-			id: string,
-			title: string,
-			s3_url: string | null | undefined,
-			artist: string | null | undefined,
-			category: string | null | undefined,
-			song?: MusicAudio
-		) => {
-			if (!id || seen.has(id)) return;
-			if (!s3_url || !isUrlCached(s3_url, set)) return;
-			seen.add(id);
-			out.push({
-				id,
-				title,
-				artist: artist ?? undefined,
-				category: category ?? undefined,
-				s3_url,
-				song
-			});
-		};
-
-		// Favorites first (most intentionally retained), then recents,
-		// then current page — preserves a sensible default ordering.
-		for (const fav of $favorites) {
-			pushIfCached(fav.id, fav.title, fav.s3_url, fav.artist, fav.category);
-		}
-		for (const rec of $recentlyPlayed) {
-			pushIfCached(rec.id, rec.title, rec.s3_url, rec.artist, rec.category);
-		}
-		for (const song of (musicPlaylist || []) as MusicAudio[]) {
-			const id = song._id || song.s3_url || '';
-			pushIfCached(id, song.title || 'Sans titre', song.s3_url, song.artist, song.category, song);
-		}
-
-		return out;
-	})();
-
-	$: cachedCount = cachedSongs.length;
 	// ── END: cached filter state ──────────────────────────────────
 
 	function findSongById(list: MusicAudio[], id: string): MusicAudio | undefined {
@@ -589,26 +429,6 @@
 		addToRecentlyPlayed(songs[0] as any);
 	}
 
-	$: cachedPlayableCount = cachedSongs.reduce(
-		(n, item) => n + ((item.song ?? findSongById(musicPlaylist, item.id)) ? 1 : 0),
-		0
-	);
-	// ── END: play all cached ──────────────────────────────────────
-	$: filteredArtists = artists.filter((a: string) =>
-		a.toLowerCase().includes(artistSearch.toLowerCase())
-	);
-	$: playlistIndexByUrl = new Map<string, number>(
-		(musicPlaylist || []).map((song: MusicAudio, index: number) => [song.s3_url, index])
-	);
-	$: activeMusicSong = isMusicAudio($selectAudio) ? $selectAudio : null;
-	$: activeMusicSongIndex = activeMusicSong
-		? (playlistIndexByUrl.get(activeMusicSong.s3_url) ?? -1)
-		: -1;
-	$: isActiveMusicSongVisible =
-		!!activeMusicSong &&
-		(musicList || []).some((song: MusicAudio) => song.s3_url === activeMusicSong.s3_url);
-	$: activeMusicSongPage =
-		activeMusicSongIndex >= 0 ? Math.floor(activeMusicSongIndex / limit) + 1 : null;
 
 	let searchInput = currentSearch;
 
@@ -634,25 +454,7 @@
 	];
 	const desktopMusicGrid =
 		'md:grid-cols-[28px_minmax(0,2fr)_minmax(0,0.95fr)_minmax(0,0.85fr)_58px_28px_36px_36px] lg:grid-cols-[30px_minmax(0,2.2fr)_minmax(0,1.05fr)_minmax(0,0.95fr)_68px_32px_40px_40px] xl:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.2fr)_minmax(0,1fr)_80px_32px_40px_40px]';
-	$: isRandomListOrder = currentSort.split(/[: ,]/)[0] === 'random';
 
-	// Sync playlist when songs are loaded
-	$: if (hasResolvedMusicList) {
-		const shouldPreserveActiveQueue =
-			(!!$selectAudio && !activeMusicSong) || (!!activeMusicSong && !isActiveMusicSongVisible);
-		if (!shouldPreserveActiveQueue) {
-			basePlaylist.set(musicPlaylist);
-			if (!$isShuffle) {
-				playlist.set(musicPlaylist);
-				if (activeMusicSong) {
-					const nextIndex = playlistIndexByUrl.get(activeMusicSong.s3_url);
-					if (nextIndex !== undefined) {
-						currentIndex.set(nextIndex);
-					}
-				}
-			}
-		}
-	}
 
 	function createPlaylistSeed() {
 		return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -881,13 +683,222 @@
 		const songUrl = 's3_url' in song ? song.s3_url : (song as any).url;
 		return activeUrl === songUrl;
 	}
+	let initialMusicList = $derived(((data as any).musicAudio || []) as MusicAudio[]);
+	let initialPlaylist = $derived(((data as any).playlistAudio || initialMusicList || []) as MusicAudio[]);
+	let initialArtists = $derived(((data as any).artists || []) as string[]);
+	let initialTotalSongs = $derived(((data as any).total || 0) as number);
+	let currentCategory = $derived((data as any).category);
+	let currentSearch = $derived((data as any).search);
+	let currentAlpha = $derived((data as any).alpha);
+	let currentSort = $derived((data as any).sort || 'uploaded_at:desc');
+	let currentSeed = $derived((data as any).seed || '');
+	let currentArtist = $derived((data as any).artist);
+	let currentPage = $derived((data as any).page);
+	let limit = $derived((data as any).limit);
+	let isDeferredData = $derived(Boolean((data as any).deferred));
+	// Shared-song metadata (server-fetched when ?play=<id> is present).
+	// Drives the dynamic OG/Twitter tags so WhatsApp etc. show the song
+	// title in the link preview instead of the generic site title.
+	let sharedSong = $derived(((data as any).sharedSong || null) as MusicAudio | null);
+	let sharedSongId = $derived(((data as any).playId || '') as string);
+	let sharedSongTitle = $derived(sharedSong?.title?.trim() || '');
+	let sharedSongArtist = $derived(sharedSong?.artist?.trim() || '');
+	let sharedSongCategory = $derived(sharedSong?.category?.trim() || '');
+	let sharedSongPreviewTitle = $derived(sharedSongTitle ? `${sharedSongTitle} — Missionnaire Network` : '');
+	let sharedSongPreviewDescription = $derived(sharedSongTitle
+		? sharedSongArtist
+			? `Écoutez « ${sharedSongTitle} » par ${sharedSongArtist} sur Missionnaire Network.`
+			: sharedSongCategory
+				? `Écoutez « ${sharedSongTitle} » (${sharedSongCategory}) sur Missionnaire Network.`
+				: `Écoutez « ${sharedSongTitle} » sur Missionnaire Network.`
+		: '');
+	let sharedSongCanonical = $derived(sharedSongId
+		? `https://missionnaire.net/musique?play=${encodeURIComponent(sharedSongId)}`
+		: '');
+	let musicRequestKey = $derived(JSON.stringify({
+		category: currentCategory || 'All',
+		search: currentSearch || '',
+		alpha: currentAlpha || '',
+		artist: currentArtist || '',
+		pageNumber: currentPage || 1,
+		limit: limit || 100,
+		sort: currentSort || 'uploaded_at:desc',
+		seed: currentSeed || ''
+	}));
+	run(() => {
+		if (musicRequestKey && musicRequestKey !== lastHandledMusicRequestKey) {
+			lastHandledMusicRequestKey = musicRequestKey;
+			listLoadError = '';
+
+			const cachedArtists = getMusicArtistsCache() || [];
+			const cachedEntry = getMusicPageCache(musicRequestKey);
+
+			if (!isDeferredData) {
+				const nextArtists = initialArtists.length > 0 ? initialArtists : cachedArtists;
+				const seededEntry = setMusicPageCache(musicRequestKey, {
+					musicAudio: initialMusicList,
+					playlistAudio: initialPlaylist,
+					artists: nextArtists,
+					total: initialTotalSongs
+				});
+
+				if (nextArtists.length > 0) {
+					setMusicArtistsCache(nextArtists, seededEntry.fetchedAt);
+				}
+
+				abortMusicListRequest();
+				applyMusicData(seededEntry);
+				isListLoading = false;
+			} else if (cachedEntry) {
+				applyMusicData({
+					...cachedEntry,
+					artists: cachedEntry.artists.length > 0 ? cachedEntry.artists : cachedArtists
+				});
+				void loadMusicListInBackground({ showLoading: !isMusicPageCacheFresh(cachedEntry) });
+			} else {
+				abortMusicListRequest();
+				musicList = [];
+				musicPlaylist = [];
+				artists = cachedArtists;
+				totalSongs = 0;
+				hasResolvedMusicList = false;
+				void loadMusicListInBackground({ showLoading: true });
+			}
+		}
+	});
+	let totalPages = $derived(Math.ceil(totalSongs / limit));
+	let downloadEstimateMb = $derived(Math.round((totalSongs * 4.5) / 1) || 0);
+	let downloadFilterLabel = $derived((() => {
+		if (currentSearch) return `« ${currentSearch} »`;
+		if (currentArtist) return currentArtist;
+		if (currentAlpha) return `lettre ${currentAlpha}`;
+		if (currentCategory && currentCategory !== 'All') return currentCategory;
+		return 'tous les chants';
+	})());
+	run(() => {
+		if (pendingPlayId && hasResolvedMusicList && pendingPlayId !== handledPlayId) {
+			handledPlayId = pendingPlayId;
+			void playSharedSong(pendingPlayId);
+		}
+	});
+	run(() => {
+		if ($selectAudio) {
+			if (cacheRefreshTimer) clearTimeout(cacheRefreshTimer);
+			cacheRefreshTimer = setTimeout(() => void refreshCachedUrls(), 1500);
+		}
+	});
+	// Build a deduplicated list of cached songs by combining metadata
+	// sources we have (favorites, recently played, current page) and
+	// keeping only those whose URL is in the cache. Songs cached but
+	// missing from all three sources won't appear — but in practice a
+	// song must be played to be cached, so it's almost always either
+	// in recently-played (last 20) or favorites.
+	let cachedSongs = $derived((() => {
+		const set = $cachedUrls;
+		if (set.size === 0)
+			return [] as Array<{
+				id: string;
+				title: string;
+				artist?: string;
+				category?: string;
+				s3_url?: string;
+				song?: MusicAudio;
+			}>;
+
+		const seen = new Set<string>();
+		const out: Array<{
+			id: string;
+			title: string;
+			artist?: string;
+			category?: string;
+			s3_url?: string;
+			song?: MusicAudio;
+		}> = [];
+
+		const pushIfCached = (
+			id: string,
+			title: string,
+			s3_url: string | null | undefined,
+			artist: string | null | undefined,
+			category: string | null | undefined,
+			song?: MusicAudio
+		) => {
+			if (!id || seen.has(id)) return;
+			if (!s3_url || !isUrlCached(s3_url, set)) return;
+			seen.add(id);
+			out.push({
+				id,
+				title,
+				artist: artist ?? undefined,
+				category: category ?? undefined,
+				s3_url,
+				song
+			});
+		};
+
+		// Favorites first (most intentionally retained), then recents,
+		// then current page — preserves a sensible default ordering.
+		for (const fav of $favorites) {
+			pushIfCached(fav.id, fav.title, fav.s3_url, fav.artist, fav.category);
+		}
+		for (const rec of $recentlyPlayed) {
+			pushIfCached(rec.id, rec.title, rec.s3_url, rec.artist, rec.category);
+		}
+		for (const song of (musicPlaylist || []) as MusicAudio[]) {
+			const id = song._id || song.s3_url || '';
+			pushIfCached(id, song.title || 'Sans titre', song.s3_url, song.artist, song.category, song);
+		}
+
+		return out;
+	})());
+	let cachedCount = $derived(cachedSongs.length);
+	let cachedPlayableCount = $derived(cachedSongs.reduce(
+		(n, item) => n + ((item.song ?? findSongById(musicPlaylist, item.id)) ? 1 : 0),
+		0
+	));
+	// ── END: play all cached ──────────────────────────────────────
+	let filteredArtists = $derived(artists.filter((a: string) =>
+		a.toLowerCase().includes(artistSearch.toLowerCase())
+	));
+	let playlistIndexByUrl = $derived(new Map<string, number>(
+		(musicPlaylist || []).map((song: MusicAudio, index: number) => [song.s3_url, index])
+	));
+	let activeMusicSong = $derived(isMusicAudio($selectAudio) ? $selectAudio : null);
+	let activeMusicSongIndex = $derived(activeMusicSong
+		? (playlistIndexByUrl.get(activeMusicSong.s3_url) ?? -1)
+		: -1);
+	let isActiveMusicSongVisible =
+		$derived(!!activeMusicSong &&
+		(musicList || []).some((song: MusicAudio) => song.s3_url === activeMusicSong.s3_url));
+	let activeMusicSongPage =
+		$derived(activeMusicSongIndex >= 0 ? Math.floor(activeMusicSongIndex / limit) + 1 : null);
+	let isRandomListOrder = $derived(currentSort.split(/[: ,]/)[0] === 'random');
+	// Sync playlist when songs are loaded
+	run(() => {
+		if (hasResolvedMusicList) {
+			const shouldPreserveActiveQueue =
+				(!!$selectAudio && !activeMusicSong) || (!!activeMusicSong && !isActiveMusicSongVisible);
+			if (!shouldPreserveActiveQueue) {
+				basePlaylist.set(musicPlaylist);
+				if (!$isShuffle) {
+					playlist.set(musicPlaylist);
+					if (activeMusicSong) {
+						const nextIndex = playlistIndexByUrl.get(activeMusicSong.s3_url);
+						if (nextIndex !== undefined) {
+							currentIndex.set(nextIndex);
+						}
+					}
+				}
+			}
+		}
+	});
 </script>
 
 <!-- All <title> / og:* / twitter:* meta lives in src/routes/+layout.svelte
      and reads from this page's load `meta` field (see +page.ts's
      buildMusiqueMeta) so there's exactly one tag per property. -->
 
-<svelte:window on:click={handleArtistOutsideClick} />
+<svelte:window onclick={handleArtistOutsideClick} />
 
 <div class="w-full min-w-0 max-w-6xl mx-auto px-4 pt-0 pb-8 md:px-6">
 	<div class="mb-8 md:mb-12 {$mobileFiltersOpen ? '' : 'hidden md:block'}">
@@ -903,7 +914,7 @@
 		>
 			<div
 				bind:this={recueilsScrollEl}
-				on:scroll={updateRecueilsScrollState}
+				onscroll={updateRecueilsScrollState}
 				class="recueils-track flex overflow-x-auto pb-4 gap-2 md:gap-3 no-scrollbar px-4 md:px-0 md:pb-0 snap-x"
 				style="scrollbar-width: none; -ms-overflow-style: none;"
 			>
@@ -913,7 +924,7 @@
 						category
 							? 'border-missionnaire text-missionnaire bg-missionnaire/5'
 							: 'bg-white/40 text-stone-500 border-stone-200/60 hover:border-missionnaire hover:text-missionnaire'}"
-						on:click={() => handleCategoryChange(category)}
+						onclick={() => handleCategoryChange(category)}
 					>
 						{category === 'All' ? 'Tout Voir' : category}
 					</button>
@@ -930,7 +941,7 @@
 				{#if isRandomListOrder}
 					<button
 						class="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-stone-500 transition-colors hover:border-missionnaire hover:text-missionnaire"
-						on:click={refreshRandomList}
+						onclick={refreshRandomList}
 						title="Rafraîchir l'ordre aléatoire"
 					>
 						<Icon src={BsShuffle} size="11" />
@@ -943,7 +954,7 @@
 				{#if isRandomListOrder}
 					<button
 						class="sm:hidden inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-stone-500 transition-colors hover:border-missionnaire hover:text-missionnaire"
-						on:click={refreshRandomList}
+						onclick={refreshRandomList}
 						title="Rafraîchir l'ordre aléatoire"
 					>
 						<Icon src={BsShuffle} size="11" />
@@ -955,17 +966,17 @@
 						class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors {isArtistMenuOpen
 							? 'border-missionnaire text-missionnaire bg-missionnaire/5'
 							: 'border-stone-200 bg-white text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
-						on:click|stopPropagation={() => (isArtistMenuOpen = !isArtistMenuOpen)}
+						onclick={stopPropagation(() => (isArtistMenuOpen = !isArtistMenuOpen))}
 					>
 						<Icon src={BsSearch} size="11" />
 						Artiste
 					</button>
 					{#if isArtistMenuOpen}
-						<!-- svelte-ignore a11y-no-static-element-interactions -->
-						<!-- svelte-ignore a11y-click-events-have-key-events -->
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
+						<!-- svelte-ignore a11y_click_events_have_key_events -->
 						<div
 							class="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-stone-200 p-3 z-50 normal-case tracking-normal"
-							on:click|stopPropagation
+							onclick={stopPropagation(bubble('click'))}
 						>
 							<div class="flex items-center gap-2 bg-stone-50 px-2 py-1.5 rounded-lg mb-2">
 								<Icon src={BsSearch} size="12" color="#999" />
@@ -987,7 +998,7 @@
 										class="w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-colors {!currentArtist
 											? 'bg-stone-100 text-missionnaire'
 											: 'text-stone-500 hover:bg-stone-50'}"
-										on:click={() => {
+										onclick={() => {
 											handleArtistChange('');
 											isArtistMenuOpen = false;
 										}}
@@ -1000,7 +1011,7 @@
 											artist
 												? 'bg-stone-100 text-missionnaire font-bold'
 												: 'text-stone-600 hover:bg-stone-50'}"
-											on:click={() => {
+											onclick={() => {
 												handleArtistChange(artist);
 												isArtistMenuOpen = false;
 											}}
@@ -1022,7 +1033,7 @@
 				{#if currentCategory && currentCategory !== 'All'}
 					<button
 						class="flex items-center gap-1.5 bg-stone-200 text-missionnaire px-3 py-1.5 rounded-full text-xs font-semibold"
-						on:click={() => handleCategoryChange('All')}
+						onclick={() => handleCategoryChange('All')}
 					>
 						<span>{currentCategory}</span>
 						<Icon src={BsX} size="14" />
@@ -1031,7 +1042,7 @@
 				{#if currentArtist}
 					<button
 						class="flex items-center gap-1.5 bg-stone-200 text-missionnaire px-3 py-1.5 rounded-full text-xs font-semibold"
-						on:click={() => handleArtistChange('')}
+						onclick={() => handleArtistChange('')}
 					>
 						<span class="max-w-[150px] truncate">{currentArtist}</span>
 						<Icon src={BsX} size="14" />
@@ -1066,7 +1077,7 @@
 				<div class="flex items-center gap-2">
 					<button
 						class="flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-bold text-missionnaire shadow-sm transition-colors hover:bg-stone-200"
-						on:click={() => dispatchAudioPlayerAction('toggle')}
+						onclick={() => dispatchAudioPlayerAction('toggle')}
 						title={$isPlaying ? 'Pause' : 'Lire'}
 					>
 						<Icon src={$isPlaying ? IoPauseCircle : IoPlayCircle} size="18" />
@@ -1074,7 +1085,7 @@
 					</button>
 					<button
 						class="rounded-full border border-stone-300 bg-white px-3 py-2 text-xs font-bold text-stone-700 transition-colors hover:border-missionnaire hover:text-missionnaire"
-						on:click={goToActiveSongPage}
+						onclick={goToActiveSongPage}
 					>
 						Afficher dans la liste
 					</button>
@@ -1091,7 +1102,7 @@
 					class="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-full border text-[10px] md:text-xs font-bold uppercase tracking-[0.12em] md:tracking-wider transition-colors whitespace-nowrap {showFavorites
 						? 'border-red-200 bg-red-50 text-red-600'
 						: 'border-stone-200 bg-white text-stone-500 hover:border-red-200 hover:text-red-500'}"
-					on:click={() => {
+					onclick={() => {
 						showFavorites = !showFavorites;
 						showRecent = false;
 						showCached = false;
@@ -1106,7 +1117,7 @@
 					class="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-full border text-[10px] md:text-xs font-bold uppercase tracking-[0.12em] md:tracking-wider transition-colors whitespace-nowrap {showRecent
 						? 'border-stone-300 bg-stone-100 text-missionnaire'
 						: 'border-stone-200 bg-white text-stone-500 hover:border-stone-300 hover:text-missionnaire'}"
-					on:click={() => {
+					onclick={() => {
 						showRecent = !showRecent;
 						showFavorites = false;
 						showCached = false;
@@ -1122,7 +1133,7 @@
 					class="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-full border text-[10px] md:text-xs font-bold uppercase tracking-[0.12em] md:tracking-wider transition-colors whitespace-nowrap {showCached
 						? 'border-emerald-200 bg-emerald-50 text-emerald-600'
 						: 'border-stone-200 bg-white text-stone-500 hover:border-emerald-200 hover:text-emerald-600'}"
-					on:click={() => {
+					onclick={() => {
 						showCached = !showCached;
 						showFavorites = false;
 						showRecent = false;
@@ -1137,7 +1148,7 @@
 			{#if totalSongs > 0}
 				<button
 					class="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-full border text-[10px] md:text-xs font-bold uppercase tracking-[0.12em] md:tracking-wider transition-colors whitespace-nowrap border-stone-200 bg-white text-stone-500 hover:border-missionnaire hover:text-missionnaire disabled:opacity-50 disabled:cursor-not-allowed"
-					on:click={openDownloadModal}
+					onclick={openDownloadModal}
 					disabled={isDownloading}
 					title="Télécharger la liste filtrée en .zip"
 				>
@@ -1158,7 +1169,7 @@
 					</span>
 					<button
 						class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-900 hover:bg-stone-800 text-white text-[10px] font-bold uppercase tracking-wider transition-colors"
-						on:click={() => playAllFavorites()}
+						onclick={() => playAllFavorites()}
 					>
 						<Icon src={BsPlayFill} size="10" />
 						Tout lire
@@ -1173,7 +1184,7 @@
 							<span class="text-[10px] font-bold text-stone-300 w-5 text-center">{i + 1}</span>
 							<button
 								class="flex-1 min-w-0 text-left"
-								on:click={() => {
+								onclick={() => {
 									if (favSong) playSong(favSong);
 								}}
 							>
@@ -1191,17 +1202,17 @@
 									{/if}
 								</div>
 							</button>
-							<!-- svelte-ignore a11y-click-events-have-key-events -->
-							<!-- svelte-ignore a11y-no-static-element-interactions -->
+							<!-- svelte-ignore a11y_click_events_have_key_events -->
+							<!-- svelte-ignore a11y_no_static_element_interactions -->
 							<div
 								class="text-red-300 hover:text-red-500 p-1 cursor-pointer transition-colors"
-								on:click|stopPropagation={() =>
+								onclick={stopPropagation(() =>
 									toggleFavorite({
 										_id: fav.id,
 										title: fav.title,
 										artist: fav.artist,
 										s3_url: fav.s3_url
-									})}
+									}))}
 								title="Retirer des favoris"
 							>
 								<Icon src={BsX} size="14" />
@@ -1228,7 +1239,7 @@
 							<span class="text-[10px] font-bold text-stone-300 w-5 text-center">{i + 1}</span>
 							<button
 								class="flex-1 min-w-0 text-left"
-								on:click={() => {
+								onclick={() => {
 									if (recentSong) playSong(recentSong);
 								}}
 							>
@@ -1262,7 +1273,7 @@
 					</span>
 					<button
 						class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-900 hover:bg-stone-800 text-white text-[10px] font-bold uppercase tracking-wider transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-stone-900"
-						on:click={() => playAllCached()}
+						onclick={() => playAllCached()}
 						disabled={cachedPlayableCount === 0}
 						title={cachedPlayableCount === 0 ? 'Aucun chant jouable sur cette page' : ''}
 					>
@@ -1279,7 +1290,7 @@
 							<span class="text-[10px] font-bold text-stone-300 w-5 text-center">{i + 1}</span>
 							<button
 								class="flex-1 min-w-0 text-left"
-								on:click={() => {
+								onclick={() => {
 									if (cachedSong) playSong(cachedSong);
 								}}
 								disabled={!cachedSong}
@@ -1315,7 +1326,7 @@
 			<div class="text-center">#</div>
 			<button
 				class="min-w-0 text-left flex items-center gap-1.5 hover:text-missionnaire transition-colors"
-				on:click={() => handleSortChange('title')}
+				onclick={() => handleSortChange('title')}
 			>
 				{#if currentSort.startsWith('title')}
 					<span class="text-missionnaire">
@@ -1326,7 +1337,7 @@
 			</button>
 			<button
 				class="hidden md:flex min-w-0 text-left items-center gap-1.5 hover:text-missionnaire transition-colors"
-				on:click={() => handleSortChange('category')}
+				onclick={() => handleSortChange('category')}
 			>
 				{#if currentSort.startsWith('category')}
 					<span class="text-missionnaire">
@@ -1355,7 +1366,7 @@
 			</div>
 			<button
 				class="hidden md:flex min-w-0 text-center items-center justify-center gap-1.5 hover:text-missionnaire transition-colors"
-				on:click={() => handleSortChange('duration')}
+				onclick={() => handleSortChange('duration')}
 			>
 				{#if currentSort.startsWith('duration')}
 					<span class="text-missionnaire">
@@ -1371,7 +1382,7 @@
 					class="hover:scale-110 active:scale-95 transition-all {isRandomListOrder
 						? 'text-missionnaire'
 						: 'text-stone-300 hover:text-missionnaire/60'}"
-					on:click={refreshRandomList}
+					onclick={refreshRandomList}
 					title={isRandomListOrder ? "Rafraîchir l'ordre aléatoire" : 'Mélanger la liste'}
 				>
 					<Icon src={BsShuffle} size="16" />
@@ -1409,7 +1420,7 @@
 					<p class="mt-2 text-xs text-stone-400">{listLoadError}</p>
 					<button
 						class="mt-5 inline-flex items-center rounded-full border border-missionnaire px-4 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-missionnaire transition-colors hover:bg-missionnaire/5"
-						on:click={() => void loadMusicListInBackground({ showLoading: true })}
+						onclick={() => void loadMusicListInBackground({ showLoading: true })}
 					>
 						Réessayer
 					</button>
@@ -1424,13 +1435,13 @@
 				{/if}
 				{#each musicList as song, i (song.s3_url || i)}
 					{@const isActive = isSongActive(song, $selectAudio)}
-					<!-- svelte-ignore a11y-click-events-have-key-events -->
-					<!-- svelte-ignore a11y-no-static-element-interactions -->
+					<!-- svelte-ignore a11y_click_events_have_key_events -->
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<div
 						class="grid grid-cols-[24px_1fr_auto_auto] {desktopMusicGrid} gap-1.5 md:gap-3 lg:gap-4 px-2 md:px-3 lg:px-4 py-3 md:py-4 items-center transition-all group cursor-pointer {isActive
 							? 'bg-missionnaire/5 border-l-4 border-l-missionnaire'
 							: 'hover:bg-white/60'}"
-						on:click={() => playSong(song)}
+						onclick={() => playSong(song)}
 					>
 						<div
 							class="text-center text-[10px] md:text-xs font-bold {isActive
@@ -1486,7 +1497,7 @@
 											: 'text-stone-400 hover:text-missionnaire'} {currentArtist === song.artist
 											? 'text-missionnaire underline'
 											: ''}"
-										on:click|stopPropagation={() => handleArtistChange(song.artist || '')}
+										onclick={stopPropagation(() => handleArtistChange(song.artist || ''))}
 									>
 										{song.artist}
 									</button>
@@ -1511,7 +1522,7 @@
 									song.artist
 										? 'text-missionnaire font-bold underline'
 										: ''}"
-									on:click|stopPropagation={() => handleArtistChange(song.artist || '')}
+									onclick={stopPropagation(() => handleArtistChange(song.artist || ''))}
 								>
 									{song.artist}
 								</button>
@@ -1534,7 +1545,7 @@
 								)
 									? 'text-red-500'
 									: 'text-stone-300 hover:text-red-400'}"
-								on:click|stopPropagation={() => toggleFavorite(song)}
+								onclick={stopPropagation(() => toggleFavorite(song))}
 								title={isFavorite(song._id || song.s3_url, $favorites)
 									? 'Retirer des favoris'
 									: 'Ajouter aux favoris'}
@@ -1550,7 +1561,7 @@
 								class="transition-colors p-1.5 md:p-2 {isActive
 									? 'text-missionnaire/60 hover:text-missionnaire'
 									: 'text-stone-400 hover:text-missionnaire'}"
-								on:click|stopPropagation={() => downloadSong(song)}
+								onclick={stopPropagation(() => downloadSong(song))}
 								title="Télécharger"
 							>
 								<Icon src={AiOutlineDownload} size="18" />
@@ -1561,13 +1572,13 @@
 								class="hover:scale-110 active:scale-95 transition-all p-1.5 md:p-2 {isActive
 									? 'text-missionnaire'
 									: 'text-missionnaire'}"
-								on:click|stopPropagation={() => {
+								onclick={stopPropagation(() => {
 									if (isActive) {
 										dispatchAudioPlayerAction('toggle');
 									} else {
 										playSong(song);
 									}
-								}}
+								})}
 								title={isActive && $isPlaying ? 'Pause' : 'Lire'}
 							>
 								<Icon src={isActive && $isPlaying ? IoPauseCircle : IoPlayCircle} size="22" />
@@ -1604,7 +1615,7 @@
 					<select
 						class="bg-stone-100 rounded-lg px-3 py-1.5 outline-none text-stone-800 focus:ring-2 focus:ring-missionnaire/20 transition-all cursor-pointer"
 						value={limit}
-						on:change={(e) => {
+						onchange={(e) => {
 							const params = new URLSearchParams($page.url.searchParams);
 							params.set('limit', e.currentTarget.value);
 							params.set('page', '1');
@@ -1639,11 +1650,11 @@
      and pins the overlay to the scrolled page position instead of the
      viewport. -->
 {#if downloadModalOpen}
-	<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+	<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 	<div
 		use:portal
 		class="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-stone-900/50 backdrop-blur-sm px-4 pb-4 sm:p-4"
-		on:click|self={closeDownloadModal}
+		onclick={self(closeDownloadModal)}
 	>
 		<div
 			class="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-stone-200"
@@ -1664,7 +1675,7 @@
 					{#if !isDownloading}
 						<button
 							class="p-1 text-stone-400 hover:text-stone-700 transition-colors"
-							on:click={closeDownloadModal}
+							onclick={closeDownloadModal}
 							aria-label="Fermer"
 						>
 							<Icon src={BsX} size="20" />
@@ -1761,27 +1772,27 @@
 				{#if isDownloading}
 					<button
 						class="px-4 py-2 rounded-full border border-stone-300 bg-white text-xs font-bold uppercase tracking-wider text-stone-700 hover:border-red-300 hover:text-red-600 transition-colors"
-						on:click={cancelDownload}
+						onclick={cancelDownload}
 					>
 						Annuler
 					</button>
 				{:else if downloadDoneSummary || downloadError}
 					<button
 						class="px-4 py-2 rounded-full bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold uppercase tracking-wider transition-colors"
-						on:click={closeDownloadModal}
+						onclick={closeDownloadModal}
 					>
 						Fermer
 					</button>
 				{:else}
 					<button
 						class="px-4 py-2 rounded-full border border-stone-300 bg-white text-xs font-bold uppercase tracking-wider text-stone-700 hover:border-stone-400 transition-colors"
-						on:click={closeDownloadModal}
+						onclick={closeDownloadModal}
 					>
 						Annuler
 					</button>
 					<button
 						class="flex items-center gap-1.5 px-4 py-2 rounded-full bg-missionnaire hover:bg-missionnaire/90 text-white text-xs font-bold uppercase tracking-wider transition-colors"
-						on:click={startDownload}
+						onclick={startDownload}
 					>
 						<Icon src={AiOutlineDownload} size="12" />
 						Démarrer

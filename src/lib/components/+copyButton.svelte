@@ -1,13 +1,16 @@
 <script lang="ts">
+	import { createBubbler, preventDefault } from 'svelte/legacy';
+
+	const bubble = createBubbler();
 	import { onMount, onDestroy } from 'svelte';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import BsClipboard2CheckFill from 'svelte-icons-pack/bs/BsClipboard2CheckFill';
 
 	let selectedText = '';
-	let showCopyButton = false;
-	let copied = false;
-	let buttonPosition = { top: 0, left: 0 };
+	let showCopyButton = $state(false);
+	let copied = $state(false);
+	let buttonPosition = $state({ top: 0, left: 0 });
 	let selectionChangeHandler: (() => void) | null = null;
 
 	const handleCopy = () => {
@@ -76,8 +79,8 @@
 	<button
 		class="fixed z-[9999] flex flex-row items-center gap-1.5 bg-slate-900 rounded-full text-white text-xs font-bold px-4 py-2.5 shadow-lg -translate-x-1/2 pointer-events-auto select-none hover:bg-slate-700 transition-colors"
 		style="top: {buttonPosition.top}px; left: {buttonPosition.left}px;"
-		on:mousedown|preventDefault
-		on:click={handleCopy}
+		onmousedown={preventDefault(bubble('mousedown'))}
+		onclick={handleCopy}
 	>
 		<Icon src={BsClipboard2CheckFill} />
 		<span>{copied ? 'Copied!' : 'Copy'}</span>

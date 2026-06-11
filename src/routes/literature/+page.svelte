@@ -13,20 +13,20 @@
 	import IoBookOutline from 'svelte-icons-pack/io/IoBookOutline';
 	import IoCreate from 'svelte-icons-pack/io/IoCreate';
 
-	export let data;
+	let { data } = $props();
 
-	$: literature = data.literature || [];
-	$: totalItems = data.total || 0;
-	$: currentAuthor = data.author;
-	$: currentType = data.category;
-	$: currentSearch = data.search;
-	$: currentSort = data.sort || 'release_date:desc';
-	$: currentPage = data.page;
-	$: limit = data.limit;
-	$: currentLanguage = data.language;
-	$: currentSource = data.source || 'All';
+	let literature = $derived(data.literature || []);
+	let totalItems = $derived(data.total || 0);
+	let currentAuthor = $derived(data.author);
+	let currentType = $derived(data.category);
+	let currentSearch = $derived(data.search);
+	let currentSort = $derived(data.sort || 'release_date:desc');
+	let currentPage = $derived(data.page);
+	let limit = $derived(data.limit);
+	let currentLanguage = $derived(data.language);
+	let currentSource = $derived(data.source || 'All');
 
-	let expandedItems = new Set<string>();
+	let expandedItems = $state(new Set<string>());
 
 	function toggleDescription(id: string | undefined) {
 		if (!id) return;
@@ -163,7 +163,7 @@
 						currentAuthor === author
 							? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20'
 							: 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-600'}"
-						on:click={() => handleAuthorChange(author)}
+						onclick={() => handleAuthorChange(author)}
 					>
 						{author === 'Tous' ? 'Tout le monde' : author}
 					</button>
@@ -188,7 +188,7 @@
 							currentType === cat
 								? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20'
 								: 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-600'}"
-							on:click={() => handleTypeChange(cat)}
+							onclick={() => handleTypeChange(cat)}
 						>
 							{#if cat === 'All'}
 								Tout
@@ -222,7 +222,7 @@
 							currentSource === src
 								? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20'
 								: 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-600'}"
-							on:click={() => handleSourceChange(src)}
+							onclick={() => handleSourceChange(src)}
 						>
 							{#if src === 'All'}
 								Toutes
@@ -253,7 +253,7 @@
 						lang.id
 							? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20'
 							: 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-600'}"
-						on:click={() => handleLanguageChange(lang.id)}
+						onclick={() => handleLanguageChange(lang.id)}
 					>
 						{lang.name}
 					</button>
@@ -272,14 +272,14 @@
 					placeholder="Rechercher un livre..."
 					class="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-xl shadow-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all text-sm"
 					value={currentSearch}
-					on:input={handleSearch}
+					oninput={handleSearch}
 				/>
 			</div>
 
 			{#if currentSearch || (currentAuthor && currentAuthor !== 'Tous') || (currentType && currentType !== 'All') || (currentSource && currentSource !== 'All')}
 				<button
 					class="flex items-center gap-2 text-orange-600 font-bold text-xs uppercase tracking-widest hover:text-orange-600 transition-colors"
-					on:click={() => goto('?')}
+					onclick={() => goto('?')}
 				>
 					<Icon src={BsX} size="18" />
 					Réinitialiser les filtres
@@ -366,7 +366,7 @@
 									{item.description}
 								</p>
 							{:else}
-								<div class="flex-grow" />
+								<div class="flex-grow"></div>
 							{/if}
 
 							<div
@@ -407,7 +407,7 @@
 					</div>
 					<button
 						class="text-left flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-orange-600 transition-colors"
-						on:click={() => handleSortChange('title')}
+						onclick={() => handleSortChange('title')}
 					>
 						TITRE
 						{#if currentSort.startsWith('title')}
@@ -420,7 +420,7 @@
 					</button>
 					<button
 						class="hidden md:flex text-left items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-orange-600 transition-colors"
-						on:click={() => handleSortChange('author')}
+						onclick={() => handleSortChange('author')}
 					>
 						AUTEUR
 						{#if currentSort.startsWith('author')}
@@ -469,7 +469,7 @@
 										{#if item.description.length > 100}
 											<button
 												class="text-[10px] font-bold text-orange-600 hover:text-orange-600 mt-1 uppercase tracking-wider"
-												on:click={() => toggleDescription(item._id)}
+												onclick={() => toggleDescription(item._id)}
 											>
 												{expandedItems.has(item._id || '') ? 'Voir moins' : 'Voir plus'}
 											</button>

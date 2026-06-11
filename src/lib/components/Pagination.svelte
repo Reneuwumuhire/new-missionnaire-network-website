@@ -1,5 +1,7 @@
 <script lang="ts">
-	/** Shared pagination used by /live/rediffusions and /predications so both
+	
+	interface Props {
+		/** Shared pagination used by /live/rediffusions and /predications so both
 	 *  lists render with identical navigation UX. Anchors-based (works with
 	 *  non-JS, right-click open-in-new-tab, and SvelteKit client-side nav).
 	 *
@@ -14,9 +16,12 @@
 	 *      Always shows the first 3 pages, the last 3 pages, and the current
 	 *      page with 2 siblings on each side. Gaps collapse into "…".
 	 */
-	export let current: number;
-	export let total: number;
-	export let getHref: (page: number) => string;
+		current: number;
+		total: number;
+		getHref: (page: number) => string;
+	}
+
+	let { current, total, getHref }: Props = $props();
 
 	// Desktop budget: first 3 + last 3 + current ± 2.
 	// Mobile budget: first + last + current ± 1. Still shows structure
@@ -45,10 +50,10 @@
 		return result;
 	}
 
-	$: desktopList = buildPageList(current, total, 3, 2);
-	$: mobileList = buildPageList(current, total, 1, 1);
-	$: hasPrev = current > 1;
-	$: hasNext = current < total;
+	let desktopList = $derived(buildPageList(current, total, 3, 2));
+	let mobileList = $derived(buildPageList(current, total, 1, 1));
+	let hasPrev = $derived(current > 1);
+	let hasNext = $derived(current < total);
 </script>
 
 {#if total > 1}

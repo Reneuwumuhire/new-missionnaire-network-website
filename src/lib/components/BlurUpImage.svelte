@@ -1,23 +1,41 @@
 <script lang="ts">
+	import { createBubbler } from 'svelte/legacy';
+
+	const bubble = createBubbler();
 	import { onMount } from 'svelte';
 
-	export let src: string;
-	export let srcset: string = '';
-	export let sizes: string = '';
-	export let placeholderSrc: string;
-	export let alt: string = '';
-	export let width: number | undefined = undefined;
-	export let height: number | undefined = undefined;
-	export let loading: 'lazy' | 'eager' = 'lazy';
-	export let fetchpriority: 'high' | 'low' | 'auto' = 'auto';
 	// Classes applied to the real <img> so callers can keep their existing
 	// hover/object-fit styles (the wrapper <div> is presentational only).
-	let className: string = '';
-	export { className as class };
+	interface Props {
+		src: string;
+		srcset?: string;
+		sizes?: string;
+		placeholderSrc: string;
+		alt?: string;
+		width?: number | undefined;
+		height?: number | undefined;
+		loading?: 'lazy' | 'eager';
+		fetchpriority?: 'high' | 'low' | 'auto';
+		class?: string;
+	}
 
-	let loaded = false;
-	let placeholderBroken = false;
-	let realImg: HTMLImageElement | undefined;
+	let {
+		src,
+		srcset = '',
+		sizes = '',
+		placeholderSrc,
+		alt = '',
+		width = undefined,
+		height = undefined,
+		loading = 'lazy',
+		fetchpriority = 'auto',
+		class: className = ''
+	}: Props = $props();
+	
+
+	let loaded = $state(false);
+	let placeholderBroken = $state(false);
+	let realImg: HTMLImageElement | undefined = $state();
 
 	function handleLoad() {
 		loaded = true;
@@ -39,7 +57,7 @@
 			src={placeholderSrc}
 			alt=""
 			aria-hidden="true"
-			on:error={() => (placeholderBroken = true)}
+			onerror={() => (placeholderBroken = true)}
 			class="blur-up-placeholder absolute inset-0 h-full w-full object-cover"
 			style:opacity={loaded ? 0 : 1}
 		/>
@@ -55,8 +73,8 @@
 		{width}
 		{height}
 		decoding="async"
-		on:load={handleLoad}
-		on:error
+		onload={handleLoad}
+		onerror={bubble('error')}
 		class={className}
 		style:opacity={loaded ? 1 : 0}
 		style:transition="opacity 400ms ease-out"

@@ -1,7 +1,11 @@
 <script lang="ts">
-	export let size = 16;
-	export let strokeWidth = 2.5;
-	export let className = '';
+	interface Props {
+		size?: number;
+		strokeWidth?: number;
+		className?: string;
+	}
+
+	let { size = 16, strokeWidth = 2.5, className = '' }: Props = $props();
 </script>
 
 <div

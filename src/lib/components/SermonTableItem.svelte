@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { run, createBubbler, stopPropagation } from 'svelte/legacy';
+
+	const bubble = createBubbler();
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import AiOutlineDownload from 'svelte-icons-pack/ai/AiOutlineDownload';
 	import BsFileEarmarkPdfFill from 'svelte-icons-pack/bs/BsFileEarmarkPdfFill';
@@ -14,11 +17,20 @@
 	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
 	import { downloadAudioFile } from '../../utils/downloadAudio';
 
-	export let sermon: Sermon;
-	export let index: number;
-	export let absoluteIndex: number;
-	export let language: string = 'french';
-	let resolvedDuration: number | null = sermon.duration ?? null;
+	interface Props {
+		sermon: Sermon;
+		index: number;
+		absoluteIndex: number;
+		language?: string;
+	}
+
+	let {
+		sermon,
+		index,
+		absoluteIndex,
+		language = 'french'
+	}: Props = $props();
+	let resolvedDuration: number | null = $state(sermon.duration ?? null);
 	let isDurationLoading = false;
 
 	// Background-download state: when the listener clicks the cloud icon we
@@ -26,25 +38,11 @@
 	// via window.open. Progress shows as a circular indicator in place of the
 	// icon (or a pulsing dot when Content-Length isn't known). Tapping the
 	// progress ring a second time cancels the in-flight request.
-	let isDownloading = false;
-	let downloadPercent: number | null = 0;
+	let isDownloading = $state(false);
+	let downloadPercent: number | null = $state(0);
 	let downloadController: AbortController | null = null;
 	const desktopSermonGrid = 'md:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.35fr)_110px_80px_120px]';
 
-	$: isActive = isSermonActive(sermon, $selectAudio);
-	$: sermonHref = `/predications/${buildSermonSlug(sermon)}`;
-	$: durationAudioUrl = language === 'english' ? sermon.english_audio_url : sermon.mp3_url;
-	$: hasDurationAudio = Boolean(durationAudioUrl);
-	// Only show the stored duration. We used to probe every row's audio via
-	// `<audio preload="metadata" src=url>` to extract its duration, but that
-	// kicked off a full network download per row (the browser fetches the
-	// moov atom which for m4a often requires the whole file). With ~100
-	// sermons per page that was ~40MB+ of wasted bandwidth on page load.
-	// Rows without a stored duration now render "--:--"; backfill them with
-	// admin/scripts/backfill-sermon-durations.ts. Each language has its own
-	// stored duration because translations usually run a different length.
-	$: resolvedDuration =
-		(language === 'english' ? sermon.english_duration : sermon.duration) ?? null;
 
 	function isSermonActive(s: Sermon, current: Sermon | AudioAsset | MusicAudio | null) {
 		// Check for specific english audio URL match
@@ -147,15 +145,31 @@
 		return isDurationLoading ? '...' : '--:--';
 	}
 
+	let isActive = $derived(isSermonActive(sermon, $selectAudio));
+	let sermonHref = $derived(`/predications/${buildSermonSlug(sermon)}`);
+	let durationAudioUrl = $derived(language === 'english' ? sermon.english_audio_url : sermon.mp3_url);
+	let hasDurationAudio = $derived(Boolean(durationAudioUrl));
+	// Only show the stored duration. We used to probe every row's audio via
+	// `<audio preload="metadata" src=url>` to extract its duration, but that
+	// kicked off a full network download per row (the browser fetches the
+	// moov atom which for m4a often requires the whole file). With ~100
+	// sermons per page that was ~40MB+ of wasted bandwidth on page load.
+	// Rows without a stored duration now render "--:--"; backfill them with
+	// admin/scripts/backfill-sermon-durations.ts. Each language has its own
+	// stored duration because translations usually run a different length.
+	run(() => {
+		resolvedDuration =
+			(language === 'english' ? sermon.english_duration : sermon.duration) ?? null;
+	});
 </script>
 
-<!-- svelte-ignore a11y-no-noninteractive-tabindex -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div
 	class="grid grid-cols-[30px_1fr_auto_auto] {desktopSermonGrid} gap-2 md:gap-4 px-4 py-3 md:py-4 items-center transition-all group cursor-pointer {isActive
 		? 'bg-orange-50/80 border-l-4 border-l-orange-500'
 		: 'hover:bg-gray-50'}"
-	on:click={togglePlay}
-	on:keydown={handleKeydown}
+	onclick={togglePlay}
+	onkeydown={handleKeydown}
 	role="button"
 	tabindex="0"
 	aria-label="Lire la prédication {sermon.french_title || sermon.english_title}"
@@ -176,7 +190,7 @@
 			class="text-sm font-bold line-clamp-1 transition-colors {isActive
 				? 'text-orange-600'
 				: 'text-gray-800 group-hover:text-orange-600'} hover:underline underline-offset-2"
-			on:click|stopPropagation
+			onclick={stopPropagation(bubble('click'))}
 		>
 			{#if language === 'english'}
 				{sermon.english_title || 'Untitled'}
@@ -237,7 +251,7 @@
 		{#if (language === 'english' && sermon.english_pdf_url) || (language !== 'english' && sermon.pdf_url)}
 			<button
 				class="p-2 text-gray-400 hover:text-red-500 transition-colors"
-				on:click|stopPropagation={downloadPdf}
+				onclick={stopPropagation(downloadPdf)}
 				title="Télécharger PDF"
 			>
 				<Icon src={BsFileEarmarkPdfFill} size="18" />
@@ -247,7 +261,7 @@
 		{#if (language === 'english' && sermon.english_audio_url) || (language !== 'english' && sermon.mp3_url)}
 			<button
 				class="group relative p-2 text-gray-400 hover:text-orange-600 transition-colors"
-				on:click|stopPropagation={downloadMp3}
+				onclick={stopPropagation(downloadMp3)}
 				title={isDownloading
 					? downloadPercent !== null
 						? `Annuler (${downloadPercent}%)`
@@ -301,7 +315,7 @@
 				class="hover:scale-110 active:scale-95 transition-all p-2 {isActive
 					? 'text-orange-600'
 					: 'text-orange-600'}"
-				on:click|stopPropagation={togglePlay}
+				onclick={stopPropagation(togglePlay)}
 				title={isActive && $isPlaying ? 'Pause' : 'Lire'}
 			>
 				<Icon src={isActive && $isPlaying ? IoPauseCircle : IoPlayCircle} size="24" />

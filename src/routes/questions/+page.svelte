@@ -8,12 +8,12 @@
 	import IoChevronDown from 'svelte-icons-pack/io/IoChevronDown';
 	import IoFilterOutline from 'svelte-icons-pack/io/IoFilterOutline';
 
-	export let data;
+	let { data } = $props();
 
-	let filtersOpen = false;
+	let filtersOpen = $state(false);
 
-	$: questions = (data.questions || []) as Question[];
-	$: totalPages = Math.max(1, Math.ceil((data.total || 0) / (data.limit || 12)));
+	let questions = $derived((data.questions || []) as Question[]);
+	let totalPages = $derived(Math.max(1, Math.ceil((data.total || 0) / (data.limit || 12))));
 
 	const sortOptions = [
 		{ value: 'newest', label: 'Plus récentes' },
@@ -101,7 +101,7 @@
 		class="mb-3 flex min-h-11 w-full items-center justify-between border border-stone-200/80 bg-white/65 px-4 text-xs font-bold uppercase tracking-[0.18em] text-stone-800 md:hidden"
 		aria-controls="question-filters"
 		aria-expanded={filtersOpen}
-		on:click={() => (filtersOpen = !filtersOpen)}
+		onclick={() => (filtersOpen = !filtersOpen)}
 	>
 		<span class="inline-flex items-center gap-2">
 			<Icon src={IoFilterOutline} className="h-4 w-4 text-missionnaire" />

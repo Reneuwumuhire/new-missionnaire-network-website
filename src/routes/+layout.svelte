@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { run } from 'svelte/legacy';
+
 	import '../app.css';
 	import NavBar from '$lib/components/+navBar.svelte';
 	import BottomNav from '$lib/components/+bottomNav.svelte';
@@ -20,14 +22,19 @@
 	import { browser, dev } from '$app/environment';
 	import { onMount, tick } from 'svelte';
 	import { radioIsLive } from '$lib/stores/global';
-	export let data: LayoutData;
+	interface Props {
+		data: LayoutData;
+		children?: import('svelte').Snippet;
+	}
+
+	let { data, children }: Props = $props();
 	const SITE_URL = 'https://missionnaire.net';
 	const DEFAULT_SEO_DESCRIPTION =
 		"Prédications, cantiques, littérature et transcriptions du Message de l'Heure pour l'édification spirituelle.";
 	const DEFAULT_SEO_TITLE = 'Missionnaire Network | Prédications et Cantiques du Message';
 	const LAST_MUSIC_PATH_KEY = 'missionnaire:last-music-path';
-	let headerRef: HTMLDivElement | null = null;
-	let headerHeight = 120;
+	let headerRef: HTMLDivElement | null = $state(null);
+	let headerHeight = $state(120);
 	let resizeObserver: ResizeObserver | null = null;
 
 	function rememberMusicPath(url: URL) {
@@ -115,13 +122,13 @@
 		};
 	});
 
-	$: canonicalUrl = `${SITE_URL}${$page.url.pathname}`;
+	let canonicalUrl = $derived(`${SITE_URL}${$page.url.pathname}`);
 	// Pages can publish per-route OG overrides through their `load`'s
 	// returned `meta` object. We surface a single set of og:* meta tags
 	// in <svelte:head> using these values so crawlers like WhatsApp
 	// never see duplicated og:title / og:description tags from layout +
 	// page (which they handle inconsistently).
-	$: pageMeta = (($page.data as any)?.meta ?? {}) as {
+	let pageMeta = $derived((($page.data as any)?.meta ?? {}) as {
 		title?: string;
 		description?: string;
 		url?: string;
@@ -130,36 +137,38 @@
 		imageHeight?: number;
 		type?: string;
 		noindex?: boolean;
-	};
-	$: ogTitle = pageMeta.title || DEFAULT_SEO_TITLE;
-	$: ogDescription = pageMeta.description || DEFAULT_SEO_DESCRIPTION;
-	$: ogUrl = pageMeta.url || canonicalUrl;
-	$: ogImage = pageMeta.image || `${SITE_URL}/og-image.jpg`;
-	$: ogType = pageMeta.type || 'website';
-	$: pageNoIndex = pageMeta.noindex === true;
+	});
+	let ogTitle = $derived(pageMeta.title || DEFAULT_SEO_TITLE);
+	let ogDescription = $derived(pageMeta.description || DEFAULT_SEO_DESCRIPTION);
+	let ogUrl = $derived(pageMeta.url || canonicalUrl);
+	let ogImage = $derived(pageMeta.image || `${SITE_URL}/og-image.jpg`);
+	let ogType = $derived(pageMeta.type || 'website');
+	let pageNoIndex = $derived(pageMeta.noindex === true);
 	// og:image:width/height are only safe to declare when we KNOW the image's
 	// real dimensions. The default og-image.jpg is 1200×630. A page-supplied
 	// image (live thumbnail, etc.) has unknown/variable dimensions — declaring
 	// the wrong 1200×630 makes Facebook/WhatsApp mis-render or reject it, so we
 	// omit the hints and let the crawler read the real size unless the page
 	// passes explicit dimensions.
-	$: ogImageDims = pageMeta.image
+	let ogImageDims = $derived(pageMeta.image
 		? pageMeta.imageWidth && pageMeta.imageHeight
 			? { w: pageMeta.imageWidth, h: pageMeta.imageHeight }
 			: null
-		: { w: 1200, h: 630 };
+		: { w: 1200, h: 630 });
 
 	const ytPages = ['/videos', '/musique', '/predications'];
-	$: needsYouTube = ytPages.some((p) => $page.url.pathname.startsWith(p));
+	let needsYouTube = $derived(ytPages.some((p) => $page.url.pathname.startsWith(p)));
 
 	// Radio live status — push-driven, no polling.
 	// 1. SSR seeds `data.radioState` so first paint shows truth.
 	// 2. Service Worker forwards Web Push payloads (`{type:'RADIO_PUSH'}`) to
 	//    every open tab, so the banner reacts the moment admin goes live.
 	// 3. BroadcastChannel keeps multiple tabs in the same browser consistent.
-	$: if (browser && data.radioState) {
-		radioIsLive.set(data.radioState.isLive);
-	}
+	run(() => {
+		if (browser && data.radioState) {
+			radioIsLive.set(data.radioState.isLive);
+		}
+	});
 
 	let radioBroadcast: BroadcastChannel | null = null;
 
@@ -368,7 +377,7 @@
 		<div class="relative mt-[120px]" style={browser ? `margin-top: ${headerHeight}px;` : undefined}>
 			{#key $page.url.pathname}
 				<div class="page-fade-in">
-					<slot />
+					{@render children?.()}
 				</div>
 			{/key}
 		</div>

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { run, preventDefault } from 'svelte/legacy';
+
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { onDestroy, onMount } from 'svelte';
@@ -24,56 +26,34 @@
 	import BsSearch from 'svelte-icons-pack/bs/BsSearch';
 	import BsX from 'svelte-icons-pack/bs/BsX';
 
-	export let data: PageData;
+	interface Props {
+		data: PageData;
+	}
+
+	let { data }: Props = $props();
 
 	const PAGE_SIZE = 20;
 
-	let loadedVideos: YoutubeVideo[] = [];
-	let liveStatus: YouTubeCachedStatus | null = null;
-	let requestedVideo: YoutubeVideo | null = null;
-	let skipCount = 0;
-	let hasMore = true;
-	let isInitialLoading = false;
-	let isLoadingMore = false;
-	let isSearchLoading = false;
-	let initialLoadError = '';
-	let hasResolved = false;
+	let loadedVideos: YoutubeVideo[] = $state([]);
+	let liveStatus: YouTubeCachedStatus | null = $state(null);
+	let requestedVideo: YoutubeVideo | null = $state(null);
+	let skipCount = $state(0);
+	let hasMore = $state(true);
+	let isInitialLoading = $state(false);
+	let isLoadingMore = $state(false);
+	let isSearchLoading = $state(false);
+	let initialLoadError = $state('');
+	let hasResolved = $state(false);
 	let abortController: AbortController | null = null;
 	let currentToken = 0;
-	let lastHandledKey = '';
-	let lastResetSelectionKey = '';
+	let lastHandledKey = $state('');
+	let lastResetSelectionKey = $state('');
 	let searchTimeout: ReturnType<typeof setTimeout> | null = null;
-	let searchInput = '';
-	let lastSyncedSearch = '';
+	let searchInput = $state('');
+	let lastSyncedSearch = $state('');
 	let observerTarget: HTMLElement;
 	let observer: IntersectionObserver | null = null;
 
-	$: initialVideos = ((data as any).videos || []) as YoutubeVideo[];
-	$: initialLiveStatus = ((data as any).liveStatus || null) as YouTubeCachedStatus | null;
-	$: initialRequestedVideo = ((data as any).requestedVideo || null) as YoutubeVideo | null;
-	$: currentFilter = ((data as any).filter || 'All') as string;
-	$: currentSearch = ((data as any).search || '') as string;
-	$: currentVideoId = ((data as any).videoId || '') as string;
-	$: isDeferredData = Boolean((data as any).deferred);
-	$: requestKey = JSON.stringify({
-		filter: currentFilter || 'All',
-		search: currentSearch || '',
-		videoId: currentVideoId || ''
-	});
-	$: activeLiveVideo = buildLiveVideo(liveStatus);
-	$: displayVideos = activeLiveVideo
-		? [activeLiveVideo, ...loadedVideos.filter((video) => video.id !== activeLiveVideo.id)]
-		: loadedVideos;
-	$: if (currentSearch !== lastSyncedSearch) {
-		searchInput = currentSearch;
-		lastSyncedSearch = currentSearch;
-	}
-	$: if (requestKey && requestKey !== lastResetSelectionKey) {
-		lastResetSelectionKey = requestKey;
-		if (browser && !currentVideoId) {
-			selectedVideo.set(undefined);
-		}
-	}
 
 	function buildLiveVideo(status: YouTubeCachedStatus | null): YoutubeVideo | null {
 		if (!status?.isLive || !status.videoId) return null;
@@ -169,39 +149,6 @@
 		}
 	}
 
-	$: if (requestKey && requestKey !== lastHandledKey) {
-		lastHandledKey = requestKey;
-		initialLoadError = '';
-
-		const cachedEntry = getVideosPageCache(requestKey);
-
-		if (!isDeferredData) {
-			const seeded = setVideosPageCache(requestKey, {
-				videos: initialVideos,
-				liveStatus: initialLiveStatus,
-				requestedVideo: initialRequestedVideo,
-				skipCount: initialVideos.length,
-				hasMore: initialVideos.length >= PAGE_SIZE
-			});
-			abortRequest();
-			applyData(seeded);
-			isInitialLoading = false;
-		} else if (cachedEntry) {
-			applyData(cachedEntry);
-			if (!isVideosPageCacheFresh(cachedEntry)) {
-				void loadInitial({ showLoading: false });
-			}
-		} else {
-			abortRequest();
-			loadedVideos = [];
-			liveStatus = null;
-			requestedVideo = null;
-			skipCount = 0;
-			hasMore = true;
-			hasResolved = false;
-			void loadInitial({ showLoading: true });
-		}
-	}
 
 	async function loadMoreVideos() {
 		if (isLoadingMore || !hasMore) return;
@@ -343,6 +290,71 @@
 		if (searchTimeout) clearTimeout(searchTimeout);
 		observer?.disconnect();
 	});
+	let initialVideos = $derived(((data as any).videos || []) as YoutubeVideo[]);
+	let initialLiveStatus = $derived(((data as any).liveStatus || null) as YouTubeCachedStatus | null);
+	let initialRequestedVideo = $derived(((data as any).requestedVideo || null) as YoutubeVideo | null);
+	let currentFilter = $derived(((data as any).filter || 'All') as string);
+	let currentSearch = $derived(((data as any).search || '') as string);
+	let currentVideoId = $derived(((data as any).videoId || '') as string);
+	let isDeferredData = $derived(Boolean((data as any).deferred));
+	let requestKey = $derived(JSON.stringify({
+		filter: currentFilter || 'All',
+		search: currentSearch || '',
+		videoId: currentVideoId || ''
+	}));
+	run(() => {
+		if (requestKey && requestKey !== lastHandledKey) {
+			lastHandledKey = requestKey;
+			initialLoadError = '';
+
+			const cachedEntry = getVideosPageCache(requestKey);
+
+			if (!isDeferredData) {
+				const seeded = setVideosPageCache(requestKey, {
+					videos: initialVideos,
+					liveStatus: initialLiveStatus,
+					requestedVideo: initialRequestedVideo,
+					skipCount: initialVideos.length,
+					hasMore: initialVideos.length >= PAGE_SIZE
+				});
+				abortRequest();
+				applyData(seeded);
+				isInitialLoading = false;
+			} else if (cachedEntry) {
+				applyData(cachedEntry);
+				if (!isVideosPageCacheFresh(cachedEntry)) {
+					void loadInitial({ showLoading: false });
+				}
+			} else {
+				abortRequest();
+				loadedVideos = [];
+				liveStatus = null;
+				requestedVideo = null;
+				skipCount = 0;
+				hasMore = true;
+				hasResolved = false;
+				void loadInitial({ showLoading: true });
+			}
+		}
+	});
+	let activeLiveVideo = $derived(buildLiveVideo(liveStatus));
+	let displayVideos = $derived(activeLiveVideo
+		? [activeLiveVideo, ...loadedVideos.filter((video) => video.id !== activeLiveVideo.id)]
+		: loadedVideos);
+	run(() => {
+		if (currentSearch !== lastSyncedSearch) {
+			searchInput = currentSearch;
+			lastSyncedSearch = currentSearch;
+		}
+	});
+	run(() => {
+		if (requestKey && requestKey !== lastResetSelectionKey) {
+			lastResetSelectionKey = requestKey;
+			if (browser && !currentVideoId) {
+				selectedVideo.set(undefined);
+			}
+		}
+	});
 </script>
 
 <svelte:head>
@@ -394,7 +406,7 @@
 		</section>
 
 		<div class="mb-8 flex flex-col gap-4">
-			<form class="relative w-full max-w-xl" on:submit|preventDefault={() => handleSearch(true)}>
+			<form class="relative w-full max-w-xl" onsubmit={preventDefault(() => handleSearch(true))}>
 				<div class="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400">
 					<Icon src={BsSearch} size="14" />
 				</div>
@@ -403,7 +415,7 @@
 					placeholder="Rechercher une vidéo..."
 					class="w-full border border-stone-200/80 bg-white pl-9 pr-24 py-3 text-sm font-body text-stone-800 placeholder:text-stone-400 focus:border-missionnaire/40 focus:outline-none focus:ring-1 focus:ring-missionnaire/30 transition-colors"
 					bind:value={searchInput}
-					on:input={() => handleSearch()}
+					oninput={() => handleSearch()}
 				/>
 				{#if isSearchLoading}
 					<LoadingRing
@@ -414,7 +426,7 @@
 					<button
 						type="button"
 						class="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-missionnaire transition-colors p-1"
-						on:click={() => {
+						onclick={() => {
 							searchInput = '';
 							handleSearch(true);
 						}}
@@ -431,7 +443,7 @@
 						class="px-3 py-1.5 text-sm font-medium transition-colors border {currentFilter === tagType.label
 							? 'border-missionnaire text-missionnaire bg-missionnaire/5'
 							: 'border-stone-200/60 text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
-						on:click={() => handleFilterChange(tagType.label)}
+						onclick={() => handleFilterChange(tagType.label)}
 					>
 						{tagType.label}
 					</button>
@@ -457,7 +469,7 @@
 				<p class="mt-2 text-xs text-stone-400">{initialLoadError}</p>
 				<button
 					class="mt-5 inline-flex items-center rounded-full border border-missionnaire px-4 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-missionnaire transition-colors hover:bg-missionnaire/5"
-					on:click={() => void loadInitial({ showLoading: true })}
+					onclick={() => void loadInitial({ showLoading: true })}
 				>
 					Réessayer
 				</button>
@@ -472,7 +484,7 @@
 			{#if !$selectedVideo && displayVideos[0]}
 				<button
 					class="relative w-full h-[50vh] min-h-[400px] max-h-[600px] overflow-hidden mb-16 group text-left transition-all block"
-					on:click={() => videoSelected(displayVideos[0])}
+					onclick={() => videoSelected(displayVideos[0])}
 				>
 					<img
 						src={displayVideos[0].thumbnail}
@@ -534,7 +546,7 @@
 
 					<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
 						{#each displayVideos.slice($selectedVideo ? 0 : 1) as video, index (video._id)}
-							<button on:click={() => videoSelected(video)} class="text-left w-full">
+							<button onclick={() => videoSelected(video)} class="text-left w-full">
 								<ThumbnailVideo {video} index={index + ($selectedVideo ? 0 : 1)} />
 							</button>
 						{/each}

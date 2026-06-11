@@ -3,11 +3,15 @@
 	import { vercelImage, vercelImageSrcSet, vercelImagePlaceholder } from '$lib/utils/vercelImage';
 	import BlurUpImage from '$lib/components/BlurUpImage.svelte';
 
-	export let recordings: PublishedRecording[] = [];
+	interface Props {
+		recordings?: PublishedRecording[];
+	}
+
+	let { recordings = [] }: Props = $props();
 
 	// Legacy thumbnails uploaded before the ACL fix return 403. Track failed
 	// IDs so the default logo fallback replaces the broken-image icon.
-	let failedThumbs = new Set<string>();
+	let failedThumbs = $state(new Set<string>());
 	function markThumbFailed(id: string) {
 		if (failedThumbs.has(id)) return;
 		failedThumbs = new Set(failedThumbs).add(id);

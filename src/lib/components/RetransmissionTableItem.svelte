@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { createBubbler, stopPropagation } from 'svelte/legacy';
+
+	const bubble = createBubbler();
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import AiOutlineDownload from 'svelte-icons-pack/ai/AiOutlineDownload';
 	import IoPlayCircle from 'svelte-icons-pack/io/IoPlayCircle';
@@ -12,31 +15,16 @@
 	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
 	import { downloadAudioFile } from '../../utils/downloadAudio';
 
-	export let recording: PublishedRecording;
-	export let absoluteIndex: number;
+	interface Props {
+		recording: PublishedRecording;
+		absoluteIndex: number;
+	}
+
+	let { recording, absoluteIndex }: Props = $props();
 
 	const desktopSermonGrid = 'md:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.35fr)_110px_80px_120px]';
 
-	// Shape the recording as a MusicAudio-compatible entry so it slots into
-	// the same global audio-player stores the sermon + music pages use.
-	$: playable = {
-		_id: recording.id,
-		book: null,
-		book_full_name: null,
-		number: null,
-		title: recording.title,
-		artist: 'Missionnaire Network',
-		category: 'Direct',
-		s3_key: '',
-		s3_url: recording.s3_url,
-		file_size: recording.size_bytes ?? 0,
-		duration: recording.duration_sec ?? undefined,
-		format: 'mp3',
-		uploaded_at: new Date(recording.started_at),
-		thumbnail_url: recording.thumbnail_url ?? undefined
-	} satisfies MusicAudio & { thumbnail_url?: string };
 
-	$: isActive = isRecordingActive($selectAudio);
 
 	function isRecordingActive(current: Sermon | AudioAsset | MusicAudio | null): boolean {
 		if (!current) return false;
@@ -71,8 +59,8 @@
 	}
 
 	// Download state mirrors SermonTableItem so the row visual is identical.
-	let isDownloading = false;
-	let downloadPercent: number | null = 0;
+	let isDownloading = $state(false);
+	let downloadPercent: number | null = $state(0);
 	let downloadController: AbortController | null = null;
 
 	async function downloadMp3() {
@@ -110,15 +98,34 @@
 		const month = String(d.getUTCMonth() + 1).padStart(2, '0');
 		return `${day}.${month}.${d.getUTCFullYear()}`;
 	}
+	// Shape the recording as a MusicAudio-compatible entry so it slots into
+	// the same global audio-player stores the sermon + music pages use.
+	let playable = $derived({
+		_id: recording.id,
+		book: null,
+		book_full_name: null,
+		number: null,
+		title: recording.title,
+		artist: 'Missionnaire Network',
+		category: 'Direct',
+		s3_key: '',
+		s3_url: recording.s3_url,
+		file_size: recording.size_bytes ?? 0,
+		duration: recording.duration_sec ?? undefined,
+		format: 'mp3',
+		uploaded_at: new Date(recording.started_at),
+		thumbnail_url: recording.thumbnail_url ?? undefined
+	} satisfies MusicAudio & { thumbnail_url?: string });
+	let isActive = $derived(isRecordingActive($selectAudio));
 </script>
 
-<!-- svelte-ignore a11y-no-noninteractive-tabindex -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div
 	class="grid grid-cols-[30px_1fr_auto_auto] {desktopSermonGrid} gap-2 md:gap-4 px-4 py-3 md:py-4 items-center transition-all group cursor-pointer {isActive
 		? 'bg-orange-50/80 border-l-4 border-l-orange-500'
 		: 'hover:bg-gray-50'}"
-	on:click={togglePlay}
-	on:keydown={handleKeydown}
+	onclick={togglePlay}
+	onkeydown={handleKeydown}
 	role="button"
 	tabindex="0"
 	aria-label="Lire la retransmission {recording.title}"
@@ -137,7 +144,7 @@
 			class="text-sm font-bold line-clamp-1 transition-colors {isActive
 				? 'text-orange-600'
 				: 'text-gray-800 group-hover:text-orange-600'} hover:underline underline-offset-2"
-			on:click|stopPropagation
+			onclick={stopPropagation(bubble('click'))}
 		>
 			{recording.title}
 		</a>
@@ -192,7 +199,7 @@
 		{#if recording.s3_url}
 			<button
 				class="group relative p-2 text-gray-400 hover:text-orange-600 transition-colors"
-				on:click|stopPropagation={downloadMp3}
+				onclick={stopPropagation(downloadMp3)}
 				title={isDownloading
 					? downloadPercent !== null
 						? `Annuler (${downloadPercent}%)`
@@ -239,7 +246,7 @@
 		{#if recording.s3_url}
 			<button
 				class="hover:scale-110 active:scale-95 transition-all p-2 text-orange-600"
-				on:click|stopPropagation={togglePlay}
+				onclick={stopPropagation(togglePlay)}
 				title={isActive && $isPlaying ? 'Pause' : 'Lire'}
 			>
 				<Icon src={isActive && $isPlaying ? IoPauseCircle : IoPlayCircle} size="24" />

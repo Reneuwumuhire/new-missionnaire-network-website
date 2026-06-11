@@ -11,8 +11,8 @@
 	// SSR/first-paint reads the admin-gate-aware `radioState` from the layout's
 	// server load; after hydration we switch to the push-driven store so SW
 	// `RADIO_PUSH` events update the banner without a network call.
-	$: ssrIsLive = $page.data?.radioState?.isLive ?? false;
-	$: isLive = browser ? $radioIsLiveStore : ssrIsLive;
+	let ssrIsLive = $derived($page.data?.radioState?.isLive ?? false);
+	let isLive = $derived(browser ? $radioIsLiveStore : ssrIsLive);
 </script>
 
 <div

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { run, preventDefault } from 'svelte/legacy';
+
 	import AndroidBanner from '$lib/components/+androidBanner.svelte';
 	import AudioTableItem from '$lib/components/+audioTableItem.svelte';
 	import { getContext, onDestroy, onMount } from 'svelte';
@@ -11,23 +13,25 @@
 	import MobileListToolbar from '$lib/components/+mobileListToolbar.svelte';
 	import { mobileSearchOpen } from '$lib/stores/mobileControls';
 
-	export let data;
-	let heroSearchValue = (data as any).search || '';
-	let debounceTimer: NodeJS.Timeout;
-	let isHeroSearchLoading = false;
-	let lastSyncedSearch = '';
+	let { data, children } = $props();
+	let heroSearchValue = $state((data as any).search || '');
+	let debounceTimer: NodeJS.Timeout = $state();
+	let isHeroSearchLoading = $state(false);
+	let lastSyncedSearch = $state('');
 
 	// Total song count for the hero copy. Loaded async on mount so the page
 	// renders immediately with a fallback string — if the count endpoint is
 	// slow or unreachable, the hero stays useful instead of blocking on it.
-	let totalSongs: number | null = null;
+	let totalSongs: number | null = $state(null);
 	const formattedTotal = (n: number) => n.toLocaleString('fr-FR');
 
-	$: currentSearch = $page.url.searchParams.get('search') || '';
-	$: if (currentSearch !== lastSyncedSearch) {
-		heroSearchValue = currentSearch;
-		lastSyncedSearch = currentSearch;
-	}
+	let currentSearch = $derived($page.url.searchParams.get('search') || '');
+	run(() => {
+		if (currentSearch !== lastSyncedSearch) {
+			heroSearchValue = currentSearch;
+			lastSyncedSearch = currentSearch;
+		}
+	});
 
 	async function handleHeroSearch() {
 		if (!browser) return;
@@ -42,19 +46,21 @@
 		await goto(`?${params.toString()}`, { keepFocus: true, noScroll: true });
 	}
 
-	$: if (browser) {
-		if (heroSearchValue !== undefined) {
-			clearTimeout(debounceTimer);
-			debounceTimer = setTimeout(() => {
-				if (heroSearchValue.trim() !== currentSearch) {
-					isHeroSearchLoading = true;
-					void handleHeroSearch();
-				} else {
-					isHeroSearchLoading = false;
-				}
-			}, 300);
+	run(() => {
+		if (browser) {
+			if (heroSearchValue !== undefined) {
+				clearTimeout(debounceTimer);
+				debounceTimer = setTimeout(() => {
+					if (heroSearchValue.trim() !== currentSearch) {
+						isHeroSearchLoading = true;
+						void handleHeroSearch();
+					} else {
+						isHeroSearchLoading = false;
+					}
+				}, 300);
+			}
 		}
-	}
+	});
 
 	async function handleClick(event: {
 		preventDefault: () => void;
@@ -101,7 +107,7 @@
 					</p>
 					<form
 						class="hidden md:flex w-full max-w-xl border border-white/25 bg-white/90 backdrop-blur-sm overflow-hidden"
-						on:submit|preventDefault={handleHeroSearch}
+						onsubmit={preventDefault(handleHeroSearch)}
 					>
 						<div class="relative flex-1">
 							<input
@@ -122,7 +128,7 @@
 									aria-label="Effacer la recherche"
 									title="Effacer"
 									class="absolute right-2.5 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full text-stone-400 hover:bg-stone-200 hover:text-stone-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
-									on:click={() => {
+									onclick={() => {
 										heroSearchValue = '';
 									}}
 								>
@@ -180,7 +186,7 @@
 {#if $mobileSearchOpen}
 	<div class="md:hidden border-b border-stone-200 bg-cream px-4 py-3">
 		<div class="relative">
-			<!-- svelte-ignore a11y-autofocus -->
+			<!-- svelte-ignore a11y_autofocus -->
 			<input
 				type="search"
 				class="w-full rounded-lg border border-stone-200 bg-white py-2.5 pl-10 pr-3 text-base font-body text-stone-800 outline-none placeholder:text-stone-400 focus:border-missionnaire/40"
@@ -209,7 +215,7 @@
 
 <div class="flex flex-row justify-center h-auto w-full pt-4 pb-32 md:pt-16 md:pb-16 overflow-x-hidden">
 	<div class=" flex flex-col w-full max-w-7xl px-2 md:px-5">
-		<slot />
+		{@render children?.()}
 	</div>
 </div>
 

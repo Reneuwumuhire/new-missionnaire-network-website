@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { run } from 'svelte/legacy';
+
 	import { createEventDispatcher, onMount, tick } from 'svelte';
 	import { formatTime } from '../../utils/FormatTime';
 
@@ -24,28 +26,40 @@
 				verse_number?: unknown;
 		  };
 
-	export let lines: LyricLine[] = [];
-	export let currentTime = 0;
-	export let fullscreenMobile = false;
 	// Opt-in (used by the live transcript): a deliberate user scroll pauses
 	// auto-follow so long texts can be read back; a sticky pill jumps back to
 	// the current line and resumes following. Music lyrics keep the always-
 	// follow behavior. Only wheel/touchmove count as "user scroll" — they
-	// never fire from programmatic scrollIntoView, so no flag juggling.
-	export let pauseOnUserScroll = false;
+	
 	// Dark palette at ALL viewport widths + fill-parent sizing — for the
 	// transcript's fullscreen overlay. (fullscreenMobile only goes dark under
-	// 768px, which is what the music drawer wants; this one is unconditional.)
-	export let fullscreenDark = false;
+	
+	interface Props {
+		lines?: LyricLine[];
+		currentTime?: number;
+		fullscreenMobile?: boolean;
+		// never fire from programmatic scrollIntoView, so no flag juggling.
+		pauseOnUserScroll?: boolean;
+		// 768px, which is what the music drawer wants; this one is unconditional.)
+		fullscreenDark?: boolean;
+	}
+
+	let {
+		lines = [],
+		currentTime = 0,
+		fullscreenMobile = false,
+		pauseOnUserScroll = false,
+		fullscreenDark = false
+	}: Props = $props();
 
 	const dispatch = createEventDispatcher<{ seek: { time: number } }>();
 
-	let panelElement: HTMLDivElement;
-	let lineElements: Array<HTMLButtonElement | HTMLDivElement | null> = [];
-	let activeLineIndex = -1;
-	let previousActiveLineIndex = -1;
-	let prefersReducedMotion = false;
-	let userScrolled = false;
+	let panelElement: HTMLDivElement = $state();
+	let lineElements: Array<HTMLButtonElement | HTMLDivElement | null> = $state([]);
+	let activeLineIndex = $state(-1);
+	let previousActiveLineIndex = $state(-1);
+	let prefersReducedMotion = $state(false);
+	let userScrolled = $state(false);
 
 	function onUserScroll() {
 		if (pauseOnUserScroll) userScrolled = true;
@@ -154,21 +168,25 @@
 		dispatch('seek', { time: start });
 	}
 
-	$: activeLineIndex = findActiveLineIndex(currentTime);
+	run(() => {
+		activeLineIndex = findActiveLineIndex(currentTime);
+	});
 
-	$: if (activeLineIndex !== previousActiveLineIndex) {
-		previousActiveLineIndex = activeLineIndex;
-		if (activeLineIndex >= 0 && !userScrolled) {
-			void tick().then(() => {
-				const activeElement = lineElements[activeLineIndex];
-				if (!activeElement || !panelElement) return;
-				activeElement.scrollIntoView({
-					block: 'center',
-					behavior: prefersReducedMotion ? 'auto' : 'smooth'
+	run(() => {
+		if (activeLineIndex !== previousActiveLineIndex) {
+			previousActiveLineIndex = activeLineIndex;
+			if (activeLineIndex >= 0 && !userScrolled) {
+				void tick().then(() => {
+					const activeElement = lineElements[activeLineIndex];
+					if (!activeElement || !panelElement) return;
+					activeElement.scrollIntoView({
+						block: 'center',
+						behavior: prefersReducedMotion ? 'auto' : 'smooth'
+					});
 				});
-			});
+			}
 		}
-	}
+	});
 
 	onMount(() => {
 		const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -192,8 +210,8 @@
 	class="lyrics-panel"
 	role="group"
 	aria-label="Paroles synchronisées"
-	on:wheel={onUserScroll}
-	on:touchmove={onUserScroll}
+	onwheel={onUserScroll}
+	ontouchmove={onUserScroll}
 >
 	{#each lines as line, index}
 		{@const start = getLineStart(line)}
@@ -228,7 +246,7 @@
 				class:chorus={chorus}
 				class:past={activeLineIndex >= 0 && index < activeLineIndex}
 				class:future={activeLineIndex >= 0 && index > activeLineIndex}
-				on:click={() => seekToLine(line)}
+				onclick={() => seekToLine(line)}
 				aria-current={index === activeLineIndex ? 'true' : undefined}
 				aria-label={verseNumber !== null
 					? `Couplet ${verseNumber}, ${formatTime(start)} : ${text}`
@@ -251,7 +269,7 @@
 		{/if}
 	{/each}
 	{#if pauseOnUserScroll && userScrolled && activeLineIndex >= 0}
-		<button type="button" class="resume-follow" on:click={resumeAutoScroll}>
+		<button type="button" class="resume-follow" onclick={resumeAutoScroll}>
 			↓ Revenir au passage en cours
 		</button>
 	{/if}
@@ -395,8 +413,8 @@
 
 	/* Round only the bottom corners of the LAST chorus line in a run */
 	.lyric-line.chorus:last-child,
-	.lyric-line.chorus:has(+ .lyric-line:not(.chorus)),
-	.lyric-line.chorus:has(+ .lyric-section) {
+	.lyric-line.chorus:has(:global(+ .lyric-line:not(.chorus))),
+	.lyric-line.chorus:has(:global(+ .lyric-section)) {
 		border-bottom-left-radius: 0.6rem;
 		border-bottom-right-radius: 0.6rem;
 	}

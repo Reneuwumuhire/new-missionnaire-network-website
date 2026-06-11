@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { stopPropagation } from 'svelte/legacy';
+
 	import { browser } from '$app/environment';
 	import { onDestroy } from 'svelte';
 
@@ -12,19 +14,17 @@
 	// Same dropdown UI as the music player and rediffusion pages: a
 	// "Partager" trigger that opens the native share sheet and a plain
 	// "Copier le lien" fallback, with inline copy/error feedback.
-	let isShareMenuOpen = false;
-	let shareFeedback: 'copied' | 'error' | null = null;
+	let isShareMenuOpen = $state(false);
+	let shareFeedback: 'copied' | 'error' | null = $state(null);
 	let shareFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
-	let shareWrapEl: HTMLElement | null = null;
-	$: hasNativeShare =
-		browser && typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+	let shareWrapEl: HTMLElement | null = $state(null);
+	let hasNativeShare =
+		$derived(browser && typeof navigator !== 'undefined' && typeof navigator.share === 'function');
 
 	// Title/text for the native share sheet — the page passes the current
 	// live's title when on air, otherwise the generic copy. (The thumbnail
 	// preview comes from the page's server-rendered og:image tags, which the
-	// share-sheet/link-preview crawlers read; it can't be set here.)
-	export let title = 'Écoute en direct - Missionnaire Network';
-	export let text = 'Écoutez Missionnaire Network en direct 🎙️';
+	
 	// Current broadcast session (epoch-ms), server-rendered by /live's load.
 	// When set, the share link is stamped with it so it later resolves to this
 	// session's replay. We deliberately do NOT fetch /api/live/radio-state here:
@@ -32,12 +32,26 @@
 	// standardised on, and a second fetch per /live load would double traffic to
 	// that no-store endpoint. The cost is that a direct which started while this
 	// page sat in the (≤60s) edge cache yields a plain /live link until the next
-	// revalidation — acceptable, since lives run far longer than that window.
-	export let liveSessionId: number | null = null;
+	
 	// Stable watch URL (/live/<slug>) — passed by the scheduled-live watch page.
 	// Takes precedence over the session-stamped /live link: the slug URL works
-	// before, during, and after the broadcast.
-	export let shareUrl: string | null = null;
+	
+	interface Props {
+		// share-sheet/link-preview crawlers read; it can't be set here.)
+		title?: string;
+		text?: string;
+		// revalidation — acceptable, since lives run far longer than that window.
+		liveSessionId?: number | null;
+		// before, during, and after the broadcast.
+		shareUrl?: string | null;
+	}
+
+	let {
+		title = 'Écoute en direct - Missionnaire Network',
+		text = 'Écoutez Missionnaire Network en direct 🎙️',
+		liveSessionId = null,
+		shareUrl = null
+	}: Props = $props();
 
 	function buildShareUrl(): string {
 		if (!browser) return '';
@@ -109,12 +123,12 @@
 	});
 </script>
 
-<svelte:window on:click={handleShareOutsideClick} />
+<svelte:window onclick={handleShareOutsideClick} />
 
 <div class="relative mt-4" bind:this={shareWrapEl}>
 	<button
 		type="button"
-		on:click|stopPropagation={toggleShareMenu}
+		onclick={stopPropagation(toggleShareMenu)}
 		aria-haspopup="menu"
 		aria-expanded={isShareMenuOpen}
 		aria-label="Partager le direct"
@@ -149,20 +163,20 @@
 	</button>
 
 	{#if isShareMenuOpen}
-		<!-- svelte-ignore a11y-click-events-have-key-events -->
-		<!-- svelte-ignore a11y-no-static-element-interactions -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			class="absolute left-1/2 top-full z-[60] mt-1.5 w-56 -translate-x-1/2 overflow-hidden rounded-lg border border-stone-200 bg-white shadow-2xl"
 			role="menu"
 			tabindex="-1"
-			on:click|stopPropagation={() => undefined}
+			onclick={stopPropagation(() => undefined)}
 		>
 			{#if hasNativeShare}
 				<button
 					type="button"
 					role="menuitem"
 					class="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-stone-700 transition-colors hover:bg-stone-50 hover:text-missionnaire"
-					on:click={nativeShare}
+					onclick={nativeShare}
 				>
 					<svg
 						width="16"
@@ -188,7 +202,7 @@
 				type="button"
 				role="menuitem"
 				class="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-stone-700 transition-colors hover:bg-stone-50 hover:text-missionnaire"
-				on:click={copyShareLink}
+				onclick={copyShareLink}
 			>
 				<svg
 					width="16"

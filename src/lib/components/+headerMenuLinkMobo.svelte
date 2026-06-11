@@ -5,18 +5,30 @@
 	import BsChevronDown from 'svelte-icons-pack/bs/BsChevronDown';
 	import type { NavigationLinkSubmenu } from '../../helpers/NavigationLinkList';
 
-	export let subMenu: NavigationLinkSubmenu[];
-	export let menuName: string;
-	export let link: string;
-	export let closeMenuFrom: () => void;
 
-	export let active: boolean = false;
-	export let activeClass: string = 'text-missionnaire';
-	export let inactiveClass: string = 'text-stone-400';
+	interface Props {
+		subMenu: NavigationLinkSubmenu[];
+		menuName: string;
+		link: string;
+		closeMenuFrom: () => void;
+		active?: boolean;
+		activeClass?: string;
+		inactiveClass?: string;
+	}
+
+	let {
+		subMenu,
+		menuName,
+		link,
+		closeMenuFrom,
+		active = false,
+		activeClass = 'text-missionnaire',
+		inactiveClass = 'text-stone-400'
+	}: Props = $props();
 
 	const dispatch = createEventDispatcher();
 
-	$: isActive = $page.url.pathname === link || $page.url.pathname.startsWith(link + '/');
+	let isActive = $derived($page.url.pathname === link || $page.url.pathname.startsWith(link + '/'));
 </script>
 
 <div class="flex flex-col w-full border-b border-stone-100 last:border-b-0">
@@ -24,7 +36,7 @@
 		<!-- Entire row is a single button for sub-menu items -->
 		<button
 			class="flex items-center justify-between w-full py-3.5 transition-colors duration-200 cursor-pointer"
-			on:click={() => dispatch('toggle')}
+			onclick={() => dispatch('toggle')}
 		>
 			<span class="text-[15px] font-medium whitespace-nowrap {isActive ? 'text-missionnaire' : 'text-stone-700'}">
 				{menuName}
@@ -41,7 +53,7 @@
 		<a
 			href={link}
 			class="flex items-center py-3.5 text-[15px] font-medium whitespace-nowrap w-full transition-colors duration-200 {isActive ? 'text-missionnaire' : 'text-stone-700 hover:text-missionnaire'}"
-			on:click={() => closeMenuFrom()}
+			onclick={() => closeMenuFrom()}
 		>
 			{menuName}
 			{#if isActive}
@@ -57,7 +69,7 @@
 				<a
 					href={subLink}
 					class="flex items-center gap-3 py-2.5 transition-colors duration-200 {isSubActive ? 'text-missionnaire' : 'hover:text-missionnaire'}"
-					on:click={() => {
+					onclick={() => {
 						closeMenuFrom();
 					}}
 				>

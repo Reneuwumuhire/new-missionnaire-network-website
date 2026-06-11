@@ -9,7 +9,7 @@
 	import HiOutlineEye from 'svelte-icons-pack/hi/HiOutlineEye';
 	import HiOutlineCalendar from 'svelte-icons-pack/hi/HiOutlineCalendar';
 
-	let playNow = false;
+	let playNow = $state(false);
 	const handleClick = () => {
 		playNow = !playNow;
 	};
@@ -69,7 +69,7 @@
 						<!-- Center Play Button -->
 						<div class="absolute inset-0 flex items-center justify-center pointer-events-none">
 							<button
-								on:click={() => (playNow = true)}
+								onclick={() => (playNow = true)}
 								class="w-20 h-20 md:w-32 md:h-32 text-missionnaire transition-all duration-300 hover:scale-110 active:scale-95 drop-shadow-[0_0_30px_rgba(242,143,62,0.3)] group/play pointer-events-auto"
 							>
 								<Icon size="100%" src={BsPlayCircleFill} />

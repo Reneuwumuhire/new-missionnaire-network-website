@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { run } from 'svelte/legacy';
+
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import type { Sermon } from '$lib/models/sermon';
@@ -30,42 +32,42 @@
 		type PredicationsPageCacheEntry
 	} from './listCache';
 
-	export let data;
+	let { data } = $props();
 
-	let sermons: Sermon[] = [];
-	let recordings: PublishedRecording[] = [];
-	let recordingsTotal = 0;
-	let showBlendedRetransmissions = false;
-	let totalSermons = 0;
-	let years: string[] = [];
-	let availableAuthors: string[] = [];
-	let filterType: 'sermon' | 'retransmission' = 'sermon';
-	let isListLoading = false;
-	let listLoadError = '';
-	let hasResolvedList = false;
+	let sermons: Sermon[] = $state([]);
+	let recordings: PublishedRecording[] = $state([]);
+	let recordingsTotal = $state(0);
+	let showBlendedRetransmissions = $state(false);
+	let totalSermons = $state(0);
+	let years: string[] = $state([]);
+	let availableAuthors: string[] = $state([]);
+	let filterType: 'sermon' | 'retransmission' = $state('sermon');
+	let isListLoading = $state(false);
+	let listLoadError = $state('');
+	let hasResolvedList = $state(false);
 	let abortController: AbortController | null = null;
 	let currentRequestToken = 0;
-	let lastHandledKey = '';
+	let lastHandledKey = $state('');
 
-	$: initialSermons = ((data as any).sermons || []) as Sermon[];
-	$: initialRecordings = ((data as any).recordings || []) as PublishedRecording[];
-	$: initialRecordingsTotal = ((data as any).recordingsTotal || 0) as number;
-	$: initialShowBlended = Boolean((data as any).showBlendedRetransmissions);
-	$: initialTotal = ((data as any).total || 0) as number;
-	$: initialYears = ((data as any).years || []) as string[];
-	$: initialAuthors = ((data as any).availableAuthors || []) as string[];
-	$: initialFilterType = ((data as any).filterType || 'sermon') as 'sermon' | 'retransmission';
-	$: currentAuthor = (data as any).author;
-	$: currentSearch = (data as any).search;
-	$: currentAlpha = (data as any).alpha;
-	$: currentYear = (data as any).year;
-	$: currentHasAudio = (data as any).hasAudio;
-	$: currentSort = (data as any).sort || 'iso_date:desc';
-	$: currentPage = (data as any).page;
-	$: limit = (data as any).limit;
-	$: currentLanguage = (data as any).language || 'french';
-	$: isDeferredData = Boolean((data as any).deferred);
-	$: requestKey = JSON.stringify({
+	let initialSermons = $derived(((data as any).sermons || []) as Sermon[]);
+	let initialRecordings = $derived(((data as any).recordings || []) as PublishedRecording[]);
+	let initialRecordingsTotal = $derived(((data as any).recordingsTotal || 0) as number);
+	let initialShowBlended = $derived(Boolean((data as any).showBlendedRetransmissions));
+	let initialTotal = $derived(((data as any).total || 0) as number);
+	let initialYears = $derived(((data as any).years || []) as string[]);
+	let initialAuthors = $derived(((data as any).availableAuthors || []) as string[]);
+	let initialFilterType = $derived(((data as any).filterType || 'sermon') as 'sermon' | 'retransmission');
+	let currentAuthor = $derived((data as any).author);
+	let currentSearch = $derived((data as any).search);
+	let currentAlpha = $derived((data as any).alpha);
+	let currentYear = $derived((data as any).year);
+	let currentHasAudio = $derived((data as any).hasAudio);
+	let currentSort = $derived((data as any).sort || 'iso_date:desc');
+	let currentPage = $derived((data as any).page);
+	let limit = $derived((data as any).limit);
+	let currentLanguage = $derived((data as any).language || 'french');
+	let isDeferredData = $derived(Boolean((data as any).deferred));
+	let requestKey = $derived(JSON.stringify({
 		author: currentAuthor || 'Tous',
 		search: currentSearch || '',
 		alpha: currentAlpha || '',
@@ -75,23 +77,23 @@
 		language: currentLanguage || 'french',
 		page: currentPage || 1,
 		limit: limit || 100
-	});
-	$: totalPages = Math.ceil(totalSermons / limit);
-	$: blendedOnly =
-		filterType === 'sermon' &&
+	}));
+	let totalPages = $derived(Math.ceil(totalSermons / limit));
+	let blendedOnly =
+		$derived(filterType === 'sermon' &&
 		sermons.length === 0 &&
 		showBlendedRetransmissions &&
-		recordings.length > 0;
-	$: playlistSermons =
-		filterType === 'sermon'
+		recordings.length > 0);
+	let playlistSermons =
+		$derived(filterType === 'sermon'
 			? sermons.map((sermon: Sermon) =>
 					createPlayableSermon(sermon, currentLanguage === 'english' ? 'english' : 'french')
 				)
-			: [];
+			: []);
 
 	const desktopSermonGrid = 'md:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.35fr)_110px_80px_120px]';
 	const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-	$: authors = ['Tous', ...(availableAuthors ?? []), 'Retransmissions'];
+	let authors = $derived(['Tous', ...(availableAuthors ?? []), 'Retransmissions']);
 
 	function abortRequest() {
 		abortController?.abort();
@@ -249,59 +251,63 @@
 		}
 	}
 
-	$: if (requestKey && requestKey !== lastHandledKey) {
-		lastHandledKey = requestKey;
-		listLoadError = '';
+	run(() => {
+		if (requestKey && requestKey !== lastHandledKey) {
+			lastHandledKey = requestKey;
+			listLoadError = '';
 
-		const cachedAuthors = getCachedAuthors() || [];
-		const cachedYears = getCachedYears() || [];
-		const cachedEntry = getPredicationsPageCache(requestKey);
+			const cachedAuthors = getCachedAuthors() || [];
+			const cachedYears = getCachedYears() || [];
+			const cachedEntry = getPredicationsPageCache(requestKey);
 
-		if (!isDeferredData) {
-			const nextAuthors = initialAuthors.length > 0 ? initialAuthors : cachedAuthors;
-			const nextYears = initialYears.length > 0 ? initialYears : cachedYears;
-			const seeded = setPredicationsPageCache(requestKey, {
-				filterType: initialFilterType,
-				sermons: initialSermons,
-				recordings: initialRecordings,
-				recordingsTotal: initialRecordingsTotal,
-				showBlendedRetransmissions: initialShowBlended,
-				total: initialTotal,
-				availableAuthors: nextAuthors,
-				years: nextYears
-			});
-			if (nextAuthors.length > 0) setCachedAuthors(nextAuthors, seeded.fetchedAt);
-			if (nextYears.length > 0) setCachedYears(nextYears, seeded.fetchedAt);
-			abortRequest();
-			applyData(seeded);
-			isListLoading = false;
-		} else if (cachedEntry) {
-			applyData({
-				...cachedEntry,
-				availableAuthors:
-					cachedEntry.availableAuthors.length > 0 ? cachedEntry.availableAuthors : cachedAuthors,
-				years: cachedEntry.years.length > 0 ? cachedEntry.years : cachedYears
-			});
-			void loadInBackground({ showLoading: !isPredicationsPageCacheFresh(cachedEntry) });
-		} else {
-			abortRequest();
-			sermons = [];
-			recordings = [];
-			recordingsTotal = 0;
-			totalSermons = 0;
-			availableAuthors = cachedAuthors;
-			years = cachedYears;
-			hasResolvedList = false;
-			void loadInBackground({ showLoading: true });
+			if (!isDeferredData) {
+				const nextAuthors = initialAuthors.length > 0 ? initialAuthors : cachedAuthors;
+				const nextYears = initialYears.length > 0 ? initialYears : cachedYears;
+				const seeded = setPredicationsPageCache(requestKey, {
+					filterType: initialFilterType,
+					sermons: initialSermons,
+					recordings: initialRecordings,
+					recordingsTotal: initialRecordingsTotal,
+					showBlendedRetransmissions: initialShowBlended,
+					total: initialTotal,
+					availableAuthors: nextAuthors,
+					years: nextYears
+				});
+				if (nextAuthors.length > 0) setCachedAuthors(nextAuthors, seeded.fetchedAt);
+				if (nextYears.length > 0) setCachedYears(nextYears, seeded.fetchedAt);
+				abortRequest();
+				applyData(seeded);
+				isListLoading = false;
+			} else if (cachedEntry) {
+				applyData({
+					...cachedEntry,
+					availableAuthors:
+						cachedEntry.availableAuthors.length > 0 ? cachedEntry.availableAuthors : cachedAuthors,
+					years: cachedEntry.years.length > 0 ? cachedEntry.years : cachedYears
+				});
+				void loadInBackground({ showLoading: !isPredicationsPageCacheFresh(cachedEntry) });
+			} else {
+				abortRequest();
+				sermons = [];
+				recordings = [];
+				recordingsTotal = 0;
+				totalSermons = 0;
+				availableAuthors = cachedAuthors;
+				years = cachedYears;
+				hasResolvedList = false;
+				void loadInBackground({ showLoading: true });
+			}
 		}
-	}
+	});
 
 	onDestroy(() => abortRequest());
 
-	$: if (playlistSermons.length > 0) {
-		basePlaylist.set(playlistSermons);
-		if (!$isShuffle) playlist.set(playlistSermons);
-	}
+	run(() => {
+		if (playlistSermons.length > 0) {
+			basePlaylist.set(playlistSermons);
+			if (!$isShuffle) playlist.set(playlistSermons);
+		}
+	});
 
 	function handleAuthorChange(author: string) {
 		const params = new URLSearchParams($page.url.searchParams);
@@ -425,7 +431,7 @@
 							class="text-[11px] font-body font-bold transition-all {currentAlpha === letter
 								? 'text-missionnaire font-semibold'
 								: 'text-stone-400 hover:text-missionnaire'}"
-							on:click={() => handleAlphaChange(letter)}
+							onclick={() => handleAlphaChange(letter)}
 						>
 							{letter}
 						</button>
@@ -451,7 +457,7 @@
 						currentAuthor === author
 							? 'border-missionnaire text-missionnaire bg-missionnaire/5'
 							: 'bg-white/40 text-stone-500 border-stone-200/60 hover:border-missionnaire hover:text-missionnaire'}"
-						on:click={() => handleAuthorChange(author)}
+						onclick={() => handleAuthorChange(author)}
 					>
 						{author === 'Tous' ? 'Tout Voir' : author}
 					</button>
@@ -476,7 +482,7 @@
 								'french'
 									? 'bg-white text-missionnaire shadow-sm'
 									: 'text-stone-500 hover:text-stone-700'}"
-								on:click={() => handleLanguageChange('french')}
+								onclick={() => handleLanguageChange('french')}
 							>
 								Français
 							</button>
@@ -485,7 +491,7 @@
 								'english'
 									? 'bg-white text-missionnaire shadow-sm'
 									: 'text-stone-500 hover:text-stone-700'}"
-								on:click={() => handleLanguageChange('english')}
+								onclick={() => handleLanguageChange('english')}
 							>
 								English
 							</button>
@@ -497,7 +503,7 @@
 							class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all {currentHasAudio
 								? 'bg-stone-100 text-missionnaire border border-stone-300'
 								: 'bg-stone-50 text-stone-500 border border-transparent hover:bg-stone-100'}"
-							on:click={() => handleAudioFilterToggle()}
+							onclick={() => handleAudioFilterToggle()}
 						>
 							<Icon src={IoPlayCircle} size="16" />
 							Audio Uniquement
@@ -524,7 +530,7 @@
 								year
 									? 'border-missionnaire text-missionnaire bg-missionnaire/5'
 									: 'bg-white/40 text-stone-400 border-stone-200/60 hover:border-missionnaire hover:text-missionnaire'}"
-								on:click={() => handleYearChange(year)}
+								onclick={() => handleYearChange(year)}
 							>
 								{year}
 							</button>
@@ -539,7 +545,7 @@
 				<div class="mb-3 flex justify-end">
 					<button
 						class="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-3 py-1.5 text-[10px] font-bold text-missionnaire hover:bg-stone-200 transition-colors"
-						on:click={() => goto('?')}
+						onclick={() => goto('?')}
 						title="Réinitialiser les filtres"
 					>
 						<Icon src={BsX} size="14" />
@@ -555,7 +561,7 @@
 						<div class="text-center">#</div>
 						<button
 							class="text-left flex items-center gap-1.5 hover:text-missionnaire transition-colors"
-							on:click={() => handleSortChange('french_title')}
+							onclick={() => handleSortChange('french_title')}
 						>
 							{#if currentSort.startsWith('french_title')}
 								<span class="text-missionnaire">
@@ -566,7 +572,7 @@
 						</button>
 						<button
 							class="hidden md:flex text-left items-center gap-1.5 hover:text-missionnaire transition-colors"
-							on:click={() => handleSortChange('author')}
+							onclick={() => handleSortChange('author')}
 						>
 							{#if currentSort.startsWith('author')}
 								<span class="text-missionnaire">
@@ -577,7 +583,7 @@
 						</button>
 						<button
 							class="hidden md:flex text-left items-center gap-1.5 hover:text-missionnaire transition-colors"
-							on:click={() => handleSortChange('iso_date')}
+							onclick={() => handleSortChange('iso_date')}
 						>
 							{#if currentSort.startsWith('iso_date')}
 								<span class="text-missionnaire">
@@ -588,7 +594,7 @@
 						</button>
 						<button
 							class="hidden md:flex text-center items-center justify-center gap-1.5 hover:text-missionnaire transition-colors"
-							on:click={() => handleSortChange('duration')}
+							onclick={() => handleSortChange('duration')}
 						>
 							{#if currentSort.startsWith('duration')}
 								<span class="text-missionnaire">
@@ -630,7 +636,7 @@
 								<p class="mt-2 text-xs text-stone-400">{listLoadError}</p>
 								<button
 									class="mt-5 inline-flex items-center rounded-full border border-missionnaire px-4 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-missionnaire transition-colors hover:bg-missionnaire/5"
-									on:click={() => void loadInBackground({ showLoading: true })}
+									onclick={() => void loadInBackground({ showLoading: true })}
 								>
 									Réessayer
 								</button>
@@ -704,7 +710,7 @@
 							<select
 								class="bg-stone-100 rounded-lg px-3 py-1.5 outline-none text-stone-800 focus:ring-2 focus:ring-missionnaire/20 transition-all cursor-pointer"
 								value={limit}
-								on:change={(e) => {
+								onchange={(e) => {
 									const params = new URLSearchParams($page.url.searchParams);
 									params.set('limit', e.currentTarget.value);
 									params.set('page', '1');

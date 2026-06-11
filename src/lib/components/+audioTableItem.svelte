@@ -11,8 +11,12 @@
 	import { downloadAudioFile } from '../../utils/downloadAudio';
 	let showDropContents = false;
 
-	export let audio: AudioAsset;
-	export let index: number;
+	interface Props {
+		audio: AudioAsset;
+		index: number;
+	}
+
+	let { audio, index }: Props = $props();
 	const updateSelectAudio = (audio: AudioAsset) => {
 		selectAudio.set(audio); // Set the selectAudio value in the store
 		currentIndex.set(index);
@@ -74,7 +78,7 @@
 				<button
 					type="button"
 					class="group flex items-center justify-center w-8 h-8 relative focus:outline-none"
-					on:click={() => downloadAudio(audio)}
+					onclick={() => downloadAudio(audio)}
 					title={$downloadPercent !== null
 						? `Annuler (${$downloadPercent}%)`
 						: 'Annuler le téléchargement'}
@@ -127,7 +131,7 @@
 			{:else}
 				<button
 					class="flex flex-row items-center space-x-1 hover:text-missionnaire"
-					on:click={() => downloadAudio(audio)}
+					onclick={() => downloadAudio(audio)}
 				>
 					<Icon src={AiOutlineDownload} />
 					<span class="hidden md:block">MP3</span>
@@ -135,7 +139,7 @@
 			{/if}
 			<button
 				class="flex flex-row items-center space-x-1 hover:text-missionnaire"
-				on:click={() => {
+				onclick={() => {
 					updateSelectAudio(audio);
 				}}
 			>

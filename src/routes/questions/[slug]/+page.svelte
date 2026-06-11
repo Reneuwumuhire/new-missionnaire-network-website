@@ -9,20 +9,24 @@
 	import IoArrowBack from 'svelte-icons-pack/io/IoArrowBack';
 	import IoSendOutline from 'svelte-icons-pack/io/IoSendOutline';
 
-	export let data: PageData;
-	export let form: ActionData;
+	interface Props {
+		data: PageData;
+		form: ActionData;
+	}
 
-	let replying = false;
+	let { data, form }: Props = $props();
 
-	$: question = data.question;
-	$: officialAnswer = data.officialAnswer;
-	$: replies = data.replies || [];
-	$: questionReferences = data.references.filter((reference) => !reference.replyId);
-	$: answerReferences = data.references.filter((reference) => reference.replyId);
-	$: seoDescription = stripRichTextFormatting(question.body).slice(0, 155);
-	$: isAdminUser = data.user?.role === 'superadmin' || data.user?.role === 'editor';
-	$: replyDisplayName = form?.replyDisplayName ?? (!isAdminUser && data.user ? data.user.name : '');
-	$: statusLabel = question.status === 'answered' ? 'Répondue' : 'Publiée';
+	let replying = $state(false);
+
+	let question = $derived(data.question);
+	let officialAnswer = $derived(data.officialAnswer);
+	let replies = $derived(data.replies || []);
+	let questionReferences = $derived(data.references.filter((reference) => !reference.replyId));
+	let answerReferences = $derived(data.references.filter((reference) => reference.replyId));
+	let seoDescription = $derived(stripRichTextFormatting(question.body).slice(0, 155));
+	let isAdminUser = $derived(data.user?.role === 'superadmin' || data.user?.role === 'editor');
+	let replyDisplayName = $derived(form?.replyDisplayName ?? (!isAdminUser && data.user ? data.user.name : ''));
+	let statusLabel = $derived(question.status === 'answered' ? 'Répondue' : 'Publiée');
 
 	function formatDate(value: string | null): string {
 		if (!value) return '';

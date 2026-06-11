@@ -55,11 +55,11 @@
 	// every navigation (client-side included) — computing the match
 	// inside a plain helper hides `pathname` from the dependency
 	// tracker and leaves the highlight stuck on first paint.
-	$: pathname = $page.url.pathname;
-	$: activeHref =
-		items.find((item) =>
+	let pathname = $derived($page.url.pathname);
+	let activeHref =
+		$derived(items.find((item) =>
 			item.match.some((base) => pathname === base || pathname.startsWith(`${base}/`))
-		)?.href ?? null;
+		)?.href ?? null);
 
 	// Open the existing header hamburger menu. The NavBar listens for
 	// this event and runs its own toggle (which handles body-scroll
@@ -99,7 +99,7 @@
 	{/each}
 
 	<!-- "More" — opens the full hamburger menu. -->
-	<button type="button" class="bottom-nav__item" aria-label="Ouvrir le menu" on:click={openMenu}>
+	<button type="button" class="bottom-nav__item" aria-label="Ouvrir le menu" onclick={openMenu}>
 		<span class="bottom-nav__icon">
 			<Icon src={CgMoreVerticalAlt} color="currentColor" className="bottom-nav__glyph" />
 		</span>

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { run } from 'svelte/legacy';
+
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import type { YoutubeVideo } from '$lib/models/youtube';
@@ -27,29 +29,29 @@
 		type VideosPageCacheEntry
 	} from './listCache';
 
-	export let data;
+	let { data } = $props();
 
-	let loadedVideos: YoutubeVideo[] = [];
-	let total = 0;
-	let skipCount = 0;
-	let hasMore = true;
-	let isLoading = false;
-	let isInitialLoading = false;
-	let initialLoadError = '';
-	let hasResolved = false;
+	let loadedVideos: YoutubeVideo[] = $state([]);
+	let total = $state(0);
+	let skipCount = $state(0);
+	let hasMore = $state(true);
+	let isLoading = $state(false);
+	let isInitialLoading = $state(false);
+	let initialLoadError = $state('');
+	let hasResolved = $state(false);
 	let abortController: AbortController | null = null;
 	let currentToken = 0;
-	let lastHandledKey: string | null = null;
+	let lastHandledKey: string | null = $state(null);
 
-	let searchInput = '';
-	let lastSearch = '';
-	let isSearchLoading = false;
+	let searchInput = $state('');
+	let lastSearch = $state('');
+	let isSearchLoading = $state(false);
 
-	$: initialVideos = ((data as any).videos || []) as YoutubeVideo[];
-	$: initialTotal = ((data as any).total || 0) as number;
-	$: currentSearch = ((data as any).search || '') as string;
-	$: isDeferredData = Boolean((data as any).deferred);
-	$: requestKey = currentSearch;
+	let initialVideos = $derived(((data as any).videos || []) as YoutubeVideo[]);
+	let initialTotal = $derived(((data as any).total || 0) as number);
+	let currentSearch = $derived(((data as any).search || '') as string);
+	let isDeferredData = $derived(Boolean((data as any).deferred));
+	let requestKey = $derived(currentSearch);
 
 	function abortRequest() {
 		abortController?.abort();
@@ -113,39 +115,41 @@
 		}
 	}
 
-	$: if (requestKey !== lastHandledKey) {
-		lastHandledKey = requestKey;
-		initialLoadError = '';
+	run(() => {
+		if (requestKey !== lastHandledKey) {
+			lastHandledKey = requestKey;
+			initialLoadError = '';
 
-		const cachedEntry = getVideosCache(requestKey);
+			const cachedEntry = getVideosCache(requestKey);
 
-		if (!isDeferredData) {
-			const seeded = setVideosCache(requestKey, {
-				videos: initialVideos,
-				total: initialTotal,
-				skipCount: initialVideos.length,
-				hasMore: initialVideos.length < initialTotal
-			});
-			abortRequest();
-			applyData(seeded);
-			isInitialLoading = false;
-		} else if (cachedEntry) {
-			applyData(cachedEntry);
-			if (!isVideosCacheFresh(cachedEntry)) {
-				void loadInitial({ showLoading: false });
+			if (!isDeferredData) {
+				const seeded = setVideosCache(requestKey, {
+					videos: initialVideos,
+					total: initialTotal,
+					skipCount: initialVideos.length,
+					hasMore: initialVideos.length < initialTotal
+				});
+				abortRequest();
+				applyData(seeded);
+				isInitialLoading = false;
+			} else if (cachedEntry) {
+				applyData(cachedEntry);
+				if (!isVideosCacheFresh(cachedEntry)) {
+					void loadInitial({ showLoading: false });
+				}
+			} else {
+				abortRequest();
+				loadedVideos = [];
+				total = 0;
+				skipCount = 0;
+				hasMore = true;
+				hasResolved = false;
+				searchInput = currentSearch;
+				lastSearch = currentSearch;
+				void loadInitial({ showLoading: true });
 			}
-		} else {
-			abortRequest();
-			loadedVideos = [];
-			total = 0;
-			skipCount = 0;
-			hasMore = true;
-			hasResolved = false;
-			searchInput = currentSearch;
-			lastSearch = currentSearch;
-			void loadInitial({ showLoading: true });
 		}
-	}
+	});
 
 	onDestroy(() => {
 		abortRequest();
@@ -325,7 +329,7 @@
 	<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
 		<div class="flex items-center gap-6">
 			<button
-				on:click={playAll}
+				onclick={playAll}
 				class="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-missionnaire hover:text-missionnaire/80 transition-colors active:scale-95 font-body disabled:opacity-50 disabled:cursor-not-allowed"
 				disabled={loadedVideos.length === 0}
 			>
@@ -333,7 +337,7 @@
 				Tout Lire
 			</button>
 			<button
-				on:click={shuffleAll}
+				onclick={shuffleAll}
 				class="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-400 hover:text-missionnaire transition-colors active:scale-95 font-body disabled:opacity-50 disabled:cursor-not-allowed"
 				disabled={loadedVideos.length === 0}
 			>
@@ -351,7 +355,7 @@
 				placeholder="Rechercher une vidéo..."
 				class="w-full border border-stone-200/80 bg-white pl-9 pr-24 py-2.5 text-sm font-body text-stone-800 placeholder:text-stone-400 focus:border-missionnaire/40 focus:outline-none focus:ring-1 focus:ring-missionnaire/30 transition-colors"
 				bind:value={searchInput}
-				on:input={() => handleSearch()}
+				oninput={() => handleSearch()}
 			/>
 			{#if isSearchLoading}
 				<LoadingRing
@@ -361,7 +365,7 @@
 			{:else if searchInput}
 				<button
 					class="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-missionnaire transition-colors p-1"
-					on:click={() => {
+					onclick={() => {
 						searchInput = '';
 						handleSearch(true);
 					}}
@@ -396,7 +400,7 @@
 			<p class="mt-2 text-xs text-stone-400">{initialLoadError}</p>
 			<button
 				class="mt-5 inline-flex items-center rounded-full border border-missionnaire px-4 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-missionnaire transition-colors hover:bg-missionnaire/5"
-				on:click={() => void loadInitial({ showLoading: true })}
+				onclick={() => void loadInitial({ showLoading: true })}
 			>
 				Réessayer
 			</button>
@@ -431,7 +435,7 @@
 					</p>
 				{:else}
 					<button
-						on:click={loadMoreVideos}
+						onclick={loadMoreVideos}
 						class="text-[10px] font-bold text-stone-400 hover:text-missionnaire uppercase tracking-[0.18em] transition-colors font-body"
 					>
 						Charger plus de vidéos
@@ -455,7 +459,7 @@
 			</p>
 			{#if lastSearch}
 				<button
-					on:click={() => {
+					onclick={() => {
 						searchInput = '';
 						handleSearch(true);
 					}}

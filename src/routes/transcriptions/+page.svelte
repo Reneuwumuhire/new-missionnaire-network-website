@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { run, preventDefault } from 'svelte/legacy';
+
 	import type { PageData } from './$types';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
@@ -26,63 +28,69 @@
 	import MobileListToolbar from '$lib/components/+mobileListToolbar.svelte';
 	import { mobileSearchOpen, mobileFiltersOpen } from '$lib/stores/mobileControls';
 
-	export let data: PageData;
-	let selectedDocument: SerializedTranscription | null = null;
-	const isDocumentOpen = writable(false);
-	let searchTerm = '';
-	let isSearching = false;
-	let searchInput: HTMLInputElement;
-	let typingTimeout: ReturnType<typeof setTimeout>;
-	let lastSearch = '';
-	let lastSyncedSearch = '';
+	interface Props {
+		data: PageData;
+	}
 
-	let documents: SerializedTranscription[] = [];
-	let total = 0;
-	let years: number[] = [];
-	let isListLoading = false;
-	let listLoadError = '';
-	let hasResolvedList = false;
+	let { data }: Props = $props();
+	let selectedDocument: SerializedTranscription | null = $state(null);
+	const isDocumentOpen = writable(false);
+	let searchTerm = $state('');
+	let isSearching = $state(false);
+	let searchInput: HTMLInputElement = $state();
+	let typingTimeout: ReturnType<typeof setTimeout>;
+	let lastSearch = $state('');
+	let lastSyncedSearch = $state('');
+
+	let documents: SerializedTranscription[] = $state([]);
+	let total = $state(0);
+	let years: number[] = $state([]);
+	let isListLoading = $state(false);
+	let listLoadError = $state('');
+	let hasResolvedList = $state(false);
 	let abortController: AbortController | null = null;
 	let currentRequestToken = 0;
-	let lastHandledKey = '';
+	let lastHandledKey = $state('');
 
-	$: initialDocuments = ((data as any).documents || []) as SerializedTranscription[];
-	$: initialTotal = (data.pagination?.total || 0) as number;
-	$: initialYears = ((data as any).years || []) as number[];
-	$: loadedSearch = ((data as any).search || '') as string;
-	$: currentPageNumber = Number($page.url.searchParams.get('page')) || data.pagination.page || 1;
-	$: currentLimit = data.pagination.limit;
-	$: sortOrder = (
+	let initialDocuments = $derived(((data as any).documents || []) as SerializedTranscription[]);
+	let initialTotal = $derived((data.pagination?.total || 0) as number);
+	let initialYears = $derived(((data as any).years || []) as number[]);
+	let loadedSearch = $derived(((data as any).search || '') as string);
+	let currentPageNumber = $derived(Number($page.url.searchParams.get('page')) || data.pagination.page || 1);
+	let currentLimit = $derived(data.pagination.limit);
+	let sortOrder = $derived((
 		$page.url.searchParams.get('sort') === 'asc'
 			? 'asc'
 			: $page.url.searchParams.get('sort') === 'desc'
 				? 'desc'
 				: data.sort || 'desc'
-	) as 'asc' | 'desc';
-	$: selectedYear = $page.url.searchParams.get('year') || data.selectedYear || '';
-	$: currentSearch = $page.url.searchParams.get('search') || loadedSearch || '';
-	$: isDeferredData = Boolean((data as any).deferred);
-	$: requestKey = JSON.stringify({
+	) as 'asc' | 'desc');
+	let selectedYear = $derived($page.url.searchParams.get('year') || data.selectedYear || '');
+	let currentSearch = $derived($page.url.searchParams.get('search') || loadedSearch || '');
+	let isDeferredData = $derived(Boolean((data as any).deferred));
+	let requestKey = $derived(JSON.stringify({
 		page: currentPageNumber,
 		limit: currentLimit,
 		sort: sortOrder,
 		year: selectedYear || '',
 		search: currentSearch || ''
-	});
-	$: dataRequestKey = JSON.stringify({
+	}));
+	let dataRequestKey = $derived(JSON.stringify({
 		page: data.pagination.page,
 		limit: currentLimit,
 		sort: (data.sort || 'desc') as 'asc' | 'desc',
 		year: data.selectedYear || '',
 		search: loadedSearch || ''
+	}));
+	let totalPages = $derived(Math.ceil(total / currentLimit));
+	let showPagination = $derived(total > 10);
+	run(() => {
+		if (currentSearch !== lastSyncedSearch) {
+			searchTerm = currentSearch;
+			lastSearch = currentSearch;
+			lastSyncedSearch = currentSearch;
+		}
 	});
-	$: totalPages = Math.ceil(total / currentLimit);
-	$: showPagination = total > 10;
-	$: if (currentSearch !== lastSyncedSearch) {
-		searchTerm = currentSearch;
-		lastSearch = currentSearch;
-		lastSyncedSearch = currentSearch;
-	}
 
 	function abortRequest() {
 		abortController?.abort();
@@ -142,31 +150,33 @@
 		}
 	}
 
-	$: if (requestKey && requestKey !== lastHandledKey) {
-		lastHandledKey = requestKey;
-		listLoadError = '';
+	run(() => {
+		if (requestKey && requestKey !== lastHandledKey) {
+			lastHandledKey = requestKey;
+			listLoadError = '';
 
-		const cachedEntry = getTranscriptionsCache(requestKey);
+			const cachedEntry = getTranscriptionsCache(requestKey);
 
-		if (!isDeferredData && dataRequestKey === requestKey) {
-			const seeded = setTranscriptionsCache(requestKey, {
-				documents: initialDocuments,
-				total: initialTotal,
-				years: initialYears
-			});
-			abortRequest();
-			applyData(seeded);
-			isListLoading = false;
-		} else if (cachedEntry) {
-			applyData(cachedEntry);
-			void loadInBackground({ showLoading: !isTranscriptionsCacheFresh(cachedEntry) });
-		} else {
-			abortRequest();
-			documents = [];
-			hasResolvedList = false;
-			void loadInBackground({ showLoading: true });
+			if (!isDeferredData && dataRequestKey === requestKey) {
+				const seeded = setTranscriptionsCache(requestKey, {
+					documents: initialDocuments,
+					total: initialTotal,
+					years: initialYears
+				});
+				abortRequest();
+				applyData(seeded);
+				isListLoading = false;
+			} else if (cachedEntry) {
+				applyData(cachedEntry);
+				void loadInBackground({ showLoading: !isTranscriptionsCacheFresh(cachedEntry) });
+			} else {
+				abortRequest();
+				documents = [];
+				hasResolvedList = false;
+				void loadInBackground({ showLoading: true });
+			}
 		}
-	}
+	});
 
 	async function runSearch(value: string) {
 		const trimmed = value.trim();
@@ -288,8 +298,8 @@
 				</p>
 				<form
 					class="hidden md:flex w-full max-w-xl mx-auto border border-stone-200/60 bg-white/40 overflow-hidden"
-					on:submit|preventDefault={() =>
-						handleSearch(searchInput?.value ?? searchTerm, { immediate: true })}
+					onsubmit={preventDefault(() =>
+						handleSearch(searchInput?.value ?? searchTerm, { immediate: true }))}
 				>
 					<div class="relative flex-1">
 						<input
@@ -298,8 +308,8 @@
 							placeholder="Rechercher par titre..."
 							bind:value={searchTerm}
 							bind:this={searchInput}
-							on:focus={handleFocus}
-							on:input={(event) => handleSearch((event.currentTarget as HTMLInputElement).value)}
+							onfocus={handleFocus}
+							oninput={(event) => handleSearch((event.currentTarget as HTMLInputElement).value)}
 						/>
 						{#if isSearching}
 							<LoadingRing
@@ -312,7 +322,7 @@
 								aria-label="Effacer la recherche"
 								title="Effacer"
 								class="absolute right-2.5 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full text-stone-400 hover:bg-stone-200 hover:text-stone-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
-								on:click={() => {
+								onclick={() => {
 									searchTerm = '';
 									handleSearch('', { immediate: true });
 								}}
@@ -353,13 +363,13 @@
 	{#if $mobileSearchOpen}
 		<div class="md:hidden -mx-2 sm:-mx-4 border-b border-stone-200 bg-cream px-4 py-3">
 			<div class="relative">
-				<!-- svelte-ignore a11y-autofocus -->
+				<!-- svelte-ignore a11y_autofocus -->
 				<input
 					type="search"
 					class="w-full rounded-lg border border-stone-200 bg-white py-2.5 pl-10 pr-3 text-base font-body text-stone-800 outline-none placeholder:text-stone-400 focus:border-missionnaire/40"
 					placeholder="Rechercher par titre..."
 					bind:value={searchTerm}
-					on:input={(event) => handleSearch((event.currentTarget as HTMLInputElement).value)}
+					oninput={(event) => handleSearch((event.currentTarget as HTMLInputElement).value)}
 					autofocus
 				/>
 				<svg
@@ -398,7 +408,7 @@
 						id="year-filter"
 						class="border border-gray-300 rounded-md px-3 py-1.5 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-missionnaire focus:border-transparent w-full sm:w-auto"
 						value={selectedYear}
-						on:change={handleYearChange}
+						onchange={handleYearChange}
 					>
 						<option value="">Toutes les années</option>
 						{#each years as year}
@@ -408,7 +418,7 @@
 				</div>
 
 				<button
-					on:click={handleSort}
+					onclick={handleSort}
 					class="flex items-center justify-center space-x-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-900 w-full sm:w-auto border sm:border-0 border-gray-300 rounded-md sm:rounded-none"
 				>
 					<span>Date de publication</span>
@@ -443,7 +453,7 @@
 					<p class="text-stone-500 text-sm sm:text-base">{listLoadError}</p>
 					<button
 						class="mt-4 inline-flex items-center rounded-full border border-missionnaire px-4 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-missionnaire transition-colors hover:bg-missionnaire/5"
-						on:click={() => void loadInBackground({ showLoading: true })}
+						onclick={() => void loadInBackground({ showLoading: true })}
 					>
 						Réessayer
 					</button>
@@ -470,7 +480,7 @@
 								document.filename
 									? 'bg-gray-100'
 									: ''}"
-								on:click={() => handleSelectDocument(document)}
+								onclick={() => handleSelectDocument(document)}
 							>
 								<div class="flex-shrink-0 pt-1">
 									<DocumentText1 size={18} color="#6B7280" />
@@ -544,7 +554,7 @@
 						</h2>
 						<button
 							class="text-gray-400 hover:text-gray-500"
-							on:click={() => isDocumentOpen.set(false)}
+							onclick={() => isDocumentOpen.set(false)}
 							aria-label="Fermer"
 						>
 							<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

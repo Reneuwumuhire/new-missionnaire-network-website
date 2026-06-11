@@ -1,5 +1,9 @@
 <script lang="ts">
-	export let items: { label: string; href?: string }[] = [];
+	interface Props {
+		items?: { label: string; href?: string }[];
+	}
+
+	let { items = [] }: Props = $props();
 </script>
 
 <nav aria-label="Fil d'Ariane" class="w-full max-w-7xl mx-auto mb-4">

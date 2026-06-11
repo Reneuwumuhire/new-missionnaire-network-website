@@ -6,9 +6,13 @@
 	import AiOutlineDownload from 'svelte-icons-pack/ai/AiOutlineDownload';
 	import IoClose from 'svelte-icons-pack/io/IoClose';
 
-	export let downloadUrl = "https://mega.nz/folder/VdJDxAxK#_hnoT20MlxFsaR2jgQcRXA";
+	interface Props {
+		downloadUrl?: string;
+	}
+
+	let { downloadUrl = "https://mega.nz/folder/VdJDxAxK#_hnoT20MlxFsaR2jgQcRXA" }: Props = $props();
 	
-	let isVisible = false;
+	let isVisible = $state(false);
 	const STORAGE_KEY = 'hide_android_banner';
 
 	onMount(() => {
@@ -37,7 +41,7 @@
 			<div class="absolute left-6 right-6 top-0 h-px bg-gradient-to-r from-transparent via-missionnaire/60 to-transparent"></div>
 
 			<button
-				on:click={dismiss}
+				onclick={dismiss}
 				class="absolute right-2 top-2 z-20 flex h-8 w-8 items-center justify-center border border-stone-200/70 bg-white/70 text-stone-400 transition-colors hover:border-stone-300 hover:text-stone-700 sm:hidden"
 				aria-label="Fermer la bannière Android"
 			>
@@ -75,7 +79,7 @@
 					</a>
 
 					<button
-						on:click={dismiss}
+						onclick={dismiss}
 						class="hidden h-10 w-10 items-center justify-center border border-stone-200/70 bg-white/70 text-stone-400 transition-colors hover:border-stone-300 hover:text-stone-700 sm:flex"
 						aria-label="Fermer la bannière Android"
 					>

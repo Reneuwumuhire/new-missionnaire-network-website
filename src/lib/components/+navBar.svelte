@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { run, stopPropagation } from 'svelte/legacy';
+
 	import { page } from '$app/stores';
 	import HeaderMenuLink from '$lib/components/+headerMenuLink.svelte';
 	import { dict, locale, t } from '../../i18n';
@@ -17,15 +19,15 @@
 	const languages = { en, fr };
 	let currentLang = 'en';
 	let preventScroll = false;
-	let openMenuIndex: number | null = null;
+	let openMenuIndex: number | null = $state(null);
 	dict.set(languages);
 	let showDropContents = false;
 
 	const langSwitch = () => {
 		showDropContents = !showDropContents;
 	};
-	let showMoboNav = false;
-	let navEl: HTMLElement;
+	let showMoboNav = $state(false);
+	let navEl: HTMLElement = $state();
 	let ignoreNextClick = false;
 
 	const handleWindowClick = (event: MouseEvent) => {
@@ -75,7 +77,9 @@
 		}
 	}
 
-	$: if (browser) syncBodyScrollLock(showMoboNav);
+	run(() => {
+		if (browser) syncBodyScrollLock(showMoboNav);
+	});
 
 	// Any route change closes the menu (and so unlocks the body via the
 	// reactive statement above).
@@ -120,7 +124,7 @@
 	});
 </script>
 
-<svelte:window on:click={handleWindowClick} />
+<svelte:window onclick={handleWindowClick} />
 
 <nav class="navbar relative z-50 max-w-full border-b border-stone-200/40 backdrop-blur-md bg-[#FAF8F3]/90" bind:this={navEl}>
 	<div class="flex items-center justify-between max-w-[1600px] mx-auto px-4 md:px-6 h-16">
@@ -159,7 +163,7 @@
 		<!-- Mobile hamburger -->
 		<button
 			class="relative lg:hidden flex items-center justify-center w-9 h-9 text-stone-700 transition-colors hover:text-missionnaire"
-			on:click|stopPropagation={toggleMobileNav}
+			onclick={stopPropagation(toggleMobileNav)}
 			aria-label={showMoboNav ? 'Fermer le menu' : 'Ouvrir le menu'}
 		>
 			{#if showMoboNav}

@@ -3,12 +3,16 @@
 	import Breadcrumbs from '$lib/components/+breadcrumbs.svelte';
 	import { page } from '$app/stores';
 
-	export let data: any;
+	interface Props {
+		data: any;
+	}
 
-	$: songs = data.songs?.ok ? data.songs.val : [];
-	$: isLoading = !data.songs;
-	$: slug = $page.params.slug || '';
-	$: pageTitle = slug.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+	let { data }: Props = $props();
+
+	let songs = $derived(data.songs?.ok ? data.songs.val : []);
+	let isLoading = $derived(!data.songs);
+	let slug = $derived($page.params.slug || '');
+	let pageTitle = $derived(slug.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()));
 </script>
 
 <svelte:head>
