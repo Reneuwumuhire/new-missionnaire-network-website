@@ -8,7 +8,7 @@
 		srcset?: string;
 		sizes?: string;
 		placeholderSrc: string;
-		alt?: string;
+		alt: string;
 		width?: number | undefined;
 		height?: number | undefined;
 		loading?: 'lazy' | 'eager';
@@ -22,7 +22,7 @@
 		srcset = '',
 		sizes = '',
 		placeholderSrc,
-		alt = '',
+		alt,
 		width = undefined,
 		height = undefined,
 		loading = 'lazy',

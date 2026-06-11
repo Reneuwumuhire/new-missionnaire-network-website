@@ -366,7 +366,7 @@
 							srcset={`${vercelImage(rec.thumbnail_url, 256)} 256w, ${vercelImage(rec.thumbnail_url, 512)} 512w, ${vercelImage(rec.thumbnail_url, 1080)} 1080w`}
 							sizes="(min-width: 768px) 256px, 100vw"
 							placeholderSrc={vercelImagePlaceholder(rec.thumbnail_url)}
-							alt=""
+							alt={rec.title}
 							width={256}
 							height={144}
 							loading="eager"

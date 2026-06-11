@@ -245,9 +245,10 @@
 	>
 		{#if (language === 'english' && sermon.english_pdf_url) || (language !== 'english' && sermon.pdf_url)}
 			<button
-				class="p-2 text-gray-400 hover:text-red-500 transition-colors"
+				class="inline-flex items-center justify-center min-w-11 min-h-11 text-gray-400 hover:text-red-500 transition-colors"
 				onclick={(e) => { e.stopPropagation(); downloadPdf(); }}
 				title="Télécharger PDF"
+				aria-label="Télécharger le PDF — {sermon.french_title || sermon.english_title}"
 			>
 				<Icon src={BsFileEarmarkPdfFill} size="18" />
 			</button>
@@ -255,7 +256,7 @@
 
 		{#if (language === 'english' && sermon.english_audio_url) || (language !== 'english' && sermon.mp3_url)}
 			<button
-				class="group relative p-2 text-gray-400 hover:text-orange-600 transition-colors"
+				class="group relative inline-flex items-center justify-center min-w-11 min-h-11 text-gray-400 hover:text-orange-600 transition-colors"
 				onclick={(e) => { e.stopPropagation(); downloadMp3(); }}
 				title={isDownloading
 					? downloadPercent !== null
@@ -307,11 +308,12 @@
 
 		{#if (language === 'english' && sermon.english_audio_url) || (language !== 'english' && sermon.mp3_url)}
 			<button
-				class="hover:scale-110 active:scale-95 transition-all p-2 {isActive
+				class="hover:scale-110 active:scale-95 transition-all inline-flex items-center justify-center min-w-11 min-h-11 {isActive
 					? 'text-orange-600'
 					: 'text-orange-600'}"
 				onclick={(e) => { e.stopPropagation(); togglePlay(); }}
 				title={isActive && $isPlaying ? 'Pause' : 'Lire'}
+				aria-label={isActive && $isPlaying ? 'Pause' : 'Lire'}
 			>
 				<Icon src={isActive && $isPlaying ? IoPauseCircle : IoPlayCircle} size="24" />
 			</button>

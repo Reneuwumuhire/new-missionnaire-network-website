@@ -11,6 +11,7 @@
 	import { browser } from '$app/environment';
 	import { afterNavigate } from '$app/navigation';
 	import { onMount } from 'svelte';
+	import { focusTrap } from '$lib/actions/focusTrap';
 
 	let openMenuIndex: number | null = $state(null);
 
@@ -201,7 +202,15 @@
 
 	<!-- Mobile menu overlay — direct child of nav for correct absolute positioning -->
 	{#if showMoboNav}
-		<div class="mobo-menu absolute left-0 right-0 top-full z-50 bg-[#FAF8F3] overflow-y-auto border-t border-stone-100 h-screen">
+		<div
+			class="mobo-menu absolute left-0 right-0 top-full z-50 bg-[#FAF8F3] overflow-y-auto border-t border-stone-100 h-screen"
+			use:focusTrap={{
+				onEscape: () => {
+					showMoboNav = false;
+					openMenuIndex = null;
+				}
+			}}
+		>
 			<div class="flex flex-col px-6 py-8 max-w-lg mx-auto pb-32">
 				<div class="flex flex-col gap-1">
 					{#each NavigationLinkList as link, index}

@@ -494,7 +494,7 @@
 											src={vercelImage(rec.thumbnail_url, 192)}
 											srcset={vercelImageSrcSet(rec.thumbnail_url, 96)}
 											placeholderSrc={vercelImagePlaceholder(rec.thumbnail_url)}
-											alt=""
+											alt={rec.title}
 											width={96}
 											height={54}
 											loading="lazy"
@@ -510,7 +510,7 @@
 												<source srcset="/icons/logo.webp" type="image/webp" />
 												<img
 													src="/icons/logo.png"
-													alt=""
+													alt={rec.title}
 													class="h-4 w-auto opacity-80"
 													width="150"
 													height="64"

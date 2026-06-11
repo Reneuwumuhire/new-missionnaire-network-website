@@ -9,6 +9,7 @@
 	import type { AudioAsset } from '$lib/models/media-assets';
 	import { writable } from 'svelte/store';
 	import { downloadAudioFile } from '../../utils/downloadAudio';
+	import { t } from '../../i18n';
 	let showDropContents = false;
 
 	interface Props {
@@ -69,7 +70,10 @@
 		</div>
 		<div class="flex flex-row space-x-6">
 			{#if audio.transcription}
-				<button class="flex flex-row items-center space-x-1 hover:text-missionnaire">
+				<button
+					class="inline-flex flex-row items-center justify-center min-w-11 min-h-11 space-x-1 hover:text-missionnaire"
+					aria-label={`PDF — ${audio.title}`}
+				>
 					<Icon src={BsFileEarmarkPdfFill} />
 					<span class=" hidden md:block">PDF</span>
 				</button>
@@ -77,7 +81,7 @@
 			{#if $isDownloading}
 				<button
 					type="button"
-					class="group flex items-center justify-center w-8 h-8 relative focus:outline-none"
+					class="group inline-flex items-center justify-center min-w-11 min-h-11 relative focus:outline-none"
 					onclick={() => downloadAudio(audio)}
 					title={$downloadPercent !== null
 						? `Annuler (${$downloadPercent}%)`
@@ -130,21 +134,23 @@
 				</button>
 			{:else}
 				<button
-					class="flex flex-row items-center space-x-1 hover:text-missionnaire"
+					class="inline-flex flex-row items-center justify-center min-w-11 min-h-11 space-x-1 hover:text-missionnaire"
 					onclick={() => downloadAudio(audio)}
+					aria-label={`${$t('player.download')} — ${audio.title}`}
 				>
 					<Icon src={AiOutlineDownload} />
 					<span class="hidden md:block">MP3</span>
 				</button>
 			{/if}
 			<button
-				class="flex flex-row items-center space-x-1 hover:text-missionnaire"
+				class="inline-flex flex-row items-center justify-center min-w-11 min-h-11 space-x-1 hover:text-missionnaire"
 				onclick={() => {
 					updateSelectAudio(audio);
 				}}
+				aria-label={`${$t('player.play')} — ${audio.title}`}
 			>
 				<Icon src={BsPlayCircleFill} />
-				<span class=" hidden md:block">Play</span>
+				<span class=" hidden md:block">{$t('player.play')}</span>
 			</button>
 		</div>
 		<!-- <div class="text-center">

@@ -61,7 +61,7 @@
 									src={vercelImage(rec.thumbnail_url, 192)}
 									srcset={vercelImageSrcSet(rec.thumbnail_url, 96)}
 									placeholderSrc={vercelImagePlaceholder(rec.thumbnail_url)}
-									alt=""
+									alt={rec.title}
 									width={80}
 									height={56}
 									loading="lazy"

@@ -68,8 +68,15 @@
 			<div class="grid gap-1">
 				{#each _list as col}
 					<div class="col">
-						{#each col as item}
-							<img loading="lazy" src={item.download_url} alt="" class="img-zoom" />
+						{#each col as item, index}
+							<img
+								loading="lazy"
+								src={item.download_url}
+								alt={item.author
+									? `Photo de ${item.author} — galerie Missionnaire Network`
+									: `Photo ${index + 1} — galerie Missionnaire Network`}
+								class="img-zoom"
+							/>
 						{/each}
 					</div>
 				{/each}

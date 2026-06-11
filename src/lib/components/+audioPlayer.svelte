@@ -9,6 +9,8 @@
 		pendingPlaybackSeek
 	} from '$lib/utils/audioResume';
 	import { formatTime } from '../../utils/FormatTime';
+	import { focusTrap } from '$lib/actions/focusTrap';
+	import { t } from '../../i18n';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import BsSkipBackwardFill from 'svelte-icons-pack/bs/BsSkipBackwardFill';
@@ -1392,6 +1394,17 @@
 		updateIndicator();
 	};
 
+	// Keyboard support for the custom progress-bar slider (role="slider").
+	const handleProgressKeydown = (event: KeyboardEvent) => {
+		if (event.key === 'ArrowRight') {
+			event.preventDefault();
+			seekForward(5);
+		} else if (event.key === 'ArrowLeft') {
+			event.preventDefault();
+			seekBackward(5);
+		}
+	};
+
 	const togglePlay = async () => {
 		if (!audio) return;
 
@@ -2551,14 +2564,23 @@
 		</button>
 
 		<!-- Top Progress Bar -->
-		<!-- svelte-ignore a11y_click_events_have_key_events -->
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			bind:this={progressBarElement}
-			class="absolute top-0 left-0 w-full h-8 -translate-y-1/2 cursor-pointer group/progress flex items-center justify-start z-50 touch-none select-none"
+			class="absolute top-0 left-0 w-full h-8 [@media(pointer:coarse)]:h-11 -translate-y-1/2 cursor-pointer group/progress flex items-center justify-start z-50 touch-none select-none"
 			onmousedown={startDrag}
 			use:nonpassiveTouchstart={startDrag}
 			onclick={seekTo}
+			onkeydown={handleProgressKeydown}
+			role="slider"
+			tabindex="0"
+			aria-label={$t('player.progressLabel')}
+			aria-valuemin={0}
+			aria-valuemax={duration}
+			aria-valuenow={currentTime}
+			aria-valuetext={$t('player.timeOf', {
+				current: formatTime(currentTime),
+				total: formatTime(duration)
+			})}
 		>
 			<!-- Visual Track -->
 			<div class="w-full h-[4px] bg-stone-200 relative overflow-visible rounded-full">
@@ -2725,6 +2747,7 @@
 								class="share-menu z-[130] w-52 overflow-hidden rounded-lg border border-stone-200 bg-white shadow-2xl"
 								role="menu"
 								tabindex="-1"
+								use:focusTrap={{ onEscape: closeShareMenu }}
 								onclick={(e) => e.stopPropagation()}
 							>
 								{#if hasNativeShare}
@@ -2844,6 +2867,7 @@
 						<!-- svelte-ignore a11y_no_static_element_interactions -->
 						<div
 							class="absolute right-0 bottom-full z-[120] mb-3 w-72 max-w-[calc(100vw-2rem)] border border-stone-200 bg-white p-3 shadow-2xl rounded-lg"
+							use:focusTrap={{ onEscape: () => (isSleepTimerOpen = false) }}
 							onclick={(e) => e.stopPropagation()}
 						>
 							<div class="mb-3 flex items-center justify-between gap-3">

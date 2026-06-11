@@ -73,7 +73,7 @@
 	</section>
 
 	{#if data.submitted}
-		<div class="mb-6 border border-green-200 bg-green-50 p-5 text-sm text-green-800">
+		<div role="status" class="mb-6 border border-green-200 bg-green-50 p-5 text-sm text-green-800">
 			Votre question a été envoyée. Elle sera visible après validation par un modérateur, et vous
 			pourrez la retrouver ici depuis ce même navigateur.
 		</div>
@@ -130,7 +130,7 @@
 		}}
 	>
 		{#if form?.error}
-			<div class="mb-5 border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+			<div role="alert" class="mb-5 border border-red-200 bg-red-50 p-4 text-sm text-red-700">
 				{form.error}
 			</div>
 		{/if}

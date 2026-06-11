@@ -3,6 +3,8 @@
 	import { onDestroy, onMount } from 'svelte';
 	import { radioIsLive as radioIsLiveStore, livePlayback } from '$lib/stores/global';
 	import LiveTranscript from './+liveTranscript.svelte';
+	import { focusTrap } from '$lib/actions/focusTrap';
+	import { t } from '../../i18n';
 
 	const STATUS_MESSAGES: Record<string, string> = {
 		offline: "L'audio en direct est hors ligne",
@@ -1136,6 +1138,9 @@
 						oninput={onSeekInput}
 						onchange={onSeekCommit}
 						aria-label="Position dans le direct"
+						aria-valuetext={isAtLive
+							? $t('live.atLive')
+							: $t('live.behindLive', { label: behindLiveLabel })}
 					/>
 					{#if !isAtLive}
 						<span class="text-[11px] font-mono text-stone-500 tabular-nums shrink-0">
@@ -1147,7 +1152,7 @@
 						onclick={backToLive}
 						aria-label={isAtLive ? 'Recharger le direct' : 'Revenir au direct'}
 						title={isAtLive ? 'Recharger le direct' : 'Revenir au direct'}
-						class="inline-flex items-center gap-1.5 px-3 py-1.5 border text-[10px] font-bold uppercase tracking-[0.15em] font-body transition-all duration-200 shrink-0 {isAtLive
+						class="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-11 border text-[10px] font-bold uppercase tracking-[0.15em] font-body transition-all duration-200 shrink-0 {isAtLive
 							? 'border-red-500 text-red-600 bg-red-50/60 hover:bg-red-100'
 							: 'border-missionnaire text-missionnaire hover:bg-missionnaire hover:text-white'}"
 					>
@@ -1245,6 +1250,7 @@
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-lightbox-in"
 		onclick={handleBackdropClick}
 		onkeydown={handleLightboxKeydown}
+		use:focusTrap={{ onEscape: closeThumbnail }}
 		role="dialog"
 		aria-modal="true"
 		aria-label="Vignette du direct"
@@ -1328,6 +1334,19 @@
 	}
 	.live-scrubber:focus-visible::-webkit-slider-thumb {
 		box-shadow: 0 0 0 3px rgba(255, 136, 12, 0.3);
+	}
+
+	/* Touch devices: a bigger thumb gives a comfortable hit target while the
+	   3px track keeps its slim look. */
+	@media (pointer: coarse) {
+		.live-scrubber::-webkit-slider-thumb {
+			width: 22px;
+			height: 22px;
+		}
+		.live-scrubber::-moz-range-thumb {
+			width: 22px;
+			height: 22px;
+		}
 	}
 
 	.animate-lightbox-in {
