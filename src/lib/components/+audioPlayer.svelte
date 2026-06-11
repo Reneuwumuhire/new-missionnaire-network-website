@@ -2527,7 +2527,7 @@
 					<div class="lyrics-drawer-header mb-3 flex items-center justify-between gap-3">
 						<div class="min-w-0">
 							<div class="text-[10px] font-bold uppercase tracking-[0.22em] text-missionnaire/90">
-								Paroles disponibles
+								{$t('player.lyricsAvailable')}
 							</div>
 							<div class="mt-0.5 truncate text-sm font-semibold text-stone-500">
 								{getDisplayTitle($selectAudio)}
@@ -2538,7 +2538,7 @@
 							class="lyrics-close-btn"
 							onclick={() => (lyricsPanelOpen = false)}
 						>
-							Fermer
+							{$t('misc.close')}
 						</button>
 					</div>
 					<SyncedLyrics
@@ -2557,8 +2557,8 @@
 		<button
 			class="absolute right-3 top-3 z-[110] hidden h-9 w-9 items-center justify-center rounded-full bg-gray-900 text-white shadow-lg transition-colors hover:bg-black lg:flex"
 			onclick={closeAudioPlayer}
-			aria-label="Fermer le lecteur"
-			title="Fermer"
+			aria-label={$t('player.close')}
+			title={$t('misc.close')}
 		>
 			<Icon src={BsX} size="20" />
 		</button>
@@ -2608,13 +2608,13 @@
 					<div
 						class="text-[10px] uppercase tracking-[0.2em] font-bold text-missionnaire mb-0.5 opacity-80 flex flex-wrap items-center gap-x-2 gap-y-0.5 whitespace-nowrap"
 					>
-						<span>Lecture en cours</span>
+						<span>{$t('player.nowPlaying')}</span>
 						<!-- ── BEGIN: cache indicator badge (added) ──────────── -->
 						{#if isCurrentTrackCached === true}
 							<span
 								class="inline-flex items-center gap-1 text-[9px] font-semibold tracking-normal normal-case text-emerald-600"
-								title="Disponible hors ligne"
-								aria-label="Piste en cache"
+								title={$t('player.availableOffline')}
+								aria-label={$t('player.trackCached')}
 							>
 								<svg
 									width="12"
@@ -2630,14 +2630,14 @@
 									<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
 									<polyline points="9 14 11 16 15 12" />
 								</svg>
-								<span>En cache</span>
+								<span>{$t('player.cached')}</span>
 							</span>
 						{/if}
 						{#if showOfflineUnavailable}
 							<span
 								class="inline-flex items-center gap-1 text-[9px] font-semibold tracking-normal normal-case text-amber-600"
-								title="Hors ligne — cette piste n'est pas en cache"
-								aria-label="Piste indisponible hors ligne"
+								title={$t('player.offlineNotCached')}
+								aria-label={$t('player.trackUnavailableOffline')}
 							>
 								<svg
 									width="12"
@@ -2658,7 +2658,7 @@
 									<path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
 									<line x1="12" y1="20" x2="12.01" y2="20" />
 								</svg>
-								<span>Hors ligne</span>
+								<span>{$t('player.offline')}</span>
 							</span>
 						{/if}
 						<!-- ── END: cache indicator badge ────────────────────── -->
@@ -2684,7 +2684,7 @@
 					</div>
 					{#if !isAudioReady}
 						<div class="text-[10px] font-medium uppercase tracking-[0.15em] text-stone-400 mt-1">
-							Chargement...
+							{$t('list.loading')}
 						</div>
 					{/if}
 					<div class="flex items-center gap-2 mt-0.5 lg:hidden">
@@ -2704,8 +2704,8 @@
 						? 'text-red-500 hover:text-red-600'
 						: 'text-stone-300 hover:text-red-400'}"
 					onclick={handleToggleFavorite}
-					aria-label={isCurrentFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
-					title={isCurrentFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+					aria-label={isCurrentFavorite ? $t('player.unfavorite') : $t('player.favorite')}
+					title={isCurrentFavorite ? $t('player.unfavorite') : $t('player.favorite')}
 				>
 					<Icon src={isCurrentFavorite ? BsHeartFill : BsHeart} size="18" />
 				</button>
@@ -2718,11 +2718,12 @@
 							: ''}"
 						onclick={toggleLyricsPanel}
 						aria-expanded={lyricsPanelOpen}
-						aria-label={lyricsPanelOpen ? 'Fermer les paroles' : 'Ouvrir les paroles'}
-						title={lyricsPanelOpen ? 'Fermer les paroles' : 'Paroles'}
+						aria-label={lyricsPanelOpen ? $t('player.closeLyrics') : $t('player.openLyrics')}
+						title={lyricsPanelOpen ? $t('player.closeLyrics') : $t('player.lyrics')}
+						data-player-action="lyrics"
 					>
 						<Icon src={BsMusicNoteList} size="17" />
-						<span class="hidden sm:inline">Paroles</span>
+						<span class="hidden sm:inline">{$t('player.lyrics')}</span>
 					</button>
 				{/if}
 
@@ -2734,8 +2735,8 @@
 							onclick={(e) => { e.stopPropagation(); toggleShareMenu(); }}
 							aria-haspopup="menu"
 							aria-expanded={isShareMenuOpen}
-							aria-label="Partager ce chant"
-							title="Partager ce chant"
+							aria-label={$t('player.shareSong')}
+							title={$t('player.shareSong')}
 						>
 							<Icon src={RiSystemShareForwardLine} size="17" />
 							<span class="hidden sm:inline">Share</span>
@@ -2777,7 +2778,7 @@
 								class="absolute right-0 bottom-full z-[140] mb-2 whitespace-nowrap rounded-md bg-stone-900 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white shadow-lg pointer-events-none"
 								role="status"
 							>
-								{shareFeedback === 'copied' ? 'Lien copié' : 'Échec — copiez l’URL'}
+								{shareFeedback === 'copied' ? $t('player.linkCopied') : $t('player.copyFailed')}
 							</span>
 						{/if}
 					</div>
@@ -2790,11 +2791,11 @@
 							class="player-action-pill {isDownloading ? 'is-active' : ''}"
 							onclick={(e) => { e.stopPropagation(); downloadCurrentAudio(); }}
 							aria-label={isDownloading
-								? 'Annuler le téléchargement'
-								: 'Télécharger ce chant'}
+								? $t('player.cancelDownload')
+								: $t('player.downloadSong')}
 							title={isDownloading
-								? 'Téléchargement en cours — cliquez pour annuler'
-								: 'Télécharger'}
+								? $t('player.downloadingClickCancel')
+								: $t('player.download')}
 						>
 							<Icon src={AiOutlineDownload} size="17" />
 							{#if isDownloading}
@@ -2808,7 +2809,7 @@
 								class="absolute right-0 bottom-full z-[140] mb-2 whitespace-nowrap rounded-md bg-stone-900 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white shadow-lg pointer-events-none"
 								role="status"
 							>
-								Échec du téléchargement
+								{$t('player.downloadFailed')}
 							</span>
 						{/if}
 					</div>
@@ -2822,13 +2823,14 @@
 							: ''} {sleepTimerEndsAt !== null && !isSleepTimerOpen ? 'is-armed' : ''}"
 						onclick={(e) => { e.stopPropagation(); isSleepTimerOpen = !isSleepTimerOpen; }}
 						aria-label={sleepTimerEndsAt !== null
-							? `Options du lecteur, minuterie active, arrêt dans ${sleepTimerRemainingLabel}`
-							: 'Options du lecteur'}
+							? $t('player.optionsTimerActive', { remaining: sleepTimerRemainingLabel })
+							: $t('player.options')}
 						aria-haspopup="menu"
 						aria-expanded={isSleepTimerOpen}
 						title={sleepTimerEndsAt !== null
-							? `Options · arrêt dans ${sleepTimerRemainingLabel}`
-							: 'Options'}
+							? $t('player.optionsStopIn', { remaining: sleepTimerRemainingLabel })
+							: $t('misc.options')}
+						data-player-action="options"
 					>
 						<!-- Lucide "settings-2" inlined (svelte-icons-pack has no `lu/`
 						     pack and we don't want a whole icon package for one glyph) -->
@@ -2848,7 +2850,7 @@
 							<circle cx="17" cy="17" r="3" />
 							<circle cx="7" cy="7" r="3" />
 						</svg>
-						<span class="hidden sm:inline">Plus</span>
+						<span class="hidden sm:inline">{$t('misc.more')}</span>
 						<Icon
 							src={BsChevronDown}
 							size="11"
@@ -2873,13 +2875,16 @@
 							<div class="mb-3 flex items-center justify-between gap-3">
 								<div class="min-w-0">
 									<div class="text-[10px] font-bold uppercase tracking-[0.22em] text-missionnaire">
-										Options
+										{$t('misc.options')}
 									</div>
 									<div class="mt-0.5 text-xs font-semibold text-stone-500">
 										{#if sleepTimerEndsAt !== null}
-											Minuterie · arrêt à {sleepTimerEndLabel} · {sleepTimerRemainingLabel}
+											{$t('player.timerStopsAt', {
+												end: sleepTimerEndLabel,
+												remaining: sleepTimerRemainingLabel
+											})}
 										{:else}
-											Minuterie désactivée
+											{$t('player.timerOff')}
 										{/if}
 									</div>
 								</div>
@@ -2889,7 +2894,7 @@
 										class="shrink-0 rounded-full border border-stone-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-stone-500 transition-colors hover:border-missionnaire hover:text-missionnaire"
 										onclick={() => clearSleepTimer({ closeMenu: true })}
 									>
-										Annuler
+										{$t('misc.cancel')}
 									</button>
 								{/if}
 							</div>
@@ -2906,7 +2911,7 @@
 										size="17"
 										color={$repeatOne ? '#FF880C' : '#a8a29e'}
 									/>
-									<span class="truncate text-xs font-bold text-stone-700">Répéter la piste</span>
+									<span class="truncate text-xs font-bold text-stone-700">{$t('player.repeatOne')}</span>
 								</span>
 								<span
 									class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] {$repeatOne
@@ -2918,7 +2923,7 @@
 							</button>
 
 							<div class="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-400">
-								Minuterie de sommeil
+								{$t('player.sleepTimerHeading')}
 							</div>
 							<div class="grid grid-cols-3 gap-2">
 								{#each sleepTimerOptions as minutes}
@@ -2937,7 +2942,7 @@
 									for="sleep-timer-time"
 									class="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.18em] text-stone-400"
 								>
-									Arrêter à
+									{$t('player.stopAt')}
 								</label>
 								<div class="flex items-center gap-2">
 									<input
@@ -2970,7 +2975,7 @@
 				<button
 					class="bg-gray-900 hover:bg-black text-white p-2 rounded-full transition-colors lg:hidden"
 					onclick={closeAudioPlayer}
-					aria-label="Fermer le lecteur"
+					aria-label={$t('player.close')}
 				>
 					<Icon src={BsX} size="20" />
 				</button>
@@ -2990,7 +2995,7 @@
 								class="p-2.5 rounded-full transition-all flex items-center gap-2 {$isShuffle
 									? 'bg-missionnaire text-white shadow-md shadow-missionnaire/20'
 									: 'bg-stone-50 text-stone-400 hover:bg-stone-100 hover:text-stone-600'}"
-								title={$isShuffle ? 'Aléatoire activé' : 'Aléatoire désactivé'}
+								title={$isShuffle ? $t('player.shuffleOn') : $t('player.shuffleOff')}
 							>
 								<Icon src={BsShuffle} size="16" />
 							</button>
@@ -3002,8 +3007,8 @@
 							<button
 								onclick={playPrevious}
 								class="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-stone-500 transition-colors hover:bg-missionnaire hover:text-white"
-								aria-label="Piste précédente"
-								title="Précédent"
+								aria-label={$t('player.previous')}
+								title={$t('pagination.previous')}
 							>
 								<Icon src={BsSkipStartFill} size="20" />
 							</button>
@@ -3048,8 +3053,8 @@
 							<button
 								onclick={playNext}
 								class="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-stone-500 transition-colors hover:bg-missionnaire hover:text-white"
-								aria-label="Piste suivante"
-								title="Suivant"
+								aria-label={$t('player.next')}
+								title={$t('pagination.next')}
 							>
 								<Icon src={BsSkipEndFill} size="20" />
 							</button>
@@ -3072,7 +3077,7 @@
 								class="p-2.5 rounded-full transition-all flex items-center gap-2 {$repeatOne
 									? 'bg-missionnaire text-white shadow-md shadow-missionnaire/20'
 									: 'bg-stone-50 text-stone-400 hover:bg-stone-100 hover:text-stone-600'}"
-								title={$repeatOne ? 'Répéter activé' : 'Répéter désactivé'}
+								title={$repeatOne ? $t('player.repeatOn') : $t('player.repeatOff')}
 							>
 								<Icon
 									src={RiMediaRepeatOneLine}
@@ -3099,7 +3104,7 @@
 								class="p-2.5 rounded-full transition-all flex items-center gap-2 {$isShuffle
 									? 'bg-missionnaire text-white'
 									: 'bg-stone-50 text-stone-400 hover:bg-stone-100 hover:text-stone-600'}"
-								title={$isShuffle ? 'Aléatoire activé' : 'Aléatoire désactivé'}
+								title={$isShuffle ? $t('player.shuffleOn') : $t('player.shuffleOff')}
 							>
 								<Icon src={BsShuffle} size="16" />
 							</button>
@@ -3110,7 +3115,7 @@
 							class="p-2.5 rounded-full transition-all flex items-center gap-2 {$repeatOne
 								? 'bg-missionnaire text-white shadow-md shadow-missionnaire/20'
 								: 'bg-stone-50 text-stone-400 hover:bg-stone-100'}"
-							title={$repeatOne ? 'Répéter activé' : 'Répéter désactivé'}
+							title={$repeatOne ? $t('player.repeatOn') : $t('player.repeatOff')}
 						>
 							<Icon
 								src={RiMediaRepeatOneLine}
@@ -3619,11 +3624,11 @@
 		/* Hide the lyrics-toggle button in the player header when lyrics are
 		   already open — the FERMER button in the drawer handles closing.
 		   Same for the sleep-timer button: not critical when the user is
-		   actively reading lyrics. Heart + close X stay visible. The X close
-		   doesn't get matched: its aria-label has "lecteur" but no
-		   aria-expanded attribute. */
-		.audio-player-shell.lyrics-open .player-main button[aria-label*='paroles'],
-		.audio-player-shell.lyrics-open .player-main button[aria-label*='lecteur'][aria-expanded] {
+		   actively reading lyrics. Heart + close X stay visible. Matched via
+		   stable data attributes (aria-labels are translated and can't be
+		   used as selectors). */
+		.audio-player-shell.lyrics-open .player-main button[data-player-action='lyrics'],
+		.audio-player-shell.lyrics-open .player-main button[data-player-action='options'] {
 			display: none;
 		}
 

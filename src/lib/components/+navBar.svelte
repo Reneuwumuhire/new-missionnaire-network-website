@@ -195,7 +195,7 @@
 				e.stopPropagation();
 				toggleMobileNav();
 			}}
-			aria-label={showMoboNav ? 'Fermer le menu' : 'Ouvrir le menu'}
+			aria-label={showMoboNav ? $t('nav.closeMenu') : $t('nav.openMenu')}
 		>
 			{#if showMoboNav}
 				<Icon src={IoCloseSharp} className="w-5 h-5" />

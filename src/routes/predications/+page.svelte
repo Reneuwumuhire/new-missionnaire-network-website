@@ -195,7 +195,7 @@
 			let nextSermons: Sermon[] = [];
 			let nextSermonTotal = 0;
 			if (sermonRes) {
-				if (!sermonRes.ok) throw new Error('Impossible de charger les prédications');
+				if (!sermonRes.ok) throw new Error($t('predications.loadFailed'));
 				const r = await sermonRes.json();
 				nextSermons = (r.data || []) as Sermon[];
 				nextSermonTotal = (r.total || 0) as number;
@@ -204,7 +204,7 @@
 			let nextRecordings: PublishedRecording[] = [];
 			let nextRecordingsTotal = 0;
 			if (retransmissionRes) {
-				if (!retransmissionRes.ok) throw new Error('Impossible de charger les retransmissions');
+				if (!retransmissionRes.ok) throw new Error($t('predications.loadRetransmissionsFailed'));
 				const r = await retransmissionRes.json();
 				nextRecordings = (r.data || []) as PublishedRecording[];
 				nextRecordingsTotal = (r.total || 0) as number;
@@ -243,7 +243,7 @@
 			if ((error as Error).name === 'AbortError') return;
 			if (token !== currentRequestToken || key !== requestKey) return;
 			listLoadError =
-				error instanceof Error ? error.message : 'Impossible de charger les prédications';
+				error instanceof Error ? error.message : $t('predications.loadFailed');
 			if (!hasResolvedList) {
 				sermons = [];
 				recordings = [];
@@ -393,9 +393,11 @@
 	<!-- Page Header -->
 	<div class="mb-5 md:mb-6">
 		<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body">
-			Prédications
+			{$t('nav.predications')}
 		</p>
-		<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">Prédications</h1>
+		<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">
+			{$t('nav.predications')}
+		</h1>
 		<a
 			href="/videos"
 			class="inline-flex items-center gap-2 mt-2 text-[12px] font-semibold text-stone-400 hover:text-missionnaire uppercase tracking-[0.15em] font-body transition-colors"
@@ -418,14 +420,14 @@
 					ry="2"
 				/></svg
 			>
-			Voir en vidéo →
+			{$t('predications.watchVideo')} →
 		</a>
 	</div>
 
 	<!-- Content-type tabs: classic sermons vs recorded live broadcasts.
 	     "Retransmissions" used to hide as a pseudo-author chip; non-technical
 	     visitors never found it. -->
-	<div class="flex items-center gap-0 mb-6 border-b border-stone-200/60" role="tablist" aria-label="Type de contenu">
+	<div class="flex items-center gap-0 mb-6 border-b border-stone-200/60" role="tablist" aria-label={$t('predications.contentType')}>
 		<button
 			role="tab"
 			aria-selected={currentAuthor !== 'Retransmissions'}
@@ -455,7 +457,7 @@
 				<h2
 					class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.35em] mb-2 md:mb-3 text-center md:text-left font-body"
 				>
-					Par ordre alphabétique
+					{$t('predications.alphabetical')}
 				</h2>
 				<div class="flex flex-wrap justify-center md:justify-start gap-x-4 gap-y-2">
 					{#each alphabet as letter}
@@ -476,7 +478,7 @@
 			<h2
 				class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.35em] mb-2 md:mb-3 text-center md:text-left font-body"
 			>
-				Prédicateurs
+				{$t('predications.preachers')}
 			</h2>
 			<div
 				class="flex flex-wrap justify-center gap-2 pb-2 md:flex-nowrap md:overflow-x-auto md:gap-3 md:justify-start no-scrollbar"
@@ -491,7 +493,7 @@
 							: 'bg-white/40 text-stone-500 border-stone-200/60 hover:border-missionnaire hover:text-missionnaire'}"
 						onclick={() => handleAuthorChange(author)}
 					>
-						{author === 'Tous' ? 'Tout Voir' : author}
+						{author === 'Tous' ? $t('misc.seeAllCap') : author}
 					</button>
 				{/each}
 			</div>
@@ -502,7 +504,7 @@
 				<h2
 					class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.35em] mb-2 md:mb-3 text-center md:text-left font-body"
 				>
-					Options
+					{$t('misc.options')}
 				</h2>
 				<div
 					class="flex flex-col md:flex-row gap-4 items-center justify-between bg-white/40 p-4 border border-stone-200/60"
@@ -516,7 +518,7 @@
 									: 'text-stone-500 hover:text-stone-700'}"
 								onclick={() => handleLanguageChange('french')}
 							>
-								Français
+								{$t('lang.french')}
 							</button>
 							<button
 								class="px-3 py-1.5 rounded-md text-xs font-bold transition-all {currentLanguage ===
@@ -525,7 +527,7 @@
 									: 'text-stone-500 hover:text-stone-700'}"
 								onclick={() => handleLanguageChange('english')}
 							>
-								English
+								{$t('lang.english')}
 							</button>
 						</div>
 
@@ -538,7 +540,7 @@
 							onclick={() => handleAudioFilterToggle()}
 						>
 							<Icon src={IoPlayCircle} size="16" />
-							Audio Uniquement
+							{$t('predications.audioOnly')}
 						</button>
 					</div>
 				</div>
@@ -553,7 +555,7 @@
 					<h2
 						class="text-xs font-bold text-stone-800 uppercase tracking-widest mb-6 pb-2 border-b border-stone-200/60 font-body"
 					>
-						Années
+						{$t('predications.years')}
 					</h2>
 					<div class="grid grid-cols-3 gap-2 max-h-[70vh] overflow-y-auto no-scrollbar pr-1">
 						{#each years as year}
@@ -578,10 +580,10 @@
 					<button
 						class="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-3 py-1.5 text-[10px] font-bold text-missionnaire hover:bg-stone-200 transition-colors"
 						onclick={() => goto('?')}
-						title="Réinitialiser les filtres"
+						title={$t('list.resetFilters')}
 					>
 						<Icon src={BsX} size="14" />
-						Réinitialiser
+						{$t('list.reset')}
 					</button>
 				</div>
 			{/if}
@@ -610,7 +612,7 @@
 									<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
 								</span>
 							{/if}
-							Titre
+							{$t('list.title')}
 						</button>
 						<button
 							class="hidden md:flex text-left items-center gap-1.5 hover:text-missionnaire transition-colors"
@@ -621,7 +623,7 @@
 									<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
 								</span>
 							{/if}
-							Prédicateur
+							{$t('predications.preacher')}
 						</button>
 						<button
 							class="hidden md:flex text-left items-center gap-1.5 hover:text-missionnaire transition-colors"
@@ -632,7 +634,7 @@
 									<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
 								</span>
 							{/if}
-							Date
+							{$t('list.date')}
 						</button>
 						<button
 							class="hidden md:flex text-center items-center justify-center gap-1.5 hover:text-missionnaire transition-colors"
@@ -643,10 +645,10 @@
 									<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
 								</span>
 							{/if}
-							Durée
+							{$t('list.duration')}
 						</button>
 						<div class="flex items-center justify-center text-center">
-							<span class="hidden md:inline">Actions</span>
+							<span class="hidden md:inline">{$t('list.actions')}</span>
 						</div>
 					</div>
 
@@ -663,7 +665,7 @@
 								<div
 									class="border-b border-stone-200/60 bg-stone-50/70 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400"
 								>
-									Mise à jour de la liste...
+									{$t('list.updating')}
 								</div>
 							{/if}
 							{#if filterType === 'retransmission'}
@@ -680,10 +682,10 @@
 											<Icon src={BsSearch} size="32" />
 										</div>
 										<h3 class="text-xl font-bold text-stone-800 mb-2">
-											Aucune retransmission trouvée
+											{$t('predications.noRetransmissions')}
 										</h3>
 										<p class="text-stone-400 text-sm">
-											Essayez de modifier vos filtres ou votre recherche.
+											{$t('list.tryAdjustFilters')}
 										</p>
 									</div>
 								{/each}
@@ -702,9 +704,11 @@
 										>
 											<Icon src={BsSearch} size="32" />
 										</div>
-										<h3 class="text-xl font-bold text-stone-800 mb-2">Aucun sermon trouvé</h3>
+										<h3 class="text-xl font-bold text-stone-800 mb-2">
+											{$t('predications.noSermons')}
+										</h3>
 										<p class="text-stone-400 text-sm">
-											Essayez de modifier vos filtres ou votre recherche.
+											{$t('list.tryAdjustFilters')}
 										</p>
 									</div>
 								{/each}
@@ -720,10 +724,10 @@
 						class="flex flex-col sm:flex-row items-center sm:justify-between gap-4 text-[10px] md:text-xs font-bold text-stone-400 tracking-widest uppercase"
 					>
 						<div class="hidden md:block">
-							Affichage de {sermons.length} sur {totalSermons} prédications
+							{$t('predications.showingOf', { shown: sermons.length, total: totalSermons })}
 						</div>
 						<div class="flex items-center gap-3">
-							<span class="opacity-60">Lignes:</span>
+							<span class="opacity-60">{$t('list.rows')}</span>
 							<select
 								class="bg-stone-100 rounded-lg px-3 py-1.5 outline-none text-stone-800 focus:ring-2 focus:ring-missionnaire/20 transition-all cursor-pointer"
 								value={limit}
@@ -759,7 +763,7 @@
 						<h2
 							class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.35em] font-body"
 						>
-							Retransmissions correspondant à « {currentSearch} »
+							{$t('predications.retransmissionsMatching', { query: currentSearch })}
 							<span class="ml-2 normal-case tracking-normal text-stone-400 font-normal"
 								>{recordingsTotal ?? recordings.length}</span
 							>
@@ -774,7 +778,7 @@
 								})()}
 								class="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.15em] text-missionnaire hover:underline"
 							>
-								Voir tout →
+								{$t('misc.viewAll')} →
 							</a>
 						{/if}
 					</div>

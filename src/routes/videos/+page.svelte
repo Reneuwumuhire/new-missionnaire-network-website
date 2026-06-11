@@ -24,6 +24,7 @@
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import BsSearch from 'svelte-icons-pack/bs/BsSearch';
 	import BsX from 'svelte-icons-pack/bs/BsX';
+	import { t } from '../../i18n';
 
 	interface Props {
 		data: PageData;
@@ -123,7 +124,7 @@
 			});
 
 			if (token !== currentToken || key !== requestKey) return;
-			if (!response.ok) throw new Error('Impossible de charger les vidéos');
+			if (!response.ok) throw new Error($t('videos.loadFailed'));
 
 			const result = await response.json();
 			const videos = (result.data || []) as YoutubeVideo[];
@@ -140,7 +141,7 @@
 		} catch (error) {
 			if ((error as Error).name === 'AbortError') return;
 			if (token !== currentToken || key !== requestKey) return;
-			initialLoadError = error instanceof Error ? error.message : 'Impossible de charger les vidéos';
+			initialLoadError = error instanceof Error ? error.message : $t('videos.loadFailed');
 			isSearchLoading = false;
 		} finally {
 			if (token === currentToken) isInitialLoading = false;
@@ -161,7 +162,7 @@
 			});
 
 			const response = await fetch(`/pagination?${params.toString()}`);
-			if (!response.ok) throw new Error('Impossible de charger plus de vidéos');
+			if (!response.ok) throw new Error($t('videos.loadMoreFailed'));
 
 			const result = await response.json();
 			const nextVideos = (result.data || []) as YoutubeVideo[];
@@ -383,7 +384,9 @@
 				Missionnaire Network
 			</p>
 			<div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-				<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">Vidéos</h1>
+				<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">
+					{$t('nav.videos')}
+				</h1>
 				<a
 					href="/predications"
 					class="inline-flex items-center gap-2 text-[12px] font-semibold text-stone-400 hover:text-missionnaire uppercase tracking-[0.15em] font-body transition-colors"
@@ -402,11 +405,11 @@
 						<circle cx="6" cy="18" r="3"></circle>
 						<circle cx="18" cy="16" r="3"></circle>
 					</svg>
-					Écouter en audio →
+					{$t('videos.listenAudio')} →
 				</a>
 			</div>
 			<p class="mt-2 text-sm text-stone-500 font-body max-w-2xl">
-				Retrouvez les retransmissions, prédications et enseignements en vidéo.
+				{$t('videos.intro')}
 			</p>
 		</section>
 
@@ -423,7 +426,7 @@
 				</div>
 				<input
 					type="text"
-					placeholder="Rechercher une vidéo..."
+					placeholder={$t('videos.searchPlaceholder')}
 					class="w-full border border-stone-200/80 bg-white pl-9 pr-24 py-3 text-sm font-body text-stone-800 placeholder:text-stone-400 focus:border-missionnaire/40 focus:outline-none focus:ring-1 focus:ring-missionnaire/30 transition-colors"
 					bind:value={searchInput}
 					oninput={() => handleSearch()}
@@ -441,7 +444,7 @@
 							searchInput = '';
 							handleSearch(true);
 						}}
-						aria-label="Effacer la recherche"
+						aria-label={$t('search.clear')}
 					>
 						<Icon src={BsX} size="16" />
 					</button>
@@ -501,7 +504,7 @@
 									? 'bg-red-600'
 									: 'bg-missionnaire'} rounded-full text-xs font-bold uppercase tracking-widest mb-2"
 							>
-								{displayVideos[0].tags.includes('LIVE') ? 'EN DIRECT' : 'À la une'}
+								{displayVideos[0].tags.includes('LIVE') ? $t('videos.liveBadge') : $t('videos.featured')}
 							</div>
 							<h2
 								class="text-3xl md:text-5xl lg:text-6xl font-black leading-tight tracking-tight line-clamp-2 group-hover:text-stone-200 transition-colors"
@@ -515,13 +518,13 @@
 								<div
 									class="px-8 py-4 bg-white text-black rounded-full font-bold text-sm uppercase tracking-wider transition-transform group-hover:scale-105 hidden sm:block"
 								>
-									Regarder maintenant
+									{$t('videos.watchNow')}
 								</div>
 								<div
 									class="px-8 py-4 bg-white/10 backdrop-blur-md text-white border border-white/20 rounded-full font-bold text-sm uppercase tracking-wider flex items-center gap-2"
 								>
 									<span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-									{displayVideos[0].duration_string || 'Vidéo'}
+									{displayVideos[0].duration_string || $t('misc.video')}
 								</div>
 							</div>
 						</div>
@@ -536,10 +539,10 @@
 							<h2
 								class="text-[10px] font-bold text-missionnaire uppercase tracking-[0.35em] mb-2 font-body"
 							>
-								Découvrir
+								{$t('footer.discover')}
 							</h2>
 							<h3 class="font-display text-2xl md:text-3xl font-semibold text-stone-900">
-								Vidéos récentes
+								{$t('videos.recentVideos')}
 							</h3>
 						</div>
 					</div>
@@ -574,7 +577,7 @@
 								<p
 									class="text-[10px] font-semibold uppercase tracking-[0.25em] text-missionnaire font-body"
 								>
-									Chargement...
+									{$t('list.loading')}
 								</p>
 							{/if}
 						</div>
@@ -584,7 +587,7 @@
 						<div class="text-center w-full py-20 opacity-50">
 							<div class="w-16 h-1 bg-stone-200/60 mx-auto rounded-full mb-4"></div>
 							<p class="text-xs font-bold uppercase tracking-widest text-stone-400 font-body">
-								Fin de la liste
+								{$t('videos.endOfList')}
 							</p>
 						</div>
 					{/if}
@@ -596,7 +599,7 @@
 					>
 						🔍
 					</div>
-					<p>Aucune vidéo trouvée</p>
+					<p>{$t('videos.noVideos')}</p>
 				</div>
 			{/if}
 		{/if}

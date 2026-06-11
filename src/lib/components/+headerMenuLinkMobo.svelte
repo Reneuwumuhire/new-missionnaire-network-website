@@ -3,11 +3,12 @@
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import BsChevronDown from 'svelte-icons-pack/bs/BsChevronDown';
 	import type { NavigationLinkSubmenu } from '../../helpers/NavigationLinkList';
+	import { t, type TranslationKey } from '../../i18n';
 
 
 	interface Props {
 		subMenu: NavigationLinkSubmenu[];
-		menuName: string;
+		menuName: TranslationKey;
 		link: string;
 		closeMenuFrom: () => void;
 		active?: boolean;
@@ -38,7 +39,7 @@
 			onclick={() => ontoggle?.()}
 		>
 			<span class="text-[15px] font-medium whitespace-nowrap {isActive ? 'text-missionnaire' : 'text-stone-700'}">
-				{menuName}
+				{$t(menuName)}
 			</span>
 			<span class="{active ? activeClass : inactiveClass} transition-colors">
 				<Icon
@@ -54,7 +55,7 @@
 			class="flex items-center py-3.5 text-[15px] font-medium whitespace-nowrap w-full transition-colors duration-200 {isActive ? 'text-missionnaire' : 'text-stone-700 hover:text-missionnaire'}"
 			onclick={() => closeMenuFrom()}
 		>
-			{menuName}
+			{$t(menuName)}
 			{#if isActive}
 				<span class="ml-2 w-1.5 h-1.5 rounded-full bg-missionnaire"></span>
 			{/if}
@@ -78,7 +79,7 @@
 						</div>
 					{/if}
 					<span class="text-sm font-medium {isSubActive ? 'text-missionnaire font-semibold' : 'text-stone-600'}">
-						{subName}
+						{$t(subName)}
 					</span>
 				</a>
 			{/each}

@@ -13,6 +13,7 @@
 	import { createPlayableSermon } from '../../utils/audioPlayback';
 	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
 	import { downloadAudioFile } from '../../utils/downloadAudio';
+	import { t } from '../../i18n';
 
 	interface Props {
 		sermon: Sermon;
@@ -167,7 +168,9 @@
 	onkeydown={handleKeydown}
 	role="button"
 	tabindex="0"
-	aria-label="Lire la prédication {sermon.french_title || sermon.english_title}"
+	aria-label={$t('player.playSermon', {
+		title: sermon.french_title || sermon.english_title || ''
+	})}
 >
 	<!-- Index -->
 	<div
@@ -247,8 +250,10 @@
 			<button
 				class="inline-flex items-center justify-center min-w-11 min-h-11 text-gray-400 hover:text-red-500 transition-colors"
 				onclick={(e) => { e.stopPropagation(); downloadPdf(); }}
-				title="Télécharger PDF"
-				aria-label="Télécharger le PDF — {sermon.french_title || sermon.english_title}"
+				title={$t('player.downloadPdf')}
+				aria-label={$t('player.downloadPdfLabel', {
+					title: sermon.french_title || sermon.english_title || ''
+				})}
 			>
 				<Icon src={BsFileEarmarkPdfFill} size="18" />
 			</button>
@@ -260,14 +265,14 @@
 				onclick={(e) => { e.stopPropagation(); downloadMp3(); }}
 				title={isDownloading
 					? downloadPercent !== null
-						? `Annuler (${downloadPercent}%)`
-						: 'Annuler le téléchargement'
-					: 'Télécharger MP3'}
+						? $t('player.cancelPercent', { percent: downloadPercent })
+						: $t('player.cancelDownload')
+					: $t('player.downloadMp3')}
 				aria-label={isDownloading
 					? downloadPercent !== null
-						? `Annuler le téléchargement (${downloadPercent}%)`
-						: 'Annuler le téléchargement'
-					: 'Télécharger le MP3'}
+						? $t('player.cancelDownloadPercent', { percent: downloadPercent })
+						: $t('player.cancelDownload')
+					: $t('player.downloadMp3Label')}
 			>
 				{#if isDownloading}
 					<span class="relative flex h-5 w-5 items-center justify-center">
@@ -312,8 +317,8 @@
 					? 'text-orange-600'
 					: 'text-orange-600'}"
 				onclick={(e) => { e.stopPropagation(); togglePlay(); }}
-				title={isActive && $isPlaying ? 'Pause' : 'Lire'}
-				aria-label={isActive && $isPlaying ? 'Pause' : 'Lire'}
+				title={isActive && $isPlaying ? $t('player.pause') : $t('player.playAction')}
+				aria-label={isActive && $isPlaying ? $t('player.pause') : $t('player.playAction')}
 			>
 				<Icon src={isActive && $isPlaying ? IoPauseCircle : IoPlayCircle} size="24" />
 			</button>

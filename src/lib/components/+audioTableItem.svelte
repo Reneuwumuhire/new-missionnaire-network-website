@@ -84,9 +84,9 @@
 					class="group inline-flex items-center justify-center min-w-11 min-h-11 relative focus:outline-none"
 					onclick={() => downloadAudio(audio)}
 					title={$downloadPercent !== null
-						? `Annuler (${$downloadPercent}%)`
-						: 'Annuler le téléchargement'}
-					aria-label="Annuler le téléchargement"
+						? $t('player.cancelPercent', { percent: $downloadPercent })
+						: $t('player.cancelDownload')}
+					aria-label={$t('player.cancelDownload')}
 				>
 					{#if $downloadPercent !== null}
 						<svg

@@ -28,6 +28,7 @@
 	} from './listCache';
 	import MobileListToolbar from '$lib/components/+mobileListToolbar.svelte';
 	import { mobileSearchOpen, mobileFiltersOpen } from '$lib/stores/mobileControls';
+	import { t } from '../../i18n';
 
 	interface Props {
 		data: PageData;
@@ -133,7 +134,7 @@
 			});
 
 			if (token !== currentRequestToken || key !== requestKey) return;
-			if (!res.ok) throw new Error('Impossible de charger les transcriptions');
+			if (!res.ok) throw new Error($t('transcriptions.loadFailed'));
 
 			const r = await res.json();
 			const cached = setTranscriptionsCache(key, {
@@ -147,7 +148,7 @@
 			if ((error as Error).name === 'AbortError') return;
 			if (token !== currentRequestToken || key !== requestKey) return;
 			listLoadError =
-				error instanceof Error ? error.message : 'Impossible de charger les transcriptions';
+				error instanceof Error ? error.message : $t('transcriptions.loadFailed');
 			isSearching = false;
 		} finally {
 			if (token === currentRequestToken) isListLoading = false;
@@ -288,17 +289,19 @@
 				<p
 					class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body"
 				>
-					Transcriptions
+					{$t('nav.transcriptions')}
 				</p>
 				<h1 class="font-display text-2xl sm:text-3xl font-semibold text-stone-900 mb-2">
-					Transcriptions
+					{$t('nav.transcriptions')}
 				</h1>
 				<p class="text-sm text-stone-500 font-body mb-2">
-					Trouvez les transcriptions des prédications
+					{$t('transcriptions.findIntro')}
 				</p>
 				<p class="text-[12px] text-stone-400 font-body mb-2 md:mb-6">
 					{#if hasResolvedList}
-						{total} transcription{total > 1 ? 's' : ''} disponible{total > 1 ? 's' : ''}
+						{total > 1
+							? $t('transcriptions.availableMany', { count: total })
+							: $t('transcriptions.availableOne', { count: total })}
 					{:else}
 						<span class="inline-block h-3 w-32 rounded-full bg-stone-200 animate-pulse"></span>
 					{/if}
@@ -314,7 +317,7 @@
 						<input
 							type="text"
 							class="w-full bg-transparent text-stone-800 px-5 py-3.5 pr-24 text-sm font-body outline-none placeholder:text-stone-400"
-							placeholder="Rechercher par titre..."
+							placeholder={$t('transcriptions.searchByTitle')}
 							bind:value={searchTerm}
 							bind:this={searchInput}
 							onfocus={handleFocus}
@@ -328,8 +331,8 @@
 						{:else if searchTerm}
 							<button
 								type="button"
-								aria-label="Effacer la recherche"
-								title="Effacer"
+								aria-label={$t('search.clear')}
+								title={$t('search.clearShort')}
 								class="absolute right-2.5 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full text-stone-400 hover:bg-stone-200 hover:text-stone-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
 								onclick={() => {
 									searchTerm = '';
@@ -356,7 +359,7 @@
 						type="submit"
 						class="bg-missionnaire hover:bg-missionnaire/90 text-white px-6 py-3.5 text-[11px] font-bold uppercase tracking-[0.15em] font-body transition-colors shrink-0"
 					>
-						Rechercher
+						{$t('search.action')}
 					</button>
 				</form>
 			</div>
@@ -376,7 +379,7 @@
 				<input
 					type="search"
 					class="w-full rounded-lg border border-stone-200 bg-white py-2.5 pl-10 pr-3 text-base font-body text-stone-800 outline-none placeholder:text-stone-400 focus:border-missionnaire/40"
-					placeholder="Rechercher par titre..."
+					placeholder={$t('transcriptions.searchByTitle')}
 					bind:value={searchTerm}
 					oninput={(event) => handleSearch((event.currentTarget as HTMLInputElement).value)}
 					autofocus
@@ -412,14 +415,14 @@
 					: 'hidden md:flex'}"
 			>
 				<div class="flex items-center space-x-2 w-full sm:w-auto">
-					<label for="year-filter" class="text-sm text-gray-600">Année:</label>
+					<label for="year-filter" class="text-sm text-gray-600">{$t('transcriptions.yearLabel')}</label>
 					<select
 						id="year-filter"
 						class="border border-gray-300 rounded-md px-3 py-1.5 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-missionnaire focus:border-transparent w-full sm:w-auto"
 						value={selectedYear}
 						onchange={handleYearChange}
 					>
-						<option value="">Toutes les années</option>
+						<option value="">{$t('list.allYears')}</option>
 						{#each years as year}
 							<option value={year}>{year}</option>
 						{/each}
@@ -430,7 +433,7 @@
 					onclick={handleSort}
 					class="flex items-center justify-center space-x-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-900 w-full sm:w-auto border sm:border-0 border-gray-300 rounded-md sm:rounded-none"
 				>
-					<span>Date de publication</span>
+					<span>{$t('transcriptions.publishDate')}</span>
 					{#if sortOrder === 'desc'}
 						<ArrowDown2 size={20} />
 					{:else}
@@ -452,14 +455,14 @@
 				</div>
 			{:else if documents.length === 0}
 				<div class="text-center py-12">
-					<p class="text-gray-600 text-sm sm:text-base">Aucun document trouvé</p>
+					<p class="text-gray-600 text-sm sm:text-base">{$t('transcriptions.noDocuments')}</p>
 				</div>
 			{:else}
 				{#if isListLoading}
 					<div
 						class="mx-2 sm:mx-0 mb-2 border border-stone-200/60 bg-stone-50/70 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400"
 					>
-						Mise à jour de la liste...
+						{$t('list.updating')}
 					</div>
 				{/if}
 				<div class="mb-2 px-2 sm:px-0">
@@ -501,17 +504,17 @@
 										target="_blank"
 										rel="noopener noreferrer"
 										class="inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2 py-1 sm:px-2.5 sm:py-1.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-stone-600 hover:border-red-500 hover:text-red-600 hover:bg-red-50 transition-colors"
-										title="Voir la vidéo sur YouTube"
+										title={$t('transcriptions.watchOnYoutube')}
 									>
 										<Icon src={AiFillPlayCircle} size="14" />
-										<span class="hidden sm:inline">Vidéo</span>
+										<span class="hidden sm:inline">{$t('misc.video')}</span>
 									</a>
 								{/if}
 								<a
 									href={document.url}
 									download
 									class="inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2 py-1 sm:px-2.5 sm:py-1.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-stone-600 hover:border-missionnaire hover:text-missionnaire hover:bg-missionnaire/5 transition-colors"
-									title="Télécharger le PDF"
+									title={$t('transcriptions.downloadPdf')}
 								>
 									<Icon src={AiOutlineDownload} size="14" />
 									<span class="hidden sm:inline">PDF</span>
@@ -550,7 +553,7 @@
 						<button
 							class="text-gray-400 hover:text-gray-500"
 							onclick={() => isDocumentOpen.set(false)}
-							aria-label="Fermer"
+							aria-label={$t('misc.close')}
 						>
 							<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path
@@ -567,13 +570,17 @@
 						<div class="mb-6">
 							<dl class="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
 								<div>
-									<dt class="text-xs sm:text-sm font-medium text-gray-500">Taille du fichier</dt>
+									<dt class="text-xs sm:text-sm font-medium text-gray-500">
+										{$t('transcriptions.fileSize')}
+									</dt>
 									<dd class="mt-1 text-xs sm:text-sm text-gray-900">
 										{formatFileSize(selectedDocument.size)}
 									</dd>
 								</div>
 								<div>
-									<dt class="text-xs sm:text-sm font-medium text-gray-500">Date de publication</dt>
+									<dt class="text-xs sm:text-sm font-medium text-gray-500">
+										{$t('transcriptions.publishDate')}
+									</dt>
 									<dd class="mt-1 text-xs sm:text-sm text-gray-900">
 										{new Date(selectedDocument.publishedOn).toLocaleDateString()}
 									</dd>
@@ -586,11 +593,10 @@
 						>
 							<DocumentText1 size={40} color="#9CA3AF" />
 							<h3 class="mt-4 text-base sm:text-lg font-medium text-gray-900">
-								Visualisation du document
+								{$t('transcriptions.previewHeading')}
 							</h3>
 							<p class="mt-2 text-xs sm:text-sm text-gray-500 max-w-md">
-								Pour des raisons de sécurité, la prévisualisation du document peut être bloquée par
-								votre navigateur. Vous pouvez :
+								{$t('transcriptions.previewBlocked')}
 							</p>
 							<div class="mt-4 sm:mt-6 flex flex-col gap-2 sm:gap-4 w-full px-4">
 								<a
@@ -612,7 +618,7 @@
 											d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
 										/>
 									</svg>
-									Ouvrir dans un nouvel onglet
+									{$t('transcriptions.openNewTab')}
 								</a>
 								<a
 									href={selectedDocument.url}
@@ -622,7 +628,7 @@
 									<div class="mr-2">
 										<Icon src={AiOutlineDownload} size="16" />
 									</div>
-									Télécharger le document
+									{$t('transcriptions.downloadDocument')}
 								</a>
 								{#if selectedDocument.videoDisplayId}
 									<a
@@ -634,7 +640,7 @@
 										<div class="mr-2">
 											<Icon src={AiFillPlayCircle} size="16" />
 										</div>
-										Voir la vidéo associée
+										{$t('transcriptions.watchRelated')}
 									</a>
 								{/if}
 							</div>

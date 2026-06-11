@@ -8,6 +8,7 @@
 	import AiOutlineFilePdf from 'svelte-icons-pack/ai/AiOutlineFilePdf';
 	import HiOutlineEye from 'svelte-icons-pack/hi/HiOutlineEye';
 	import HiOutlineCalendar from 'svelte-icons-pack/hi/HiOutlineCalendar';
+	import { t } from '../../i18n';
 
 	let playNow = $state(false);
 	const handleClick = () => {
@@ -70,7 +71,7 @@
 						<div class="absolute inset-0 flex items-center justify-center pointer-events-none">
 							<button
 								onclick={() => (playNow = true)}
-								aria-label={`Lire la vidéo : ${$selectedVideo?.title ?? ''}`}
+								aria-label={$t('player.playVideo', { title: $selectedVideo?.title ?? '' })}
 								class="w-20 h-20 md:w-32 md:h-32 text-missionnaire transition-all duration-300 hover:scale-110 active:scale-95 drop-shadow-[0_0_30px_rgba(242,143,62,0.3)] group/play pointer-events-auto"
 							>
 								<Icon size="100%" src={BsPlayCircleFill} />
@@ -96,7 +97,7 @@
 								</div>
 								<div class="flex items-center gap-2">
 									<Icon src={HiOutlineEye} size="1.1rem" />
-									<span>{$selectedVideo?.view_count?.toLocaleString() || 0} views</span>
+									<span>{$selectedVideo?.view_count?.toLocaleString() || 0} {$t('misc.views')}</span>
 								</div>
 							</div>
 						</div>

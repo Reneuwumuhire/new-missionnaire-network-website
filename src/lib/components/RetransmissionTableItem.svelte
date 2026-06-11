@@ -11,6 +11,7 @@
 	import { formatTime } from '../../utils/FormatTime';
 	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
 	import { downloadAudioFile } from '../../utils/downloadAudio';
+	import { t } from '../../i18n';
 
 	interface Props {
 		recording: PublishedRecording;
@@ -127,7 +128,7 @@
 	onkeydown={handleKeydown}
 	role="button"
 	tabindex="0"
-	aria-label="Lire la retransmission {recording.title}"
+	aria-label={$t('player.playRecording', { title: recording.title })}
 >
 	<div
 		class="text-center text-[10px] md:text-xs font-bold {isActive
@@ -143,7 +144,7 @@
 				<span
 					class="shrink-0 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider bg-red-50 text-red-600 border border-red-200/60"
 				>
-					Retransmission
+					{$t('misc.retransmissionBadge')}
 				</span>
 			{/if}
 			<a
@@ -213,10 +214,10 @@
 				}}
 				title={isDownloading
 					? downloadPercent !== null
-						? `Annuler (${downloadPercent}%)`
-						: 'Annuler le téléchargement'
-					: 'Télécharger MP3'}
-				aria-label={isDownloading ? 'Annuler le téléchargement' : 'Télécharger le MP3'}
+						? $t('player.cancelPercent', { percent: downloadPercent })
+						: $t('player.cancelDownload')
+					: $t('player.downloadMp3')}
+				aria-label={isDownloading ? $t('player.cancelDownload') : $t('player.downloadMp3Label')}
 			>
 				{#if isDownloading}
 					<span class="relative flex h-5 w-5 items-center justify-center">
@@ -261,7 +262,7 @@
 					e.stopPropagation();
 					togglePlay();
 				}}
-				title={isActive && $isPlaying ? 'Pause' : 'Lire'}
+				title={isActive && $isPlaying ? $t('player.pause') : $t('player.playAction')}
 			>
 				<Icon src={isActive && $isPlaying ? IoPauseCircle : IoPlayCircle} size="24" />
 			</button>

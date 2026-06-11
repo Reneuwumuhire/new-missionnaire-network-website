@@ -4,17 +4,19 @@
 	import { radioIsLive as radioIsLiveStore, livePlayback } from '$lib/stores/global';
 	import LiveTranscript from './+liveTranscript.svelte';
 	import { focusTrap } from '$lib/actions/focusTrap';
-	import { t } from '../../i18n';
+	import { t, type TranslationKey } from '../../i18n';
 
-	const STATUS_MESSAGES: Record<string, string> = {
-		offline: "L'audio en direct est hors ligne",
-		listening: 'Vous écoutez le direct audio',
-		connecting: 'Connexion en cours...',
-		reconnecting: 'Reconnexion en cours...',
-		availablePressPlay: "Direct audio disponible. Touchez l'écran pour démarrer.",
-		waiting: 'En attente du signal audio...',
-		cannotPlay: 'Impossible de lire le direct pour le moment',
-		unavailable: 'Le direct audio est indisponible pour le moment'
+	// Status → translation key; `statusMessage` below resolves through `$t`
+	// so the text follows the FR/EN toggle live.
+	const STATUS_MESSAGE_KEYS: Record<string, TranslationKey> = {
+		offline: 'live.status.offline',
+		listening: 'live.status.listening',
+		connecting: 'live.status.connecting',
+		reconnecting: 'live.status.reconnecting',
+		availablePressPlay: 'live.status.availablePressPlay',
+		waiting: 'live.status.waiting',
+		cannotPlay: 'live.status.cannotPlay',
+		unavailable: 'live.status.unavailable'
 	};
 
 	let audio: HTMLAudioElement | null = $state(null);
@@ -143,7 +145,9 @@
 	);
 	// Button stays enabled after failure so user can manually retry
 	let canPlay = $derived(probeReachable || confirmedLive || playbackFailed);
-	let statusMessage = $derived(STATUS_MESSAGES[statusKey] || '');
+	let statusMessage = $derived(
+		STATUS_MESSAGE_KEYS[statusKey] ? $t(STATUS_MESSAGE_KEYS[statusKey]) : ''
+	);
 	let behindLiveSec = $derived(Math.max(0, liveEdge - currentTime));
 	// Feed the transcript the wall-clock moment of what the listener is
 	// hearing right now (connection epoch + playback position). Frozen while
@@ -926,15 +930,15 @@
 						: 'text-stone-400'}"
 			>
 				{showLive
-					? 'Audio en direct'
+					? $t('live.audioLive')
 					: awaitingPlay
-						? 'Direct audio disponible'
-						: 'Audio hors ligne'}
+						? $t('live.audioAvailable')
+						: $t('live.audioOffline')}
 			</span>
 			{#if listenerCount > 0 && showLive}
 				<span class="text-[10px] text-red-400 font-body">
 					· {listenerCount}
-					{listenerCount === 1 ? 'auditeur' : 'auditeurs'}
+					{listenerCount === 1 ? $t('live.listener') : $t('live.listeners')}
 				</span>
 			{/if}
 		</div>
@@ -952,17 +956,17 @@
 					{showLive && broadcastTitle
 						? broadcastTitle
 						: showLive
-							? 'Audio en direct'
+							? $t('live.audioLive')
 							: awaitingPlay
-								? 'Audio en direct'
-								: 'Audio hors ligne'}
+								? $t('live.audioLive')
+								: $t('live.audioOffline')}
 				</h2>
 				<p class="text-sm text-stone-500 font-body mt-1.5">
 					{statusMessage}
 				</p>
 				{#if checkedAtLabel}
 					<p class="text-[11px] text-stone-400 font-body mt-1">
-						Dernière vérification : {checkedAtLabel}
+						{$t('live.lastChecked', { time: checkedAtLabel })}
 					</p>
 				{/if}
 
@@ -975,19 +979,19 @@
 								: 'bg-stone-900 hover:bg-missionnaire text-white'
 							: 'bg-stone-200 text-stone-400 cursor-not-allowed'}"
 						onclick={togglePlay}
-						aria-label={isPlaying ? 'Mettre en pause le direct' : 'Écouter le direct'}
+						aria-label={isPlaying ? $t('live.pause') : $t('live.listen')}
 						disabled={!canPlay}
 					>
 						{#if isPlaying}
 							<svg viewBox="0 0 24 24" class="h-4 w-4 fill-current" aria-hidden="true">
 								<path d="M8 5h3v14H8zm5 0h3v14h-3z" />
 							</svg>
-							<span>Pause</span>
+							<span>{$t('player.pause')}</span>
 						{:else}
 							<svg viewBox="0 0 24 24" class="h-4 w-4 fill-current" aria-hidden="true">
 								<path d="M8 5v14l11-7z" />
 							</svg>
-							<span>Lecture</span>
+							<span>{$t('player.play')}</span>
 						{/if}
 					</button>
 
@@ -996,7 +1000,7 @@
 							? 'border-stone-200/60 text-stone-600 hover:border-missionnaire hover:text-missionnaire'
 							: 'border-stone-200/40 text-stone-300 cursor-not-allowed'}"
 						onclick={toggleMute}
-						aria-label={isMuted ? 'Activer le son' : 'Couper le son'}
+						aria-label={isMuted ? $t('player.unmute') : $t('player.mute')}
 						disabled={!canPlay}
 					>
 						{#if isMuted}
@@ -1015,7 +1019,7 @@
 									y2="15"
 								/><line x1="17" y1="9" x2="23" y2="15" /></svg
 							>
-							<span>Son coupé</span>
+							<span>{$t('live.muted')}</span>
 						{:else}
 							<svg
 								width="16"
@@ -1029,7 +1033,7 @@
 									d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"
 								/></svg
 							>
-							<span>Couper le son</span>
+							<span>{$t('player.mute')}</span>
 						{/if}
 					</button>
 				</div>
@@ -1041,12 +1045,12 @@
 						<button
 							type="button"
 							onclick={openThumbnail}
-							aria-label="Agrandir la vignette"
+							aria-label={$t('live.expandThumbnail')}
 							class="group relative aspect-video w-full overflow-hidden border border-stone-200/60 bg-stone-100 cursor-zoom-in transition-all duration-300 hover:border-missionnaire/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
 						>
 							<img
 								src={broadcastThumbnail}
-								alt={broadcastTitle || 'Vignette du direct'}
+								alt={broadcastTitle || $t('live.thumbnailAlt')}
 								onerror={() => (broadcastThumbnailBroken = true)}
 								class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
 								loading="eager"
@@ -1098,7 +1102,7 @@
 										></span>
 										<span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500"></span>
 									</span>
-									En direct
+									{$t('live.atLive')}
 								</div>
 							</div>
 							<!-- Decorative ornament -->
@@ -1120,7 +1124,7 @@
 		{#if isBuffering}
 			<div class="flex items-center gap-2 mt-4">
 				<div class="animate-spin h-3.5 w-3.5 border-t-2 border-missionnaire rounded-full"></div>
-				<span class="text-[11px] text-stone-400 font-body">Chargement...</span>
+				<span class="text-[11px] text-stone-400 font-body">{$t('list.loading')}</span>
 			</div>
 		{/if}
 
@@ -1137,7 +1141,7 @@
 						value={currentTime}
 						oninput={onSeekInput}
 						onchange={onSeekCommit}
-						aria-label="Position dans le direct"
+						aria-label={$t('live.scrubberLabel')}
 						aria-valuetext={isAtLive
 							? $t('live.atLive')
 							: $t('live.behindLive', { label: behindLiveLabel })}
@@ -1150,8 +1154,8 @@
 					<button
 						type="button"
 						onclick={backToLive}
-						aria-label={isAtLive ? 'Recharger le direct' : 'Revenir au direct'}
-						title={isAtLive ? 'Recharger le direct' : 'Revenir au direct'}
+						aria-label={isAtLive ? $t('live.reload') : $t('live.backToLive')}
+						title={isAtLive ? $t('live.reload') : $t('live.backToLive')}
 						class="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-11 border text-[10px] font-bold uppercase tracking-[0.15em] font-body transition-all duration-200 shrink-0 {isAtLive
 							? 'border-red-500 text-red-600 bg-red-50/60 hover:bg-red-100'
 							: 'border-missionnaire text-missionnaire hover:bg-missionnaire hover:text-white'}"
@@ -1163,16 +1167,15 @@
 								></span>
 								<span class="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
 							</span>
-							En direct
+							{$t('live.atLive')}
 						{:else}
-							<span class="hidden sm:inline">Revenir au direct</span>
-							<span class="sm:hidden">Au direct</span>
+							<span class="hidden sm:inline">{$t('live.backToLive')}</span>
+							<span class="sm:hidden">{$t('live.atLiveShort')}</span>
 						{/if}
 					</button>
 				</div>
 				<p class="mt-2 text-[10px] text-stone-400 font-body">
-					Vous pouvez faire glisser le curseur pour revenir en arrière dans ce que vous avez déjà
-					écouté.
+					{$t('live.dvrHint')}
 				</p>
 			</div>
 		{/if}
@@ -1186,7 +1189,7 @@
 			<p
 				class="text-[10px] font-bold uppercase tracking-[0.25em] text-missionnaire/80 font-body mb-3"
 			>
-				À propos de ce direct
+				{$t('live.aboutBroadcast')}
 			</p>
 			<div
 				class="text-sm text-stone-700 font-body leading-relaxed whitespace-pre-wrap"
@@ -1200,7 +1203,7 @@
 					onclick={() => (descriptionExpanded = !descriptionExpanded)}
 					class="mt-3 text-[11px] font-bold uppercase tracking-[0.15em] font-body text-missionnaire hover:text-missionnaire-dark transition-colors"
 				>
-					{descriptionExpanded ? 'Voir moins ↑' : 'Voir plus ↓'}
+					{descriptionExpanded ? `${$t('misc.seeLess')} ↑` : `${$t('misc.seeMore')} ↓`}
 				</button>
 			{/if}
 		</div>
@@ -1219,7 +1222,7 @@
 	{#if !showLive && hasError}
 		<div class="border border-red-200 bg-red-50/50 px-4 py-3">
 			<p class="text-[12px] font-semibold text-red-600 font-body">
-				Le direct n'est pas encore disponible.
+				{$t('live.notAvailableYet')}
 			</p>
 		</div>
 	{/if}
@@ -1253,13 +1256,13 @@
 		use:focusTrap={{ onEscape: closeThumbnail }}
 		role="dialog"
 		aria-modal="true"
-		aria-label="Vignette du direct"
+		aria-label={$t('live.thumbnailAlt')}
 		tabindex="-1"
 	>
 		<button
 			type="button"
 			onclick={closeThumbnail}
-			aria-label="Fermer"
+			aria-label={$t('live.closeLightbox')}
 			class="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
 		>
 			<svg
@@ -1277,7 +1280,7 @@
 		</button>
 		<img
 			src={broadcastThumbnail}
-			alt={broadcastTitle || 'Vignette du direct'}
+			alt={broadcastTitle || $t('live.thumbnailAlt')}
 			onerror={() => {
 				broadcastThumbnailBroken = true;
 				closeThumbnail();

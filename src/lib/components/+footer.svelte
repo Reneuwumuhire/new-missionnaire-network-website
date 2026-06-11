@@ -4,36 +4,43 @@
 	import FaBrandsYoutube from 'svelte-icons-pack/fa/FaBrandsYoutube';
 	import FaBrandsFacebook from 'svelte-icons-pack/fa/FaBrandsFacebook';
 	import RiLogoWhatsappFill from 'svelte-icons-pack/ri/RiLogoWhatsappFill';
+	import { t, type TranslationKey } from '../../i18n';
 
-	const navColumns = [
+	// `title` and `label` are translation keys; literal strings (brand
+	// names like YouTube) are rendered as-is via the `literal` flag.
+	const navColumns: {
+		title: TranslationKey;
+		links: { label: string; href: string; external?: boolean; literal?: boolean }[];
+	}[] = [
 		{
-			title: 'Ressources',
+			title: 'footer.resources',
 			links: [
-				{ label: 'Prédications', href: '/predications' },
-				{ label: 'Musique', href: '/musique' },
-				{ label: 'Vidéos', href: '/videos' },
-				{ label: 'Transcriptions', href: '/transcriptions' },
-				{ label: 'Littérature', href: '/literature' }
+				{ label: 'nav.predications', href: '/predications' },
+				{ label: 'nav.musique', href: '/musique' },
+				{ label: 'nav.videos', href: '/videos' },
+				{ label: 'nav.transcriptions', href: '/transcriptions' },
+				{ label: 'nav.literature', href: '/literature' }
 			]
 		},
 		{
-			title: 'Découvrir',
+			title: 'footer.discover',
 			links: [
-				{ label: 'William Branham', href: '/william-branham/biographie' },
-				{ label: 'Ewald Frank', href: '/ewald-frank' },
-				{ label: "L'église", href: '/eglise' },
-				{ label: 'Galerie', href: '/galerie' },
-				{ label: 'Direct', href: '/live' }
+				{ label: 'nav.williamBranham', href: '/william-branham/biographie' },
+				{ label: 'nav.ewaldFrank', href: '/ewald-frank' },
+				{ label: 'nav.eglise', href: '/eglise' },
+				{ label: 'nav.galerie', href: '/galerie' },
+				{ label: 'nav.direct', href: '/live' }
 			]
 		},
 		{
-			title: 'Informations',
+			title: 'footer.info',
 			links: [
-				{ label: 'À propos', href: '/a-propos' },
+				{ label: 'nav.aPropos', href: '/a-propos' },
 				{
 					label: 'YouTube',
 					href: 'https://www.youtube.com/channel/UCS3zqpqnCvT0SFa_jI662Kg',
-					external: true
+					external: true,
+					literal: true
 				}
 			]
 		}
@@ -208,8 +215,7 @@
 					</picture>
 				</div>
 				<p class="text-sm leading-relaxed text-stone-400 max-w-xs">
-					Prédications, cantiques et ressources du Message de l'Heure pour l'édification des
-					croyants.
+					{$t('footer.tagline')}
 				</p>
 
 				<!-- Social icons -->
@@ -232,7 +238,7 @@
 			{#each navColumns as column}
 				<div>
 					<p class="text-[10px] font-semibold uppercase tracking-[0.25em] text-stone-400 mb-4">
-						{column.title}
+						{$t(column.title)}
 					</p>
 					<ul class="flex flex-col gap-2.5">
 						{#each column.links as link}
@@ -243,7 +249,7 @@
 									target={link.external ? '_blank' : undefined}
 									rel={link.external ? 'noopener noreferrer' : undefined}
 								>
-									{link.label}
+									{link.literal ? link.label : $t(link.label as TranslationKey)}
 								</a>
 							</li>
 						{/each}
@@ -256,10 +262,13 @@
 		{#if audioCacheBytes > 0 || clearedToast}
 			<div class="flex items-center justify-center gap-3 pt-6 text-[11px] text-stone-500">
 				{#if clearedToast}
-					<span class="text-emerald-400" role="status" aria-live="polite">Cache vidé</span>
+					<span class="text-emerald-400" role="status" aria-live="polite"
+						>{$t('footer.cacheCleared')}</span
+					>
 				{:else if audioCacheBytes > 0}
 					<span class="text-stone-400"
-						>Cache audio : <span class="text-stone-300 font-medium">{audioCacheSize}</span></span
+						>{$t('footer.audioCache')}
+						<span class="text-stone-300 font-medium">{audioCacheSize}</span></span
 					>
 					<span class="text-stone-700">·</span>
 					<button
@@ -268,7 +277,7 @@
 						disabled={isClearingCache}
 						class="text-missionnaire hover:text-orange-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed underline-offset-2 hover:underline"
 					>
-						{isClearingCache ? 'Suppression…' : 'Vider'}
+						{isClearingCache ? $t('footer.clearing') : $t('footer.clear')}
 					</button>
 				{/if}
 			</div>
@@ -278,7 +287,7 @@
 		<!-- Bottom bar -->
 		<div class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-8">
 			<p class="text-xs text-stone-400">
-				© 2012 – {new Date().getFullYear()} Missionnaire Network. Tous droits réservés.
+				{$t('footer.rights', { year: new Date().getFullYear() })}
 			</p>
 
 			<!-- Decorative cross -->

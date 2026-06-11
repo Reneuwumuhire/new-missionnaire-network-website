@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
+	import { t } from '../../i18n';
 	import type { MusicAudio } from '$lib/models/music-audio';
 	import type { AudioAsset } from '$lib/models/media-assets';
 	import type { Sermon } from '$lib/models/sermon';
@@ -157,7 +158,7 @@
 				signal
 			);
 			if (songs.length === 0) {
-				downloadError = 'Aucun chant à télécharger pour ce filtre.';
+				downloadError = $t('music.nothingToDownload');
 				return;
 			}
 			downloadProgress = {
@@ -181,7 +182,7 @@
 			downloadDoneSummary = summary;
 		} catch (err) {
 			if ((err as Error).name !== 'AbortError') {
-				downloadError = err instanceof Error ? err.message : 'Téléchargement échoué.';
+				downloadError = err instanceof Error ? err.message : $t('music.downloadFailedDot');
 			}
 		} finally {
 			isDownloading = false;
@@ -256,7 +257,7 @@
 			]);
 
 			if (!musicResponse.ok) {
-				throw new Error('Impossible de charger la liste de musique');
+				throw new Error($t('music.loadFailed'));
 			}
 
 			const musicResult = (await musicResponse.json()) as MusicAudioApiResponse;
@@ -267,7 +268,7 @@
 			let nextArtists = getMusicArtistsCache() || artists;
 			if (artistsResponse) {
 				if (!artistsResponse.ok) {
-					throw new Error('Impossible de charger les artistes');
+					throw new Error($t('music.loadArtistsFailed'));
 				}
 
 				const artistsResult = (await artistsResponse.json()) as MusicArtistsApiResponse;
@@ -294,7 +295,7 @@
 			if (requestToken !== currentListRequestToken || requestKey !== musicRequestKey) return;
 
 			listLoadError =
-				error instanceof Error ? error.message : 'Impossible de charger la liste de musique';
+				error instanceof Error ? error.message : $t('music.loadFailed');
 
 			if (!hasResolvedMusicList) {
 				musicList = [];
@@ -775,9 +776,9 @@
 	let downloadFilterLabel = $derived((() => {
 		if (currentSearch) return `« ${currentSearch} »`;
 		if (currentArtist) return currentArtist;
-		if (currentAlpha) return `lettre ${currentAlpha}`;
+		if (currentAlpha) return $t('music.letterLabel', { letter: currentAlpha });
 		if (currentCategory && currentCategory !== 'All') return currentCategory;
-		return 'tous les chants';
+		return $t('music.allSongs');
 	})());
 	$effect(() => {
 		if (pendingPlayId && hasResolvedMusicList && pendingPlayId !== handledPlayId) {
@@ -916,7 +917,7 @@
 		<h2
 			class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.35em] mb-4 font-body"
 		>
-			Recueils
+			{$t('music.collections')}
 		</h2>
 		<div
 			class="recueils-scroll relative -mx-4 md:mx-0"
@@ -937,7 +938,7 @@
 							: 'bg-white/40 text-stone-500 border-stone-200/60 hover:border-missionnaire hover:text-missionnaire'}"
 						onclick={() => handleCategoryChange(category)}
 					>
-						{category === 'All' ? 'Tout Voir' : category}
+						{category === 'All' ? $t('misc.seeAllCap') : category}
 					</button>
 				{/each}
 			</div>
@@ -948,15 +949,15 @@
 	<div class="flex flex-col gap-2 mb-4 md:mb-6">
 		<div class="flex items-center justify-between gap-3">
 			<div class="flex items-center gap-2">
-				<h2 class="font-display text-2xl md:text-3xl font-bold text-stone-900">Liste</h2>
+				<h2 class="font-display text-2xl md:text-3xl font-bold text-stone-900">{$t('music.list')}</h2>
 				{#if isRandomListOrder}
 					<button
 						class="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-stone-500 transition-colors hover:border-missionnaire hover:text-missionnaire"
 						onclick={refreshRandomList}
-						title="Rafraîchir l'ordre aléatoire"
+						title={$t('music.refreshRandom')}
 					>
 						<Icon src={BsShuffle} size="11" />
-						Rafraîchir
+						{$t('music.refresh')}
 					</button>
 				{/if}
 			</div>
@@ -966,10 +967,10 @@
 					<button
 						class="sm:hidden inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-stone-500 transition-colors hover:border-missionnaire hover:text-missionnaire"
 						onclick={refreshRandomList}
-						title="Rafraîchir l'ordre aléatoire"
+						title={$t('music.refreshRandom')}
 					>
 						<Icon src={BsShuffle} size="11" />
-						Rafraîchir
+						{$t('music.refresh')}
 					</button>
 				{/if}
 				<div class="relative" bind:this={artistMenuEl}>
@@ -983,7 +984,7 @@
 						}}
 					>
 						<Icon src={BsSearch} size="11" />
-						Artiste
+						{$t('music.artist')}
 					</button>
 					{#if isArtistMenuOpen}
 						<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -996,7 +997,7 @@
 								<Icon src={BsSearch} size="12" color="#999" />
 								<input
 									type="text"
-									placeholder="Rechercher un artiste..."
+									placeholder={$t('music.searchArtist')}
 									class="bg-transparent border-none outline-none text-xs w-full text-stone-700 placeholder:text-stone-400"
 									bind:value={artistSearch}
 								/>
@@ -1005,7 +1006,7 @@
 							<div class="max-h-60 overflow-y-auto space-y-1 custom-scrollbar">
 								{#if filteredArtists.length === 0}
 									<div class="px-3 py-4 text-xs text-stone-400 text-center italic">
-										Aucun artiste trouvé
+										{$t('music.noArtistFound')}
 									</div>
 								{:else}
 									<button
@@ -1017,7 +1018,7 @@
 											isArtistMenuOpen = false;
 										}}
 									>
-										Tous les artistes
+										{$t('music.allArtists')}
 									</button>
 									{#each filteredArtists as artist}
 										<button
@@ -1071,7 +1072,7 @@
 			<div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
 				<div class="min-w-0">
 					<div class="text-[10px] font-semibold uppercase tracking-[0.25em] text-missionnaire">
-						Lecture en cours
+						{$t('player.nowPlaying')}
 					</div>
 					<div class="mt-1 truncate text-sm font-bold text-stone-900">
 						{activeMusicSong.title || 'Sans titre'}
@@ -1083,7 +1084,7 @@
 							'Missionnaire'}
 						{#if activeMusicSongPage}
 							<span class="mx-1 text-stone-300">•</span>
-							<span>Page {activeMusicSongPage}</span>
+							<span>{$t('pagination.page')} {activeMusicSongPage}</span>
 						{/if}
 					</div>
 				</div>
@@ -1092,16 +1093,16 @@
 					<button
 						class="flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-bold text-missionnaire shadow-sm transition-colors hover:bg-stone-200"
 						onclick={() => dispatchAudioPlayerAction('toggle')}
-						title={$isPlaying ? 'Pause' : 'Lire'}
+						title={$isPlaying ? $t('player.pause') : $t('player.playAction')}
 					>
 						<Icon src={$isPlaying ? IoPauseCircle : IoPlayCircle} size="18" />
-						<span>{$isPlaying ? 'Pause' : 'Lire'}</span>
+						<span>{$isPlaying ? $t('player.pause') : $t('player.playAction')}</span>
 					</button>
 					<button
 						class="rounded-full border border-stone-300 bg-white px-3 py-2 text-xs font-bold text-stone-700 transition-colors hover:border-missionnaire hover:text-missionnaire"
 						onclick={goToActiveSongPage}
 					>
-						Afficher dans la liste
+						{$t('music.showInList')}
 					</button>
 				</div>
 			</div>
@@ -1123,7 +1124,7 @@
 					}}
 				>
 					<Icon src={BsHeartFill} size="11" />
-					Favoris ({$favorites.length})
+					{$t('music.favoritesCount', { count: $favorites.length })}
 				</button>
 			{/if}
 			{#if $recentlyPlayed.length > 0}
@@ -1138,7 +1139,7 @@
 					}}
 				>
 					<Icon src={BsClockHistory} size="11" />
-					Recents ({$recentlyPlayed.length})
+					{$t('music.recentsCount', { count: $recentlyPlayed.length })}
 				</button>
 			{/if}
 			<!-- ── BEGIN: cached filter button (added) ─────────────── -->
@@ -1154,7 +1155,7 @@
 					}}
 				>
 					<Icon src={IoCloudDoneOutline} size="12" />
-					En cache ({cachedCount})
+					{$t('music.cachedCount', { count: cachedCount })}
 				</button>
 			{/if}
 			<!-- ── END: cached filter button ─────────────────────────── -->
@@ -1164,10 +1165,10 @@
 					class="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-full border text-[10px] md:text-xs font-bold uppercase tracking-[0.12em] md:tracking-wider transition-colors whitespace-nowrap border-stone-200 bg-white text-stone-500 hover:border-missionnaire hover:text-missionnaire disabled:opacity-50 disabled:cursor-not-allowed"
 					onclick={openDownloadModal}
 					disabled={isDownloading}
-					title="Télécharger la liste filtrée en .zip"
+					title={$t('music.downloadAllTitle')}
 				>
 					<Icon src={AiOutlineDownload} size="12" />
-					Tout télécharger
+					{$t('music.downloadAll')}
 				</button>
 			{/if}
 		</div>
@@ -1178,15 +1179,15 @@
 					class="flex items-center justify-between px-4 py-3 border-b border-stone-200 bg-stone-50/50"
 				>
 					<span class="text-[10px] font-bold uppercase tracking-widest text-stone-400">
-						Favoris — {$favorites.length}
-						{$favorites.length > 1 ? 'chants' : 'chant'}
+						{$t('music.favorites')} — {$favorites.length}
+						{$favorites.length > 1 ? $t('music.songs') : $t('music.song')}
 					</span>
 					<button
 						class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-900 hover:bg-stone-800 text-white text-[10px] font-bold uppercase tracking-wider transition-colors"
 						onclick={() => playAllFavorites()}
 					>
 						<Icon src={BsPlayFill} size="10" />
-						Tout lire
+						{$t('music.playAll')}
 					</button>
 				</div>
 				<div class="divide-y divide-stone-50 max-h-[300px] overflow-y-auto">
@@ -1229,7 +1230,7 @@
 										s3_url: fav.s3_url
 									});
 								}}
-								title="Retirer des favoris"
+								title={$t('player.unfavorite')}
 							>
 								<Icon src={BsX} size="14" />
 							</div>
@@ -1243,7 +1244,7 @@
 			<div class="bg-white/40 border border-stone-200/60 mb-6 overflow-hidden">
 				<div class="px-4 py-3 border-b border-stone-200 bg-stone-50/50">
 					<span class="text-[10px] font-bold uppercase tracking-widest text-stone-400">
-						Récemment joués
+						{$t('music.recentlyPlayed')}
 					</span>
 				</div>
 				<div class="divide-y divide-stone-50 max-h-[300px] overflow-y-auto">
@@ -1284,17 +1285,17 @@
 						class="text-[10px] font-bold uppercase tracking-widest text-stone-400 flex items-center gap-2"
 					>
 						<span class="text-emerald-600"><Icon src={IoCloudDoneOutline} size="12" /></span>
-						En cache — {cachedCount}
-						{cachedCount > 1 ? 'chants disponibles hors ligne' : 'chant disponible hors ligne'}
+						{$t('player.cached')} — {cachedCount}
+						{cachedCount > 1 ? $t('music.cachedManySuffix') : $t('music.cachedOneSuffix')}
 					</span>
 					<button
 						class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-900 hover:bg-stone-800 text-white text-[10px] font-bold uppercase tracking-wider transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-stone-900"
 						onclick={() => playAllCached()}
 						disabled={cachedPlayableCount === 0}
-						title={cachedPlayableCount === 0 ? 'Aucun chant jouable sur cette page' : ''}
+						title={cachedPlayableCount === 0 ? $t('music.noPlayableCached') : ''}
 					>
 						<Icon src={BsPlayFill} size="10" />
-						Tout lire
+						{$t('music.playAll')}
 					</button>
 				</div>
 				<div class="divide-y divide-stone-50 max-h-[300px] overflow-y-auto">
@@ -1310,7 +1311,7 @@
 									if (cachedSong) playSong(cachedSong);
 								}}
 								disabled={!cachedSong}
-								title={cachedSong ? '' : 'Rechargez la liste pour rejouer ce chant'}
+								title={cachedSong ? '' : $t('music.reloadToReplay')}
 							>
 								<div
 									class="text-sm font-bold text-stone-800 group-hover:text-missionnaire transition-colors truncate"
@@ -1354,7 +1355,7 @@
 						<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
 					</span>
 				{/if}
-				<span class="truncate">Titre</span>
+				<span class="truncate">{$t('list.title')}</span>
 			</button>
 			<button
 				class="hidden md:flex min-w-0 text-left items-center gap-1.5 hover:text-missionnaire transition-colors"
@@ -1365,7 +1366,7 @@
 						<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
 					</span>
 				{/if}
-				<span class="truncate">Recueil</span>
+				<span class="truncate">{$t('music.collection')}</span>
 			</button>
 			<!-- Artist column is a plain label; filtering is done via the
 			     "Artiste" chip button in the list header (works on all sizes).
@@ -1377,11 +1378,11 @@
 						<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
 					</span>
 				{/if}
-				<span class="truncate">Artiste</span>
+				<span class="truncate">{$t('music.artist')}</span>
 				{#if currentArtist}
 					<span
 						class="ml-1 bg-stone-200 text-missionnaire px-1.5 py-0.5 rounded-md text-[9px] lowercase"
-						>filtré</span
+						>{$t('music.filtered')}</span
 					>
 				{/if}
 			</div>
@@ -1394,7 +1395,7 @@
 						<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
 					</span>
 				{/if}
-				<span class="truncate">Durée</span>
+				<span class="truncate">{$t('list.duration')}</span>
 			</button>
 			<div class="w-7 lg:w-8 hidden md:block"></div>
 			<div class="w-9 lg:w-10 text-center"></div>
@@ -1404,7 +1405,7 @@
 						? 'text-missionnaire'
 						: 'text-stone-300 hover:text-missionnaire/60'}"
 					onclick={refreshRandomList}
-					title={isRandomListOrder ? "Rafraîchir l'ordre aléatoire" : 'Mélanger la liste'}
+					title={isRandomListOrder ? $t('music.refreshRandom') : $t('music.shuffleList')}
 				>
 					<Icon src={BsShuffle} size="16" />
 				</button>
@@ -1424,7 +1425,7 @@
 					<div
 						class="border-b border-stone-200/60 bg-stone-50/70 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400"
 					>
-						Mise à jour de la liste...
+						{$t('list.updating')}
 					</div>
 				{/if}
 				{#each musicList as song, i (song.s3_url || i)}
@@ -1466,9 +1467,9 @@
 										stroke="currentColor"
 										stroke-width="1.4"
 										stroke-linecap="round"
-										aria-label="Paroles disponibles"
+										aria-label={$t('player.lyricsAvailable')}
 									>
-										<title>Paroles disponibles</title>
+										<title>{$t('player.lyricsAvailable')}</title>
 										<path d="M2 3.25h7M2 6h7M2 8.75h5" />
 									</svg>
 								{/if}
@@ -1550,8 +1551,8 @@
 									toggleFavorite(song);
 								}}
 								title={isFavorite(song._id || song.s3_url, $favorites)
-									? 'Retirer des favoris'
-									: 'Ajouter aux favoris'}
+									? $t('player.unfavorite')
+									: $t('player.favorite')}
 							>
 								<Icon
 									src={isFavorite(song._id || song.s3_url, $favorites) ? BsHeartFill : BsHeart}
@@ -1568,7 +1569,7 @@
 									e.stopPropagation();
 									downloadSong(song);
 								}}
-								title="Télécharger"
+								title={$t('player.download')}
 							>
 								<Icon src={AiOutlineDownload} size="18" />
 							</button>
@@ -1586,7 +1587,7 @@
 										playSong(song);
 									}
 								}}
-								title={isActive && $isPlaying ? 'Pause' : 'Lire'}
+								title={isActive && $isPlaying ? $t('player.pause') : $t('player.playAction')}
 							>
 								<Icon src={isActive && $isPlaying ? IoPauseCircle : IoPlayCircle} size="22" />
 							</button>
@@ -1598,7 +1599,7 @@
 							<Icon src={BsSearch} size="64" />
 						</div>
 						<p class="text-stone-400 font-bold uppercase tracking-widest text-sm">
-							Aucun chant trouvé
+							{$t('music.noSongs')}
 						</p>
 					</div>
 				{/each}
@@ -1615,10 +1616,10 @@
 				class="flex flex-col sm:flex-row items-center sm:justify-between gap-4 text-[10px] md:text-xs font-bold text-stone-400 tracking-widest uppercase"
 			>
 				<div class="hidden md:block">
-					Affichage de {musicList.length} sur {totalSongs} chants
+					{$t('music.showingOf', { shown: musicList.length, total: totalSongs })}
 				</div>
 				<div class="flex items-center gap-3">
-					<span class="opacity-60">Lignes:</span>
+					<span class="opacity-60">{$t('list.rows')}</span>
 					<select
 						class="bg-stone-100 rounded-lg px-3 py-1.5 outline-none text-stone-800 focus:ring-2 focus:ring-missionnaire/20 transition-all cursor-pointer"
 						value={limit}
@@ -1669,13 +1670,13 @@
 			class="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-stone-200"
 			role="dialog"
 			aria-modal="true"
-			aria-label="Télécharger les chants"
+			aria-label={$t('music.downloadSongs')}
 		>
 			<div class="px-5 pt-5 pb-4 border-b border-stone-100">
 				<div class="flex items-start justify-between gap-3">
 					<div class="min-w-0">
 						<p class="text-[10px] font-bold uppercase tracking-[0.25em] text-missionnaire mb-1">
-							Téléchargement
+							{$t('music.downloadHeading')}
 						</p>
 						<h3 class="font-display text-xl font-semibold text-stone-900 truncate">
 							{downloadFilterLabel}
@@ -1685,7 +1686,7 @@
 						<button
 							class="p-1 text-stone-400 hover:text-stone-700 transition-colors"
 							onclick={closeDownloadModal}
-							aria-label="Fermer"
+							aria-label={$t('misc.close')}
 						>
 							<Icon src={BsX} size="20" />
 						</button>
@@ -1697,20 +1698,20 @@
 				{#if !isDownloading && !downloadDoneSummary && !downloadError}
 					<div class="space-y-2">
 						<p class="text-sm text-stone-700">
-							{totalSongs}
-							{totalSongs > 1 ? 'chants' : 'chant'} seront regroupés dans un seul fichier
-							<span class="font-semibold">.zip</span>.
+							{$t('music.zipBefore', {
+								count: totalSongs,
+								unit: totalSongs > 1 ? $t('music.songs') : $t('music.song')
+							})}
+							<span class="font-semibold">.zip</span>{$t('music.zipAfter')}
 						</p>
 						<p class="text-xs text-stone-500 leading-relaxed">
-							Taille estimée : ~{downloadEstimateMb}&nbsp;Mo. Gardez l'onglet ouvert pendant le
-							téléchargement — fermer l'application l'interrompt.
+							{$t('music.zipSizeHint', { mb: downloadEstimateMb })}
 						</p>
 						{#if totalSongs > 200}
 							<p
 								class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2"
 							>
-								Liste volumineuse : le navigateur peut échouer si la mémoire est limitée. Filtrez
-								davantage pour un téléchargement plus sûr.
+								{$t('music.zipLargeWarning')}
 							</p>
 						{/if}
 					</div>
@@ -1726,7 +1727,7 @@
 								{#if downloadProgress.total > 0}
 									{Math.round((downloadProgress.completed / downloadProgress.total) * 100)}%
 								{:else}
-									Préparation…
+									{$t('music.preparing')}
 								{/if}
 							</span>
 						</div>
@@ -1743,12 +1744,12 @@
 						</div>
 						{#if downloadProgress.currentTitle}
 							<p class="text-xs text-stone-500 truncate">
-								En cours : {downloadProgress.currentTitle}
+								{$t('music.inProgress', { title: downloadProgress.currentTitle })}
 							</p>
 						{/if}
 						{#if downloadProgress.skipped > 0}
 							<p class="text-xs text-amber-700">
-								{downloadProgress.skipped} ignoré(s)
+								{$t('music.skippedCount', { count: downloadProgress.skipped })}
 							</p>
 						{/if}
 					</div>
@@ -1757,12 +1758,14 @@
 				{#if downloadDoneSummary}
 					<div class="space-y-2">
 						<p class="text-sm text-emerald-700 font-semibold">
-							Téléchargement terminé — {downloadDoneSummary.completed}
-							{downloadDoneSummary.completed > 1 ? 'chants' : 'chant'} dans le zip.
+							{$t('music.zipDone', {
+								count: downloadDoneSummary.completed,
+								unit: downloadDoneSummary.completed > 1 ? $t('music.songs') : $t('music.song')
+							})}
 						</p>
 						{#if downloadDoneSummary.skipped > 0}
 							<p class="text-xs text-amber-700">
-								{downloadDoneSummary.skipped} chant(s) ignoré(s) (erreur réseau).
+								{$t('music.zipSkipped', { count: downloadDoneSummary.skipped })}
 							</p>
 						{/if}
 					</div>
@@ -1783,28 +1786,28 @@
 						class="px-4 py-2 rounded-full border border-stone-300 bg-white text-xs font-bold uppercase tracking-wider text-stone-700 hover:border-red-300 hover:text-red-600 transition-colors"
 						onclick={cancelDownload}
 					>
-						Annuler
+						{$t('misc.cancel')}
 					</button>
 				{:else if downloadDoneSummary || downloadError}
 					<button
 						class="px-4 py-2 rounded-full bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold uppercase tracking-wider transition-colors"
 						onclick={closeDownloadModal}
 					>
-						Fermer
+						{$t('misc.close')}
 					</button>
 				{:else}
 					<button
 						class="px-4 py-2 rounded-full border border-stone-300 bg-white text-xs font-bold uppercase tracking-wider text-stone-700 hover:border-stone-400 transition-colors"
 						onclick={closeDownloadModal}
 					>
-						Annuler
+						{$t('misc.cancel')}
 					</button>
 					<button
 						class="flex items-center gap-1.5 px-4 py-2 rounded-full bg-missionnaire hover:bg-missionnaire/90 text-white text-xs font-bold uppercase tracking-wider transition-colors"
 						onclick={startDownload}
 					>
 						<Icon src={AiOutlineDownload} size="12" />
-						Démarrer
+						{$t('music.start')}
 					</button>
 				{/if}
 			</div>

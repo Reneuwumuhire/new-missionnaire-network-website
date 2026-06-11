@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { t } from '../../i18n';
+
 	interface Props {
 		items?: { label: string; href?: string }[];
 	}
@@ -6,10 +8,10 @@
 	let { items = [] }: Props = $props();
 </script>
 
-<nav aria-label="Fil d'Ariane" class="w-full max-w-7xl mx-auto mb-4">
+<nav aria-label={$t('nav.breadcrumb')} class="w-full max-w-7xl mx-auto mb-4">
 	<ol class="flex items-center gap-1.5 text-xs font-medium text-gray-400 flex-wrap">
 		<li>
-			<a href="/" class="hover:text-orange-600 transition-colors">Accueil</a>
+			<a href="/" class="hover:text-orange-600 transition-colors">{$t('nav.home')}</a>
 		</li>
 		{#each items as item, i}
 			<li class="flex items-center gap-1.5">

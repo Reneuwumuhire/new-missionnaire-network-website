@@ -45,20 +45,9 @@
 		typeInput = data.filters.type ?? '';
 	});
 
-	const MONTHS: Array<{ value: number; label: string }> = [
-		{ value: 1, label: 'Janvier' },
-		{ value: 2, label: 'Février' },
-		{ value: 3, label: 'Mars' },
-		{ value: 4, label: 'Avril' },
-		{ value: 5, label: 'Mai' },
-		{ value: 6, label: 'Juin' },
-		{ value: 7, label: 'Juillet' },
-		{ value: 8, label: 'Août' },
-		{ value: 9, label: 'Septembre' },
-		{ value: 10, label: 'Octobre' },
-		{ value: 11, label: 'Novembre' },
-		{ value: 12, label: 'Décembre' }
-	];
+	// Month labels resolve through `$t('months.N')` at render time so the
+	// dropdown follows the FR/EN toggle.
+	const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 
 	function buildQuery(
 		overrides: Partial<{
@@ -203,10 +192,10 @@
 		<!-- Header -->
 		<div class="text-center mb-6 md:mb-12">
 			<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-2 md:mb-3 font-body">
-				Archives
+				{$t('rediffusions.archives')}
 			</p>
 			<h1 class="font-display text-2xl md:text-4xl font-semibold text-stone-900">
-				Directs précédents
+				{$t('rediffusions.title')}
 			</h1>
 			{#if data.allTotal > 0}
 				<p class="mt-4 font-body text-stone-500 text-base">
@@ -215,16 +204,16 @@
 						>{data.allTotal}</span
 					>
 					<span class="align-middle"
-						>enregistrement{data.allTotal > 1 ? 's' : ''} disponible{data.allTotal > 1
-							? 's'
-							: ''}</span
+						>{data.allTotal > 1
+							? $t('rediffusions.recordingAvailableMany')
+							: $t('rediffusions.recordingAvailableOne')}</span
 					>
 				</p>
 			{/if}
 			<p
 				class="mt-2 md:mt-3 text-[13px] md:text-[15px] text-stone-400 font-body font-light max-w-md mx-auto leading-relaxed"
 			>
-				Retrouvez les enregistrements des directs audio passés.
+				{$t('rediffusions.intro')}
 			</p>
 		</div>
 
@@ -234,7 +223,7 @@
 				href="/live"
 				class="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.15em] font-body text-missionnaire/80 hover:text-missionnaire transition-colors"
 			>
-				← Retour au direct
+				← {$t('rediffusions.backToLive')}
 			</a>
 		</div>
 
@@ -262,7 +251,7 @@
 						type="search"
 						bind:value={searchInput}
 						oninput={onSearchInput}
-						placeholder="Rechercher un titre…"
+						placeholder={$t('rediffusions.searchTitle')}
 						autofocus
 						class="w-full rounded-lg border border-stone-200 bg-white py-2.5 pl-10 pr-3 text-base font-body text-stone-800 outline-none placeholder:text-stone-400 focus:border-missionnaire/40"
 					/>
@@ -271,8 +260,8 @@
 		{/if}
 		{#if $mobileFiltersOpen}
 			<div class="md:hidden -mx-6 border-b border-stone-200 bg-cream px-4 py-3 space-y-3">
-				<div class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Type de direct">
-					{#each [{ v: '', label: 'Tous' }, { v: 'retransmission', label: 'Retransmissions' }, { v: 'local', label: 'Locales' }] as opt}
+				<div class="flex flex-wrap items-center gap-1.5" role="group" aria-label={$t('rediffusions.typeGroup')}>
+					{#each [{ v: '', label: $t('list.all') }, { v: 'retransmission', label: $t('rediffusions.retransmissions') }, { v: 'local', label: $t('rediffusions.local') }] as opt}
 						{@const typeValue = opt.v as '' | RecordingType}
 						<button
 							type="button"
@@ -291,10 +280,10 @@
 					<select
 						bind:value={yearInput}
 						onchange={onFilterChange}
-						aria-label="Filtrer par année"
+						aria-label={$t('rediffusions.filterByYear')}
 						class="flex-1 min-w-0 border border-stone-200/80 bg-white px-3 py-2 text-sm font-body text-stone-800 focus:border-missionnaire/40 focus:outline-none"
 					>
-						<option value="">Toutes les années</option>
+						<option value="">{$t('list.allYears')}</option>
 						{#each data.availableYears as year}
 							<option value={year}>{year}</option>
 						{/each}
@@ -303,24 +292,28 @@
 						bind:value={monthInput}
 						onchange={onFilterChange}
 						disabled={!yearInput}
-						aria-label="Filtrer par mois"
+						aria-label={$t('rediffusions.filterByMonth')}
 						class="flex-1 min-w-0 border border-stone-200/80 bg-white px-3 py-2 text-sm font-body text-stone-800 disabled:opacity-50 focus:border-missionnaire/40 focus:outline-none"
 					>
-						<option value="">Tous les mois</option>
+						<option value="">{$t('list.allMonths')}</option>
 						{#each MONTHS as m}
-							<option value={m.value}>{m.label}</option>
+							<option value={m}>{$t(`months.${m}`)}</option>
 						{/each}
 					</select>
 				</div>
 				{#if hasActiveFilters}
 					<div class="flex items-center justify-between text-[11px] font-body text-stone-500">
-						<span>{data.total} résultat{data.total > 1 ? 's' : ''}</span>
+						<span
+							>{data.total > 1
+								? $t('list.resultMany', { count: data.total })
+								: $t('list.resultOne', { count: data.total })}</span
+						>
 						<button
 							type="button"
 							onclick={resetFilters}
 							class="font-bold uppercase tracking-[0.15em] text-missionnaire/80 hover:text-missionnaire transition-colors"
 						>
-							Réinitialiser
+							{$t('list.reset')}
 						</button>
 					</div>
 				{/if}
@@ -342,7 +335,7 @@
 			<!-- Type segmented control: Retransmission = relayed broadcast
 			     (Frank/Ewald/retransmission title), Locales = everything else
 			     (sermons recorded at this assembly, e.g. by Chauffeur). -->
-			<div class="mb-3 flex flex-wrap items-center gap-1.5" role="group" aria-label="Type de direct">
+			<div class="mb-3 flex flex-wrap items-center gap-1.5" role="group" aria-label={$t('rediffusions.typeGroup')}>
 				<button
 					type="button"
 					onclick={() => selectType('')}
@@ -351,7 +344,7 @@
 						? 'border-missionnaire text-missionnaire bg-missionnaire/5'
 						: 'border-stone-200/80 bg-white text-stone-500 hover:border-missionnaire/60 hover:text-missionnaire'}"
 				>
-					Tous
+					{$t('list.all')}
 				</button>
 				<button
 					type="button"
@@ -362,7 +355,7 @@
 						? 'border-missionnaire text-missionnaire bg-missionnaire/5'
 						: 'border-stone-200/80 bg-white text-stone-500 hover:border-missionnaire/60 hover:text-missionnaire'}"
 				>
-					Retransmissions
+					{$t('rediffusions.retransmissions')}
 				</button>
 				<button
 					type="button"
@@ -373,14 +366,14 @@
 						? 'border-missionnaire text-missionnaire bg-missionnaire/5'
 						: 'border-stone-200/80 bg-white text-stone-500 hover:border-missionnaire/60 hover:text-missionnaire'}"
 				>
-					Locales
+					{$t('rediffusions.local')}
 				</button>
 				<input type="hidden" name="type" value={typeInput} />
 			</div>
 
 			<div class="flex flex-col sm:flex-row gap-2 sm:gap-3">
 				<label class="relative flex-1">
-					<span class="sr-only">Rechercher un titre</span>
+					<span class="sr-only">{$t('rediffusions.searchTitle')}</span>
 					<svg
 						aria-hidden="true"
 						class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400"
@@ -397,7 +390,7 @@
 					<input
 						type="search"
 						name="q"
-						placeholder="Rechercher un titre…"
+						placeholder={$t('rediffusions.searchTitle')}
 						bind:value={searchInput}
 						oninput={onSearchInput}
 						class="w-full border border-stone-200/80 bg-white pl-9 pr-3 py-2 text-sm font-body text-stone-800 placeholder:text-stone-400 focus:border-missionnaire/40 focus:outline-none focus:ring-1 focus:ring-missionnaire/30"
@@ -410,9 +403,9 @@
 					onchange={onFilterChange}
 					disabled={$navigating ? true : false}
 					class="border border-stone-200/80 bg-white px-3 py-2 text-sm font-body text-stone-800 disabled:opacity-50 disabled:cursor-not-allowed focus:border-missionnaire/40 focus:outline-none focus:ring-1 focus:ring-missionnaire/30"
-					aria-label="Filtrer par année"
+					aria-label={$t('rediffusions.filterByYear')}
 				>
-					<option value="">Toutes les années</option>
+					<option value="">{$t('list.allYears')}</option>
 					{#each data.availableYears as year}
 						<option value={year}>{year}</option>
 					{/each}
@@ -424,11 +417,11 @@
 					onchange={onFilterChange}
 					disabled={!yearInput || !!$navigating}
 					class="border border-stone-200/80 bg-white px-3 py-2 text-sm font-body text-stone-800 disabled:opacity-50 disabled:cursor-not-allowed focus:border-missionnaire/40 focus:outline-none focus:ring-1 focus:ring-missionnaire/30"
-					aria-label="Filtrer par mois"
+					aria-label={$t('rediffusions.filterByMonth')}
 				>
-					<option value="">Tous les mois</option>
+					<option value="">{$t('list.allMonths')}</option>
 					{#each MONTHS as m}
-						<option value={m.value}>{m.label}</option>
+						<option value={m}>{$t(`months.${m}`)}</option>
 					{/each}
 				</select>
 			</div>
@@ -436,14 +429,16 @@
 			{#if hasActiveFilters}
 				<div class="mt-3 flex items-center justify-between text-[11px] font-body text-stone-500">
 					<span>
-						{data.total} résultat{data.total > 1 ? 's' : ''}
+						{data.total > 1
+							? $t('list.resultMany', { count: data.total })
+							: $t('list.resultOne', { count: data.total })}
 					</span>
 					<button
 						type="button"
 						onclick={resetFilters}
 						class="font-bold uppercase tracking-[0.15em] text-missionnaire/80 hover:text-missionnaire transition-colors"
 					>
-						Réinitialiser
+						{$t('list.reset')}
 					</button>
 				</div>
 			{/if}
@@ -452,7 +447,7 @@
 			     and users without JS. Hidden visually but accessible. -->
 			<noscript>
 				<button type="submit" class="mt-3 w-full bg-missionnaire text-white py-2 text-sm">
-					Appliquer
+					{$t('forms.apply')}
 				</button>
 			</noscript>
 		</form>
@@ -468,9 +463,7 @@
 			{:else if data.recordings.length === 0}
 				<div class="text-center py-16">
 					<p class="font-display text-lg italic text-stone-400">
-						{hasActiveFilters
-							? 'Aucun enregistrement ne correspond à votre recherche.'
-							: $t('list.empty')}
+						{hasActiveFilters ? $t('rediffusions.noMatch') : $t('list.empty')}
 					</p>
 				</div>
 			{:else}
@@ -484,7 +477,9 @@
 								<button
 									type="button"
 									onclick={(e) => openThumb(rec, e)}
-									aria-label={rec.thumbnail_url ? 'Agrandir la vignette' : 'Vignette par défaut'}
+									aria-label={rec.thumbnail_url
+										? $t('live.expandThumbnail')
+										: $t('rediffusions.defaultThumb')}
 									class="relative h-14 w-24 sm:h-16 sm:w-28 shrink-0 overflow-hidden border border-stone-200/60 bg-stone-100 {rec.thumbnail_url
 										? 'cursor-zoom-in'
 										: 'cursor-default'} focus:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
@@ -543,7 +538,7 @@
 									tabindex="-1"
 									class="hidden sm:inline-flex shrink-0 text-[11px] font-bold uppercase tracking-[0.15em] font-body text-stone-300 group-hover:text-missionnaire transition-colors"
 								>
-									Écouter →
+									{$t('rediffusions.listen')} →
 								</a>
 							</div>
 						</li>
@@ -571,13 +566,13 @@
 		onkeydown={onLightboxKeydown}
 		role="dialog"
 		aria-modal="true"
-		aria-label="Vignette du direct"
+		aria-label={$t('live.thumbnailAlt')}
 		tabindex="-1"
 	>
 		<button
 			type="button"
 			onclick={closeThumb}
-			aria-label="Fermer"
+			aria-label={$t('live.closeLightbox')}
 			class="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
 		>
 			<svg
