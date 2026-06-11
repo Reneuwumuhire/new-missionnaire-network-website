@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import HeaderMenuLink from '$lib/components/+headerMenuLink.svelte';
+	import GlobalSearch from '$lib/components/GlobalSearch.svelte';
 	import { locale, setLocale, t, type Locale } from '../../i18n';
 	import { NavigationLinkList } from '../../helpers/NavigationLinkList';
 	// @ts-ignore
@@ -151,9 +152,11 @@
 				{/each}
 			</div>
 
+			<GlobalSearch />
+
 			<!-- Language toggle -->
 			<div
-				class="ml-3 flex items-center border border-stone-200/60 rounded-full p-0.5"
+				class="ml-1 flex items-center border border-stone-200/60 rounded-full p-0.5"
 				role="group"
 				aria-label={$t('lang.label')}
 			>
@@ -182,7 +185,10 @@
 			</div>
 		</div>
 
-		<!-- Mobile hamburger -->
+		<!-- Mobile: search + hamburger -->
+		<div class="flex items-center gap-1 lg:hidden">
+			<GlobalSearch />
+		</div>
 		<button
 			class="relative lg:hidden flex items-center justify-center w-9 h-9 text-stone-700 transition-colors hover:text-missionnaire"
 			onclick={(e) => {
