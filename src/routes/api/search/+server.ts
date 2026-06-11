@@ -11,7 +11,11 @@ const GROUP_LIMIT = 5;
  * parallel and returns the top matches per group. Backs the header
  * GlobalSearch overlay.
  */
-export async function GET({ url }: RequestEvent) {
+export async function GET({ url, setHeaders }: RequestEvent) {
+	// CDN-cache identical queries so repeated searches (and multiple users
+	// typing the same words) don't each invoke the function + 4 DB queries.
+	setHeaders({ 'cache-control': 'public, s-maxage=300, stale-while-revalidate=3600' });
+
 	const q = (url.searchParams.get('q') || '').trim();
 	if (q.length < 2) {
 		return json({
