@@ -21,7 +21,15 @@ const config = {
 			}
 		})
 	},
-	preprocess: vitePreprocess()
+	preprocess: vitePreprocess(),
+	vitePlugin: {
+		// Force runes mode for all app code so stray legacy syntax fails the
+		// build, while node_modules components (svelte-icons-pack, iconsax-svelte
+		// are still Svelte 4 era) keep compiler auto-detection.
+		dynamicCompileOptions({ filename }) {
+			if (!filename.includes('node_modules')) return { runes: true };
+		}
+	}
 };
 
 export default config;
