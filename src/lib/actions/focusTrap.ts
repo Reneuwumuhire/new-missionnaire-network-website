@@ -66,23 +66,30 @@ export function focusTrap(node: HTMLElement, options: FocusTrapOptions = {}) {
 		}
 	};
 
-	node.addEventListener('keydown', handleKeydown);
+	// Listen at the document level (capture): if the opening click leaves
+	// focus on the trigger or <body> — common when the dialog is portaled
+	// after mount — a node-scoped listener would never hear Escape.
+	document.addEventListener('keydown', handleKeydown, true);
 
-	if (initialFocus) {
+	// Focus on the next frame so `use:portal` (which re-parents the dialog
+	// to <body> after mount) has finished before we measure focusability.
+	const focusFrame = requestAnimationFrame(() => {
+		if (!initialFocus) return;
 		const focusable = getFocusable();
 		if (focusable.length > 0) focusable[0].focus();
 		else {
 			node.setAttribute('tabindex', '-1');
 			node.focus();
 		}
-	}
+	});
 
 	return {
 		update(next: FocusTrapOptions = {}) {
 			({ onEscape, initialFocus = true } = next);
 		},
 		destroy() {
-			node.removeEventListener('keydown', handleKeydown);
+			cancelAnimationFrame(focusFrame);
+			document.removeEventListener('keydown', handleKeydown, true);
 			previouslyFocused?.focus?.();
 		}
 	};
