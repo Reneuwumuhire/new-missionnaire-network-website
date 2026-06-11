@@ -1734,13 +1734,26 @@
 				ts: Date.now()
 			});
 			registerMediaSessionHandlers();
+			// The freeze means JS was fully suspended — the OS almost
+			// certainly tore down the audio session with it. Resume with the
+			// 'long' rebuild path so the listener doesn't have to tap play
+			// after unlocking the phone.
+			tryResumeAfterInterruption(PAUSE_RELOAD_THRESHOLD_MS);
 		};
 		const onBlur = () => console.log('[Lifecycle] blur', { ts: Date.now() });
 		const onFocusLog = () => console.log('[Lifecycle] focus', { ts: Date.now() });
 
+		// A dropped connection pauses playback with a media error; when the
+		// network returns, rebuild and resume instead of waiting for a tap.
+		const onOnline = () => {
+			console.log('[Lifecycle] online');
+			tryResumeAfterInterruption(PAUSE_RELOAD_THRESHOLD_MS);
+		};
+
 		document.addEventListener('visibilitychange', onVisibility);
 		document.addEventListener('freeze', onFreeze);
 		document.addEventListener('resume', onResume);
+		window.addEventListener('online', onOnline);
 		window.addEventListener('focus', onFocus);
 		window.addEventListener('focus', onFocusLog);
 		window.addEventListener('blur', onBlur);
@@ -1752,6 +1765,7 @@
 			document.removeEventListener('visibilitychange', onVisibility);
 			document.removeEventListener('freeze', onFreeze);
 			document.removeEventListener('resume', onResume);
+			window.removeEventListener('online', onOnline);
 			window.removeEventListener('focus', onFocus);
 			window.removeEventListener('focus', onFocusLog);
 			window.removeEventListener('blur', onBlur);
@@ -2491,7 +2505,7 @@
 	without affecting playback behavior.
 -->
 {#key audioElementKey}
-	<audio bind:this={audio} crossorigin="anonymous" playsinline preload="none" hidden></audio>
+	<audio bind:this={audio} crossorigin="anonymous" playsinline preload="auto" hidden></audio>
 {/key}
 
 <!--
