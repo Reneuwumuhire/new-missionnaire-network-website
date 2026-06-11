@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Breadcrumbs from '$lib/components/+breadcrumbs.svelte';
 	import ArticleParagraph from '$lib/components/+articleParagraph.svelte';
 	import Quotes from '$lib/components/+quotes.svelte';
 	import { BranhamsBiographyParagraphsPart1, BranhamsBiographyParagraphsPart2 } from './paragraphs';
@@ -19,6 +20,7 @@
 	/>
 </svelte:head>
 <div class="flex flex-col">
+	<Breadcrumbs items={[{ label: 'William Branham', href: '/william-branham/biographie' }, { label: 'Biographie' }]} />
 	<header class="relative h-[40vh] min-h-[300px] max-h-[500px] overflow-hidden">
 		<img src="/img/branham_page_header.jpg" alt="William Marrion Branham" class="absolute inset-0 w-full h-full object-cover img-zoom" />
 		<div class="absolute inset-0 bg-gradient-to-t from-stone-900/60 via-transparent to-transparent"></div>

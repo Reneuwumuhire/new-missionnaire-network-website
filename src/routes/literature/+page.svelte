@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Breadcrumbs from '$lib/components/+breadcrumbs.svelte';
 	import { goto } from '$app/navigation';
 	import { page, navigating } from '$app/stores';
 	import type { Literature } from '$lib/models/literature';
@@ -134,6 +135,7 @@
 </svelte:head>
 
 <div class="container mx-auto px-4 pt-4 pb-10 md:px-8 md:pt-6 max-w-7xl">
+	<Breadcrumbs items={[{ label: 'Littérature' }]} />
 	<!-- Hero Section -->
 	<div class="mb-12 text-left">
 		<h1 class="text-4xl md:text-5xl font-black text-gray-900 mb-4">Littérature</h1>

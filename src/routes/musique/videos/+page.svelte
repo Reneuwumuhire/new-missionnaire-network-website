@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Breadcrumbs from '$lib/components/+breadcrumbs.svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import type { YoutubeVideo } from '$lib/models/youtube';
@@ -304,6 +305,7 @@
 </svelte:head>
 
 <div class="w-full min-w-0 max-w-6xl mx-auto px-4 pt-0 pb-8 md:px-6">
+	<Breadcrumbs items={[{ label: 'Musique', href: '/musique' }, { label: 'Chants en vidéo' }]} />
 	<!-- Page Header -->
 	<div class="mb-10">
 		<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body">

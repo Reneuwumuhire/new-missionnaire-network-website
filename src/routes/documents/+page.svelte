@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Breadcrumbs from '$lib/components/+breadcrumbs.svelte';
 	import type { PageData } from './$types';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
@@ -112,6 +113,7 @@
 </svelte:head>
 
 <div class="container mx-auto px-4 pt-4 pb-8 md:pt-6">
+	<Breadcrumbs items={[{ label: 'Documents' }]} />
 	<!-- Search Header -->
 	<div class="relative mb-8">
 		<div class="flex flex-row items-center justify-center">

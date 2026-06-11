@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import Breadcrumbs from '$lib/components/+breadcrumbs.svelte';
 	import FormattedQuestionText from '$lib/components/questions/FormattedQuestionText.svelte';
 	import QuestionReferenceCards from '$lib/components/questions/QuestionReferenceCards.svelte';
 	import { stripRichTextFormatting } from '$lib/questions/rich-text';
@@ -147,6 +148,7 @@
 </svelte:head>
 
 <div class="container mx-auto max-w-5xl px-4 py-6 md:px-8 md:py-8">
+	<Breadcrumbs items={[{ label: 'Questions', href: '/questions' }, { label: question.title }]} />
 	<a
 		href="/questions"
 		class="group mb-4 inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-missionnaire transition hover:text-stone-900"
