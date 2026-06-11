@@ -19,6 +19,7 @@
 	import { afterNavigate, goto } from '$app/navigation';
 	import { browser, dev } from '$app/environment';
 	import { onMount, tick } from 'svelte';
+	import { initLocale } from '../i18n';
 	import { radioIsLive } from '$lib/stores/global';
 	interface Props {
 		data: LayoutData;
@@ -105,6 +106,10 @@
 
 	onMount(() => {
 		if (!browser) return;
+
+		// Apply the visitor's saved language (cookie/localStorage) after
+		// hydration — SSR always renders French.
+		initLocale();
 
 		resizeObserver = new ResizeObserver(updateLayoutOffset);
 

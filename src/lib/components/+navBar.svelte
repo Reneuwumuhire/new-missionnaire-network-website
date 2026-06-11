@@ -1,9 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import HeaderMenuLink from '$lib/components/+headerMenuLink.svelte';
-	import { dict, locale, t } from '../../i18n';
-	import fr from '../../translations/fr';
-	import en from '../../translations/en';
+	import { locale, setLocale, t, type Locale } from '../../i18n';
 	import { NavigationLinkList } from '../../helpers/NavigationLinkList';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
@@ -14,15 +12,10 @@
 	import { afterNavigate } from '$app/navigation';
 	import { onMount } from 'svelte';
 
-	const languages = { en, fr };
-	let currentLang = 'en';
-	let preventScroll = false;
 	let openMenuIndex: number | null = $state(null);
-	dict.set(languages);
-	let showDropContents = false;
 
-	const langSwitch = () => {
-		showDropContents = !showDropContents;
+	const switchLanguage = (next: Locale) => {
+		if (next !== $locale) setLocale(next);
 	};
 	let showMoboNav = $state(false);
 	let navEl: HTMLElement | undefined = $state();
@@ -156,6 +149,36 @@
 					/>
 				{/each}
 			</div>
+
+			<!-- Language toggle -->
+			<div
+				class="ml-3 flex items-center border border-stone-200/60 rounded-full p-0.5"
+				role="group"
+				aria-label={$t('lang.label')}
+			>
+				<button
+					type="button"
+					class="px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-full font-body transition-colors {$locale ===
+					'fr'
+						? 'bg-stone-900 text-white'
+						: 'text-stone-400 hover:text-stone-700'}"
+					aria-pressed={$locale === 'fr'}
+					onclick={() => switchLanguage('fr')}
+				>
+					FR
+				</button>
+				<button
+					type="button"
+					class="px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-full font-body transition-colors {$locale ===
+					'en'
+						? 'bg-stone-900 text-white'
+						: 'text-stone-400 hover:text-stone-700'}"
+					aria-pressed={$locale === 'en'}
+					onclick={() => switchLanguage('en')}
+				>
+					EN
+				</button>
+			</div>
 		</div>
 
 		<!-- Mobile hamburger -->
@@ -200,6 +223,43 @@
 							closeMenuFrom={toggleMobileNav}
 						/>
 					{/each}
+				</div>
+
+				<!-- Language toggle -->
+				<div class="mt-8 pt-6 border-t border-stone-100">
+					<p class="text-[10px] uppercase tracking-[0.3em] text-stone-400 font-body mb-3">
+						{$t('lang.label')}
+					</p>
+					<div class="flex items-center gap-2" role="group" aria-label={$t('lang.label')}>
+						<button
+							type="button"
+							class="px-4 py-2.5 min-h-11 text-[12px] font-bold uppercase tracking-wider font-body border transition-colors {$locale ===
+							'fr'
+								? 'bg-stone-900 text-white border-stone-900'
+								: 'text-stone-500 border-stone-200/60 hover:border-stone-400'}"
+							aria-pressed={$locale === 'fr'}
+							onclick={() => switchLanguage('fr')}
+						>
+							{$t('lang.french')}
+						</button>
+						<button
+							type="button"
+							class="px-4 py-2.5 min-h-11 text-[12px] font-bold uppercase tracking-wider font-body border transition-colors {$locale ===
+							'en'
+								? 'bg-stone-900 text-white border-stone-900'
+								: 'text-stone-500 border-stone-200/60 hover:border-stone-400'}"
+							aria-pressed={$locale === 'en'}
+							onclick={() => switchLanguage('en')}
+						>
+							{$t('lang.english')}
+						</button>
+					</div>
+					<a
+						href="/predications?language=english"
+						class="mt-3 inline-block text-[12px] text-stone-500 hover:text-missionnaire font-body underline underline-offset-2 transition-colors"
+					>
+						{$t('nav.englishSermons')} →
+					</a>
 				</div>
 
 				<!-- Mobile footer accent -->
