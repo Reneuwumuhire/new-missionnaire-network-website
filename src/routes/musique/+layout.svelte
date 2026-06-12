@@ -7,9 +7,11 @@
 	import { t } from '../../i18n';
 	import LoadingRing from '$lib/components/LoadingRing.svelte';
 
-	let { data, children } = $props();
-	let heroSearchValue = $state((data as any).search || '');
-	let debounceTimer: NodeJS.Timeout | undefined = $state();
+	let { children } = $props();
+	// Seeded from the URL (not load data) so there's no initial-value capture;
+	// the sync $effect below keeps it aligned on every navigation.
+	let heroSearchValue = $state($page.url.searchParams.get('search') || '');
+	let debounceTimer: ReturnType<typeof setTimeout> | undefined = $state();
 	let isHeroSearchLoading = $state(false);
 	let lastSyncedSearch = $state('');
 
@@ -39,7 +41,11 @@
 		}
 		params.set('page', '1');
 		isHeroSearchLoading = true;
-		await goto(`?${params.toString()}`, { keepFocus: true, noScroll: true });
+		try {
+			await goto(`?${params.toString()}`, { keepFocus: true, noScroll: true });
+		} finally {
+			isHeroSearchLoading = false;
+		}
 	}
 
 	$effect(() => {
@@ -93,7 +99,9 @@
 			class="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between md:gap-8 md:px-6 md:py-8"
 		>
 			<div class="min-w-0">
-				<p class="font-body text-[9px] font-bold uppercase tracking-[0.35em] text-missionnaire md:text-[10px]">
+				<p
+					class="font-body text-[9px] font-bold uppercase tracking-[0.35em] text-missionnaire md:text-[10px]"
+				>
 					{$t('music.headerKicker')}
 				</p>
 				<div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
@@ -153,14 +161,14 @@
 					{#if isHeroSearchLoading}
 						<LoadingRing
 							size={14}
-							className="mr-3 flex h-6 w-6 shrink-0 items-center justify-center text-missionnaire"
+							className="mr-3 flex h-6 w-6 shrink-0 self-center items-center justify-center text-missionnaire"
 						/>
 					{:else if heroSearchValue}
 						<button
 							type="button"
 							aria-label={$t('music.clearSearch')}
 							title={$t('music.clearSearch')}
-							class="mr-1.5 flex h-7 w-7 shrink-0 items-center justify-center text-stone-400 transition-colors duration-150 hover:text-stone-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/50"
+							class="mr-1.5 flex h-7 w-7 shrink-0 self-center items-center justify-center text-stone-400 transition-colors duration-150 hover:text-stone-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/50"
 							onclick={() => {
 								heroSearchValue = '';
 							}}
@@ -180,13 +188,13 @@
 							</svg>
 						</button>
 					{/if}
-								<button
+					<button
 						type="submit"
 						class="shrink-0 self-stretch bg-missionnaire px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-white font-body transition-colors duration-200 hover:bg-missionnaire/90 active:scale-[0.98]"
 					>
 						{$t('search.action')}
 					</button>
-</form>
+				</form>
 
 				<!-- Audio / Vidéos segmented control — h-11 on md+ so it sits on
 				     the same baseline as the inline search field beside it. -->
@@ -222,7 +230,9 @@
      pill row directly under this band, then a slim search + Filtres
      utility bar (see musique/+page.svelte). Desktop keeps the inline
      header search above. -->
-<div class="flex h-auto w-full flex-row justify-center overflow-x-hidden pt-4 pb-32 md:pt-10 md:pb-16">
+<div
+	class="flex h-auto w-full flex-row justify-center overflow-x-hidden pt-4 pb-32 md:pt-10 md:pb-16"
+>
 	<div class="flex w-full max-w-7xl flex-col px-2 md:px-5">
 		{@render children?.()}
 
