@@ -70,7 +70,7 @@
 		)?.href ?? null);
 
 	// "Menu" opens a bottom sheet with the sections the four tabs don't
-	// cover (Questions, Galerie, Documents…) — one tap to reach anything,
+	// cover (Questions, Documents…) — one tap to reach anything,
 	// instead of routing through the header hamburger menu.
 	let moreSheetOpen = $state(false);
 </script>

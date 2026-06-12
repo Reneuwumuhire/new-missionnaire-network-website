@@ -307,7 +307,7 @@
 	.global-search-backdrop {
 		position: fixed;
 		inset: 0;
-		z-index: 70;
+		z-index: 140;
 		background: rgba(28, 25, 23, 0.45);
 		backdrop-filter: blur(2px);
 		-webkit-backdrop-filter: blur(2px);

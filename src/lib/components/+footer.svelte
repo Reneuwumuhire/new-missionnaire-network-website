@@ -28,7 +28,6 @@
 				{ label: 'nav.williamBranham', href: '/william-branham/biographie' },
 				{ label: 'nav.ewaldFrank', href: '/ewald-frank' },
 				{ label: 'nav.eglise', href: '/eglise' },
-				{ label: 'nav.galerie', href: '/galerie' },
 				{ label: 'nav.direct', href: '/live' }
 			]
 		},

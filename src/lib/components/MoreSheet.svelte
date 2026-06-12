@@ -5,7 +5,6 @@
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import BsChatDots from 'svelte-icons-pack/bs/BsChatDots';
-	import BsImages from 'svelte-icons-pack/bs/BsImages';
 	import BsFileEarmarkText from 'svelte-icons-pack/bs/BsFileEarmarkText';
 	import BsBook from 'svelte-icons-pack/bs/BsBook';
 	import BsHouseDoor from 'svelte-icons-pack/bs/BsHouseDoor';
@@ -25,7 +24,6 @@
 	const sections = $derived([
 		{ label: $t('nav.questions'), href: '/questions', icon: BsChatDots },
 		{ label: $t('nav.videos'), href: '/videos', icon: BsCameraVideo },
-		{ label: $t('nav.galerie'), href: '/galerie', icon: BsImages },
 		{ label: $t('nav.documents'), href: '/documents', icon: BsFileEarmarkText },
 		{ label: $t('nav.literature'), href: '/literature', icon: BsBook },
 		{ label: $t('nav.eglise'), href: '/eglise', icon: BsHouseDoor },
@@ -133,7 +131,7 @@
 	.more-sheet-backdrop {
 		position: fixed;
 		inset: 0;
-		z-index: 60;
+		z-index: 130;
 		background: rgba(28, 25, 23, 0.45);
 		backdrop-filter: blur(2px);
 		-webkit-backdrop-filter: blur(2px);

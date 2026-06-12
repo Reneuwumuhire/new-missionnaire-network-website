@@ -119,7 +119,7 @@
 
 <svelte:window onclick={handleWindowClick} />
 
-<nav class="navbar relative z-50 max-w-full border-b border-stone-200/40 backdrop-blur-md bg-[#FAF8F3]/90" bind:this={navEl}>
+<nav class="navbar relative z-[120] max-w-full border-b border-stone-200/40 backdrop-blur-md bg-[#FAF8F3]/90" bind:this={navEl}>
 	<div class="flex items-center justify-between max-w-[1600px] mx-auto px-4 md:px-6 h-16">
 		<!-- Logo -->
 		<a href="/" class="flex items-center shrink-0">
