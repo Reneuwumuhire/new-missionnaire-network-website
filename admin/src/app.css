@@ -128,24 +128,37 @@ body {
 /* ── Admin-specific utilities ──
    Sharp-cornered, editorial-voice treatment aligned with the public site
    (CTAs use rounded-none + uppercase wide tracking — see src/routes/+page.svelte:195). */
+/* One input height across the admin: h-11 (44px). Textareas opt back into
+   auto height below so multi-line fields keep breathing room. */
 .admin-input {
-	@apply w-full rounded-none border border-stone-200/60 bg-white/60 px-4 py-3 font-body text-sm text-stone-800 transition-all placeholder:text-stone-400 focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 focus:outline-none;
+	@apply h-11 w-full rounded-none border border-stone-200/60 bg-white/60 px-4 font-body text-sm text-stone-800 transition-all placeholder:text-stone-400 focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 focus:outline-none;
+}
+
+textarea.admin-input {
+	@apply h-auto min-h-[5.5rem] py-3;
 }
 
 .admin-label {
 	@apply mb-1.5 block font-body text-sm font-medium text-stone-600;
 }
 
+/* Two button sizes only: default h-11 (matches inputs) and `.admin-btn-compact`
+   (h-9) for dense rows/toolbars. Combine: `class="admin-btn-secondary admin-btn-compact"`. */
 .admin-btn-primary {
-	@apply inline-flex items-center gap-2 rounded-none bg-primary px-6 py-3 font-body text-[12px] font-semibold uppercase tracking-[0.2em] text-white transition-all hover:bg-missionnaire-600 focus:ring-2 focus:ring-primary/30 active:scale-[0.98];
+	@apply inline-flex h-11 items-center gap-2 rounded-none bg-primary px-6 font-body text-[12px] font-semibold uppercase tracking-[0.2em] text-white transition-all hover:bg-missionnaire-600 focus:ring-2 focus:ring-primary/30 active:scale-[0.98];
 }
 
 .admin-btn-secondary {
-	@apply inline-flex items-center gap-2 rounded-none border border-stone-300 bg-white/60 px-6 py-3 font-body text-[12px] font-semibold uppercase tracking-[0.2em] text-stone-700 transition-all hover:border-stone-900 hover:bg-stone-900 hover:text-white focus:ring-2 focus:ring-stone-200 active:scale-[0.98];
+	@apply inline-flex h-11 items-center gap-2 rounded-none border border-stone-300 bg-white/60 px-6 font-body text-[12px] font-semibold uppercase tracking-[0.2em] text-stone-700 transition-all hover:border-stone-900 hover:bg-stone-900 hover:text-white focus:ring-2 focus:ring-stone-200 active:scale-[0.98];
 }
 
 .admin-btn-danger {
-	@apply inline-flex items-center gap-2 rounded-none bg-red-700 px-6 py-3 font-body text-[12px] font-semibold uppercase tracking-[0.2em] text-white transition-all hover:bg-red-800 focus:ring-2 focus:ring-red-300 active:scale-[0.98];
+	@apply inline-flex h-11 items-center gap-2 rounded-none bg-red-700 px-6 font-body text-[12px] font-semibold uppercase tracking-[0.2em] text-white transition-all hover:bg-red-800 focus:ring-2 focus:ring-red-300 active:scale-[0.98];
+}
+
+/* Declared after the size-bearing button classes so it wins the cascade. */
+.admin-btn-compact {
+	@apply h-9 gap-1.5 px-3.5 text-[10px] tracking-[0.14em];
 }
 
 .admin-btn-primary:disabled,

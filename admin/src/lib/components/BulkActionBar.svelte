@@ -76,7 +76,7 @@
 				<div class="relative">
 					<button
 						onclick={() => { showCategoryPicker = !showCategoryPicker; confirmDelete = false; }}
-						class="admin-btn-secondary py-1.5 text-xs"
+						class="admin-btn-secondary admin-btn-compact"
 					>
 						{$t('audio.bulkbar.changeCategory')}
 					</button>
@@ -101,7 +101,7 @@
 				{#if confirmDelete}
 					<div class="flex items-center gap-2">
 						<span class="text-xs text-red-600">{$t('audio.bulkbar.confirm')}</span>
-						<button onclick={bulkDelete} disabled={loading} class="admin-btn-danger py-1.5 text-xs">
+						<button onclick={bulkDelete} disabled={loading} class="admin-btn-danger admin-btn-compact">
 							{loading ? $t('audio.bulkbar.deleting') : $t('audio.bulkbar.yesDelete')}
 						</button>
 						<button onclick={() => (confirmDelete = false)} class="text-xs text-stone-500 hover:text-stone-700">
@@ -111,7 +111,7 @@
 				{:else}
 					<button
 						onclick={() => { confirmDelete = true; showCategoryPicker = false; }}
-						class="admin-btn-danger py-1.5 text-xs"
+						class="admin-btn-danger admin-btn-compact"
 					>
 						{$t('audio.bulkbar.delete')}
 					</button>

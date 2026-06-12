@@ -8,8 +8,11 @@ const PAGE_SIZE = 30;
 export const load: PageServerLoad = async ({ locals, url }) => {
 	if (!canModerateQuestions(locals.user)) throw error(403, 'Accès refusé');
 	const page = Math.max(1, Number.parseInt(url.searchParams.get('page') || '1', 10) || 1);
+	// Streamed: the page renders its header + card skeletons immediately.
+	const deferred = listOpenReports({ page, limit: PAGE_SIZE });
+	deferred.catch(() => {});
 	return {
-		...(await listOpenReports({ page, limit: PAGE_SIZE })),
+		deferred,
 		page,
 		limit: PAGE_SIZE
 	};

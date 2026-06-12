@@ -548,7 +548,7 @@
 							<td class="px-3 py-2 align-top">
 								<input
 									type="text"
-									class="admin-input !py-1 !text-xs"
+									class="admin-input !h-9 !text-xs"
 									value={row.title}
 									oninput={(e) => updateRow(row.id, { title: e.currentTarget.value })}
 									disabled={row.status === 'uploading' || row.status === 'saving' || row.status === 'done'}
@@ -557,7 +557,7 @@
 							<td class="px-3 py-2 align-top">
 								<input
 									type="text"
-									class="admin-input !py-1 !text-xs"
+									class="admin-input !h-9 !text-xs"
 									value={row.artist}
 									oninput={(e) => updateRow(row.id, { artist: e.currentTarget.value })}
 									list="bulk-artist-list"
@@ -566,7 +566,7 @@
 							</td>
 							<td class="px-3 py-2 align-top">
 								<select
-									class="admin-input !py-1 !text-xs"
+									class="admin-input !h-9 !text-xs"
 									value={row.category}
 									onchange={(e) => updateRow(row.id, { category: e.currentTarget.value })}
 									disabled={row.status === 'uploading' || row.status === 'saving' || row.status === 'done'}
@@ -583,7 +583,7 @@
 							<td class="px-3 py-2 align-top">
 								<input
 									type="number"
-									class="admin-input !w-16 !py-1 !text-xs"
+									class="admin-input !w-16 !h-9 !text-xs"
 									value={row.number ?? ''}
 									oninput={(e) => {
 										const v = e.currentTarget.value;

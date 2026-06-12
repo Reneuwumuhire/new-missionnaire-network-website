@@ -10,9 +10,11 @@ import { validateModerationReason } from '$lib/questions/validation';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	if (!canModerateQuestions(locals.user)) throw error(403, 'Accès refusé');
-	const result = await listAdminQuestions({ status: 'pending', page: 1, limit: 100 });
+	// Streamed: the page renders its header + card skeletons immediately.
+	const deferred = listAdminQuestions({ status: 'pending', page: 1, limit: 100 });
+	deferred.catch(() => {});
 	return {
-		...result,
+		deferred,
 		canDelete: canDeleteQuestions(locals.user),
 		canDeletePermanently: locals.user.role === 'superadmin'
 	};

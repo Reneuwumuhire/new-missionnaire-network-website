@@ -1096,5 +1096,36 @@ export default {
 		'Transcription attachée au direct — cliquez « Démarrer les sous-titres » au bon moment',
 	'recordings.subtitles.toast.started': 'Sous-titres démarrés — les auditeurs voient maintenant le texte',
 	'recordings.subtitles.toast.jumped': 'Texte calé sur la réplique choisie',
-	'recordings.subtitles.toast.disabled': 'Sous-titres désactivés'
+	'recordings.subtitles.toast.disabled': 'Sous-titres désactivés',
+
+	// ── UI polish : chargement / vides / erreurs ────────────────
+	'common.loading': 'Chargement…',
+	'common.loadError': 'Impossible de charger les données.',
+	'common.resetFilters': 'Réinitialiser les filtres',
+
+	// ── Page d'erreur ───────────────────────────────────────────
+	'errors.notFoundTitle': 'Page introuvable',
+	'errors.notFoundBody': "Cette page n'existe pas ou a été déplacée.",
+	'errors.forbiddenTitle': 'Accès refusé',
+	'errors.forbiddenBody': "Vous n'avez pas les permissions nécessaires pour accéder à cette page.",
+	'errors.serverTitle': 'Une erreur est survenue',
+	'errors.serverBody': "Le serveur n'a pas pu traiter la demande. Réessayez dans un instant.",
+	'errors.retry': 'Réessayer',
+	'errors.backToDashboard': 'Retour au tableau de bord',
+
+	// ── Pré-écoute audio ────────────────────────────────────────
+	'audio.preview.play': 'Écouter',
+	'audio.preview.pause': 'Pause',
+
+	// ── Erreurs de champ (formulaires) ──────────────────────────
+	'users.error.nameRequired': 'Le nom est requis',
+	'users.error.emailRequired': "L'email est requis",
+	'users.error.emailExists': 'Un utilisateur avec cet email existe déjà',
+	'users.error.roleInvalid': 'Rôle invalide',
+	'settings.error.nameTooShort': 'Le nom doit contenir au moins 2 caractères',
+	'settings.error.passwordTooShort': 'Le nouveau mot de passe doit contenir au moins 8 caractères',
+	'settings.error.passwordMismatch': 'Les mots de passe ne correspondent pas',
+	'settings.error.currentPasswordWrong': 'Mot de passe actuel incorrect',
+	'audio.edit.titleRequired': 'Le titre est requis',
+	'audio.edit.numberInvalid': 'Le numéro doit être un entier positif'
 } as const;

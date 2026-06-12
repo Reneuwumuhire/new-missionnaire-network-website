@@ -8,6 +8,7 @@
 	import { t, type TranslationKey } from '$lib/i18n';
 	import type { Component } from 'svelte';
 	import BlurUpImage from '$lib/components/BlurUpImage.svelte';
+	import SkeletonRows from '$lib/components/SkeletonRows.svelte';
 	import ScheduledLivesPanel from '$lib/components/ScheduledLivesPanel.svelte';
 	import SubtitleSyncPanel from '$lib/components/SubtitleSyncPanel.svelte';
 
@@ -159,8 +160,14 @@
 	});
 
 	const PAGE_SIZE = 5;
-	let recordings = $state<typeof data.recordings>(data.recordings);
-	let total = $state<number>(data.total);
+	// The initial page of recordings is STREAMED from the loader (data.list is
+	// a promise) so the control center paints instantly with skeleton rows.
+	// It's consumed exactly once in onMount; later updates go through
+	// fetchRecordings()/refreshVisibleRecordings() as before.
+	type RecordingList = Awaited<PageData['list']>['data'];
+	let recordings = $state<RecordingList>([]);
+	let total = $state(0);
+	let listLoaded = $state(false);
 	let currentPage = $state(1);
 	let isFetching = $state(false);
 	let fetchError = $state<string | null>(null);
@@ -196,7 +203,7 @@
 		try {
 			const res = await fetch(buildListUrl(targetPage, limit));
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
-			const body = (await res.json()) as { data: typeof data.recordings; total: number };
+			const body = (await res.json()) as { data: RecordingList; total: number };
 			if (append) {
 				recordings = [...recordings, ...body.data];
 				currentPage = targetPage;
@@ -210,6 +217,7 @@
 					selectedIds = new Set([...selectedIds].filter((id) => surviving.has(id)));
 				}
 			}
+			listLoaded = true;
 		} catch (err) {
 			if (!options.silentErrors) fetchError = (err as Error).message || $t('recordings.error.network');
 		} finally {
@@ -1176,6 +1184,21 @@
 	}
 
 	onMount(() => {
+		// Resolve the streamed initial recordings list (skeleton rows until
+		// then). A user-triggered fetch (search while loading) wins the race.
+		void data.list.then(
+			(result) => {
+				if (listLoaded) return;
+				recordings = result.data;
+				total = result.total;
+				listLoaded = true;
+			},
+			() => {
+				if (listLoaded) return;
+				listLoaded = true;
+				fetchError = fetchError ?? $t('recordings.error.network');
+			}
+		);
 		recomputeElapsed();
 		pollTimer = setInterval(refreshStatus, 5000);
 		tickTimer = setInterval(recomputeElapsed, 1000);
@@ -1846,7 +1869,10 @@
 <div class="mb-8">
 	<h1 class="font-display text-3xl font-bold text-stone-800">{$t('recordings.title')}</h1>
 	<p class="mt-1 text-sm text-stone-500">
-		{$t('recordings.subtitle')} {data.total !== 1 ? $t('recordings.countMany', { count: data.total }) : $t('recordings.countOne', { count: data.total })}
+		{$t('recordings.subtitle')}
+		{#if listLoaded}
+			{total !== 1 ? $t('recordings.countMany', { count: total }) : $t('recordings.countOne', { count: total })}
+		{/if}
 	</p>
 </div>
 
@@ -2420,7 +2446,7 @@
 	<select
 		bind:value={statusFilter}
 		aria-label={$t('recordings.toolbar.filterStatus')}
-		class="admin-input !w-auto !py-2 text-sm"
+		class="admin-input !w-auto text-sm"
 	>
 		<option value="all">{$t('recordings.toolbar.allStatuses')}</option>
 		<option value="ready">{$t('recordings.status.ready')}</option>
@@ -2432,7 +2458,7 @@
 	<select
 		bind:value={publishedFilter}
 		aria-label={$t('recordings.toolbar.filterPublished')}
-		class="admin-input !w-auto !py-2 text-sm"
+		class="admin-input !w-auto text-sm"
 	>
 		<option value="all">{$t('recordings.toolbar.all')}</option>
 		<option value="published">{$t('recordings.toolbar.published')}</option>
@@ -2453,7 +2479,7 @@
 	{/if}
 
 	<span class="ml-auto text-xs text-stone-400">
-		{#if isFetching}
+		{#if isFetching || !listLoaded}
 			{$t('recordings.common.loading')}
 		{:else}
 			{$t('recordings.list.shownCount', { shown: recordings.length, total })} {hasActiveFilters ? $t('recordings.list.results') : $t('recordings.list.total')}
@@ -2488,6 +2514,26 @@
 				{filteredRecordings.length > 1 ? $t('recordings.list.countMany', { count: filteredRecordings.length }) : $t('recordings.list.countOne', { count: filteredRecordings.length })}
 			</span>
 		</div>
+	{/if}
+
+	{#if !listLoaded}
+		<!-- Initial-load skeleton: mirrors the recording card layout -->
+		{#each Array.from({ length: 3 }) as _}
+			<article class="animate-pulse overflow-hidden border border-stone-200/70 bg-white/60" aria-hidden="true">
+				<div class="flex items-start gap-3 p-4">
+					<div class="h-14 w-20 shrink-0 bg-stone-200"></div>
+					<div class="min-w-0 flex-1 space-y-2 pt-0.5">
+						<div class="h-4 w-3/4 rounded-full bg-stone-200"></div>
+						<div class="h-3 w-1/2 rounded-full bg-stone-100"></div>
+					</div>
+				</div>
+				<div class="flex items-center gap-3 border-t border-stone-100 bg-stone-50/30 px-4 py-2.5">
+					<div class="h-4 w-14 rounded bg-stone-100"></div>
+					<div class="h-3 w-12 rounded-full bg-stone-100"></div>
+					<div class="ml-auto h-5 w-9 rounded-full bg-stone-200"></div>
+				</div>
+			</article>
+		{/each}
 	{/if}
 
 	{#each filteredRecordings as rec}
@@ -2625,7 +2671,7 @@
 		</article>
 	{/each}
 
-	{#if filteredRecordings.length === 0 && !isFetching}
+	{#if listLoaded && filteredRecordings.length === 0 && !isFetching}
 		<div class="border border-dashed border-stone-200 bg-white/40 px-5 py-14 text-center">
 			<p class="font-display text-sm text-stone-500">
 				{#if hasActiveFilters}
@@ -2687,6 +2733,9 @@
 			</tr>
 		</thead>
 		<tbody>
+			{#if !listLoaded}
+				<SkeletonRows rows={5} cols={canDeleteRecordings ? 8 : 7} />
+			{/if}
 			{#each filteredRecordings as rec}
 				{@const isEditing = editingRecordingId === rec._id}
 				{@const isSelected = selectedIds.has(rec._id!)}
@@ -2790,7 +2839,7 @@
 					</td>
 				</tr>
 				{/each}
-			{#if filteredRecordings.length === 0}
+			{#if listLoaded && filteredRecordings.length === 0}
 				<tr>
 					<td colspan={canDeleteRecordings ? 8 : 7} class="px-5 py-12 text-center text-stone-400">
 						{#if total === 0}
@@ -2838,7 +2887,7 @@
 			<button
 				onclick={bulkDelete}
 				disabled={bulkDeleting}
-				class="admin-btn-danger py-1.5 text-xs"
+				class="admin-btn-danger admin-btn-compact"
 			>
 				{bulkDeleting ? $t('recordings.bulk.deleting') : $t('recordings.common.delete')}
 			</button>

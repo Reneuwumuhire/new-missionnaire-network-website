@@ -1,5 +1,8 @@
 <script lang="ts">
 	import { loadingSubmit } from '$lib/actions/loadingSubmit';
+	import ListSkeleton from '$lib/components/ListSkeleton.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
+	import { invalidateAll } from '$app/navigation';
 	import { t } from '$lib/i18n';
 	import type { PageData } from './$types';
 
@@ -21,23 +24,28 @@
 <div class="mb-8 flex items-end justify-between">
 	<div>
 		<h1 class="font-display text-3xl font-semibold text-stone-800">{$t('questions.reports.title')}</h1>
-		<p class="mt-1 text-sm text-stone-500">
-			{data.total === 1
-				? $t('questions.reports.countOne', { count: data.total })
-				: $t('questions.reports.countMany', { count: data.total })}
-		</p>
+		{#await data.deferred}
+			<div class="mt-2 h-3.5 w-40 animate-pulse rounded-full bg-stone-200" aria-hidden="true"></div>
+		{:then d}
+			<p class="mt-1 text-sm text-stone-500">
+				{d.total === 1
+					? $t('questions.reports.countOne', { count: d.total })
+					: $t('questions.reports.countMany', { count: d.total })}
+			</p>
+		{/await}
 	</div>
 	<a href="/questions" class="admin-btn-secondary">{$t('questions.title')}</a>
 </div>
 
-{#if data.reports.length === 0}
-	<div class="border border-stone-200/60 bg-white/40 p-8 text-center text-sm text-stone-500">
-		{$t('questions.reports.empty')}
-	</div>
+{#await data.deferred}
+	<ListSkeleton variant="cards" rows={4} />
+{:then d}
+{#if d.reports.length === 0}
+	<EmptyState icon="flag" message={$t('questions.reports.empty')} />
 {:else}
 	<div class="grid gap-4">
-		{#each data.reports as report}
-			{@const question = data.questions[report.questionId]}
+		{#each d.reports as report}
+			{@const question = d.questions[report.questionId]}
 			<article class="border border-stone-200/60 bg-white/50 p-5">
 				<div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
 					<div>
@@ -79,3 +87,11 @@
 		{/each}
 	</div>
 {/if}
+{:catch}
+	<div class="border border-red-200 bg-red-50/80 p-8 text-center">
+		<p class="text-sm text-red-700">{$t('common.loadError')}</p>
+		<button class="admin-btn-secondary admin-btn-compact mt-4" onclick={() => invalidateAll()}>
+			{$t('errors.retry')}
+		</button>
+	</div>
+{/await}

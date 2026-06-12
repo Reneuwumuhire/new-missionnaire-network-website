@@ -2,10 +2,17 @@
 	import { loadingSubmit } from '$lib/actions/loadingSubmit';
 	import { stripRichTextFormatting } from '$lib/questions/rich-text';
 	import { confirmDialog } from '$lib/stores/confirm-dialog';
+	import { invalidateAll } from '$app/navigation';
+	import SkeletonRows from '$lib/components/SkeletonRows.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
 	import { t, type TranslationKey } from '$lib/i18n';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
+
+	const hasFilters = $derived(
+		(data.status && data.status !== 'all') || Boolean(data.search) || Boolean(data.answered)
+	);
 	const confirmedPermanentDeleteForms = new WeakSet<HTMLFormElement>();
 
 	const statuses: Array<{ value: string; label: TranslationKey }> = [
@@ -71,8 +78,6 @@
 		const query = params.toString();
 		return query ? `/questions?${query}` : '/questions';
 	}
-
-	const totalPages = $derived(Math.max(1, Math.ceil(data.total / data.limit)));
 </script>
 
 <svelte:head>
@@ -87,17 +92,29 @@
 		</p>
 	</div>
 	{#if data.canModerate}
-		<div class="flex flex-wrap gap-2">
-			<a href="/questions/pending" class="admin-btn-secondary py-2"
-				>{$t('questions.pendingLink', { count: data.stats.pending })}</a
-			>
-			<a href="/questions/reports" class="admin-btn-secondary py-2"
-				>{$t('questions.reportsLink', { count: data.stats.openReports })}</a
-			>
-		</div>
+		{#await data.deferred then d}
+			<div class="flex flex-wrap gap-2">
+				<a href="/questions/pending" class="admin-btn-secondary admin-btn-compact"
+					>{$t('questions.pendingLink', { count: d.stats.pending })}</a
+				>
+				<a href="/questions/reports" class="admin-btn-secondary admin-btn-compact"
+					>{$t('questions.reportsLink', { count: d.stats.openReports })}</a
+				>
+			</div>
+		{/await}
 	{/if}
 </div>
 
+{#await data.deferred}
+	<div class="mb-6 grid gap-3 sm:grid-cols-3" aria-hidden="true">
+		{#each Array.from({ length: 3 }) as _}
+			<div class="animate-pulse border border-stone-200/60 bg-white/50 p-4">
+				<div class="h-3 w-24 rounded-full bg-stone-100"></div>
+				<div class="mt-3 h-7 w-12 rounded-full bg-stone-200"></div>
+			</div>
+		{/each}
+	</div>
+{:then d}
 <div class="mb-6 grid gap-3 sm:grid-cols-3">
 	<a
 		href="/questions?status=pending"
@@ -109,7 +126,7 @@
 	>
 		<p class="text-xs uppercase tracking-[0.16em] text-stone-400">{$t('questions.statusLabel.pending')}</p>
 		<div class="mt-1 flex items-end justify-between gap-3">
-			<p class="text-2xl font-semibold text-stone-800">{data.stats.pending}</p>
+			<p class="text-2xl font-semibold text-stone-800">{d.stats.pending}</p>
 			<span
 				class="text-[10px] font-bold uppercase tracking-[0.16em] text-primary opacity-0 transition-opacity group-hover:opacity-100"
 			>
@@ -123,7 +140,7 @@
 	>
 		<p class="text-xs uppercase tracking-[0.16em] text-stone-400">{$t('questions.openReports')}</p>
 		<div class="mt-1 flex items-end justify-between gap-3">
-			<p class="text-2xl font-semibold text-stone-800">{data.stats.openReports}</p>
+			<p class="text-2xl font-semibold text-stone-800">{d.stats.openReports}</p>
 			<span
 				class="text-[10px] font-bold uppercase tracking-[0.16em] text-primary opacity-0 transition-opacity group-hover:opacity-100"
 			>
@@ -141,7 +158,7 @@
 	>
 		<p class="text-xs uppercase tracking-[0.16em] text-stone-400">{$t('questions.filterStatus.hidden')}</p>
 		<div class="mt-1 flex items-end justify-between gap-3">
-			<p class="text-2xl font-semibold text-stone-800">{data.stats.hidden}</p>
+			<p class="text-2xl font-semibold text-stone-800">{d.stats.hidden}</p>
 			<span
 				class="text-[10px] font-bold uppercase tracking-[0.16em] text-primary opacity-0 transition-opacity group-hover:opacity-100"
 			>
@@ -150,6 +167,7 @@
 		</div>
 	</a>
 </div>
+{/await}
 
 <form
 	method="GET"
@@ -170,11 +188,7 @@
 	<button class="admin-btn-primary justify-center">{$t('questions.filterAction')}</button>
 </form>
 
-{#if data.questions.length === 0}
-	<div class="border border-stone-200/60 bg-white/40 p-8 text-center text-sm text-stone-500">
-		{$t('questions.empty')}
-	</div>
-{:else}
+{#await data.deferred}
 	<div class="overflow-hidden border border-stone-200/60 bg-white/40">
 		<table class="w-full text-left text-sm">
 			<thead>
@@ -182,11 +196,35 @@
 					<th class="px-5 py-3.5 font-medium text-stone-500">{$t('questions.table.question')}</th>
 					<th class="px-5 py-3.5 font-medium text-stone-500">{$t('questions.table.status')}</th>
 					<th class="px-5 py-3.5 font-medium text-stone-500">{$t('questions.table.activity')}</th>
-					<th class="w-[235px] px-4 py-3.5 text-right font-medium text-stone-500">{$t('questions.table.actions')}</th>
+					<th class="w-[260px] px-4 py-3.5 text-right font-medium text-stone-500">{$t('questions.table.actions')}</th>
 				</tr>
 			</thead>
 			<tbody>
-				{#each data.questions as question}
+				<SkeletonRows rows={8} cols={4} />
+			</tbody>
+		</table>
+	</div>
+{:then d}
+{#if d.questions.length === 0}
+	<EmptyState
+		message={$t('questions.empty')}
+		actionLabel={hasFilters ? $t('common.resetFilters') : undefined}
+		actionHref={hasFilters ? '/questions' : undefined}
+	/>
+{:else}
+	{@const totalPages = Math.max(1, Math.ceil(d.total / data.limit))}
+	<div class="overflow-hidden border border-stone-200/60 bg-white/40">
+		<table class="w-full text-left text-sm">
+			<thead>
+				<tr class="border-b border-stone-100 bg-cream/50">
+					<th class="px-5 py-3.5 font-medium text-stone-500">{$t('questions.table.question')}</th>
+					<th class="px-5 py-3.5 font-medium text-stone-500">{$t('questions.table.status')}</th>
+					<th class="px-5 py-3.5 font-medium text-stone-500">{$t('questions.table.activity')}</th>
+					<th class="w-[260px] px-4 py-3.5 text-right font-medium text-stone-500">{$t('questions.table.actions')}</th>
+				</tr>
+			</thead>
+			<tbody>
+				{#each d.questions as question}
 					<tr class="border-b border-stone-50 align-top transition-colors hover:bg-cream/30">
 						<td class="px-5 py-4">
 							<a
@@ -220,11 +258,11 @@
 							<p>{$t('questions.viewCount', { count: question.viewCount })}</p>
 							<p>{$t('questions.reportCount', { count: question.reportCount })}</p>
 						</td>
-						<td class="w-[235px] px-4 py-4">
-							<div class="flex flex-nowrap justify-end gap-1.5 whitespace-nowrap">
+						<td class="w-[260px] px-4 py-4">
+							<div class="flex flex-wrap justify-end gap-1.5">
 								<a
 									href={`/questions/${question._id}`}
-									class="admin-btn-secondary shrink-0 px-2.5 py-1.5 text-[9px] leading-none tracking-[0.12em]"
+									class="admin-btn-secondary admin-btn-compact shrink-0"
 								>
 									{$t('questions.open')}
 								</a>
@@ -232,8 +270,7 @@
 									<form method="POST" action="?/moderate" use:loadingSubmit>
 										<input type="hidden" name="id" value={question._id} />
 										<input type="hidden" name="actionName" value="approve" />
-										<button
-											class="admin-btn-primary shrink-0 px-2.5 py-1.5 text-[9px] leading-none tracking-[0.12em]"
+										<button class="admin-btn-primary admin-btn-compact shrink-0"
 											>{$t('questions.approve')}</button
 										>
 									</form>
@@ -242,8 +279,7 @@
 									<form method="POST" action="?/moderate" use:loadingSubmit>
 										<input type="hidden" name="id" value={question._id} />
 										<input type="hidden" name="actionName" value="hide" />
-										<button
-											class="admin-btn-secondary shrink-0 px-2.5 py-1.5 text-[9px] leading-none tracking-[0.12em]"
+										<button class="admin-btn-secondary admin-btn-compact shrink-0"
 											>{$t('questions.hide')}</button
 										>
 									</form>
@@ -254,7 +290,7 @@
 										<input type="hidden" name="actionName" value="soft_delete" />
 										<input type="hidden" name="reason" value="Suppression depuis la liste admin" />
 										<button
-											class="admin-btn-danger shrink-0 px-2.5 py-1.5 text-[9px] leading-none tracking-[0.12em]"
+											class="admin-btn-danger admin-btn-compact shrink-0"
 											data-loading-label={$t('questions.deleting')}
 										>
 											{$t('questions.delete')}
@@ -276,7 +312,7 @@
 											value="Suppression définitive depuis la liste admin"
 										/>
 										<button
-											class="admin-btn-danger shrink-0 px-2.5 py-1.5 text-[9px] leading-none tracking-[0.12em]"
+											class="admin-btn-danger admin-btn-compact shrink-0"
 											data-loading-label={$t('questions.deleting')}
 										>
 											{$t('questions.permanent')}
@@ -313,3 +349,11 @@
 		</nav>
 	{/if}
 {/if}
+{:catch}
+	<div class="border border-red-200 bg-red-50/80 p-8 text-center">
+		<p class="text-sm text-red-700">{$t('common.loadError')}</p>
+		<button class="admin-btn-secondary admin-btn-compact mt-4" onclick={() => invalidateAll()}>
+			{$t('errors.retry')}
+		</button>
+	</div>
+{/await}

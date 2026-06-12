@@ -1087,7 +1087,38 @@ const en: Record<keyof typeof fr, string> = {
 		'Transcript attached to the live — click "Start subtitles" at the right moment',
 	'recordings.subtitles.toast.started': 'Subtitles started — listeners now see the text',
 	'recordings.subtitles.toast.jumped': 'Text aligned to the chosen cue',
-	'recordings.subtitles.toast.disabled': 'Subtitles disabled'
+	'recordings.subtitles.toast.disabled': 'Subtitles disabled',
+
+	// ── UI polish: loading / empty / error states ───────────────
+	'common.loading': 'Loading…',
+	'common.loadError': 'Could not load the data.',
+	'common.resetFilters': 'Reset filters',
+
+	// ── Error page ──────────────────────────────────────────────
+	'errors.notFoundTitle': 'Page not found',
+	'errors.notFoundBody': 'This page does not exist or has been moved.',
+	'errors.forbiddenTitle': 'Access denied',
+	'errors.forbiddenBody': 'You do not have the permissions required to access this page.',
+	'errors.serverTitle': 'Something went wrong',
+	'errors.serverBody': 'The server could not process the request. Try again in a moment.',
+	'errors.retry': 'Try again',
+	'errors.backToDashboard': 'Back to dashboard',
+
+	// ── Inline audio preview ────────────────────────────────────
+	'audio.preview.play': 'Play',
+	'audio.preview.pause': 'Pause',
+
+	// ── Field-level form errors ─────────────────────────────────
+	'users.error.nameRequired': 'Name is required',
+	'users.error.emailRequired': 'Email is required',
+	'users.error.emailExists': 'A user with this email already exists',
+	'users.error.roleInvalid': 'Invalid role',
+	'settings.error.nameTooShort': 'The name must be at least 2 characters',
+	'settings.error.passwordTooShort': 'The new password must be at least 8 characters',
+	'settings.error.passwordMismatch': 'The passwords do not match',
+	'settings.error.currentPasswordWrong': 'Current password is incorrect',
+	'audio.edit.titleRequired': 'Title is required',
+	'audio.edit.numberInvalid': 'The number must be a positive integer'
 };
 
 export default en;

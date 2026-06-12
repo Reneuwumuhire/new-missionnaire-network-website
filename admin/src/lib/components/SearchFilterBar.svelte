@@ -65,7 +65,7 @@
 		<input
 			type="text"
 			placeholder={$t('audio.filters.searchPlaceholder')}
-			class="w-full rounded-none border border-stone-200/60 bg-white/60 px-4 py-3 pl-10 text-sm text-stone-800 transition-all placeholder:text-stone-400 focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 focus:outline-none"
+			class="admin-input pl-10"
 			bind:value={searchValue}
 			oninput={handleSearch}
 		/>
@@ -87,7 +87,7 @@
 		<span class="mr-1 text-xs font-medium tracking-wide text-stone-400 uppercase">{$t('audio.filters.label')}</span>
 
 		<select
-			class="rounded-none border border-stone-200/60 bg-white/60 px-3 py-1.5 text-xs font-medium text-stone-600 transition-all hover:border-stone-300 focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none {activeCategory ? 'border-primary/40 bg-missionnaire-50 text-primary' : ''}"
+			class="h-9 rounded-none border border-stone-200/60 bg-white/60 px-3 text-xs font-medium text-stone-600 transition-all hover:border-stone-300 focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none {activeCategory ? 'border-primary/40 bg-missionnaire-50 text-primary' : ''}"
 			value={activeCategory}
 			onchange={(e) => updateParam('category', e.currentTarget.value)}
 		>
@@ -98,7 +98,7 @@
 		</select>
 
 		<select
-			class="rounded-none border border-stone-200/60 bg-white/60 px-3 py-1.5 text-xs font-medium text-stone-600 transition-all hover:border-stone-300 focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none {activeArtist ? 'border-primary/40 bg-missionnaire-50 text-primary' : ''}"
+			class="h-9 rounded-none border border-stone-200/60 bg-white/60 px-3 text-xs font-medium text-stone-600 transition-all hover:border-stone-300 focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none {activeArtist ? 'border-primary/40 bg-missionnaire-50 text-primary' : ''}"
 			value={activeArtist}
 			onchange={(e) => updateParam('artist', e.currentTarget.value)}
 		>
@@ -109,7 +109,7 @@
 		</select>
 
 		<select
-			class="rounded-none border border-stone-200/60 bg-white/60 px-3 py-1.5 text-xs font-medium text-stone-600 transition-all hover:border-stone-300 focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none {activeLyrics ? 'border-primary/40 bg-missionnaire-50 text-primary' : ''}"
+			class="h-9 rounded-none border border-stone-200/60 bg-white/60 px-3 text-xs font-medium text-stone-600 transition-all hover:border-stone-300 focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none {activeLyrics ? 'border-primary/40 bg-missionnaire-50 text-primary' : ''}"
 			value={activeLyrics}
 			onchange={(e) => updateParam('lyrics', e.currentTarget.value)}
 		>
@@ -121,7 +121,7 @@
 		<div class="h-4 w-px bg-stone-200"></div>
 
 		<select
-			class="rounded-none border border-stone-200/60 bg-white/60 px-3 py-1.5 text-xs font-medium text-stone-600 transition-all hover:border-stone-300 focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none"
+			class="h-9 rounded-none border border-stone-200/60 bg-white/60 px-3 text-xs font-medium text-stone-600 transition-all hover:border-stone-300 focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none"
 			value={activeSort}
 			onchange={(e) => updateParam('sort', e.currentTarget.value)}
 		>
@@ -135,7 +135,7 @@
 		{#if hasFilters}
 			<button
 				onclick={clearFilters}
-				class="ml-auto flex items-center gap-1 rounded-none px-2.5 py-1.5 text-xs font-medium text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600"
+				class="ml-auto flex h-9 items-center gap-1 rounded-none px-2.5 text-xs font-medium text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600"
 			>
 				<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />

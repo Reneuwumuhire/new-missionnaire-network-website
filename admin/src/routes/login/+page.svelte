@@ -76,7 +76,7 @@
 				<button
 					type="submit"
 					disabled={loading}
-					class="admin-btn-primary w-full justify-center py-3 text-base disabled:opacity-60"
+					class="admin-btn-primary w-full justify-center disabled:opacity-60"
 				>
 					{#if loading}
 						<svg class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">

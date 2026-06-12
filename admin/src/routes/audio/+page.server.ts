@@ -16,15 +16,24 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const pageNumber = Number.parseInt(url.searchParams.get('pageNumber') || '1');
 	const sort = url.searchParams.get('sort') || 'uploaded_at:desc';
 
-	const [result, artists, categories] = await Promise.all([
-		queryMusicAudio({ category, search, artist, lyrics, limit, pageNumber, orderBy: sort }),
-		getMusicArtists(),
-		getMusicCategories()
-	]);
+	// Stream the (potentially slow) list query so the page shell + filter bar
+	// render immediately with a skeleton table; await only the cheap distinct
+	// queries that the filter dropdowns need on first paint.
+	const listPromise = queryMusicAudio({
+		category,
+		search,
+		artist,
+		lyrics,
+		limit,
+		pageNumber,
+		orderBy: sort
+	});
+	listPromise.catch(() => {}); // surfaced via the page's error state
+
+	const [artists, categories] = await Promise.all([getMusicArtists(), getMusicCategories()]);
 
 	return {
-		audioList: result.data,
-		total: result.total,
+		listPromise,
 		artists,
 		categories,
 		filters: { category, search, artist, lyrics, sort },

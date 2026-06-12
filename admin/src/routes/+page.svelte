@@ -1,5 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
+	import { invalidateAll } from '$app/navigation';
+	import ListSkeleton from '$lib/components/ListSkeleton.svelte';
 	import { t, type TranslationKey } from '$lib/i18n';
 
 	let { data }: { data: PageData } = $props();
@@ -47,52 +49,14 @@
 		return 'bg-stone-100 text-stone-600';
 	}
 
-	const maxCategoryCount = $derived(
-		Math.max(...(data.stats.categoryDistribution.map((c) => c.count) || [1]))
-	);
+	function maxCategoryCount(categories: Array<{ count: number }>): number {
+		return Math.max(1, ...categories.map((c) => c.count));
+	}
 </script>
 
 <svelte:head>
 	<title>{$t('dashboard.pageTitle')}</title>
 </svelte:head>
-
-{#if data.liveButNotBroadcasting}
-	<a
-		href="/recordings"
-		class="mb-6 flex items-start gap-3 border border-green-200 bg-green-50/80 p-5 transition-colors hover:bg-green-50"
-	>
-		<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100">
-			<span class="relative inline-flex h-2.5 w-2.5">
-				<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75"></span>
-				<span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-600"></span>
-			</span>
-		</div>
-		<div class="min-w-0 flex-1">
-			<p class="text-sm font-semibold text-green-800">{$t('dashboard.liveDetectedTitle')}</p>
-			<p class="mt-1 text-xs text-green-700">
-				{$t('dashboard.liveDetectedBody')}
-			</p>
-		</div>
-	</a>
-{:else if data.liveButNotRecording}
-	<a
-		href="/recordings"
-		class="mb-6 flex items-start gap-3 border border-amber-200 bg-amber-50/80 p-5 transition-colors hover:bg-amber-50"
-	>
-		<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100">
-			<svg class="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-				<circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" />
-				<path stroke-linecap="round" stroke-linejoin="round" d="M12 3a9 9 0 109 9" />
-			</svg>
-		</div>
-		<div class="min-w-0 flex-1">
-			<p class="text-sm font-semibold text-amber-800">{$t('dashboard.notRecordingTitle')}</p>
-			<p class="mt-1 text-xs text-amber-700">
-				{$t('dashboard.notRecordingBody')}
-			</p>
-		</div>
-	</a>
-{/if}
 
 <!-- Header -->
 <div class="mb-8 flex items-end justify-between">
@@ -118,136 +82,192 @@
 	{/if}
 </div>
 
-<!-- Stats cards -->
-<div class="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-	<!-- Total tracks -->
-	<div class="card-lift border border-stone-200/60 bg-white/40 p-5">
-		<div class="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-missionnaire-50">
-			<svg class="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-			</svg>
+{#await data.deferred}
+	<!-- Loading skeleton: mirrors the stat-card grid + the two content panels -->
+	<div class="mb-8">
+		<ListSkeleton variant="stats" />
+	</div>
+	<div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+		<ListSkeleton variant="panel" rows={6} />
+		<ListSkeleton variant="panel" rows={6} />
+	</div>
+{:then dash}
+	{#if dash.liveButNotBroadcasting}
+		<a
+			href="/recordings"
+			class="mb-6 flex items-start gap-3 border border-green-200 bg-green-50/80 p-5 transition-colors hover:bg-green-50"
+		>
+			<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100">
+				<span class="relative inline-flex h-2.5 w-2.5">
+					<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75"></span>
+					<span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-600"></span>
+				</span>
+			</div>
+			<div class="min-w-0 flex-1">
+				<p class="text-sm font-semibold text-green-800">{$t('dashboard.liveDetectedTitle')}</p>
+				<p class="mt-1 text-xs text-green-700">
+					{$t('dashboard.liveDetectedBody')}
+				</p>
+			</div>
+		</a>
+	{:else if dash.liveButNotRecording}
+		<a
+			href="/recordings"
+			class="mb-6 flex items-start gap-3 border border-amber-200 bg-amber-50/80 p-5 transition-colors hover:bg-amber-50"
+		>
+			<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100">
+				<svg class="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+					<circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" />
+					<path stroke-linecap="round" stroke-linejoin="round" d="M12 3a9 9 0 109 9" />
+				</svg>
+			</div>
+			<div class="min-w-0 flex-1">
+				<p class="text-sm font-semibold text-amber-800">{$t('dashboard.notRecordingTitle')}</p>
+				<p class="mt-1 text-xs text-amber-700">
+					{$t('dashboard.notRecordingBody')}
+				</p>
+			</div>
+		</a>
+	{/if}
+
+	<!-- Stats cards -->
+	<div class="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+		<!-- Total tracks -->
+		<div class="card-lift border border-stone-200/60 bg-white/40 p-5">
+			<div class="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-missionnaire-50">
+				<svg class="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+				</svg>
+			</div>
+			<p class="text-2xl font-semibold text-stone-800">{dash.stats.totalTracks}</p>
+			<p class="text-sm text-stone-500">{$t('dashboard.totalTracks')}</p>
 		</div>
-		<p class="text-2xl font-semibold text-stone-800">{data.stats.totalTracks}</p>
-		<p class="text-sm text-stone-500">{$t('dashboard.totalTracks')}</p>
+
+		<!-- Total storage -->
+		<div class="card-lift border border-stone-200/60 bg-white/40 p-5">
+			<div class="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-blue-50">
+				<svg class="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+				</svg>
+			</div>
+			<p class="text-2xl font-semibold text-stone-800">{formatBytes(dash.stats.totalStorage)}</p>
+			<p class="text-sm text-stone-500">{$t('dashboard.totalStorage')}</p>
+		</div>
+
+		<!-- Uploads this month -->
+		<div class="card-lift border border-stone-200/60 bg-white/40 p-5">
+			<div class="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-green-50">
+				<svg class="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+				</svg>
+			</div>
+			<p class="text-2xl font-semibold text-stone-800">{dash.stats.uploadsThisMonth}</p>
+			<p class="text-sm text-stone-500">{$t('dashboard.uploadsThisMonth')}</p>
+		</div>
+
+		<!-- Missing metadata -->
+		<div class="card-lift border border-stone-200/60 bg-white/40 p-5">
+			<div class="mb-3 flex h-10 w-10 items-center justify-center rounded-full {dash.stats.missingMetadata > 0 ? 'bg-amber-50' : 'bg-green-50'}">
+				<svg class="h-5 w-5 {dash.stats.missingMetadata > 0 ? 'text-amber-600' : 'text-green-600'}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+				</svg>
+			</div>
+			<p class="text-2xl font-semibold text-stone-800">{dash.stats.missingMetadata}</p>
+			<p class="text-sm text-stone-500">{$t('dashboard.missingMetadata')}</p>
+		</div>
 	</div>
 
-	<!-- Total storage -->
-	<div class="card-lift border border-stone-200/60 bg-white/40 p-5">
-		<div class="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-blue-50">
-			<svg class="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-			</svg>
-		</div>
-		<p class="text-2xl font-semibold text-stone-800">{formatBytes(data.stats.totalStorage)}</p>
-		<p class="text-sm text-stone-500">{$t('dashboard.totalStorage')}</p>
-	</div>
-
-	<!-- Uploads this month -->
-	<div class="card-lift border border-stone-200/60 bg-white/40 p-5">
-		<div class="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-green-50">
-			<svg class="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-			</svg>
-		</div>
-		<p class="text-2xl font-semibold text-stone-800">{data.stats.uploadsThisMonth}</p>
-		<p class="text-sm text-stone-500">{$t('dashboard.uploadsThisMonth')}</p>
-	</div>
-
-	<!-- Missing metadata -->
-	<div class="card-lift border border-stone-200/60 bg-white/40 p-5">
-		<div class="mb-3 flex h-10 w-10 items-center justify-center rounded-full {data.stats.missingMetadata > 0 ? 'bg-amber-50' : 'bg-green-50'}">
-			<svg class="h-5 w-5 {data.stats.missingMetadata > 0 ? 'text-amber-600' : 'text-green-600'}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
-			</svg>
-		</div>
-		<p class="text-2xl font-semibold text-stone-800">{data.stats.missingMetadata}</p>
-		<p class="text-sm text-stone-500">{$t('dashboard.missingMetadata')}</p>
-	</div>
-</div>
-
-<div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
-	<!-- Category distribution -->
-	<div class="border border-stone-200/60 bg-white/40 p-6">
-		<h2 class="mb-4 font-display text-xl font-semibold text-stone-800">{$t('dashboard.categoryDistribution')}</h2>
-		<div class="space-y-3">
-			{#each data.stats.categoryDistribution as cat}
-				<div class="flex items-center gap-3">
-					<span class="w-28 truncate text-sm text-stone-600">{cat.category}</span>
-					<div class="flex-1">
-						<div class="h-6 overflow-hidden rounded-full bg-cream-dark">
-							<div
-								class="h-full rounded-full bg-gradient-to-r from-primary to-missionnaire-400 transition-all duration-500"
-								style="width: {(cat.count / maxCategoryCount) * 100}%"
-							></div>
+	<div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+		<!-- Category distribution -->
+		<div class="border border-stone-200/60 bg-white/40 p-6">
+			<h2 class="mb-4 font-display text-xl font-semibold text-stone-800">{$t('dashboard.categoryDistribution')}</h2>
+			<div class="space-y-3">
+				{#each dash.stats.categoryDistribution as cat}
+					<div class="flex items-center gap-3">
+						<span class="w-28 truncate text-sm text-stone-600">{cat.category}</span>
+						<div class="flex-1">
+							<div class="h-6 overflow-hidden rounded-full bg-cream-dark">
+								<div
+									class="h-full rounded-full bg-gradient-to-r from-primary to-missionnaire-400 transition-all duration-500"
+									style="width: {(cat.count / maxCategoryCount(dash.stats.categoryDistribution)) * 100}%"
+								></div>
+							</div>
 						</div>
+						<span class="w-10 text-right text-sm font-medium text-stone-700">{cat.count}</span>
 					</div>
-					<span class="w-10 text-right text-sm font-medium text-stone-700">{cat.count}</span>
-				</div>
-			{/each}
-			{#if data.stats.categoryDistribution.length === 0}
-				<p class="text-sm text-stone-400 italic">{$t('dashboard.noCategories')}</p>
-			{/if}
+				{/each}
+				{#if dash.stats.categoryDistribution.length === 0}
+					<p class="text-sm text-stone-400 italic">{$t('dashboard.noCategories')}</p>
+				{/if}
+			</div>
+		</div>
+
+		<!-- Recent uploads -->
+		<div class="border border-stone-200/60 bg-white/40 p-6">
+			<div class="mb-4 flex items-center justify-between">
+				<h2 class="font-display text-xl font-semibold text-stone-800">{$t('dashboard.recentUploads')}</h2>
+				{#if data.canManageAudio}
+					<a href="/audio" class="text-sm font-medium text-primary hover:text-missionnaire-600">
+						{$t('dashboard.viewAll')} &rarr;
+					</a>
+				{/if}
+			</div>
+			<div class="space-y-3">
+				{#each dash.stats.recentUploads as audio}
+					<svelte:element
+						this={data.canManageAudio ? 'a' : 'div'}
+						href={data.canManageAudio ? `/audio/${audio._id}` : undefined}
+						class="flex items-center gap-3 p-2.5 transition-colors {data.canManageAudio ? 'hover:bg-cream' : ''}"
+					>
+						<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-missionnaire-50">
+							<svg class="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z" />
+							</svg>
+						</div>
+						<div class="min-w-0 flex-1">
+							<p class="truncate text-sm font-medium text-stone-700">{audio.title || $t('common.untitled')}</p>
+							<p class="truncate text-xs text-stone-400">{audio.artist || $t('common.unknownArtist')} &middot; {audio.category}</p>
+						</div>
+						<span class="shrink-0 text-xs text-stone-400">{formatDate(audio.uploaded_at)}</span>
+					</svelte:element>
+				{/each}
+				{#if dash.stats.recentUploads.length === 0}
+					<p class="py-4 text-center text-sm text-stone-400 italic">{$t('dashboard.noUploads')}</p>
+				{/if}
+			</div>
 		</div>
 	</div>
 
-	<!-- Recent uploads -->
-	<div class="border border-stone-200/60 bg-white/40 p-6">
-		<div class="mb-4 flex items-center justify-between">
-			<h2 class="font-display text-xl font-semibold text-stone-800">{$t('dashboard.recentUploads')}</h2>
-			{#if data.canManageAudio}
-				<a href="/audio" class="text-sm font-medium text-primary hover:text-missionnaire-600">
-					{$t('dashboard.viewAll')} &rarr;
-				</a>
-			{/if}
-		</div>
-		<div class="space-y-3">
-			{#each data.stats.recentUploads as audio}
-				<svelte:element
-					this={data.canManageAudio ? 'a' : 'div'}
-					href={data.canManageAudio ? `/audio/${audio._id}` : undefined}
-					class="flex items-center gap-3 p-2.5 transition-colors {data.canManageAudio ? 'hover:bg-cream' : ''}"
-				>
-					<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-missionnaire-50">
-						<svg class="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z" />
-						</svg>
+	<!-- Activity log -->
+	{#if dash.recentActivity.length > 0}
+		<div class="mt-6 border border-stone-200/60 bg-white/40 p-6">
+			<h2 class="mb-4 font-display text-xl font-semibold text-stone-800">{$t('dashboard.recentActivity')}</h2>
+			<div class="space-y-2">
+				{#each dash.recentActivity as log}
+					{@const labelKey = actionKey(log.action)}
+					<div class="flex items-center gap-3 px-3 py-2">
+						<span class="inline-flex shrink-0 rounded-md px-2 py-0.5 text-xs font-medium {actionColor(log.action)}">
+							{labelKey ? $t(labelKey) : log.action}
+						</span>
+						<span class="min-w-0 flex-1 truncate text-sm text-stone-600">
+							{log.user_email}
+							{#if log.target_id}
+								&middot; <span class="font-mono text-xs text-stone-400">{log.target_id.slice(-6)}</span>
+							{/if}
+						</span>
+						<span class="shrink-0 text-xs text-stone-400">
+							{formatDate(log.timestamp)} {formatTime(log.timestamp)}
+						</span>
 					</div>
-					<div class="min-w-0 flex-1">
-						<p class="truncate text-sm font-medium text-stone-700">{audio.title || $t('common.untitled')}</p>
-						<p class="truncate text-xs text-stone-400">{audio.artist || $t('common.unknownArtist')} &middot; {audio.category}</p>
-					</div>
-					<span class="shrink-0 text-xs text-stone-400">{formatDate(audio.uploaded_at)}</span>
-				</svelte:element>
-			{/each}
-			{#if data.stats.recentUploads.length === 0}
-				<p class="py-4 text-center text-sm text-stone-400 italic">{$t('dashboard.noUploads')}</p>
-			{/if}
+				{/each}
+			</div>
 		</div>
+	{/if}
+{:catch}
+	<div class="border border-red-200 bg-red-50/80 p-8 text-center">
+		<p class="text-sm text-red-700">{$t('common.loadError')}</p>
+		<button class="admin-btn-secondary admin-btn-compact mt-4" onclick={() => invalidateAll()}>
+			{$t('errors.retry')}
+		</button>
 	</div>
-</div>
-
-<!-- Activity log -->
-{#if data.recentActivity.length > 0}
-	<div class="mt-6 border border-stone-200/60 bg-white/40 p-6">
-		<h2 class="mb-4 font-display text-xl font-semibold text-stone-800">{$t('dashboard.recentActivity')}</h2>
-		<div class="space-y-2">
-			{#each data.recentActivity as log}
-				{@const labelKey = actionKey(log.action)}
-				<div class="flex items-center gap-3 px-3 py-2">
-					<span class="inline-flex shrink-0 rounded-md px-2 py-0.5 text-xs font-medium {actionColor(log.action)}">
-						{labelKey ? $t(labelKey) : log.action}
-					</span>
-					<span class="min-w-0 flex-1 truncate text-sm text-stone-600">
-						{log.user_email}
-						{#if log.target_id}
-							&middot; <span class="font-mono text-xs text-stone-400">{log.target_id.slice(-6)}</span>
-						{/if}
-					</span>
-					<span class="shrink-0 text-xs text-stone-400">
-						{formatDate(log.timestamp)} {formatTime(log.timestamp)}
-					</span>
-				</div>
-			{/each}
-		</div>
-	</div>
-{/if}
+{/await}

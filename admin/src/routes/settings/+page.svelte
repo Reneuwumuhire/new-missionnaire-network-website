@@ -10,6 +10,20 @@
 	let showCurrentPassword = $state(false);
 	let showNewPassword = $state(false);
 
+	// Field-level action errors → translated inline messages (aria-invalid).
+	const profileFieldError = $derived(form?.profileFieldError ?? null);
+	const passwordFieldError = $derived(form?.passwordFieldError ?? null);
+	const fieldErrorKeys: Record<string, TranslationKey> = {
+		nameTooShort: 'settings.error.nameTooShort',
+		passwordTooShort: 'settings.error.passwordTooShort',
+		passwordMismatch: 'settings.error.passwordMismatch',
+		currentPasswordWrong: 'settings.error.currentPasswordWrong'
+	};
+	function fieldErrorMessage(code: string): string {
+		const key = fieldErrorKeys[code];
+		return key ? $t(key) : code;
+	}
+
 	function formatDate(date: string | Date | null): string {
 		if (!date) return $t('settings.never');
 		return new Date(date).toLocaleDateString('fr-FR', {
@@ -96,8 +110,13 @@
 						type="text"
 						required
 						value={data.user.name}
-						class="admin-input"
+						class="admin-input {profileFieldError?.field === 'name' ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : ''}"
+						aria-invalid={profileFieldError?.field === 'name' ? 'true' : undefined}
+						aria-describedby={profileFieldError?.field === 'name' ? 'name-error' : undefined}
 					/>
+					{#if profileFieldError?.field === 'name'}
+						<p id="name-error" class="mt-1.5 text-xs text-red-600">{fieldErrorMessage(profileFieldError.code)}</p>
+					{/if}
 				</div>
 
 				<div>
@@ -187,7 +206,9 @@
 							type={showCurrentPassword ? 'text' : 'password'}
 							required
 							autocomplete="current-password"
-							class="admin-input pr-10"
+							class="admin-input pr-10 {passwordFieldError?.field === 'currentPassword' ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : ''}"
+							aria-invalid={passwordFieldError?.field === 'currentPassword' ? 'true' : undefined}
+							aria-describedby={passwordFieldError?.field === 'currentPassword' ? 'currentPassword-error' : undefined}
 						/>
 						<button
 							type="button"
@@ -207,6 +228,9 @@
 							{/if}
 						</button>
 					</div>
+					{#if passwordFieldError?.field === 'currentPassword'}
+						<p id="currentPassword-error" class="mt-1.5 text-xs text-red-600">{fieldErrorMessage(passwordFieldError.code)}</p>
+					{/if}
 				</div>
 
 				<div class="ornament-line my-2">
@@ -223,8 +247,10 @@
 							required
 							minlength={8}
 							autocomplete="new-password"
-							class="admin-input pr-10"
+							class="admin-input pr-10 {passwordFieldError?.field === 'newPassword' ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : ''}"
 							placeholder={$t('settings.minChars')}
+							aria-invalid={passwordFieldError?.field === 'newPassword' ? 'true' : undefined}
+							aria-describedby={passwordFieldError?.field === 'newPassword' ? 'newPassword-error' : undefined}
 						/>
 						<button
 							type="button"
@@ -244,6 +270,9 @@
 							{/if}
 						</button>
 					</div>
+					{#if passwordFieldError?.field === 'newPassword'}
+						<p id="newPassword-error" class="mt-1.5 text-xs text-red-600">{fieldErrorMessage(passwordFieldError.code)}</p>
+					{/if}
 				</div>
 
 				<div>
@@ -255,9 +284,14 @@
 						required
 						minlength={8}
 						autocomplete="new-password"
-						class="admin-input"
+						class="admin-input {passwordFieldError?.field === 'confirmPassword' ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : ''}"
 						placeholder={$t('settings.retypePassword')}
+						aria-invalid={passwordFieldError?.field === 'confirmPassword' ? 'true' : undefined}
+						aria-describedby={passwordFieldError?.field === 'confirmPassword' ? 'confirmPassword-error' : undefined}
 					/>
+					{#if passwordFieldError?.field === 'confirmPassword'}
+						<p id="confirmPassword-error" class="mt-1.5 text-xs text-red-600">{fieldErrorMessage(passwordFieldError.code)}</p>
+					{/if}
 				</div>
 			</div>
 

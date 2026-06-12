@@ -1,9 +1,25 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
+	import SkeletonRows from '$lib/components/SkeletonRows.svelte';
 	import { t, type TranslationKey } from '$lib/i18n';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
+
+	// Field-level create errors: the action returns { field, code }; translate
+	// the code here and render it inline under the failing input.
+	const createFieldError = $derived(form?.createFieldError ?? null);
+	const createErrorKeys: Record<string, TranslationKey> = {
+		nameRequired: 'users.error.nameRequired',
+		emailRequired: 'users.error.emailRequired',
+		emailExists: 'users.error.emailExists',
+		roleInvalid: 'users.error.roleInvalid'
+	};
+	function createErrorMessage(code: string): string {
+		const key = createErrorKeys[code];
+		return key ? $t(key) : code;
+	}
 
 	let showCreateForm = $state(false);
 	let createLoading = $state(false);
@@ -45,11 +61,15 @@
 <div class="mb-8 flex items-end justify-between">
 	<div>
 		<h1 class="font-display text-3xl font-semibold text-stone-800">{$t('users.title')}</h1>
-		<p class="mt-1 text-sm text-stone-500">
-			{data.users.length === 1
-				? $t('users.countOne', { count: data.users.length })
-				: $t('users.countMany', { count: data.users.length })}
-		</p>
+		{#await data.usersPromise}
+			<div class="mt-2 h-3.5 w-32 animate-pulse rounded-full bg-stone-200" aria-hidden="true"></div>
+		{:then users}
+			<p class="mt-1 text-sm text-stone-500">
+				{users.length === 1
+					? $t('users.countOne', { count: users.length })
+					: $t('users.countMany', { count: users.length })}
+			</p>
+		{/await}
 	</div>
 	<button onclick={() => (showCreateForm = !showCreateForm)} class="admin-btn-primary">
 		<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -170,9 +190,14 @@
 						name="name"
 						type="text"
 						required
-						class="admin-input"
+						class="admin-input {createFieldError?.field === 'name' ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : ''}"
 						placeholder={$t('users.fullNamePlaceholder')}
+						aria-invalid={createFieldError?.field === 'name' ? 'true' : undefined}
+						aria-describedby={createFieldError?.field === 'name' ? 'name-error' : undefined}
 					/>
+					{#if createFieldError?.field === 'name'}
+						<p id="name-error" class="mt-1.5 text-xs text-red-600">{createErrorMessage(createFieldError.code)}</p>
+					{/if}
 				</div>
 				<div>
 					<label for="email" class="admin-label">{$t('users.email')}</label>
@@ -181,16 +206,30 @@
 						name="email"
 						type="email"
 						required
-						class="admin-input"
+						class="admin-input {createFieldError?.field === 'email' ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : ''}"
 						placeholder={$t('users.emailPlaceholder')}
+						aria-invalid={createFieldError?.field === 'email' ? 'true' : undefined}
+						aria-describedby={createFieldError?.field === 'email' ? 'email-error' : undefined}
 					/>
+					{#if createFieldError?.field === 'email'}
+						<p id="email-error" class="mt-1.5 text-xs text-red-600">{createErrorMessage(createFieldError.code)}</p>
+					{/if}
 				</div>
 				<div>
 					<label for="role" class="admin-label">{$t('users.role')}</label>
-					<select id="role" name="role" class="admin-input">
+					<select
+						id="role"
+						name="role"
+						class="admin-input"
+						aria-invalid={createFieldError?.field === 'role' ? 'true' : undefined}
+						aria-describedby={createFieldError?.field === 'role' ? 'role-error' : undefined}
+					>
 						<option value="editor">{$t('users.roleEditor')}</option>
 						<option value="superadmin">{$t('users.roleSuperadminFull')}</option>
 					</select>
+					{#if createFieldError?.field === 'role'}
+						<p id="role-error" class="mt-1.5 text-xs text-red-600">{createErrorMessage(createFieldError.code)}</p>
+					{/if}
 				</div>
 			</div>
 
@@ -245,7 +284,10 @@
 			</tr>
 		</thead>
 		<tbody>
-			{#each data.users as user}
+			{#await data.usersPromise}
+				<SkeletonRows rows={4} cols={6} />
+			{:then users}
+			{#each users as user}
 				{@const ep = user.effectivePermissions}
 				<tr class="border-b border-stone-50 transition-colors hover:bg-cream/30">
 					<td class="px-5 py-4">
@@ -661,7 +703,7 @@
 								</label>
 
 								<div class="flex items-center gap-2">
-									<button type="submit" class="admin-btn-primary py-1.5 text-xs">
+									<button type="submit" class="admin-btn-primary admin-btn-compact">
 										{$t('users.save')}
 									</button>
 									<button
@@ -677,11 +719,37 @@
 					</tr>
 				{/if}
 			{/each}
-			{#if data.users.length === 0}
+			{#if users.length === 0}
 				<tr>
-					<td colspan="6" class="px-5 py-12 text-center text-stone-400"> {$t('users.noUsers')} </td>
+					<td colspan="6" class="px-5 py-14 text-center">
+						<svg
+							class="mx-auto h-8 w-8 text-stone-300"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							stroke-width="1.5"
+							aria-hidden="true"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4z"
+							/>
+						</svg>
+						<p class="mt-3 text-sm text-stone-500">{$t('users.noUsers')}</p>
+					</td>
 				</tr>
 			{/if}
+			{:catch}
+				<tr>
+					<td colspan="6" class="px-5 py-12 text-center">
+						<p class="text-sm text-red-700">{$t('common.loadError')}</p>
+						<button class="admin-btn-secondary admin-btn-compact mt-4" onclick={() => invalidateAll()}>
+							{$t('errors.retry')}
+						</button>
+					</td>
+				</tr>
+			{/await}
 		</tbody>
 	</table>
 </div>

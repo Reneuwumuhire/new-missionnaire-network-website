@@ -1,7 +1,9 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { toast } from '$lib/stores/toast';
+	import { audioPreview } from '$lib/stores/audio-preview';
 	import { t } from '$lib/i18n';
 	import AudioPreviewPlayer from '$lib/components/AudioPreviewPlayer.svelte';
 	import type { PageData } from './$types';
@@ -42,6 +44,23 @@
 		bookFullName = data.audio.book_full_name ?? '';
 		number = data.audio.number ?? null;
 	});
+
+	// Stop the shared inline preview when leaving the page.
+	onDestroy(() => audioPreview.stop());
+
+	// Field-level validation feedback (inline, aria-invalid). Server errors
+	// without a field keep using the generic toast.
+	let fieldErrors = $state<Partial<Record<'title' | 'number', string>>>({});
+
+	function validateFields(): boolean {
+		const errors: typeof fieldErrors = {};
+		if (!title.trim()) errors.title = $t('audio.edit.titleRequired');
+		if (number !== null && (!Number.isInteger(number) || number < 0)) {
+			errors.number = $t('audio.edit.numberInvalid');
+		}
+		fieldErrors = errors;
+		return Object.keys(errors).length === 0;
+	}
 
 	let saving = $state(false);
 	let confirmDelete = $state(false);
@@ -144,6 +163,7 @@
 
 	async function saveChanges() {
 		if (!data.canEdit) return;
+		if (!validateFields()) return;
 		saving = true;
 		try {
 			const res = await fetch(`/api/audio/${data.audio._id}`, {
@@ -159,8 +179,17 @@
 				})
 			});
 			const result = await res.json();
-			if (result.error) throw new Error(result.error);
+			if (result.error) {
+				// Validation errors carry a `field` → show them inline instead
+				// of a toast.
+				if (res.status === 400 && (result.field === 'title' || result.field === 'number')) {
+					fieldErrors = { [result.field]: String(result.error) };
+					return;
+				}
+				throw new Error(result.error);
+			}
 
+			fieldErrors = {};
 			toast.success($t('audio.edit.saved'));
 			await invalidateAll();
 		} catch (err) {
@@ -333,10 +362,15 @@
 					<input
 						id="title"
 						type="text"
-						class="admin-input"
+						class="admin-input {fieldErrors.title ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : ''}"
 						bind:value={title}
 						disabled={!data.canEdit}
+						aria-invalid={fieldErrors.title ? 'true' : undefined}
+						aria-describedby={fieldErrors.title ? 'title-error' : undefined}
 					/>
+					{#if fieldErrors.title}
+						<p id="title-error" class="mt-1.5 text-xs text-red-600">{fieldErrors.title}</p>
+					{/if}
 				</div>
 
 				<div>
@@ -392,14 +426,19 @@
 					<input
 						id="number"
 						type="number"
-						class="admin-input"
+						class="admin-input {fieldErrors.number ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : ''}"
 						value={number ?? ''}
 						disabled={!data.canEdit}
+						aria-invalid={fieldErrors.number ? 'true' : undefined}
+						aria-describedby={fieldErrors.number ? 'number-error' : undefined}
 						oninput={(e) => {
 							const v = e.currentTarget.value;
 							number = v ? Number.parseInt(v) : null;
 						}}
 					/>
+					{#if fieldErrors.number}
+						<p id="number-error" class="mt-1.5 text-xs text-red-600">{fieldErrors.number}</p>
+					{/if}
 				</div>
 			</div>
 
@@ -589,7 +628,7 @@
 				</p>
 				{#if confirmDelete}
 					<div class="flex items-center gap-2">
-						<button onclick={deleteAudio} disabled={deleting} class="admin-btn-danger text-xs">
+						<button onclick={deleteAudio} disabled={deleting} class="admin-btn-danger admin-btn-compact">
 							{deleting ? $t('audio.edit.deleting') : $t('audio.edit.confirmDelete')}
 						</button>
 						<button

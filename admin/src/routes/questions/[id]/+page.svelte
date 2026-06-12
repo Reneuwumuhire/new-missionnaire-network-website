@@ -191,7 +191,7 @@
 		<a
 			href={`/questions/${question.slug}`}
 			target="_blank"
-			class="admin-btn-secondary px-4 py-2 text-[10px] tracking-[0.16em]">{$t('questions.detail.viewPublic')}</a
+			class="admin-btn-secondary admin-btn-compact">{$t('questions.detail.viewPublic')}</a
 		>
 		{#if data.canModerate}
 			<form method="POST" action="?/moderate" use:loadingSubmit>
@@ -200,13 +200,13 @@
 					name="actionName"
 					value={question.featured ? 'unfeature' : 'feature'}
 				/>
-				<button class="admin-btn-secondary px-4 py-2 text-[10px] tracking-[0.16em]"
+				<button class="admin-btn-secondary admin-btn-compact"
 					>{question.featured ? $t('questions.detail.unfeature') : $t('questions.detail.feature')}</button
 				>
 			</form>
 			<form method="POST" action="?/moderate" use:loadingSubmit>
 				<input type="hidden" name="actionName" value={question.locked ? 'unlock' : 'lock'} />
-				<button class="admin-btn-secondary px-4 py-2 text-[10px] tracking-[0.16em]"
+				<button class="admin-btn-secondary admin-btn-compact"
 					>{question.locked ? $t('questions.detail.unlock') : $t('questions.detail.lock')}</button
 				>
 			</form>
@@ -265,7 +265,7 @@
 					<input
 						id="moderation-reason"
 						name="reason"
-						class="admin-input h-10 min-w-0 py-2 text-sm"
+						class="admin-input min-w-0 text-sm"
 						placeholder={$t('questions.detail.reasonOptional')}
 					/>
 					<div class="flex flex-wrap gap-2 lg:justify-end">
@@ -273,7 +273,7 @@
 							<button
 								name="actionName"
 								value="approve"
-								class="admin-btn-primary px-3 py-2 text-[10px]"
+								class="admin-btn-primary admin-btn-compact"
 							>
 								{$t('questions.approve')}
 							</button>
@@ -282,7 +282,7 @@
 							<button
 								name="actionName"
 								value="hide"
-								class="admin-btn-secondary px-3 py-2 text-[10px]"
+								class="admin-btn-secondary admin-btn-compact"
 							>
 								{$t('questions.hide')}
 							</button>
@@ -290,19 +290,19 @@
 							<button
 								name="actionName"
 								value="unhide"
-								class="admin-btn-primary px-3 py-2 text-[10px]"
+								class="admin-btn-primary admin-btn-compact"
 							>
 								{$t('questions.detail.unhide')}
 							</button>
 						{/if}
-						<button name="actionName" value="reject" class="admin-btn-danger px-3 py-2 text-[10px]">
+						<button name="actionName" value="reject" class="admin-btn-danger admin-btn-compact">
 							{$t('questions.reject')}
 						</button>
 						{#if data.canDelete && !data.canDeletePermanently && !question.deletedAt}
 							<button
 								name="actionName"
 								value="soft_delete"
-								class="admin-btn-danger px-3 py-2 text-[10px]"
+								class="admin-btn-danger admin-btn-compact"
 								data-loading-label={$t('questions.deleting')}
 							>
 								{$t('questions.delete')}
@@ -312,7 +312,7 @@
 							<button
 								name="actionName"
 								value="permanent_delete"
-								class="admin-btn-danger px-3 py-2 text-[10px]"
+								class="admin-btn-danger admin-btn-compact"
 								data-loading-label={$t('questions.deleting')}
 							>
 								{$t('questions.permanent')}
@@ -362,7 +362,7 @@
 						</div>
 					</div>
 					<button
-						class="admin-btn-primary justify-self-start px-4 py-2 text-[10px] tracking-[0.16em]"
+						class="admin-btn-primary admin-btn-compact justify-self-start"
 					>
 						{$t('questions.detail.save')}
 					</button>
@@ -421,7 +421,7 @@
 						placeholder={$t('questions.detail.officialPlaceholder')}
 					/>
 					<button
-						class="admin-btn-primary justify-self-start px-4 py-2 text-[10px] tracking-[0.16em]"
+						class="admin-btn-primary admin-btn-compact justify-self-start"
 					>
 						{officialAnswer ? $t('questions.detail.update') : $t('questions.detail.publishAnswer')}
 					</button>
@@ -458,15 +458,15 @@
 											name="visibilityStatus"
 											value={reply.visibilityStatus === 'hidden' ? 'visible' : 'hidden'}
 										/>
-										<input name="reason" class="admin-input w-40 py-2" placeholder={$t('questions.reasonPlaceholder')} />
-										<button class="admin-btn-secondary px-3 py-2 text-[10px]">
+										<input name="reason" class="admin-input w-40" placeholder={$t('questions.reasonPlaceholder')} />
+										<button class="admin-btn-secondary admin-btn-compact">
 											{reply.visibilityStatus === 'hidden' ? $t('questions.detail.show') : $t('questions.hide')}
 										</button>
 									</form>
 									<form method="POST" action="?/replyVisibility" use:loadingSubmit>
 										<input type="hidden" name="replyId" value={reply._id} />
 										<input type="hidden" name="visibilityStatus" value="deleted" />
-										<button class="admin-btn-danger px-3 py-2 text-[10px]">{$t('questions.delete')}</button>
+										<button class="admin-btn-danger admin-btn-compact">{$t('questions.delete')}</button>
 									</form>
 								</div>
 							{/if}
@@ -549,7 +549,7 @@
 							id="referenceType"
 							bind:value={referenceType}
 							name="referenceType"
-							class="admin-input h-10 py-2 text-sm"
+							class="admin-input text-sm"
 						>
 							<option value="text">{$t('questions.detail.refOptionText')}</option>
 							<option value="sermon">{$t('questions.type.sermon')}</option>
@@ -567,10 +567,10 @@
 									id="referenceSearch"
 									name="referenceSearch"
 									value={data.referenceSearch}
-									class="admin-input h-10 py-2 text-sm"
+									class="admin-input text-sm"
 									placeholder={$t('questions.detail.searchPlaceholder')}
 								/>
-								<button class="admin-btn-secondary px-3 py-2 text-[10px] tracking-[0.16em]">
+								<button class="admin-btn-secondary admin-btn-compact">
 									{$t('questions.detail.search')}
 								</button>
 							</div>
@@ -598,7 +598,7 @@
 							<input
 								id="biblePassage"
 								name="biblePassage"
-								class="admin-input h-10 py-2 text-sm"
+								class="admin-input text-sm"
 								placeholder={$t('questions.detail.biblePassagePlaceholder')}
 								required
 							/>
@@ -609,7 +609,7 @@
 								id="bibleText"
 								name="bibleText"
 								rows="4"
-								class="admin-input py-2 text-sm"
+								class="admin-input text-sm"
 								placeholder={$t('questions.detail.bibleTextPlaceholder')}
 							></textarea>
 						</div>
@@ -618,7 +618,7 @@
 							<input
 								id="bibleTranslation"
 								name="bibleTranslation"
-								class="admin-input h-10 py-2 text-sm"
+								class="admin-input text-sm"
 								placeholder={$t('questions.detail.bibleTranslationPlaceholder')}
 							/>
 						</div>
@@ -723,7 +723,7 @@
 									<input
 										id="manualTitle"
 										name="manualTitle"
-										class="admin-input h-10 py-2 text-sm"
+										class="admin-input text-sm"
 										placeholder={referenceType === 'text'
 											? $t('questions.detail.textTitlePlaceholder')
 											: referenceType === 'video'
@@ -741,7 +741,7 @@
 											id="manualNote"
 											name="manualNote"
 											rows="4"
-											class="admin-input py-2 text-sm"
+											class="admin-input text-sm"
 											placeholder={referenceType === 'video'
 												? $t('questions.detail.videoNotePlaceholder')
 												: $t('questions.detail.textNotePlaceholder')}
@@ -760,7 +760,7 @@
 									<input
 										id="manualHref"
 										name="manualHref"
-										class="admin-input h-10 py-2 text-sm"
+										class="admin-input text-sm"
 										placeholder={referenceType === 'text'
 											? $t('questions.detail.hrefPlaceholder')
 											: referenceType === 'video'
@@ -772,14 +772,14 @@
 							</div>
 						{/if}
 					{/if}
-					<select name="replyId" class="admin-input h-10 py-2 text-sm">
+					<select name="replyId" class="admin-input text-sm">
 						<option value="">{$t('questions.detail.attachToQuestion')}</option>
 						{#if officialAnswer}
 							<option value={officialAnswer._id}>{$t('questions.detail.attachToOfficial')}</option>
 						{/if}
 					</select>
 					<button
-						class="admin-btn-primary w-full min-w-0 justify-center px-3 py-2 text-center text-[10px] tracking-[0.16em]"
+						class="admin-btn-primary admin-btn-compact w-full min-w-0 justify-center text-center"
 						disabled={!isBibleReference &&
 							supportsLibraryReference &&
 							referenceMode === 'existing' &&
@@ -855,7 +855,7 @@
 				<p class="mt-2 text-sm text-red-700">{question.authorId}</p>
 				<form method="POST" action="?/suspendAuthor" class="mt-4" use:loadingSubmit>
 					<input type="hidden" name="authorId" value={question.authorId} />
-					<button class="admin-btn-danger px-4 py-2 text-[10px] tracking-[0.16em]">
+					<button class="admin-btn-danger admin-btn-compact">
 						{$t('questions.detail.suspendAuthor')}
 					</button>
 				</form>
