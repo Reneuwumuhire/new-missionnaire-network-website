@@ -455,7 +455,7 @@
 		{#if !blendedOnly}
 			<div>
 				<h2
-					class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.35em] mb-2 md:mb-3 text-center md:text-left font-body"
+					class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.3em] mb-2 md:mb-3 text-center md:text-left font-body"
 				>
 					{$t('predications.alphabetical')}
 				</h2>
@@ -478,7 +478,7 @@
 
 		<div>
 			<h2
-				class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.35em] mb-2 md:mb-3 text-center md:text-left font-body"
+				class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.3em] mb-2 md:mb-3 text-center md:text-left font-body"
 			>
 				{$t('predications.preachers')}
 			</h2>
@@ -504,7 +504,7 @@
 		{#if currentAuthor !== 'Retransmissions' && !blendedOnly}
 			<div>
 				<h2
-					class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.35em] mb-2 md:mb-3 text-center md:text-left font-body"
+					class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.3em] mb-2 md:mb-3 text-center md:text-left font-body"
 				>
 					{$t('misc.options')}
 				</h2>
@@ -512,9 +512,9 @@
 					class="flex flex-col md:flex-row gap-4 items-center justify-between bg-white/40 p-4 border border-stone-200/60"
 				>
 					<div class="flex items-center gap-4 w-full md:w-auto">
-						<div class="flex bg-stone-100 rounded-lg p-1">
+						<div class="flex border border-stone-200 bg-stone-100/80 p-1">
 							<button
-								class="px-3 py-1.5 rounded-md text-xs font-bold transition-all {currentLanguage ===
+								class="px-3 py-1.5 text-xs font-bold transition-all duration-200 active:scale-[0.98] {currentLanguage ===
 								'french'
 									? 'bg-white text-missionnaire shadow-sm'
 									: 'text-stone-500 hover:text-stone-700'}"
@@ -523,7 +523,7 @@
 								{$t('lang.french')}
 							</button>
 							<button
-								class="px-3 py-1.5 rounded-md text-xs font-bold transition-all {currentLanguage ===
+								class="px-3 py-1.5 text-xs font-bold transition-all duration-200 active:scale-[0.98] {currentLanguage ===
 								'english'
 									? 'bg-white text-missionnaire shadow-sm'
 									: 'text-stone-500 hover:text-stone-700'}"
@@ -536,9 +536,9 @@
 						<div class="h-6 w-px bg-stone-200"></div>
 
 						<button
-							class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all {currentHasAudio
-								? 'bg-stone-100 text-missionnaire border border-stone-300'
-								: 'bg-stone-50 text-stone-500 border border-transparent hover:bg-stone-100'}"
+							class="flex items-center gap-2 px-3 py-1.5 text-xs font-bold transition-all duration-200 active:scale-[0.98] {currentHasAudio
+								? 'bg-missionnaire/10 text-missionnaire border border-missionnaire'
+								: 'bg-stone-50 text-stone-500 border border-stone-200 hover:border-missionnaire hover:text-missionnaire'}"
 							onclick={() => handleAudioFilterToggle()}
 						>
 							<Icon src={IoPlayCircle} size="16" />
@@ -562,7 +562,7 @@
 					<div class="grid grid-cols-3 gap-2 max-h-[70vh] overflow-y-auto no-scrollbar pr-1">
 						{#each years as year}
 							<button
-								class="px-3 py-2 rounded-lg text-[11px] font-bold transition-all border text-center {currentYear ===
+								class="px-3 py-2 text-[11px] font-bold tabular-nums transition-all duration-200 active:scale-[0.98] border text-center {currentYear ===
 								year
 									? 'border-missionnaire text-missionnaire bg-missionnaire/10'
 									: 'bg-white/40 text-stone-400 border-stone-200/60 hover:border-missionnaire hover:text-missionnaire'}"
@@ -580,7 +580,7 @@
 			{#if currentSearch || currentAlpha || currentYear || currentHasAudio || (currentAuthor && currentAuthor !== 'Tous')}
 				<div class="mb-3 flex justify-end">
 					<button
-						class="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-3 py-1.5 text-[10px] font-bold text-missionnaire hover:bg-stone-200 transition-colors"
+						class="inline-flex items-center gap-1.5 border border-stone-200 bg-white/60 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-stone-500 hover:border-missionnaire hover:text-missionnaire transition-colors duration-200 active:scale-[0.98]"
 						onclick={() => goto('?')}
 						title={$t('list.resetFilters')}
 					>
@@ -723,7 +723,7 @@
 			{#if hasResolvedList && totalPages > 1}
 				<div class="mt-12 py-6 border-t border-stone-200/60 flex flex-col gap-6">
 					<div
-						class="flex flex-col sm:flex-row items-center sm:justify-between gap-4 text-[10px] md:text-xs font-bold text-stone-400 tracking-widest uppercase"
+						class="flex flex-col sm:flex-row items-center sm:justify-between gap-4 text-[10px] md:text-xs font-bold text-stone-400 tracking-widest uppercase tabular-nums"
 					>
 						<div class="hidden md:block">
 							{$t('predications.showingOf', { shown: sermons.length, total: totalSermons })}
@@ -731,7 +731,7 @@
 						<div class="flex items-center gap-3">
 							<span class="opacity-60">{$t('list.rows')}</span>
 							<select
-								class="bg-stone-100 rounded-lg px-3 py-1.5 outline-none text-stone-800 focus:ring-2 focus:ring-missionnaire/20 transition-all cursor-pointer"
+								class="border border-stone-200 bg-white px-3 py-1.5 outline-none text-stone-800 tabular-nums focus:ring-2 focus:ring-missionnaire/20 transition-all cursor-pointer"
 								value={limit}
 								onchange={(e) => {
 									const params = new URLSearchParams($page.url.searchParams);
@@ -763,7 +763,7 @@
 				<section class="mt-12">
 					<div class="mb-4 flex items-baseline justify-between gap-4">
 						<h2
-							class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.35em] font-body"
+							class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.3em] font-body"
 						>
 							{$t('predications.retransmissionsMatching', { query: currentSearch })}
 							<span class="ml-2 normal-case tracking-normal text-stone-400 font-normal"

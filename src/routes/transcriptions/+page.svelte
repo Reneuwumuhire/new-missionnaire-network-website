@@ -287,17 +287,17 @@
 		<div class="flex flex-row items-center justify-center">
 			<div class="w-full max-w-4xl text-center">
 				<p
-					class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body"
+					class="text-[10px] font-semibold uppercase tracking-[0.3em] text-missionnaire mb-3 font-body"
 				>
-					{$t('nav.transcriptions')}
+					Missionnaire Network
 				</p>
-				<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900 mb-2">
+				<h1 class="font-display text-4xl md:text-5xl font-semibold tracking-tight leading-[1.05] text-stone-900 mb-3">
 					{$t('nav.transcriptions')}
 				</h1>
 				<p class="text-sm text-stone-500 font-body mb-2">
 					{$t('transcriptions.findIntro')}
 				</p>
-				<p class="text-[12px] text-stone-400 font-body mb-2 md:mb-6">
+				<p class="text-[12px] text-stone-400 font-body tabular-nums mb-2 md:mb-6">
 					{#if hasResolvedList}
 						{total > 1
 							? $t('transcriptions.availableMany', { count: total })
@@ -357,7 +357,7 @@
 					</div>
 					<button
 						type="submit"
-						class="bg-missionnaire hover:bg-missionnaire/90 text-white px-6 py-3.5 text-[11px] font-bold uppercase tracking-[0.15em] font-body transition-colors shrink-0"
+						class="bg-missionnaire hover:bg-missionnaire/90 text-white px-6 py-3.5 text-[11px] font-bold uppercase tracking-[0.15em] font-body transition-all duration-200 active:scale-[0.98] shrink-0"
 					>
 						{$t('search.action')}
 					</button>
@@ -378,7 +378,7 @@
 				<!-- svelte-ignore a11y_autofocus -->
 				<input
 					type="search"
-					class="w-full min-h-11 rounded-lg border border-stone-200 bg-white py-2.5 pl-10 pr-3 text-base font-body text-stone-800 outline-none placeholder:text-stone-400 focus:border-missionnaire/40 focus:ring-2 focus:ring-missionnaire/30"
+					class="w-full min-h-11 border border-stone-200 bg-white py-2.5 pl-10 pr-3 text-base font-body text-stone-800 outline-none placeholder:text-stone-400 focus:border-missionnaire/40 focus:ring-2 focus:ring-missionnaire/30"
 					placeholder={$t('transcriptions.searchByTitle')}
 					bind:value={searchTerm}
 					oninput={(event) => handleSearch((event.currentTarget as HTMLInputElement).value)}
@@ -418,7 +418,7 @@
 					<label for="year-filter" class="text-sm text-stone-600 font-body">{$t('transcriptions.yearLabel')}</label>
 					<select
 						id="year-filter"
-						class="border border-stone-200/80 rounded-md px-3 py-2 text-sm font-body text-stone-700 bg-white focus:outline-none focus:ring-2 focus:ring-missionnaire/30 focus:border-missionnaire/40 w-full sm:w-auto"
+						class="border border-stone-200 px-3 py-2 text-sm font-body text-stone-700 bg-white tabular-nums focus:outline-none focus:ring-2 focus:ring-missionnaire/30 focus:border-missionnaire/40 w-full sm:w-auto"
 						value={selectedYear}
 						onchange={handleYearChange}
 					>
@@ -431,7 +431,7 @@
 
 				<button
 					onclick={handleSort}
-					class="flex items-center justify-center space-x-2 px-4 py-2 min-h-11 text-sm font-body text-stone-600 hover:text-stone-900 w-full sm:w-auto border sm:border-0 border-stone-200/80 rounded-md sm:rounded-none"
+					class="flex items-center justify-center space-x-2 px-4 py-2 min-h-11 text-sm font-body text-stone-600 hover:text-missionnaire transition-colors duration-200 w-full sm:w-auto border sm:border-0 border-stone-200"
 				>
 					<span>{$t('transcriptions.publishDate')}</span>
 					{#if sortOrder === 'desc'}
@@ -498,10 +498,10 @@
 										{document.filename}
 									</h3>
 									<div class="mt-1 flex flex-col sm:flex-row sm:flex-wrap sm:space-x-6">
-										<div class="text-xs text-stone-500">
+										<div class="text-xs text-stone-500 tabular-nums">
 											{formatFileSize(document.size)}
 										</div>
-										<div class="text-xs text-stone-500">
+										<div class="text-xs text-stone-500 tabular-nums">
 											{new Date(document.publishedOn).toLocaleDateString()}
 										</div>
 									</div>
@@ -513,7 +513,7 @@
 										href={`https://www.youtube.com/watch?v=${document.videoDisplayId}`}
 										target="_blank"
 										rel="noopener noreferrer"
-										class="inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2 py-1 sm:px-2.5 sm:py-1.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-stone-600 hover:border-red-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+										class="inline-flex items-center gap-1.5 border border-stone-200 bg-white px-2 py-1 sm:px-2.5 sm:py-1.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-stone-600 hover:border-red-500 hover:text-red-600 hover:bg-red-50 transition-colors duration-200 active:scale-[0.98]"
 										title={$t('transcriptions.watchOnYoutube')}
 									>
 										<Icon src={AiFillPlayCircle} size="14" />
@@ -523,7 +523,7 @@
 								<a
 									href={document.url}
 									download
-									class="inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2 py-1 sm:px-2.5 sm:py-1.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-stone-600 hover:border-missionnaire hover:text-missionnaire hover:bg-missionnaire/5 transition-colors"
+									class="inline-flex items-center gap-1.5 border border-stone-200 bg-white px-2 py-1 sm:px-2.5 sm:py-1.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-stone-600 hover:border-missionnaire hover:text-missionnaire hover:bg-missionnaire/5 transition-colors duration-200 active:scale-[0.98]"
 									title={$t('transcriptions.downloadPdf')}
 								>
 									<Icon src={AiOutlineDownload} size="14" />
@@ -553,15 +553,15 @@
 		<!-- Document Preview Panel -->
 		{#if $isDocumentOpen && selectedDocument}
 			<div
-				class="fixed inset-0 lg:relative lg:w-1/2 border-l border-gray-200 bg-white p-4 sm:p-6 min-h-screen z-50 lg:z-auto"
+				class="fixed inset-0 lg:relative lg:w-1/2 border-l border-stone-200 bg-white p-4 sm:p-6 min-h-screen z-50 lg:z-auto"
 			>
 				<div class="flex flex-col h-full">
 					<div class="flex justify-between items-start mb-4 sm:mb-6">
-						<h2 class="text-lg sm:text-xl font-semibold text-gray-900 pr-8">
+						<h2 class="text-lg sm:text-xl font-semibold text-stone-900 pr-8">
 							{selectedDocument.filename}
 						</h2>
 						<button
-							class="text-gray-400 hover:text-gray-500"
+							class="text-stone-400 hover:text-stone-600 transition-colors duration-200"
 							onclick={() => isDocumentOpen.set(false)}
 							aria-label={$t('misc.close')}
 						>
@@ -580,18 +580,18 @@
 						<div class="mb-6">
 							<dl class="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
 								<div>
-									<dt class="text-xs sm:text-sm font-medium text-gray-500">
+									<dt class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.15em] text-stone-400 font-body">
 										{$t('transcriptions.fileSize')}
 									</dt>
-									<dd class="mt-1 text-xs sm:text-sm text-gray-900">
+									<dd class="mt-1 text-xs sm:text-sm text-stone-800 tabular-nums">
 										{formatFileSize(selectedDocument.size)}
 									</dd>
 								</div>
 								<div>
-									<dt class="text-xs sm:text-sm font-medium text-gray-500">
+									<dt class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.15em] text-stone-400 font-body">
 										{$t('transcriptions.publishDate')}
 									</dt>
-									<dd class="mt-1 text-xs sm:text-sm text-gray-900">
+									<dd class="mt-1 text-xs sm:text-sm text-stone-800 tabular-nums">
 										{new Date(selectedDocument.publishedOn).toLocaleDateString()}
 									</dd>
 								</div>
@@ -599,13 +599,13 @@
 						</div>
 
 						<div
-							class="relative w-full h-[calc(100vh-300px)] border border-gray-200 rounded-lg bg-gray-50 flex flex-col items-center justify-center p-4 sm:p-8 text-center"
+							class="relative w-full h-[calc(100vh-300px)] border border-stone-200 bg-stone-50 flex flex-col items-center justify-center p-4 sm:p-8 text-center"
 						>
-							<DocumentText1 size={40} color="#9CA3AF" />
-							<h3 class="mt-4 text-base sm:text-lg font-medium text-gray-900">
+							<DocumentText1 size={40} color="#a8a29e" />
+							<h3 class="mt-4 text-base sm:text-lg font-medium text-stone-900">
 								{$t('transcriptions.previewHeading')}
 							</h3>
-							<p class="mt-2 text-xs sm:text-sm text-gray-500 max-w-md">
+							<p class="mt-2 text-xs sm:text-sm text-stone-500 max-w-md">
 								{$t('transcriptions.previewBlocked')}
 							</p>
 							<div class="mt-4 sm:mt-6 flex flex-col gap-2 sm:gap-4 w-full px-4">
@@ -613,7 +613,7 @@
 									href={selectedDocument.url}
 									target="_blank"
 									rel="noopener noreferrer"
-									class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-xs sm:text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-missionnaire w-full"
+									class="inline-flex items-center justify-center px-4 py-2 border border-stone-300 text-xs sm:text-sm font-medium text-stone-700 bg-white hover:border-missionnaire hover:text-missionnaire transition-colors duration-200 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-missionnaire w-full"
 								>
 									<svg
 										class="w-4 h-4 mr-2 -ml-1"
@@ -633,7 +633,7 @@
 								<a
 									href={selectedDocument.url}
 									download
-									class="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-xs sm:text-sm font-medium text-white bg-missionnaire hover:bg-missionnaire/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-missionnaire w-full"
+									class="inline-flex items-center justify-center px-4 py-2 border border-transparent text-xs sm:text-sm font-medium text-white bg-missionnaire hover:bg-missionnaire/90 transition-colors duration-200 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-missionnaire w-full"
 								>
 									<div class="mr-2">
 										<Icon src={AiOutlineDownload} size="16" />
@@ -645,7 +645,7 @@
 										href={`https://www.youtube.com/watch?v=${selectedDocument.videoDisplayId}`}
 										target="_blank"
 										rel="noopener noreferrer"
-										class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-xs sm:text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-missionnaire w-full"
+										class="inline-flex items-center justify-center px-4 py-2 border border-stone-300 text-xs sm:text-sm font-medium text-stone-700 bg-white hover:border-missionnaire hover:text-missionnaire transition-colors duration-200 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-missionnaire w-full"
 									>
 										<div class="mr-2">
 											<Icon src={AiFillPlayCircle} size="16" />

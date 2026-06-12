@@ -380,16 +380,16 @@
 <main class="relative max-w-6xl mx-auto px-6">
 	<div class="mt-5 mb-16">
 		<section class="mb-8">
-			<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body">
+			<p class="text-[10px] font-semibold uppercase tracking-[0.3em] text-missionnaire mb-3 font-body">
 				Missionnaire Network
 			</p>
 			<div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-				<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">
+				<h1 class="font-display text-4xl md:text-5xl font-semibold tracking-tight leading-[1.05] text-stone-900">
 					{$t('nav.videos')}
 				</h1>
 				<a
 					href="/predications"
-					class="inline-flex items-center gap-2 text-[12px] font-semibold text-stone-400 hover:text-missionnaire uppercase tracking-[0.15em] font-body transition-colors"
+					class="inline-flex items-center gap-2 text-[12px] font-semibold text-stone-400 hover:text-missionnaire uppercase tracking-[0.15em] font-body transition-all duration-200 hover:translate-x-0.5"
 				>
 					<svg
 						width="14"
@@ -454,7 +454,7 @@
 			<div class="flex flex-wrap gap-2 items-center">
 				{#each availableTypesTag as tagType}
 					<button
-						class="px-3 py-1.5 text-sm font-medium transition-colors border {currentFilter === tagType.label
+						class="px-3 py-1.5 text-sm font-medium transition-colors duration-200 active:scale-[0.98] border {currentFilter === tagType.label
 							? 'border-missionnaire text-missionnaire bg-missionnaire/5'
 							: 'border-stone-200/60 text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
 						onclick={() => handleFilterChange(tagType.label)}
@@ -500,28 +500,28 @@
 					<div class="absolute bottom-0 left-0 w-full p-6 md:p-12 text-white">
 						<div class="max-w-4xl space-y-4">
 							<div
-								class="inline-block px-3 py-1 {displayVideos[0].tags.includes('LIVE')
+								class="inline-block px-3 py-1.5 {displayVideos[0].tags.includes('LIVE')
 									? 'bg-red-600'
-									: 'bg-missionnaire'} rounded-full text-xs font-bold uppercase tracking-widest mb-2"
+									: 'bg-missionnaire'} text-[10px] font-bold uppercase tracking-[0.25em] font-body mb-2"
 							>
 								{displayVideos[0].tags.includes('LIVE') ? $t('videos.liveBadge') : $t('videos.featured')}
 							</div>
 							<h2
-								class="text-3xl md:text-5xl lg:text-6xl font-black leading-tight tracking-tight line-clamp-2 group-hover:text-stone-200 transition-colors"
+								class="font-display font-semibold text-3xl md:text-5xl lg:text-6xl leading-[1.05] tracking-tight line-clamp-2 group-hover:text-stone-200 transition-colors"
 							>
 								{displayVideos[0].title}
 							</h2>
-							<p class="text-white/80 text-sm md:text-lg line-clamp-2 max-w-2xl font-medium">
+							<p class="text-white/80 text-sm md:text-base line-clamp-2 max-w-2xl font-body font-light">
 								{displayVideos[0].description}
 							</p>
 							<div class="pt-6 flex items-center gap-4">
 								<div
-									class="px-8 py-4 bg-white text-black rounded-full font-bold text-sm uppercase tracking-wider transition-transform group-hover:scale-105 hidden sm:block"
+									class="px-7 py-3.5 bg-white text-stone-900 text-[11px] font-semibold uppercase tracking-[0.2em] font-body transition-colors duration-200 group-hover:bg-missionnaire group-hover:text-white hidden sm:block"
 								>
 									{$t('videos.watchNow')}
 								</div>
 								<div
-									class="px-8 py-4 bg-white/10 backdrop-blur-md text-white border border-white/20 rounded-full font-bold text-sm uppercase tracking-wider flex items-center gap-2"
+									class="px-5 py-3.5 bg-white/10 backdrop-blur-md text-white border border-white/20 text-[11px] font-semibold uppercase tracking-[0.2em] font-body tabular-nums flex items-center gap-2"
 								>
 									<span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
 									{displayVideos[0].duration_string || $t('misc.video')}
@@ -537,11 +537,11 @@
 					<div class="flex items-end justify-between mb-8 px-2">
 						<div>
 							<h2
-								class="text-[10px] font-bold text-missionnaire uppercase tracking-[0.35em] mb-2 font-body"
+								class="text-[10px] font-semibold text-missionnaire uppercase tracking-[0.3em] mb-2 font-body"
 							>
 								{$t('footer.discover')}
 							</h2>
-							<h3 class="font-display text-2xl md:text-3xl font-semibold text-stone-900">
+							<h3 class="font-display text-2xl md:text-3xl font-semibold tracking-tight leading-[1.05] text-stone-900">
 								{$t('videos.recentVideos')}
 							</h3>
 						</div>
@@ -595,11 +595,11 @@
 			{:else}
 				<div class="flex flex-col items-center justify-center py-32 text-center text-stone-400">
 					<div
-						class="w-16 h-16 bg-white/40 border border-stone-200/60 rounded-full flex items-center justify-center mb-4 text-2xl"
+						class="w-16 h-16 bg-white/40 border border-stone-200/60 rounded-full flex items-center justify-center mb-4 text-stone-300"
 					>
-						🔍
+						<Icon src={BsSearch} size="24" />
 					</div>
-					<p>{$t('videos.noVideos')}</p>
+					<p class="font-body text-sm">{$t('videos.noVideos')}</p>
 				</div>
 			{/if}
 		{/if}
