@@ -19,15 +19,25 @@
 	import { afterNavigate, goto } from '$app/navigation';
 	import { browser, dev } from '$app/environment';
 	import { onMount, tick } from 'svelte';
+	import { initLocale } from '../i18n';
 	import { radioIsLive } from '$lib/stores/global';
-	export let data: LayoutData;
-	const SITE_URL = 'https://missionnaire.net';
-	const DEFAULT_SEO_DESCRIPTION =
-		"Prédications, cantiques, littérature et transcriptions du Message de l'Heure pour l'édification spirituelle.";
-	const DEFAULT_SEO_TITLE = 'Missionnaire Network | Prédications et Cantiques du Message';
+	import {
+		SITE_URL,
+		SITE_NAME,
+		DEFAULT_SEO_TITLE,
+		DEFAULT_SEO_DESCRIPTION,
+		DEFAULT_OG_IMAGE,
+		type PageMeta
+	} from '$lib/seo';
+	interface Props {
+		data: LayoutData;
+		children?: import('svelte').Snippet;
+	}
+
+	let { data, children }: Props = $props();
 	const LAST_MUSIC_PATH_KEY = 'missionnaire:last-music-path';
-	let headerRef: HTMLDivElement | null = null;
-	let headerHeight = 120;
+	let headerRef: HTMLDivElement | null = $state(null);
+	let headerHeight = $state(120);
 	let resizeObserver: ResizeObserver | null = null;
 
 	function rememberMusicPath(url: URL) {
@@ -101,6 +111,10 @@
 	onMount(() => {
 		if (!browser) return;
 
+		// Apply the visitor's saved language (cookie/localStorage) after
+		// hydration — SSR always renders French.
+		initLocale();
+
 		resizeObserver = new ResizeObserver(updateLayoutOffset);
 
 		if (headerRef) {
@@ -115,51 +129,44 @@
 		};
 	});
 
-	$: canonicalUrl = `${SITE_URL}${$page.url.pathname}`;
+	let canonicalUrl = $derived(`${SITE_URL}${$page.url.pathname}`);
 	// Pages can publish per-route OG overrides through their `load`'s
 	// returned `meta` object. We surface a single set of og:* meta tags
 	// in <svelte:head> using these values so crawlers like WhatsApp
 	// never see duplicated og:title / og:description tags from layout +
 	// page (which they handle inconsistently).
-	$: pageMeta = (($page.data as any)?.meta ?? {}) as {
-		title?: string;
-		description?: string;
-		url?: string;
-		image?: string;
-		imageWidth?: number;
-		imageHeight?: number;
-		type?: string;
-		noindex?: boolean;
-	};
-	$: ogTitle = pageMeta.title || DEFAULT_SEO_TITLE;
-	$: ogDescription = pageMeta.description || DEFAULT_SEO_DESCRIPTION;
-	$: ogUrl = pageMeta.url || canonicalUrl;
-	$: ogImage = pageMeta.image || `${SITE_URL}/og-image.jpg`;
-	$: ogType = pageMeta.type || 'website';
-	$: pageNoIndex = pageMeta.noindex === true;
+	let pageMeta = $derived((($page.data as any)?.meta ?? {}) as PageMeta);
+	let ogTitle = $derived(pageMeta.title || DEFAULT_SEO_TITLE);
+	let ogDescription = $derived(pageMeta.description || DEFAULT_SEO_DESCRIPTION);
+	let ogUrl = $derived(pageMeta.url || canonicalUrl);
+	let ogImage = $derived(pageMeta.image || DEFAULT_OG_IMAGE);
+	let ogType = $derived(pageMeta.type || 'website');
+	let pageNoIndex = $derived(pageMeta.noindex === true);
 	// og:image:width/height are only safe to declare when we KNOW the image's
 	// real dimensions. The default og-image.jpg is 1200×630. A page-supplied
 	// image (live thumbnail, etc.) has unknown/variable dimensions — declaring
 	// the wrong 1200×630 makes Facebook/WhatsApp mis-render or reject it, so we
 	// omit the hints and let the crawler read the real size unless the page
 	// passes explicit dimensions.
-	$: ogImageDims = pageMeta.image
+	let ogImageDims = $derived(pageMeta.image
 		? pageMeta.imageWidth && pageMeta.imageHeight
 			? { w: pageMeta.imageWidth, h: pageMeta.imageHeight }
 			: null
-		: { w: 1200, h: 630 };
+		: { w: 1200, h: 630 });
 
 	const ytPages = ['/videos', '/musique', '/predications'];
-	$: needsYouTube = ytPages.some((p) => $page.url.pathname.startsWith(p));
+	let needsYouTube = $derived(ytPages.some((p) => $page.url.pathname.startsWith(p)));
 
 	// Radio live status — push-driven, no polling.
 	// 1. SSR seeds `data.radioState` so first paint shows truth.
 	// 2. Service Worker forwards Web Push payloads (`{type:'RADIO_PUSH'}`) to
 	//    every open tab, so the banner reacts the moment admin goes live.
 	// 3. BroadcastChannel keeps multiple tabs in the same browser consistent.
-	$: if (browser && data.radioState) {
-		radioIsLive.set(data.radioState.isLive);
-	}
+	$effect(() => {
+		if (browser && data.radioState) {
+			radioIsLive.set(data.radioState.isLive);
+		}
+	});
 
 	let radioBroadcast: BroadcastChannel | null = null;
 
@@ -324,7 +331,10 @@
 		<link rel="dns-prefetch" href="https://i.ytimg.com" />
 		<link rel="dns-prefetch" href="https://www.youtube.com" />
 	{/if}
-	<link rel="canonical" href={canonicalUrl} />
+	<!-- Canonical follows the page-published meta URL (slug-canonicalised
+	     detail URLs, ?play= share variants…) and falls back to the bare
+	     pathname for everything else. -->
+	<link rel="canonical" href={ogUrl} />
 	{#if pageNoIndex}
 		<!-- Pages publish `meta.noindex: true` in their load when they're
 		     filter/share variants whose canonical content already lives
@@ -333,7 +343,8 @@
 		<meta name="robots" content="noindex, follow" />
 	{/if}
 	<meta name="description" content={ogDescription} />
-	<meta property="og:site_name" content="Missionnaire Network" />
+	<meta property="og:site_name" content={SITE_NAME} />
+	<meta property="og:locale" content="fr_FR" />
 	<meta property="og:type" content={ogType} />
 	<meta property="og:title" content={ogTitle} />
 	<meta property="og:description" content={ogDescription} />
@@ -360,7 +371,7 @@
 	<div class="relative">
 		<div
 			bind:this={headerRef}
-			class="flex flex-col fixed top-0 z-40 bg-[#FAF8F3]/95 backdrop-blur-sm w-full"
+			class="flex flex-col fixed top-0 z-[110] bg-[#FAF8F3]/95 backdrop-blur-sm w-full"
 		>
 			<SocialMediaAbove />
 			<NavBar />
@@ -368,7 +379,7 @@
 		<div class="relative mt-[120px]" style={browser ? `margin-top: ${headerHeight}px;` : undefined}>
 			{#key $page.url.pathname}
 				<div class="page-fade-in">
-					<slot />
+					{@render children?.()}
 				</div>
 			{/key}
 		</div>

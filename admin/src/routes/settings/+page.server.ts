@@ -26,7 +26,12 @@ export const actions: Actions = {
 		const name = formData.get('name')?.toString()?.trim();
 
 		if (!name || name.length < 2) {
-			return fail(400, { profileError: 'Le nom doit contenir au moins 2 caractères', profileSuccess: false });
+			// Field-level error: the page translates the code and renders it
+			// inline under the input (aria-invalid).
+			return fail(400, {
+				profileFieldError: { field: 'name', code: 'nameTooShort' } as const,
+				profileSuccess: false
+			});
 		}
 
 		try {
@@ -59,11 +64,17 @@ export const actions: Actions = {
 		}
 
 		if (newPassword.length < 8) {
-			return fail(400, { passwordError: 'Le nouveau mot de passe doit contenir au moins 8 caractères', passwordSuccess: false });
+			return fail(400, {
+				passwordFieldError: { field: 'newPassword', code: 'passwordTooShort' } as const,
+				passwordSuccess: false
+			});
 		}
 
 		if (newPassword !== confirmPassword) {
-			return fail(400, { passwordError: 'Les mots de passe ne correspondent pas', passwordSuccess: false });
+			return fail(400, {
+				passwordFieldError: { field: 'confirmPassword', code: 'passwordMismatch' } as const,
+				passwordSuccess: false
+			});
 		}
 
 		// Verify current password
@@ -74,7 +85,10 @@ export const actions: Actions = {
 
 		const valid = await verifyPassword(currentPassword, user.password_hash);
 		if (!valid) {
-			return fail(400, { passwordError: 'Mot de passe actuel incorrect', passwordSuccess: false });
+			return fail(400, {
+				passwordFieldError: { field: 'currentPassword', code: 'currentPasswordWrong' } as const,
+				passwordSuccess: false
+			});
 		}
 
 		try {

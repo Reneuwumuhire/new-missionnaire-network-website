@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Breadcrumbs from '$lib/components/+breadcrumbs.svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import type { YoutubeVideo } from '$lib/models/youtube';
@@ -9,7 +10,7 @@
 	import BsSearch from 'svelte-icons-pack/bs/BsSearch';
 	import BsX from 'svelte-icons-pack/bs/BsX';
 	import { browser } from '$app/environment';
-	import { onDestroy } from 'svelte';
+	import { onDestroy, untrack } from 'svelte';
 	import {
 		isVideoPlaylistActive,
 		videoPlaylist,
@@ -27,29 +28,29 @@
 		type VideosPageCacheEntry
 	} from './listCache';
 
-	export let data;
+	let { data } = $props();
 
-	let loadedVideos: YoutubeVideo[] = [];
-	let total = 0;
-	let skipCount = 0;
-	let hasMore = true;
-	let isLoading = false;
-	let isInitialLoading = false;
-	let initialLoadError = '';
-	let hasResolved = false;
+	let loadedVideos: YoutubeVideo[] = $state([]);
+	let total = $state(0);
+	let skipCount = $state(0);
+	let hasMore = $state(true);
+	let isLoading = $state(false);
+	let isInitialLoading = $state(false);
+	let initialLoadError = $state('');
+	let hasResolved = $state(false);
 	let abortController: AbortController | null = null;
 	let currentToken = 0;
-	let lastHandledKey: string | null = null;
+	let lastHandledKey: string | null = $state(null);
 
-	let searchInput = '';
-	let lastSearch = '';
-	let isSearchLoading = false;
+	let searchInput = $state('');
+	let lastSearch = $state('');
+	let isSearchLoading = $state(false);
 
-	$: initialVideos = ((data as any).videos || []) as YoutubeVideo[];
-	$: initialTotal = ((data as any).total || 0) as number;
-	$: currentSearch = ((data as any).search || '') as string;
-	$: isDeferredData = Boolean((data as any).deferred);
-	$: requestKey = currentSearch;
+	let initialVideos = $derived(((data as any).videos || []) as YoutubeVideo[]);
+	let initialTotal = $derived(((data as any).total || 0) as number);
+	let currentSearch = $derived(((data as any).search || '') as string);
+	let isDeferredData = $derived(Boolean((data as any).deferred));
+	let requestKey = $derived(currentSearch);
 
 	function abortRequest() {
 		abortController?.abort();
@@ -113,39 +114,43 @@
 		}
 	}
 
-	$: if (requestKey !== lastHandledKey) {
-		lastHandledKey = requestKey;
-		initialLoadError = '';
-
-		const cachedEntry = getVideosCache(requestKey);
-
-		if (!isDeferredData) {
-			const seeded = setVideosCache(requestKey, {
-				videos: initialVideos,
-				total: initialTotal,
-				skipCount: initialVideos.length,
-				hasMore: initialVideos.length < initialTotal
+	$effect(() => {
+		if (requestKey !== lastHandledKey) {
+			untrack(() => {
+				lastHandledKey = requestKey;
 			});
-			abortRequest();
-			applyData(seeded);
-			isInitialLoading = false;
-		} else if (cachedEntry) {
-			applyData(cachedEntry);
-			if (!isVideosCacheFresh(cachedEntry)) {
-				void loadInitial({ showLoading: false });
+			initialLoadError = '';
+
+			const cachedEntry = getVideosCache(requestKey);
+
+			if (!isDeferredData) {
+				const seeded = setVideosCache(requestKey, {
+					videos: initialVideos,
+					total: initialTotal,
+					skipCount: initialVideos.length,
+					hasMore: initialVideos.length < initialTotal
+				});
+				abortRequest();
+				applyData(seeded);
+				isInitialLoading = false;
+			} else if (cachedEntry) {
+				applyData(cachedEntry);
+				if (!isVideosCacheFresh(cachedEntry)) {
+					void loadInitial({ showLoading: false });
+				}
+			} else {
+				abortRequest();
+				loadedVideos = [];
+				total = 0;
+				skipCount = 0;
+				hasMore = true;
+				hasResolved = false;
+				searchInput = currentSearch;
+				lastSearch = currentSearch;
+				void loadInitial({ showLoading: true });
 			}
-		} else {
-			abortRequest();
-			loadedVideos = [];
-			total = 0;
-			skipCount = 0;
-			hasMore = true;
-			hasResolved = false;
-			searchInput = currentSearch;
-			lastSearch = currentSearch;
-			void loadInitial({ showLoading: true });
 		}
-	}
+	});
 
 	onDestroy(() => {
 		abortRequest();
@@ -285,21 +290,11 @@
 	}
 </script>
 
-<svelte:head>
-	<title>Chants en Vidéo - Missionnaire Network</title>
-	<meta
-		name="description"
-		content="Regardez les chants en vidéo du Message, avec recherche et lecture continue sur Missionnaire Network."
-	/>
-	<meta property="og:title" content="Chants en Vidéo - Missionnaire Network" />
-	<meta
-		property="og:description"
-		content="Catalogue de chants en vidéo pour votre adoration quotidienne."
-	/>
-	<link rel="canonical" href="https://missionnaire.net/musique/videos" />
-</svelte:head>
+<!-- Title/description/og:*/canonical come from `meta` in this route's
+     load — the root layout renders the single canonical tag set ($lib/seo). -->
 
 <div class="w-full min-w-0 max-w-6xl mx-auto px-4 pt-0 pb-8 md:px-6">
+	<Breadcrumbs items={[{ label: 'Musique', href: '/musique' }, { label: 'Chants en vidéo' }]} />
 	<!-- Page Header -->
 	<div class="mb-10">
 		<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body">
@@ -325,7 +320,7 @@
 	<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
 		<div class="flex items-center gap-6">
 			<button
-				on:click={playAll}
+				onclick={playAll}
 				class="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-missionnaire hover:text-missionnaire/80 transition-colors active:scale-95 font-body disabled:opacity-50 disabled:cursor-not-allowed"
 				disabled={loadedVideos.length === 0}
 			>
@@ -333,7 +328,7 @@
 				Tout Lire
 			</button>
 			<button
-				on:click={shuffleAll}
+				onclick={shuffleAll}
 				class="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-400 hover:text-missionnaire transition-colors active:scale-95 font-body disabled:opacity-50 disabled:cursor-not-allowed"
 				disabled={loadedVideos.length === 0}
 			>
@@ -351,7 +346,7 @@
 				placeholder="Rechercher une vidéo..."
 				class="w-full border border-stone-200/80 bg-white pl-9 pr-24 py-2.5 text-sm font-body text-stone-800 placeholder:text-stone-400 focus:border-missionnaire/40 focus:outline-none focus:ring-1 focus:ring-missionnaire/30 transition-colors"
 				bind:value={searchInput}
-				on:input={() => handleSearch()}
+				oninput={() => handleSearch()}
 			/>
 			{#if isSearchLoading}
 				<LoadingRing
@@ -361,7 +356,7 @@
 			{:else if searchInput}
 				<button
 					class="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-missionnaire transition-colors p-1"
-					on:click={() => {
+					onclick={() => {
 						searchInput = '';
 						handleSearch(true);
 					}}
@@ -396,7 +391,7 @@
 			<p class="mt-2 text-xs text-stone-400">{initialLoadError}</p>
 			<button
 				class="mt-5 inline-flex items-center rounded-full border border-missionnaire px-4 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-missionnaire transition-colors hover:bg-missionnaire/5"
-				on:click={() => void loadInitial({ showLoading: true })}
+				onclick={() => void loadInitial({ showLoading: true })}
 			>
 				Réessayer
 			</button>
@@ -404,7 +399,7 @@
 	{:else if loadedVideos.length > 0}
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 			{#each loadedVideos as video, i (video._id)}
-				<SongVideoCard videoData={video} on:playPlaylist={() => playFromIndex(i)} />
+				<SongVideoCard videoData={video} onplayPlaylist={() => playFromIndex(i)} />
 			{/each}
 		</div>
 
@@ -431,7 +426,7 @@
 					</p>
 				{:else}
 					<button
-						on:click={loadMoreVideos}
+						onclick={loadMoreVideos}
 						class="text-[10px] font-bold text-stone-400 hover:text-missionnaire uppercase tracking-[0.18em] transition-colors font-body"
 					>
 						Charger plus de vidéos
@@ -455,7 +450,7 @@
 			</p>
 			{#if lastSearch}
 				<button
-					on:click={() => {
+					onclick={() => {
 						searchInput = '';
 						handleSearch(true);
 					}}

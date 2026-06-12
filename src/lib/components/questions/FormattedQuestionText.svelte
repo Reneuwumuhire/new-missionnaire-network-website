@@ -1,10 +1,14 @@
 <script lang="ts">
 	import { parseRichText, type InlineNode } from '$lib/questions/rich-text';
 
-	export let text = '';
-	export let proseClass = '';
+	interface Props {
+		text?: string;
+		proseClass?: string;
+	}
 
-	$: blocks = parseRichText(text);
+	let { text = '', proseClass = '' }: Props = $props();
+
+	let blocks = $derived(parseRichText(text));
 
 	function isExternalHref(href: string): boolean {
 		return /^https?:\/\//i.test(href);

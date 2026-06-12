@@ -41,6 +41,30 @@ const ACCENT_MAP: Record<string, string[]> = {
 
 const OPT_COMBINING = '[\u0300-\u036f]?';
 
+// Compiled-pattern LRU cache. Admin search inputs repeat heavily (debounced
+// keystrokes, pagination over the same query), so rebuilding the accent-folding
+// pattern per request is wasted work. Map iteration order doubles as recency:
+// on hit we re-insert the key, on overflow we evict the oldest entry.
+const FUZZY_PATTERN_CACHE_MAX = 200;
+const fuzzyPatternCache = new Map<string, string>();
+
+function getFuzzySearchPattern(search: string): string {
+	const cached = fuzzyPatternCache.get(search);
+	if (cached !== undefined) {
+		fuzzyPatternCache.delete(search);
+		fuzzyPatternCache.set(search, cached);
+		return cached;
+	}
+
+	const pattern = buildFuzzySearchPattern(search);
+	if (fuzzyPatternCache.size >= FUZZY_PATTERN_CACHE_MAX) {
+		const oldest = fuzzyPatternCache.keys().next().value;
+		if (oldest !== undefined) fuzzyPatternCache.delete(oldest);
+	}
+	fuzzyPatternCache.set(search, pattern);
+	return pattern;
+}
+
 function buildFuzzySearchPattern(search: string): string {
 	const normalized = search.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 	let pattern = '';
@@ -93,8 +117,11 @@ export async function queryMusicAudio(options: {
 		conditions.push({ category });
 	}
 
-	if (search && search.trim()) {
-		const searchPattern = buildFuzzySearchPattern(search.trim());
+	// Early bail: single-character searches match nearly every row while still
+	// paying for a regex scan over the whole collection — treat them as "no
+	// search" (the UI fires queries per keystroke; 2+ chars arrive right after).
+	if (search && search.trim().length >= 2) {
+		const searchPattern = getFuzzySearchPattern(search.trim());
 		const fields = ['title', 'book_full_name', 'artist'];
 		const searchConditions: Filter<Document>[] = [];
 		for (const field of fields) {
@@ -468,6 +495,72 @@ export async function findSession(token: string): Promise<AdminSession | null> {
 export async function deleteSession(token: string): Promise<void> {
 	const db = await getDb();
 	await db.collection('admin_sessions').deleteOne({ token });
+}
+
+// ══════════════════════════════════════
+//  LOGIN ATTEMPTS (brute-force throttle)
+// ══════════════════════════════════════
+
+const LOGIN_ATTEMPTS_COLLECTION = 'admin_login_attempts';
+export const LOGIN_ATTEMPT_WINDOW_MS = 15 * 60 * 1000; // 15 min
+export const LOGIN_ATTEMPT_MAX_FAILURES = 5;
+
+// Lazy index creation — same no-migration pattern as ensureScheduledLiveIndexes
+// below: createIndex is a no-op when the index already exists. The TTL index
+// makes Mongo garbage-collect attempt documents ~15 min after insertion, so the
+// collection stays tiny without a cleanup job; the compound index serves the
+// per-(email, ip) window count.
+let loginAttemptIndexesEnsured: Promise<void> | null = null;
+async function ensureLoginAttemptIndexes(): Promise<void> {
+	if (loginAttemptIndexesEnsured !== null) return loginAttemptIndexesEnsured;
+	loginAttemptIndexesEnsured = (async () => {
+		try {
+			const db = await getDb();
+			const collection = db.collection(LOGIN_ATTEMPTS_COLLECTION);
+			await collection.createIndex(
+				{ created_at: 1 },
+				{ expireAfterSeconds: LOGIN_ATTEMPT_WINDOW_MS / 1000, name: 'created_at_ttl' }
+			);
+			await collection.createIndex(
+				{ email: 1, ip_address: 1, created_at: 1 },
+				{ name: 'email_ip_createdAt' }
+			);
+		} catch (err) {
+			loginAttemptIndexesEnsured = null;
+			console.error('[admin_login_attempts] ensureIndexes failed', err);
+		}
+	})();
+	return loginAttemptIndexesEnsured;
+}
+
+export async function recordLoginFailure(email: string, ip: string | null): Promise<void> {
+	await ensureLoginAttemptIndexes();
+	const db = await getDb();
+	await db.collection(LOGIN_ATTEMPTS_COLLECTION).insertOne({
+		email: email.toLowerCase(),
+		ip_address: ip,
+		created_at: new Date()
+	});
+}
+
+/** Failed attempts for this (email, ip) pair within the rolling window. The
+ *  TTL monitor only runs every ~60s, so the time filter stays authoritative. */
+export async function countRecentLoginFailures(email: string, ip: string | null): Promise<number> {
+	await ensureLoginAttemptIndexes();
+	const db = await getDb();
+	return db.collection(LOGIN_ATTEMPTS_COLLECTION).countDocuments({
+		email: email.toLowerCase(),
+		ip_address: ip,
+		created_at: { $gte: new Date(Date.now() - LOGIN_ATTEMPT_WINDOW_MS) }
+	});
+}
+
+export async function clearLoginFailures(email: string, ip: string | null): Promise<void> {
+	const db = await getDb();
+	await db.collection(LOGIN_ATTEMPTS_COLLECTION).deleteMany({
+		email: email.toLowerCase(),
+		ip_address: ip
+	});
 }
 
 // ══════════════════════════════════════

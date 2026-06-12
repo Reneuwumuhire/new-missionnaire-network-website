@@ -20,9 +20,12 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const search = url.searchParams.get('search')?.trim() ?? '';
 	const answered = url.searchParams.get('answered') ?? '';
 	const page = Math.max(1, Number.parseInt(url.searchParams.get('page') || '1', 10) || 1);
-	const result = await listAdminQuestions({ status, search, answered, page, limit: PAGE_SIZE });
+	// Streamed: the page shows skeletons (stat cards + table rows) while the
+	// aggregate query runs. See `{#await data.deferred}` in +page.svelte.
+	const deferred = listAdminQuestions({ status, search, answered, page, limit: PAGE_SIZE });
+	deferred.catch(() => {});
 	return {
-		...result,
+		deferred,
 		status,
 		search,
 		answered,

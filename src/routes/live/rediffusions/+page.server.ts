@@ -2,11 +2,20 @@ import {
 	getAvailableYears,
 	getPublishedTotal,
 	listPublished,
+	type PublishedRecording,
 	type RecordingType
 } from '$lib/server/recordings';
 import type { PageServerLoad } from './$types';
+import { pageMeta } from '$lib/seo';
 
 const PAGE_SIZE = 20;
+
+// Rendered by the root layout as the single og:*/twitter:* tag set.
+const META = pageMeta('/live/rediffusions', {
+	title: 'Directs précédents - Missionnaire Network',
+	description:
+		'Réécoutez les directs audio précédents de Missionnaire Network : retransmissions et réunions locales.'
+});
 
 function parseIntParam(value: string | null, min: number, max: number): number | undefined {
 	if (!value) return undefined;
@@ -27,31 +36,52 @@ export const load: PageServerLoad = async ({ url }) => {
 	const month = parseIntParam(url.searchParams.get('month'), 1, 12);
 	const type = parseTypeParam(url.searchParams.get('type'));
 
-	const [{ data, total }, years, allTotal] = await Promise.all([
-		listPublished({
-			limit: PAGE_SIZE,
-			pageNumber,
-			q: q || undefined,
-			year,
-			month: year ? month : undefined,
-			type
-		}),
-		getAvailableYears(),
-		getPublishedTotal()
-	]);
-
-	return {
-		recordings: data,
-		total,
-		allTotal,
-		pageNumber,
-		pageSize: PAGE_SIZE,
-		filters: {
-			q,
-			year: year ?? null,
-			month: year ? month ?? null : null,
-			type: type ?? null
-		},
-		availableYears: years
+	const filters = {
+		q,
+		year: year ?? null,
+		month: year ? (month ?? null) : null,
+		type: type ?? null
 	};
+
+	try {
+		const [{ data, total }, years, allTotal] = await Promise.all([
+			listPublished({
+				limit: PAGE_SIZE,
+				pageNumber,
+				q: q || undefined,
+				year,
+				month: year ? month : undefined,
+				type
+			}),
+			getAvailableYears(),
+			getPublishedTotal()
+		]);
+
+		return {
+			recordings: data,
+			total,
+			allTotal,
+			pageNumber,
+			pageSize: PAGE_SIZE,
+			filters,
+			availableYears: years,
+			meta: META,
+			loadError: false
+		};
+	} catch (error) {
+		// Fail soft: the page renders an ErrorCard with a retry instead of
+		// bubbling up to the generic +error.svelte boundary.
+		console.error('[rediffusions] load failed:', error);
+		return {
+			recordings: [] as PublishedRecording[],
+			total: 0,
+			allTotal: 0,
+			pageNumber,
+			pageSize: PAGE_SIZE,
+			filters,
+			availableYears: [] as number[],
+			meta: META,
+			loadError: true
+		};
+	}
 };

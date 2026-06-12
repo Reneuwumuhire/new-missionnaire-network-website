@@ -8,7 +8,11 @@
 	import IoPlayCircleOutline from 'svelte-icons-pack/io/IoPlayCircleOutline';
 	import IoVideocamOutline from 'svelte-icons-pack/io/IoVideocamOutline';
 
-	export let references: QuestionReference[] = [];
+	interface Props {
+		references?: QuestionReference[];
+	}
+
+	let { references = [] }: Props = $props();
 
 	const typeLabel: Record<string, string> = {
 		pdf: 'PDF',

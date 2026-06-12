@@ -5,8 +5,10 @@
 	import type { Recording, RecordingStatus } from '$lib/models/recording';
 	import { confirmDialog } from '$lib/stores/confirm-dialog';
 	import { toast } from '$lib/stores/toast';
+	import { t, type TranslationKey } from '$lib/i18n';
 	import type { Component } from 'svelte';
 	import BlurUpImage from '$lib/components/BlurUpImage.svelte';
+	import SkeletonRows from '$lib/components/SkeletonRows.svelte';
 	import ScheduledLivesPanel from '$lib/components/ScheduledLivesPanel.svelte';
 	import SubtitleSyncPanel from '$lib/components/SubtitleSyncPanel.svelte';
 
@@ -77,9 +79,9 @@
 		if (!publicWatchUrl) return;
 		try {
 			await navigator.clipboard.writeText(publicWatchUrl);
-			toast.success('Lien copié');
+			toast.success($t('recordings.toast.linkCopied'));
 		} catch {
-			toast.error('Impossible de copier le lien');
+			toast.error($t('recordings.toast.linkCopyFailed'));
 		}
 	}
 	const recordingStartedBy = $derived(
@@ -128,10 +130,13 @@
 	): Promise<boolean> {
 		if (!startedBy || startedBy === currentUserEmail) return true;
 		return confirmDialog.ask({
-			title: `${label} : démarré par quelqu'un d'autre`,
-			message: `${displayName(startedByName, startedBy)} a démarré ${label.toLowerCase()}. Voulez-vous vraiment l'arrêter à sa place ?`,
-			confirmLabel: 'Arrêter quand même',
-			cancelLabel: 'Annuler',
+			title: $t('recordings.confirm.override.title', { label }),
+			message: $t('recordings.confirm.override.message', {
+				name: displayName(startedByName, startedBy),
+				label: label.toLowerCase()
+			}),
+			confirmLabel: $t('recordings.confirm.override.confirm'),
+			cancelLabel: $t('recordings.common.cancel'),
 			tone: 'warning'
 		});
 	}
@@ -155,8 +160,14 @@
 	});
 
 	const PAGE_SIZE = 5;
-	let recordings = $state<typeof data.recordings>(data.recordings);
-	let total = $state<number>(data.total);
+	// The initial page of recordings is STREAMED from the loader (data.list is
+	// a promise) so the control center paints instantly with skeleton rows.
+	// It's consumed exactly once in onMount; later updates go through
+	// fetchRecordings()/refreshVisibleRecordings() as before.
+	type RecordingList = Awaited<PageData['list']>['data'];
+	let recordings = $state<RecordingList>([]);
+	let total = $state(0);
+	let listLoaded = $state(false);
 	let currentPage = $state(1);
 	let isFetching = $state(false);
 	let fetchError = $state<string | null>(null);
@@ -192,7 +203,7 @@
 		try {
 			const res = await fetch(buildListUrl(targetPage, limit));
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
-			const body = (await res.json()) as { data: typeof data.recordings; total: number };
+			const body = (await res.json()) as { data: RecordingList; total: number };
 			if (append) {
 				recordings = [...recordings, ...body.data];
 				currentPage = targetPage;
@@ -206,8 +217,9 @@
 					selectedIds = new Set([...selectedIds].filter((id) => surviving.has(id)));
 				}
 			}
+			listLoaded = true;
 		} catch (err) {
-			if (!options.silentErrors) fetchError = (err as Error).message || 'Erreur réseau';
+			if (!options.silentErrors) fetchError = (err as Error).message || $t('recordings.error.network');
 		} finally {
 			if (showLoading) isFetching = false;
 		}
@@ -236,9 +248,7 @@
 		} | null;
 		if (body?.subtitlesAnchored === true) {
 			// Recording start doubled as the subtitle anchor (SRT 00:00 = now).
-			toast.success(
-				'Sous-titres synchronisés au démarrage de l\'enregistrement — ajustez avec les boutons ±'
-			);
+			toast.success($t('recordings.toast.subtitlesAnchoredAtStart'));
 			await invalidateAll(); // refresh the sync panel with the new anchor
 		}
 		return typeof body?.id === 'string' ? body.id : null;
@@ -346,16 +356,18 @@
 		if (bulkDeleting || selectedIds.size === 0) return;
 		if (!canDeleteRecordings) {
 			clearSelection();
-			toast.error("Vous n'avez pas la permission de supprimer des enregistrements");
+			toast.error($t('recordings.error.noDeletePermission'));
 			return;
 		}
 		const count = selectedIds.size;
 		const ok = await confirmDialog.ask({
-			title: `Supprimer ${count} enregistrement${count > 1 ? 's' : ''} ?`,
-			message:
-				'Les fichiers audio et les vignettes associés seront également supprimés de S3. Cette action est irréversible.',
-			confirmLabel: 'Supprimer',
-			cancelLabel: 'Annuler',
+			title:
+				count > 1
+					? $t('recordings.confirm.bulkDelete.titleMany', { count })
+					: $t('recordings.confirm.bulkDelete.titleOne', { count }),
+			message: $t('recordings.confirm.bulkDelete.message'),
+			confirmLabel: $t('recordings.common.delete'),
+			cancelLabel: $t('recordings.common.cancel'),
 			tone: 'danger'
 		});
 		if (!ok) return;
@@ -368,14 +380,19 @@
 			});
 			const payload = (await res.json()) as { data?: { deleted: number }; error?: string };
 			if (!res.ok || payload.error) {
-				toast.error(payload.error ?? `Erreur ${res.status}`);
+				toast.error(payload.error ?? $t('recordings.error.http', { status: res.status }));
 				return;
 			}
-			toast.success(`${payload.data?.deleted ?? count} enregistrement${(payload.data?.deleted ?? count) > 1 ? 's supprimés' : ' supprimé'}`);
+			const deleted = payload.data?.deleted ?? count;
+			toast.success(
+				deleted > 1
+					? $t('recordings.toast.deletedMany', { count: deleted })
+					: $t('recordings.toast.deletedOne', { count: deleted })
+			);
 			clearSelection();
 			await refreshVisibleRecordings();
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Suppression en masse échouée');
+			toast.error(err instanceof Error ? err.message : $t('recordings.error.bulkDeleteFailed'));
 		} finally {
 			bulkDeleting = false;
 		}
@@ -495,17 +512,17 @@
 			file.type === 'audio/mp3' ||
 			file.name.toLowerCase().endsWith('.mp3');
 		if (!isMp3) {
-			uploadAudioError = 'Sélectionnez un fichier MP3';
+			uploadAudioError = $t('recordings.error.selectMp3');
 			return;
 		}
 		if (file.size > 2 * 1024 * 1024 * 1024) {
-			uploadAudioError = 'Fichier trop volumineux (max 2 Go)';
+			uploadAudioError = $t('recordings.error.mp3TooLarge');
 			return;
 		}
 		try {
 			uploadAudioDurationSec = await readAudioDuration(file);
 		} catch {
-			uploadAudioError = 'Impossible de lire la durée — vérifiez que le MP3 est valide';
+			uploadAudioError = $t('recordings.error.audioDurationUnreadable');
 			return;
 		}
 		uploadAudioError = null;
@@ -518,11 +535,11 @@
 		input.value = '';
 		if (!file) return;
 		if (!file.type.startsWith('image/')) {
-			uploadThumbnailError = 'Sélectionnez un fichier image';
+			uploadThumbnailError = $t('recordings.error.selectImage');
 			return;
 		}
 		if (file.size > 5 * 1024 * 1024) {
-			uploadThumbnailError = 'Image trop volumineuse (max 5 Mo)';
+			uploadThumbnailError = $t('recordings.error.imageTooLarge');
 			return;
 		}
 		uploadThumbnailError = null;
@@ -539,16 +556,16 @@
 		uploadThumbnailError = null;
 
 		if (!uploadAudioFile || !uploadAudioDurationSec) {
-			uploadAudioError = 'Sélectionnez un fichier MP3';
+			uploadAudioError = $t('recordings.error.selectMp3');
 			return;
 		}
 		if (!uploadTitle.trim()) {
-			uploadError = 'Titre requis';
+			uploadError = $t('recordings.error.titleRequired');
 			return;
 		}
 		const startedAt = new Date(uploadStartedAt);
 		if (!uploadStartedAt || Number.isNaN(startedAt.getTime())) {
-			uploadError = 'Date invalide';
+			uploadError = $t('recordings.error.invalidDate');
 			return;
 		}
 
@@ -567,7 +584,7 @@
 					})
 				});
 				if (!presignRes.ok) {
-					uploadThumbnailError = (await presignRes.text()) || `Erreur ${presignRes.status}`;
+					uploadThumbnailError = (await presignRes.text()) || $t('recordings.error.http', { status: presignRes.status });
 					return;
 				}
 				const presign = (await presignRes.json()) as {
@@ -581,7 +598,7 @@
 					body: uploadThumbnailFile
 				});
 				if (!putRes.ok) {
-					uploadThumbnailError = 'Échec du téléversement de la vignette';
+					uploadThumbnailError = $t('recordings.error.thumbnailUploadFailed');
 					return;
 				}
 				thumbnail_url = presign.publicUrl;
@@ -602,7 +619,7 @@
 				})
 			});
 			if (!createRes.ok) {
-				const msg = (await createRes.text()) || `Erreur ${createRes.status}`;
+				const msg = (await createRes.text()) || $t('recordings.error.http', { status: createRes.status });
 				if (msg.includes('YouTube')) uploadYoutubeError = msg;
 				else uploadError = msg;
 				return;
@@ -616,7 +633,7 @@
 				body: JSON.stringify({ contentType: 'audio/mpeg' })
 			});
 			if (!presignRes.ok) {
-				uploadAudioError = (await presignRes.text()) || `Erreur ${presignRes.status}`;
+				uploadAudioError = (await presignRes.text()) || $t('recordings.error.http', { status: presignRes.status });
 				return;
 			}
 			const { uploadUrl, s3Key } = (await presignRes.json()) as {
@@ -629,7 +646,7 @@
 					uploadAudioPct = pct;
 				});
 			} catch (err) {
-				uploadAudioError = err instanceof Error ? err.message : 'Échec du téléversement vers S3';
+				uploadAudioError = err instanceof Error ? err.message : $t('recordings.error.s3UploadFailed');
 				return;
 			}
 			const finalizeRes = await fetch(`/api/recordings/${id}/audio/finalize`, {
@@ -642,7 +659,7 @@
 				})
 			});
 			if (!finalizeRes.ok) {
-				uploadAudioError = (await finalizeRes.text()) || `Erreur ${finalizeRes.status}`;
+				uploadAudioError = (await finalizeRes.text()) || $t('recordings.error.http', { status: finalizeRes.status });
 				return;
 			}
 
@@ -654,19 +671,21 @@
 					body: JSON.stringify({ published: true })
 				});
 				if (!pubRes.ok) {
-					toast.error('Enregistrement créé mais publication échouée — publiez-le depuis la liste.');
+					toast.error($t('recordings.toast.publishAfterUploadFailed'));
 				}
 			}
 
 			toast.success(
-				uploadPublishNow ? 'Enregistrement téléversé et publié' : 'Enregistrement téléversé'
+				uploadPublishNow
+					? $t('recordings.toast.uploadedAndPublished')
+					: $t('recordings.toast.uploaded')
 			);
 			uploadModalOpen = false;
 			clearUploadThumbnail();
 			clearUploadAudio();
 			await refreshVisibleRecordings();
 		} catch (err) {
-			uploadError = err instanceof Error ? err.message : 'Téléversement échoué';
+			uploadError = err instanceof Error ? err.message : $t('recordings.error.uploadFailed');
 		} finally {
 			uploadSaving = false;
 			uploadAudioPct = null;
@@ -684,7 +703,7 @@
 	async function closeTrimEditor(saved: boolean) {
 		trimEditorRecordingId = null;
 		if (saved) {
-			toast.success('Audio enregistré');
+			toast.success($t('recordings.toast.audioSaved'));
 			await refreshVisibleRecordings();
 		}
 	}
@@ -763,17 +782,17 @@
 		if (!file) return;
 		const isMp3 = file.type === 'audio/mpeg' || file.type === 'audio/mp3' || file.name.toLowerCase().endsWith('.mp3');
 		if (!isMp3) {
-			recAudioError = 'Sélectionnez un fichier MP3';
+			recAudioError = $t('recordings.error.selectMp3');
 			return;
 		}
 		if (file.size > 2 * 1024 * 1024 * 1024) {
-			recAudioError = 'Fichier trop volumineux (max 2 Go)';
+			recAudioError = $t('recordings.error.mp3TooLarge');
 			return;
 		}
 		try {
 			recAudioDurationSec = await readAudioDuration(file);
 		} catch {
-			recAudioError = 'Impossible de lire la durée du fichier — vérifiez que le MP3 est valide';
+			recAudioError = $t('recordings.error.audioFileDurationUnreadable');
 			return;
 		}
 		recAudioError = null;
@@ -795,11 +814,11 @@
 		if (!file) return;
 		const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 		if (!isPdf) {
-			recPdfError = 'Sélectionnez un fichier PDF';
+			recPdfError = $t('recordings.error.selectPdf');
 			return;
 		}
 		if (file.size > 100 * 1024 * 1024) {
-			recPdfError = 'PDF trop volumineux (max 100 Mo)';
+			recPdfError = $t('recordings.error.pdfTooLarge');
 			return;
 		}
 		recPdfError = null;
@@ -839,10 +858,12 @@
 		const id = editingRecordingId;
 		if (!id || !recExistingTranscript) return;
 		const ok = await confirmDialog.ask({
-			title: 'Retirer la transcription PDF',
-			message: `« ${recExistingTranscript.filename} » ne sera plus proposé sur la page publique de cet enregistrement. Le fichier PDF lui-même n'est pas supprimé.`,
-			confirmLabel: 'Retirer',
-			cancelLabel: 'Annuler',
+			title: $t('recordings.confirm.detachTranscript.title'),
+			message: $t('recordings.confirm.detachTranscript.message', {
+				filename: recExistingTranscript.filename
+			}),
+			confirmLabel: $t('recordings.common.remove'),
+			cancelLabel: $t('recordings.common.cancel'),
 			tone: 'warning'
 		});
 		if (!ok) return;
@@ -853,15 +874,15 @@
 				body: JSON.stringify({ transcript_pdf_id: 'none' })
 			});
 			if (!res.ok) {
-				toast.error((await res.text()) || `Erreur ${res.status}`);
+				toast.error((await res.text()) || $t('recordings.error.http', { status: res.status }));
 				return;
 			}
 			recExistingTranscript = null;
 			recTranscriptUploadOpen = false;
 			recPdfMode = 'add';
-			toast.success('Transcription PDF retirée');
+			toast.success($t('recordings.toast.pdfDetached'));
 		} catch {
-			toast.error('Échec du retrait de la transcription');
+			toast.error($t('recordings.error.pdfDetachFailed'));
 		}
 	}
 
@@ -884,8 +905,8 @@
 				if (xhr.status >= 200 && xhr.status < 300) resolve();
 				else reject(new Error(`Upload failed (${xhr.status})`));
 			};
-			xhr.onerror = () => reject(new Error('Erreur réseau pendant le téléversement'));
-			xhr.onabort = () => reject(new Error('Téléversement interrompu'));
+			xhr.onerror = () => reject(new Error($t('recordings.error.uploadNetwork')));
+			xhr.onabort = () => reject(new Error($t('recordings.error.uploadAborted')));
 			xhr.send(file);
 		});
 	}
@@ -894,7 +915,7 @@
 		if (!recPdfFile) return true;
 		const hasYoutubeLink = Boolean(recDraftYoutubeUrl.trim() || rec.source_video_id);
 		if (!hasYoutubeLink) {
-			recPdfError = 'Ajoutez un lien YouTube avant de rattacher une transcription PDF';
+			recPdfError = $t('recordings.error.youtubeRequiredForPdf');
 			return false;
 		}
 
@@ -909,7 +930,7 @@
 			})
 		});
 		if (!uploadUrlRes.ok) {
-			recPdfError = (await uploadUrlRes.text()) || `Erreur ${uploadUrlRes.status}`;
+			recPdfError = (await uploadUrlRes.text()) || $t('recordings.error.http', { status: uploadUrlRes.status });
 			return false;
 		}
 		const { uploadUrl, s3Key, s3Url } = (await uploadUrlRes.json()) as {
@@ -924,7 +945,7 @@
 				recPdfUploadPct = pct;
 			});
 		} catch (err) {
-			recPdfError = err instanceof Error ? err.message : 'Échec du téléversement PDF vers S3';
+			recPdfError = err instanceof Error ? err.message : $t('recordings.error.pdfUploadFailed');
 			recPdfUploadPct = null;
 			return false;
 		}
@@ -942,7 +963,7 @@
 			})
 		});
 		if (!finalizeRes.ok) {
-			recPdfError = (await finalizeRes.text()) || `Erreur ${finalizeRes.status}`;
+			recPdfError = (await finalizeRes.text()) || $t('recordings.error.http', { status: finalizeRes.status });
 			return false;
 		}
 
@@ -956,11 +977,11 @@
 		input.value = '';
 		if (!file) return;
 		if (!file.type.startsWith('image/')) {
-			recThumbnailError = 'Sélectionnez un fichier image';
+			recThumbnailError = $t('recordings.error.selectImage');
 			return;
 		}
 		if (file.size > 5 * 1024 * 1024) {
-			recThumbnailError = 'Image trop volumineuse (max 5 Mo)';
+			recThumbnailError = $t('recordings.error.imageTooLarge');
 			return;
 		}
 		recThumbnailError = null;
@@ -1015,7 +1036,7 @@
 					body: JSON.stringify({ contentType: recThumbnailFile.type, size: recThumbnailFile.size })
 				});
 				if (!presignRes.ok) {
-					recThumbnailError = (await presignRes.text()) || `Erreur ${presignRes.status}`;
+					recThumbnailError = (await presignRes.text()) || $t('recordings.error.http', { status: presignRes.status });
 					return;
 				}
 				const { uploadUrl, key, publicUrl } = (await presignRes.json()) as {
@@ -1029,7 +1050,7 @@
 					body: recThumbnailFile
 				});
 				if (!uploadRes.ok) {
-					recThumbnailError = 'Échec du téléversement vers S3';
+					recThumbnailError = $t('recordings.error.s3UploadFailed');
 					return;
 				}
 				patch.thumbnail_url = publicUrl;
@@ -1048,7 +1069,7 @@
 					body: JSON.stringify(patch)
 				});
 				if (!res.ok) {
-					const msg = (await res.text()) || `Erreur ${res.status}`;
+					const msg = (await res.text()) || $t('recordings.error.http', { status: res.status });
 					// Route the YouTube-URL validation error to its inline slot
 					// instead of the thumbnail error area.
 					if (msg.includes('YouTube')) recYoutubeError = msg;
@@ -1072,7 +1093,7 @@
 					body: JSON.stringify({ contentType: 'audio/mpeg' })
 				});
 				if (!presign.ok) {
-					recAudioError = (await presign.text()) || `Erreur ${presign.status}`;
+					recAudioError = (await presign.text()) || $t('recordings.error.http', { status: presign.status });
 					return;
 				}
 				const { uploadUrl, s3Key } = (await presign.json()) as { uploadUrl: string; s3Key: string };
@@ -1082,7 +1103,7 @@
 						recAudioUploadPct = pct;
 					});
 				} catch (err) {
-					recAudioError = err instanceof Error ? err.message : 'Échec du téléversement vers S3';
+					recAudioError = err instanceof Error ? err.message : $t('recordings.error.s3UploadFailed');
 					recAudioUploadPct = null;
 					return;
 				}
@@ -1096,7 +1117,7 @@
 					})
 				});
 				if (!finalize.ok) {
-					recAudioError = (await finalize.text()) || `Erreur ${finalize.status}`;
+					recAudioError = (await finalize.text()) || $t('recordings.error.http', { status: finalize.status });
 					return;
 				}
 			} else if (!hasMetadataPatch && !recPdfFile) {
@@ -1105,7 +1126,7 @@
 			}
 
 			if (recPdfFile) {
-				toast.success(recPdfMode === 'replace' ? 'Transcription PDF remplacée' : 'Transcription PDF ajoutée');
+				toast.success(recPdfMode === 'replace' ? $t('recordings.toast.pdfReplaced') : $t('recordings.toast.pdfAdded'));
 			}
 			cancelRecordingEdit();
 			await refreshVisibleRecordings();
@@ -1163,6 +1184,21 @@
 	}
 
 	onMount(() => {
+		// Resolve the streamed initial recordings list (skeleton rows until
+		// then). A user-triggered fetch (search while loading) wins the race.
+		void data.list.then(
+			(result) => {
+				if (listLoaded) return;
+				recordings = result.data;
+				total = result.total;
+				listLoaded = true;
+			},
+			() => {
+				if (listLoaded) return;
+				listLoaded = true;
+				fetchError = fetchError ?? $t('recordings.error.network');
+			}
+		);
 		recomputeElapsed();
 		pollTimer = setInterval(refreshStatus, 5000);
 		tickTimer = setInterval(recomputeElapsed, 1000);
@@ -1297,7 +1333,7 @@
 			const res = await fetch('/api/recordings/start', { method: 'POST' });
 			if (!res.ok) {
 				const text = await res.text();
-				actionError = text || `Erreur ${res.status}`;
+				actionError = text || $t('recordings.error.http', { status: res.status });
 			} else {
 				await readRecordingId(res);
 			}
@@ -1310,7 +1346,7 @@
 
 	async function stop() {
 		if (busy) return;
-		if (!(await confirmOverride(recordingStartedBy, recordingStartedByName, "L'enregistrement"))) return;
+		if (!(await confirmOverride(recordingStartedBy, recordingStartedByName, $t('recordings.confirm.override.recordingLabel')))) return;
 		busy = true;
 		actionError = null;
 		let stoppedRecording = false;
@@ -1318,7 +1354,7 @@
 			const res = await fetch('/api/recordings/stop', { method: 'POST' });
 			if (!res.ok) {
 				const text = await res.text();
-				actionError = text || `Erreur ${res.status}`;
+				actionError = text || $t('recordings.error.http', { status: res.status });
 			} else {
 				stoppedRecording = true;
 				watchRecordingList(await readRecordingId(res));
@@ -1334,15 +1370,17 @@
 		if (broadcastBusy) return;
 		const willNotify = notifyOnGoLive && subscriberCount > 0;
 		const msg = willNotify
-			? `Cela enverra une notification à ${subscriberCount} abonné${subscriberCount > 1 ? 's' : ''}.`
+			? subscriberCount > 1
+				? $t('recordings.confirm.goLive.notifyMany', { count: subscriberCount })
+				: $t('recordings.confirm.goLive.notifyOne', { count: subscriberCount })
 			: notifyOnGoLive
-				? 'Aucun abonné aux notifications pour l\'instant. Aller en direct quand même ?'
-				: 'Aller en direct SANS notifier les abonnés.';
+				? $t('recordings.confirm.goLive.noSubscribers')
+				: $t('recordings.confirm.goLive.silent');
 		const ok = await confirmDialog.ask({
-			title: 'Aller en direct',
+			title: $t('recordings.actions.goLive'),
 			message: msg,
-			confirmLabel: willNotify ? 'Diffuser et notifier' : 'Aller en direct',
-			cancelLabel: 'Annuler',
+			confirmLabel: willNotify ? $t('recordings.confirm.goLive.confirmNotify') : $t('recordings.actions.goLive'),
+			cancelLabel: $t('recordings.common.cancel'),
 			tone: willNotify ? 'default' : 'warning'
 		});
 		if (!ok) return;
@@ -1356,13 +1394,13 @@
 			});
 			if (!res.ok) {
 				const text = await res.text();
-				actionError = text || `Erreur ${res.status}`;
+				actionError = text || $t('recordings.error.http', { status: res.status });
 			} else {
 				// The handler links (or back-fills) a scheduled_lives entry and
 				// returns its stable watch URL — surface it right away.
 				const payload = (await res.json().catch(() => null)) as { watchPath?: string } | null;
 				if (payload?.watchPath) {
-					toast.success(`En direct — lien public : ${data.publicBaseUrl}${payload.watchPath}`);
+					toast.success($t('recordings.toast.liveWithLink', { url: `${data.publicBaseUrl}${payload.watchPath}` }));
 				}
 			}
 			await invalidateAll();
@@ -1373,12 +1411,12 @@
 
 	async function endLive() {
 		if (broadcastBusy) return;
-		if (!(await confirmOverride(broadcastStartedBy, broadcastStartedByName, 'Le direct'))) return;
+		if (!(await confirmOverride(broadcastStartedBy, broadcastStartedByName, $t('recordings.confirm.override.liveLabel')))) return;
 		const ok = await confirmDialog.ask({
-			title: 'Terminer le direct',
-			message: 'Le site public ne montrera plus le lecteur en direct.',
-			confirmLabel: 'Terminer le direct',
-			cancelLabel: 'Annuler',
+			title: $t('recordings.actions.endLive'),
+			message: $t('recordings.confirm.endLive.message'),
+			confirmLabel: $t('recordings.actions.endLive'),
+			cancelLabel: $t('recordings.common.cancel'),
 			tone: 'warning'
 		});
 		if (!ok) return;
@@ -1388,7 +1426,7 @@
 			const res = await fetch('/api/broadcast/end-live', { method: 'POST' });
 			if (!res.ok) {
 				const text = await res.text();
-				actionError = text || `Erreur ${res.status}`;
+				actionError = text || $t('recordings.error.http', { status: res.status });
 			}
 			await invalidateAll();
 		} finally {
@@ -1503,7 +1541,7 @@
 				body: JSON.stringify(patch)
 			});
 			if (!res.ok) {
-				applyDefaultsError = (await res.text()) || `Erreur ${res.status}`;
+				applyDefaultsError = (await res.text()) || $t('recordings.error.http', { status: res.status });
 				return;
 			}
 			await invalidateAll();
@@ -1518,11 +1556,11 @@
 		input.value = '';
 		if (!file) return;
 		if (!file.type.startsWith('image/')) {
-			thumbnailError = 'Sélectionnez un fichier image';
+			thumbnailError = $t('recordings.error.selectImage');
 			return;
 		}
 		if (file.size > 5 * 1024 * 1024) {
-			thumbnailError = 'Image trop volumineuse (max 5 Mo)';
+			thumbnailError = $t('recordings.error.imageTooLarge');
 			return;
 		}
 		thumbnailError = null;
@@ -1575,7 +1613,7 @@
 					body: JSON.stringify({ contentType: thumbnailFile.type, size: thumbnailFile.size })
 				});
 				if (!presignRes.ok) {
-					thumbnailError = (await presignRes.text()) || `Erreur ${presignRes.status}`;
+					thumbnailError = (await presignRes.text()) || $t('recordings.error.http', { status: presignRes.status });
 					return;
 				}
 				const { uploadUrl, key, publicUrl } = (await presignRes.json()) as {
@@ -1589,7 +1627,7 @@
 					body: thumbnailFile
 				});
 				if (!uploadRes.ok) {
-					thumbnailError = 'Échec du téléversement vers S3';
+					thumbnailError = $t('recordings.error.s3UploadFailed');
 					return;
 				}
 				patch.thumbnail_url = publicUrl;
@@ -1611,7 +1649,7 @@
 				body: JSON.stringify(patch)
 			});
 			if (!res.ok) {
-				const msg = (await res.text()) || `Erreur ${res.status}`;
+				const msg = (await res.text()) || $t('recordings.error.http', { status: res.status });
 				if (msg.includes('YouTube')) broadcastYoutubeError = msg;
 				else thumbnailError = msg;
 				return;
@@ -1630,9 +1668,9 @@
 					})
 				});
 				if (!defRes.ok) {
-					toast.error('Vignette enregistrée, mais échec de la définition par défaut');
+					toast.error($t('recordings.toast.defaultThumbnailFailed'));
 				} else {
-					toast.success('Vignette définie comme défaut');
+					toast.success($t('recordings.toast.defaultThumbnailSet'));
 				}
 			}
 
@@ -1682,13 +1720,13 @@
 	 *  recording (which triggers the S3 upload). Single confirmation for both. */
 	async function stopBoth() {
 		if (broadcastBusy || busy) return;
-		if (!(await confirmOverride(broadcastStartedBy, broadcastStartedByName, 'Le direct'))) return;
-		if (!(await confirmOverride(recordingStartedBy, recordingStartedByName, "L'enregistrement"))) return;
+		if (!(await confirmOverride(broadcastStartedBy, broadcastStartedByName, $t('recordings.confirm.override.liveLabel')))) return;
+		if (!(await confirmOverride(recordingStartedBy, recordingStartedByName, $t('recordings.confirm.override.recordingLabel')))) return;
 		const ok = await confirmDialog.ask({
-			title: 'Tout arrêter',
-			message: 'Terminer le direct ET arrêter l\'enregistrement en cours ?',
-			confirmLabel: 'Tout arrêter',
-			cancelLabel: 'Annuler',
+			title: $t('recordings.actions.stopAll'),
+			message: $t('recordings.confirm.stopAll.message'),
+			confirmLabel: $t('recordings.actions.stopAll'),
+			cancelLabel: $t('recordings.common.cancel'),
 			tone: 'warning'
 		});
 		if (!ok) return;
@@ -1699,12 +1737,14 @@
 		try {
 			const liveRes = await fetch('/api/broadcast/end-live', { method: 'POST' });
 			if (!liveRes.ok) {
-				actionError = (await liveRes.text()) || `Erreur fin direct: ${liveRes.status}`;
+				actionError = (await liveRes.text()) || $t('recordings.error.endLiveHttp', { status: liveRes.status });
 			}
 			const recRes = await fetch('/api/recordings/stop', { method: 'POST' });
 			if (!recRes.ok) {
 				const recErr = (await recRes.text()) || `${recRes.status}`;
-				actionError = actionError ? `${actionError} · arrêt enregistrement: ${recErr}` : `Arrêt enregistrement: ${recErr}`;
+				actionError = actionError
+					? $t('recordings.error.stopRecordingCombined', { error: actionError, detail: recErr })
+					: $t('recordings.error.stopRecording', { detail: recErr });
 			} else {
 				stoppedRecording = true;
 				watchRecordingList(await readRecordingId(recRes));
@@ -1724,13 +1764,15 @@
 	async function startBoth() {
 		if (broadcastBusy || busy) return;
 		const msg = subscriberCount > 0
-			? `Aller en direct ET démarrer l'enregistrement. Une notification sera envoyée à ${subscriberCount} abonné${subscriberCount > 1 ? 's' : ''}.`
-			: 'Aller en direct ET démarrer l\'enregistrement.';
+			? subscriberCount > 1
+				? $t('recordings.confirm.startAll.notifyMany', { count: subscriberCount })
+				: $t('recordings.confirm.startAll.notifyOne', { count: subscriberCount })
+			: $t('recordings.confirm.startAll.message');
 		const ok = await confirmDialog.ask({
-			title: 'Tout démarrer',
+			title: $t('recordings.actions.startAll'),
 			message: msg,
-			confirmLabel: 'Tout démarrer',
-			cancelLabel: 'Annuler'
+			confirmLabel: $t('recordings.actions.startAll'),
+			cancelLabel: $t('recordings.common.cancel')
 		});
 		if (!ok) return;
 		broadcastBusy = true;
@@ -1739,12 +1781,12 @@
 		try {
 			const liveRes = await fetch('/api/broadcast/go-live', { method: 'POST' });
 			if (!liveRes.ok) {
-				actionError = (await liveRes.text()) || `Erreur ${liveRes.status}`;
+				actionError = (await liveRes.text()) || $t('recordings.error.http', { status: liveRes.status });
 				return;
 			}
 			const recRes = await fetch('/api/recordings/start', { method: 'POST' });
 			if (!recRes.ok) {
-				actionError = `Direct démarré, mais échec de l'enregistrement: ${(await recRes.text()) || recRes.status}`;
+				actionError = $t('recordings.error.startRecordingAfterLive', { detail: (await recRes.text()) || recRes.status });
 			} else {
 				await readRecordingId(recRes);
 			}
@@ -1779,32 +1821,31 @@
 
 	async function remove(id: string) {
 		if (!canDeleteRecordings) {
-			toast.error("Vous n'avez pas la permission de supprimer des enregistrements");
+			toast.error($t('recordings.error.noDeletePermission'));
 			return;
 		}
 		const ok = await confirmDialog.ask({
-			title: 'Supprimer cet enregistrement ?',
-			message:
-				"Le fichier audio et la vignette associés seront également supprimés de S3. Cette action est irréversible.",
-			confirmLabel: 'Supprimer',
-			cancelLabel: 'Annuler',
+			title: $t('recordings.confirm.delete.title'),
+			message: $t('recordings.confirm.delete.message'),
+			confirmLabel: $t('recordings.common.delete'),
+			cancelLabel: $t('recordings.common.cancel'),
 			tone: 'danger'
 		});
 		if (!ok) return;
 		const res = await fetch(`/api/recordings/${id}`, { method: 'DELETE' });
 		if (!res.ok) {
-			toast.error((await res.text()) || `Erreur ${res.status}`);
+			toast.error((await res.text()) || $t('recordings.error.http', { status: res.status }));
 			return;
 		}
-		toast.success('Enregistrement supprimé');
+		toast.success($t('recordings.toast.deleted'));
 		await refreshVisibleRecordings();
 	}
 
-	const statusLabel: Record<RecordingStatus, string> = {
-		recording: 'En cours',
-		uploading: 'Téléversement',
-		ready: 'Prêt',
-		failed: 'Échec'
+	const statusLabel: Record<RecordingStatus, TranslationKey> = {
+		recording: 'recordings.status.recording',
+		uploading: 'recordings.status.uploading',
+		ready: 'recordings.status.ready',
+		failed: 'recordings.status.failed'
 	};
 
 	function statusClass(status: RecordingStatus): string {
@@ -1822,19 +1863,22 @@
 </script>
 
 <svelte:head>
-	<title>Enregistrements - Missionnaire Admin</title>
+	<title>{$t('recordings.head.title')}</title>
 </svelte:head>
 
 <div class="mb-8">
-	<h1 class="font-display text-3xl font-bold text-stone-800">Enregistrements</h1>
+	<h1 class="font-display text-3xl font-bold text-stone-800">{$t('recordings.title')}</h1>
 	<p class="mt-1 text-sm text-stone-500">
-		Capture le direct audio en temps réel. {data.total} enregistrement{data.total !== 1 ? 's' : ''}.
+		{$t('recordings.subtitle')}
+		{#if listLoaded}
+			{total !== 1 ? $t('recordings.countMany', { count: total }) : $t('recordings.countOne', { count: total })}
+		{/if}
 	</p>
 </div>
 
 {#if !recorder.available}
 	<div class="mb-6 border border-red-200 bg-red-50/80 p-5">
-		<p class="text-sm font-semibold text-red-800">Service d'enregistrement injoignable</p>
+		<p class="text-sm font-semibold text-red-800">{$t('recordings.recorderUnreachable')}</p>
 		<p class="mt-1 text-xs text-red-600">{recorder.error}</p>
 	</div>
 {/if}
@@ -1849,9 +1893,9 @@
 				</span>
 			</div>
 			<div>
-				<p class="text-sm font-semibold text-green-800">Direct détecté — prêt à enregistrer</p>
+				<p class="text-sm font-semibold text-green-800">{$t('recordings.liveDetected.title')}</p>
 				<p class="mt-1 text-xs text-green-700">
-					Icecast reçoit un flux audio. Cliquez sur <strong>Démarrer l'enregistrement</strong> pour le capturer.
+					{$t('recordings.liveDetected.body1')} <strong>{$t('recordings.actions.startRecording')}</strong> {$t('recordings.liveDetected.body2')}
 				</p>
 			</div>
 		</div>
@@ -1911,42 +1955,42 @@
 
 			<div>
 				{#if broadcast.is_live && isRecording}
-					<p class="font-display text-lg font-semibold text-red-700">En direct + enregistrement</p>
+					<p class="font-display text-lg font-semibold text-red-700">{$t('recordings.state.liveAndRecording')}</p>
 					<p class="text-xs text-stone-500">
-						Audience en direct · capture en cours vers S3
+						{$t('recordings.state.liveAndRecordingHint')}
 					</p>
 					{#if broadcastStartedBy || recordingStartedBy}
 						<p class="mt-0.5 text-[11px] text-stone-400">
 							{#if broadcastStartedBy && recordingStartedBy && broadcastStartedBy === recordingStartedBy}
-								Démarré par <span class="font-medium text-stone-600">{displayName(broadcastStartedByName, broadcastStartedBy)}</span>
+								{$t('recordings.state.startedBy')} <span class="font-medium text-stone-600">{displayName(broadcastStartedByName, broadcastStartedBy)}</span>
 							{:else}
-								{#if broadcastStartedBy}Direct : <span class="font-medium text-stone-600">{displayName(broadcastStartedByName, broadcastStartedBy)}</span>{/if}
+								{#if broadcastStartedBy}{$t('recordings.state.livePrefix')} <span class="font-medium text-stone-600">{displayName(broadcastStartedByName, broadcastStartedBy)}</span>{/if}
 								{#if broadcastStartedBy && recordingStartedBy} · {/if}
-								{#if recordingStartedBy}Enreg. : <span class="font-medium text-stone-600">{displayName(recordingStartedByName, recordingStartedBy)}</span>{/if}
+								{#if recordingStartedBy}{$t('recordings.state.recPrefix')} <span class="font-medium text-stone-600">{displayName(recordingStartedByName, recordingStartedBy)}</span>{/if}
 							{/if}
 						</p>
 					{/if}
 				{:else if broadcast.is_live}
-					<p class="font-display text-lg font-semibold text-red-700">En direct</p>
+					<p class="font-display text-lg font-semibold text-red-700">{$t('recordings.state.live')}</p>
 					<p class="text-xs text-stone-500">
-						Démarré à {formatTime(broadcast.started_at)} · {icecast.listeners} auditeur{icecast.listeners !== 1 ? 's' : ''}
-						{#if broadcastStartedBy} · par <span class="font-medium text-stone-600">{displayName(broadcastStartedByName, broadcastStartedBy)}</span>{/if}
+						{$t('recordings.state.startedAt', { time: formatTime(broadcast.started_at) })} · {icecast.listeners !== 1 ? $t('recordings.listenersMany', { count: icecast.listeners }) : $t('recordings.listenersOne', { count: icecast.listeners })}
+						{#if broadcastStartedBy} · {$t('recordings.state.by')} <span class="font-medium text-stone-600">{displayName(broadcastStartedByName, broadcastStartedBy)}</span>{/if}
 					</p>
 				{:else if isRecording}
-					<p class="font-display text-lg font-semibold text-stone-800">Enregistrement seul</p>
+					<p class="font-display text-lg font-semibold text-stone-800">{$t('recordings.state.recordingOnly')}</p>
 					<p class="text-xs text-stone-500">
-						Capture silencieuse · audience hors ligne
-						{#if recordingStartedBy} · par <span class="font-medium text-stone-600">{displayName(recordingStartedByName, recordingStartedBy)}</span>{/if}
+						{$t('recordings.state.recordingOnlyHint')}
+						{#if recordingStartedBy} · {$t('recordings.state.by')} <span class="font-medium text-stone-600">{displayName(recordingStartedByName, recordingStartedBy)}</span>{/if}
 					</p>
 				{:else}
-					<p class="font-display text-lg font-semibold text-stone-800">Prêt à diffuser</p>
+					<p class="font-display text-lg font-semibold text-stone-800">{$t('recordings.state.readyToBroadcast')}</p>
 					<p class="text-xs text-stone-500">
 						{#if icecast.reachable}
-							Flux Icecast {icecast.sourceActive ? 'actif' : 'inactif'} · {icecast.listeners} auditeur{icecast.listeners !== 1 ? 's' : ''}
+							{$t('recordings.state.icecastStream', { state: icecast.sourceActive ? $t('recordings.state.streamActive') : $t('recordings.state.streamInactive') })} · {icecast.listeners !== 1 ? $t('recordings.listenersMany', { count: icecast.listeners }) : $t('recordings.listenersOne', { count: icecast.listeners })}
 						{:else}
-							Icecast injoignable
+							{$t('recordings.state.icecastUnreachable')}
 						{/if}
-						{#if subscriberCount > 0} · {subscriberCount} abonné{subscriberCount > 1 ? 's' : ''}{/if}
+						{#if subscriberCount > 0} · {subscriberCount > 1 ? $t('recordings.subscribersMany', { count: subscriberCount }) : $t('recordings.subscribersOne', { count: subscriberCount })}{/if}
 					</p>
 				{/if}
 			</div>
@@ -1958,7 +2002,7 @@
 			<div class="flex w-full items-start gap-6 sm:w-auto sm:items-center sm:gap-5">
 				{#if broadcast.is_live}
 					<div class="flex flex-1 flex-col sm:flex-initial sm:items-end">
-						<span class="text-[9px] font-bold uppercase tracking-[0.2em] text-red-600">Direct</span>
+						<span class="text-[9px] font-bold uppercase tracking-[0.2em] text-red-600">{$t('recordings.timer.live')}</span>
 						<span class="font-mono text-2xl font-semibold text-red-700 tabular-nums leading-tight">
 							{formatElapsed(broadcastElapsed)}
 						</span>
@@ -1966,7 +2010,7 @@
 				{/if}
 				{#if isRecording}
 					<div class="flex flex-1 flex-col sm:flex-initial sm:items-end">
-						<span class="text-[9px] font-bold uppercase tracking-[0.2em] {sourceRecovering ? 'text-amber-600' : 'text-stone-500'}">Enregistrement</span>
+						<span class="text-[9px] font-bold uppercase tracking-[0.2em] {sourceRecovering ? 'text-amber-600' : 'text-stone-500'}">{$t('recordings.timer.recording')}</span>
 						<span class="font-mono text-2xl font-semibold {sourceRecovering ? 'text-amber-700' : 'text-stone-700'} tabular-nums leading-tight">
 							{formatElapsed(elapsed)}
 						</span>
@@ -1976,12 +2020,12 @@
 									<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500 opacity-75"></span>
 									<span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-500"></span>
 								</span>
-								Reconnexion en cours
-								{#if segmentCount > 1} · {segmentCount} segments{/if}
+								{$t('recordings.timer.reconnecting')}
+								{#if segmentCount > 1} · {$t('recordings.timer.segments', { count: segmentCount })}{/if}
 							</span>
 						{:else if segmentCount > 1}
 							<span class="mt-1 text-[10px] text-stone-500">
-								{segmentCount} segments · fusion à l'arrêt
+								{$t('recordings.timer.segmentsMerge', { count: segmentCount })}
 							</span>
 						{/if}
 					</div>
@@ -1994,7 +2038,7 @@
 	{#if broadcast.is_live && publicWatchUrl}
 		<div class="mt-4 flex flex-wrap items-center gap-2 border-t border-stone-100 pt-4">
 			<span class="shrink-0 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400">
-				Lien public
+				{$t('recordings.publicLink')}
 			</span>
 			<code class="min-w-0 flex-1 truncate border border-stone-200/60 bg-stone-50 px-3 py-1.5 text-[11px] text-stone-500">
 				{publicWatchUrl}
@@ -2004,7 +2048,7 @@
 				class="shrink-0 border border-stone-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-stone-600 transition-colors hover:border-primary hover:bg-primary hover:text-white"
 				onclick={copyWatchLink}
 			>
-				Copier
+				{$t('recordings.common.copy')}
 			</button>
 			<a
 				href={publicWatchUrl}
@@ -2012,7 +2056,7 @@
 				rel="noopener noreferrer"
 				class="shrink-0 border border-stone-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-stone-600 transition-colors hover:border-stone-900 hover:bg-stone-900 hover:text-white"
 			>
-				Ouvrir
+				{$t('recordings.common.open')}
 			</a>
 		</div>
 	{/if}
@@ -2024,14 +2068,14 @@
 				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
 				</svg>
-				En attente d'un flux audio… (démarrez OBS)
+				{$t('recordings.waitingForStream')}
 			</span>
 		{:else if broadcast.is_live && isRecording}
 			<!-- All three actions stay visible, equal-height, each with a distinct
 			     tonal identity at rest so they're recognizable at a glance:
 			     stone = direct, rose = enregistrement, red-700 = session totale. -->
 			<p class="mb-2.5 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400">
-				Contrôles de session
+				{$t('recordings.sessionControls')}
 			</p>
 			<div class="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
 				<button
@@ -2040,7 +2084,7 @@
 					class="inline-flex items-center justify-center gap-2 border border-stone-300 bg-stone-100 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-stone-800 transition-all hover:border-stone-900 hover:bg-stone-900 hover:text-white disabled:opacity-50 sm:order-1"
 				>
 					{@render iconLiveStop()}
-					<span>{broadcastBusy ? '…' : 'Terminer le direct'}</span>
+					<span>{broadcastBusy ? '…' : $t('recordings.actions.endLive')}</span>
 				</button>
 				<button
 					onclick={stop}
@@ -2048,7 +2092,7 @@
 					class="inline-flex items-center justify-center gap-2 border border-rose-200 bg-rose-50 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-rose-700 transition-all hover:border-rose-600 hover:bg-rose-600 hover:text-white disabled:opacity-50 sm:order-2"
 				>
 					{@render iconRecordStop()}
-					<span>{busy ? 'Arrêt…' : 'Arrêter l\'enregistrement'}</span>
+					<span>{busy ? $t('recordings.busy.stopping') : $t('recordings.actions.stopRecording')}</span>
 				</button>
 				<button
 					onclick={stopBoth}
@@ -2056,14 +2100,14 @@
 					class="order-first inline-flex items-center justify-center gap-2 bg-red-700 px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white shadow-sm shadow-red-700/30 ring-1 ring-red-700/60 transition-all hover:bg-red-800 hover:shadow-md hover:shadow-red-700/40 disabled:opacity-50 sm:order-3"
 				>
 					{@render iconStop()}
-					<span>{(broadcastBusy || busy) ? 'Arrêt…' : 'Tout arrêter'}</span>
+					<span>{(broadcastBusy || busy) ? $t('recordings.busy.stopping') : $t('recordings.actions.stopAll')}</span>
 				</button>
 			</div>
 		{:else if !broadcast.is_live && !isRecording && icecast.sourceActive}
 			<!-- Mirror of the stop cluster: stone = direct, orange = enregistrement,
 			     emerald = session complète. -->
 			<p class="mb-2.5 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400">
-				Démarrer la session
+				{$t('recordings.sessionStart')}
 			</p>
 			<div class="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
 				<button
@@ -2072,7 +2116,7 @@
 					class="inline-flex items-center justify-center gap-2 border border-stone-300 bg-stone-100 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-stone-800 transition-all hover:border-stone-900 hover:bg-stone-900 hover:text-white disabled:opacity-50 sm:order-1"
 				>
 					{@render iconBroadcast()}
-					<span>{broadcastBusy ? '…' : 'Aller en direct'}</span>
+					<span>{broadcastBusy ? '…' : $t('recordings.actions.goLive')}</span>
 				</button>
 				<button
 					onclick={start}
@@ -2080,7 +2124,7 @@
 					class="inline-flex items-center justify-center gap-2 border border-orange-200 bg-orange-50 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-primary transition-all hover:border-primary hover:bg-primary hover:text-white disabled:opacity-50 sm:order-2"
 				>
 					{@render iconRecord()}
-					<span>{busy ? '…' : 'Enregistrer'}</span>
+					<span>{busy ? '…' : $t('recordings.actions.record')}</span>
 				</button>
 				<button
 					onclick={startBoth}
@@ -2088,14 +2132,14 @@
 					class="order-first inline-flex items-center justify-center gap-2 bg-emerald-600 px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white shadow-sm shadow-emerald-600/30 ring-1 ring-emerald-600/50 transition-all hover:bg-emerald-700 hover:shadow-md hover:shadow-emerald-600/40 disabled:opacity-50 sm:order-3"
 				>
 					{@render iconBoth()}
-					<span>{(broadcastBusy || busy) ? 'Démarrage…' : 'Tout démarrer'}</span>
+					<span>{(broadcastBusy || busy) ? $t('recordings.busy.starting') : $t('recordings.actions.startAll')}</span>
 				</button>
 			</div>
 		{:else if broadcast.is_live}
 			<!-- Direct seul : arrêt du direct (tonalité stone) + démarrage de
 			     l'enregistrement (tonalité orange). -->
 			<p class="mb-2.5 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400">
-				Contrôles de session
+				{$t('recordings.sessionControls')}
 			</p>
 			<div class="grid gap-2 sm:grid-cols-2">
 				<button
@@ -2104,7 +2148,7 @@
 					class="inline-flex items-center justify-center gap-2 bg-stone-800 px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white shadow-sm shadow-stone-900/20 ring-1 ring-stone-900/40 transition-all hover:bg-stone-900 hover:shadow-md hover:shadow-stone-900/30 disabled:opacity-50"
 				>
 					{@render iconLiveStop()}
-					<span>{broadcastBusy ? 'Arrêt…' : 'Terminer le direct'}</span>
+					<span>{broadcastBusy ? $t('recordings.busy.stopping') : $t('recordings.actions.endLive')}</span>
 				</button>
 				<button
 					onclick={start}
@@ -2112,14 +2156,14 @@
 					class="inline-flex items-center justify-center gap-2 border border-orange-200 bg-orange-50 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-primary transition-all hover:border-primary hover:bg-primary hover:text-white disabled:opacity-50"
 				>
 					{@render iconRecord()}
-					<span>{busy ? 'Démarrage…' : 'Démarrer l\'enregistrement'}</span>
+					<span>{busy ? $t('recordings.busy.starting') : $t('recordings.actions.startRecording')}</span>
 				</button>
 			</div>
 		{:else if isRecording}
 			<!-- Enregistrement seul : arrêt (tonalité rose) + passage en direct
 			     (tonalité stone pour le domaine broadcast). -->
 			<p class="mb-2.5 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400">
-				Contrôles de session
+				{$t('recordings.sessionControls')}
 			</p>
 			<div class="grid gap-2 sm:grid-cols-2">
 				<button
@@ -2128,7 +2172,7 @@
 					class="inline-flex items-center justify-center gap-2 bg-rose-600 px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white shadow-sm shadow-rose-600/30 ring-1 ring-rose-600/50 transition-all hover:bg-rose-700 hover:shadow-md hover:shadow-rose-600/40 disabled:opacity-50"
 				>
 					{@render iconRecordStop()}
-					<span>{busy ? 'Arrêt…' : 'Arrêter l\'enregistrement'}</span>
+					<span>{busy ? $t('recordings.busy.stopping') : $t('recordings.actions.stopRecording')}</span>
 				</button>
 				<button
 					onclick={goLive}
@@ -2136,7 +2180,7 @@
 					class="inline-flex items-center justify-center gap-2 border border-stone-300 bg-stone-100 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-stone-800 transition-all hover:border-stone-900 hover:bg-stone-900 hover:text-white disabled:opacity-50"
 				>
 					{@render iconBroadcast()}
-					<span>{broadcastBusy ? '…' : 'Aller en direct'}</span>
+					<span>{broadcastBusy ? '…' : $t('recordings.actions.goLive')}</span>
 				</button>
 			</div>
 		{/if}
@@ -2144,7 +2188,7 @@
 
 	{#if recorder.available && 'pendingOrphans' in recorder && recorder.pendingOrphans > 0}
 		<p class="mt-4 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-			Récupération en cours : {recorder.pendingOrphans} enregistrement(s) en attente de téléversement.
+			{$t('recordings.pendingOrphans', { count: recorder.pendingOrphans })}
 		</p>
 	{/if}
 
@@ -2158,7 +2202,7 @@
 			<svg class="h-4 w-4 text-missionnaire" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z" />
 			</svg>
-			Écoute du direct
+			{$t('recordings.monitor.title')}
 		</div>
 		{#if icecast.sourceActive}
 			<!-- No pause, no seek — always the live edge. Mute is the only
@@ -2170,13 +2214,13 @@
 							<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"></span>
 							<span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500"></span>
 						</span>
-						Au direct
+						{$t('recordings.monitor.live')}
 					</span>
 				{:else}
-					<span class="text-[11px] italic text-stone-400">Connexion au flux…</span>
+					<span class="text-[11px] italic text-stone-400">{$t('recordings.monitor.connecting')}</span>
 				{/if}
 				<span class="min-w-0 flex-1 truncate text-[10px] text-stone-400">
-					{monitorMuted ? 'Son coupé — activez-le pour vérifier la synchro' : 'Vous entendez ce que les auditeurs entendent'}
+					{monitorMuted ? $t('recordings.monitor.mutedHint') : $t('recordings.monitor.unmutedHint')}
 				</span>
 				<button
 					type="button"
@@ -2190,24 +2234,24 @@
 							<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
 							<path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
 						</svg>
-						Activer le son
+						{$t('recordings.monitor.unmute')}
 					{:else}
 						<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
 							<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
 							<line x1="23" y1="9" x2="17" y2="15" />
 							<line x1="17" y1="9" x2="23" y2="15" />
 						</svg>
-						Couper le son
+						{$t('recordings.monitor.mute')}
 					{/if}
 				</button>
 			</div>
 		{:else}
 			<div class="flex h-9 flex-1 min-w-[280px] items-center bg-stone-50 px-3 text-[11px] italic text-stone-400">
-				Aucune source connectée — l'écoute démarre dès qu'un flux est diffusé.
+				{$t('recordings.monitor.noSource')}
 			</div>
 		{/if}
 		<span class="text-[11px] text-stone-400">
-			{icecast.sourceActive ? 'Flux actif' : 'Aucune source active'}
+			{icecast.sourceActive ? $t('recordings.monitor.sourceActive') : $t('recordings.monitor.sourceInactive')}
 		</span>
 		<audio
 			bind:this={monitorEl}
@@ -2224,10 +2268,10 @@
 		<div class="mb-4 flex items-start justify-between gap-4">
 			<div class="min-w-0 flex-1">
 				<p class="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500">
-					Informations affichées pendant le direct
+					{$t('recordings.meta.title')}
 				</p>
 				<p class="mt-1 text-[10px] text-stone-400">
-					Persiste entre les directs — modifiable à tout moment.
+					{$t('recordings.meta.hint')}
 				</p>
 			</div>
 			<div class="flex shrink-0 items-center gap-2">
@@ -2235,17 +2279,17 @@
 					type="button"
 					onclick={applyDefaultsDirectly}
 					disabled={applyingDefaults}
-					title="Appliquer les valeurs par défaut au direct actuel"
+					title={$t('recordings.meta.applyDefaultsTitle')}
 					class="border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-stone-600 transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
 				>
-					{applyingDefaults ? 'Application…' : 'Défauts'}
+					{applyingDefaults ? $t('recordings.meta.applying') : $t('recordings.meta.defaults')}
 				</button>
 				<button
 					type="button"
 					onclick={enterEditMode}
 					class="border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-stone-600 transition-colors hover:border-primary hover:text-primary"
 				>
-					Modifier
+					{$t('recordings.common.edit')}
 				</button>
 			</div>
 		</div>
@@ -2261,26 +2305,26 @@
 				<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.2 16c-.77 1.33.2 3 1.73 3z" />
 			</svg>
 			<p class="text-[11px] leading-snug text-amber-800 sm:text-xs">
-				<strong>Avant chaque direct</strong>, pensez à mettre à jour ces informations pour que les auditeurs aient le bon titre, la description et la vignette dès le début de la diffusion.
+				<strong>{$t('recordings.meta.reminderStrong')}</strong>{$t('recordings.meta.reminderRest')}
 			</p>
 		</div>
 
 		<div class="flex flex-col gap-5 sm:flex-row sm:items-start">
 			<!-- Thumbnail (view-only, click to expand) -->
 			<div class="flex flex-col gap-2">
-				<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Vignette</span>
+				<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.common.thumbnail')}</span>
 				{#if broadcast.thumbnail_url && !broadcastThumbnailBroken}
 					<button
 						type="button"
 						onclick={openThumbnail}
-						aria-label="Agrandir la vignette"
+						aria-label={$t('recordings.meta.expandThumbnail')}
 						class="relative h-28 w-44 overflow-hidden border border-stone-300 bg-cream/40 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 group cursor-zoom-in hover:border-primary"
 					>
 						<BlurUpImage
 							src={vercelImage(broadcast.thumbnail_url, 384)}
 							srcset={vercelImageSrcSet(broadcast.thumbnail_url, 192)}
 							placeholderSrc={vercelImagePlaceholder(broadcast.thumbnail_url)}
-							alt="Vignette du direct"
+							alt={$t('recordings.meta.thumbnailAlt')}
 							width={176}
 							height={112}
 							loading="eager"
@@ -2309,11 +2353,11 @@
 									<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"></span>
 									<span class="relative inline-flex h-1 w-1 rounded-full bg-red-500"></span>
 								</span>
-								En direct
+								{$t('recordings.state.live')}
 							</div>
 						</div>
 						<span class="absolute bottom-1 left-1 rounded-sm bg-stone-900/70 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wider text-white">
-							Défaut
+							{$t('recordings.meta.defaultBadge')}
 						</span>
 					</div>
 				{/if}
@@ -2322,23 +2366,23 @@
 			<!-- Title + Description (view-only) -->
 			<div class="flex flex-1 flex-col gap-4">
 				<div class="flex flex-col gap-2">
-					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Titre du direct</span>
+					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.meta.liveTitle')}</span>
 					<p class="text-sm {broadcast.title ? 'text-stone-700' : 'text-stone-400 italic'}">
-						{broadcast.title || 'Aucun titre (le site affichera «\u00a0Audio en direct\u00a0»)'}
+						{broadcast.title || $t('recordings.meta.noTitle')}
 					</p>
 				</div>
 
 				<div class="flex flex-col gap-2">
-					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Description</span>
+					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.common.description')}</span>
 					<p class="text-sm whitespace-pre-wrap {broadcast.description ? 'text-stone-700' : 'text-stone-400 italic'}">
-						{broadcast.description || 'Aucune description'}
+						{broadcast.description || $t('recordings.meta.noDescription')}
 					</p>
 				</div>
 
 				<!-- YouTube link — view-only. Shows the stored URL, or the channel
 				     /live URL in muted grey when nothing's been pinned yet. -->
 				<div class="flex flex-col gap-2">
-					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Lien YouTube</span>
+					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.common.youtubeLink')}</span>
 					<a
 						href={broadcast.youtube_url || YOUTUBE_CHANNEL_LIVE_URL}
 						target="_blank"
@@ -2348,7 +2392,7 @@
 						<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" class="shrink-0">
 							<path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
 						</svg>
-						<span>{broadcast.youtube_url || `${YOUTUBE_CHANNEL_LIVE_URL} (par défaut)`}</span>
+						<span>{broadcast.youtube_url || $t('recordings.meta.youtubeDefault', { url: YOUTUBE_CHANNEL_LIVE_URL })}</span>
 					</a>
 				</div>
 			</div>
@@ -2383,8 +2427,8 @@
 			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0-12l-4 4m4-4l4 4M4 20h16" />
 			</svg>
-			<span class="hidden sm:inline">Téléverser un enregistrement</span>
-			<span class="sm:hidden">Téléverser</span>
+			<span class="hidden sm:inline">{$t('recordings.upload.title')}</span>
+			<span class="sm:hidden">{$t('recordings.common.upload')}</span>
 		</button>
 	{/if}
 	<div class="relative min-w-[220px] flex-1 basis-full sm:basis-auto">
@@ -2394,31 +2438,31 @@
 		<input
 			type="search"
 			bind:value={searchQuery}
-			placeholder="Rechercher par titre, auteur, description…"
+			placeholder={$t('recordings.toolbar.searchPlaceholder')}
 			class="admin-input w-full !pl-10 text-sm"
 		/>
 	</div>
 
 	<select
 		bind:value={statusFilter}
-		aria-label="Filtrer par statut"
-		class="admin-input !w-auto !py-2 text-sm"
+		aria-label={$t('recordings.toolbar.filterStatus')}
+		class="admin-input !w-auto text-sm"
 	>
-		<option value="all">Tous statuts</option>
-		<option value="ready">Prêt</option>
-		<option value="recording">En cours</option>
-		<option value="uploading">Téléversement</option>
-		<option value="failed">Échec</option>
+		<option value="all">{$t('recordings.toolbar.allStatuses')}</option>
+		<option value="ready">{$t('recordings.status.ready')}</option>
+		<option value="recording">{$t('recordings.status.recording')}</option>
+		<option value="uploading">{$t('recordings.status.uploading')}</option>
+		<option value="failed">{$t('recordings.status.failed')}</option>
 	</select>
 
 	<select
 		bind:value={publishedFilter}
-		aria-label="Filtrer par publication"
-		class="admin-input !w-auto !py-2 text-sm"
+		aria-label={$t('recordings.toolbar.filterPublished')}
+		class="admin-input !w-auto text-sm"
 	>
-		<option value="all">Tous</option>
-		<option value="published">Publiés</option>
-		<option value="unpublished">Non publiés</option>
+		<option value="all">{$t('recordings.toolbar.all')}</option>
+		<option value="published">{$t('recordings.toolbar.published')}</option>
+		<option value="unpublished">{$t('recordings.toolbar.unpublished')}</option>
 	</select>
 
 	{#if hasActiveFilters}
@@ -2430,21 +2474,21 @@
 			<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
 			</svg>
-			Réinitialiser
+			{$t('recordings.common.reset')}
 		</button>
 	{/if}
 
 	<span class="ml-auto text-xs text-stone-400">
-		{#if isFetching}
-			Chargement…
+		{#if isFetching || !listLoaded}
+			{$t('recordings.common.loading')}
 		{:else}
-			{recordings.length} affichés / {total} {hasActiveFilters ? 'résultats' : 'total'}
+			{$t('recordings.list.shownCount', { shown: recordings.length, total })} {hasActiveFilters ? $t('recordings.list.results') : $t('recordings.list.total')}
 		{/if}
 	</span>
 </div>
 {#if fetchError}
 	<p class="mb-3 border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-		Erreur lors du chargement: {fetchError}
+		{$t('recordings.list.loadError', { error: fetchError })}
 	</p>
 {/if}
 
@@ -2460,16 +2504,36 @@
 				indeterminate={someFilteredSelected}
 				onchange={toggleSelectAllFiltered}
 				disabled={filteredIds.length === 0}
-				aria-label="Tout sélectionner"
+				aria-label={$t('recordings.list.selectAll')}
 				class="h-4 w-4 cursor-pointer rounded border-stone-300 text-primary focus:ring-primary"
 			/>
 			<span class="text-[11px] font-semibold uppercase tracking-wider text-stone-500">
-				{allFilteredSelected ? 'Tout désélectionner' : 'Tout sélectionner'}
+				{allFilteredSelected ? $t('recordings.list.deselectAll') : $t('recordings.list.selectAll')}
 			</span>
 			<span class="ml-auto text-[11px] text-stone-400 tabular-nums">
-				{filteredRecordings.length} {filteredRecordings.length > 1 ? 'enregistrements' : 'enregistrement'}
+				{filteredRecordings.length > 1 ? $t('recordings.list.countMany', { count: filteredRecordings.length }) : $t('recordings.list.countOne', { count: filteredRecordings.length })}
 			</span>
 		</div>
+	{/if}
+
+	{#if !listLoaded}
+		<!-- Initial-load skeleton: mirrors the recording card layout -->
+		{#each Array.from({ length: 3 }) as _}
+			<article class="animate-pulse overflow-hidden border border-stone-200/70 bg-white/60" aria-hidden="true">
+				<div class="flex items-start gap-3 p-4">
+					<div class="h-14 w-20 shrink-0 bg-stone-200"></div>
+					<div class="min-w-0 flex-1 space-y-2 pt-0.5">
+						<div class="h-4 w-3/4 rounded-full bg-stone-200"></div>
+						<div class="h-3 w-1/2 rounded-full bg-stone-100"></div>
+					</div>
+				</div>
+				<div class="flex items-center gap-3 border-t border-stone-100 bg-stone-50/30 px-4 py-2.5">
+					<div class="h-4 w-14 rounded bg-stone-100"></div>
+					<div class="h-3 w-12 rounded-full bg-stone-100"></div>
+					<div class="ml-auto h-5 w-9 rounded-full bg-stone-200"></div>
+				</div>
+			</article>
+		{/each}
 	{/if}
 
 	{#each filteredRecordings as rec}
@@ -2485,7 +2549,7 @@
 						type="checkbox"
 						checked={isSelected}
 						onchange={() => toggleSelection(rec._id!)}
-						aria-label="Sélectionner {rec.title}"
+						aria-label={$t('recordings.list.selectOne', { title: rec.title })}
 						class="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-stone-300 text-primary focus:ring-primary"
 					/>
 				{/if}
@@ -2527,7 +2591,7 @@
 			<!-- Meta row: status · duration · size · publish toggle -->
 			<div class="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-stone-100 bg-stone-50/30 px-4 py-2.5">
 				<span class="inline-flex rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {statusClass(rec.status)}">
-					{statusLabel[rec.status]}
+					{$t(statusLabel[rec.status])}
 				</span>
 				<span class="font-mono text-[11px] tabular-nums text-stone-600">
 					{formatDuration(rec.duration_sec)}
@@ -2536,12 +2600,12 @@
 					{formatBytes(rec.size_bytes)}
 				</span>
 				<div class="ml-auto flex items-center gap-1.5">
-					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Publié</span>
+					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.list.published')}</span>
 					<button
 						onclick={() => togglePublish(rec)}
 						disabled={rec.status !== 'ready'}
-						aria-label={rec.published ? 'Dépublier' : 'Publier'}
-						title={rec.published ? 'Dépublier' : 'Publier'}
+						aria-label={rec.published ? $t('recordings.list.unpublish') : $t('recordings.list.publish')}
+						title={rec.published ? $t('recordings.list.unpublish') : $t('recordings.list.publish')}
 						class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors {rec.published ? 'bg-primary' : 'bg-stone-200'} disabled:opacity-40"
 					>
 						<span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform {rec.published ? 'translate-x-4' : 'translate-x-0.5'}"></span>
@@ -2564,7 +2628,7 @@
 							onclick={() => retryUpload(rec._id!)}
 							class="bg-amber-100 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-700 transition-colors hover:bg-amber-200"
 						>
-							Réessayer l'envoi
+							{$t('recordings.list.retryUpload')}
 						</button>
 					{/if}
 					{#if rec.status === 'ready' || rec.status === 'failed'}
@@ -2575,31 +2639,31 @@
 							<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
 								<path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
 							</svg>
-							{isEditing ? 'Fermer' : 'Modifier'}
+							{isEditing ? $t('recordings.common.close') : $t('recordings.common.edit')}
 						</button>
 					{/if}
 					{#if rec.status === 'ready' && rec.s3_url}
 						<button
 							onclick={() => openTrimEditor(rec._id!)}
 							class="inline-flex items-center gap-1.5 border border-stone-200 bg-white/60 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary"
-							title="Éditer l'audio (couper début/fin)"
+							title={$t('recordings.list.trimAudioTitle')}
 						>
 							<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
 								<path stroke-linecap="round" stroke-linejoin="round" d="M6 20l3.5-3.5M18 20l-3.5-3.5M6 4l12 12M18 4L6 16" />
 							</svg>
-							Éditer l'audio
+							{$t('recordings.list.trimAudio')}
 						</button>
 					{/if}
 					{#if canDeleteRecordings}
 						<button
 							onclick={() => remove(rec._id!)}
 							class="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600"
-							title="Supprimer"
+							title={$t('recordings.common.delete')}
 						>
 							<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
 								<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
 							</svg>
-							Supprimer
+							{$t('recordings.common.delete')}
 						</button>
 					{/if}
 				</div>
@@ -2607,18 +2671,18 @@
 		</article>
 	{/each}
 
-	{#if filteredRecordings.length === 0 && !isFetching}
+	{#if listLoaded && filteredRecordings.length === 0 && !isFetching}
 		<div class="border border-dashed border-stone-200 bg-white/40 px-5 py-14 text-center">
 			<p class="font-display text-sm text-stone-500">
 				{#if hasActiveFilters}
-					Aucun enregistrement ne correspond aux filtres actifs.
+					{$t('recordings.list.emptyFiltered')}
 				{:else}
-					Aucun enregistrement pour l'instant.
+					{$t('recordings.list.emptyNone')}
 				{/if}
 			</p>
 			{#if hasActiveFilters}
 				<button type="button" onclick={resetFilters} class="mt-3 text-xs font-medium text-primary underline-offset-4 hover:underline">
-					Réinitialiser les filtres
+					{$t('recordings.list.resetFilters')}
 				</button>
 			{/if}
 		</div>
@@ -2632,9 +2696,9 @@
 				class="inline-flex items-center gap-2 border border-stone-300 bg-white px-5 py-2 text-xs font-semibold uppercase tracking-[0.15em] text-stone-700 transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
 			>
 				{#if isFetching}
-					Chargement…
+					{$t('recordings.common.loading')}
 				{:else}
-					Charger plus ({total - recordings.length} restants)
+					{$t('recordings.list.loadMore', { count: total - recordings.length })}
 				{/if}
 			</button>
 		</div>
@@ -2654,21 +2718,24 @@
 							indeterminate={someFilteredSelected}
 							onchange={toggleSelectAllFiltered}
 							disabled={filteredIds.length === 0}
-							aria-label="Tout sélectionner"
+							aria-label={$t('recordings.list.selectAll')}
 							class="h-4 w-4 cursor-pointer rounded border-stone-300 text-primary focus:ring-primary"
 						/>
 					</th>
 				{/if}
-				<th class="px-5 py-3.5 font-medium text-stone-500">Titre</th>
-				<th class="px-5 py-3.5 font-medium text-stone-500">Date</th>
-				<th class="px-5 py-3.5 font-medium text-stone-500">Durée</th>
-				<th class="px-5 py-3.5 font-medium text-stone-500">Taille</th>
-				<th class="px-5 py-3.5 font-medium text-stone-500">Statut</th>
-				<th class="px-5 py-3.5 font-medium text-stone-500">Publié</th>
-				<th class="px-5 py-3.5 text-right font-medium text-stone-500">Actions</th>
+				<th class="px-5 py-3.5 font-medium text-stone-500">{$t('recordings.common.title')}</th>
+				<th class="px-5 py-3.5 font-medium text-stone-500">{$t('recordings.table.date')}</th>
+				<th class="px-5 py-3.5 font-medium text-stone-500">{$t('recordings.table.duration')}</th>
+				<th class="px-5 py-3.5 font-medium text-stone-500">{$t('recordings.table.size')}</th>
+				<th class="px-5 py-3.5 font-medium text-stone-500">{$t('recordings.table.status')}</th>
+				<th class="px-5 py-3.5 font-medium text-stone-500">{$t('recordings.list.published')}</th>
+				<th class="px-5 py-3.5 text-right font-medium text-stone-500">{$t('recordings.table.actions')}</th>
 			</tr>
 		</thead>
 		<tbody>
+			{#if !listLoaded}
+				<SkeletonRows rows={5} cols={canDeleteRecordings ? 8 : 7} />
+			{/if}
 			{#each filteredRecordings as rec}
 				{@const isEditing = editingRecordingId === rec._id}
 				{@const isSelected = selectedIds.has(rec._id!)}
@@ -2679,7 +2746,7 @@
 								type="checkbox"
 								checked={isSelected}
 								onchange={() => toggleSelection(rec._id!)}
-								aria-label="Sélectionner {rec.title}"
+								aria-label={$t('recordings.list.selectOne', { title: rec.title })}
 								class="h-4 w-4 cursor-pointer rounded border-stone-300 text-primary focus:ring-primary"
 							/>
 						</td>
@@ -2720,15 +2787,15 @@
 					<td class="px-5 py-4 text-stone-500">{formatBytes(rec.size_bytes)}</td>
 					<td class="px-5 py-4">
 						<span class="inline-flex rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {statusClass(rec.status)}">
-							{statusLabel[rec.status]}
+							{$t(statusLabel[rec.status])}
 						</span>
 					</td>
 					<td class="px-5 py-4">
 						<button
 							onclick={() => togglePublish(rec)}
 							disabled={rec.status !== 'ready'}
-							aria-label={rec.published ? 'Dépublier' : 'Publier'}
-							title={rec.published ? 'Dépublier' : 'Publier'}
+							aria-label={rec.published ? $t('recordings.list.unpublish') : $t('recordings.list.publish')}
+							title={rec.published ? $t('recordings.list.unpublish') : $t('recordings.list.publish')}
 							class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors {rec.published ? 'bg-primary' : 'bg-stone-200'} disabled:opacity-40"
 						>
 							<span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform {rec.published ? 'translate-x-4' : 'translate-x-0.5'}"></span>
@@ -2741,7 +2808,7 @@
 							{/if}
 							{#if rec.status === 'failed'}
 								<button onclick={() => retryUpload(rec._id!)} class="bg-amber-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-700 hover:bg-amber-200">
-									Réessayer
+									{$t('recordings.list.retry')}
 								</button>
 							{/if}
 							{#if rec.status === 'ready' || rec.status === 'failed'}
@@ -2749,20 +2816,20 @@
 									onclick={() => (isEditing ? cancelRecordingEdit() : enterRecordingEdit(rec))}
 									class="border border-stone-200 bg-white/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 hover:border-primary hover:text-primary"
 								>
-									{isEditing ? 'Fermer' : 'Modifier'}
+									{isEditing ? $t('recordings.common.close') : $t('recordings.common.edit')}
 								</button>
 							{/if}
 							{#if rec.status === 'ready' && rec.s3_url}
 								<button
 									onclick={() => openTrimEditor(rec._id!)}
 									class="border border-stone-200 bg-white/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 hover:border-primary hover:text-primary"
-									title="Éditer l'audio (couper début/fin)"
+									title={$t('recordings.list.trimAudioTitle')}
 								>
-									Éditer l'audio
+									{$t('recordings.list.trimAudio')}
 								</button>
 							{/if}
 							{#if canDeleteRecordings}
-								<button onclick={() => remove(rec._id!)} class="px-2 py-1.5 text-xs text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600" title="Supprimer">
+								<button onclick={() => remove(rec._id!)} class="px-2 py-1.5 text-xs text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600" title={$t('recordings.common.delete')}>
 									<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 										<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
 									</svg>
@@ -2772,18 +2839,18 @@
 					</td>
 				</tr>
 				{/each}
-			{#if filteredRecordings.length === 0}
+			{#if listLoaded && filteredRecordings.length === 0}
 				<tr>
 					<td colspan={canDeleteRecordings ? 8 : 7} class="px-5 py-12 text-center text-stone-400">
 						{#if total === 0}
-							Aucun enregistrement pour l'instant. Démarrez le premier ci-dessus.
+							{$t('recordings.list.emptyStart')}
 						{:else if hasActiveFilters}
-							Aucun enregistrement ne correspond aux filtres actifs.
+							{$t('recordings.list.emptyFiltered')}
 							<button type="button" onclick={resetFilters} class="ml-1 font-medium text-primary underline-offset-4 hover:underline">
-								Réinitialiser
+								{$t('recordings.common.reset')}
 							</button>
 						{:else}
-							Aucun enregistrement.
+							{$t('recordings.list.empty')}
 						{/if}
 					</td>
 				</tr>
@@ -2801,7 +2868,7 @@
 			class="inline-flex items-center gap-2 border border-stone-300 bg-white px-5 py-2 text-xs font-semibold uppercase tracking-[0.15em] text-stone-700 transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
 		>
 			{#if isFetching}
-				Chargement…
+				{$t('recordings.common.loading')}
 			{:else}
 				Charger plus ({total - recordings.length} restants)
 			{/if}
@@ -2814,18 +2881,18 @@
 	<div class="sticky bottom-4 z-20 mx-auto mt-4 w-fit animate-[page-in_0.2s_ease] rounded-sm border border-stone-200 bg-white px-6 py-3 shadow-lg">
 		<div class="flex items-center gap-4">
 			<span class="text-sm font-medium text-stone-700">
-				{selectedIds.size} sélectionné{selectedIds.size > 1 ? 's' : ''}
+				{selectedIds.size > 1 ? $t('recordings.bulk.selectedMany', { count: selectedIds.size }) : $t('recordings.bulk.selectedOne', { count: selectedIds.size })}
 			</span>
 			<div class="h-5 w-px bg-stone-200"></div>
 			<button
 				onclick={bulkDelete}
 				disabled={bulkDeleting}
-				class="admin-btn-danger py-1.5 text-xs"
+				class="admin-btn-danger admin-btn-compact"
 			>
-				{bulkDeleting ? 'Suppression…' : 'Supprimer'}
+				{bulkDeleting ? $t('recordings.bulk.deleting') : $t('recordings.common.delete')}
 			</button>
 			<button onclick={clearSelection} class="text-xs text-stone-400 hover:text-stone-600">
-				Désélectionner
+				{$t('recordings.bulk.clear')}
 			</button>
 		</div>
 	</div>
@@ -2852,13 +2919,13 @@
 		<div class="my-8 w-full max-w-2xl rounded-sm bg-white shadow-2xl">
 			<div class="flex items-center justify-between border-b border-stone-100 px-6 py-4">
 				<h2 id="upload-recording-title" class="font-display text-lg font-semibold text-stone-800">
-					Téléverser un enregistrement
+					{$t('recordings.upload.title')}
 				</h2>
 				<button
 					type="button"
 					onclick={closeUploadModal}
 					disabled={uploadSaving}
-					aria-label="Fermer"
+					aria-label={$t('recordings.common.close')}
 					class="flex h-8 w-8 items-center justify-center rounded-full text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 disabled:opacity-50"
 				>
 					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -2869,16 +2936,15 @@
 
 			<div class="flex flex-col gap-5 px-6 py-6">
 				<p class="text-xs text-stone-500">
-					Pour une diffusion manquée sur la plateforme mais disponible ailleurs (YouTube…).
-					Choisissez le fichier MP3 et la date réelle du direct.
+					{$t('recordings.upload.intro')}
 				</p>
 
 				<!-- Audio file (required) -->
 				<div class="flex flex-col gap-1.5">
-					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Fichier audio (MP3) <span class="text-red-500">*</span></span>
+					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.upload.audioLabel')} <span class="text-red-500">*</span></span>
 					<div class="flex flex-wrap items-center gap-3">
 						<label class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary {uploadSaving ? 'pointer-events-none opacity-50' : ''}">
-							{uploadAudioFile ? 'Changer le fichier' : 'Choisir un MP3'}
+							{uploadAudioFile ? $t('recordings.upload.changeFile') : $t('recordings.upload.chooseMp3')}
 							<input
 								type="file"
 								accept="audio/mpeg,audio/mp3,.mp3"
@@ -2899,7 +2965,7 @@
 						<div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-stone-100">
 							<div class="h-full bg-primary transition-all" style="width: {uploadAudioPct}%"></div>
 						</div>
-						<span class="text-[10px] text-stone-400 tabular-nums">Téléversement {uploadAudioPct}%</span>
+						<span class="text-[10px] text-stone-400 tabular-nums">{$t('recordings.upload.progress', { pct: uploadAudioPct })}</span>
 					{/if}
 					{#if uploadAudioError}
 						<p class="text-xs text-red-600">{uploadAudioError}</p>
@@ -2908,7 +2974,7 @@
 
 				<!-- Date / time (required) -->
 				<div class="flex flex-col gap-1.5">
-					<label for="upload-started-at" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Date et heure du direct <span class="text-red-500">*</span></label>
+					<label for="upload-started-at" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.upload.dateLabel')} <span class="text-red-500">*</span></label>
 					<input
 						id="upload-started-at"
 						type="datetime-local"
@@ -2917,12 +2983,12 @@
 						disabled={uploadSaving}
 						class="admin-input text-sm sm:w-64"
 					/>
-					<span class="text-[10px] text-stone-400">Détermine la position de l'enregistrement dans les archives.</span>
+					<span class="text-[10px] text-stone-400">{$t('recordings.upload.dateHint')}</span>
 				</div>
 
 				<!-- Title (required) -->
 				<div class="flex flex-col gap-1.5">
-					<label for="upload-title" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Titre <span class="text-red-500">*</span></label>
+					<label for="upload-title" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.common.title')} <span class="text-red-500">*</span></label>
 					<input
 						id="upload-title"
 						type="text"
@@ -2930,28 +2996,28 @@
 						oninput={() => (uploadTitleDirty = true)}
 						maxlength="200"
 						disabled={uploadSaving}
-						placeholder="Ex. 2025-05-30 Missionnaire Network Live audio"
+						placeholder={$t('recordings.upload.titlePlaceholder')}
 						class="admin-input text-sm"
 					/>
 				</div>
 
 				<!-- Description -->
 				<div class="flex flex-col gap-1.5">
-					<label for="upload-description" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Description</label>
+					<label for="upload-description" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.common.description')}</label>
 					<textarea
 						id="upload-description"
 						bind:value={uploadDescription}
 						maxlength="2000"
 						rows="4"
 						disabled={uploadSaving}
-						placeholder="Sujet, orateur, texte biblique…"
+						placeholder={$t('recordings.upload.descriptionPlaceholder')}
 						class="admin-input resize-y text-sm"
 					></textarea>
 				</div>
 
 				<!-- YouTube link -->
 				<div class="flex flex-col gap-1.5">
-					<label for="upload-youtube" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Lien YouTube</label>
+					<label for="upload-youtube" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.common.youtubeLink')}</label>
 					<input
 						id="upload-youtube"
 						type="url"
@@ -2967,7 +3033,7 @@
 
 				<!-- Thumbnail -->
 				<div class="flex flex-col gap-2">
-					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Vignette</span>
+					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.common.thumbnail')}</span>
 					<div class="flex items-start gap-4">
 						{#if uploadThumbnailPreviewUrl}
 							<div class="relative aspect-video w-40 shrink-0 overflow-hidden border border-stone-300 bg-cream/40">
@@ -2979,13 +3045,13 @@
 									<source srcset="/icons/logo.webp" type="image/webp" />
 									<img src="/icons/logo.png" alt="" class="h-5 w-auto opacity-90" width="150" height="64" />
 								</picture>
-								<span class="text-[8px] font-bold uppercase tracking-[0.2em] text-stone-500">Aucune vignette</span>
+								<span class="text-[8px] font-bold uppercase tracking-[0.2em] text-stone-500">{$t('recordings.common.noThumbnail')}</span>
 							</div>
 						{/if}
 						<div class="flex flex-col gap-2">
 							<div class="flex gap-2">
 								<label class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary {uploadSaving ? 'pointer-events-none opacity-50' : ''}">
-									{uploadThumbnailPreviewUrl ? 'Changer' : 'Téléverser'}
+									{uploadThumbnailPreviewUrl ? $t('recordings.common.change') : $t('recordings.common.upload')}
 									<input
 										type="file"
 										accept="image/jpeg,image/png,image/webp,image/gif"
@@ -3001,11 +3067,11 @@
 										disabled={uploadSaving}
 										class="border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 transition-colors hover:border-red-200 hover:text-red-600 disabled:opacity-50"
 									>
-										Retirer
+										{$t('recordings.common.remove')}
 									</button>
 								{/if}
 							</div>
-							<p class="text-[10px] text-stone-400">JPEG, PNG, WebP ou GIF · 5 Mo max</p>
+							<p class="text-[10px] text-stone-400">{$t('recordings.common.imageFormats')}</p>
 							{#if uploadThumbnailError}
 								<p class="text-xs text-red-600">{uploadThumbnailError}</p>
 							{/if}
@@ -3016,7 +3082,7 @@
 				<!-- Publish immediately -->
 				<label class="flex items-center gap-2 text-sm text-stone-700">
 					<input type="checkbox" bind:checked={uploadPublishNow} disabled={uploadSaving} class="h-4 w-4 accent-primary" />
-					Publier immédiatement (visible sur le site public)
+					{$t('recordings.upload.publishNow')}
 				</label>
 
 				{#if uploadError}
@@ -3031,7 +3097,7 @@
 					disabled={uploadSaving}
 					class="px-4 py-2 text-sm font-medium text-stone-500 transition-colors hover:text-stone-700 disabled:opacity-50"
 				>
-					Annuler
+					{$t('recordings.common.cancel')}
 				</button>
 				<button
 					type="button"
@@ -3039,7 +3105,7 @@
 					disabled={uploadSaving || !uploadAudioFile}
 					class="inline-flex items-center gap-2 bg-primary px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
 				>
-					{uploadSaving ? 'Téléversement…' : 'Téléverser'}
+					{uploadSaving ? $t('recordings.common.uploading') : $t('recordings.common.upload')}
 				</button>
 			</div>
 		</div>
@@ -3060,13 +3126,13 @@
 		<div class="w-full max-w-3xl rounded-sm bg-white shadow-2xl my-8">
 			<div class="flex items-center justify-between border-b border-stone-100 px-6 py-4">
 				<h2 id="edit-broadcast-title" class="font-display text-lg font-semibold text-stone-800">
-					Modifier les informations du direct
+					{$t('recordings.meta.editTitle')}
 				</h2>
 				<button
 					type="button"
 					onclick={cancelEditMode}
 					disabled={metadataSaving}
-					aria-label="Fermer"
+					aria-label={$t('recordings.common.close')}
 					class="flex h-8 w-8 items-center justify-center rounded-full text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 disabled:opacity-50"
 				>
 					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -3078,7 +3144,7 @@
 			<div class="px-6 py-6">
 				<div class="flex flex-col gap-5 sm:flex-row sm:items-start">
 					<div class="flex flex-col gap-2 shrink-0">
-						<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Vignette</span>
+						<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.common.thumbnail')}</span>
 						{#if previewSrc}
 							<div class="relative aspect-video w-48 overflow-hidden border border-stone-300 bg-cream/40">
 								<img
@@ -3091,7 +3157,7 @@
 								/>
 								{#if metadataSaving && thumbnailAction === 'replace'}
 									<div class="absolute inset-0 flex items-center justify-center bg-white/80 text-xs font-medium text-stone-600">
-										Téléversement…
+										{$t('recordings.common.uploading')}
 									</div>
 								{/if}
 							</div>
@@ -3101,12 +3167,12 @@
 									<source srcset="/icons/logo.webp" type="image/webp" />
 									<img src="/icons/logo.png" alt="" class="h-5 w-auto opacity-90" width="150" height="64" />
 								</picture>
-								<span class="text-[8px] font-bold uppercase tracking-[0.2em] text-stone-500">Aucune vignette</span>
+								<span class="text-[8px] font-bold uppercase tracking-[0.2em] text-stone-500">{$t('recordings.common.noThumbnail')}</span>
 							</div>
 						{/if}
 						<div class="flex gap-2">
 							<label class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary">
-								{previewSrc ? 'Changer' : 'Téléverser'}
+								{previewSrc ? $t('recordings.common.change') : $t('recordings.common.upload')}
 								<input
 									type="file"
 									accept="image/jpeg,image/png,image/webp,image/gif"
@@ -3122,11 +3188,11 @@
 									disabled={metadataSaving}
 									class="border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 transition-colors hover:border-red-200 hover:text-red-600 disabled:opacity-50"
 								>
-									Retirer
+									{$t('recordings.common.remove')}
 								</button>
 							{/if}
 						</div>
-						<p class="text-[10px] text-stone-400">JPEG, PNG, WebP ou GIF · 5 Mo max</p>
+						<p class="text-[10px] text-stone-400">{$t('recordings.common.imageFormats')}</p>
 						{#if thumbnailAction === 'replace'}
 							<label class="flex w-48 items-start gap-2 border border-stone-100 bg-stone-50/60 px-2.5 py-2">
 								<input
@@ -3136,8 +3202,8 @@
 									class="mt-0.5 accent-[#FF880C]"
 								/>
 								<span class="text-[10px] leading-snug text-stone-500">
-									<span class="font-semibold text-stone-600">Définir comme vignette par défaut</span>
-									— utilisée automatiquement quand un direct démarre sans vignette
+									<span class="font-semibold text-stone-600">{$t('recordings.meta.setDefaultLabel')}</span>
+									{$t('recordings.meta.setDefaultHint')}
 								</span>
 							</label>
 						{/if}
@@ -3145,25 +3211,25 @@
 
 					<div class="flex flex-1 flex-col gap-4">
 						<div class="flex flex-col gap-1.5">
-							<label for="edit-broadcast-title-input" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Titre du direct</label>
+							<label for="edit-broadcast-title-input" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.meta.liveTitle')}</label>
 							<input
 								id="edit-broadcast-title-input"
 								type="text"
 								bind:value={titleDraft}
 								maxlength="120"
 								disabled={metadataSaving}
-								placeholder="Ex. Prédication du mercredi"
+								placeholder={$t('recordings.meta.titlePlaceholder')}
 								class="admin-input text-sm"
 							/>
 							<span class="self-end text-[10px] text-stone-400 tabular-nums">{titleDraft.length} / 120</span>
 						</div>
 
 						<div class="flex flex-col gap-1.5">
-							<label for="edit-broadcast-desc" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Description</label>
+							<label for="edit-broadcast-desc" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.common.description')}</label>
 							<textarea
 								id="edit-broadcast-desc"
 								bind:value={descriptionDraft}
-								placeholder="Décrivez ce direct : sujet, orateur, texte biblique…"
+								placeholder={$t('recordings.meta.descriptionPlaceholder')}
 								maxlength="2000"
 								rows="6"
 								disabled={metadataSaving}
@@ -3176,7 +3242,7 @@
 						     when nothing's stored — admin can replace with a specific
 						     video URL once the live ends and YouTube assigns the VOD id. -->
 						<div class="flex flex-col gap-1.5">
-							<label for="edit-broadcast-youtube" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Lien YouTube</label>
+							<label for="edit-broadcast-youtube" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.common.youtubeLink')}</label>
 							<input
 								id="edit-broadcast-youtube"
 								type="url"
@@ -3186,7 +3252,7 @@
 								class="admin-input text-sm"
 							/>
 							<span class="text-[10px] text-stone-400">
-								Par défaut : URL de la chaîne /live. Remplacez par l'URL de la vidéo précise une fois publiée.
+								{$t('recordings.meta.youtubeHint')}
 							</span>
 							{#if broadcastYoutubeError}
 								<p class="bg-red-50 px-3 py-2 text-xs text-red-700">{broadcastYoutubeError}</p>
@@ -3207,7 +3273,7 @@
 					disabled={metadataSaving}
 					class="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500 hover:bg-stone-100 hover:text-stone-700 disabled:opacity-50"
 				>
-					Annuler
+					{$t('recordings.common.cancel')}
 				</button>
 				<button
 					type="button"
@@ -3215,7 +3281,7 @@
 					disabled={metadataSaving}
 					class="bg-primary px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-white hover:bg-missionnaire-600 disabled:opacity-50"
 				>
-					{metadataSaving ? 'Enregistrement…' : 'Enregistrer'}
+					{metadataSaving ? $t('recordings.common.saving') : $t('recordings.common.save')}
 				</button>
 			</div>
 		</div>
@@ -3239,13 +3305,13 @@
 				<!-- Modal header -->
 				<div class="flex items-center justify-between gap-3 border-b border-stone-100 px-4 py-4 sm:px-6">
 					<h2 id="edit-rec-title" class="min-w-0 truncate font-display text-lg font-semibold text-stone-800">
-						Modifier l'enregistrement
+						{$t('recordings.edit.title')}
 					</h2>
 					<button
 						type="button"
 						onclick={cancelRecordingEdit}
 						disabled={recSaving}
-						aria-label="Fermer"
+						aria-label={$t('recordings.common.close')}
 						class="flex h-8 w-8 items-center justify-center rounded-full text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 disabled:opacity-50"
 					>
 						<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -3259,7 +3325,7 @@
 					<div class="flex min-w-0 flex-col gap-5 sm:flex-row sm:items-start">
 						<!-- Thumbnail editor -->
 						<div class="flex w-full max-w-[12rem] shrink-0 flex-col gap-2 sm:w-48">
-							<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Vignette</span>
+							<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.common.thumbnail')}</span>
 							{#if recPreviewSrc(editingRec)}
 								<div class="relative aspect-video w-48 overflow-hidden border border-stone-300 bg-cream/40">
 									<img
@@ -3274,7 +3340,7 @@
 									/>
 									{#if recSaving && recThumbnailAction === 'replace'}
 										<div class="absolute inset-0 flex items-center justify-center bg-white/80 text-xs font-medium text-stone-600">
-											Téléversement…
+											{$t('recordings.common.uploading')}
 										</div>
 									{/if}
 								</div>
@@ -3284,12 +3350,12 @@
 										<source srcset="/icons/logo.webp" type="image/webp" />
 										<img src="/icons/logo.png" alt="" class="h-5 w-auto opacity-90" width="150" height="64" />
 									</picture>
-									<span class="text-[8px] font-bold uppercase tracking-[0.2em] text-stone-500">Aucune vignette</span>
+									<span class="text-[8px] font-bold uppercase tracking-[0.2em] text-stone-500">{$t('recordings.common.noThumbnail')}</span>
 								</div>
 							{/if}
 							<div class="flex flex-wrap gap-2">
 								<label class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary">
-									{recPreviewSrc(editingRec) ? 'Changer' : 'Téléverser'}
+									{recPreviewSrc(editingRec) ? $t('recordings.common.change') : $t('recordings.common.upload')}
 									<input
 										type="file"
 										accept="image/jpeg,image/png,image/webp,image/gif"
@@ -3305,35 +3371,35 @@
 										disabled={recSaving}
 										class="border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 transition-colors hover:border-red-200 hover:text-red-600 disabled:opacity-50"
 									>
-										Retirer
+										{$t('recordings.common.remove')}
 									</button>
 								{/if}
 							</div>
-							<p class="text-[10px] text-stone-400">JPEG, PNG, WebP ou GIF · 5 Mo max</p>
+							<p class="text-[10px] text-stone-400">{$t('recordings.common.imageFormats')}</p>
 						</div>
 
 						<!-- Title + Description -->
 						<div class="flex min-w-0 flex-1 flex-col gap-4">
 							<div class="flex flex-col gap-1.5">
-								<label for="edit-rec-title-input" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Titre</label>
+								<label for="edit-rec-title-input" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.common.title')}</label>
 								<input
 									id="edit-rec-title-input"
 									type="text"
 									bind:value={recDraftTitle}
 									maxlength="200"
 									disabled={recSaving}
-									placeholder="Ex. Prédication du dimanche — Foi et prière"
+									placeholder={$t('recordings.edit.titlePlaceholder')}
 									class="admin-input text-sm"
 								/>
 								<span class="self-end text-[10px] text-stone-400 tabular-nums">{recDraftTitle.length} / 200</span>
 							</div>
 
 							<div class="flex flex-col gap-1.5">
-								<label for="edit-rec-desc" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Description</label>
+								<label for="edit-rec-desc" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.common.description')}</label>
 								<textarea
 									id="edit-rec-desc"
 									bind:value={recDraftDescription}
-									placeholder="Décrivez ce direct enregistré : sujet, orateur, texte biblique…"
+									placeholder={$t('recordings.edit.descriptionPlaceholder')}
 									maxlength="2000"
 									rows="6"
 									disabled={recSaving}
@@ -3347,7 +3413,7 @@
 							     transcription-PDF lookup on the public detail page. Empty
 							     clears the link. -->
 							<div class="flex flex-col gap-1.5">
-								<label for="edit-rec-youtube" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Lien YouTube</label>
+								<label for="edit-rec-youtube" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.common.youtubeLink')}</label>
 								<input
 									id="edit-rec-youtube"
 									type="url"
@@ -3357,7 +3423,7 @@
 									class="admin-input text-sm"
 								/>
 								<span class="text-[10px] text-stone-400">
-									Collez l'URL YouTube de la vidéo correspondante. Laissez vide pour ne pas lier de vidéo.
+									{$t('recordings.edit.youtubeHint')}
 								</span>
 								{#if recYoutubeError}
 									<p class="bg-red-50 px-3 py-2 text-xs text-red-700">{recYoutubeError}</p>
@@ -3366,14 +3432,14 @@
 
 							<div class="flex min-w-0 flex-col gap-2 overflow-hidden border border-stone-100 bg-stone-50/40 p-3">
 								<div class="flex flex-col gap-1">
-									<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Transcription PDF</span>
+									<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.edit.transcriptLabel')}</span>
 									<span class="text-[10px] text-stone-400">
-										Si la vidéo liée possède déjà un PDF, il est attaché ici automatiquement.
+										{$t('recordings.edit.transcriptAutoHint')}
 									</span>
 								</div>
 								{#if recTranscriptLoading}
 									<div class="border border-stone-200 bg-white px-3 py-2 text-xs text-stone-500">
-										Recherche d'une transcription déjà téléversée…
+										{$t('recordings.edit.transcriptSearching')}
 									</div>
 								{:else if recExistingTranscript && !recPdfFile && !recTranscriptUploadOpen}
 									<div class="flex min-w-0 items-center justify-between gap-3 overflow-hidden border border-green-200 bg-green-50/70 px-3 py-2">
@@ -3392,11 +3458,11 @@
 											rel="noopener noreferrer"
 											class="shrink-0 text-[10px] font-semibold uppercase tracking-[0.15em] text-green-700 hover:text-green-900"
 										>
-											Ouvrir
+											{$t('recordings.common.open')}
 										</a>
 									</div>
 									<div class="flex flex-wrap items-center gap-2">
-										<span class="text-[10px] text-stone-400">Aucun nouveau téléversement nécessaire.</span>
+										<span class="text-[10px] text-stone-400">{$t('recordings.edit.transcriptNoUploadNeeded')}</span>
 										<button
 											type="button"
 											onclick={() => {
@@ -3406,7 +3472,7 @@
 											disabled={recSaving}
 											class="text-[10px] font-semibold uppercase tracking-[0.15em] text-primary hover:underline disabled:opacity-50"
 										>
-											Remplacer ce PDF
+											{$t('recordings.edit.replacePdf')}
 										</button>
 										<button
 											type="button"
@@ -3417,7 +3483,7 @@
 											disabled={recSaving}
 											class="text-[10px] font-semibold uppercase tracking-[0.15em] text-primary hover:underline disabled:opacity-50"
 										>
-											Ajouter un autre PDF
+											{$t('recordings.edit.addAnotherPdf')}
 										</button>
 										<button
 											type="button"
@@ -3425,7 +3491,7 @@
 											disabled={recSaving}
 											class="text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 transition-colors hover:text-red-600 hover:underline disabled:opacity-50"
 										>
-											Retirer ce PDF
+											{$t('recordings.edit.removePdf')}
 										</button>
 									</div>
 								{/if}
@@ -3436,7 +3502,7 @@
 											<p class="truncate text-[10px] text-stone-500 tabular-nums">
 												{formatBytes(recPdfFile.size)}
 												{#if recPdfMode === 'replace' && recExistingTranscript}
-													· remplacera {recExistingTranscript.filename}
+													· {$t('recordings.edit.willReplace', { filename: recExistingTranscript.filename })}
 												{/if}
 											</p>
 										</div>
@@ -3446,13 +3512,13 @@
 											disabled={recSaving}
 											class="shrink-0 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 hover:text-red-600 disabled:opacity-50"
 										>
-											Retirer
+											{$t('recordings.common.remove')}
 										</button>
 									</div>
 									{#if recPdfUploadPct !== null}
 										<div class="flex flex-col gap-1">
 											<div class="flex items-center justify-between text-[10px] font-mono text-stone-500 tabular-nums">
-												<span>{recPdfUploadPct < 100 ? 'Téléversement PDF…' : 'Finalisation…'}</span>
+												<span>{recPdfUploadPct < 100 ? $t('recordings.edit.pdfUploading') : $t('recordings.edit.finalizing')}</span>
 												<span>{recPdfUploadPct}%</span>
 											</div>
 											<div class="h-1.5 w-full overflow-hidden rounded-full bg-stone-200">
@@ -3467,10 +3533,10 @@
 									<div class="flex flex-wrap items-center gap-2">
 										<label class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary">
 											{recExistingTranscript && recPdfMode === 'replace'
-												? 'Choisir le PDF de remplacement'
+												? $t('recordings.edit.choosePdfReplacement')
 												: recExistingTranscript
-													? 'Choisir un autre PDF'
-													: 'Ajouter un PDF'}
+													? $t('recordings.edit.chooseAnotherPdf')
+													: $t('recordings.edit.addPdf')}
 											<input
 												type="file"
 												accept="application/pdf,.pdf"
@@ -3479,7 +3545,7 @@
 												disabled={recSaving}
 											/>
 										</label>
-										<p class="text-[10px] text-stone-400">PDF uniquement · 100 Mo max</p>
+										<p class="text-[10px] text-stone-400">{$t('recordings.edit.pdfFormats')}</p>
 										{#if recExistingTranscript}
 											<button
 												type="button"
@@ -3490,7 +3556,7 @@
 												disabled={recSaving}
 												class="text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 hover:text-stone-700 disabled:opacity-50"
 											>
-												Garder l'existant
+												{$t('recordings.edit.keepExisting')}
 											</button>
 										{/if}
 									</div>
@@ -3509,7 +3575,7 @@
 					<!-- Audio replace — destructive: overwrites the published MP3 -->
 					<div class="mt-6 min-w-0 border-t border-stone-100 pt-5">
 						<div class="flex flex-col gap-2">
-							<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Fichier audio</span>
+							<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.edit.audioLabel')}</span>
 							{#if recAudioFile && recAudioDurationSec}
 								<div class="flex min-w-0 items-center justify-between gap-3 overflow-hidden border border-amber-200 bg-amber-50/60 px-3 py-2">
 									<div class="min-w-0 flex-1">
@@ -3524,16 +3590,16 @@
 										disabled={recSaving}
 										class="text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 hover:text-red-600 disabled:opacity-50"
 									>
-										Retirer
+										{$t('recordings.common.remove')}
 									</button>
 								</div>
 								<p class="text-[10px] text-amber-700">
-									L'ancien fichier audio sera définitivement remplacé à l'enregistrement.
+									{$t('recordings.edit.audioReplaceWarning')}
 								</p>
 								{#if recAudioUploadPct !== null}
 									<div class="flex flex-col gap-1">
 										<div class="flex items-center justify-between text-[10px] font-mono text-stone-500 tabular-nums">
-											<span>{recAudioUploadPct < 100 ? 'Téléversement…' : 'Finalisation…'}</span>
+											<span>{recAudioUploadPct < 100 ? $t('recordings.common.uploading') : $t('recordings.edit.finalizing')}</span>
 											<span>{recAudioUploadPct}%</span>
 										</div>
 										<div class="h-1.5 w-full overflow-hidden rounded-full bg-stone-200">
@@ -3547,7 +3613,7 @@
 							{:else}
 								<div class="flex items-center gap-2">
 									<label class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary">
-										Remplacer l'audio
+										{$t('recordings.edit.replaceAudio')}
 										<input
 											type="file"
 											accept="audio/mpeg,audio/mp3,.mp3"
@@ -3556,7 +3622,7 @@
 											disabled={recSaving}
 										/>
 									</label>
-									<p class="text-[10px] text-stone-400">MP3 uniquement · 2 Go max</p>
+									<p class="text-[10px] text-stone-400">{$t('recordings.edit.audioFormats')}</p>
 								</div>
 							{/if}
 							{#if recAudioError}
@@ -3574,7 +3640,7 @@
 						disabled={recSaving}
 						class="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500 hover:bg-stone-100 hover:text-stone-700 disabled:opacity-50"
 					>
-						Annuler
+						{$t('recordings.common.cancel')}
 					</button>
 					<button
 						type="button"
@@ -3582,7 +3648,7 @@
 						disabled={recSaving}
 						class="bg-primary px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-white hover:bg-missionnaire-600 disabled:opacity-50"
 					>
-						{recSaving ? 'Enregistrement…' : 'Enregistrer'}
+						{recSaving ? $t('recordings.common.saving') : $t('recordings.common.save')}
 					</button>
 				</div>
 			</div>
@@ -3607,13 +3673,13 @@
 		onkeydown={onLightboxKeydown}
 		role="dialog"
 		aria-modal="true"
-		aria-label="Vignette du direct"
+		aria-label={$t('recordings.meta.thumbnailAlt')}
 		tabindex="-1"
 	>
 		<button
 			type="button"
 			onclick={closeThumbnail}
-			aria-label="Fermer"
+			aria-label={$t('recordings.common.close')}
 			class="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
 		>
 			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -3624,7 +3690,7 @@
 		     blur-up distracts. Just request the largest optimized variant. -->
 		<img
 			src={vercelImage(broadcast.thumbnail_url, 1920, 85)}
-			alt={broadcast.title || 'Vignette du direct'}
+			alt={broadcast.title || $t('recordings.meta.thumbnailAlt')}
 			onerror={() => {
 				broadcastThumbnailBroken = true;
 				closeThumbnail();

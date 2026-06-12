@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { toast } from '$lib/stores/toast';
+	import { t } from '$lib/i18n';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -91,10 +92,10 @@
 	function validateFile(file: File): string | null {
 		const ext = extOf(file.name);
 		if (!ALLOWED_EXTENSIONS.includes(ext)) {
-			return `Format non supporté (.${ext})`;
+			return $t('audio.bulk.unsupportedFormat', { ext });
 		}
 		if (file.size > MAX_SIZE) {
-			return `Trop volumineux (${(file.size / 1024 / 1024).toFixed(0)} MB)`;
+			return $t('audio.bulk.tooLarge', { size: (file.size / 1024 / 1024).toFixed(0) });
 		}
 		return null;
 	}
@@ -132,10 +133,10 @@
 
 		if (newRows.length > 0) {
 			rows = [...rows, ...newRows];
-			toast.success(`${newRows.length} fichier${newRows.length > 1 ? 's' : ''} ajouté${newRows.length > 1 ? 's' : ''}`);
+			toast.success(newRows.length > 1 ? $t('audio.bulk.filesAddedMany', { count: newRows.length }) : $t('audio.bulk.filesAddedOne', { count: newRows.length }));
 		}
 		if (skipped.length > 0) {
-			toast.error(`${skipped.length} fichier(s) ignoré(s): ${skipped.slice(0, 3).join(', ')}${skipped.length > 3 ? '…' : ''}`);
+			toast.error($t('audio.bulk.filesSkipped', { count: skipped.length, list: skipped.slice(0, 3).join(', ') + (skipped.length > 3 ? '…' : '') }));
 		}
 	}
 
@@ -225,7 +226,7 @@
 		if (cat && !categories.includes(cat)) {
 			categories = [...categories, cat];
 		}
-		toast.success('Valeurs appliquées à toutes les lignes');
+		toast.success($t('audio.bulk.appliedToAll'));
 	}
 
 	function updateRow(id: string, patch: Partial<Row>) {
@@ -285,9 +286,9 @@
 			});
 			xhr.addEventListener('load', () => {
 				if (xhr.status >= 200 && xhr.status < 300) resolve();
-				else reject(new Error(`Upload S3 a échoué (${xhr.status})`));
+				else reject(new Error($t('audio.bulk.s3Failed', { status: xhr.status })));
 			});
-			xhr.addEventListener('error', () => reject(new Error('Erreur réseau durant l\'upload')));
+			xhr.addEventListener('error', () => reject(new Error($t('audio.bulk.networkError'))));
 			xhr.open('PUT', uploadUrl);
 			xhr.setRequestHeader('Content-Type', contentType);
 			xhr.send(row.file);
@@ -330,7 +331,7 @@
 		// Validate everything has title + category
 		const invalid = rows.filter((r) => !r.title || !r.category);
 		if (invalid.length > 0) {
-			toast.error(`${invalid.length} ligne(s) sans titre ou catégorie`);
+			toast.error($t('audio.bulk.invalidRows', { count: invalid.length }));
 			return;
 		}
 
@@ -349,7 +350,7 @@
 				} catch (err) {
 					updateRow(row.id, {
 						status: 'error',
-						error: err instanceof Error ? err.message : 'Erreur inconnue'
+						error: err instanceof Error ? err.message : $t('audio.bulk.unknownError')
 					});
 				}
 			}
@@ -361,33 +362,33 @@
 		const finalDone = rows.filter((r) => r.status === 'done').length;
 		const finalErr = rows.filter((r) => r.status === 'error').length;
 		if (finalErr === 0) {
-			toast.success(`${finalDone} audio${finalDone > 1 ? 's' : ''} importé${finalDone > 1 ? 's' : ''} avec succès`);
+			toast.success(finalDone > 1 ? $t('audio.bulk.importedMany', { count: finalDone }) : $t('audio.bulk.importedOne', { count: finalDone }));
 			setTimeout(() => goto('/audio'), 1000);
 		} else {
-			toast.error(`${finalErr} erreur(s), ${finalDone} réussi(s)`);
+			toast.error($t('audio.bulk.finishedWithErrors', { errors: finalErr, done: finalDone }));
 		}
 	}
 
 	function statusLabel(status: RowStatus): string {
 		switch (status) {
 			case 'pending':
-				return 'En attente';
+				return $t('audio.bulk.status.pending');
 			case 'uploading':
-				return 'Import…';
+				return $t('audio.bulk.status.uploading');
 			case 'saving':
-				return 'Enregistrement…';
+				return $t('audio.bulk.status.saving');
 			case 'done':
-				return 'Terminé';
+				return $t('audio.bulk.status.done');
 			case 'error':
-				return 'Erreur';
+				return $t('audio.bulk.status.error');
 			case 'skipped':
-				return 'Ignoré';
+				return $t('audio.bulk.status.skipped');
 		}
 	}
 </script>
 
 <svelte:head>
-	<title>Importer en lot - Missionnaire Admin</title>
+	<title>{$t('audio.bulk.pageTitle')}</title>
 </svelte:head>
 
 <!-- Header -->
@@ -396,17 +397,17 @@
 		<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 			<path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
 		</svg>
-		Bibliothèque
+		{$t('audio.backToLibrary')}
 	</a>
-	<h1 class="font-display text-3xl font-semibold text-stone-800">Importer en lot</h1>
-	<p class="mt-1 text-sm text-stone-500">Déposez plusieurs fichiers ou un dossier entier. Vérifiez les métadonnées avant de confirmer l'import.</p>
+	<h1 class="font-display text-3xl font-semibold text-stone-800">{$t('audio.bulk.title')}</h1>
+	<p class="mt-1 text-sm text-stone-500">{$t('audio.bulk.subtitle')}</p>
 </div>
 
 <!-- Drop zone -->
 <div class="mb-6">
 	<div
 		role="region"
-		aria-label="Zone de dépôt des fichiers audio"
+		aria-label={$t('audio.bulk.dropzoneAria')}
 		class="relative w-full rounded-none border-2 border-dashed transition-all duration-200
 		{dragover ? 'border-primary bg-missionnaire-50/50' : 'border-stone-200 bg-white/40'}"
 		ondragover={(e) => { e.preventDefault(); dragover = true; }}
@@ -435,20 +436,20 @@
 					<path stroke-linecap="round" stroke-linejoin="round" d="M3 7l2-2h4l2 2h10a2 2 0 012 2v9a2 2 0 01-2 2H3a2 2 0 01-2-2V9a2 2 0 012-2z" />
 				</svg>
 			</div>
-			<p class="text-sm font-medium text-stone-600">Glissez plusieurs fichiers audio ou un dossier ici</p>
-			<p class="mt-1 text-xs text-stone-400">MP3, WAV, FLAC, OGG, M4A, AAC &middot; Max 500 MB par fichier</p>
+			<p class="text-sm font-medium text-stone-600">{$t('audio.bulk.dragHint')}</p>
+			<p class="mt-1 text-xs text-stone-400">{$t('audio.bulk.formatsHint')}</p>
 			<div class="mt-5 flex flex-wrap justify-center gap-3">
 				<button type="button" class="admin-btn-secondary" onclick={() => fileInputEl?.click()}>
 					<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
 					</svg>
-					Choisir des fichiers
+					{$t('audio.bulk.chooseFiles')}
 				</button>
 				<button type="button" class="admin-btn-primary" onclick={() => folderInputEl?.click()}>
 					<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M3 7l2-2h4l2 2h10a2 2 0 012 2v9a2 2 0 01-2 2H3a2 2 0 01-2-2V9a2 2 0 012-2z" />
 					</svg>
-					Choisir un dossier
+					{$t('audio.bulk.chooseFolder')}
 				</button>
 			</div>
 		</div>
@@ -458,24 +459,24 @@
 {#if rows.length > 0}
 	<!-- Bulk controls -->
 	<div class="mb-6 border border-stone-200/60 bg-white/40 p-5">
-		<h2 class="mb-4 font-display text-base font-semibold text-stone-700">Appliquer à toutes les lignes</h2>
+		<h2 class="mb-4 font-display text-base font-semibold text-stone-700">{$t('audio.bulk.applyToAll')}</h2>
 		<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 			<div>
-				<label for="bulk-category" class="admin-label">Catégorie</label>
+				<label for="bulk-category" class="admin-label">{$t('audio.fields.category')}</label>
 				<select id="bulk-category" class="admin-input" bind:value={bulkCategory}>
 					<option value="">—</option>
 					{#each categories as cat}
 						<option value={cat}>{cat}</option>
 					{/each}
-					<option value="__new">+ Nouvelle catégorie</option>
+					<option value="__new">{$t('audio.fields.newCategory')}</option>
 				</select>
 				{#if bulkCategory === '__new'}
-					<input type="text" class="admin-input mt-2" placeholder="Nom de la catégorie" bind:value={bulkNewCategory} />
+					<input type="text" class="admin-input mt-2" placeholder={$t('audio.fields.newCategoryPlaceholder')} bind:value={bulkNewCategory} />
 				{/if}
 			</div>
 			<div>
-				<label for="bulk-artist" class="admin-label">Artiste</label>
-				<input id="bulk-artist" type="text" class="admin-input" bind:value={bulkArtist} list="bulk-artist-list" placeholder="Artiste" />
+				<label for="bulk-artist" class="admin-label">{$t('audio.fields.artist')}</label>
+				<input id="bulk-artist" type="text" class="admin-input" bind:value={bulkArtist} list="bulk-artist-list" placeholder={$t('audio.fields.artist')} />
 				<datalist id="bulk-artist-list">
 					{#each data.artists as a}
 						<option value={a}></option>
@@ -483,17 +484,17 @@
 				</datalist>
 			</div>
 			<div>
-				<label for="bulk-book" class="admin-label">Livre (abrégé)</label>
-				<input id="bulk-book" type="text" class="admin-input" bind:value={bulkBook} placeholder="Ex: CAN" />
+				<label for="bulk-book" class="admin-label">{$t('audio.fields.book')}</label>
+				<input id="bulk-book" type="text" class="admin-input" bind:value={bulkBook} placeholder={$t('audio.fields.bookPlaceholder')} />
 			</div>
 			<div>
-				<label for="bulk-book-full" class="admin-label">Livre (nom complet)</label>
-				<input id="bulk-book-full" type="text" class="admin-input" bind:value={bulkBookFullName} placeholder="Ex: Cantiques" />
+				<label for="bulk-book-full" class="admin-label">{$t('audio.fields.bookFullName')}</label>
+				<input id="bulk-book-full" type="text" class="admin-input" bind:value={bulkBookFullName} placeholder={$t('audio.fields.bookFullNamePlaceholder')} />
 			</div>
 		</div>
 		<div class="mt-4 flex justify-end">
 			<button type="button" onclick={applyToAll} class="admin-btn-secondary text-sm" disabled={processing}>
-				Appliquer à toutes les lignes
+				{$t('audio.bulk.applyToAll')}
 			</button>
 		</div>
 	</div>
@@ -502,31 +503,31 @@
 	<div class="mb-6 border border-stone-200/60 bg-white/40">
 		<div class="flex items-center justify-between border-b border-stone-100 px-5 py-3">
 			<div class="text-sm text-stone-600">
-				<span class="font-semibold text-stone-800">{totalFiles}</span> fichier{totalFiles > 1 ? 's' : ''} détecté{totalFiles > 1 ? 's' : ''}
+				<span class="font-semibold text-stone-800">{totalFiles}</span> {totalFiles > 1 ? $t('audio.bulk.fileDetectedMany') : $t('audio.bulk.fileDetectedOne')}
 				{#if readyCount < totalFiles}
-					&middot; <span class="text-amber-600">{totalFiles - readyCount} sans titre ou catégorie</span>
+					&middot; <span class="text-amber-600">{$t('audio.bulk.missingMeta', { count: totalFiles - readyCount })}</span>
 				{/if}
 				{#if doneCount > 0}
-					&middot; <span class="text-green-600">{doneCount} importé{doneCount > 1 ? 's' : ''}</span>
+					&middot; <span class="text-green-600">{doneCount > 1 ? $t('audio.bulk.importedCountMany', { count: doneCount }) : $t('audio.bulk.importedCountOne', { count: doneCount })}</span>
 				{/if}
 				{#if errorCount > 0}
-					&middot; <span class="text-red-600">{errorCount} erreur{errorCount > 1 ? 's' : ''}</span>
+					&middot; <span class="text-red-600">{errorCount > 1 ? $t('audio.bulk.errorsMany', { count: errorCount }) : $t('audio.bulk.errorsOne', { count: errorCount })}</span>
 				{/if}
 			</div>
 			<button type="button" onclick={clearAll} class="text-xs text-stone-500 hover:text-red-600 disabled:opacity-50" disabled={processing}>
-				Tout effacer
+				{$t('audio.bulk.clearAll')}
 			</button>
 		</div>
 		<div class="overflow-x-auto">
 			<table class="w-full text-left text-sm">
 				<thead>
 					<tr class="border-b border-stone-100 bg-cream/50 text-xs uppercase tracking-wide text-stone-500">
-						<th class="px-3 py-2">Fichier</th>
-						<th class="px-3 py-2">Titre *</th>
-						<th class="px-3 py-2">Artiste</th>
-						<th class="px-3 py-2">Catégorie *</th>
-						<th class="px-3 py-2">N°</th>
-						<th class="px-3 py-2">Statut</th>
+						<th class="px-3 py-2">{$t('audio.bulk.colFile')}</th>
+						<th class="px-3 py-2">{$t('audio.fields.title')} *</th>
+						<th class="px-3 py-2">{$t('audio.fields.artist')}</th>
+						<th class="px-3 py-2">{$t('audio.fields.category')} *</th>
+						<th class="px-3 py-2">{$t('audio.bulk.colNumber')}</th>
+						<th class="px-3 py-2">{$t('audio.bulk.colStatus')}</th>
 						<th class="px-3 py-2"></th>
 					</tr>
 				</thead>
@@ -547,7 +548,7 @@
 							<td class="px-3 py-2 align-top">
 								<input
 									type="text"
-									class="admin-input !py-1 !text-xs"
+									class="admin-input !h-9 !text-xs"
 									value={row.title}
 									oninput={(e) => updateRow(row.id, { title: e.currentTarget.value })}
 									disabled={row.status === 'uploading' || row.status === 'saving' || row.status === 'done'}
@@ -556,7 +557,7 @@
 							<td class="px-3 py-2 align-top">
 								<input
 									type="text"
-									class="admin-input !py-1 !text-xs"
+									class="admin-input !h-9 !text-xs"
 									value={row.artist}
 									oninput={(e) => updateRow(row.id, { artist: e.currentTarget.value })}
 									list="bulk-artist-list"
@@ -565,7 +566,7 @@
 							</td>
 							<td class="px-3 py-2 align-top">
 								<select
-									class="admin-input !py-1 !text-xs"
+									class="admin-input !h-9 !text-xs"
 									value={row.category}
 									onchange={(e) => updateRow(row.id, { category: e.currentTarget.value })}
 									disabled={row.status === 'uploading' || row.status === 'saving' || row.status === 'done'}
@@ -582,7 +583,7 @@
 							<td class="px-3 py-2 align-top">
 								<input
 									type="number"
-									class="admin-input !w-16 !py-1 !text-xs"
+									class="admin-input !w-16 !h-9 !text-xs"
 									value={row.number ?? ''}
 									oninput={(e) => {
 										const v = e.currentTarget.value;
@@ -610,7 +611,7 @@
 										<span class="max-w-[160px] text-[11px] text-red-600" title={row.error}>{row.error}</span>
 									{/if}
 									{#if row.duplicateWarning}
-										<span class="text-[11px] text-amber-600" title={row.duplicateWarning}>Doublon possible</span>
+										<span class="text-[11px] text-amber-600" title={row.duplicateWarning}>{$t('audio.bulk.possibleDuplicate')}</span>
 									{/if}
 								</div>
 							</td>
@@ -620,7 +621,7 @@
 									onclick={() => removeRow(row.id)}
 									disabled={row.status === 'uploading' || row.status === 'saving'}
 									class="text-xs text-stone-400 hover:text-red-600 disabled:opacity-30"
-									title="Retirer"
+									title={$t('audio.bulk.remove')}
 								>
 									<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 										<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -639,14 +640,14 @@
 		<div class="text-sm text-stone-600">
 			{#if !allReady}
 				<span class="text-amber-600">
-					{totalFiles - readyCount} ligne{totalFiles - readyCount > 1 ? 's' : ''} à compléter (titre + catégorie requis)
+					{totalFiles - readyCount > 1 ? $t('audio.bulk.rowsIncompleteMany', { count: totalFiles - readyCount }) : $t('audio.bulk.rowsIncompleteOne', { count: totalFiles - readyCount })}
 				</span>
 			{:else if processing}
-				<span class="text-primary">Import en cours…</span>
+				<span class="text-primary">{$t('audio.bulk.uploading')}</span>
 			{:else if doneCount === totalFiles}
-				<span class="text-green-700">Tous les fichiers ont été importés</span>
+				<span class="text-green-700">{$t('audio.bulk.allImported')}</span>
 			{:else}
-				<span>Prêt à importer {hasPending ? rows.filter((r) => r.status === 'pending' || r.status === 'error').length : 0} fichier(s)</span>
+				<span>{$t('audio.bulk.readyToImport', { count: hasPending ? rows.filter((r) => r.status === 'pending' || r.status === 'error').length : 0 })}</span>
 			{/if}
 		</div>
 		<button
@@ -660,12 +661,12 @@
 					<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
 					<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
 				</svg>
-				Import en cours…
+				{$t('audio.bulk.uploading')}
 			{:else}
 				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 				</svg>
-				Confirmer et tout importer
+				{$t('audio.bulk.confirmImport')}
 			{/if}
 		</button>
 	</div>

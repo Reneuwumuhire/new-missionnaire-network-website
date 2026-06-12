@@ -2,6 +2,7 @@ import type { PDF } from '../../core/model/pdf';
 import { getDb } from '../../db/mongo';
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
+import { pageMeta } from '$lib/seo';
 import { ObjectId, type Filter } from 'mongodb';
 
 export const load: PageServerLoad = async ({ url }) => {
@@ -68,6 +69,14 @@ export const load: PageServerLoad = async ({ url }) => {
 					serialized.videoId = serialized.videoId.toString();
 				}
 
+				// recordingId (link to a live recording) is also an ObjectId —
+				// left raw it makes the whole load non-serializable and the
+				// page 500s for any month containing such a document.
+				const withRecording = serialized as PDF & { recordingId?: { toString(): string } | string };
+				if (withRecording.recordingId) {
+					withRecording.recordingId = withRecording.recordingId.toString();
+				}
+
 				// If there's a videoId, try to get the video ID from videos collection
 				if (serialized.videoId) {
 					const videosCollection = db.collection('videos');
@@ -90,7 +99,13 @@ export const load: PageServerLoad = async ({ url }) => {
 			},
 			sort: sortOrder,
 			years,
-			selectedYear
+			selectedYear,
+			// Rendered by the root layout as the single og:*/twitter:* tag set.
+			meta: pageMeta('/documents', {
+				title: 'Documents et transcriptions - Missionnaire Network',
+				description:
+					'Consultez et téléchargez les documents et transcriptions du Message classés par année sur Missionnaire Network.'
+			})
 		};
 	} catch (err) {
 		console.error('Error loading documents:', err);

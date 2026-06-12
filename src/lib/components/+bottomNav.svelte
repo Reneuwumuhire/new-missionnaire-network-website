@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { radioIsLive } from '$lib/stores/global';
+	import { t, type TranslationKey } from '../../i18n';
 	import { portal } from '$lib/actions/portal';
+	import MoreSheet from '$lib/components/MoreSheet.svelte';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import BsMic from 'svelte-icons-pack/bs/BsMic';
@@ -19,30 +21,36 @@
 	// opens the full hamburger menu, so listeners can jump anywhere in
 	// one tap. Each tab swaps to its filled icon + turns orange when its
 	// route is active.
-	const items = [
+	const items: {
+		label: TranslationKey;
+		href: string;
+		match: string[];
+		iconInactive: unknown;
+		iconActive: unknown;
+	}[] = [
 		{
-			label: 'Prédications',
+			label: 'nav.predications',
 			href: '/predications',
 			match: ['/predications'],
 			iconInactive: BsMic,
 			iconActive: BsMicFill
 		},
 		{
-			label: 'Musique',
+			label: 'nav.musique',
 			href: '/musique',
 			match: ['/musique'],
 			iconInactive: BsPlayCircle,
 			iconActive: BsPlayCircleFill
 		},
 		{
-			label: 'Direct',
+			label: 'nav.direct',
 			href: '/live',
 			match: ['/live'],
 			iconInactive: RiMediaLiveLine,
 			iconActive: RiMediaLiveFill
 		},
 		{
-			label: 'Transcriptions',
+			label: 'nav.transcriptions',
 			href: '/transcriptions',
 			match: ['/transcriptions'],
 			iconInactive: BsFileEarmarkPdf,
@@ -55,18 +63,16 @@
 	// every navigation (client-side included) — computing the match
 	// inside a plain helper hides `pathname` from the dependency
 	// tracker and leaves the highlight stuck on first paint.
-	$: pathname = $page.url.pathname;
-	$: activeHref =
-		items.find((item) =>
+	let pathname = $derived($page.url.pathname);
+	let activeHref =
+		$derived(items.find((item) =>
 			item.match.some((base) => pathname === base || pathname.startsWith(`${base}/`))
-		)?.href ?? null;
+		)?.href ?? null);
 
-	// Open the existing header hamburger menu. The NavBar listens for
-	// this event and runs its own toggle (which handles body-scroll
-	// locking) — keeps a single menu implementation.
-	function openMenu() {
-		window.dispatchEvent(new CustomEvent('missionnaire:toggle-mobile-nav'));
-	}
+	// "Menu" opens a bottom sheet with the sections the four tabs don't
+	// cover (Questions, Documents…) — one tap to reach anything,
+	// instead of routing through the header hamburger menu.
+	let moreSheetOpen = $state(false);
 </script>
 
 <!-- `use:portal` re-parents the bar to <body> so it can never land
@@ -74,7 +80,7 @@
      those would make that ancestor the containing block and the bar
      would scroll with the page instead of staying pinned to the
      viewport. -->
-<nav class="bottom-nav" aria-label="Navigation rapide" use:portal>
+<nav class="bottom-nav" aria-label={$t('nav.quickNav')} use:portal>
 	{#each items as item}
 		<a
 			href={item.href}
@@ -94,18 +100,26 @@
 					<span class="bottom-nav__live" aria-hidden="true"></span>
 				{/if}
 			</span>
-			<span class="bottom-nav__label">{item.label}</span>
+			<span class="bottom-nav__label">{$t(item.label)}</span>
 		</a>
 	{/each}
 
-	<!-- "More" — opens the full hamburger menu. -->
-	<button type="button" class="bottom-nav__item" aria-label="Ouvrir le menu" on:click={openMenu}>
+	<!-- "More" — opens the sections sheet. -->
+	<button
+		type="button"
+		class="bottom-nav__item"
+		aria-label={$t('nav.openMenu')}
+		aria-expanded={moreSheetOpen}
+		onclick={() => (moreSheetOpen = !moreSheetOpen)}
+	>
 		<span class="bottom-nav__icon">
 			<Icon src={CgMoreVerticalAlt} color="currentColor" className="bottom-nav__glyph" />
 		</span>
-		<span class="bottom-nav__label">Menu</span>
+		<span class="bottom-nav__label">{$t('nav.menu')}</span>
 	</button>
 </nav>
+
+<MoreSheet open={moreSheetOpen} onclose={() => (moreSheetOpen = false)} />
 
 <style>
 	.bottom-nav {

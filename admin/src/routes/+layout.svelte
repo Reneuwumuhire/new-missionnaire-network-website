@@ -7,6 +7,12 @@
 	import type { LayoutData } from './$types';
 	import type { Snippet } from 'svelte';
 	import { navigating } from '$app/state';
+	import { onMount } from 'svelte';
+	import { initLocale } from '$lib/i18n';
+
+	onMount(() => {
+		initLocale();
+	});
 
 	let { data, children }: { data: LayoutData; children: Snippet } = $props();
 	const isLoggedIn = $derived(!!data.user);

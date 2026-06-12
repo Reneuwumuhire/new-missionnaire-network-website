@@ -7,23 +7,28 @@
 	import NotificationBell from '$lib/components/+notificationBell.svelte';
 	import { radioIsLive as radioIsLiveStore } from '$lib/stores/global';
 
-	export let data: {
+	interface Props {
+		data: {
 		data: YoutubeVideo[];
 	};
+	}
+
+	let { data }: Props = $props();
 
 	// Single source of truth: the layout's `radioState` (admin-gate aware) for
 	// SSR + initial paint, the push-driven store thereafter. Banner and button
 	// stay in sync because both pull from this same state.
-	$: ssrIsLive = $page.data?.radioState?.isLive ?? false;
-	$: radioIsLive = browser ? $radioIsLiveStore : ssrIsLive;
-	$: recentVideos = (data.data || []).slice(0, 3);
+	let ssrIsLive = $derived($page.data?.radioState?.isLive ?? false);
+	let radioIsLive = $derived(browser ? $radioIsLiveStore : ssrIsLive);
+	let recentVideos = $derived((data.data || []).slice(0, 3));
 
-	let bellRef: NotificationBell | undefined;
+	let bellRef: NotificationBell | undefined = $state();
+	let bellSubscribed = $state(false);
 
 	// Scroll-triggered reveal
-	let heroVisible = false;
-	let sectionsVisible: Record<string, boolean> = {};
-	let scrolledPastHero = false;
+	let heroVisible = $state(false);
+	let sectionsVisible: Record<string, boolean> = $state({});
+	let scrolledPastHero = $state(false);
 
 	onMount(() => {
 		if (!browser) return;
@@ -76,8 +81,8 @@
 		{ text: 'Voici, je me tiens à la porte, et je frappe. Si quelqu\u2019un entend ma voix et ouvre la porte, j\u2019entrerai.', ref: 'Apocalypse 3:20' },
 	];
 
-	let heroVerseIndex = 0;
-	let heroVerseVisible = true;
+	let heroVerseIndex = $state(0);
+	let heroVerseVisible = $state(true);
 	let heroVerseInterval: ReturnType<typeof setInterval>;
 
 	onMount(() => {
@@ -118,29 +123,9 @@
 	}
 </script>
 
+<!-- Title/description/og:*/twitter:* come from `meta` in +page.server.ts —
+     the root layout renders the single canonical tag set (see $lib/seo). -->
 <svelte:head>
-	<title>Missionnaire Network - Accueil | Prédications et Cantiques du Message</title>
-	<meta
-		name="description"
-		content="Bienvenue sur Missionnaire Network. Découvrez les prédications et cantiques inspirants du Message de l'Heure pour votre édification spirituelle."
-	/>
-	<meta
-		property="og:title"
-		content="Missionnaire Network - Accueil | Prédications et Cantiques du Message"
-	/>
-	<meta
-		property="og:description"
-		content="Découvrez les prédications et cantiques inspirants du Message de l'Heure pour votre édification spirituelle."
-	/>
-	<meta property="og:url" content="https://missionnaire.net/" />
-	<meta
-		name="twitter:title"
-		content="Missionnaire Network - Accueil | Prédications et Cantiques du Message"
-	/>
-	<meta
-		name="twitter:description"
-		content="Découvrez les prédications et cantiques inspirants du Message de l'Heure pour votre édification spirituelle."
-	/>
 	<meta name="google-site-verification" content="5KUjbDomG7hhFBwtEU79pKDetc2q3I2qhEE_0BO4o_o" />
 </svelte:head>
 
@@ -183,7 +168,7 @@
 				Missionnaire Network
 			</p>
 
-			<h1 class="hero-title font-display font-semibold text-[clamp(2.2rem,7vw,4.8rem)] leading-[1.08] text-stone-900">
+			<h1 class="hero-title font-display font-semibold text-[clamp(2.3rem,7.5vw,5.2rem)] leading-[1.05] tracking-tight text-stone-900">
 				Le Message de l'Heure<br />
 				<span class="text-missionnaire italic">pour aujourd'hui</span>
 			</h1>
@@ -195,7 +180,7 @@
 			<div class="hero-cta mt-8 md:mt-10 flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
 				<a
 					href="/live"
-					class="group px-6 sm:px-8 py-3.5 text-white text-[11px] sm:text-[12px] font-semibold uppercase tracking-[0.2em] font-body overflow-hidden transition-all duration-300 flex items-center justify-center gap-3 {radioIsLive
+					class="group px-6 sm:px-8 py-3.5 text-white text-[11px] sm:text-[12px] font-semibold uppercase tracking-[0.2em] font-body overflow-hidden transition-all duration-300 active:scale-[0.98] flex items-center justify-center gap-3 {radioIsLive
 						? 'bg-red-700 hover:bg-red-800'
 						: 'bg-stone-900 hover:bg-missionnaire'}"
 				>
@@ -212,7 +197,7 @@
 				</a>
 				<a
 					href="/predications"
-					class="px-6 sm:px-8 py-3.5 border border-stone-300 text-stone-600 text-[11px] sm:text-[12px] font-semibold uppercase tracking-[0.2em] font-body hover:border-missionnaire hover:text-missionnaire transition-all duration-300 text-center"
+					class="px-6 sm:px-8 py-3.5 border border-stone-300 text-stone-600 text-[11px] sm:text-[12px] font-semibold uppercase tracking-[0.2em] font-body hover:border-missionnaire hover:text-missionnaire transition-all duration-300 active:scale-[0.98] text-center"
 				>
 					Explorer les prédications
 				</a>
@@ -308,14 +293,14 @@
 			</a>
 
 			<button
-				on:click={() => bellRef?.toggle()}
-				class="group flex items-center gap-4 px-6 py-5 border transition-all duration-200 cursor-pointer sm:w-auto bg-white/40 {bellRef?.isSubscribed
+				onclick={() => bellRef?.toggle()}
+				class="group flex items-center gap-4 px-6 py-5 border transition-all duration-200 active:scale-[0.98] cursor-pointer sm:w-auto bg-white/40 {bellSubscribed
 					? 'border-missionnaire/30 bg-orange-50/40'
 					: 'border-stone-200/60 hover:border-missionnaire/30 hover:bg-white/60'}"
 			>
-				<NotificationBell bind:this={bellRef} />
+				<NotificationBell bind:this={bellRef} bind:isSubscribed={bellSubscribed} />
 				<div class="flex-1 min-w-0 text-left">
-					{#if bellRef?.isSubscribed}
+					{#if bellSubscribed}
 						<p class="text-sm font-semibold text-missionnaire font-body">Notifications activées</p>
 						<p class="text-[11px] text-stone-400 font-body mt-0.5">Cliquez pour désactiver</p>
 					{:else}
@@ -337,8 +322,8 @@
 			<div class="pt-4">
 				<div class="flex items-end justify-between mb-10">
 					<div>
-						<p class="text-[10px] font-semibold uppercase tracking-[0.35em] text-missionnaire font-body mb-2">Nouveautés</p>
-						<h2 class="font-display font-semibold text-3xl md:text-[2.6rem] text-stone-900">Récemment ajouté</h2>
+						<p class="text-[10px] font-semibold uppercase tracking-[0.3em] text-missionnaire font-body mb-2">Nouveautés</p>
+						<h2 class="font-display font-semibold text-3xl md:text-[2.6rem] tracking-tight leading-[1.05] text-stone-900">Récemment ajouté</h2>
 					</div>
 					<a href="/videos" class="section-cta hidden sm:inline-flex">
 						<span class="section-cta-label">Tout voir</span>
@@ -377,7 +362,7 @@
 							{/if}
 							<div class="p-4">
 								{#if publishedLabel}
-									<p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-400 mb-1.5 font-body">
+									<p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-400 mb-1.5 font-body tabular-nums">
 										{publishedLabel}
 									</p>
 								{/if}
@@ -412,8 +397,8 @@
 	>
 		<div class="flex items-end justify-between mb-10">
 			<div>
-				<p class="text-[10px] font-semibold uppercase tracking-[0.35em] text-missionnaire font-body mb-2">À propos</p>
-				<h2 class="font-display font-semibold text-3xl md:text-[2.6rem] text-stone-900">Notre héritage</h2>
+				<p class="text-[10px] font-semibold uppercase tracking-[0.3em] text-missionnaire font-body mb-2">À propos</p>
+				<h2 class="font-display font-semibold text-3xl md:text-[2.6rem] tracking-tight leading-[1.05] text-stone-900">Notre héritage</h2>
 			</div>
 			<a href="/a-propos" class="section-cta hidden sm:inline-flex">
 				<span class="section-cta-label">En savoir plus</span>
@@ -440,7 +425,7 @@
 						</picture>
 						<div class="absolute inset-0 bg-gradient-to-t from-stone-900/70 via-stone-900/20 to-transparent"></div>
 						<div class="absolute bottom-0 left-0 right-0 p-6 md:p-8">
-							<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire-100 mb-3 font-body">Notre mission</p>
+							<p class="text-[10px] font-semibold uppercase tracking-[0.3em] text-missionnaire-100 mb-3 font-body">Notre mission</p>
 							<h2 class="font-display font-semibold text-3xl md:text-4xl text-white leading-tight">
 								Répandre le <span class="italic">Message</span><br />à travers le monde
 							</h2>
@@ -484,7 +469,7 @@
 							<p class="font-display font-medium text-xl text-stone-900 group-hover:text-missionnaire transition-colors">
 								William M. Branham
 							</p>
-							<p class="text-[10px] text-stone-400 mt-1 font-body uppercase tracking-wider">1909 – 1965 · Prophète du Message</p>
+							<p class="text-[10px] text-stone-400 mt-1 font-body uppercase tracking-wider tabular-nums">1909 – 1965 · Prophète du Message</p>
 							<p class="text-sm text-stone-500 mt-2 leading-relaxed font-body">
 								Son ministère a marqué des millions de croyants à travers le monde.
 							</p>

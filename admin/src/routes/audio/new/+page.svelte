@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { toast } from '$lib/stores/toast';
+	import { t } from '$lib/i18n';
 	import FileDropZone from '$lib/components/FileDropZone.svelte';
 	import type { PageData } from './$types';
 
@@ -49,18 +50,18 @@
 	async function loadLyricsFromUrl() {
 		const url = lyricsSourceUrl.trim();
 		if (!url) {
-			toast.error('Collez une URL avant de charger');
+			toast.error($t('audio.lyrics.pasteUrlFirst'));
 			return;
 		}
 
 		try {
 			const parsed = new URL(url);
 			if (parsed.hostname !== 'indirimbo-zikundwa.bi') {
-				toast.error('URL non supportée — utilisez indirimbo-zikundwa.bi');
+				toast.error($t('audio.lyrics.unsupportedUrl'));
 				return;
 			}
 		} catch {
-			toast.error('URL invalide');
+			toast.error($t('audio.lyrics.invalidUrl'));
 			return;
 		}
 
@@ -72,11 +73,11 @@
 			});
 			const res = await fetch(`/api/lyrics-review/lyrics?${params.toString()}`);
 			const result = await res.json();
-			if (!res.ok) throw new Error(result.error ?? 'Impossible de charger les paroles');
+			if (!res.ok) throw new Error(result.error ?? $t('audio.lyrics.loadFailed'));
 
 			const formatted = formatExtractedLyrics(result.sections, result.lines);
 			if (!formatted.trim()) {
-				toast.error('Aucune parole trouvée à cette URL');
+				toast.error($t('audio.lyrics.noneFound'));
 				return;
 			}
 
@@ -84,9 +85,9 @@
 			if (!title && typeof result.title === 'string' && result.title.trim()) {
 				title = result.title.trim();
 			}
-			toast.success('Paroles chargées depuis l’URL');
+			toast.success($t('audio.lyrics.loadedFromUrl'));
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Erreur lors du chargement des paroles');
+			toast.error(err instanceof Error ? err.message : $t('audio.lyrics.loadError'));
 		} finally {
 			lyricsUrlLoading = false;
 		}
@@ -175,9 +176,9 @@
 			});
 
 			uploaded = true;
-			toast.success('Fichier importé sur le serveur');
+			toast.success($t('audio.new.uploadedToServer'));
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : "Erreur lors de l'import");
+			toast.error(err instanceof Error ? err.message : $t('audio.new.uploadError'));
 			s3Key = '';
 			s3Url = '';
 		} finally {
@@ -256,15 +257,15 @@
 				if (lyricsResult.error) {
 					toast.error(lyricsResult.error);
 				} else {
-					toast.success('Audio et paroles enregistrés avec succès');
+					toast.success($t('audio.new.savedWithLyrics'));
 				}
 			} else {
-				toast.success('Audio enregistré avec succès');
+				toast.success($t('audio.new.saved'));
 			}
 
 			goto(`/audio/${audioId}`);
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : "Erreur lors de l'enregistrement");
+			toast.error(err instanceof Error ? err.message : $t('audio.new.saveError'));
 		} finally {
 			saving = false;
 		}
@@ -275,7 +276,7 @@
 </script>
 
 <svelte:head>
-	<title>Importer un audio - Missionnaire Admin</title>
+	<title>{$t('audio.new.pageTitle')}</title>
 </svelte:head>
 
 <!-- Header -->
@@ -287,10 +288,10 @@
 		<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 			<path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
 		</svg>
-		Bibliothèque
+		{$t('audio.backToLibrary')}
 	</a>
 	<div class="flex items-end justify-between gap-4">
-		<h1 class="font-display text-3xl font-semibold text-stone-800">Importer un audio</h1>
+		<h1 class="font-display text-3xl font-semibold text-stone-800">{$t('audio.new.title')}</h1>
 		<a
 			href="/audio/bulk-new"
 			class="inline-flex items-center gap-1 text-sm text-primary hover:underline"
@@ -302,7 +303,7 @@
 					d="M3 7l2-2h4l2 2h10a2 2 0 012 2v9a2 2 0 01-2 2H3a2 2 0 01-2-2V9a2 2 0 012-2z"
 				/>
 			</svg>
-			Plusieurs fichiers ? Importer en lot
+			{$t('audio.new.bulkLink')}
 		</a>
 	</div>
 </div>
@@ -310,35 +311,35 @@
 <div class="mx-auto max-w-2xl">
 	<!-- Step 1: File selection -->
 	<div class="mb-8">
-		<h2 class="mb-3 font-display text-lg font-semibold text-stone-700">1. Fichier audio</h2>
+		<h2 class="mb-3 font-display text-lg font-semibold text-stone-700">{$t('audio.new.step1')}</h2>
 		<FileDropZone onfileselected={onFileSelected} />
 	</div>
 
 	<!-- Step 2: Metadata -->
 	<div class="mb-8 border border-stone-200/60 bg-white/40 p-6">
-		<h2 class="mb-5 font-display text-lg font-semibold text-stone-700">2. Métadonnées</h2>
+		<h2 class="mb-5 font-display text-lg font-semibold text-stone-700">{$t('audio.new.step2')}</h2>
 
 		<div class="grid gap-5 sm:grid-cols-2">
 			<div class="sm:col-span-2">
-				<label for="title" class="admin-label">Titre *</label>
+				<label for="title" class="admin-label">{$t('audio.fields.title')} *</label>
 				<input
 					id="title"
 					type="text"
 					class="admin-input"
 					bind:value={title}
-					placeholder="Titre du cantique"
+					placeholder={$t('audio.new.titlePlaceholder')}
 				/>
 			</div>
 
 			<div>
-				<label for="artist" class="admin-label">Artiste</label>
+				<label for="artist" class="admin-label">{$t('audio.fields.artist')}</label>
 				<input
 					id="artist"
 					type="text"
 					class="admin-input"
 					bind:value={artist}
 					list="artist-list"
-					placeholder="Nom de l'artiste"
+					placeholder={$t('audio.new.artistPlaceholder')}
 				/>
 				<datalist id="artist-list">
 					{#each data.artists as a}
@@ -348,42 +349,42 @@
 			</div>
 
 			<div>
-				<label for="category" class="admin-label">Catégorie *</label>
+				<label for="category" class="admin-label">{$t('audio.fields.category')} *</label>
 				<select id="category" class="admin-input" bind:value={category}>
-					<option value="">Sélectionner...</option>
+					<option value="">{$t('audio.new.selectPlaceholder')}</option>
 					{#each data.categories as cat}
 						<option value={cat}>{cat}</option>
 					{/each}
-					<option value="__new">+ Nouvelle catégorie</option>
+					<option value="__new">{$t('audio.fields.newCategory')}</option>
 				</select>
 				{#if category === '__new'}
 					<input
 						type="text"
 						class="admin-input mt-2"
-						placeholder="Nom de la catégorie"
+						placeholder={$t('audio.fields.newCategoryPlaceholder')}
 						onchange={(e) => (category = e.currentTarget.value)}
 					/>
 				{/if}
 			</div>
 
 			<div>
-				<label for="book" class="admin-label">Livre (abrégé)</label>
-				<input id="book" type="text" class="admin-input" bind:value={book} placeholder="Ex: CAN" />
+				<label for="book" class="admin-label">{$t('audio.fields.book')}</label>
+				<input id="book" type="text" class="admin-input" bind:value={book} placeholder={$t('audio.fields.bookPlaceholder')} />
 			</div>
 
 			<div>
-				<label for="bookFullName" class="admin-label">Livre (nom complet)</label>
+				<label for="bookFullName" class="admin-label">{$t('audio.fields.bookFullName')}</label>
 				<input
 					id="bookFullName"
 					type="text"
 					class="admin-input"
 					bind:value={bookFullName}
-					placeholder="Ex: Cantiques"
+					placeholder={$t('audio.fields.bookFullNamePlaceholder')}
 				/>
 			</div>
 
 			<div>
-				<label for="number" class="admin-label">Numéro</label>
+				<label for="number" class="admin-label">{$t('audio.fields.number')}</label>
 				<input
 					id="number"
 					type="number"
@@ -393,7 +394,7 @@
 						const v = e.currentTarget.value;
 						number = v ? Number.parseInt(v) : null;
 					}}
-					placeholder="N°"
+					placeholder={$t('audio.new.numberPlaceholder')}
 				/>
 			</div>
 		</div>
@@ -402,12 +403,12 @@
 	<!-- Step 3: Optional lyrics -->
 	<div class="mb-8 border border-stone-200/60 bg-white/40 p-6">
 		<h2 class="mb-3 font-display text-lg font-semibold text-stone-700">
-			3. Paroles <span class="text-sm font-normal text-stone-400">(optionnel)</span>
+			{$t('audio.new.step3')} <span class="text-sm font-normal text-stone-400">{$t('audio.new.optional')}</span>
 		</h2>
 
 		<div class="mb-5 rounded border border-stone-200/70 bg-stone-50/60 p-4">
 			<label for="lyricsSourceUrl" class="admin-label">
-				Importer depuis indirimbo-zikundwa.bi
+				{$t('audio.lyrics.importFromSite')}
 			</label>
 			<div class="flex flex-col gap-2 sm:flex-row">
 				<input
@@ -430,37 +431,36 @@
 					disabled={lyricsUrlLoading || !lyricsSourceUrl.trim()}
 					class="admin-btn-secondary disabled:opacity-50"
 				>
-					{lyricsUrlLoading ? 'Chargement...' : 'Charger depuis l’URL'}
+					{lyricsUrlLoading ? $t('audio.lyrics.loading') : $t('audio.lyrics.loadFromUrl')}
 				</button>
 			</div>
 			<p class="mt-2 text-xs text-stone-500">
-				Collez l’URL de la page des paroles pour les importer automatiquement, ou laissez ce champ
-				vide et collez les paroles directement ci-dessous.
+				{$t('audio.lyrics.urlHelp')}
 			</p>
 		</div>
 
-		<label for="lyricsText" class="admin-label">Texte des paroles</label>
+		<label for="lyricsText" class="admin-label">{$t('audio.lyrics.textLabel')}</label>
 		<textarea
 			id="lyricsText"
 			class="admin-input min-h-64 resize-y leading-7"
 			bind:value={lyricsText}
-			placeholder="Collez les paroles ici si vous les avez déjà..."
+			placeholder={$t('audio.new.lyricsPlaceholder')}
 		></textarea>
 		<p class="mt-2 text-xs text-stone-500">
-			Vous pourrez aussi ajouter ou corriger les paroles après l'import depuis la fiche audio.
+			{$t('audio.new.lyricsHelp')}
 		</p>
 	</div>
 
 	<!-- Step 4: Upload & Save -->
 	<div class="mb-8 border border-stone-200/60 bg-white/40 p-6">
-		<h2 class="mb-5 font-display text-lg font-semibold text-stone-700">4. Import</h2>
+		<h2 class="mb-5 font-display text-lg font-semibold text-stone-700">{$t('audio.new.step4')}</h2>
 
 		{#if !uploaded}
 			<!-- Upload progress -->
 			{#if uploading}
 				<div class="mb-4">
 					<div class="mb-2 flex justify-between text-sm">
-						<span class="text-stone-600">Import en cours...</span>
+						<span class="text-stone-600">{$t('audio.new.uploading')}</span>
 						<span class="font-medium text-primary">{uploadProgress}%</span>
 					</div>
 					<div class="h-3 overflow-hidden rounded-full bg-cream-dark">
@@ -493,7 +493,7 @@
 							d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
 						/>
 					</svg>
-					Import en cours...
+					{$t('audio.new.uploading')}
 				{:else}
 					<svg
 						class="h-4 w-4"
@@ -508,19 +508,19 @@
 							d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
 						/>
 					</svg>
-					Importer le fichier sur le serveur
+					{$t('audio.new.uploadButton')}
 				{/if}
 			</button>
 
 			{#if !file}
 				<p class="mt-2 text-center text-xs text-stone-400">
-					Sélectionnez un fichier et une catégorie d'abord
+					{$t('audio.new.selectFileFirst')}
 				</p>
 			{/if}
 		{:else}
 			<!-- Save record -->
 			<div class="mb-4 border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-				Fichier importé avec succès. Enregistrez les métadonnées pour finaliser.
+				{$t('audio.new.uploadSuccessHint')}
 			</div>
 
 			<button
@@ -544,7 +544,7 @@
 							d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
 						/>
 					</svg>
-					Enregistrement...
+					{$t('audio.new.savingButton')}
 				{:else}
 					<svg
 						class="h-4 w-4"
@@ -555,7 +555,7 @@
 					>
 						<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 					</svg>
-					Enregistrer l'audio
+					{$t('audio.new.saveButton')}
 				{/if}
 			</button>
 		{/if}

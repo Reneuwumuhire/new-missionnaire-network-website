@@ -1,6 +1,7 @@
 import type { PageServerLoad } from './$types';
 import { queryLiterature } from '../../db/collections';
 import type { Literature } from '$lib/models/literature';
+import { pageMeta } from '$lib/seo';
 
 export const load: PageServerLoad = async ({ url }) => {
 	const author = url.searchParams.get('author') || 'Tous';
@@ -36,6 +37,12 @@ export const load: PageServerLoad = async ({ url }) => {
 	return {
 		literature: result.data,
 		total: result.total,
+		// Rendered by the root layout as the single og:*/twitter:* tag set.
+		meta: pageMeta('/literature', {
+			title: 'Littérature - Missionnaire Network',
+			description:
+				'Découvrez la littérature du Message : livres, brochures et lettres circulaires disponibles en plusieurs langues.'
+		}),
 		author,
 		category: type,
 		language,

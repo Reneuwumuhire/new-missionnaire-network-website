@@ -2,11 +2,11 @@
 	import { browser } from '$app/environment';
 	import { onMount, onDestroy } from 'svelte';
 
-	let pullDistance = 0;
-	let isRefreshing = false;
+	let pullDistance = $state(0);
+	let isRefreshing = $state(false);
 	let isPulling = false;
 	let startY = 0;
-	let visible = false;
+	let visible = $state(false);
 
 	const THRESHOLD = 80;
 	const MAX_PULL = 120;
@@ -80,8 +80,8 @@
 		document.removeEventListener('touchend', handleTouchEnd);
 	});
 
-	$: progress = Math.min(pullDistance / THRESHOLD, 1);
-	$: rotation = progress * 180;
+	let progress = $derived(Math.min(pullDistance / THRESHOLD, 1));
+	let rotation = $derived(progress * 180);
 </script>
 
 {#if visible || isRefreshing}

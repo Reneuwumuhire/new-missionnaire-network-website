@@ -157,6 +157,15 @@ img {
 	border-radius: 2px;
 }
 
+/* Form fields signal focus through their container (border/ring on the
+   wrapping form) — the global outline on the inner input stacked a second
+   rounded capsule inside the wrapper's ring. */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+	outline: none;
+}
+
 /* ── Prevent iOS Safari focus-zoom ──
    Safari zooms the viewport whenever a focused form field's computed
    font-size is < 16px. We can't disable that with `user-scalable=no`

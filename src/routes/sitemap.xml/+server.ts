@@ -129,7 +129,6 @@ export async function GET() {
 		'/ewald-frank',
 		'/predications',
 		'/musique',
-		'/documents',
 		'/transcriptions',
 		'/william-branham/biographie',
 		'/videos',

@@ -1,5 +1,6 @@
 import { browser } from '$app/environment';
 import type { SerializedTranscription } from '$lib/server/transcriptions';
+import { pageMeta } from '$lib/seo';
 
 export const load = async ({ fetch, url }) => {
 	const page = Number(url.searchParams.get('page')) || 1;
@@ -12,7 +13,13 @@ export const load = async ({ fetch, url }) => {
 		search: searchTerm || '',
 		sort: sortOrder as 'asc' | 'desc',
 		selectedYear,
-		pagination: { page, limit, total: 0 }
+		pagination: { page, limit, total: 0 },
+		// Rendered by the root layout as the single og:*/twitter:* tag set.
+		meta: pageMeta('/transcriptions', {
+			title: 'Transcriptions - Missionnaire Network',
+			description:
+				'Recherchez les transcriptions des prédications du Message par année et par titre, pour étude et édification.'
+		})
 	};
 
 	if (browser) {
@@ -47,9 +54,7 @@ export const load = async ({ fetch, url }) => {
 	const total = (r.total || 0) as number;
 
 	return {
-		search: searchTerm || '',
-		sort: sortOrder as 'asc' | 'desc',
-		selectedYear,
+		...baseShape,
 		pagination: { page, limit, total },
 		documents,
 		years,

@@ -1,13 +1,14 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import type { ActionData } from './$types';
+	import { t } from '$lib/i18n';
 
 	let { form }: { form: ActionData } = $props();
 	let loading = $state(false);
 </script>
 
 <svelte:head>
-	<title>Connexion - Missionnaire Admin</title>
+	<title>{$t('auth.pageTitle')}</title>
 </svelte:head>
 
 <div class="flex min-h-screen items-center justify-center bg-cream px-4">
@@ -18,7 +19,7 @@
 				Missionnaire
 			</h1>
 			<p class="mt-1 font-body text-sm tracking-widest text-earth uppercase">
-				Administration
+				{$t('common.administration')}
 			</p>
 			<div class="ornament-line mt-6">
 				<span class="text-xs text-earth/60">&#10047;</span>
@@ -31,7 +32,7 @@
 				<div
 					class="mb-6 border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
 				>
-					{form.error}
+					{'errorIsKey' in form && form.errorIsKey ? $t('auth.tooManyAttempts') : form.error}
 				</div>
 			{/if}
 
@@ -46,7 +47,7 @@
 				}}
 			>
 				<div class="mb-5">
-					<label for="email" class="admin-label">Adresse email</label>
+					<label for="email" class="admin-label">{$t('auth.email')}</label>
 					<input
 						id="email"
 						name="email"
@@ -60,7 +61,7 @@
 				</div>
 
 				<div class="mb-8">
-					<label for="password" class="admin-label">Mot de passe</label>
+					<label for="password" class="admin-label">{$t('auth.password')}</label>
 					<input
 						id="password"
 						name="password"
@@ -75,7 +76,7 @@
 				<button
 					type="submit"
 					disabled={loading}
-					class="admin-btn-primary w-full justify-center py-3 text-base disabled:opacity-60"
+					class="admin-btn-primary w-full justify-center disabled:opacity-60"
 				>
 					{#if loading}
 						<svg class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -93,9 +94,9 @@
 								d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
 							/>
 						</svg>
-						Connexion...
+						{$t('auth.loggingIn')}
 					{:else}
-						Se connecter
+						{$t('auth.login')}
 					{/if}
 				</button>
 			</form>

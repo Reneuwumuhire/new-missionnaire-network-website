@@ -4,8 +4,12 @@
 
 	// Optional extra classes — e.g. negative margins to break the bar out
 	// of a padded container so `position: sticky` keeps a tall parent.
-	let className = '';
-	export { className as class };
+	interface Props {
+		class?: string;
+	}
+
+	let { class: className = '' }: Props = $props();
+	
 
 	// Slim sticky toolbar shown above the list on /musique and
 	// /predications (mobile only). It collapses the search field and the
@@ -36,7 +40,7 @@
 		class="mobile-toolbar__btn"
 		class:is-active={$mobileSearchOpen}
 		aria-expanded={$mobileSearchOpen}
-		on:click={toggleSearch}
+		onclick={toggleSearch}
 	>
 		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 			<circle cx="11" cy="11" r="7" />
@@ -49,7 +53,7 @@
 		class="mobile-toolbar__btn"
 		class:is-active={$mobileFiltersOpen}
 		aria-expanded={$mobileFiltersOpen}
-		on:click={toggleFilters}
+		onclick={toggleFilters}
 	>
 		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 			<line x1="4" y1="6" x2="20" y2="6" />

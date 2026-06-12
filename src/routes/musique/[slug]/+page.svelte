@@ -3,22 +3,20 @@
 	import Breadcrumbs from '$lib/components/+breadcrumbs.svelte';
 	import { page } from '$app/stores';
 
-	export let data: any;
+	interface Props {
+		data: any;
+	}
 
-	$: songs = data.songs?.ok ? data.songs.val : [];
-	$: isLoading = !data.songs;
-	$: slug = $page.params.slug || '';
-	$: pageTitle = slug.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+	let { data }: Props = $props();
+
+	let songs = $derived(data.songs?.ok ? data.songs.val : []);
+	let isLoading = $derived(!data.songs);
+	let slug = $derived($page.params.slug || '');
+	let pageTitle = $derived(slug.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()));
 </script>
 
-<svelte:head>
-	<title>{pageTitle} | Musique - Missionnaire Network</title>
-	<meta name="description" content="Écoutez les cantiques de {pageTitle} sur Missionnaire Network." />
-	<link rel="canonical" href="https://missionnaire.net/musique/{slug}" />
-	<meta property="og:title" content="{pageTitle} | Musique - Missionnaire Network" />
-	<meta property="og:description" content="Écoutez les cantiques de {pageTitle} sur Missionnaire Network." />
-	<meta property="og:url" content="https://missionnaire.net/musique/{slug}" />
-</svelte:head>
+<!-- Title/description/og:*/canonical come from `meta` in this route's
+     load — the root layout renders the single canonical tag set ($lib/seo). -->
 
 <Breadcrumbs items={[
 	{ label: 'Musique', href: '/musique' },

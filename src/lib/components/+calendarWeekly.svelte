@@ -10,7 +10,11 @@
 		scheduledStartTime?: Date; //Wed Mar 13 2024 20:30:00 GMT+0200 (Central Africa Time)
 		title: string;
 	}
-	export let upComingEventData: EventData[] = [];
+	interface Props {
+		upComingEventData?: EventData[];
+	}
+
+	let { upComingEventData = [] }: Props = $props();
 	const scrollRight = () => {
 		const container = document.querySelector('.overflow-x-scroll');
 		if (container) container.scrollBy({ left: 400, behavior: 'smooth' });
@@ -23,14 +27,14 @@
 	</div>
 	<!-- verical line between -->
 	<div class="hidden md:flex flex-col items-center justify-center">
-		<div class="w-1 h-10 bg-gray-200" />
+		<div class="w-1 h-10 bg-gray-200"></div>
 	</div>
 
 	<div class="relative flex flex-row items-center scroll-smooth overflow-x-hidden w-auto">
 		<!-- Left arrow for navigation -->
 		<button
 			class=" hidden md:flex absolute top-0 bottom-0 w-24 z-10 pl-2 items-center justify-start cursor-pointe right-arrow-button left-0"
-			on:click={scrollLeft}
+			onclick={scrollLeft}
 			aria-label="Scroll Left"
 		>
 			<svg
@@ -57,7 +61,7 @@
 		<!-- Right arrow for navigation -->
 		<button
 			class="hidden md:flex absolute top-0 bottom-0 w-24 z-10 items-center justify-end cursor-pointer left-arrow-button right-0"
-			on:click={scrollRight}
+			onclick={scrollRight}
 			aria-label="Scroll Right"
 		>
 			<svg

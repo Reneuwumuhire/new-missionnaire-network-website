@@ -1,28 +1,31 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import Breadcrumbs from '$lib/components/+breadcrumbs.svelte';
 	import FormattedQuestionText from '$lib/components/questions/FormattedQuestionText.svelte';
 	import QuestionReferenceCards from '$lib/components/questions/QuestionReferenceCards.svelte';
-	import { stripRichTextFormatting } from '$lib/questions/rich-text';
 	import type { ActionData, PageData } from './$types';
 	// @ts-ignore - svelte-icons-pack ships loose icon typings in this project.
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import IoArrowBack from 'svelte-icons-pack/io/IoArrowBack';
 	import IoSendOutline from 'svelte-icons-pack/io/IoSendOutline';
 
-	export let data: PageData;
-	export let form: ActionData;
+	interface Props {
+		data: PageData;
+		form: ActionData;
+	}
 
-	let replying = false;
+	let { data, form }: Props = $props();
 
-	$: question = data.question;
-	$: officialAnswer = data.officialAnswer;
-	$: replies = data.replies || [];
-	$: questionReferences = data.references.filter((reference) => !reference.replyId);
-	$: answerReferences = data.references.filter((reference) => reference.replyId);
-	$: seoDescription = stripRichTextFormatting(question.body).slice(0, 155);
-	$: isAdminUser = data.user?.role === 'superadmin' || data.user?.role === 'editor';
-	$: replyDisplayName = form?.replyDisplayName ?? (!isAdminUser && data.user ? data.user.name : '');
-	$: statusLabel = question.status === 'answered' ? 'Répondue' : 'Publiée';
+	let replying = $state(false);
+
+	let question = $derived(data.question);
+	let officialAnswer = $derived(data.officialAnswer);
+	let replies = $derived(data.replies || []);
+	let questionReferences = $derived(data.references.filter((reference) => !reference.replyId));
+	let answerReferences = $derived(data.references.filter((reference) => reference.replyId));
+	let isAdminUser = $derived(data.user?.role === 'superadmin' || data.user?.role === 'editor');
+	let replyDisplayName = $derived(form?.replyDisplayName ?? (!isAdminUser && data.user ? data.user.name : ''));
+	let statusLabel = $derived(question.status === 'answered' ? 'Répondue' : 'Publiée');
 
 	function formatDate(value: string | null): string {
 		if (!value) return '';
@@ -134,15 +137,11 @@
 	</svg>
 {/snippet}
 
-<svelte:head>
-	<title>{question.title} - Questions et réponses</title>
-	<meta name="description" content={seoDescription} />
-	<link rel="canonical" href={`https://missionnaire.net/questions/${question.slug}`} />
-	<meta property="og:title" content={question.title} />
-	<meta property="og:description" content={seoDescription} />
-</svelte:head>
+<!-- Title/description/og:*/canonical come from `meta` in this route's
+     load — the root layout renders the single canonical tag set ($lib/seo). -->
 
 <div class="container mx-auto max-w-5xl px-4 py-6 md:px-8 md:py-8">
+	<Breadcrumbs items={[{ label: 'Questions', href: '/questions' }, { label: question.title }]} />
 	<a
 		href="/questions"
 		class="group mb-4 inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-missionnaire transition hover:text-stone-900"

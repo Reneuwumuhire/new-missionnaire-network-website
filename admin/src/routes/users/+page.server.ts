@@ -28,12 +28,15 @@ export const load: PageServerLoad = async ({ locals }) => {
 		throw redirect(303, '/');
 	}
 
-	const users = await getAllAdminUsers();
-	const usersWithPermissions = users.map((u) => ({
-		...u,
-		effectivePermissions: getPermissions(u)
-	}));
-	return { users: usersWithPermissions };
+	// Streamed: the page renders its header + skeleton rows immediately.
+	const usersPromise = getAllAdminUsers().then((users) =>
+		users.map((u) => ({
+			...u,
+			effectivePermissions: getPermissions(u)
+		}))
+	);
+	usersPromise.catch(() => {});
+	return { usersPromise };
 };
 
 export const actions: Actions = {
@@ -47,17 +50,22 @@ export const actions: Actions = {
 		const name = formData.get('name')?.toString()?.trim();
 		const role = formData.get('role')?.toString() as 'superadmin' | 'editor' | undefined;
 
-		if (!email || !name) {
-			return fail(400, { createError: 'Email et nom requis' });
+		// Field-level errors return a { field, code } pair; the page translates
+		// the code and renders it inline under the failing input (aria-invalid).
+		if (!name) {
+			return fail(400, { createFieldError: { field: 'name', code: 'nameRequired' } as const });
+		}
+		if (!email) {
+			return fail(400, { createFieldError: { field: 'email', code: 'emailRequired' } as const });
 		}
 
 		if (role !== 'superadmin' && role !== 'editor') {
-			return fail(400, { createError: 'Rôle invalide' });
+			return fail(400, { createFieldError: { field: 'role', code: 'roleInvalid' } as const });
 		}
 
 		const existing = await findAdminByEmail(email);
 		if (existing) {
-			return fail(400, { createError: 'Un utilisateur avec cet email existe déjà' });
+			return fail(400, { createFieldError: { field: 'email', code: 'emailExists' } as const });
 		}
 
 		const generatedPassword = generatePassword();

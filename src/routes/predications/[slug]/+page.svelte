@@ -6,43 +6,12 @@
 	import { onMount } from 'svelte';
 	import Breadcrumbs from '$lib/components/+breadcrumbs.svelte';
 
-	export let data: PageData;
+	interface Props {
+		data: PageData;
+	}
 
-	$: sermon = data.sermon as unknown as Sermon;
-	$: relatedSermons = (data.relatedSermons || []) as any[];
-	$: sermonTitle = sermon.french_title || sermon.english_title || 'Prédication';
-	$: sermonDate = sermon.full_date_code || sermon.date_code || sermon.iso_date || '';
-	$: description = `Écoutez la prédication "${sermonTitle}"${
-		sermonDate ? ` (${sermonDate})` : ''
-	} sur Missionnaire Network.`;
-	$: canonicalUrl = `https://missionnaire.net/predications/${data.canonicalSlug}`;
-	$: jsonLd = JSON.stringify({
-		'@context': 'https://schema.org',
-		'@type': 'AudioObject',
-		name: sermonTitle,
-		description,
-		url: canonicalUrl,
-		contentUrl: sermon.mp3_url || undefined,
-		encodingFormat: 'audio/mpeg',
-		duration: sermon.duration ? `PT${Math.floor(sermon.duration / 60)}M${sermon.duration % 60}S` : undefined,
-		datePublished: sermon.iso_date || sermon.full_date_code || undefined,
-		author: sermon.author ? { '@type': 'Person', name: sermon.author } : undefined,
-		publisher: {
-			'@type': 'Organization',
-			name: 'Missionnaire Network',
-			url: 'https://missionnaire.net'
-		},
-		inLanguage: 'fr'
-	});
-	$: frenchPdfProxyUrl = sermon.pdf_url ? `/predications/${data.canonicalSlug}/pdf?lang=fr` : '';
-	$: englishPdfProxyUrl = sermon.english_pdf_url
-		? `/predications/${data.canonicalSlug}/pdf?lang=en`
-		: '';
-	$: previewPdfUrl = frenchPdfProxyUrl || englishPdfProxyUrl;
-	$: currentSelectedUrl = getCurrentAudioUrl($selectAudio);
-	$: isFrenchTrackActive = !!sermon.mp3_url && currentSelectedUrl === sermon.mp3_url;
-	$: isEnglishTrackActive =
-		!!sermon.english_audio_url && currentSelectedUrl === sermon.english_audio_url;
+	let { data }: Props = $props();
+
 
 	function getCurrentAudioUrl(current: Sermon | Record<string, unknown> | null): string | null {
 		if (!current) return null;
@@ -105,17 +74,46 @@
 	onMount(() => {
 		initAudioOnPageOpen();
 	});
+	let sermon = $derived(data.sermon as unknown as Sermon);
+	let relatedSermons = $derived((data.relatedSermons || []) as any[]);
+	let sermonTitle = $derived(sermon.french_title || sermon.english_title || 'Prédication');
+	let sermonDate = $derived(sermon.full_date_code || sermon.date_code || sermon.iso_date || '');
+	let description = $derived(`Écoutez la prédication "${sermonTitle}"${
+		sermonDate ? ` (${sermonDate})` : ''
+	} sur Missionnaire Network.`);
+	let canonicalUrl = $derived(`https://missionnaire.net/predications/${data.canonicalSlug}`);
+	let jsonLd = $derived(JSON.stringify({
+		'@context': 'https://schema.org',
+		'@type': 'AudioObject',
+		name: sermonTitle,
+		description,
+		url: canonicalUrl,
+		contentUrl: sermon.mp3_url || undefined,
+		encodingFormat: 'audio/mpeg',
+		duration: sermon.duration ? `PT${Math.floor(sermon.duration / 60)}M${sermon.duration % 60}S` : undefined,
+		datePublished: sermon.iso_date || sermon.full_date_code || undefined,
+		author: sermon.author ? { '@type': 'Person', name: sermon.author } : undefined,
+		publisher: {
+			'@type': 'Organization',
+			name: 'Missionnaire Network',
+			url: 'https://missionnaire.net'
+		},
+		inLanguage: 'fr'
+	}));
+	let frenchPdfProxyUrl = $derived(sermon.pdf_url ? `/predications/${data.canonicalSlug}/pdf?lang=fr` : '');
+	let englishPdfProxyUrl = $derived(sermon.english_pdf_url
+		? `/predications/${data.canonicalSlug}/pdf?lang=en`
+		: '');
+	let previewPdfUrl = $derived(frenchPdfProxyUrl || englishPdfProxyUrl);
+	let currentSelectedUrl = $derived(getCurrentAudioUrl($selectAudio));
+	let isFrenchTrackActive = $derived(!!sermon.mp3_url && currentSelectedUrl === sermon.mp3_url);
+	let isEnglishTrackActive =
+		$derived(!!sermon.english_audio_url && currentSelectedUrl === sermon.english_audio_url);
 </script>
 
+<!-- Title/description/og:*/canonical come from `meta` in this route's
+     load — the root layout renders the single canonical tag set ($lib/seo). -->
 <svelte:head>
-	<title>{sermonTitle} | Prédications - Missionnaire Network</title>
-	<meta name="description" content={description} />
-	<link rel="canonical" href={canonicalUrl} />
-	<meta property="og:title" content={`${sermonTitle} | Prédications - Missionnaire Network`} />
-	<meta property="og:description" content={description} />
-	<meta property="og:url" content={canonicalUrl} />
-	<meta name="twitter:title" content={`${sermonTitle} | Prédications - Missionnaire Network`} />
-	<meta name="twitter:description" content={description} />
 	{@html `<script type="application/ld+json">${jsonLd}</script>`}
 </svelte:head>
 
@@ -141,7 +139,7 @@
 				<button
 					type="button"
 					class="px-4 py-2 bg-stone-900 text-white text-xs font-semibold uppercase tracking-wider hover:bg-stone-800 transition-colors"
-					on:click={() => toggleSermonAudio('french')}
+					onclick={() => toggleSermonAudio('french')}
 				>
 					{isFrenchTrackActive && $isPlaying ? 'Pause audio FR' : 'Lire audio FR'}
 				</button>
@@ -167,7 +165,7 @@
 				<button
 					type="button"
 					class="px-4 py-2 border border-stone-200/60 bg-white/40 text-stone-700 text-xs font-semibold uppercase tracking-wider hover:border-missionnaire hover:text-missionnaire transition-colors"
-					on:click={() => toggleSermonAudio('english')}
+					onclick={() => toggleSermonAudio('english')}
 				>
 					{isEnglishTrackActive && $isPlaying ? 'Pause audio EN' : 'Lire audio EN'}
 				</button>

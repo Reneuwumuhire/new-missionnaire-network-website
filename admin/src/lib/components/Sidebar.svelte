@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { page } from '$app/stores';
+	import { locale, setLocale, t, type Locale, type TranslationKey } from '$lib/i18n';
 
 	interface NavItem {
 		href: string;
-		label: string;
+		labelKey: TranslationKey;
 		icon: string;
 	}
 
@@ -25,15 +26,19 @@
 	} = $props();
 
 	const navItems: NavItem[] = $derived([
-		...(user.canViewDashboard ? [{ href: '/', label: 'Tableau de bord', icon: 'home' }] : []),
-		...(user.canViewQuestions ? [{ href: '/questions', label: 'Questions', icon: 'questions' }] : []),
-		...(user.canManageRecordings ? [{ href: '/recordings', label: 'Enregistrements', icon: 'recordings' }] : []),
-		...(user.canManageAudio ? [{ href: '/audio', label: 'Bibliothèque audio', icon: 'music' }] : []),
-		...(user.canReviewLyrics ? [{ href: '/lyrics-review', label: 'Révision paroles', icon: 'lyrics' }] : []),
-		...(user.role === 'superadmin' ? [{ href: '/users', label: 'Utilisateurs', icon: 'users' }] : []),
-		{ href: '/settings', label: 'Paramètres', icon: 'settings' }
+		...(user.canViewDashboard ? [{ href: '/', labelKey: 'nav.dashboard' as const, icon: 'home' }] : []),
+		...(user.canViewQuestions ? [{ href: '/questions', labelKey: 'nav.questions' as const, icon: 'questions' }] : []),
+		...(user.canManageRecordings ? [{ href: '/recordings', labelKey: 'nav.recordings' as const, icon: 'recordings' }] : []),
+		...(user.canManageAudio ? [{ href: '/audio', labelKey: 'nav.audioLibrary' as const, icon: 'music' }] : []),
+		...(user.canReviewLyrics ? [{ href: '/lyrics-review', labelKey: 'nav.lyricsReview' as const, icon: 'lyrics' }] : []),
+		...(user.role === 'superadmin' ? [{ href: '/users', labelKey: 'nav.users' as const, icon: 'users' }] : []),
+		{ href: '/settings', labelKey: 'nav.settings' as const, icon: 'settings' }
 	]);
 	let mobileOpen = $state(false);
+
+	const switchLanguage = (next: Locale) => {
+		if (next !== $locale) setLocale(next);
+	};
 
 	function isActive(href: string, pathname: string): boolean {
 		if (href === '/') return pathname === '/';
@@ -46,7 +51,7 @@
 	<button
 		class="fixed inset-0 z-30 bg-stone-900/40 backdrop-blur-[2px] lg:hidden"
 		onclick={() => (mobileOpen = false)}
-		aria-label="Fermer le menu"
+		aria-label={$t('nav.closeMenu')}
 	></button>
 {/if}
 
@@ -55,7 +60,7 @@
 	<button
 		class="fixed left-4 top-4 z-40 flex h-10 w-10 items-center justify-center bg-white shadow-md lg:hidden"
 		onclick={() => (mobileOpen = true)}
-		aria-label="Menu"
+		aria-label={$t('nav.menu')}
 	>
 		<svg
 			class="h-[18px] w-[18px] text-stone-700"
@@ -83,14 +88,14 @@
 					Missionnaire
 				</h2>
 				<span class="text-[10px] font-semibold tracking-[0.2em] text-earth/60 uppercase">
-					Administration
+					{$t('common.administration')}
 				</span>
 			</div>
 		</a>
 		<button
 			class="flex h-8 w-8 items-center justify-center rounded-full text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 lg:hidden"
 			onclick={() => (mobileOpen = false)}
-			aria-label="Fermer le menu"
+			aria-label={$t('nav.closeMenu')}
 		>
 			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -213,11 +218,11 @@
 							</svg>
 						{/if}
 					</span>
-					<span class="flex-1">{item.label}</span>
+					<span class="flex-1">{$t(item.labelKey)}</span>
 					{#if item.icon === 'recordings' && broadcastIsLive}
 						<span
 							class="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-red-600"
-							title="Audience en direct"
+							title={$t('nav.liveAudience')}
 						>
 							<span class="relative inline-flex h-1.5 w-1.5">
 								<span
@@ -263,8 +268,34 @@
 						d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
 					/>
 				</svg>
-				Déconnexion
+				{$t('nav.logout')}
 			</button>
 		</form>
+
+		<!-- Language toggle -->
+		<div class="mt-3 flex items-center gap-1.5 px-3.5" role="group" aria-label={$t('nav.language')}>
+			<button
+				type="button"
+				class="px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.15em] border transition-colors {$locale ===
+				'fr'
+					? 'border-stone-900 bg-stone-900 text-white'
+					: 'border-stone-200/60 text-stone-400 hover:border-stone-400 hover:text-stone-600'}"
+				aria-pressed={$locale === 'fr'}
+				onclick={() => switchLanguage('fr')}
+			>
+				FR
+			</button>
+			<button
+				type="button"
+				class="px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.15em] border transition-colors {$locale ===
+				'en'
+					? 'border-stone-900 bg-stone-900 text-white'
+					: 'border-stone-200/60 text-stone-400 hover:border-stone-400 hover:text-stone-600'}"
+				aria-pressed={$locale === 'en'}
+				onclick={() => switchLanguage('en')}
+			>
+				EN
+			</button>
+		</div>
 	</div>
 </aside>

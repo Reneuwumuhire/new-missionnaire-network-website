@@ -7,37 +7,41 @@
 	import NotificationBell from '$lib/components/+notificationBell.svelte';
 	import type { PageData } from './$types';
 
-	export let data: PageData;
+	interface Props {
+		data: PageData;
+	}
+
+	let { data }: Props = $props();
 
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	let bellRef: any;
+	let bellRef: any = $state();
 
 	// Phase is server-rendered for first paint (possibly ≤60s stale from the
 	// edge cache), then kept current by polling the no-store watch endpoint —
 	// that's what flips the waiting room into the live player without a reload.
-	let phase = data.watch.phase;
-	$: watch = data.watch;
+	let phase = $state(data.watch.phase);
+	let watch = $derived(data.watch);
 
-	$: shareUrl = browser
+	let shareUrl = $derived(browser
 		? `${window.location.origin}/live/${watch.slug}`
-		: `https://missionnaire.net/live/${watch.slug}`;
+		: `https://missionnaire.net/live/${watch.slug}`);
 
 	// ── Countdown (viewer-local timezone) ──────────────────────────
-	let now = Date.now();
-	$: scheduledMs = Date.parse(watch.scheduledAt);
-	$: remainingMs = Math.max(0, scheduledMs - now);
-	$: countdown = {
+	let now = $state(Date.now());
+	let scheduledMs = $derived(Date.parse(watch.scheduledAt));
+	let remainingMs = $derived(Math.max(0, scheduledMs - now));
+	let countdown = $derived({
 		days: Math.floor(remainingMs / 86_400_000),
 		hours: Math.floor((remainingMs % 86_400_000) / 3_600_000),
 		minutes: Math.floor((remainingMs % 3_600_000) / 60_000),
 		seconds: Math.floor((remainingMs % 60_000) / 1000)
-	};
+	});
 	// Countdown at zero does NOT mean on air — only the server says that.
-	$: startingSoon = phase === 'scheduled' && remainingMs === 0;
+	let startingSoon = $derived(phase === 'scheduled' && remainingMs === 0);
 
-	$: scheduledLocal = browser
+	let scheduledLocal = $derived(browser
 		? new Date(scheduledMs).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' })
-		: '';
+		: '');
 
 	function pad(n: number): string {
 		return String(n).padStart(2, '0');
@@ -101,7 +105,7 @@
 	});
 </script>
 
-<svelte:document on:visibilitychange={handleVisibilityChange} />
+<svelte:document onvisibilitychange={handleVisibilityChange} />
 
 <section class="w-full px-6 pt-4 pb-10 md:pt-6">
 	<div class="max-w-2xl mx-auto">
@@ -254,7 +258,7 @@
 
 			<!-- Notification opt-in — same block as /live -->
 			<button
-				on:click={() => bellRef?.toggle()}
+				onclick={() => bellRef?.toggle()}
 				class="flex items-center gap-4 w-full text-left border px-5 py-4 mt-6 transition-all duration-300 cursor-pointer group {bellRef?.isSubscribed
 					? 'border-missionnaire/30 bg-missionnaire/5'
 					: 'border-stone-200/60 bg-white/40 hover:border-missionnaire/30 hover:bg-missionnaire/5 hover:-translate-y-0.5 hover:shadow-sm'}"

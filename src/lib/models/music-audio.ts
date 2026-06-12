@@ -12,6 +12,10 @@ export const MusicAudioSchema = z.object({
 	s3_url: z.string().url(),
 	file_size: z.number(),
 	duration: z.number().nullable().optional(),
+	/** Seconds of silent intro to skip on playback start (e.g. tracks ripped
+	 *  from YouTube videos with an on-screen title card). Optional; the
+	 *  player also has artist-rule fallbacks in src/lib/utils/introSkip.ts. */
+	intro_skip_sec: z.number().optional(),
 	format: z.string(),
 	uploaded_at: z.union([z.instanceof(Date), z.string()]).transform((val) => new Date(val)),
 	/** Computed at the API layer (joined from music_lyrics). True when this

@@ -2,8 +2,8 @@
 	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
 
-	let isOffline = false;
-	let justReconnected = false;
+	let isOffline = $state(false);
+	let justReconnected = $state(false);
 	let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
 	onMount(() => {

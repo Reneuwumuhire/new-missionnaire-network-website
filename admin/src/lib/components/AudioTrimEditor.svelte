@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy, tick } from 'svelte';
+	import { t } from '$lib/i18n';
 	import WaveSurfer from 'wavesurfer.js';
 	import RegionsPlugin from 'wavesurfer.js/dist/plugins/regions.esm.js';
 	import TimelinePlugin from 'wavesurfer.js/dist/plugins/timeline.esm.js';
@@ -93,14 +94,14 @@
 
 	onMount(async () => {
 		if (!recording.s3_url || !recording.s3_key) {
-			loadError = 'Enregistrement sans fichier audio';
+			loadError = $t('audio.trim.noAudioFile');
 			return;
 		}
 		await tick(); // ensure audioEl + waveformEl are bound
 		try {
 			await boot();
 		} catch (err) {
-			loadError = err instanceof Error ? err.message : 'Chargement audio échoué';
+			loadError = err instanceof Error ? err.message : $t('audio.trim.loadFailed');
 		}
 	});
 
@@ -116,7 +117,7 @@
 			const duration = recording.peaks_duration_sec ?? recording.duration_sec ?? 0;
 			await initWaveSurfer([recording.peaks], duration);
 			fetchAudioBytes(url).catch((err) => {
-				bufferError = err instanceof Error ? err.message : 'Téléchargement audio échoué';
+				bufferError = err instanceof Error ? err.message : $t('audio.trim.downloadFailed');
 			});
 			return;
 		}
@@ -128,7 +129,7 @@
 			fromCache = true;
 			await initWaveSurfer(cached.peaks, cached.duration);
 			fetchAudioBytes(url).catch((err) => {
-				bufferError = err instanceof Error ? err.message : 'Téléchargement audio échoué';
+				bufferError = err instanceof Error ? err.message : $t('audio.trim.downloadFailed');
 			});
 			return;
 		}
@@ -493,8 +494,8 @@
 				if (xhr.status >= 200 && xhr.status < 300) resolve();
 				else reject(new Error(`Upload S3 (${xhr.status})`));
 			};
-			xhr.onerror = () => reject(new Error('Erreur réseau pendant le téléversement'));
-			xhr.onabort = () => reject(new Error('Téléversement interrompu'));
+			xhr.onerror = () => reject(new Error($t('audio.trim.networkError')));
+			xhr.onabort = () => reject(new Error($t('audio.trim.uploadAborted')));
 			xhr.send(blob);
 		});
 	}
@@ -520,7 +521,7 @@
 	async function save() {
 		if (!recording._id || saving) return;
 		if (endSec - startSec < 0.5) {
-			saveError = 'La plage conservée doit faire au moins 0,5 s';
+			saveError = $t('audio.trim.rangeTooShort');
 			return;
 		}
 		saving = true;
@@ -531,7 +532,7 @@
 			const blob = sliceMp3(buf, startSec, endSec);
 			const durationSec = Math.floor(endSec - startSec);
 			if (durationSec < 1) {
-				saveError = 'Durée conservée trop courte (< 1 s)';
+				saveError = $t('audio.trim.durationTooShort');
 				return;
 			}
 
@@ -577,7 +578,7 @@
 
 			onSaved();
 		} catch (err) {
-			saveError = err instanceof Error ? err.message : 'Enregistrement échoué';
+			saveError = err instanceof Error ? err.message : $t('audio.trim.saveFailed');
 		} finally {
 			saving = false;
 		}
@@ -607,7 +608,7 @@
 		<div class="flex items-center justify-between border-b border-stone-100 px-6 py-4">
 			<div>
 				<h2 id="trim-title" class="text-sm font-semibold uppercase tracking-[0.15em] text-stone-700">
-					Éditer l'audio
+					{$t('audio.trim.title')}
 				</h2>
 				<p class="mt-0.5 truncate text-xs text-stone-500">{recording.title}</p>
 			</div>
@@ -617,7 +618,7 @@
 				disabled={saving}
 				class="text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 hover:text-stone-700 disabled:opacity-50"
 			>
-				Fermer
+				{$t('audio.trim.close')}
 			</button>
 		</div>
 
@@ -645,11 +646,11 @@
 					<div class="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-stone-200 border-t-primary"></div>
 					<p class="text-[11px] text-stone-600">
 						{#if fromCache}
-							Chargement de la forme d'onde (cache)…
+							{$t('audio.trim.loadingWaveformCache')}
 						{:else if decodeProgress === 'decoding'}
-							Décodage de la forme d'onde…
+							{$t('audio.trim.decodingWaveform')}
 						{:else}
-							Téléchargement de l'audio — vous pouvez écouter en streaming ci-dessus.
+							{$t('audio.trim.downloadingHint')}
 						{/if}
 					</p>
 				</div>
@@ -659,7 +660,7 @@
 				<!-- Waveform -->
 				<div class="relative border border-stone-200 bg-stone-50 p-3">
 					<div class="pointer-events-none absolute right-3 top-3 z-10 bg-blue-600 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-white shadow">
-						Nouvelle durée&nbsp;: <span class="tabular-nums">{formatTime(Math.max(0, endSec - startSec)).replace(/\.\d+$/, '')}</span>
+						{$t('audio.trim.newDuration')}&nbsp;: <span class="tabular-nums">{formatTime(Math.max(0, endSec - startSec)).replace(/\.\d+$/, '')}</span>
 					</div>
 					<div bind:this={waveformEl} class="min-h-[120px]"></div>
 				</div>
@@ -672,7 +673,7 @@
 							onclick={() => skip(-10)}
 							disabled={saving}
 							class="flex h-9 w-9 items-center justify-center border border-stone-200 bg-white text-stone-600 hover:border-primary hover:text-primary disabled:opacity-50"
-							aria-label="Reculer de 10 s"
+							aria-label={$t('audio.trim.back10')}
 						>
 							<svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 19l-7-7 7-7m6 14l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"/></svg>
 						</button>
@@ -681,7 +682,7 @@
 							onclick={togglePlay}
 							disabled={saving}
 							class="flex h-10 w-10 items-center justify-center bg-primary text-white hover:bg-missionnaire-600 disabled:opacity-50"
-							aria-label={playing ? 'Pause' : 'Lecture'}
+							aria-label={playing ? $t('audio.trim.pause') : $t('audio.trim.play')}
 						>
 							{#if playing}
 								<svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
@@ -694,7 +695,7 @@
 							onclick={() => skip(10)}
 							disabled={saving}
 							class="flex h-9 w-9 items-center justify-center border border-stone-200 bg-white text-stone-600 hover:border-primary hover:text-primary disabled:opacity-50"
-							aria-label="Avancer de 10 s"
+							aria-label={$t('audio.trim.forward10')}
 						>
 							<svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 5l7 7-7 7M7 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
 						</button>
@@ -709,8 +710,8 @@
 							onclick={() => applyZoom(zoomIdx - 1)}
 							disabled={saving || zoomIdx === 0}
 							class="flex h-7 w-7 items-center justify-center text-stone-500 transition-colors hover:text-primary disabled:opacity-30"
-							aria-label="Zoom arrière"
-							title="Zoom arrière"
+							aria-label={$t('audio.trim.zoomOut')}
+							title={$t('audio.trim.zoomOut')}
 						>
 							<svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 21l-4.35-4.35M8 11h6" stroke-linecap="round" stroke-linejoin="round"/></svg>
 						</button>
@@ -724,7 +725,7 @@
 								oninput={(e) => applyZoom(Number((e.target as HTMLInputElement).value))}
 								disabled={saving}
 								class="trim-zoom-input relative z-10 h-7 w-full cursor-pointer appearance-none bg-transparent"
-								aria-label="Zoom"
+								aria-label={$t('audio.trim.zoom')}
 							/>
 						</div>
 						<button
@@ -732,8 +733,8 @@
 							onclick={() => applyZoom(zoomIdx + 1)}
 							disabled={saving || zoomIdx === ZOOM_LEVELS.length - 1}
 							class="flex h-7 w-7 items-center justify-center text-stone-500 transition-colors hover:text-primary disabled:opacity-30"
-							aria-label="Zoom avant"
-							title="Zoom avant"
+							aria-label={$t('audio.trim.zoomIn')}
+							title={$t('audio.trim.zoomIn')}
 						>
 							<svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 21l-4.35-4.35M8 11h6M11 8v6" stroke-linecap="round" stroke-linejoin="round"/></svg>
 						</button>
@@ -743,7 +744,7 @@
 				<!-- Trim inputs -->
 				<div class="grid grid-cols-1 gap-3 border border-stone-200 bg-white p-4 sm:grid-cols-3">
 					<div class="flex flex-col gap-1.5">
-						<label for="trim-start" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Début</label>
+						<label for="trim-start" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('audio.trim.start')}</label>
 						<input
 							id="trim-start"
 							type="text"
@@ -755,7 +756,7 @@
 						/>
 					</div>
 					<div class="flex flex-col gap-1.5">
-						<label for="trim-end" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Fin</label>
+						<label for="trim-end" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('audio.trim.end')}</label>
 						<input
 							id="trim-end"
 							type="text"
@@ -767,7 +768,7 @@
 						/>
 					</div>
 					<div class="flex flex-col gap-1.5">
-						<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">Durée conservée</span>
+						<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('audio.trim.keptDuration')}</span>
 						<div class="flex items-center justify-between gap-2 border border-stone-200 bg-stone-50 px-3 py-2">
 							<span class="font-mono text-sm tabular-nums text-stone-700">
 								{formatTime(Math.max(0, endSec - startSec)).replace(/\.\d+$/, '')}
@@ -778,21 +779,20 @@
 								disabled={saving}
 								class="text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 hover:text-primary disabled:opacity-50"
 							>
-								Réinitialiser
+								{$t('audio.trim.reset')}
 							</button>
 						</div>
 					</div>
 				</div>
 
 				<p class="text-[10px] leading-relaxed text-stone-500">
-					Le fichier MP3 sera réécrit à l'enregistrement. Précision au niveau de la trame
-					(~26 ms). L'ancien fichier sera définitivement remplacé.
+					{$t('audio.trim.rewriteNotice')}
 				</p>
 
 				{#if uploadPct !== null}
 					<div class="flex flex-col gap-1">
 						<div class="flex items-center justify-between text-[10px] font-mono text-stone-500 tabular-nums">
-							<span>{uploadPct < 100 ? 'Téléversement…' : 'Finalisation…'}</span>
+							<span>{uploadPct < 100 ? $t('audio.trim.uploadingProgress') : $t('audio.trim.finalizing')}</span>
 							<span>{uploadPct}%</span>
 						</div>
 						<div class="h-1.5 w-full overflow-hidden rounded-full bg-stone-200">
@@ -815,7 +815,7 @@
 				disabled={saving}
 				class="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500 hover:bg-stone-100 hover:text-stone-700 disabled:opacity-50"
 			>
-				Annuler
+				{$t('audio.common.cancel')}
 			</button>
 			<button
 				type="button"
@@ -824,11 +824,11 @@
 				class="bg-primary px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-white hover:bg-missionnaire-600 disabled:opacity-50"
 			>
 				{#if saving && !bufferReady}
-					Finalisation du téléchargement…
+					{$t('audio.trim.finalizingDownload')}
 				{:else if saving}
-					Enregistrement…
+					{$t('audio.trim.saving')}
 				{:else}
-					Enregistrer
+					{$t('audio.trim.save')}
 				{/if}
 			</button>
 		</div>

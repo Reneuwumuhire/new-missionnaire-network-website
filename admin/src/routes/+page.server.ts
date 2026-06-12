@@ -15,7 +15,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	const canManageRecordings = permissions.can_manage_recordings;
 
-	const [stats, recentActivity, recorder, icecast, broadcast] = await Promise.all([
+	// Streamed (not awaited): the page renders its header + skeleton instantly
+	// and fills in stats/activity/banners when this resolves. See the page's
+	// `{#await data.deferred}` block.
+	const deferred = Promise.all([
 		getDashboardStats(),
 		getRecentAuditLogs(10),
 		canManageRecordings
@@ -25,21 +28,25 @@ export const load: PageServerLoad = async ({ locals }) => {
 			: Promise.resolve(null),
 		canManageRecordings ? getIcecastSnapshot() : Promise.resolve(null),
 		canManageRecordings ? getBroadcastAdminState().catch(() => null) : Promise.resolve(null)
-	]);
+	]).then(([stats, recentActivity, recorder, icecast, broadcast]) => {
+		const isRecording = Boolean(recorder && 'recording' in recorder && recorder.recording);
 
-	const isRecording = Boolean(recorder && 'recording' in recorder && recorder.recording);
+		// Two distinct states warrant a CTA banner on the dashboard:
+		const liveButNotBroadcasting = Boolean(
+			canManageRecordings && icecast?.sourceActive && broadcast && !broadcast.is_live
+		);
+		const liveButNotRecording = Boolean(
+			canManageRecordings && icecast?.sourceActive && !isRecording
+		);
 
-	// Two distinct states warrant a CTA banner on the dashboard:
-	const liveButNotBroadcasting = Boolean(
-		canManageRecordings && icecast?.sourceActive && broadcast && !broadcast.is_live
-	);
-	const liveButNotRecording = Boolean(canManageRecordings && icecast?.sourceActive && !isRecording);
+		return { stats, recentActivity, liveButNotBroadcasting, liveButNotRecording };
+	});
+	// Rejections surface via the page's {:catch}; this avoids an unhandled
+	// rejection if the client disconnects before consuming the stream.
+	deferred.catch(() => {});
 
 	return {
-		stats,
-		recentActivity,
-		liveButNotBroadcasting,
-		liveButNotRecording,
+		deferred,
 		canAddAudio: permissions.can_add,
 		canManageAudio: permissions.can_add || permissions.can_edit || permissions.can_delete
 	};

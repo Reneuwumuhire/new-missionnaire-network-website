@@ -1,7 +1,10 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { toast } from '$lib/stores/toast';
+	import { audioPreview } from '$lib/stores/audio-preview';
+	import { t } from '$lib/i18n';
 	import AudioPreviewPlayer from '$lib/components/AudioPreviewPlayer.svelte';
 	import type { PageData } from './$types';
 
@@ -42,6 +45,23 @@
 		number = data.audio.number ?? null;
 	});
 
+	// Stop the shared inline preview when leaving the page.
+	onDestroy(() => audioPreview.stop());
+
+	// Field-level validation feedback (inline, aria-invalid). Server errors
+	// without a field keep using the generic toast.
+	let fieldErrors = $state<Partial<Record<'title' | 'number', string>>>({});
+
+	function validateFields(): boolean {
+		const errors: typeof fieldErrors = {};
+		if (!title.trim()) errors.title = $t('audio.edit.titleRequired');
+		if (number !== null && (!Number.isInteger(number) || number < 0)) {
+			errors.number = $t('audio.edit.numberInvalid');
+		}
+		fieldErrors = errors;
+		return Object.keys(errors).length === 0;
+	}
+
 	let saving = $state(false);
 	let confirmDelete = $state(false);
 	let deleting = $state(false);
@@ -67,7 +87,7 @@
 	}
 
 	function formatDuration(seconds: number | null | undefined): string {
-		if (!seconds) return 'Inconnue';
+		if (!seconds) return $t('audio.edit.unknownDuration');
 		const m = Math.floor(seconds / 60);
 		const s = Math.floor(seconds % 60);
 		return `${m}:${s.toString().padStart(2, '0')}`;
@@ -143,6 +163,7 @@
 
 	async function saveChanges() {
 		if (!data.canEdit) return;
+		if (!validateFields()) return;
 		saving = true;
 		try {
 			const res = await fetch(`/api/audio/${data.audio._id}`, {
@@ -158,12 +179,21 @@
 				})
 			});
 			const result = await res.json();
-			if (result.error) throw new Error(result.error);
+			if (result.error) {
+				// Validation errors carry a `field` → show them inline instead
+				// of a toast.
+				if (res.status === 400 && (result.field === 'title' || result.field === 'number')) {
+					fieldErrors = { [result.field]: String(result.error) };
+					return;
+				}
+				throw new Error(result.error);
+			}
 
-			toast.success('Modifications enregistrées');
+			fieldErrors = {};
+			toast.success($t('audio.edit.saved'));
 			await invalidateAll();
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Erreur lors de la sauvegarde');
+			toast.error(err instanceof Error ? err.message : $t('audio.edit.saveError'));
 		} finally {
 			saving = false;
 		}
@@ -177,10 +207,10 @@
 			const result = await res.json();
 			if (result.error) throw new Error(result.error);
 
-			toast.success('Audio supprimé');
+			toast.success($t('audio.edit.deleted'));
 			goto(backHref);
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Erreur lors de la suppression');
+			toast.error(err instanceof Error ? err.message : $t('audio.edit.deleteError'));
 		} finally {
 			deleting = false;
 		}
@@ -189,18 +219,18 @@
 	async function loadLyricsFromUrl() {
 		const url = lyricsSourceUrl.trim();
 		if (!url) {
-			toast.error('Collez une URL avant de charger');
+			toast.error($t('audio.lyrics.pasteUrlFirst'));
 			return;
 		}
 
 		try {
 			const parsed = new URL(url);
 			if (parsed.hostname !== 'indirimbo-zikundwa.bi') {
-				toast.error('URL non supportée — utilisez indirimbo-zikundwa.bi');
+				toast.error($t('audio.lyrics.unsupportedUrl'));
 				return;
 			}
 		} catch {
-			toast.error('URL invalide');
+			toast.error($t('audio.lyrics.invalidUrl'));
 			return;
 		}
 
@@ -212,18 +242,18 @@
 			});
 			const res = await fetch(`/api/lyrics-review/lyrics?${params.toString()}`);
 			const result = await res.json();
-			if (!res.ok) throw new Error(result.error ?? 'Impossible de charger les paroles');
+			if (!res.ok) throw new Error(result.error ?? $t('audio.lyrics.loadFailed'));
 
 			const formatted = formatExtractedLyrics(result.sections, result.lines);
 			if (!formatted.trim()) {
-				toast.error('Aucune parole trouvée à cette URL');
+				toast.error($t('audio.lyrics.noneFound'));
 				return;
 			}
 
 			lyricsTextOverride = formatted;
-			toast.success('Paroles chargées depuis l’URL');
+			toast.success($t('audio.lyrics.loadedFromUrl'));
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Erreur lors du chargement des paroles');
+			toast.error(err instanceof Error ? err.message : $t('audio.lyrics.loadError'));
 		} finally {
 			lyricsUrlLoading = false;
 		}
@@ -268,7 +298,7 @@
 	async function publishLyrics() {
 		if (!data.canPublishLyrics || !data.audio._id) return;
 		if (!lyricsText.trim()) {
-			toast.error('Ajoutez les paroles avant de publier');
+			toast.error($t('audio.lyrics.addBeforePublish'));
 			return;
 		}
 
@@ -289,11 +319,11 @@
 			const result = await res.json();
 			if (result.error) throw new Error(result.error);
 
-			toast.success('Paroles publiées sur le site');
+			toast.success($t('audio.lyrics.published'));
 			await invalidateAll();
 			lyricsTextOverride = null;
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Erreur lors de la publication des paroles');
+			toast.error(err instanceof Error ? err.message : $t('audio.lyrics.publishError'));
 		} finally {
 			lyricsSaving = false;
 		}
@@ -301,7 +331,7 @@
 </script>
 
 <svelte:head>
-	<title>{data.audio.title || 'Éditer'} - Missionnaire Admin</title>
+	<title>{data.audio.title || $t('audio.edit.fallbackTitle')} - Missionnaire Admin</title>
 </svelte:head>
 
 <!-- Header -->
@@ -313,10 +343,10 @@
 		<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 			<path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
 		</svg>
-		Bibliothèque
+		{$t('audio.backToLibrary')}
 	</a>
 	<h1 class="font-display text-3xl font-semibold text-stone-800">
-		{data.canEdit ? "Éditer l'audio" : "Détail de l'audio"}
+		{data.canEdit ? $t('audio.edit.title') : $t('audio.edit.titleReadonly')}
 	</h1>
 </div>
 
@@ -324,22 +354,27 @@
 	<!-- Main form (2 cols) -->
 	<div class="lg:col-span-2">
 		<div class="border border-stone-200/60 bg-white/40 p-6">
-			<h2 class="mb-5 font-display text-lg font-semibold text-stone-700">Métadonnées</h2>
+			<h2 class="mb-5 font-display text-lg font-semibold text-stone-700">{$t('audio.edit.metadata')}</h2>
 
 			<div class="grid gap-5 sm:grid-cols-2">
 				<div class="sm:col-span-2">
-					<label for="title" class="admin-label">Titre</label>
+					<label for="title" class="admin-label">{$t('audio.fields.title')}</label>
 					<input
 						id="title"
 						type="text"
-						class="admin-input"
+						class="admin-input {fieldErrors.title ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : ''}"
 						bind:value={title}
 						disabled={!data.canEdit}
+						aria-invalid={fieldErrors.title ? 'true' : undefined}
+						aria-describedby={fieldErrors.title ? 'title-error' : undefined}
 					/>
+					{#if fieldErrors.title}
+						<p id="title-error" class="mt-1.5 text-xs text-red-600">{fieldErrors.title}</p>
+					{/if}
 				</div>
 
 				<div>
-					<label for="artist" class="admin-label">Artiste</label>
+					<label for="artist" class="admin-label">{$t('audio.fields.artist')}</label>
 					<input
 						id="artist"
 						type="text"
@@ -356,7 +391,7 @@
 				</div>
 
 				<div>
-					<label for="category" class="admin-label">Catégorie</label>
+					<label for="category" class="admin-label">{$t('audio.fields.category')}</label>
 					<select id="category" class="admin-input" bind:value={category} disabled={!data.canEdit}>
 						{#each data.categories as cat}
 							<option value={cat}>{cat}</option>
@@ -365,7 +400,7 @@
 				</div>
 
 				<div>
-					<label for="book" class="admin-label">Livre (abrégé)</label>
+					<label for="book" class="admin-label">{$t('audio.fields.book')}</label>
 					<input
 						id="book"
 						type="text"
@@ -376,7 +411,7 @@
 				</div>
 
 				<div>
-					<label for="bookFullName" class="admin-label">Livre (nom complet)</label>
+					<label for="bookFullName" class="admin-label">{$t('audio.fields.bookFullName')}</label>
 					<input
 						id="bookFullName"
 						type="text"
@@ -387,18 +422,23 @@
 				</div>
 
 				<div>
-					<label for="number" class="admin-label">Numéro</label>
+					<label for="number" class="admin-label">{$t('audio.fields.number')}</label>
 					<input
 						id="number"
 						type="number"
-						class="admin-input"
+						class="admin-input {fieldErrors.number ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : ''}"
 						value={number ?? ''}
 						disabled={!data.canEdit}
+						aria-invalid={fieldErrors.number ? 'true' : undefined}
+						aria-describedby={fieldErrors.number ? 'number-error' : undefined}
 						oninput={(e) => {
 							const v = e.currentTarget.value;
 							number = v ? Number.parseInt(v) : null;
 						}}
 					/>
+					{#if fieldErrors.number}
+						<p id="number-error" class="mt-1.5 text-xs text-red-600">{fieldErrors.number}</p>
+					{/if}
 				</div>
 			</div>
 
@@ -426,29 +466,29 @@
 								/>
 							</svg>
 						{/if}
-						Enregistrer
+						{$t('audio.edit.save')}
 					</button>
 				{/if}
-				<a href={backHref} class="admin-btn-secondary">Annuler</a>
+				<a href={backHref} class="admin-btn-secondary">{$t('audio.common.cancel')}</a>
 			</div>
 		</div>
 
 		<div class="mt-6 border border-stone-200/60 bg-white/40 p-6">
 			<div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 				<div>
-					<p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">Paroles</p>
+					<p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">{$t('audio.lyrics.eyebrow')}</p>
 					<h2 class="mt-1 font-display text-lg font-semibold text-stone-700">
-						Publier les paroles de cet audio
+						{$t('audio.lyrics.publishHeading')}
 					</h2>
 					{#if lyrics}
 						<p class="mt-1 text-sm text-stone-500">
-							{lyricLineCount(lyrics.lines)} lignes publiées{lyrics.synced_at
-								? ` le ${formatDate(lyrics.synced_at)}`
-								: ''}{lyrics.synced_by ? ` par ${lyrics.synced_by}` : ''}
+							{$t('audio.lyrics.linesPublished', { count: lyricLineCount(lyrics.lines) })}{lyrics.synced_at
+								? $t('audio.lyrics.onDate', { date: formatDate(lyrics.synced_at) })
+								: ''}{lyrics.synced_by ? $t('audio.lyrics.byUser', { user: lyrics.synced_by }) : ''}
 						</p>
 					{:else}
 						<p class="mt-1 text-sm text-stone-500">
-							Collez les paroles ici pour les rendre visibles sur le site.
+							{$t('audio.lyrics.emptyHint')}
 						</p>
 					{/if}
 				</div>
@@ -456,7 +496,7 @@
 					<span
 						class="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800"
 					>
-						Publié
+						{$t('audio.lyrics.publishedBadge')}
 					</span>
 				{/if}
 			</div>
@@ -464,7 +504,7 @@
 			{#if data.canPublishLyrics}
 				<div class="mb-5 rounded border border-stone-200/70 bg-stone-50/60 p-4">
 					<label for="lyricsSourceUrl" class="admin-label">
-						Importer depuis indirimbo-zikundwa.bi
+						{$t('audio.lyrics.importFromSite')}
 					</label>
 					<div class="flex flex-col gap-2 sm:flex-row">
 						<input
@@ -481,27 +521,25 @@
 							disabled={lyricsUrlLoading || !lyricsSourceUrl.trim()}
 							class="admin-btn-secondary disabled:opacity-50"
 						>
-							{lyricsUrlLoading ? 'Chargement...' : 'Charger depuis l’URL'}
+							{lyricsUrlLoading ? $t('audio.lyrics.loading') : $t('audio.lyrics.loadFromUrl')}
 						</button>
 					</div>
 					<p class="mt-2 text-xs text-stone-500">
-						Collez l’URL de la page des paroles pour les importer automatiquement, ou laissez ce
-						champ vide et collez les paroles directement ci-dessous.
+						{$t('audio.lyrics.urlHelp')}
 					</p>
 				</div>
 			{/if}
 
-			<label for="lyricsText" class="admin-label">Texte des paroles</label>
+			<label for="lyricsText" class="admin-label">{$t('audio.lyrics.textLabel')}</label>
 			<textarea
 				id="lyricsText"
 				class="admin-input min-h-72 resize-y leading-7"
 				bind:value={lyricsText}
 				disabled={!data.canPublishLyrics}
-				placeholder={`Collez les paroles de ${title || 'cet audio'} ici...`}
+				placeholder={$t('audio.lyrics.pastePlaceholder', { title: title || $t('audio.lyrics.thisAudio') })}
 			></textarea>
 			<p class="mt-2 text-xs text-stone-500">
-				Un couplet par paragraphe fonctionne bien. Écrivez "Refrain" seul sur une ligne pour marquer
-				le refrain.
+				{$t('audio.lyrics.formatHelp')}
 			</p>
 
 			<div class="mt-5 flex flex-wrap items-center gap-3">
@@ -512,20 +550,20 @@
 						class="admin-btn-primary disabled:opacity-50"
 					>
 						{lyricsSaving
-							? 'Publication...'
+							? $t('audio.lyrics.publishing')
 							: lyrics
-								? 'Republier les paroles'
-								: 'Publier les paroles'}
+								? $t('audio.lyrics.republish')
+								: $t('audio.lyrics.publish')}
 					</button>
 				{/if}
 				{#if lyrics && data.canReviewLyrics && data.audio._id}
 					<a href={`/lyrics-review/timing/${data.audio._id}`} class="admin-btn-secondary">
-						Ajouter le timing
+						{$t('audio.lyrics.addTiming')}
 					</a>
 				{/if}
 				{#if lyricsSourceLabel(lyrics)}
 					<span class="text-xs font-semibold text-stone-500">
-						Source: {lyricsSourceLabel(lyrics)}
+						{$t('audio.lyrics.sourceLabel', { source: lyricsSourceLabel(lyrics) })}
 					</span>
 				{/if}
 			</div>
@@ -536,7 +574,7 @@
 	<div class="space-y-6">
 		<!-- Audio preview -->
 		<div class="border border-stone-200/60 bg-white/40 p-6">
-			<h3 class="mb-4 text-sm font-medium text-stone-500 uppercase tracking-wider">Aperçu</h3>
+			<h3 class="mb-4 text-sm font-medium text-stone-500 uppercase tracking-wider">{$t('audio.edit.preview')}</h3>
 			<div class="mb-4">
 				<AudioPreviewPlayer src={data.audio.s3_url} />
 			</div>
@@ -545,34 +583,34 @@
 			</div>
 			<dl class="space-y-3 text-sm">
 				<div>
-					<dt class="text-stone-400">Format</dt>
+					<dt class="text-stone-400">{$t('audio.edit.format')}</dt>
 					<dd class="font-medium text-stone-700">{data.audio.format.toUpperCase()}</dd>
 				</div>
 				<div>
-					<dt class="text-stone-400">Taille</dt>
+					<dt class="text-stone-400">{$t('audio.edit.size')}</dt>
 					<dd class="font-medium text-stone-700">{formatBytes(data.audio.file_size)}</dd>
 				</div>
 				<div>
-					<dt class="text-stone-400">Durée</dt>
+					<dt class="text-stone-400">{$t('audio.edit.duration')}</dt>
 					<dd class="font-medium text-stone-700">{formatDuration(data.audio.duration)}</dd>
 				</div>
 				<div>
-					<dt class="text-stone-400">Clé S3</dt>
+					<dt class="text-stone-400">{$t('audio.edit.s3Key')}</dt>
 					<dd class="break-all font-mono text-xs text-stone-500">{data.audio.s3_key}</dd>
 				</div>
 				<div>
-					<dt class="text-stone-400">Importé le</dt>
+					<dt class="text-stone-400">{$t('audio.edit.uploadedAt')}</dt>
 					<dd class="font-medium text-stone-700">{formatDate(data.audio.uploaded_at)}</dd>
 				</div>
 				{#if data.audio.updated_at}
 					<div>
-						<dt class="text-stone-400">Modifié le</dt>
+						<dt class="text-stone-400">{$t('audio.edit.updatedAt')}</dt>
 						<dd class="font-medium text-stone-700">{formatDate(data.audio.updated_at)}</dd>
 					</div>
 				{/if}
 				{#if data.audio.updated_by}
 					<div>
-						<dt class="text-stone-400">Modifié par</dt>
+						<dt class="text-stone-400">{$t('audio.edit.updatedBy')}</dt>
 						<dd class="font-medium text-stone-700">{data.audio.updated_by}</dd>
 					</div>
 				{/if}
@@ -583,22 +621,21 @@
 			<!-- Danger zone -->
 			<div class="border border-red-200/60 bg-white/40 p-6">
 				<h3 class="mb-3 text-sm font-medium text-red-600 uppercase tracking-wider">
-					Zone dangereuse
+					{$t('audio.edit.dangerZone')}
 				</h3>
 				<p class="mb-4 text-sm text-stone-500">
-					Supprimer cet audio définitivement. Le fichier sera retiré du serveur et de la base de
-					données.
+					{$t('audio.edit.deleteWarning')}
 				</p>
 				{#if confirmDelete}
 					<div class="flex items-center gap-2">
-						<button onclick={deleteAudio} disabled={deleting} class="admin-btn-danger text-xs">
-							{deleting ? 'Suppression...' : 'Confirmer la suppression'}
+						<button onclick={deleteAudio} disabled={deleting} class="admin-btn-danger admin-btn-compact">
+							{deleting ? $t('audio.edit.deleting') : $t('audio.edit.confirmDelete')}
 						</button>
 						<button
 							onclick={() => (confirmDelete = false)}
 							class="text-xs text-stone-500 hover:text-stone-700"
 						>
-							Annuler
+							{$t('audio.common.cancel')}
 						</button>
 					</div>
 				{:else}
@@ -619,7 +656,7 @@
 								d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
 							/>
 						</svg>
-						Supprimer cet audio
+						{$t('audio.edit.deleteButton')}
 					</button>
 				{/if}
 			</div>

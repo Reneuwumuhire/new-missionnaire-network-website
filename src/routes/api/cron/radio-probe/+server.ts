@@ -68,6 +68,8 @@ export async function GET({ request }) {
 		console.log('[CronRadioProbe] Backstop: firing pending Go Live push');
 		sendPushToAll(
 			radioLivePayload({
+				broadcastTitle: adminGate.title,
+				broadcastDescription: adminGate.description,
 				thumbnailUrl: adminGate.thumbnail_url,
 				watchPath: adminGate.scheduled_live_slug ? `/live/${adminGate.scheduled_live_slug}` : null
 			})
