@@ -55,6 +55,7 @@
 	import { toggleFavorite, isFavorite, favorites } from '../stores/musicHistory';
 	import { songSlug } from '$lib/utils/songSlug';
 	import { downloadAudioFile } from '../../utils/downloadAudio';
+	import { getIntroSkipSeconds } from '$lib/utils/introSkip';
 	// ── BEGIN: cache indicator imports (added) ────────────────────
 	import { isCached, prefetchAudio } from '$lib/audioCache';
 	import { isOnline } from '$lib/onlineStatus';
@@ -107,6 +108,11 @@
 	let lastKnownPlaybackDuration = 0;
 	let pendingSessionResumeTime: number | null = null;
 	let isChangingSource = false;
+	// Intro-skip bookkeeping: applied once per loaded source so a listener
+	// deliberately seeking back to 0:00 isn't yanked forward again ('canplay'
+	// re-fires after seeks). Plain lets — never read in templates.
+	let introSkipAppliedForSrc = '';
+	let introFadeTimer: ReturnType<typeof setInterval> | null = null;
 	const SLEEP_TIMER_STORAGE_KEY = 'missionnaire:sleep-timer-ends-at';
 	const sleepTimerOptions = [15, 30, 45, 60, 90];
 	let isSleepTimerOpen = $state(false);
@@ -1157,11 +1163,51 @@
 		console.log('[AudioPlayer] Metadata loaded, duration:', duration);
 	}
 
+	/** Jump past a known-silent intro and ramp the volume up over ~600ms so
+	 *  the entry feels gentle. No-ops when the listener is resuming mid-track
+	 *  or the source was already handled. iOS ignores programmatic volume, so
+	 *  there the seek applies without the fade — still better than dead air. */
+	function applyIntroSkip() {
+		if (!audio) return;
+		const src = audio.currentSrc || audio.src;
+		if (!src || introSkipAppliedForSrc === src) return;
+		introSkipAppliedForSrc = src;
+		if (pendingSessionResumeTime !== null) return;
+		const skip = getIntroSkipSeconds($selectAudio);
+		if (skip <= 0 || audio.currentTime >= skip) return;
+		if (Number.isFinite(audio.duration) && audio.duration > 0 && skip >= audio.duration) return;
+		try {
+			audio.currentTime = skip;
+		} catch {
+			return;
+		}
+		if (isMuted) return;
+		const targetVolume = audio.volume;
+		if (introFadeTimer) clearInterval(introFadeTimer);
+		audio.volume = 0;
+		const startedAt = Date.now();
+		const FADE_MS = 600;
+		introFadeTimer = setInterval(() => {
+			if (!audio) {
+				if (introFadeTimer) clearInterval(introFadeTimer);
+				introFadeTimer = null;
+				return;
+			}
+			const progress = Math.min(1, (Date.now() - startedAt) / FADE_MS);
+			audio.volume = targetVolume * progress;
+			if (progress >= 1 && introFadeTimer) {
+				clearInterval(introFadeTimer);
+				introFadeTimer = null;
+			}
+		}, 40);
+	}
+
 	function handleAudioCanPlay() {
 		isAudioReady = true;
 		if (pendingSessionResumeTime !== null) {
 			restorePlaybackPosition(pendingSessionResumeTime);
 		}
+		applyIntroSkip();
 		if (shouldAutoplayOnLoad || $isPlaying) {
 			setPendingPlaybackIntent('play');
 			audio.play().catch((e) => {
