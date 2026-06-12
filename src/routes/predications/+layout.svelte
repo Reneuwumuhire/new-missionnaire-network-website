@@ -96,7 +96,7 @@
 			     Same refined treatment as the /musique band search; native
 			     autofill suggestions suppressed. -->
 			<form
-				class="hidden h-11 w-72 shrink-0 items-center overflow-hidden border border-white/15 bg-white shadow-sm transition-shadow duration-150 focus-within:ring-2 focus-within:ring-missionnaire/80 md:flex lg:w-96"
+				class="hidden h-11 w-72 shrink-0 items-stretch overflow-hidden border border-stone-200/60 bg-white transition-shadow focus-within:border-missionnaire/40 focus-within:ring-2 focus-within:ring-missionnaire/30 md:flex lg:w-96"
 				role="search"
 				autocomplete="off"
 				onsubmit={(e) => {
@@ -105,7 +105,7 @@
 				}}
 			>
 				<svg
-					class="ml-3 shrink-0 text-stone-400"
+					class="ml-3 shrink-0 self-center text-stone-400"
 					width="14"
 					height="14"
 					viewBox="0 0 24 24"
@@ -162,7 +162,13 @@
 						</svg>
 					</button>
 				{/if}
-			</form>
+							<button
+						type="submit"
+						class="shrink-0 self-stretch bg-missionnaire px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-white font-body transition-colors duration-200 hover:bg-missionnaire/90 active:scale-[0.98]"
+					>
+						{$t('search.action')}
+					</button>
+</form>
 		</div>
 	</div>
 </header>
