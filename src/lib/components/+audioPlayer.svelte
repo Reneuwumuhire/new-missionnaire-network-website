@@ -146,11 +146,13 @@
 		// gesture so iOS's mediaserverd attributes the audio session to
 		// this PWA. safePlay deliberately no longer does this on its own.
 		applyMediaSessionMetadata();
-		// Stop the silent loop if it was running from a prior pause —
-		// main is about to take over as the active audio source. Two
-		// concurrent audio elements confuse iOS's Now-Playing state
-		// machine and trigger duplicate pause dispatches.
-		stopSilentLoop();
+		// ZERO-GAP TRANSITION (mirrors the MediaSession 'play' handler):
+		// keep the silent loop alive across the play() call — iOS releases
+		// the AVAudioSession in any gap between silent.pause() and main's
+		// play promise resolving. handleAudioPlay stops the loop once main
+		// is actually producing audio. While the keeper held the session
+		// during the pause, a plain play() is reliable — no reload needed.
+		resumeSessionHeld = silentLoopRunning;
 		safePlay('auto');
 	}
 
@@ -446,6 +448,17 @@
 	 *  the counter so a fresh resume can be attempted. */
 	let lastSuccessfulPlayAt = 0;
 	let consecutiveFailedResumes = 0;
+
+	/** True when the silent-loop keeper held the AVAudioSession across the
+	 *  pause we're now resuming from (iOS standalone PWA). In that case the
+	 *  output route never tore down, so safePlay can use an instant plain
+	 *  play() instead of the 1-2s load()-reload — the single biggest
+	 *  "doesn't feel native" cost on in-app pause→resume. Consumed (reset)
+	 *  by the next safePlay call. */
+	let resumeSessionHeld = false;
+	/** One-shot guard so the stuck-playback verifier escalates at most once
+	 *  per resume attempt. Re-armed on each user-initiated resume. */
+	let stuckVerifierArmed = false;
 	const RAPID_REPAUSE_THRESHOLD_MS = 2500;
 
 	/** Set true after the audio element has been torn down and rebuilt to
@@ -1593,10 +1606,12 @@
 			Number.isFinite(seekHint.time) &&
 			seekHint.time > 0;
 
+		const sessionHeld = resumeSessionHeld;
+		resumeSessionHeld = false;
 		const needsReload =
 			reasonHint === 'long' ||
 			hasOverrideSeek ||
-			(reasonHint === 'auto' && pausedMs >= PAUSE_RELOAD_THRESHOLD_MS);
+			(reasonHint === 'auto' && pausedMs >= PAUSE_RELOAD_THRESHOLD_MS && !sessionHeld);
 
 		if (!needsReload) {
 			// Don't probe with play() while a reload is in flight — the
@@ -1607,9 +1622,24 @@
 			} else if (audio.currentTime <= 0.25 && lastKnownPlaybackTime > 0.25) {
 				restorePlaybackPosition(lastKnownPlaybackTime);
 			}
+			const t0 = audio.currentTime;
+			stuckVerifierArmed = true;
 			audio.play().catch((err) => {
 				console.warn('[AudioPlayer] play() failed:', err);
 			});
+			// Stuck-playback verifier: if the element claims to be playing
+			// but the clock hasn't advanced ~1.2s later, the session is in
+			// the degraded state the reload exists for — escalate once.
+			setTimeout(() => {
+				if (!stuckVerifierArmed) return;
+				stuckVerifierArmed = false;
+				if (destroyed || !audio || !userWantsToPlay) return;
+				if (audio.paused) return;
+				if (audio.currentTime - t0 < 0.05) {
+					console.warn('[AudioPlayer] Playback stuck after fast resume — reloading session');
+					safePlay('long');
+				}
+			}, 1200);
 			return;
 		}
 

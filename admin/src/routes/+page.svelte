@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
+	import { t, type TranslationKey } from '$lib/i18n';
 
 	let { data }: { data: PageData } = $props();
 
@@ -26,17 +27,17 @@
 		});
 	}
 
-	function actionLabel(action: string): string {
-		const labels: Record<string, string> = {
-			create: 'Ajout',
-			update: 'Modification',
-			delete: 'Suppression',
-			bulk_delete: 'Suppression groupée',
-			bulk_update: 'Modification groupée',
-			login: 'Connexion',
-			logout: 'Déconnexion'
+	function actionKey(action: string): TranslationKey | null {
+		const keys: Record<string, TranslationKey> = {
+			create: 'dashboard.actionCreate',
+			update: 'dashboard.actionUpdate',
+			delete: 'dashboard.actionDelete',
+			bulk_delete: 'dashboard.actionBulkDelete',
+			bulk_update: 'dashboard.actionBulkUpdate',
+			login: 'dashboard.actionLogin',
+			logout: 'dashboard.actionLogout'
 		};
-		return labels[action] ?? action;
+		return keys[action] ?? null;
 	}
 
 	function actionColor(action: string): string {
@@ -52,7 +53,7 @@
 </script>
 
 <svelte:head>
-	<title>Tableau de bord - Missionnaire Admin</title>
+	<title>{$t('dashboard.pageTitle')}</title>
 </svelte:head>
 
 {#if data.liveButNotBroadcasting}
@@ -67,9 +68,9 @@
 			</span>
 		</div>
 		<div class="min-w-0 flex-1">
-			<p class="text-sm font-semibold text-green-800">Direct détecté — prêt à passer en direct</p>
+			<p class="text-sm font-semibold text-green-800">{$t('dashboard.liveDetectedTitle')}</p>
 			<p class="mt-1 text-xs text-green-700">
-				Le flux audio est actif sur Icecast mais l'audience ne le voit pas encore. Cliquez pour aller en direct.
+				{$t('dashboard.liveDetectedBody')}
 			</p>
 		</div>
 	</a>
@@ -85,9 +86,9 @@
 			</svg>
 		</div>
 		<div class="min-w-0 flex-1">
-			<p class="text-sm font-semibold text-amber-800">En direct — aucun enregistrement en cours</p>
+			<p class="text-sm font-semibold text-amber-800">{$t('dashboard.notRecordingTitle')}</p>
 			<p class="mt-1 text-xs text-amber-700">
-				Le direct est diffusé mais rien n'est sauvegardé. Cliquez pour démarrer l'enregistrement.
+				{$t('dashboard.notRecordingBody')}
 			</p>
 		</div>
 	</a>
@@ -96,8 +97,8 @@
 <!-- Header -->
 <div class="mb-8 flex items-end justify-between">
 	<div>
-		<h1 class="font-display text-3xl font-semibold text-stone-800">Tableau de bord</h1>
-		<p class="mt-1 text-sm text-stone-500">Vue d'ensemble de votre bibliothèque audio</p>
+		<h1 class="font-display text-3xl font-semibold text-stone-800">{$t('dashboard.title')}</h1>
+		<p class="mt-1 text-sm text-stone-500">{$t('dashboard.subtitle')}</p>
 	</div>
 	{#if data.canAddAudio}
 		<div class="flex gap-2">
@@ -105,13 +106,13 @@
 				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M3 7l2-2h4l2 2h10a2 2 0 012 2v9a2 2 0 01-2 2H3a2 2 0 01-2-2V9a2 2 0 012-2z" />
 				</svg>
-				Importer en lot
+				{$t('common.bulkImport')}
 			</a>
 			<a href="/audio/new" class="admin-btn-primary">
 				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
 				</svg>
-				Importer un audio
+				{$t('dashboard.importOne')}
 			</a>
 		</div>
 	{/if}
@@ -127,7 +128,7 @@
 			</svg>
 		</div>
 		<p class="text-2xl font-semibold text-stone-800">{data.stats.totalTracks}</p>
-		<p class="text-sm text-stone-500">Pistes audio</p>
+		<p class="text-sm text-stone-500">{$t('dashboard.totalTracks')}</p>
 	</div>
 
 	<!-- Total storage -->
@@ -138,7 +139,7 @@
 			</svg>
 		</div>
 		<p class="text-2xl font-semibold text-stone-800">{formatBytes(data.stats.totalStorage)}</p>
-		<p class="text-sm text-stone-500">Stockage total</p>
+		<p class="text-sm text-stone-500">{$t('dashboard.totalStorage')}</p>
 	</div>
 
 	<!-- Uploads this month -->
@@ -149,7 +150,7 @@
 			</svg>
 		</div>
 		<p class="text-2xl font-semibold text-stone-800">{data.stats.uploadsThisMonth}</p>
-		<p class="text-sm text-stone-500">Importés ce mois</p>
+		<p class="text-sm text-stone-500">{$t('dashboard.uploadsThisMonth')}</p>
 	</div>
 
 	<!-- Missing metadata -->
@@ -160,14 +161,14 @@
 			</svg>
 		</div>
 		<p class="text-2xl font-semibold text-stone-800">{data.stats.missingMetadata}</p>
-		<p class="text-sm text-stone-500">Métadonnées manquantes</p>
+		<p class="text-sm text-stone-500">{$t('dashboard.missingMetadata')}</p>
 	</div>
 </div>
 
 <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
 	<!-- Category distribution -->
 	<div class="border border-stone-200/60 bg-white/40 p-6">
-		<h2 class="mb-4 font-display text-xl font-semibold text-stone-800">Répartition par catégorie</h2>
+		<h2 class="mb-4 font-display text-xl font-semibold text-stone-800">{$t('dashboard.categoryDistribution')}</h2>
 		<div class="space-y-3">
 			{#each data.stats.categoryDistribution as cat}
 				<div class="flex items-center gap-3">
@@ -184,7 +185,7 @@
 				</div>
 			{/each}
 			{#if data.stats.categoryDistribution.length === 0}
-				<p class="text-sm text-stone-400 italic">Aucune catégorie trouvée</p>
+				<p class="text-sm text-stone-400 italic">{$t('dashboard.noCategories')}</p>
 			{/if}
 		</div>
 	</div>
@@ -192,10 +193,10 @@
 	<!-- Recent uploads -->
 	<div class="border border-stone-200/60 bg-white/40 p-6">
 		<div class="mb-4 flex items-center justify-between">
-			<h2 class="font-display text-xl font-semibold text-stone-800">Ajouts récents</h2>
+			<h2 class="font-display text-xl font-semibold text-stone-800">{$t('dashboard.recentUploads')}</h2>
 			{#if data.canManageAudio}
 				<a href="/audio" class="text-sm font-medium text-primary hover:text-missionnaire-600">
-					Voir tout &rarr;
+					{$t('dashboard.viewAll')} &rarr;
 				</a>
 			{/if}
 		</div>
@@ -212,14 +213,14 @@
 						</svg>
 					</div>
 					<div class="min-w-0 flex-1">
-						<p class="truncate text-sm font-medium text-stone-700">{audio.title || 'Sans titre'}</p>
-						<p class="truncate text-xs text-stone-400">{audio.artist || 'Artiste inconnu'} &middot; {audio.category}</p>
+						<p class="truncate text-sm font-medium text-stone-700">{audio.title || $t('common.untitled')}</p>
+						<p class="truncate text-xs text-stone-400">{audio.artist || $t('common.unknownArtist')} &middot; {audio.category}</p>
 					</div>
 					<span class="shrink-0 text-xs text-stone-400">{formatDate(audio.uploaded_at)}</span>
 				</svelte:element>
 			{/each}
 			{#if data.stats.recentUploads.length === 0}
-				<p class="py-4 text-center text-sm text-stone-400 italic">Aucun audio importé</p>
+				<p class="py-4 text-center text-sm text-stone-400 italic">{$t('dashboard.noUploads')}</p>
 			{/if}
 		</div>
 	</div>
@@ -228,12 +229,13 @@
 <!-- Activity log -->
 {#if data.recentActivity.length > 0}
 	<div class="mt-6 border border-stone-200/60 bg-white/40 p-6">
-		<h2 class="mb-4 font-display text-xl font-semibold text-stone-800">Activité récente</h2>
+		<h2 class="mb-4 font-display text-xl font-semibold text-stone-800">{$t('dashboard.recentActivity')}</h2>
 		<div class="space-y-2">
 			{#each data.recentActivity as log}
+				{@const labelKey = actionKey(log.action)}
 				<div class="flex items-center gap-3 px-3 py-2">
 					<span class="inline-flex shrink-0 rounded-md px-2 py-0.5 text-xs font-medium {actionColor(log.action)}">
-						{actionLabel(log.action)}
+						{labelKey ? $t(labelKey) : log.action}
 					</span>
 					<span class="min-w-0 flex-1 truncate text-sm text-stone-600">
 						{log.user_email}

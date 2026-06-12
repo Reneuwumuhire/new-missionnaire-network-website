@@ -5,6 +5,7 @@
 	import BulkActionBar from '$lib/components/BulkActionBar.svelte';
 	import { selection } from '$lib/stores/selection';
 	import { page } from '$app/stores';
+	import { t } from '$lib/i18n';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -50,14 +51,14 @@
 </script>
 
 <svelte:head>
-	<title>Bibliothèque audio - Missionnaire Admin</title>
+	<title>{$t('audio.pageTitle')}</title>
 </svelte:head>
 
 <!-- Header -->
 <div class="mb-6 flex items-end justify-between">
 	<div>
-		<h1 class="font-display text-3xl font-semibold text-stone-800">Bibliothèque audio</h1>
-		<p class="mt-1 text-sm text-stone-500">{data.total} piste{data.total !== 1 ? 's' : ''} au total</p>
+		<h1 class="font-display text-3xl font-semibold text-stone-800">{$t('audio.title')}</h1>
+		<p class="mt-1 text-sm text-stone-500">{$t(data.total !== 1 ? 'audio.totalCountMany' : 'audio.totalCountOne', { count: data.total })}</p>
 	</div>
 	{#if perms.can_add}
 	<div class="flex gap-2">
@@ -65,13 +66,13 @@
 			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M3 7l2-2h4l2 2h10a2 2 0 012 2v9a2 2 0 01-2 2H3a2 2 0 01-2-2V9a2 2 0 012-2z" />
 			</svg>
-			Importer en lot
+			{$t('common.bulkImport')}
 		</a>
 		<a href="/audio/new" class="admin-btn-primary">
 			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
 			</svg>
-			Importer
+			{$t('audio.import')}
 		</a>
 	</div>
 	{/if}
@@ -99,12 +100,12 @@
 						</th>
 					{/if}
 					<th class="w-10 px-2 py-3"></th>
-					<th class="px-4 py-3 font-medium text-stone-500">Titre</th>
-					<th class="px-4 py-3 font-medium text-stone-500">Artiste</th>
-					<th class="px-4 py-3 font-medium text-stone-500">Catégorie</th>
-					<th class="px-4 py-3 font-medium text-stone-500">Durée</th>
-					<th class="px-4 py-3 font-medium text-stone-500">Taille</th>
-					<th class="px-4 py-3 font-medium text-stone-500">Date</th>
+					<th class="px-4 py-3 font-medium text-stone-500">{$t('common.title')}</th>
+					<th class="px-4 py-3 font-medium text-stone-500">{$t('common.artist')}</th>
+					<th class="px-4 py-3 font-medium text-stone-500">{$t('common.category')}</th>
+					<th class="px-4 py-3 font-medium text-stone-500">{$t('common.duration')}</th>
+					<th class="px-4 py-3 font-medium text-stone-500">{$t('common.size')}</th>
+					<th class="px-4 py-3 font-medium text-stone-500">{$t('common.date')}</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -130,10 +131,10 @@
 									href="/audio/{id}{filterQuery}"
 									class="block truncate font-medium text-stone-700 hover:text-primary"
 								>
-									{audio.title || 'Sans titre'}
+									{audio.title || $t('common.untitled')}
 								</a>
 							{:else}
-								<span class="block truncate font-medium text-stone-700">{audio.title || 'Sans titre'}</span>
+								<span class="block truncate font-medium text-stone-700">{audio.title || $t('common.untitled')}</span>
 							{/if}
 							{#if audio.book}
 								<span class="text-xs text-stone-400">{audio.book_full_name || audio.book}</span>
@@ -153,7 +154,7 @@
 				{#if data.audioList.length === 0}
 					<tr>
 						<td colspan={canSelectAudio ? 8 : 7} class="px-4 py-12 text-center text-stone-400">
-							Aucun audio trouvé
+							{$t('audio.noResults')}
 						</td>
 					</tr>
 				{/if}

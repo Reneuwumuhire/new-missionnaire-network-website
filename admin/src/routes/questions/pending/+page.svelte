@@ -2,6 +2,7 @@
 	import { loadingSubmit } from '$lib/actions/loadingSubmit';
 	import FormattedQuestionText from '$lib/components/questions/FormattedQuestionText.svelte';
 	import { confirmDialog } from '$lib/stores/confirm-dialog';
+	import { t } from '$lib/i18n';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -30,11 +31,10 @@
 
 		event.preventDefault();
 		const ok = await confirmDialog.ask({
-			title: 'Supprimer définitivement ?',
-			message:
-				'Cette question sera retirée avec ses réponses, références et signalements. Cette action est irréversible.',
-			confirmLabel: 'Supprimer',
-			cancelLabel: 'Annuler',
+			title: $t('questions.confirmDelete.title'),
+			message: $t('questions.confirmDelete.message'),
+			confirmLabel: $t('questions.confirmDelete.confirm'),
+			cancelLabel: $t('questions.confirmDelete.cancel'),
 			tone: 'danger'
 		});
 		if (!ok) return;
@@ -45,22 +45,24 @@
 </script>
 
 <svelte:head>
-	<title>Questions en attente - Missionnaire Admin</title>
+	<title>{$t('questions.pending.headTitle')}</title>
 </svelte:head>
 
 <div class="mb-8 flex items-end justify-between">
 	<div>
-		<h1 class="font-display text-3xl font-semibold text-stone-800">Questions en attente</h1>
+		<h1 class="font-display text-3xl font-semibold text-stone-800">{$t('questions.pending.title')}</h1>
 		<p class="mt-1 text-sm text-stone-500">
-			{data.total} question{data.total === 1 ? '' : 's'} à relire
+			{data.total === 1
+				? $t('questions.pending.countOne', { count: data.total })
+				: $t('questions.pending.countMany', { count: data.total })}
 		</p>
 	</div>
-	<a href="/questions" class="admin-btn-secondary">Toutes les questions</a>
+	<a href="/questions" class="admin-btn-secondary">{$t('questions.allQuestions')}</a>
 </div>
 
 {#if data.questions.length === 0}
 	<div class="border border-stone-200/60 bg-white/40 p-8 text-center text-sm text-stone-500">
-		Aucune question en attente.
+		{$t('questions.pending.empty')}
 	</div>
 {:else}
 	<div class="grid gap-4">
@@ -83,13 +85,13 @@
 						<form method="POST" action="?/moderate" use:loadingSubmit>
 							<input type="hidden" name="id" value={question._id} />
 							<input type="hidden" name="actionName" value="approve" />
-							<button class="admin-btn-primary">Approuver</button>
+							<button class="admin-btn-primary">{$t('questions.approve')}</button>
 						</form>
 						<form method="POST" action="?/moderate" class="flex gap-2" use:loadingSubmit>
 							<input type="hidden" name="id" value={question._id} />
 							<input type="hidden" name="actionName" value="reject" />
-							<input name="reason" class="admin-input w-48 py-2" placeholder="Raison" />
-							<button class="admin-btn-danger">Rejeter</button>
+							<input name="reason" class="admin-input w-48 py-2" placeholder={$t('questions.reasonPlaceholder')} />
+							<button class="admin-btn-danger">{$t('questions.reject')}</button>
 						</form>
 						{#if data.canDelete && !data.canDeletePermanently}
 							<form method="POST" action="?/moderate" use:loadingSubmit>
@@ -100,8 +102,8 @@
 									name="reason"
 									value="Suppression depuis les questions en attente"
 								/>
-								<button class="admin-btn-danger" data-loading-label="Suppression...">
-									Supprimer
+								<button class="admin-btn-danger" data-loading-label={$t('questions.deleting')}>
+									{$t('questions.delete')}
 								</button>
 							</form>
 						{/if}
@@ -119,12 +121,12 @@
 									name="reason"
 									value="Suppression définitive depuis les questions en attente"
 								/>
-								<button class="admin-btn-danger" data-loading-label="Suppression...">
-									Supprimer définitivement
+								<button class="admin-btn-danger" data-loading-label={$t('questions.deleting')}>
+									{$t('questions.deletePermanently')}
 								</button>
 							</form>
 						{/if}
-						<a href={`/questions/${question._id}`} class="admin-btn-secondary">Ouvrir</a>
+						<a href={`/questions/${question._id}`} class="admin-btn-secondary">{$t('questions.open')}</a>
 					</div>
 				</div>
 			</article>

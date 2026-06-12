@@ -2,27 +2,28 @@
 	import { loadingSubmit } from '$lib/actions/loadingSubmit';
 	import { stripRichTextFormatting } from '$lib/questions/rich-text';
 	import { confirmDialog } from '$lib/stores/confirm-dialog';
+	import { t } from '$lib/i18n';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 	const confirmedPermanentDeleteForms = new WeakSet<HTMLFormElement>();
 
 	const statuses = [
-		{ value: 'all', label: 'Toutes' },
-		{ value: 'pending', label: 'En attente' },
-		{ value: 'approved', label: 'Publiées' },
-		{ value: 'answered', label: 'Répondues' },
-		{ value: 'hidden', label: 'Masquées' },
-		{ value: 'rejected', label: 'Rejetées' },
-		{ value: 'archived', label: 'Archivées' }
+		{ value: 'all', label: 'questions.filterStatus.all' },
+		{ value: 'pending', label: 'questions.filterStatus.pending' },
+		{ value: 'approved', label: 'questions.filterStatus.approved' },
+		{ value: 'answered', label: 'questions.filterStatus.answered' },
+		{ value: 'hidden', label: 'questions.filterStatus.hidden' },
+		{ value: 'rejected', label: 'questions.filterStatus.rejected' },
+		{ value: 'archived', label: 'questions.filterStatus.archived' }
 	];
 	const statusLabels: Record<string, string> = {
-		pending: 'En attente',
-		approved: 'Publiée',
-		answered: 'Répondue',
-		rejected: 'Rejetée',
-		hidden: 'Masquée',
-		archived: 'Archivée'
+		pending: 'questions.statusLabel.pending',
+		approved: 'questions.statusLabel.approved',
+		answered: 'questions.statusLabel.answered',
+		rejected: 'questions.statusLabel.rejected',
+		hidden: 'questions.statusLabel.hidden',
+		archived: 'questions.statusLabel.archived'
 	};
 
 	async function confirmPermanentDelete(event: SubmitEvent) {
@@ -40,11 +41,10 @@
 
 		event.preventDefault();
 		const ok = await confirmDialog.ask({
-			title: 'Supprimer définitivement ?',
-			message:
-				'Cette question sera retirée avec ses réponses, références et signalements. Cette action est irréversible.',
-			confirmLabel: 'Supprimer',
-			cancelLabel: 'Annuler',
+			title: $t('questions.confirmDelete.title'),
+			message: $t('questions.confirmDelete.message'),
+			confirmLabel: $t('questions.confirmDelete.confirm'),
+			cancelLabel: $t('questions.confirmDelete.cancel'),
 			tone: 'danger'
 		});
 		if (!ok) return;
@@ -76,23 +76,23 @@
 </script>
 
 <svelte:head>
-	<title>Questions - Missionnaire Admin</title>
+	<title>{$t('questions.headTitle')}</title>
 </svelte:head>
 
 <div class="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
 	<div>
-		<h1 class="font-display text-3xl font-semibold text-stone-800">Questions</h1>
+		<h1 class="font-display text-3xl font-semibold text-stone-800">{$t('questions.title')}</h1>
 		<p class="mt-1 text-sm text-stone-500">
-			Modération des questions publiques, réponses pastorales et signalements.
+			{$t('questions.subtitle')}
 		</p>
 	</div>
 	{#if data.canModerate}
 		<div class="flex flex-wrap gap-2">
 			<a href="/questions/pending" class="admin-btn-secondary py-2"
-				>En attente ({data.stats.pending})</a
+				>{$t('questions.pendingLink', { count: data.stats.pending })}</a
 			>
 			<a href="/questions/reports" class="admin-btn-secondary py-2"
-				>Signalements ({data.stats.openReports})</a
+				>{$t('questions.reportsLink', { count: data.stats.openReports })}</a
 			>
 		</div>
 	{/if}
@@ -107,13 +107,13 @@
 			? 'border-primary bg-orange-50/50'
 			: 'border-stone-200/60 bg-white/50'}"
 	>
-		<p class="text-xs uppercase tracking-[0.16em] text-stone-400">En attente</p>
+		<p class="text-xs uppercase tracking-[0.16em] text-stone-400">{$t('questions.statusLabel.pending')}</p>
 		<div class="mt-1 flex items-end justify-between gap-3">
 			<p class="text-2xl font-semibold text-stone-800">{data.stats.pending}</p>
 			<span
 				class="text-[10px] font-bold uppercase tracking-[0.16em] text-primary opacity-0 transition-opacity group-hover:opacity-100"
 			>
-				Filtrer
+				{$t('questions.filterAction')}
 			</span>
 		</div>
 	</a>
@@ -121,13 +121,13 @@
 		href="/questions/reports"
 		class="group border border-stone-200/60 bg-white/50 p-4 transition-colors hover:border-primary hover:bg-orange-50/40"
 	>
-		<p class="text-xs uppercase tracking-[0.16em] text-stone-400">Signalements ouverts</p>
+		<p class="text-xs uppercase tracking-[0.16em] text-stone-400">{$t('questions.openReports')}</p>
 		<div class="mt-1 flex items-end justify-between gap-3">
 			<p class="text-2xl font-semibold text-stone-800">{data.stats.openReports}</p>
 			<span
 				class="text-[10px] font-bold uppercase tracking-[0.16em] text-primary opacity-0 transition-opacity group-hover:opacity-100"
 			>
-				Revoir
+				{$t('questions.review')}
 			</span>
 		</div>
 	</a>
@@ -139,13 +139,13 @@
 			? 'border-primary bg-orange-50/50'
 			: 'border-stone-200/60 bg-white/50'}"
 	>
-		<p class="text-xs uppercase tracking-[0.16em] text-stone-400">Masquées</p>
+		<p class="text-xs uppercase tracking-[0.16em] text-stone-400">{$t('questions.filterStatus.hidden')}</p>
 		<div class="mt-1 flex items-end justify-between gap-3">
 			<p class="text-2xl font-semibold text-stone-800">{data.stats.hidden}</p>
 			<span
 				class="text-[10px] font-bold uppercase tracking-[0.16em] text-primary opacity-0 transition-opacity group-hover:opacity-100"
 			>
-				Filtrer
+				{$t('questions.filterAction')}
 			</span>
 		</div>
 	</a>
@@ -156,33 +156,33 @@
 	class="mb-6 grid gap-3 border border-stone-200/60 bg-white/40 p-4 md:grid-cols-[1fr_170px_170px_auto]"
 	use:loadingSubmit
 >
-	<input name="search" value={data.search} placeholder="Rechercher" class="admin-input" />
+	<input name="search" value={data.search} placeholder={$t('questions.searchPlaceholder')} class="admin-input" />
 	<select name="status" class="admin-input">
 		{#each statuses as status}
-			<option value={status.value} selected={data.status === status.value}>{status.label}</option>
+			<option value={status.value} selected={data.status === status.value}>{$t(status.label)}</option>
 		{/each}
 	</select>
 	<select name="answered" class="admin-input">
-		<option value="">Toutes</option>
-		<option value="answered" selected={data.answered === 'answered'}>Avec réponse</option>
-		<option value="unanswered" selected={data.answered === 'unanswered'}>Sans réponse</option>
+		<option value="">{$t('questions.filterStatus.all')}</option>
+		<option value="answered" selected={data.answered === 'answered'}>{$t('questions.withAnswer')}</option>
+		<option value="unanswered" selected={data.answered === 'unanswered'}>{$t('questions.withoutAnswer')}</option>
 	</select>
-	<button class="admin-btn-primary justify-center">Filtrer</button>
+	<button class="admin-btn-primary justify-center">{$t('questions.filterAction')}</button>
 </form>
 
 {#if data.questions.length === 0}
 	<div class="border border-stone-200/60 bg-white/40 p-8 text-center text-sm text-stone-500">
-		Aucune question trouvée.
+		{$t('questions.empty')}
 	</div>
 {:else}
 	<div class="overflow-hidden border border-stone-200/60 bg-white/40">
 		<table class="w-full text-left text-sm">
 			<thead>
 				<tr class="border-b border-stone-100 bg-cream/50">
-					<th class="px-5 py-3.5 font-medium text-stone-500">Question</th>
-					<th class="px-5 py-3.5 font-medium text-stone-500">Statut</th>
-					<th class="px-5 py-3.5 font-medium text-stone-500">Activité</th>
-					<th class="w-[235px] px-4 py-3.5 text-right font-medium text-stone-500">Actions</th>
+					<th class="px-5 py-3.5 font-medium text-stone-500">{$t('questions.table.question')}</th>
+					<th class="px-5 py-3.5 font-medium text-stone-500">{$t('questions.table.status')}</th>
+					<th class="px-5 py-3.5 font-medium text-stone-500">{$t('questions.table.activity')}</th>
+					<th class="w-[235px] px-4 py-3.5 text-right font-medium text-stone-500">{$t('questions.table.actions')}</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -206,19 +206,19 @@
 							<span
 								class="inline-flex bg-stone-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-stone-600"
 							>
-								{statusLabels[question.status] ?? question.status}
+								{statusLabels[question.status] ? $t(statusLabels[question.status]) : question.status}
 							</span>
 							{#if question.locked}
-								<span class="mt-2 block text-xs text-amber-600">Verrouillée</span>
+								<span class="mt-2 block text-xs text-amber-600">{$t('questions.statusLabel.locked')}</span>
 							{/if}
 							{#if question.featured}
-								<span class="mt-2 block text-xs text-primary">En avant</span>
+								<span class="mt-2 block text-xs text-primary">{$t('questions.featuredBadge')}</span>
 							{/if}
 						</td>
 						<td class="px-5 py-4 text-xs text-stone-500">
-							<p>{question.replyCount} réponses</p>
-							<p>{question.viewCount} vues</p>
-							<p>{question.reportCount} signalements</p>
+							<p>{$t('questions.replyCount', { count: question.replyCount })}</p>
+							<p>{$t('questions.viewCount', { count: question.viewCount })}</p>
+							<p>{$t('questions.reportCount', { count: question.reportCount })}</p>
 						</td>
 						<td class="w-[235px] px-4 py-4">
 							<div class="flex flex-nowrap justify-end gap-1.5 whitespace-nowrap">
@@ -226,7 +226,7 @@
 									href={`/questions/${question._id}`}
 									class="admin-btn-secondary shrink-0 px-2.5 py-1.5 text-[9px] leading-none tracking-[0.12em]"
 								>
-									Ouvrir
+									{$t('questions.open')}
 								</a>
 								{#if data.canModerate && question.status === 'pending'}
 									<form method="POST" action="?/moderate" use:loadingSubmit>
@@ -234,7 +234,7 @@
 										<input type="hidden" name="actionName" value="approve" />
 										<button
 											class="admin-btn-primary shrink-0 px-2.5 py-1.5 text-[9px] leading-none tracking-[0.12em]"
-											>Approuver</button
+											>{$t('questions.approve')}</button
 										>
 									</form>
 								{/if}
@@ -244,7 +244,7 @@
 										<input type="hidden" name="actionName" value="hide" />
 										<button
 											class="admin-btn-secondary shrink-0 px-2.5 py-1.5 text-[9px] leading-none tracking-[0.12em]"
-											>Masquer</button
+											>{$t('questions.hide')}</button
 										>
 									</form>
 								{/if}
@@ -255,9 +255,9 @@
 										<input type="hidden" name="reason" value="Suppression depuis la liste admin" />
 										<button
 											class="admin-btn-danger shrink-0 px-2.5 py-1.5 text-[9px] leading-none tracking-[0.12em]"
-											data-loading-label="Suppression..."
+											data-loading-label={$t('questions.deleting')}
 										>
-											Supprimer
+											{$t('questions.delete')}
 										</button>
 									</form>
 								{/if}
@@ -277,9 +277,9 @@
 										/>
 										<button
 											class="admin-btn-danger shrink-0 px-2.5 py-1.5 text-[9px] leading-none tracking-[0.12em]"
-											data-loading-label="Suppression..."
+											data-loading-label={$t('questions.deleting')}
 										>
-											Définitif
+											{$t('questions.permanent')}
 										</button>
 									</form>
 								{/if}
@@ -299,16 +299,16 @@
 					: ''}"
 				href={pageHref(data.page - 1)}
 			>
-				Précédent
+				{$t('questions.previous')}
 			</a>
-			<span class="text-stone-500">Page {data.page} / {totalPages}</span>
+			<span class="text-stone-500">{$t('questions.pageOf', { page: data.page, total: totalPages })}</span>
 			<a
 				class="text-stone-500 hover:text-primary {data.page >= totalPages
 					? 'pointer-events-none opacity-40'
 					: ''}"
 				href={pageHref(data.page + 1)}
 			>
-				Suivant
+				{$t('questions.next')}
 			</a>
 		</nav>
 	{/if}

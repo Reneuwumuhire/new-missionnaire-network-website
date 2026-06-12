@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
+	import { t } from '$lib/i18n';
 
 	let {
 		total,
@@ -32,7 +33,7 @@
 {#if totalPages > 1}
 	<div class="flex items-center justify-between">
 		<p class="text-sm text-stone-500">
-			{(currentPage - 1) * limit + 1}–{Math.min(currentPage * limit, total)} sur {total}
+			{$t('common.pagination.range', { from: (currentPage - 1) * limit + 1, to: Math.min(currentPage * limit, total), total })}
 		</p>
 		<div class="flex items-center gap-1">
 			<button

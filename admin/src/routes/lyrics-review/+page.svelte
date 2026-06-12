@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { t } from '$lib/i18n';
 
 	type ReviewStatus = '' | 'approved' | 'rejected' | 'ready_for_sync';
 
@@ -122,7 +123,7 @@
 
 			const payload = await response.json();
 			if (!response.ok) {
-				throw new Error(payload.error ?? 'Could not load lyrics review data');
+				throw new Error(payload.error ?? $t('lyrics.review.errors.load'));
 			}
 
 			rows = payload.rows ?? [];
@@ -132,7 +133,7 @@
 			}
 		} catch (caughtError) {
 			error =
-				caughtError instanceof Error ? caughtError.message : 'Could not load lyrics review data';
+				caughtError instanceof Error ? caughtError.message : $t('lyrics.review.errors.load');
 		} finally {
 			loading = false;
 		}
@@ -195,7 +196,7 @@
 			const payload = await response.json();
 
 			if (!response.ok) {
-				throw new Error(payload.error ?? 'Could not load lyrics');
+				throw new Error(payload.error ?? $t('lyrics.review.errors.loadLyrics'));
 			}
 
 			lyricsByRow = {
@@ -210,7 +211,10 @@
 			lyricsByRow = {
 				...lyricsByRow,
 				[row.audio_id]: {
-					error: caughtError instanceof Error ? caughtError.message : 'Could not load lyrics'
+					error:
+						caughtError instanceof Error
+							? caughtError.message
+							: $t('lyrics.review.errors.loadLyrics')
 				}
 			};
 		}
@@ -244,7 +248,7 @@
 			const payload = await response.json();
 
 			if (!response.ok) {
-				throw new Error(payload.error ?? 'Could not save review');
+				throw new Error(payload.error ?? $t('lyrics.review.errors.save'));
 			}
 
 			if (payload.row) {
@@ -255,7 +259,7 @@
 			}
 			return null;
 		} catch (caughtError) {
-			error = caughtError instanceof Error ? caughtError.message : 'Could not save review';
+			error = caughtError instanceof Error ? caughtError.message : $t('lyrics.review.errors.save');
 			rows = rows.map((item) =>
 				item.audio_id === row.audio_id ? { ...item, saving: false } : item
 			);
@@ -287,7 +291,7 @@
 			const payload = await response.json();
 
 			if (!response.ok) {
-				throw new Error(payload.error ?? 'Could not save selected reviews');
+				throw new Error(payload.error ?? $t('lyrics.review.errors.bulkSave'));
 			}
 
 			const updatedRows = new Map(
@@ -302,7 +306,7 @@
 			selectedAudioIds = new Set();
 		} catch (caughtError) {
 			error =
-				caughtError instanceof Error ? caughtError.message : 'Could not save selected reviews';
+				caughtError instanceof Error ? caughtError.message : $t('lyrics.review.errors.bulkSave');
 			rows = rows.map((item) =>
 				selectedSet.has(item.audio_id) ? { ...item, saving: false } : item
 			);
@@ -342,12 +346,16 @@
 			}
 			if (!row.source_url) {
 				skipped += 1;
-				reasons.push(`${row.audio_title || row.audio_id} : pas de source`);
+				reasons.push(
+					$t('lyrics.review.reasons.noSource', { title: row.audio_title || row.audio_id })
+				);
 				continue;
 			}
 			if (row.review_status !== 'approved' && row.review_status !== 'ready_for_sync') {
 				skipped += 1;
-				reasons.push(`${row.audio_title || row.audio_id} : non confirmé`);
+				reasons.push(
+					$t('lyrics.review.reasons.notConfirmed', { title: row.audio_title || row.audio_id })
+				);
 				continue;
 			}
 
@@ -367,7 +375,7 @@
 			} catch (caughtError) {
 				failed += 1;
 				reasons.push(
-					`${row.audio_title || row.audio_id} : ${caughtError instanceof Error ? caughtError.message : 'erreur'}`
+					`${row.audio_title || row.audio_id} : ${caughtError instanceof Error ? caughtError.message : $t('lyrics.review.errors.generic')}`
 				);
 			}
 		}
@@ -377,14 +385,32 @@
 		bulkPublishTotal = 0;
 
 		const parts: string[] = [];
-		if (published > 0) parts.push(`${published} publié${published > 1 ? 's' : ''}`);
-		if (skipped > 0) parts.push(`${skipped} ignoré${skipped > 1 ? 's' : ''}`);
-		if (failed > 0) parts.push(`${failed} échec${failed > 1 ? 's' : ''}`);
+		if (published > 0)
+			parts.push(
+				published > 1
+					? $t('lyrics.review.bulk.publishedMany', { count: published })
+					: $t('lyrics.review.bulk.publishedOne', { count: published })
+			);
+		if (skipped > 0)
+			parts.push(
+				skipped > 1
+					? $t('lyrics.review.bulk.skippedMany', { count: skipped })
+					: $t('lyrics.review.bulk.skippedOne', { count: skipped })
+			);
+		if (failed > 0)
+			parts.push(
+				failed > 1
+					? $t('lyrics.review.bulk.failedMany', { count: failed })
+					: $t('lyrics.review.bulk.failedOne', { count: failed })
+			);
 
 		if (failed > 0 || skipped > 0) {
 			// Surface up to 3 reasons so the user can act on them.
 			const sample = reasons.slice(0, 3).join(' · ');
-			const more = reasons.length > 3 ? ` · +${reasons.length - 3} autres` : '';
+			const more =
+				reasons.length > 3
+					? ` · ${$t('lyrics.review.bulk.moreReasons', { count: reasons.length - 3 })}`
+					: '';
 			error = `${parts.join(' · ')}${reasons.length ? ` — ${sample}${more}` : ''}`;
 		}
 
@@ -408,13 +434,13 @@
 		}
 
 		if (!row.source_url) {
-			error = 'Ajoutez les bonnes paroles avant de publier cet audio.';
+			error = $t('lyrics.review.errors.addLyricsFirst');
 			return;
 		}
 
 		const current = rows.find((item) => item.audio_id === row.audio_id) ?? row;
 		if (current.review_status !== 'approved' && current.review_status !== 'ready_for_sync') {
-			error = 'Confirmez la correspondance avant de publier les paroles.';
+			error = $t('lyrics.review.errors.confirmFirst');
 			return;
 		}
 
@@ -438,7 +464,7 @@
 			const payload = await response.json();
 
 			if (!response.ok) {
-				throw new Error(payload.error ?? 'Could not sync lyrics');
+				throw new Error(payload.error ?? $t('lyrics.review.errors.sync'));
 			}
 
 			const lyrics = payload.lyrics ?? {};
@@ -466,7 +492,7 @@
 					: item
 			);
 		} catch (caughtError) {
-			error = caughtError instanceof Error ? caughtError.message : 'Could not sync lyrics';
+			error = caughtError instanceof Error ? caughtError.message : $t('lyrics.review.errors.sync');
 			rows = rows.map((item) =>
 				item.audio_id === row.audio_id ? { ...item, syncing: false } : item
 			);
@@ -494,7 +520,7 @@
 			const payload = await response.json();
 
 			if (!response.ok) {
-				throw new Error(payload.error ?? 'Could not publish lyrics');
+				throw new Error(payload.error ?? $t('lyrics.review.errors.publish'));
 			}
 
 			const lyrics = payload.data?.lyrics ?? {};
@@ -527,7 +553,8 @@
 				[row.audio_id]: ''
 			};
 		} catch (caughtError) {
-			error = caughtError instanceof Error ? caughtError.message : 'Could not publish lyrics';
+			error =
+				caughtError instanceof Error ? caughtError.message : $t('lyrics.review.errors.publish');
 			rows = rows.map((item) =>
 				item.audio_id === row.audio_id ? { ...item, syncing: false } : item
 			);
@@ -553,7 +580,8 @@
 			anchor.click();
 			URL.revokeObjectURL(url);
 		} catch (caughtError) {
-			error = caughtError instanceof Error ? caughtError.message : 'Could not export CSV';
+			error =
+				caughtError instanceof Error ? caughtError.message : $t('lyrics.review.errors.export');
 		} finally {
 			exporting = false;
 		}
@@ -599,16 +627,18 @@
 	}
 
 	function statusLabel(status: string) {
-		if (status === 'approved') return 'Confirmé';
-		if (status === 'rejected') return 'Rejeté';
-		if (status === 'ready_for_sync') return 'Prêt';
-		return 'En attente';
+		if (status === 'approved') return 'lyrics.review.status.approved';
+		if (status === 'rejected') return 'lyrics.review.status.rejected';
+		if (status === 'ready_for_sync') return 'lyrics.review.status.ready';
+		return 'lyrics.review.status.pending';
 	}
 
 	function syncStatusLabel(row: ReviewRow) {
-		if (row.lyrics_sync_status === 'published' || row.lyrics_synced_at) return 'Synchronisé';
-		if (row.review_status === 'ready_for_sync') return 'Prêt à synchroniser';
-		return 'Non synchronisé';
+		if (row.lyrics_sync_status === 'published' || row.lyrics_synced_at) {
+			return 'lyrics.review.sync.synced';
+		}
+		if (row.review_status === 'ready_for_sync') return 'lyrics.review.sync.ready';
+		return 'lyrics.review.sync.notSynced';
 	}
 
 	function syncStatusClass(row: ReviewRow) {
@@ -620,10 +650,12 @@
 	}
 
 	function timelineStatusLabel(row: ReviewRow) {
-		if (row.timeline_status === 'published') return 'Timeline publiée';
-		if (row.timeline_status === 'draft') return 'Timeline brouillon';
-		if (row.lyrics_sync_status === 'published' || row.lyrics_synced_at) return 'Timing requis';
-		return 'Pas de timeline';
+		if (row.timeline_status === 'published') return 'lyrics.review.timeline.published';
+		if (row.timeline_status === 'draft') return 'lyrics.review.timeline.draft';
+		if (row.lyrics_sync_status === 'published' || row.lyrics_synced_at) {
+			return 'lyrics.review.timeline.timingRequired';
+		}
+		return 'lyrics.review.timeline.none';
 	}
 
 	function timelineStatusClass(row: ReviewRow) {
@@ -639,7 +671,10 @@
 		const total = Number(row.timeline_line_count);
 		const timed = Number(row.timeline_timed_line_count);
 		if (!Number.isFinite(total) || total <= 0) return '';
-		return `${Number.isFinite(timed) ? timed : 0}/${total} synchronisées`;
+		return $t('lyrics.review.timelineProgress', {
+			timed: Number.isFinite(timed) ? timed : 0,
+			total
+		});
 	}
 
 	function canSyncLyrics(row: ReviewRow) {
@@ -658,9 +693,9 @@
 	}
 
 	function lyricsPublishLabel(row: ReviewRow) {
-		if (row.syncing) return 'Publication...';
-		if (row.lyrics_sync_status || row.lyrics_synced_at) return 'Republier paroles';
-		return 'Publier paroles';
+		if (row.syncing) return 'lyrics.review.publishing';
+		if (row.lyrics_sync_status || row.lyrics_synced_at) return 'lyrics.review.actions.republishLyrics';
+		return 'lyrics.review.actions.publishLyrics';
 	}
 
 	function canOpenTiming(row: ReviewRow) {
@@ -682,9 +717,9 @@
 	}
 
 	function matchLabel(status: string) {
-		if (status === 'likely') return 'Probable';
-		if (status === 'candidate') return 'Candidat';
-		return 'À revoir';
+		if (status === 'likely') return 'lyrics.review.match.likely';
+		if (status === 'candidate') return 'lyrics.review.match.candidate';
+		return 'lyrics.review.match.needsReview';
 	}
 
 	function numberLabel(row: ReviewRow) {
@@ -693,7 +728,7 @@
 </script>
 
 <svelte:head>
-	<title>Révision paroles - Missionnaire Admin</title>
+	<title>{$t('lyrics.review.pageTitle')}</title>
 </svelte:head>
 
 <div class="flex flex-col gap-6 text-stone-900">
@@ -701,34 +736,39 @@
 		<header>
 			<div>
 				<p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-primary">
-					Révision paroles
+					{$t('lyrics.review.eyebrow')}
 				</p>
 				<h1 class="mt-2 font-display text-3xl font-semibold text-stone-800">
-					Correspondances audio/paroles
+					{$t('lyrics.review.heading')}
 				</h1>
 				<p class="mt-1 max-w-2xl text-sm text-stone-500">
-					Validez les correspondances, synchronisez les paroles et préparez les timelines pour le
-					lecteur public.
+					{$t('lyrics.review.subtitle')}
 				</p>
 			</div>
 		</header>
 
 		<div class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:min-w-[560px]">
 			<div class="card-lift border border-stone-200/60 bg-white/40 p-4">
-				<p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-400">Révisé</p>
+				<p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-400">
+					{$t('lyrics.review.summary.reviewed')}
+				</p>
 				<p class="mt-1 text-2xl font-semibold text-stone-800">{summary.reviewed}/{summary.total}</p>
 			</div>
 			<div class="card-lift border border-stone-200/60 bg-white/40 p-4">
-				<p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-400">Validés</p>
+				<p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-400">
+					{$t('lyrics.review.summary.validated')}
+				</p>
 				<p class="mt-1 text-2xl font-semibold text-stone-800">{summary.matched}</p>
 			</div>
 			<div class="card-lift border border-stone-200/60 bg-white/40 p-4">
-				<p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-400">Prêts</p>
+				<p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-400">
+					{$t('lyrics.review.summary.ready')}
+				</p>
 				<p class="mt-1 text-2xl font-semibold text-stone-800">{summary.readyForSync}</p>
 			</div>
 			<div class="card-lift border border-stone-200/60 bg-white/40 p-4">
 				<p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-400">
-					En attente
+					{$t('lyrics.review.summary.pending')}
 				</p>
 				<p class="mt-1 text-2xl font-semibold text-stone-800">{summary.pending}</p>
 			</div>
@@ -745,43 +785,43 @@
 		<div class="grid gap-4 xl:grid-cols-[1fr_auto] xl:items-end">
 			<div class="grid gap-4 md:grid-cols-[1fr_170px_190px_220px]">
 				<label>
-					<span class="admin-label">Recherche</span>
+					<span class="admin-label">{$t('lyrics.review.filters.search')}</span>
 					<input
 						class="admin-input"
 						bind:value={search}
-						placeholder="Titre, recueil, numéro, paroles"
+						placeholder={$t('lyrics.review.filters.searchPlaceholder')}
 					/>
 				</label>
 
 				<label>
-					<span class="admin-label">Score</span>
+					<span class="admin-label">{$t('lyrics.review.filters.score')}</span>
 					<select class="admin-input" bind:value={matchFilter}>
-						<option value="all">Tous</option>
-						<option value="likely">Probable</option>
-						<option value="candidate">Candidat</option>
-						<option value="needs_review">À revoir</option>
+						<option value="all">{$t('lyrics.review.filters.all')}</option>
+						<option value="likely">{$t('lyrics.review.match.likely')}</option>
+						<option value="candidate">{$t('lyrics.review.match.candidate')}</option>
+						<option value="needs_review">{$t('lyrics.review.match.needsReview')}</option>
 					</select>
 				</label>
 
 				<label>
-					<span class="admin-label">Statut</span>
+					<span class="admin-label">{$t('lyrics.review.filters.status')}</span>
 					<select class="admin-input" bind:value={reviewFilter}>
-						<option value="all">Tous</option>
-						<option value="pending">En attente</option>
-						<option value="approved">Confirmé</option>
-						<option value="lyrics_published">Republier paroles</option>
-						<option value="timing">Timing</option>
-						<option value="rejected">Rejeté</option>
+						<option value="all">{$t('lyrics.review.filters.all')}</option>
+						<option value="pending">{$t('lyrics.review.status.pending')}</option>
+						<option value="approved">{$t('lyrics.review.status.approved')}</option>
+						<option value="lyrics_published">{$t('lyrics.review.actions.republishLyrics')}</option>
+						<option value="timing">{$t('lyrics.review.timing')}</option>
+						<option value="rejected">{$t('lyrics.review.status.rejected')}</option>
 					</select>
 				</label>
 
 				<label>
-					<span class="admin-label">Réviseur</span>
+					<span class="admin-label">{$t('lyrics.review.filters.reviewer')}</span>
 					<input
 						class="admin-input"
 						value={reviewerName}
 						on:input={(event) => setReviewerName(event.currentTarget.value)}
-						placeholder="Nom"
+						placeholder={$t('lyrics.review.filters.reviewerPlaceholder')}
 					/>
 				</label>
 			</div>
@@ -792,7 +832,7 @@
 				on:click={downloadCsv}
 				type="button"
 			>
-				{exporting ? 'Export...' : 'Exporter CSV'}
+				{exporting ? $t('lyrics.review.exporting') : $t('lyrics.review.export')}
 			</button>
 		</div>
 	</section>
@@ -801,7 +841,7 @@
 		<div
 			class="border border-stone-200/60 bg-white/40 p-8 text-center text-sm font-semibold text-stone-500"
 		>
-			Chargement des correspondances...
+			{$t('lyrics.review.loading')}
 		</div>
 	{:else if rows.length > 0}
 		<section class="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(390px,0.75fr)]">
@@ -810,19 +850,26 @@
 					class="flex flex-col gap-3 border-b border-stone-200/60 bg-white/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
 				>
 					<div>
-						<p class="text-sm font-semibold text-stone-700">{filteredRows.length} chants</p>
+						<p class="text-sm font-semibold text-stone-700">
+							{$t('lyrics.review.songsCount', { count: filteredRows.length })}
+						</p>
 						<p class="mt-1 text-xs font-medium text-stone-500">
-							{summary.likely} probables / {summary.candidate} candidats / {summary.needsReview}
-							à revoir
+							{$t('lyrics.review.summaryLine', {
+								likely: summary.likely,
+								candidate: summary.candidate,
+								needsReview: summary.needsReview
+							})}
 						</p>
 					</div>
 
 					{#if selectedCount > 0}
 						<div class="flex flex-wrap items-center gap-2">
 							<span class="text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-400">
-								{selectedCount} sélectionné{selectedCount > 1 ? 's' : ''}
+								{selectedCount > 1
+									? $t('lyrics.review.selectedMany', { count: selectedCount })
+									: $t('lyrics.review.selectedOne', { count: selectedCount })}
 								{visibleSelectedCount !== selectedCount
-									? ` / ${visibleSelectedCount} visibles`
+									? ` / ${$t('lyrics.review.visibleCount', { count: visibleSelectedCount })}`
 									: ''}
 							</span>
 							<button
@@ -831,7 +878,7 @@
 								on:click={() => saveBulkReview('approved')}
 								type="button"
 							>
-								Confirmer
+								{$t('lyrics.review.actions.confirm')}
 							</button>
 							<button
 								class="inline-flex min-h-9 items-center bg-emerald-600 px-3 text-xs font-semibold text-white disabled:cursor-wait disabled:opacity-60"
@@ -839,18 +886,21 @@
 								on:click={() => saveBulkReview('ready_for_sync')}
 								type="button"
 							>
-								Prêt
+								{$t('lyrics.review.actions.ready')}
 							</button>
 							<button
 								class="inline-flex min-h-9 items-center bg-missionnaire px-3 text-xs font-semibold text-white shadow-sm shadow-missionnaire/20 disabled:cursor-wait disabled:opacity-60"
 								disabled={bulkSaving}
 								on:click={bulkPublishLyrics}
 								type="button"
-								title="Publier les paroles pour les chants confirmés sélectionnés"
+								title={$t('lyrics.review.bulkPublishTitle')}
 							>
 								{bulkPublishTotal > 0
-									? `Publication ${bulkPublishCurrent}/${bulkPublishTotal}…`
-									: 'Publier paroles'}
+									? $t('lyrics.review.bulkPublishProgress', {
+											current: bulkPublishCurrent,
+											total: bulkPublishTotal
+										})
+									: $t('lyrics.review.actions.publishLyrics')}
 							</button>
 							<button
 								class="inline-flex min-h-9 items-center bg-red-700 px-3 text-xs font-semibold text-white disabled:cursor-wait disabled:opacity-60"
@@ -858,7 +908,7 @@
 								on:click={() => saveBulkReview('rejected')}
 								type="button"
 							>
-								Rejeter
+								{$t('lyrics.review.actions.reject')}
 							</button>
 							<button
 								class="inline-flex min-h-9 items-center border border-stone-300 bg-white/70 px-3 text-xs font-semibold text-stone-700 disabled:cursor-wait disabled:opacity-60"
@@ -866,7 +916,7 @@
 								on:click={() => saveBulkReview('')}
 								type="button"
 							>
-								Effacer
+								{$t('lyrics.review.actions.clear')}
 							</button>
 							<button
 								class="inline-flex min-h-9 items-center border border-stone-200 bg-white/50 px-3 text-xs font-semibold text-stone-500 hover:text-stone-800 disabled:cursor-wait disabled:opacity-60"
@@ -874,7 +924,7 @@
 								on:click={clearSelectedRows}
 								type="button"
 							>
-								Désélectionner
+								{$t('lyrics.review.actions.deselect')}
 							</button>
 						</div>
 					{/if}
@@ -888,7 +938,7 @@
 							<tr>
 								<th class="w-10 px-4 py-3">
 									<input
-										aria-label="Select visible songs"
+										aria-label={$t('lyrics.review.selectVisibleAria')}
 										checked={allVisibleSelected}
 										class="h-4 w-4 rounded border-stone-300 text-primary focus:ring-primary/30"
 										disabled={filteredRows.length === 0 || bulkSaving}
@@ -896,10 +946,10 @@
 										type="checkbox"
 									/>
 								</th>
-								<th class="w-24 px-4 py-3">Score</th>
-								<th class="min-w-[260px] px-4 py-3">Audio</th>
-								<th class="min-w-[260px] px-4 py-3">Paroles</th>
-								<th class="w-28 px-4 py-3">Statut</th>
+								<th class="w-24 px-4 py-3">{$t('lyrics.review.table.score')}</th>
+								<th class="min-w-[260px] px-4 py-3">{$t('lyrics.review.table.audio')}</th>
+								<th class="min-w-[260px] px-4 py-3">{$t('lyrics.review.table.lyrics')}</th>
+								<th class="w-28 px-4 py-3">{$t('lyrics.review.table.status')}</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -913,7 +963,7 @@
 								>
 									<td class="px-4 py-3 align-top">
 										<input
-											aria-label={`Select ${row.audio_title}`}
+											aria-label={$t('lyrics.review.selectRowAria', { title: row.audio_title })}
 											checked={selectedAudioIds.has(row.audio_id)}
 											class="h-4 w-4 rounded border-stone-300 text-primary focus:ring-primary/30"
 											disabled={bulkSaving || row.saving}
@@ -927,7 +977,7 @@
 											{confidenceLabel(row.confidence)}
 										</div>
 										<div class="mt-1 text-xs font-medium text-stone-500">
-											{matchLabel(row.match_status)}
+											{$t(matchLabel(row.match_status))}
 										</div>
 									</td>
 									<td class="px-4 py-3 align-top">
@@ -954,7 +1004,7 @@
 															? 'bg-red-100 text-red-800'
 															: 'bg-stone-100 text-stone-600'}"
 											>
-												{statusLabel(row.review_status)}
+												{$t(statusLabel(row.review_status))}
 											</span>
 											{#if row.review_status === 'ready_for_sync' || row.lyrics_sync_status || row.lyrics_synced_at}
 												<span
@@ -962,7 +1012,7 @@
 														row
 													)}"
 												>
-													{syncStatusLabel(row)}
+													{$t(syncStatusLabel(row))}
 												</span>
 											{/if}
 											{#if row.timeline_status || row.lyrics_sync_status || row.lyrics_synced_at}
@@ -972,10 +1022,10 @@
 													)}"
 												>
 													{row.timeline_status === 'published'
-														? 'publiée'
+														? $t('lyrics.review.badge.published')
 														: row.timeline_status === 'draft'
-															? 'brouillon'
-															: 'timing'}
+															? $t('lyrics.review.badge.draft')
+															: $t('lyrics.review.badge.timing')}
 												</span>
 											{/if}
 										</div>
@@ -995,7 +1045,7 @@
 						<div class="flex items-start justify-between gap-3">
 							<div>
 								<p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-400">
-									Chant sélectionné
+									{$t('lyrics.review.selectedSong')}
 								</p>
 								<h2 class="mt-1 font-display text-2xl font-semibold leading-tight text-stone-800">
 									{selectedRow.audio_title}
@@ -1020,14 +1070,14 @@
 										selectedRow
 									)}"
 								>
-									{syncStatusLabel(selectedRow)}
+									{$t(syncStatusLabel(selectedRow))}
 								</span>
 								<span
 									class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {timelineStatusClass(
 										selectedRow
 									)}"
 								>
-									{timelineStatusLabel(selectedRow)}
+									{$t(timelineStatusLabel(selectedRow))}
 								</span>
 								{#if timelineProgressLabel(selectedRow)}
 									<span class="text-xs font-bold text-stone-500">
@@ -1038,9 +1088,12 @@
 
 							{#if selectedRow.lyrics_synced_at}
 								<p class="mt-2 text-xs font-semibold text-stone-500">
-									Synced {selectedRow.lyrics_synced_at}{selectedRow.lyrics_synced_by
-										? ` by ${selectedRow.lyrics_synced_by}`
-										: ''}
+									{selectedRow.lyrics_synced_by
+										? $t('lyrics.review.syncedAtBy', {
+												date: selectedRow.lyrics_synced_at,
+												name: selectedRow.lyrics_synced_by
+											})
+										: $t('lyrics.review.syncedAt', { date: selectedRow.lyrics_synced_at })}
 								</p>
 							{/if}
 						</div>
@@ -1058,8 +1111,8 @@
 							>
 								{selectedRow.review_status === 'approved' ||
 								selectedRow.review_status === 'ready_for_sync'
-									? 'Confirmé'
-									: 'Confirmer'}
+									? $t('lyrics.review.status.approved')
+									: $t('lyrics.review.actions.confirm')}
 							</button>
 							<button
 								class="min-h-11 bg-emerald-600 px-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1067,21 +1120,21 @@
 								on:click={() => publishLyrics(selectedRow)}
 								type="button"
 							>
-								{lyricsPublishLabel(selectedRow)}
+								{$t(lyricsPublishLabel(selectedRow))}
 							</button>
 							{#if canOpenTiming(selectedRow)}
 								<a
 									class="inline-flex min-h-11 items-center justify-center border border-stone-300 bg-white/70 px-3 text-sm font-semibold text-stone-800 transition-colors hover:border-primary hover:text-primary"
 									href={`/lyrics-review/timing/${selectedRow.audio_id}`}
 								>
-									Timing
+									{$t('lyrics.review.timing')}
 								</a>
 							{/if}
 						</div>
 
 						{#if !selectedManualLyrics.trim() && selectedRow.source_url && !canSyncLyrics(selectedRow)}
 							<p class="mt-2 text-xs font-semibold text-stone-500">
-								Confirmez d'abord la correspondance, puis publiez les paroles.
+								{$t('lyrics.review.confirmFirstHint')}
 							</p>
 						{/if}
 					</div>
@@ -1090,7 +1143,7 @@
 						<div class="flex items-start justify-between gap-3">
 							<div>
 								<p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-400">
-									Paroles candidates
+									{$t('lyrics.review.candidateLyrics')}
 								</p>
 								<h3 class="mt-1 font-display text-xl font-semibold text-stone-800">
 									{selectedLyrics?.title || selectedRow.source_title}
@@ -1105,26 +1158,26 @@
 								target="_blank"
 								rel="noreferrer"
 							>
-								Source
+								{$t('lyrics.review.source')}
 							</a>
 						</div>
 
 						<label class="mt-4 block">
-							<span class="admin-label">Remplacer les paroles</span>
+							<span class="admin-label">{$t('lyrics.review.replaceLyrics')}</span>
 							<textarea
 								class="admin-input min-h-32 resize-y leading-7"
 								value={selectedManualLyrics}
 								on:input={(event) => setManualLyrics(selectedRow, event.currentTarget.value)}
-								placeholder="Si la source ne correspond pas, collez les bonnes paroles ici puis publiez."
+								placeholder={$t('lyrics.review.replaceLyricsPlaceholder')}
 							></textarea>
 						</label>
 						<p class="mt-2 text-xs text-stone-500">
-							Si ce champ reste vide, la publication utilise la source candidate ci-dessous.
+							{$t('lyrics.review.replaceLyricsHint')}
 						</p>
 
 						<div class="mt-4 max-h-[48vh] overflow-auto border border-stone-200/70 bg-white/55 p-4">
 							{#if selectedLyrics?.loading}
-								<p class="text-sm font-semibold text-stone-500">Chargement des paroles...</p>
+								<p class="text-sm font-semibold text-stone-500">{$t('lyrics.review.lyricsLoading')}</p>
 							{:else if selectedLyrics?.error}
 								<p class="text-sm font-semibold text-red-700">{selectedLyrics.error}</p>
 							{:else if selectedLyrics?.sections?.length}
@@ -1154,7 +1207,7 @@
 									on:click={() => loadLyrics(selectedRow)}
 									type="button"
 								>
-									Charger les paroles
+									{$t('lyrics.review.loadLyrics')}
 								</button>
 							{/if}
 						</div>
@@ -1166,7 +1219,7 @@
 		<div
 			class="border border-stone-200/60 bg-white/40 p-8 text-center text-sm font-semibold text-stone-500"
 		>
-			Aucune correspondance trouvée.
+			{$t('lyrics.review.empty')}
 		</div>
 	{/if}
 </div>

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { t } from '$lib/i18n';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -16,7 +17,7 @@
 	const passwordTargetEmail = $derived(form?.createdEmail ?? form?.resetEmail ?? null);
 
 	function formatDate(date: string | Date | null): string {
-		if (!date) return 'Jamais';
+		if (!date) return $t('users.never');
 		return new Date(date).toLocaleDateString('fr-FR', {
 			day: 'numeric',
 			month: 'short',
@@ -32,20 +33,22 @@
 	}
 
 	const roleLabel: Record<string, string> = {
-		superadmin: 'Super Admin',
-		editor: 'Éditeur'
+		superadmin: 'users.roleSuperadmin',
+		editor: 'users.roleEditor'
 	};
 </script>
 
 <svelte:head>
-	<title>Utilisateurs - Missionnaire Admin</title>
+	<title>{$t('users.headTitle')}</title>
 </svelte:head>
 
 <div class="mb-8 flex items-end justify-between">
 	<div>
-		<h1 class="font-display text-3xl font-semibold text-stone-800">Utilisateurs</h1>
+		<h1 class="font-display text-3xl font-semibold text-stone-800">{$t('users.title')}</h1>
 		<p class="mt-1 text-sm text-stone-500">
-			{data.users.length} compte{data.users.length !== 1 ? 's' : ''} administrateur
+			{data.users.length === 1
+				? $t('users.countOne', { count: data.users.length })
+				: $t('users.countMany', { count: data.users.length })}
 		</p>
 	</div>
 	<button onclick={() => (showCreateForm = !showCreateForm)} class="admin-btn-primary">
@@ -56,7 +59,7 @@
 				d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
 			/>
 		</svg>
-		Ajouter un utilisateur
+		{$t('users.addUser')}
 	</button>
 </div>
 
@@ -81,11 +84,10 @@
 			</div>
 			<div class="min-w-0 flex-1">
 				<p class="text-sm font-semibold text-amber-800">
-					Mot de passe généré pour {passwordTargetEmail}
+					{$t('users.passwordGeneratedFor', { email: passwordTargetEmail })}
 				</p>
 				<p class="mt-1 text-xs text-amber-600">
-					Copiez ce mot de passe et partagez-le avec l'utilisateur. Il ne sera plus visible après
-					avoir quitté cette page.
+					{$t('users.passwordCopyHint')}
 				</p>
 				<div class="mt-3 flex items-center gap-2">
 					<code
@@ -108,10 +110,10 @@
 								>
 									<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 								</svg>
-								Copié
+								{$t('users.copied')}
 							</span>
 						{:else}
-							Copier
+							{$t('users.copy')}
 						{/if}
 					</button>
 				</div>
@@ -137,7 +139,7 @@
 					d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
 				/>
 			</svg>
-			Nouvel utilisateur
+			{$t('users.newUser')}
 		</h2>
 
 		{#if form?.createError}
@@ -162,39 +164,38 @@
 		>
 			<div class="grid gap-4 sm:grid-cols-3">
 				<div>
-					<label for="name" class="admin-label">Nom complet</label>
+					<label for="name" class="admin-label">{$t('users.fullName')}</label>
 					<input
 						id="name"
 						name="name"
 						type="text"
 						required
 						class="admin-input"
-						placeholder="Jean Dupont"
+						placeholder={$t('users.fullNamePlaceholder')}
 					/>
 				</div>
 				<div>
-					<label for="email" class="admin-label">Adresse email</label>
+					<label for="email" class="admin-label">{$t('users.email')}</label>
 					<input
 						id="email"
 						name="email"
 						type="email"
 						required
 						class="admin-input"
-						placeholder="jean@missionnaire.net"
+						placeholder={$t('users.emailPlaceholder')}
 					/>
 				</div>
 				<div>
-					<label for="role" class="admin-label">Rôle</label>
+					<label for="role" class="admin-label">{$t('users.role')}</label>
 					<select id="role" name="role" class="admin-input">
-						<option value="editor">Éditeur</option>
-						<option value="superadmin">Super Administrateur</option>
+						<option value="editor">{$t('users.roleEditor')}</option>
+						<option value="superadmin">{$t('users.roleSuperadminFull')}</option>
 					</select>
 				</div>
 			</div>
 
 			<div class="mt-3 bg-cream/60 px-4 py-2.5 text-xs text-stone-500">
-				Un mot de passe sera généré automatiquement. Vous pourrez le copier et le partager avec
-				l'utilisateur.
+				{$t('users.passwordAutoHint')}
 			</div>
 
 			<div class="mt-4 flex items-center gap-3">
@@ -220,10 +221,10 @@
 							/>
 						</svg>
 					{/if}
-					Créer l'utilisateur
+					{$t('users.create')}
 				</button>
 				<button type="button" onclick={() => (showCreateForm = false)} class="admin-btn-secondary">
-					Annuler
+					{$t('users.cancel')}
 				</button>
 			</div>
 		</form>
@@ -235,12 +236,12 @@
 	<table class="w-full text-left text-sm">
 		<thead>
 			<tr class="border-b border-stone-100 bg-cream/50">
-				<th class="px-5 py-3.5 font-medium text-stone-500">Utilisateur</th>
-				<th class="px-5 py-3.5 font-medium text-stone-500">Rôle</th>
-				<th class="px-5 py-3.5 font-medium text-stone-500">Permissions</th>
-				<th class="px-5 py-3.5 font-medium text-stone-500">Statut</th>
-				<th class="px-5 py-3.5 font-medium text-stone-500">Dernière connexion</th>
-				<th class="px-5 py-3.5 text-right font-medium text-stone-500">Actions</th>
+				<th class="px-5 py-3.5 font-medium text-stone-500">{$t('users.table.user')}</th>
+				<th class="px-5 py-3.5 font-medium text-stone-500">{$t('users.role')}</th>
+				<th class="px-5 py-3.5 font-medium text-stone-500">{$t('users.table.permissions')}</th>
+				<th class="px-5 py-3.5 font-medium text-stone-500">{$t('users.table.status')}</th>
+				<th class="px-5 py-3.5 font-medium text-stone-500">{$t('users.table.lastLogin')}</th>
+				<th class="px-5 py-3.5 text-right font-medium text-stone-500">{$t('users.table.actions')}</th>
 			</tr>
 		</thead>
 		<tbody>
@@ -269,12 +270,12 @@
 								? 'bg-primary/10 text-primary'
 								: 'bg-earth/10 text-earth'}"
 						>
-							{roleLabel[user.role] ?? user.role}
+							{roleLabel[user.role] ? $t(roleLabel[user.role]) : user.role}
 						</span>
 					</td>
 					<td class="px-5 py-4">
 						{#if user.role === 'superadmin'}
-							<span class="text-xs text-stone-400 italic">Accès complet</span>
+							<span class="text-xs text-stone-400 italic">{$t('users.fullAccess')}</span>
 						{:else}
 							<div class="flex flex-wrap items-center gap-1.5">
 								<span
@@ -282,62 +283,62 @@
 										? 'bg-green-100 text-green-700'
 										: 'bg-stone-100 text-stone-400'}"
 								>
-									Ajout
+									{$t('users.perm.add')}
 								</span>
 								<span
 									class="inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {ep.can_edit
 										? 'bg-blue-100 text-blue-700'
 										: 'bg-stone-100 text-stone-400'}"
 								>
-									Modif
+									{$t('users.perm.edit')}
 								</span>
 								<span
 									class="inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {ep.can_delete
 										? 'bg-red-100 text-red-700'
 										: 'bg-stone-100 text-stone-400'}"
 								>
-									Suppr
+									{$t('users.perm.delete')}
 								</span>
 								<span
 									class="inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {ep.can_manage_recordings
 										? 'bg-purple-100 text-purple-700'
 										: 'bg-stone-100 text-stone-400'}"
 								>
-									Enreg.
+									{$t('users.perm.recordings')}
 								</span>
 								<span
 									class="inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {ep.can_review_lyrics
 										? 'bg-sky-100 text-sky-700'
 										: 'bg-stone-100 text-stone-400'}"
 								>
-									Lyrics
+									{$t('users.perm.lyrics')}
 								</span>
 								<span
 									class="inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {ep.can_view_questions
 										? 'bg-orange-100 text-orange-700'
 										: 'bg-stone-100 text-stone-400'}"
 								>
-									Q voir
+									{$t('users.perm.qView')}
 								</span>
 								<span
 									class="inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {ep.can_answer_questions
 										? 'bg-emerald-100 text-emerald-700'
 										: 'bg-stone-100 text-stone-400'}"
 								>
-									Q répondre
+									{$t('users.perm.qAnswer')}
 								</span>
 								<span
 									class="inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {ep.can_moderate_questions
 										? 'bg-amber-100 text-amber-700'
 										: 'bg-stone-100 text-stone-400'}"
 								>
-									Q modérer
+									{$t('users.perm.qModerate')}
 								</span>
 								<button
 									onclick={() =>
 										(permissionsEmail = permissionsEmail === user.email ? null : user.email)}
 									class="ml-1 rounded-md p-1 text-stone-400 transition-colors hover:bg-cream-dark hover:text-stone-600"
-									title="Modifier les permissions"
+									title={$t('users.editPermissions')}
 								>
 									<svg
 										class="h-3.5 w-3.5"
@@ -365,7 +366,7 @@
 							<span
 								class="h-1.5 w-1.5 rounded-full {user.is_active ? 'bg-green-500' : 'bg-stone-300'}"
 							></span>
-							{user.is_active ? 'Actif' : 'Désactivé'}
+							{user.is_active ? $t('users.active') : $t('users.inactive')}
 						</span>
 					</td>
 					<td class="px-5 py-4 text-stone-500">{formatDate(user.last_login)}</td>
@@ -385,19 +386,19 @@
 									class="flex items-center gap-1"
 								>
 									<input type="hidden" name="email" value={user.email} />
-									<span class="text-xs text-amber-600">Confirmer ?</span>
+									<span class="text-xs text-amber-600">{$t('users.confirmQuestion')}</span>
 									<button
 										type="submit"
 										class="bg-amber-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-700 hover:bg-amber-200"
 									>
-										Oui
+										{$t('users.yes')}
 									</button>
 									<button
 										type="button"
 										onclick={() => (confirmResetEmail = null)}
 										class="px-2 py-1 text-[10px] uppercase tracking-[0.15em] text-stone-400 hover:text-stone-600"
 									>
-										Non
+										{$t('users.no')}
 									</button>
 								</form>
 							{:else}
@@ -408,7 +409,7 @@
 										permissionsEmail = null;
 									}}
 									class="px-2.5 py-1.5 text-[10px] uppercase tracking-[0.15em] text-stone-500 transition-colors hover:bg-amber-50 hover:text-amber-700"
-									title="Réinitialiser le mot de passe"
+									title={$t('users.resetPassword')}
 								>
 									<svg
 										class="h-4 w-4"
@@ -446,7 +447,7 @@
 										value={user.is_active ? 'deactivate' : 'activate'}
 									/>
 									<span class="text-xs {user.is_active ? 'text-red-600' : 'text-green-600'}">
-										{user.is_active ? 'Désactiver ?' : 'Activer ?'}
+										{user.is_active ? $t('users.deactivateConfirm') : $t('users.activateConfirm')}
 									</span>
 									<button
 										type="submit"
@@ -454,14 +455,14 @@
 											? 'bg-red-100 text-red-700 hover:bg-red-200'
 											: 'bg-green-100 text-green-700 hover:bg-green-200'}"
 									>
-										Oui
+										{$t('users.yes')}
 									</button>
 									<button
 										type="button"
 										onclick={() => (confirmToggleEmail = null)}
 										class="px-2 py-1 text-[10px] uppercase tracking-[0.15em] text-stone-400 hover:text-stone-600"
 									>
-										Non
+										{$t('users.no')}
 									</button>
 								</form>
 							{:else}
@@ -474,7 +475,7 @@
 									class="px-2.5 py-1.5 text-[10px] uppercase tracking-[0.15em] transition-colors {user.is_active
 										? 'text-stone-500 hover:bg-red-50 hover:text-red-600'
 										: 'text-stone-500 hover:bg-green-50 hover:text-green-600'}"
-									title={user.is_active ? 'Désactiver' : 'Activer'}
+									title={user.is_active ? $t('users.deactivate') : $t('users.activate')}
 								>
 									{#if user.is_active}
 										<svg
@@ -529,7 +530,7 @@
 								<input type="hidden" name="email" value={user.email} />
 
 								<span class="text-xs font-semibold tracking-wide text-stone-500 uppercase">
-									Permissions pour {user.name}
+									{$t('users.permissionsFor', { name: user.name })}
 								</span>
 
 								<label
@@ -542,8 +543,8 @@
 										class="h-4 w-4 rounded border-stone-300 text-green-600 focus:ring-green-500/30"
 									/>
 									<div>
-										<span class="text-sm font-medium text-stone-700">Ajouter</span>
-										<p class="text-[10px] text-stone-400">Importer de nouveaux audios</p>
+										<span class="text-sm font-medium text-stone-700">{$t('users.permAdd.label')}</span>
+										<p class="text-[10px] text-stone-400">{$t('users.permAdd.desc')}</p>
 									</div>
 								</label>
 

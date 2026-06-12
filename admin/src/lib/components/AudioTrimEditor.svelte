@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy, tick } from 'svelte';
+	import { t } from '$lib/i18n';
 	import WaveSurfer from 'wavesurfer.js';
 	import RegionsPlugin from 'wavesurfer.js/dist/plugins/regions.esm.js';
 	import TimelinePlugin from 'wavesurfer.js/dist/plugins/timeline.esm.js';
@@ -93,14 +94,14 @@
 
 	onMount(async () => {
 		if (!recording.s3_url || !recording.s3_key) {
-			loadError = 'Enregistrement sans fichier audio';
+			loadError = $t('audio.trim.noAudioFile');
 			return;
 		}
 		await tick(); // ensure audioEl + waveformEl are bound
 		try {
 			await boot();
 		} catch (err) {
-			loadError = err instanceof Error ? err.message : 'Chargement audio échoué';
+			loadError = err instanceof Error ? err.message : $t('audio.trim.loadFailed');
 		}
 	});
 
@@ -116,7 +117,7 @@
 			const duration = recording.peaks_duration_sec ?? recording.duration_sec ?? 0;
 			await initWaveSurfer([recording.peaks], duration);
 			fetchAudioBytes(url).catch((err) => {
-				bufferError = err instanceof Error ? err.message : 'Téléchargement audio échoué';
+				bufferError = err instanceof Error ? err.message : $t('audio.trim.downloadFailed');
 			});
 			return;
 		}
@@ -128,7 +129,7 @@
 			fromCache = true;
 			await initWaveSurfer(cached.peaks, cached.duration);
 			fetchAudioBytes(url).catch((err) => {
-				bufferError = err instanceof Error ? err.message : 'Téléchargement audio échoué';
+				bufferError = err instanceof Error ? err.message : $t('audio.trim.downloadFailed');
 			});
 			return;
 		}
@@ -493,8 +494,8 @@
 				if (xhr.status >= 200 && xhr.status < 300) resolve();
 				else reject(new Error(`Upload S3 (${xhr.status})`));
 			};
-			xhr.onerror = () => reject(new Error('Erreur réseau pendant le téléversement'));
-			xhr.onabort = () => reject(new Error('Téléversement interrompu'));
+			xhr.onerror = () => reject(new Error($t('audio.trim.networkError')));
+			xhr.onabort = () => reject(new Error($t('audio.trim.uploadAborted')));
 			xhr.send(blob);
 		});
 	}
@@ -520,7 +521,7 @@
 	async function save() {
 		if (!recording._id || saving) return;
 		if (endSec - startSec < 0.5) {
-			saveError = 'La plage conservée doit faire au moins 0,5 s';
+			saveError = $t('audio.trim.rangeTooShort');
 			return;
 		}
 		saving = true;
@@ -531,7 +532,7 @@
 			const blob = sliceMp3(buf, startSec, endSec);
 			const durationSec = Math.floor(endSec - startSec);
 			if (durationSec < 1) {
-				saveError = 'Durée conservée trop courte (< 1 s)';
+				saveError = $t('audio.trim.durationTooShort');
 				return;
 			}
 
@@ -577,7 +578,7 @@
 
 			onSaved();
 		} catch (err) {
-			saveError = err instanceof Error ? err.message : 'Enregistrement échoué';
+			saveError = err instanceof Error ? err.message : $t('audio.trim.saveFailed');
 		} finally {
 			saving = false;
 		}
@@ -607,7 +608,7 @@
 		<div class="flex items-center justify-between border-b border-stone-100 px-6 py-4">
 			<div>
 				<h2 id="trim-title" class="text-sm font-semibold uppercase tracking-[0.15em] text-stone-700">
-					Éditer l'audio
+					{$t('audio.trim.title')}
 				</h2>
 				<p class="mt-0.5 truncate text-xs text-stone-500">{recording.title}</p>
 			</div>
@@ -617,7 +618,7 @@
 				disabled={saving}
 				class="text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 hover:text-stone-700 disabled:opacity-50"
 			>
-				Fermer
+				{$t('audio.trim.close')}
 			</button>
 		</div>
 
@@ -645,11 +646,11 @@
 					<div class="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-stone-200 border-t-primary"></div>
 					<p class="text-[11px] text-stone-600">
 						{#if fromCache}
-							Chargement de la forme d'onde (cache)…
+							{$t('audio.trim.loadingWaveformCache')}
 						{:else if decodeProgress === 'decoding'}
-							Décodage de la forme d'onde…
+							{$t('audio.trim.decodingWaveform')}
 						{:else}
-							Téléchargement de l'audio — vous pouvez écouter en streaming ci-dessus.
+							{$t('audio.trim.downloadingHint')}
 						{/if}
 					</p>
 				</div>
