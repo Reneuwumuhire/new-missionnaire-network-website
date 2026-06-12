@@ -962,14 +962,14 @@
 		<div
 			bind:this={recueilsScrollEl}
 			onscroll={updateRecueilsScrollState}
-			class="recueils-track flex overflow-x-auto gap-2 md:gap-2.5 no-scrollbar px-4 md:px-0 py-1 snap-x"
+			class="recueils-track flex overflow-x-auto overscroll-x-contain gap-2 md:gap-2.5 no-scrollbar px-4 md:px-0 py-1"
 			style="scrollbar-width: none; -ms-overflow-style: none;"
 			role="group"
 			aria-label={$t('music.collections')}
 		>
 			{#each categories as category}
 				<button
-					class="snap-start flex-shrink-0 inline-flex items-center h-10 md:h-11 px-4 md:px-5 rounded-full border text-[11px] md:text-xs font-bold uppercase tracking-[0.1em] md:tracking-wider transition-colors duration-150 {currentCategory ===
+					class="flex-shrink-0 inline-flex items-center h-10 md:h-11 px-4 md:px-5 rounded-full border text-[11px] md:text-xs font-bold uppercase tracking-[0.1em] md:tracking-wider transition-colors duration-150 {currentCategory ===
 					category
 						? 'bg-missionnaire border-missionnaire text-white shadow-sm'
 						: 'bg-white/60 text-stone-600 border-stone-200 hover:border-missionnaire hover:text-missionnaire'}"
