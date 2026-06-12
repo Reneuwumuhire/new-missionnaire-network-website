@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
+	import { t, type TranslationKey } from '$lib/i18n';
 
 	export let targetId = '';
 	export let bare = false;
@@ -14,15 +15,15 @@
 		| 'unorderedList'
 		| 'orderedList';
 
-	const actions: Array<{ action: Action; title: string }> = [
-		{ action: 'bold', title: 'Gras' },
-		{ action: 'italic', title: 'Italique' },
-		{ action: 'underline', title: 'Souligner' },
-		{ action: 'strike', title: 'Barrer' },
-		{ action: 'link', title: 'Lien vidéo ou fichier' },
-		{ action: 'quote', title: 'Citation' },
-		{ action: 'unorderedList', title: 'Liste à puces' },
-		{ action: 'orderedList', title: 'Liste numérotée' }
+	const actions: Array<{ action: Action; title: TranslationKey }> = [
+		{ action: 'bold', title: 'questions.toolbar.bold' },
+		{ action: 'italic', title: 'questions.toolbar.italic' },
+		{ action: 'underline', title: 'questions.toolbar.underline' },
+		{ action: 'strike', title: 'questions.toolbar.strike' },
+		{ action: 'link', title: 'questions.toolbar.link' },
+		{ action: 'quote', title: 'questions.toolbar.quote' },
+		{ action: 'unorderedList', title: 'questions.toolbar.unorderedList' },
+		{ action: 'orderedList', title: 'questions.toolbar.orderedList' }
 	];
 
 	let linkModalOpen = false;
@@ -315,7 +316,7 @@
 		linkEnd = textarea.selectionEnd ?? linkStart;
 		const selected = textarea.value.slice(linkStart, linkEnd).trim();
 		const selectedHref = normalizeHref(selected);
-		linkText = selected && !selectedHref ? selected : 'texte du lien';
+		linkText = selected && !selectedHref ? selected : $t('questions.toolbar.linkTextFallback');
 		linkHref = selectedHref;
 		linkError = '';
 		linkModalOpen = true;
@@ -339,11 +340,11 @@
 
 		if (!textarea) return;
 		if (!text) {
-			linkError = 'Indiquez le texte du lien.';
+			linkError = $t('questions.toolbar.linkTextError');
 			return;
 		}
 		if (!href) {
-			linkError = 'Indiquez une adresse valide.';
+			linkError = $t('questions.toolbar.linkHrefError');
 			return;
 		}
 
@@ -367,10 +368,10 @@
 		const selected = textarea.value.slice(start, end);
 		const fallback =
 			action === 'quote'
-				? 'citation'
+				? $t('questions.toolbar.quoteFallback')
 				: action === 'unorderedList' || action === 'orderedList'
-					? 'élément'
-					: 'texte';
+					? $t('questions.toolbar.itemFallback')
+					: $t('questions.toolbar.textFallback');
 		const value = selected || fallback;
 		let replacement = value;
 		let selectionOffset = 0;
@@ -490,8 +491,8 @@
 		<button
 			type="button"
 			class="flex h-8 w-8 items-center justify-center border border-transparent text-stone-500 transition hover:border-primary/30 hover:bg-primary/10 hover:text-primary"
-			title={item.title}
-			aria-label={item.title}
+			title={$t(item.title)}
+			aria-label={$t(item.title)}
 			onclick={() => wrapSelection(item.action)}
 		>
 			{#if item.action === 'bold'}
@@ -527,12 +528,12 @@
 		>
 			<div class="flex items-center justify-between border-b border-stone-100 px-5 py-4">
 				<h2 id={modalId} class="font-display text-xl font-semibold text-stone-900">
-					Ajouter un lien
+					{$t('questions.toolbar.addLink')}
 				</h2>
 				<button
 					type="button"
 					class="flex h-8 w-8 items-center justify-center text-stone-400 transition hover:bg-stone-100 hover:text-stone-900"
-					aria-label="Fermer"
+					aria-label={$t('questions.toolbar.close')}
 					onclick={closeLinkModal}
 				>
 					<svg
@@ -559,17 +560,17 @@
 					<p class="border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{linkError}</p>
 				{/if}
 				<div>
-					<label for={linkTextId} class="admin-label">Texte</label>
+					<label for={linkTextId} class="admin-label">{$t('questions.toolbar.textLabel')}</label>
 					<input
 						bind:this={linkTextInput}
 						bind:value={linkText}
 						id={linkTextId}
 						class="admin-input"
-						placeholder="Texte du lien"
+						placeholder={$t('questions.toolbar.linkTextPlaceholder')}
 					/>
 				</div>
 				<div>
-					<label for={linkHrefId} class="admin-label">Lien</label>
+					<label for={linkHrefId} class="admin-label">{$t('questions.toolbar.linkLabel')}</label>
 					<input
 						bind:this={linkHrefInput}
 						bind:value={linkHref}
@@ -581,9 +582,9 @@
 				</div>
 				<div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
 					<button type="button" class="admin-btn-secondary justify-center" onclick={closeLinkModal}
-						>Annuler</button
+						>{$t('questions.toolbar.cancel')}</button
 					>
-					<button type="submit" class="admin-btn-primary justify-center">Insérer</button>
+					<button type="submit" class="admin-btn-primary justify-center">{$t('questions.toolbar.insert')}</button>
 				</div>
 			</form>
 		</div>

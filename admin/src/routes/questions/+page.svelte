@@ -2,13 +2,13 @@
 	import { loadingSubmit } from '$lib/actions/loadingSubmit';
 	import { stripRichTextFormatting } from '$lib/questions/rich-text';
 	import { confirmDialog } from '$lib/stores/confirm-dialog';
-	import { t } from '$lib/i18n';
+	import { t, type TranslationKey } from '$lib/i18n';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 	const confirmedPermanentDeleteForms = new WeakSet<HTMLFormElement>();
 
-	const statuses = [
+	const statuses: Array<{ value: string; label: TranslationKey }> = [
 		{ value: 'all', label: 'questions.filterStatus.all' },
 		{ value: 'pending', label: 'questions.filterStatus.pending' },
 		{ value: 'approved', label: 'questions.filterStatus.approved' },
@@ -17,7 +17,7 @@
 		{ value: 'rejected', label: 'questions.filterStatus.rejected' },
 		{ value: 'archived', label: 'questions.filterStatus.archived' }
 	];
-	const statusLabels: Record<string, string> = {
+	const statusLabels: Record<string, TranslationKey> = {
 		pending: 'questions.statusLabel.pending',
 		approved: 'questions.statusLabel.approved',
 		answered: 'questions.statusLabel.answered',

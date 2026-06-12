@@ -3,6 +3,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import { confirmDialog } from '$lib/stores/confirm-dialog';
 	import { toast } from '$lib/stores/toast';
+	import { t } from '$lib/i18n';
 	import { parseSrt, findCueIndex, type SrtCue } from '$lib/utils/srt';
 
 	// Live subtitle sync control — shown under the broadcast card while a live
@@ -46,11 +47,11 @@
 			// Cache-bust: the GET proxy serves whatever SRT the gate currently
 			// points to, which changes after an attach/replace.
 			const res = await fetch(`/api/broadcast/subtitles?t=${Date.now()}`);
-			if (!res.ok) throw new Error(`Erreur ${res.status}`);
+			if (!res.ok) throw new Error($t('recordings.error.http', { status: res.status }));
 			cues = parseSrt(await res.text());
-			if (cues.length === 0) loadError = 'Fichier .srt vide ou illisible';
+			if (cues.length === 0) loadError = $t('recordings.subtitles.error.emptySrt');
 		} catch (err) {
-			loadError = err instanceof Error ? err.message : 'Transcription inaccessible';
+			loadError = err instanceof Error ? err.message : $t('recordings.subtitles.error.unreachable');
 		}
 	}
 
@@ -63,24 +64,27 @@
 		input.value = '';
 		if (!file || attachBusy) return;
 		if (!file.name.toLowerCase().endsWith('.srt')) {
-			attachError = 'Sélectionnez un fichier .srt';
+			attachError = $t('recordings.error.selectSrt');
 			return;
 		}
 		if (file.size > 2 * 1024 * 1024) {
-			attachError = 'Fichier .srt trop volumineux (max 2 Mo)';
+			attachError = $t('recordings.error.srtTooLarge');
 			return;
 		}
 		const parsed = parseSrt(await file.text());
 		if (parsed.length === 0) {
-			attachError = 'Fichier .srt illisible (aucune réplique détectée)';
+			attachError = $t('recordings.error.srtUnreadable');
 			return;
 		}
 		if (hasSrt) {
 			const ok = await confirmDialog.ask({
-				title: 'Remplacer la transcription',
-				message: `« ${file.name} » (${parsed.length} répliques) remplacera le fichier actuel. La synchronisation sera réinitialisée — il faudra re-cliquer « Démarrer les sous-titres ».`,
-				confirmLabel: 'Remplacer',
-				cancelLabel: 'Annuler',
+				title: $t('recordings.subtitles.confirm.replaceTitle'),
+				message: $t('recordings.subtitles.confirm.replaceMessage', {
+					filename: file.name,
+					count: parsed.length
+				}),
+				confirmLabel: $t('recordings.common.replace'),
+				cancelLabel: $t('recordings.common.cancel'),
 				tone: 'warning'
 			});
 			if (!ok) return;
@@ -94,7 +98,7 @@
 				body: JSON.stringify({ filename: file.name, size: file.size })
 			});
 			if (!presignRes.ok) {
-				attachError = (await presignRes.text()) || `Erreur ${presignRes.status}`;
+				attachError = (await presignRes.text()) || $t('recordings.error.http', { status: presignRes.status });
 				return;
 			}
 			const { uploadUrl, key, publicUrl, contentType } = (await presignRes.json()) as {
@@ -109,7 +113,7 @@
 				body: file
 			});
 			if (!uploadRes.ok) {
-				attachError = 'Échec du téléversement du fichier .srt vers S3';
+				attachError = $t('recordings.error.srtUploadFailed');
 				return;
 			}
 			const attachRes = await fetch('/api/broadcast/subtitles', {
@@ -123,16 +127,14 @@
 				})
 			});
 			if (!attachRes.ok) {
-				attachError = (await attachRes.text()) || `Erreur ${attachRes.status}`;
+				attachError = (await attachRes.text()) || $t('recordings.error.http', { status: attachRes.status });
 				return;
 			}
 			hasSrt = true;
 			anchorEpochMs = null;
 			offsetMs = 0;
 			cues = parsed;
-			toast.success(
-				'Transcription attachée au direct — cliquez « Démarrer les sous-titres » au bon moment'
-			);
+			toast.success($t('recordings.subtitles.toast.attached'));
 			await invalidateAll();
 		} finally {
 			attachBusy = false;
@@ -182,7 +184,7 @@
 				body: JSON.stringify(body)
 			});
 			if (!res.ok) {
-				toast.error((await res.text()) || `Erreur ${res.status}`);
+				toast.error((await res.text()) || $t('recordings.error.http', { status: res.status }));
 				return false;
 			}
 			const data = (await res.json()) as { anchorEpochMs: number | null; offsetMs: number };
@@ -196,17 +198,16 @@
 
 	async function start() {
 		if (await post({ action: 'start', atEpochMs: Date.now() })) {
-			toast.success('Sous-titres démarrés — les auditeurs voient maintenant le texte');
+			toast.success($t('recordings.subtitles.toast.started'));
 		}
 	}
 
 	async function resync() {
 		const ok = await confirmDialog.ask({
-			title: 'Re-synchroniser',
-			message:
-				'Le texte repartira de 00:00 maintenant. À utiliser uniquement si l\'audio sous-titré vient de recommencer.',
-			confirmLabel: 'Re-synchroniser',
-			cancelLabel: 'Annuler',
+			title: $t('recordings.subtitles.resync'),
+			message: $t('recordings.subtitles.confirm.resyncMessage'),
+			confirmLabel: $t('recordings.subtitles.resync'),
+			cancelLabel: $t('recordings.common.cancel'),
 			tone: 'warning'
 		});
 		if (ok) await start();
@@ -222,21 +223,21 @@
 		// latency doesn't shift the anchor; a wrong click is fixed by simply
 		// clicking the right cue (or nudging).
 		if (await post({ action: 'jump-to-cue', cueStartMs: cue.startMs, atEpochMs: Date.now() })) {
-			toast.success('Texte calé sur la réplique choisie');
+			toast.success($t('recordings.subtitles.toast.jumped'));
 		}
 	}
 
 	async function clear() {
 		const ok = await confirmDialog.ask({
-			title: 'Désactiver les sous-titres',
-			message: 'Le texte disparaîtra chez tous les auditeurs. Vous pourrez redémarrer ensuite.',
-			confirmLabel: 'Désactiver',
-			cancelLabel: 'Annuler',
+			title: $t('recordings.subtitles.confirm.disableTitle'),
+			message: $t('recordings.subtitles.confirm.disableMessage'),
+			confirmLabel: $t('recordings.subtitles.disable'),
+			cancelLabel: $t('recordings.common.cancel'),
 			tone: 'danger'
 		});
 		if (!ok) return;
 		if (await post({ action: 'clear' })) {
-			toast.success('Sous-titres désactivés');
+			toast.success($t('recordings.subtitles.toast.disabled'));
 			await invalidateAll();
 		}
 	}
@@ -246,17 +247,17 @@
 	<div class="flex flex-wrap items-start justify-between gap-3">
 		<div>
 			<p class="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500">
-				Sous-titres du direct
+				{$t('recordings.subtitles.title')}
 			</p>
 			<p class="mt-1 text-[10px] text-stone-400">
-				Texte synchronisé affiché aux auditeurs pendant la diffusion.
+				{$t('recordings.subtitles.subtitle')}
 			</p>
 		</div>
 		{#if anchorEpochMs !== null && srtMs !== null}
 			<div class="text-right">
 				<p class="font-mono text-lg font-semibold text-stone-800">{fmtClock(srtMs)}</p>
 				<p class="text-[10px] text-stone-400">
-					Position du texte · décalage {fmtOffset(offsetMs)}
+					{$t('recordings.subtitles.position', { offset: fmtOffset(offsetMs) })}
 				</p>
 			</div>
 		{/if}
@@ -271,13 +272,11 @@
 				<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16" />
 				</svg>
-				{attachBusy ? 'Téléversement…' : 'Ajouter une transcription (.srt)'}
+				{attachBusy ? $t('recordings.common.uploading') : $t('recordings.subtitles.attach')}
 				<input type="file" accept=".srt" class="hidden" disabled={attachBusy} onchange={onAttachFileChange} />
 			</label>
 			<p class="text-[11px] leading-relaxed text-stone-500">
-				Ce direct a démarré sans transcription. Vous pouvez en attacher une maintenant — elle
-				apparaîtra chez les auditeurs en quelques secondes, puis vous la synchroniserez avec
-				« Démarrer les sous-titres ».
+				{$t('recordings.subtitles.attachHint')}
 			</p>
 			{#if attachError}
 				<p class="border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">{attachError}</p>
@@ -297,31 +296,29 @@
 				<svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 					<path d="M8 5v14l11-7z" />
 				</svg>
-				Démarrer les sous-titres
+				{$t('recordings.subtitles.start')}
 			</button>
 			<p class="text-[11px] leading-relaxed text-stone-500">
-				Cliquez à l'instant exact où la prédication sous-titrée commence —
-				en écoutant « Écoute du direct » ci-dessus (son activé) pour que la latence du flux soit
-				prise en compte. Moment manqué ? Utilisez « Caler sur une réplique ».
+				{$t('recordings.subtitles.startHint')}
 			</p>
 		</div>
 	{:else}
 		<!-- Anchored: cue preview + nudge controls -->
 		<div class="mt-4 space-y-3">
 			<div class="border border-stone-200/60 bg-white/70 px-4 py-3">
-				<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-stone-400">En cours</p>
+				<p class="text-[10px] font-bold uppercase tracking-[0.18em] text-stone-400">{$t('recordings.subtitles.current')}</p>
 				<p class="mt-1 text-sm leading-relaxed text-stone-800">
-					{currentCue ? currentCue.text : srtMs !== null && cues.length > 0 && srtMs < cues[0].startMs ? '(avant la première réplique)' : '—'}
+					{currentCue ? currentCue.text : srtMs !== null && cues.length > 0 && srtMs < cues[0].startMs ? $t('recordings.subtitles.beforeFirstCue') : '—'}
 				</p>
 				{#if nextCue}
-					<p class="mt-2 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-300">Suivant</p>
+					<p class="mt-2 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-300">{$t('recordings.subtitles.next')}</p>
 					<p class="mt-0.5 truncate text-xs text-stone-400">{nextCue.text}</p>
 				{/if}
 			</div>
 
 			<div class="flex flex-wrap items-center gap-2">
 				<span class="text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-400">
-					Texte en retard →
+					{$t('recordings.subtitles.textBehind')}
 				</span>
 				{#each [-30000, -5000, -1000, 1000, 5000, 30000] as delta (delta)}
 					{#if delta === 1000}
@@ -337,7 +334,7 @@
 					</button>
 				{/each}
 				<span class="text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-400">
-					← texte en avance
+					{$t('recordings.subtitles.textAhead')}
 				</span>
 			</div>
 
@@ -348,7 +345,7 @@
 					disabled={busy}
 					onclick={resync}
 				>
-					Re-synchroniser (repartir de 00:00)
+					{$t('recordings.subtitles.resyncFull')}
 				</button>
 				<button
 					type="button"
@@ -356,7 +353,7 @@
 					disabled={busy}
 					onclick={clear}
 				>
-					Désactiver
+					{$t('recordings.subtitles.disable')}
 				</button>
 			</div>
 		</div>
@@ -379,7 +376,7 @@
 			>
 				<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
 			</svg>
-			Caler sur une réplique ({cues.length})
+			{$t('recordings.subtitles.jumpList', { count: cues.length })}
 		</button>
 		{#if showCueList}
 			<div class="mt-2 max-h-64 divide-y divide-stone-100 overflow-y-auto border border-stone-200/60 bg-white/70">
@@ -400,10 +397,8 @@
 		<!-- Single audio reference: the « Écoute du direct » monitor in the
 		     broadcast card above (always live, mute-only). -->
 		<p class="mt-3 border border-sky-100 bg-sky-50/60 px-3 py-2 text-[11px] leading-relaxed text-stone-500">
-			<span class="font-semibold text-stone-600">Comment synchroniser :</span>
-			activez le son dans « Écoute du direct » ci-dessus — c'est exactement ce que les auditeurs
-			entendent. Calez-vous sur cet audio (pas sur le son de la salle), en cliquant la réplique
-			prononcée à l'instant même.
+			<span class="font-semibold text-stone-600">{$t('recordings.subtitles.howToLabel')}</span>
+			{$t('recordings.subtitles.howToBody')}
 		</p>
 	{/if}
 
@@ -417,7 +412,7 @@
 				<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M5.5 9a7.5 7.5 0 0113-2.5M18.5 15a7.5 7.5 0 01-13 2.5" />
 				</svg>
-				{attachBusy ? 'Téléversement…' : 'Remplacer le fichier .srt'}
+				{attachBusy ? $t('recordings.common.uploading') : $t('recordings.subtitles.replaceSrt')}
 				<input type="file" accept=".srt" class="hidden" disabled={attachBusy} onchange={onAttachFileChange} />
 			</label>
 			{#if attachError}

@@ -3,6 +3,7 @@
 	import type { ScheduledLive } from '../../db/collections';
 	import { confirmDialog } from '$lib/stores/confirm-dialog';
 	import { toast } from '$lib/stores/toast';
+	import { t, type TranslationKey } from '$lib/i18n';
 	import { parseSrt } from '$lib/utils/srt';
 
 	// Embedded in /recordings, right under the broadcast control card —
@@ -40,13 +41,15 @@
 	function relativeUntil(iso: string): string {
 		const diffMs = Date.parse(iso) - Date.now();
 		if (Number.isNaN(diffMs)) return '';
-		if (diffMs <= 60_000) return 'Imminent';
+		if (diffMs <= 60_000) return $t('recordings.scheduled.imminent');
 		const minutes = Math.round(diffMs / 60_000);
-		if (minutes < 60) return `Dans ${minutes} min`;
+		if (minutes < 60) return $t('recordings.scheduled.inMinutes', { count: minutes });
 		const hours = Math.round(minutes / 60);
-		if (hours < 24) return `Dans ${hours} h`;
+		if (hours < 24) return $t('recordings.scheduled.inHours', { count: hours });
 		const days = Math.round(hours / 24);
-		return `Dans ${days} jour${days > 1 ? 's' : ''}`;
+		return days > 1
+			? $t('recordings.scheduled.inDaysMany', { count: days })
+			: $t('recordings.scheduled.inDaysOne', { count: days });
 	}
 
 	function pad(n: number): string {
@@ -62,9 +65,9 @@
 	async function copyLink(slug: string) {
 		try {
 			await navigator.clipboard.writeText(watchUrl(slug));
-			toast.success('Lien copié');
+			toast.success($t('recordings.toast.linkCopied'));
 		} catch {
-			toast.error('Impossible de copier le lien');
+			toast.error($t('recordings.toast.linkCopyFailed'));
 		}
 	}
 
@@ -158,11 +161,11 @@
 		input.value = '';
 		if (!file) return;
 		if (!file.type.startsWith('image/')) {
-			formError = 'Sélectionnez un fichier image';
+			formError = $t('recordings.error.selectImage');
 			return;
 		}
 		if (file.size > 5 * 1024 * 1024) {
-			formError = 'Image trop volumineuse (max 5 Mo)';
+			formError = $t('recordings.error.imageTooLarge');
 			return;
 		}
 		formError = null;
@@ -185,18 +188,18 @@
 		input.value = '';
 		if (!file) return;
 		if (!file.name.toLowerCase().endsWith('.srt')) {
-			formError = 'Sélectionnez un fichier .srt';
+			formError = $t('recordings.error.selectSrt');
 			return;
 		}
 		if (file.size > 2 * 1024 * 1024) {
-			formError = 'Fichier .srt trop volumineux (max 2 Mo)';
+			formError = $t('recordings.error.srtTooLarge');
 			return;
 		}
 		// Sanity-parse before staging: a 0-cue file would silently show nothing
 		// to listeners, better to reject it at upload time.
 		const cues = parseSrt(await file.text());
 		if (cues.length === 0) {
-			formError = 'Fichier .srt illisible (aucune réplique détectée)';
+			formError = $t('recordings.error.srtUnreadable');
 			return;
 		}
 		formError = null;
@@ -205,7 +208,7 @@
 		subtitleCueCount = cues.length;
 		const totalMin = Math.round(cues[cues.length - 1].endMs / 60_000);
 		subtitleDurationLabel =
-			totalMin >= 60 ? `${Math.floor(totalMin / 60)}h${String(totalMin % 60).padStart(2, '0')}` : `${totalMin} min`;
+			totalMin >= 60 ? `${Math.floor(totalMin / 60)}h${String(totalMin % 60).padStart(2, '0')}` : $t('recordings.scheduled.durationMin', { count: totalMin });
 	}
 
 	function markSubtitleForRemoval() {
@@ -232,7 +235,7 @@
 			body: JSON.stringify({ filename: subtitleFile.name, size: subtitleFile.size })
 		});
 		if (!presignRes.ok) {
-			formError = (await presignRes.text()) || `Erreur ${presignRes.status}`;
+			formError = (await presignRes.text()) || $t('recordings.error.http', { status: presignRes.status });
 			return null;
 		}
 		const { uploadUrl, key, publicUrl, contentType } = (await presignRes.json()) as {
@@ -247,7 +250,7 @@
 			body: subtitleFile
 		});
 		if (!uploadRes.ok) {
-			formError = 'Échec du téléversement du fichier .srt vers S3';
+			formError = $t('recordings.error.srtUploadFailed');
 			return null;
 		}
 		return {
@@ -273,7 +276,7 @@
 			body: JSON.stringify({ contentType: thumbnailFile.type, size: thumbnailFile.size })
 		});
 		if (!presignRes.ok) {
-			formError = (await presignRes.text()) || `Erreur ${presignRes.status}`;
+			formError = (await presignRes.text()) || $t('recordings.error.http', { status: presignRes.status });
 			return null;
 		}
 		const { uploadUrl, key, publicUrl } = (await presignRes.json()) as {
@@ -287,7 +290,7 @@
 			body: thumbnailFile
 		});
 		if (!uploadRes.ok) {
-			formError = 'Échec du téléversement vers S3';
+			formError = $t('recordings.error.s3UploadFailed');
 			return null;
 		}
 		return { thumbnail_url: publicUrl, thumbnail_s3_key: key };
@@ -296,11 +299,11 @@
 	async function saveEntry() {
 		if (saving) return;
 		if (!titleDraft.trim()) {
-			formError = 'Titre requis';
+			formError = $t('recordings.error.titleRequired');
 			return;
 		}
 		if (!scheduledAtDraft) {
-			formError = 'Date et heure requises';
+			formError = $t('recordings.error.dateTimeRequired');
 			return;
 		}
 		const scheduledIso = new Date(scheduledAtDraft).toISOString();
@@ -344,7 +347,7 @@
 					});
 
 			if (!res.ok) {
-				formError = (await res.text()) || `Erreur ${res.status}`;
+				formError = (await res.text()) || $t('recordings.error.http', { status: res.status });
 				return;
 			}
 
@@ -353,13 +356,13 @@
 				if (payload.shareUrl) {
 					try {
 						await navigator.clipboard.writeText(payload.shareUrl);
-						toast.success('Direct programmé — lien de partage copié');
+						toast.success($t('recordings.scheduled.toast.createdLinkCopied'));
 					} catch {
-						toast.success('Direct programmé');
+						toast.success($t('recordings.scheduled.toast.created'));
 					}
 				}
 			} else {
-				toast.success('Direct mis à jour');
+				toast.success($t('recordings.scheduled.toast.updated'));
 			}
 			closeModal();
 			await invalidateAll();
@@ -374,17 +377,19 @@
 	async function startLive(entry: ScheduledLive) {
 		if (busyId) return;
 		if (broadcast.is_live) {
-			toast.error('Un direct est déjà en cours — terminez-le avant d’en démarrer un autre');
+			toast.error($t('recordings.scheduled.error.alreadyLive'));
 			return;
 		}
 		const willNotify = subscriberCount > 0;
 		const ok = await confirmDialog.ask({
-			title: 'Démarrer le direct',
+			title: $t('recordings.scheduled.startLive'),
 			message: willNotify
-				? `« ${entry.title} » passera en direct et ${subscriberCount} abonné${subscriberCount > 1 ? 's seront notifiés' : ' sera notifié'}.`
-				: `« ${entry.title} » passera en direct.`,
-			confirmLabel: willNotify ? 'Diffuser et notifier' : 'Démarrer le direct',
-			cancelLabel: 'Annuler'
+				? subscriberCount > 1
+					? $t('recordings.scheduled.confirm.startNotifyMany', { title: entry.title, count: subscriberCount })
+					: $t('recordings.scheduled.confirm.startNotifyOne', { title: entry.title, count: subscriberCount })
+				: $t('recordings.scheduled.confirm.start', { title: entry.title }),
+			confirmLabel: willNotify ? $t('recordings.confirm.goLive.confirmNotify') : $t('recordings.scheduled.startLive'),
+			cancelLabel: $t('recordings.common.cancel')
 		});
 		if (!ok) return;
 		busyId = entry._id;
@@ -395,10 +400,10 @@
 				body: JSON.stringify({ notify: true, scheduledLiveId: entry._id })
 			});
 			if (!res.ok) {
-				toast.error((await res.text()) || `Erreur ${res.status}`);
+				toast.error((await res.text()) || $t('recordings.error.http', { status: res.status }));
 				return;
 			}
-			toast.success('Le direct a commencé');
+			toast.success($t('recordings.scheduled.toast.started'));
 			await invalidateAll();
 		} finally {
 			busyId = null;
@@ -408,10 +413,10 @@
 	async function cancelEntry(entry: ScheduledLive) {
 		if (busyId) return;
 		const ok = await confirmDialog.ask({
-			title: 'Annuler ce direct',
-			message: `« ${entry.title} » sera marqué comme annulé. Le lien de partage affichera « direct annulé ».`,
-			confirmLabel: 'Annuler le direct',
-			cancelLabel: 'Retour',
+			title: $t('recordings.scheduled.confirm.cancelTitle'),
+			message: $t('recordings.scheduled.confirm.cancelMessage', { title: entry.title }),
+			confirmLabel: $t('recordings.scheduled.confirm.cancelConfirm'),
+			cancelLabel: $t('recordings.scheduled.confirm.back'),
 			tone: 'warning'
 		});
 		if (!ok) return;
@@ -419,10 +424,10 @@
 		try {
 			const res = await fetch(`/api/scheduled-lives/${entry._id}/cancel`, { method: 'POST' });
 			if (!res.ok) {
-				toast.error((await res.text()) || `Erreur ${res.status}`);
+				toast.error((await res.text()) || $t('recordings.error.http', { status: res.status }));
 				return;
 			}
-			toast.success('Direct annulé');
+			toast.success($t('recordings.scheduled.toast.cancelled'));
 			await invalidateAll();
 		} finally {
 			busyId = null;
@@ -432,10 +437,10 @@
 	async function deleteEntry(entry: ScheduledLive) {
 		if (busyId) return;
 		const ok = await confirmDialog.ask({
-			title: 'Supprimer cette entrée',
-			message: `« ${entry.title} » sera supprimé définitivement. Son lien de partage cessera de fonctionner.`,
-			confirmLabel: 'Supprimer',
-			cancelLabel: 'Annuler',
+			title: $t('recordings.scheduled.confirm.deleteTitle'),
+			message: $t('recordings.scheduled.confirm.deleteMessage', { title: entry.title }),
+			confirmLabel: $t('recordings.common.delete'),
+			cancelLabel: $t('recordings.common.cancel'),
 			tone: 'danger'
 		});
 		if (!ok) return;
@@ -443,26 +448,26 @@
 		try {
 			const res = await fetch(`/api/scheduled-lives/${entry._id}`, { method: 'DELETE' });
 			if (!res.ok) {
-				toast.error((await res.text()) || `Erreur ${res.status}`);
+				toast.error((await res.text()) || $t('recordings.error.http', { status: res.status }));
 				return;
 			}
-			toast.success('Entrée supprimée');
+			toast.success($t('recordings.scheduled.toast.deleted'));
 			await invalidateAll();
 		} finally {
 			busyId = null;
 		}
 	}
 
-	function statusBadge(entry: ScheduledLive): { label: string; cls: string } {
+	function statusBadge(entry: ScheduledLive): { label: TranslationKey; cls: string } {
 		switch (entry.status) {
 			case 'live':
-				return { label: 'En direct', cls: 'bg-red-50 text-red-700 border-red-200' };
+				return { label: 'recordings.scheduled.status.live', cls: 'bg-red-50 text-red-700 border-red-200' };
 			case 'scheduled':
-				return { label: 'Programmé', cls: 'bg-orange-50 text-primary border-orange-200' };
+				return { label: 'recordings.scheduled.status.scheduled', cls: 'bg-orange-50 text-primary border-orange-200' };
 			case 'ended':
-				return { label: 'Terminé', cls: 'bg-stone-100 text-stone-600 border-stone-200' };
+				return { label: 'recordings.scheduled.status.ended', cls: 'bg-stone-100 text-stone-600 border-stone-200' };
 			default:
-				return { label: 'Annulé', cls: 'bg-stone-50 text-stone-400 border-stone-200' };
+				return { label: 'recordings.scheduled.status.cancelled', cls: 'bg-stone-50 text-stone-400 border-stone-200' };
 		}
 	}
 </script>
@@ -472,7 +477,7 @@
 	<div class="flex flex-wrap items-start justify-between gap-4">
 		<div class="min-w-0 flex-1">
 			<p class="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500">
-				Directs programmés
+				{$t('recordings.scheduled.title')}
 				{#if upcoming.length > 0}
 					<span class="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary/10 px-1 text-[9px] font-bold text-primary">
 						{upcoming.length}
@@ -480,8 +485,7 @@
 				{/if}
 			</p>
 			<p class="mt-1 text-[10px] text-stone-400">
-				Chaque direct programmé reçoit un lien de partage stable — utilisable avant, pendant et
-				après la diffusion.
+				{$t('recordings.scheduled.intro')}
 			</p>
 		</div>
 		<button
@@ -492,7 +496,7 @@
 			<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
 			</svg>
-			Programmer un direct
+			{$t('recordings.scheduled.schedule')}
 		</button>
 	</div>
 
@@ -502,10 +506,9 @@
 			<svg class="mb-2.5 h-8 w-8 text-stone-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
 			</svg>
-			<p class="text-sm font-medium text-stone-500">Aucun direct programmé</p>
+			<p class="text-sm font-medium text-stone-500">{$t('recordings.scheduled.emptyTitle')}</p>
 			<p class="mt-1 max-w-sm text-xs leading-relaxed text-stone-400">
-				Programmez un direct pour obtenir immédiatement un lien de partage et annoncer la
-				diffusion aux abonnés.
+				{$t('recordings.scheduled.emptyBody')}
 			</p>
 		</div>
 	{:else}
@@ -531,7 +534,7 @@
 						<div class="min-w-0 flex-1">
 							<div class="flex flex-wrap items-center gap-2">
 								<span class="border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.15em] {badge.cls}">
-									{badge.label}
+									{$t(badge.label)}
 								</span>
 								{#if entry.status === 'scheduled'}
 									<span class="border border-stone-200 bg-stone-50 px-2 py-0.5 text-[10px] font-semibold text-stone-500">
@@ -543,12 +546,12 @@
 										<svg class="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3" aria-hidden="true">
 											<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 										</svg>
-										Annoncé
+										{$t('recordings.scheduled.announced')}
 									</span>
 								{/if}
 								{#if entry.reminder_enabled}
 									<span class="text-[10px] font-semibold uppercase tracking-[0.1em] text-stone-400">
-										Rappel activé
+										{$t('recordings.scheduled.reminderOn')}
 									</span>
 								{/if}
 								{#if entry.subtitle_filename}
@@ -559,7 +562,7 @@
 										<svg class="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
 											<path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h10" />
 										</svg>
-										Transcription
+										{$t('recordings.scheduled.transcript')}
 									</span>
 								{/if}
 							</div>
@@ -583,7 +586,7 @@
 									class="shrink-0 border border-stone-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-stone-600 transition-colors hover:border-primary hover:bg-primary hover:text-white"
 									onclick={() => copyLink(entry.slug)}
 								>
-									Copier
+									{$t('recordings.common.copy')}
 								</button>
 								<a
 									href={watchUrl(entry.slug)}
@@ -591,7 +594,7 @@
 									rel="noopener noreferrer"
 									class="shrink-0 border border-stone-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-stone-600 transition-colors hover:border-stone-900 hover:bg-stone-900 hover:text-white"
 								>
-									Ouvrir
+									{$t('recordings.common.open')}
 								</a>
 							</div>
 						</div>
@@ -609,7 +612,7 @@
 								<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 									<path stroke-linecap="round" stroke-linejoin="round" d="M5.6 5.6a9 9 0 000 12.8M8.4 8.4a5 5 0 000 7.2m10-12.8a9 9 0 010 12.8m-2.8-9.2a5 5 0 010 7.2M12 12h.01" />
 								</svg>
-								Démarrer le direct
+								{$t('recordings.scheduled.startLive')}
 							</button>
 							<button
 								type="button"
@@ -617,7 +620,7 @@
 								disabled={busyId === entry._id}
 								onclick={() => openEdit(entry)}
 							>
-								Modifier
+								{$t('recordings.common.edit')}
 							</button>
 							<button
 								type="button"
@@ -625,11 +628,11 @@
 								disabled={busyId === entry._id}
 								onclick={() => cancelEntry(entry)}
 							>
-								Annuler
+								{$t('recordings.common.cancel')}
 							</button>
 							{#if broadcast.is_live}
 								<span class="text-[11px] text-stone-400">
-									Un direct est déjà en cours
+									{$t('recordings.scheduled.alreadyLiveShort')}
 								</span>
 							{/if}
 						</div>
@@ -655,7 +658,7 @@
 			>
 				<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
 			</svg>
-			Historique ({past.length})
+			{$t('recordings.scheduled.history', { count: past.length })}
 		</button>
 		{#if showPast}
 			<div class="mt-3 divide-y divide-stone-100 border border-stone-200/60 bg-white/60">
@@ -663,7 +666,7 @@
 					{@const badge = statusBadge(entry)}
 					<div class="flex flex-wrap items-center gap-3 px-5 py-3.5 transition-colors hover:bg-stone-50/60">
 						<span class="border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.15em] {badge.cls}">
-							{badge.label}
+							{$t(badge.label)}
 						</span>
 						<div class="min-w-0 flex-1">
 							<p class="truncate text-sm font-medium text-stone-700">{entry.title}</p>
@@ -677,7 +680,7 @@
 									rel="noopener noreferrer"
 									class="text-[11px] font-semibold text-primary underline-offset-2 hover:underline"
 								>
-									Rediffusion
+									{$t('recordings.scheduled.replay')}
 								</a>
 							{/if}
 							<button
@@ -685,7 +688,7 @@
 								class="border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-stone-500 transition-colors hover:border-primary hover:bg-primary hover:text-white"
 								onclick={() => copyLink(entry.slug)}
 							>
-								Copier le lien
+								{$t('recordings.scheduled.copyLink')}
 							</button>
 							<button
 								type="button"
@@ -693,7 +696,7 @@
 								disabled={busyId === entry._id}
 								onclick={() => deleteEntry(entry)}
 							>
-								Supprimer
+								{$t('recordings.common.delete')}
 							</button>
 						</div>
 					</div>
@@ -710,37 +713,37 @@
 			type="button"
 			class="absolute inset-0 bg-stone-900/40 backdrop-blur-[2px]"
 			onclick={closeModal}
-			aria-label="Fermer"
+			aria-label={$t('recordings.common.close')}
 		></button>
 		<div class="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto bg-white p-6 shadow-2xl">
 			<h2 class="font-display text-xl font-semibold text-stone-800">
-				{editingId ? 'Modifier le direct' : 'Programmer un direct'}
+				{editingId ? $t('recordings.scheduled.editTitle') : $t('recordings.scheduled.schedule')}
 			</h2>
 			<p class="mt-1 text-xs text-stone-400">
 				{editingId
-					? 'Le lien de partage reste inchangé.'
-					: 'Un lien de partage stable est créé immédiatement — partageable avant le direct.'}
+					? $t('recordings.scheduled.editHint')
+					: $t('recordings.scheduled.createHint')}
 			</p>
 
 			<div class="mt-5 space-y-4">
 				<div>
 					<label for="direct-title" class="mb-1 block text-xs font-semibold text-stone-600">
-						Titre <span class="text-rose-500">*</span>
+						{$t('recordings.common.title')} <span class="text-rose-500">*</span>
 					</label>
 					<input
 						id="direct-title"
 						type="text"
 						maxlength="120"
 						bind:value={titleDraft}
-						placeholder="ex. Réunion du mercredi soir"
+						placeholder={$t('recordings.scheduled.titlePlaceholder')}
 						class="w-full border border-stone-200 bg-white px-3 py-2 text-sm text-stone-800 focus:border-primary focus:outline-none"
 					/>
 				</div>
 
 				<div>
 					<label for="direct-datetime" class="mb-1 block text-xs font-semibold text-stone-600">
-						Date et heure <span class="text-rose-500">*</span>
-						<span class="ml-1 font-normal text-stone-400">(heure locale)</span>
+						{$t('recordings.scheduled.dateTimeLabel')} <span class="text-rose-500">*</span>
+						<span class="ml-1 font-normal text-stone-400">{$t('recordings.scheduled.localTime')}</span>
 					</label>
 					<input
 						id="direct-datetime"
@@ -752,28 +755,28 @@
 
 				<div>
 					<label for="direct-description" class="mb-1 block text-xs font-semibold text-stone-600">
-						Description
+						{$t('recordings.common.description')}
 					</label>
 					<textarea
 						id="direct-description"
 						rows="3"
 						maxlength="2000"
 						bind:value={descriptionDraft}
-						placeholder="Visible sur la page publique du direct"
+						placeholder={$t('recordings.scheduled.descriptionPlaceholder')}
 						class="w-full border border-stone-200 bg-white px-3 py-2 text-sm text-stone-800 focus:border-primary focus:outline-none"
 					></textarea>
 				</div>
 
 				<!-- Thumbnail -->
 				<div>
-					<span class="mb-1 block text-xs font-semibold text-stone-600">Vignette</span>
+					<span class="mb-1 block text-xs font-semibold text-stone-600">{$t('recordings.common.thumbnail')}</span>
 					<div class="flex items-center gap-3">
 						<div class="h-16 w-28 shrink-0 overflow-hidden border border-stone-200 bg-stone-50">
 							{#if previewSrc}
-								<img src={previewSrc} alt="Vignette" class="h-full w-full object-cover" />
+								<img src={previewSrc} alt={$t('recordings.common.thumbnail')} class="h-full w-full object-cover" />
 							{:else}
 								<div class="flex h-full w-full items-center justify-center text-[10px] text-stone-300">
-									Aucune
+									{$t('recordings.scheduled.noneThumb')}
 								</div>
 							{/if}
 						</div>
@@ -781,7 +784,7 @@
 							<label
 								class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-center text-[11px] font-semibold text-stone-600 transition-colors hover:border-primary hover:text-primary"
 							>
-								{previewSrc ? 'Remplacer' : 'Choisir une image'}
+								{previewSrc ? $t('recordings.common.replace') : $t('recordings.scheduled.chooseImage')}
 								<input type="file" accept="image/*" class="hidden" onchange={onThumbnailFileChange} />
 							</label>
 							{#if previewSrc}
@@ -790,7 +793,7 @@
 									class="border border-transparent px-3 py-1 text-[11px] font-semibold text-stone-400 hover:text-rose-600"
 									onclick={markThumbnailForRemoval}
 								>
-									Retirer
+									{$t('recordings.common.remove')}
 								</button>
 							{/if}
 						</div>
@@ -800,11 +803,10 @@
 				<!-- Subtitle (SRT) -->
 				<div>
 					<span class="mb-1 block text-xs font-semibold text-stone-600">
-						Transcription synchronisée (.srt)
+						{$t('recordings.scheduled.srtLabel')}
 					</span>
 					<p class="mb-2 text-[11px] leading-relaxed text-stone-400">
-						Fichier créé avant le direct. Le texte sera affiché aux auditeurs, synchronisé avec
-						l'audio (bouton « Démarrer les sous-titres » pendant le direct).
+						{$t('recordings.scheduled.srtHint')}
 					</p>
 					<div class="flex items-center gap-3">
 						{#if subtitleDisplayName}
@@ -812,7 +814,7 @@
 								<p class="truncate text-xs font-medium text-stone-700">{subtitleDisplayName}</p>
 								{#if subtitleCueCount !== null}
 									<p class="text-[10px] text-stone-400">
-										{subtitleCueCount} répliques{subtitleDurationLabel ? ` · ${subtitleDurationLabel}` : ''}
+										{$t('recordings.scheduled.cueCount', { count: subtitleCueCount })}{subtitleDurationLabel ? ` · ${subtitleDurationLabel}` : ''}
 									</p>
 								{/if}
 							</div>
@@ -821,7 +823,7 @@
 							<label
 								class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-center text-[11px] font-semibold text-stone-600 transition-colors hover:border-primary hover:text-primary"
 							>
-								{subtitleDisplayName ? 'Remplacer' : 'Choisir un fichier .srt'}
+								{subtitleDisplayName ? $t('recordings.common.replace') : $t('recordings.scheduled.chooseSrt')}
 								<input type="file" accept=".srt" class="hidden" onchange={onSubtitleFileChange} />
 							</label>
 							{#if subtitleDisplayName}
@@ -830,7 +832,7 @@
 									class="border border-transparent px-3 py-1 text-[11px] font-semibold text-stone-400 hover:text-rose-600"
 									onclick={markSubtitleForRemoval}
 								>
-									Retirer
+									{$t('recordings.common.remove')}
 								</button>
 							{/if}
 						</div>
@@ -842,16 +844,15 @@
 					<label class="flex items-start gap-2.5">
 						<input type="checkbox" bind:checked={announceDraft} class="mt-0.5 accent-[#FF880C]" />
 						<span class="text-xs text-stone-600">
-							<span class="font-semibold">Annoncer aux abonnés</span>
-							({subscriberCount} abonné{subscriberCount > 1 ? 's' : ''}) — notification « Live à venir »
-							envoyée {editingId ? 'après modification' : 'à la création'}
+							<span class="font-semibold">{$t('recordings.scheduled.announceLabel')}</span>
+							({subscriberCount > 1 ? $t('recordings.subscribersMany', { count: subscriberCount }) : $t('recordings.subscribersOne', { count: subscriberCount })}) {$t('recordings.scheduled.announceHint')}
+							{editingId ? $t('recordings.scheduled.afterEdit') : $t('recordings.scheduled.atCreation')}
 						</span>
 					</label>
 					<label class="flex items-start gap-2.5">
 						<input type="checkbox" bind:checked={reminderDraft} class="mt-0.5 accent-[#FF880C]" />
 						<span class="text-xs text-stone-600">
-							<span class="font-semibold">Rappel automatique</span> — notification « commence bientôt »
-							environ 30 minutes avant le début
+							<span class="font-semibold">{$t('recordings.scheduled.reminderLabel')}</span> {$t('recordings.scheduled.reminderHint')}
 						</span>
 					</label>
 				</div>
@@ -863,10 +864,10 @@
 
 			<div class="mt-6 flex justify-end gap-2">
 				<button type="button" class="admin-btn-secondary" onclick={closeModal} disabled={saving}>
-					Annuler
+					{$t('recordings.common.cancel')}
 				</button>
 				<button type="button" class="admin-btn-primary disabled:opacity-50" onclick={saveEntry} disabled={saving}>
-					{saving ? 'Enregistrement…' : editingId ? 'Enregistrer' : 'Programmer'}
+					{saving ? $t('recordings.common.saving') : editingId ? $t('recordings.common.save') : $t('recordings.scheduled.scheduleAction')}
 				</button>
 			</div>
 		</div>

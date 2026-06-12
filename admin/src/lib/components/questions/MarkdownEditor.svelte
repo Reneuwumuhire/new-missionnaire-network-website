@@ -1,6 +1,7 @@
 <script lang="ts">
 	import RichTextToolbar from './RichTextToolbar.svelte';
 	import FormattedQuestionText from './FormattedQuestionText.svelte';
+	import { t } from '$lib/i18n';
 
 	let {
 		id,
@@ -28,7 +29,7 @@
 	<div
 		class="flex flex-wrap items-center justify-between gap-1 border-b border-stone-200 bg-stone-50 px-2 pt-2"
 	>
-		<div class="flex items-end gap-1" role="tablist" aria-label="Éditeur">
+		<div class="flex items-end gap-1" role="tablist" aria-label={$t('questions.editor.label')}>
 			<button
 				type="button"
 				role="tab"
@@ -40,7 +41,7 @@
 						: 'border-transparent text-stone-500 hover:text-stone-800'
 				}`}
 			>
-				Write
+				{$t('questions.editor.write')}
 			</button>
 			<button
 				type="button"
@@ -53,7 +54,7 @@
 						: 'border-transparent text-stone-500 hover:text-stone-800'
 				}`}
 			>
-				Preview
+				{$t('questions.editor.preview')}
 			</button>
 		</div>
 
@@ -78,13 +79,13 @@
 				{#if hasContent}
 					<FormattedQuestionText text={value} proseClass="text-sm leading-7 text-stone-800" />
 				{:else}
-					<p class="text-sm italic text-stone-400">Rien à prévisualiser pour le moment.</p>
+					<p class="text-sm italic text-stone-400">{$t('questions.editor.nothingToPreview')}</p>
 				{/if}
 			</div>
 		{/if}
 	</div>
 
 	<div class="border-t border-stone-100 bg-stone-50/60 px-3 py-1.5 text-[11px] text-stone-400">
-		Mise en forme Markdown prise en charge — collez depuis Word ou Docs pour conserver le format.
+		{$t('questions.editor.markdownHint')}
 	</div>
 </div>

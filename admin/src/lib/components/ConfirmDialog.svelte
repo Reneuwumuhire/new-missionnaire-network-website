@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { confirmDialog } from '$lib/stores/confirm-dialog';
+	import { t } from '$lib/i18n';
 	import { fade, scale } from 'svelte/transition';
 
 	function onBackdropClick(e: MouseEvent) {
@@ -74,7 +75,7 @@
 					onclick={confirmDialog.cancel}
 					class="rounded-none px-4 py-2.5 font-body text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-700"
 				>
-					{$confirmDialog.cancelLabel ?? 'Annuler'}
+					{$confirmDialog.cancelLabel ?? $t('common.cancel')}
 				</button>
 				<button
 					type="button"
@@ -85,7 +86,7 @@
 							? 'bg-amber-600 hover:bg-amber-700'
 							: 'bg-primary hover:bg-missionnaire-600'}"
 				>
-					{$confirmDialog.confirmLabel ?? 'Confirmer'}
+					{$confirmDialog.confirmLabel ?? $t('common.confirm')}
 				</button>
 			</div>
 		</div>

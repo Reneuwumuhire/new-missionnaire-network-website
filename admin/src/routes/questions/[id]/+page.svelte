@@ -4,7 +4,7 @@
 	import MarkdownEditor from '$lib/components/questions/MarkdownEditor.svelte';
 	import { loadingSubmit } from '$lib/actions/loadingSubmit';
 	import { confirmDialog } from '$lib/stores/confirm-dialog';
-	import { t } from '$lib/i18n';
+	import { t, type TranslationKey } from '$lib/i18n';
 	import type { ActionData, PageData } from './$types';
 	import type {
 		QuestionReference,
@@ -20,7 +20,7 @@
 	let removingReferenceId = $state<string | null>(null);
 	let referenceType = $state<QuestionReferenceType>('sermon');
 	const confirmedPermanentDeleteForms = new WeakSet<HTMLFormElement>();
-	const typeLabels: Record<QuestionReferenceType, string> = {
+	const typeLabels: Record<QuestionReferenceType, TranslationKey> = {
 		pdf: 'questions.type.pdf',
 		audio: 'questions.type.audio',
 		video: 'questions.type.video',
@@ -30,7 +30,7 @@
 		bible: 'questions.type.bible'
 	};
 
-	const statusLabel: Record<string, string> = {
+	const statusLabel: Record<string, TranslationKey> = {
 		pending: 'questions.statusLabel.pending',
 		approved: 'questions.statusLabel.approved',
 		answered: 'questions.statusLabel.answered',
@@ -762,10 +762,10 @@
 										name="manualHref"
 										class="admin-input h-10 py-2 text-sm"
 										placeholder={referenceType === 'text'
-											? 'https://... ou /transcriptions/...'
+											? $t('questions.detail.hrefPlaceholder')
 											: referenceType === 'video'
-												? 'https://www.youtube.com/watch?v=...'
-												: 'https://... ou /transcriptions/...'}
+												? $t('questions.detail.videoHrefPlaceholder')
+												: $t('questions.detail.hrefPlaceholder')}
 										required={referenceMode === 'manual'}
 									/>
 								</div>

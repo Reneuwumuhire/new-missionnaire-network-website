@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { t } from '$lib/i18n';
+	import { t, type TranslationKey } from '$lib/i18n';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -32,7 +32,7 @@
 		setTimeout(() => (copiedPassword = false), 3000);
 	}
 
-	const roleLabel: Record<string, string> = {
+	const roleLabel: Record<string, TranslationKey> = {
 		superadmin: 'users.roleSuperadmin',
 		editor: 'users.roleEditor'
 	};
@@ -558,8 +558,8 @@
 										class="h-4 w-4 rounded border-stone-300 text-blue-600 focus:ring-blue-500/30"
 									/>
 									<div>
-										<span class="text-sm font-medium text-stone-700">Modifier</span>
-										<p class="text-[10px] text-stone-400">Éditer titre, artiste, catégorie</p>
+										<span class="text-sm font-medium text-stone-700">{$t('users.permEdit.label')}</span>
+										<p class="text-[10px] text-stone-400">{$t('users.permEdit.desc')}</p>
 									</div>
 								</label>
 
@@ -573,8 +573,8 @@
 										class="h-4 w-4 rounded border-stone-300 text-red-600 focus:ring-red-500/30"
 									/>
 									<div>
-										<span class="text-sm font-medium text-stone-700">Supprimer</span>
-										<p class="text-[10px] text-stone-400">Retirer des audios du serveur</p>
+										<span class="text-sm font-medium text-stone-700">{$t('users.permDelete.label')}</span>
+										<p class="text-[10px] text-stone-400">{$t('users.permDelete.desc')}</p>
 									</div>
 								</label>
 
@@ -588,10 +588,10 @@
 										class="h-4 w-4 rounded border-stone-300 text-purple-600 focus:ring-purple-500/30"
 									/>
 									<div>
-										<span class="text-sm font-medium text-stone-700">Gérer les enregistrements</span
+										<span class="text-sm font-medium text-stone-700">{$t('users.permRecordings.label')}</span
 										>
 										<p class="text-[10px] text-stone-400">
-											Démarrer / arrêter et publier les directs
+											{$t('users.permRecordings.desc')}
 										</p>
 									</div>
 								</label>
@@ -606,8 +606,8 @@
 										class="h-4 w-4 rounded border-stone-300 text-sky-600 focus:ring-sky-500/30"
 									/>
 									<div>
-										<span class="text-sm font-medium text-stone-700">Réviser les paroles</span>
-										<p class="text-[10px] text-stone-400">Accéder à la page de validation lyrics</p>
+										<span class="text-sm font-medium text-stone-700">{$t('users.permLyrics.label')}</span>
+										<p class="text-[10px] text-stone-400">{$t('users.permLyrics.desc')}</p>
 									</div>
 								</label>
 
@@ -621,8 +621,8 @@
 										class="h-4 w-4 rounded border-stone-300 text-orange-600 focus:ring-orange-500/30"
 									/>
 									<div>
-										<span class="text-sm font-medium text-stone-700">Voir Questions</span>
-										<p class="text-[10px] text-stone-400">Accéder aux pages Q&amp;R admin</p>
+										<span class="text-sm font-medium text-stone-700">{$t('users.permQView.label')}</span>
+										<p class="text-[10px] text-stone-400">{$t('users.permQView.desc')}</p>
 									</div>
 								</label>
 
@@ -636,9 +636,9 @@
 										class="h-4 w-4 rounded border-stone-300 text-emerald-600 focus:ring-emerald-500/30"
 									/>
 									<div>
-										<span class="text-sm font-medium text-stone-700">Répondre aux questions</span>
+										<span class="text-sm font-medium text-stone-700">{$t('users.permQAnswer.label')}</span>
 										<p class="text-[10px] text-stone-400">
-											Publier réponses pastorales et références
+											{$t('users.permQAnswer.desc')}
 										</p>
 									</div>
 								</label>
@@ -653,23 +653,23 @@
 										class="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500/30"
 									/>
 									<div>
-										<span class="text-sm font-medium text-stone-700">Modérer les questions</span>
+										<span class="text-sm font-medium text-stone-700">{$t('users.permQModerate.label')}</span>
 										<p class="text-[10px] text-stone-400">
-											Approuver, masquer, verrouiller, traiter rapports
+											{$t('users.permQModerate.desc')}
 										</p>
 									</div>
 								</label>
 
 								<div class="flex items-center gap-2">
 									<button type="submit" class="admin-btn-primary py-1.5 text-xs">
-										Enregistrer
+										{$t('users.save')}
 									</button>
 									<button
 										type="button"
 										onclick={() => (permissionsEmail = null)}
 										class="text-xs text-stone-400 hover:text-stone-600"
 									>
-										Annuler
+										{$t('users.cancel')}
 									</button>
 								</div>
 							</form>
@@ -679,7 +679,7 @@
 			{/each}
 			{#if data.users.length === 0}
 				<tr>
-					<td colspan="6" class="px-5 py-12 text-center text-stone-400"> Aucun utilisateur </td>
+					<td colspan="6" class="px-5 py-12 text-center text-stone-400"> {$t('users.noUsers')} </td>
 				</tr>
 			{/if}
 		</tbody>
@@ -693,6 +693,6 @@
 {/if}
 {#if form?.permSuccess}
 	<div class="mt-4 border border-green-200 bg-green-50/80 px-4 py-3 text-sm text-green-700">
-		Permissions mises à jour pour {form.permEmail}
+		{$t('users.permissionsUpdated', { email: form.permEmail })}
 	</div>
 {/if}
