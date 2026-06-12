@@ -1,17 +1,17 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
+	import { t } from '../../i18n';
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import FaBrandsAndroid from 'svelte-icons-pack/fa/FaBrandsAndroid';
-	import AiOutlineDownload from 'svelte-icons-pack/ai/AiOutlineDownload';
 	import IoClose from 'svelte-icons-pack/io/IoClose';
 
 	interface Props {
 		downloadUrl?: string;
 	}
 
-	let { downloadUrl = "https://mega.nz/folder/VdJDxAxK#_hnoT20MlxFsaR2jgQcRXA" }: Props = $props();
-	
+	let { downloadUrl = 'https://mega.nz/folder/VdJDxAxK#_hnoT20MlxFsaR2jgQcRXA' }: Props = $props();
+
 	let isVisible = $state(false);
 	const STORAGE_KEY = 'hide_android_banner';
 
@@ -32,69 +32,38 @@
 	}
 </script>
 
+<!-- Slim, quiet, dismissible single-row strip — reads as a helpful note,
+     not an ad. Icon + one sentence + small text-link + close. -->
 {#if isVisible}
-	<div class="w-full max-w-3xl mx-auto px-4 pointer-events-none">
-		<div class="pointer-events-auto relative isolate overflow-hidden border border-stone-200/70 bg-[#faf6ef] shadow-[0_20px_52px_-30px_rgba(41,37,36,0.3)] transition-all hover:-translate-y-0.5 hover:shadow-[0_26px_64px_-32px_rgba(41,37,36,0.36)]">
-			<div class="absolute inset-0 bg-[linear-gradient(135deg,#ffffff,#faf6ef)]"></div>
-			<div class="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-missionnaire/10 via-missionnaire/4 to-transparent"></div>
-			<div class="absolute -left-10 top-1/2 h-24 w-24 -translate-y-1/2 rounded-full bg-missionnaire/10 blur-3xl"></div>
-			<div class="absolute left-6 right-6 top-0 h-px bg-gradient-to-r from-transparent via-missionnaire/60 to-transparent"></div>
+	<div
+		class="mx-auto flex w-full max-w-3xl items-center gap-3 border border-stone-200 bg-white/60 px-3 py-2.5 transition-colors duration-150 hover:border-stone-300 md:px-4"
+	>
+		<span class="flex h-7 w-7 shrink-0 items-center justify-center text-missionnaire" aria-hidden="true">
+			<Icon src={FaBrandsAndroid} size="17" />
+		</span>
 
-			<button
-				onclick={dismiss}
-				class="absolute right-2 top-2 z-20 flex h-8 w-8 items-center justify-center border border-stone-200/70 bg-white/70 text-stone-400 transition-colors hover:border-stone-300 hover:text-stone-700 sm:hidden"
-				aria-label="Fermer la bannière Android"
-			>
-				<Icon src={IoClose} size="14" />
-			</button>
+		<p class="min-w-0 flex-1 truncate font-body text-xs text-stone-600 md:text-[13px]">
+			<span class="font-semibold text-stone-800">{$t('androidBanner.title')}</span>
+			<span class="text-stone-300" aria-hidden="true">—</span>
+			<span class="hidden sm:inline">{$t('androidBanner.tagline')}</span>
+			<span class="sm:hidden">{$t('androidBanner.taglineShort')}</span>
+		</p>
 
-			<div class="relative z-10 flex flex-col gap-3 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4 md:px-6">
-				<div class="flex min-w-0 items-center gap-3.5 pr-10 sm:pr-0">
-					<div class="flex h-11 w-11 shrink-0 items-center justify-center border border-missionnaire/15 bg-white/80 shadow-sm shadow-missionnaire/5">
-						<Icon src={FaBrandsAndroid} size="20" color="#FF880C" />
-					</div>
+		<a
+			href={downloadUrl}
+			target="_blank"
+			rel="noopener noreferrer"
+			class="shrink-0 font-body text-[10px] font-bold uppercase tracking-[0.16em] text-missionnaire underline-offset-4 transition-colors duration-150 hover:text-missionnaire/80 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
+		>
+			{$t('androidBanner.download')}
+		</a>
 
-					<div class="min-w-0 flex-1">
-						<p class="mb-1 text-[9px] font-bold uppercase tracking-[0.35em] text-missionnaire font-body">
-							Cantiques &amp; louange
-						</p>
-						<h3 class="font-display text-lg font-semibold leading-none text-stone-900 md:text-[1.55rem]">
-							Application Android
-						</h3>
-						<p class="mt-1 text-[11px] leading-relaxed text-stone-500 font-body md:max-w-[26rem] md:text-[12px]">
-							Retrouvez plus de <span class="font-semibold text-missionnaire">1 500 cantiques</span> sur votre téléphone.
-						</p>
-					</div>
-				</div>
-
-				<div class="flex shrink-0 items-center gap-2.5">
-					<a
-						href={downloadUrl}
-						target="_blank"
-						rel="noopener noreferrer"
-						class="inline-flex h-10 flex-1 items-center justify-center gap-2 border border-missionnaire bg-missionnaire px-4 text-[10px] font-bold uppercase tracking-[0.16em] text-white font-body transition-colors hover:bg-missionnaire/90 sm:flex-none md:px-5"
-					>
-						<Icon src={AiOutlineDownload} size="14" />
-						<span>Télécharger</span>
-					</a>
-
-					<button
-						onclick={dismiss}
-						class="hidden h-10 w-10 items-center justify-center border border-stone-200/70 bg-white/70 text-stone-400 transition-colors hover:border-stone-300 hover:text-stone-700 sm:flex"
-						aria-label="Fermer la bannière Android"
-					>
-						<Icon src={IoClose} size="16" />
-					</button>
-				</div>
-			</div>
-		</div>
+		<button
+			onclick={dismiss}
+			class="flex h-7 w-7 shrink-0 items-center justify-center text-stone-400 transition-colors duration-150 hover:text-stone-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
+			aria-label={$t('androidBanner.close')}
+		>
+			<Icon src={IoClose} size="15" />
+		</button>
 	</div>
 {/if}
-
-<style>
-	@media (max-width: 640px) {
-		a[href] {
-			letter-spacing: 0.14em;
-		}
-	}
-</style>

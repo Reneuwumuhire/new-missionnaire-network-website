@@ -913,9 +913,11 @@
 <svelte:window onclick={handleArtistOutsideClick} />
 
 <div class="w-full min-w-0 max-w-6xl mx-auto px-4 pt-0 pb-8 md:px-6">
-	<div class="mb-6 md:mb-8 {$mobileFiltersOpen ? '' : 'hidden md:block'}">
+	<!-- Collections: always visible, single horizontally-scrollable row on
+	     mobile — the main way non-technical listeners browse the recueils. -->
+	<div class="mb-4 md:mb-8">
 		<h2
-			class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.35em] mb-4 font-body"
+			class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.35em] mb-2 md:mb-4 font-body"
 		>
 			{$t('music.collections')}
 		</h2>
@@ -927,7 +929,7 @@
 			<div
 				bind:this={recueilsScrollEl}
 				onscroll={updateRecueilsScrollState}
-				class="recueils-track flex overflow-x-auto pb-4 gap-2 md:gap-3 no-scrollbar px-4 md:px-0 md:pb-0 snap-x"
+				class="recueils-track flex overflow-x-auto pb-2 gap-2 md:gap-3 no-scrollbar px-4 md:px-0 md:pb-0 snap-x"
 				style="scrollbar-width: none; -ms-overflow-style: none;"
 			>
 				{#each categories as category}
@@ -946,7 +948,7 @@
 	</div>
 
 	<!-- List Title and Mobile Filters -->
-	<div class="flex flex-col gap-2 mb-6">
+	<div class="flex flex-col gap-2 mb-4 md:mb-6">
 		<div class="flex items-center justify-between gap-3">
 			<div class="flex items-center gap-2">
 				<h2 class="font-display text-2xl md:text-3xl font-bold text-stone-900">{$t('music.list')}</h2>

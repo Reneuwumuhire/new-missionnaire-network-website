@@ -261,6 +261,13 @@ export default {
 	'predications.loadRetransmissionsFailed': 'Impossible de charger les retransmissions',
 
 	// ── Music page ──────────────────────────────────────────────
+	'music.headerKicker': 'Tous les cantiques',
+	'music.headerTitle': 'Louange et Adoration',
+	'music.headerCount': '{count} cantiques',
+	'music.searchPlaceholder': 'Rechercher par titre...',
+	'music.clearSearch': 'Effacer la recherche',
+	'music.audioTab': 'Audio',
+	'music.videosTab': 'Vidéos',
 	'music.collections': 'Recueils',
 	'music.collection': 'Recueil',
 	'music.list': 'Liste',
@@ -307,6 +314,13 @@ export default {
 	'music.downloadFailedDot': 'Téléchargement échoué.',
 	'music.loadFailed': 'Impossible de charger la liste de musique',
 	'music.loadArtistsFailed': 'Impossible de charger les artistes',
+
+	// ── Android app strip ───────────────────────────────────────
+	'androidBanner.title': 'Application Android',
+	'androidBanner.tagline': 'plus de 1 500 cantiques sur votre téléphone.',
+	'androidBanner.taglineShort': '1 500 cantiques hors ligne.',
+	'androidBanner.download': 'Télécharger',
+	'androidBanner.close': 'Fermer la bannière Android',
 	'music.letterLabel': 'lettre {letter}',
 	'music.allSongs': 'tous les chants',
 

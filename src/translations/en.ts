@@ -260,6 +260,13 @@ const en: Record<keyof typeof fr, string> = {
 	'predications.loadRetransmissionsFailed': 'Could not load the replays',
 
 	// ── Music page ──────────────────────────────────────────────
+	'music.headerKicker': 'All the hymns',
+	'music.headerTitle': 'Praise and Worship',
+	'music.headerCount': '{count} hymns',
+	'music.searchPlaceholder': 'Search by title...',
+	'music.clearSearch': 'Clear search',
+	'music.audioTab': 'Audio',
+	'music.videosTab': 'Videos',
 	'music.collections': 'Collections',
 	'music.collection': 'Collection',
 	'music.list': 'List',
@@ -306,6 +313,13 @@ const en: Record<keyof typeof fr, string> = {
 	'music.downloadFailedDot': 'Download failed.',
 	'music.loadFailed': 'Could not load the music list',
 	'music.loadArtistsFailed': 'Could not load the artists',
+
+	// ── Android app strip ───────────────────────────────────────
+	'androidBanner.title': 'Android app',
+	'androidBanner.tagline': 'over 1,500 hymns on your phone.',
+	'androidBanner.taglineShort': '1,500 hymns offline.',
+	'androidBanner.download': 'Download',
+	'androidBanner.close': 'Close the Android banner',
 	'music.letterLabel': 'letter {letter}',
 	'music.allSongs': 'all songs',
 
