@@ -5,7 +5,6 @@
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import BsChatDots from 'svelte-icons-pack/bs/BsChatDots';
-	import BsFileEarmarkText from 'svelte-icons-pack/bs/BsFileEarmarkText';
 	import BsBook from 'svelte-icons-pack/bs/BsBook';
 	import BsHouseDoor from 'svelte-icons-pack/bs/BsHouseDoor';
 	import BsInfoCircle from 'svelte-icons-pack/bs/BsInfoCircle';
@@ -24,7 +23,6 @@
 	const sections = $derived([
 		{ label: $t('nav.questions'), href: '/questions', icon: BsChatDots },
 		{ label: $t('nav.videos'), href: '/videos', icon: BsCameraVideo },
-		{ label: $t('nav.documents'), href: '/documents', icon: BsFileEarmarkText },
 		{ label: $t('nav.literature'), href: '/literature', icon: BsBook },
 		{ label: $t('nav.eglise'), href: '/eglise', icon: BsHouseDoor },
 		{ label: $t('nav.williamBranham'), href: '/william-branham/biographie', icon: BsPeople },
