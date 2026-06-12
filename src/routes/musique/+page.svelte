@@ -15,7 +15,6 @@
 		isShuffle,
 		isPlaying
 	} from '$lib/stores/global';
-	import { mobileFiltersOpen } from '$lib/stores/mobileControls';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import ListSkeleton from '$lib/components/ListSkeleton.svelte';
 	import ErrorCard from '$lib/components/ErrorCard.svelte';
@@ -34,7 +33,6 @@
 	import IoPauseCircle from 'svelte-icons-pack/io/IoPauseCircle';
 	import BsHeartFill from 'svelte-icons-pack/bs/BsHeartFill';
 	import BsHeart from 'svelte-icons-pack/bs/BsHeart';
-	import BsClockHistory from 'svelte-icons-pack/bs/BsClockHistory';
 	import { formatTime } from '../../utils/FormatTime';
 	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
 	import {
@@ -65,6 +63,7 @@
 		type DownloadProgress
 	} from '$lib/utils/musicDownload';
 	import { portal } from '$lib/actions/portal';
+	import { focusTrap } from '$lib/actions/focusTrap';
 
 	type MusicAudioApiResponse = {
 		data: MusicAudio[];
@@ -91,16 +90,20 @@
 	let lastHandledMusicRequestKey = $state('');
 
 
-	let isArtistMenuOpen = $state(false);
-	let artistMenuEl: HTMLDivElement | null = $state(null);
-
-	// Close the "Artiste" dropdown on an outside tap. The toggle button uses
-	// `stopPropagation`, so its own click never reaches this handler.
-	function handleArtistOutsideClick(event: MouseEvent) {
-		if (!isArtistMenuOpen || !artistMenuEl) return;
-		if (!artistMenuEl.contains(event.target as Node)) isArtistMenuOpen = false;
-	}
 	let artistSearch = $state('');
+	// "Filtres" sheet — bottom sheet on mobile, centered dialog on sm+.
+	// Hosts the artist picker, alphabet, sort options and the list
+	// utilities (Rafraîchir, Tout télécharger). Every choice inside goes
+	// through the existing handle*Change goto/URL-param handlers.
+	let filtersOpen = $state(false);
+
+	function openFilters() {
+		filtersOpen = true;
+	}
+
+	function closeFilters() {
+		filtersOpen = false;
+	}
 	let showFavorites = $state(false);
 	let showRecent = $state(false);
 	// ── BEGIN: cached filter state (added) ────────────────────────
@@ -383,6 +386,7 @@
 
 	onDestroy(() => {
 		if (cacheRefreshTimer) clearTimeout(cacheRefreshTimer);
+		if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
 		abortMusicListRequest();
 	});
 
@@ -432,6 +436,26 @@
 
 
 	let searchInput = $state((data as any).search);
+
+	// Debounced list search for the row-2 utility bar (mobile; desktop
+	// keeps the header band's inline search). Same 300ms debounce as the
+	// layout's hero search, applied through the existing handleSearch()
+	// URL mechanism so both inputs stay in sync via the URL.
+	let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+	let lastSyncedListSearch = $state(((data as any).search || '') as string);
+
+	function onSearchInput() {
+		if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+		searchDebounceTimer = setTimeout(() => {
+			if ((searchInput || '').trim() !== (currentSearch || '')) handleSearch();
+		}, 300);
+	}
+
+	function clearListSearch() {
+		if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+		searchInput = '';
+		if (currentSearch) handleSearch();
+	}
 
 	const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
@@ -780,6 +804,21 @@
 		if (currentCategory && currentCategory !== 'All') return currentCategory;
 		return $t('music.allSongs');
 	})());
+	// Keep the row-2 search input in step with the URL (e.g. when the
+	// desktop header search or a back/forward navigation changes it),
+	// without stomping on in-progress typing.
+	$effect(() => {
+		const urlSearch = currentSearch || '';
+		if (urlSearch !== lastSyncedListSearch) {
+			searchInput = urlSearch;
+			untrack(() => {
+				lastSyncedListSearch = urlSearch;
+			});
+		}
+	});
+	// Badge on the "Filtres" button: how many sheet-managed filters are
+	// currently narrowing the list (collection has its own pill row).
+	let activeFilterCount = $derived((currentArtist ? 1 : 0) + (currentAlpha ? 1 : 0));
 	$effect(() => {
 		if (pendingPlayId && hasResolvedMusicList && pendingPlayId !== handledPlayId) {
 			const id = pendingPlayId;
@@ -910,164 +949,153 @@
      and reads from this page's load `meta` field (see +page.ts's
      buildMusiqueMeta) so there's exactly one tag per property. -->
 
-<svelte:window onclick={handleArtistOutsideClick} />
-
 <div class="w-full min-w-0 max-w-6xl mx-auto px-4 pt-0 pb-8 md:px-6">
-	<!-- Collections: always visible, single horizontally-scrollable row on
-	     mobile — the main way non-technical listeners browse the recueils. -->
-	<div class="mb-4 md:mb-8">
-		<h2
-			class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.35em] mb-2 md:mb-4 font-body"
-		>
-			{$t('music.collections')}
-		</h2>
+	<!-- ROW 1 — Collections: THE primary filter, music-app style pill row
+	     directly under the header band. No kicker label; the active pill
+	     is solid missionnaire orange so the current recueil is
+	     unmistakable. Edge fade hints at horizontal scrollability. -->
+	<div
+		class="recueils-scroll relative -mx-4 md:mx-0"
+		class:can-scroll-left={recueilsCanLeft}
+		class:can-scroll-right={recueilsCanRight}
+	>
 		<div
-			class="recueils-scroll relative -mx-4 md:mx-0"
-			class:can-scroll-left={recueilsCanLeft}
-			class:can-scroll-right={recueilsCanRight}
+			bind:this={recueilsScrollEl}
+			onscroll={updateRecueilsScrollState}
+			class="recueils-track flex overflow-x-auto gap-2 md:gap-2.5 no-scrollbar px-4 md:px-0 py-1 snap-x"
+			style="scrollbar-width: none; -ms-overflow-style: none;"
+			role="group"
+			aria-label={$t('music.collections')}
 		>
-			<div
-				bind:this={recueilsScrollEl}
-				onscroll={updateRecueilsScrollState}
-				class="recueils-track flex overflow-x-auto pb-2 gap-2 md:gap-3 no-scrollbar px-4 md:px-0 md:pb-0 snap-x"
-				style="scrollbar-width: none; -ms-overflow-style: none;"
+			{#each categories as category}
+				<button
+					class="snap-start flex-shrink-0 inline-flex items-center h-10 md:h-11 px-4 md:px-5 rounded-full border text-[11px] md:text-xs font-bold uppercase tracking-[0.1em] md:tracking-wider transition-colors duration-150 {currentCategory ===
+					category
+						? 'bg-missionnaire border-missionnaire text-white shadow-sm'
+						: 'bg-white/60 text-stone-600 border-stone-200 hover:border-missionnaire hover:text-missionnaire'}"
+					aria-pressed={currentCategory === category}
+					onclick={() => handleCategoryChange(category)}
+				>
+					{category === 'All' ? $t('music.allPill') : category}
+				</button>
+			{/each}
+		</div>
+	</div>
+
+	<!-- ROW 2 — slim utility bar: compact search (mobile only; desktop
+	     keeps the header band's inline search) + one "Filtres" button that
+	     opens the sheet (artist, alphabet, sort, Rafraîchir, Tout
+	     télécharger). -->
+	<div class="mt-3 mb-3 md:mb-4 flex items-center gap-2 md:justify-end">
+		<div class="relative min-w-0 flex-1 md:hidden">
+			<svg
+				class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
+				width="14"
+				height="14"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2.2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
 			>
-				{#each categories as category}
-					<button
-						class="snap-start flex-shrink-0 px-3.5 md:px-5 py-2 md:py-2.5 text-[10px] md:text-[11px] font-bold uppercase tracking-[0.12em] md:tracking-wider transition-all border {currentCategory ===
-						category
-							? 'border-missionnaire text-missionnaire bg-missionnaire/10'
-							: 'bg-white/40 text-stone-500 border-stone-200/60 hover:border-missionnaire hover:text-missionnaire'}"
-						onclick={() => handleCategoryChange(category)}
-					>
-						{category === 'All' ? $t('misc.seeAllCap') : category}
-					</button>
-				{/each}
-			</div>
+				<circle cx="11" cy="11" r="7" />
+				<line x1="21" y1="21" x2="16.65" y2="16.65" />
+			</svg>
+			<input
+				type="text"
+				inputmode="search"
+				enterkeyhint="search"
+				class="h-10 w-full border border-stone-200 bg-white/70 pl-9 {searchInput
+					? 'pr-9'
+					: 'pr-3'} font-body text-sm text-stone-800 outline-none transition-colors duration-150 placeholder:text-stone-400 focus:border-missionnaire/60 focus:bg-white"
+				placeholder={$t('music.searchPlaceholder')}
+				aria-label={$t('music.searchPlaceholder')}
+				bind:value={searchInput}
+				oninput={onSearchInput}
+			/>
+			{#if searchInput}
+				<button
+					type="button"
+					class="absolute right-0 top-0 flex h-10 w-9 items-center justify-center text-stone-400 transition-colors duration-150 hover:text-stone-700"
+					aria-label={$t('music.clearSearch')}
+					onclick={clearListSearch}
+				>
+					<Icon src={BsX} size="16" />
+				</button>
+			{/if}
 		</div>
-	</div>
-
-	<!-- List Title and Mobile Filters -->
-	<div class="flex flex-col gap-2 mb-4 md:mb-6">
-		<div class="flex items-center justify-between gap-3">
-			<div class="flex items-center gap-2">
-				<h2 class="font-display text-2xl md:text-3xl font-bold text-stone-900">{$t('music.list')}</h2>
-				{#if isRandomListOrder}
-					<button
-						class="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-stone-500 transition-colors hover:border-missionnaire hover:text-missionnaire"
-						onclick={refreshRandomList}
-						title={$t('music.refreshRandom')}
-					>
-						<Icon src={BsShuffle} size="11" />
-						{$t('music.refresh')}
-					</button>
-				{/if}
-			</div>
-			<!-- Mobile Artist Filter Toggle -->
-			<div class="flex items-center gap-2">
-				{#if isRandomListOrder}
-					<button
-						class="sm:hidden inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-stone-500 transition-colors hover:border-missionnaire hover:text-missionnaire"
-						onclick={refreshRandomList}
-						title={$t('music.refreshRandom')}
-					>
-						<Icon src={BsShuffle} size="11" />
-						{$t('music.refresh')}
-					</button>
-				{/if}
-				<div class="relative" bind:this={artistMenuEl}>
-					<button
-						class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors {isArtistMenuOpen
-							? 'border-missionnaire text-missionnaire bg-missionnaire/5'
-							: 'border-stone-200 bg-white text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
-						onclick={(e) => {
-							e.stopPropagation();
-							isArtistMenuOpen = !isArtistMenuOpen;
-						}}
-					>
-						<Icon src={BsSearch} size="11" />
-						{$t('music.artist')}
-					</button>
-					{#if isArtistMenuOpen}
-						<!-- svelte-ignore a11y_no_static_element_interactions -->
-						<!-- svelte-ignore a11y_click_events_have_key_events -->
-						<div
-							class="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-stone-200 p-3 z-50 normal-case tracking-normal"
-							onclick={(e) => e.stopPropagation()}
-						>
-							<div class="flex items-center gap-2 bg-stone-50 px-2 py-1.5 rounded-lg mb-2">
-								<Icon src={BsSearch} size="12" color="#999" />
-								<input
-									type="text"
-									placeholder={$t('music.searchArtist')}
-									class="bg-transparent border-none outline-none text-xs w-full text-stone-700 placeholder:text-stone-400"
-									bind:value={artistSearch}
-								/>
-							</div>
-
-							<div class="max-h-60 overflow-y-auto space-y-1 custom-scrollbar">
-								{#if filteredArtists.length === 0}
-									<div class="px-3 py-4 text-xs text-stone-400 text-center italic">
-										{$t('music.noArtistFound')}
-									</div>
-								{:else}
-									<button
-										class="w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-colors {!currentArtist
-											? 'bg-stone-100 text-missionnaire'
-											: 'text-stone-500 hover:bg-stone-50'}"
-										onclick={() => {
-											handleArtistChange('');
-											isArtistMenuOpen = false;
-										}}
-									>
-										{$t('music.allArtists')}
-									</button>
-									{#each filteredArtists as artist}
-										<button
-											class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-colors {currentArtist ===
-											artist
-												? 'bg-stone-100 text-missionnaire font-bold'
-												: 'text-stone-600 hover:bg-stone-50'}"
-											onclick={() => {
-												handleArtistChange(artist);
-												isArtistMenuOpen = false;
-											}}
-										>
-											{artist}
-										</button>
-									{/each}
-								{/if}
-							</div>
-						</div>
-					{/if}
-				</div>
-			</div>
-		</div>
-
-		<!-- Active Filters (Mobile Only) -->
-		{#if currentArtist || (currentCategory && currentCategory !== 'All')}
-			<div class="md:hidden flex flex-wrap gap-2">
-				{#if currentCategory && currentCategory !== 'All'}
-					<button
-						class="flex items-center gap-1.5 border border-missionnaire/40 bg-missionnaire/10 text-missionnaire px-3 py-1.5 rounded-full text-xs font-semibold"
-						onclick={() => handleCategoryChange('All')}
-					>
-						<span>{currentCategory}</span>
-						<Icon src={BsX} size="14" />
-					</button>
-				{/if}
-				{#if currentArtist}
-					<button
-						class="flex items-center gap-1.5 border border-missionnaire/40 bg-missionnaire/10 text-missionnaire px-3 py-1.5 rounded-full text-xs font-semibold"
-						onclick={() => handleArtistChange('')}
-					>
-						<span class="max-w-[150px] truncate">{currentArtist}</span>
-						<Icon src={BsX} size="14" />
-					</button>
-				{/if}
-			</div>
+		{#if isRandomListOrder}
+			<button
+				class="hidden md:inline-flex h-10 items-center gap-1.5 border border-stone-200 bg-white/70 px-4 text-[10px] font-bold uppercase tracking-[0.16em] text-stone-500 transition-colors duration-150 hover:border-missionnaire hover:text-missionnaire"
+				onclick={refreshRandomList}
+				title={$t('music.refreshRandom')}
+			>
+				<Icon src={BsShuffle} size="11" />
+				{$t('music.refresh')}
+			</button>
 		{/if}
+		<button
+			class="inline-flex h-10 shrink-0 items-center gap-2 border px-4 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors duration-150 {filtersOpen ||
+			activeFilterCount > 0
+				? 'border-missionnaire/60 bg-missionnaire/5 text-missionnaire'
+				: 'border-stone-200 bg-white/70 text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
+			aria-haspopup="dialog"
+			aria-expanded={filtersOpen}
+			onclick={openFilters}
+		>
+			<svg
+				viewBox="0 0 24 24"
+				width="13"
+				height="13"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2.2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<line x1="4" y1="6" x2="20" y2="6" />
+				<line x1="7" y1="12" x2="17" y2="12" />
+				<line x1="10" y1="18" x2="14" y2="18" />
+			</svg>
+			{$t('music.filters')}
+			{#if activeFilterCount > 0}
+				<span
+					class="flex h-4 min-w-4 items-center justify-center rounded-full bg-missionnaire px-1 text-[9px] font-bold text-white"
+				>
+					{activeFilterCount}
+				</span>
+			{/if}
+		</button>
 	</div>
+
+	<!-- Active sheet-filters as dismissible chips (collection state is
+	     already visible in the pill row above). -->
+	{#if currentArtist || currentAlpha}
+		<div class="mb-3 flex flex-wrap gap-2">
+			{#if currentArtist}
+				<button
+					class="flex items-center gap-1.5 rounded-full border border-missionnaire/40 bg-missionnaire/10 px-3 py-1.5 text-xs font-semibold text-missionnaire"
+					onclick={() => handleArtistChange('')}
+					title={$t('music.allArtists')}
+				>
+					<span class="max-w-[150px] truncate">{currentArtist}</span>
+					<Icon src={BsX} size="14" />
+				</button>
+			{/if}
+			{#if currentAlpha}
+				<button
+					class="flex items-center gap-1.5 rounded-full border border-missionnaire/40 bg-missionnaire/10 px-3 py-1.5 text-xs font-semibold text-missionnaire"
+					onclick={() => handleAlphaChange(currentAlpha)}
+				>
+					<span>{$t('music.letterLabel', { letter: currentAlpha })}</span>
+					<Icon src={BsX} size="14" />
+				</button>
+			{/if}
+		</div>
+	{/if}
 
 	{#if activeMusicSong && !isActiveMusicSongVisible}
 		<div class="mb-4 border border-stone-300 bg-stone-100/80 px-4 py-3">
@@ -1111,69 +1139,71 @@
 		</div>
 	{/if}
 
-	<!-- Favorites & Recently Played (collapsed by default) -->
-	{#if $favorites.length > 0 || $recentlyPlayed.length > 0 || cachedCount > 0 || totalSongs > 0}
-		<div class="flex flex-wrap gap-1.5 md:gap-2 mb-6 {$mobileFiltersOpen ? '' : 'hidden md:flex'}">
-			{#if $favorites.length > 0}
-				<button
-					class="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-full border text-[10px] md:text-xs font-bold uppercase tracking-[0.12em] md:tracking-wider transition-colors whitespace-nowrap {showFavorites
-						? 'border-red-200 bg-red-50 text-red-600'
-						: 'border-stone-200 bg-white text-stone-500 hover:border-red-200 hover:text-red-500'}"
-					onclick={() => {
-						showFavorites = !showFavorites;
-						showRecent = false;
-						showCached = false;
-					}}
-				>
-					<Icon src={BsHeartFill} size="11" />
-					{$t('music.favoritesCount', { count: $favorites.length })}
-				</button>
-			{/if}
-			{#if $recentlyPlayed.length > 0}
-				<button
-					class="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-full border text-[10px] md:text-xs font-bold uppercase tracking-[0.12em] md:tracking-wider transition-colors whitespace-nowrap {showRecent
-						? 'border-stone-300 bg-stone-100 text-missionnaire'
-						: 'border-stone-200 bg-white text-stone-500 hover:border-stone-300 hover:text-missionnaire'}"
-					onclick={() => {
-						showRecent = !showRecent;
-						showFavorites = false;
-						showCached = false;
-					}}
-				>
-					<Icon src={BsClockHistory} size="11" />
-					{$t('music.recentsCount', { count: $recentlyPlayed.length })}
-				</button>
-			{/if}
-			<!-- ── BEGIN: cached filter button (added) ─────────────── -->
-			{#if cachedCount > 0}
-				<button
-					class="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-full border text-[10px] md:text-xs font-bold uppercase tracking-[0.12em] md:tracking-wider transition-colors whitespace-nowrap {showCached
-						? 'border-emerald-200 bg-emerald-50 text-emerald-600'
-						: 'border-stone-200 bg-white text-stone-500 hover:border-emerald-200 hover:text-emerald-600'}"
-					onclick={() => {
-						showCached = !showCached;
-						showFavorites = false;
-						showRecent = false;
-					}}
-				>
-					<Icon src={IoCloudDoneOutline} size="12" />
-					{$t('music.cachedCount', { count: cachedCount })}
-				</button>
-			{/if}
-			<!-- ── END: cached filter button ─────────────────────────── -->
-			<!-- Bulk download (current filtered list as .zip) -->
-			{#if totalSongs > 0}
-				<button
-					class="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-full border text-[10px] md:text-xs font-bold uppercase tracking-[0.12em] md:tracking-wider transition-colors whitespace-nowrap border-stone-200 bg-white text-stone-500 hover:border-missionnaire hover:text-missionnaire disabled:opacity-50 disabled:cursor-not-allowed"
-					onclick={openDownloadModal}
-					disabled={isDownloading}
-					title={$t('music.downloadAllTitle')}
-				>
-					<Icon src={AiOutlineDownload} size="12" />
-					{$t('music.downloadAll')}
-				</button>
+	<!-- ROW 3 — results summary with the quiet Favoris / Récents / En
+	     cache links right-aligned. The links open the same panels the
+	     old pill buttons did; Tout télécharger moved into the Filtres
+	     sheet. -->
+	<div class="mb-2 flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
+		<div class="min-w-0">
+			{#if hasResolvedMusicList}
+				<ResultsSummary
+					from={summaryFrom}
+					to={summaryTo}
+					total={totalSongs}
+					query={currentSearch}
+				/>
 			{/if}
 		</div>
+		{#if $favorites.length > 0 || $recentlyPlayed.length > 0 || cachedCount > 0}
+			<div class="ml-auto flex shrink-0 items-center gap-3 font-body text-[11px]">
+				{#if $favorites.length > 0}
+					<button
+						class="underline decoration-stone-300 underline-offset-2 transition-colors duration-150 {showFavorites
+							? 'font-semibold text-red-600 decoration-red-300'
+							: 'text-stone-500 hover:text-red-600'}"
+						aria-pressed={showFavorites}
+						onclick={() => {
+							showFavorites = !showFavorites;
+							showRecent = false;
+							showCached = false;
+						}}
+					>
+						{$t('music.favoritesCount', { count: $favorites.length })}
+					</button>
+				{/if}
+				{#if $recentlyPlayed.length > 0}
+					<button
+						class="underline decoration-stone-300 underline-offset-2 transition-colors duration-150 {showRecent
+							? 'font-semibold text-missionnaire decoration-missionnaire/40'
+							: 'text-stone-500 hover:text-missionnaire'}"
+						aria-pressed={showRecent}
+						onclick={() => {
+							showRecent = !showRecent;
+							showFavorites = false;
+							showCached = false;
+						}}
+					>
+						{$t('music.recentsCount', { count: $recentlyPlayed.length })}
+					</button>
+				{/if}
+				{#if cachedCount > 0}
+					<button
+						class="underline decoration-stone-300 underline-offset-2 transition-colors duration-150 {showCached
+							? 'font-semibold text-emerald-600 decoration-emerald-300'
+							: 'text-stone-500 hover:text-emerald-600'}"
+						aria-pressed={showCached}
+						onclick={() => {
+							showCached = !showCached;
+							showFavorites = false;
+							showRecent = false;
+						}}
+					>
+						{$t('music.cachedCount', { count: cachedCount })}
+					</button>
+				{/if}
+			</div>
+		{/if}
+	</div>
 
 		{#if showFavorites && $favorites.length > 0}
 			<div class="bg-white/40 border border-stone-200/60 mb-6 overflow-hidden">
@@ -1335,14 +1365,8 @@
 			</div>
 		{/if}
 		<!-- ── END: cached panel ──────────────────────────────────── -->
-	{/if}
 
 	<!-- Songs List -->
-	{#if hasResolvedMusicList}
-		<div class="mb-2">
-			<ResultsSummary from={summaryFrom} to={summaryTo} total={totalSongs} query={currentSearch} />
-		</div>
-	{/if}
 	<div class="bg-white/40 border border-stone-200/60 min-h-[500px] flex flex-col overflow-hidden">
 		<div
 			class="grid grid-cols-[24px_1fr_auto_auto] {desktopMusicGrid} gap-1.5 md:gap-3 lg:gap-4 px-2 md:px-3 lg:px-4 py-3 border-b border-stone-200/60 text-[10px] md:text-[11px] font-bold text-stone-400 uppercase tracking-widest bg-white/40"
@@ -1659,6 +1683,182 @@
 	{/if}
 </div>
 
+<!-- "Filtres" sheet — bottom sheet on mobile, centered panel on sm+.
+     Hosts everything that used to crowd the rows above the list: the
+     artist picker (old "Artiste" dropdown), the alphabet filter, sort
+     options, plus the Rafraîchir / Tout télécharger utilities. Each
+     choice routes through the existing handle*Change goto/URL handlers,
+     so a filter picked here applies exactly like the old inline panel.
+     Portalled to <body> for the same containing-block reason as the
+     download modal below. -->
+{#if filtersOpen}
+	<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+	<div
+		use:portal
+		class="fixed inset-0 z-[100] flex items-end justify-center bg-stone-900/50 backdrop-blur-sm sm:items-center sm:p-4"
+		onclick={(e) => {
+			if (e.target === e.currentTarget) closeFilters();
+		}}
+	>
+		<div
+			class="filters-sheet flex max-h-[85dvh] w-full max-w-md flex-col overflow-hidden border border-stone-200 bg-white shadow-2xl"
+			role="dialog"
+			aria-modal="true"
+			aria-label={$t('music.filters')}
+			use:focusTrap={{ onEscape: closeFilters }}
+		>
+			<div class="flex items-center justify-between border-b border-stone-100 px-5 py-4">
+				<p class="text-[10px] font-bold uppercase tracking-[0.25em] text-missionnaire">
+					{$t('music.filters')}
+				</p>
+				<button
+					class="p-1 text-stone-400 transition-colors duration-150 hover:text-stone-700"
+					onclick={closeFilters}
+					aria-label={$t('misc.close')}
+				>
+					<Icon src={BsX} size="20" />
+				</button>
+			</div>
+
+			<div class="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">
+				<!-- Sort -->
+				<section>
+					<h3 class="mb-2 text-[10px] font-bold uppercase tracking-widest text-stone-400">
+						{$t('music.sortBy')}
+					</h3>
+					<div class="flex flex-wrap gap-2">
+						<button
+							class="inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[11px] font-bold uppercase tracking-[0.08em] transition-colors duration-150 {isRandomListOrder
+								? 'bg-missionnaire border-missionnaire text-white'
+								: 'border-stone-200 bg-white text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
+							aria-pressed={isRandomListOrder}
+							onclick={() => handleSortChange('random')}
+						>
+							<Icon src={BsShuffle} size="11" />
+							{$t('music.sortRandom')}
+						</button>
+						{#each [{ prop: 'uploaded_at', label: $t('music.sortNewest') }, { prop: 'title', label: $t('list.title') }, { prop: 'artist', label: $t('music.artist') }, { prop: 'category', label: $t('music.collection') }, { prop: 'duration', label: $t('list.duration') }] as option}
+							{@const isActiveSort = currentSort.startsWith(option.prop)}
+							<button
+								class="inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[11px] font-bold uppercase tracking-[0.08em] transition-colors duration-150 {isActiveSort
+									? 'bg-missionnaire border-missionnaire text-white'
+									: 'border-stone-200 bg-white text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
+								aria-pressed={isActiveSort}
+								onclick={() => handleSortChange(option.prop)}
+							>
+								{option.label}
+								{#if isActiveSort}
+									<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="11" />
+								{/if}
+							</button>
+						{/each}
+					</div>
+				</section>
+
+				<!-- Alphabet -->
+				<section>
+					<h3 class="mb-2 text-[10px] font-bold uppercase tracking-widest text-stone-400">
+						{$t('music.firstLetter')}
+					</h3>
+					<div class="grid grid-cols-7 gap-1.5">
+						{#each alphabet as letter}
+							<button
+								class="flex h-9 items-center justify-center border text-xs font-bold transition-colors duration-150 {currentAlpha ===
+								letter
+									? 'bg-missionnaire border-missionnaire text-white'
+									: 'border-stone-200 bg-white text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
+								aria-pressed={currentAlpha === letter}
+								onclick={() => {
+									handleAlphaChange(letter);
+									closeFilters();
+								}}
+							>
+								{letter}
+							</button>
+						{/each}
+					</div>
+				</section>
+
+				<!-- Artist picker (moved here from the old "Artiste" dropdown) -->
+				<section>
+					<h3 class="mb-2 text-[10px] font-bold uppercase tracking-widest text-stone-400">
+						{$t('music.artist')}
+					</h3>
+					<div class="mb-2 flex items-center gap-2 border border-stone-200 bg-stone-50 px-2.5 py-2">
+						<Icon src={BsSearch} size="12" color="#999" />
+						<input
+							type="text"
+							placeholder={$t('music.searchArtist')}
+							class="w-full border-none bg-transparent font-body text-sm text-stone-700 outline-none placeholder:text-stone-400"
+							bind:value={artistSearch}
+						/>
+					</div>
+					<div class="max-h-48 space-y-1 overflow-y-auto custom-scrollbar">
+						{#if filteredArtists.length === 0}
+							<div class="px-3 py-4 text-center text-xs italic text-stone-400">
+								{$t('music.noArtistFound')}
+							</div>
+						{:else}
+							<button
+								class="w-full px-3 py-2 text-left text-xs font-bold transition-colors duration-150 {!currentArtist
+									? 'bg-stone-100 text-missionnaire'
+									: 'text-stone-500 hover:bg-stone-50'}"
+								onclick={() => {
+									handleArtistChange('');
+									closeFilters();
+								}}
+							>
+								{$t('music.allArtists')}
+							</button>
+							{#each filteredArtists as artist}
+								<button
+									class="w-full px-3 py-2 text-left text-xs font-medium transition-colors duration-150 {currentArtist ===
+									artist
+										? 'bg-stone-100 font-bold text-missionnaire'
+										: 'text-stone-600 hover:bg-stone-50'}"
+									onclick={() => {
+										handleArtistChange(artist);
+										closeFilters();
+									}}
+								>
+									{artist}
+								</button>
+							{/each}
+						{/if}
+					</div>
+				</section>
+			</div>
+
+			<!-- Utilities (moved from the old pill row) -->
+			<div class="flex items-center gap-2 border-t border-stone-100 bg-stone-50/50 px-5 py-3">
+				<button
+					class="inline-flex h-10 flex-1 items-center justify-center gap-1.5 border border-stone-200 bg-white px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-stone-600 transition-colors duration-150 hover:border-missionnaire hover:text-missionnaire"
+					onclick={() => {
+						closeFilters();
+						refreshRandomList();
+					}}
+					title={$t('music.refreshRandom')}
+				>
+					<Icon src={BsShuffle} size="11" />
+					{$t('music.refresh')}
+				</button>
+				<button
+					class="inline-flex h-10 flex-1 items-center justify-center gap-1.5 border border-stone-200 bg-white px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-stone-600 transition-colors duration-150 hover:border-missionnaire hover:text-missionnaire disabled:cursor-not-allowed disabled:opacity-50"
+					onclick={() => {
+						closeFilters();
+						openDownloadModal();
+					}}
+					disabled={isDownloading || totalSongs === 0}
+					title={$t('music.downloadAllTitle')}
+				>
+					<Icon src={AiOutlineDownload} size="12" />
+					{$t('music.downloadAll')}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
 <!-- Bulk-download modal. Single dialog used for confirm + progress + done.
      Portalled to <body> because `.page-fade-in` (the layout wrapper) uses
      a CSS transform, which makes it a containing block for `position: fixed`
@@ -1823,6 +2023,30 @@
 {/if}
 
 <style>
+	/* Filtres sheet entrance: quick slide-up from the bottom edge on
+	   mobile (where it is a bottom sheet). Kept under 200ms and disabled
+	   entirely for prefers-reduced-motion. */
+	.filters-sheet {
+		animation: sheet-up 0.18s ease-out;
+	}
+
+	@keyframes sheet-up {
+		from {
+			transform: translateY(24px);
+			opacity: 0.5;
+		}
+		to {
+			transform: translateY(0);
+			opacity: 1;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.filters-sheet {
+			animation: none;
+		}
+	}
+
 	/* Hide scrollbar for Chrome, Safari and Opera */
 	.no-scrollbar::-webkit-scrollbar {
 		display: none;

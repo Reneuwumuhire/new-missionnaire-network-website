@@ -6,8 +6,6 @@
 	import { goto } from '$app/navigation';
 	import { t } from '../../i18n';
 	import LoadingRing from '$lib/components/LoadingRing.svelte';
-	import MobileListToolbar from '$lib/components/+mobileListToolbar.svelte';
-	import { mobileSearchOpen } from '$lib/stores/mobileControls';
 
 	let { data, children } = $props();
 	let heroSearchValue = $state((data as any).search || '');
@@ -204,40 +202,10 @@
 	</div>
 </header>
 
-<!-- Mobile compact toolbar: collapses the search + filters so the song
-     list is the first thing the listener sees. Desktop keeps the inline
-     header search. -->
-<MobileListToolbar />
-{#if $mobileSearchOpen}
-	<div class="md:hidden border-b border-stone-200 bg-cream px-4 py-3">
-		<div class="relative">
-			<!-- svelte-ignore a11y_autofocus -->
-			<input
-				type="search"
-				class="w-full min-h-11 rounded-lg border border-stone-200 bg-white py-2.5 pl-10 pr-3 text-base font-body text-stone-800 outline-none placeholder:text-stone-400 focus:border-missionnaire/40 focus:ring-2 focus:ring-missionnaire/30"
-				placeholder={$t('music.searchPlaceholder')}
-				bind:value={heroSearchValue}
-				autofocus
-			/>
-			<svg
-				class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
-				width="16"
-				height="16"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2.2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				aria-hidden="true"
-			>
-				<circle cx="11" cy="11" r="7" />
-				<line x1="21" y1="21" x2="16.65" y2="16.65" />
-			</svg>
-		</div>
-	</div>
-{/if}
-
+<!-- Mobile search + filters now live on the page itself: a collections
+     pill row directly under this band, then a slim search + Filtres
+     utility bar (see musique/+page.svelte). Desktop keeps the inline
+     header search above. -->
 <div class="flex h-auto w-full flex-row justify-center overflow-x-hidden pt-4 pb-32 md:pt-10 md:pb-16">
 	<div class="flex w-full max-w-7xl flex-col px-2 md:px-5">
 		{@render children?.()}
