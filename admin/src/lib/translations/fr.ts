@@ -63,6 +63,8 @@ export default {
 	'auth.password': 'Mot de passe',
 	'auth.loggingIn': 'Connexion...',
 	'auth.login': 'Se connecter',
+	'auth.tooManyAttempts':
+		'Trop de tentatives de connexion. Veuillez réessayer dans une quinzaine de minutes.',
 
 	// ── Audio library (list) ────────────────────────────────────
 	'audio.pageTitle': 'Bibliothèque audio - Missionnaire Admin',
@@ -113,6 +115,8 @@ export default {
 	'lyrics.review.loading': 'Chargement des correspondances...',
 	'lyrics.review.songsCount': '{count} chants',
 	'lyrics.review.summaryLine': '{likely} probables / {candidate} candidats / {needsReview} à revoir',
+	'lyrics.review.renderedCount': '{shown} affichés sur {total}',
+	'lyrics.review.showMore': 'Afficher plus ({count} restants)',
 	'lyrics.review.selectedOne': '{count} sélectionné',
 	'lyrics.review.selectedMany': '{count} sélectionnés',
 	'lyrics.review.visibleCount': '{count} visibles',

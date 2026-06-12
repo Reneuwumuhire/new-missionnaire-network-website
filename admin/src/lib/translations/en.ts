@@ -64,6 +64,7 @@ const en: Record<keyof typeof fr, string> = {
 	'auth.password': 'Password',
 	'auth.loggingIn': 'Signing in...',
 	'auth.login': 'Sign in',
+	'auth.tooManyAttempts': 'Too many login attempts. Please try again in about 15 minutes.',
 
 	// ── Audio library (list) ────────────────────────────────────
 	'audio.pageTitle': 'Audio library - Missionnaire Admin',
@@ -114,6 +115,8 @@ const en: Record<keyof typeof fr, string> = {
 	'lyrics.review.loading': 'Loading matches...',
 	'lyrics.review.songsCount': '{count} songs',
 	'lyrics.review.summaryLine': '{likely} likely / {candidate} candidates / {needsReview} to review',
+	'lyrics.review.renderedCount': 'showing {shown} of {total}',
+	'lyrics.review.showMore': 'Show more ({count} remaining)',
 	'lyrics.review.selectedOne': '{count} selected',
 	'lyrics.review.selectedMany': '{count} selected',
 	'lyrics.review.visibleCount': '{count} visible',

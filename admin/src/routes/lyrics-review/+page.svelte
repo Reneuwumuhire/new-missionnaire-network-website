@@ -64,6 +64,17 @@
 	let bulkSaving = false;
 	let selectedAudioIds = new Set<string>();
 
+	// Windowed rendering: the dataset (CSV + Mongo overlays) must be fully
+	// loaded client-side anyway — the summary cards, the three filters and the
+	// bulk-selection workflows all operate on the complete set. The actual cost
+	// of 1000s of rows is the DOM, so we only RENDER the first 50 filtered rows
+	// and lazy-render more as the table scrolls (plus an explicit button as a
+	// keyboard/fallback path). Filters and "select visible" keep their exact
+	// current semantics over the full filtered set.
+	const RENDER_PAGE_SIZE = 50;
+	let renderLimit = RENDER_PAGE_SIZE;
+	let lastFilterKey = '';
+
 	onMount(() => {
 		reviewerName = localStorage.getItem('lyrics-reviewer-name') ?? '';
 		void loadRows();
@@ -107,6 +118,15 @@
 
 		return matchesSearch && matchesMatchFilter && matchesReviewFilter;
 	});
+	// Reset the render window whenever any filter changes so the user always
+	// starts from the top of the new result set.
+	$: filterKey = [search, matchFilter, reviewFilter].join(" ");
+	$: if (filterKey !== lastFilterKey) {
+		lastFilterKey = filterKey;
+		renderLimit = RENDER_PAGE_SIZE;
+	}
+	$: renderedRows = filteredRows.slice(0, renderLimit);
+	$: hasMoreRows = filteredRows.length > renderLimit;
 	$: selectedLyrics = selectedRow ? lyricsByRow[selectedRow.audio_id] : null;
 	$: selectedManualLyrics = selectedRow ? (manualLyricsByRow[selectedRow.audio_id] ?? '') : '';
 	$: selectedCount = selectedAudioIds.size;
@@ -147,6 +167,18 @@
 	function selectRow(row: ReviewRow) {
 		selectedAudioId = row.audio_id;
 		void loadLyrics(row);
+	}
+
+	function showMoreRows() {
+		renderLimit += RENDER_PAGE_SIZE;
+	}
+
+	function handleTableScroll(event: Event) {
+		if (!hasMoreRows) return;
+		const el = event.currentTarget as HTMLElement;
+		if (el.scrollTop + el.clientHeight >= el.scrollHeight - 400) {
+			renderLimit += RENDER_PAGE_SIZE;
+		}
 	}
 
 	function toggleRowSelection(row: ReviewRow, event: Event) {
@@ -859,6 +891,12 @@
 								candidate: summary.candidate,
 								needsReview: summary.needsReview
 							})}
+							{#if hasMoreRows}
+								· {$t('lyrics.review.renderedCount', {
+									shown: renderedRows.length,
+									total: filteredRows.length
+								})}
+							{/if}
 						</p>
 					</div>
 
@@ -930,7 +968,7 @@
 					{/if}
 				</div>
 
-				<div class="max-h-[72vh] overflow-auto">
+				<div class="max-h-[72vh] overflow-auto" on:scroll={handleTableScroll}>
 					<table class="w-full border-collapse text-left text-sm">
 						<thead
 							class="sticky top-0 z-10 border-b border-stone-200/60 bg-cream/90 text-[11px] uppercase tracking-[0.12em] text-stone-500 backdrop-blur"
@@ -953,7 +991,7 @@
 							</tr>
 						</thead>
 						<tbody>
-							{#each filteredRows as row (row.audio_id)}
+							{#each renderedRows as row (row.audio_id)}
 								<tr
 									class="cursor-pointer border-b border-stone-100 transition {selectedAudioId ===
 									row.audio_id
@@ -1032,6 +1070,17 @@
 									</td>
 								</tr>
 							{/each}
+							{#if hasMoreRows}
+								<tr>
+									<td class="px-4 py-4 text-center" colspan="5">
+										<button class="admin-btn-secondary" on:click={showMoreRows} type="button">
+											{$t('lyrics.review.showMore', {
+												count: filteredRows.length - renderedRows.length
+											})}
+										</button>
+									</td>
+								</tr>
+							{/if}
 						</tbody>
 					</table>
 				</div>

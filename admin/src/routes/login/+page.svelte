@@ -32,7 +32,7 @@
 				<div
 					class="mb-6 border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
 				>
-					{form.error}
+					{'errorIsKey' in form && form.errorIsKey ? $t('auth.tooManyAttempts') : form.error}
 				</div>
 			{/if}
 
