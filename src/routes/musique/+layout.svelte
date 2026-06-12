@@ -109,17 +109,21 @@
 			</div>
 
 			<div class="flex items-center justify-between gap-3 md:justify-end md:gap-4">
-				<!-- Desktop inline search — mobile uses the sticky toolbar below -->
+				<!-- Desktop inline search — mobile uses the sticky toolbar below.
+				     White field (same refined feel as the prédications band),
+				     h-11 to match the segmented control next to it, orange
+				     focus ring, native autofill suppressed. -->
 				<form
-					class="hidden h-10 w-64 items-center border border-white/20 bg-white/10 transition-colors duration-150 focus-within:border-missionnaire/70 focus-within:bg-white/15 md:flex lg:w-80"
+					class="hidden h-11 w-64 items-center overflow-hidden border border-white/15 bg-white shadow-sm transition-shadow duration-150 focus-within:ring-2 focus-within:ring-missionnaire/80 md:flex lg:w-80"
 					role="search"
+					autocomplete="off"
 					onsubmit={(e) => {
 						e.preventDefault();
 						void handleHeroSearch();
 					}}
 				>
 					<svg
-						class="ml-3 shrink-0 text-white/40"
+						class="ml-3 shrink-0 text-stone-400"
 						width="14"
 						height="14"
 						viewBox="0 0 24 24"
@@ -134,11 +138,16 @@
 						<line x1="21" y1="21" x2="16.65" y2="16.65" />
 					</svg>
 					<input
-						id="hero-search"
+						id="musique-band-search"
+						name="musique-band-search"
 						type="text"
-						class="min-w-0 flex-1 bg-transparent px-2.5 font-body text-sm text-white outline-none placeholder:text-white/40"
+						class="min-w-0 flex-1 bg-transparent px-2.5 font-body text-sm text-stone-800 outline-none placeholder:text-stone-400"
 						placeholder={$t('music.searchPlaceholder')}
 						aria-label={$t('music.searchPlaceholder')}
+						autocomplete="off"
+						autocorrect="off"
+						autocapitalize="off"
+						spellcheck="false"
 						bind:value={heroSearchValue}
 					/>
 					{#if isHeroSearchLoading}
@@ -151,7 +160,7 @@
 							type="button"
 							aria-label={$t('music.clearSearch')}
 							title={$t('music.clearSearch')}
-							class="mr-1.5 flex h-7 w-7 shrink-0 items-center justify-center text-white/50 transition-colors duration-150 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/50"
+							class="mr-1.5 flex h-7 w-7 shrink-0 items-center justify-center text-stone-400 transition-colors duration-150 hover:text-stone-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/50"
 							onclick={() => {
 								heroSearchValue = '';
 							}}
@@ -173,15 +182,16 @@
 					{/if}
 				</form>
 
-				<!-- Audio / Vidéos segmented control -->
+				<!-- Audio / Vidéos segmented control — h-11 on md+ so it sits on
+				     the same baseline as the inline search field beside it. -->
 				<nav
-					class="inline-flex shrink-0 border border-white/25 bg-white/5 p-0.5"
+					class="inline-flex shrink-0 items-stretch border border-white/25 bg-white/5 p-0.5 md:h-11 md:p-1"
 					aria-label="Audio ou vidéos"
 				>
 					<a
 						href="/musique"
 						aria-current={isAudioActive ? 'page' : undefined}
-						class="px-4 py-1.5 font-body text-[10px] font-bold uppercase tracking-[0.15em] transition-colors duration-150 md:px-5 {isAudioActive
+						class="inline-flex items-center px-4 py-1.5 font-body text-[10px] font-bold uppercase tracking-[0.15em] transition-colors duration-150 md:px-5 md:py-0 {isAudioActive
 							? 'bg-missionnaire text-white'
 							: 'text-white/65 hover:bg-white/10 hover:text-white'}"
 					>
@@ -190,7 +200,7 @@
 					<a
 						href="/musique/videos"
 						aria-current={!isAudioActive ? 'page' : undefined}
-						class="px-4 py-1.5 font-body text-[10px] font-bold uppercase tracking-[0.15em] transition-colors duration-150 md:px-5 {!isAudioActive
+						class="inline-flex items-center px-4 py-1.5 font-body text-[10px] font-bold uppercase tracking-[0.15em] transition-colors duration-150 md:px-5 md:py-0 {!isAudioActive
 							? 'bg-missionnaire text-white'
 							: 'text-white/65 hover:bg-white/10 hover:text-white'}"
 					>

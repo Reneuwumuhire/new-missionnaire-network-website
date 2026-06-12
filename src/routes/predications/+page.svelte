@@ -5,7 +5,8 @@
 	import type { Sermon } from '$lib/models/sermon';
 	import type { PublishedRecording } from '$lib/server/recordings';
 	import { basePlaylist, playlist, isShuffle } from '$lib/stores/global';
-	import { mobileFiltersOpen } from '$lib/stores/mobileControls';
+	import { portal } from '$lib/actions/portal';
+	import { focusTrap } from '$lib/actions/focusTrap';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import BsSearch from 'svelte-icons-pack/bs/BsSearch';
@@ -20,7 +21,7 @@
 	import ListSkeleton from '$lib/components/ListSkeleton.svelte';
 	import ErrorCard from '$lib/components/ErrorCard.svelte';
 	import ResultsSummary from '$lib/components/ResultsSummary.svelte';
-	import { onDestroy, untrack } from 'svelte';
+	import { onDestroy, onMount, tick, untrack } from 'svelte';
 	import {
 		areAuthorsFresh,
 		areYearsFresh,
@@ -98,6 +99,97 @@
 	const desktopSermonGrid = 'md:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.35fr)_110px_80px_120px]';
 	const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 	let authors = $derived(['Tous', ...(availableAuthors ?? [])]);
+
+	// "Filtres" sheet — bottom sheet on mobile, centered dialog on sm+
+	// (same pattern as /musique). Hosts the alphabet, years, language and
+	// audio-only filters; every choice routes through the existing
+	// handle*Change URL handlers, so filters behave exactly as before.
+	let filtersOpen = $state(false);
+
+	function openFilters() {
+		filtersOpen = true;
+	}
+
+	function closeFilters() {
+		filtersOpen = false;
+	}
+
+	// Badge on the "Filtres" button: how many sheet-managed filters are
+	// currently narrowing the list (the preacher has its own pill row).
+	let activeFilterCount = $derived(
+		(currentAlpha ? 1 : 0) +
+			(currentYear ? 1 : 0) +
+			(currentLanguage === 'english' ? 1 : 0) +
+			(currentHasAudio ? 1 : 0)
+	);
+
+	// Preacher pill row scroll affordance (edge fade), mirroring the
+	// Recueils row on /musique.
+	let pillsScrollEl: HTMLDivElement | undefined = $state();
+	let pillsCanLeft = $state(false);
+	let pillsCanRight = $state(true);
+
+	function updatePillsScrollState() {
+		if (!pillsScrollEl) return;
+		const { scrollLeft, clientWidth, scrollWidth } = pillsScrollEl;
+		pillsCanLeft = scrollLeft > 4;
+		pillsCanRight = scrollLeft + clientWidth < scrollWidth - 4;
+	}
+
+	onMount(() => {
+		updatePillsScrollState();
+	});
+
+	// Authors arrive async on cold loads — recompute the edge fade once
+	// the pill row has re-rendered with the full list.
+	$effect(() => {
+		void authors.length;
+		void tick().then(updatePillsScrollState);
+	});
+
+	// Debounced list search for the utility bar (mobile only; desktop keeps
+	// the header band's inline search). Same 300ms debounce and URL params
+	// as the layout's hero search, so both inputs stay in sync via the URL.
+	let searchInput = $state(((data as any).search || '') as string);
+	let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+	let lastSyncedListSearch = $state(((data as any).search || '') as string);
+
+	function applyListSearch() {
+		const params = new URLSearchParams($page.url.searchParams);
+		const value = (searchInput || '').trim();
+		if (value) params.set('search', value);
+		else params.delete('search');
+		params.delete('alpha');
+		params.delete('year');
+		params.set('page', '1');
+		goto(`?${params.toString()}`, { keepFocus: true, noScroll: true });
+	}
+
+	function onSearchInput() {
+		if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+		searchDebounceTimer = setTimeout(() => {
+			if ((searchInput || '').trim() !== (currentSearch || '')) applyListSearch();
+		}, 300);
+	}
+
+	function clearListSearch() {
+		if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+		searchInput = '';
+		if (currentSearch) applyListSearch();
+	}
+
+	// Keep the utility-bar search in step with the URL (e.g. when the
+	// desktop band search or a back/forward navigation changes it),
+	// without stomping on in-progress typing.
+	$effect(() => {
+		const urlSearch = currentSearch || '';
+		if (urlSearch !== lastSyncedListSearch) {
+			searchInput = urlSearch;
+			untrack(() => {
+				lastSyncedListSearch = urlSearch;
+			});
+		}
+	});
 
 	function abortRequest() {
 		abortController?.abort();
@@ -306,7 +398,10 @@
 		}
 	});
 
-	onDestroy(() => abortRequest());
+	onDestroy(() => {
+		if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+		abortRequest();
+	});
 
 	$effect(() => {
 		if (playlistSermons.length > 0) {
@@ -375,32 +470,39 @@
 	}
 </script>
 
-<svelte:head>
-	<title>Prédications - Missionnaire Network</title>
-	<meta
-		name="description"
-		content="Explorez les prédications du Message par auteur, année, langue et thème. Lecture audio et recherche rapide sur Missionnaire Network."
-	/>
-	<meta property="og:title" content="Prédications - Missionnaire Network" />
-	<meta
-		property="og:description"
-		content="Consultez les prédications de William Branham, Ewald Frank et de l'église locale."
-	/>
-	<link rel="canonical" href="https://missionnaire.net/predications" />
-</svelte:head>
+<!-- Title/description/og:*/canonical come from `meta` in this route's
+     load — the root layout renders the single canonical tag set ($lib/seo). -->
 
 <div class="w-full max-w-6xl mx-auto px-4 pt-0 pb-8 md:px-6">
-	<!-- Page Header -->
-	<div class="mb-6 md:mb-8">
-		<p class="text-[10px] font-semibold uppercase tracking-[0.3em] text-missionnaire mb-3 font-body">
-			Missionnaire Network
-		</p>
-		<h1 class="font-display text-4xl md:text-5xl font-semibold tracking-tight leading-[1.05] text-stone-900">
-			{$t('nav.predications')}
-		</h1>
+	<!-- Content-type tabs: classic sermons vs recorded live broadcasts.
+	     Page identity now lives in the layout's compact band; the video
+	     cross-link sits beside the tabs instead of a second header. -->
+	<div class="mb-4 md:mb-5 flex items-center justify-between gap-3 border-b border-stone-200/60">
+		<div class="flex items-center gap-0" role="tablist" aria-label={$t('predications.contentType')}>
+			<button
+				role="tab"
+				aria-selected={currentAuthor !== 'Retransmissions'}
+				class="px-4 md:px-6 py-3 min-h-11 text-[12px] md:text-[13px] font-bold uppercase tracking-[0.15em] font-body border-b-2 -mb-px transition-colors {currentAuthor !== 'Retransmissions'
+					? 'border-missionnaire text-missionnaire'
+					: 'border-transparent text-stone-400 hover:text-stone-600'}"
+				onclick={() => handleAuthorChange('Tous')}
+			>
+				{$t('misc.sermonBadge')}s
+			</button>
+			<button
+				role="tab"
+				aria-selected={currentAuthor === 'Retransmissions'}
+				class="px-4 md:px-6 py-3 min-h-11 text-[12px] md:text-[13px] font-bold uppercase tracking-[0.15em] font-body border-b-2 -mb-px transition-colors {currentAuthor === 'Retransmissions'
+					? 'border-missionnaire text-missionnaire'
+					: 'border-transparent text-stone-400 hover:text-stone-600'}"
+				onclick={() => handleAuthorChange('Retransmissions')}
+			>
+				{$t('misc.retransmissionBadge')}s
+			</button>
+		</div>
 		<a
 			href="/videos"
-			class="inline-flex items-center gap-2 mt-3 text-[12px] font-semibold text-stone-400 hover:text-missionnaire uppercase tracking-[0.15em] font-body transition-all duration-200 hover:translate-x-0.5"
+			class="inline-flex shrink-0 items-center gap-2 text-[10px] md:text-[11px] font-semibold text-stone-400 hover:text-missionnaire uppercase tracking-[0.15em] font-body transition-all duration-200 hover:translate-x-0.5"
 		>
 			<svg
 				width="14"
@@ -411,6 +513,7 @@
 				stroke-width="2"
 				stroke-linecap="round"
 				stroke-linejoin="round"
+				aria-hidden="true"
 				><polygon points="23 7 16 12 23 17 23 7" /><rect
 					x="1"
 					y="5"
@@ -424,159 +527,165 @@
 		</a>
 	</div>
 
-	<!-- Content-type tabs: classic sermons vs recorded live broadcasts.
-	     "Retransmissions" used to hide as a pseudo-author chip; non-technical
-	     visitors never found it. -->
-	<div class="flex items-center gap-0 mb-6 border-b border-stone-200/60" role="tablist" aria-label={$t('predications.contentType')}>
-		<button
-			role="tab"
-			aria-selected={currentAuthor !== 'Retransmissions'}
-			class="px-4 md:px-6 py-3 min-h-11 text-[12px] md:text-[13px] font-bold uppercase tracking-[0.15em] font-body border-b-2 -mb-px transition-colors {currentAuthor !== 'Retransmissions'
-				? 'border-missionnaire text-missionnaire'
-				: 'border-transparent text-stone-400 hover:text-stone-600'}"
-			onclick={() => handleAuthorChange('Tous')}
+	<!-- ROW 1 — Preachers: THE primary filter, music-app style pill row
+	     directly under the tabs (mirrors the Recueils row on /musique).
+	     The active pill is solid missionnaire orange; edge fade hints at
+	     horizontal scrollability. -->
+	<div
+		class="preachers-scroll relative -mx-4 md:mx-0"
+		class:can-scroll-left={pillsCanLeft}
+		class:can-scroll-right={pillsCanRight}
+	>
+		<div
+			bind:this={pillsScrollEl}
+			onscroll={updatePillsScrollState}
+			class="preachers-track flex overflow-x-auto gap-2 md:gap-2.5 no-scrollbar px-4 md:px-0 py-1 snap-x"
+			style="scrollbar-width: none; -ms-overflow-style: none;"
+			role="group"
+			aria-label={$t('predications.preachers')}
 		>
-			{$t('misc.sermonBadge')}s
-		</button>
-		<button
-			role="tab"
-			aria-selected={currentAuthor === 'Retransmissions'}
-			class="px-4 md:px-6 py-3 min-h-11 text-[12px] md:text-[13px] font-bold uppercase tracking-[0.15em] font-body border-b-2 -mb-px transition-colors {currentAuthor === 'Retransmissions'
-				? 'border-missionnaire text-missionnaire'
-				: 'border-transparent text-stone-400 hover:text-stone-600'}"
-			onclick={() => handleAuthorChange('Retransmissions')}
-		>
-			{$t('misc.retransmissionBadge')}s
-		</button>
-	</div>
-
-	<!-- Top Filters (Alpha & Authors) -->
-	<div class="flex flex-col gap-6 mb-6 md:mb-8 {$mobileFiltersOpen ? '' : 'hidden md:flex'}">
-		{#if !blendedOnly}
-			<div>
-				<h2
-					class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.3em] mb-2 md:mb-3 text-center md:text-left font-body"
+			{#each authors as author}
+				{@const isActivePill =
+					(author === 'Tous' && !currentAuthor) || currentAuthor === author}
+				<button
+					class="snap-start flex-shrink-0 inline-flex items-center h-10 md:h-11 px-4 md:px-5 rounded-full border text-[11px] md:text-xs font-bold uppercase tracking-[0.1em] md:tracking-wider transition-colors duration-150 {isActivePill
+						? 'bg-missionnaire border-missionnaire text-white shadow-sm'
+						: 'bg-white/60 text-stone-600 border-stone-200 hover:border-missionnaire hover:text-missionnaire'}"
+					aria-pressed={isActivePill}
+					onclick={() => handleAuthorChange(author)}
 				>
-					{$t('predications.alphabetical')}
-				</h2>
-				<div
-					class="-mx-4 px-4 flex flex-nowrap overflow-x-auto no-scrollbar gap-x-3 md:mx-0 md:px-0 md:flex-wrap md:overflow-visible md:gap-x-4 md:gap-y-2"
-				>
-					{#each alphabet as letter}
-						<button
-							class="shrink-0 px-1.5 py-2 md:py-0 text-xs md:text-[11px] font-body font-bold transition-all {currentAlpha === letter
-								? 'text-missionnaire font-semibold'
-								: 'text-stone-400 hover:text-missionnaire'}"
-							onclick={() => handleAlphaChange(letter)}
-						>
-							{letter}
-						</button>
-					{/each}
-				</div>
-			</div>
-		{/if}
-
-		<div>
-			<h2
-				class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.3em] mb-2 md:mb-3 text-center md:text-left font-body"
-			>
-				{$t('predications.preachers')}
-			</h2>
-			<div
-				class="flex flex-wrap justify-center gap-2 pb-2 md:flex-nowrap md:overflow-x-auto md:gap-3 md:justify-start no-scrollbar"
-			>
-				{#each authors as author}
-					<button
-						class="flex-shrink-0 px-3 py-2 md:px-5 md:py-2.5 text-[10px] md:text-[11px] font-bold uppercase tracking-wider transition-all border {(author ===
-							'Tous' &&
-							!currentAuthor) ||
-						currentAuthor === author
-							? 'border-missionnaire text-missionnaire bg-missionnaire/10'
-							: 'bg-white/40 text-stone-500 border-stone-200/60 hover:border-missionnaire hover:text-missionnaire'}"
-						onclick={() => handleAuthorChange(author)}
-					>
-						{author === 'Tous' ? $t('misc.seeAllCap') : author}
-					</button>
-				{/each}
-			</div>
+					{author === 'Tous' ? $t('misc.seeAllCap') : author}
+				</button>
+			{/each}
 		</div>
-
-		{#if currentAuthor !== 'Retransmissions' && !blendedOnly}
-			<div>
-				<h2
-					class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.3em] mb-2 md:mb-3 text-center md:text-left font-body"
-				>
-					{$t('misc.options')}
-				</h2>
-				<div
-					class="flex flex-col md:flex-row gap-4 items-center justify-between bg-white/40 p-4 border border-stone-200/60"
-				>
-					<div class="flex items-center gap-4 w-full md:w-auto">
-						<div class="flex border border-stone-200 bg-stone-100/80 p-1">
-							<button
-								class="px-3 py-1.5 text-xs font-bold transition-all duration-200 active:scale-[0.98] {currentLanguage ===
-								'french'
-									? 'bg-white text-missionnaire shadow-sm'
-									: 'text-stone-500 hover:text-stone-700'}"
-								onclick={() => handleLanguageChange('french')}
-							>
-								{$t('lang.french')}
-							</button>
-							<button
-								class="px-3 py-1.5 text-xs font-bold transition-all duration-200 active:scale-[0.98] {currentLanguage ===
-								'english'
-									? 'bg-white text-missionnaire shadow-sm'
-									: 'text-stone-500 hover:text-stone-700'}"
-								onclick={() => handleLanguageChange('english')}
-							>
-								{$t('lang.english')}
-							</button>
-						</div>
-
-						<div class="h-6 w-px bg-stone-200"></div>
-
-						<button
-							class="flex items-center gap-2 px-3 py-1.5 text-xs font-bold transition-all duration-200 active:scale-[0.98] {currentHasAudio
-								? 'bg-missionnaire/10 text-missionnaire border border-missionnaire'
-								: 'bg-stone-50 text-stone-500 border border-stone-200 hover:border-missionnaire hover:text-missionnaire'}"
-							onclick={() => handleAudioFilterToggle()}
-						>
-							<Icon src={IoPlayCircle} size="16" />
-							{$t('predications.audioOnly')}
-						</button>
-					</div>
-				</div>
-			</div>
-		{/if}
 	</div>
 
-	<div class="flex flex-col md:flex-row gap-8">
-		{#if (sermons.length > 0 || (isListLoading && !hasResolvedList)) && years.length > 0}
-			<aside class="w-full md:w-56 flex-shrink-0 {$mobileFiltersOpen ? '' : 'hidden md:block'}">
-				<div class="bg-white/40 border border-stone-200/60 p-5 md:sticky md:top-24">
-					<h2
-						class="text-xs font-bold text-stone-800 uppercase tracking-widest mb-6 pb-2 border-b border-stone-200/60 font-body"
-					>
-						{$t('predications.years')}
-					</h2>
-					<div class="grid grid-cols-3 gap-2 max-h-[70vh] overflow-y-auto no-scrollbar pr-1">
-						{#each years as year}
-							<button
-								class="px-3 py-2 text-[11px] font-bold tabular-nums transition-all duration-200 active:scale-[0.98] border text-center {currentYear ===
-								year
-									? 'border-missionnaire text-missionnaire bg-missionnaire/10'
-									: 'bg-white/40 text-stone-400 border-stone-200/60 hover:border-missionnaire hover:text-missionnaire'}"
-								onclick={() => handleYearChange(year)}
-							>
-								{year}
-							</button>
-						{/each}
-					</div>
-				</div>
-			</aside>
-		{/if}
+	<!-- ROW 2 — slim utility bar: compact search (mobile only; desktop
+	     keeps the header band's inline search) + one "Filtres" button that
+	     opens the sheet (alphabet, years, language, audio-only). -->
+	<div class="mt-3 mb-3 md:mb-4 flex items-center gap-2 md:justify-end">
+		<div class="relative min-w-0 flex-1 md:hidden">
+			<svg
+				class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
+				width="14"
+				height="14"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2.2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<circle cx="11" cy="11" r="7" />
+				<line x1="21" y1="21" x2="16.65" y2="16.65" />
+			</svg>
+			<input
+				type="text"
+				inputmode="search"
+				enterkeyhint="search"
+				autocomplete="off"
+				class="h-10 w-full border border-stone-200 bg-white/70 pl-9 {searchInput
+					? 'pr-9'
+					: 'pr-3'} font-body text-sm text-stone-800 outline-none transition-colors duration-150 placeholder:text-stone-400 focus:border-missionnaire/60 focus:bg-white"
+				placeholder={$t('predications.searchPlaceholder')}
+				aria-label={$t('predications.searchPlaceholder')}
+				bind:value={searchInput}
+				oninput={onSearchInput}
+			/>
+			{#if searchInput}
+				<button
+					type="button"
+					class="absolute right-0 top-0 flex h-10 w-9 items-center justify-center text-stone-400 transition-colors duration-150 hover:text-stone-700"
+					aria-label={$t('predications.clearSearch')}
+					onclick={clearListSearch}
+				>
+					<Icon src={BsX} size="16" />
+				</button>
+			{/if}
+		</div>
+		<button
+			class="inline-flex h-10 shrink-0 items-center gap-2 border px-4 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors duration-150 {filtersOpen ||
+			activeFilterCount > 0
+				? 'border-missionnaire/60 bg-missionnaire/5 text-missionnaire'
+				: 'border-stone-200 bg-white/70 text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
+			aria-haspopup="dialog"
+			aria-expanded={filtersOpen}
+			onclick={openFilters}
+		>
+			<svg
+				viewBox="0 0 24 24"
+				width="13"
+				height="13"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2.2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<line x1="4" y1="6" x2="20" y2="6" />
+				<line x1="7" y1="12" x2="17" y2="12" />
+				<line x1="10" y1="18" x2="14" y2="18" />
+			</svg>
+			{$t('predications.filters')}
+			{#if activeFilterCount > 0}
+				<span
+					class="flex h-4 min-w-4 items-center justify-center rounded-full bg-missionnaire px-1 text-[9px] font-bold text-white"
+				>
+					{activeFilterCount}
+				</span>
+			{/if}
+		</button>
+	</div>
 
-		<div class="flex-1 min-w-0 relative">
+	<!-- Active sheet-filters as dismissible chips (the preacher state is
+	     already visible in the pill row above). -->
+	{#if currentAlpha || currentYear || currentLanguage === 'english' || currentHasAudio}
+		<div class="mb-3 flex flex-wrap gap-2">
+			{#if currentAlpha}
+				<button
+					class="flex items-center gap-1.5 rounded-full border border-missionnaire/40 bg-missionnaire/10 px-3 py-1.5 text-xs font-semibold text-missionnaire"
+					onclick={() => handleAlphaChange(currentAlpha)}
+				>
+					<span>{$t('predications.letterLabel', { letter: currentAlpha })}</span>
+					<Icon src={BsX} size="14" />
+				</button>
+			{/if}
+			{#if currentYear}
+				<button
+					class="flex items-center gap-1.5 rounded-full border border-missionnaire/40 bg-missionnaire/10 px-3 py-1.5 text-xs font-semibold text-missionnaire"
+					onclick={() => handleYearChange(currentYear)}
+				>
+					<span>{$t('predications.yearLabel', { year: currentYear })}</span>
+					<Icon src={BsX} size="14" />
+				</button>
+			{/if}
+			{#if currentLanguage === 'english'}
+				<button
+					class="flex items-center gap-1.5 rounded-full border border-missionnaire/40 bg-missionnaire/10 px-3 py-1.5 text-xs font-semibold text-missionnaire"
+					onclick={() => handleLanguageChange('french')}
+					title={$t('lang.french')}
+				>
+					<span>{$t('lang.english')}</span>
+					<Icon src={BsX} size="14" />
+				</button>
+			{/if}
+			{#if currentHasAudio}
+				<button
+					class="flex items-center gap-1.5 rounded-full border border-missionnaire/40 bg-missionnaire/10 px-3 py-1.5 text-xs font-semibold text-missionnaire"
+					onclick={() => handleAudioFilterToggle()}
+				>
+					<span>{$t('predications.audioOnly')}</span>
+					<Icon src={BsX} size="14" />
+				</button>
+			{/if}
+		</div>
+	{/if}
+
+	<!-- The years sidebar moved into the Filtres sheet — the list now
+	     takes the full width, like /musique. -->
+	<div class="relative">
 			{#if currentSearch || currentAlpha || currentYear || currentHasAudio || (currentAuthor && currentAuthor !== 'Tous')}
 				<div class="mb-3 flex justify-end">
 					<button
@@ -791,9 +900,150 @@
 					</div>
 				</section>
 			{/if}
-		</div>
 	</div>
 </div>
+
+<!-- "Filtres" sheet — bottom sheet on mobile, centered panel on sm+.
+     Hosts everything that used to crowd the rows above the list: the
+     alphabet filter, the years grid (old sidebar), the language toggle
+     and the audio-only toggle. Each choice routes through the existing
+     handle*Change goto/URL handlers, so a filter picked here applies
+     exactly like the old inline panels. Portalled to <body> because the
+     layout wrapper's transform makes it a containing block for
+     position: fixed. -->
+{#if filtersOpen}
+	<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+	<div
+		use:portal
+		class="fixed inset-0 z-[100] flex items-end justify-center bg-stone-900/50 backdrop-blur-sm sm:items-center sm:p-4"
+		onclick={(e) => {
+			if (e.target === e.currentTarget) closeFilters();
+		}}
+	>
+		<div
+			class="filters-sheet flex max-h-[85dvh] w-full max-w-md flex-col overflow-hidden border border-stone-200 bg-white shadow-2xl"
+			role="dialog"
+			aria-modal="true"
+			aria-label={$t('predications.filters')}
+			use:focusTrap={{ onEscape: closeFilters }}
+		>
+			<div class="flex items-center justify-between border-b border-stone-100 px-5 py-4">
+				<p class="text-[10px] font-bold uppercase tracking-[0.25em] text-missionnaire">
+					{$t('predications.filters')}
+				</p>
+				<button
+					class="p-1 text-stone-400 transition-colors duration-150 hover:text-stone-700"
+					onclick={closeFilters}
+					aria-label={$t('misc.close')}
+				>
+					<Icon src={BsX} size="20" />
+				</button>
+			</div>
+
+			<div class="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">
+				<!-- Alphabet -->
+				{#if !blendedOnly}
+					<section>
+						<h3 class="mb-2 text-[10px] font-bold uppercase tracking-widest text-stone-400">
+							{$t('predications.alphabetical')}
+						</h3>
+						<div class="grid grid-cols-7 gap-1.5">
+							{#each alphabet as letter}
+								<button
+									class="flex h-9 items-center justify-center border text-xs font-bold transition-colors duration-150 {currentAlpha ===
+									letter
+										? 'bg-missionnaire border-missionnaire text-white'
+										: 'border-stone-200 bg-white text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
+									aria-pressed={currentAlpha === letter}
+									onclick={() => {
+										handleAlphaChange(letter);
+										closeFilters();
+									}}
+								>
+									{letter}
+								</button>
+							{/each}
+						</div>
+					</section>
+				{/if}
+
+				<!-- Years (old sidebar) -->
+				{#if years.length > 0}
+					<section>
+						<h3 class="mb-2 text-[10px] font-bold uppercase tracking-widest text-stone-400">
+							{$t('predications.years')}
+						</h3>
+						<div class="grid max-h-56 grid-cols-4 gap-1.5 overflow-y-auto pr-1">
+							{#each years as year}
+								<button
+									class="flex h-9 items-center justify-center border text-xs font-bold tabular-nums transition-colors duration-150 {currentYear ===
+									year
+										? 'bg-missionnaire border-missionnaire text-white'
+										: 'border-stone-200 bg-white text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
+									aria-pressed={currentYear === year}
+									onclick={() => {
+										handleYearChange(year);
+										closeFilters();
+									}}
+								>
+									{year}
+								</button>
+							{/each}
+						</div>
+					</section>
+				{/if}
+
+				{#if currentAuthor !== 'Retransmissions' && !blendedOnly}
+					<!-- Language -->
+					<section>
+						<h3 class="mb-2 text-[10px] font-bold uppercase tracking-widest text-stone-400">
+							{$t('lang.label')}
+						</h3>
+						<div class="flex flex-wrap gap-2">
+							<button
+								class="inline-flex h-9 items-center rounded-full border px-3.5 text-[11px] font-bold uppercase tracking-[0.08em] transition-colors duration-150 {currentLanguage ===
+								'french'
+									? 'bg-missionnaire border-missionnaire text-white'
+									: 'border-stone-200 bg-white text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
+								aria-pressed={currentLanguage === 'french'}
+								onclick={() => handleLanguageChange('french')}
+							>
+								{$t('lang.french')}
+							</button>
+							<button
+								class="inline-flex h-9 items-center rounded-full border px-3.5 text-[11px] font-bold uppercase tracking-[0.08em] transition-colors duration-150 {currentLanguage ===
+								'english'
+									? 'bg-missionnaire border-missionnaire text-white'
+									: 'border-stone-200 bg-white text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
+								aria-pressed={currentLanguage === 'english'}
+								onclick={() => handleLanguageChange('english')}
+							>
+								{$t('lang.english')}
+							</button>
+						</div>
+					</section>
+
+					<!-- Audio only -->
+					<section>
+						<h3 class="mb-2 text-[10px] font-bold uppercase tracking-widest text-stone-400">
+							{$t('misc.options')}
+						</h3>
+						<button
+							class="inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[11px] font-bold uppercase tracking-[0.08em] transition-colors duration-150 {currentHasAudio
+								? 'bg-missionnaire border-missionnaire text-white'
+								: 'border-stone-200 bg-white text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
+							aria-pressed={!!currentHasAudio}
+							onclick={() => handleAudioFilterToggle()}
+						>
+							<Icon src={IoPlayCircle} size="14" />
+							{$t('predications.audioOnly')}
+						</button>
+					</section>
+				{/if}
+			</div>
+		</div>
+	</div>
+{/if}
 
 <style>
 	.no-scrollbar::-webkit-scrollbar {
@@ -802,5 +1052,66 @@
 	.no-scrollbar {
 		-ms-overflow-style: none;
 		scrollbar-width: none;
+	}
+
+	/* Filtres sheet entrance: quick slide-up from the bottom edge on
+	   mobile (where it is a bottom sheet). Kept under 200ms and disabled
+	   entirely for prefers-reduced-motion. Same as /musique. */
+	.filters-sheet {
+		animation: sheet-up 0.18s ease-out;
+	}
+
+	@keyframes sheet-up {
+		from {
+			transform: translateY(24px);
+			opacity: 0.5;
+		}
+		to {
+			transform: translateY(0);
+			opacity: 1;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.filters-sheet {
+			animation: none;
+		}
+	}
+
+	/* Edge-fade affordance for the horizontally scrollable Prédicateurs
+	   row — same treatment as the Recueils row on /musique. */
+	.preachers-scroll .preachers-track {
+		--fade: 28px;
+		-webkit-mask-image: linear-gradient(to right, #000 0, #000 100%);
+		mask-image: linear-gradient(to right, #000 0, #000 100%);
+	}
+	.preachers-scroll.can-scroll-right .preachers-track {
+		-webkit-mask-image: linear-gradient(
+			to right,
+			#000 0,
+			#000 calc(100% - var(--fade)),
+			transparent 100%
+		);
+		mask-image: linear-gradient(to right, #000 0, #000 calc(100% - var(--fade)), transparent 100%);
+	}
+	.preachers-scroll.can-scroll-left .preachers-track {
+		-webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fade), #000 100%);
+		mask-image: linear-gradient(to right, transparent 0, #000 var(--fade), #000 100%);
+	}
+	.preachers-scroll.can-scroll-left.can-scroll-right .preachers-track {
+		-webkit-mask-image: linear-gradient(
+			to right,
+			transparent 0,
+			#000 var(--fade),
+			#000 calc(100% - var(--fade)),
+			transparent 100%
+		);
+		mask-image: linear-gradient(
+			to right,
+			transparent 0,
+			#000 var(--fade),
+			#000 calc(100% - var(--fade)),
+			transparent 100%
+		);
 	}
 </style>
