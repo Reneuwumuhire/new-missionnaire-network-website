@@ -4,6 +4,7 @@ import { findSermonByIdentifier, normalizeSermon } from '$lib/server/sermonByIde
 import { buildSermonSlug } from '../../../utils/sermonSlug';
 import { getDb } from '../../../db/mongo';
 import { ObjectId } from 'mongodb';
+import { pageMeta } from '$lib/seo';
 
 export const load: PageServerLoad = async ({ params }) => {
 	const identifier = params.slug;
@@ -44,9 +45,26 @@ export const load: PageServerLoad = async ({ params }) => {
 		// Non-critical, just return empty
 	}
 
+	const normalized = normalizeSermon(sermon);
+
+	// Share preview (og:*/twitter:*) — rendered by the root layout as the
+	// single canonical tag set, mirroring the page's JSON-LD values.
+	const sermonTitle =
+		(normalized as any).french_title || (normalized as any).english_title || 'Prédication';
+	const sermonDate =
+		(normalized as any).full_date_code || (normalized as any).date_code || (normalized as any).iso_date || '';
+	const meta = pageMeta(`/predications/${canonicalSlug}`, {
+		title: `${sermonTitle} | Prédications - Missionnaire Network`,
+		description: `Écoutez la prédication "${sermonTitle}"${
+			sermonDate ? ` (${sermonDate})` : ''
+		} sur Missionnaire Network.`,
+		type: 'article'
+	});
+
 	return {
-		sermon: normalizeSermon(sermon),
+		sermon: normalized,
 		canonicalSlug,
-		relatedSermons
+		relatedSermons,
+		meta
 	};
 };

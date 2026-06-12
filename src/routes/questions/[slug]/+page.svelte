@@ -3,7 +3,6 @@
 	import Breadcrumbs from '$lib/components/+breadcrumbs.svelte';
 	import FormattedQuestionText from '$lib/components/questions/FormattedQuestionText.svelte';
 	import QuestionReferenceCards from '$lib/components/questions/QuestionReferenceCards.svelte';
-	import { stripRichTextFormatting } from '$lib/questions/rich-text';
 	import type { ActionData, PageData } from './$types';
 	// @ts-ignore - svelte-icons-pack ships loose icon typings in this project.
 	import Icon from 'svelte-icons-pack/Icon.svelte';
@@ -24,7 +23,6 @@
 	let replies = $derived(data.replies || []);
 	let questionReferences = $derived(data.references.filter((reference) => !reference.replyId));
 	let answerReferences = $derived(data.references.filter((reference) => reference.replyId));
-	let seoDescription = $derived(stripRichTextFormatting(question.body).slice(0, 155));
 	let isAdminUser = $derived(data.user?.role === 'superadmin' || data.user?.role === 'editor');
 	let replyDisplayName = $derived(form?.replyDisplayName ?? (!isAdminUser && data.user ? data.user.name : ''));
 	let statusLabel = $derived(question.status === 'answered' ? 'Répondue' : 'Publiée');
@@ -139,13 +137,8 @@
 	</svg>
 {/snippet}
 
-<svelte:head>
-	<title>{question.title} - Questions et réponses</title>
-	<meta name="description" content={seoDescription} />
-	<link rel="canonical" href={`https://missionnaire.net/questions/${question.slug}`} />
-	<meta property="og:title" content={question.title} />
-	<meta property="og:description" content={seoDescription} />
-</svelte:head>
+<!-- Title/description/og:*/canonical come from `meta` in this route's
+     load — the root layout renders the single canonical tag set ($lib/seo). -->
 
 <div class="container mx-auto max-w-5xl px-4 py-6 md:px-8 md:py-8">
 	<Breadcrumbs items={[{ label: 'Questions', href: '/questions' }, { label: question.title }]} />

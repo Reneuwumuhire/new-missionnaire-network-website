@@ -268,18 +268,8 @@
 	onDestroy(() => abortRequest());
 </script>
 
-<svelte:head>
-	<title>Transcriptions - Missionnaire Network</title>
-	<meta
-		name="description"
-		content="Recherchez les transcriptions des prédications par année et par titre sur Missionnaire Network."
-	/>
-	<meta property="og:title" content="Transcriptions - Missionnaire Network" />
-	<meta
-		property="og:description"
-		content="Bibliothèque de transcriptions du Message pour étude et édification."
-	/>
-</svelte:head>
+<!-- Title/description/og:*/canonical come from `meta` in this route's
+     load — the root layout renders the single canonical tag set ($lib/seo). -->
 
 <div class="container mx-auto px-2 pt-4 pb-4 sm:px-4 sm:pt-6 sm:pb-8">
 	<!-- Search Header -->

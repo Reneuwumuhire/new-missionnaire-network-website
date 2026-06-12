@@ -99,18 +99,8 @@
 	});
 </script>
 
-<svelte:head>
-	<title>Transcriptions - Missionnaire Network</title>
-	<meta
-		name="description"
-		content="Consultez et téléchargez les documents et transcriptions classés par année sur Missionnaire Network."
-	/>
-	<meta property="og:title" content="Transcriptions - Missionnaire Network" />
-	<meta
-		property="og:description"
-		content="Accédez rapidement aux transcriptions et documents du Message."
-	/>
-</svelte:head>
+<!-- Title/description/og:*/canonical come from `meta` in this route's
+     load — the root layout renders the single canonical tag set ($lib/seo). -->
 
 <div class="container mx-auto px-4 pt-4 pb-8 md:pt-6">
 	<Breadcrumbs items={[{ label: 'Documents' }]} />

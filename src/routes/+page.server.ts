@@ -1,6 +1,7 @@
 import type { PageServerLoad } from './$types';
 import { redirect } from '@sveltejs/kit';
 import { getCollection } from '../db/collections';
+import { pageMeta } from '$lib/seo';
 
 export const load: PageServerLoad = async ({ url, setHeaders }) => {
 	const filter = url.searchParams.get('filter');
@@ -28,6 +29,11 @@ export const load: PageServerLoad = async ({ url, setHeaders }) => {
 	const videos = await getCollection('videos', 0, 3, 'All', '');
 
 	return {
-		data: videos
+		data: videos,
+		meta: pageMeta('/', {
+			title: 'Missionnaire Network - Accueil | Prédications et Cantiques du Message',
+			description:
+				"Découvrez les prédications et cantiques inspirants du Message de l'Heure pour votre édification spirituelle."
+		})
 	};
 };

@@ -27,12 +27,43 @@ export interface PushPayload {
 	url?: string;
 	icon?: string;
 	image?: string;
+	/** Notification tag — notifications sharing a tag REPLACE each other on
+	 *  the device instead of stacking. All radio events share one tag so a
+	 *  repeated go-live (admin restart, cron backstop double-fire) or the
+	 *  later "diffusion terminée" update the same card. Older SW builds fall
+	 *  back to tagging by `url`. */
+	tag?: string;
 	// Discriminator the Service Worker forwards to open tabs as the message
 	// payload. Clients use this to decide how to update local state — flipping
 	// the radio "is live" indicator on/off without doing a network round-trip.
 	// Tabs ignore events they don't handle, so adding kinds here is safe
 	// without a Service Worker change.
 	event?: 'radio-live' | 'radio-end' | 'live-scheduled' | 'live-reminder';
+}
+
+// One tag for the whole live/radio lifecycle (announcement → reminder →
+// go-live → end): each phase replaces the previous notification, so a
+// subscriber never accumulates a stack of cards for the same broadcast.
+const RADIO_TAG = 'mn-radio-live';
+
+// Notification bodies get truncated by the OS anyway; clamping here keeps the
+// web-push payload comfortably inside the 4 KB limit even with long
+// admin-written descriptions.
+function clampBody(text: string, limit = 160): string {
+	const clean = text.replace(/\s+/g, ' ').trim();
+	if (clean.length <= limit) return clean;
+	return `${clean.slice(0, limit - 1).trimEnd()}…`;
+}
+
+// Only attach `image` when it's an absolute HTTPS URL — web-push silently
+// drops anything else, and a broken image URL can suppress the whole
+// notification on some Android builds. Raw S3 thumbnails run ~700 KB PNG, so
+// route them through Vercel Image Optimization on the production origin
+// (same trick as the /live og:image — w=1080 is an allowed size in
+// svelte.config's images.sizes) for a fast, data-friendly download.
+function notificationImage(thumb: string | null | undefined): string | undefined {
+	if (!thumb || !/^https:\/\//i.test(thumb)) return undefined;
+	return `https://missionnaire.net/_vercel/image?url=${encodeURIComponent(thumb)}&w=1080&q=50`;
 }
 
 export async function sendPushToAll(payload: PushPayload): Promise<void> {
@@ -96,35 +127,49 @@ export async function sendPushToAll(payload: PushPayload): Promise<void> {
 // Pre-built payloads
 
 export function radioLivePayload(opts?: {
+	/** Broadcast title from broadcast_admin_state \u2014 surfaces WHAT is live in
+	 *  the notification itself instead of a generic "Audio en direct". */
+	broadcastTitle?: string | null;
+	/** Broadcast description \u2014 used as the notification body when present. */
+	broadcastDescription?: string | null;
 	thumbnailUrl?: string | null;
 	/** Stable watch URL (/live/<slug>) when the broadcast is linked to a
 	 *  scheduled live \u2014 deep-links the notification to the watch page so the
 	 *  same URL later resolves to the replay. */
 	watchPath?: string | null;
 }): PushPayload {
+	const broadcastTitle = opts?.broadcastTitle?.trim();
+	const broadcastDescription = opts?.broadcastDescription?.trim();
 	const payload: PushPayload = {
-		title: 'Audio en direct',
-		body: 'Missionnaire Network est en direct audio maintenant\u00a0!',
+		// Lead with the broadcast's real title so the lock-screen card is
+		// informative on its own; sensible generic copy when admin left it blank.
+		title: broadcastTitle ? `\u{1F534} En direct\u00a0: ${clampBody(broadcastTitle, 80)}` : 'Audio en direct',
+		body: broadcastDescription
+			? clampBody(broadcastDescription)
+			: 'Missionnaire Network est en direct audio maintenant\u00a0!',
 		url: opts?.watchPath || '/live',
 		icon: '/favicon.png',
+		tag: RADIO_TAG,
 		event: 'radio-live'
 	};
-	// Only attach `image` if it's an absolute HTTPS URL \u2014 web-push silently
-	// drops anything else, and a broken image URL can suppress the whole
-	// notification on some Android builds.
-	const thumb = opts?.thumbnailUrl;
-	if (thumb && /^https:\/\//i.test(thumb)) {
-		payload.image = thumb;
-	}
+	const image = notificationImage(opts?.thumbnailUrl);
+	if (image) payload.image = image;
 	return payload;
 }
 
-export function radioEndPayload(): PushPayload {
+export function radioEndPayload(opts?: { broadcastTitle?: string | null }): PushPayload {
+	const broadcastTitle = opts?.broadcastTitle?.trim();
 	return {
 		title: 'Diffusion termin\u00e9e',
-		body: 'La diffusion en direct est maintenant termin\u00e9e.',
-		url: '/',
+		body: broadcastTitle
+			? `\u00ab\u00a0${clampBody(broadcastTitle, 80)}\u00a0\u00bb est termin\u00e9e. La rediffusion arrive bient\u00f4t sur le site.`
+			: 'La diffusion en direct est maintenant termin\u00e9e.',
+		// Land listeners where the replay will appear rather than the homepage.
+		url: '/live',
 		icon: '/favicon.png',
+		// Same tag as the go-live push \u2014 REPLACES the "En direct" card instead
+		// of stacking a second notification for the same broadcast.
+		tag: RADIO_TAG,
 		event: 'radio-end'
 	};
 }
@@ -167,15 +212,16 @@ export function liveScheduledPayload(opts: {
 }): PushPayload {
 	const payload: PushPayload = {
 		title: 'Direct \u00e0 venir',
-		body: `\u00ab\u00a0${opts.title}\u00a0\u00bb \u2014 ${formatScheduledDateFr(opts.scheduledAtIso)}`,
+		body: clampBody(`\u00ab\u00a0${opts.title}\u00a0\u00bb \u2014 ${formatScheduledDateFr(opts.scheduledAtIso)}`),
 		url: `/live/${opts.slug}`,
 		icon: '/favicon.png',
+		// Per-broadcast tag: the later "starts soon" reminder replaces this
+		// announcement instead of stacking next to it.
+		tag: `mn-live-${opts.slug}`,
 		event: 'live-scheduled'
 	};
-	const thumb = opts.thumbnailUrl;
-	if (thumb && /^https:\/\//i.test(thumb)) {
-		payload.image = thumb;
-	}
+	const image = notificationImage(opts.thumbnailUrl);
+	if (image) payload.image = image;
 	return payload;
 }
 
@@ -188,15 +234,15 @@ export function liveReminderPayload(opts: {
 }): PushPayload {
 	const payload: PushPayload = {
 		title: 'Le direct commence bient\u00f4t',
-		body: `\u00ab\u00a0${opts.title}\u00a0\u00bb commence \u00e0 ${formatScheduledTimeFr(opts.scheduledAtIso)}.`,
+		body: clampBody(`\u00ab\u00a0${opts.title}\u00a0\u00bb commence \u00e0 ${formatScheduledTimeFr(opts.scheduledAtIso)}.`),
 		url: `/live/${opts.slug}`,
 		icon: '/favicon.png',
+		// Replaces the earlier announcement card for this same broadcast.
+		tag: `mn-live-${opts.slug}`,
 		event: 'live-reminder'
 	};
-	const thumb = opts.thumbnailUrl;
-	if (thumb && /^https:\/\//i.test(thumb)) {
-		payload.image = thumb;
-	}
+	const image = notificationImage(opts.thumbnailUrl);
+	if (image) payload.image = image;
 	return payload;
 }
 

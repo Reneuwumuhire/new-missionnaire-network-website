@@ -21,16 +21,20 @@
 	import { onMount, tick } from 'svelte';
 	import { initLocale } from '../i18n';
 	import { radioIsLive } from '$lib/stores/global';
+	import {
+		SITE_URL,
+		SITE_NAME,
+		DEFAULT_SEO_TITLE,
+		DEFAULT_SEO_DESCRIPTION,
+		DEFAULT_OG_IMAGE,
+		type PageMeta
+	} from '$lib/seo';
 	interface Props {
 		data: LayoutData;
 		children?: import('svelte').Snippet;
 	}
 
 	let { data, children }: Props = $props();
-	const SITE_URL = 'https://missionnaire.net';
-	const DEFAULT_SEO_DESCRIPTION =
-		"Prédications, cantiques, littérature et transcriptions du Message de l'Heure pour l'édification spirituelle.";
-	const DEFAULT_SEO_TITLE = 'Missionnaire Network | Prédications et Cantiques du Message';
 	const LAST_MUSIC_PATH_KEY = 'missionnaire:last-music-path';
 	let headerRef: HTMLDivElement | null = $state(null);
 	let headerHeight = $state(120);
@@ -131,20 +135,11 @@
 	// in <svelte:head> using these values so crawlers like WhatsApp
 	// never see duplicated og:title / og:description tags from layout +
 	// page (which they handle inconsistently).
-	let pageMeta = $derived((($page.data as any)?.meta ?? {}) as {
-		title?: string;
-		description?: string;
-		url?: string;
-		image?: string;
-		imageWidth?: number;
-		imageHeight?: number;
-		type?: string;
-		noindex?: boolean;
-	});
+	let pageMeta = $derived((($page.data as any)?.meta ?? {}) as PageMeta);
 	let ogTitle = $derived(pageMeta.title || DEFAULT_SEO_TITLE);
 	let ogDescription = $derived(pageMeta.description || DEFAULT_SEO_DESCRIPTION);
 	let ogUrl = $derived(pageMeta.url || canonicalUrl);
-	let ogImage = $derived(pageMeta.image || `${SITE_URL}/og-image.jpg`);
+	let ogImage = $derived(pageMeta.image || DEFAULT_OG_IMAGE);
 	let ogType = $derived(pageMeta.type || 'website');
 	let pageNoIndex = $derived(pageMeta.noindex === true);
 	// og:image:width/height are only safe to declare when we KNOW the image's
@@ -336,7 +331,10 @@
 		<link rel="dns-prefetch" href="https://i.ytimg.com" />
 		<link rel="dns-prefetch" href="https://www.youtube.com" />
 	{/if}
-	<link rel="canonical" href={canonicalUrl} />
+	<!-- Canonical follows the page-published meta URL (slug-canonicalised
+	     detail URLs, ?play= share variants…) and falls back to the bare
+	     pathname for everything else. -->
+	<link rel="canonical" href={ogUrl} />
 	{#if pageNoIndex}
 		<!-- Pages publish `meta.noindex: true` in their load when they're
 		     filter/share variants whose canonical content already lives
@@ -345,7 +343,8 @@
 		<meta name="robots" content="noindex, follow" />
 	{/if}
 	<meta name="description" content={ogDescription} />
-	<meta property="og:site_name" content="Missionnaire Network" />
+	<meta property="og:site_name" content={SITE_NAME} />
+	<meta property="og:locale" content="fr_FR" />
 	<meta property="og:type" content={ogType} />
 	<meta property="og:title" content={ogTitle} />
 	<meta property="og:description" content={ogDescription} />

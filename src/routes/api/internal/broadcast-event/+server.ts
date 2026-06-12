@@ -87,6 +87,10 @@ export async function POST({ request }) {
 		try {
 			await sendPushToAll(
 				radioLivePayload({
+					// Surface the broadcast's real title/description in the
+					// notification so the lock-screen card says WHAT is live.
+					broadcastTitle: gate.title,
+					broadcastDescription: gate.description,
 					thumbnailUrl: gate.thumbnail_url,
 					// Deep-link to the stable watch page when this broadcast is
 					// linked to a scheduled live — that URL keeps working after the
@@ -112,7 +116,10 @@ export async function POST({ request }) {
 		streamUrl: undefined
 	});
 	try {
-		await sendPushToAll(radioEndPayload());
+		// Re-read the gate so the "terminée" card can name the broadcast that
+		// just ended (title usually survives the is_live flip).
+		const endedGate = await getBroadcastAdminState().catch(() => null);
+		await sendPushToAll(radioEndPayload({ broadcastTitle: endedGate?.title ?? null }));
 	} catch (e) {
 		console.error('[BroadcastEvent] sendPushToAll (end) failed:', e);
 		return json({ ok: false, fired: false, error: 'push-failed' }, { status: 502 });

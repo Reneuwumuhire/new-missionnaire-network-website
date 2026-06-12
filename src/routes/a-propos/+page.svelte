@@ -38,18 +38,8 @@
 	});
 </script>
 
-<svelte:head>
-	<title>À propos - Missionnaire Network</title>
-	<meta
-		name="description"
-		content="Découvrez la mission de Missionnaire Network, nos contacts et les statistiques de visite du site."
-	/>
-	<meta property="og:title" content="À propos - Missionnaire Network" />
-	<meta
-		property="og:description"
-		content="Qui nous sommes, comment nous contacter et suivre l'œuvre de Missionnaire Network."
-	/>
-</svelte:head>
+<!-- Title/description/og:*/canonical come from `meta` in this route's
+     load — the root layout renders the single canonical tag set ($lib/seo). -->
 <div class="flex flex-col overflow-hidden">
 	<header class="relative h-[40vh] min-h-[300px] max-h-[500px] overflow-hidden">
 		<img src="/img/eglise_header.jpg" alt="Église Murambi" class="absolute inset-0 w-full h-full object-cover" />

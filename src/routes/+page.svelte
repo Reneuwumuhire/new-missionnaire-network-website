@@ -123,29 +123,9 @@
 	}
 </script>
 
+<!-- Title/description/og:*/twitter:* come from `meta` in +page.server.ts —
+     the root layout renders the single canonical tag set (see $lib/seo). -->
 <svelte:head>
-	<title>Missionnaire Network - Accueil | Prédications et Cantiques du Message</title>
-	<meta
-		name="description"
-		content="Bienvenue sur Missionnaire Network. Découvrez les prédications et cantiques inspirants du Message de l'Heure pour votre édification spirituelle."
-	/>
-	<meta
-		property="og:title"
-		content="Missionnaire Network - Accueil | Prédications et Cantiques du Message"
-	/>
-	<meta
-		property="og:description"
-		content="Découvrez les prédications et cantiques inspirants du Message de l'Heure pour votre édification spirituelle."
-	/>
-	<meta property="og:url" content="https://missionnaire.net/" />
-	<meta
-		name="twitter:title"
-		content="Missionnaire Network - Accueil | Prédications et Cantiques du Message"
-	/>
-	<meta
-		name="twitter:description"
-		content="Découvrez les prédications et cantiques inspirants du Message de l'Heure pour votre édification spirituelle."
-	/>
 	<meta name="google-site-verification" content="5KUjbDomG7hhFBwtEU79pKDetc2q3I2qhEE_0BO4o_o" />
 </svelte:head>
 

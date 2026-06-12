@@ -290,19 +290,8 @@
 	}
 </script>
 
-<svelte:head>
-	<title>Chants en Vidéo - Missionnaire Network</title>
-	<meta
-		name="description"
-		content="Regardez les chants en vidéo du Message, avec recherche et lecture continue sur Missionnaire Network."
-	/>
-	<meta property="og:title" content="Chants en Vidéo - Missionnaire Network" />
-	<meta
-		property="og:description"
-		content="Catalogue de chants en vidéo pour votre adoration quotidienne."
-	/>
-	<link rel="canonical" href="https://missionnaire.net/musique/videos" />
-</svelte:head>
+<!-- Title/description/og:*/canonical come from `meta` in this route's
+     load — the root layout renders the single canonical tag set ($lib/seo). -->
 
 <div class="w-full min-w-0 max-w-6xl mx-auto px-4 pt-0 pb-8 md:px-6">
 	<Breadcrumbs items={[{ label: 'Musique', href: '/musique' }, { label: 'Chants en vidéo' }]} />

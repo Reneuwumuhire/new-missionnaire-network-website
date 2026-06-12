@@ -176,14 +176,8 @@
 	}
 </script>
 
-<svelte:head>
-	<title>Directs précédents - Missionnaire Network</title>
-	<meta
-		name="description"
-		content="Réécoutez les directs audio précédents de Missionnaire Network."
-	/>
-	<link rel="canonical" href="https://missionnaire.net/live/rediffusions" />
-</svelte:head>
+<!-- Title/description/og:*/canonical come from `meta` in this route's
+     load — the root layout renders the single canonical tag set ($lib/seo). -->
 
 <svelte:window onkeydown={onLightboxKeydown} />
 

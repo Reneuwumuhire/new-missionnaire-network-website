@@ -111,15 +111,9 @@
 		$derived(!!sermon.english_audio_url && currentSelectedUrl === sermon.english_audio_url);
 </script>
 
+<!-- Title/description/og:*/canonical come from `meta` in this route's
+     load — the root layout renders the single canonical tag set ($lib/seo). -->
 <svelte:head>
-	<title>{sermonTitle} | Prédications - Missionnaire Network</title>
-	<meta name="description" content={description} />
-	<link rel="canonical" href={canonicalUrl} />
-	<meta property="og:title" content={`${sermonTitle} | Prédications - Missionnaire Network`} />
-	<meta property="og:description" content={description} />
-	<meta property="og:url" content={canonicalUrl} />
-	<meta name="twitter:title" content={`${sermonTitle} | Prédications - Missionnaire Network`} />
-	<meta name="twitter:description" content={description} />
 	{@html `<script type="application/ld+json">${jsonLd}</script>`}
 </svelte:head>
 

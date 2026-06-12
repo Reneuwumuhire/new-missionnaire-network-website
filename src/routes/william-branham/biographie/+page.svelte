@@ -7,18 +7,8 @@
 	import ArticleCornerImage from '$lib/components/+articleCornerImage.svelte';
 </script>
 
-<svelte:head>
-	<title>William Branham - Missionnaire Network</title>
-	<meta
-		name="description"
-		content="Biographie de William Marrion Branham, ministère, citations et ressources du Message."
-	/>
-	<meta property="og:title" content="William Branham - Missionnaire Network" />
-	<meta
-		property="og:description"
-		content="Découvrez la biographie de William Branham et son impact dans le Message de l'Heure."
-	/>
-</svelte:head>
+<!-- Title/description/og:*/canonical come from `meta` in this route's
+     load — the root layout renders the single canonical tag set ($lib/seo). -->
 <div class="flex flex-col">
 	<Breadcrumbs items={[{ label: 'William Branham', href: '/william-branham/biographie' }, { label: 'Biographie' }]} />
 	<header class="relative h-[40vh] min-h-[300px] max-h-[500px] overflow-hidden">

@@ -6,18 +6,8 @@
 	import ArticleCornerImage from '$lib/components/+articleCornerImage.svelte';
 </script>
 
-<svelte:head>
-	<title>Église Locale - Missionnaire Network</title>
-	<meta
-		name="description"
-		content="Présentation de l'assemblée locale de Kigali/Gatenga/Murambi et de son ministère sur Missionnaire Network."
-	/>
-	<meta property="og:title" content="Église Locale - Missionnaire Network" />
-	<meta
-		property="og:description"
-		content="Découvrez l'assemblée locale et son engagement pour le Message de l'Heure."
-	/>
-</svelte:head>
+<!-- Title/description/og:*/canonical come from `meta` in this route's
+     load — the root layout renders the single canonical tag set ($lib/seo). -->
 <div class="flex flex-col">
 	<header class="relative h-[40vh] min-h-[300px] max-h-[500px] overflow-hidden">
 		<img src="/img/eglise_header.jpg" alt="Église Murambi" class="absolute inset-0 w-full h-full object-cover img-zoom" />

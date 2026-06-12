@@ -61,18 +61,8 @@
 	}
 </script>
 
-<svelte:head>
-	<title>Questions et réponses - Missionnaire Network</title>
-	<meta
-		name="description"
-		content="Parcourez les questions bibliques publiées et les réponses pastorales de Missionnaire Network."
-	/>
-	<meta property="og:title" content="Questions et réponses - Missionnaire Network" />
-	<meta
-		property="og:description"
-		content="Questions publiques, réponses pastorales et références audio, vidéo et littérature."
-	/>
-</svelte:head>
+<!-- Title/description/og:*/canonical come from `meta` in this route's
+     load — the root layout renders the single canonical tag set ($lib/seo). -->
 
 <div class="container mx-auto max-w-6xl px-4 py-10 md:px-8">
 	<section class="mb-8 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">

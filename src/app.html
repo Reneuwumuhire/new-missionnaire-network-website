@@ -19,15 +19,12 @@
 		/>
 		<!-- og:* / twitter:* / <title> / <meta name="description"> all live
 		     in src/routes/+layout.svelte so per-route overrides via
-		     `load`'s `meta` return value (see musique/+page.ts) are the
-		     single source of truth. Emitting static fallbacks here put
-		     them BEFORE SvelteKit's svelte:head injection — and crawlers
+		     `load`'s `meta` return value (see $lib/seo) are the single
+		     source of truth. NO static og/twitter fallbacks here: they'd
+		     land BEFORE SvelteKit's svelte:head injection — and crawlers
 		     like Facebook/WhatsApp pick the first occurrence per
-		     property, which meant the dynamic song title never won the
-		     link preview. -->
-		<meta property="og:image:width" content="1200" />
-		<meta property="og:image:height" content="630" />
-		<meta name="twitter:card" content="summary_large_image" />
+		     property, so the static values would always win (e.g. the
+		     1200×630 image dims would override a page's real image size). -->
 
 		<!-- PWA launch helpers (run BEFORE SvelteKit boots) ───────────────────
 		     1. Tag <html> if running in installed-app (standalone) mode — the

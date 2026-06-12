@@ -6,17 +6,9 @@
 	import ArticleCornerImage from '$lib/components/+articleCornerImage.svelte';
 </script>
 
+<!-- Title/description/og:*/canonical come from `meta` in this route's
+     load — the root layout renders the single canonical tag set ($lib/seo). -->
 <svelte:head>
-	<title>Ewald Frank - Missionnaire Network</title>
-	<meta
-		name="description"
-		content="Biographie et enseignements d'Ewald Frank, avec citations et contenus d'édification."
-	/>
-	<meta property="og:title" content="Ewald Frank - Missionnaire Network" />
-	<meta
-		property="og:description"
-		content="Parcours du ministère d'Ewald Frank et ressources du Message."
-	/>
 	<!-- LCP image preload. Google was flagging this page at 4.2s LCP on
 	     mobile because the 1 MB hero JPEG started downloading late.
 	     Preload + responsive WebP brings the mobile payload to ~37 KB. -->

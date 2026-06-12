@@ -121,18 +121,8 @@
 	}
 </script>
 
-<svelte:head>
-	<title>Littérature - Missionnaire Network</title>
-	<meta
-		name="description"
-		content="Découvrez la littérature du Message: livres, brochures et lettres circulaires disponibles en plusieurs langues."
-	/>
-	<meta property="og:title" content="Littérature - Missionnaire Network" />
-	<meta
-		property="og:description"
-		content="Collection de livres et lettres circulaires pour l'édification du Corps de Christ."
-	/>
-</svelte:head>
+<!-- Title/description/og:*/canonical come from `meta` in this route's
+     load — the root layout renders the single canonical tag set ($lib/seo). -->
 
 <div class="container mx-auto px-4 pt-4 pb-10 md:px-8 md:pt-6 max-w-7xl">
 	<Breadcrumbs items={[{ label: 'Littérature' }]} />

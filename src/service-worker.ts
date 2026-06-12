@@ -170,9 +170,12 @@ sw.addEventListener('push', (event) => {
 			url?: string;
 			icon?: string;
 			image?: string;
+			tag?: string;
 		};
 
-		const tag = payload.url || 'missionnaire-notification';
+		// Server-chosen tag first (lets go-live/end pushes for the same
+		// broadcast replace each other); URL keeps older payloads grouped.
+		const tag = payload.tag || payload.url || 'missionnaire-notification';
 
 		const options: NotificationOptions & {
 			renotify?: boolean;

@@ -363,19 +363,8 @@
 	});
 </script>
 
-<svelte:head>
-	<title>Vidéos | Missionnaire Network</title>
-	<meta
-		name="description"
-		content="Regardez les vidéos de prédications, retransmissions et enseignements du Message sur Missionnaire Network."
-	/>
-	<meta property="og:title" content="Vidéos | Missionnaire Network" />
-	<meta
-		property="og:description"
-		content="Regardez les vidéos de prédications, retransmissions et enseignements du Message."
-	/>
-	<meta property="og:url" content="https://missionnaire.net/videos" />
-</svelte:head>
+<!-- Title/description/og:*/canonical come from `meta` in this route's
+     load — the root layout renders the single canonical tag set ($lib/seo). -->
 
 <main class="relative max-w-6xl mx-auto px-6">
 	<div class="mt-5 mb-16">

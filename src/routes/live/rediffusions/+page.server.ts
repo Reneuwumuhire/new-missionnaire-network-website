@@ -6,8 +6,16 @@ import {
 	type RecordingType
 } from '$lib/server/recordings';
 import type { PageServerLoad } from './$types';
+import { pageMeta } from '$lib/seo';
 
 const PAGE_SIZE = 20;
+
+// Rendered by the root layout as the single og:*/twitter:* tag set.
+const META = pageMeta('/live/rediffusions', {
+	title: 'Directs précédents - Missionnaire Network',
+	description:
+		'Réécoutez les directs audio précédents de Missionnaire Network : retransmissions et réunions locales.'
+});
 
 function parseIntParam(value: string | null, min: number, max: number): number | undefined {
 	if (!value) return undefined;
@@ -57,6 +65,7 @@ export const load: PageServerLoad = async ({ url }) => {
 			pageSize: PAGE_SIZE,
 			filters,
 			availableYears: years,
+			meta: META,
 			loadError: false
 		};
 	} catch (error) {
@@ -71,6 +80,7 @@ export const load: PageServerLoad = async ({ url }) => {
 			pageSize: PAGE_SIZE,
 			filters,
 			availableYears: [] as number[],
+			meta: META,
 			loadError: true
 		};
 	}

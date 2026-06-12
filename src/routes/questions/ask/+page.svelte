@@ -41,13 +41,8 @@
 	}
 </script>
 
-<svelte:head>
-	<title>Poser une question - Missionnaire Network</title>
-	<meta
-		name="description"
-		content="Soumettez une question biblique à l'équipe pastorale de Missionnaire Network."
-	/>
-</svelte:head>
+<!-- Title/description/og:*/canonical come from `meta` in this route's
+     load — the root layout renders the single canonical tag set ($lib/seo). -->
 
 <div class="container mx-auto max-w-4xl px-4 py-10 md:px-8">
 	<a
