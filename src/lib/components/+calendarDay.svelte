@@ -42,8 +42,12 @@
 		};
 	};
 
-	export let dateToWhen = new Date();
-	export let videoTitle = 'Video Title';
+	interface Props {
+		dateToWhen?: any;
+		videoTitle?: string;
+	}
+
+	let { dateToWhen = new Date(), videoTitle = 'Video Title' }: Props = $props();
 </script>
 
 <div class=" flex flex-row space-x-3 w-96 min-w-[400px] rounded-md border-2 border-gray-200 p-3">

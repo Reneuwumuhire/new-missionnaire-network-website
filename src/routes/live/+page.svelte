@@ -1,33 +1,30 @@
 <script lang="ts">
 	import LiveRadioPlayer from '$lib/components/+liveRadioPlayer.svelte';
+	import ShareLive from '$lib/components/+shareLive.svelte';
 	import NotificationBell from '$lib/components/+notificationBell.svelte';
 	import RecentRecordings from '$lib/components/+recentRecordings.svelte';
 	import type { PageData } from './$types';
 
-	export let data: PageData;
-	let bellRef: any;
-</script>
+	interface Props {
+		data: PageData;
+	}
 
-<svelte:head>
-	<title>Audio en direct - Missionnaire Network</title>
-	<meta
-		name="description"
-		content="Écoutez Missionnaire Network en direct audio. Prédications et cantiques du Message de l'Heure en streaming continu."
-	/>
-	<link rel="canonical" href="https://missionnaire.net/live" />
-	<meta property="og:title" content="Audio en direct - Missionnaire Network" />
-	<meta
-		property="og:description"
-		content="Écoutez Missionnaire Network en direct audio. Prédications et cantiques du Message de l'Heure en streaming continu."
-	/>
-	<meta property="og:url" content="https://missionnaire.net/live" />
-</svelte:head>
+	let { data }: Props = $props();
+	let bellRef: any = $state();
+
+	// og:*/twitter:*/<title>/<canonical> are rendered once by the root
+	// +layout.svelte from the `meta` object this route returns in its load —
+	// emitting them here too would duplicate the tags and let crawlers pick the
+	// layout's default image over the live thumbnail. `liveMeta` is kept only to
+	// drive the share-sheet copy below.
+	let liveMeta = $derived(data.liveMeta);
+</script>
 
 <section class="w-full px-6 pt-4 pb-10 md:pt-6">
 	<div class="max-w-2xl mx-auto">
 		<!-- Header -->
-		<div class="text-center mb-12">
-			<div class="flex justify-center mb-5">
+		<div class="text-center mb-6 md:mb-12">
+			<div class="flex justify-center mb-3 md:mb-5">
 				<!-- Audio waveform icon -->
 				<svg width="32" height="28" viewBox="0 0 32 28" fill="none">
 					<rect x="0" y="8" width="4" height="12" rx="2" fill="#FF880C" fill-opacity="0.3">
@@ -52,14 +49,16 @@
 					</rect>
 				</svg>
 			</div>
-			<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body">
+			<p
+				class="text-[10px] font-semibold uppercase tracking-[0.3em] text-missionnaire mb-3 font-body"
+			>
 				Direct Audio
 			</p>
-			<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">
+			<h1 class="font-display text-4xl md:text-5xl font-semibold tracking-tight leading-[1.05] text-stone-900">
 				Écoute en direct
 			</h1>
 			<p
-				class="mt-3 text-[15px] text-stone-400 font-body font-light max-w-md mx-auto leading-relaxed"
+				class="mt-2 md:mt-3 text-[13px] md:text-[15px] text-stone-400 font-body font-light max-w-md mx-auto leading-relaxed"
 			>
 				La page se met à jour automatiquement. Dès que le direct audio commence, la lecture démarre
 				toute seule.
@@ -69,13 +68,22 @@
 		<!-- Player -->
 		<LiveRadioPlayer />
 
+		<!-- Share the live stream with others -->
+		<ShareLive
+			liveSessionId={data.liveSessionId}
+			title={liveMeta?.title ? `🔴 ${liveMeta.title}` : 'Écoute en direct - Missionnaire Network'}
+			text={liveMeta?.title
+				? `${liveMeta.title} — en direct sur Missionnaire Network 🎙️`
+				: 'Écoutez Missionnaire Network en direct 🎙️'}
+		/>
+
 		<!-- Recent recordings -->
 		<RecentRecordings recordings={data.recentRecordings} />
 
 		<!-- Notification opt-in -->
 		<button
-			on:click={() => bellRef?.toggle()}
-			class="flex items-center gap-4 w-full text-left border px-5 py-4 mt-6 transition-all duration-300 cursor-pointer group {bellRef?.isSubscribed
+			onclick={() => bellRef?.toggle()}
+			class="flex items-center gap-4 w-full text-left border px-5 py-4 mt-6 transition-all duration-300 active:scale-[0.98] cursor-pointer group {bellRef?.isSubscribed
 				? 'border-missionnaire/30 bg-missionnaire/5'
 				: 'border-stone-200/60 bg-white/40 hover:border-missionnaire/30 hover:bg-missionnaire/5 hover:-translate-y-0.5 hover:shadow-sm'}"
 		>

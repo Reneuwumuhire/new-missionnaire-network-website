@@ -3,6 +3,8 @@ import type { PageServerLoad } from './$types';
 import { createQuestionReply, getPublicQuestionDetail } from '../../../db/questions';
 import { ensurePublicQaUser, getCurrentQaUser, resolveQaDisplayName } from '$lib/server/qa-auth';
 import { validateGuestName, validateReplyInput } from '$lib/questions/validation';
+import { stripRichTextFormatting } from '$lib/questions/rich-text';
+import { pageMeta, shareTitle, shareDescription } from '$lib/seo';
 
 export const load: PageServerLoad = async ({ params, cookies, url }) => {
 	const detail = await getPublicQuestionDetail(params.slug);
@@ -12,7 +14,14 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
 	return {
 		...detail,
 		user,
-		replyPosted: url.searchParams.get('reply') === 'posted'
+		replyPosted: url.searchParams.get('reply') === 'posted',
+		// Rendered by the root layout as the single og:*/twitter:* tag set —
+		// the question's real title/body drive the share preview card.
+		meta: pageMeta(`/questions/${params.slug}`, {
+			title: shareTitle(detail.question.title, ' - Questions et réponses'),
+			description: shareDescription(stripRichTextFormatting(detail.question.body)),
+			type: 'article'
+		})
 	};
 };
 

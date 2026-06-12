@@ -7,21 +7,23 @@
 	import IoCalendarOutline from 'svelte-icons-pack/io/IoCalendarOutline';
 	import { formatTime } from '../../utils/FormatTime';
 
-	import { createEventDispatcher } from 'svelte';
 	import BsShuffle from 'svelte-icons-pack/bs/BsShuffle';
 
-	const dispatch = createEventDispatcher();
+	interface Props {
+		videoData: YoutubeVideo;
+		onplayPlaylist?: () => void;
+	}
 
-	export let videoData: YoutubeVideo;
+	let { videoData, onplayPlaylist }: Props = $props();
 
-	let showFullDescription = false;
+	let showFullDescription = $state(false);
 	const maxDescriptionLength = 90;
-	let isPlaying = false;
+	let isPlaying = $state(false);
 
-	$: truncatedDescription =
-		videoData.description.length > maxDescriptionLength
+	let truncatedDescription =
+		$derived(videoData.description.length > maxDescriptionLength
 			? `${videoData.description.slice(0, maxDescriptionLength)}...`
-			: videoData.description;
+			: videoData.description);
 
 	function formatDate(dateStr: string) {
 		if (!dateStr) return '';
@@ -43,11 +45,11 @@
 				allow="autoplay; encrypted-media"
 				title={videoData.title}
 				frameborder="0"
-			/>
+			></iframe>
 		{:else}
 			<button
 				class="w-full h-full relative cursor-pointer"
-				on:click={() => (isPlaying = true)}
+				onclick={() => (isPlaying = true)}
 			>
 				<img
 					src={videoData.thumbnail}
@@ -66,8 +68,8 @@
 						role="button"
 						tabindex="0"
 						class="bg-white/95 text-missionnaire p-3 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:scale-105 active:scale-95"
-						on:click|stopPropagation={() => (isPlaying = true)}
-						on:keydown|stopPropagation={(e) => e.key === 'Enter' && (isPlaying = true)}
+						onclick={(e) => { e.stopPropagation(); isPlaying = true; }}
+						onkeydown={(e) => { e.stopPropagation(); if (e.key === 'Enter') isPlaying = true; }}
 						title="Lire cette vidéo"
 					>
 						<Icon src={IoPlayCircle} size="28" />
@@ -76,8 +78,8 @@
 						role="button"
 						tabindex="0"
 						class="bg-missionnaire text-white p-3 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75 hover:scale-105 active:scale-95"
-						on:click|stopPropagation={() => dispatch('playPlaylist')}
-						on:keydown|stopPropagation={(e) => e.key === 'Enter' && dispatch('playPlaylist')}
+						onclick={(e) => { e.stopPropagation(); onplayPlaylist?.(); }}
+						onkeydown={(e) => { e.stopPropagation(); if (e.key === 'Enter') onplayPlaylist?.(); }}
 						title="Lire en playlist à partir d'ici"
 					>
 						<Icon src={BsShuffle} size="20" />
@@ -110,7 +112,7 @@
 				{#if videoData.description.length > maxDescriptionLength}
 					<button
 						class="text-missionnaire hover:text-missionnaire/80 font-bold ml-1 text-[10px] uppercase tracking-[0.18em] font-body transition-colors"
-						on:click|stopPropagation={() => (showFullDescription = !showFullDescription)}
+						onclick={(e) => { e.stopPropagation(); showFullDescription = !showFullDescription; }}
 					>
 						{showFullDescription ? 'Moins' : 'Plus'}
 					</button>
@@ -139,7 +141,7 @@
 			<button
 				type="button"
 				class="flex items-center gap-1.5 text-[10px] font-bold text-stone-400 group-hover:text-missionnaire hover:text-missionnaire uppercase tracking-[0.2em] transition-colors font-body active:scale-95"
-				on:click|stopPropagation={() => (isPlaying = true)}
+				onclick={(e) => { e.stopPropagation(); isPlaying = true; }}
 				title="Lire cette vidéo"
 			>
 				<Icon src={IoPlayCircle} size="14" />

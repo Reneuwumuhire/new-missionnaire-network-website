@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { t } from '$lib/i18n';
+
 	let {
 		onfileselected,
 		accept = '.mp3,.wav,.flac,.ogg,.m4a,.aac'
@@ -18,11 +20,11 @@
 	function validateFile(file: File): boolean {
 		const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
 		if (!ALLOWED_EXTENSIONS.includes(ext)) {
-			error = `Format non supporté (.${ext}). Formats acceptés: ${ALLOWED_EXTENSIONS.join(', ')}`;
+			error = $t('audio.dropzone.unsupportedFormat', { ext, formats: ALLOWED_EXTENSIONS.join(', ') });
 			return false;
 		}
 		if (file.size > MAX_SIZE) {
-			error = `Fichier trop volumineux (${(file.size / 1024 / 1024).toFixed(0)} MB). Maximum: 500 MB`;
+			error = $t('audio.dropzone.tooLarge', { size: (file.size / 1024 / 1024).toFixed(0) });
 			return false;
 		}
 		error = '';
@@ -90,7 +92,7 @@
 				<p class="mt-1 text-xs text-stone-400">
 					{formatBytes(selectedFile.size)} &middot; {selectedFile.type || 'audio'}
 				</p>
-				<p class="mt-3 text-xs text-stone-400">Cliquez pour changer de fichier</p>
+				<p class="mt-3 text-xs text-stone-400">{$t('audio.dropzone.clickToChange')}</p>
 			{:else}
 				<div class="mb-3 flex h-14 w-14 items-center justify-center rounded-full {dragover ? 'bg-missionnaire-100' : 'bg-cream-dark'}">
 					<svg class="h-7 w-7 {dragover ? 'text-primary' : 'text-stone-400'}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -98,10 +100,10 @@
 					</svg>
 				</div>
 				<p class="text-sm font-medium text-stone-600">
-					Glissez un fichier audio ici
+					{$t('audio.dropzone.dragHere')}
 				</p>
 				<p class="mt-1 text-xs text-stone-400">
-					ou cliquez pour parcourir &middot; MP3, WAV, FLAC, OGG, M4A, AAC &middot; Max 500 MB
+					{$t('audio.dropzone.hint')}
 				</p>
 			{/if}
 		</div>

@@ -45,16 +45,27 @@ export async function GET({ url, setHeaders }: RequestEvent) {
 		const pageNumber = Number.parseInt(url.searchParams.get('pageNumber') || '1');
 		const sort = url.searchParams.get('sort') || 'uploaded_at:desc';
 		const artist = url.searchParams.get('artist') ?? undefined;
-		const seed = url.searchParams.get('seed') ?? undefined;
+		const rawSeed = url.searchParams.get('seed');
+		const isRandom = sort.split(/[: ,]/)[0] === 'random';
+		// When the listener hasn't picked a custom shuffle, fall back to a
+		// UTC-day-stamped seed. Every visitor on the same day gets the same
+		// ordering, which means the in-memory shuffle cache and the edge
+		// cache both stay warm across users and lambdas. The shuffle rolls
+		// over once a day so the list stays fresh-feeling. The "Rafraîchir"
+		// button still mints a per-session seed when the user wants their
+		// own order.
+		const seed = rawSeed
+			? rawSeed
+			: isRandom
+				? `daily-${new Date().toISOString().slice(0, 10)}`
+				: undefined;
 
 		// Edge-cache list responses. Search results are skipped — the
 		// query space is unbounded and individual queries are unlikely
 		// to repeat at the edge often enough to be worth it. Random
-		// sort is included because the seed makes the URL stable per
-		// session (so reload + back-button benefit), and the in-memory
-		// shuffle cache helps the origin too. Browsing/filtering hits
-		// the same URLs across users, so this is where edge caching
-		// pays off the most.
+		// sort without an explicit seed shares one URL across all
+		// listeners for the day (see daily-seed default above), so the
+		// edge cache pays off heavily there.
 		if (!search) {
 			setHeaders({
 				'cache-control': 'public, s-maxage=30, stale-while-revalidate=300'

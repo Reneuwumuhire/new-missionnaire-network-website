@@ -1,7 +1,7 @@
-<!-- svelte-ignore a11y-no-static-element-interactions -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <!-- SomeComponent.svelte -->
 <script lang="ts">
-	import { createEventDispatcher, onMount } from 'svelte';
+		import { onMount } from 'svelte';
 	import { slide } from 'svelte/transition';
 	import More from 'iconsax-svelte/More.svelte';
 	import AudioSquare from 'iconsax-svelte/AudioSquare.svelte';
@@ -11,14 +11,15 @@
 	import Icon from 'svelte-icons-pack';
 	import BsThreeDotsVertical from 'svelte-icons-pack/bs/BsThreeDotsVertical';
 
-	export let video: YoutubeVideo;
-	export let index: number;
-	export const key = 'key';
-	let playing;
-	const dispatch = createEventDispatcher();
-	let visible: boolean[] = [];
+	interface Props {
+		video: YoutubeVideo;
+		index: number;
+	}
 
-	let downloadDivElement: HTMLDivElement;
+	let { video, index }: Props = $props();
+	let visible: boolean[] = $state([]);
+
+	let downloadDivElement: HTMLDivElement | undefined = $state();
 
 	const toggleVisible: (event: MouseEvent) => void = (event) => {
 		event.stopPropagation();
@@ -65,12 +66,11 @@
 	}
 </script>
 
-<svelte:window on:click={hideIfClickedOutside} />
-<!-- svelte-ignore a11y-click-events-have-key-events -->
-<!-- svelte-ignore a11y-no-static-element-interactions -->
+<svelte:window onclick={hideIfClickedOutside} />
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
 	class="group w-full cursor-pointer border border-stone-200/60 bg-white/40 overflow-hidden transition-all duration-300 hover:shadow-md hover:shadow-stone-200/40 hover:-translate-y-1"
-	on:click={() => dispatch('selectedVideo', video)}
 >
 	<!-- Thumbnail -->
 	<div class="relative overflow-hidden aspect-video">
@@ -103,7 +103,7 @@
 		<div class="flex items-center justify-end mt-2 -mr-1">
 			<button
 				class="p-1.5 rounded-full text-stone-300 hover:text-stone-600 hover:bg-stone-100 transition-colors duration-200"
-				on:click|stopPropagation={toggleVisible}
+				onclick={toggleVisible}
 				aria-label="Options"
 			>
 				<Icon src={BsThreeDotsVertical} className="w-3.5 h-3.5" />
@@ -113,8 +113,8 @@
 
 	<!-- Dropdown menu -->
 	{#if visible[index]}
-		<!-- svelte-ignore a11y-click-events-have-key-events -->
-		<!-- svelte-ignore a11y-no-static-element-interactions -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			transition:slide={{ duration: 200 }}
 			bind:this={downloadDivElement}
@@ -122,23 +122,23 @@
 		>
 			<div class="absolute w-56 z-20 bg-white border border-stone-200/80 shadow-lg shadow-stone-200/30 right-2 bottom-1">
 				<ul class="w-full text-[13px] font-body">
-					<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+					<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 					<li
-						on:click|stopPropagation={toggleVisible}
+						onclick={toggleVisible}
 						class="w-full px-4 py-3 hover:bg-stone-50 flex items-center gap-3 text-stone-600 hover:text-stone-900 transition-colors cursor-pointer"
 					>
 						<AudioSquare size={16} color="currentColor" variant="Linear" /><span>Télécharger MP3</span>
 					</li>
-					<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+					<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 					<li
-						on:click|stopPropagation={toggleVisible}
+						onclick={toggleVisible}
 						class="w-full px-4 py-3 hover:bg-stone-50 flex items-center gap-3 text-stone-600 hover:text-stone-900 transition-colors border-t border-stone-100 cursor-pointer"
 					>
 						<DocumentText1 size={16} color="currentColor" variant="Linear" /><span>Télécharger PDF</span>
 					</li>
-					<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+					<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 					<li
-						on:click|stopPropagation={toggleVisible}
+						onclick={toggleVisible}
 						class="w-full px-4 py-3 hover:bg-stone-50 flex items-center gap-3 text-stone-600 hover:text-stone-900 transition-colors border-t border-stone-100 cursor-pointer"
 					>
 						<VideoPlay size={16} color="currentColor" variant="Linear" /><span>Télécharger vidéo</span>

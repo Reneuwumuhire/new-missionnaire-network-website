@@ -11,10 +11,12 @@ async function ensureIndexes(): Promise<void> {
 	indexesEnsured = (async () => {
 		try {
 			const db = await getDb();
-			await db.collection('recordings').createIndex(
-				{ published: 1, status: 1, started_at: -1 },
-				{ name: 'pub_status_startedAt_desc' }
-			);
+			await db
+				.collection('recordings')
+				.createIndex(
+					{ published: 1, status: 1, started_at: -1 },
+					{ name: 'pub_status_startedAt_desc' }
+				);
 		} catch (err) {
 			// Retry next call: reset the latch so a transient failure doesn't
 			// permanently disable indexes (e.g. if the DB is briefly unavailable
@@ -40,6 +42,10 @@ export interface PublishedRecording {
 	source_video_id: string | null;
 	/** Preferred transcript PDF explicitly attached from admin. */
 	transcript_pdf_id: string | null;
+	/** Cumulative number of views. Stored on the doc and incremented by a
+	 *  separate fire-and-forget endpoint, so reading it here costs nothing
+	 *  extra — it rides along on the findOne the page already does. */
+	view_count: number;
 }
 
 interface RecordingRow {
@@ -53,6 +59,7 @@ interface RecordingRow {
 	description?: string | null;
 	source_video_id?: string | null;
 	transcript_pdf_id?: string | null;
+	view_count?: number | null;
 }
 
 function toPublic(doc: RecordingRow): PublishedRecording {
@@ -67,12 +74,17 @@ function toPublic(doc: RecordingRow): PublishedRecording {
 		thumbnail_url: doc.thumbnail_url ?? null,
 		description: doc.description ?? null,
 		source_video_id: doc.source_video_id ?? null,
-		transcript_pdf_id: doc.transcript_pdf_id ?? null
+		transcript_pdf_id: doc.transcript_pdf_id ?? null,
+		view_count: typeof doc.view_count === 'number' && doc.view_count > 0 ? doc.view_count : 0
 	};
 }
 
 export async function getRecentPublished(limit = 5): Promise<PublishedRecording[]> {
 	try {
+		// Same `(published, status, started_at desc)` compound index the other
+		// list queries rely on — ensures the /live revalidation render seeks
+		// directly instead of scanning + sorting in memory.
+		await ensureIndexes();
 		const db = await getDb();
 		const rows = (await db
 			.collection('recordings')
@@ -87,23 +99,104 @@ export async function getRecentPublished(limit = 5): Promise<PublishedRecording[
 	}
 }
 
-export async function listPublished(options: {
-	limit?: number;
-	pageNumber?: number;
-	q?: string;
-	year?: number;
-	month?: number; // 1-12
-} = {}): Promise<{ data: PublishedRecording[]; total: number }> {
-	const { limit = 20, pageNumber = 1, q, year, month } = options;
+/** Resolve the published rediffusion that came out of a given live session.
+ *
+ *  A shared live link carries the broadcast's `started_at` (see
+ *  `+shareLive.svelte`). Once that direct ends, the listener should land on the
+ *  exact replay — but there is no foreign key between `broadcast_admin_state`
+ *  and the `recordings` row the recorder created (the recorder runs as a
+ *  separate service and only stamps its own `started_at` when ffmpeg starts).
+ *  The two are correlated only by time: the recording starts a few
+ *  seconds-to-minutes AFTER "Go Live" and runs until the broadcast ends.
+ *
+ *  So we match by `started_at` proximity: among published+ready recordings in a
+ *  window around the session start, pick the one whose start is closest. Lives
+ *  are spaced hours/days apart, so the nearest recording to a session timestamp
+ *  is unambiguous in practice. A small lead (clock skew / recorder starting a
+ *  touch early) and a generous trailing window (a long broadcast) bound the
+ *  search. Returns null when no recording is published yet — the caller then
+ *  just renders /live, and the link starts working once the admin publishes. */
+export async function getPublishedNearSession(
+	sessionStartedAtIso: string
+): Promise<PublishedRecording | null> {
+	try {
+		const sessionMs = Date.parse(sessionStartedAtIso);
+		if (Number.isNaN(sessionMs)) return null;
+		await ensureIndexes();
+		const db = await getDb();
+		const from = new Date(sessionMs - 30 * 60 * 1000); // 30 min before go-live
+		const to = new Date(sessionMs + 12 * 60 * 60 * 1000); // 12 h after
+		const rows = (await db
+			.collection('recordings')
+			.find({ published: true, status: 'ready', started_at: { $gte: from, $lte: to } })
+			.sort({ started_at: 1 })
+			.limit(20)
+			.toArray()) as unknown as RecordingRow[];
+		if (rows.length === 0) return null;
+		let best = rows[0];
+		let bestDist = Infinity;
+		for (const row of rows) {
+			const ms =
+				row.started_at instanceof Date
+					? row.started_at.getTime()
+					: Date.parse(String(row.started_at));
+			if (Number.isNaN(ms)) continue;
+			const dist = Math.abs(ms - sessionMs);
+			if (dist < bestDist) {
+				bestDist = dist;
+				best = row;
+			}
+		}
+		return toPublic(best);
+	} catch (err) {
+		console.error('[recordings] getPublishedNearSession failed', err);
+		return null;
+	}
+}
+
+/** Title pattern that identifies a "retransmission" — i.e. a broadcast
+ *  relayed from another assembly. Local recordings (sermons from the local
+ *  pastor) are everything else. Shared between listPublished's `type` filter
+ *  and listRetransmissions below so both stay in sync. */
+const RETRANSMISSION_TITLE_REGEX = 'retransmission|frank|ewald';
+
+export type RecordingType = 'retransmission' | 'local';
+
+export async function listPublished(
+	options: {
+		limit?: number;
+		pageNumber?: number;
+		q?: string;
+		year?: number;
+		month?: number; // 1-12
+		type?: RecordingType;
+	} = {}
+): Promise<{ data: PublishedRecording[]; total: number }> {
+	const { limit = 20, pageNumber = 1, q, year, month, type } = options;
 	try {
 		await ensureIndexes();
 		const db = await getDb();
 		const query: Record<string, unknown> = { published: true, status: 'ready' };
 
+		// Both q (user search) and type (retransmission/local) constrain the
+		// title — combine via $and so neither clobbers the other.
+		const titleConditions: Record<string, unknown>[] = [];
 		if (q && q.trim().length > 0) {
 			// Escape regex metacharacters so user input is treated literally.
 			const escaped = q.trim().replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
-			query.title = { $regex: escaped, $options: 'i' };
+			titleConditions.push({ title: { $regex: escaped, $options: 'i' } });
+		}
+		if (type === 'retransmission') {
+			titleConditions.push({ title: { $regex: RETRANSMISSION_TITLE_REGEX, $options: 'i' } });
+		} else if (type === 'local') {
+			titleConditions.push({
+				title: { $not: { $regex: RETRANSMISSION_TITLE_REGEX, $options: 'i' } }
+			});
+		}
+		if (titleConditions.length === 1) {
+			Object.assign(query, titleConditions[0]);
+		} else if (titleConditions.length > 1) {
+			query.$and = titleConditions;
 		}
 
 		if (year) {
@@ -113,18 +206,20 @@ export async function listPublished(options: {
 			// IXSCANs and an in-memory merge-sort. We assume started_at is stored
 			// as a BSON Date — the legacy `Date | string` typing is defensive but
 			// live data uses Date.
-			const from = month
-				? new Date(Date.UTC(year, month - 1, 1))
-				: new Date(Date.UTC(year, 0, 1));
-			const to = month
-				? new Date(Date.UTC(year, month, 1))
-				: new Date(Date.UTC(year + 1, 0, 1));
+			const from = month ? new Date(Date.UTC(year, month - 1, 1)) : new Date(Date.UTC(year, 0, 1));
+			const to = month ? new Date(Date.UTC(year, month, 1)) : new Date(Date.UTC(year + 1, 0, 1));
 			query.started_at = { $gte: from, $lt: to };
 		}
 
 		const skip = (pageNumber - 1) * limit;
 		const [rows, total] = await Promise.all([
-			db.collection('recordings').find(query).sort({ started_at: -1 }).skip(skip).limit(limit).toArray(),
+			db
+				.collection('recordings')
+				.find(query)
+				.sort({ started_at: -1 })
+				.skip(skip)
+				.limit(limit)
+				.toArray(),
 			db.collection('recordings').countDocuments(query)
 		]);
 		return { data: (rows as unknown as RecordingRow[]).map(toPublic), total };
@@ -192,14 +287,16 @@ export async function getAvailableYears(): Promise<number[]> {
  *  sermons when the Ewald Frank / "Tous" author filter is active. Shares
  *  the `(published, status, started_at)` compound index created in
  *  ensureIndexes() — the regex only filters the already-indexed result set. */
-export async function listRetransmissions(options: {
-	limit?: number;
-	pageNumber?: number;
-	q?: string;
-	year?: number;
-	sortField?: string; // 'title' | 'started_at' | 'duration_sec'
-	sortOrder?: 'asc' | 'desc';
-} = {}): Promise<{ data: PublishedRecording[]; total: number }> {
+export async function listRetransmissions(
+	options: {
+		limit?: number;
+		pageNumber?: number;
+		q?: string;
+		year?: number;
+		sortField?: string; // 'title' | 'started_at' | 'duration_sec'
+		sortOrder?: 'asc' | 'desc';
+	} = {}
+): Promise<{ data: PublishedRecording[]; total: number }> {
 	const {
 		limit = 12,
 		pageNumber = 1,
@@ -214,7 +311,7 @@ export async function listRetransmissions(options: {
 		const query: Record<string, unknown> = {
 			published: true,
 			status: 'ready',
-			title: { $regex: 'retransmission|frank|ewald', $options: 'i' }
+			title: { $regex: RETRANSMISSION_TITLE_REGEX, $options: 'i' }
 		};
 
 		if (q && q.trim().length > 0) {
@@ -222,7 +319,7 @@ export async function listRetransmissions(options: {
 			// Combine with the retransmission regex via $and so both conditions
 			// apply without clobbering each other.
 			query.$and = [
-				{ title: { $regex: 'retransmission|frank|ewald', $options: 'i' } },
+				{ title: { $regex: RETRANSMISSION_TITLE_REGEX, $options: 'i' } },
 				{ title: { $regex: escaped, $options: 'i' } }
 			];
 			delete query.title;
@@ -241,13 +338,7 @@ export async function listRetransmissions(options: {
 
 		const skip = (pageNumber - 1) * limit;
 		const [rows, total] = await Promise.all([
-			db
-				.collection('recordings')
-				.find(query)
-				.sort(sort)
-				.skip(skip)
-				.limit(limit)
-				.toArray(),
+			db.collection('recordings').find(query).sort(sort).skip(skip).limit(limit).toArray(),
 			db.collection('recordings').countDocuments(query)
 		]);
 		return { data: (rows as unknown as RecordingRow[]).map(toPublic), total };
@@ -264,10 +355,38 @@ export async function getPublishedById(id: string): Promise<PublishedRecording |
 		const db = await getDb();
 		const row = (await db
 			.collection('recordings')
-			.findOne({ _id: new ObjectId(id), published: true, status: 'ready' })) as unknown as RecordingRow | null;
+			.findOne({
+				_id: new ObjectId(id),
+				published: true,
+				status: 'ready'
+			})) as unknown as RecordingRow | null;
 		return row ? toPublic(row) : null;
 	} catch (err) {
 		console.error('[recordings] getPublishedById failed', err);
+		return null;
+	}
+}
+
+/** Atomically bump a recording's view counter. Called fire-and-forget from a
+ *  dedicated endpoint after the page has already rendered, so it never sits on
+ *  the page's critical path. Scoped to published+ready docs so hitting the
+ *  endpoint with a draft/unknown id is a no-op. Returns the new count, or null
+ *  if nothing matched. */
+export async function incrementViewCount(id: string): Promise<number | null> {
+	try {
+		if (!ObjectId.isValid(id)) return null;
+		const db = await getDb();
+		const result = await db
+			.collection('recordings')
+			.findOneAndUpdate(
+				{ _id: new ObjectId(id), published: true, status: 'ready' },
+				{ $inc: { view_count: 1 } },
+				{ returnDocument: 'after', projection: { view_count: 1 } }
+			);
+		const doc = result as { view_count?: number } | null;
+		return typeof doc?.view_count === 'number' ? doc.view_count : null;
+	} catch (err) {
+		console.error('[recordings] incrementViewCount failed', err);
 		return null;
 	}
 }
@@ -318,6 +437,11 @@ export async function getTranscriptForRecording(recording: {
 	started_at: string | null;
 }): Promise<RecordingTranscript | null> {
 	try {
+		// 'none' = admin explicitly detached the PDF from this recording. Skip
+		// everything, including the date-based fallback — that fallback is what
+		// attaches a wrong same-day PDF in the first place.
+		if (recording.transcript_pdf_id === 'none') return null;
+
 		const db = await getDb();
 		if (recording.transcript_pdf_id && ObjectId.isValid(recording.transcript_pdf_id)) {
 			const attached = await db

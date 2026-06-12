@@ -32,7 +32,17 @@ export async function PATCH({ params, request, locals, getClientAddress }: Reque
 		const body = await request.json();
 		const parsed = UpdateMusicAudioSchema.safeParse(body);
 		if (!parsed.success) {
-			return json({ data: null, error: parsed.error.issues[0].message }, { status: 400 });
+			const issue = parsed.error.issues[0];
+			// `field` lets the edit form surface the message inline under the
+			// failing input instead of a generic toast.
+			return json(
+				{
+					data: null,
+					error: issue.message,
+					field: typeof issue.path[0] === 'string' ? issue.path[0] : null
+				},
+				{ status: 400 }
+			);
 		}
 
 		// Get current state for audit diff

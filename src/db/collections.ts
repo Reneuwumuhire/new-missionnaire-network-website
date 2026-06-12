@@ -1042,6 +1042,18 @@ export type BroadcastAdminState = {
 	description: string | null;
 	thumbnail_url: string | null;
 	thumbnail_s3_key: string | null;
+	/** scheduled_lives entry currently on air (or last aired) — set by the
+	 *  admin go-live handler. Lets /live/<slug> know whether "live right now"
+	 *  is that entry, and lets the go-live push deep-link to the watch URL. */
+	scheduled_live_id: string | null;
+	scheduled_live_slug: string | null;
+	/** Live transcript: SRT copied from the linked scheduled live at go-live.
+	 *  anchor = wall-clock ms when SRT 00:00:00 started playing on air (set by
+	 *  the admin sync button); offset = manual nudge correction in ms. */
+	subtitle_srt_url: string | null;
+	subtitle_srt_s3_key: string | null;
+	subtitle_anchor_epoch_ms: number | null;
+	subtitle_offset_ms: number;
 	updated_at: string;
 };
 
@@ -1057,6 +1069,12 @@ const BROADCAST_DEFAULT: BroadcastAdminState = {
 	description: null,
 	thumbnail_url: null,
 	thumbnail_s3_key: null,
+	scheduled_live_id: null,
+	scheduled_live_slug: null,
+	subtitle_srt_url: null,
+	subtitle_srt_s3_key: null,
+	subtitle_anchor_epoch_ms: null,
+	subtitle_offset_ms: 0,
 	updated_at: new Date(0).toISOString()
 };
 
@@ -1079,6 +1097,14 @@ export async function getBroadcastAdminState(): Promise<BroadcastAdminState> {
 			description: (doc.description as string | null) ?? null,
 			thumbnail_url: (doc.thumbnail_url as string | null) ?? null,
 			thumbnail_s3_key: (doc.thumbnail_s3_key as string | null) ?? null,
+			scheduled_live_id: (doc.scheduled_live_id as string | null) ?? null,
+			scheduled_live_slug: (doc.scheduled_live_slug as string | null) ?? null,
+			subtitle_srt_url: (doc.subtitle_srt_url as string | null) ?? null,
+			subtitle_srt_s3_key: (doc.subtitle_srt_s3_key as string | null) ?? null,
+			subtitle_anchor_epoch_ms:
+				typeof doc.subtitle_anchor_epoch_ms === 'number' ? doc.subtitle_anchor_epoch_ms : null,
+			subtitle_offset_ms:
+				typeof doc.subtitle_offset_ms === 'number' ? doc.subtitle_offset_ms : 0,
 			updated_at: (doc.updated_at as string) ?? new Date(0).toISOString()
 		};
 	} catch (e) {
@@ -1099,6 +1125,184 @@ export async function setBroadcastAdminState(updates: Partial<BroadcastAdminStat
 			);
 	} catch (e) {
 		console.error('[BroadcastAdminState] set error:', e);
+	}
+}
+
+// ── Scheduled lives (public reads) ─────────────────────────────
+// Mirrors the admin-side scheduled_lives collection. Each entry backs a stable
+// watch URL (/live/<slug>) shareable before/during/after the broadcast. The
+// admin app owns all writes except the lazy back-fills below (replay link,
+// announcement claim, reminder claim).
+
+export type ScheduledLiveStatus = 'scheduled' | 'live' | 'ended' | 'cancelled';
+
+export type ScheduledLive = {
+	_id: string;
+	slug: string;
+	title: string;
+	description: string | null;
+	thumbnail_url: string | null;
+	thumbnail_s3_key: string | null;
+	scheduled_at: string; // ISO
+	status: ScheduledLiveStatus;
+	live_started_at: string | null;
+	live_ended_at: string | null;
+	recording_id: string | null;
+	announce_pending: boolean;
+	announced_at: string | null;
+	reminder_enabled: boolean;
+	reminder_sent_at: string | null;
+	/** Pre-made SRT transcript for the broadcast audio. anchor/offset are
+	 *  mirrored here by the admin sync actions so the replay can recompute the
+	 *  transcript position against recording.started_at. */
+	subtitle_srt_url: string | null;
+	subtitle_srt_s3_key: string | null;
+	subtitle_filename: string | null;
+	subtitle_anchor_epoch_ms: number | null;
+	subtitle_offset_ms: number;
+	created_at: string;
+	updated_at: string;
+};
+
+export async function getScheduledLiveBySlug(slug: string): Promise<ScheduledLive | null> {
+	try {
+		const db = await getDb();
+		const doc = await db.collection('scheduled_lives').findOne({ slug });
+		return doc ? serializeDocument<ScheduledLive>(doc) : null;
+	} catch (e) {
+		console.error('[ScheduledLive] getBySlug error:', e);
+		return null;
+	}
+}
+
+export async function getScheduledLiveById(id: string): Promise<ScheduledLive | null> {
+	try {
+		if (!ObjectId.isValid(id)) return null;
+		const db = await getDb();
+		const doc = await db.collection('scheduled_lives').findOne({ _id: new ObjectId(id) });
+		return doc ? serializeDocument<ScheduledLive>(doc) : null;
+	} catch (e) {
+		console.error('[ScheduledLive] getById error:', e);
+		return null;
+	}
+}
+
+/** The scheduled live a published recording came from — lets the replay page
+ *  recover the subtitle file + sync anchor for that broadcast. */
+export async function getScheduledLiveByRecordingId(
+	recordingId: string
+): Promise<ScheduledLive | null> {
+	try {
+		const db = await getDb();
+		const doc = await db.collection('scheduled_lives').findOne({ recording_id: recordingId });
+		return doc ? serializeDocument<ScheduledLive>(doc) : null;
+	} catch (e) {
+		console.error('[ScheduledLive] getByRecordingId error:', e);
+		return null;
+	}
+}
+
+/** Sticky replay link: once the watch page has matched an ended live to its
+ *  published recording, persist the id so later visits skip the
+ *  timestamp-proximity search. Fire-and-forget — failure just means we match
+ *  again next time. */
+export async function setScheduledLiveRecordingId(id: string, recordingId: string): Promise<void> {
+	try {
+		if (!ObjectId.isValid(id)) return;
+		const db = await getDb();
+		await db
+			.collection('scheduled_lives')
+			.updateOne(
+				{ _id: new ObjectId(id) },
+				{ $set: { recording_id: recordingId, updated_at: new Date().toISOString() } }
+			);
+	} catch (e) {
+		console.error('[ScheduledLive] setRecordingId error:', e);
+	}
+}
+
+/** Atomically claim a pending "live scheduled" announcement so duplicate pings
+ *  (admin retry + cron backstop racing) can never double-push. Same pattern as
+ *  the notification_pending clear in the broadcast-event handler. Returns the
+ *  claimed doc, or null if there was nothing pending. */
+export async function claimScheduledLiveAnnouncement(id: string): Promise<ScheduledLive | null> {
+	try {
+		if (!ObjectId.isValid(id)) return null;
+		const db = await getDb();
+		const doc = await db.collection('scheduled_lives').findOneAndUpdate(
+			{ _id: new ObjectId(id), announce_pending: true, status: 'scheduled' },
+			{
+				$set: {
+					announce_pending: false,
+					announced_at: new Date().toISOString(),
+					updated_at: new Date().toISOString()
+				}
+			},
+			{ returnDocument: 'after' }
+		);
+		return doc ? serializeDocument<ScheduledLive>(doc) : null;
+	} catch (e) {
+		console.error('[ScheduledLive] claimAnnouncement error:', e);
+		return null;
+	}
+}
+
+/** Backstop sweep for the cron: announcements still pending a couple of
+ *  minutes after creation (the admin→main-site ping failed). Caller claims
+ *  each via claimScheduledLiveAnnouncement before sending. */
+export async function listStaleScheduledLiveAnnouncements(
+	olderThanMs = 2 * 60 * 1000
+): Promise<ScheduledLive[]> {
+	try {
+		const db = await getDb();
+		const cutoff = new Date(Date.now() - olderThanMs).toISOString();
+		const docs = await db
+			.collection('scheduled_lives')
+			.find({ status: 'scheduled', announce_pending: true, created_at: { $lte: cutoff } })
+			.limit(10)
+			.toArray();
+		return docs.map((doc) => serializeDocument<ScheduledLive>(doc));
+	} catch (e) {
+		console.error('[ScheduledLive] listStaleAnnouncements error:', e);
+		return [];
+	}
+}
+
+/** Atomically claim "starts soon" reminders due within the next `windowMs`.
+ *  Each doc is claimed via findOneAndUpdate so a doubled cron tick can't
+ *  double-send. Returns the claimed docs. */
+export async function claimDueScheduledLiveReminders(
+	windowMs = 30 * 60 * 1000
+): Promise<ScheduledLive[]> {
+	try {
+		const db = await getDb();
+		const now = new Date();
+		const horizon = new Date(now.getTime() + windowMs);
+		const claimed: ScheduledLive[] = [];
+		// Tiny loop (a handful of docs at most) — atomic claim per doc.
+		for (let i = 0; i < 10; i++) {
+			const doc = await db.collection('scheduled_lives').findOneAndUpdate(
+				{
+					status: 'scheduled',
+					reminder_enabled: true,
+					reminder_sent_at: null,
+					scheduled_at: { $gte: now, $lte: horizon }
+				},
+				{
+					$set: {
+						reminder_sent_at: new Date().toISOString(),
+						updated_at: new Date().toISOString()
+					}
+				},
+				{ returnDocument: 'after' }
+			);
+			if (!doc) break;
+			claimed.push(serializeDocument<ScheduledLive>(doc));
+		}
+		return claimed;
+	} catch (e) {
+		console.error('[ScheduledLive] claimDueReminders error:', e);
+		return [];
 	}
 }
 

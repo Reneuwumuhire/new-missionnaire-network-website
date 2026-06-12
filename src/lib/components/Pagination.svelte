@@ -1,5 +1,9 @@
 <script lang="ts">
-	/** Shared pagination used by /live/rediffusions and /predications so both
+	import { goto } from '$app/navigation';
+	import { t } from '../../i18n';
+
+	interface Props {
+		/** Shared pagination used by /live/rediffusions and /predications so both
 	 *  lists render with identical navigation UX. Anchors-based (works with
 	 *  non-JS, right-click open-in-new-tab, and SvelteKit client-side nav).
 	 *
@@ -14,9 +18,12 @@
 	 *      Always shows the first 3 pages, the last 3 pages, and the current
 	 *      page with 2 siblings on each side. Gaps collapse into "…".
 	 */
-	export let current: number;
-	export let total: number;
-	export let getHref: (page: number) => string;
+		current: number;
+		total: number;
+		getHref: (page: number) => string;
+	}
+
+	let { current, total, getHref }: Props = $props();
 
 	// Desktop budget: first 3 + last 3 + current ± 2.
 	// Mobile budget: first + last + current ± 1. Still shows structure
@@ -45,10 +52,22 @@
 		return result;
 	}
 
-	$: desktopList = buildPageList(current, total, 3, 2);
-	$: mobileList = buildPageList(current, total, 1, 1);
-	$: hasPrev = current > 1;
-	$: hasNext = current < total;
+	let desktopList = $derived(buildPageList(current, total, 3, 2));
+	let mobileList = $derived(buildPageList(current, total, 1, 1));
+	let hasPrev = $derived(current > 1);
+	let hasNext = $derived(current < total);
+	// Jump-to-page select: only worth the chrome once the page list is long
+	// enough to collapse into ellipses. Navigates through the same hrefs the
+	// prev/next anchors use so SvelteKit client-side nav stays in charge.
+	let showJump = $derived(total > 7);
+	let pageOptions = $derived(Array.from({ length: total }, (_, i) => i + 1));
+
+	function jumpTo(event: Event) {
+		const next = Number((event.currentTarget as HTMLSelectElement).value);
+		if (next >= 1 && next <= total && next !== current) {
+			void goto(getHref(next));
+		}
+	}
 </script>
 
 {#if total > 1}
@@ -61,32 +80,32 @@
 			<a
 				href={getHref(current - 1)}
 				data-sveltekit-preload-data="hover"
-				class="inline-flex items-center justify-center h-9 min-w-9 px-2 border border-stone-200/80 text-stone-600 hover:border-missionnaire hover:text-missionnaire transition-colors"
+				class="inline-flex items-center justify-center h-11 min-w-11 px-2 border border-stone-200/80 text-stone-600 hover:border-missionnaire hover:text-missionnaire transition-colors"
 				aria-label="Page précédente">‹</a
 			>
 		{:else}
 			<span
-				class="inline-flex items-center justify-center h-9 min-w-9 px-2 border border-stone-100 text-stone-300"
+				class="inline-flex items-center justify-center h-11 min-w-11 px-2 border border-stone-100 text-stone-300"
 				aria-hidden="true">‹</span
 			>
 		{/if}
 		{#each mobileList as item}
 			{#if item === '…'}
 				<span
-					class="inline-flex items-center justify-center h-9 min-w-9 px-1 text-stone-400"
+					class="inline-flex items-center justify-center h-11 min-w-11 px-1 text-stone-400"
 					aria-hidden="true">…</span
 				>
 			{:else if item === current}
 				<span
 					aria-current="page"
-					class="inline-flex items-center justify-center h-9 min-w-9 px-2 border border-missionnaire bg-missionnaire text-white font-semibold tabular-nums"
+					class="inline-flex items-center justify-center h-11 min-w-11 px-2 border border-missionnaire bg-missionnaire text-white font-semibold tabular-nums"
 				>
 					{item}
 				</span>
 			{:else}
 				<a
 					href={getHref(item)}
-					class="inline-flex items-center justify-center h-9 min-w-9 px-2 border border-stone-200/80 text-stone-600 hover:border-missionnaire hover:text-missionnaire transition-colors tabular-nums"
+					class="inline-flex items-center justify-center h-11 min-w-11 px-2 border border-stone-200/80 text-stone-600 hover:border-missionnaire hover:text-missionnaire transition-colors tabular-nums"
 					aria-label="Page {item}"
 				>
 					{item}
@@ -97,14 +116,26 @@
 			<a
 				href={getHref(current + 1)}
 				data-sveltekit-preload-data="hover"
-				class="inline-flex items-center justify-center h-9 min-w-9 px-2 border border-stone-200/80 text-stone-600 hover:border-missionnaire hover:text-missionnaire transition-colors"
+				class="inline-flex items-center justify-center h-11 min-w-11 px-2 border border-stone-200/80 text-stone-600 hover:border-missionnaire hover:text-missionnaire transition-colors"
 				aria-label="Page suivante">›</a
 			>
 		{:else}
 			<span
-				class="inline-flex items-center justify-center h-9 min-w-9 px-2 border border-stone-100 text-stone-300"
+				class="inline-flex items-center justify-center h-11 min-w-11 px-2 border border-stone-100 text-stone-300"
 				aria-hidden="true">›</span
 			>
+		{/if}
+		{#if showJump}
+			<select
+				aria-label={$t('pagination.jumpTo')}
+				value={current}
+				onchange={jumpTo}
+				class="h-11 ml-1 border border-stone-200/80 bg-white px-1.5 text-sm font-body text-stone-600 tabular-nums focus:border-missionnaire/40 focus:outline-none"
+			>
+				{#each pageOptions as p}
+					<option value={p}>{p}</option>
+				{/each}
+			</select>
 		{/if}
 	</nav>
 
@@ -163,6 +194,18 @@
 				class="inline-flex items-center justify-center h-9 min-w-9 px-3 border border-stone-100 text-stone-300 cursor-not-allowed"
 				aria-hidden="true">›</span
 			>
+		{/if}
+		{#if showJump}
+			<select
+				aria-label={$t('pagination.jumpTo')}
+				value={current}
+				onchange={jumpTo}
+				class="h-9 ml-1 border border-stone-200/80 bg-white px-1.5 text-sm font-body text-stone-600 tabular-nums focus:border-missionnaire/40 focus:outline-none"
+			>
+				{#each pageOptions as p}
+					<option value={p}>{p}</option>
+				{/each}
+			</select>
 		{/if}
 	</nav>
 {/if}

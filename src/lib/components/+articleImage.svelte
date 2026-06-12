@@ -1,6 +1,10 @@
 <script lang="ts">
-	export let image: string = '';
-	export let alt: string = '';
+	interface Props {
+		image?: string;
+		alt?: string;
+	}
+
+	let { image = '', alt = '' }: Props = $props();
 </script>
 
 <div class="relative w-full bg-slate-300 rounded-3xl overflow-hidden">

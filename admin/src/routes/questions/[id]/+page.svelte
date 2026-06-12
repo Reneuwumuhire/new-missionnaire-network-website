@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import FormattedQuestionText from '$lib/components/questions/FormattedQuestionText.svelte';
-	import RichTextToolbar from '$lib/components/questions/RichTextToolbar.svelte';
+	import MarkdownEditor from '$lib/components/questions/MarkdownEditor.svelte';
 	import { loadingSubmit } from '$lib/actions/loadingSubmit';
 	import { confirmDialog } from '$lib/stores/confirm-dialog';
+	import { t, type TranslationKey } from '$lib/i18n';
 	import type { ActionData, PageData } from './$types';
 	import type {
 		QuestionReference,
@@ -19,24 +20,24 @@
 	let removingReferenceId = $state<string | null>(null);
 	let referenceType = $state<QuestionReferenceType>('sermon');
 	const confirmedPermanentDeleteForms = new WeakSet<HTMLFormElement>();
-	const typeLabels: Record<QuestionReferenceType, string> = {
-		pdf: 'PDF',
-		audio: 'Prédication audio',
-		video: 'Vidéo',
-		sermon: 'Prédication',
-		text: 'Texte',
-		music: 'Cantique',
-		bible: 'Bible'
+	const typeLabels: Record<QuestionReferenceType, TranslationKey> = {
+		pdf: 'questions.type.pdf',
+		audio: 'questions.type.audio',
+		video: 'questions.type.video',
+		sermon: 'questions.type.sermon',
+		text: 'questions.type.text',
+		music: 'questions.type.music',
+		bible: 'questions.type.bible'
 	};
 
-	const statusLabel: Record<string, string> = {
-		pending: 'En attente',
-		approved: 'Publiée',
-		answered: 'Répondue',
-		rejected: 'Rejetée',
-		hidden: 'Masquée',
-		archived: 'Archivée',
-		locked: 'Verrouillée'
+	const statusLabel: Record<string, TranslationKey> = {
+		pending: 'questions.statusLabel.pending',
+		approved: 'questions.statusLabel.approved',
+		answered: 'questions.statusLabel.answered',
+		rejected: 'questions.statusLabel.rejected',
+		hidden: 'questions.statusLabel.hidden',
+		archived: 'questions.statusLabel.archived',
+		locked: 'questions.statusLabel.locked'
 	};
 
 	function formatDate(value: string | null): string {
@@ -67,11 +68,10 @@
 
 		event.preventDefault();
 		const ok = await confirmDialog.ask({
-			title: 'Supprimer définitivement ?',
-			message:
-				'Cette question sera retirée avec ses réponses, références et signalements. Cette action est irréversible.',
-			confirmLabel: 'Supprimer',
-			cancelLabel: 'Annuler',
+			title: $t('questions.confirmDelete.title'),
+			message: $t('questions.confirmDelete.message'),
+			confirmLabel: $t('questions.confirmDelete.confirm'),
+			cancelLabel: $t('questions.confirmDelete.cancel'),
 			tone: 'danger'
 		});
 		if (!ok) return;
@@ -155,7 +155,7 @@
 </script>
 
 <svelte:head>
-	<title>{question.title} - Missionnaire Admin</title>
+	<title>{$t('questions.detail.headTitle', { title: question.title })}</title>
 </svelte:head>
 
 <div class="mb-5 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -178,20 +178,20 @@
 					<path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
 				</svg>
 			</span>
-			<span>Questions</span>
+			<span>{$t('questions.title')}</span>
 		</a>
 		<h1 class="font-display text-2xl font-semibold leading-tight text-stone-800 lg:text-[1.7rem]">
 			{question.title}
 		</h1>
 		<p class="mt-1.5 text-xs text-stone-500">
-			{question.authorDisplayName} - {formatDate(question.createdAt)} - {question.replyCount} réponses
+			{question.authorDisplayName} - {formatDate(question.createdAt)} - {$t('questions.replyCount', { count: question.replyCount })}
 		</p>
 	</div>
 	<div class="flex flex-wrap gap-2">
 		<a
 			href={`/questions/${question.slug}`}
 			target="_blank"
-			class="admin-btn-secondary px-4 py-2 text-[10px] tracking-[0.16em]">Voir public</a
+			class="admin-btn-secondary admin-btn-compact">{$t('questions.detail.viewPublic')}</a
 		>
 		{#if data.canModerate}
 			<form method="POST" action="?/moderate" use:loadingSubmit>
@@ -200,14 +200,14 @@
 					name="actionName"
 					value={question.featured ? 'unfeature' : 'feature'}
 				/>
-				<button class="admin-btn-secondary px-4 py-2 text-[10px] tracking-[0.16em]"
-					>{question.featured ? "Retirer de l'avant" : 'Mettre en avant'}</button
+				<button class="admin-btn-secondary admin-btn-compact"
+					>{question.featured ? $t('questions.detail.unfeature') : $t('questions.detail.feature')}</button
 				>
 			</form>
 			<form method="POST" action="?/moderate" use:loadingSubmit>
 				<input type="hidden" name="actionName" value={question.locked ? 'unlock' : 'lock'} />
-				<button class="admin-btn-secondary px-4 py-2 text-[10px] tracking-[0.16em]"
-					>{question.locked ? 'Déverrouiller' : 'Verrouiller'}</button
+				<button class="admin-btn-secondary admin-btn-compact"
+					>{question.locked ? $t('questions.detail.unlock') : $t('questions.detail.lock')}</button
 				>
 			</form>
 		{/if}
@@ -235,16 +235,16 @@
 				<span
 					class="bg-stone-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-stone-600"
 				>
-					{statusLabel[question.status] ?? question.status}
+					{statusLabel[question.status] ? $t(statusLabel[question.status]) : question.status}
 				</span>
 				{#if question.locked}
 					<span class="bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700"
-						>Verrouillée</span
+						>{$t('questions.statusLabel.locked')}</span
 					>
 				{/if}
 				{#if question.deletedAt}
 					<span class="bg-red-100 px-2.5 py-1 text-[11px] font-semibold text-red-700"
-						>Supprimée</span
+						>{$t('questions.detail.deletedBadge')}</span
 					>
 				{/if}
 				{#if question.category}
@@ -261,61 +261,61 @@
 					use:loadingSubmit
 					onsubmit={confirmPermanentDelete}
 				>
-					<label for="moderation-reason" class="sr-only">Raison de modération</label>
+					<label for="moderation-reason" class="sr-only">{$t('questions.detail.moderationReason')}</label>
 					<input
 						id="moderation-reason"
 						name="reason"
-						class="admin-input h-10 min-w-0 py-2 text-sm"
-						placeholder="Raison (optionnelle)"
+						class="admin-input min-w-0 text-sm"
+						placeholder={$t('questions.detail.reasonOptional')}
 					/>
 					<div class="flex flex-wrap gap-2 lg:justify-end">
 						{#if question.status === 'pending' || question.status === 'rejected'}
 							<button
 								name="actionName"
 								value="approve"
-								class="admin-btn-primary px-3 py-2 text-[10px]"
+								class="admin-btn-primary admin-btn-compact"
 							>
-								Approuver
+								{$t('questions.approve')}
 							</button>
 						{/if}
 						{#if question.status !== 'hidden'}
 							<button
 								name="actionName"
 								value="hide"
-								class="admin-btn-secondary px-3 py-2 text-[10px]"
+								class="admin-btn-secondary admin-btn-compact"
 							>
-								Masquer
+								{$t('questions.hide')}
 							</button>
 						{:else}
 							<button
 								name="actionName"
 								value="unhide"
-								class="admin-btn-primary px-3 py-2 text-[10px]"
+								class="admin-btn-primary admin-btn-compact"
 							>
-								Rendre visible
+								{$t('questions.detail.unhide')}
 							</button>
 						{/if}
-						<button name="actionName" value="reject" class="admin-btn-danger px-3 py-2 text-[10px]">
-							Rejeter
+						<button name="actionName" value="reject" class="admin-btn-danger admin-btn-compact">
+							{$t('questions.reject')}
 						</button>
 						{#if data.canDelete && !data.canDeletePermanently && !question.deletedAt}
 							<button
 								name="actionName"
 								value="soft_delete"
-								class="admin-btn-danger px-3 py-2 text-[10px]"
-								data-loading-label="Suppression..."
+								class="admin-btn-danger admin-btn-compact"
+								data-loading-label={$t('questions.deleting')}
 							>
-								Supprimer
+								{$t('questions.delete')}
 							</button>
 						{/if}
 						{#if data.canDeletePermanently}
 							<button
 								name="actionName"
 								value="permanent_delete"
-								class="admin-btn-danger px-3 py-2 text-[10px]"
-								data-loading-label="Suppression..."
+								class="admin-btn-danger admin-btn-compact"
+								data-loading-label={$t('questions.deleting')}
 							>
-								Définitif
+								{$t('questions.permanent')}
 							</button>
 						{/if}
 					</div>
@@ -326,7 +326,7 @@
 		{#if data.canModerate}
 			<details class="border border-stone-200/60 bg-white/50 p-4">
 				<summary class="cursor-pointer font-display text-lg font-semibold text-stone-800">
-					Modifier pour modération
+					{$t('questions.detail.editForModeration')}
 				</summary>
 				<form method="POST" action="?/edit" class="mt-4 grid gap-3" use:loadingSubmit>
 					{#if form?.editError}
@@ -335,17 +335,16 @@
 						</div>
 					{/if}
 					<div>
-						<label for="title" class="admin-label">Titre</label>
+						<label for="title" class="admin-label">{$t('questions.detail.titleLabel')}</label>
 						<input id="title" name="title" class="admin-input" value={question.title} />
 					</div>
 					<div>
-						<label for="body" class="admin-label">Question</label>
-						<RichTextToolbar targetId="body" />
-						<textarea id="body" name="body" rows="6" class="admin-input">{question.body}</textarea>
+						<label for="body" class="admin-label">{$t('questions.detail.questionLabel')}</label>
+						<MarkdownEditor id="body" name="body" rows={6} content={question.body} />
 					</div>
 					<div class="grid gap-3 md:grid-cols-3">
 						<div>
-							<label for="category" class="admin-label">Catégorie</label>
+							<label for="category" class="admin-label">{$t('questions.detail.categoryLabel')}</label>
 							<input
 								id="category"
 								name="category"
@@ -354,63 +353,86 @@
 							/>
 						</div>
 						<div>
-							<label for="tags" class="admin-label">Tags</label>
+							<label for="tags" class="admin-label">{$t('questions.detail.tagsLabel')}</label>
 							<input id="tags" name="tags" class="admin-input" value={question.tags.join(', ')} />
 						</div>
 						<div>
-							<label for="reason" class="admin-label">Raison</label>
+							<label for="reason" class="admin-label">{$t('questions.detail.reasonLabel')}</label>
 							<input id="reason" name="reason" class="admin-input" />
 						</div>
 					</div>
 					<button
-						class="admin-btn-primary justify-self-start px-4 py-2 text-[10px] tracking-[0.16em]"
+						class="admin-btn-primary admin-btn-compact justify-self-start"
 					>
-						Enregistrer
+						{$t('questions.detail.save')}
 					</button>
 				</form>
 			</details>
 		{/if}
 
 		<section class="border border-stone-200/60 bg-white/50 p-4">
-			<h2 class="font-display text-xl font-semibold text-stone-800">Réponse officielle</h2>
+			<h2 class="font-display text-xl font-semibold text-stone-800">{$t('questions.detail.officialAnswer')}</h2>
 			{#if officialAnswer}
-				<div class="mt-3 border-l-4 border-primary bg-white p-3">
-					<p class="mb-2 text-[11px] uppercase tracking-[0.16em] text-primary">
-						{officialAnswer.authorDisplayName} - {formatDate(officialAnswer.createdAt)}
-					</p>
-					<FormattedQuestionText
-						text={officialAnswer.body}
-						proseClass="text-sm leading-6 text-stone-700"
-					/>
-				</div>
+				<details class="group mt-3 border-l-4 border-primary bg-white">
+					<summary
+						class="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-[11px] uppercase tracking-[0.16em] text-primary transition hover:bg-primary/5 [&::-webkit-details-marker]:hidden"
+					>
+						<span class="min-w-0 truncate">
+							{officialAnswer.authorDisplayName} - {formatDate(officialAnswer.createdAt)}
+						</span>
+						<span class="inline-flex items-center gap-1.5 text-stone-400">
+							<span class="text-[10px] font-bold normal-case tracking-normal group-open:hidden"
+								>{$t('questions.detail.show')}</span
+							>
+							<span
+								class="hidden text-[10px] font-bold normal-case tracking-normal group-open:inline"
+								>{$t('questions.hide')}</span
+							>
+							<svg
+								class="h-4 w-4 shrink-0 transition-transform group-open:rotate-180"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								aria-hidden="true"
+							>
+								<path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
+							</svg>
+						</span>
+					</summary>
+					<div class="border-t border-stone-100 px-3 pb-3 pt-3">
+						<FormattedQuestionText
+							text={officialAnswer.body}
+							proseClass="text-sm leading-6 text-stone-700"
+						/>
+					</div>
+				</details>
 			{:else}
-				<p class="mt-3 text-sm text-stone-500">Aucune réponse officielle publiée.</p>
+				<p class="mt-3 text-sm text-stone-500">{$t('questions.detail.noOfficialAnswer')}</p>
 			{/if}
 
 			{#if data.canPublishOfficial}
 				<form method="POST" action="?/official" class="mt-4 grid gap-3" use:loadingSubmit>
-					<RichTextToolbar targetId="official-answer-body" />
-					<textarea
+					<MarkdownEditor
 						id="official-answer-body"
 						name="body"
-						rows="7"
-						class="admin-input"
-						placeholder="Écrire ou mettre à jour la réponse pastorale"
-						>{officialAnswer?.body ?? ''}</textarea
-					>
+						rows={9}
+						content={officialAnswer?.body ?? ''}
+						placeholder={$t('questions.detail.officialPlaceholder')}
+					/>
 					<button
-						class="admin-btn-primary justify-self-start px-4 py-2 text-[10px] tracking-[0.16em]"
+						class="admin-btn-primary admin-btn-compact justify-self-start"
 					>
-						{officialAnswer ? 'Mettre à jour' : 'Publier la réponse'}
+						{officialAnswer ? $t('questions.detail.update') : $t('questions.detail.publishAnswer')}
 					</button>
 				</form>
 			{/if}
 		</section>
 
 		<section class="border border-stone-200/60 bg-white/50 p-4">
-			<h2 class="font-display text-xl font-semibold text-stone-800">Discussion</h2>
+			<h2 class="font-display text-xl font-semibold text-stone-800">{$t('questions.detail.discussion')}</h2>
 			{#if normalReplies.length === 0}
-				<p class="mt-3 text-sm text-stone-500">Aucune réponse publique.</p>
+				<p class="mt-3 text-sm text-stone-500">{$t('questions.detail.noPublicReplies')}</p>
 			{:else}
 				<div class="mt-3 grid gap-3">
 					{#each normalReplies as reply}
@@ -436,15 +458,15 @@
 											name="visibilityStatus"
 											value={reply.visibilityStatus === 'hidden' ? 'visible' : 'hidden'}
 										/>
-										<input name="reason" class="admin-input w-40 py-2" placeholder="Raison" />
-										<button class="admin-btn-secondary px-3 py-2 text-[10px]">
-											{reply.visibilityStatus === 'hidden' ? 'Afficher' : 'Masquer'}
+										<input name="reason" class="admin-input w-40" placeholder={$t('questions.reasonPlaceholder')} />
+										<button class="admin-btn-secondary admin-btn-compact">
+											{reply.visibilityStatus === 'hidden' ? $t('questions.detail.show') : $t('questions.hide')}
 										</button>
 									</form>
 									<form method="POST" action="?/replyVisibility" use:loadingSubmit>
 										<input type="hidden" name="replyId" value={reply._id} />
 										<input type="hidden" name="visibilityStatus" value="deleted" />
-										<button class="admin-btn-danger px-3 py-2 text-[10px]">Supprimer</button>
+										<button class="admin-btn-danger admin-btn-compact">{$t('questions.delete')}</button>
 									</form>
 								</div>
 							{/if}
@@ -457,14 +479,14 @@
 
 	<aside class="min-w-0 space-y-4">
 		<section class="min-w-0 overflow-hidden border border-stone-200/60 bg-white/50 p-4">
-			<h2 class="font-display text-lg font-semibold text-stone-800">Références</h2>
+			<h2 class="font-display text-lg font-semibold text-stone-800">{$t('questions.detail.references')}</h2>
 
 			{#if references.length > 0}
 				<div class="mt-3 space-y-2">
 					{#each references as reference (reference._id)}
 						<div class="min-w-0 border border-stone-100 bg-white p-3">
 							<p class="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-								{typeLabels[reference.type]}
+								{$t(typeLabels[reference.type])}
 							</p>
 							{#if reference.href}
 								<a
@@ -484,7 +506,7 @@
 								</p>
 							{/if}
 							<p class="mt-1 text-xs text-stone-400">
-								{reference.replyId ? 'Réponse officielle' : 'Question'}
+								{reference.replyId ? $t('questions.detail.officialAnswer') : $t('questions.detail.questionLabel')}
 							</p>
 							{#if data.canAnswer}
 								<form
@@ -504,7 +526,7 @@
 												aria-hidden="true"
 											></span>
 										{/if}
-										{removingReferenceId === reference._id ? 'Retrait...' : 'Retirer'}
+										{removingReferenceId === reference._id ? $t('questions.detail.removing') : $t('questions.detail.remove')}
 									</button>
 								</form>
 							{/if}
@@ -512,7 +534,7 @@
 					{/each}
 				</div>
 			{:else}
-				<p class="mt-3 text-sm text-stone-500">Aucune référence attachée.</p>
+				<p class="mt-3 text-sm text-stone-500">{$t('questions.detail.noReferences')}</p>
 			{/if}
 
 			{#if data.canAnswer}
@@ -522,45 +544,43 @@
 					use:loadingSubmit
 				>
 					<div>
-						<label for="referenceType" class="admin-label">Type de référence</label>
+						<label for="referenceType" class="admin-label">{$t('questions.detail.referenceType')}</label>
 						<select
 							id="referenceType"
 							bind:value={referenceType}
 							name="referenceType"
-							class="admin-input h-10 py-2 text-sm"
+							class="admin-input text-sm"
 						>
-							<option value="text">Texte / transcription</option>
-							<option value="sermon">Prédication</option>
-							<option value="audio">Prédication audio</option>
-							<option value="video">Vidéo</option>
-							<option value="pdf">PDF</option>
-							<option value="bible">Référence biblique</option>
+							<option value="text">{$t('questions.detail.refOptionText')}</option>
+							<option value="sermon">{$t('questions.type.sermon')}</option>
+							<option value="audio">{$t('questions.type.audio')}</option>
+							<option value="video">{$t('questions.type.video')}</option>
+							<option value="pdf">{$t('questions.type.pdf')}</option>
+							<option value="bible">{$t('questions.detail.refOptionBible')}</option>
 						</select>
 					</div>
 					{#if supportsLibraryReference}
 						<div>
-							<label for="referenceSearch" class="admin-label">Chercher dans la bibliothèque</label>
+							<label for="referenceSearch" class="admin-label">{$t('questions.detail.searchLibrary')}</label>
 							<div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
 								<input
 									id="referenceSearch"
 									name="referenceSearch"
 									value={data.referenceSearch}
-									class="admin-input h-10 py-2 text-sm"
-									placeholder="Titre, auteur, date, lien..."
+									class="admin-input text-sm"
+									placeholder={$t('questions.detail.searchPlaceholder')}
 								/>
-								<button class="admin-btn-secondary px-3 py-2 text-[10px] tracking-[0.16em]">
-									Chercher
+								<button class="admin-btn-secondary admin-btn-compact">
+									{$t('questions.detail.search')}
 								</button>
 							</div>
 						</div>
 						<p class="text-xs leading-5 text-stone-500">
-							Les 25 meilleurs résultats sont affichés. Si le contenu n'apparaît pas, affinez la
-							recherche ou ajoutez un lien manuel.
+							{$t('questions.detail.searchHint')}
 						</p>
 					{:else if referenceType === 'text'}
 						<p class="text-xs leading-5 text-stone-500">
-							Collez le passage utile et ajoutez le lien vers la transcription, le PDF ou la page
-							source.
+							{$t('questions.detail.textHint')}
 						</p>
 					{/if}
 				</form>
@@ -574,32 +594,32 @@
 					<input type="hidden" name="type" value={referenceType} />
 					{#if isBibleReference}
 						<div>
-							<label for="biblePassage" class="admin-label">Passage biblique</label>
+							<label for="biblePassage" class="admin-label">{$t('questions.detail.biblePassage')}</label>
 							<input
 								id="biblePassage"
 								name="biblePassage"
-								class="admin-input h-10 py-2 text-sm"
-								placeholder="Ex: Jean 14:6"
+								class="admin-input text-sm"
+								placeholder={$t('questions.detail.biblePassagePlaceholder')}
 								required
 							/>
 						</div>
 						<div>
-							<label for="bibleText" class="admin-label">Texte du verset</label>
+							<label for="bibleText" class="admin-label">{$t('questions.detail.bibleText')}</label>
 							<textarea
 								id="bibleText"
 								name="bibleText"
 								rows="4"
-								class="admin-input py-2 text-sm"
-								placeholder="Optionnel, pour afficher le verset sur la carte"
+								class="admin-input text-sm"
+								placeholder={$t('questions.detail.bibleTextPlaceholder')}
 							></textarea>
 						</div>
 						<div>
-							<label for="bibleTranslation" class="admin-label">Traduction</label>
+							<label for="bibleTranslation" class="admin-label">{$t('questions.detail.bibleTranslation')}</label>
 							<input
 								id="bibleTranslation"
 								name="bibleTranslation"
-								class="admin-input h-10 py-2 text-sm"
-								placeholder="Ex: Louis Segond"
+								class="admin-input text-sm"
+								placeholder={$t('questions.detail.bibleTranslationPlaceholder')}
 							/>
 						</div>
 					{:else}
@@ -616,7 +636,7 @@
 										value="existing"
 										disabled={currentReferenceOptions.length === 0}
 									/>
-									<span>Bibliothèque</span>
+									<span>{$t('questions.detail.library')}</span>
 								</label>
 								<label
 									class={`flex cursor-pointer items-center gap-2 border px-3 py-2.5 transition ${referenceMode === 'manual' ? 'border-primary bg-orange-50 text-stone-900' : 'border-stone-200 bg-white text-stone-500 hover:border-primary hover:text-stone-800'}`}
@@ -628,7 +648,7 @@
 										name="referenceMode"
 										value="manual"
 									/>
-									<span>{referenceType === 'video' ? 'Lien vidéo' : 'Lien manuel'}</span>
+									<span>{referenceType === 'video' ? $t('questions.detail.videoLink') : $t('questions.detail.manualLink')}</span>
 								</label>
 							</div>
 						{:else}
@@ -641,9 +661,9 @@
 									class="flex items-center justify-between gap-3 border-b border-stone-100 px-3 py-2"
 								>
 									<p class="text-xs font-bold uppercase tracking-[0.14em] text-stone-500">
-										Résultats
+										{$t('questions.detail.results')}
 									</p>
-									<p class="text-xs text-stone-400">{currentReferenceOptions.length} trouvés</p>
+									<p class="text-xs text-stone-400">{$t('questions.detail.foundCount', { count: currentReferenceOptions.length })}</p>
 								</div>
 								<div class="max-h-64 overflow-y-auto">
 									{#each currentReferenceOptions as option}
@@ -661,7 +681,7 @@
 												<span
 													class="block text-[10px] font-bold uppercase tracking-[0.16em] text-primary"
 												>
-													{typeLabels[option.type]}
+													{$t(typeLabels[option.type])}
 												</span>
 												<span
 													class="mt-1 block break-words text-sm font-semibold leading-5 text-stone-800"
@@ -685,48 +705,46 @@
 							<div class="grid gap-3 border border-stone-200 bg-orange-50/30 p-3">
 								<p class="text-xs leading-5 text-stone-600">
 									{#if referenceType === 'text'}
-										Collez le texte à mettre en évidence, puis ajoutez le lien vers sa source.
+										{$t('questions.detail.manualTextHint')}
 									{:else if referenceType === 'video'}
-										Ajoutez le lien de la vidéo. Vous pouvez aussi noter brièvement ce qui est dit
-										dans l'extrait.
+										{$t('questions.detail.manualVideoHint')}
 									{:else}
-										Utilisez ce mode lorsqu'une prédication, un PDF ou un fichier existe déjà en
-										ligne mais n'apparaît pas dans la recherche.
+										{$t('questions.detail.manualOtherHint')}
 									{/if}
 								</p>
 								<div>
 									<label for="manualTitle" class="admin-label">
 										{referenceType === 'text'
-											? 'Titre du texte'
+											? $t('questions.detail.textTitle')
 											: referenceType === 'video'
-												? 'Titre de la vidéo'
-												: 'Titre affiché'}
+												? $t('questions.detail.videoTitle')
+												: $t('questions.detail.displayTitle')}
 									</label>
 									<input
 										id="manualTitle"
 										name="manualTitle"
-										class="admin-input h-10 py-2 text-sm"
+										class="admin-input text-sm"
 										placeholder={referenceType === 'text'
-											? 'Ex: Citation de la transcription'
+											? $t('questions.detail.textTitlePlaceholder')
 											: referenceType === 'video'
-												? 'Ex: Extrait vidéo sur la prière'
-												: 'Ex: Transcription: La Communion'}
+												? $t('questions.detail.videoTitlePlaceholder')
+												: $t('questions.detail.displayTitlePlaceholder')}
 										required={referenceMode === 'manual'}
 									/>
 								</div>
 								{#if referenceType === 'text' || referenceType === 'video'}
 									<div>
 										<label for="manualNote" class="admin-label">
-											{referenceType === 'video' ? "Ce qu'il dit dans la vidéo" : 'Texte cité'}
+											{referenceType === 'video' ? $t('questions.detail.videoNoteLabel') : $t('questions.detail.textNoteLabel')}
 										</label>
 										<textarea
 											id="manualNote"
 											name="manualNote"
 											rows="4"
-											class="admin-input py-2 text-sm"
+											class="admin-input text-sm"
 											placeholder={referenceType === 'video'
-												? 'Optionnel: résumez ou citez le passage utile.'
-												: 'Collez ici le passage du texte à afficher.'}
+												? $t('questions.detail.videoNotePlaceholder')
+												: $t('questions.detail.textNotePlaceholder')}
 											required={referenceType === 'text'}
 										></textarea>
 									</div>
@@ -734,40 +752,40 @@
 								<div>
 									<label for="manualHref" class="admin-label">
 										{referenceType === 'text'
-											? 'Lien vers le texte'
+											? $t('questions.detail.textHrefLabel')
 											: referenceType === 'video'
-												? 'Lien de la vidéo'
-												: 'Lien'}
+												? $t('questions.detail.videoHrefLabel')
+												: $t('questions.detail.linkLabel')}
 									</label>
 									<input
 										id="manualHref"
 										name="manualHref"
-										class="admin-input h-10 py-2 text-sm"
+										class="admin-input text-sm"
 										placeholder={referenceType === 'text'
-											? 'https://... ou /transcriptions/...'
+											? $t('questions.detail.hrefPlaceholder')
 											: referenceType === 'video'
-												? 'https://www.youtube.com/watch?v=...'
-												: 'https://... ou /transcriptions/...'}
+												? $t('questions.detail.videoHrefPlaceholder')
+												: $t('questions.detail.hrefPlaceholder')}
 										required={referenceMode === 'manual'}
 									/>
 								</div>
 							</div>
 						{/if}
 					{/if}
-					<select name="replyId" class="admin-input h-10 py-2 text-sm">
-						<option value="">Attacher à la question</option>
+					<select name="replyId" class="admin-input text-sm">
+						<option value="">{$t('questions.detail.attachToQuestion')}</option>
 						{#if officialAnswer}
-							<option value={officialAnswer._id}>Attacher à la réponse officielle</option>
+							<option value={officialAnswer._id}>{$t('questions.detail.attachToOfficial')}</option>
 						{/if}
 					</select>
 					<button
-						class="admin-btn-primary w-full min-w-0 justify-center px-3 py-2 text-center text-[10px] tracking-[0.16em]"
+						class="admin-btn-primary admin-btn-compact w-full min-w-0 justify-center text-center"
 						disabled={!isBibleReference &&
 							supportsLibraryReference &&
 							referenceMode === 'existing' &&
 							selectedReferenceId.length === 0}
 					>
-						Ajouter la référence
+						{$t('questions.detail.addReference')}
 					</button>
 				</form>
 			{/if}
@@ -775,9 +793,9 @@
 
 		{#if data.canModerate}
 			<section class="border border-stone-200/60 bg-white/50 p-4">
-				<h2 class="font-display text-lg font-semibold text-stone-800">Signalements</h2>
+				<h2 class="font-display text-lg font-semibold text-stone-800">{$t('questions.reports.title')}</h2>
 				{#if data.reports.length === 0}
-					<p class="mt-3 text-sm text-stone-500">Aucun signalement.</p>
+					<p class="mt-3 text-sm text-stone-500">{$t('questions.detail.noReports')}</p>
 				{:else}
 					<div class="mt-3 space-y-2">
 						{#each data.reports as report}
@@ -794,12 +812,12 @@
 										<form method="POST" action="?/resolveReport" use:loadingSubmit>
 											<input type="hidden" name="reportId" value={report._id} />
 											<input type="hidden" name="status" value="reviewed" />
-											<button class="text-xs font-semibold text-primary">Traité</button>
+											<button class="text-xs font-semibold text-primary">{$t('questions.detail.reviewed')}</button>
 										</form>
 										<form method="POST" action="?/resolveReport" use:loadingSubmit>
 											<input type="hidden" name="reportId" value={report._id} />
 											<input type="hidden" name="status" value="dismissed" />
-											<button class="text-xs font-semibold text-stone-500">Ignorer</button>
+											<button class="text-xs font-semibold text-stone-500">{$t('questions.dismiss')}</button>
 										</form>
 									</div>
 								{/if}
@@ -811,9 +829,9 @@
 		{/if}
 
 		<section class="border border-stone-200/60 bg-white/50 p-4">
-			<h2 class="font-display text-lg font-semibold text-stone-800">Audit</h2>
+			<h2 class="font-display text-lg font-semibold text-stone-800">{$t('questions.detail.audit')}</h2>
 			{#if data.actions.length === 0}
-				<p class="mt-3 text-sm text-stone-500">Aucune action enregistrée.</p>
+				<p class="mt-3 text-sm text-stone-500">{$t('questions.detail.noActions')}</p>
 			{:else}
 				<div class="mt-3 space-y-2.5">
 					{#each data.actions as action}
@@ -833,12 +851,12 @@
 
 		{#if data.canManageUsers && question.authorId && question.authorId.includes('@')}
 			<section class="border border-red-200 bg-red-50/60 p-4">
-				<h2 class="font-display text-lg font-semibold text-red-900">Utilisateur</h2>
+				<h2 class="font-display text-lg font-semibold text-red-900">{$t('questions.detail.userHeading')}</h2>
 				<p class="mt-2 text-sm text-red-700">{question.authorId}</p>
 				<form method="POST" action="?/suspendAuthor" class="mt-4" use:loadingSubmit>
 					<input type="hidden" name="authorId" value={question.authorId} />
-					<button class="admin-btn-danger px-4 py-2 text-[10px] tracking-[0.16em]">
-						Suspendre l'auteur
+					<button class="admin-btn-danger admin-btn-compact">
+						{$t('questions.detail.suspendAuthor')}
 					</button>
 				</form>
 			</section>

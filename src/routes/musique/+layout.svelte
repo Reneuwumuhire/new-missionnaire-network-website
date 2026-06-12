@@ -1,31 +1,35 @@
 <script lang="ts">
 	import AndroidBanner from '$lib/components/+androidBanner.svelte';
-	import AudioTableItem from '$lib/components/+audioTableItem.svelte';
-	import { getContext, onDestroy, onMount } from 'svelte';
+	import { onDestroy, onMount, untrack } from 'svelte';
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
-	import type { AudioAsset } from '$lib/models/media-assets';
-	import type { MusicAudio } from '$lib/models/music-audio';
 	import { goto } from '$app/navigation';
+	import { t } from '../../i18n';
 	import LoadingRing from '$lib/components/LoadingRing.svelte';
 
-	export let data;
-	let heroSearchValue = (data as any).search || '';
-	let debounceTimer: NodeJS.Timeout;
-	let isHeroSearchLoading = false;
-	let lastSyncedSearch = '';
+	let { children } = $props();
+	// Seeded from the URL (not load data) so there's no initial-value capture;
+	// the sync $effect below keeps it aligned on every navigation.
+	let heroSearchValue = $state($page.url.searchParams.get('search') || '');
+	let debounceTimer: ReturnType<typeof setTimeout> | undefined = $state();
+	let isHeroSearchLoading = $state(false);
+	let lastSyncedSearch = $state('');
 
-	// Total song count for the hero copy. Loaded async on mount so the page
-	// renders immediately with a fallback string — if the count endpoint is
-	// slow or unreachable, the hero stays useful instead of blocking on it.
-	let totalSongs: number | null = null;
+	// Total song count for the header copy. Loaded async on mount so the page
+	// renders immediately without it — if the count endpoint is slow or
+	// unreachable, the count simply stays hidden instead of blocking.
+	let totalSongs: number | null = $state(null);
 	const formattedTotal = (n: number) => n.toLocaleString('fr-FR');
 
-	$: currentSearch = $page.url.searchParams.get('search') || '';
-	$: if (currentSearch !== lastSyncedSearch) {
-		heroSearchValue = currentSearch;
-		lastSyncedSearch = currentSearch;
-	}
+	let currentSearch = $derived($page.url.searchParams.get('search') || '');
+	$effect(() => {
+		if (currentSearch !== lastSyncedSearch) {
+			heroSearchValue = currentSearch;
+			untrack(() => {
+				lastSyncedSearch = currentSearch;
+			});
+		}
+	});
 
 	async function handleHeroSearch() {
 		if (!browser) return;
@@ -37,30 +41,32 @@
 		}
 		params.set('page', '1');
 		isHeroSearchLoading = true;
-		await goto(`?${params.toString()}`, { keepFocus: true, noScroll: true });
-	}
-
-	$: if (browser) {
-		if (heroSearchValue !== undefined) {
-			clearTimeout(debounceTimer);
-			debounceTimer = setTimeout(() => {
-				if (heroSearchValue.trim() !== currentSearch) {
-					isHeroSearchLoading = true;
-					void handleHeroSearch();
-				} else {
-					isHeroSearchLoading = false;
-				}
-			}, 300);
+		try {
+			await goto(`?${params.toString()}`, { keepFocus: true, noScroll: true });
+		} finally {
+			isHeroSearchLoading = false;
 		}
 	}
 
-	async function handleClick(event: {
-		preventDefault: () => void;
-		currentTarget: { href: string | URL };
-	}) {
-		event.preventDefault();
-		await goto(event.currentTarget.href);
-	}
+	$effect(() => {
+		if (browser) {
+			if (heroSearchValue !== undefined) {
+				// Timer bookkeeping is untracked: reading + reassigning
+				// `debounceTimer` inside the effect would re-trigger it forever.
+				untrack(() => {
+					clearTimeout(debounceTimer);
+					debounceTimer = setTimeout(() => {
+						if (heroSearchValue.trim() !== currentSearch) {
+							isHeroSearchLoading = true;
+							void handleHeroSearch();
+						} else {
+							isHeroSearchLoading = false;
+						}
+					}, 300);
+				});
+			}
+		}
+	});
 
 	onDestroy(() => {
 		clearTimeout(debounceTimer);
@@ -76,118 +82,177 @@
 				totalSongs = result.count;
 			}
 		} catch {
-			// network failure — keep the fallback hero copy
+			// network failure — keep the header without the count
 		}
 	});
+
+	let isAudioActive = $derived($page.url.pathname === '/musique');
 </script>
 
-<div class="flex flex-col">
-	<header class="relative">
-		<div class="relative header-predications flex flex-col items-center justify-center w-full min-h-[340px] md:min-h-[400px]">
-			<div class="absolute inset-0 overlay-predications flex items-center justify-center px-5 py-12">
-				<div class="flex flex-col items-center text-white w-full max-w-3xl text-center">
-					<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-4 font-body">
-						Tous les cantiques
-					</p>
-					<h1 class="font-display text-3xl md:text-5xl font-semibold leading-tight">Louange et Adoration</h1>
-					<p class="text-sm text-white/60 font-body mt-3 mb-8 max-w-lg leading-relaxed">
-						{#if totalSongs !== null}
-							Trouvez ici <span class="font-semibold text-white">{formattedTotal(totalSongs)}</span> cantiques.
-						{:else}
-							Trouvez ici les cantiques.
-						{/if}
-					</p>
-					<form
-						class="flex w-full max-w-xl border border-white/25 bg-white/90 backdrop-blur-sm overflow-hidden"
-						on:submit|preventDefault={handleHeroSearch}
-					>
-						<div class="relative flex-1">
-							<input
-								id="hero-search"
-								type="text"
-								class="w-full bg-transparent text-stone-800 px-5 py-3.5 pr-24 text-sm font-body outline-none placeholder:text-stone-400"
-								placeholder="Rechercher par titre..."
-								bind:value={heroSearchValue}
-							/>
-							{#if isHeroSearchLoading}
-								<LoadingRing
-									size={16}
-									className="absolute right-2.5 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center text-missionnaire/90"
-								/>
-							{:else if heroSearchValue}
-								<button
-									type="button"
-									aria-label="Effacer la recherche"
-									title="Effacer"
-									class="absolute right-2.5 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full text-stone-400 hover:bg-stone-200 hover:text-stone-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
-									on:click={() => {
-										heroSearchValue = '';
-									}}
-								>
-									<svg
-										width="14"
-										height="14"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										stroke-width="2"
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										aria-hidden="true"
-									>
-										<path d="M6 6l12 12M6 18L18 6" />
-									</svg>
-								</button>
-							{/if}
-						</div>
-						<button type="submit" class="bg-missionnaire hover:bg-missionnaire/90 text-white px-6 py-3.5 text-[11px] font-bold uppercase tracking-[0.15em] font-body transition-colors shrink-0">
-							Rechercher
-						</button>
-					</form>
-					<div class="flex items-center gap-3 mt-6">
-						<a
-							href="/musique"
-							class="px-5 py-2 text-[11px] font-bold uppercase tracking-[0.15em] font-body transition-all border {$page.url.pathname === '/musique' ? 'bg-missionnaire text-white border-missionnaire' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}"
-						>
-							Audio
-						</a>
-						<a
-							href="/musique/videos"
-							class="px-5 py-2 text-[11px] font-bold uppercase tracking-[0.15em] font-body transition-all border {$page.url.pathname === '/musique/videos' ? 'bg-missionnaire text-white border-missionnaire' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}"
-						>
-							Vidéos
-						</a>
-					</div>
+<!-- Compact header band: one line of identity (kicker + Cormorant title +
+     quiet count), the search inline on desktop, and the Audio/Vidéos
+     segmented control. The photo stays, but as a subtle darkened strip —
+     the song list is the point of the page and must sit above the fold. -->
+<header class="musique-band relative border-b border-stone-200/80">
+	<div class="musique-band-overlay">
+		<div
+			class="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between md:gap-8 md:px-6 md:py-8"
+		>
+			<div class="min-w-0">
+				<p
+					class="font-body text-[9px] font-bold uppercase tracking-[0.35em] text-missionnaire md:text-[10px]"
+				>
+					{$t('music.headerKicker')}
+				</p>
+				<div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+					<h1 class="font-display text-[26px] font-semibold leading-none text-white md:text-4xl">
+						{$t('music.headerTitle')}
+					</h1>
+					{#if totalSongs !== null}
+						<span class="font-body text-[11px] tabular-nums text-white/50 md:text-xs">
+							{$t('music.headerCount', { count: formattedTotal(totalSongs) })}
+						</span>
+					{/if}
 				</div>
 			</div>
-		</div>
 
-		<!-- Banner: inline below hero on mobile (so it doesn't overlap the
-		     Audio/Vidéos toggle), absolute floating on desktop where there's
-		     room. Single render — duplicating it would split the dismiss
-		     state across two instances. -->
-		<div class="md:absolute md:bottom-0 md:left-1/2 md:-translate-x-1/2 md:translate-y-1/2 w-full max-w-2xl mx-auto px-2 md:px-5 z-10 mt-4 md:mt-0">
+			<div class="flex items-center justify-between gap-3 md:justify-end md:gap-4">
+				<!-- Desktop inline search — mobile uses the sticky toolbar below.
+				     White field (same refined feel as the prédications band),
+				     h-11 to match the segmented control next to it, orange
+				     focus ring, native autofill suppressed. -->
+				<form
+					class="hidden h-11 w-72 items-stretch overflow-hidden border border-stone-200/60 bg-white transition-shadow focus-within:border-missionnaire/40 focus-within:ring-2 focus-within:ring-missionnaire/30 md:flex lg:w-96"
+					role="search"
+					autocomplete="off"
+					onsubmit={(e) => {
+						e.preventDefault();
+						void handleHeroSearch();
+					}}
+				>
+					<svg
+						class="ml-3 shrink-0 self-center text-stone-400"
+						width="14"
+						height="14"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2.2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
+					>
+						<circle cx="11" cy="11" r="7" />
+						<line x1="21" y1="21" x2="16.65" y2="16.65" />
+					</svg>
+					<input
+						id="musique-band-search"
+						name="musique-band-search"
+						type="text"
+						class="min-w-0 flex-1 bg-transparent px-2.5 font-body text-sm text-stone-800 outline-none placeholder:text-stone-400"
+						placeholder={$t('music.searchPlaceholder')}
+						aria-label={$t('music.searchPlaceholder')}
+						autocomplete="off"
+						autocorrect="off"
+						autocapitalize="off"
+						spellcheck="false"
+						bind:value={heroSearchValue}
+					/>
+					{#if isHeroSearchLoading}
+						<LoadingRing
+							size={14}
+							className="mr-3 flex h-6 w-6 shrink-0 self-center items-center justify-center text-missionnaire"
+						/>
+					{:else if heroSearchValue}
+						<button
+							type="button"
+							aria-label={$t('music.clearSearch')}
+							title={$t('music.clearSearch')}
+							class="mr-1.5 flex h-7 w-7 shrink-0 self-center items-center justify-center text-stone-400 transition-colors duration-150 hover:text-stone-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/50"
+							onclick={() => {
+								heroSearchValue = '';
+							}}
+						>
+							<svg
+								width="13"
+								height="13"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								aria-hidden="true"
+							>
+								<path d="M6 6l12 12M6 18L18 6" />
+							</svg>
+						</button>
+					{/if}
+					<button
+						type="submit"
+						class="shrink-0 self-stretch bg-missionnaire px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-white font-body transition-colors duration-200 hover:bg-missionnaire/90 active:scale-[0.98]"
+					>
+						{$t('search.action')}
+					</button>
+				</form>
+
+				<!-- Audio / Vidéos segmented control — h-11 on md+ so it sits on
+				     the same baseline as the inline search field beside it. -->
+				<nav
+					class="inline-flex shrink-0 items-stretch border border-white/25 bg-white/5 p-0.5 md:h-11 md:p-1"
+					aria-label="Audio ou vidéos"
+				>
+					<a
+						href="/musique"
+						aria-current={isAudioActive ? 'page' : undefined}
+						class="inline-flex items-center px-4 py-1.5 font-body text-[10px] font-bold uppercase tracking-[0.15em] transition-colors duration-150 md:px-5 md:py-0 {isAudioActive
+							? 'bg-missionnaire text-white'
+							: 'text-white/65 hover:bg-white/10 hover:text-white'}"
+					>
+						{$t('music.audioTab')}
+					</a>
+					<a
+						href="/musique/videos"
+						aria-current={!isAudioActive ? 'page' : undefined}
+						class="inline-flex items-center px-4 py-1.5 font-body text-[10px] font-bold uppercase tracking-[0.15em] transition-colors duration-150 md:px-5 md:py-0 {!isAudioActive
+							? 'bg-missionnaire text-white'
+							: 'text-white/65 hover:bg-white/10 hover:text-white'}"
+					>
+						{$t('music.videosTab')}
+					</a>
+				</nav>
+			</div>
+		</div>
+	</div>
+</header>
+
+<!-- Mobile search + filters now live on the page itself: a collections
+     pill row directly under this band, then a slim search + Filtres
+     utility bar (see musique/+page.svelte). Desktop keeps the inline
+     header search above. -->
+<div
+	class="flex h-auto w-full flex-row justify-center overflow-x-hidden pt-4 pb-32 md:pt-10 md:pb-16"
+>
+	<div class="flex w-full max-w-7xl flex-col px-2 md:px-5">
+		{@render children?.()}
+
+		<!-- Android app strip: quiet, dismissible, above the footer — out of
+		     the way of the list. Single render keeps the dismiss state whole. -->
+		<div class="mt-10 md:mt-12">
 			<AndroidBanner />
 		</div>
-	</header>
-</div>
-<div class="flex flex-row justify-center h-auto w-full pt-8 pb-32 md:pt-16 md:pb-16 overflow-x-hidden">
-	<div class=" flex flex-col w-full max-w-7xl px-2 md:px-5">
-		<slot />
 	</div>
 </div>
 
 <style>
-	.header-predications {
+	.musique-band {
 		background-image: url('/img/predications_header.jpg');
-		background-color: #1a1a1a;
+		background-color: #1c1917;
 		background-repeat: no-repeat;
 		background-size: cover;
-		background-position: center;
+		background-position: center 30%;
 	}
-	.overlay-predications {
-		background-color: rgba(0, 0, 0, 0.5);
-		backdrop-filter: blur(2px);
-		-webkit-backdrop-filter: blur(2px);
+	.musique-band-overlay {
+		background-color: rgba(16, 14, 12, 0.84);
 	}
 </style>

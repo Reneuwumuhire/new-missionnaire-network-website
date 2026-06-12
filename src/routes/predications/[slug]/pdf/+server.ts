@@ -73,6 +73,18 @@ export const GET: RequestHandler = async ({ params, url, fetch }) => {
 	headers.set('content-type', upstreamType.toLowerCase().includes('pdf') ? upstreamType : 'application/pdf');
 	headers.set('content-disposition', `inline; filename="${toInlineFilename(canonicalSlug)}"`);
 	headers.set('cache-control', 'public, max-age=3600, stale-while-revalidate=86400');
+	// Search Console was reporting these PDF URLs as "Duplicate without
+	// user-selected canonical" — Google groups them with the HTML
+	// predication page but can't pick a canonical between the two.
+	// Tell crawlers to skip them entirely; the HTML page carries the
+	// indexable content (title, description, transcription preview).
+	// Also surface the canonical HTML URL so any link-graph signal
+	// flows back to it.
+	headers.set('x-robots-tag', 'noindex, nofollow');
+	headers.set(
+		'link',
+		`<https://missionnaire.net/predications/${canonicalSlug}>; rel="canonical"`
+	);
 
 	const contentLength = upstreamResponse.headers.get('content-length');
 	if (contentLength) {

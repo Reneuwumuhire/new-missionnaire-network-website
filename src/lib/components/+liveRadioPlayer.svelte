@@ -1,38 +1,43 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { onDestroy, onMount } from 'svelte';
-	import { radioIsLive as radioIsLiveStore } from '$lib/stores/global';
+	import { radioIsLive as radioIsLiveStore, livePlayback } from '$lib/stores/global';
+	import LiveTranscript from './+liveTranscript.svelte';
+	import { focusTrap } from '$lib/actions/focusTrap';
+	import { t, type TranslationKey } from '../../i18n';
 
-	const STATUS_MESSAGES: Record<string, string> = {
-		offline: 'L\'audio en direct est hors ligne',
-		listening: 'Vous écoutez le direct audio',
-		connecting: 'Connexion en cours...',
-		reconnecting: 'Reconnexion en cours...',
-		availablePressPlay: 'Direct audio disponible. Touchez l\'écran pour démarrer.',
-		waiting: 'En attente du signal audio...',
-		cannotPlay: 'Impossible de lire le direct pour le moment',
-		unavailable: 'Le direct audio est indisponible pour le moment'
+	// Status → translation key; `statusMessage` below resolves through `$t`
+	// so the text follows the FR/EN toggle live.
+	const STATUS_MESSAGE_KEYS: Record<string, TranslationKey> = {
+		offline: 'live.status.offline',
+		listening: 'live.status.listening',
+		connecting: 'live.status.connecting',
+		reconnecting: 'live.status.reconnecting',
+		availablePressPlay: 'live.status.availablePressPlay',
+		waiting: 'live.status.waiting',
+		cannotPlay: 'live.status.cannotPlay',
+		unavailable: 'live.status.unavailable'
 	};
 
-	let audio: HTMLAudioElement | null = null;
-	let isPlaying = false;
-	let isMuted = false;
-	let isBuffering = false;
-	let hasError = false;
-	let lastCheckedAt = '';
-	let statusKey = 'waiting';
+	let audio: HTMLAudioElement | null = $state(null);
+	let isPlaying = $state(false);
+	let isMuted = $state(false);
+	let isBuffering = $state(false);
+	let hasError = $state(false);
+	let lastCheckedAt = $state('');
+	let statusKey = $state('waiting');
 	let pollTimer: ReturnType<typeof setInterval> | null = null;
 	let noAudioGraceTimer: ReturnType<typeof setTimeout> | null = null;
 	let offlineStreak = 0;
 	let userWantsToPlay = false;
-	let listenerCount = 0;
-	let keepLiveUi = false;
-	let broadcastTitle: string | null = null;
-	let broadcastDescription: string | null = null;
-	let broadcastThumbnail: string | null = null;
-	let broadcastThumbnailBroken = false;
-	let thumbnailExpanded = false;
-	let descriptionExpanded = false;
+	let listenerCount = $state(0);
+	let keepLiveUi = $state(false);
+	let broadcastTitle: string | null = $state(null);
+	let broadcastDescription: string | null = $state(null);
+	let broadcastThumbnail: string | null = $state(null);
+	let broadcastThumbnailBroken = $state(false);
+	let thumbnailExpanded = $state(false);
+	let descriptionExpanded = $state(false);
 
 	function openThumbnail() {
 		if (!broadcastThumbnail) return;
@@ -59,20 +64,20 @@
 	// "liveEdge" (the highest currentTime we've seen while playing forward).
 	// We do NOT use audio.seekable or audio.duration because Icecast MP3
 	// streams report them as Infinity, which breaks arithmetic & UI.
-	let currentTime = 0;
-	let bufferStart = 0;
-	let liveEdge = 0;
-	let isSeeking = false;
+	let currentTime = $state(0);
+	let bufferStart = $state(0);
+	let liveEdge = $state(0);
+	let isSeeking = $state(false);
 	// True once the user has deliberately scrubbed backward. The button label
 	// is driven by this flag, not by a live-edge time delta — otherwise the
 	// browser's buffer-ahead (5-15s on Icecast) makes the label oscillate
 	// between "En direct" and "Revenir au direct" as playback catches up.
-	let userSeeked = false;
+	let userSeeked = $state(false);
 	const DVR_THRESHOLD_SEC = 3;
 
-	let probeReachable = false;
-	let confirmedLive = false;
-	let playbackFailed = false;
+	let probeReachable = $state(false);
+	let confirmedLive = $state(false);
+	let playbackFailed = $state(false);
 
 	// Direct URL to the audio source, received from the server via SSE.
 	// Bypasses the serverless proxy which has execution time limits.
@@ -116,16 +121,50 @@
 		return `${base}${base.includes('?') ? '&' : '?'}t=${Date.now()}`;
 	}
 
-	$: showLive = confirmedLive || keepLiveUi;
-	$: awaitingPlay = probeReachable && !isPlaying && !isBuffering && !confirmedLive && !keepLiveUi;
+	// Wall-clock epoch at which the CURRENT stream connection was opened.
+	// On a fresh Icecast connection, audio position 0 is "live at that
+	// instant", so the wall-clock moment of what the listener hears at
+	// position t is streamConnectEpochMs + t*1000. The transcript syncs on
+	// this rather than on buffer-edge deltas, which makes pause/resume,
+	// DVR rewind and silent reconnects all correct by construction — a
+	// paused player's frozen currentTime freezes the text, and a long-pause
+	// buffer-expiry reconnect resets the epoch to "now" along with the audio.
+	let streamConnectEpochMs: number | null = $state(null);
+
+	/** Single place every (re)connection goes through. */
+	function connectStream() {
+		if (!audio) return;
+		audio.src = getStreamUrl();
+		audio.load();
+		streamConnectEpochMs = Date.now();
+	}
+
+	let showLive = $derived(confirmedLive || keepLiveUi);
+	let awaitingPlay = $derived(
+		probeReachable && !isPlaying && !isBuffering && !confirmedLive && !keepLiveUi
+	);
 	// Button stays enabled after failure so user can manually retry
-	$: canPlay = probeReachable || confirmedLive || playbackFailed;
-	$: statusMessage = STATUS_MESSAGES[statusKey] || '';
-	$: behindLiveSec = Math.max(0, liveEdge - currentTime);
-	$: isAtLive = !userSeeked;
-	$: hasSeekableRange =
-		Number.isFinite(liveEdge) && Number.isFinite(bufferStart) && liveEdge > bufferStart + 1;
-	$: behindLiveLabel = formatBehindLive(behindLiveSec);
+	let canPlay = $derived(probeReachable || confirmedLive || playbackFailed);
+	let statusMessage = $derived(
+		STATUS_MESSAGE_KEYS[statusKey] ? $t(STATUS_MESSAGE_KEYS[statusKey]) : ''
+	);
+	let behindLiveSec = $derived(Math.max(0, liveEdge - currentTime));
+	// Feed the transcript the wall-clock moment of what the listener is
+	// hearing right now (connection epoch + playback position). Frozen while
+	// paused (currentTime doesn't advance), shifted by DVR scrubbing, reset
+	// to "now" on every fresh reconnection — all without buffer-edge math.
+	$effect(() => {
+		livePlayback.set({
+			playing: isPlaying,
+			positionEpochMs:
+				streamConnectEpochMs === null ? null : streamConnectEpochMs + currentTime * 1000
+		});
+	});
+	let isAtLive = $derived(!userSeeked);
+	let hasSeekableRange = $derived(
+		Number.isFinite(liveEdge) && Number.isFinite(bufferStart) && liveEdge > bufferStart + 1
+	);
+	let behindLiveLabel = $derived(formatBehindLive(behindLiveSec));
 
 	function formatBehindLive(sec: number): string {
 		if (!Number.isFinite(sec) || sec < 0) return '';
@@ -134,13 +173,15 @@
 		const rem = s % 60;
 		return `-${m}:${rem.toString().padStart(2, '0')}`;
 	}
-	$: checkedAtLabel = lastCheckedAt
-		? new Date(lastCheckedAt).toLocaleTimeString('fr-FR', {
-				hour: '2-digit',
-				minute: '2-digit',
-				second: '2-digit'
-		  })
-		: '';
+	let checkedAtLabel = $derived(
+		lastCheckedAt
+			? new Date(lastCheckedAt).toLocaleTimeString('fr-FR', {
+					hour: '2-digit',
+					minute: '2-digit',
+					second: '2-digit'
+				})
+			: ''
+	);
 
 	// ── SSE status handler ─────────────────────────────────────────
 
@@ -187,8 +228,7 @@
 		if (!probeReachable) return;
 		hasAttemptedAutoplay = true;
 
-		audio.src = getStreamUrl();
-		audio.load();
+		connectStream();
 		isBuffering = true;
 		userWantsToPlay = true;
 		statusKey = 'connecting';
@@ -237,7 +277,12 @@
 		document.removeEventListener('keydown', handleAutoplayGesture, { capture: true });
 	}
 
-	function handleStatusEvent(liveNow: boolean, checkedAt: string, listeners: number, streamUrl?: string) {
+	function handleStatusEvent(
+		liveNow: boolean,
+		checkedAt: string,
+		listeners: number,
+		streamUrl?: string
+	) {
 		lastCheckedAt = checkedAt;
 		listenerCount = listeners;
 		if (streamUrl) directStreamUrl = streamUrl;
@@ -247,6 +292,7 @@
 
 		if (liveNow) {
 			cancelNoAudioGrace();
+			stopOfflineWatcher();
 			offlineStreak = 0;
 			probeReachable = true;
 
@@ -294,24 +340,36 @@
 		}
 	}
 
-	// ── Polling ───────────────────────────────────────────────────
+	// ── State refresh ─────────────────────────────────────────────
+	// No more 10-second polling. State is push-driven:
+	//  - SSR seeds initial state via the parent layout's data.
+	//  - One on-mount fetch of /api/live/radio-state hydrates this component.
+	//  - Service-Worker push events flip live state immediately, no network.
+	//  - While audio is actively playing, a slow 60s tick to /api/live/radio-state
+	//    refreshes listener count + admin-edited metadata (title, thumbnail) and
+	//    doubles as the listener heartbeat (the endpoint accepts ?sid=).
+	//  - Stopping audio or hiding the tab stops the tick entirely.
 
-	const POLL_INTERVAL = 10_000; // 10 seconds
+	const STATE_REFRESH_INTERVAL = 60_000; // 60s — only while playing + visible
 
-	async function pollRadioStatus() {
+	type RadioStatePayload = {
+		isLive: boolean;
+		checkedAt: string;
+		listeners: number;
+		streamUrl?: string;
+		title?: string | null;
+		description?: string | null;
+		thumbnailUrl?: string | null;
+	};
+
+	async function fetchRadioState(opts: { withSid?: boolean } = {}): Promise<void> {
 		try {
-			const sessionId = getSessionId();
-			const response = await fetch(`/api/live/radio-poll?sid=${encodeURIComponent(sessionId)}`);
+			const url = opts.withSid
+				? `/api/live/radio-state?sid=${encodeURIComponent(getSessionId())}`
+				: '/api/live/radio-state';
+			const response = await fetch(url);
 			if (!response.ok) return;
-			const data = (await response.json()) as {
-				isLive: boolean;
-				checkedAt: string;
-				listeners: number;
-				streamUrl?: string;
-				title?: string | null;
-				description?: string | null;
-				thumbnailUrl?: string | null;
-			};
+			const data = (await response.json()) as RadioStatePayload;
 			broadcastTitle = data.title ?? null;
 			broadcastDescription = data.description ?? null;
 			const nextThumb = data.thumbnailUrl ?? null;
@@ -319,21 +377,52 @@
 			broadcastThumbnail = nextThumb;
 			handleStatusEvent(data.isLive, data.checkedAt, data.listeners, data.streamUrl);
 		} catch {
-			// Network error — keep current state, will retry next interval
+			// Network error — keep current state.
 		}
 	}
 
-	function startPolling() {
+	function startStateRefresh() {
 		if (pollTimer) return;
-		pollRadioStatus(); // immediate first poll
-		pollTimer = setInterval(pollRadioStatus, POLL_INTERVAL);
+		pollTimer = setInterval(() => {
+			void fetchRadioState({ withSid: true });
+		}, STATE_REFRESH_INTERVAL);
 	}
 
-	function stopPolling() {
+	function stopStateRefresh() {
 		if (pollTimer) {
 			clearInterval(pollTimer);
 			pollTimer = null;
 		}
+	}
+
+	function sendListenerHeartbeat(): void {
+		const sid = getSessionId();
+		if (!sid) return;
+		fetch(`/api/live/radio-listener?sid=${encodeURIComponent(sid)}&action=heartbeat`, {
+			method: 'POST',
+			keepalive: true
+		}).catch(() => {});
+	}
+
+	// React to play/pause: only spend network while audio is actually playing
+	// and the tab is visible.
+	$effect(() => {
+		if (!browser) return;
+		if (isPlaying && document.visibilityState === 'visible') {
+			startStateRefresh();
+		} else {
+			stopStateRefresh();
+		}
+	});
+
+	// ── Push-driven updates (Service Worker → BroadcastChannel) ──
+	let radioBroadcast: BroadcastChannel | null = null;
+	let swMessageListener: ((event: MessageEvent) => void) | null = null;
+
+	function handleRadioPush() {
+		// A go-live push just landed. Refresh state immediately so the player
+		// flips to live with fresh metadata; no need to wait for the next tick.
+		void fetchRadioState({ withSid: true });
 	}
 
 	// ── Lifecycle ──────────────────────────────────────────────────
@@ -341,37 +430,64 @@
 	onMount(() => {
 		if (!browser) return;
 
-		startPolling();
+		// Initial paint — also registers the listener via ?sid=.
+		void fetchRadioState({ withSid: true });
+
 		document.addEventListener('visibilitychange', handleVisibilityChange);
+
+		try {
+			radioBroadcast = new BroadcastChannel('radio-state');
+			radioBroadcast.addEventListener('message', (event) => {
+				if (event.data?.type === 'RADIO_PUSH') handleRadioPush();
+			});
+		} catch {
+			/* BroadcastChannel unsupported */
+		}
+
+		swMessageListener = (event: MessageEvent) => {
+			if (event.data?.type !== 'RADIO_PUSH') return;
+			handleRadioPush();
+		};
+		navigator.serviceWorker?.addEventListener('message', swMessageListener);
 	});
 
 	onDestroy(() => {
-		stopPolling();
+		stopStateRefresh();
+		stopOfflineWatcher();
 		clearReconnectTimer();
 		clearNoAudioGraceTimer();
 		detachAutoplayGestureListener();
 		if (browser) {
 			document.removeEventListener('visibilitychange', handleVisibilityChange);
-			// Notify server to remove listener
+			if (swMessageListener) {
+				navigator.serviceWorker?.removeEventListener('message', swMessageListener);
+				swMessageListener = null;
+			}
+			radioBroadcast?.close();
+			radioBroadcast = null;
+			// Tell the server we're gone so the listener count drops promptly.
 			const sid = getSessionId();
 			if (sid) {
-				navigator.sendBeacon?.(`/api/live/radio-poll?sid=${encodeURIComponent(sid)}&action=disconnect`);
+				navigator.sendBeacon?.(
+					`/api/live/radio-listener?sid=${encodeURIComponent(sid)}&action=disconnect`
+				);
 			}
 		}
 	});
 
 	function handleVisibilityChange() {
 		if (document.visibilityState === 'visible') {
-			// Resume polling and trigger immediate check
-			startPolling();
-
-			// Resume audio if user was listening
+			// Tab regained focus — refresh once and (if playing) restart the tick.
+			void fetchRadioState({ withSid: true });
+			if (isPlaying) startStateRefresh();
 			if (userWantsToPlay && audio && audio.paused && !audio.ended) {
 				attemptReconnect();
 			}
 		} else {
-			// Pause polling when tab is hidden to save resources
-			stopPolling();
+			stopStateRefresh();
+			// One last heartbeat so the listener stays counted while the tab is
+			// hidden but audio keeps playing in the background (mobile lock screen).
+			if (isPlaying) sendListenerHeartbeat();
 		}
 	}
 
@@ -396,6 +512,89 @@
 				audio.removeAttribute('src');
 				audio.load();
 			}
+			streamConnectEpochMs = null;
+		}
+	}
+
+	// ── Stream-drop triage ─────────────────────────────────────────
+	// When playback dies we ask the server whether the broadcast is still on
+	// air before showing any retry UI. A listener-side hiccup keeps the
+	// visible "Reconnexion en cours…" flow; a broadcast that actually ended
+	// flips straight to the calm offline card — no red card stuck on
+	// "reconnecting" while retries hammer a dead stream. A quiet background
+	// watcher keeps checking for a few minutes so a server-side blip that
+	// recovers (Icecast restart) brings the player back to life on its own.
+
+	const OFFLINE_WATCH_INTERVAL_MS = 12_000;
+	const OFFLINE_WATCH_WINDOW_MS = 3 * 60_000;
+	let offlineWatchTimer: ReturnType<typeof setInterval> | null = null;
+	let offlineWatchUntil = 0;
+	let dropCheckInFlight = false;
+
+	async function handleStreamDrop() {
+		if (dropCheckInFlight || !userWantsToPlay) return;
+		dropCheckInFlight = true;
+		try {
+			const res = await fetch('/api/live/radio-state');
+			if (!res.ok) {
+				attemptReconnect(); // can't tell — treat as a hiccup
+				return;
+			}
+			const data = (await res.json()) as { isLive: boolean };
+			if (data.isLive) {
+				attemptReconnect();
+			} else {
+				goOfflineQuietly();
+			}
+		} catch {
+			attemptReconnect();
+		} finally {
+			dropCheckInFlight = false;
+		}
+	}
+
+	/** Broadcast is over (or the source dropped server-side): reset the UI to
+	 *  the plain offline card immediately instead of flashing reconnect
+	 *  states, and watch quietly in the background for a possible return. */
+	function goOfflineQuietly() {
+		cancelNoAudioGrace();
+		stopPlayback();
+		probeReachable = false;
+		confirmedLive = false;
+		playbackFailed = false;
+		hasError = false;
+		offlineStreak = 0;
+		statusKey = 'offline';
+		// Hide the stale scrubber — its buffer window died with the stream.
+		currentTime = 0;
+		bufferStart = 0;
+		liveEdge = 0;
+		userSeeked = false;
+		// Re-arm autoplay so the background watcher can restart playback
+		// seamlessly if the stream comes back.
+		hasAttemptedAutoplay = false;
+		detachAutoplayGestureListener();
+		radioIsLiveStore.set(false);
+		startOfflineWatcher();
+	}
+
+	function startOfflineWatcher() {
+		offlineWatchUntil = Date.now() + OFFLINE_WATCH_WINDOW_MS;
+		if (offlineWatchTimer) return;
+		offlineWatchTimer = setInterval(() => {
+			if (Date.now() > offlineWatchUntil) {
+				stopOfflineWatcher();
+				return;
+			}
+			if (document.visibilityState !== 'visible') return;
+			void fetchRadioState();
+		}, OFFLINE_WATCH_INTERVAL_MS);
+	}
+
+	function stopOfflineWatcher() {
+		if (offlineWatchTimer) {
+			clearInterval(offlineWatchTimer);
+			offlineWatchTimer = null;
 		}
 	}
 
@@ -414,13 +613,15 @@
 				audio.removeAttribute('src');
 				audio.load();
 			}
+			streamConnectEpochMs = null;
 			return;
 		}
 
 		isBuffering = true;
 		statusKey = 'reconnecting';
 
-		const delay = RECONNECT_DELAYS[reconnectAttempts] ?? RECONNECT_DELAYS[RECONNECT_DELAYS.length - 1];
+		const delay =
+			RECONNECT_DELAYS[reconnectAttempts] ?? RECONNECT_DELAYS[RECONNECT_DELAYS.length - 1];
 		reconnectAttempts += 1;
 
 		clearReconnectTimer();
@@ -429,8 +630,7 @@
 
 			// Fresh src — the browser reuses the audio session from the
 			// user's initial play tap, so play() works on mobile.
-			audio.src = getStreamUrl();
-			audio.load();
+			connectStream();
 			audio.play().catch(() => {
 				// play() rejected — handleError will fire and retry
 			});
@@ -445,6 +645,8 @@
 		if (!audio.paused || reconnectTimer) {
 			// Pause only — keep the audio session + buffer intact so
 			// resume plays from where the listener paused (time-shift).
+			// The transcript follows via the connection-epoch math, so a
+			// paused listener's text freezes and resumes in sync.
 			userWantsToPlay = false;
 			clearReconnectTimer();
 			reconnectAttempts = 0;
@@ -469,8 +671,7 @@
 		if (needsFreshStream) {
 			isBuffering = true;
 			statusKey = 'connecting';
-			audio.src = getStreamUrl();
-			audio.load();
+			connectStream();
 		}
 
 		try {
@@ -483,8 +684,7 @@
 				try {
 					isBuffering = true;
 					statusKey = 'reconnecting';
-					audio.src = getStreamUrl();
-					audio.load();
+					connectStream();
 					await audio.play();
 					return;
 				} catch (retryError) {
@@ -515,8 +715,7 @@
 		currentTime = 0;
 		bufferStart = 0;
 		liveEdge = 0;
-		audio.src = getStreamUrl();
-		audio.load();
+		connectStream();
 		try {
 			await audio.play();
 		} catch {
@@ -666,7 +865,7 @@
 		startNoAudioGrace();
 
 		if (userWantsToPlay) {
-			attemptReconnect();
+			void handleStreamDrop();
 		} else {
 			statusKey = 'waiting';
 		}
@@ -687,7 +886,7 @@
 			// user's initial tap, so no autoplay policy issues.
 			startNoAudioGrace();
 			playbackFailed = false; // allow UI updates during reconnect
-			attemptReconnect();
+			void handleStreamDrop();
 		} else {
 			playbackFailed = false;
 			startNoAudioGrace();
@@ -699,26 +898,47 @@
 <div class="space-y-4">
 	<!-- Main player card -->
 	<div
-		class="relative border p-6 md:p-8 transition-all duration-500 {showLive
+		class="relative border p-5 md:p-8 transition-all duration-500 {showLive
 			? 'border-red-200 bg-red-50/30'
 			: awaitingPlay
 				? 'border-missionnaire/40 bg-orange-50/30 radio-pulse'
 				: 'border-stone-200/60 bg-white/40'}"
 	>
 		<!-- Status indicator -->
-		<div class="flex items-center gap-2.5 mb-4">
+		<div class="flex items-center gap-2.5 mb-3 md:mb-4">
 			<span class="relative inline-flex h-2.5 w-2.5">
 				{#if showLive || awaitingPlay}
-					<span class="absolute inline-flex h-full w-full animate-ping rounded-full {showLive ? 'bg-red-500' : 'bg-missionnaire'} opacity-75"></span>
+					<span
+						class="absolute inline-flex h-full w-full animate-ping rounded-full {showLive
+							? 'bg-red-500'
+							: 'bg-missionnaire'} opacity-75"
+					></span>
 				{/if}
-				<span class="relative inline-flex h-2.5 w-2.5 rounded-full {showLive ? 'bg-red-500' : awaitingPlay ? 'bg-missionnaire' : 'bg-stone-300'}"></span>
+				<span
+					class="relative inline-flex h-2.5 w-2.5 rounded-full {showLive
+						? 'bg-red-500'
+						: awaitingPlay
+							? 'bg-missionnaire'
+							: 'bg-stone-300'}"
+				></span>
 			</span>
-			<span class="text-[10px] font-bold uppercase tracking-[0.25em] font-body {showLive ? 'text-red-600' : awaitingPlay ? 'text-missionnaire' : 'text-stone-400'}">
-				{showLive ? 'Audio en direct' : awaitingPlay ? 'Direct audio disponible' : 'Audio hors ligne'}
+			<span
+				class="text-[10px] font-bold uppercase tracking-[0.25em] font-body {showLive
+					? 'text-red-600'
+					: awaitingPlay
+						? 'text-missionnaire'
+						: 'text-stone-400'}"
+			>
+				{showLive
+					? $t('live.audioLive')
+					: awaitingPlay
+						? $t('live.audioAvailable')
+						: $t('live.audioOffline')}
 			</span>
 			{#if listenerCount > 0 && showLive}
 				<span class="text-[10px] text-red-400 font-body">
-					· {listenerCount} {listenerCount === 1 ? 'auditeur' : 'auditeurs'}
+					· {listenerCount}
+					{listenerCount === 1 ? $t('live.listener') : $t('live.listeners')}
 				</span>
 			{/if}
 		</div>
@@ -726,57 +946,94 @@
 		<!-- Title + thumbnail (2-column when thumbnail available) -->
 		<div class="flex flex-col md:flex-row md:items-start gap-6">
 			<div class="flex-1 min-w-0">
-				<h2 class="font-display text-2xl md:text-3xl font-semibold {showLive ? 'text-stone-900' : awaitingPlay ? 'text-stone-900' : 'text-stone-700'}">
-					{showLive && broadcastTitle ? broadcastTitle : showLive ? 'Audio en direct' : awaitingPlay ? 'Audio en direct' : 'Audio hors ligne'}
+				<h2
+					class="font-display text-xl md:text-3xl font-semibold {showLive
+						? 'text-stone-900'
+						: awaitingPlay
+							? 'text-stone-900'
+							: 'text-stone-700'}"
+				>
+					{showLive && broadcastTitle
+						? broadcastTitle
+						: showLive
+							? $t('live.audioLive')
+							: awaitingPlay
+								? $t('live.audioLive')
+								: $t('live.audioOffline')}
 				</h2>
 				<p class="text-sm text-stone-500 font-body mt-1.5">
 					{statusMessage}
 				</p>
 				{#if checkedAtLabel}
 					<p class="text-[11px] text-stone-400 font-body mt-1">
-						Dernière vérification : {checkedAtLabel}
+						{$t('live.lastChecked', { time: checkedAtLabel })}
 					</p>
 				{/if}
 
 				<!-- Controls -->
-				<div class="flex items-center gap-3 mt-6">
+				<div class="flex items-center gap-2 md:gap-3 mt-4 md:mt-6">
 					<button
-						class="inline-flex items-center gap-2.5 px-6 py-3 text-[12px] font-bold uppercase tracking-[0.15em] font-body transition-all duration-300 {canPlay
+						class="inline-flex items-center gap-2 px-4 py-2.5 md:px-6 md:py-3 min-h-11 text-[12px] font-bold uppercase tracking-[0.15em] font-body whitespace-nowrap transition-all duration-300 {canPlay
 							? showLive
 								? 'bg-red-600 hover:bg-red-700 text-white'
 								: 'bg-stone-900 hover:bg-missionnaire text-white'
 							: 'bg-stone-200 text-stone-400 cursor-not-allowed'}"
-						on:click={togglePlay}
-						aria-label={isPlaying ? 'Mettre en pause le direct' : 'Écouter le direct'}
+						onclick={togglePlay}
+						aria-label={isPlaying ? $t('live.pause') : $t('live.listen')}
 						disabled={!canPlay}
 					>
 						{#if isPlaying}
 							<svg viewBox="0 0 24 24" class="h-4 w-4 fill-current" aria-hidden="true">
 								<path d="M8 5h3v14H8zm5 0h3v14h-3z" />
 							</svg>
-							<span>Pause</span>
+							<span>{$t('player.pause')}</span>
 						{:else}
 							<svg viewBox="0 0 24 24" class="h-4 w-4 fill-current" aria-hidden="true">
 								<path d="M8 5v14l11-7z" />
 							</svg>
-							<span>Lecture</span>
+							<span>{$t('player.play')}</span>
 						{/if}
 					</button>
 
 					<button
-						class="inline-flex items-center gap-2 px-5 py-3 border text-[12px] font-semibold font-body transition-all duration-300 {canPlay
+						class="inline-flex items-center gap-2 px-4 py-2.5 md:px-5 md:py-3 min-h-11 border text-[12px] font-semibold font-body whitespace-nowrap transition-all duration-300 {canPlay
 							? 'border-stone-200/60 text-stone-600 hover:border-missionnaire hover:text-missionnaire'
 							: 'border-stone-200/40 text-stone-300 cursor-not-allowed'}"
-						on:click={toggleMute}
-						aria-label={isMuted ? 'Activer le son' : 'Couper le son'}
+						onclick={toggleMute}
+						aria-label={isMuted ? $t('player.unmute') : $t('player.mute')}
 						disabled={!canPlay}
 					>
 						{#if isMuted}
-							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
-							<span>Son coupé</span>
+							<svg
+								width="16"
+								height="16"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><line
+									x1="23"
+									y1="9"
+									x2="17"
+									y2="15"
+								/><line x1="17" y1="9" x2="23" y2="15" /></svg
+							>
+							<span>{$t('live.muted')}</span>
 						{:else}
-							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-							<span>Couper le son</span>
+							<svg
+								width="16"
+								height="16"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path
+									d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"
+								/></svg
+							>
+							<span>{$t('player.mute')}</span>
 						{/if}
 					</button>
 				</div>
@@ -787,42 +1044,74 @@
 					{#if broadcastThumbnail && !broadcastThumbnailBroken}
 						<button
 							type="button"
-							on:click={openThumbnail}
-							aria-label="Agrandir la vignette"
+							onclick={openThumbnail}
+							aria-label={$t('live.expandThumbnail')}
 							class="group relative aspect-video w-full overflow-hidden border border-stone-200/60 bg-stone-100 cursor-zoom-in transition-all duration-300 hover:border-missionnaire/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
 						>
 							<img
 								src={broadcastThumbnail}
-								alt={broadcastTitle || 'Vignette du direct'}
-								on:error={() => (broadcastThumbnailBroken = true)}
+								alt={broadcastTitle || $t('live.thumbnailAlt')}
+								onerror={() => (broadcastThumbnailBroken = true)}
 								class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
 								loading="eager"
 							/>
-							<span class="pointer-events-none absolute inset-0 flex items-end justify-end p-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-								<span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/90 shadow">
-									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-stone-700">
+							<span
+								class="pointer-events-none absolute inset-0 flex items-end justify-end p-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+							>
+								<span
+									class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/90 shadow"
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										class="text-stone-700"
+									>
 										<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
 									</svg>
 								</span>
 							</span>
 						</button>
 					{:else}
-						<div class="default-thumbnail relative aspect-video w-full overflow-hidden border border-stone-200/60">
+						<div
+							class="default-thumbnail relative aspect-video w-full overflow-hidden border border-stone-200/60"
+						>
 							<div class="absolute inset-0 flex flex-col items-center justify-center gap-2.5">
 								<picture>
 									<source srcset="/icons/logo.webp" type="image/webp" />
-									<img src="/icons/logo.png" alt="" class="h-9 w-auto opacity-90" width="150" height="64" loading="eager" />
+									<img
+										src="/icons/logo.png"
+										alt=""
+										class="h-9 w-auto opacity-90"
+										width="150"
+										height="64"
+										loading="eager"
+									/>
 								</picture>
-								<div class="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.25em] text-red-600 font-body">
+								<div
+									class="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.25em] text-red-600 font-body"
+								>
 									<span class="relative inline-flex h-1.5 w-1.5">
-										<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"></span>
+										<span
+											class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"
+										></span>
 										<span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500"></span>
 									</span>
-									En direct
+									{$t('live.atLive')}
 								</div>
 							</div>
 							<!-- Decorative ornament -->
-							<svg class="absolute top-2 right-2 h-3 w-3 text-missionnaire/30" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
+							<svg
+								class="absolute top-2 right-2 h-3 w-3 text-missionnaire/30"
+								viewBox="0 0 14 14"
+								fill="currentColor"
+								aria-hidden="true"
+							>
 								<path d="M7 0L8.5 5.5L14 7L8.5 8.5L7 14L5.5 8.5L0 7L5.5 5.5L7 0Z" />
 							</svg>
 						</div>
@@ -835,7 +1124,7 @@
 		{#if isBuffering}
 			<div class="flex items-center gap-2 mt-4">
 				<div class="animate-spin h-3.5 w-3.5 border-t-2 border-missionnaire rounded-full"></div>
-				<span class="text-[11px] text-stone-400 font-body">Chargement...</span>
+				<span class="text-[11px] text-stone-400 font-body">{$t('list.loading')}</span>
 			</div>
 		{/if}
 
@@ -850,9 +1139,12 @@
 						max={liveEdge}
 						step="0.1"
 						value={currentTime}
-						on:input={onSeekInput}
-						on:change={onSeekCommit}
-						aria-label="Position dans le direct"
+						oninput={onSeekInput}
+						onchange={onSeekCommit}
+						aria-label={$t('live.scrubberLabel')}
+						aria-valuetext={isAtLive
+							? $t('live.atLive')
+							: $t('live.behindLive', { label: behindLiveLabel })}
 					/>
 					{#if !isAtLive}
 						<span class="text-[11px] font-mono text-stone-500 tabular-nums shrink-0">
@@ -861,27 +1153,29 @@
 					{/if}
 					<button
 						type="button"
-						on:click={backToLive}
-						aria-label={isAtLive ? 'Recharger le direct' : 'Revenir au direct'}
-						title={isAtLive ? 'Recharger le direct' : 'Revenir au direct'}
-						class="inline-flex items-center gap-1.5 px-3 py-1.5 border text-[10px] font-bold uppercase tracking-[0.15em] font-body transition-all duration-200 shrink-0 {isAtLive
+						onclick={backToLive}
+						aria-label={isAtLive ? $t('live.reload') : $t('live.backToLive')}
+						title={isAtLive ? $t('live.reload') : $t('live.backToLive')}
+						class="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-11 border text-[10px] font-bold uppercase tracking-[0.15em] font-body transition-all duration-200 shrink-0 {isAtLive
 							? 'border-red-500 text-red-600 bg-red-50/60 hover:bg-red-100'
 							: 'border-missionnaire text-missionnaire hover:bg-missionnaire hover:text-white'}"
 					>
 						{#if isAtLive}
 							<span class="relative inline-flex h-2 w-2">
-								<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"></span>
+								<span
+									class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"
+								></span>
 								<span class="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
 							</span>
-							En direct
+							{$t('live.atLive')}
 						{:else}
-							<span class="hidden sm:inline">Revenir au direct</span>
-							<span class="sm:hidden">Au direct</span>
+							<span class="hidden sm:inline">{$t('live.backToLive')}</span>
+							<span class="sm:hidden">{$t('live.atLiveShort')}</span>
 						{/if}
 					</button>
 				</div>
-				<p class="mt-2 text-[10px] text-stone-400 font-body">
-					Vous pouvez faire glisser le curseur pour revenir en arrière dans ce que vous avez déjà écouté.
+				<p class="mt-3 text-[10px] leading-relaxed text-stone-400/90 font-body">
+					{$t('live.dvrHint')}
 				</p>
 			</div>
 		{/if}
@@ -889,10 +1183,13 @@
 
 	<!-- Description (YouTube-style expandable block under the player) -->
 	{#if showLive && broadcastDescription}
-		{@const isLong = broadcastDescription.length > 280 || (broadcastDescription.match(/\n/g)?.length ?? 0) >= 3}
-		<div class="border border-stone-200/60 bg-white/40 p-5 md:p-6">
-			<p class="text-[10px] font-bold uppercase tracking-[0.25em] text-missionnaire/80 font-body mb-3">
-				À propos de ce direct
+		{@const isLong =
+			broadcastDescription.length > 280 || (broadcastDescription.match(/\n/g)?.length ?? 0) >= 3}
+		<div class="border border-stone-200/60 bg-white/40 p-5 md:p-8">
+			<p
+				class="text-[10px] font-bold uppercase tracking-[0.25em] text-missionnaire/80 font-body mb-3"
+			>
+				{$t('live.aboutBroadcast')}
 			</p>
 			<div
 				class="text-sm text-stone-700 font-body leading-relaxed whitespace-pre-wrap"
@@ -903,32 +1200,30 @@
 			{#if isLong}
 				<button
 					type="button"
-					on:click={() => (descriptionExpanded = !descriptionExpanded)}
+					onclick={() => (descriptionExpanded = !descriptionExpanded)}
 					class="mt-3 text-[11px] font-bold uppercase tracking-[0.15em] font-body text-missionnaire hover:text-missionnaire-dark transition-colors"
 				>
-					{descriptionExpanded ? 'Voir moins ↑' : 'Voir plus ↓'}
+					{descriptionExpanded ? `${$t('misc.seeLess')} ↑` : `${$t('misc.seeMore')} ↓`}
 				</button>
 			{/if}
 		</div>
 	{/if}
 
-	<!-- Offline info card -->
-	{#if !showLive}
-		<div class="border border-stone-200/60 bg-white/40 p-5 md:p-6">
-			<p class="text-[10px] font-bold uppercase tracking-[0.25em] text-stone-400 font-body mb-2">
-				Information
+	<!-- Synced transcript — renders nothing unless the broadcast has an SRT
+	     attached (the component polls radio-state itself). -->
+	{#if showLive}
+		<LiveTranscript />
+	{/if}
+
+	<!-- Offline: only surface a message when the listener tapped Lecture
+	     while the stream is down. The "page updates automatically" copy
+	     already lives in the page header, so no full card is shown
+	     otherwise — that keeps the rediffusions list in view. -->
+	{#if !showLive && hasError}
+		<div class="border border-red-200 bg-red-50/50 px-4 py-3">
+			<p class="text-[12px] font-semibold text-red-600 font-body">
+				{$t('live.notAvailableYet')}
 			</p>
-			<p class="text-sm text-stone-500 font-body leading-relaxed">
-				Cette page se met à jour automatiquement en temps réel.
-				Dès que le direct commence, le bouton
-				<span class="font-semibold text-stone-700">Lecture</span>
-				devient actif.
-			</p>
-			{#if hasError}
-				<p class="mt-3 text-[12px] font-semibold text-red-600 font-body">
-					Le direct n'est pas encore disponible.
-				</p>
-			{/if}
 		</div>
 	{/if}
 
@@ -936,47 +1231,57 @@
 		<audio
 			bind:this={audio}
 			preload="none"
-			on:play={handlePlay}
-			on:pause={handlePause}
-			on:waiting={handleWaiting}
-			on:stalled={handleStalled}
-			on:canplay={handleCanPlay}
-			on:error={handleError}
-			on:ended={handleEnded}
-			on:timeupdate={handleTimeUpdate}
-			on:progress={handleProgress}
+			onplay={handlePlay}
+			onpause={handlePause}
+			onwaiting={handleWaiting}
+			onstalled={handleStalled}
+			oncanplay={handleCanPlay}
+			onerror={handleError}
+			onended={handleEnded}
+			ontimeupdate={handleTimeUpdate}
+			onprogress={handleProgress}
 		></audio>
 	{/if}
 </div>
 
-<svelte:window on:keydown={handleLightboxKeydown} />
+<svelte:window onkeydown={handleLightboxKeydown} />
 
 {#if thumbnailExpanded && broadcastThumbnail && !broadcastThumbnailBroken}
 	<!-- Lightbox: click backdrop or press Escape to close. Image inside
 	     stops propagation so clicking the image itself doesn't dismiss. -->
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-lightbox-in"
-		on:click={handleBackdropClick}
-		on:keydown={handleLightboxKeydown}
+		onclick={handleBackdropClick}
+		onkeydown={handleLightboxKeydown}
+		use:focusTrap={{ onEscape: closeThumbnail }}
 		role="dialog"
 		aria-modal="true"
-		aria-label="Vignette du direct"
+		aria-label={$t('live.thumbnailAlt')}
 		tabindex="-1"
 	>
 		<button
 			type="button"
-			on:click={closeThumbnail}
-			aria-label="Fermer"
+			onclick={closeThumbnail}
+			aria-label={$t('live.closeLightbox')}
 			class="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
 		>
-			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+			<svg
+				width="18"
+				height="18"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
 				<path d="M6 6l12 12M6 18L18 6" />
 			</svg>
 		</button>
 		<img
 			src={broadcastThumbnail}
-			alt={broadcastTitle || 'Vignette du direct'}
-			on:error={() => {
+			alt={broadcastTitle || $t('live.thumbnailAlt')}
+			onerror={() => {
 				broadcastThumbnailBroken = true;
 				closeThumbnail();
 			}}
@@ -991,7 +1296,8 @@
 	}
 
 	@keyframes radio-glow {
-		0%, 100% {
+		0%,
+		100% {
 			box-shadow: 0 0 0 0 rgba(255, 136, 12, 0);
 		}
 		50% {
@@ -1015,7 +1321,7 @@
 		width: 11px;
 		height: 11px;
 		border-radius: 9999px;
-		background: #FF880C;
+		background: #ff880c;
 		border: 2px solid white;
 		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 		cursor: pointer;
@@ -1024,7 +1330,7 @@
 		width: 11px;
 		height: 11px;
 		border-radius: 9999px;
-		background: #FF880C;
+		background: #ff880c;
 		border: 2px solid white;
 		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 		cursor: pointer;
@@ -1033,19 +1339,36 @@
 		box-shadow: 0 0 0 3px rgba(255, 136, 12, 0.3);
 	}
 
+	/* Touch devices: a bigger thumb gives a comfortable hit target while the
+	   3px track keeps its slim look. */
+	@media (pointer: coarse) {
+		.live-scrubber::-webkit-slider-thumb {
+			width: 22px;
+			height: 22px;
+		}
+		.live-scrubber::-moz-range-thumb {
+			width: 22px;
+			height: 22px;
+		}
+	}
+
 	.animate-lightbox-in {
 		animation: lightbox-fade 0.18s ease-out;
 	}
 	@keyframes lightbox-fade {
-		from { opacity: 0; }
-		to { opacity: 1; }
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
 	}
 
 	/* Default live thumbnail — warm stone gradient matching the site palette */
 	.default-thumbnail {
 		background:
 			radial-gradient(circle at 30% 20%, rgba(255, 136, 12, 0.08), transparent 60%),
-			linear-gradient(135deg, #FAF6F1 0%, #F1EAE0 100%);
+			linear-gradient(135deg, #faf6f1 0%, #f1eae0 100%);
 	}
 
 	/* Collapsed description: show first ~3 lines then fade, expand on click */

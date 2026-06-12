@@ -16,6 +16,22 @@ import type {
 
 let indexesReady: Promise<void> | null = null;
 
+/**
+ * Authoritative count of visible, non-deleted replies for a question (official
+ * answer included). Used to keep the cached `replyCount` on the question in
+ * sync whenever a reply is added or its visibility changes.
+ */
+async function countVisibleReplies(
+	db: Awaited<ReturnType<typeof getDb>>,
+	questionId: string
+): Promise<number> {
+	return db.collection('questionReplies').countDocuments({
+		questionId,
+		visibilityStatus: 'visible',
+		deletedAt: null
+	});
+}
+
 function serializeDocument<T = unknown>(doc: unknown): T {
 	if (doc == null) return doc as T;
 	if (doc instanceof ObjectId) return doc.toString() as T;
@@ -386,9 +402,22 @@ export async function setReplyVisibility(input: {
 	if (input.visibilityStatus === 'deleted') set.deletedAt = now;
 	else set.deletedAt = null;
 
-	await db
+	const reply = await db
 		.collection('questionReplies')
-		.updateOne({ _id: idFromString(input.replyId) }, { $set: set });
+		.findOneAndUpdate({ _id: idFromString(input.replyId) }, { $set: set });
+
+	// Hiding/restoring/deleting a reply changes how many are visible, so keep the
+	// question's cached `replyCount` accurate.
+	const questionId = reply?.questionId as string | undefined;
+	if (questionId) {
+		await db
+			.collection('questions')
+			.updateOne(
+				{ _id: idFromString(questionId) },
+				{ $set: { replyCount: await countVisibleReplies(db, questionId) } }
+			);
+	}
+
 	await recordModerationAction({
 		targetType: 'reply',
 		targetId: input.replyId,
@@ -451,7 +480,11 @@ export async function upsertOfficialAnswer(input: {
 				answeredAt: question.answeredAt ?? now,
 				approvedAt: question.approvedAt ?? now,
 				lastActivityAt: now,
-				updatedAt: now
+				updatedAt: now,
+				// Authoritative recount of visible replies (incl. this official
+				// answer) so the "réponses" count stays in sync — the cached
+				// counter is otherwise only ever incremented for public replies.
+				replyCount: await countVisibleReplies(db, input.questionId)
 			}
 		}
 	);

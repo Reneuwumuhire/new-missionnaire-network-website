@@ -1,12 +1,13 @@
 {
+	"id": "/admin",
 	"name": "Missionnaire Admin",
 	"short_name": "MN Admin",
 	"description": "Panneau d'administration Missionnaire Network pour les contenus, les directs et les questions-réponses",
-	"start_url": "/",
+	"start_url": "/?source=pwa-missionnaire-admin",
+	"scope": "/",
 	"display": "standalone",
 	"background_color": "#FAF8F3",
 	"theme_color": "#f97316",
-	"orientation": "any",
 	"icons": [
 		{
 			"src": "/icons/pwa-192x192.png",

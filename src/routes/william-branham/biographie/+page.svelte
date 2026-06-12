@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Breadcrumbs from '$lib/components/+breadcrumbs.svelte';
 	import ArticleParagraph from '$lib/components/+articleParagraph.svelte';
 	import Quotes from '$lib/components/+quotes.svelte';
 	import { BranhamsBiographyParagraphsPart1, BranhamsBiographyParagraphsPart2 } from './paragraphs';
@@ -6,19 +7,10 @@
 	import ArticleCornerImage from '$lib/components/+articleCornerImage.svelte';
 </script>
 
-<svelte:head>
-	<title>William Branham - Missionnaire Network</title>
-	<meta
-		name="description"
-		content="Biographie de William Marrion Branham, ministère, citations et ressources du Message."
-	/>
-	<meta property="og:title" content="William Branham - Missionnaire Network" />
-	<meta
-		property="og:description"
-		content="Découvrez la biographie de William Branham et son impact dans le Message de l'Heure."
-	/>
-</svelte:head>
+<!-- Title/description/og:*/canonical come from `meta` in this route's
+     load — the root layout renders the single canonical tag set ($lib/seo). -->
 <div class="flex flex-col">
+	<Breadcrumbs items={[{ label: 'William Branham', href: '/william-branham/biographie' }, { label: 'Biographie' }]} />
 	<header class="relative h-[40vh] min-h-[300px] max-h-[500px] overflow-hidden">
 		<img src="/img/branham_page_header.jpg" alt="William Marrion Branham" class="absolute inset-0 w-full h-full object-cover img-zoom" />
 		<div class="absolute inset-0 bg-gradient-to-t from-stone-900/60 via-transparent to-transparent"></div>

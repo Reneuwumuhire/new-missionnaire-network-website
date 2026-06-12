@@ -3,11 +3,15 @@
 	import { vercelImage, vercelImageSrcSet, vercelImagePlaceholder } from '$lib/utils/vercelImage';
 	import BlurUpImage from '$lib/components/BlurUpImage.svelte';
 
-	export let recordings: PublishedRecording[] = [];
+	interface Props {
+		recordings?: PublishedRecording[];
+	}
+
+	let { recordings = [] }: Props = $props();
 
 	// Legacy thumbnails uploaded before the ACL fix return 403. Track failed
 	// IDs so the default logo fallback replaces the broken-image icon.
-	let failedThumbs = new Set<string>();
+	let failedThumbs = $state(new Set<string>());
 	function markThumbFailed(id: string) {
 		if (failedThumbs.has(id)) return;
 		failedThumbs = new Set(failedThumbs).add(id);
@@ -30,7 +34,7 @@
 </script>
 
 {#if recordings.length > 0}
-	<section class="mt-12">
+	<section class="mt-4 md:mt-10">
 		<div class="flex items-end justify-between mb-5">
 			<div>
 				<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-1 font-body">
@@ -57,13 +61,13 @@
 									src={vercelImage(rec.thumbnail_url, 192)}
 									srcset={vercelImageSrcSet(rec.thumbnail_url, 96)}
 									placeholderSrc={vercelImagePlaceholder(rec.thumbnail_url)}
-									alt=""
+									alt={rec.title}
 									width={80}
 									height={56}
 									loading="lazy"
 									fetchpriority="low"
 									class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-									on:error={() => markThumbFailed(rec.id)}
+									onerror={() => markThumbFailed(rec.id)}
 								/>
 							{:else}
 								<div class="recent-default-thumb absolute inset-0 flex items-center justify-center">

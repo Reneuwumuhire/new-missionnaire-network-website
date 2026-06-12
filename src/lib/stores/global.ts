@@ -29,6 +29,25 @@ export const filteredVideos = writable<YoutubeVideo[]>();
 // Radio live status — shared across components (banner, homepage, radio player)
 export const radioIsLive = writable<boolean>(false);
 
+// Live player playback position bridge — written by +liveRadioPlayer, read by
+// the live transcript. positionEpochMs = wall-clock ms of the audio the
+// listener is hearing right now (stream connection epoch + playback
+// position); null when no stream is connected. Pause freezes it, DVR
+// rewind shifts it back, reconnects snap it to "now".
+export const livePlayback = writable<{ playing: boolean; positionEpochMs: number | null }>({
+	playing: false,
+	positionEpochMs: null
+});
+
+// Global audio player position bridge — written by +audioPlayer (throttled),
+// read by the replay transcript on the rediffusion page. trackId is the
+// playing item's _id so the transcript only follows its own recording.
+export const replayPlayback = writable<{
+	trackId: string | null;
+	timeSec: number;
+	playing: boolean;
+}>({ trackId: null, timeSec: 0, playing: false });
+
 // Video Playlist Search
 export const videoPlaylist = writable<YoutubeVideo[]>([]);
 export const videoPlaylistIndex = writable<number>(0);

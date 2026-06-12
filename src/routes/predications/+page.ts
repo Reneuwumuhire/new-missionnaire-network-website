@@ -1,6 +1,7 @@
 import { browser } from '$app/environment';
 import type { Sermon } from '$lib/models/sermon';
 import type { PublishedRecording } from '$lib/server/recordings';
+import { pageMeta } from '$lib/seo';
 
 const RETRANSMISSIONS_FILTER = 'Retransmissions';
 
@@ -42,7 +43,13 @@ export const load = async ({ fetch, url }) => {
 		sort,
 		language,
 		page: parsedPage,
-		limit: parsedLimit
+		limit: parsedLimit,
+		// Rendered by the root layout as the single og:*/twitter:* tag set.
+		meta: pageMeta('/predications', {
+			title: 'Prédications - Missionnaire Network',
+			description:
+				"Explorez les prédications de William Branham, Ewald Frank et de l'église locale par auteur, année, langue et thème. Lecture audio et recherche rapide."
+		})
 	};
 
 	if (browser) {

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Icon from 'svelte-icons-pack/Icon.svelte';
-	import IoCloudDownloadOutline from 'svelte-icons-pack/io/IoCloudDownloadOutline';
+	import AiOutlineDownload from 'svelte-icons-pack/ai/AiOutlineDownload';
 	import IoPlayCircle from 'svelte-icons-pack/io/IoPlayCircle';
 	import IoPauseCircle from 'svelte-icons-pack/io/IoPauseCircle';
 	import { selectAudio, isPlaying, currentIndex, playlist, basePlaylist } from '../stores/global';
@@ -11,32 +11,20 @@
 	import { formatTime } from '../../utils/FormatTime';
 	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
 	import { downloadAudioFile } from '../../utils/downloadAudio';
+	import { t } from '../../i18n';
 
-	export let recording: PublishedRecording;
-	export let absoluteIndex: number;
+	interface Props {
+		recording: PublishedRecording;
+		absoluteIndex: number;
+		/** Show a small "Retransmission" pill — used when rows are blended into sermon search results. */
+		showBadge?: boolean;
+	}
+
+	let { recording, absoluteIndex, showBadge = false }: Props = $props();
 
 	const desktopSermonGrid = 'md:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.35fr)_110px_80px_120px]';
 
-	// Shape the recording as a MusicAudio-compatible entry so it slots into
-	// the same global audio-player stores the sermon + music pages use.
-	$: playable = {
-		_id: recording.id,
-		book: null,
-		book_full_name: null,
-		number: null,
-		title: recording.title,
-		artist: 'Missionnaire Network',
-		category: 'Direct',
-		s3_key: '',
-		s3_url: recording.s3_url,
-		file_size: recording.size_bytes ?? 0,
-		duration: recording.duration_sec ?? undefined,
-		format: 'mp3',
-		uploaded_at: new Date(recording.started_at),
-		thumbnail_url: recording.thumbnail_url ?? undefined
-	} satisfies MusicAudio & { thumbnail_url?: string };
 
-	$: isActive = isRecordingActive($selectAudio);
 
 	function isRecordingActive(current: Sermon | AudioAsset | MusicAudio | null): boolean {
 		if (!current) return false;
@@ -71,8 +59,8 @@
 	}
 
 	// Download state mirrors SermonTableItem so the row visual is identical.
-	let isDownloading = false;
-	let downloadPercent: number | null = 0;
+	let isDownloading = $state(false);
+	let downloadPercent: number | null = $state(0);
 	let downloadController: AbortController | null = null;
 
 	async function downloadMp3() {
@@ -110,18 +98,37 @@
 		const month = String(d.getUTCMonth() + 1).padStart(2, '0');
 		return `${day}.${month}.${d.getUTCFullYear()}`;
 	}
+	// Shape the recording as a MusicAudio-compatible entry so it slots into
+	// the same global audio-player stores the sermon + music pages use.
+	let playable = $derived({
+		_id: recording.id,
+		book: null,
+		book_full_name: null,
+		number: null,
+		title: recording.title,
+		artist: 'Missionnaire Network',
+		category: 'Direct',
+		s3_key: '',
+		s3_url: recording.s3_url,
+		file_size: recording.size_bytes ?? 0,
+		duration: recording.duration_sec ?? undefined,
+		format: 'mp3',
+		uploaded_at: new Date(recording.started_at),
+		thumbnail_url: recording.thumbnail_url ?? undefined
+	} satisfies MusicAudio & { thumbnail_url?: string });
+	let isActive = $derived(isRecordingActive($selectAudio));
 </script>
 
-<!-- svelte-ignore a11y-no-noninteractive-tabindex -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div
-	class="grid grid-cols-[30px_1fr_auto_auto] {desktopSermonGrid} gap-2 md:gap-4 px-3 md:px-4 py-3 md:py-4 items-center transition-all group cursor-pointer {isActive
+	class="grid grid-cols-[30px_1fr_auto_auto] {desktopSermonGrid} gap-2 md:gap-4 px-4 py-3 md:py-4 items-center transition-all group cursor-pointer {isActive
 		? 'bg-orange-50/80 border-l-4 border-l-orange-500'
 		: 'hover:bg-gray-50'}"
-	on:click={togglePlay}
-	on:keydown={handleKeydown}
+	onclick={togglePlay}
+	onkeydown={handleKeydown}
 	role="button"
 	tabindex="0"
-	aria-label="Lire la retransmission {recording.title}"
+	aria-label={$t('player.playRecording', { title: recording.title })}
 >
 	<div
 		class="text-center text-[10px] md:text-xs font-bold {isActive
@@ -132,15 +139,24 @@
 	</div>
 
 	<div class="flex flex-col min-w-0">
-		<a
-			href={`/live/rediffusions/${recording.id}`}
-			class="text-sm font-bold line-clamp-1 transition-colors {isActive
-				? 'text-orange-600'
-				: 'text-gray-800 group-hover:text-orange-600'} hover:underline underline-offset-2"
-			on:click|stopPropagation
-		>
-			{recording.title}
-		</a>
+		<div class="flex items-center gap-2 min-w-0">
+			{#if showBadge}
+				<span
+					class="shrink-0 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider bg-red-50 text-red-600 border border-red-200/60"
+				>
+					{$t('misc.retransmissionBadge')}
+				</span>
+			{/if}
+			<a
+				href={`/live/rediffusions/${recording.id}`}
+				class="text-sm font-bold line-clamp-1 transition-colors {isActive
+					? 'text-orange-600'
+					: 'text-gray-800 group-hover:text-orange-600'} hover:underline underline-offset-2"
+				onclick={(e) => e.stopPropagation()}
+			>
+				{recording.title}
+			</a>
+		</div>
 		<div
 			class="flex flex-row items-center gap-2 md:hidden overflow-hidden text-ellipsis whitespace-nowrap"
 		>
@@ -182,17 +198,26 @@
 		{recording.duration_sec ? formatTime(recording.duration_sec) : '--:--'}
 	</div>
 
-	<div class="flex w-full items-center justify-center gap-1 md:gap-2">
+	<!-- Actions — hidden on mobile until the row is selected, so the title
+	     gets the full width (matches SermonTableItem). -->
+	<div
+		class="w-full items-center justify-center gap-1 md:gap-2 {isActive
+			? 'flex'
+			: 'hidden md:flex'}"
+	>
 		{#if recording.s3_url}
 			<button
 				class="group relative p-2 text-gray-400 hover:text-orange-600 transition-colors"
-				on:click|stopPropagation={downloadMp3}
+				onclick={(e) => {
+					e.stopPropagation();
+					downloadMp3();
+				}}
 				title={isDownloading
 					? downloadPercent !== null
-						? `Annuler (${downloadPercent}%)`
-						: 'Annuler le téléchargement'
-					: 'Télécharger MP3'}
-				aria-label={isDownloading ? 'Annuler le téléchargement' : 'Télécharger le MP3'}
+						? $t('player.cancelPercent', { percent: downloadPercent })
+						: $t('player.cancelDownload')
+					: $t('player.downloadMp3')}
+				aria-label={isDownloading ? $t('player.cancelDownload') : $t('player.downloadMp3Label')}
 			>
 				{#if isDownloading}
 					<span class="relative flex h-5 w-5 items-center justify-center">
@@ -225,7 +250,7 @@
 						</span>
 					</span>
 				{:else}
-					<Icon src={IoCloudDownloadOutline} size="20" />
+					<Icon src={AiOutlineDownload} size="20" />
 				{/if}
 			</button>
 		{/if}
@@ -233,8 +258,11 @@
 		{#if recording.s3_url}
 			<button
 				class="hover:scale-110 active:scale-95 transition-all p-2 text-orange-600"
-				on:click|stopPropagation={togglePlay}
-				title={isActive && $isPlaying ? 'Pause' : 'Lire'}
+				onclick={(e) => {
+					e.stopPropagation();
+					togglePlay();
+				}}
+				title={isActive && $isPlaying ? $t('player.pause') : $t('player.playAction')}
 			>
 				<Icon src={isActive && $isPlaying ? IoPauseCircle : IoPlayCircle} size="24" />
 			</button>

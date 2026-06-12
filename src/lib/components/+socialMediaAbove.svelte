@@ -4,9 +4,15 @@
 	import FaBrandsYoutube from 'svelte-icons-pack/fa/FaBrandsYoutube';
 	import FaBrandsFacebook from 'svelte-icons-pack/fa/FaBrandsFacebook';
 	import RiLogoWhatsappFill from 'svelte-icons-pack/ri/RiLogoWhatsappFill';
+	import { browser } from '$app/environment';
+	import { page } from '$app/stores';
 	import { radioIsLive as radioIsLiveStore } from '$lib/stores/global';
 
-	$: isLive = $radioIsLiveStore;
+	// SSR/first-paint reads the admin-gate-aware `radioState` from the layout's
+	// server load; after hydration we switch to the push-driven store so SW
+	// `RADIO_PUSH` events update the banner without a network call.
+	let ssrIsLive = $derived($page.data?.radioState?.isLive ?? false);
+	let isLive = $derived(browser ? $radioIsLiveStore : ssrIsLive);
 </script>
 
 <div

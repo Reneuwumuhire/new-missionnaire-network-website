@@ -71,6 +71,11 @@ export const POST: RequestHandler = async ({ locals, params, request, getClientA
 	const parsed = parsePeaks(body.peaks, body.peaks_duration_sec, durationSec);
 
 	const s3Url = getS3Url(s3Key);
+	// A backfilled upload (createRecording) sits in 'uploading' with no audio
+	// until this point — landing the MP3 is what makes it a real recording, so
+	// promote it to 'ready'. An already-ready recording having its audio
+	// replaced keeps its status untouched.
+	const promoteToReady = current.status === 'uploading';
 	// Audio changed — always set peaks fields (to the fresh values if the
 	// client sent them, otherwise to null) so the admin editor never
 	// renders a stale waveform that doesn't match the new bytes.
@@ -80,7 +85,8 @@ export const POST: RequestHandler = async ({ locals, params, request, getClientA
 		size_bytes: sizeBytes,
 		duration_sec: durationSec,
 		peaks: parsed?.peaks ?? null,
-		peaks_duration_sec: parsed?.peaksDurationSec ?? null
+		peaks_duration_sec: parsed?.peaksDurationSec ?? null,
+		...(promoteToReady ? { status: 'ready' as const } : {})
 	});
 	if (!ok) throw error(500, 'Mise à jour échouée');
 

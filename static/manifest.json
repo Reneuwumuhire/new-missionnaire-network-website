@@ -1,14 +1,14 @@
 {
+	"id": "/",
 	"name": "Missionnaire Network",
 	"short_name": "Missionnaire",
 	"description": "Prédications, cantiques, questions-réponses, littérature et transcriptions du Message de l'Heure",
-	"start_url": "/",
+	"start_url": "/?source=pwa-missionnaire-network",
 	"scope": "/",
 	"display": "standalone",
 	"display_override": ["standalone", "minimal-ui"],
 	"background_color": "#FAF8F3",
 	"theme_color": "#FF880C",
-	"orientation": "any",
 	"icons": [
 		{
 			"src": "/icons/pwa-192x192.png",
@@ -23,7 +23,13 @@
 			"purpose": "any"
 		},
 		{
-			"src": "/icons/pwa-512x512.png",
+			"src": "/icons/pwa-1024x1024.png",
+			"sizes": "1024x1024",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/icons/pwa-maskable-512x512.png",
 			"sizes": "512x512",
 			"type": "image/png",
 			"purpose": "maskable"

@@ -6,21 +6,60 @@
 	import ArticleCornerImage from '$lib/components/+articleCornerImage.svelte';
 </script>
 
+<!-- Title/description/og:*/canonical come from `meta` in this route's
+     load — the root layout renders the single canonical tag set ($lib/seo). -->
 <svelte:head>
-	<title>Ewald Frank - Missionnaire Network</title>
-	<meta
-		name="description"
-		content="Biographie et enseignements d'Ewald Frank, avec citations et contenus d'édification."
+	<!-- LCP image preload. Google was flagging this page at 4.2s LCP on
+	     mobile because the 1 MB hero JPEG started downloading late.
+	     Preload + responsive WebP brings the mobile payload to ~37 KB. -->
+	<link
+		rel="preload"
+		as="image"
+		href="/img/ewald_frank_page_header-768.webp"
+		type="image/webp"
+		fetchpriority="high"
+		media="(max-width: 768px)"
 	/>
-	<meta property="og:title" content="Ewald Frank - Missionnaire Network" />
-	<meta
-		property="og:description"
-		content="Parcours du ministère d'Ewald Frank et ressources du Message."
+	<link
+		rel="preload"
+		as="image"
+		href="/img/ewald_frank_page_header-1280.webp"
+		type="image/webp"
+		fetchpriority="high"
+		media="(min-width: 769px) and (max-width: 1280px)"
+	/>
+	<link
+		rel="preload"
+		as="image"
+		href="/img/ewald_frank_page_header.webp"
+		type="image/webp"
+		fetchpriority="high"
+		media="(min-width: 1281px)"
 	/>
 </svelte:head>
 <div class="flex flex-col">
 	<header class="relative h-[40vh] min-h-[300px] max-h-[500px] overflow-hidden">
-		<img src="/img/ewald_frank_page_header.jpg" alt="Ewald Frank" class="absolute inset-0 w-full h-full object-cover img-zoom" />
+		<picture>
+			<source
+				type="image/webp"
+				srcset="/img/ewald_frank_page_header-768.webp 768w, /img/ewald_frank_page_header-1280.webp 1280w, /img/ewald_frank_page_header.webp 1920w"
+				sizes="100vw"
+			/>
+			<source
+				type="image/jpeg"
+				srcset="/img/ewald_frank_page_header-768.jpg 768w, /img/ewald_frank_page_header-1280.jpg 1280w, /img/ewald_frank_page_header.jpg 1920w"
+				sizes="100vw"
+			/>
+			<img
+				src="/img/ewald_frank_page_header.jpg"
+				alt="Ewald Frank"
+				width="1920"
+				height="1224"
+				fetchpriority="high"
+				decoding="async"
+				class="absolute inset-0 w-full h-full object-cover img-zoom"
+			/>
+		</picture>
 		<div class="absolute inset-0 bg-gradient-to-t from-stone-900/60 via-transparent to-transparent"></div>
 		<div class="absolute bottom-0 left-0 right-0 p-8 md:p-12">
 			<div class="max-w-3xl mx-auto">

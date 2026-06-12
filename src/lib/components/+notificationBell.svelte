@@ -3,11 +3,15 @@
 	import { onMount } from 'svelte';
 	import { env } from '$env/dynamic/public';
 
-	let permission: NotificationPermission = 'default';
-	export let isSubscribed = false;
-	export let isSupported = false;
-	let loading = false;
-	let justToggled = false;
+	let permission: NotificationPermission = $state('default');
+	interface Props {
+		isSubscribed?: boolean;
+		isSupported?: boolean;
+	}
+
+	let { isSubscribed = $bindable(false), isSupported = $bindable(false) }: Props = $props();
+	let loading = $state(false);
+	let justToggled = $state(false);
 
 	onMount(async () => {
 		isSupported =

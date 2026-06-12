@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
-	import { tick, onMount } from 'svelte';
+	import { tick, onMount, untrack } from 'svelte';
 	import { isVideoPlaylistActive, videoPlaylist, videoPlaylistIndex, isVideoShuffle, videoPlaylistSearch, videoPlaylistTotal } from '$lib/stores/global';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
@@ -14,33 +14,20 @@
 	import { fade } from 'svelte/transition';
 	import { formatTime } from '../../utils/FormatTime';
 
-	let player: any;
-	let playerElement: HTMLElement;
-	let ytApiReady = browser && !!(window as any).YT?.Player;
-	let playerState = -1; 
-	let currentTime = 0;
-	let duration = 0;
+	let player: any = $state();
+	let playerElement: HTMLElement | undefined = $state();
+	let ytApiReady = $state(browser && !!(window as any).YT?.Player);
+	let playerState = $state(-1); 
+	let currentTime = $state(0);
+	let duration = $state(0);
 	let progressInterval: any;
-	let isInitializing = false;
-	let isFetchingMore = false;
-	let isRepeat = false;
-	let isPlayerReady = false;
+	let isInitializing = $state(false);
+	let isFetchingMore = $state(false);
+	let isRepeat = $state(false);
+	let isPlayerReady = $state(false);
 
-	$: currentVideo = $videoPlaylist && $videoPlaylist.length > 0 ? $videoPlaylist[$videoPlaylistIndex] : null;
 
-	// Predictive loading: load more when near the end
-	$: if ($videoPlaylist.length > 0 && $videoPlaylistIndex >= $videoPlaylist.length - 3) {
-		loadMore();
-	}
 
-	// Body scroll lock
-	$: if (browser) {
-		if ($isVideoPlaylistActive) {
-			document.body.style.overflow = 'hidden';
-		} else {
-			document.body.style.overflow = '';
-		}
-	}
 
 	function onPlayerStateChange(event: any) {
 		playerState = event.data;
@@ -124,22 +111,7 @@
 		isInitializing = false;
 	}
 
-	$: if (browser && $isVideoPlaylistActive && ytApiReady) {
-		if (!player && !isInitializing) {
-			createYTPlayer();
-		} else if (isPlayerReady && player?.loadVideoById && currentVideo && player.getVideoData()?.video_id !== currentVideo.id) {
-			console.log('[Playlist] Loading video:', currentVideo.title);
-			player.loadVideoById(currentVideo.id);
-			currentTime = 0;
-		}
-	}
 
-	$: if (browser && !$isVideoPlaylistActive && player) {
-		console.log('[Playlist] Destroying player on close');
-		isPlayerReady = false;
-		try { player.destroy(); } catch(e) {}
-		player = null;
-	}
 
 	onMount(() => {
 		const handleReady = () => { ytApiReady = true; };
@@ -225,9 +197,52 @@
 		const x = event.clientX - rect.left;
 		player.seekTo((x / rect.width) * duration, true);
 	}
+	let currentVideo = $derived($videoPlaylist && $videoPlaylist.length > 0 ? $videoPlaylist[$videoPlaylistIndex] : null);
+	// Predictive loading: load more when near the end. Only the playlist
+	// length/index should re-trigger this (matching the legacy `$:` static
+	// deps); untrack keeps loadMore's internal reads (isFetchingMore, search,
+	// total) from becoming dependencies and re-running the effect.
+	$effect(() => {
+		if ($videoPlaylist.length > 0 && $videoPlaylistIndex >= $videoPlaylist.length - 3) {
+			untrack(() => loadMore());
+		}
+	});
+	// Body scroll lock
+	$effect(() => {
+		if (browser) {
+			if ($isVideoPlaylistActive) {
+				document.body.style.overflow = 'hidden';
+			} else {
+				document.body.style.overflow = '';
+			}
+		}
+	});
+	$effect(() => {
+		if (browser && !$isVideoPlaylistActive && player) {
+			console.log('[Playlist] Destroying player on close');
+			isPlayerReady = false;
+			try { player.destroy(); } catch(e) {}
+			player = null;
+		}
+	});
+	// Create/swap the YT player. Same dependency set as the legacy `$:` block
+	// ($isVideoPlaylistActive, ytApiReady, player, isInitializing,
+	// isPlayerReady, currentVideo); createYTPlayer's own guards make the
+	// isInitializing flip converge instead of re-creating the player.
+	$effect(() => {
+		if (browser && $isVideoPlaylistActive && ytApiReady) {
+			if (!player && !isInitializing) {
+				createYTPlayer();
+			} else if (isPlayerReady && player?.loadVideoById && currentVideo && player.getVideoData()?.video_id !== currentVideo.id) {
+				console.log('[Playlist] Loading video:', currentVideo.title);
+				player.loadVideoById(currentVideo.id);
+				currentTime = 0;
+			}
+		}
+	});
 </script>
 
-<svelte:window on:keydown={handleKeydown} />
+<svelte:window onkeydown={handleKeydown} />
 
 {#if $isVideoPlaylistActive}
 	<div 
@@ -243,7 +258,7 @@
 
 		<!-- Close Button -->
 		<button 
-			on:click={() => isVideoPlaylistActive.set(false)}
+			onclick={() => isVideoPlaylistActive.set(false)}
 			class="absolute top-4 right-4 text-white/60 hover:text-white transition-all p-2 z-[550] hover:bg-white/10 rounded-full"
 			title="Fermer"
 		>
@@ -260,7 +275,7 @@
 					
 					{#if playerState !== 1 && playerState !== 3}
 						<button 
-							on:click={togglePlay}
+							onclick={togglePlay}
 							class="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-[1px] transition-all hover:bg-black/30"
 						>
 							<div class="text-white opacity-80 group-hover:opacity-100 transform transition-all duration-300 scale-90 group-hover:scale-100">
@@ -286,11 +301,11 @@
 						</div>
 
 						<div class="flex items-center gap-2 md:gap-4">
-							<button on:click={prevVideo} class="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-all" title="Précédent">
+							<button onclick={prevVideo} class="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-all" title="Précédent">
 								<Icon src={IoPlaySkipBackOutline} size="24" />
 							</button>
 							<button 
-								on:click={togglePlay} 
+								onclick={togglePlay} 
 								class="p-2 text-white hover:scale-110 transition-all"
 							>
 								{#if playerState === 1}
@@ -299,7 +314,7 @@
 									<Icon src={BsPlayCircleFill} size="54" />
 								{/if}
 							</button>
-							<button on:click={nextVideo} class="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-all" title="Suivant">
+							<button onclick={nextVideo} class="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-all" title="Suivant">
 								<Icon src={IoPlaySkipForwardOutline} size="24" />
 							</button>
 						</div>
@@ -308,8 +323,8 @@
 					<!-- Progress bar -->
 					<div 
 						class="h-1 w-full bg-white/10 rounded-full cursor-pointer relative group mt-2"
-						on:click={seekTo}
-						on:keydown={(e) => {
+						onclick={seekTo}
+						onkeydown={(e) => {
 							if (e.key === 'ArrowRight') player.seekTo(currentTime + 5, true);
 							else if (e.key === 'ArrowLeft') player.seekTo(currentTime - 5, true);
 						}}
@@ -335,7 +350,7 @@
 					<div class="flex items-center justify-between mb-2">
 						<h3 class="font-bold text-lg">À regarder plus tard</h3>
 						<button 
-							on:click={() => isVideoPlaylistActive.set(false)}
+							onclick={() => isVideoPlaylistActive.set(false)}
 							class="text-white/40 hover:text-white lg:hidden"
 						>
 							<Icon src={BsX} size="24" />
@@ -345,14 +360,14 @@
 						<span>{currentVideo?.artist || 'Privé'} • {$videoPlaylistIndex + 1} / {$videoPlaylist.length}</span>
 						<div class="flex items-center gap-3">
 							<button 
-								on:click={() => isVideoShuffle.update(s => !s)}
+								onclick={() => isVideoShuffle.update(s => !s)}
 								class="hover:text-white transition-colors {$isVideoShuffle ? 'text-[#f28f3e]' : ''}"
 								title="Aléatoire"
 							>
 								<Icon src={BsShuffle} size="18" />
 							</button>
 							<button 
-								on:click={() => isRepeat = !isRepeat}
+								onclick={() => isRepeat = !isRepeat}
 								class="hover:text-white transition-colors {isRepeat ? 'text-[#f28f3e]' : ''}"
 								title="Répéter"
 							>
@@ -366,7 +381,7 @@
 				<div class="flex-1 overflow-y-auto custom-scrollbar bg-[#0f0f0f]">
 					{#each $videoPlaylist as video, i}
 						<button 
-							on:click={() => videoPlaylistIndex.set(i)}
+							onclick={() => videoPlaylistIndex.set(i)}
 							class="w-full flex items-center gap-3 p-2 group transition-all {i === $videoPlaylistIndex ? 'bg-white/[0.08]' : 'hover:bg-white/5'}"
 						>
 							<!-- Index and Status Icon -->
@@ -411,7 +426,7 @@
 					{#if $videoPlaylist.length < $videoPlaylistTotal}
 						<div class="p-4 flex justify-center border-t border-white/5">
 							<button
-								on:click={loadMore}
+								onclick={loadMore}
 								disabled={isFetchingMore}
 								class="w-full py-3 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-2"
 							>

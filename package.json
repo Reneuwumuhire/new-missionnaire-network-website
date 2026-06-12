@@ -1,6 +1,6 @@
 {
 	"name": "missionaire-web",
-	"version": "1.0.0",
+	"version": "2.0.0",
 	"private": true,
 	"scripts": {
 		"dev": "vite dev",
@@ -51,7 +51,7 @@
 		"@badrap/result": "^0.2.13",
 		"@distube/ytdl-core": "^4.16.12",
 		"@tanstack/svelte-query": "^5.35.1",
-		"flowbite-svelte": "^0.44.20",
+		"client-zip": "^2.5.0",
 		"mongodb": "^6.8.0",
 		"plyr": "^3.7.8",
 		"svelte-icons-pack": "^2.1.0",

@@ -11,15 +11,33 @@
 	--icons-colors: #4f4f4f;
 	--font-display: 'Cormorant Garamond', Georgia, serif;
 	--font-body: 'Outfit', system-ui, sans-serif;
-	--color-missionnaire: #FF880C;
+	--color-missionnaire: #ff880c;
 	--audio-player-height: 0px;
+	/* Height reserved for the mobile bottom navigation bar. 0 on desktop
+	   (the bar is hidden there); on mobile it matches +bottomNav.svelte's
+	   fixed height plus the safe-area inset. The audio player and page
+	   content both offset themselves by this value. */
+	--bottom-nav-height: 0px;
+	/* Fixed site-header height, kept current by the root layout. Used as
+	   the sticky offset for the mobile list toolbar. */
+	--header-height: 112px;
 	scroll-behavior: smooth;
+}
+
+@media (max-width: 1023px) {
+	:root {
+		/* 4rem (64px) of tappable bar + the iOS home-indicator inset. Kept
+		   taller than the 56px it used to be so each tab clears Apple's
+		   44px minimum touch target and sits clear of the bottom gesture
+		   area, which was making taps unreliable on iPhones. */
+		--bottom-nav-height: calc(4rem + env(safe-area-inset-bottom, 0px));
+	}
 }
 
 /* ── Base typography ── */
 html {
 	overflow-x: hidden;
-	scroll-padding-bottom: var(--audio-player-height);
+	scroll-padding-bottom: calc(var(--audio-player-height) + var(--bottom-nav-height));
 	font-family: var(--font-body);
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
@@ -28,13 +46,13 @@ html {
 
 body {
 	color: #292524; /* stone-800 — warmer than pure black */
-	background-color: #FAF8F3; /* cream — warm editorial base */
-	padding-bottom: var(--audio-player-height);
+	background-color: #faf8f3; /* cream — warm editorial base */
+	padding-bottom: calc(var(--audio-player-height) + var(--bottom-nav-height));
 }
 
 /* ── Selection highlight ── */
 ::selection {
-	background-color: #FF880C;
+	background-color: #ff880c;
 	color: #fff;
 }
 
@@ -139,12 +157,43 @@ img {
 	border-radius: 2px;
 }
 
+/* Form fields signal focus through their container (border/ring on the
+   wrapping form) — the global outline on the inner input stacked a second
+   rounded capsule inside the wrapper's ring. */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+	outline: none;
+}
+
+/* ── Prevent iOS Safari focus-zoom ──
+   Safari zooms the viewport whenever a focused form field's computed
+   font-size is < 16px. We can't disable that with `user-scalable=no`
+   (bad for accessibility and ignored on modern iOS anyway), so the
+   accepted fix is to floor every interactive field at 16px on mobile.
+   `!important` is required because Tailwind text utilities like
+   `text-sm` (class selector, specificity 0,1,0) would otherwise win
+   over an element selector (0,0,1). Mobile-only so desktop designs
+   that intentionally use smaller field text stay untouched —
+   desktop browsers don't auto-zoom on focus anyway. `max(16px, 1em)`
+   keeps designed-larger fields at their intended size. */
+@media (max-width: 767px) {
+	input,
+	textarea,
+	select,
+	[contenteditable='true'],
+	[contenteditable=''] {
+		font-size: max(16px, 1em) !important;
+	}
+}
+
 /* ── Scroll-triggered reveal animation ── */
 .reveal-up {
 	opacity: 0;
 	transform: translateY(28px);
-	transition: opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1),
-				transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+	transition:
+		opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+		transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .reveal-up.visible {
 	opacity: 1;
@@ -153,8 +202,9 @@ img {
 
 /* ── Card hover lift ── */
 .card-lift {
-	transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-				box-shadow 0.35s ease;
+	transition:
+		transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+		box-shadow 0.35s ease;
 }
 .card-lift:hover {
 	transform: translateY(-3px);
@@ -172,7 +222,7 @@ img {
 	content: '';
 	flex: 1;
 	height: 1px;
-	background: linear-gradient(to right, transparent, #D4C9B5, transparent);
+	background: linear-gradient(to right, transparent, #d4c9b5, transparent);
 }
 
 /* ── Image zoom on parent hover ── */
@@ -185,35 +235,35 @@ img {
 
 /* ── Skeleton shimmer loader ── */
 @keyframes shimmer {
-	0% { background-position: -400px 0; }
-	100% { background-position: 400px 0; }
+	0% {
+		background-position: -400px 0;
+	}
+	100% {
+		background-position: 400px 0;
+	}
 }
 
 .skeleton-shimmer {
-	background: linear-gradient(
-		90deg,
-		#F0ECE3 0%,
-		#FAF8F3 40%,
-		#F0ECE3 80%
-	);
+	background: linear-gradient(90deg, #f0ece3 0%, #faf8f3 40%, #f0ece3 80%);
 	background-size: 800px 100%;
 	animation: shimmer 1.8s ease-in-out infinite;
 }
 
 .skeleton-shimmer-warm {
-	background: linear-gradient(
-		90deg,
-		#FCF5ED 0%,
-		#FFE5C9 35%,
-		#FCF5ED 70%
-	);
+	background: linear-gradient(90deg, #fcf5ed 0%, #ffe5c9 35%, #fcf5ed 70%);
 	background-size: 800px 100%;
 	animation: shimmer 2s ease-in-out infinite;
 }
 
 @keyframes skeleton-fade-in {
-	from { opacity: 0; transform: translateY(6px); }
-	to { opacity: 1; transform: translateY(0); }
+	from {
+		opacity: 0;
+		transform: translateY(6px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
 }
 
 .skeleton-stagger {
@@ -227,7 +277,7 @@ img {
 	gap: 0.5rem;
 	padding: 0.5rem 1rem;
 	border: 1px solid rgba(255, 136, 12, 0.25);
-	color: #FF880C;
+	color: #ff880c;
 	font-family: var(--font-body, inherit);
 	font-size: 11px;
 	font-weight: 600;

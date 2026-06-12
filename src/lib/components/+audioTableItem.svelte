@@ -1,7 +1,7 @@
 <script lang="ts">
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
-	import BsCloudDownloadFill from 'svelte-icons-pack/bs/BsCloudDownloadFill';
+	import AiOutlineDownload from 'svelte-icons-pack/ai/AiOutlineDownload';
 	import BsFileEarmarkPdfFill from 'svelte-icons-pack/bs/BsFileEarmarkPdfFill';
 	import BsPlayCircleFill from 'svelte-icons-pack/bs/BsPlayCircleFill';
 	import { currentIndex, isPlaying, selectAudio } from '../stores/global';
@@ -9,10 +9,15 @@
 	import type { AudioAsset } from '$lib/models/media-assets';
 	import { writable } from 'svelte/store';
 	import { downloadAudioFile } from '../../utils/downloadAudio';
+	import { t } from '../../i18n';
 	let showDropContents = false;
 
-	export let audio: AudioAsset;
-	export let index: number;
+	interface Props {
+		audio: AudioAsset;
+		index: number;
+	}
+
+	let { audio, index }: Props = $props();
 	const updateSelectAudio = (audio: AudioAsset) => {
 		selectAudio.set(audio); // Set the selectAudio value in the store
 		currentIndex.set(index);
@@ -65,7 +70,10 @@
 		</div>
 		<div class="flex flex-row space-x-6">
 			{#if audio.transcription}
-				<button class="flex flex-row items-center space-x-1 hover:text-missionnaire">
+				<button
+					class="inline-flex flex-row items-center justify-center min-w-11 min-h-11 space-x-1 hover:text-missionnaire"
+					aria-label={`PDF — ${audio.title}`}
+				>
 					<Icon src={BsFileEarmarkPdfFill} />
 					<span class=" hidden md:block">PDF</span>
 				</button>
@@ -73,12 +81,12 @@
 			{#if $isDownloading}
 				<button
 					type="button"
-					class="group flex items-center justify-center w-8 h-8 relative focus:outline-none"
-					on:click={() => downloadAudio(audio)}
+					class="group inline-flex items-center justify-center min-w-11 min-h-11 relative focus:outline-none"
+					onclick={() => downloadAudio(audio)}
 					title={$downloadPercent !== null
-						? `Annuler (${$downloadPercent}%)`
-						: 'Annuler le téléchargement'}
-					aria-label="Annuler le téléchargement"
+						? $t('player.cancelPercent', { percent: $downloadPercent })
+						: $t('player.cancelDownload')}
+					aria-label={$t('player.cancelDownload')}
 				>
 					{#if $downloadPercent !== null}
 						<svg
@@ -126,21 +134,23 @@
 				</button>
 			{:else}
 				<button
-					class="flex flex-row items-center space-x-1 hover:text-missionnaire"
-					on:click={() => downloadAudio(audio)}
+					class="inline-flex flex-row items-center justify-center min-w-11 min-h-11 space-x-1 hover:text-missionnaire"
+					onclick={() => downloadAudio(audio)}
+					aria-label={`${$t('player.download')} — ${audio.title}`}
 				>
-					<Icon src={BsCloudDownloadFill} />
+					<Icon src={AiOutlineDownload} />
 					<span class="hidden md:block">MP3</span>
 				</button>
 			{/if}
 			<button
-				class="flex flex-row items-center space-x-1 hover:text-missionnaire"
-				on:click={() => {
+				class="inline-flex flex-row items-center justify-center min-w-11 min-h-11 space-x-1 hover:text-missionnaire"
+				onclick={() => {
 					updateSelectAudio(audio);
 				}}
+				aria-label={`${$t('player.play')} — ${audio.title}`}
 			>
 				<Icon src={BsPlayCircleFill} />
-				<span class=" hidden md:block">Play</span>
+				<span class=" hidden md:block">{$t('player.play')}</span>
 			</button>
 		</div>
 		<!-- <div class="text-center">

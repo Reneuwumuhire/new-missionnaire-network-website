@@ -3,10 +3,10 @@
 	import { onMount } from 'svelte';
 
 	let deferredPrompt: BeforeInstallPromptEvent | null = null;
-	let showPrompt = false;
-	let dismissed = false;
+	let showPrompt = $state(false);
+	let dismissed = $state(false);
 	let isIOS = false;
-	let showIOSInstructions = false;
+	let showIOSInstructions = $state(false);
 
 	interface BeforeInstallPromptEvent extends Event {
 		prompt(): Promise<void>;
@@ -20,8 +20,11 @@
 		if (window.matchMedia('(display-mode: standalone)').matches) return;
 		if ((navigator as unknown as { standalone: boolean }).standalone === true) return;
 		if (sessionStorage.getItem('pwa-install-dismissed')) return;
-
-		isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !('MSStream' in window);
+		// Hide on phone-sized viewports — the modal covers the screen on
+		// landing and feedback was that it interrupts more than it helps.
+		// Desktop still gets the prompt where it can sit unobtrusively in
+		// the corner.
+		if (window.matchMedia('(max-width: 767px)').matches) return;
 
 		if (isIOS) {
 			showPrompt = true;
@@ -63,10 +66,10 @@
 
 {#if showPrompt && !dismissed}
 	<!-- Backdrop -->
-	<!-- svelte-ignore a11y-no-static-element-interactions -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		class="install-backdrop fixed inset-0 z-[9998] bg-black/20 backdrop-blur-[2px]"
-		on:click={handleDismiss}
+		onclick={handleDismiss}
 	></div>
 
 	<!-- Prompt card -->
@@ -77,7 +80,7 @@
 
 			<!-- Close button -->
 			<button
-				on:click={handleDismiss}
+				onclick={handleDismiss}
 				class="absolute top-4 right-4 w-7 h-7 flex items-center justify-center text-stone-300 hover:text-stone-500 transition-colors duration-200"
 				aria-label="Fermer"
 			>
@@ -140,7 +143,7 @@
 					</ol>
 
 					<button
-						on:click={handleDismiss}
+						onclick={handleDismiss}
 						class="mt-5 w-full h-11 bg-missionnaire hover:bg-missionnaire-600 text-white text-xs font-bold uppercase tracking-[0.2em] font-body transition-colors duration-200"
 					>
 						Compris
@@ -153,13 +156,13 @@
 
 				<div class="flex items-center gap-3 mt-5 pt-5 border-t border-stone-200/40">
 					<button
-						on:click={handleInstall}
+						onclick={handleInstall}
 						class="flex-1 h-11 bg-missionnaire hover:bg-missionnaire-600 text-white text-xs font-bold uppercase tracking-[0.2em] font-body transition-colors duration-200"
 					>
 						Installer
 					</button>
 					<button
-						on:click={handleDismiss}
+						onclick={handleDismiss}
 						class="flex-1 h-11 border border-stone-200/60 text-stone-500 hover:text-stone-700 hover:border-stone-300 text-xs font-medium uppercase tracking-[0.15em] font-body transition-colors duration-200"
 					>
 						Plus tard

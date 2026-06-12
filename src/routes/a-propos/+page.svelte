@@ -17,9 +17,9 @@
 		monthlyAverage: number;
 		topCountries: { name: string; count: number }[];
 		deviceStats: { type: string; count: number }[];
-	} | null = null;
-	let statsError = false;
-	let statsLoading = true;
+	} | null = $state(null);
+	let statsError = $state(false);
+	let statsLoading = $state(true);
 
 	onMount(async () => {
 		try {
@@ -38,18 +38,8 @@
 	});
 </script>
 
-<svelte:head>
-	<title>À propos - Missionnaire Network</title>
-	<meta
-		name="description"
-		content="Découvrez la mission de Missionnaire Network, nos contacts et les statistiques de visite du site."
-	/>
-	<meta property="og:title" content="À propos - Missionnaire Network" />
-	<meta
-		property="og:description"
-		content="Qui nous sommes, comment nous contacter et suivre l'œuvre de Missionnaire Network."
-	/>
-</svelte:head>
+<!-- Title/description/og:*/canonical come from `meta` in this route's
+     load — the root layout renders the single canonical tag set ($lib/seo). -->
 <div class="flex flex-col overflow-hidden">
 	<header class="relative h-[40vh] min-h-[300px] max-h-[500px] overflow-hidden">
 		<img src="/img/eglise_header.jpg" alt="Église Murambi" class="absolute inset-0 w-full h-full object-cover" />
@@ -82,7 +72,7 @@
 					<p class="text-red-600 font-medium text-sm">Impossible de charger les statistiques.</p>
 					<button
 						class="mt-3 text-sm text-missionnaire hover:text-missionnaire font-bold"
-						on:click={() => { statsLoading = true; statsError = false; fetch('/api/analytics').then(r => r.ok ? r.json() : Promise.reject()).then(d => { stats = d; }).catch(() => { statsError = true; }).finally(() => { statsLoading = false; }); }}
+						onclick={() => { statsLoading = true; statsError = false; fetch('/api/analytics').then(r => r.ok ? r.json() : Promise.reject()).then(d => { stats = d; }).catch(() => { statsError = true; }).finally(() => { statsLoading = false; }); }}
 					>
 						Réessayer
 					</button>
@@ -97,7 +87,7 @@
 								>Visiteurs Aujourd'hui</span
 							>
 							<div class="flex items-center space-x-2">
-								<div class="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
+								<div class="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
 								<span class="text-3xl font-black text-stone-900">{stats.todayVisitors}</span>
 							</div>
 						</div>

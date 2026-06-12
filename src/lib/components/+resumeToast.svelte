@@ -22,18 +22,18 @@
 	// toast straight off `$selectAudio` (instead of a per-page prop) lets it
 	// surface anywhere under /predications, including the list page where
 	// playback most often starts.
-	$: currentAudioUrl = getPlayableAudioUrl($selectAudio) || null;
+	let currentAudioUrl = $derived(getPlayableAudioUrl($selectAudio) || null);
 
 	const AUTO_DISMISS_MS = 15000;
 	const SESSION_DISMISS_PREFIX = 'missionnaire:resume-dismissed:';
 
-	let visible = false;
-	let resumeTime = 0;
+	let visible = $state(false);
+	let resumeTime = $state(0);
 	let resumeDuration = 0;
-	let progressPercent = 0;
+	let progressPercent = $state(0);
 	let savedAudioUrl: string | null = null;
 	let savedSermon: Record<string, unknown> | null = null;
-	let savedTitle = '';
+	let savedTitle = $state('');
 	let autoDismissTimer: ReturnType<typeof setTimeout> | null = null;
 	let currentAudio: HTMLAudioElement | null = null;
 	let pendingResumeSeek = false;
@@ -197,10 +197,12 @@
 	// Re-evaluate whenever the live URL changes. Runs on initial render, which
 	// covers the cold-load case where `currentAudioUrl` is null but a saved
 	// state exists.
-	$: if (browser) {
-		void currentAudioUrl;
-		checkEligibility();
-	}
+	$effect(() => {
+		if (browser) {
+			void currentAudioUrl;
+			checkEligibility();
+		}
+	});
 
 	function formatTime(seconds: number): string {
 		if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
@@ -228,7 +230,7 @@
 		<button
 			type="button"
 			class="resume-toast__close"
-			on:click={onDismissClick}
+			onclick={onDismissClick}
 			aria-label="Ignorer"
 		>
 			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -256,14 +258,14 @@
 			<button
 				type="button"
 				class="resume-toast__btn-primary font-body"
-				on:click={onResumeClick}
+				onclick={onResumeClick}
 			>
 				Reprendre
 			</button>
 			<button
 				type="button"
 				class="resume-toast__btn-secondary font-body"
-				on:click={onDismissClick}
+				onclick={onDismissClick}
 			>
 				Ignorer
 			</button>

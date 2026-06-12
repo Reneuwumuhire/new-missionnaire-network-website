@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Breadcrumbs from '$lib/components/+breadcrumbs.svelte';
 	import type { PageData } from './$types';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
@@ -12,18 +13,22 @@
 	import ArrowUp2 from 'iconsax-svelte/ArrowUp2.svelte';
 	import { writable } from 'svelte/store';
 
-	export let data: PageData;
-	let selectedDocument: (typeof data.documents)[0] | null = null;
+	interface Props {
+		data: PageData;
+	}
+
+	let { data }: Props = $props();
+	let selectedDocument: (typeof data.documents)[0] | null = $state(null);
 	const isDocumentOpen = writable(false);
-	let searchTerm = '';
-	let filteredDocuments = data.documents;
+	let searchTerm = $state('');
+	let filteredDocuments = $state(data.documents);
 	let sortOrder = data.sort || 'desc';
 	let selectedYear = data.selectedYear || '';
 
-	$: currentPage = data.pagination.page;
-	$: totalPages = Math.ceil(data.pagination.total / data.pagination.limit);
+	let currentPage = $derived(data.pagination.page);
+	let totalPages = $derived(Math.ceil(data.pagination.total / data.pagination.limit));
 
-	$: {
+	$effect(() => {
 		if (searchTerm.trim() === '') {
 			filteredDocuments = data.documents;
 		} else {
@@ -32,7 +37,7 @@
 				doc.filename.toLowerCase().includes(searchLower)
 			);
 		}
-	}
+	});
 
 	function handlePageChange(newPage: number) {
 		if (browser) {
@@ -94,27 +99,18 @@
 	});
 </script>
 
-<svelte:head>
-	<title>Transcriptions - Missionnaire Network</title>
-	<meta
-		name="description"
-		content="Consultez et téléchargez les documents et transcriptions classés par année sur Missionnaire Network."
-	/>
-	<meta property="og:title" content="Transcriptions - Missionnaire Network" />
-	<meta
-		property="og:description"
-		content="Accédez rapidement aux transcriptions et documents du Message."
-	/>
-</svelte:head>
+<!-- Title/description/og:*/canonical come from `meta` in this route's
+     load — the root layout renders the single canonical tag set ($lib/seo). -->
 
 <div class="container mx-auto px-4 pt-4 pb-8 md:pt-6">
+	<Breadcrumbs items={[{ label: 'Documents' }]} />
 	<!-- Search Header -->
 	<div class="relative mb-8">
 		<div class="flex flex-row items-center justify-center">
 			<div class="w-full max-w-4xl text-center">
 				<h1 class="text-3xl font-bold mb-4">Transcriptions</h1>
 				<p class="text-gray-600 mb-6">Trouvez les transcriptions des prédications</p>
-				<form on:submit={handleSearch} class="flex flex-row w-full max-w-xl mx-auto">
+				<form onsubmit={handleSearch} class="flex flex-row w-full max-w-xl mx-auto">
 					<input
 						type="text"
 						class="border border-gray-300 rounded-l-full indent-4 p-2 w-full text-gray-900 outline-none focus:ring-2 focus:ring-missionnaire focus:border-transparent"
@@ -148,7 +144,7 @@
 						id="year-filter"
 						class="border border-gray-300 rounded-md px-3 py-1.5 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-missionnaire focus:border-transparent"
 						value={selectedYear}
-						on:change={handleYearChange}
+						onchange={handleYearChange}
 					>
 						<option value="">Toutes les années</option>
 						{#each data.years as year}
@@ -159,7 +155,7 @@
 
 				<!-- Sort Button -->
 				<button
-					on:click={handleSort}
+					onclick={handleSort}
 					class="flex items-center space-x-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-900"
 				>
 					<span>Date de publication</span>
@@ -186,7 +182,7 @@
 								document.filename
 									? 'bg-gray-100'
 									: ''}"
-								on:click={() => handleSelectDocument(document)}
+								onclick={() => handleSelectDocument(document)}
 							>
 								<div class="flex-shrink-0 pt-1">
 									<DocumentText1 size={20} color="#6B7280" />
@@ -236,7 +232,7 @@
 								? 'bg-gray-100 text-gray-400'
 								: 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
 							disabled={currentPage === 1}
-							on:click={() => handlePageChange(currentPage - 1)}
+							onclick={() => handlePageChange(currentPage - 1)}
 						>
 							Précédent
 						</button>
@@ -245,7 +241,7 @@
 								class="px-4 py-2 rounded-md transition-colors duration-200 {currentPage === i + 1
 									? 'bg-missionnaire text-white'
 									: 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
-								on:click={() => handlePageChange(i + 1)}
+								onclick={() => handlePageChange(i + 1)}
 							>
 								{i + 1}
 							</button>
@@ -255,7 +251,7 @@
 								? 'bg-gray-100 text-gray-400'
 								: 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
 							disabled={currentPage === totalPages}
-							on:click={() => handlePageChange(currentPage + 1)}
+							onclick={() => handlePageChange(currentPage + 1)}
 						>
 							Suivant
 						</button>
@@ -274,7 +270,7 @@
 						<h2 class="text-xl font-semibold text-gray-900">{selectedDocument.filename}</h2>
 						<button
 							class="text-gray-400 hover:text-gray-500"
-							on:click={() => isDocumentOpen.set(false)}
+							onclick={() => isDocumentOpen.set(false)}
 						>
 							<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path

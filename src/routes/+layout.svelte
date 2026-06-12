@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import NavBar from '$lib/components/+navBar.svelte';
+	import BottomNav from '$lib/components/+bottomNav.svelte';
 	import SocialMediaAbove from '$lib/components/+socialMediaAbove.svelte';
 	import Footer from '$lib/components/+footer.svelte';
 	import CopyButton from '$lib/components/+copyButton.svelte';
@@ -17,16 +18,26 @@
 	import { navigating, page } from '$app/stores';
 	import { afterNavigate, goto } from '$app/navigation';
 	import { browser, dev } from '$app/environment';
-	import { onMount, onDestroy, tick } from 'svelte';
+	import { onMount, tick } from 'svelte';
+	import { initLocale } from '../i18n';
 	import { radioIsLive } from '$lib/stores/global';
-	export let data: LayoutData;
-	const SITE_URL = 'https://missionnaire.net';
-	const DEFAULT_SEO_DESCRIPTION =
-		"Prédications, cantiques, littérature et transcriptions du Message de l'Heure pour l'édification spirituelle.";
-	const DEFAULT_SEO_TITLE = 'Missionnaire Network | Prédications et Cantiques du Message';
+	import {
+		SITE_URL,
+		SITE_NAME,
+		DEFAULT_SEO_TITLE,
+		DEFAULT_SEO_DESCRIPTION,
+		DEFAULT_OG_IMAGE,
+		type PageMeta
+	} from '$lib/seo';
+	interface Props {
+		data: LayoutData;
+		children?: import('svelte').Snippet;
+	}
+
+	let { data, children }: Props = $props();
 	const LAST_MUSIC_PATH_KEY = 'missionnaire:last-music-path';
-	let headerRef: HTMLDivElement | null = null;
-	let headerHeight = 120;
+	let headerRef: HTMLDivElement | null = $state(null);
+	let headerHeight = $state(120);
 	let resizeObserver: ResizeObserver | null = null;
 
 	function rememberMusicPath(url: URL) {
@@ -90,11 +101,19 @@
 		cancelAnimationFrame(rafId);
 		rafId = requestAnimationFrame(() => {
 			headerHeight = headerRef?.offsetHeight ?? 120;
+			// Publish the header height so sticky in-page elements (the
+			// mobile list toolbar) can offset themselves below the fixed
+			// site header.
+			document.documentElement.style.setProperty('--header-height', `${headerHeight}px`);
 		});
 	};
 
 	onMount(() => {
 		if (!browser) return;
+
+		// Apply the visitor's saved language (cookie/localStorage) after
+		// hydration — SSR always renders French.
+		initLocale();
 
 		resizeObserver = new ResizeObserver(updateLayoutOffset);
 
@@ -110,33 +129,101 @@
 		};
 	});
 
-	$: canonicalUrl = `${SITE_URL}${$page.url.pathname}`;
+	let canonicalUrl = $derived(`${SITE_URL}${$page.url.pathname}`);
+	// Pages can publish per-route OG overrides through their `load`'s
+	// returned `meta` object. We surface a single set of og:* meta tags
+	// in <svelte:head> using these values so crawlers like WhatsApp
+	// never see duplicated og:title / og:description tags from layout +
+	// page (which they handle inconsistently).
+	let pageMeta = $derived((($page.data as any)?.meta ?? {}) as PageMeta);
+	let ogTitle = $derived(pageMeta.title || DEFAULT_SEO_TITLE);
+	let ogDescription = $derived(pageMeta.description || DEFAULT_SEO_DESCRIPTION);
+	let ogUrl = $derived(pageMeta.url || canonicalUrl);
+	let ogImage = $derived(pageMeta.image || DEFAULT_OG_IMAGE);
+	let ogType = $derived(pageMeta.type || 'website');
+	let pageNoIndex = $derived(pageMeta.noindex === true);
+	// og:image:width/height are only safe to declare when we KNOW the image's
+	// real dimensions. The default og-image.jpg is 1200×630. A page-supplied
+	// image (live thumbnail, etc.) has unknown/variable dimensions — declaring
+	// the wrong 1200×630 makes Facebook/WhatsApp mis-render or reject it, so we
+	// omit the hints and let the crawler read the real size unless the page
+	// passes explicit dimensions.
+	let ogImageDims = $derived(pageMeta.image
+		? pageMeta.imageWidth && pageMeta.imageHeight
+			? { w: pageMeta.imageWidth, h: pageMeta.imageHeight }
+			: null
+		: { w: 1200, h: 630 });
 
 	const ytPages = ['/videos', '/musique', '/predications'];
-	$: needsYouTube = ytPages.some((p) => $page.url.pathname.startsWith(p));
+	let needsYouTube = $derived(ytPages.some((p) => $page.url.pathname.startsWith(p)));
 
-	// Radio live status polling — runs globally so the banner works on all pages
-	let radioPollTimer: ReturnType<typeof setInterval> | null = null;
-
-	async function pollRadioStatus() {
-		try {
-			const res = await fetch('/api/live/radio-poll');
-			if (!res.ok) return;
-			const status = (await res.json()) as { isLive: boolean };
-			radioIsLive.set(status.isLive);
-		} catch {
-			/* ignore */
+	// Radio live status — push-driven, no polling.
+	// 1. SSR seeds `data.radioState` so first paint shows truth.
+	// 2. Service Worker forwards Web Push payloads (`{type:'RADIO_PUSH'}`) to
+	//    every open tab, so the banner reacts the moment admin goes live.
+	// 3. BroadcastChannel keeps multiple tabs in the same browser consistent.
+	$effect(() => {
+		if (browser && data.radioState) {
+			radioIsLive.set(data.radioState.isLive);
 		}
-	}
+	});
+
+	let radioBroadcast: BroadcastChannel | null = null;
 
 	onMount(() => {
 		if (!browser) return;
-		pollRadioStatus();
-		radioPollTimer = setInterval(pollRadioStatus, 10_000);
-	});
 
-	onDestroy(() => {
-		if (radioPollTimer) clearInterval(radioPollTimer);
+		radioIsLive.set(data.radioState?.isLive ?? false);
+
+		// Reconcile against the source of truth on every mount. The SSR HTML
+		// can be served stale by the service worker (navigate handler is
+		// stale-while-revalidate) or by the edge CDN, so a stale "live" badge
+		// can survive a broadcast end indefinitely if push events were
+		// missed. /api/live/radio-state is `no-store`, so this always
+		// reflects current DB state and corrects the banner within ~100ms
+		// of hydration.
+		fetch('/api/live/radio-state', { cache: 'no-store' })
+			.then((r) => (r.ok ? r.json() : null))
+			.then((state) => {
+				if (state && typeof state.isLive === 'boolean') {
+					radioIsLive.set(state.isLive);
+				}
+			})
+			.catch(() => {
+				/* offline or transient failure — keep SSR value */
+			});
+
+		const applyPushPayload = (payload: { event?: string } | undefined) => {
+			// Default to "live" for backward compat (older payloads without `event`).
+			radioIsLive.set(payload?.event !== 'radio-end');
+		};
+
+		try {
+			radioBroadcast = new BroadcastChannel('radio-state');
+			radioBroadcast.addEventListener('message', (event) => {
+				if (event.data?.type === 'RADIO_PUSH') applyPushPayload(event.data.payload);
+			});
+		} catch {
+			// BroadcastChannel unsupported — single-tab fallback is fine
+		}
+
+		const swListener = (event: MessageEvent) => {
+			const msg = event.data;
+			if (!msg || msg.type !== 'RADIO_PUSH') return;
+			applyPushPayload(msg.payload);
+			try {
+				radioBroadcast?.postMessage({ type: 'RADIO_PUSH', payload: msg.payload });
+			} catch {
+				/* channel closed */
+			}
+		};
+		navigator.serviceWorker?.addEventListener('message', swListener);
+
+		return () => {
+			navigator.serviceWorker?.removeEventListener('message', swListener);
+			radioBroadcast?.close();
+			radioBroadcast = null;
+		};
 	});
 
 	// Load Google Fonts globally (non-render-blocking)
@@ -209,7 +296,17 @@
 	afterNavigate(({ to }) => {
 		if (!browser || !to) return;
 		try {
-			const path = to.url.pathname + to.url.search;
+			// Drop the random-shuffle `seed` before persisting. Seeds are
+			// per-session state — keeping one in the saved last-path means
+			// every PWA launch resumes onto a stale unique-per-user URL that
+			// bypasses both the edge cache and the daily shared seed on the
+			// server. Listeners get the fast cache-friendly URL on resume;
+			// the "Rafraîchir" button still creates a fresh seed when they
+			// want one mid-session.
+			const cleaned = new URL(to.url.toString());
+			cleaned.searchParams.delete('seed');
+			const search = cleaned.searchParams.toString();
+			const path = cleaned.pathname + (search ? `?${search}` : '');
 			// Don't record bare "/" or error routes — those are fallbacks, not
 			// destinations the listener wanted to return to.
 			if (path === '/' || path.startsWith('/__')) return;
@@ -223,7 +320,7 @@
 </script>
 
 <svelte:head>
-	<title>Missionnaire Network</title>
+	<title>{ogTitle}</title>
 	<!-- Font preconnect (global) -->
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
@@ -234,21 +331,34 @@
 		<link rel="dns-prefetch" href="https://i.ytimg.com" />
 		<link rel="dns-prefetch" href="https://www.youtube.com" />
 	{/if}
-	<link rel="canonical" href={canonicalUrl} />
-	<meta name="description" content={DEFAULT_SEO_DESCRIPTION} />
-	<meta property="og:site_name" content="Missionnaire Network" />
-	<meta property="og:type" content="website" />
-	<meta property="og:title" content={DEFAULT_SEO_TITLE} />
-	<meta property="og:description" content={DEFAULT_SEO_DESCRIPTION} />
-	<meta property="og:url" content={canonicalUrl} />
+	<!-- Canonical follows the page-published meta URL (slug-canonicalised
+	     detail URLs, ?play= share variants…) and falls back to the bare
+	     pathname for everything else. -->
+	<link rel="canonical" href={ogUrl} />
+	{#if pageNoIndex}
+		<!-- Pages publish `meta.noindex: true` in their load when they're
+		     filter/share variants whose canonical content already lives
+		     elsewhere (e.g. /musique?search=…). Saves crawl budget and
+		     clears the "Crawled — currently not indexed" report. -->
+		<meta name="robots" content="noindex, follow" />
+	{/if}
+	<meta name="description" content={ogDescription} />
+	<meta property="og:site_name" content={SITE_NAME} />
+	<meta property="og:locale" content="fr_FR" />
+	<meta property="og:type" content={ogType} />
+	<meta property="og:title" content={ogTitle} />
+	<meta property="og:description" content={ogDescription} />
+	<meta property="og:url" content={ogUrl} />
 	<meta property="og:logo" content="https://missionnaire.net/favicon.png" />
-	<meta property="og:image" content="https://missionnaire.net/og-image.png" />
-	<meta property="og:image:width" content="1200" />
-	<meta property="og:image:height" content="630" />
+	<meta property="og:image" content={ogImage} />
+	{#if ogImageDims}
+		<meta property="og:image:width" content={String(ogImageDims.w)} />
+		<meta property="og:image:height" content={String(ogImageDims.h)} />
+	{/if}
 	<meta name="twitter:card" content="summary_large_image" />
-	<meta name="twitter:title" content={DEFAULT_SEO_TITLE} />
-	<meta name="twitter:description" content={DEFAULT_SEO_DESCRIPTION} />
-	<meta name="twitter:image" content="https://missionnaire.net/og-image.png" />
+	<meta name="twitter:title" content={ogTitle} />
+	<meta name="twitter:description" content={ogDescription} />
+	<meta name="twitter:image" content={ogImage} />
 </svelte:head>
 
 {#if $navigating}
@@ -261,7 +371,7 @@
 	<div class="relative">
 		<div
 			bind:this={headerRef}
-			class="flex flex-col fixed top-0 z-40 bg-[#FAF8F3]/95 backdrop-blur-sm w-full"
+			class="flex flex-col fixed top-0 z-[110] bg-[#FAF8F3]/95 backdrop-blur-sm w-full"
 		>
 			<SocialMediaAbove />
 			<NavBar />
@@ -269,7 +379,7 @@
 		<div class="relative mt-[120px]" style={browser ? `margin-top: ${headerHeight}px;` : undefined}>
 			{#key $page.url.pathname}
 				<div class="page-fade-in">
-					<slot />
+					{@render children?.()}
 				</div>
 			{/key}
 		</div>
@@ -286,8 +396,19 @@
 	     site while a sermon or rediffusion keeps playing. Previously
 	     mounted per-section (/musique, /predications), which meant
 	     navigating out of the section unmounted the bar mid-playback. -->
-	{#if $selectAudio}
-		<AudioPlayer />
-	{/if}
+	<!--
+		AudioPlayer mounts unconditionally so the DOM-attached <audio> element
+		inside it exists for the lifetime of the session. The player's own
+		template uses {#if $selectAudio} internally to hide its UI when no
+		track is selected, so visually this is identical to the previous
+		conditional mount — but the audio element survives, which is what
+		iOS needs to attribute the audio session to *this* PWA's WebKit
+		process rather than the shared media daemon.
+	-->
+	<AudioPlayer />
 	<ResumeRecorder />
+	<!-- Mobile-only bottom navigation. Fixed at the viewport bottom for
+	     one-tap access to the most-visited sections; the audio player is
+	     lifted above it (see `--bottom-nav-height` in app.css). -->
+	<BottomNav />
 </QueryClientProvider>

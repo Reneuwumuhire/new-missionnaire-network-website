@@ -3,6 +3,7 @@ import { fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { createQuestion, listQuestionsForAuthor } from '../../../db/questions';
 import { ensurePublicQaUser, getCurrentQaUser, resolveQaDisplayName } from '$lib/server/qa-auth';
+import { pageMeta } from '$lib/seo';
 import { QUESTION_CATEGORIES, validateGuestName, validateQuestionInput } from '$lib/questions/validation';
 
 function clientKey(ip: string, userAgent: string | null): string {
@@ -15,7 +16,13 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
 		user,
 		myQuestions: user ? await listQuestionsForAuthor(user.email) : [],
 		categories: QUESTION_CATEGORIES,
-		submitted: url.searchParams.get('submitted') === '1'
+		submitted: url.searchParams.get('submitted') === '1',
+		// Rendered by the root layout as the single og:*/twitter:* tag set.
+		meta: pageMeta('/questions/ask', {
+			title: 'Poser une question - Missionnaire Network',
+			description:
+				"Soumettez une question biblique à l'équipe pastorale de Missionnaire Network."
+		})
 	};
 };
 

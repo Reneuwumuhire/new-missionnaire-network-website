@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { t } from '$lib/i18n';
 
 	type LyricsLine = {
 		id: string;
@@ -92,11 +93,11 @@
 			const response = await fetch(`/api/lyrics-review/timeline/${data.audioId}`);
 			const payload = await response.json();
 			if (!response.ok) {
-				throw new Error(payload.error ?? 'Could not load timeline');
+				throw new Error(payload.error ?? $t('lyrics.timing.errors.load'));
 			}
 			applyDetail(payload);
 		} catch (caughtError) {
-			error = caughtError instanceof Error ? caughtError.message : 'Could not load timeline';
+			error = caughtError instanceof Error ? caughtError.message : $t('lyrics.timing.errors.load');
 		} finally {
 			loading = false;
 		}
@@ -134,12 +135,14 @@
 			});
 			const payload = await response.json();
 			if (!response.ok) {
-				throw new Error(payload.error ?? 'Could not sync lyrics');
+				throw new Error(payload.error ?? $t('lyrics.timing.errors.sync'));
 			}
 			applyDetail(payload);
-			notice = `Lyrics synced. ${payload.sync?.timableLineCount ?? timableLines.length} lines are ready for timing.`;
+			notice = $t('lyrics.timing.notices.synced', {
+				count: payload.sync?.timableLineCount ?? timableLines.length
+			});
 		} catch (caughtError) {
-			error = caughtError instanceof Error ? caughtError.message : 'Could not sync lyrics';
+			error = caughtError instanceof Error ? caughtError.message : $t('lyrics.timing.errors.sync');
 		} finally {
 			syncing = false;
 		}
@@ -163,12 +166,15 @@
 			});
 			const payload = await response.json();
 			if (!response.ok) {
-				throw new Error(payload.error ?? 'Could not save timeline');
+				throw new Error(payload.error ?? $t('lyrics.timing.errors.save'));
 			}
 			applyDetail(payload);
-			notice = status === 'published' ? 'Timeline published.' : 'Draft saved.';
+			notice =
+				status === 'published'
+					? $t('lyrics.timing.notices.published')
+					: $t('lyrics.timing.notices.draftSaved');
 		} catch (caughtError) {
-			error = caughtError instanceof Error ? caughtError.message : 'Could not save timeline';
+			error = caughtError instanceof Error ? caughtError.message : $t('lyrics.timing.errors.save');
 		} finally {
 			saving = false;
 			publishing = false;
@@ -259,7 +265,7 @@
 			.filter(Boolean);
 
 		if (parts.length < 2) {
-			error = 'Put each sung phrase on its own line before saving.';
+			error = $t('lyrics.timing.errors.splitMinParts');
 			return;
 		}
 
@@ -279,14 +285,13 @@
 			});
 			const payload = await response.json();
 			if (!response.ok) {
-				throw new Error(payload.error ?? 'Could not split lyric line');
+				throw new Error(payload.error ?? $t('lyrics.timing.errors.split'));
 			}
 			applyDetail(payload);
 			closeSplitEditor();
-			notice =
-				'Line breaks saved. Review the new phrases, then save or publish the timeline again.';
+			notice = $t('lyrics.timing.notices.breaksSaved');
 		} catch (caughtError) {
-			error = caughtError instanceof Error ? caughtError.message : 'Could not split lyric line';
+			error = caughtError instanceof Error ? caughtError.message : $t('lyrics.timing.errors.split');
 		} finally {
 			splitting = false;
 		}
@@ -305,15 +310,14 @@
 			});
 			const payload = await response.json();
 			if (!response.ok) {
-				throw new Error(payload.error ?? 'Could not reset lyric line breaks');
+				throw new Error(payload.error ?? $t('lyrics.timing.errors.reset'));
 			}
 			applyDetail(payload);
 			closeSplitEditor();
-			notice =
-				'Line breaks restored from the original lyrics source. Review the timing, then save or publish again.';
+			notice = $t('lyrics.timing.notices.breaksRestored');
 		} catch (caughtError) {
 			error =
-				caughtError instanceof Error ? caughtError.message : 'Could not reset lyric line breaks';
+				caughtError instanceof Error ? caughtError.message : $t('lyrics.timing.errors.reset');
 		} finally {
 			resettingBreaks = false;
 		}
@@ -321,9 +325,7 @@
 
 	async function clearTimeline() {
 		if (!hasAnyTiming) return;
-		const confirmed = window.confirm(
-			'Remove all timing for this audio? The lyrics text will stay, but published synced scrolling will be removed until you publish timing again.'
-		);
+		const confirmed = window.confirm($t('lyrics.timing.confirmClear'));
 		if (!confirmed) return;
 
 		clearingTimeline = true;
@@ -338,12 +340,12 @@
 			});
 			const payload = await response.json();
 			if (!response.ok) {
-				throw new Error(payload.error ?? 'Could not clear timing');
+				throw new Error(payload.error ?? $t('lyrics.timing.errors.clear'));
 			}
 			applyDetail(payload);
-			notice = 'All timing was removed. The lyrics text is still synced.';
+			notice = $t('lyrics.timing.notices.cleared');
 		} catch (caughtError) {
-			error = caughtError instanceof Error ? caughtError.message : 'Could not clear timing';
+			error = caughtError instanceof Error ? caughtError.message : $t('lyrics.timing.errors.clear');
 		} finally {
 			clearingTimeline = false;
 		}
@@ -396,7 +398,7 @@
 </script>
 
 <svelte:head>
-	<title>Lyrics Timing - Missionnaire Network</title>
+	<title>{$t('lyrics.timing.pageTitle')}</title>
 </svelte:head>
 
 <main class="min-h-screen bg-stone-50 px-4 py-8 text-stone-900 sm:px-6 lg:px-8">
@@ -409,25 +411,31 @@
 					class="text-xs font-bold uppercase tracking-[0.18em] text-missionnaire hover:text-stone-900"
 					href="/lyrics-review"
 				>
-					Back to lyrics review
+					{$t('lyrics.timing.back')}
 				</a>
-				<h1 class="mt-2 text-3xl font-black tracking-normal text-stone-950">Tap-to-sync lyrics</h1>
+				<h1 class="mt-2 text-3xl font-black tracking-normal text-stone-950">
+					{$t('lyrics.timing.heading')}
+				</h1>
 				<p class="mt-2 text-sm font-semibold text-stone-500">
-					{audio?.title || detail?.reviewRow?.audio_title || 'Selected audio'}
+					{audio?.title || detail?.reviewRow?.audio_title || $t('lyrics.timing.selectedAudioFallback')}
 				</p>
 			</div>
 
 			<div class="grid grid-cols-3 gap-2 lg:min-w-[420px]">
 				<div class="rounded-md border border-stone-200 bg-white p-3">
-					<p class="text-xs font-semibold uppercase text-stone-500">Lines</p>
+					<p class="text-xs font-semibold uppercase text-stone-500">{$t('lyrics.timing.stats.lines')}</p>
 					<p class="mt-1 text-2xl font-black">{completedCount}/{timableLines.length}</p>
 				</div>
 				<div class="rounded-md border border-stone-200 bg-white p-3">
-					<p class="text-xs font-semibold uppercase text-stone-500">Status</p>
-					<p class="mt-1 text-lg font-black capitalize">{lyrics?.timeline_status || 'None'}</p>
+					<p class="text-xs font-semibold uppercase text-stone-500">
+						{$t('lyrics.timing.stats.status')}
+					</p>
+					<p class="mt-1 text-lg font-black capitalize">
+						{lyrics?.timeline_status || $t('lyrics.timing.statusNone')}
+					</p>
 				</div>
 				<div class="rounded-md border border-stone-200 bg-white p-3">
-					<p class="text-xs font-semibold uppercase text-stone-500">Time</p>
+					<p class="text-xs font-semibold uppercase text-stone-500">{$t('lyrics.timing.stats.time')}</p>
 					<p class="mt-1 text-lg font-black">
 						{formatMs(currentTimeMs)}{durationMs ? ` / ${formatMs(durationMs)}` : ''}
 					</p>
@@ -455,17 +463,16 @@
 			<div
 				class="rounded-md border border-stone-200 bg-white p-8 text-center text-sm font-semibold text-stone-500"
 			>
-				Loading timing editor...
+				{$t('lyrics.timing.loading')}
 			</div>
 		{:else if !lyrics}
 			<section class="rounded-md border border-stone-200 bg-white p-6">
-				<p class="text-xs font-bold uppercase text-stone-500">Lyrics not synced yet</p>
+				<p class="text-xs font-bold uppercase text-stone-500">{$t('lyrics.timing.notSynced')}</p>
 				<h2 class="mt-2 text-2xl font-black text-stone-950">
-					{detail?.reviewRow?.audio_title || audio?.title || 'This audio'}
+					{detail?.reviewRow?.audio_title || audio?.title || $t('lyrics.timing.thisAudioFallback')}
 				</h2>
 				<p class="mt-2 max-w-2xl text-sm font-semibold leading-6 text-stone-500">
-					Syncing copies the approved source lyrics into your database as safe plain text. Public
-					users can only see synced lyrics, and timing stays private until you publish it.
+					{$t('lyrics.timing.syncExplainer')}
 				</p>
 				<button
 					class="mt-5 min-h-11 rounded-md bg-stone-950 px-5 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60"
@@ -473,14 +480,14 @@
 					on:click={syncLyrics}
 					type="button"
 				>
-					{syncing ? 'Syncing...' : 'Sync lyrics'}
+					{syncing ? $t('lyrics.timing.syncing') : $t('lyrics.timing.syncLyrics')}
 				</button>
 			</section>
 		{:else}
 			<section class="grid gap-5 xl:grid-cols-[minmax(360px,0.85fr)_minmax(0,1.15fr)]">
 				<aside class="rounded-md border border-stone-200 bg-white">
 					<div class="border-b border-stone-200 p-5">
-						<p class="text-xs font-bold uppercase text-stone-500">Audio</p>
+						<p class="text-xs font-bold uppercase text-stone-500">{$t('lyrics.timing.audio')}</p>
 						<h2 class="mt-1 text-xl font-black text-stone-950">
 							{audio?.title || detail?.reviewRow?.audio_title}
 						</h2>
@@ -504,11 +511,13 @@
 
 					<div class="space-y-4 p-5">
 						<div>
-							<p class="text-xs font-bold uppercase text-stone-500">Current line</p>
+							<p class="text-xs font-bold uppercase text-stone-500">
+								{$t('lyrics.timing.currentLine')}
+							</p>
 							<p
 								class="mt-1 min-h-14 rounded-md border border-stone-200 bg-stone-50 p-3 text-lg font-black leading-6 text-stone-950"
 							>
-								{selectedLine?.text || 'No lyric line selected'}
+								{selectedLine?.text || $t('lyrics.timing.noLineSelected')}
 							</p>
 							<div class="mt-2 grid gap-2 sm:grid-cols-2">
 								<button
@@ -517,7 +526,7 @@
 									on:click={() => openSplitEditor()}
 									type="button"
 								>
-									Break into sung phrases
+									{$t('lyrics.timing.breakPhrases')}
 								</button>
 								<button
 									class="min-h-9 rounded-md border border-stone-300 bg-white px-3 text-xs font-bold text-stone-700 hover:border-missionnaire hover:text-missionnaire disabled:cursor-wait disabled:opacity-50"
@@ -525,7 +534,7 @@
 									on:click={resetLineBreaks}
 									type="button"
 								>
-									{resettingBreaks ? 'Restoring...' : 'Restore source breaks'}
+									{resettingBreaks ? $t('lyrics.timing.restoring') : $t('lyrics.timing.restoreBreaks')}
 								</button>
 							</div>
 						</div>
@@ -535,10 +544,10 @@
 								<div class="flex items-start justify-between gap-3">
 									<div>
 										<p class="text-xs font-black uppercase tracking-[0.14em] text-orange-700">
-											Line breaks
+											{$t('lyrics.timing.lineBreaks')}
 										</p>
 										<p class="mt-1 text-xs font-semibold leading-5 text-stone-600">
-											Put each breath or sung phrase on a separate line.
+											{$t('lyrics.timing.lineBreaksHint')}
 										</p>
 									</div>
 									<button
@@ -546,7 +555,7 @@
 										on:click={closeSplitEditor}
 										type="button"
 									>
-										Close
+										{$t('lyrics.timing.close')}
 									</button>
 								</div>
 								<textarea
@@ -559,7 +568,7 @@
 									on:click={saveLineSplit}
 									type="button"
 								>
-									{splitting ? 'Saving breaks...' : 'Save line breaks'}
+									{splitting ? $t('lyrics.timing.savingBreaks') : $t('lyrics.timing.saveBreaks')}
 								</button>
 							</div>
 						{/if}
@@ -570,7 +579,7 @@
 								on:click={togglePlayback}
 								type="button"
 							>
-								{isPlaying ? 'Pause' : 'Play'}
+								{isPlaying ? $t('lyrics.timing.pause') : $t('lyrics.timing.play')}
 							</button>
 							<button
 								class="min-h-11 rounded-md bg-missionnaire px-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
@@ -578,7 +587,7 @@
 								on:click={markSelectedLine}
 								type="button"
 							>
-								Mark current line
+								{$t('lyrics.timing.markLine')}
 							</button>
 						</div>
 
@@ -597,7 +606,7 @@
 								on:click={() => selectedLine && seekToLine(selectedLine)}
 								type="button"
 							>
-								Replay
+								{$t('lyrics.timing.replay')}
 							</button>
 							<button
 								class="min-h-10 rounded-md border border-stone-300 bg-white px-3 text-xs font-bold text-stone-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -616,7 +625,7 @@
 								on:click={undoMark}
 								type="button"
 							>
-								Undo
+								{$t('lyrics.timing.undo')}
 							</button>
 							<button
 								class="min-h-10 rounded-md bg-stone-950 px-3 text-xs font-bold text-white disabled:cursor-wait disabled:opacity-60"
@@ -624,7 +633,7 @@
 								on:click={() => saveTimeline('draft')}
 								type="button"
 							>
-								{saving ? 'Saving...' : 'Save draft'}
+								{saving ? $t('lyrics.timing.saving') : $t('lyrics.timing.saveDraft')}
 							</button>
 							<button
 								class="min-h-10 rounded-md bg-emerald-600 px-3 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
@@ -632,7 +641,7 @@
 								on:click={() => saveTimeline('published')}
 								type="button"
 							>
-								{publishing ? 'Publishing...' : 'Publish'}
+								{publishing ? $t('lyrics.timing.publishing') : $t('lyrics.timing.publish')}
 							</button>
 						</div>
 
@@ -642,7 +651,7 @@
 							on:click={clearTimeline}
 							type="button"
 						>
-							{clearingTimeline ? 'Clearing timing...' : 'Clear all timing'}
+							{clearingTimeline ? $t('lyrics.timing.clearing') : $t('lyrics.timing.clearAll')}
 						</button>
 					</div>
 				</aside>
@@ -652,7 +661,7 @@
 						class="flex flex-col gap-3 border-b border-stone-200 p-4 sm:flex-row sm:items-center sm:justify-between"
 					>
 						<div>
-							<p class="text-xs font-bold uppercase text-stone-500">Lyrics</p>
+							<p class="text-xs font-bold uppercase text-stone-500">{$t('lyrics.timing.lyrics')}</p>
 							<h2 class="mt-1 text-xl font-black text-stone-950">{lyrics.title}</h2>
 							<p class="mt-1 text-sm text-stone-500">
 								{lyrics.source_book} #{lyrics.source_number}
@@ -664,7 +673,7 @@
 							target="_blank"
 							rel="noreferrer"
 						>
-							Source
+							{$t('lyrics.timing.source')}
 						</a>
 					</div>
 

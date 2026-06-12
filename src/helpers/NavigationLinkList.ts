@@ -22,35 +22,39 @@ import IoMusicalNotes from 'svelte-icons-pack/io/IoMusicalNotes';
 import IoVideocam from 'svelte-icons-pack/io/IoVideocam';
 import IoBookOutline from 'svelte-icons-pack/io/IoBookOutline';
 import IoInformationCircleOutline from 'svelte-icons-pack/io/IoInformationCircleOutline';
+import type { TranslationKey } from '../i18n';
 
+// `menuName`, `subName` and `subText` are translation KEYS — the nav
+// components render them through `$t(...)` so the header follows the
+// FR/EN toggle.
 export interface NavigationLinkSubmenu {
-	subName: string;
+	subName: TranslationKey;
 	link: string;
-	subText?: string;
+	subText?: TranslationKey;
 	image?: string;
 	icon?: any;
 }
 export interface NavigationLink {
 	id?: number;
-	menuName: string;
+	menuName: TranslationKey;
 	link: string;
 	subMenu?: NavigationLinkSubmenu[];
 }
 export const NavigationLinkList: NavigationLink[] = [
 	{
 		id: 1,
-		menuName: 'Prédications',
+		menuName: 'nav.predications',
 		link: '/predications',
 		subMenu: [
 			{
-				subName: 'Prédications (Audio)',
-				subText: 'Écoutez les prédications de Branham, Ewald Frank et locales.',
+				subName: 'nav.sub.sermonsAudio',
+				subText: 'nav.sub.sermonsAudioText',
 				link: '/predications',
 				icon: IoMusicalNotes
 			},
 			{
-				subName: 'Vidéos',
-				subText: 'Regardez les retransmissions et enseignements en vidéo.',
+				subName: 'nav.sub.videos',
+				subText: 'nav.sub.videosText',
 				link: '/videos',
 				icon: IoVideocam
 			}
@@ -58,23 +62,23 @@ export const NavigationLinkList: NavigationLink[] = [
 	},
 	{
 		id: 2,
-		menuName: 'Transcriptions',
+		menuName: 'nav.transcriptions',
 		link: '/transcriptions'
 	},
 	{
 		id: 3,
-		menuName: 'William Branham',
+		menuName: 'nav.williamBranham',
 		link: '/william-branham/biographie',
 		subMenu: [
 			{
-				subName: 'Qui est William Marrion Branham?',
-				subText: 'Découvrez toute la biographie du prophète et son histoire.',
+				subName: 'nav.sub.branhamBio',
+				subText: 'nav.sub.branhamBioText',
 				link: '/william-branham/biographie',
 				image: '/img/branham_icon.png'
 			},
 			{
-				subName: 'Brochures',
-				subText: "Téléchargez les brochures pour connaître le Message qu'il apporte.",
+				subName: 'nav.sub.branhamBrochures',
+				subText: 'nav.sub.branhamBrochuresText',
 				link: '/literature?author=William Marrion Branham&category=book',
 				icon: IoBookOutline
 			}
@@ -82,18 +86,18 @@ export const NavigationLinkList: NavigationLink[] = [
 	},
 	{
 		id: 4,
-		menuName: 'Ewald Frank',
+		menuName: 'nav.ewaldFrank',
 		link: '/ewald-frank',
 		subMenu: [
 			{
-				subName: 'À propos de Ewald Frank',
-				subText: "Tout savoir sur l'homme de Dieu Ewald Frank.",
+				subName: 'nav.sub.frankAbout',
+				subText: 'nav.sub.frankAboutText',
 				link: '/ewald-frank',
 				icon: IoInformationCircleOutline
 			},
 			{
-				subName: 'Livres & Brochures',
-				subText: 'Consultez les livres et brochures de Ewald Frank.',
+				subName: 'nav.sub.frankBooks',
+				subText: 'nav.sub.frankBooksText',
 				link: '/literature?author=Ewald Frank&category=book',
 				icon: IoBookOutline
 			}
@@ -101,18 +105,18 @@ export const NavigationLinkList: NavigationLink[] = [
 	},
 	{
 		id: 5,
-		menuName: 'Musique',
+		menuName: 'nav.musique',
 		link: '/musique',
 		subMenu: [
 			{
-				subName: 'Cantiques (Audio)',
-				subText: 'Écoutez les chants de louange et adoration.',
+				subName: 'nav.sub.songsAudio',
+				subText: 'nav.sub.songsAudioText',
 				link: '/musique',
 				icon: IoMusicalNotes
 			},
 			{
-				subName: 'Chants en Vidéo',
-				subText: 'Regardez nos clips et enregistrements de chants.',
+				subName: 'nav.sub.songsVideo',
+				subText: 'nav.sub.songsVideoText',
 				link: '/musique/videos',
 				icon: IoVideocam
 			}
@@ -120,22 +124,22 @@ export const NavigationLinkList: NavigationLink[] = [
 	},
 	{
 		id: 6,
-		menuName: 'Questions',
+		menuName: 'nav.questions',
 		link: '/questions'
 	},
 	{
 		id: 7,
-		menuName: 'Direct',
+		menuName: 'nav.direct',
 		link: '/live'
 	},
 	{
 		id: 8,
-		menuName: "L'église",
+		menuName: 'nav.eglise',
 		link: '/eglise'
 	},
 	{
 		id: 9,
-		menuName: 'À propos',
+		menuName: 'nav.aPropos',
 		link: '/a-propos'
 	}
 ];

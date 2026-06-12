@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { t, type TranslationKey } from '$lib/i18n';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -9,8 +10,22 @@
 	let showCurrentPassword = $state(false);
 	let showNewPassword = $state(false);
 
+	// Field-level action errors → translated inline messages (aria-invalid).
+	const profileFieldError = $derived(form?.profileFieldError ?? null);
+	const passwordFieldError = $derived(form?.passwordFieldError ?? null);
+	const fieldErrorKeys: Record<string, TranslationKey> = {
+		nameTooShort: 'settings.error.nameTooShort',
+		passwordTooShort: 'settings.error.passwordTooShort',
+		passwordMismatch: 'settings.error.passwordMismatch',
+		currentPasswordWrong: 'settings.error.currentPasswordWrong'
+	};
+	function fieldErrorMessage(code: string): string {
+		const key = fieldErrorKeys[code];
+		return key ? $t(key) : code;
+	}
+
 	function formatDate(date: string | Date | null): string {
-		if (!date) return 'Jamais';
+		if (!date) return $t('settings.never');
 		return new Date(date).toLocaleDateString('fr-FR', {
 			day: 'numeric',
 			month: 'long',
@@ -20,19 +35,19 @@
 		});
 	}
 
-	const roleLabel: Record<string, string> = {
-		superadmin: 'Super Administrateur',
-		editor: 'Éditeur'
+	const roleLabel: Record<string, TranslationKey> = {
+		superadmin: 'settings.roleSuperadmin',
+		editor: 'settings.roleEditor'
 	};
 </script>
 
 <svelte:head>
-	<title>Paramètres - Missionnaire Admin</title>
+	<title>{$t('settings.headTitle')}</title>
 </svelte:head>
 
 <div class="mb-8">
-	<h1 class="font-display text-3xl font-semibold text-stone-800">Paramètres</h1>
-	<p class="mt-1 text-sm text-stone-500">Gérez votre profil et votre sécurité</p>
+	<h1 class="font-display text-3xl font-semibold text-stone-800">{$t('settings.title')}</h1>
+	<p class="mt-1 text-sm text-stone-500">{$t('settings.subtitle')}</p>
 </div>
 
 <div class="mx-auto max-w-2xl space-y-6">
@@ -49,7 +64,7 @@
 					<h2 class="font-display text-xl font-semibold text-stone-800">{data.user.name}</h2>
 					<p class="text-sm text-stone-500">{data.user.email}</p>
 					<span class="mt-1.5 inline-flex items-center rounded-full bg-white/80 px-2.5 py-0.5 text-xs font-medium text-earth shadow-sm">
-						{roleLabel[data.user.role] ?? data.user.role}
+						{roleLabel[data.user.role] ? $t(roleLabel[data.user.role]) : data.user.role}
 					</span>
 				</div>
 			</div>
@@ -72,12 +87,12 @@
 				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
 				</svg>
-				Profil
+				{$t('settings.profile')}
 			</h3>
 
 			{#if form?.profileSuccess}
 				<div class="mb-5 border border-green-200 bg-green-50/80 px-4 py-3 text-sm text-green-700">
-					Profil mis à jour avec succès
+					{$t('settings.profileUpdated')}
 				</div>
 			{/if}
 			{#if form?.profileError}
@@ -88,19 +103,24 @@
 
 			<div class="space-y-4">
 				<div>
-					<label for="name" class="admin-label">Nom</label>
+					<label for="name" class="admin-label">{$t('settings.name')}</label>
 					<input
 						id="name"
 						name="name"
 						type="text"
 						required
 						value={data.user.name}
-						class="admin-input"
+						class="admin-input {profileFieldError?.field === 'name' ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : ''}"
+						aria-invalid={profileFieldError?.field === 'name' ? 'true' : undefined}
+						aria-describedby={profileFieldError?.field === 'name' ? 'name-error' : undefined}
 					/>
+					{#if profileFieldError?.field === 'name'}
+						<p id="name-error" class="mt-1.5 text-xs text-red-600">{fieldErrorMessage(profileFieldError.code)}</p>
+					{/if}
 				</div>
 
 				<div>
-					<label for="email-display" class="admin-label">Adresse email</label>
+					<label for="email-display" class="admin-label">{$t('settings.email')}</label>
 					<input
 						id="email-display"
 						type="email"
@@ -108,7 +128,7 @@
 						value={data.user.email}
 						class="admin-input cursor-not-allowed bg-cream/60 text-stone-400"
 					/>
-					<p class="mt-1 text-xs text-stone-400">L'adresse email ne peut pas être modifiée</p>
+					<p class="mt-1 text-xs text-stone-400">{$t('settings.emailNotEditable')}</p>
 				</div>
 			</div>
 
@@ -116,11 +136,11 @@
 			<div class="mt-5 bg-cream/50 p-4">
 				<div class="grid grid-cols-2 gap-3 text-xs">
 					<div>
-						<span class="text-stone-400">Membre depuis</span>
+						<span class="text-stone-400">{$t('settings.memberSince')}</span>
 						<p class="mt-0.5 font-medium text-stone-600">{formatDate(data.user.created_at)}</p>
 					</div>
 					<div>
-						<span class="text-stone-400">Dernière connexion</span>
+						<span class="text-stone-400">{$t('settings.lastLogin')}</span>
 						<p class="mt-0.5 font-medium text-stone-600">{formatDate(data.user.last_login)}</p>
 					</div>
 				</div>
@@ -134,7 +154,7 @@
 							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
 						</svg>
 					{/if}
-					Enregistrer le profil
+					{$t('settings.saveProfile')}
 				</button>
 			</div>
 		</form>
@@ -146,12 +166,12 @@
 			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
 			</svg>
-			Changer le mot de passe
+			{$t('settings.changePassword')}
 		</h3>
 
 		{#if form?.passwordSuccess}
 			<div class="mb-5 border border-green-200 bg-green-50/80 px-4 py-3 text-sm text-green-700">
-				Mot de passe mis à jour avec succès
+				{$t('settings.passwordUpdated')}
 			</div>
 		{/if}
 		{#if form?.passwordError}
@@ -178,7 +198,7 @@
 		>
 			<div class="space-y-4">
 				<div>
-					<label for="currentPassword" class="admin-label">Mot de passe actuel</label>
+					<label for="currentPassword" class="admin-label">{$t('settings.currentPassword')}</label>
 					<div class="relative">
 						<input
 							id="currentPassword"
@@ -186,13 +206,15 @@
 							type={showCurrentPassword ? 'text' : 'password'}
 							required
 							autocomplete="current-password"
-							class="admin-input pr-10"
+							class="admin-input pr-10 {passwordFieldError?.field === 'currentPassword' ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : ''}"
+							aria-invalid={passwordFieldError?.field === 'currentPassword' ? 'true' : undefined}
+							aria-describedby={passwordFieldError?.field === 'currentPassword' ? 'currentPassword-error' : undefined}
 						/>
 						<button
 							type="button"
 							onclick={() => (showCurrentPassword = !showCurrentPassword)}
 							class="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 transition-colors hover:text-stone-600"
-							aria-label={showCurrentPassword ? 'Masquer' : 'Afficher'}
+							aria-label={showCurrentPassword ? $t('settings.hide') : $t('settings.show')}
 						>
 							{#if showCurrentPassword}
 								<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -206,6 +228,9 @@
 							{/if}
 						</button>
 					</div>
+					{#if passwordFieldError?.field === 'currentPassword'}
+						<p id="currentPassword-error" class="mt-1.5 text-xs text-red-600">{fieldErrorMessage(passwordFieldError.code)}</p>
+					{/if}
 				</div>
 
 				<div class="ornament-line my-2">
@@ -213,7 +238,7 @@
 				</div>
 
 				<div>
-					<label for="newPassword" class="admin-label">Nouveau mot de passe</label>
+					<label for="newPassword" class="admin-label">{$t('settings.newPassword')}</label>
 					<div class="relative">
 						<input
 							id="newPassword"
@@ -222,14 +247,16 @@
 							required
 							minlength={8}
 							autocomplete="new-password"
-							class="admin-input pr-10"
-							placeholder="Minimum 8 caractères"
+							class="admin-input pr-10 {passwordFieldError?.field === 'newPassword' ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : ''}"
+							placeholder={$t('settings.minChars')}
+							aria-invalid={passwordFieldError?.field === 'newPassword' ? 'true' : undefined}
+							aria-describedby={passwordFieldError?.field === 'newPassword' ? 'newPassword-error' : undefined}
 						/>
 						<button
 							type="button"
 							onclick={() => (showNewPassword = !showNewPassword)}
 							class="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 transition-colors hover:text-stone-600"
-							aria-label={showNewPassword ? 'Masquer' : 'Afficher'}
+							aria-label={showNewPassword ? $t('settings.hide') : $t('settings.show')}
 						>
 							{#if showNewPassword}
 								<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -243,10 +270,13 @@
 							{/if}
 						</button>
 					</div>
+					{#if passwordFieldError?.field === 'newPassword'}
+						<p id="newPassword-error" class="mt-1.5 text-xs text-red-600">{fieldErrorMessage(passwordFieldError.code)}</p>
+					{/if}
 				</div>
 
 				<div>
-					<label for="confirmPassword" class="admin-label">Confirmer le nouveau mot de passe</label>
+					<label for="confirmPassword" class="admin-label">{$t('settings.confirmNewPassword')}</label>
 					<input
 						id="confirmPassword"
 						name="confirmPassword"
@@ -254,9 +284,14 @@
 						required
 						minlength={8}
 						autocomplete="new-password"
-						class="admin-input"
-						placeholder="Retapez le nouveau mot de passe"
+						class="admin-input {passwordFieldError?.field === 'confirmPassword' ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : ''}"
+						placeholder={$t('settings.retypePassword')}
+						aria-invalid={passwordFieldError?.field === 'confirmPassword' ? 'true' : undefined}
+						aria-describedby={passwordFieldError?.field === 'confirmPassword' ? 'confirmPassword-error' : undefined}
 					/>
+					{#if passwordFieldError?.field === 'confirmPassword'}
+						<p id="confirmPassword-error" class="mt-1.5 text-xs text-red-600">{fieldErrorMessage(passwordFieldError.code)}</p>
+					{/if}
 				</div>
 			</div>
 
@@ -268,7 +303,7 @@
 							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
 						</svg>
 					{/if}
-					Mettre à jour le mot de passe
+					{$t('settings.updatePassword')}
 				</button>
 			</div>
 		</form>

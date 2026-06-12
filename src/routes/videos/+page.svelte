@@ -1,14 +1,15 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
-	import { onDestroy, onMount } from 'svelte';
+	import { onDestroy, onMount, untrack } from 'svelte';
 	import type { PageData } from './$types';
 	import type { YouTubeCachedStatus } from '../../db/collections';
 	import type { YoutubeVideo } from '$lib/models/youtube';
 	import '../../app.css';
 	import ThumbnailVideo from '$lib/components/+thumbnailVideo.svelte';
 	import VideoView from '$lib/components/+videoView.svelte';
-	import HomepageLoadingSkelton from '$lib/components/+homepageLoadingSkelton.svelte';
+	import ListSkeleton from '$lib/components/ListSkeleton.svelte';
+	import ErrorCard from '$lib/components/ErrorCard.svelte';
 	import LoadingRing from '$lib/components/LoadingRing.svelte';
 	import { availableTypesTag } from '../../utils/data';
 	import { selectedVideo } from '$lib/stores/videoStore';
@@ -23,57 +24,36 @@
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import BsSearch from 'svelte-icons-pack/bs/BsSearch';
 	import BsX from 'svelte-icons-pack/bs/BsX';
+	import { t } from '../../i18n';
 
-	export let data: PageData;
+	interface Props {
+		data: PageData;
+	}
+
+	let { data }: Props = $props();
 
 	const PAGE_SIZE = 20;
 
-	let loadedVideos: YoutubeVideo[] = [];
-	let liveStatus: YouTubeCachedStatus | null = null;
-	let requestedVideo: YoutubeVideo | null = null;
-	let skipCount = 0;
-	let hasMore = true;
-	let isInitialLoading = false;
-	let isLoadingMore = false;
-	let isSearchLoading = false;
-	let initialLoadError = '';
-	let hasResolved = false;
+	let loadedVideos: YoutubeVideo[] = $state([]);
+	let liveStatus: YouTubeCachedStatus | null = $state(null);
+	let requestedVideo: YoutubeVideo | null = $state(null);
+	let skipCount = $state(0);
+	let hasMore = $state(true);
+	let isInitialLoading = $state(false);
+	let isLoadingMore = $state(false);
+	let isSearchLoading = $state(false);
+	let initialLoadError = $state('');
+	let hasResolved = $state(false);
 	let abortController: AbortController | null = null;
 	let currentToken = 0;
-	let lastHandledKey = '';
-	let lastResetSelectionKey = '';
+	let lastHandledKey = $state('');
+	let lastResetSelectionKey = $state('');
 	let searchTimeout: ReturnType<typeof setTimeout> | null = null;
-	let searchInput = '';
-	let lastSyncedSearch = '';
+	let searchInput = $state('');
+	let lastSyncedSearch = $state('');
 	let observerTarget: HTMLElement;
 	let observer: IntersectionObserver | null = null;
 
-	$: initialVideos = ((data as any).videos || []) as YoutubeVideo[];
-	$: initialLiveStatus = ((data as any).liveStatus || null) as YouTubeCachedStatus | null;
-	$: initialRequestedVideo = ((data as any).requestedVideo || null) as YoutubeVideo | null;
-	$: currentFilter = ((data as any).filter || 'All') as string;
-	$: currentSearch = ((data as any).search || '') as string;
-	$: currentVideoId = ((data as any).videoId || '') as string;
-	$: isDeferredData = Boolean((data as any).deferred);
-	$: requestKey = JSON.stringify({
-		filter: currentFilter || 'All',
-		search: currentSearch || '',
-		videoId: currentVideoId || ''
-	});
-	$: activeLiveVideo = buildLiveVideo(liveStatus);
-	$: displayVideos = activeLiveVideo
-		? [activeLiveVideo, ...loadedVideos.filter((video) => video.id !== activeLiveVideo.id)]
-		: loadedVideos;
-	$: if (currentSearch !== lastSyncedSearch) {
-		searchInput = currentSearch;
-		lastSyncedSearch = currentSearch;
-	}
-	$: if (requestKey && requestKey !== lastResetSelectionKey) {
-		lastResetSelectionKey = requestKey;
-		if (browser && !currentVideoId) {
-			selectedVideo.set(undefined);
-		}
-	}
 
 	function buildLiveVideo(status: YouTubeCachedStatus | null): YoutubeVideo | null {
 		if (!status?.isLive || !status.videoId) return null;
@@ -144,7 +124,7 @@
 			});
 
 			if (token !== currentToken || key !== requestKey) return;
-			if (!response.ok) throw new Error('Impossible de charger les vidéos');
+			if (!response.ok) throw new Error($t('videos.loadFailed'));
 
 			const result = await response.json();
 			const videos = (result.data || []) as YoutubeVideo[];
@@ -161,7 +141,7 @@
 		} catch (error) {
 			if ((error as Error).name === 'AbortError') return;
 			if (token !== currentToken || key !== requestKey) return;
-			initialLoadError = error instanceof Error ? error.message : 'Impossible de charger les vidéos';
+			initialLoadError = error instanceof Error ? error.message : $t('videos.loadFailed');
 			isSearchLoading = false;
 		} finally {
 			if (token === currentToken) isInitialLoading = false;
@@ -169,39 +149,6 @@
 		}
 	}
 
-	$: if (requestKey && requestKey !== lastHandledKey) {
-		lastHandledKey = requestKey;
-		initialLoadError = '';
-
-		const cachedEntry = getVideosPageCache(requestKey);
-
-		if (!isDeferredData) {
-			const seeded = setVideosPageCache(requestKey, {
-				videos: initialVideos,
-				liveStatus: initialLiveStatus,
-				requestedVideo: initialRequestedVideo,
-				skipCount: initialVideos.length,
-				hasMore: initialVideos.length >= PAGE_SIZE
-			});
-			abortRequest();
-			applyData(seeded);
-			isInitialLoading = false;
-		} else if (cachedEntry) {
-			applyData(cachedEntry);
-			if (!isVideosPageCacheFresh(cachedEntry)) {
-				void loadInitial({ showLoading: false });
-			}
-		} else {
-			abortRequest();
-			loadedVideos = [];
-			liveStatus = null;
-			requestedVideo = null;
-			skipCount = 0;
-			hasMore = true;
-			hasResolved = false;
-			void loadInitial({ showLoading: true });
-		}
-	}
 
 	async function loadMoreVideos() {
 		if (isLoadingMore || !hasMore) return;
@@ -215,7 +162,7 @@
 			});
 
 			const response = await fetch(`/pagination?${params.toString()}`);
-			if (!response.ok) throw new Error('Impossible de charger plus de vidéos');
+			if (!response.ok) throw new Error($t('videos.loadMoreFailed'));
 
 			const result = await response.json();
 			const nextVideos = (result.data || []) as YoutubeVideo[];
@@ -343,33 +290,95 @@
 		if (searchTimeout) clearTimeout(searchTimeout);
 		observer?.disconnect();
 	});
+	let initialVideos = $derived(((data as any).videos || []) as YoutubeVideo[]);
+	let initialLiveStatus = $derived(((data as any).liveStatus || null) as YouTubeCachedStatus | null);
+	let initialRequestedVideo = $derived(((data as any).requestedVideo || null) as YoutubeVideo | null);
+	let currentFilter = $derived(((data as any).filter || 'All') as string);
+	let currentSearch = $derived(((data as any).search || '') as string);
+	let currentVideoId = $derived(((data as any).videoId || '') as string);
+	let isDeferredData = $derived(Boolean((data as any).deferred));
+	let requestKey = $derived(JSON.stringify({
+		filter: currentFilter || 'All',
+		search: currentSearch || '',
+		videoId: currentVideoId || ''
+	}));
+	$effect(() => {
+		if (requestKey && requestKey !== lastHandledKey) {
+			untrack(() => {
+				lastHandledKey = requestKey;
+			});
+			initialLoadError = '';
+
+			const cachedEntry = getVideosPageCache(requestKey);
+
+			if (!isDeferredData) {
+				const seeded = setVideosPageCache(requestKey, {
+					videos: initialVideos,
+					liveStatus: initialLiveStatus,
+					requestedVideo: initialRequestedVideo,
+					skipCount: initialVideos.length,
+					hasMore: initialVideos.length >= PAGE_SIZE
+				});
+				abortRequest();
+				applyData(seeded);
+				isInitialLoading = false;
+			} else if (cachedEntry) {
+				applyData(cachedEntry);
+				if (!isVideosPageCacheFresh(cachedEntry)) {
+					void loadInitial({ showLoading: false });
+				}
+			} else {
+				abortRequest();
+				loadedVideos = [];
+				liveStatus = null;
+				requestedVideo = null;
+				skipCount = 0;
+				hasMore = true;
+				hasResolved = false;
+				void loadInitial({ showLoading: true });
+			}
+		}
+	});
+	let activeLiveVideo = $derived(buildLiveVideo(liveStatus));
+	let displayVideos = $derived(activeLiveVideo
+		? [activeLiveVideo, ...loadedVideos.filter((video) => video.id !== activeLiveVideo.id)]
+		: loadedVideos);
+	$effect(() => {
+		if (currentSearch !== lastSyncedSearch) {
+			searchInput = currentSearch;
+			untrack(() => {
+				lastSyncedSearch = currentSearch;
+			});
+		}
+	});
+	$effect(() => {
+		if (requestKey && requestKey !== lastResetSelectionKey) {
+			untrack(() => {
+				lastResetSelectionKey = requestKey;
+			});
+			if (browser && !currentVideoId) {
+				selectedVideo.set(undefined);
+			}
+		}
+	});
 </script>
 
-<svelte:head>
-	<title>Vidéos | Missionnaire Network</title>
-	<meta
-		name="description"
-		content="Regardez les vidéos de prédications, retransmissions et enseignements du Message sur Missionnaire Network."
-	/>
-	<meta property="og:title" content="Vidéos | Missionnaire Network" />
-	<meta
-		property="og:description"
-		content="Regardez les vidéos de prédications, retransmissions et enseignements du Message."
-	/>
-	<meta property="og:url" content="https://missionnaire.net/videos" />
-</svelte:head>
+<!-- Title/description/og:*/canonical come from `meta` in this route's
+     load — the root layout renders the single canonical tag set ($lib/seo). -->
 
 <main class="relative max-w-6xl mx-auto px-6">
 	<div class="mt-5 mb-16">
 		<section class="mb-8">
-			<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body">
+			<p class="text-[10px] font-semibold uppercase tracking-[0.3em] text-missionnaire mb-3 font-body">
 				Missionnaire Network
 			</p>
 			<div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-				<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">Vidéos</h1>
+				<h1 class="font-display text-4xl md:text-5xl font-semibold tracking-tight leading-[1.05] text-stone-900">
+					{$t('nav.videos')}
+				</h1>
 				<a
 					href="/predications"
-					class="inline-flex items-center gap-2 text-[12px] font-semibold text-stone-400 hover:text-missionnaire uppercase tracking-[0.15em] font-body transition-colors"
+					class="inline-flex items-center gap-2 text-[12px] font-semibold text-stone-400 hover:text-missionnaire uppercase tracking-[0.15em] font-body transition-all duration-200 hover:translate-x-0.5"
 				>
 					<svg
 						width="14"
@@ -385,25 +394,31 @@
 						<circle cx="6" cy="18" r="3"></circle>
 						<circle cx="18" cy="16" r="3"></circle>
 					</svg>
-					Écouter en audio →
+					{$t('videos.listenAudio')} →
 				</a>
 			</div>
 			<p class="mt-2 text-sm text-stone-500 font-body max-w-2xl">
-				Retrouvez les retransmissions, prédications et enseignements en vidéo.
+				{$t('videos.intro')}
 			</p>
 		</section>
 
 		<div class="mb-8 flex flex-col gap-4">
-			<form class="relative w-full max-w-xl" on:submit|preventDefault={() => handleSearch(true)}>
+			<form
+				class="relative w-full max-w-xl"
+				onsubmit={(e) => {
+					e.preventDefault();
+					handleSearch(true);
+				}}
+			>
 				<div class="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400">
 					<Icon src={BsSearch} size="14" />
 				</div>
 				<input
 					type="text"
-					placeholder="Rechercher une vidéo..."
+					placeholder={$t('videos.searchPlaceholder')}
 					class="w-full border border-stone-200/80 bg-white pl-9 pr-24 py-3 text-sm font-body text-stone-800 placeholder:text-stone-400 focus:border-missionnaire/40 focus:outline-none focus:ring-1 focus:ring-missionnaire/30 transition-colors"
 					bind:value={searchInput}
-					on:input={() => handleSearch()}
+					oninput={() => handleSearch()}
 				/>
 				{#if isSearchLoading}
 					<LoadingRing
@@ -414,11 +429,11 @@
 					<button
 						type="button"
 						class="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-missionnaire transition-colors p-1"
-						on:click={() => {
+						onclick={() => {
 							searchInput = '';
 							handleSearch(true);
 						}}
-						aria-label="Effacer la recherche"
+						aria-label={$t('search.clear')}
 					>
 						<Icon src={BsX} size="16" />
 					</button>
@@ -428,10 +443,10 @@
 			<div class="flex flex-wrap gap-2 items-center">
 				{#each availableTypesTag as tagType}
 					<button
-						class="px-3 py-1.5 text-sm font-medium transition-colors border {currentFilter === tagType.label
+						class="px-3 py-1.5 text-sm font-medium transition-colors duration-200 active:scale-[0.98] border {currentFilter === tagType.label
 							? 'border-missionnaire text-missionnaire bg-missionnaire/5'
 							: 'border-stone-200/60 text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
-						on:click={() => handleFilterChange(tagType.label)}
+						onclick={() => handleFilterChange(tagType.label)}
 					>
 						{tagType.label}
 					</button>
@@ -445,23 +460,12 @@
 		</div>
 
 		{#if isInitialLoading && !hasResolved}
-			<HomepageLoadingSkelton />
+			<ListSkeleton variant="cards" rows={8} />
 		{:else if initialLoadError && !hasResolved}
-			<div class="py-20 text-center bg-white/40 border border-stone-200/60">
-				<div class="text-stone-200 mb-4 flex justify-center">
-					<Icon src={BsSearch} size="56" />
-				</div>
-				<p class="text-stone-500 font-bold uppercase tracking-widest text-sm">
-					La liste n'a pas pu charger
-				</p>
-				<p class="mt-2 text-xs text-stone-400">{initialLoadError}</p>
-				<button
-					class="mt-5 inline-flex items-center rounded-full border border-missionnaire px-4 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-missionnaire transition-colors hover:bg-missionnaire/5"
-					on:click={() => void loadInitial({ showLoading: true })}
-				>
-					Réessayer
-				</button>
-			</div>
+			<ErrorCard
+				message={initialLoadError}
+				onRetry={() => void loadInitial({ showLoading: true })}
+			/>
 		{:else}
 			{#if $selectedVideo !== undefined}
 				<div class="mb-12">
@@ -472,7 +476,7 @@
 			{#if !$selectedVideo && displayVideos[0]}
 				<button
 					class="relative w-full h-[50vh] min-h-[400px] max-h-[600px] overflow-hidden mb-16 group text-left transition-all block"
-					on:click={() => videoSelected(displayVideos[0])}
+					onclick={() => videoSelected(displayVideos[0])}
 				>
 					<img
 						src={displayVideos[0].thumbnail}
@@ -485,31 +489,31 @@
 					<div class="absolute bottom-0 left-0 w-full p-6 md:p-12 text-white">
 						<div class="max-w-4xl space-y-4">
 							<div
-								class="inline-block px-3 py-1 {displayVideos[0].tags.includes('LIVE')
+								class="inline-block px-3 py-1.5 {displayVideos[0].tags.includes('LIVE')
 									? 'bg-red-600'
-									: 'bg-missionnaire'} rounded-full text-xs font-bold uppercase tracking-widest mb-2"
+									: 'bg-missionnaire'} text-[10px] font-bold uppercase tracking-[0.25em] font-body mb-2"
 							>
-								{displayVideos[0].tags.includes('LIVE') ? 'EN DIRECT' : 'À la une'}
+								{displayVideos[0].tags.includes('LIVE') ? $t('videos.liveBadge') : $t('videos.featured')}
 							</div>
 							<h2
-								class="text-3xl md:text-5xl lg:text-6xl font-black leading-tight tracking-tight line-clamp-2 group-hover:text-stone-200 transition-colors"
+								class="font-display font-semibold text-3xl md:text-5xl lg:text-6xl leading-[1.05] tracking-tight line-clamp-2 group-hover:text-stone-200 transition-colors"
 							>
 								{displayVideos[0].title}
 							</h2>
-							<p class="text-white/80 text-sm md:text-lg line-clamp-2 max-w-2xl font-medium">
+							<p class="text-white/80 text-sm md:text-base line-clamp-2 max-w-2xl font-body font-light">
 								{displayVideos[0].description}
 							</p>
 							<div class="pt-6 flex items-center gap-4">
 								<div
-									class="px-8 py-4 bg-white text-black rounded-full font-bold text-sm uppercase tracking-wider transition-transform group-hover:scale-105 hidden sm:block"
+									class="px-7 py-3.5 bg-white text-stone-900 text-[11px] font-semibold uppercase tracking-[0.2em] font-body transition-colors duration-200 group-hover:bg-missionnaire group-hover:text-white hidden sm:block"
 								>
-									Regarder maintenant
+									{$t('videos.watchNow')}
 								</div>
 								<div
-									class="px-8 py-4 bg-white/10 backdrop-blur-md text-white border border-white/20 rounded-full font-bold text-sm uppercase tracking-wider flex items-center gap-2"
+									class="px-5 py-3.5 bg-white/10 backdrop-blur-md text-white border border-white/20 text-[11px] font-semibold uppercase tracking-[0.2em] font-body tabular-nums flex items-center gap-2"
 								>
 									<span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-									{displayVideos[0].duration_string || 'Vidéo'}
+									{displayVideos[0].duration_string || $t('misc.video')}
 								</div>
 							</div>
 						</div>
@@ -522,19 +526,19 @@
 					<div class="flex items-end justify-between mb-8 px-2">
 						<div>
 							<h2
-								class="text-[10px] font-bold text-missionnaire uppercase tracking-[0.35em] mb-2 font-body"
+								class="text-[10px] font-semibold text-missionnaire uppercase tracking-[0.3em] mb-2 font-body"
 							>
-								Découvrir
+								{$t('footer.discover')}
 							</h2>
-							<h3 class="font-display text-2xl md:text-3xl font-semibold text-stone-900">
-								Vidéos récentes
+							<h3 class="font-display text-2xl md:text-3xl font-semibold tracking-tight leading-[1.05] text-stone-900">
+								{$t('videos.recentVideos')}
 							</h3>
 						</div>
 					</div>
 
 					<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
 						{#each displayVideos.slice($selectedVideo ? 0 : 1) as video, index (video._id)}
-							<button on:click={() => videoSelected(video)} class="text-left w-full">
+							<button onclick={() => videoSelected(video)} class="text-left w-full">
 								<ThumbnailVideo {video} index={index + ($selectedVideo ? 0 : 1)} />
 							</button>
 						{/each}
@@ -562,7 +566,7 @@
 								<p
 									class="text-[10px] font-semibold uppercase tracking-[0.25em] text-missionnaire font-body"
 								>
-									Chargement...
+									{$t('list.loading')}
 								</p>
 							{/if}
 						</div>
@@ -572,7 +576,7 @@
 						<div class="text-center w-full py-20 opacity-50">
 							<div class="w-16 h-1 bg-stone-200/60 mx-auto rounded-full mb-4"></div>
 							<p class="text-xs font-bold uppercase tracking-widest text-stone-400 font-body">
-								Fin de la liste
+								{$t('videos.endOfList')}
 							</p>
 						</div>
 					{/if}
@@ -580,11 +584,11 @@
 			{:else}
 				<div class="flex flex-col items-center justify-center py-32 text-center text-stone-400">
 					<div
-						class="w-16 h-16 bg-white/40 border border-stone-200/60 rounded-full flex items-center justify-center mb-4 text-2xl"
+						class="w-16 h-16 bg-white/40 border border-stone-200/60 rounded-full flex items-center justify-center mb-4 text-stone-300"
 					>
-						🔍
+						<Icon src={BsSearch} size="24" />
 					</div>
-					<p>Aucune vidéo trouvée</p>
+					<p class="font-body text-sm">{$t('videos.noVideos')}</p>
 				</div>
 			{/if}
 		{/if}
