@@ -50,11 +50,11 @@
 				</svg>
 			</div>
 			<p
-				class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body"
+				class="text-[10px] font-semibold uppercase tracking-[0.3em] text-missionnaire mb-3 font-body"
 			>
 				Direct Audio
 			</p>
-			<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">
+			<h1 class="font-display text-4xl md:text-5xl font-semibold tracking-tight leading-[1.05] text-stone-900">
 				Écoute en direct
 			</h1>
 			<p
@@ -83,7 +83,7 @@
 		<!-- Notification opt-in -->
 		<button
 			onclick={() => bellRef?.toggle()}
-			class="flex items-center gap-4 w-full text-left border px-5 py-4 mt-6 transition-all duration-300 cursor-pointer group {bellRef?.isSubscribed
+			class="flex items-center gap-4 w-full text-left border px-5 py-4 mt-6 transition-all duration-300 active:scale-[0.98] cursor-pointer group {bellRef?.isSubscribed
 				? 'border-missionnaire/30 bg-missionnaire/5'
 				: 'border-stone-200/60 bg-white/40 hover:border-missionnaire/30 hover:bg-missionnaire/5 hover:-translate-y-0.5 hover:shadow-sm'}"
 		>

@@ -372,7 +372,7 @@
 	<div class="relative">
 		<div
 			bind:this={headerRef}
-			class="flex flex-col fixed top-0 z-40 bg-[#FAF8F3]/95 backdrop-blur-sm w-full"
+			class="flex flex-col fixed top-0 z-[110] bg-[#FAF8F3]/95 backdrop-blur-sm w-full"
 		>
 			<SocialMediaAbove />
 			<NavBar />

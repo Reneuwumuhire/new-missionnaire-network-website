@@ -63,23 +63,30 @@
 	{/if}
 
 	{#if active && subMenu && subMenu.length > 0}
-		<div class="mobo-submenu flex flex-col ml-4 mb-3 border-l-2 border-missionnaire/20 pl-4">
-			{#each subMenu as { subName, link: subLink, icon }, i (subName)}
+		<div class="mobo-submenu flex flex-col ml-4 mb-3 border-l border-stone-200 pl-4">
+			{#each subMenu as { subName, link: subLink, subText, icon }, i (subName)}
 				{@const isSubActive = $page.url.pathname === subLink || $page.url.pathname.startsWith(subLink + '/')}
 				<a
 					href={subLink}
-					class="flex items-center gap-3 py-2.5 transition-colors duration-200 {isSubActive ? 'text-missionnaire' : 'hover:text-missionnaire'}"
+					class="group flex items-start gap-3 py-2.5 transition-colors duration-200"
 					onclick={() => {
 						closeMenuFrom();
 					}}
 				>
 					{#if icon}
-						<div class="{isSubActive ? 'text-missionnaire' : 'text-missionnaire/60'}">
+						<span class="mt-0.5 transition-colors duration-200 {isSubActive ? 'text-missionnaire' : 'text-stone-400 group-hover:text-missionnaire'}">
 							<Icon src={icon} size="14" />
-						</div>
+						</span>
 					{/if}
-					<span class="text-sm font-medium {isSubActive ? 'text-missionnaire font-semibold' : 'text-stone-600'}">
-						{$t(subName)}
+					<span class="flex flex-col min-w-0">
+						<span class="font-body text-sm font-semibold leading-tight transition-colors duration-200 {isSubActive ? 'text-missionnaire' : 'text-stone-900 group-hover:text-missionnaire'}">
+							{$t(subName)}
+						</span>
+						{#if subText}
+							<span class="font-body text-xs text-stone-500 mt-0.5 line-clamp-1 leading-relaxed">
+								{$t(subText)}
+							</span>
+						{/if}
 					</span>
 				</a>
 			{/each}
@@ -100,6 +107,12 @@
 		to {
 			opacity: 1;
 			transform: translateX(0);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.mobo-submenu {
+			animation: none;
 		}
 	}
 </style>

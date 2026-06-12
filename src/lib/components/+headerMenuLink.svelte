@@ -66,57 +66,75 @@
 	{/if}
 	{#if isOpen && subMenu && subMenu.length > 0}
 		<div
-			class="submenu-dropdown absolute z-50 self-center w-[400px] mt-10 bg-white border border-stone-200 flex flex-col p-2 shadow-xl shadow-stone-900/5"
+			class="submenu-dropdown absolute z-50 self-center w-[400px] mt-10 bg-cream/95 backdrop-blur-sm border border-stone-200 flex flex-col shadow-lg shadow-stone-900/[0.06]"
 		>
-			{#each subMenu as { subName, link: subLink, subText, image, icon }, i (subName)}
-				<a
-					href={subLink}
-					class="w-full flex items-center gap-4 p-3.5 transition-colors duration-200 hover:bg-stone-50"
-					onclick={() => {
-						onclose?.();
-					}}
-				>
-					<div class="flex-shrink-0 w-10 h-10 overflow-hidden bg-stone-100 border border-stone-200 flex items-center justify-center">
+			<div class="flex items-center gap-3 px-5 pt-4 pb-3">
+				<span class="font-body text-[10px] font-medium uppercase tracking-[0.2em] text-stone-400">
+					{$t(menuName)}
+				</span>
+				<span class="h-px flex-1 bg-stone-200"></span>
+				<span class="w-1 h-1 bg-missionnaire"></span>
+			</div>
+			<div class="flex flex-col pb-2">
+				{#each subMenu as { subName, link: subLink, subText, image, icon } (subName)}
+					<a
+						href={subLink}
+						class="group relative w-full flex items-center gap-4 px-5 py-3 transition-colors duration-200 hover:bg-orange-50/40"
+						onclick={() => {
+							onclose?.();
+						}}
+					>
+						<span
+							class="absolute left-0 top-1/2 -translate-y-1/2 h-0 w-[2px] bg-missionnaire transition-all duration-200 ease-out group-hover:h-7"
+							aria-hidden="true"
+						></span>
 						{#if image}
-							<img src={image} class="w-full h-full object-cover" alt={$t(subName)} />
+							<img
+								src={image}
+								class="flex-shrink-0 w-8 h-8 object-cover border border-stone-200 grayscale opacity-80 transition-all duration-200 group-hover:grayscale-0 group-hover:opacity-100"
+								alt={$t(subName)}
+							/>
 						{:else if icon}
-							<div class="text-missionnaire">
-								<Icon src={icon} size="18" />
-							</div>
+							<span class="flex-shrink-0 text-stone-400 transition-colors duration-200 group-hover:text-missionnaire">
+								<Icon src={icon} size="16" />
+							</span>
 						{/if}
-					</div>
-					<div class="flex flex-col min-w-0">
-						<span class="text-sm font-semibold text-stone-800 leading-tight">
-							{$t(subName)}
+						<span class="flex flex-col min-w-0">
+							<span class="font-body text-sm font-semibold text-stone-900 leading-tight transition-colors duration-200 group-hover:text-missionnaire">
+								{$t(subName)}
+							</span>
+							{#if subText}
+								<span class="font-body text-xs text-stone-500 mt-0.5 line-clamp-2 leading-relaxed">
+									{$t(subText)}
+								</span>
+							{/if}
 						</span>
-						{#if subText}
-							<p class="text-[11px] text-stone-400 mt-0.5 line-clamp-2 leading-relaxed">
-								{$t(subText)}
-							</p>
-						{/if}
-					</div>
-				</a>
-				{#if i < subMenu.length - 1}
-					<div class="mx-3.5 border-b border-stone-100"></div>
-				{/if}
-			{/each}
+					</a>
+				{/each}
+			</div>
 		</div>
 	{/if}
 </div>
 
 <style>
 	.submenu-dropdown {
-		animation: dropdown-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+		animation: dropdown-in 0.16s cubic-bezier(0.16, 1, 0.3, 1);
 	}
 
 	@keyframes dropdown-in {
 		from {
 			opacity: 0;
-			transform: translateY(-4px);
+			transform: translateY(4px);
 		}
 		to {
 			opacity: 1;
 			transform: translateY(0);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.submenu-dropdown {
+			animation: none;
 		}
 	}
 </style>

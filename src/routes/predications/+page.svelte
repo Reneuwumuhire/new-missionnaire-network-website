@@ -391,16 +391,16 @@
 
 <div class="w-full max-w-6xl mx-auto px-4 pt-0 pb-8 md:px-6">
 	<!-- Page Header -->
-	<div class="mb-5 md:mb-6">
-		<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body">
-			{$t('nav.predications')}
+	<div class="mb-6 md:mb-8">
+		<p class="text-[10px] font-semibold uppercase tracking-[0.3em] text-missionnaire mb-3 font-body">
+			Missionnaire Network
 		</p>
-		<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">
+		<h1 class="font-display text-4xl md:text-5xl font-semibold tracking-tight leading-[1.05] text-stone-900">
 			{$t('nav.predications')}
 		</h1>
 		<a
 			href="/videos"
-			class="inline-flex items-center gap-2 mt-2 text-[12px] font-semibold text-stone-400 hover:text-missionnaire uppercase tracking-[0.15em] font-body transition-colors"
+			class="inline-flex items-center gap-2 mt-3 text-[12px] font-semibold text-stone-400 hover:text-missionnaire uppercase tracking-[0.15em] font-body transition-all duration-200 hover:translate-x-0.5"
 		>
 			<svg
 				width="14"
