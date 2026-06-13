@@ -59,9 +59,27 @@
 	let previousActiveLineIndex = $state(-1);
 	let prefersReducedMotion = $state(false);
 	let userScrolled = $state(false);
+	// Which way the "back to current line" pill arrow points: down when the
+	// live passage is below the reader's viewport (they scrolled up to read
+	// earlier text), up when it's above (they scrolled ahead).
+	let arrowPointsDown = $state(true);
+
+	function updateScrollDirection() {
+		const active = lineElements[activeLineIndex];
+		if (!active || !panelElement) return;
+		const panelRect = panelElement.getBoundingClientRect();
+		const activeRect = active.getBoundingClientRect();
+		const activeCenter = activeRect.top + activeRect.height / 2;
+		const panelCenter = panelRect.top + panelRect.height / 2;
+		// Active line below the viewport centre → reader is above it → point
+		// down so the arrow leads them toward the live passage (and vice-versa).
+		arrowPointsDown = activeCenter >= panelCenter;
+	}
 
 	function onUserScroll() {
-		if (pauseOnUserScroll) userScrolled = true;
+		if (!pauseOnUserScroll) return;
+		userScrolled = true;
+		updateScrollDirection();
 	}
 
 	function resumeAutoScroll() {
@@ -172,6 +190,14 @@
 	});
 
 	$effect(() => {
+		// As the live passage advances while the reader is parked elsewhere,
+		// the pill's arrow may need to flip (the active line can move from
+		// below the viewport to above it).
+		void activeLineIndex;
+		if (userScrolled) void tick().then(updateScrollDirection);
+	});
+
+	$effect(() => {
 		if (activeLineIndex !== previousActiveLineIndex) {
 			previousActiveLineIndex = activeLineIndex;
 			if (activeLineIndex >= 0 && !userScrolled) {
@@ -211,6 +237,7 @@
 	aria-label={$t('syncedLyrics.label')}
 	onwheel={onUserScroll}
 	ontouchmove={onUserScroll}
+	onscroll={() => userScrolled && updateScrollDirection()}
 >
 	{#each lines as line, index}
 		{@const start = getLineStart(line)}
@@ -271,7 +298,8 @@
 	{/each}
 	{#if pauseOnUserScroll && userScrolled && activeLineIndex >= 0}
 		<button type="button" class="resume-follow" onclick={resumeAutoScroll}>
-			↓ {$t('syncedLyrics.backToCurrent')}
+			<span aria-hidden="true">{arrowPointsDown ? '↓' : '↑'}</span>
+			{$t('syncedLyrics.backToCurrent')}
 		</button>
 	{/if}
 </div>
