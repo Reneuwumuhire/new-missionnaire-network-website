@@ -3569,10 +3569,11 @@
 	}
 
 	@media (max-width: 767px) {
-		/* Warm espresso base — same brand-warmth as the cream theme, just
-		   pulled into shadow. Deliberate dark, not "art bleeding through
-		   black". The artwork is atmospheric texture (low opacity), not
-		   the dominant color. */
+		/* Light full-screen reading surface — near-white with a faint warm tint
+		   so it matches the site without forcing a dark theme on the reader
+		   (mirrors the live-transcript fullscreen). The z-index sits above the
+		   site header (z-110) and navbar (z-120) so the full-screen view isn't
+		   clipped by them. */
 		.audio-player-shell.lyrics-open {
 			top: 0;
 			height: 100dvh;
@@ -3580,8 +3581,9 @@
 			flex-direction: column;
 			overflow: hidden;
 			padding-top: 0;
-			background: #1a130c;
-			color: #efe5d0;
+			background: #faf6f1;
+			color: rgb(28 25 23);
+			z-index: 130;
 		}
 
 		.audio-player-shell.lyrics-open::before {
@@ -3590,12 +3592,12 @@
 			inset: -2rem;
 			z-index: -2;
 			background-image:
-				linear-gradient(180deg, rgba(26, 19, 12, 0.74), rgba(20, 14, 8, 0.96)),
+				linear-gradient(180deg, rgba(255, 251, 245, 0.88), rgba(250, 248, 243, 0.97)),
 				var(--lyrics-artwork);
 			background-position: center;
 			background-size: cover;
-			filter: blur(36px) saturate(0.92);
-			opacity: 0.32;
+			filter: blur(36px) saturate(1.05);
+			opacity: 0.55;
 			transform: scale(1.08);
 		}
 
@@ -3605,8 +3607,8 @@
 			inset: 0;
 			z-index: -1;
 			background:
-				radial-gradient(circle at 50% 6%, rgba(255, 136, 12, 0.14), transparent 28%),
-				linear-gradient(180deg, rgba(26, 19, 12, 0.18), rgba(16, 11, 6, 0.78) 62%);
+				radial-gradient(circle at 50% 6%, rgba(255, 136, 12, 0.06), transparent 30%),
+				linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(250, 248, 243, 0.45) 62%);
 			pointer-events: none;
 		}
 
@@ -3619,14 +3621,14 @@
 			display: flex;
 			flex-direction: column;
 			margin-top: 0.45rem;
-			/* Hairline cream rule — picks up the cream text instead of cool grey */
-			border: 1px solid rgba(239, 229, 208, 0.08);
+			/* Hairline warm-grey rule */
+			border: 1px solid rgba(120, 113, 108, 0.12);
 			border-bottom: 0;
 			border-radius: 2rem 2rem 0 0;
-			/* Warm dark espresso surface, slightly translucent so the artwork
-			   atmosphere reads through subtly without dominating */
-			background: rgba(35, 25, 16, 0.82);
-			box-shadow: 0 -22px 70px rgba(0, 0, 0, 0.45);
+			/* Light surface, slightly translucent so the artwork atmosphere reads
+			   through subtly without dominating */
+			background: rgba(255, 251, 245, 0.86);
+			box-shadow: 0 -22px 70px rgba(41, 37, 36, 0.12);
 			padding: 0.9rem 1.25rem 1rem;
 			backdrop-filter: blur(28px) saturate(1.1);
 		}
@@ -3648,33 +3650,33 @@
 		}
 
 		.audio-player-shell.lyrics-open .lyrics-drawer-header .text-missionnaire\/90 {
-			color: #efe5d0;
+			color: #c2640c;
 			letter-spacing: 0;
 			text-transform: none;
 			font-size: 0.95rem;
 		}
 
 		.audio-player-shell.lyrics-open .lyrics-drawer-header .text-stone-500 {
-			color: rgba(239, 229, 208, 0.5);
+			color: rgba(120, 113, 108, 0.9);
 		}
 
 		.audio-player-shell.lyrics-open .lyrics-sheet-handle {
 			width: 3.35rem;
 			height: 0.24rem;
 			margin-bottom: 1rem;
-			background: rgba(239, 229, 208, 0.7);
+			background: rgba(120, 113, 108, 0.3);
 		}
 
 		.audio-player-shell.lyrics-open .lyrics-close-btn {
-			border-color: rgba(239, 229, 208, 0.16);
-			background: rgba(239, 229, 208, 0.06);
-			color: rgba(239, 229, 208, 0.78);
+			border-color: rgba(214, 211, 209, 0.9);
+			background: rgba(255, 255, 255, 0.74);
+			color: rgb(87 83 78);
 		}
 
 		.audio-player-shell.lyrics-open .lyrics-close-btn:hover {
-			border-color: rgba(255, 190, 119, 0.45);
-			background: rgba(255, 136, 12, 0.12);
-			color: #ffbe77;
+			border-color: rgba(255, 136, 12, 0.55);
+			background: white;
+			color: rgb(194 100 12);
 		}
 
 		.audio-player-shell.lyrics-open .player-main {
@@ -3722,38 +3724,7 @@
 			display: none;
 		}
 
-		.audio-player-shell.lyrics-open .player-main .text-missionnaire {
-			color: #ffbe77;
-		}
-
-		.audio-player-shell.lyrics-open .player-main .text-stone-900,
-		.audio-player-shell.lyrics-open .player-main .text-stone-500 {
-			color: #efe5d0;
-		}
-
-		.audio-player-shell.lyrics-open .player-main .text-stone-400 {
-			color: rgba(239, 229, 208, 0.62);
-		}
-
-		.audio-player-shell.lyrics-open .player-main .text-stone-300 {
-			color: rgba(239, 229, 208, 0.5);
-		}
-
-		.audio-player-shell.lyrics-open .player-main .bg-stone-50,
-		.audio-player-shell.lyrics-open .player-main .bg-stone-100 {
-			background: rgba(239, 229, 208, 0.08);
-		}
-
-		.audio-player-shell.lyrics-open .player-main .bg-gray-900 {
-			background: rgba(255, 255, 255, 0.12);
-		}
-
-		.audio-player-shell.lyrics-open .player-main .bg-gray-900:hover {
-			background: rgba(255, 255, 255, 0.18);
-		}
-
-		.audio-player-shell.lyrics-open .player-main .bg-stone-200 {
-			background: rgba(255, 255, 255, 0.22);
-		}
+		/* Player controls keep their default light-theme colours on the light
+		   reading surface — no cream overrides needed. */
 	}
 </style>

@@ -46,6 +46,18 @@ export interface PublishedRecording {
 	 *  separate fire-and-forget endpoint, so reading it here costs nothing
 	 *  extra — it rides along on the findOne the page already does. */
 	view_count: number;
+	/** Replay subtitles attached directly to this recording by an admin
+	 *  (independent of the scheduled-live source). When set, they take
+	 *  precedence over the scheduled-live anchor-derived subtitles. */
+	subtitle_srt_url: string | null;
+	subtitle_srt_s3_key: string | null;
+	subtitle_filename: string | null;
+	/** Milliseconds into the recording at which SRT 00:00 occurs (the sync
+	 *  point). May be negative if the subtitles lead the audio. */
+	subtitle_offset_into_recording_ms: number | null;
+	/** Admin kill-switch: hide subtitles from listeners (e.g. while a bad SRT
+	 *  is being fixed) without deleting the file. */
+	subtitles_hidden: boolean;
 }
 
 interface RecordingRow {
@@ -60,6 +72,11 @@ interface RecordingRow {
 	source_video_id?: string | null;
 	transcript_pdf_id?: string | null;
 	view_count?: number | null;
+	subtitle_srt_url?: string | null;
+	subtitle_srt_s3_key?: string | null;
+	subtitle_filename?: string | null;
+	subtitle_offset_into_recording_ms?: number | null;
+	subtitles_hidden?: boolean | null;
 }
 
 function toPublic(doc: RecordingRow): PublishedRecording {
@@ -75,7 +92,15 @@ function toPublic(doc: RecordingRow): PublishedRecording {
 		description: doc.description ?? null,
 		source_video_id: doc.source_video_id ?? null,
 		transcript_pdf_id: doc.transcript_pdf_id ?? null,
-		view_count: typeof doc.view_count === 'number' && doc.view_count > 0 ? doc.view_count : 0
+		view_count: typeof doc.view_count === 'number' && doc.view_count > 0 ? doc.view_count : 0,
+		subtitle_srt_url: doc.subtitle_srt_url ?? null,
+		subtitle_srt_s3_key: doc.subtitle_srt_s3_key ?? null,
+		subtitle_filename: doc.subtitle_filename ?? null,
+		subtitle_offset_into_recording_ms:
+			typeof doc.subtitle_offset_into_recording_ms === 'number'
+				? doc.subtitle_offset_into_recording_ms
+				: null,
+		subtitles_hidden: doc.subtitles_hidden === true
 	};
 }
 
@@ -397,33 +422,19 @@ export interface RecordingTranscript {
 	size: number;
 }
 
-/** Find the `videos._id` for a recording — prefers the stored YouTube id,
- *  falls back to date-based title match so recordings created by the live
- *  broadcast recorder (which never sets `source_video_id`) still resolve. */
+/** Find the `videos._id` for a recording from its stored YouTube id only.
+ *  The previous date-based title fallback was removed: matching any video
+ *  whose title merely contained the recording's YYYY-MM-DD attached the wrong
+ *  same-day PDF to recordings nobody had explicitly linked (a recurring admin
+ *  complaint). A PDF now resolves only from an explicit `transcript_pdf_id` or
+ *  a real `source_video_id` link — attach the YouTube URL (or upload the PDF)
+ *  in the admin to surface a transcript. */
 async function findVideoObjectIdForRecording(
 	db: Awaited<ReturnType<typeof getDb>>,
-	sourceVideoId: string | null,
-	startedAt: string | null
+	sourceVideoId: string | null
 ): Promise<unknown> {
-	// 1) Direct lookup by stored YouTube id.
-	if (sourceVideoId) {
-		const v = await db
-			.collection('videos')
-			.findOne({ id: sourceVideoId }, { projection: { _id: 1 } });
-		if (v) return v._id;
-	}
-	// 2) Fallback: pick the video whose title begins with the recording's
-	//    YYYY-MM-DD. Older channel entries also have the date mid-title with
-	//    stray whitespace ("[ZURICH] - 2023 -11 - 15"), so we search unanchored
-	//    and tolerate spaces around hyphens.
-	if (!startedAt) return null;
-	const day = startedAt.slice(0, 10);
-	if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
-	const [y, mo, d] = day.split('-');
-	const flexible = String.raw`${y}\s*-\s*${mo}\s*-\s*${d}`;
-	const v = await db
-		.collection('videos')
-		.findOne({ title: { $regex: flexible } }, { projection: { _id: 1 } });
+	if (!sourceVideoId) return null;
+	const v = await db.collection('videos').findOne({ id: sourceVideoId }, { projection: { _id: 1 } });
 	return v?._id ?? null;
 }
 
@@ -459,11 +470,7 @@ export async function getTranscriptForRecording(recording: {
 			}
 		}
 
-		const videoObjectId = await findVideoObjectIdForRecording(
-			db,
-			recording.source_video_id,
-			recording.started_at
-		);
+		const videoObjectId = await findVideoObjectIdForRecording(db, recording.source_video_id);
 		if (!videoObjectId) return null;
 		const videoObjectIdString = String(videoObjectId);
 		const pdf = await db

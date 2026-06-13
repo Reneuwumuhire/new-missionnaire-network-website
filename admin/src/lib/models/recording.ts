@@ -42,6 +42,18 @@ export const RecordingSchema = z.object({
 	/** Preferred PDF transcription attached to this recording. Usually this is
 	 *  auto-filled from an already-uploaded PDF on the linked YouTube video. */
 	transcript_pdf_id: z.string().nullable().optional(),
+	/** Replay subtitles attached directly to this recording (independent of the
+	 *  scheduled-live source). When set, the public replay uses these instead of
+	 *  the scheduled-live anchor-derived subtitles. */
+	subtitle_srt_url: z.string().url().nullable().optional(),
+	subtitle_srt_s3_key: z.string().nullable().optional(),
+	subtitle_filename: z.string().nullable().optional(),
+	/** Milliseconds into the recording at which SRT 00:00 occurs (sync point).
+	 *  May be negative if the subtitles lead the audio. */
+	subtitle_offset_into_recording_ms: z.number().nullable().optional(),
+	/** Admin kill-switch: hide subtitles from listeners without deleting the
+	 *  file (e.g. while a bad SRT is being corrected). */
+	subtitles_hidden: z.boolean().optional(),
 	updated_at: z
 		.union([z.instanceof(Date), z.string()])
 		.transform((val) => new Date(val))

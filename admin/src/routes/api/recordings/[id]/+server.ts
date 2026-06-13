@@ -9,11 +9,14 @@ import {
 	updateRecording
 } from '../../../../db/collections';
 import { deleteObject, updateDownloadFilename } from '$lib/server/s3';
+import { parseSubtitleTriple } from '$lib/server/scheduled-live-validation';
 import {
 	ensureVideoForRecording,
 	extractYoutubeVideoId,
 	getFirstTranscriptPdfForVideo
 } from '$lib/server/video-sync';
+
+const MAX_SUBTITLE_OFFSET_MS = 6 * 60 * 60 * 1000; // ±6h guard against bad input
 
 const MAX_TITLE_LEN = 200;
 const MAX_DESCRIPTION_LEN = 2000;
@@ -32,6 +35,11 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 		thumbnail_s3_key?: unknown;
 		youtube_url?: unknown;
 		transcript_pdf_id?: unknown;
+		subtitle_srt_url?: unknown;
+		subtitle_srt_s3_key?: unknown;
+		subtitle_filename?: unknown;
+		subtitle_offset_into_recording_ms?: unknown;
+		subtitles_hidden?: unknown;
 	};
 	const updates: {
 		title?: string;
@@ -41,6 +49,11 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 		thumbnail_s3_key?: string | null;
 		source_video_id?: string | null;
 		transcript_pdf_id?: string | null;
+		subtitle_srt_url?: string | null;
+		subtitle_srt_s3_key?: string | null;
+		subtitle_filename?: string | null;
+		subtitle_offset_into_recording_ms?: number | null;
+		subtitles_hidden?: boolean;
 	} = {};
 	let nextSourceVideoId: string | null | undefined;
 
@@ -98,7 +111,57 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 		}
 	}
 
-	if (Object.keys(updates).length === 0) throw error(400, 'Aucune modification valide');
+	// ── Replay subtitles (attach/replace/remove/resync/hide) ──────────────
+	// Attach or replace: the triple (url + subtitles/ key + filename) must come
+	// together. Remove: explicit nulls for both url and key. parseSubtitleTriple
+	// returns all-null for the remove case and validated values otherwise.
+	if ('subtitle_srt_s3_key' in body || 'subtitle_srt_url' in body) {
+		const isRemove = body.subtitle_srt_url === null && body.subtitle_srt_s3_key === null;
+		if (isRemove) {
+			updates.subtitle_srt_url = null;
+			updates.subtitle_srt_s3_key = null;
+			updates.subtitle_filename = null;
+			updates.subtitle_offset_into_recording_ms = null;
+		} else {
+			const triple = parseSubtitleTriple(
+				body.subtitle_srt_url,
+				body.subtitle_srt_s3_key,
+				body.subtitle_filename
+			);
+			if (!triple.subtitle_srt_url || !triple.subtitle_srt_s3_key) {
+				throw error(400, 'Fichier .srt invalide');
+			}
+			updates.subtitle_srt_url = triple.subtitle_srt_url;
+			updates.subtitle_srt_s3_key = triple.subtitle_srt_s3_key;
+			updates.subtitle_filename = triple.subtitle_filename;
+		}
+	}
+
+	// Sync point: ms into the recording where SRT 00:00 sits (may be negative).
+	if ('subtitle_offset_into_recording_ms' in body) {
+		if (body.subtitle_offset_into_recording_ms === null) {
+			updates.subtitle_offset_into_recording_ms = null;
+		} else if (typeof body.subtitle_offset_into_recording_ms === 'number') {
+			const value = Math.round(body.subtitle_offset_into_recording_ms);
+			if (!Number.isFinite(value) || Math.abs(value) > MAX_SUBTITLE_OFFSET_MS) {
+				throw error(400, 'Décalage de sous-titres invalide');
+			}
+			updates.subtitle_offset_into_recording_ms = value;
+		} else {
+			throw error(400, 'Décalage de sous-titres invalide');
+		}
+	}
+
+	if (typeof body.subtitles_hidden === 'boolean') {
+		updates.subtitles_hidden = body.subtitles_hidden;
+	}
+
+	// `transcript_pdf_id: 'none'` (detach) is applied further below, after the
+	// YouTube auto-attach so a deliberate detach wins — so it isn't in `updates`
+	// yet. Exempt it here, otherwise a detach-only request looks empty and 400s.
+	if (Object.keys(updates).length === 0 && body.transcript_pdf_id !== 'none') {
+		throw error(400, 'Aucune modification valide');
+	}
 
 	let currentRecording = null as Awaited<ReturnType<typeof getRecordingById>>;
 	async function loadCurrentRecording() {
@@ -113,6 +176,13 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 	if (isThumbnailChange) {
 		const current = await loadCurrentRecording();
 		oldThumbnailKey = current?.thumbnail_s3_key ?? null;
+	}
+
+	const isSubtitleChange = 'subtitle_srt_s3_key' in updates;
+	let oldSubtitleKey: string | null = null;
+	if (isSubtitleChange) {
+		const current = await loadCurrentRecording();
+		oldSubtitleKey = current?.subtitle_srt_s3_key ?? null;
 	}
 
 	if (nextSourceVideoId) {
@@ -158,6 +228,19 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 				console.error('[recordings/patch] old thumbnail delete failed:', err)
 			);
 		}
+	}
+
+	// Replaced or removed SRT — drop the old object. Subtitle keys are unique
+	// per recording (presigned with a fresh name), so no shared-reference check.
+	if (
+		isSubtitleChange &&
+		oldSubtitleKey &&
+		oldSubtitleKey.startsWith('subtitles/') &&
+		oldSubtitleKey !== updates.subtitle_srt_s3_key
+	) {
+		deleteObject(oldSubtitleKey).catch((err) =>
+			console.error('[recordings/patch] old subtitle delete failed:', err)
+		);
 	}
 
 	// When the title changes, rewrite the S3 Content-Disposition so future

@@ -892,6 +892,19 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.edit.audioReplaceWarning': 'The old audio file will be permanently replaced when saving.',
 	'recordings.edit.replaceAudio': 'Replace audio',
 	'recordings.edit.audioFormats': 'MP3 only · 2 GB max',
+	'recordings.edit.subtitleLabel': 'Subtitles (replay)',
+	'recordings.edit.subtitleHint':
+		'.srt file shown on the replay page, synced to the audio above. Overrides the subtitles inherited from the scheduled live.',
+	'recordings.edit.subtitleFormats': '.srt only · 2 MB max',
+	'recordings.edit.addSubtitle': 'Add an .srt',
+	'recordings.edit.replaceSubtitle': 'Replace the .srt',
+	'recordings.edit.subtitleOffsetLabel': 'Sync offset (seconds)',
+	'recordings.edit.subtitleOffsetHint':
+		'Where the subtitles start (00:00) sits in the audio. Increase if the text runs ahead, decrease (negative allowed) if it lags.',
+	'recordings.edit.subtitleHide': 'Hide subtitles from listeners',
+	'recordings.edit.subtitleHideHint':
+		'Hides subtitles on the public page without deleting the file — handy while you fix a mistake.',
+	'recordings.toast.subtitleSaved': 'Subtitles saved',
 	'recordings.confirm.override.title': '{label}: started by someone else',
 	'recordings.confirm.override.message': '{name} started {label}. Do you really want to stop it on their behalf?',
 	'recordings.confirm.override.confirm': 'Stop anyway',

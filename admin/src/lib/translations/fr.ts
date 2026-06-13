@@ -896,6 +896,19 @@ export default {
 	'recordings.edit.audioReplaceWarning': "L'ancien fichier audio sera définitivement remplacé à l'enregistrement.",
 	'recordings.edit.replaceAudio': "Remplacer l'audio",
 	'recordings.edit.audioFormats': 'MP3 uniquement · 2 Go max',
+	'recordings.edit.subtitleLabel': 'Sous-titres (rediffusion)',
+	'recordings.edit.subtitleHint':
+		"Fichier .srt affiché sur la page de rediffusion, synchronisé avec l'audio ci-dessus. Remplace les sous-titres hérités du direct programmé.",
+	'recordings.edit.subtitleFormats': '.srt uniquement · 2 Mo max',
+	'recordings.edit.addSubtitle': 'Ajouter un .srt',
+	'recordings.edit.replaceSubtitle': 'Remplacer le .srt',
+	'recordings.edit.subtitleOffsetLabel': 'Décalage de synchronisation (secondes)',
+	'recordings.edit.subtitleOffsetHint':
+		"Position du début des sous-titres (00:00) dans l'audio. Augmentez si le texte est en avance, diminuez (valeur négative possible) s'il est en retard.",
+	'recordings.edit.subtitleHide': 'Masquer les sous-titres aux auditeurs',
+	'recordings.edit.subtitleHideHint':
+		'Cache les sous-titres sur la page publique sans supprimer le fichier — pratique pour corriger une erreur plus tard.',
+	'recordings.toast.subtitleSaved': 'Sous-titres enregistrés',
 	'recordings.confirm.override.title': "{label} : démarré par quelqu'un d'autre",
 	'recordings.confirm.override.message': "{name} a démarré {label}. Voulez-vous vraiment l'arrêter à sa place ?",
 	'recordings.confirm.override.confirm': 'Arrêter quand même',

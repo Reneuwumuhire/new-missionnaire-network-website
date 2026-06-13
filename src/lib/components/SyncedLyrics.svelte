@@ -30,17 +30,18 @@
 	// the current line and resumes following. Music lyrics keep the always-
 	// follow behavior. Only wheel/touchmove count as "user scroll" — they
 	
-	// Dark palette at ALL viewport widths + fill-parent sizing — for the
-	// transcript's fullscreen overlay. (fullscreenMobile only goes dark under
-	
+	// Fill-parent sizing + large type at ALL viewport widths — for the
+	// transcript's fullscreen reading overlay. Keeps the default light palette
+	// (dark text) so no dark theme is forced on the reader. (fullscreenMobile
+	// goes dark under 768px, which is what the music drawer wants.)
+
 	interface Props {
 		lines?: LyricLine[];
 		currentTime?: number;
 		fullscreenMobile?: boolean;
 		// never fire from programmatic scrollIntoView, so no flag juggling.
 		pauseOnUserScroll?: boolean;
-		// 768px, which is what the music drawer wants; this one is unconditional.)
-		fullscreenDark?: boolean;
+		fullscreenLarge?: boolean;
 		onseek?: (detail: { time: number }) => void;
 	}
 
@@ -49,7 +50,7 @@
 		currentTime = 0,
 		fullscreenMobile = false,
 		pauseOnUserScroll = false,
-		fullscreenDark = false,
+		fullscreenLarge = false,
 		onseek
 	}: Props = $props();
 
@@ -231,7 +232,7 @@
 <div
 	bind:this={panelElement}
 	class:fullscreen-mobile={fullscreenMobile}
-	class:fullscreen-dark={fullscreenDark}
+	class:fullscreen-large={fullscreenLarge}
 	class="lyrics-panel"
 	role="group"
 	aria-label={$t('syncedLyrics.label')}
@@ -554,32 +555,15 @@
 	   Inherits all the structure above; just inverts the palette for the
 	   blurred-artwork backdrop. */
 	@media (max-width: 767px) {
-		/* Dark mobile theme: warm cream + espresso, NOT generic white-on-black.
-		   Verse text is the same #efe5d0 cream as the rest of the site (just
-		   in shadow). Chorus tint uses the brand orange directly so it reads
-		   against the warm espresso drawer surface — not blocked by warm
-		   artwork bleed. */
+		/* Light mobile theme: dark text on the player's light reading surface —
+		   no dark theme forced on the reader. Inherits the default light palette;
+		   only sizing/spacing change for the full-screen drawer. */
 		.lyrics-panel.fullscreen-mobile {
-			--lyric-color-active: #fffaf0; /* warm cream nearly-white for spotlight */
-			--lyric-color-default: rgba(239, 229, 208, 0.78); /* warm cream at rest */
-			--lyric-color-chorus-default: #f4b988; /* warm peach — chorus reads as different hue */
-			--lyric-color-accent: #ffa64d; /* saturated brand orange — chorus active */
-			--lyric-chorus-bg: rgba(255, 136, 12, 0.1); /* visible against espresso */
-			--lyric-chorus-bg-active: rgba(255, 136, 12, 0.18);
-			--lyric-glow-active: rgba(255, 168, 64, 0.42);
-			--lyric-rule-color: rgba(239, 229, 208, 0.24);
-			--lyric-rule-chorus: rgba(255, 168, 64, 0.6);
-
 			max-height: none;
 			min-height: 0;
 			flex: 1 1 auto;
 			padding: 0.5rem 0 3rem;
 			scroll-padding-block: 42%;
-			scrollbar-color: rgba(239, 229, 208, 0.18) transparent;
-		}
-
-		.lyrics-panel.fullscreen-mobile::-webkit-scrollbar-thumb {
-			background: rgba(239, 229, 208, 0.18);
 		}
 
 		.lyrics-panel.fullscreen-mobile .lyric-line {
@@ -596,31 +580,11 @@
 		}
 
 		.lyrics-panel.fullscreen-mobile .lyric-line.past .lyric-text {
-			opacity: 0.24;
+			opacity: 0.3;
 		}
 
 		.lyrics-panel.fullscreen-mobile .lyric-line.future .lyric-text {
 			opacity: 0.55;
-		}
-
-		.lyrics-panel.fullscreen-mobile .lyric-line.timed:hover:not(.active) {
-			color: rgba(255, 250, 240, 0.95);
-		}
-
-		.lyrics-panel.fullscreen-mobile .lyric-line.timed:hover:not(.active) .lyric-text {
-			opacity: 0.92;
-		}
-
-		.lyrics-panel.fullscreen-mobile .lyric-line.active {
-			text-shadow:
-				0 0 28px var(--lyric-glow-active),
-				0 0 2px rgba(255, 168, 64, 0.32);
-		}
-
-		.lyrics-panel.fullscreen-mobile .lyric-line.active.chorus {
-			text-shadow:
-				0 0 30px rgba(255, 168, 64, 0.6),
-				0 0 2px rgba(255, 168, 64, 0.42);
 		}
 
 		.lyrics-panel.fullscreen-mobile .lyric-text {
@@ -629,71 +593,43 @@
 		}
 	}
 
-	/* ─── Fullscreen overlay theme (dark, all widths) ─────────────────────
-	   Same warm cream-on-espresso palette as the mobile drawer, but applied
-	   unconditionally + fill-parent sizing, for the transcript's fullscreen
-	   reading/projection view. */
-	.lyrics-panel.fullscreen-dark {
-		--lyric-color-active: #fffaf0;
-		--lyric-color-default: rgba(239, 229, 208, 0.78);
-		--lyric-color-chorus-default: #f4b988;
-		--lyric-color-accent: #ffa64d;
-		--lyric-chorus-bg: rgba(255, 136, 12, 0.1);
-		--lyric-chorus-bg-active: rgba(255, 136, 12, 0.18);
-		--lyric-glow-active: rgba(255, 168, 64, 0.42);
-		--lyric-rule-color: rgba(239, 229, 208, 0.24);
-		--lyric-rule-chorus: rgba(255, 168, 64, 0.6);
-
+	/* ─── Fullscreen overlay reading view (all widths) ────────────────────
+	   Keeps the default light palette (dark text on the overlay's light
+	   background) so no dark theme is forced on the reader — only the sizing
+	   changes to a fill-screen, large-type layout for reading/projection. */
+	.lyrics-panel.fullscreen-large {
 		max-height: none;
 		min-height: 0;
 		flex: 1 1 auto;
 		/* Extra bottom padding so the last lines clear the floating close bar. */
 		padding: 1rem 1rem calc(6.5rem + env(safe-area-inset-bottom, 0px));
 		scroll-padding-block: 42%;
-		scrollbar-color: rgba(239, 229, 208, 0.18) transparent;
-	}
-
-	.lyrics-panel.fullscreen-dark::-webkit-scrollbar-thumb {
-		background: rgba(239, 229, 208, 0.18);
 	}
 
 	/* Bigger type for reading at a distance (projection / across the room) */
-	.lyrics-panel.fullscreen-dark .lyric-text {
+	.lyrics-panel.fullscreen-large .lyric-text {
 		max-width: min(100%, 52rem);
 		font-size: 1.7rem;
 		line-height: 1.55;
 	}
 
 	@media (min-width: 768px) {
-		.lyrics-panel.fullscreen-dark .lyric-text {
+		.lyrics-panel.fullscreen-large .lyric-text {
 			font-size: 2.2rem;
 			line-height: 1.6;
 		}
 	}
 
-	.lyrics-panel.fullscreen-dark .lyric-line.past .lyric-text {
-		opacity: 0.24;
+	.lyrics-panel.fullscreen-large .lyric-line.past .lyric-text {
+		opacity: 0.3;
 	}
 
-	.lyrics-panel.fullscreen-dark .lyric-line.future .lyric-text {
+	.lyrics-panel.fullscreen-large .lyric-line.future .lyric-text {
 		opacity: 0.55;
 	}
 
-	.lyrics-panel.fullscreen-dark .lyric-line.timed:hover:not(.active) {
-		color: rgba(255, 250, 240, 0.95);
-	}
-
-	.lyrics-panel.fullscreen-dark .lyric-line.active {
-		text-shadow:
-			0 0 28px var(--lyric-glow-active),
-			0 0 2px rgba(255, 168, 64, 0.32);
-	}
-
-	.lyrics-panel.fullscreen-dark .resume-follow {
-		border-color: rgba(255, 168, 64, 0.5);
-		background: rgba(41, 32, 26, 0.92);
-		color: #ffa64d;
-		/* Sit above the overlay's floating "Fermer" bar. */
+	.lyrics-panel.fullscreen-large .resume-follow {
+		/* Sit above the overlay's floating close bar. */
 		bottom: calc(4.4rem + env(safe-area-inset-bottom, 0px));
 	}
 

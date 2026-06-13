@@ -305,7 +305,7 @@
 		aria-label={$t('liveTranscript.fullscreenDialogAria')}
 	>
 		<div
-			class="transcript-fullscreen-header flex items-center justify-between gap-3 px-4 py-3 md:px-8"
+			class="transcript-fullscreen-header flex items-center justify-between gap-3 border-b border-stone-200/70 px-4 py-3 md:px-8"
 			role="presentation"
 			ontouchstart={onHeaderTouchStart}
 			ontouchmove={onHeaderTouchMove}
@@ -318,7 +318,7 @@
 						<span class="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
 					</span>
 				{/if}
-				<span class="truncate text-[11px] font-bold uppercase tracking-[0.25em] font-body text-[#efe5d0]/80">
+				<span class="truncate text-[11px] font-bold uppercase tracking-[0.25em] font-body text-stone-500">
 					{$t('liveTranscript.title')}{mode === 'live' ? ` · ${$t('live.atLive')}` : ''}
 				</span>
 			</div>
@@ -326,7 +326,7 @@
 				type="button"
 				onclick={closeFullscreen}
 				aria-label={$t('liveTranscript.exitFullscreen')}
-				class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10 text-[#efe5d0] transition-colors hover:bg-white/20 active:bg-white/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+				class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-600 transition-colors hover:bg-stone-200 active:bg-stone-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-400"
 			>
 				<svg
 					width="18"
@@ -347,7 +347,7 @@
 			{lines}
 			currentTime={displayTime}
 			pauseOnUserScroll
-			fullscreenDark
+			fullscreenLarge
 			onseek={handleSeek}
 		/>
 		<!-- Thumb-zone close bar: always visible at the bottom so closing never
@@ -356,7 +356,7 @@
 			<button
 				type="button"
 				onclick={closeFullscreen}
-				class="pointer-events-auto inline-flex min-h-11 items-center gap-2 rounded-full border border-[#efe5d0]/25 bg-[#29201a]/90 px-6 py-2.5 text-[12px] font-bold uppercase tracking-[0.18em] font-body text-[#efe5d0] shadow-lg backdrop-blur transition-colors hover:bg-[#3a2d23] active:bg-[#3a2d23]"
+				class="pointer-events-auto inline-flex min-h-11 items-center gap-2 rounded-full border border-stone-200 bg-white/95 px-6 py-2.5 text-[12px] font-bold uppercase tracking-[0.18em] font-body text-stone-700 shadow-lg backdrop-blur transition-colors hover:bg-stone-50 active:bg-stone-100"
 			>
 				<svg
 					width="14"
@@ -378,12 +378,13 @@
 {/if}
 
 <style>
-	/* Warm espresso gradient — same family as the music drawer's dark theme,
-	   chosen over flat black so the cream text keeps the site's character. */
+	/* Light reading surface — near-white with a faint warm tint so it matches
+	   the site without forcing a dark theme on the reader. Dark text from the
+	   default lyric palette stays comfortably legible. */
 	.transcript-fullscreen {
 		background:
-			radial-gradient(circle at 50% -10%, rgba(255, 136, 12, 0.08), transparent 55%),
-			linear-gradient(180deg, #221a14 0%, #1a140f 100%);
+			radial-gradient(circle at 50% -10%, rgba(255, 136, 12, 0.05), transparent 55%),
+			linear-gradient(180deg, #ffffff 0%, #faf6f1 100%);
 	}
 
 	/* Keep the header clear of notches/status bars on phones. */

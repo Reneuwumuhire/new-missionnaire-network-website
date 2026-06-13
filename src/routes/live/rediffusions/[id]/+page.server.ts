@@ -54,19 +54,37 @@ export const load: PageServerLoad = async ({ params, url }) => {
 	// started_at + t — hence SRT 00:00 sits at (anchor + offset − started_at)
 	// into the file.
 	let subtitles: { url: string; offsetIntoRecordingMs: number } | null = null;
-	const scheduled = await getScheduledLiveByRecordingId(recording.id);
-	if (
-		scheduled?.subtitle_srt_s3_key &&
-		typeof scheduled.subtitle_anchor_epoch_ms === 'number' &&
-		recording.started_at
-	) {
-		const startedMs = Date.parse(recording.started_at);
-		if (Number.isFinite(startedMs)) {
+	// Admin hide kill-switch wins over everything.
+	if (!recording.subtitles_hidden) {
+		// 1) Subtitles attached + synced directly on the recording by an admin
+		//    take precedence — this is the editable, "resync with the uploaded
+		//    audio" path, and works even for recordings with no scheduled live.
+		if (
+			recording.subtitle_srt_s3_key &&
+			typeof recording.subtitle_offset_into_recording_ms === 'number'
+		) {
 			subtitles = {
-				url: `/api/subtitles/file?key=${encodeURIComponent(scheduled.subtitle_srt_s3_key)}`,
-				offsetIntoRecordingMs:
-					scheduled.subtitle_anchor_epoch_ms + (scheduled.subtitle_offset_ms ?? 0) - startedMs
+				url: `/api/subtitles/file?key=${encodeURIComponent(recording.subtitle_srt_s3_key)}`,
+				offsetIntoRecordingMs: recording.subtitle_offset_into_recording_ms
 			};
+		} else {
+			// 2) Fall back to the scheduled-live source: translate the live
+			//    wall-clock anchor into an offset from the recording start.
+			const scheduled = await getScheduledLiveByRecordingId(recording.id);
+			if (
+				scheduled?.subtitle_srt_s3_key &&
+				typeof scheduled.subtitle_anchor_epoch_ms === 'number' &&
+				recording.started_at
+			) {
+				const startedMs = Date.parse(recording.started_at);
+				if (Number.isFinite(startedMs)) {
+					subtitles = {
+						url: `/api/subtitles/file?key=${encodeURIComponent(scheduled.subtitle_srt_s3_key)}`,
+						offsetIntoRecordingMs:
+							scheduled.subtitle_anchor_epoch_ms + (scheduled.subtitle_offset_ms ?? 0) - startedMs
+					};
+				}
+			}
 		}
 	}
 

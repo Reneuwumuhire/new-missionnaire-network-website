@@ -723,6 +723,11 @@ export async function updateRecording(
 		peaks_duration_sec: number | null;
 		source_video_id: string | null;
 		transcript_pdf_id: string | null;
+		subtitle_srt_url: string | null;
+		subtitle_srt_s3_key: string | null;
+		subtitle_filename: string | null;
+		subtitle_offset_into_recording_ms: number | null;
+		subtitles_hidden: boolean;
 	}>
 ): Promise<boolean> {
 	const db = await getDb();

@@ -310,9 +310,7 @@ export async function getTranscriptPdfForRecording(recording: {
 	source_video_id?: string | null;
 	started_at?: string | Date | null;
 }): Promise<LinkedTranscriptPdf | null> {
-	// 'none' = admin explicitly detached the PDF. Skip everything, including
-	// the date-based fallback below — it's that fallback that wrongly attaches
-	// a same-day PDF, which is precisely what the admin is opting out of.
+	// 'none' = admin explicitly detached the PDF.
 	if (recording.transcript_pdf_id === 'none') return null;
 
 	const db = await getDb();
@@ -325,27 +323,17 @@ export async function getTranscriptPdfForRecording(recording: {
 		if (serialized) return serialized;
 	}
 
+	// Resolve only via an explicit YouTube link. The previous date-based title
+	// fallback (any video whose title contained the recording's YYYY-MM-DD) is
+	// what surfaced a wrong same-day PDF as if it were attached — and made it
+	// look un-removable. A transcript now appears only when explicitly attached
+	// or when a real source_video_id links to a video that has one.
 	let videoObjectId: ObjectId | null = null;
 	if (recording.source_video_id) {
 		const video = await db
 			.collection('videos')
 			.findOne({ id: recording.source_video_id }, { projection: { _id: 1 } });
 		if (video?._id instanceof ObjectId) videoObjectId = video._id;
-	}
-
-	if (!videoObjectId && recording.started_at) {
-		const startedAt = recording.started_at instanceof Date
-			? recording.started_at.toISOString()
-			: recording.started_at;
-		const day = startedAt.slice(0, 10);
-		if (/^\d{4}-\d{2}-\d{2}$/.test(day)) {
-			const [year, month, date] = day.split('-');
-			const flexibleDate = String.raw`${year}\s*-\s*${month}\s*-\s*${date}`;
-			const video = await db
-				.collection('videos')
-				.findOne({ title: { $regex: flexibleDate } }, { projection: { _id: 1 } });
-			if (video?._id instanceof ObjectId) videoObjectId = video._id;
-		}
 	}
 
 	return videoObjectId ? getFirstTranscriptPdfForVideo(videoObjectId) : null;
