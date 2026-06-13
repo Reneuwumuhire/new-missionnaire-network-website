@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { querySermons, queryMusicAudio } from '../../../db/collections';
 import { queryTranscriptions } from '$lib/server/transcriptions';
-import { listRetransmissions } from '$lib/server/recordings';
+import { listPublished } from '$lib/server/recordings';
 import type { RequestEvent } from './$types';
 
 const GROUP_LIMIT = 5;
@@ -42,7 +42,11 @@ export async function GET({ url, setHeaders }: RequestEvent) {
 				documents: [],
 				total: 0
 			})),
-			listRetransmissions({ q, limit: GROUP_LIMIT, pageNumber: 1 }).catch(() => ({
+			// All published recordings (both local meetings and retransmissions),
+			// not just retransmissions — otherwise a local-preacher search like
+			// "Chauffeur" misses the local rediffusions shown at
+			// /live/rediffusions?type=local.
+			listPublished({ q, limit: GROUP_LIMIT, pageNumber: 1 }).catch(() => ({
 				data: [],
 				total: 0
 			}))

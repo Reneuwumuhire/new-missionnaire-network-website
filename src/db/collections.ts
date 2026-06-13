@@ -1431,7 +1431,11 @@ export async function querySermons(options: {
 				$or: [
 					{ english_title: { $regex: search, $options: 'i' } },
 					{ french_title: { $regex: search, $options: 'i' } },
-					{ full_date_code: { $regex: search, $options: 'i' } }
+					{ full_date_code: { $regex: search, $options: 'i' } },
+					// Also match the preacher's name so a search like "Frank" or
+					// "Branham" returns their sermons (the title holds the subject,
+					// not the speaker, so author must be searched explicitly).
+					{ author: { $regex: search, $options: 'i' } }
 				]
 			});
 		}
