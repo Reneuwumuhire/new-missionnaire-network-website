@@ -2,6 +2,7 @@
 	import type { PublishedRecording } from '$lib/server/recordings';
 	import { vercelImage, vercelImageSrcSet, vercelImagePlaceholder } from '$lib/utils/vercelImage';
 	import BlurUpImage from '$lib/components/BlurUpImage.svelte';
+	import { t, locale } from '../../i18n';
 
 	interface Props {
 		recordings?: PublishedRecording[];
@@ -18,7 +19,7 @@
 	}
 
 	function formatDate(iso: string): string {
-		return new Date(iso).toLocaleDateString('fr-FR', {
+		return new Date(iso).toLocaleDateString($locale === 'en' ? 'en-US' : 'fr-FR', {
 			day: 'numeric',
 			month: 'long',
 			year: 'numeric'
@@ -38,12 +39,12 @@
 		<div class="flex items-end justify-between mb-5">
 			<div>
 				<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-1 font-body">
-					Rediffusions
+					{$t('search.recordings')}
 				</p>
-				<h2 class="font-display text-xl font-semibold text-stone-900">Directs précédents</h2>
+				<h2 class="font-display text-xl font-semibold text-stone-900">{$t('rediffusions.title')}</h2>
 			</div>
 			<a href="/live/rediffusions" class="section-cta">
-				<span class="section-cta-label">Voir tout</span>
+				<span class="section-cta-label">{$t('misc.viewAll')}</span>
 				<span class="section-cta-arrow" aria-hidden="true">→</span>
 			</a>
 		</div>

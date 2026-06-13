@@ -3,6 +3,7 @@
 	import ShareLive from '$lib/components/+shareLive.svelte';
 	import NotificationBell from '$lib/components/+notificationBell.svelte';
 	import RecentRecordings from '$lib/components/+recentRecordings.svelte';
+	import { t } from '../../i18n';
 	import type { PageData } from './$types';
 
 	interface Props {
@@ -52,16 +53,15 @@
 			<p
 				class="text-[10px] font-semibold uppercase tracking-[0.3em] text-missionnaire mb-3 font-body"
 			>
-				Direct Audio
+				{$t('live.page.kicker')}
 			</p>
 			<h1 class="font-display text-4xl md:text-5xl font-semibold tracking-tight leading-[1.05] text-stone-900">
-				Écoute en direct
+				{$t('live.page.title')}
 			</h1>
 			<p
 				class="mt-2 md:mt-3 text-[13px] md:text-[15px] text-stone-400 font-body font-light max-w-md mx-auto leading-relaxed"
 			>
-				La page se met à jour automatiquement. Dès que le direct audio commence, la lecture démarre
-				toute seule.
+				{$t('live.page.subtitle')}
 			</p>
 		</div>
 
@@ -71,10 +71,10 @@
 		<!-- Share the live stream with others -->
 		<ShareLive
 			liveSessionId={data.liveSessionId}
-			title={liveMeta?.title ? `🔴 ${liveMeta.title}` : 'Écoute en direct - Missionnaire Network'}
+			title={liveMeta?.title ? `🔴 ${liveMeta.title}` : $t('live.page.shareTitle')}
 			text={liveMeta?.title
-				? `${liveMeta.title} — en direct sur Missionnaire Network 🎙️`
-				: 'Écoutez Missionnaire Network en direct 🎙️'}
+				? $t('live.shareLiveText', { title: liveMeta.title })
+				: $t('live.page.shareText')}
 		/>
 
 		<!-- Recent recordings -->
@@ -96,16 +96,16 @@
 			</div>
 			<div class="font-body flex-1 min-w-0">
 				{#if bellRef?.isSubscribed}
-					<p class="text-sm font-semibold text-missionnaire">Notifications activées</p>
-					<p class="text-[11px] text-stone-400 mt-0.5">Cliquez pour désactiver</p>
+					<p class="text-sm font-semibold text-missionnaire">{$t('live.notif.enabledTitle')}</p>
+					<p class="text-[11px] text-stone-400 mt-0.5">{$t('live.notif.clickToDisable')}</p>
 				{:else}
 					<p
 						class="text-sm font-semibold text-stone-700 group-hover:text-missionnaire transition-colors"
 					>
-						Activer les notifications
+						{$t('live.notif.enableTitle')}
 					</p>
 					<p class="text-[11px] text-stone-400 mt-0.5">
-						Soyez alerté quand le direct audio commence
+						{$t('live.notif.enableSubtitle')}
 					</p>
 				{/if}
 			</div>
@@ -114,7 +114,7 @@
 					? 'text-missionnaire/60'
 					: 'text-stone-300 group-hover:text-missionnaire'}"
 			>
-				{bellRef?.isSubscribed ? 'Activé' : 'Activer →'}
+				{bellRef?.isSubscribed ? $t('live.notif.on') : $t('live.notif.activate')}
 			</span>
 		</button>
 
@@ -129,12 +129,12 @@
 				>
 			</p>
 			<p class="font-display text-lg italic text-stone-400 leading-relaxed">
-				« Voici, je me tiens à la porte, et je frappe. »
+				{$t('live.verse')}
 			</p>
 			<p
 				class="text-[11px] font-bold uppercase tracking-[0.25em] text-missionnaire/60 mt-2 font-body"
 			>
-				— Apocalypse 3:20
+				{$t('live.verseRef')}
 			</p>
 		</div>
 	</div>

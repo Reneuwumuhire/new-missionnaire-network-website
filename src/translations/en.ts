@@ -451,7 +451,65 @@ const en: Record<keyof typeof fr, string> = {
 	'questions.nameKept': 'Name kept: {name}',
 	'questions.signedInAs': 'Signed in as {name}',
 	'questions.noAccount': 'No account required.',
-	'questions.submit': 'Send the question'
+	'questions.submit': 'Send the question',
+
+	// ── Live pages (hero, scheduled watch, transcript, share) ───
+	'live.page.kicker': 'Live Audio',
+	'live.page.title': 'Listen live',
+	'live.page.subtitle':
+		'This page updates automatically. As soon as the live audio starts, playback begins on its own.',
+	'live.page.shareTitle': 'Listen live - Missionnaire Network',
+	'live.page.shareText': 'Listen to Missionnaire Network live 🎙️',
+	'live.shareLiveText': '{title} — live on Missionnaire Network 🎙️',
+	'live.verse': '“Behold, I stand at the door, and knock.”',
+	'live.verseRef': '— Revelation 3:20',
+
+	'live.notif.enabledTitle': 'Notifications enabled',
+	'live.notif.clickToDisable': 'Click to disable',
+	'live.notif.enableTitle': 'Enable notifications',
+	'live.notif.enableSubtitle': 'Get notified when the live audio starts',
+	'live.notif.on': 'On',
+	'live.notif.activate': 'Enable →',
+	'live.notif.notifyMe': 'Notify me',
+	'live.notif.notifyMeSubtitle': 'Get notified when this broadcast starts',
+	'live.notif.sampleBody': 'You will be alerted when the radio goes live.',
+
+	'liveWatch.scheduled': 'Scheduled broadcast',
+	'liveWatch.localTime': '· local time',
+	'liveWatch.startingSoon': 'The broadcast will start soon…',
+	'liveWatch.day': 'Day',
+	'liveWatch.days': 'Days',
+	'liveWatch.hours': 'Hours',
+	'liveWatch.minutes': 'Minutes',
+	'liveWatch.seconds': 'Seconds',
+	'liveWatch.ended': 'Broadcast ended',
+	'liveWatch.endedBody':
+		'This broadcast has ended. The replay will be available shortly — this page will redirect you automatically.',
+	'liveWatch.seePrevious': 'See previous broadcasts →',
+	'liveWatch.cancelled': 'Broadcast cancelled',
+	'liveWatch.cancelledBody':
+		'This broadcast has been cancelled. Find upcoming broadcasts and replays on the live page.',
+	'liveWatch.goToListen': 'Go to the live page',
+	'liveWatch.shareScheduledTitle': 'Scheduled broadcast: {title}',
+	'liveWatch.shareScheduledText': '{title} — scheduled broadcast on Missionnaire Network 🎙️',
+	'liveWatch.shareEndedText': '{title} — on Missionnaire Network 🎙️',
+
+	'liveTranscript.title': 'Transcript',
+	'liveTranscript.waitingSync': 'Waiting for synchronization…',
+	'liveTranscript.fullscreenAria': 'Show the transcript in fullscreen',
+	'liveTranscript.fullscreen': 'Fullscreen',
+	'liveTranscript.shownFullscreen': 'Transcript shown in fullscreen',
+	'liveTranscript.followHint':
+		'The text follows the audio you hear — it rewinds with you if you go back.',
+	'liveTranscript.fullscreenDialogAria': 'Transcript in fullscreen',
+	'liveTranscript.exitFullscreen': 'Exit fullscreen',
+
+	'shareLive.share': 'Share the live stream',
+
+	'syncedLyrics.label': 'Synced lyrics',
+	'syncedLyrics.verse': 'Verse {number}',
+	'syncedLyrics.clickToListen': 'click to listen',
+	'syncedLyrics.backToCurrent': 'Back to current line'
 };
 
 export default en;

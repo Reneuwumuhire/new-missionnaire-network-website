@@ -4,6 +4,7 @@
 	import { livePlayback, replayPlayback } from '$lib/stores/global';
 	import { parseSrt, type SrtCue } from '$lib/utils/srt';
 	import { dispatchAudioPlayerSeek } from '$lib/utils/audioPlayerControls';
+	import { t } from '../../i18n';
 	import SyncedLyrics from './SyncedLyrics.svelte';
 
 	// Synced sermon transcript, two modes sharing the same renderer:
@@ -244,20 +245,20 @@
 	<div class="border border-stone-200/60 bg-white/40 p-5 md:p-6">
 		<div class="mb-3 flex flex-wrap items-center justify-between gap-2">
 			<p class="text-[10px] font-bold uppercase tracking-[0.25em] text-missionnaire/80 font-body">
-				Transcription
+				{$t('liveTranscript.title')}
 			</p>
 			<div class="flex items-center gap-3">
 				{#if waitingForSync}
 					<span class="inline-flex items-center gap-1.5 text-[10px] font-semibold text-stone-400 font-body">
 						<span class="inline-flex h-1.5 w-1.5 animate-pulse rounded-full bg-stone-300"></span>
-						En attente de la synchronisation…
+						{$t('liveTranscript.waitingSync')}
 					</span>
 				{/if}
 				<button
 					type="button"
 					onclick={openFullscreen}
-					aria-label="Afficher la transcription en plein écran"
-					title="Plein écran"
+					aria-label={$t('liveTranscript.fullscreenAria')}
+					title={$t('liveTranscript.fullscreen')}
 					class="inline-flex items-center gap-1.5 border border-stone-200/60 bg-white/60 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] font-body text-stone-500 transition-colors hover:border-missionnaire hover:text-missionnaire"
 				>
 					<svg
@@ -273,7 +274,7 @@
 					>
 						<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
 					</svg>
-					<span class="hidden sm:inline">Plein écran</span>
+					<span class="hidden sm:inline">{$t('liveTranscript.fullscreen')}</span>
 				</button>
 			</div>
 		</div>
@@ -281,12 +282,12 @@
 			<SyncedLyrics {lines} currentTime={displayTime} pauseOnUserScroll onseek={handleSeek} />
 		{:else}
 			<p class="py-8 text-center text-xs text-stone-400 font-body">
-				Transcription affichée en plein écran
+				{$t('liveTranscript.shownFullscreen')}
 			</p>
 		{/if}
 		{#if mode === 'live'}
 			<p class="mt-2 text-[10px] text-stone-400 font-body">
-				Le texte suit l'audio que vous entendez — il recule avec vous si vous revenez en arrière.
+				{$t('liveTranscript.followHint')}
 			</p>
 		{/if}
 	</div>
@@ -301,7 +302,7 @@
 		class="transcript-fullscreen fixed inset-0 z-[9990] flex flex-col"
 		role="dialog"
 		aria-modal="true"
-		aria-label="Transcription en plein écran"
+		aria-label={$t('liveTranscript.fullscreenDialogAria')}
 	>
 		<div
 			class="transcript-fullscreen-header flex items-center justify-between gap-3 px-4 py-3 md:px-8"
@@ -318,13 +319,13 @@
 					</span>
 				{/if}
 				<span class="truncate text-[11px] font-bold uppercase tracking-[0.25em] font-body text-[#efe5d0]/80">
-					Transcription {mode === 'live' ? '· En direct' : ''}
+					{$t('liveTranscript.title')}{mode === 'live' ? ` · ${$t('live.atLive')}` : ''}
 				</span>
 			</div>
 			<button
 				type="button"
 				onclick={closeFullscreen}
-				aria-label="Quitter le plein écran"
+				aria-label={$t('liveTranscript.exitFullscreen')}
 				class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10 text-[#efe5d0] transition-colors hover:bg-white/20 active:bg-white/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
 			>
 				<svg
@@ -370,7 +371,7 @@
 				>
 					<path d="M6 6l12 12M6 18L18 6" />
 				</svg>
-				Fermer
+				{$t('misc.close')}
 			</button>
 		</div>
 	</div>

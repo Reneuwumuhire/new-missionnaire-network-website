@@ -452,5 +452,63 @@ export default {
 	'questions.nameKept': 'Nom gardé : {name}',
 	'questions.signedInAs': 'Connecté en tant que {name}',
 	'questions.noAccount': 'Aucun compte requis.',
-	'questions.submit': 'Envoyer la question'
+	'questions.submit': 'Envoyer la question',
+
+	// ── Live pages (hero, scheduled watch, transcript, share) ───
+	'live.page.kicker': 'Direct Audio',
+	'live.page.title': 'Écoute en direct',
+	'live.page.subtitle':
+		'La page se met à jour automatiquement. Dès que le direct audio commence, la lecture démarre toute seule.',
+	'live.page.shareTitle': 'Écoute en direct - Missionnaire Network',
+	'live.page.shareText': 'Écoutez Missionnaire Network en direct 🎙️',
+	'live.shareLiveText': '{title} — en direct sur Missionnaire Network 🎙️',
+	'live.verse': '« Voici, je me tiens à la porte, et je frappe. »',
+	'live.verseRef': '— Apocalypse 3:20',
+
+	'live.notif.enabledTitle': 'Notifications activées',
+	'live.notif.clickToDisable': 'Cliquez pour désactiver',
+	'live.notif.enableTitle': 'Activer les notifications',
+	'live.notif.enableSubtitle': 'Soyez alerté quand le direct audio commence',
+	'live.notif.on': 'Activé',
+	'live.notif.activate': 'Activer →',
+	'live.notif.notifyMe': 'Me prévenir',
+	'live.notif.notifyMeSubtitle': 'Soyez alerté quand ce direct commence',
+	'live.notif.sampleBody': 'Vous recevrez une alerte quand la radio sera en direct.',
+
+	'liveWatch.scheduled': 'Direct programmé',
+	'liveWatch.localTime': '· heure locale',
+	'liveWatch.startingSoon': 'Le direct va bientôt commencer…',
+	'liveWatch.day': 'Jour',
+	'liveWatch.days': 'Jours',
+	'liveWatch.hours': 'Heures',
+	'liveWatch.minutes': 'Minutes',
+	'liveWatch.seconds': 'Secondes',
+	'liveWatch.ended': 'Direct terminé',
+	'liveWatch.endedBody':
+		'Ce direct est terminé. La rediffusion sera bientôt disponible — cette page vous y redirigera automatiquement.',
+	'liveWatch.seePrevious': 'Voir les directs précédents →',
+	'liveWatch.cancelled': 'Direct annulé',
+	'liveWatch.cancelledBody':
+		"Ce direct a été annulé. Retrouvez les prochains directs et les rediffusions sur la page d'écoute.",
+	'liveWatch.goToListen': "Aller à la page d'écoute",
+	'liveWatch.shareScheduledTitle': 'Direct programmé : {title}',
+	'liveWatch.shareScheduledText': '{title} — direct programmé sur Missionnaire Network 🎙️',
+	'liveWatch.shareEndedText': '{title} — sur Missionnaire Network 🎙️',
+
+	'liveTranscript.title': 'Transcription',
+	'liveTranscript.waitingSync': 'En attente de la synchronisation…',
+	'liveTranscript.fullscreenAria': 'Afficher la transcription en plein écran',
+	'liveTranscript.fullscreen': 'Plein écran',
+	'liveTranscript.shownFullscreen': 'Transcription affichée en plein écran',
+	'liveTranscript.followHint':
+		"Le texte suit l'audio que vous entendez — il recule avec vous si vous revenez en arrière.",
+	'liveTranscript.fullscreenDialogAria': 'Transcription en plein écran',
+	'liveTranscript.exitFullscreen': 'Quitter le plein écran',
+
+	'shareLive.share': 'Partager le direct',
+
+	'syncedLyrics.label': 'Paroles synchronisées',
+	'syncedLyrics.verse': 'Couplet {number}',
+	'syncedLyrics.clickToListen': 'cliquez pour écouter',
+	'syncedLyrics.backToCurrent': 'Revenir au passage en cours'
 } as const;

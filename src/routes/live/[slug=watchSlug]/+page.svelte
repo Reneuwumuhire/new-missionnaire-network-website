@@ -5,6 +5,7 @@
 	import LiveRadioPlayer from '$lib/components/+liveRadioPlayer.svelte';
 	import ShareLive from '$lib/components/+shareLive.svelte';
 	import NotificationBell from '$lib/components/+notificationBell.svelte';
+	import { t, locale } from '../../../i18n';
 	import type { PageData } from './$types';
 
 	interface Props {
@@ -40,7 +41,10 @@
 	let startingSoon = $derived(phase === 'scheduled' && remainingMs === 0);
 
 	let scheduledLocal = $derived(browser
-		? new Date(scheduledMs).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' })
+		? new Date(scheduledMs).toLocaleString($locale === 'en' ? 'en-US' : 'fr-FR', {
+				dateStyle: 'full',
+				timeStyle: 'short'
+			})
 		: '');
 
 	function pad(n: number): string {
@@ -117,7 +121,7 @@
 				>
 					<span class="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse mr-1 align-middle"
 					></span>
-					En direct
+					{$t('live.atLive')}
 				</p>
 				<h1 class="font-display text-2xl md:text-4xl font-semibold text-stone-900">
 					{watch.title}
@@ -136,7 +140,7 @@
 			<ShareLive
 				{shareUrl}
 				title={`🔴 ${watch.title}`}
-				text={`${watch.title} — en direct sur Missionnaire Network 🎙️`}
+				text={$t('live.shareLiveText', { title: watch.title })}
 			/>
 		{:else if phase === 'scheduled'}
 			<!-- ── Waiting room (YouTube-style) ── -->
@@ -144,7 +148,7 @@
 				<p
 					class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-2 md:mb-3 font-body"
 				>
-					Direct programmé
+					{$t('liveWatch.scheduled')}
 				</p>
 				<h1 class="font-display text-2xl md:text-4xl font-semibold text-stone-900">
 					{watch.title}
@@ -152,7 +156,7 @@
 				{#if scheduledLocal}
 					<p class="mt-2 text-[13px] md:text-[14px] text-stone-500 font-body">
 						{scheduledLocal}
-						<span class="text-stone-300">· heure locale</span>
+						<span class="text-stone-300">{$t('liveWatch.localTime')}</span>
 					</p>
 				{/if}
 			</div>
@@ -189,7 +193,7 @@
 						<p
 							class="text-center text-white font-body text-sm md:text-base font-semibold animate-pulse"
 						>
-							Le direct va bientôt commencer…
+							{$t('liveWatch.startingSoon')}
 						</p>
 					{:else}
 						<div class="flex items-end justify-center gap-2 md:gap-3 font-body">
@@ -203,7 +207,7 @@
 									<p
 										class="mt-1 text-[9px] md:text-[10px] font-bold uppercase tracking-[0.2em] text-white/70"
 									>
-										{countdown.days > 1 ? 'Jours' : 'Jour'}
+										{countdown.days > 1 ? $t('liveWatch.days') : $t('liveWatch.day')}
 									</p>
 								</div>
 							{/if}
@@ -216,7 +220,7 @@
 								<p
 									class="mt-1 text-[9px] md:text-[10px] font-bold uppercase tracking-[0.2em] text-white/70"
 								>
-									Heures
+									{$t('liveWatch.hours')}
 								</p>
 							</div>
 							<div class="text-center">
@@ -228,7 +232,7 @@
 								<p
 									class="mt-1 text-[9px] md:text-[10px] font-bold uppercase tracking-[0.2em] text-white/70"
 								>
-									Minutes
+									{$t('liveWatch.minutes')}
 								</p>
 							</div>
 							<div class="text-center">
@@ -240,7 +244,7 @@
 								<p
 									class="mt-1 text-[9px] md:text-[10px] font-bold uppercase tracking-[0.2em] text-white/70"
 								>
-									Secondes
+									{$t('liveWatch.seconds')}
 								</p>
 							</div>
 						</div>
@@ -272,16 +276,16 @@
 				</div>
 				<div class="font-body flex-1 min-w-0">
 					{#if bellRef?.isSubscribed}
-						<p class="text-sm font-semibold text-missionnaire">Notifications activées</p>
-						<p class="text-[11px] text-stone-400 mt-0.5">Cliquez pour désactiver</p>
+						<p class="text-sm font-semibold text-missionnaire">{$t('live.notif.enabledTitle')}</p>
+						<p class="text-[11px] text-stone-400 mt-0.5">{$t('live.notif.clickToDisable')}</p>
 					{:else}
 						<p
 							class="text-sm font-semibold text-stone-700 group-hover:text-missionnaire transition-colors"
 						>
-							Me prévenir
+							{$t('live.notif.notifyMe')}
 						</p>
 						<p class="text-[11px] text-stone-400 mt-0.5">
-							Soyez alerté quand ce direct commence
+							{$t('live.notif.notifyMeSubtitle')}
 						</p>
 					{/if}
 				</div>
@@ -290,14 +294,14 @@
 						? 'text-missionnaire/60'
 						: 'text-stone-300 group-hover:text-missionnaire'}"
 				>
-					{bellRef?.isSubscribed ? 'Activé' : 'Activer →'}
+					{bellRef?.isSubscribed ? $t('live.notif.on') : $t('live.notif.activate')}
 				</span>
 			</button>
 
 			<ShareLive
 				{shareUrl}
-				title={`Direct programmé : ${watch.title}`}
-				text={`${watch.title} — direct programmé sur Missionnaire Network 🎙️`}
+				title={$t('liveWatch.shareScheduledTitle', { title: watch.title })}
+				text={$t('liveWatch.shareScheduledText', { title: watch.title })}
 			/>
 		{:else if phase === 'ended_pending'}
 			<!-- ── Live over, replay not published yet ── -->
@@ -305,7 +309,7 @@
 				<p
 					class="text-[10px] font-bold uppercase tracking-[0.35em] text-stone-400 mb-2 md:mb-3 font-body"
 				>
-					Direct terminé
+					{$t('liveWatch.ended')}
 				</p>
 				<h1 class="font-display text-2xl md:text-4xl font-semibold text-stone-900">
 					{watch.title}
@@ -313,15 +317,14 @@
 				<p
 					class="mt-3 text-[13px] md:text-[15px] text-stone-400 font-body font-light max-w-md mx-auto leading-relaxed"
 				>
-					Ce direct est terminé. La rediffusion sera bientôt disponible — cette page vous y
-					redirigera automatiquement.
+					{$t('liveWatch.endedBody')}
 				</p>
 			</div>
 
 			<ShareLive
 				{shareUrl}
 				title={watch.title}
-				text={`${watch.title} — sur Missionnaire Network 🎙️`}
+				text={$t('liveWatch.shareEndedText', { title: watch.title })}
 			/>
 
 			<div class="mt-6 text-center">
@@ -329,7 +332,7 @@
 					href="/live"
 					class="inline-block text-[11px] font-bold uppercase tracking-[0.2em] font-body text-missionnaire hover:underline"
 				>
-					Voir les directs précédents →
+					{$t('liveWatch.seePrevious')}
 				</a>
 			</div>
 		{:else}
@@ -338,7 +341,7 @@
 				<p
 					class="text-[10px] font-bold uppercase tracking-[0.35em] text-stone-400 mb-2 md:mb-3 font-body"
 				>
-					Direct annulé
+					{$t('liveWatch.cancelled')}
 				</p>
 				<h1 class="font-display text-2xl md:text-4xl font-semibold text-stone-900">
 					{watch.title}
@@ -346,8 +349,7 @@
 				<p
 					class="mt-3 text-[13px] md:text-[15px] text-stone-400 font-body font-light max-w-md mx-auto leading-relaxed"
 				>
-					Ce direct a été annulé. Retrouvez les prochains directs et les rediffusions sur la page
-					d'écoute.
+					{$t('liveWatch.cancelledBody')}
 				</p>
 			</div>
 
@@ -356,7 +358,7 @@
 					href="/live"
 					class="inline-block border border-stone-200/60 bg-white/40 px-6 py-3 text-[11px] font-bold uppercase tracking-[0.2em] font-body text-stone-600 transition-colors hover:border-missionnaire/30 hover:bg-missionnaire hover:text-white"
 				>
-					Aller à la page d'écoute
+					{$t('liveWatch.goToListen')}
 				</a>
 			</div>
 		{/if}
@@ -372,12 +374,12 @@
 				>
 			</p>
 			<p class="font-display text-lg italic text-stone-400 leading-relaxed">
-				« Voici, je me tiens à la porte, et je frappe. »
+				{$t('live.verse')}
 			</p>
 			<p
 				class="text-[11px] font-bold uppercase tracking-[0.25em] text-missionnaire/60 mt-2 font-body"
 			>
-				— Apocalypse 3:20
+				{$t('live.verseRef')}
 			</p>
 		</div>
 	</div>

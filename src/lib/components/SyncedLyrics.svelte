@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
 	import { formatTime } from '../../utils/FormatTime';
+	import { t } from '../../i18n';
 
 	type LyricLine =
 		| string
@@ -207,7 +208,7 @@
 	class:fullscreen-dark={fullscreenDark}
 	class="lyrics-panel"
 	role="group"
-	aria-label="Paroles synchronisées"
+	aria-label={$t('syncedLyrics.label')}
 	onwheel={onUserScroll}
 	ontouchmove={onUserScroll}
 >
@@ -247,9 +248,9 @@
 				onclick={() => seekToLine(line)}
 				aria-current={index === activeLineIndex ? 'true' : undefined}
 				aria-label={verseNumber !== null
-					? `Couplet ${verseNumber}, ${formatTime(start)} : ${text}`
+					? `${$t('syncedLyrics.verse', { number: verseNumber })}, ${formatTime(start)} : ${text}`
 					: `${formatTime(start)} : ${text}`}
-				title={`${formatTime(start)} — cliquez pour écouter`}
+				title={`${formatTime(start)} — ${$t('syncedLyrics.clickToListen')}`}
 			>
 				<span class="lyric-text">{text}</span>
 			</button>
@@ -260,7 +261,9 @@
 				class:chorus={chorus}
 				class:past={activeLineIndex >= 0 && index < activeLineIndex}
 				class:future={activeLineIndex >= 0 && index > activeLineIndex}
-				aria-label={verseNumber !== null ? `Couplet ${verseNumber} : ${text}` : text}
+				aria-label={verseNumber !== null
+				? `${$t('syncedLyrics.verse', { number: verseNumber })} : ${text}`
+				: text}
 			>
 				<span class="lyric-text">{text}</span>
 			</div>
@@ -268,7 +271,7 @@
 	{/each}
 	{#if pauseOnUserScroll && userScrolled && activeLineIndex >= 0}
 		<button type="button" class="resume-follow" onclick={resumeAutoScroll}>
-			↓ Revenir au passage en cours
+			↓ {$t('syncedLyrics.backToCurrent')}
 		</button>
 	{/if}
 </div>

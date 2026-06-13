@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
+	import { get } from 'svelte/store';
 	import { env } from '$env/dynamic/public';
+	import { t } from '../../i18n';
 
 	let permission: NotificationPermission = $state('default');
 	interface Props {
@@ -76,8 +78,9 @@
 			isSubscribed = true;
 
 			// Show a sample notification so the user sees what to expect
-			reg.showNotification('Notifications activées', {
-				body: 'Vous recevrez une alerte quand la radio sera en direct.',
+			const translate = get(t);
+			reg.showNotification(translate('live.notif.enabledTitle'), {
+				body: translate('live.notif.sampleBody'),
 				icon: '/favicon.png',
 				badge: '/favicon.png',
 				tag: 'welcome-notification'

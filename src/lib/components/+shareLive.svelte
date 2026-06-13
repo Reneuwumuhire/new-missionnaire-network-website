@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { onDestroy } from 'svelte';
+	import { t } from '../../i18n';
 
 	// ── Share the live stream ──────────────────────────────────────
 	// Lets a listener share the live page with others. While a direct is on
@@ -132,7 +133,7 @@
 		}}
 		aria-haspopup="menu"
 		aria-expanded={isShareMenuOpen}
-		aria-label="Partager le direct"
+		aria-label={$t('shareLive.share')}
 		class="group flex w-full items-center justify-center gap-2 border px-5 py-3.5 text-[11px] font-bold uppercase tracking-[0.2em] font-body transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40 {isShareMenuOpen
 			? 'border-missionnaire/30 bg-missionnaire/5 text-missionnaire'
 			: 'border-stone-200/60 bg-white/40 text-stone-600 hover:border-missionnaire/30 hover:bg-missionnaire hover:text-white'}"
@@ -155,11 +156,11 @@
 			<line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
 		</svg>
 		{#if shareFeedback === 'copied'}
-			Lien copié
+			{$t('player.linkCopied')}
 		{:else if shareFeedback === 'error'}
-			Échec — copiez l'URL
+			{$t('player.copyFailed')}
 		{:else}
-			Partager le direct
+			{$t('shareLive.share')}
 		{/if}
 	</button>
 
@@ -196,7 +197,7 @@
 						<line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
 						<line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
 					</svg>
-					<span>Partager…</span>
+					<span>{$t('rediffDetail.shareNative')}</span>
 				</button>
 			{/if}
 			<button
@@ -219,7 +220,7 @@
 					<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
 					<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
 				</svg>
-				<span>Copier le lien</span>
+				<span>{$t('rediffDetail.copyLink')}</span>
 			</button>
 		</div>
 	{/if}
