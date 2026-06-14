@@ -1,11 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
-import {
-	getRecordingById,
-	logAudit,
-	updateRecording
-} from '../../../../../../db/collections';
+import { getRecordingById, logAudit, updateRecording } from '../../../../../../db/collections';
 import { deleteObject, getS3Url, updateDownloadFilename } from '$lib/server/s3';
 
 const MAX_SIZE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB hard cap
@@ -45,13 +41,24 @@ export const POST: RequestHandler = async ({ locals, params, request, getClientA
 		duration_sec?: unknown;
 		peaks?: unknown;
 		peaks_duration_sec?: unknown;
+		variant?: unknown;
 	};
 
+	const variant = body.variant === 'french' ? 'french' : 'original';
+	const frenchPrefix = `recordings/${id}-french-`;
+
 	const s3Key = typeof body.s3_key === 'string' ? body.s3_key : '';
-	// The presign endpoint mints keys as `recordings/{id}-{timestamp}.mp3`.
-	// Enforcing the prefix here blocks a caller from pointing at an arbitrary
-	// S3 object we didn't sign for them.
-	if (!s3Key.startsWith(`recordings/${id}-`) || !s3Key.endsWith('.mp3')) {
+	// The presign endpoint mints keys as `recordings/{id}-{timestamp}.mp3` (or
+	// `recordings/{id}-french-{timestamp}.mp3`). Enforcing the variant-specific
+	// prefix blocks pointing at an arbitrary object — and stops a French key
+	// from being finalized as the primary audio (or vice-versa).
+	const validKey =
+		variant === 'french'
+			? s3Key.startsWith(frenchPrefix) && s3Key.endsWith('.mp3')
+			: s3Key.startsWith(`recordings/${id}-`) &&
+				!s3Key.startsWith(frenchPrefix) &&
+				s3Key.endsWith('.mp3');
+	if (!validKey) {
 		throw error(400, 'Clé S3 invalide');
 	}
 
@@ -60,17 +67,62 @@ export const POST: RequestHandler = async ({ locals, params, request, getClientA
 		throw error(400, 'Taille de fichier invalide');
 	}
 
-	const durationSec = typeof body.duration_sec === 'number' ? Math.floor(body.duration_sec) : Number.NaN;
+	const durationSec =
+		typeof body.duration_sec === 'number' ? Math.floor(body.duration_sec) : Number.NaN;
 	if (!Number.isFinite(durationSec) || durationSec <= 0 || durationSec > MAX_DURATION_SEC) {
 		throw error(400, 'Durée invalide');
 	}
 
+	const s3Url = getS3Url(s3Key);
+
+	// ── French audio version ──────────────────────────────────────────
+	// Supplementary track stored in dedicated fields; never touches the
+	// primary audio, status, or peaks.
+	if (variant === 'french') {
+		const oldFrenchKey = current.french_audio_s3_key ?? null;
+		const ok = await updateRecording(id, {
+			french_audio_s3_key: s3Key,
+			french_audio_s3_url: s3Url,
+			french_audio_size_bytes: sizeBytes,
+			french_audio_duration_sec: durationSec
+		});
+		if (!ok) throw error(500, 'Mise à jour échouée');
+
+		if (oldFrenchKey && oldFrenchKey !== s3Key) {
+			deleteObject(oldFrenchKey).catch((err) =>
+				console.error('[recordings/audio/finalize] old French audio delete failed:', err)
+			);
+		}
+		if (current.title) {
+			updateDownloadFilename(s3Key, `${current.title} (Français)`).catch((err) =>
+				console.error('[recordings/audio/finalize] French Content-Disposition update failed:', err)
+			);
+		}
+		await logAudit({
+			user_id: locals.user.email,
+			user_email: locals.user.email,
+			action: 'update',
+			target_collection: 'recordings',
+			target_id: id,
+			changes: { french_audio_s3_key: { old: oldFrenchKey, new: s3Key } },
+			ip_address: getClientAddress()
+		});
+		return json({
+			ok: true,
+			variant,
+			french_audio_s3_key: s3Key,
+			french_audio_s3_url: s3Url,
+			french_audio_size_bytes: sizeBytes,
+			french_audio_duration_sec: durationSec
+		});
+	}
+
+	// ── Primary (original) audio ──────────────────────────────────────
 	// Optional: precomputed waveform peaks from the client (e.g. the trim
 	// editor already decoded the sliced MP3). Stored inline so the admin
 	// editor can render the waveform instantly on future opens.
 	const parsed = parsePeaks(body.peaks, body.peaks_duration_sec, durationSec);
 
-	const s3Url = getS3Url(s3Key);
 	// A backfilled upload (createRecording) sits in 'uploading' with no audio
 	// until this point — landing the MP3 is what makes it a real recording, so
 	// promote it to 'ready'. An already-ready recording having its audio
@@ -121,5 +173,11 @@ export const POST: RequestHandler = async ({ locals, params, request, getClientA
 		ip_address: getClientAddress()
 	});
 
-	return json({ ok: true, s3_key: s3Key, s3_url: s3Url, size_bytes: sizeBytes, duration_sec: durationSec });
+	return json({
+		ok: true,
+		s3_key: s3Key,
+		s3_url: s3Url,
+		size_bytes: sizeBytes,
+		duration_sec: durationSec
+	});
 };

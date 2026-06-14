@@ -256,7 +256,8 @@ const en: Record<keyof typeof fr, string> = {
 	'audio.new.selectPlaceholder': 'Select...',
 	'audio.new.numberPlaceholder': 'No.',
 	'audio.new.lyricsPlaceholder': 'Paste the lyrics here if you already have them...',
-	'audio.new.lyricsHelp': 'You can also add or correct the lyrics after the upload from the audio page.',
+	'audio.new.lyricsHelp':
+		'You can also add or correct the lyrics after the upload from the audio page.',
 	'audio.new.uploading': 'Uploading...',
 	'audio.new.uploadButton': 'Upload the file to the server',
 	'audio.new.selectFileFirst': 'Select a file and a category first',
@@ -592,7 +593,8 @@ const en: Record<keyof typeof fr, string> = {
 	'questions.detail.manualLink': 'Manual link',
 	'questions.detail.results': 'Results',
 	'questions.detail.foundCount': '{count} found',
-	'questions.detail.manualTextHint': 'Paste the text to highlight, then add the link to its source.',
+	'questions.detail.manualTextHint':
+		'Paste the text to highlight, then add the link to its source.',
 	'questions.detail.manualVideoHint':
 		'Add the video link. You can also briefly note what is said in the excerpt.',
 	'questions.detail.manualOtherHint':
@@ -801,7 +803,8 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.monitor.unmutedHint': 'You hear what the listeners hear',
 	'recordings.monitor.unmute': 'Unmute',
 	'recordings.monitor.mute': 'Mute',
-	'recordings.monitor.noSource': 'No source connected — monitoring starts as soon as a stream is broadcast.',
+	'recordings.monitor.noSource':
+		'No source connected — monitoring starts as soon as a stream is broadcast.',
 	'recordings.monitor.sourceActive': 'Stream active',
 	'recordings.monitor.sourceInactive': 'No active source',
 	'recordings.meta.title': 'Information shown during the live',
@@ -824,7 +827,8 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.meta.setDefaultHint': '— used automatically when a live starts without a thumbnail',
 	'recordings.meta.titlePlaceholder': 'E.g. Wednesday sermon',
 	'recordings.meta.descriptionPlaceholder': 'Describe this live: topic, speaker, Bible passage…',
-	'recordings.meta.youtubeHint': 'Default: the channel /live URL. Replace it with the exact video URL once published.',
+	'recordings.meta.youtubeHint':
+		'Default: the channel /live URL. Replace it with the exact video URL once published.',
 	'recordings.toolbar.searchPlaceholder': 'Search by title, author, description…',
 	'recordings.toolbar.filterStatus': 'Filter by status',
 	'recordings.toolbar.allStatuses': 'All statuses',
@@ -881,10 +885,13 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.upload.publishNow': 'Publish immediately (visible on the public site)',
 	'recordings.edit.title': 'Edit recording',
 	'recordings.edit.titlePlaceholder': 'E.g. Sunday sermon — Faith and prayer',
-	'recordings.edit.descriptionPlaceholder': 'Describe this recorded live: topic, speaker, Bible passage…',
-	'recordings.edit.youtubeHint': 'Paste the YouTube URL of the matching video. Leave empty to link no video.',
+	'recordings.edit.descriptionPlaceholder':
+		'Describe this recorded live: topic, speaker, Bible passage…',
+	'recordings.edit.youtubeHint':
+		'Paste the YouTube URL of the matching video. Leave empty to link no video.',
 	'recordings.edit.transcriptLabel': 'PDF transcript',
-	'recordings.edit.transcriptAutoHint': 'If the linked video already has a PDF, it is attached here automatically.',
+	'recordings.edit.transcriptAutoHint':
+		'If the linked video already has a PDF, it is attached here automatically.',
 	'recordings.edit.transcriptSearching': 'Looking for an already uploaded transcript…',
 	'recordings.edit.transcriptNoUploadNeeded': 'No new upload needed.',
 	'recordings.edit.replacePdf': 'Replace this PDF',
@@ -899,9 +906,19 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.edit.pdfFormats': 'PDF only · 100 MB max',
 	'recordings.edit.keepExisting': 'Keep the existing one',
 	'recordings.edit.audioLabel': 'Audio file',
-	'recordings.edit.audioReplaceWarning': 'The old audio file will be permanently replaced when saving.',
+	'recordings.edit.audioReplaceWarning':
+		'The old audio file will be permanently replaced when saving.',
 	'recordings.edit.replaceAudio': 'Replace audio',
 	'recordings.edit.audioFormats': 'MP3 only · 2 GB max',
+	'recordings.edit.frenchAudioLabel': 'French audio',
+	'recordings.edit.frenchAudioHint':
+		'Optional French version. The primary audio above stays the original; listeners can switch between the two on the replay page.',
+	'recordings.edit.frenchAudioAttached': 'French version attached',
+	'recordings.edit.addFrenchAudio': 'Add French audio',
+	'recordings.edit.originalAudioLanguage': 'Original audio language',
+	'lang.name.rw': 'Kinyarwanda',
+	'lang.name.fr': 'French',
+	'lang.name.en': 'English',
 	'recordings.edit.subtitleLabel': 'Subtitles (replay)',
 	'recordings.edit.subtitleHint':
 		'.srt file shown on the replay page, synced to the audio above. Overrides the subtitles inherited from the scheduled live.',
@@ -915,8 +932,11 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.edit.subtitleHideHint':
 		'Hides subtitles on the public page without deleting the file — handy while you fix a mistake.',
 	'recordings.toast.subtitleSaved': 'Subtitles saved',
+	'recordings.toast.frenchAudioSaved': 'French audio saved',
+	'recordings.toast.frenchAudioRemoved': 'French audio removed',
 	'recordings.confirm.override.title': '{label}: started by someone else',
-	'recordings.confirm.override.message': '{name} started {label}. Do you really want to stop it on their behalf?',
+	'recordings.confirm.override.message':
+		'{name} started {label}. Do you really want to stop it on their behalf?',
 	'recordings.confirm.override.confirm': 'Stop anyway',
 	'recordings.confirm.override.recordingLabel': 'The recording',
 	'recordings.confirm.override.liveLabel': 'The live',
@@ -944,11 +964,13 @@ const en: Record<keyof typeof fr, string> = {
 		'"{filename}" will no longer be offered on this recording\'s public page. The PDF file itself is not deleted.',
 	'recordings.toast.linkCopied': 'Link copied',
 	'recordings.toast.linkCopyFailed': 'Could not copy the link',
-	'recordings.toast.subtitlesAnchoredAtStart': 'Subtitles synced to the recording start — adjust with the ± buttons',
+	'recordings.toast.subtitlesAnchoredAtStart':
+		'Subtitles synced to the recording start — adjust with the ± buttons',
 	'recordings.toast.deletedOne': '{count} recording deleted',
 	'recordings.toast.deletedMany': '{count} recordings deleted',
 	'recordings.toast.deleted': 'Recording deleted',
-	'recordings.toast.publishAfterUploadFailed': 'Recording created but publishing failed — publish it from the list.',
+	'recordings.toast.publishAfterUploadFailed':
+		'Recording created but publishing failed — publish it from the list.',
 	'recordings.toast.uploaded': 'Recording uploaded',
 	'recordings.toast.uploadedAndPublished': 'Recording uploaded and published',
 	'recordings.toast.audioSaved': 'Audio saved',
@@ -968,8 +990,10 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.error.bulkDeleteFailed': 'Bulk delete failed',
 	'recordings.error.selectMp3': 'Select an MP3 file',
 	'recordings.error.mp3TooLarge': 'File too large (max 2 GB)',
-	'recordings.error.audioDurationUnreadable': 'Could not read the duration — check that the MP3 is valid',
-	'recordings.error.audioFileDurationUnreadable': 'Could not read the file duration — check that the MP3 is valid',
+	'recordings.error.audioDurationUnreadable':
+		'Could not read the duration — check that the MP3 is valid',
+	'recordings.error.audioFileDurationUnreadable':
+		'Could not read the file duration — check that the MP3 is valid',
 	'recordings.error.selectImage': 'Select an image file',
 	'recordings.error.imageTooLarge': 'Image too large (max 5 MB)',
 	'recordings.error.titleRequired': 'Title required',
@@ -1033,7 +1057,8 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.scheduled.copyLink': 'Copy link',
 	'recordings.scheduled.editTitle': 'Edit the live',
 	'recordings.scheduled.editHint': 'The share link remains unchanged.',
-	'recordings.scheduled.createHint': 'A stable share link is created immediately — shareable before the live.',
+	'recordings.scheduled.createHint':
+		'A stable share link is created immediately — shareable before the live.',
 	'recordings.scheduled.dateTimeLabel': 'Date and time',
 	'recordings.scheduled.localTime': '(local time)',
 	'recordings.scheduled.titlePlaceholder': 'e.g. Wednesday evening meeting',
@@ -1051,14 +1076,17 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.scheduled.afterEdit': 'after editing',
 	'recordings.scheduled.atCreation': 'at creation',
 	'recordings.scheduled.reminderLabel': 'Automatic reminder',
-	'recordings.scheduled.reminderHint': '— "starting soon" notification about 30 minutes before the start',
+	'recordings.scheduled.reminderHint':
+		'— "starting soon" notification about 30 minutes before the start',
 	'recordings.scheduled.status.live': 'Live',
 	'recordings.scheduled.status.scheduled': 'Scheduled',
 	'recordings.scheduled.status.ended': 'Ended',
 	'recordings.scheduled.status.cancelled': 'Cancelled',
 	'recordings.scheduled.confirm.start': '"{title}" will go live.',
-	'recordings.scheduled.confirm.startNotifyOne': '"{title}" will go live and {count} subscriber will be notified.',
-	'recordings.scheduled.confirm.startNotifyMany': '"{title}" will go live and {count} subscribers will be notified.',
+	'recordings.scheduled.confirm.startNotifyOne':
+		'"{title}" will go live and {count} subscriber will be notified.',
+	'recordings.scheduled.confirm.startNotifyMany':
+		'"{title}" will go live and {count} subscribers will be notified.',
 	'recordings.scheduled.confirm.cancelTitle': 'Cancel this live',
 	'recordings.scheduled.confirm.cancelMessage':
 		'"{title}" will be marked as cancelled. The share link will show "live cancelled".',
@@ -1067,7 +1095,8 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.scheduled.confirm.deleteTitle': 'Delete this entry',
 	'recordings.scheduled.confirm.deleteMessage':
 		'"{title}" will be permanently deleted. Its share link will stop working.',
-	'recordings.scheduled.error.alreadyLive': 'A live is already running — end it before starting another one',
+	'recordings.scheduled.error.alreadyLive':
+		'A live is already running — end it before starting another one',
 	'recordings.scheduled.toast.createdLinkCopied': 'Live scheduled — share link copied',
 	'recordings.scheduled.toast.created': 'Live scheduled',
 	'recordings.scheduled.toast.updated': 'Live updated',

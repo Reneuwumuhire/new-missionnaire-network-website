@@ -114,7 +114,8 @@ export default {
 	'lyrics.review.exporting': 'Export...',
 	'lyrics.review.loading': 'Chargement des correspondances...',
 	'lyrics.review.songsCount': '{count} chants',
-	'lyrics.review.summaryLine': '{likely} probables / {candidate} candidats / {needsReview} à revoir',
+	'lyrics.review.summaryLine':
+		'{likely} probables / {candidate} candidats / {needsReview} à revoir',
 	'lyrics.review.renderedCount': '{shown} affichés sur {total}',
 	'lyrics.review.showMore': 'Afficher plus ({count} restants)',
 	'lyrics.review.selectedOne': '{count} sélectionné',
@@ -139,7 +140,8 @@ export default {
 	'lyrics.review.selectedSong': 'Chant sélectionné',
 	'lyrics.review.syncedAt': 'Synced {date}',
 	'lyrics.review.syncedAtBy': 'Synced {date} by {name}',
-	'lyrics.review.confirmFirstHint': "Confirmez d'abord la correspondance, puis publiez les paroles.",
+	'lyrics.review.confirmFirstHint':
+		"Confirmez d'abord la correspondance, puis publiez les paroles.",
 	'lyrics.review.candidateLyrics': 'Paroles candidates',
 	'lyrics.review.source': 'Source',
 	'lyrics.review.replaceLyrics': 'Remplacer les paroles',
@@ -261,7 +263,8 @@ export default {
 	'audio.new.uploading': 'Import en cours...',
 	'audio.new.uploadButton': 'Importer le fichier sur le serveur',
 	'audio.new.selectFileFirst': "Sélectionnez un fichier et une catégorie d'abord",
-	'audio.new.uploadSuccessHint': 'Fichier importé avec succès. Enregistrez les métadonnées pour finaliser.',
+	'audio.new.uploadSuccessHint':
+		'Fichier importé avec succès. Enregistrez les métadonnées pour finaliser.',
 	'audio.new.savingButton': 'Enregistrement...',
 	'audio.new.saveButton': "Enregistrer l'audio",
 	'audio.new.uploadedToServer': 'Fichier importé sur le serveur',
@@ -425,7 +428,8 @@ export default {
 	'audio.trim.downloadFailed': 'Téléchargement audio échoué',
 	'audio.trim.loadingWaveformCache': "Chargement de la forme d'onde (cache)…",
 	'audio.trim.decodingWaveform': "Décodage de la forme d'onde…",
-	'audio.trim.downloadingHint': "Téléchargement de l'audio — vous pouvez écouter en streaming ci-dessus.",
+	'audio.trim.downloadingHint':
+		"Téléchargement de l'audio — vous pouvez écouter en streaming ci-dessus.",
 	'audio.trim.newDuration': 'Nouvelle durée',
 	'audio.trim.back10': 'Reculer de 10 s',
 	'audio.trim.forward10': 'Avancer de 10 s',
@@ -762,7 +766,8 @@ export default {
 	'recordings.sessionStart': 'Démarrer la session',
 	'recordings.publicLink': 'Lien public',
 	'recordings.waitingForStream': "En attente d'un flux audio… (démarrez OBS)",
-	'recordings.pendingOrphans': 'Récupération en cours : {count} enregistrement(s) en attente de téléversement.',
+	'recordings.pendingOrphans':
+		'Récupération en cours : {count} enregistrement(s) en attente de téléversement.',
 	'recordings.listenersOne': '{count} auditeur',
 	'recordings.listenersMany': '{count} auditeurs',
 	'recordings.subscribersOne': '{count} abonné',
@@ -803,7 +808,8 @@ export default {
 	'recordings.monitor.unmutedHint': 'Vous entendez ce que les auditeurs entendent',
 	'recordings.monitor.unmute': 'Activer le son',
 	'recordings.monitor.mute': 'Couper le son',
-	'recordings.monitor.noSource': "Aucune source connectée — l'écoute démarre dès qu'un flux est diffusé.",
+	'recordings.monitor.noSource':
+		"Aucune source connectée — l'écoute démarre dès qu'un flux est diffusé.",
 	'recordings.monitor.sourceActive': 'Flux actif',
 	'recordings.monitor.sourceInactive': 'Aucune source active',
 	'recordings.meta.title': 'Informations affichées pendant le direct',
@@ -823,7 +829,8 @@ export default {
 	'recordings.meta.youtubeDefault': '{url} (par défaut)',
 	'recordings.meta.editTitle': 'Modifier les informations du direct',
 	'recordings.meta.setDefaultLabel': 'Définir comme vignette par défaut',
-	'recordings.meta.setDefaultHint': '— utilisée automatiquement quand un direct démarre sans vignette',
+	'recordings.meta.setDefaultHint':
+		'— utilisée automatiquement quand un direct démarre sans vignette',
 	'recordings.meta.titlePlaceholder': 'Ex. Prédication du mercredi',
 	'recordings.meta.descriptionPlaceholder': 'Décrivez ce direct : sujet, orateur, texte biblique…',
 	'recordings.meta.youtubeHint':
@@ -857,7 +864,8 @@ export default {
 	'recordings.list.trimAudioTitle': "Éditer l'audio (couper début/fin)",
 	'recordings.list.emptyFiltered': 'Aucun enregistrement ne correspond aux filtres actifs.',
 	'recordings.list.emptyNone': "Aucun enregistrement pour l'instant.",
-	'recordings.list.emptyStart': "Aucun enregistrement pour l'instant. Démarrez le premier ci-dessus.",
+	'recordings.list.emptyStart':
+		"Aucun enregistrement pour l'instant. Démarrez le premier ci-dessus.",
 	'recordings.list.empty': 'Aucun enregistrement.',
 	'recordings.list.resetFilters': 'Réinitialiser les filtres',
 	'recordings.list.loadMore': 'Charger plus ({count} restants)',
@@ -884,11 +892,13 @@ export default {
 	'recordings.upload.publishNow': 'Publier immédiatement (visible sur le site public)',
 	'recordings.edit.title': "Modifier l'enregistrement",
 	'recordings.edit.titlePlaceholder': 'Ex. Prédication du dimanche — Foi et prière',
-	'recordings.edit.descriptionPlaceholder': 'Décrivez ce direct enregistré : sujet, orateur, texte biblique…',
+	'recordings.edit.descriptionPlaceholder':
+		'Décrivez ce direct enregistré : sujet, orateur, texte biblique…',
 	'recordings.edit.youtubeHint':
 		"Collez l'URL YouTube de la vidéo correspondante. Laissez vide pour ne pas lier de vidéo.",
 	'recordings.edit.transcriptLabel': 'Transcription PDF',
-	'recordings.edit.transcriptAutoHint': 'Si la vidéo liée possède déjà un PDF, il est attaché ici automatiquement.',
+	'recordings.edit.transcriptAutoHint':
+		'Si la vidéo liée possède déjà un PDF, il est attaché ici automatiquement.',
 	'recordings.edit.transcriptSearching': "Recherche d'une transcription déjà téléversée…",
 	'recordings.edit.transcriptNoUploadNeeded': 'Aucun nouveau téléversement nécessaire.',
 	'recordings.edit.replacePdf': 'Remplacer ce PDF',
@@ -903,9 +913,19 @@ export default {
 	'recordings.edit.pdfFormats': 'PDF uniquement · 100 Mo max',
 	'recordings.edit.keepExisting': "Garder l'existant",
 	'recordings.edit.audioLabel': 'Fichier audio',
-	'recordings.edit.audioReplaceWarning': "L'ancien fichier audio sera définitivement remplacé à l'enregistrement.",
+	'recordings.edit.audioReplaceWarning':
+		"L'ancien fichier audio sera définitivement remplacé à l'enregistrement.",
 	'recordings.edit.replaceAudio': "Remplacer l'audio",
 	'recordings.edit.audioFormats': 'MP3 uniquement · 2 Go max',
+	'recordings.edit.frenchAudioLabel': 'Audio en français',
+	'recordings.edit.frenchAudioHint':
+		"Version française optionnelle. L'audio principal ci-dessus reste l'original ; les auditeurs pourront basculer entre les deux sur la page de rediffusion.",
+	'recordings.edit.frenchAudioAttached': 'Version française attachée',
+	'recordings.edit.addFrenchAudio': "Ajouter l'audio français",
+	'recordings.edit.originalAudioLanguage': "Langue de l'audio original",
+	'lang.name.rw': 'Kinyarwanda',
+	'lang.name.fr': 'Français',
+	'lang.name.en': 'Anglais',
 	'recordings.edit.subtitleLabel': 'Sous-titres (rediffusion)',
 	'recordings.edit.subtitleHint':
 		"Fichier .srt affiché sur la page de rediffusion, synchronisé avec l'audio ci-dessus. Remplace les sous-titres hérités du direct programmé.",
@@ -919,8 +939,11 @@ export default {
 	'recordings.edit.subtitleHideHint':
 		'Cache les sous-titres sur la page publique sans supprimer le fichier — pratique pour corriger une erreur plus tard.',
 	'recordings.toast.subtitleSaved': 'Sous-titres enregistrés',
+	'recordings.toast.frenchAudioSaved': 'Audio français enregistré',
+	'recordings.toast.frenchAudioRemoved': 'Audio français retiré',
 	'recordings.confirm.override.title': "{label} : démarré par quelqu'un d'autre",
-	'recordings.confirm.override.message': "{name} a démarré {label}. Voulez-vous vraiment l'arrêter à sa place ?",
+	'recordings.confirm.override.message':
+		"{name} a démarré {label}. Voulez-vous vraiment l'arrêter à sa place ?",
 	'recordings.confirm.override.confirm': 'Arrêter quand même',
 	'recordings.confirm.override.recordingLabel': "L'enregistrement",
 	'recordings.confirm.override.liveLabel': 'Le direct',
@@ -963,19 +986,23 @@ export default {
 	'recordings.toast.pdfAdded': 'Transcription PDF ajoutée',
 	'recordings.toast.pdfDetached': 'Transcription PDF retirée',
 	'recordings.toast.liveWithLink': 'En direct — lien public : {url}',
-	'recordings.toast.defaultThumbnailFailed': 'Vignette enregistrée, mais échec de la définition par défaut',
+	'recordings.toast.defaultThumbnailFailed':
+		'Vignette enregistrée, mais échec de la définition par défaut',
 	'recordings.toast.defaultThumbnailSet': 'Vignette définie comme défaut',
 	'recordings.error.network': 'Erreur réseau',
 	'recordings.error.http': 'Erreur {status}',
 	'recordings.error.endLiveHttp': 'Erreur fin direct: {status}',
 	'recordings.error.stopRecording': 'Arrêt enregistrement: {detail}',
 	'recordings.error.stopRecordingCombined': '{error} · arrêt enregistrement: {detail}',
-	'recordings.error.startRecordingAfterLive': "Direct démarré, mais échec de l'enregistrement: {detail}",
-	'recordings.error.noDeletePermission': "Vous n'avez pas la permission de supprimer des enregistrements",
+	'recordings.error.startRecordingAfterLive':
+		"Direct démarré, mais échec de l'enregistrement: {detail}",
+	'recordings.error.noDeletePermission':
+		"Vous n'avez pas la permission de supprimer des enregistrements",
 	'recordings.error.bulkDeleteFailed': 'Suppression en masse échouée',
 	'recordings.error.selectMp3': 'Sélectionnez un fichier MP3',
 	'recordings.error.mp3TooLarge': 'Fichier trop volumineux (max 2 Go)',
-	'recordings.error.audioDurationUnreadable': 'Impossible de lire la durée — vérifiez que le MP3 est valide',
+	'recordings.error.audioDurationUnreadable':
+		'Impossible de lire la durée — vérifiez que le MP3 est valide',
 	'recordings.error.audioFileDurationUnreadable':
 		'Impossible de lire la durée du fichier — vérifiez que le MP3 est valide',
 	'recordings.error.selectImage': 'Sélectionnez un fichier image',
@@ -992,7 +1019,8 @@ export default {
 	'recordings.error.pdfTooLarge': 'PDF trop volumineux (max 100 Mo)',
 	'recordings.error.pdfUploadFailed': 'Échec du téléversement PDF vers S3',
 	'recordings.error.pdfDetachFailed': 'Échec du retrait de la transcription',
-	'recordings.error.youtubeRequiredForPdf': 'Ajoutez un lien YouTube avant de rattacher une transcription PDF',
+	'recordings.error.youtubeRequiredForPdf':
+		'Ajoutez un lien YouTube avant de rattacher une transcription PDF',
 	'recordings.error.selectSrt': 'Sélectionnez un fichier .srt',
 	'recordings.error.srtTooLarge': 'Fichier .srt trop volumineux (max 2 Mo)',
 	'recordings.error.srtUnreadable': 'Fichier .srt illisible (aucune réplique détectée)',
@@ -1060,14 +1088,17 @@ export default {
 	'recordings.scheduled.afterEdit': 'après modification',
 	'recordings.scheduled.atCreation': 'à la création',
 	'recordings.scheduled.reminderLabel': 'Rappel automatique',
-	'recordings.scheduled.reminderHint': '— notification « commence bientôt » environ 30 minutes avant le début',
+	'recordings.scheduled.reminderHint':
+		'— notification « commence bientôt » environ 30 minutes avant le début',
 	'recordings.scheduled.status.live': 'En direct',
 	'recordings.scheduled.status.scheduled': 'Programmé',
 	'recordings.scheduled.status.ended': 'Terminé',
 	'recordings.scheduled.status.cancelled': 'Annulé',
 	'recordings.scheduled.confirm.start': '« {title} » passera en direct.',
-	'recordings.scheduled.confirm.startNotifyOne': '« {title} » passera en direct et {count} abonné sera notifié.',
-	'recordings.scheduled.confirm.startNotifyMany': '« {title} » passera en direct et {count} abonnés seront notifiés.',
+	'recordings.scheduled.confirm.startNotifyOne':
+		'« {title} » passera en direct et {count} abonné sera notifié.',
+	'recordings.scheduled.confirm.startNotifyMany':
+		'« {title} » passera en direct et {count} abonnés seront notifiés.',
 	'recordings.scheduled.confirm.cancelTitle': 'Annuler ce direct',
 	'recordings.scheduled.confirm.cancelMessage':
 		'« {title} » sera marqué comme annulé. Le lien de partage affichera « direct annulé ».',
@@ -1076,7 +1107,8 @@ export default {
 	'recordings.scheduled.confirm.deleteTitle': 'Supprimer cette entrée',
 	'recordings.scheduled.confirm.deleteMessage':
 		'« {title} » sera supprimé définitivement. Son lien de partage cessera de fonctionner.',
-	'recordings.scheduled.error.alreadyLive': 'Un direct est déjà en cours — terminez-le avant d’en démarrer un autre',
+	'recordings.scheduled.error.alreadyLive':
+		'Un direct est déjà en cours — terminez-le avant d’en démarrer un autre',
 	'recordings.scheduled.toast.createdLinkCopied': 'Direct programmé — lien de partage copié',
 	'recordings.scheduled.toast.created': 'Direct programmé',
 	'recordings.scheduled.toast.updated': 'Direct mis à jour',
@@ -1117,7 +1149,8 @@ export default {
 	'recordings.subtitles.error.unreachable': 'Transcription inaccessible',
 	'recordings.subtitles.toast.attached':
 		'Transcription attachée au direct — cliquez « Démarrer les sous-titres » au bon moment',
-	'recordings.subtitles.toast.started': 'Sous-titres démarrés — les auditeurs voient maintenant le texte',
+	'recordings.subtitles.toast.started':
+		'Sous-titres démarrés — les auditeurs voient maintenant le texte',
 	'recordings.subtitles.toast.jumped': 'Texte calé sur la réplique choisie',
 	'recordings.subtitles.toast.disabled': 'Sous-titres désactivés',
 

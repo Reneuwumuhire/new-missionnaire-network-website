@@ -139,9 +139,7 @@ export async function queryMusicAudio(options: {
 	}
 
 	if (lyrics === 'with' || lyrics === 'without') {
-		const lyricsAudioIds = await db
-			.collection('music_lyrics')
-			.distinct('audio_id');
+		const lyricsAudioIds = await db.collection('music_lyrics').distinct('audio_id');
 		const objectIds = lyricsAudioIds
 			.filter((value): value is string => typeof value === 'string' && ObjectId.isValid(value))
 			.map((value) => new ObjectId(value));
@@ -723,6 +721,11 @@ export async function updateRecording(
 		peaks_duration_sec: number | null;
 		source_video_id: string | null;
 		transcript_pdf_id: string | null;
+		french_audio_s3_key: string | null;
+		french_audio_s3_url: string | null;
+		french_audio_size_bytes: number | null;
+		french_audio_duration_sec: number | null;
+		original_audio_language: string | null;
 		subtitle_srt_url: string | null;
 		subtitle_srt_s3_key: string | null;
 		subtitle_filename: string | null;
@@ -990,8 +993,7 @@ export async function getBroadcastAdminState(opts?: {
 		subtitle_srt_s3_key: (doc.subtitle_srt_s3_key as string | null) ?? null,
 		subtitle_anchor_epoch_ms:
 			typeof doc.subtitle_anchor_epoch_ms === 'number' ? doc.subtitle_anchor_epoch_ms : null,
-		subtitle_offset_ms:
-			typeof doc.subtitle_offset_ms === 'number' ? doc.subtitle_offset_ms : 0,
+		subtitle_offset_ms: typeof doc.subtitle_offset_ms === 'number' ? doc.subtitle_offset_ms : 0,
 		updated_at: (doc.updated_at as string) ?? new Date(0).toISOString()
 	};
 	cachedBroadcast = { value, cachedAt: Date.now() };
@@ -1225,7 +1227,9 @@ export async function deleteScheduledLive(
  *  nearest still-`scheduled` doc whose slot is within [now − 1h, now + 6h].
  *  Wide on purpose — admins routinely start a bit early or late. The go-live
  *  confirm dialog shows which entry will be linked so a mis-link is visible. */
-export async function findLinkableScheduledLive(now: Date = new Date()): Promise<ScheduledLive | null> {
+export async function findLinkableScheduledLive(
+	now: Date = new Date()
+): Promise<ScheduledLive | null> {
 	await ensureScheduledLiveIndexes();
 	const db = await getDb();
 	const from = new Date(now.getTime() - 60 * 60 * 1000);
@@ -1240,7 +1244,10 @@ export async function findLinkableScheduledLive(now: Date = new Date()): Promise
 	let best = docs[0];
 	let bestDist = Infinity;
 	for (const doc of docs) {
-		const ms = doc.scheduled_at instanceof Date ? doc.scheduled_at.getTime() : Date.parse(String(doc.scheduled_at));
+		const ms =
+			doc.scheduled_at instanceof Date
+				? doc.scheduled_at.getTime()
+				: Date.parse(String(doc.scheduled_at));
 		const dist = Math.abs(ms - now.getTime());
 		if (dist < bestDist) {
 			bestDist = dist;

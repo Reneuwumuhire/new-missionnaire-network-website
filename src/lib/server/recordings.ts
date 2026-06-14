@@ -58,6 +58,15 @@ export interface PublishedRecording {
 	/** Admin kill-switch: hide subtitles from listeners (e.g. while a bad SRT
 	 *  is being fixed) without deleting the file. */
 	subtitles_hidden: boolean;
+	/** Optional French-language audio version. When set, the replay page offers a
+	 *  language switch between the original capture (`s3_url`) and this one. */
+	french_audio_url: string | null;
+	french_audio_size_bytes: number | null;
+	french_audio_duration_sec: number | null;
+	/** Language code of the primary/original audio (e.g. 'rw' Kinyarwanda, 'sw'
+	 *  Swahili, 'fr', 'en'). Drives the label of the original option in the
+	 *  replay language switch. Defaults to Kinyarwanda for legacy rows. */
+	original_audio_language: string;
 }
 
 interface RecordingRow {
@@ -77,6 +86,10 @@ interface RecordingRow {
 	subtitle_filename?: string | null;
 	subtitle_offset_into_recording_ms?: number | null;
 	subtitles_hidden?: boolean | null;
+	french_audio_s3_url?: string | null;
+	french_audio_size_bytes?: number | null;
+	french_audio_duration_sec?: number | null;
+	original_audio_language?: string | null;
 }
 
 function toPublic(doc: RecordingRow): PublishedRecording {
@@ -100,7 +113,16 @@ function toPublic(doc: RecordingRow): PublishedRecording {
 			typeof doc.subtitle_offset_into_recording_ms === 'number'
 				? doc.subtitle_offset_into_recording_ms
 				: null,
-		subtitles_hidden: doc.subtitles_hidden === true
+		subtitles_hidden: doc.subtitles_hidden === true,
+		french_audio_url: doc.french_audio_s3_url ?? null,
+		french_audio_size_bytes:
+			typeof doc.french_audio_size_bytes === 'number' ? doc.french_audio_size_bytes : null,
+		french_audio_duration_sec:
+			typeof doc.french_audio_duration_sec === 'number' ? doc.french_audio_duration_sec : null,
+		original_audio_language:
+			typeof doc.original_audio_language === 'string' && doc.original_audio_language
+				? doc.original_audio_language
+				: 'rw'
 	};
 }
 
@@ -378,13 +400,11 @@ export async function getPublishedById(id: string): Promise<PublishedRecording |
 		const { ObjectId } = await import('mongodb');
 		if (!ObjectId.isValid(id)) return null;
 		const db = await getDb();
-		const row = (await db
-			.collection('recordings')
-			.findOne({
-				_id: new ObjectId(id),
-				published: true,
-				status: 'ready'
-			})) as unknown as RecordingRow | null;
+		const row = (await db.collection('recordings').findOne({
+			_id: new ObjectId(id),
+			published: true,
+			status: 'ready'
+		})) as unknown as RecordingRow | null;
 		return row ? toPublic(row) : null;
 	} catch (err) {
 		console.error('[recordings] getPublishedById failed', err);
@@ -434,7 +454,9 @@ async function findVideoObjectIdForRecording(
 	sourceVideoId: string | null
 ): Promise<unknown> {
 	if (!sourceVideoId) return null;
-	const v = await db.collection('videos').findOne({ id: sourceVideoId }, { projection: { _id: 1 } });
+	const v = await db
+		.collection('videos')
+		.findOne({ id: sourceVideoId }, { projection: { _id: 1 } });
 	return v?._id ?? null;
 }
 
