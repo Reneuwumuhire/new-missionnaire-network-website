@@ -2,7 +2,6 @@ import { json } from '@sveltejs/kit';
 
 // REMOVED. Live-status polling moved to push-driven updates:
 // - /api/live/radio-state — pure state read (one-shot on page load)
-// - /api/live/radio-listener — listener heartbeat (only while audio plays)
 // - /api/cron/radio-probe — server-side Icecast probe (replaces user polls)
 // - /api/internal/broadcast-event — admin → main-site push trigger
 //

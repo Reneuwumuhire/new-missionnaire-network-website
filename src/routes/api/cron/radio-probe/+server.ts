@@ -1,6 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { probeLiveAudio, getLiveAudioSourceUrl, applyAutoEndSafety } from '$lib/server/live-audio';
+import { getIcecastSnapshot } from '$lib/server/icecast';
 import {
 	sendPushToAll,
 	radioLivePayload,
@@ -126,11 +127,16 @@ export async function GET({ request }) {
 		const probe = await probeLiveAudio(fetch);
 		probedIsLive = probe.isLive;
 
+		// Pull the real Icecast listener count while we're here so the cached
+		// status carries it for SSR + the public player. Only meaningful when live.
+		const listeners = probe.isLive ? (await getIcecastSnapshot()).listeners : 0;
+
 		const previous = await getRadioCachedStatus();
 		const newStatus = {
 			isLive: probe.isLive,
 			checkedAt: new Date().toISOString(),
-			streamUrl: probe.isLive ? getLiveAudioSourceUrl() : undefined
+			streamUrl: probe.isLive ? getLiveAudioSourceUrl() : undefined,
+			listeners
 		};
 		await setRadioCachedStatus(newStatus);
 

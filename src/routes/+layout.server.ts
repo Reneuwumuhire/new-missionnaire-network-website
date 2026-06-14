@@ -1,10 +1,6 @@
 import type { LayoutServerLoad } from './$types';
 import { getLiveAudioSourceUrl } from '$lib/server/live-audio';
-import {
-	getRadioCachedStatus,
-	getBroadcastAdminState,
-	countActiveListeners
-} from '../db/collections';
+import { getRadioCachedStatus, getBroadcastAdminState } from '../db/collections';
 
 // Seed every page render with the current radio state so the live banner
 // reflects truth on first paint without any client-side polling. Same shape
@@ -37,18 +33,12 @@ export const load: LayoutServerLoad = async () => {
 			getRadioCachedStatus(),
 			getBroadcastAdminState()
 		]);
-		let listeners = 0;
-		try {
-			listeners = await countActiveListeners();
-		} catch {
-			/* listeners unavailable — show 0 */
-		}
 		const icecastLive = status?.isLive ?? false;
 		const isLive = icecastLive && adminGate.is_live;
 		radioState = {
 			isLive,
 			checkedAt: status?.checkedAt ?? new Date().toISOString(),
-			listeners,
+			listeners: isLive ? (status?.listeners ?? 0) : 0,
 			streamUrl: isLive ? (status?.streamUrl ?? getLiveAudioSourceUrl()) : undefined,
 			title: adminGate.title,
 			description: adminGate.description,

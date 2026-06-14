@@ -838,33 +838,6 @@ export async function trackNotificationEvent(event: {
 	});
 }
 
-// ── Live radio listener tracking ────────────────────────────────
-
-const LISTENER_TTL_MS = 25_000; // Consider a listener gone after 25s without heartbeat (accommodates 10s poll interval)
-
-export async function heartbeatListener(listenerId: string): Promise<void> {
-	const db = await getDb();
-	const col = db.collection('radio_listeners');
-	await col.updateOne(
-		{ _id: listenerId as unknown as ObjectId },
-		{ $set: { lastSeen: Date.now() } },
-		{ upsert: true }
-	);
-}
-
-export async function removeListener(listenerId: string): Promise<void> {
-	const db = await getDb();
-	const col = db.collection('radio_listeners');
-	await col.deleteOne({ _id: listenerId as unknown as ObjectId });
-}
-
-export async function countActiveListeners(): Promise<number> {
-	const db = await getDb();
-	const col = db.collection('radio_listeners');
-	const cutoff = Date.now() - LISTENER_TTL_MS;
-	return col.countDocuments({ lastSeen: { $gt: cutoff } });
-}
-
 // ── Shared check-slot lock (YouTube & Radio) ───────────────────
 
 let checkLockIndexEnsured = false;
@@ -988,6 +961,9 @@ export type RadioCachedStatus = {
 	isLive: boolean;
 	checkedAt: string;
 	streamUrl?: string;
+	// Real Icecast listener count (same source Fly reports), refreshed alongside
+	// the live probe. Absent on legacy docs written before this field existed.
+	listeners?: number;
 };
 
 export async function getRadioCachedStatus(): Promise<RadioCachedStatus | null> {
@@ -1000,7 +976,8 @@ export async function getRadioCachedStatus(): Promise<RadioCachedStatus | null> 
 		return {
 			isLive: doc.isLive,
 			checkedAt: doc.checkedAt,
-			streamUrl: doc.streamUrl
+			streamUrl: doc.streamUrl,
+			listeners: doc.listeners
 		};
 	} catch (e) {
 		console.error('[RadioCache] getRadioCachedStatus error:', e);

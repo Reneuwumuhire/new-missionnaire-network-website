@@ -113,18 +113,6 @@
 	let hasAttemptedAutoplay = false;
 	let autoplayGestureAttached = false;
 
-	// Stable session ID for listener tracking — survives page refresh
-	// but not tab close, so the DB record is reused on refresh.
-	function getSessionId(): string {
-		if (!browser) return '';
-		let id = sessionStorage.getItem('radio-session-id');
-		if (!id) {
-			id = crypto.randomUUID();
-			sessionStorage.setItem('radio-session-id', id);
-		}
-		return id;
-	}
-
 	/** Get the best stream URL — prefer direct, fall back to proxy */
 	function getStreamUrl(): string {
 		const base = directStreamUrl || proxyStreamUrl;
@@ -359,8 +347,8 @@
 	//  - One on-mount fetch of /api/live/radio-state hydrates this component.
 	//  - Service-Worker push events flip live state immediately, no network.
 	//  - While audio is actively playing, a slow 60s tick to /api/live/radio-state
-	//    refreshes listener count + admin-edited metadata (title, thumbnail) and
-	//    doubles as the listener heartbeat (the endpoint accepts ?sid=).
+	//    refreshes the listener count (sourced from Icecast, same as Fly) and
+	//    admin-edited metadata (title, thumbnail).
 	//  - Stopping audio or hiding the tab stops the tick entirely.
 
 	const STATE_REFRESH_INTERVAL = 60_000; // 60s — only while playing + visible
@@ -375,12 +363,9 @@
 		thumbnailUrl?: string | null;
 	};
 
-	async function fetchRadioState(opts: { withSid?: boolean } = {}): Promise<void> {
+	async function fetchRadioState(): Promise<void> {
 		try {
-			const url = opts.withSid
-				? `/api/live/radio-state?sid=${encodeURIComponent(getSessionId())}`
-				: '/api/live/radio-state';
-			const response = await fetch(url);
+			const response = await fetch('/api/live/radio-state');
 			if (!response.ok) return;
 			const data = (await response.json()) as RadioStatePayload;
 			broadcastTitle = data.title ?? null;
@@ -397,7 +382,7 @@
 	function startStateRefresh() {
 		if (pollTimer) return;
 		pollTimer = setInterval(() => {
-			void fetchRadioState({ withSid: true });
+			void fetchRadioState();
 		}, STATE_REFRESH_INTERVAL);
 	}
 
@@ -406,15 +391,6 @@
 			clearInterval(pollTimer);
 			pollTimer = null;
 		}
-	}
-
-	function sendListenerHeartbeat(): void {
-		const sid = getSessionId();
-		if (!sid) return;
-		fetch(`/api/live/radio-listener?sid=${encodeURIComponent(sid)}&action=heartbeat`, {
-			method: 'POST',
-			keepalive: true
-		}).catch(() => {});
 	}
 
 	// React to play/pause: only spend network while audio is actually playing
@@ -435,7 +411,7 @@
 	function handleRadioPush() {
 		// A go-live push just landed. Refresh state immediately so the player
 		// flips to live with fresh metadata; no need to wait for the next tick.
-		void fetchRadioState({ withSid: true });
+		void fetchRadioState();
 	}
 
 	// ── Lifecycle ──────────────────────────────────────────────────
@@ -443,8 +419,8 @@
 	onMount(() => {
 		if (!browser) return;
 
-		// Initial paint — also registers the listener via ?sid=.
-		void fetchRadioState({ withSid: true });
+		// Initial paint — hydrate live state + listener count.
+		void fetchRadioState();
 
 		// Self-gating: only acts while the listener wants audio. Cheap when idle.
 		startStallWatch();
@@ -482,20 +458,13 @@
 			}
 			radioBroadcast?.close();
 			radioBroadcast = null;
-			// Tell the server we're gone so the listener count drops promptly.
-			const sid = getSessionId();
-			if (sid) {
-				navigator.sendBeacon?.(
-					`/api/live/radio-listener?sid=${encodeURIComponent(sid)}&action=disconnect`
-				);
-			}
 		}
 	});
 
 	function handleVisibilityChange() {
 		if (document.visibilityState === 'visible') {
 			// Tab regained focus — refresh once and (if playing) restart the tick.
-			void fetchRadioState({ withSid: true });
+			void fetchRadioState();
 			// Background tabs throttle `timeupdate`, so lastProgressMs is stale on
 			// return. Reset it to give the stall watchdog a fresh window instead of
 			// firing on the elapsed-while-hidden gap.
@@ -506,9 +475,6 @@
 			}
 		} else {
 			stopStateRefresh();
-			// One last heartbeat so the listener stays counted while the tab is
-			// hidden but audio keeps playing in the background (mobile lock screen).
-			if (isPlaying) sendListenerHeartbeat();
 		}
 	}
 
