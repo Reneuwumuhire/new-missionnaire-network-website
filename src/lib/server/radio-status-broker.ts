@@ -7,7 +7,7 @@
  * it just surfaces the latest cached status for SSR consumers.
  */
 
-import { getRadioCachedStatus, countActiveListeners } from '../../db/collections';
+import { getRadioCachedStatus } from '../../db/collections';
 
 export type RadioStatusEvent = {
 	isLive: boolean;
@@ -19,11 +19,5 @@ export type RadioStatusEvent = {
 export async function getLastStatus(): Promise<RadioStatusEvent | null> {
 	const cached = await getRadioCachedStatus();
 	if (!cached) return null;
-	let listeners = 0;
-	try {
-		listeners = await countActiveListeners();
-	} catch {
-		/* fallback to 0 */
-	}
-	return { ...cached, listeners };
+	return { ...cached, listeners: cached.isLive ? (cached.listeners ?? 0) : 0 };
 }

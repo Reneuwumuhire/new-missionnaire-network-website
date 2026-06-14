@@ -1,11 +1,10 @@
 import { json } from '@sveltejs/kit';
 import { getLiveAudioSourceUrl, probeLiveAudio } from '$lib/server/live-audio';
+import { getIcecastSnapshot } from '$lib/server/icecast';
 import {
 	getRadioCachedStatus,
 	getBroadcastAdminState,
-	setRadioCachedStatus,
-	countActiveListeners,
-	heartbeatListener
+	setRadioCachedStatus
 } from '../../../../db/collections';
 
 // How stale the cached Icecast probe may get before this endpoint refreshes it
@@ -16,27 +15,17 @@ import {
 // the cache write so concurrent listeners don't each hammer Icecast.
 const CACHE_STALE_MS = 20_000;
 
-export async function GET({ url, fetch, setHeaders }) {
+export async function GET({ fetch, setHeaders }) {
 	setHeaders({
 		'Cache-Control': 'no-store, no-cache, must-revalidate',
 		Pragma: 'no-cache'
 	});
 
-	// Optional listener heartbeat — lets the player do `/radio-state?sid=...`
-	// for its initial paint and register the listener in one round trip.
-	const sid = url.searchParams.get('sid');
-	if (sid) {
-		heartbeatListener(sid).catch(() => {});
-	}
-
 	const [status, adminGate] = await Promise.all([getRadioCachedStatus(), getBroadcastAdminState()]);
 
-	let listeners = 0;
-	try {
-		listeners = await countActiveListeners();
-	} catch {
-		// DB unavailable — return 0
-	}
+	// Listener count comes from the cached Icecast snapshot (same source Fly
+	// reports). The self-heal probe below refreshes it when the cache is stale.
+	let listeners = status?.listeners ?? 0;
 
 	let icecastLive = status?.isLive ?? false;
 	let checkedAt = status?.checkedAt ?? null;
@@ -53,13 +42,16 @@ export async function GET({ url, fetch, setHeaders }) {
 			icecastLive = probe.isLive;
 			checkedAt = new Date().toISOString();
 			streamUrl = probe.isLive ? getLiveAudioSourceUrl() : undefined;
-			await setRadioCachedStatus({ isLive: icecastLive, checkedAt, streamUrl });
+			// Refresh the real listener count from Icecast at the same cadence.
+			listeners = probe.isLive ? (await getIcecastSnapshot()).listeners : 0;
+			await setRadioCachedStatus({ isLive: icecastLive, checkedAt, streamUrl, listeners });
 		} catch {
 			// Probe failed — keep whatever the cache had.
 		}
 	}
 
 	const isLive = icecastLive && adminGate.is_live;
+	if (!isLive) listeners = 0;
 
 	return json({
 		isLive,
