@@ -92,6 +92,16 @@
 	const MAX_RECONNECT_ATTEMPTS = 8;
 	const RECONNECT_DELAYS = [1000, 2000, 3000, 5000, 5000, 10000, 10000, 15000];
 
+	// Stall watchdog. A continuous Icecast/MP3 stream can silently wedge: the
+	// <audio> element fires `waiting`/`stalled` but never `error` or `ended`, so
+	// none of the reconnect paths trigger and the player sits on "reconnecting"
+	// until the listener reloads the page. We track forward playback progress and
+	// force a fresh reconnect when it stops advancing for too long.
+	const STALL_TIMEOUT_MS = 12_000;
+	const STALL_CHECK_INTERVAL_MS = 3_000;
+	let lastProgressMs = 0;
+	let stallWatchTimer: ReturnType<typeof setInterval> | null = null;
+
 	const OFFLINE_THRESHOLD = 6;
 	const NO_AUDIO_GRACE_MS = 30_000;
 
@@ -137,6 +147,9 @@
 		audio.src = getStreamUrl();
 		audio.load();
 		streamConnectEpochMs = Date.now();
+		// Give the fresh connection a full window before the stall watchdog can
+		// fire — otherwise a stale timestamp would trip it immediately.
+		lastProgressMs = Date.now();
 	}
 
 	let showLive = $derived(confirmedLive || keepLiveUi);
@@ -433,6 +446,9 @@
 		// Initial paint — also registers the listener via ?sid=.
 		void fetchRadioState({ withSid: true });
 
+		// Self-gating: only acts while the listener wants audio. Cheap when idle.
+		startStallWatch();
+
 		document.addEventListener('visibilitychange', handleVisibilityChange);
 
 		try {
@@ -454,6 +470,7 @@
 	onDestroy(() => {
 		stopStateRefresh();
 		stopOfflineWatcher();
+		stopStallWatch();
 		clearReconnectTimer();
 		clearNoAudioGraceTimer();
 		detachAutoplayGestureListener();
@@ -479,6 +496,10 @@
 		if (document.visibilityState === 'visible') {
 			// Tab regained focus — refresh once and (if playing) restart the tick.
 			void fetchRadioState({ withSid: true });
+			// Background tabs throttle `timeupdate`, so lastProgressMs is stale on
+			// return. Reset it to give the stall watchdog a fresh window instead of
+			// firing on the elapsed-while-hidden gap.
+			lastProgressMs = Date.now();
 			if (isPlaying) startStateRefresh();
 			if (userWantsToPlay && audio && audio.paused && !audio.ended) {
 				attemptReconnect();
@@ -497,6 +518,33 @@
 		if (reconnectTimer) {
 			clearTimeout(reconnectTimer);
 			reconnectTimer = null;
+		}
+	}
+
+	// ── Stall watchdog ─────────────────────────────────────────────
+	function startStallWatch() {
+		if (stallWatchTimer || !browser) return;
+		stallWatchTimer = setInterval(() => {
+			if (!audio || !userWantsToPlay) return;
+			// Hidden tabs throttle timers + timeupdate; don't judge staleness then.
+			if (document.visibilityState !== 'visible') return;
+			// A reconnect is already scheduled or being triaged — let it finish.
+			if (reconnectTimer || dropCheckInFlight) return;
+			// `handleTimeUpdate` refreshes lastProgressMs while audio actually
+			// advances; if it hasn't moved for STALL_TIMEOUT_MS the stream is
+			// wedged (buffering forever with no error event) → force a reconnect.
+			if (Date.now() - lastProgressMs < STALL_TIMEOUT_MS) return;
+			// Debounce: push the marker forward so we don't stack triage calls
+			// while this one resolves (or while the new stream warms up).
+			lastProgressMs = Date.now();
+			void handleStreamDrop();
+		}, STALL_CHECK_INTERVAL_MS);
+	}
+
+	function stopStallWatch() {
+		if (stallWatchTimer) {
+			clearInterval(stallWatchTimer);
+			stallWatchTimer = null;
 		}
 	}
 
@@ -725,6 +773,10 @@
 
 	const handleTimeUpdate = () => {
 		if (!audio) return;
+		// Forward progress — resets the stall watchdog. `timeupdate` only fires
+		// while the media position actually changes, so it goes quiet the moment
+		// the stream wedges.
+		lastProgressMs = Date.now();
 		if (!isSeeking) {
 			currentTime = audio.currentTime;
 		}
@@ -818,6 +870,7 @@
 		confirmedLive = true;
 		playbackFailed = false;
 		reconnectAttempts = 0;
+		lastProgressMs = Date.now();
 		clearReconnectTimer();
 		statusKey = 'listening';
 	};
