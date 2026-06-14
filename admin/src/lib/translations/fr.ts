@@ -440,6 +440,16 @@ export default {
 	'audio.trim.reset': 'Réinitialiser',
 	'audio.trim.rewriteNotice':
 		"Le fichier MP3 sera réécrit à l'enregistrement. Précision au niveau de la trame (~26 ms). L'ancien fichier sera définitivement remplacé.",
+	'audio.trim.subtitleSyncLabel': 'Synchronisation des sous-titres',
+	'audio.trim.subtitleStartAt': 'Début à',
+	'audio.trim.subtitleNoLineHere': 'Aucune ligne à cet instant',
+	'audio.trim.subtitleSetStartHere': 'Définir le début ici',
+	'audio.trim.subtitleGoToStart': 'Aller au point de départ',
+	'audio.trim.subtitleSaveSync': 'Enregistrer la sync',
+	'audio.trim.subtitleSyncSaved': 'Sync enregistrée',
+	'audio.trim.subtitleSyncHint':
+		"Lisez jusqu'à l'endroit où les sous-titres doivent commencer, puis cliquez sur « Définir le début ici » — ou saisissez la valeur exacte et ajustez avec les boutons ±. La ligne ci-dessus montre ce que verra l'auditeur à la position actuelle.",
+	'audio.trim.subtitleSyncFailed': "Échec de l'enregistrement de la synchronisation",
 	'audio.trim.uploadingProgress': 'Téléversement…',
 	'audio.trim.finalizing': 'Finalisation…',
 	'audio.trim.networkError': 'Erreur réseau pendant le téléversement',

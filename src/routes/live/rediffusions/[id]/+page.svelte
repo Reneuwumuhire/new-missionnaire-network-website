@@ -324,7 +324,7 @@
 	// fill) — the old full-width rows used `hover:bg-missionnaire` which
 	// stuck after click/tap and read as a phantom active state.
 	const secondaryAction =
-		'inline-flex min-h-[44px] w-full sm:w-auto items-center justify-center gap-2 border px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.15em] font-body transition-colors duration-200 motion-reduce:transition-none hover:border-missionnaire/60 hover:text-missionnaire hover:bg-missionnaire/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40';
+		'inline-flex flex-1 sm:flex-none min-w-fit min-h-[44px] items-center justify-center gap-2 whitespace-nowrap border px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.15em] font-body transition-colors duration-200 motion-reduce:transition-none hover:border-missionnaire/60 hover:text-missionnaire hover:bg-missionnaire/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40';
 </script>
 
 <!-- Title/description/og:*/canonical come from `meta` in this route's
@@ -469,9 +469,10 @@
 					</button>
 				</div>
 
-				<!-- Secondary actions: compact outlined icon+label buttons,
-				     2×2 grid on mobile, inline wrap from sm up. -->
-				<div class="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+				<!-- Secondary actions: compact outlined icon+label buttons that size
+				     to their content and wrap to the next row as needed, so labels
+				     never break mid-word in narrow cells. -->
+				<div class="mt-3 flex flex-wrap gap-2">
 					<button
 						type="button"
 						onclick={downloadAudio}
@@ -553,7 +554,7 @@
 						{/if}
 					</button>
 
-					<div class="relative" bind:this={shareWrapEl}>
+					<div class="relative flex-1 sm:flex-none" bind:this={shareWrapEl}>
 						<button
 							type="button"
 							onclick={(e) => {
@@ -563,7 +564,7 @@
 							aria-haspopup="menu"
 							aria-expanded={isShareMenuOpen}
 							aria-label={$t('rediffDetail.shareAria')}
-							class="{secondaryAction} {isShareMenuOpen
+							class="{secondaryAction} w-full sm:w-auto {isShareMenuOpen
 								? 'border-missionnaire/60 bg-missionnaire/5 text-missionnaire'
 								: 'border-stone-300/70 text-stone-600'}"
 						>

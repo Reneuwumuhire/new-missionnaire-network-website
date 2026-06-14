@@ -7,6 +7,7 @@
 	import type { Recording } from '$lib/models/recording';
 	import { sliceMp3 } from '$lib/audio/mp3-slice';
 	import { getCachedPeaks, setCachedPeaks, computePeaksFromMp3 } from '$lib/audio/peaks-cache';
+	import { parseSrt, findCueIndex, type SrtCue } from '$lib/utils/srt';
 
 	type Region = {
 		start: number;
@@ -64,6 +65,89 @@
 	let uploadPct = $state<number | null>(null);
 	let saveError = $state<string | null>(null);
 
+	// ── Subtitle sync (replay) ─────────────────────────────────────
+	// Align the recording's attached .srt to this audio visually: play to where
+	// the subtitles should start, click "set start here" to capture the offset
+	// (ms into the recording where SRT 00:00 sits), then save. Persists the same
+	// `subtitle_offset_into_recording_ms` field the recording editor also writes.
+	let hasSubtitle = $derived(Boolean(recording.subtitle_srt_s3_key));
+	let subtitleCues = $state<SrtCue[]>([]);
+	let subtitleOffsetSec = $state((recording.subtitle_offset_into_recording_ms ?? 0) / 1000);
+	let subtitleSyncSaving = $state(false);
+	let subtitleSyncError = $state<string | null>(null);
+	let subtitleSyncSaved = $state(false);
+	// Line that would be showing to a listener at the current playhead, given the
+	// staged offset — lets the operator verify the alignment by ear/eye.
+	let currentCueText = $derived.by(() => {
+		if (subtitleCues.length === 0) return null;
+		const srtMs = (currentSec - subtitleOffsetSec) * 1000;
+		if (srtMs < 0) return null;
+		const idx = findCueIndex(subtitleCues, srtMs);
+		return idx >= 0 ? subtitleCues[idx].text : null;
+	});
+
+	function setSubtitleStartHere() {
+		subtitleOffsetSec = Math.round(currentSec * 100) / 100;
+		subtitleSyncSaved = false;
+		subtitleSyncError = null;
+	}
+
+	/** Fine-tune the offset without re-seeking — the listener preview above
+	 *  updates live so the operator can nudge until the line matches the audio. */
+	function nudgeSubtitle(deltaSec: number) {
+		subtitleOffsetSec = Math.round(((subtitleOffsetSec || 0) + deltaSec) * 100) / 100;
+		subtitleSyncSaved = false;
+		subtitleSyncError = null;
+	}
+
+	function markSubtitleDirty() {
+		subtitleSyncSaved = false;
+		subtitleSyncError = null;
+	}
+
+	/** Jump the playhead to the chosen start so the operator can hit play and
+	 *  hear whether the first line lands on cue. */
+	function seekToSubtitleStart() {
+		if (!ws) return;
+		ws.setTime(Math.max(0, Math.min(totalSec, subtitleOffsetSec || 0)));
+	}
+
+	async function saveSubtitleSync() {
+		if (subtitleSyncSaving) return;
+		subtitleSyncSaving = true;
+		subtitleSyncError = null;
+		try {
+			const res = await fetch(`/api/recordings/${recording._id}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					subtitle_offset_into_recording_ms: Math.round((subtitleOffsetSec || 0) * 1000)
+				})
+			});
+			if (!res.ok) {
+				subtitleSyncError =
+					(await res.text()) || $t('recordings.error.http', { status: res.status });
+				return;
+			}
+			subtitleSyncSaved = true;
+		} catch {
+			subtitleSyncError = $t('audio.trim.subtitleSyncFailed');
+		} finally {
+			subtitleSyncSaving = false;
+		}
+	}
+
+	async function loadSubtitleCues() {
+		if (!recording.subtitle_srt_s3_key) return;
+		try {
+			const res = await fetch(`/api/recordings/${recording._id}/subtitle`);
+			if (!res.ok) return;
+			subtitleCues = parseSrt(await res.text());
+		} catch {
+			// Preview is a convenience; capturing/saving the offset still works.
+		}
+	}
+
 	// Lock background scroll while the modal is open. Lock both <html> and
 	// <body> because either can be the scroll container depending on layout.
 	onMount(() => {
@@ -93,6 +177,7 @@
 	}
 
 	onMount(async () => {
+		void loadSubtitleCues();
 		if (!recording.s3_url || !recording.s3_key) {
 			loadError = $t('audio.trim.noAudioFile');
 			return;
@@ -784,6 +869,91 @@
 						</div>
 					</div>
 				</div>
+
+				{#if hasSubtitle}
+					<!-- Subtitle sync: align the attached .srt to this audio visually -->
+					<div class="flex flex-col gap-3 border border-stone-200 bg-white p-4">
+						<div class="flex flex-wrap items-center justify-between gap-2">
+							<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">
+								{$t('audio.trim.subtitleSyncLabel')}
+							</span>
+							<div class="flex items-center gap-1.5">
+								<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">
+									{$t('audio.trim.subtitleStartAt')}
+								</span>
+								<input
+									type="number"
+									step="0.1"
+									bind:value={subtitleOffsetSec}
+									oninput={markSubtitleDirty}
+									disabled={saving || subtitleSyncSaving}
+									class="w-20 border border-stone-200 px-2 py-1 text-right font-mono text-xs tabular-nums focus:border-primary focus:outline-none disabled:opacity-50"
+									aria-label={$t('audio.trim.subtitleStartAt')}
+								/>
+								<span class="text-xs text-stone-400">s</span>
+								<button
+									type="button"
+									onclick={seekToSubtitleStart}
+									disabled={saving || subtitleSyncSaving}
+									class="ml-0.5 flex h-7 w-7 items-center justify-center border border-stone-200 text-stone-500 transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
+									title={$t('audio.trim.subtitleGoToStart')}
+									aria-label={$t('audio.trim.subtitleGoToStart')}
+								>
+									<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 5v14M9 12l8-7v14z"/></svg>
+								</button>
+							</div>
+						</div>
+
+						<div class="min-h-[2.25rem] border border-stone-100 bg-stone-50 px-3 py-2 text-center text-sm text-stone-700">
+							{#if currentCueText}
+								{currentCueText}
+							{:else}
+								<span class="text-xs italic text-stone-400">{$t('audio.trim.subtitleNoLineHere')}</span>
+							{/if}
+						</div>
+
+						<div class="flex flex-wrap items-center gap-1.5">
+							<button
+								type="button"
+								onclick={setSubtitleStartHere}
+								disabled={saving || subtitleSyncSaving}
+								class="border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
+							>
+								{$t('audio.trim.subtitleSetStartHere')}
+							</button>
+							<span class="mx-1 h-5 w-px bg-stone-200" aria-hidden="true"></span>
+							{#each [-1, -0.2, 0.2, 1] as step (step)}
+								<button
+									type="button"
+									onclick={() => nudgeSubtitle(step)}
+									disabled={saving || subtitleSyncSaving}
+									class="min-w-[3rem] border border-stone-200 px-2 py-1.5 font-mono text-[11px] tabular-nums text-stone-600 transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
+								>
+									{step > 0 ? `+${step}` : step}s
+								</button>
+							{/each}
+							<span class="grow"></span>
+							<button
+								type="button"
+								onclick={saveSubtitleSync}
+								disabled={saving || subtitleSyncSaving}
+								class="bg-primary px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-white transition-colors hover:bg-missionnaire-600 disabled:opacity-50"
+							>
+								{subtitleSyncSaving ? $t('recordings.common.saving') : $t('audio.trim.subtitleSaveSync')}
+							</button>
+							{#if subtitleSyncSaved && !subtitleSyncError}
+								<span class="text-[11px] font-semibold text-green-700">{$t('audio.trim.subtitleSyncSaved')}</span>
+							{/if}
+						</div>
+
+						<p class="text-[10px] leading-relaxed text-stone-500">
+							{$t('audio.trim.subtitleSyncHint')}
+						</p>
+						{#if subtitleSyncError}
+							<p class="bg-red-50 px-3 py-2 text-xs text-red-700">{subtitleSyncError}</p>
+						{/if}
+					</div>
+				{/if}
 
 				<p class="text-[10px] leading-relaxed text-stone-500">
 					{$t('audio.trim.rewriteNotice')}

@@ -439,6 +439,16 @@ const en: Record<keyof typeof fr, string> = {
 	'audio.trim.reset': 'Reset',
 	'audio.trim.rewriteNotice':
 		'The MP3 file will be rewritten on save. Frame-level precision (~26 ms). The old file will be permanently replaced.',
+	'audio.trim.subtitleSyncLabel': 'Subtitle sync',
+	'audio.trim.subtitleStartAt': 'Starts at',
+	'audio.trim.subtitleNoLineHere': 'No line at this moment',
+	'audio.trim.subtitleSetStartHere': 'Set start here',
+	'audio.trim.subtitleGoToStart': 'Go to start point',
+	'audio.trim.subtitleSaveSync': 'Save sync',
+	'audio.trim.subtitleSyncSaved': 'Sync saved',
+	'audio.trim.subtitleSyncHint':
+		'Play to where the subtitles should begin, then click "Set start here" — or type the exact value and fine-tune with the ± buttons. The line above shows what a listener would see at the current position.',
+	'audio.trim.subtitleSyncFailed': 'Failed to save the sync',
 	'audio.trim.uploadingProgress': 'Uploading…',
 	'audio.trim.finalizing': 'Finalizing…',
 	'audio.trim.networkError': 'Network error during upload',
