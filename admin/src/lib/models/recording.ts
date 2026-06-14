@@ -34,6 +34,17 @@ export const RecordingSchema = z.object({
 	 *  instantly without re-downloading and decoding the full MP3. */
 	peaks: z.array(z.number()).nullable().optional(),
 	peaks_duration_sec: z.number().nullable().optional(),
+	/** Optional French-language audio version. The primary `s3_*` audio is the
+	 *  original broadcast capture (often a local language for retransmissions);
+	 *  when a French dub is attached here, listeners can switch to it on the
+	 *  replay page. */
+	french_audio_s3_key: z.string().nullable().optional(),
+	french_audio_s3_url: z.string().url().nullable().optional(),
+	french_audio_size_bytes: z.number().nullable().optional(),
+	french_audio_duration_sec: z.number().nullable().optional(),
+	/** Language code of the primary/original audio (e.g. 'rw' Kinyarwanda).
+	 *  Labels the original option in the replay language switch. */
+	original_audio_language: z.string().nullable().optional(),
 	/** YouTube video id (e.g. "MgoAxBWkG-s") linking this recording to the
 	 *  corresponding VOD on our channel. Lets the public audio detail page
 	 *  surface a YouTube link + pull the transcription PDF associated with

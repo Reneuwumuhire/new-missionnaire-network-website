@@ -40,6 +40,8 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 		subtitle_filename?: unknown;
 		subtitle_offset_into_recording_ms?: unknown;
 		subtitles_hidden?: unknown;
+		french_audio_s3_url?: unknown;
+		original_audio_language?: unknown;
 	};
 	const updates: {
 		title?: string;
@@ -54,6 +56,11 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 		subtitle_filename?: string | null;
 		subtitle_offset_into_recording_ms?: number | null;
 		subtitles_hidden?: boolean;
+		french_audio_s3_key?: string | null;
+		french_audio_s3_url?: string | null;
+		french_audio_size_bytes?: number | null;
+		french_audio_duration_sec?: number | null;
+		original_audio_language?: string;
 	} = {};
 	let nextSourceVideoId: string | null | undefined;
 
@@ -156,6 +163,24 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 		updates.subtitles_hidden = body.subtitles_hidden;
 	}
 
+	// Language of the original/primary audio (labels the replay version switch).
+	if (typeof body.original_audio_language === 'string') {
+		const allowed = new Set(['rw', 'fr', 'en']);
+		if (!allowed.has(body.original_audio_language)) {
+			throw error(400, 'Langue audio invalide');
+		}
+		updates.original_audio_language = body.original_audio_language;
+	}
+
+	// Remove the French audio version (attach/replace goes through the audio
+	// finalize endpoint; only explicit removal is handled here).
+	if (body.french_audio_s3_url === null) {
+		updates.french_audio_s3_key = null;
+		updates.french_audio_s3_url = null;
+		updates.french_audio_size_bytes = null;
+		updates.french_audio_duration_sec = null;
+	}
+
 	// `transcript_pdf_id: 'none'` (detach) is applied further below, after the
 	// YouTube auto-attach so a deliberate detach wins — so it isn't in `updates`
 	// yet. Exempt it here, otherwise a detach-only request looks empty and 400s.
@@ -185,13 +210,20 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 		oldSubtitleKey = current?.subtitle_srt_s3_key ?? null;
 	}
 
+	const isFrenchAudioRemoval = updates.french_audio_s3_url === null;
+	let oldFrenchAudioKey: string | null = null;
+	if (isFrenchAudioRemoval) {
+		const current = await loadCurrentRecording();
+		oldFrenchAudioKey = current?.french_audio_s3_key ?? null;
+	}
+
 	if (nextSourceVideoId) {
 		const current = await loadCurrentRecording();
 		const { videoObjectId } = await ensureVideoForRecording({
 			videoId: nextSourceVideoId,
 			title: updates.title ?? current.title,
 			description: Object.hasOwn(updates, 'description')
-				? updates.description ?? null
+				? (updates.description ?? null)
 				: current.description,
 			thumbnailUrl: updates.thumbnail_url ?? current.thumbnail_url,
 			startedAt: current.started_at,
@@ -240,6 +272,12 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 	) {
 		deleteObject(oldSubtitleKey).catch((err) =>
 			console.error('[recordings/patch] old subtitle delete failed:', err)
+		);
+	}
+
+	if (isFrenchAudioRemoval && oldFrenchAudioKey) {
+		deleteObject(oldFrenchAudioKey).catch((err) =>
+			console.error('[recordings/patch] French audio delete failed:', err)
 		);
 	}
 

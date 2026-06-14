@@ -62,6 +62,11 @@ const en: Record<keyof typeof fr, string> = {
 	'lang.french': 'Français',
 	'lang.english': 'English',
 
+	// ── Audio language names (replay version switch) ────────────
+	'lang.name.rw': 'Kinyarwanda',
+	'lang.name.fr': 'French',
+	'lang.name.en': 'English',
+
 	// ── Lists, search & filters ─────────────────────────────────
 	'list.loading': 'Loading...',
 	'list.empty': 'Nothing to show here.',
@@ -415,6 +420,7 @@ const en: Record<keyof typeof fr, string> = {
 	'rediffDetail.about': 'About this broadcast',
 	'rediffDetail.close': 'Close',
 	'rediffDetail.lightboxAria': 'Broadcast thumbnail',
+	'rediffDetail.audioLanguage': 'Audio language',
 
 	// ── Questions / ask page ────────────────────────────────────
 	'questions.allQuestions': 'All questions',

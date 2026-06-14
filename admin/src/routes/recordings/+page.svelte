@@ -72,7 +72,9 @@
 	// Stable public watch link for the broadcast currently linked to a
 	// scheduled live — shareable while live, resolves to the replay after.
 	const publicWatchUrl = $derived(
-		broadcast.scheduled_live_slug ? `${data.publicBaseUrl}/live/${broadcast.scheduled_live_slug}` : null
+		broadcast.scheduled_live_slug
+			? `${data.publicBaseUrl}/live/${broadcast.scheduled_live_slug}`
+			: null
 	);
 
 	async function copyWatchLink() {
@@ -219,7 +221,8 @@
 			}
 			listLoaded = true;
 		} catch (err) {
-			if (!options.silentErrors) fetchError = (err as Error).message || $t('recordings.error.network');
+			if (!options.silentErrors)
+				fetchError = (err as Error).message || $t('recordings.error.network');
 		} finally {
 			if (showLoading) isFetching = false;
 		}
@@ -412,6 +415,15 @@
 	let recAudioDurationSec = $state<number | null>(null);
 	let recAudioError = $state<string | null>(null);
 	let recAudioUploadPct = $state<number | null>(null);
+	// Optional French-language audio version (separate from the primary audio).
+	let recFrenchAudioFile = $state<File | null>(null);
+	let recFrenchAudioDurationSec = $state<number | null>(null);
+	let recFrenchAudioError = $state<string | null>(null);
+	let recFrenchAudioUploadPct = $state<number | null>(null);
+	let recFrenchAudioRemove = $state(false);
+	// Language of the primary/original audio — labels the replay version switch.
+	let recOriginalAudioLang = $state('rw');
+	const ORIGINAL_AUDIO_LANGS = ['rw', 'fr', 'en'] as const;
 	let recPdfFile = $state<File | null>(null);
 	let recPdfError = $state<string | null>(null);
 	let recPdfUploadPct = $state<number | null>(null);
@@ -590,7 +602,8 @@
 					})
 				});
 				if (!presignRes.ok) {
-					uploadThumbnailError = (await presignRes.text()) || $t('recordings.error.http', { status: presignRes.status });
+					uploadThumbnailError =
+						(await presignRes.text()) || $t('recordings.error.http', { status: presignRes.status });
 					return;
 				}
 				const presign = (await presignRes.json()) as {
@@ -625,7 +638,8 @@
 				})
 			});
 			if (!createRes.ok) {
-				const msg = (await createRes.text()) || $t('recordings.error.http', { status: createRes.status });
+				const msg =
+					(await createRes.text()) || $t('recordings.error.http', { status: createRes.status });
 				if (msg.includes('YouTube')) uploadYoutubeError = msg;
 				else uploadError = msg;
 				return;
@@ -639,7 +653,8 @@
 				body: JSON.stringify({ contentType: 'audio/mpeg' })
 			});
 			if (!presignRes.ok) {
-				uploadAudioError = (await presignRes.text()) || $t('recordings.error.http', { status: presignRes.status });
+				uploadAudioError =
+					(await presignRes.text()) || $t('recordings.error.http', { status: presignRes.status });
 				return;
 			}
 			const { uploadUrl, s3Key } = (await presignRes.json()) as {
@@ -652,7 +667,8 @@
 					uploadAudioPct = pct;
 				});
 			} catch (err) {
-				uploadAudioError = err instanceof Error ? err.message : $t('recordings.error.s3UploadFailed');
+				uploadAudioError =
+					err instanceof Error ? err.message : $t('recordings.error.s3UploadFailed');
 				return;
 			}
 			const finalizeRes = await fetch(`/api/recordings/${id}/audio/finalize`, {
@@ -665,7 +681,8 @@
 				})
 			});
 			if (!finalizeRes.ok) {
-				uploadAudioError = (await finalizeRes.text()) || $t('recordings.error.http', { status: finalizeRes.status });
+				uploadAudioError =
+					(await finalizeRes.text()) || $t('recordings.error.http', { status: finalizeRes.status });
 				return;
 			}
 
@@ -702,9 +719,7 @@
 	// the metadata edit flow without entangling its state.
 	let trimEditorRecordingId = $state<string | null>(null);
 	const trimEditorRecording = $derived.by(() =>
-		trimEditorRecordingId
-			? (recordings.find((r) => r._id === trimEditorRecordingId) ?? null)
-			: null
+		trimEditorRecordingId ? (recordings.find((r) => r._id === trimEditorRecordingId) ?? null) : null
 	);
 	async function closeTrimEditor(saved: boolean) {
 		trimEditorRecordingId = null;
@@ -725,6 +740,12 @@
 		recAudioDurationSec = null;
 		recAudioError = null;
 		recAudioUploadPct = null;
+		recFrenchAudioFile = null;
+		recFrenchAudioDurationSec = null;
+		recFrenchAudioError = null;
+		recFrenchAudioUploadPct = null;
+		recFrenchAudioRemove = false;
+		recOriginalAudioLang = rec.original_audio_language ?? 'rw';
 		recPdfFile = null;
 		recPdfError = null;
 		recPdfUploadPct = null;
@@ -757,6 +778,11 @@
 		recAudioDurationSec = null;
 		recAudioError = null;
 		recAudioUploadPct = null;
+		recFrenchAudioFile = null;
+		recFrenchAudioDurationSec = null;
+		recFrenchAudioError = null;
+		recFrenchAudioUploadPct = null;
+		recFrenchAudioRemove = false;
 		recPdfFile = null;
 		recPdfError = null;
 		recPdfUploadPct = null;
@@ -796,7 +822,10 @@
 		const file = input.files?.[0];
 		input.value = '';
 		if (!file) return;
-		const isMp3 = file.type === 'audio/mpeg' || file.type === 'audio/mp3' || file.name.toLowerCase().endsWith('.mp3');
+		const isMp3 =
+			file.type === 'audio/mpeg' ||
+			file.type === 'audio/mp3' ||
+			file.name.toLowerCase().endsWith('.mp3');
 		if (!isMp3) {
 			recAudioError = $t('recordings.error.selectMp3');
 			return;
@@ -821,6 +850,60 @@
 		recAudioError = null;
 		recAudioUploadPct = null;
 		recAudioUploadPct = null;
+	}
+
+	async function onRecFrenchAudioFileChange(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		if (!file) return;
+		const isMp3 =
+			file.type === 'audio/mpeg' ||
+			file.type === 'audio/mp3' ||
+			file.name.toLowerCase().endsWith('.mp3');
+		if (!isMp3) {
+			recFrenchAudioError = $t('recordings.error.selectMp3');
+			return;
+		}
+		if (file.size > 2 * 1024 * 1024 * 1024) {
+			recFrenchAudioError = $t('recordings.error.mp3TooLarge');
+			return;
+		}
+		try {
+			recFrenchAudioDurationSec = await readAudioDuration(file);
+		} catch {
+			recFrenchAudioError = $t('recordings.error.audioFileDurationUnreadable');
+			return;
+		}
+		recFrenchAudioError = null;
+		recFrenchAudioFile = file;
+		recFrenchAudioRemove = false;
+	}
+
+	function clearStagedRecFrenchAudio() {
+		recFrenchAudioFile = null;
+		recFrenchAudioDurationSec = null;
+		recFrenchAudioError = null;
+		recFrenchAudioUploadPct = null;
+	}
+
+	function markRecFrenchAudioRemove() {
+		clearStagedRecFrenchAudio();
+		recFrenchAudioRemove = true;
+	}
+
+	/** Display name for an audio-language code (type-safe, no dynamic key). */
+	function audioLangLabel(code: string): string {
+		switch (code) {
+			case 'rw':
+				return $t('lang.name.rw');
+			case 'fr':
+				return $t('lang.name.fr');
+			case 'en':
+				return $t('lang.name.en');
+			default:
+				return code;
+		}
 	}
 
 	function onRecPdfFileChange(event: Event) {
@@ -1067,7 +1150,8 @@
 			})
 		});
 		if (!uploadUrlRes.ok) {
-			recPdfError = (await uploadUrlRes.text()) || $t('recordings.error.http', { status: uploadUrlRes.status });
+			recPdfError =
+				(await uploadUrlRes.text()) || $t('recordings.error.http', { status: uploadUrlRes.status });
 			return false;
 		}
 		const { uploadUrl, s3Key, s3Url } = (await uploadUrlRes.json()) as {
@@ -1100,7 +1184,8 @@
 			})
 		});
 		if (!finalizeRes.ok) {
-			recPdfError = (await finalizeRes.text()) || $t('recordings.error.http', { status: finalizeRes.status });
+			recPdfError =
+				(await finalizeRes.text()) || $t('recordings.error.http', { status: finalizeRes.status });
 			return false;
 		}
 
@@ -1166,6 +1251,10 @@
 				patch.youtube_url = nextYoutube;
 			}
 
+			if (recOriginalAudioLang !== (rec.original_audio_language ?? 'rw')) {
+				patch.original_audio_language = recOriginalAudioLang;
+			}
+
 			if (recThumbnailAction === 'replace' && recThumbnailFile) {
 				const presignRes = await fetch('/api/broadcast/thumbnail/presign', {
 					method: 'POST',
@@ -1173,7 +1262,8 @@
 					body: JSON.stringify({ contentType: recThumbnailFile.type, size: recThumbnailFile.size })
 				});
 				if (!presignRes.ok) {
-					recThumbnailError = (await presignRes.text()) || $t('recordings.error.http', { status: presignRes.status });
+					recThumbnailError =
+						(await presignRes.text()) || $t('recordings.error.http', { status: presignRes.status });
 					return;
 				}
 				const { uploadUrl, key, publicUrl } = (await presignRes.json()) as {
@@ -1198,6 +1288,7 @@
 			}
 
 			const hasMetadataPatch = Object.keys(patch).length > 0;
+			const frenchAudioChanged = Boolean(recFrenchAudioFile) || recFrenchAudioRemove;
 
 			if (hasMetadataPatch) {
 				const res = await fetch(`/api/recordings/${rec._id}`, {
@@ -1230,7 +1321,8 @@
 					body: JSON.stringify({ contentType: 'audio/mpeg' })
 				});
 				if (!presign.ok) {
-					recAudioError = (await presign.text()) || $t('recordings.error.http', { status: presign.status });
+					recAudioError =
+						(await presign.text()) || $t('recordings.error.http', { status: presign.status });
 					return;
 				}
 				const { uploadUrl, s3Key } = (await presign.json()) as { uploadUrl: string; s3Key: string };
@@ -1240,7 +1332,8 @@
 						recAudioUploadPct = pct;
 					});
 				} catch (err) {
-					recAudioError = err instanceof Error ? err.message : $t('recordings.error.s3UploadFailed');
+					recAudioError =
+						err instanceof Error ? err.message : $t('recordings.error.s3UploadFailed');
 					recAudioUploadPct = null;
 					return;
 				}
@@ -1254,12 +1347,70 @@
 					})
 				});
 				if (!finalize.ok) {
-					recAudioError = (await finalize.text()) || $t('recordings.error.http', { status: finalize.status });
+					recAudioError =
+						(await finalize.text()) || $t('recordings.error.http', { status: finalize.status });
 					return;
 				}
-			} else if (!hasMetadataPatch && !recPdfFile && !recSubtitleChanged(rec)) {
+			} else if (
+				!hasMetadataPatch &&
+				!recPdfFile &&
+				!frenchAudioChanged &&
+				!recSubtitleChanged(rec)
+			) {
 				cancelRecordingEdit();
 				return;
+			}
+
+			// French audio version: remove, or upload + finalize (variant=french).
+			if (recFrenchAudioRemove) {
+				const res = await fetch(`/api/recordings/${rec._id}`, {
+					method: 'PATCH',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ french_audio_s3_url: null })
+				});
+				if (!res.ok) {
+					recFrenchAudioError =
+						(await res.text()) || $t('recordings.error.http', { status: res.status });
+					return;
+				}
+			} else if (recFrenchAudioFile && recFrenchAudioDurationSec) {
+				const presign = await fetch(`/api/recordings/${rec._id}/audio/upload-url`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ contentType: 'audio/mpeg', variant: 'french' })
+				});
+				if (!presign.ok) {
+					recFrenchAudioError =
+						(await presign.text()) || $t('recordings.error.http', { status: presign.status });
+					return;
+				}
+				const { uploadUrl, s3Key } = (await presign.json()) as { uploadUrl: string; s3Key: string };
+				recFrenchAudioUploadPct = 0;
+				try {
+					await putWithProgress(uploadUrl, recFrenchAudioFile, 'audio/mpeg', (pct) => {
+						recFrenchAudioUploadPct = pct;
+					});
+				} catch (err) {
+					recFrenchAudioError =
+						err instanceof Error ? err.message : $t('recordings.error.s3UploadFailed');
+					recFrenchAudioUploadPct = null;
+					return;
+				}
+				const finalize = await fetch(`/api/recordings/${rec._id}/audio/finalize`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						s3_key: s3Key,
+						size_bytes: recFrenchAudioFile.size,
+						duration_sec: recFrenchAudioDurationSec,
+						variant: 'french'
+					})
+				});
+				if (!finalize.ok) {
+					recFrenchAudioError =
+						(await finalize.text()) || $t('recordings.error.http', { status: finalize.status });
+					return;
+				}
 			}
 
 			const subtitleChanged = recSubtitleChanged(rec);
@@ -1269,10 +1420,21 @@
 			}
 
 			if (recPdfFile) {
-				toast.success(recPdfMode === 'replace' ? $t('recordings.toast.pdfReplaced') : $t('recordings.toast.pdfAdded'));
+				toast.success(
+					recPdfMode === 'replace'
+						? $t('recordings.toast.pdfReplaced')
+						: $t('recordings.toast.pdfAdded')
+				);
 			}
 			if (subtitleChanged) {
 				toast.success($t('recordings.toast.subtitleSaved'));
+			}
+			if (frenchAudioChanged) {
+				toast.success(
+					recFrenchAudioRemove
+						? $t('recordings.toast.frenchAudioRemoved')
+						: $t('recordings.toast.frenchAudioSaved')
+				);
 			}
 			cancelRecordingEdit();
 			await refreshVisibleRecordings();
@@ -1285,9 +1447,7 @@
 	let tickTimer: ReturnType<typeof setInterval> | null = null;
 
 	const isRecording = $derived(recorder.available && 'recording' in recorder && recorder.recording);
-	const showLiveBanner = $derived(
-		icecast.reachable && icecast.sourceActive && !isRecording
-	);
+	const showLiveBanner = $derived(icecast.reachable && icecast.sourceActive && !isRecording);
 
 	async function refreshStatus() {
 		// Hot path: this fires every 5s. Hit a dedicated lightweight endpoint
@@ -1315,7 +1475,10 @@
 
 	function recomputeElapsed() {
 		if (recorder.available && 'recording' in recorder && recorder.recording && recorder.startedAt) {
-			elapsed = Math.max(0, Math.floor((Date.now() - new Date(recorder.startedAt).getTime()) / 1000));
+			elapsed = Math.max(
+				0,
+				Math.floor((Date.now() - new Date(recorder.startedAt).getTime()) / 1000)
+			);
 		} else {
 			elapsed = 0;
 		}
@@ -1492,7 +1655,14 @@
 
 	async function stop() {
 		if (busy) return;
-		if (!(await confirmOverride(recordingStartedBy, recordingStartedByName, $t('recordings.confirm.override.recordingLabel')))) return;
+		if (
+			!(await confirmOverride(
+				recordingStartedBy,
+				recordingStartedByName,
+				$t('recordings.confirm.override.recordingLabel')
+			))
+		)
+			return;
 		busy = true;
 		actionError = null;
 		let stoppedRecording = false;
@@ -1525,7 +1695,9 @@
 		const ok = await confirmDialog.ask({
 			title: $t('recordings.actions.goLive'),
 			message: msg,
-			confirmLabel: willNotify ? $t('recordings.confirm.goLive.confirmNotify') : $t('recordings.actions.goLive'),
+			confirmLabel: willNotify
+				? $t('recordings.confirm.goLive.confirmNotify')
+				: $t('recordings.actions.goLive'),
 			cancelLabel: $t('recordings.common.cancel'),
 			tone: willNotify ? 'default' : 'warning'
 		});
@@ -1546,7 +1718,11 @@
 				// returns its stable watch URL — surface it right away.
 				const payload = (await res.json().catch(() => null)) as { watchPath?: string } | null;
 				if (payload?.watchPath) {
-					toast.success($t('recordings.toast.liveWithLink', { url: `${data.publicBaseUrl}${payload.watchPath}` }));
+					toast.success(
+						$t('recordings.toast.liveWithLink', {
+							url: `${data.publicBaseUrl}${payload.watchPath}`
+						})
+					);
 				}
 			}
 			await invalidateAll();
@@ -1557,7 +1733,14 @@
 
 	async function endLive() {
 		if (broadcastBusy) return;
-		if (!(await confirmOverride(broadcastStartedBy, broadcastStartedByName, $t('recordings.confirm.override.liveLabel')))) return;
+		if (
+			!(await confirmOverride(
+				broadcastStartedBy,
+				broadcastStartedByName,
+				$t('recordings.confirm.override.liveLabel')
+			))
+		)
+			return;
 		const ok = await confirmDialog.ask({
 			title: $t('recordings.actions.endLive'),
 			message: $t('recordings.confirm.endLive.message'),
@@ -1656,7 +1839,9 @@
 		const date = berlinDateYmd(new Date());
 		// If the template uses {date}, substitute; otherwise prepend so we never
 		// end up with a dateless title (the original spec requires it at start).
-		return template.includes('{date}') ? template.replaceAll('{date}', date) : `${date} ${template}`;
+		return template.includes('{date}')
+			? template.replaceAll('{date}', date)
+			: `${date} ${template}`;
 	}
 
 	async function applyDefaultsDirectly() {
@@ -1687,7 +1872,8 @@
 				body: JSON.stringify(patch)
 			});
 			if (!res.ok) {
-				applyDefaultsError = (await res.text()) || $t('recordings.error.http', { status: res.status });
+				applyDefaultsError =
+					(await res.text()) || $t('recordings.error.http', { status: res.status });
 				return;
 			}
 			await invalidateAll();
@@ -1759,7 +1945,8 @@
 					body: JSON.stringify({ contentType: thumbnailFile.type, size: thumbnailFile.size })
 				});
 				if (!presignRes.ok) {
-					thumbnailError = (await presignRes.text()) || $t('recordings.error.http', { status: presignRes.status });
+					thumbnailError =
+						(await presignRes.text()) || $t('recordings.error.http', { status: presignRes.status });
 					return;
 				}
 				const { uploadUrl, key, publicUrl } = (await presignRes.json()) as {
@@ -1866,8 +2053,22 @@
 	 *  recording (which triggers the S3 upload). Single confirmation for both. */
 	async function stopBoth() {
 		if (broadcastBusy || busy) return;
-		if (!(await confirmOverride(broadcastStartedBy, broadcastStartedByName, $t('recordings.confirm.override.liveLabel')))) return;
-		if (!(await confirmOverride(recordingStartedBy, recordingStartedByName, $t('recordings.confirm.override.recordingLabel')))) return;
+		if (
+			!(await confirmOverride(
+				broadcastStartedBy,
+				broadcastStartedByName,
+				$t('recordings.confirm.override.liveLabel')
+			))
+		)
+			return;
+		if (
+			!(await confirmOverride(
+				recordingStartedBy,
+				recordingStartedByName,
+				$t('recordings.confirm.override.recordingLabel')
+			))
+		)
+			return;
 		const ok = await confirmDialog.ask({
 			title: $t('recordings.actions.stopAll'),
 			message: $t('recordings.confirm.stopAll.message'),
@@ -1883,7 +2084,8 @@
 		try {
 			const liveRes = await fetch('/api/broadcast/end-live', { method: 'POST' });
 			if (!liveRes.ok) {
-				actionError = (await liveRes.text()) || $t('recordings.error.endLiveHttp', { status: liveRes.status });
+				actionError =
+					(await liveRes.text()) || $t('recordings.error.endLiveHttp', { status: liveRes.status });
 			}
 			const recRes = await fetch('/api/recordings/stop', { method: 'POST' });
 			if (!recRes.ok) {
@@ -1909,11 +2111,12 @@
 	 *  but leave the broadcast running — admin can retry recording separately. */
 	async function startBoth() {
 		if (broadcastBusy || busy) return;
-		const msg = subscriberCount > 0
-			? subscriberCount > 1
-				? $t('recordings.confirm.startAll.notifyMany', { count: subscriberCount })
-				: $t('recordings.confirm.startAll.notifyOne', { count: subscriberCount })
-			: $t('recordings.confirm.startAll.message');
+		const msg =
+			subscriberCount > 0
+				? subscriberCount > 1
+					? $t('recordings.confirm.startAll.notifyMany', { count: subscriberCount })
+					: $t('recordings.confirm.startAll.notifyOne', { count: subscriberCount })
+				: $t('recordings.confirm.startAll.message');
 		const ok = await confirmDialog.ask({
 			title: $t('recordings.actions.startAll'),
 			message: msg,
@@ -1927,12 +2130,15 @@
 		try {
 			const liveRes = await fetch('/api/broadcast/go-live', { method: 'POST' });
 			if (!liveRes.ok) {
-				actionError = (await liveRes.text()) || $t('recordings.error.http', { status: liveRes.status });
+				actionError =
+					(await liveRes.text()) || $t('recordings.error.http', { status: liveRes.status });
 				return;
 			}
 			const recRes = await fetch('/api/recordings/start', { method: 'POST' });
 			if (!recRes.ok) {
-				actionError = $t('recordings.error.startRecordingAfterLive', { detail: (await recRes.text()) || recRes.status });
+				actionError = $t('recordings.error.startRecordingAfterLive', {
+					detail: (await recRes.text()) || recRes.status
+				});
 			} else {
 				await readRecordingId(recRes);
 			}
@@ -2017,7 +2223,9 @@
 	<p class="mt-1 text-sm text-stone-500">
 		{$t('recordings.subtitle')}
 		{#if listLoaded}
-			{total !== 1 ? $t('recordings.countMany', { count: total }) : $t('recordings.countOne', { count: total })}
+			{total !== 1
+				? $t('recordings.countMany', { count: total })
+				: $t('recordings.countOne', { count: total })}
 		{/if}
 	</p>
 </div>
@@ -2034,14 +2242,18 @@
 		<div class="flex items-start gap-3">
 			<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100">
 				<span class="relative inline-flex h-2.5 w-2.5">
-					<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75"></span>
+					<span
+						class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75"
+					></span>
 					<span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-600"></span>
 				</span>
 			</div>
 			<div>
 				<p class="text-sm font-semibold text-green-800">{$t('recordings.liveDetected.title')}</p>
 				<p class="mt-1 text-xs text-green-700">
-					{$t('recordings.liveDetected.body1')} <strong>{$t('recordings.actions.startRecording')}</strong> {$t('recordings.liveDetected.body2')}
+					{$t('recordings.liveDetected.body1')}
+					<strong>{$t('recordings.actions.startRecording')}</strong>
+					{$t('recordings.liveDetected.body2')}
 				</p>
 			</div>
 		</div>
@@ -2050,8 +2262,19 @@
 
 <!-- Unified broadcast + recording control card -->
 {#snippet iconBroadcast()}
-	<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-		<path stroke-linecap="round" stroke-linejoin="round" d="M5.636 5.636a9 9 0 010 12.728m12.728 0a9 9 0 010-12.728M8.464 8.464a5 5 0 000 7.072m7.072 0a5 5 0 000-7.072M12 12h.01" />
+	<svg
+		class="h-4 w-4"
+		fill="none"
+		viewBox="0 0 24 24"
+		stroke="currentColor"
+		stroke-width="2"
+		aria-hidden="true"
+	>
+		<path
+			stroke-linecap="round"
+			stroke-linejoin="round"
+			d="M5.636 5.636a9 9 0 010 12.728m12.728 0a9 9 0 010-12.728M8.464 8.464a5 5 0 000 7.072m7.072 0a5 5 0 000-7.072M12 12h.01"
+		/>
 	</svg>
 {/snippet}
 {#snippet iconRecord()}
@@ -2071,72 +2294,148 @@
 	</svg>
 {/snippet}
 {#snippet iconLiveStop()}
-	<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+	<svg
+		class="h-4 w-4"
+		fill="none"
+		viewBox="0 0 24 24"
+		stroke="currentColor"
+		stroke-width="2"
+		aria-hidden="true"
+	>
 		<path stroke-linecap="round" stroke-linejoin="round" d="M12 3v9M5.5 8a8 8 0 1013 0" />
 	</svg>
 {/snippet}
 {#snippet iconBoth()}
-	<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+	<svg
+		class="h-4 w-4"
+		fill="none"
+		viewBox="0 0 24 24"
+		stroke="currentColor"
+		stroke-width="2"
+		aria-hidden="true"
+	>
 		<circle cx="9" cy="12" r="3" fill="currentColor" stroke="none" />
-		<path stroke-linecap="round" stroke-linejoin="round" d="M15 9a4.5 4.5 0 010 6m2.5-8.5a8 8 0 010 11" />
+		<path
+			stroke-linecap="round"
+			stroke-linejoin="round"
+			d="M15 9a4.5 4.5 0 010 6m2.5-8.5a8 8 0 010 11"
+		/>
 	</svg>
 {/snippet}
 
-<div class="mb-8 border bg-white/40 p-6 {broadcast.is_live ? 'border-red-200' : 'border-stone-200/60'}">
+<div
+	class="mb-8 border bg-white/40 p-6 {broadcast.is_live ? 'border-red-200' : 'border-stone-200/60'}"
+>
 	<!-- Header: status + timers -->
 	<div class="flex flex-wrap items-center justify-between gap-4">
 		<div class="flex items-center gap-4">
-			<div class="flex h-12 w-12 items-center justify-center rounded-full {broadcast.is_live || isRecording ? 'bg-red-50' : 'bg-stone-100'}">
+			<div
+				class="flex h-12 w-12 items-center justify-center rounded-full {broadcast.is_live ||
+				isRecording
+					? 'bg-red-50'
+					: 'bg-stone-100'}"
+			>
 				{#if broadcast.is_live || isRecording}
 					<span class="relative inline-flex h-2.5 w-2.5">
-						<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"></span>
+						<span
+							class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"
+						></span>
 						<span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500"></span>
 					</span>
 				{:else}
-					<svg class="h-5 w-5 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+					<svg
+						class="h-5 w-5 text-stone-400"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+						/>
 					</svg>
 				{/if}
 			</div>
 
 			<div>
 				{#if broadcast.is_live && isRecording}
-					<p class="font-display text-lg font-semibold text-red-700">{$t('recordings.state.liveAndRecording')}</p>
+					<p class="font-display text-lg font-semibold text-red-700">
+						{$t('recordings.state.liveAndRecording')}
+					</p>
 					<p class="text-xs text-stone-500">
 						{$t('recordings.state.liveAndRecordingHint')}
 					</p>
 					{#if broadcastStartedBy || recordingStartedBy}
 						<p class="mt-0.5 text-[11px] text-stone-400">
 							{#if broadcastStartedBy && recordingStartedBy && broadcastStartedBy === recordingStartedBy}
-								{$t('recordings.state.startedBy')} <span class="font-medium text-stone-600">{displayName(broadcastStartedByName, broadcastStartedBy)}</span>
+								{$t('recordings.state.startedBy')}
+								<span class="font-medium text-stone-600"
+									>{displayName(broadcastStartedByName, broadcastStartedBy)}</span
+								>
 							{:else}
-								{#if broadcastStartedBy}{$t('recordings.state.livePrefix')} <span class="font-medium text-stone-600">{displayName(broadcastStartedByName, broadcastStartedBy)}</span>{/if}
-								{#if broadcastStartedBy && recordingStartedBy} · {/if}
-								{#if recordingStartedBy}{$t('recordings.state.recPrefix')} <span class="font-medium text-stone-600">{displayName(recordingStartedByName, recordingStartedBy)}</span>{/if}
+								{#if broadcastStartedBy}{$t('recordings.state.livePrefix')}
+									<span class="font-medium text-stone-600"
+										>{displayName(broadcastStartedByName, broadcastStartedBy)}</span
+									>{/if}
+								{#if broadcastStartedBy && recordingStartedBy}
+									·
+								{/if}
+								{#if recordingStartedBy}{$t('recordings.state.recPrefix')}
+									<span class="font-medium text-stone-600"
+										>{displayName(recordingStartedByName, recordingStartedBy)}</span
+									>{/if}
 							{/if}
 						</p>
 					{/if}
 				{:else if broadcast.is_live}
-					<p class="font-display text-lg font-semibold text-red-700">{$t('recordings.state.live')}</p>
+					<p class="font-display text-lg font-semibold text-red-700">
+						{$t('recordings.state.live')}
+					</p>
 					<p class="text-xs text-stone-500">
-						{$t('recordings.state.startedAt', { time: formatTime(broadcast.started_at) })} · {icecast.listeners !== 1 ? $t('recordings.listenersMany', { count: icecast.listeners }) : $t('recordings.listenersOne', { count: icecast.listeners })}
-						{#if broadcastStartedBy} · {$t('recordings.state.by')} <span class="font-medium text-stone-600">{displayName(broadcastStartedByName, broadcastStartedBy)}</span>{/if}
+						{$t('recordings.state.startedAt', { time: formatTime(broadcast.started_at) })} · {icecast.listeners !==
+						1
+							? $t('recordings.listenersMany', { count: icecast.listeners })
+							: $t('recordings.listenersOne', { count: icecast.listeners })}
+						{#if broadcastStartedBy}
+							· {$t('recordings.state.by')}
+							<span class="font-medium text-stone-600"
+								>{displayName(broadcastStartedByName, broadcastStartedBy)}</span
+							>{/if}
 					</p>
 				{:else if isRecording}
-					<p class="font-display text-lg font-semibold text-stone-800">{$t('recordings.state.recordingOnly')}</p>
+					<p class="font-display text-lg font-semibold text-stone-800">
+						{$t('recordings.state.recordingOnly')}
+					</p>
 					<p class="text-xs text-stone-500">
 						{$t('recordings.state.recordingOnlyHint')}
-						{#if recordingStartedBy} · {$t('recordings.state.by')} <span class="font-medium text-stone-600">{displayName(recordingStartedByName, recordingStartedBy)}</span>{/if}
+						{#if recordingStartedBy}
+							· {$t('recordings.state.by')}
+							<span class="font-medium text-stone-600"
+								>{displayName(recordingStartedByName, recordingStartedBy)}</span
+							>{/if}
 					</p>
 				{:else}
-					<p class="font-display text-lg font-semibold text-stone-800">{$t('recordings.state.readyToBroadcast')}</p>
+					<p class="font-display text-lg font-semibold text-stone-800">
+						{$t('recordings.state.readyToBroadcast')}
+					</p>
 					<p class="text-xs text-stone-500">
 						{#if icecast.reachable}
-							{$t('recordings.state.icecastStream', { state: icecast.sourceActive ? $t('recordings.state.streamActive') : $t('recordings.state.streamInactive') })} · {icecast.listeners !== 1 ? $t('recordings.listenersMany', { count: icecast.listeners }) : $t('recordings.listenersOne', { count: icecast.listeners })}
+							{$t('recordings.state.icecastStream', {
+								state: icecast.sourceActive
+									? $t('recordings.state.streamActive')
+									: $t('recordings.state.streamInactive')
+							})} · {icecast.listeners !== 1
+								? $t('recordings.listenersMany', { count: icecast.listeners })
+								: $t('recordings.listenersOne', { count: icecast.listeners })}
 						{:else}
 							{$t('recordings.state.icecastUnreachable')}
 						{/if}
-						{#if subscriberCount > 0} · {subscriberCount > 1 ? $t('recordings.subscribersMany', { count: subscriberCount }) : $t('recordings.subscribersOne', { count: subscriberCount })}{/if}
+						{#if subscriberCount > 0}
+							· {subscriberCount > 1
+								? $t('recordings.subscribersMany', { count: subscriberCount })
+								: $t('recordings.subscribersOne', { count: subscriberCount })}{/if}
 					</p>
 				{/if}
 			</div>
@@ -2148,7 +2447,9 @@
 			<div class="flex w-full items-start gap-6 sm:w-auto sm:items-center sm:gap-5">
 				{#if broadcast.is_live}
 					<div class="flex flex-1 flex-col sm:flex-initial sm:items-end">
-						<span class="text-[9px] font-bold uppercase tracking-[0.2em] text-red-600">{$t('recordings.timer.live')}</span>
+						<span class="text-[9px] font-bold uppercase tracking-[0.2em] text-red-600"
+							>{$t('recordings.timer.live')}</span
+						>
 						<span class="font-mono text-2xl font-semibold text-red-700 tabular-nums leading-tight">
 							{formatElapsed(broadcastElapsed)}
 						</span>
@@ -2156,18 +2457,31 @@
 				{/if}
 				{#if isRecording}
 					<div class="flex flex-1 flex-col sm:flex-initial sm:items-end">
-						<span class="text-[9px] font-bold uppercase tracking-[0.2em] {sourceRecovering ? 'text-amber-600' : 'text-stone-500'}">{$t('recordings.timer.recording')}</span>
-						<span class="font-mono text-2xl font-semibold {sourceRecovering ? 'text-amber-700' : 'text-stone-700'} tabular-nums leading-tight">
+						<span
+							class="text-[9px] font-bold uppercase tracking-[0.2em] {sourceRecovering
+								? 'text-amber-600'
+								: 'text-stone-500'}">{$t('recordings.timer.recording')}</span
+						>
+						<span
+							class="font-mono text-2xl font-semibold {sourceRecovering
+								? 'text-amber-700'
+								: 'text-stone-700'} tabular-nums leading-tight"
+						>
 							{formatElapsed(elapsed)}
 						</span>
 						{#if sourceRecovering}
-							<span class="mt-1 inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-700">
+							<span
+								class="mt-1 inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-700"
+							>
 								<span class="relative inline-flex h-1.5 w-1.5">
-									<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500 opacity-75"></span>
+									<span
+										class="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500 opacity-75"
+									></span>
 									<span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-500"></span>
 								</span>
 								{$t('recordings.timer.reconnecting')}
-								{#if segmentCount > 1} · {$t('recordings.timer.segments', { count: segmentCount })}{/if}
+								{#if segmentCount > 1}
+									· {$t('recordings.timer.segments', { count: segmentCount })}{/if}
 							</span>
 						{:else if segmentCount > 1}
 							<span class="mt-1 text-[10px] text-stone-500">
@@ -2186,7 +2500,9 @@
 			<span class="shrink-0 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400">
 				{$t('recordings.publicLink')}
 			</span>
-			<code class="min-w-0 flex-1 truncate border border-stone-200/60 bg-stone-50 px-3 py-1.5 text-[11px] text-stone-500">
+			<code
+				class="min-w-0 flex-1 truncate border border-stone-200/60 bg-stone-50 px-3 py-1.5 text-[11px] text-stone-500"
+			>
 				{publicWatchUrl}
 			</code>
 			<button
@@ -2210,9 +2526,15 @@
 	<!-- Actions -->
 	<div class="mt-5 border-t border-stone-100 pt-5">
 		{#if !icecast.sourceActive && !broadcast.is_live && !isRecording}
-			<span class="inline-flex items-center gap-2 border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm font-medium text-stone-400">
+			<span
+				class="inline-flex items-center gap-2 border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm font-medium text-stone-400"
+			>
 				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+					/>
 				</svg>
 				{$t('recordings.waitingForStream')}
 			</span>
@@ -2238,7 +2560,9 @@
 					class="inline-flex items-center justify-center gap-2 border border-rose-200 bg-rose-50 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-rose-700 transition-all hover:border-rose-600 hover:bg-rose-600 hover:text-white disabled:opacity-50 sm:order-2"
 				>
 					{@render iconRecordStop()}
-					<span>{busy ? $t('recordings.busy.stopping') : $t('recordings.actions.stopRecording')}</span>
+					<span
+						>{busy ? $t('recordings.busy.stopping') : $t('recordings.actions.stopRecording')}</span
+					>
 				</button>
 				<button
 					onclick={stopBoth}
@@ -2246,7 +2570,11 @@
 					class="order-first inline-flex items-center justify-center gap-2 bg-red-700 px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white shadow-sm shadow-red-700/30 ring-1 ring-red-700/60 transition-all hover:bg-red-800 hover:shadow-md hover:shadow-red-700/40 disabled:opacity-50 sm:order-3"
 				>
 					{@render iconStop()}
-					<span>{(broadcastBusy || busy) ? $t('recordings.busy.stopping') : $t('recordings.actions.stopAll')}</span>
+					<span
+						>{broadcastBusy || busy
+							? $t('recordings.busy.stopping')
+							: $t('recordings.actions.stopAll')}</span
+					>
 				</button>
 			</div>
 		{:else if !broadcast.is_live && !isRecording && icecast.sourceActive}
@@ -2266,7 +2594,9 @@
 				</button>
 				<button
 					onclick={start}
-					disabled={busy || !recorder.available || ('pendingOrphans' in recorder && recorder.pendingOrphans > 0)}
+					disabled={busy ||
+						!recorder.available ||
+						('pendingOrphans' in recorder && recorder.pendingOrphans > 0)}
 					class="inline-flex items-center justify-center gap-2 border border-orange-200 bg-orange-50 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-primary transition-all hover:border-primary hover:bg-primary hover:text-white disabled:opacity-50 sm:order-2"
 				>
 					{@render iconRecord()}
@@ -2274,11 +2604,18 @@
 				</button>
 				<button
 					onclick={startBoth}
-					disabled={broadcastBusy || busy || !recorder.available || ('pendingOrphans' in recorder && recorder.pendingOrphans > 0)}
+					disabled={broadcastBusy ||
+						busy ||
+						!recorder.available ||
+						('pendingOrphans' in recorder && recorder.pendingOrphans > 0)}
 					class="order-first inline-flex items-center justify-center gap-2 bg-emerald-600 px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white shadow-sm shadow-emerald-600/30 ring-1 ring-emerald-600/50 transition-all hover:bg-emerald-700 hover:shadow-md hover:shadow-emerald-600/40 disabled:opacity-50 sm:order-3"
 				>
 					{@render iconBoth()}
-					<span>{(broadcastBusy || busy) ? $t('recordings.busy.starting') : $t('recordings.actions.startAll')}</span>
+					<span
+						>{broadcastBusy || busy
+							? $t('recordings.busy.starting')
+							: $t('recordings.actions.startAll')}</span
+					>
 				</button>
 			</div>
 		{:else if broadcast.is_live}
@@ -2294,15 +2631,23 @@
 					class="inline-flex items-center justify-center gap-2 bg-stone-800 px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white shadow-sm shadow-stone-900/20 ring-1 ring-stone-900/40 transition-all hover:bg-stone-900 hover:shadow-md hover:shadow-stone-900/30 disabled:opacity-50"
 				>
 					{@render iconLiveStop()}
-					<span>{broadcastBusy ? $t('recordings.busy.stopping') : $t('recordings.actions.endLive')}</span>
+					<span
+						>{broadcastBusy
+							? $t('recordings.busy.stopping')
+							: $t('recordings.actions.endLive')}</span
+					>
 				</button>
 				<button
 					onclick={start}
-					disabled={busy || !recorder.available || ('pendingOrphans' in recorder && recorder.pendingOrphans > 0)}
+					disabled={busy ||
+						!recorder.available ||
+						('pendingOrphans' in recorder && recorder.pendingOrphans > 0)}
 					class="inline-flex items-center justify-center gap-2 border border-orange-200 bg-orange-50 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-primary transition-all hover:border-primary hover:bg-primary hover:text-white disabled:opacity-50"
 				>
 					{@render iconRecord()}
-					<span>{busy ? $t('recordings.busy.starting') : $t('recordings.actions.startRecording')}</span>
+					<span
+						>{busy ? $t('recordings.busy.starting') : $t('recordings.actions.startRecording')}</span
+					>
 				</button>
 			</div>
 		{:else if isRecording}
@@ -2318,7 +2663,9 @@
 					class="inline-flex items-center justify-center gap-2 bg-rose-600 px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white shadow-sm shadow-rose-600/30 ring-1 ring-rose-600/50 transition-all hover:bg-rose-700 hover:shadow-md hover:shadow-rose-600/40 disabled:opacity-50"
 				>
 					{@render iconRecordStop()}
-					<span>{busy ? $t('recordings.busy.stopping') : $t('recordings.actions.stopRecording')}</span>
+					<span
+						>{busy ? $t('recordings.busy.stopping') : $t('recordings.actions.stopRecording')}</span
+					>
 				</button>
 				<button
 					onclick={goLive}
@@ -2344,9 +2691,21 @@
 
 	<!-- Live audio monitor -->
 	<div class="mt-5 flex flex-wrap items-center gap-3 border-t border-stone-100 pt-4">
-		<div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-stone-500">
-			<svg class="h-4 w-4 text-missionnaire" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z" />
+		<div
+			class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-stone-500"
+		>
+			<svg
+				class="h-4 w-4 text-missionnaire"
+				fill="none"
+				viewBox="0 0 24 24"
+				stroke="currentColor"
+				stroke-width="2"
+			>
+				<path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"
+				/>
 			</svg>
 			{$t('recordings.monitor.title')}
 		</div>
@@ -2355,15 +2714,21 @@
 			     control, so this stays a trustworthy sync reference. -->
 			<div class="flex h-9 flex-1 min-w-[280px] items-center gap-3 bg-stone-50 px-3">
 				{#if monitorLive}
-					<span class="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-red-600">
+					<span
+						class="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-red-600"
+					>
 						<span class="relative inline-flex h-1.5 w-1.5">
-							<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"></span>
+							<span
+								class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"
+							></span>
 							<span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500"></span>
 						</span>
 						{$t('recordings.monitor.live')}
 					</span>
 				{:else}
-					<span class="text-[11px] italic text-stone-400">{$t('recordings.monitor.connecting')}</span>
+					<span class="text-[11px] italic text-stone-400"
+						>{$t('recordings.monitor.connecting')}</span
+					>
 				{/if}
 				<span class="min-w-0 flex-1 truncate text-[10px] text-stone-400">
 					{monitorMuted ? $t('recordings.monitor.mutedHint') : $t('recordings.monitor.unmutedHint')}
@@ -2376,13 +2741,29 @@
 						: 'border-stone-200 bg-white text-stone-600 hover:border-stone-900 hover:bg-stone-900 hover:text-white'}"
 				>
 					{#if monitorMuted}
-						<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+						<svg
+							class="h-3 w-3"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							aria-hidden="true"
+						>
 							<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
 							<path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
 						</svg>
 						{$t('recordings.monitor.unmute')}
 					{:else}
-						<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+						<svg
+							class="h-3 w-3"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							aria-hidden="true"
+						>
 							<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
 							<line x1="23" y1="9" x2="17" y2="15" />
 							<line x1="17" y1="9" x2="23" y2="15" />
@@ -2392,12 +2773,16 @@
 				</button>
 			</div>
 		{:else}
-			<div class="flex h-9 flex-1 min-w-[280px] items-center bg-stone-50 px-3 text-[11px] italic text-stone-400">
+			<div
+				class="flex h-9 flex-1 min-w-[280px] items-center bg-stone-50 px-3 text-[11px] italic text-stone-400"
+			>
 				{$t('recordings.monitor.noSource')}
 			</div>
 		{/if}
 		<span class="text-[11px] text-stone-400">
-			{icecast.sourceActive ? $t('recordings.monitor.sourceActive') : $t('recordings.monitor.sourceInactive')}
+			{icecast.sourceActive
+				? $t('recordings.monitor.sourceActive')
+				: $t('recordings.monitor.sourceInactive')}
 		</span>
 		<audio
 			bind:this={monitorEl}
@@ -2447,8 +2832,19 @@
 		<!-- Full-width reminder banner — spans under the label/button row so the
 		     message reads comfortably regardless of viewport size. -->
 		<div class="mb-4 flex items-start gap-2.5 border border-amber-200 bg-amber-50/80 px-3.5 py-2.5">
-			<svg class="h-4 w-4 shrink-0 text-amber-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.2 16c-.77 1.33.2 3 1.73 3z" />
+			<svg
+				class="h-4 w-4 shrink-0 text-amber-600 mt-0.5"
+				fill="none"
+				viewBox="0 0 24 24"
+				stroke="currentColor"
+				stroke-width="2"
+				aria-hidden="true"
+			>
+				<path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					d="M12 9v2m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.2 16c-.77 1.33.2 3 1.73 3z"
+				/>
 			</svg>
 			<p class="text-[11px] leading-snug text-amber-800 sm:text-xs">
 				<strong>{$t('recordings.meta.reminderStrong')}</strong>{$t('recordings.meta.reminderRest')}
@@ -2458,7 +2854,9 @@
 		<div class="flex flex-col gap-5 sm:flex-row sm:items-start">
 			<!-- Thumbnail (view-only, click to expand) -->
 			<div class="flex flex-col gap-2">
-				<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.common.thumbnail')}</span>
+				<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
+					>{$t('recordings.common.thumbnail')}</span
+				>
 				{#if broadcast.thumbnail_url && !broadcastThumbnailBroken}
 					<button
 						type="button"
@@ -2478,9 +2876,23 @@
 							class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
 							on:error={() => (broadcastThumbnailBroken = true)}
 						/>
-						<span class="pointer-events-none absolute inset-0 flex items-end justify-end p-1.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-							<span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/90 shadow">
-								<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-stone-700">
+						<span
+							class="pointer-events-none absolute inset-0 flex items-end justify-end p-1.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+						>
+							<span
+								class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/90 shadow"
+							>
+								<svg
+									width="11"
+									height="11"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									class="text-stone-700"
+								>
 									<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
 								</svg>
 							</span>
@@ -2488,21 +2900,35 @@
 					</button>
 				{:else}
 					<!-- Default fallback preview — this is what the public site will show -->
-					<div class="relative h-28 w-44 overflow-hidden border border-dashed border-stone-300 default-thumbnail-admin">
+					<div
+						class="relative h-28 w-44 overflow-hidden border border-dashed border-stone-300 default-thumbnail-admin"
+					>
 						<div class="flex h-full w-full flex-col items-center justify-center gap-1.5">
 							<picture>
 								<source srcset="/icons/logo.webp" type="image/webp" />
-								<img src="/icons/logo.png" alt="" class="h-6 w-auto opacity-90" width="150" height="64" />
+								<img
+									src="/icons/logo.png"
+									alt=""
+									class="h-6 w-auto opacity-90"
+									width="150"
+									height="64"
+								/>
 							</picture>
-							<div class="flex items-center gap-1 text-[8px] font-bold uppercase tracking-[0.2em] text-red-600">
+							<div
+								class="flex items-center gap-1 text-[8px] font-bold uppercase tracking-[0.2em] text-red-600"
+							>
 								<span class="relative inline-flex h-1 w-1">
-									<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"></span>
+									<span
+										class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"
+									></span>
 									<span class="relative inline-flex h-1 w-1 rounded-full bg-red-500"></span>
 								</span>
 								{$t('recordings.state.live')}
 							</div>
 						</div>
-						<span class="absolute bottom-1 left-1 rounded-sm bg-stone-900/70 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wider text-white">
+						<span
+							class="absolute bottom-1 left-1 rounded-sm bg-stone-900/70 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wider text-white"
+						>
 							{$t('recordings.meta.defaultBadge')}
 						</span>
 					</div>
@@ -2512,15 +2938,23 @@
 			<!-- Title + Description (view-only) -->
 			<div class="flex flex-1 flex-col gap-4">
 				<div class="flex flex-col gap-2">
-					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.meta.liveTitle')}</span>
+					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
+						>{$t('recordings.meta.liveTitle')}</span
+					>
 					<p class="text-sm {broadcast.title ? 'text-stone-700' : 'text-stone-400 italic'}">
 						{broadcast.title || $t('recordings.meta.noTitle')}
 					</p>
 				</div>
 
 				<div class="flex flex-col gap-2">
-					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.common.description')}</span>
-					<p class="text-sm whitespace-pre-wrap {broadcast.description ? 'text-stone-700' : 'text-stone-400 italic'}">
+					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
+						>{$t('recordings.common.description')}</span
+					>
+					<p
+						class="text-sm whitespace-pre-wrap {broadcast.description
+							? 'text-stone-700'
+							: 'text-stone-400 italic'}"
+					>
 						{broadcast.description || $t('recordings.meta.noDescription')}
 					</p>
 				</div>
@@ -2528,17 +2962,33 @@
 				<!-- YouTube link — view-only. Shows the stored URL, or the channel
 				     /live URL in muted grey when nothing's been pinned yet. -->
 				<div class="flex flex-col gap-2">
-					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.common.youtubeLink')}</span>
+					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
+						>{$t('recordings.common.youtubeLink')}</span
+					>
 					<a
 						href={broadcast.youtube_url || YOUTUBE_CHANNEL_LIVE_URL}
 						target="_blank"
 						rel="noopener noreferrer"
-						class="inline-flex items-center gap-1.5 text-sm {broadcast.youtube_url ? 'text-stone-700 hover:text-primary' : 'text-stone-400 italic hover:text-stone-500'} break-all transition-colors"
+						class="inline-flex items-center gap-1.5 text-sm {broadcast.youtube_url
+							? 'text-stone-700 hover:text-primary'
+							: 'text-stone-400 italic hover:text-stone-500'} break-all transition-colors"
 					>
-						<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" class="shrink-0">
-							<path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+						<svg
+							width="14"
+							height="14"
+							viewBox="0 0 24 24"
+							fill="currentColor"
+							aria-hidden="true"
+							class="shrink-0"
+						>
+							<path
+								d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"
+							/>
 						</svg>
-						<span>{broadcast.youtube_url || $t('recordings.meta.youtubeDefault', { url: YOUTUBE_CHANNEL_LIVE_URL })}</span>
+						<span
+							>{broadcast.youtube_url ||
+								$t('recordings.meta.youtubeDefault', { url: YOUTUBE_CHANNEL_LIVE_URL })}</span
+						>
 					</a>
 				</div>
 			</div>
@@ -2570,16 +3020,38 @@
 			onclick={openUploadModal}
 			class="inline-flex shrink-0 items-center gap-2 bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary/90"
 		>
-			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0-12l-4 4m4-4l4 4M4 20h16" />
+			<svg
+				class="h-4 w-4"
+				fill="none"
+				viewBox="0 0 24 24"
+				stroke="currentColor"
+				stroke-width="2"
+				aria-hidden="true"
+			>
+				<path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					d="M12 4v12m0-12l-4 4m4-4l4 4M4 20h16"
+				/>
 			</svg>
 			<span class="hidden sm:inline">{$t('recordings.upload.title')}</span>
 			<span class="sm:hidden">{$t('recordings.common.upload')}</span>
 		</button>
 	{/if}
 	<div class="relative min-w-[220px] flex-1 basis-full sm:basis-auto">
-		<svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-			<path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z" />
+		<svg
+			class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400"
+			fill="none"
+			viewBox="0 0 24 24"
+			stroke="currentColor"
+			stroke-width="2"
+			aria-hidden="true"
+		>
+			<path
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z"
+			/>
 		</svg>
 		<input
 			type="search"
@@ -2617,7 +3089,14 @@
 			onclick={resetFilters}
 			class="inline-flex items-center gap-1 border border-stone-200 bg-white/60 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 transition-colors hover:border-stone-400 hover:text-stone-700"
 		>
-			<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+			<svg
+				class="h-3 w-3"
+				fill="none"
+				viewBox="0 0 24 24"
+				stroke="currentColor"
+				stroke-width="2"
+				aria-hidden="true"
+			>
 				<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
 			</svg>
 			{$t('recordings.common.reset')}
@@ -2628,7 +3107,8 @@
 		{#if isFetching || !listLoaded}
 			{$t('recordings.common.loading')}
 		{:else}
-			{$t('recordings.list.shownCount', { shown: recordings.length, total })} {hasActiveFilters ? $t('recordings.list.results') : $t('recordings.list.total')}
+			{$t('recordings.list.shownCount', { shown: recordings.length, total })}
+			{hasActiveFilters ? $t('recordings.list.results') : $t('recordings.list.total')}
 		{/if}
 	</span>
 </div>
@@ -2657,7 +3137,9 @@
 				{allFilteredSelected ? $t('recordings.list.deselectAll') : $t('recordings.list.selectAll')}
 			</span>
 			<span class="ml-auto text-[11px] text-stone-400 tabular-nums">
-				{filteredRecordings.length > 1 ? $t('recordings.list.countMany', { count: filteredRecordings.length }) : $t('recordings.list.countOne', { count: filteredRecordings.length })}
+				{filteredRecordings.length > 1
+					? $t('recordings.list.countMany', { count: filteredRecordings.length })
+					: $t('recordings.list.countOne', { count: filteredRecordings.length })}
 			</span>
 		</div>
 	{/if}
@@ -2665,7 +3147,10 @@
 	{#if !listLoaded}
 		<!-- Initial-load skeleton: mirrors the recording card layout -->
 		{#each Array.from({ length: 3 }) as _}
-			<article class="animate-pulse overflow-hidden border border-stone-200/70 bg-white/60" aria-hidden="true">
+			<article
+				class="animate-pulse overflow-hidden border border-stone-200/70 bg-white/60"
+				aria-hidden="true"
+			>
 				<div class="flex items-start gap-3 p-4">
 					<div class="h-14 w-20 shrink-0 bg-stone-200"></div>
 					<div class="min-w-0 flex-1 space-y-2 pt-0.5">
@@ -2686,7 +3171,9 @@
 		{@const isEditing = editingRecordingId === rec._id}
 		{@const isSelected = selectedIds.has(rec._id!)}
 		<article
-			class="group overflow-hidden border bg-white/60 transition-all {isSelected ? 'border-primary/50 bg-orange-50/40 shadow-sm shadow-primary/10' : 'border-stone-200/70'}"
+			class="group overflow-hidden border bg-white/60 transition-all {isSelected
+				? 'border-primary/50 bg-orange-50/40 shadow-sm shadow-primary/10'
+				: 'border-stone-200/70'}"
 		>
 			<!-- Header: checkbox + thumbnail + title block -->
 			<div class="flex items-start gap-3 p-4">
@@ -2715,19 +3202,36 @@
 						/>
 					</div>
 				{:else}
-					<div class="flex h-14 w-20 shrink-0 items-center justify-center border border-stone-200/60 bg-cream/60 text-stone-300" aria-hidden="true">
-						<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M4 6h16v12H4V6z" />
+					<div
+						class="flex h-14 w-20 shrink-0 items-center justify-center border border-stone-200/60 bg-cream/60 text-stone-300"
+						aria-hidden="true"
+					>
+						<svg
+							class="h-5 w-5"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							stroke-width="1.5"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M4 6h16v12H4V6z"
+							/>
 						</svg>
 					</div>
 				{/if}
 
 				<div class="min-w-0 flex-1 pt-0.5">
-					<h3 class="font-display text-[15px] font-semibold leading-snug text-stone-800 line-clamp-2">
+					<h3
+						class="font-display text-[15px] font-semibold leading-snug text-stone-800 line-clamp-2"
+					>
 						{rec.title}
 					</h3>
 					<p class="mt-1 text-[11px] leading-tight text-stone-500">
-						<span class="font-medium text-stone-600">{displayName(rec.created_by_name, rec.created_by)}</span>
+						<span class="font-medium text-stone-600"
+							>{displayName(rec.created_by_name, rec.created_by)}</span
+						>
 						<span class="text-stone-300"> · </span>
 						<span>{formatDateTime(rec.started_at)}</span>
 					</p>
@@ -2735,8 +3239,14 @@
 			</div>
 
 			<!-- Meta row: status · duration · size · publish toggle -->
-			<div class="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-stone-100 bg-stone-50/30 px-4 py-2.5">
-				<span class="inline-flex rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {statusClass(rec.status)}">
+			<div
+				class="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-stone-100 bg-stone-50/30 px-4 py-2.5"
+			>
+				<span
+					class="inline-flex rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {statusClass(
+						rec.status
+					)}"
+				>
 					{$t(statusLabel[rec.status])}
 				</span>
 				<span class="font-mono text-[11px] tabular-nums text-stone-600">
@@ -2746,15 +3256,25 @@
 					{formatBytes(rec.size_bytes)}
 				</span>
 				<div class="ml-auto flex items-center gap-1.5">
-					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.list.published')}</span>
+					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
+						>{$t('recordings.list.published')}</span
+					>
 					<button
 						onclick={() => togglePublish(rec)}
 						disabled={rec.status !== 'ready'}
-						aria-label={rec.published ? $t('recordings.list.unpublish') : $t('recordings.list.publish')}
+						aria-label={rec.published
+							? $t('recordings.list.unpublish')
+							: $t('recordings.list.publish')}
 						title={rec.published ? $t('recordings.list.unpublish') : $t('recordings.list.publish')}
-						class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors {rec.published ? 'bg-primary' : 'bg-stone-200'} disabled:opacity-40"
+						class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors {rec.published
+							? 'bg-primary'
+							: 'bg-stone-200'} disabled:opacity-40"
 					>
-						<span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform {rec.published ? 'translate-x-4' : 'translate-x-0.5'}"></span>
+						<span
+							class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform {rec.published
+								? 'translate-x-4'
+								: 'translate-x-0.5'}"
+						></span>
 					</button>
 				</div>
 			</div>
@@ -2782,8 +3302,19 @@
 							onclick={() => (isEditing ? cancelRecordingEdit() : enterRecordingEdit(rec))}
 							class="inline-flex items-center gap-1.5 border border-stone-200 bg-white/60 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary"
 						>
-							<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+							<svg
+								class="h-3 w-3"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+								stroke-width="2"
+								aria-hidden="true"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+								/>
 							</svg>
 							{isEditing ? $t('recordings.common.close') : $t('recordings.common.edit')}
 						</button>
@@ -2794,8 +3325,19 @@
 							class="inline-flex items-center gap-1.5 border border-stone-200 bg-white/60 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary"
 							title={$t('recordings.list.trimAudioTitle')}
 						>
-							<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M6 20l3.5-3.5M18 20l-3.5-3.5M6 4l12 12M18 4L6 16" />
+							<svg
+								class="h-3 w-3"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+								stroke-width="2"
+								aria-hidden="true"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									d="M6 20l3.5-3.5M18 20l-3.5-3.5M6 4l12 12M18 4L6 16"
+								/>
 							</svg>
 							{$t('recordings.list.trimAudio')}
 						</button>
@@ -2806,8 +3348,19 @@
 							class="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600"
 							title={$t('recordings.common.delete')}
 						>
-							<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
+							<svg
+								class="h-3.5 w-3.5"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+								stroke-width="2"
+								aria-hidden="true"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"
+								/>
 							</svg>
 							{$t('recordings.common.delete')}
 						</button>
@@ -2827,7 +3380,11 @@
 				{/if}
 			</p>
 			{#if hasActiveFilters}
-				<button type="button" onclick={resetFilters} class="mt-3 text-xs font-medium text-primary underline-offset-4 hover:underline">
+				<button
+					type="button"
+					onclick={resetFilters}
+					class="mt-3 text-xs font-medium text-primary underline-offset-4 hover:underline"
+				>
 					{$t('recordings.list.resetFilters')}
 				</button>
 			{/if}
@@ -2875,7 +3432,9 @@
 				<th class="px-5 py-3.5 font-medium text-stone-500">{$t('recordings.table.size')}</th>
 				<th class="px-5 py-3.5 font-medium text-stone-500">{$t('recordings.table.status')}</th>
 				<th class="px-5 py-3.5 font-medium text-stone-500">{$t('recordings.list.published')}</th>
-				<th class="px-5 py-3.5 text-right font-medium text-stone-500">{$t('recordings.table.actions')}</th>
+				<th class="px-5 py-3.5 text-right font-medium text-stone-500"
+					>{$t('recordings.table.actions')}</th
+				>
 			</tr>
 		</thead>
 		<tbody>
@@ -2914,9 +3473,22 @@
 									/>
 								</div>
 							{:else}
-								<div class="flex h-9 w-14 shrink-0 items-center justify-center rounded border border-stone-200/60 bg-cream/60 text-stone-300" aria-hidden="true">
-									<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-										<path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M4 6h16v12H4V6z" />
+								<div
+									class="flex h-9 w-14 shrink-0 items-center justify-center rounded border border-stone-200/60 bg-cream/60 text-stone-300"
+									aria-hidden="true"
+								>
+									<svg
+										class="h-4 w-4"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+										stroke-width="1.5"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M4 6h16v12H4V6z"
+										/>
 									</svg>
 								</div>
 							{/if}
@@ -2929,10 +3501,16 @@
 						</div>
 					</td>
 					<td class="px-5 py-4 text-stone-500">{formatDateTime(rec.started_at)}</td>
-					<td class="px-5 py-4 font-mono text-xs text-stone-500">{formatDuration(rec.duration_sec)}</td>
+					<td class="px-5 py-4 font-mono text-xs text-stone-500"
+						>{formatDuration(rec.duration_sec)}</td
+					>
 					<td class="px-5 py-4 text-stone-500">{formatBytes(rec.size_bytes)}</td>
 					<td class="px-5 py-4">
-						<span class="inline-flex rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {statusClass(rec.status)}">
+						<span
+							class="inline-flex rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {statusClass(
+								rec.status
+							)}"
+						>
 							{$t(statusLabel[rec.status])}
 						</span>
 					</td>
@@ -2940,11 +3518,21 @@
 						<button
 							onclick={() => togglePublish(rec)}
 							disabled={rec.status !== 'ready'}
-							aria-label={rec.published ? $t('recordings.list.unpublish') : $t('recordings.list.publish')}
-							title={rec.published ? $t('recordings.list.unpublish') : $t('recordings.list.publish')}
-							class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors {rec.published ? 'bg-primary' : 'bg-stone-200'} disabled:opacity-40"
+							aria-label={rec.published
+								? $t('recordings.list.unpublish')
+								: $t('recordings.list.publish')}
+							title={rec.published
+								? $t('recordings.list.unpublish')
+								: $t('recordings.list.publish')}
+							class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors {rec.published
+								? 'bg-primary'
+								: 'bg-stone-200'} disabled:opacity-40"
 						>
-							<span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform {rec.published ? 'translate-x-4' : 'translate-x-0.5'}"></span>
+							<span
+								class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform {rec.published
+									? 'translate-x-4'
+									: 'translate-x-0.5'}"
+							></span>
 						</button>
 					</td>
 					<td class="px-5 py-4">
@@ -2953,7 +3541,10 @@
 								<audio src={rec.s3_url} controls preload="none" class="h-8 w-44"></audio>
 							{/if}
 							{#if rec.status === 'failed'}
-								<button onclick={() => retryUpload(rec._id!)} class="bg-amber-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-700 hover:bg-amber-200">
+								<button
+									onclick={() => retryUpload(rec._id!)}
+									class="bg-amber-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-700 hover:bg-amber-200"
+								>
 									{$t('recordings.list.retry')}
 								</button>
 							{/if}
@@ -2975,16 +3566,30 @@
 								</button>
 							{/if}
 							{#if canDeleteRecordings}
-								<button onclick={() => remove(rec._id!)} class="px-2 py-1.5 text-xs text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600" title={$t('recordings.common.delete')}>
-									<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-										<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
+								<button
+									onclick={() => remove(rec._id!)}
+									class="px-2 py-1.5 text-xs text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600"
+									title={$t('recordings.common.delete')}
+								>
+									<svg
+										class="h-4 w-4"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"
+										/>
 									</svg>
 								</button>
 							{/if}
 						</div>
 					</td>
 				</tr>
-				{/each}
+			{/each}
 			{#if listLoaded && filteredRecordings.length === 0}
 				<tr>
 					<td colspan={canDeleteRecordings ? 8 : 7} class="px-5 py-12 text-center text-stone-400">
@@ -2992,7 +3597,11 @@
 							{$t('recordings.list.emptyStart')}
 						{:else if hasActiveFilters}
 							{$t('recordings.list.emptyFiltered')}
-							<button type="button" onclick={resetFilters} class="ml-1 font-medium text-primary underline-offset-4 hover:underline">
+							<button
+								type="button"
+								onclick={resetFilters}
+								class="ml-1 font-medium text-primary underline-offset-4 hover:underline"
+							>
 								{$t('recordings.common.reset')}
 							</button>
 						{:else}
@@ -3024,10 +3633,14 @@
 
 <!-- Bulk action bar — sticky footer appears while anything is selected -->
 {#if canDeleteRecordings && selectedIds.size > 0}
-	<div class="sticky bottom-4 z-20 mx-auto mt-4 w-fit animate-[page-in_0.2s_ease] rounded-sm border border-stone-200 bg-white px-6 py-3 shadow-lg">
+	<div
+		class="sticky bottom-4 z-20 mx-auto mt-4 w-fit animate-[page-in_0.2s_ease] rounded-sm border border-stone-200 bg-white px-6 py-3 shadow-lg"
+	>
 		<div class="flex items-center gap-4">
 			<span class="text-sm font-medium text-stone-700">
-				{selectedIds.size > 1 ? $t('recordings.bulk.selectedMany', { count: selectedIds.size }) : $t('recordings.bulk.selectedOne', { count: selectedIds.size })}
+				{selectedIds.size > 1
+					? $t('recordings.bulk.selectedMany', { count: selectedIds.size })
+					: $t('recordings.bulk.selectedOne', { count: selectedIds.size })}
 			</span>
 			<div class="h-5 w-px bg-stone-200"></div>
 			<button
@@ -3074,7 +3687,16 @@
 					aria-label={$t('recordings.common.close')}
 					class="flex h-8 w-8 items-center justify-center rounded-full text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 disabled:opacity-50"
 				>
-					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<svg
+						width="16"
+						height="16"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
 						<path d="M6 6l12 12M6 18L18 6" />
 					</svg>
 				</button>
@@ -3087,10 +3709,18 @@
 
 				<!-- Audio file (required) -->
 				<div class="flex flex-col gap-1.5">
-					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.upload.audioLabel')} <span class="text-red-500">*</span></span>
+					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
+						>{$t('recordings.upload.audioLabel')} <span class="text-red-500">*</span></span
+					>
 					<div class="flex flex-wrap items-center gap-3">
-						<label class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary {uploadSaving ? 'pointer-events-none opacity-50' : ''}">
-							{uploadAudioFile ? $t('recordings.upload.changeFile') : $t('recordings.upload.chooseMp3')}
+						<label
+							class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary {uploadSaving
+								? 'pointer-events-none opacity-50'
+								: ''}"
+						>
+							{uploadAudioFile
+								? $t('recordings.upload.changeFile')
+								: $t('recordings.upload.chooseMp3')}
 							<input
 								type="file"
 								accept="audio/mpeg,audio/mp3,.mp3"
@@ -3111,7 +3741,9 @@
 						<div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-stone-100">
 							<div class="h-full bg-primary transition-all" style="width: {uploadAudioPct}%"></div>
 						</div>
-						<span class="text-[10px] text-stone-400 tabular-nums">{$t('recordings.upload.progress', { pct: uploadAudioPct })}</span>
+						<span class="text-[10px] text-stone-400 tabular-nums"
+							>{$t('recordings.upload.progress', { pct: uploadAudioPct })}</span
+						>
 					{/if}
 					{#if uploadAudioError}
 						<p class="text-xs text-red-600">{uploadAudioError}</p>
@@ -3120,7 +3752,11 @@
 
 				<!-- Date / time (required) -->
 				<div class="flex flex-col gap-1.5">
-					<label for="upload-started-at" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.upload.dateLabel')} <span class="text-red-500">*</span></label>
+					<label
+						for="upload-started-at"
+						class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
+						>{$t('recordings.upload.dateLabel')} <span class="text-red-500">*</span></label
+					>
 					<input
 						id="upload-started-at"
 						type="datetime-local"
@@ -3134,7 +3770,11 @@
 
 				<!-- Title (required) -->
 				<div class="flex flex-col gap-1.5">
-					<label for="upload-title" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.common.title')} <span class="text-red-500">*</span></label>
+					<label
+						for="upload-title"
+						class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
+						>{$t('recordings.common.title')} <span class="text-red-500">*</span></label
+					>
 					<input
 						id="upload-title"
 						type="text"
@@ -3149,7 +3789,11 @@
 
 				<!-- Description -->
 				<div class="flex flex-col gap-1.5">
-					<label for="upload-description" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.common.description')}</label>
+					<label
+						for="upload-description"
+						class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
+						>{$t('recordings.common.description')}</label
+					>
 					<textarea
 						id="upload-description"
 						bind:value={uploadDescription}
@@ -3163,7 +3807,11 @@
 
 				<!-- YouTube link -->
 				<div class="flex flex-col gap-1.5">
-					<label for="upload-youtube" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.common.youtubeLink')}</label>
+					<label
+						for="upload-youtube"
+						class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
+						>{$t('recordings.common.youtubeLink')}</label
+					>
 					<input
 						id="upload-youtube"
 						type="url"
@@ -3179,25 +3827,45 @@
 
 				<!-- Thumbnail -->
 				<div class="flex flex-col gap-2">
-					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.common.thumbnail')}</span>
+					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
+						>{$t('recordings.common.thumbnail')}</span
+					>
 					<div class="flex items-start gap-4">
 						{#if uploadThumbnailPreviewUrl}
-							<div class="relative aspect-video w-40 shrink-0 overflow-hidden border border-stone-300 bg-cream/40">
+							<div
+								class="relative aspect-video w-40 shrink-0 overflow-hidden border border-stone-300 bg-cream/40"
+							>
 								<img src={uploadThumbnailPreviewUrl} alt="" class="h-full w-full object-cover" />
 							</div>
 						{:else}
-							<div class="flex aspect-video w-40 shrink-0 flex-col items-center justify-center gap-1 border border-dashed border-stone-300">
+							<div
+								class="flex aspect-video w-40 shrink-0 flex-col items-center justify-center gap-1 border border-dashed border-stone-300"
+							>
 								<picture>
 									<source srcset="/icons/logo.webp" type="image/webp" />
-									<img src="/icons/logo.png" alt="" class="h-5 w-auto opacity-90" width="150" height="64" />
+									<img
+										src="/icons/logo.png"
+										alt=""
+										class="h-5 w-auto opacity-90"
+										width="150"
+										height="64"
+									/>
 								</picture>
-								<span class="text-[8px] font-bold uppercase tracking-[0.2em] text-stone-500">{$t('recordings.common.noThumbnail')}</span>
+								<span class="text-[8px] font-bold uppercase tracking-[0.2em] text-stone-500"
+									>{$t('recordings.common.noThumbnail')}</span
+								>
 							</div>
 						{/if}
 						<div class="flex flex-col gap-2">
 							<div class="flex gap-2">
-								<label class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary {uploadSaving ? 'pointer-events-none opacity-50' : ''}">
-									{uploadThumbnailPreviewUrl ? $t('recordings.common.change') : $t('recordings.common.upload')}
+								<label
+									class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary {uploadSaving
+										? 'pointer-events-none opacity-50'
+										: ''}"
+								>
+									{uploadThumbnailPreviewUrl
+										? $t('recordings.common.change')
+										: $t('recordings.common.upload')}
 									<input
 										type="file"
 										accept="image/jpeg,image/png,image/webp,image/gif"
@@ -3227,12 +3895,19 @@
 
 				<!-- Publish immediately -->
 				<label class="flex items-center gap-2 text-sm text-stone-700">
-					<input type="checkbox" bind:checked={uploadPublishNow} disabled={uploadSaving} class="h-4 w-4 accent-primary" />
+					<input
+						type="checkbox"
+						bind:checked={uploadPublishNow}
+						disabled={uploadSaving}
+						class="h-4 w-4 accent-primary"
+					/>
 					{$t('recordings.upload.publishNow')}
 				</label>
 
 				{#if uploadError}
-					<p class="border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{uploadError}</p>
+					<p class="border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+						{uploadError}
+					</p>
 				{/if}
 			</div>
 
@@ -3281,7 +3956,16 @@
 					aria-label={$t('recordings.common.close')}
 					class="flex h-8 w-8 items-center justify-center rounded-full text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 disabled:opacity-50"
 				>
-					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<svg
+						width="16"
+						height="16"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
 						<path d="M6 6l12 12M6 18L18 6" />
 					</svg>
 				</button>
@@ -3290,9 +3974,13 @@
 			<div class="px-6 py-6">
 				<div class="flex flex-col gap-5 sm:flex-row sm:items-start">
 					<div class="flex flex-col gap-2 shrink-0">
-						<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.common.thumbnail')}</span>
+						<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
+							>{$t('recordings.common.thumbnail')}</span
+						>
 						{#if previewSrc}
-							<div class="relative aspect-video w-48 overflow-hidden border border-stone-300 bg-cream/40">
+							<div
+								class="relative aspect-video w-48 overflow-hidden border border-stone-300 bg-cream/40"
+							>
 								<img
 									src={previewSrc}
 									alt=""
@@ -3302,22 +3990,36 @@
 									class="h-full w-full object-cover"
 								/>
 								{#if metadataSaving && thumbnailAction === 'replace'}
-									<div class="absolute inset-0 flex items-center justify-center bg-white/80 text-xs font-medium text-stone-600">
+									<div
+										class="absolute inset-0 flex items-center justify-center bg-white/80 text-xs font-medium text-stone-600"
+									>
 										{$t('recordings.common.uploading')}
 									</div>
 								{/if}
 							</div>
 						{:else}
-							<div class="default-thumbnail-admin relative flex aspect-video w-48 flex-col items-center justify-center gap-1 border border-dashed border-stone-300">
+							<div
+								class="default-thumbnail-admin relative flex aspect-video w-48 flex-col items-center justify-center gap-1 border border-dashed border-stone-300"
+							>
 								<picture>
 									<source srcset="/icons/logo.webp" type="image/webp" />
-									<img src="/icons/logo.png" alt="" class="h-5 w-auto opacity-90" width="150" height="64" />
+									<img
+										src="/icons/logo.png"
+										alt=""
+										class="h-5 w-auto opacity-90"
+										width="150"
+										height="64"
+									/>
 								</picture>
-								<span class="text-[8px] font-bold uppercase tracking-[0.2em] text-stone-500">{$t('recordings.common.noThumbnail')}</span>
+								<span class="text-[8px] font-bold uppercase tracking-[0.2em] text-stone-500"
+									>{$t('recordings.common.noThumbnail')}</span
+								>
 							</div>
 						{/if}
 						<div class="flex gap-2">
-							<label class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary">
+							<label
+								class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary"
+							>
 								{previewSrc ? $t('recordings.common.change') : $t('recordings.common.upload')}
 								<input
 									type="file"
@@ -3340,7 +4042,9 @@
 						</div>
 						<p class="text-[10px] text-stone-400">{$t('recordings.common.imageFormats')}</p>
 						{#if thumbnailAction === 'replace'}
-							<label class="flex w-48 items-start gap-2 border border-stone-100 bg-stone-50/60 px-2.5 py-2">
+							<label
+								class="flex w-48 items-start gap-2 border border-stone-100 bg-stone-50/60 px-2.5 py-2"
+							>
 								<input
 									type="checkbox"
 									bind:checked={setAsDefaultThumbnail}
@@ -3348,7 +4052,9 @@
 									class="mt-0.5 accent-[#FF880C]"
 								/>
 								<span class="text-[10px] leading-snug text-stone-500">
-									<span class="font-semibold text-stone-600">{$t('recordings.meta.setDefaultLabel')}</span>
+									<span class="font-semibold text-stone-600"
+										>{$t('recordings.meta.setDefaultLabel')}</span
+									>
 									{$t('recordings.meta.setDefaultHint')}
 								</span>
 							</label>
@@ -3357,7 +4063,11 @@
 
 					<div class="flex flex-1 flex-col gap-4">
 						<div class="flex flex-col gap-1.5">
-							<label for="edit-broadcast-title-input" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.meta.liveTitle')}</label>
+							<label
+								for="edit-broadcast-title-input"
+								class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
+								>{$t('recordings.meta.liveTitle')}</label
+							>
 							<input
 								id="edit-broadcast-title-input"
 								type="text"
@@ -3367,11 +4077,17 @@
 								placeholder={$t('recordings.meta.titlePlaceholder')}
 								class="admin-input text-sm"
 							/>
-							<span class="self-end text-[10px] text-stone-400 tabular-nums">{titleDraft.length} / 120</span>
+							<span class="self-end text-[10px] text-stone-400 tabular-nums"
+								>{titleDraft.length} / 120</span
+							>
 						</div>
 
 						<div class="flex flex-col gap-1.5">
-							<label for="edit-broadcast-desc" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.common.description')}</label>
+							<label
+								for="edit-broadcast-desc"
+								class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
+								>{$t('recordings.common.description')}</label
+							>
 							<textarea
 								id="edit-broadcast-desc"
 								bind:value={descriptionDraft}
@@ -3381,14 +4097,20 @@
 								disabled={metadataSaving}
 								class="admin-input text-sm resize-y min-h-[120px]"
 							></textarea>
-							<span class="self-end text-[10px] text-stone-400 tabular-nums">{descriptionDraft.length} / 2000</span>
+							<span class="self-end text-[10px] text-stone-400 tabular-nums"
+								>{descriptionDraft.length} / 2000</span
+							>
 						</div>
 
 						<!-- YouTube link for the live. Defaults to the channel /live URL
 						     when nothing's stored — admin can replace with a specific
 						     video URL once the live ends and YouTube assigns the VOD id. -->
 						<div class="flex flex-col gap-1.5">
-							<label for="edit-broadcast-youtube" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.common.youtubeLink')}</label>
+							<label
+								for="edit-broadcast-youtube"
+								class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
+								>{$t('recordings.common.youtubeLink')}</label
+							>
 							<input
 								id="edit-broadcast-youtube"
 								type="url"
@@ -3449,8 +4171,13 @@
 		>
 			<div class="my-4 w-full max-w-3xl overflow-hidden rounded-sm bg-white shadow-2xl sm:my-8">
 				<!-- Modal header -->
-				<div class="flex items-center justify-between gap-3 border-b border-stone-100 px-4 py-4 sm:px-6">
-					<h2 id="edit-rec-title" class="min-w-0 truncate font-display text-lg font-semibold text-stone-800">
+				<div
+					class="flex items-center justify-between gap-3 border-b border-stone-100 px-4 py-4 sm:px-6"
+				>
+					<h2
+						id="edit-rec-title"
+						class="min-w-0 truncate font-display text-lg font-semibold text-stone-800"
+					>
 						{$t('recordings.edit.title')}
 					</h2>
 					<button
@@ -3460,7 +4187,16 @@
 						aria-label={$t('recordings.common.close')}
 						class="flex h-8 w-8 items-center justify-center rounded-full text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 disabled:opacity-50"
 					>
-						<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<svg
+							width="16"
+							height="16"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
 							<path d="M6 6l12 12M6 18L18 6" />
 						</svg>
 					</button>
@@ -3471,9 +4207,13 @@
 					<div class="flex min-w-0 flex-col gap-5 sm:flex-row sm:items-start">
 						<!-- Thumbnail editor -->
 						<div class="flex w-full max-w-[12rem] shrink-0 flex-col gap-2 sm:w-48">
-							<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.common.thumbnail')}</span>
+							<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
+								>{$t('recordings.common.thumbnail')}</span
+							>
 							{#if recPreviewSrc(editingRec)}
-								<div class="relative aspect-video w-48 overflow-hidden border border-stone-300 bg-cream/40">
+								<div
+									class="relative aspect-video w-48 overflow-hidden border border-stone-300 bg-cream/40"
+								>
 									<img
 										src={recPreviewSrc(editingRec)}
 										alt=""
@@ -3485,23 +4225,39 @@
 										class="h-full w-full object-cover"
 									/>
 									{#if recSaving && recThumbnailAction === 'replace'}
-										<div class="absolute inset-0 flex items-center justify-center bg-white/80 text-xs font-medium text-stone-600">
+										<div
+											class="absolute inset-0 flex items-center justify-center bg-white/80 text-xs font-medium text-stone-600"
+										>
 											{$t('recordings.common.uploading')}
 										</div>
 									{/if}
 								</div>
 							{:else}
-								<div class="default-thumbnail-admin relative flex aspect-video w-48 flex-col items-center justify-center gap-1 border border-dashed border-stone-300">
+								<div
+									class="default-thumbnail-admin relative flex aspect-video w-48 flex-col items-center justify-center gap-1 border border-dashed border-stone-300"
+								>
 									<picture>
 										<source srcset="/icons/logo.webp" type="image/webp" />
-										<img src="/icons/logo.png" alt="" class="h-5 w-auto opacity-90" width="150" height="64" />
+										<img
+											src="/icons/logo.png"
+											alt=""
+											class="h-5 w-auto opacity-90"
+											width="150"
+											height="64"
+										/>
 									</picture>
-									<span class="text-[8px] font-bold uppercase tracking-[0.2em] text-stone-500">{$t('recordings.common.noThumbnail')}</span>
+									<span class="text-[8px] font-bold uppercase tracking-[0.2em] text-stone-500"
+										>{$t('recordings.common.noThumbnail')}</span
+									>
 								</div>
 							{/if}
 							<div class="flex flex-wrap gap-2">
-								<label class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary">
-									{recPreviewSrc(editingRec) ? $t('recordings.common.change') : $t('recordings.common.upload')}
+								<label
+									class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary"
+								>
+									{recPreviewSrc(editingRec)
+										? $t('recordings.common.change')
+										: $t('recordings.common.upload')}
 									<input
 										type="file"
 										accept="image/jpeg,image/png,image/webp,image/gif"
@@ -3527,7 +4283,11 @@
 						<!-- Title + Description -->
 						<div class="flex min-w-0 flex-1 flex-col gap-4">
 							<div class="flex flex-col gap-1.5">
-								<label for="edit-rec-title-input" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.common.title')}</label>
+								<label
+									for="edit-rec-title-input"
+									class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
+									>{$t('recordings.common.title')}</label
+								>
 								<input
 									id="edit-rec-title-input"
 									type="text"
@@ -3537,11 +4297,17 @@
 									placeholder={$t('recordings.edit.titlePlaceholder')}
 									class="admin-input text-sm"
 								/>
-								<span class="self-end text-[10px] text-stone-400 tabular-nums">{recDraftTitle.length} / 200</span>
+								<span class="self-end text-[10px] text-stone-400 tabular-nums"
+									>{recDraftTitle.length} / 200</span
+								>
 							</div>
 
 							<div class="flex flex-col gap-1.5">
-								<label for="edit-rec-desc" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.common.description')}</label>
+								<label
+									for="edit-rec-desc"
+									class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
+									>{$t('recordings.common.description')}</label
+								>
 								<textarea
 									id="edit-rec-desc"
 									bind:value={recDraftDescription}
@@ -3551,7 +4317,9 @@
 									disabled={recSaving}
 									class="admin-input text-sm resize-y min-h-[120px]"
 								></textarea>
-								<span class="self-end text-[10px] text-stone-400 tabular-nums">{recDraftDescription.length} / 2000</span>
+								<span class="self-end text-[10px] text-stone-400 tabular-nums"
+									>{recDraftDescription.length} / 2000</span
+								>
 							</div>
 
 							<!-- YouTube link. Server parses to source_video_id (11-char id),
@@ -3559,7 +4327,11 @@
 							     transcription-PDF lookup on the public detail page. Empty
 							     clears the link. -->
 							<div class="flex flex-col gap-1.5">
-								<label for="edit-rec-youtube" class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.common.youtubeLink')}</label>
+								<label
+									for="edit-rec-youtube"
+									class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
+									>{$t('recordings.common.youtubeLink')}</label
+								>
 								<input
 									id="edit-rec-youtube"
 									type="url"
@@ -3576,9 +4348,13 @@
 								{/if}
 							</div>
 
-							<div class="flex min-w-0 flex-col gap-2 overflow-hidden border border-stone-100 bg-stone-50/40 p-3">
+							<div
+								class="flex min-w-0 flex-col gap-2 overflow-hidden border border-stone-100 bg-stone-50/40 p-3"
+							>
 								<div class="flex flex-col gap-1">
-									<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.edit.transcriptLabel')}</span>
+									<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
+										>{$t('recordings.edit.transcriptLabel')}</span
+									>
 									<span class="text-[10px] text-stone-400">
 										{$t('recordings.edit.transcriptAutoHint')}
 									</span>
@@ -3588,9 +4364,13 @@
 										{$t('recordings.edit.transcriptSearching')}
 									</div>
 								{:else if recExistingTranscript && !recPdfFile && !recTranscriptUploadOpen}
-									<div class="flex min-w-0 items-center justify-between gap-3 overflow-hidden border border-green-200 bg-green-50/70 px-3 py-2">
+									<div
+										class="flex min-w-0 items-center justify-between gap-3 overflow-hidden border border-green-200 bg-green-50/70 px-3 py-2"
+									>
 										<div class="min-w-0 flex-1">
-											<p class="truncate text-xs font-medium text-green-900">{recExistingTranscript.filename}</p>
+											<p class="truncate text-xs font-medium text-green-900">
+												{recExistingTranscript.filename}
+											</p>
 											<p class="truncate text-[10px] text-green-700 tabular-nums">
 												{formatBytes(recExistingTranscript.size)}
 												{#if recExistingTranscript.publishedOn}
@@ -3608,7 +4388,9 @@
 										</a>
 									</div>
 									<div class="flex flex-wrap items-center gap-2">
-										<span class="text-[10px] text-stone-400">{$t('recordings.edit.transcriptNoUploadNeeded')}</span>
+										<span class="text-[10px] text-stone-400"
+											>{$t('recordings.edit.transcriptNoUploadNeeded')}</span
+										>
 										<button
 											type="button"
 											onclick={() => {
@@ -3642,13 +4424,17 @@
 									</div>
 								{/if}
 								{#if recPdfFile}
-									<div class="flex min-w-0 items-center justify-between gap-3 overflow-hidden border border-stone-200 bg-white px-3 py-2">
+									<div
+										class="flex min-w-0 items-center justify-between gap-3 overflow-hidden border border-stone-200 bg-white px-3 py-2"
+									>
 										<div class="min-w-0 flex-1">
 											<p class="truncate text-xs font-medium text-stone-700">{recPdfFile.name}</p>
 											<p class="truncate text-[10px] text-stone-500 tabular-nums">
 												{formatBytes(recPdfFile.size)}
 												{#if recPdfMode === 'replace' && recExistingTranscript}
-													· {$t('recordings.edit.willReplace', { filename: recExistingTranscript.filename })}
+													· {$t('recordings.edit.willReplace', {
+														filename: recExistingTranscript.filename
+													})}
 												{/if}
 											</p>
 										</div>
@@ -3663,8 +4449,14 @@
 									</div>
 									{#if recPdfUploadPct !== null}
 										<div class="flex flex-col gap-1">
-											<div class="flex items-center justify-between text-[10px] font-mono text-stone-500 tabular-nums">
-												<span>{recPdfUploadPct < 100 ? $t('recordings.edit.pdfUploading') : $t('recordings.edit.finalizing')}</span>
+											<div
+												class="flex items-center justify-between text-[10px] font-mono text-stone-500 tabular-nums"
+											>
+												<span
+													>{recPdfUploadPct < 100
+														? $t('recordings.edit.pdfUploading')
+														: $t('recordings.edit.finalizing')}</span
+												>
 												<span>{recPdfUploadPct}%</span>
 											</div>
 											<div class="h-1.5 w-full overflow-hidden rounded-full bg-stone-200">
@@ -3677,7 +4469,9 @@
 									{/if}
 								{:else if !recTranscriptLoading && (!recExistingTranscript || recTranscriptUploadOpen)}
 									<div class="flex flex-wrap items-center gap-2">
-										<label class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary">
+										<label
+											class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary"
+										>
 											{recExistingTranscript && recPdfMode === 'replace'
 												? $t('recordings.edit.choosePdfReplacement')
 												: recExistingTranscript
@@ -3721,9 +4515,28 @@
 					<!-- Audio replace — destructive: overwrites the published MP3 -->
 					<div class="mt-6 min-w-0 border-t border-stone-100 pt-5">
 						<div class="flex flex-col gap-2">
-							<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.edit.audioLabel')}</span>
+							<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
+								>{$t('recordings.edit.audioLabel')}</span
+							>
+
+							<label class="flex flex-wrap items-center gap-2 pb-1">
+								<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
+									>{$t('recordings.edit.originalAudioLanguage')}</span
+								>
+								<select
+									bind:value={recOriginalAudioLang}
+									disabled={recSaving}
+									class="border border-stone-200 px-2 py-1.5 text-xs focus:border-primary focus:outline-none disabled:opacity-50"
+								>
+									{#each ORIGINAL_AUDIO_LANGS as code (code)}
+										<option value={code}>{audioLangLabel(code)}</option>
+									{/each}
+								</select>
+							</label>
 							{#if recAudioFile && recAudioDurationSec}
-								<div class="flex min-w-0 items-center justify-between gap-3 overflow-hidden border border-amber-200 bg-amber-50/60 px-3 py-2">
+								<div
+									class="flex min-w-0 items-center justify-between gap-3 overflow-hidden border border-amber-200 bg-amber-50/60 px-3 py-2"
+								>
 									<div class="min-w-0 flex-1">
 										<p class="truncate text-xs font-medium text-stone-700">{recAudioFile.name}</p>
 										<p class="text-[10px] text-stone-500 tabular-nums">
@@ -3744,8 +4557,14 @@
 								</p>
 								{#if recAudioUploadPct !== null}
 									<div class="flex flex-col gap-1">
-										<div class="flex items-center justify-between text-[10px] font-mono text-stone-500 tabular-nums">
-											<span>{recAudioUploadPct < 100 ? $t('recordings.common.uploading') : $t('recordings.edit.finalizing')}</span>
+										<div
+											class="flex items-center justify-between text-[10px] font-mono text-stone-500 tabular-nums"
+										>
+											<span
+												>{recAudioUploadPct < 100
+													? $t('recordings.common.uploading')
+													: $t('recordings.edit.finalizing')}</span
+											>
 											<span>{recAudioUploadPct}%</span>
 										</div>
 										<div class="h-1.5 w-full overflow-hidden rounded-full bg-stone-200">
@@ -3758,7 +4577,9 @@
 								{/if}
 							{:else}
 								<div class="flex items-center gap-2">
-									<label class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary">
+									<label
+										class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary"
+									>
 										{$t('recordings.edit.replaceAudio')}
 										<input
 											type="file"
@@ -3777,6 +4598,136 @@
 						</div>
 					</div>
 
+					<!-- French audio version — optional second track listeners can switch to -->
+					<div class="mt-6 min-w-0 border-t border-stone-100 pt-5">
+						<div class="flex flex-col gap-2">
+							<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
+								>{$t('recordings.edit.frenchAudioLabel')}</span
+							>
+							<p class="text-[10px] text-stone-400">{$t('recordings.edit.frenchAudioHint')}</p>
+
+							{#if recFrenchAudioFile && recFrenchAudioDurationSec}
+								<div
+									class="flex min-w-0 items-center justify-between gap-3 overflow-hidden border border-amber-200 bg-amber-50/60 px-3 py-2"
+								>
+									<div class="min-w-0 flex-1">
+										<p class="truncate text-xs font-medium text-stone-700">
+											{recFrenchAudioFile.name}
+										</p>
+										<p class="text-[10px] text-stone-500 tabular-nums">
+											{formatBytes(recFrenchAudioFile.size)} · {formatDuration(
+												recFrenchAudioDurationSec
+											)}
+										</p>
+									</div>
+									<button
+										type="button"
+										onclick={clearStagedRecFrenchAudio}
+										disabled={recSaving}
+										class="text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 hover:text-stone-700 disabled:opacity-50"
+									>
+										{$t('recordings.edit.keepExisting')}
+									</button>
+								</div>
+								{#if recFrenchAudioUploadPct !== null}
+									<div class="flex flex-col gap-1">
+										<div
+											class="flex items-center justify-between text-[10px] font-mono text-stone-500 tabular-nums"
+										>
+											<span
+												>{recFrenchAudioUploadPct < 100
+													? $t('recordings.common.uploading')
+													: $t('recordings.edit.finalizing')}</span
+											>
+											<span>{recFrenchAudioUploadPct}%</span>
+										</div>
+										<div class="h-1.5 w-full overflow-hidden rounded-full bg-stone-200">
+											<div
+												class="h-full bg-primary transition-[width] duration-150 ease-out"
+												style:width="{recFrenchAudioUploadPct}%"
+											></div>
+										</div>
+									</div>
+								{/if}
+							{:else if recFrenchAudioRemove}
+								<div
+									class="flex min-w-0 items-center justify-between gap-3 border border-red-200 bg-red-50/60 px-3 py-2"
+								>
+									<p class="truncate text-xs font-medium text-red-700">
+										{$t('recordings.common.remove')}
+									</p>
+									<button
+										type="button"
+										onclick={() => (recFrenchAudioRemove = false)}
+										disabled={recSaving}
+										class="text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 hover:text-stone-700 disabled:opacity-50"
+									>
+										{$t('recordings.edit.keepExisting')}
+									</button>
+								</div>
+							{:else if editingRec.french_audio_s3_url}
+								<div
+									class="flex min-w-0 items-center justify-between gap-3 overflow-hidden border border-green-200 bg-green-50/60 px-3 py-2"
+								>
+									<div class="min-w-0 flex-1">
+										<p class="truncate text-xs font-medium text-green-900">
+											{$t('recordings.edit.frenchAudioAttached')}
+										</p>
+										{#if editingRec.french_audio_size_bytes}
+											<p class="text-[10px] text-green-800/80 tabular-nums">
+												{formatBytes(
+													editingRec.french_audio_size_bytes
+												)}{#if editingRec.french_audio_duration_sec}
+													· {formatDuration(editingRec.french_audio_duration_sec)}{/if}
+											</p>
+										{/if}
+									</div>
+									<div class="flex shrink-0 items-center gap-3">
+										<label
+											class="cursor-pointer text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 hover:text-primary"
+										>
+											{$t('recordings.edit.replaceAudio')}
+											<input
+												type="file"
+												accept="audio/mpeg,audio/mp3,.mp3"
+												class="hidden"
+												onchange={onRecFrenchAudioFileChange}
+												disabled={recSaving}
+											/>
+										</label>
+										<button
+											type="button"
+											onclick={markRecFrenchAudioRemove}
+											disabled={recSaving}
+											class="text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 hover:text-red-600 disabled:opacity-50"
+										>
+											{$t('recordings.common.remove')}
+										</button>
+									</div>
+								</div>
+							{:else}
+								<div class="flex items-center gap-2">
+									<label
+										class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary"
+									>
+										{$t('recordings.edit.addFrenchAudio')}
+										<input
+											type="file"
+											accept="audio/mpeg,audio/mp3,.mp3"
+											class="hidden"
+											onchange={onRecFrenchAudioFileChange}
+											disabled={recSaving}
+										/>
+									</label>
+									<p class="text-[10px] text-stone-400">{$t('recordings.edit.audioFormats')}</p>
+								</div>
+							{/if}
+							{#if recFrenchAudioError}
+								<p class="bg-red-50 px-3 py-2 text-xs text-red-700">{recFrenchAudioError}</p>
+							{/if}
+						</div>
+					</div>
+
 					<!-- Replay subtitles: per-recording .srt + sync offset + hide toggle -->
 					<div class="mt-6 min-w-0 border-t border-stone-100 pt-5">
 						<div class="flex flex-col gap-2">
@@ -3786,10 +4737,16 @@
 							<p class="text-[10px] text-stone-400">{$t('recordings.edit.subtitleHint')}</p>
 
 							{#if recSubtitleFile}
-								<div class="flex min-w-0 items-center justify-between gap-3 overflow-hidden border border-amber-200 bg-amber-50/60 px-3 py-2">
+								<div
+									class="flex min-w-0 items-center justify-between gap-3 overflow-hidden border border-amber-200 bg-amber-50/60 px-3 py-2"
+								>
 									<div class="min-w-0 flex-1">
-										<p class="truncate text-xs font-medium text-stone-700">{recSubtitleFile.name}</p>
-										<p class="text-[10px] text-stone-500 tabular-nums">{formatBytes(recSubtitleFile.size)}</p>
+										<p class="truncate text-xs font-medium text-stone-700">
+											{recSubtitleFile.name}
+										</p>
+										<p class="text-[10px] text-stone-500 tabular-nums">
+											{formatBytes(recSubtitleFile.size)}
+										</p>
 									</div>
 									<button
 										type="button"
@@ -3801,8 +4758,12 @@
 									</button>
 								</div>
 							{:else if recSubtitleAction === 'remove'}
-								<div class="flex min-w-0 items-center justify-between gap-3 border border-red-200 bg-red-50/60 px-3 py-2">
-									<p class="truncate text-xs font-medium text-red-700">{$t('recordings.common.remove')}</p>
+								<div
+									class="flex min-w-0 items-center justify-between gap-3 border border-red-200 bg-red-50/60 px-3 py-2"
+								>
+									<p class="truncate text-xs font-medium text-red-700">
+										{$t('recordings.common.remove')}
+									</p>
 									<button
 										type="button"
 										onclick={clearStagedRecSubtitle}
@@ -3813,12 +4774,24 @@
 									</button>
 								</div>
 							{:else if editingRec.subtitle_filename}
-								<div class="flex min-w-0 items-center justify-between gap-3 overflow-hidden border border-green-200 bg-green-50/60 px-3 py-2">
-									<p class="truncate text-xs font-medium text-green-900">{editingRec.subtitle_filename}</p>
+								<div
+									class="flex min-w-0 items-center justify-between gap-3 overflow-hidden border border-green-200 bg-green-50/60 px-3 py-2"
+								>
+									<p class="truncate text-xs font-medium text-green-900">
+										{editingRec.subtitle_filename}
+									</p>
 									<div class="flex shrink-0 items-center gap-3">
-										<label class="cursor-pointer text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 hover:text-primary">
+										<label
+											class="cursor-pointer text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 hover:text-primary"
+										>
 											{$t('recordings.edit.replaceSubtitle')}
-											<input type="file" accept=".srt,text/plain" class="hidden" onchange={onRecSubtitleFileChange} disabled={recSaving} />
+											<input
+												type="file"
+												accept=".srt,text/plain"
+												class="hidden"
+												onchange={onRecSubtitleFileChange}
+												disabled={recSaving}
+											/>
 										</label>
 										<button
 											type="button"
@@ -3832,9 +4805,17 @@
 								</div>
 							{:else}
 								<div class="flex items-center gap-2">
-									<label class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary">
+									<label
+										class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary"
+									>
 										{$t('recordings.edit.addSubtitle')}
-										<input type="file" accept=".srt,text/plain" class="hidden" onchange={onRecSubtitleFileChange} disabled={recSaving} />
+										<input
+											type="file"
+											accept=".srt,text/plain"
+											class="hidden"
+											onchange={onRecSubtitleFileChange}
+											disabled={recSaving}
+										/>
 									</label>
 									<p class="text-[10px] text-stone-400">{$t('recordings.edit.subtitleFormats')}</p>
 								</div>
@@ -3842,7 +4823,9 @@
 
 							{#if recSubtitleFile || (editingRec.subtitle_filename && recSubtitleAction !== 'remove')}
 								<label class="mt-1 flex flex-col gap-1">
-									<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{$t('recordings.edit.subtitleOffsetLabel')}</span>
+									<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
+										>{$t('recordings.edit.subtitleOffsetLabel')}</span
+									>
 									<input
 										type="number"
 										step="0.1"
@@ -3850,15 +4833,26 @@
 										disabled={recSaving}
 										class="w-32 border border-stone-200 px-2 py-1.5 text-xs tabular-nums focus:border-primary focus:outline-none disabled:opacity-50"
 									/>
-									<span class="text-[10px] text-stone-400">{$t('recordings.edit.subtitleOffsetHint')}</span>
+									<span class="text-[10px] text-stone-400"
+										>{$t('recordings.edit.subtitleOffsetHint')}</span
+									>
 								</label>
 							{/if}
 
 							<label class="mt-1 flex items-start gap-2">
-								<input type="checkbox" bind:checked={recSubtitlesHidden} disabled={recSaving} class="mt-0.5" />
+								<input
+									type="checkbox"
+									bind:checked={recSubtitlesHidden}
+									disabled={recSaving}
+									class="mt-0.5"
+								/>
 								<span class="flex flex-col">
-									<span class="text-xs font-medium text-stone-700">{$t('recordings.edit.subtitleHide')}</span>
-									<span class="text-[10px] text-stone-400">{$t('recordings.edit.subtitleHideHint')}</span>
+									<span class="text-xs font-medium text-stone-700"
+										>{$t('recordings.edit.subtitleHide')}</span
+									>
+									<span class="text-[10px] text-stone-400"
+										>{$t('recordings.edit.subtitleHideHint')}</span
+									>
 								</span>
 							</label>
 
@@ -3870,7 +4864,9 @@
 				</div>
 
 				<!-- Modal footer -->
-				<div class="flex flex-wrap items-center justify-end gap-2 border-t border-stone-100 px-4 py-4 sm:px-6">
+				<div
+					class="flex flex-wrap items-center justify-end gap-2 border-t border-stone-100 px-4 py-4 sm:px-6"
+				>
 					<button
 						type="button"
 						onclick={cancelRecordingEdit}
@@ -3901,7 +4897,6 @@
 	/>
 {/if}
 
-
 {#if thumbnailExpanded && broadcast.thumbnail_url && !broadcastThumbnailBroken}
 	<!-- Lightbox: click backdrop or press Escape to close. -->
 	<div
@@ -3919,7 +4914,16 @@
 			aria-label={$t('recordings.common.close')}
 			class="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
 		>
-			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+			<svg
+				width="18"
+				height="18"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
 				<path d="M6 6l12 12M6 18L18 6" />
 			</svg>
 		</button>
@@ -3941,13 +4945,17 @@
 	.default-thumbnail-admin {
 		background:
 			radial-gradient(circle at 30% 20%, rgba(255, 136, 12, 0.08), transparent 60%),
-			linear-gradient(135deg, #FAF6F1 0%, #F1EAE0 100%);
+			linear-gradient(135deg, #faf6f1 0%, #f1eae0 100%);
 	}
 	.animate-lightbox-in {
 		animation: lightbox-fade 0.18s ease-out;
 	}
 	@keyframes lightbox-fade {
-		from { opacity: 0; }
-		to { opacity: 1; }
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
 	}
 </style>

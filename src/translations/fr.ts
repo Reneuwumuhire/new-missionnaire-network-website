@@ -62,6 +62,11 @@ export default {
 	'lang.french': 'Français',
 	'lang.english': 'English',
 
+	// ── Audio language names (replay version switch) ────────────
+	'lang.name.rw': 'Kinyarwanda',
+	'lang.name.fr': 'Français',
+	'lang.name.en': 'Anglais',
+
 	// ── Lists, search & filters ─────────────────────────────────
 	'list.loading': 'Chargement...',
 	'list.empty': 'Aucun élément à afficher.',
@@ -416,6 +421,7 @@ export default {
 	'rediffDetail.about': 'À propos de ce direct',
 	'rediffDetail.close': 'Fermer',
 	'rediffDetail.lightboxAria': 'Vignette du direct',
+	'rediffDetail.audioLanguage': 'Langue audio',
 
 	// ── Questions / ask page ────────────────────────────────────
 	'questions.allQuestions': 'Toutes les questions',

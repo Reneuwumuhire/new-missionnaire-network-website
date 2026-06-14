@@ -21,9 +21,9 @@
 
 	let rec = $derived(data.recording);
 	let transcript = $derived(data.transcript);
-	let youtubeUrl = $derived(rec.source_video_id
-		? `https://www.youtube.com/watch?v=${rec.source_video_id}`
-		: null);
+	let youtubeUrl = $derived(
+		rec.source_video_id ? `https://www.youtube.com/watch?v=${rec.source_video_id}` : null
+	);
 
 	let thumbnailExpanded = $state(false);
 	let thumbnailBroken = $state(false);
@@ -36,31 +36,95 @@
 	// resume-after-interruption logic. The rediffusion is shaped as a
 	// single-item MusicAudio-compatible entry so it plugs into the
 	// existing selectAudio/playlist stores without special-casing.
-	let playable = $derived({
-		_id: rec.id,
-		book: null,
-		book_full_name: null,
-		number: null,
-		title: rec.title,
-		artist: 'Missionnaire Network',
-		category: 'Direct',
-		s3_key: '',
-		s3_url: rec.s3_url,
-		file_size: rec.size_bytes ?? 0,
-		duration: rec.duration_sec ?? undefined,
-		format: 'mp3',
-		uploaded_at: new Date(rec.started_at),
-		thumbnail_url: rec.thumbnail_url ?? undefined
-	} satisfies MusicAudio & { thumbnail_url?: string });
+	// ── Audio language version ─────────────────────────────────────
+	// The primary `s3_url` is the original broadcast capture; the admin can
+	// attach a French dub. Listeners switch between them; switching re-loads
+	// the global player with the chosen file.
+	type AudioVersion = 'original' | 'french';
+	let audioVersion = $state<AudioVersion>('original');
+	let hasFrenchAudio = $derived(Boolean(rec.french_audio_url));
 
-	// Is *this* recording currently loaded into the global player? Used
-	// to flip the button label between "Écouter" and the play/pause
-	// state the bottom bar is showing.
+	/** Display name for an audio-language code, kept type-safe (no dynamic key). */
+	function languageName(code: string): string {
+		switch (code) {
+			case 'rw':
+				return $t('lang.name.rw');
+			case 'fr':
+				return $t('lang.name.fr');
+			case 'en':
+				return $t('lang.name.en');
+			default:
+				return code;
+		}
+	}
+
+	// The two pickable versions, labelled by their actual language (the original
+	// capture's language is admin-set; the French dub is always Français).
+	let audioVersions = $derived([
+		{ id: 'original' as AudioVersion, label: languageName(rec.original_audio_language) },
+		{ id: 'french' as AudioVersion, label: $t('lang.name.fr') }
+	]);
+
+	function urlFor(v: AudioVersion): string {
+		return v === 'french' && rec.french_audio_url ? rec.french_audio_url : rec.s3_url;
+	}
+	function durationFor(v: AudioVersion): number | undefined {
+		const d =
+			v === 'french' && rec.french_audio_duration_sec != null
+				? rec.french_audio_duration_sec
+				: rec.duration_sec;
+		return d ?? undefined;
+	}
+	function sizeFor(v: AudioVersion): number {
+		const s =
+			v === 'french' && rec.french_audio_size_bytes != null
+				? rec.french_audio_size_bytes
+				: rec.size_bytes;
+		return s ?? 0;
+	}
+	function titleFor(v: AudioVersion): string {
+		return v === 'french' ? `${rec.title} (Français)` : rec.title;
+	}
+
+	function buildPlayable(v: AudioVersion) {
+		return {
+			_id: rec.id,
+			book: null,
+			book_full_name: null,
+			number: null,
+			title: rec.title,
+			artist: 'Missionnaire Network',
+			category: 'Direct',
+			s3_key: '',
+			s3_url: urlFor(v),
+			file_size: sizeFor(v),
+			duration: durationFor(v),
+			format: 'mp3',
+			uploaded_at: new Date(rec.started_at),
+			thumbnail_url: rec.thumbnail_url ?? undefined
+		} satisfies MusicAudio & { thumbnail_url?: string };
+	}
+
+	let activeAudioUrl = $derived(urlFor(audioVersion));
+	let playable = $derived(buildPlayable(audioVersion));
+
+	// Is *this* recording (either language version) currently loaded into the
+	// global player? Flips the button label between "Écouter" and play/pause.
 	const isCurrent = derivedStore(selectAudio, ($sel) => {
 		if (!$sel) return false;
 		const url = 's3_url' in $sel ? $sel.s3_url : '';
-		return url === rec?.s3_url;
+		return url === rec?.s3_url || (!!rec?.french_audio_url && url === rec.french_audio_url);
 	});
+
+	function loadVersionIntoPlayer(v: AudioVersion, play: boolean) {
+		const next = buildPlayable(v);
+		const single = [next] as unknown as MusicAudio[];
+		basePlaylist.set(single);
+		playlist.set(single);
+		currentIndex.set(0);
+		selectAudio.set(next as unknown as MusicAudio);
+		isPlaying.set(play);
+	}
 
 	function playRecording() {
 		if ($isCurrent) {
@@ -69,12 +133,16 @@
 			dispatchAudioPlayerAction('toggle');
 			return;
 		}
-		const single = [playable] as unknown as MusicAudio[];
-		basePlaylist.set(single);
-		playlist.set(single);
-		currentIndex.set(0);
-		selectAudio.set(playable as unknown as MusicAudio);
-		isPlaying.set(true);
+		loadVersionIntoPlayer(audioVersion, true);
+	}
+
+	/** Switch language — load the chosen version into the player and play it so
+	 *  the selection always takes audible effect. If it was already playing this
+	 *  recording, keep playing; otherwise the tap (a user gesture) starts it. */
+	function setAudioVersion(v: AudioVersion) {
+		if (v === audioVersion) return;
+		audioVersion = v;
+		loadVersionIntoPlayer(v, true);
 	}
 
 	// ── Share ──────────────────────────────────────────────────────
@@ -86,8 +154,9 @@
 	let shareFeedback: 'copied' | 'error' | null = $state(null);
 	let shareFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
 	let shareWrapEl: HTMLElement | null = $state(null);
-	let hasNativeShare =
-		$derived(browser && typeof navigator !== 'undefined' && typeof navigator.share === 'function');
+	let hasNativeShare = $derived(
+		browser && typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+	);
 
 	function buildShareUrl(): string {
 		if (!browser) return '';
@@ -165,11 +234,7 @@
 		if ($page.url.searchParams.get('autoplay') !== '1') return;
 		playRecording();
 		try {
-			window.history.replaceState(
-				window.history.state,
-				'',
-				`/live/rediffusions/${rec.id}`
-			);
+			window.history.replaceState(window.history.state, '', `/live/rediffusions/${rec.id}`);
 		} catch {
 			/* history API unavailable — harmless */
 		}
@@ -225,7 +290,7 @@
 	}
 
 	async function downloadAudio() {
-		if (!rec.s3_url) return;
+		if (!activeAudioUrl) return;
 		// Click while in-flight = cancel.
 		if (isDownloading && downloadController) {
 			downloadController.abort();
@@ -238,9 +303,9 @@
 		downloadLoaded = 0;
 		downloadFailed = false;
 		try {
-			await downloadAudioFile(rec.s3_url, rec.title, {
+			await downloadAudioFile(activeAudioUrl, titleFor(audioVersion), {
 				signal: controller.signal,
-				totalBytesHint: rec.size_bytes ?? 0,
+				totalBytesHint: sizeFor(audioVersion),
 				onProgress: (p) => {
 					downloadPercent = p.percent;
 					downloadLoaded = p.loaded;
@@ -324,7 +389,7 @@
 	// fill) — the old full-width rows used `hover:bg-missionnaire` which
 	// stuck after click/tap and read as a phantom active state.
 	const secondaryAction =
-		'inline-flex min-h-[44px] w-full sm:w-auto items-center justify-center gap-2 border px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.15em] font-body transition-colors duration-200 motion-reduce:transition-none hover:border-missionnaire/60 hover:text-missionnaire hover:bg-missionnaire/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40';
+		'inline-flex flex-1 sm:flex-none min-w-fit min-h-[44px] items-center justify-center gap-2 whitespace-nowrap border px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.15em] font-body transition-colors duration-200 motion-reduce:transition-none hover:border-missionnaire/60 hover:text-missionnaire hover:bg-missionnaire/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40';
 </script>
 
 <!-- Title/description/og:*/canonical come from `meta` in this route's
@@ -425,7 +490,9 @@
 
 			<!-- Title, meta and actions -->
 			<div class="min-w-0 flex-1">
-				<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-2 font-body">
+				<p
+					class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-2 font-body"
+				>
 					{$t('rediffDetail.kicker')}
 				</p>
 				<h1
@@ -442,6 +509,66 @@
 					{displayViews >= 2 ? $t('rediffDetail.viewPlural') : $t('rediffDetail.viewSingular')}
 				</p>
 
+				<!-- Audio language switch — only when a French version is attached -->
+				{#if hasFrenchAudio}
+					<div class="mt-5">
+						<p
+							class="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-stone-400 font-body"
+						>
+							{$t('rediffDetail.audioLanguage')}
+						</p>
+						<div
+							class="flex flex-wrap gap-2"
+							role="group"
+							aria-label={$t('rediffDetail.audioLanguage')}
+						>
+							{#each audioVersions as v (v.id)}
+								<button
+									type="button"
+									onclick={() => setAudioVersion(v.id)}
+									aria-pressed={audioVersion === v.id}
+									class="inline-flex min-h-[40px] items-center gap-2 rounded-full border px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] font-body transition-colors duration-200 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40 {audioVersion ===
+									v.id
+										? 'border-missionnaire bg-missionnaire text-white shadow-sm'
+										: 'border-stone-200/70 bg-white/50 text-stone-600 hover:border-missionnaire/50 hover:text-missionnaire'}"
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"
+									>
+										<circle cx="12" cy="12" r="9" />
+										<path d="M3 12h18" />
+										<path d="M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18" />
+									</svg>
+									<span>{v.label}</span>
+									{#if audioVersion === v.id}
+										<svg
+											width="13"
+											height="13"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="3"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											aria-hidden="true"
+										>
+											<path d="M5 13l4 4L19 7" />
+										</svg>
+									{/if}
+								</button>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
 				<!-- Primary action -->
 				<div class="mt-6">
 					<button
@@ -455,13 +582,25 @@
 						class="inline-flex min-h-[44px] w-full items-center justify-center gap-3 whitespace-nowrap bg-missionnaire px-8 py-3 text-sm font-bold uppercase tracking-[0.2em] font-body text-white transition-colors duration-200 motion-reduce:transition-none hover:bg-missionnaire/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40 md:w-auto md:min-w-[14rem]"
 					>
 						{#if $isCurrent && $isPlaying}
-							<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+							<svg
+								width="14"
+								height="14"
+								viewBox="0 0 24 24"
+								fill="currentColor"
+								aria-hidden="true"
+							>
 								<rect x="6" y="5" width="4" height="14" rx="1" />
 								<rect x="14" y="5" width="4" height="14" rx="1" />
 							</svg>
 							<span>{$t('rediffDetail.playingPause')}</span>
 						{:else}
-							<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+							<svg
+								width="14"
+								height="14"
+								viewBox="0 0 24 24"
+								fill="currentColor"
+								aria-hidden="true"
+							>
 								<path d="M8 5v14l11-7z" />
 							</svg>
 							<span>{$isCurrent ? $t('rediffDetail.resume') : $t('rediffusions.listen')}</span>
@@ -469,9 +608,10 @@
 					</button>
 				</div>
 
-				<!-- Secondary actions: compact outlined icon+label buttons,
-				     2×2 grid on mobile, inline wrap from sm up. -->
-				<div class="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+				<!-- Secondary actions: compact outlined icon+label buttons that size
+				     to their content and wrap to the next row as needed, so labels
+				     never break mid-word in narrow cells. -->
+				<div class="mt-3 flex flex-wrap gap-2">
 					<button
 						type="button"
 						onclick={downloadAudio}
@@ -483,7 +623,9 @@
 									})
 							: $t('rediffDetail.downloadAria')}
 						class="download-btn group relative overflow-hidden border-stone-300/70 text-stone-600 {secondaryAction}"
-						style={isDownloading && downloadPercent !== null ? `--progress: ${downloadPercent}%` : ''}
+						style={isDownloading && downloadPercent !== null
+							? `--progress: ${downloadPercent}%`
+							: ''}
 					>
 						{#if isDownloading}
 							{#if downloadPercent !== null}
@@ -545,15 +687,15 @@
 								/>
 							</svg>
 							{$t('rediffDetail.download')}
-							{#if rec.size_bytes}
+							{#if sizeFor(audioVersion)}
 								<span class="font-normal tracking-normal text-stone-400"
-									>· {formatBytes(rec.size_bytes)}</span
+									>· {formatBytes(sizeFor(audioVersion))}</span
 								>
 							{/if}
 						{/if}
 					</button>
 
-					<div class="relative" bind:this={shareWrapEl}>
+					<div class="relative flex-1 sm:flex-none" bind:this={shareWrapEl}>
 						<button
 							type="button"
 							onclick={(e) => {
@@ -563,7 +705,7 @@
 							aria-haspopup="menu"
 							aria-expanded={isShareMenuOpen}
 							aria-label={$t('rediffDetail.shareAria')}
-							class="{secondaryAction} {isShareMenuOpen
+							class="{secondaryAction} w-full sm:w-auto {isShareMenuOpen
 								? 'border-missionnaire/60 bg-missionnaire/5 text-missionnaire'
 								: 'border-stone-300/70 text-stone-600'}"
 						>
@@ -689,7 +831,13 @@
 							rel="noopener noreferrer"
 							class="border-stone-300/70 text-stone-600 {secondaryAction}"
 						>
-							<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+							<svg
+								width="14"
+								height="14"
+								viewBox="0 0 24 24"
+								fill="currentColor"
+								aria-hidden="true"
+							>
 								<path
 									d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"
 								/>

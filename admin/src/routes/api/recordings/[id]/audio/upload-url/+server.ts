@@ -15,15 +15,23 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
 	const rec = await getRecordingById(id);
 	if (!rec) throw error(404, 'Enregistrement introuvable');
 
-	const body = (await request.json()) as { contentType?: unknown };
+	const body = (await request.json()) as { contentType?: unknown; variant?: unknown };
 	const contentType = typeof body.contentType === 'string' ? body.contentType : '';
 	if (!ALLOWED_CONTENT_TYPES.has(contentType)) {
 		throw error(400, 'Type de fichier non autorisé (MP3 uniquement)');
 	}
 
+	// `french` = the optional French-language audio version; anything else is the
+	// primary/original audio. Distinct key prefixes keep the two separable when
+	// finalizing.
+	const variant = body.variant === 'french' ? 'french' : 'original';
+
 	// Use a timestamped key so the new file has a different URL from the old —
 	// breaks any immutable browser/CDN caches pointing at the old audio.
-	const s3Key = `recordings/${id}-${Date.now()}.mp3`;
+	const s3Key =
+		variant === 'french'
+			? `recordings/${id}-french-${Date.now()}.mp3`
+			: `recordings/${id}-${Date.now()}.mp3`;
 	const uploadUrl = await generatePresignedUploadUrl(s3Key, contentType);
 
 	return json({ uploadUrl, s3Key, s3Url: getS3Url(s3Key) });

@@ -39,7 +39,7 @@
 		lines?: LyricLine[];
 		currentTime?: number;
 		fullscreenMobile?: boolean;
-		// never fire from programmatic scrollIntoView, so no flag juggling.
+		// never fire from our programmatic panel scroll, so no flag juggling.
 		pauseOnUserScroll?: boolean;
 		fullscreenLarge?: boolean;
 		onseek?: (detail: { time: number }) => void;
@@ -83,13 +83,26 @@
 		updateScrollDirection();
 	}
 
+	/** Center the active line WITHIN the panel's own scroll area only. We avoid
+	 *  element.scrollIntoView() because it scrolls every scrollable ancestor —
+	 *  including the document — which yanks the whole page as the passage
+	 *  advances. Scrolling just the panel keeps the page where the reader left
+	 *  it. */
+	function scrollActiveLineIntoPanel(smooth: boolean) {
+		const el = lineElements[activeLineIndex];
+		if (!el || !panelElement) return;
+		const panelRect = panelElement.getBoundingClientRect();
+		const elRect = el.getBoundingClientRect();
+		const delta = elRect.top + elRect.height / 2 - (panelRect.top + panelRect.height / 2);
+		panelElement.scrollTo({
+			top: panelElement.scrollTop + delta,
+			behavior: smooth ? 'smooth' : 'auto'
+		});
+	}
+
 	function resumeAutoScroll() {
 		userScrolled = false;
-		const activeElement = lineElements[activeLineIndex];
-		activeElement?.scrollIntoView({
-			block: 'center',
-			behavior: prefersReducedMotion ? 'auto' : 'smooth'
-		});
+		scrollActiveLineIntoPanel(!prefersReducedMotion);
 	}
 
 	function coerceSeconds(value: unknown): number | null {
@@ -202,14 +215,8 @@
 		if (activeLineIndex !== previousActiveLineIndex) {
 			previousActiveLineIndex = activeLineIndex;
 			if (activeLineIndex >= 0 && !userScrolled) {
-				void tick().then(() => {
-					const activeElement = lineElements[activeLineIndex];
-					if (!activeElement || !panelElement) return;
-					activeElement.scrollIntoView({
-						block: 'center',
-						behavior: prefersReducedMotion ? 'auto' : 'smooth'
-					});
-				});
+				// Follow within the panel only — never scroll the page.
+				void tick().then(() => scrollActiveLineIntoPanel(!prefersReducedMotion));
 			}
 		}
 	});
