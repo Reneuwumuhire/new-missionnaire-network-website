@@ -509,6 +509,17 @@ const en: Record<keyof typeof fr, string> = {
 		'The text follows the audio you hear — it rewinds with you if you go back.',
 	'liveTranscript.fullscreenDialogAria': 'Transcript in fullscreen',
 	'liveTranscript.exitFullscreen': 'Exit fullscreen',
+	'liveTranscript.appearance': 'Display',
+	'liveTranscript.theme': 'Theme',
+	'liveTranscript.textSize': 'Text size',
+	'liveTranscript.theme.cream': 'Cream',
+	'liveTranscript.theme.sepia': 'Sepia',
+	'liveTranscript.theme.dark': 'Dark',
+	'liveTranscript.theme.contrast': 'High contrast',
+	'liveTranscript.size.sm': 'Small',
+	'liveTranscript.size.md': 'Normal',
+	'liveTranscript.size.lg': 'Large',
+	'liveTranscript.size.xl': 'Extra large',
 
 	'shareLive.share': 'Share the live stream',
 

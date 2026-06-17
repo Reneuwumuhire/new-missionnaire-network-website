@@ -510,6 +510,17 @@ export default {
 		"Le texte suit l'audio que vous entendez — il recule avec vous si vous revenez en arrière.",
 	'liveTranscript.fullscreenDialogAria': 'Transcription en plein écran',
 	'liveTranscript.exitFullscreen': 'Quitter le plein écran',
+	'liveTranscript.appearance': 'Affichage',
+	'liveTranscript.theme': 'Thème',
+	'liveTranscript.textSize': 'Taille du texte',
+	'liveTranscript.theme.cream': 'Crème',
+	'liveTranscript.theme.sepia': 'Sépia',
+	'liveTranscript.theme.dark': 'Sombre',
+	'liveTranscript.theme.contrast': 'Contraste élevé',
+	'liveTranscript.size.sm': 'Petit',
+	'liveTranscript.size.md': 'Normal',
+	'liveTranscript.size.lg': 'Grand',
+	'liveTranscript.size.xl': 'Très grand',
 
 	'shareLive.share': 'Partager le direct',
 

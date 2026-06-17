@@ -4,7 +4,12 @@
 	import { livePlayback, replayPlayback } from '$lib/stores/global';
 	import { parseSrt, type SrtCue } from '$lib/utils/srt';
 	import { dispatchAudioPlayerSeek } from '$lib/utils/audioPlayerControls';
-	import { t } from '../../i18n';
+	import {
+		subtitlePrefs,
+		type SubtitleTheme,
+		type SubtitleSize
+	} from '$lib/stores/subtitlePrefs';
+	import { t, type TranslationKey } from '../../i18n';
 	import SyncedLyrics from './SyncedLyrics.svelte';
 
 	// Synced sermon transcript, two modes sharing the same renderer:
@@ -60,6 +65,29 @@
 
 	let pollTimer: ReturnType<typeof setInterval> | null = null;
 	let tickTimer: ReturnType<typeof setInterval> | null = null;
+
+	// ── Reader appearance (theme + text size) ──────────────────
+	// Persisted per-listener; lets people pick a palette that's easy on their
+	// eyes and a comfortable text size for long reads.
+	let settingsOpen = $state(false);
+	const THEME_OPTIONS: { key: SubtitleTheme; swatch: string; ink: string; titleKey: TranslationKey }[] = [
+		{ key: 'cream', swatch: '#fbf8f3', ink: '#2a2521', titleKey: 'liveTranscript.theme.cream' },
+		{ key: 'sepia', swatch: '#f4ecd9', ink: '#43361f', titleKey: 'liveTranscript.theme.sepia' },
+		{ key: 'dark', swatch: '#1c1a17', ink: '#f2ece3', titleKey: 'liveTranscript.theme.dark' },
+		{ key: 'contrast', swatch: '#ffffff', ink: '#111111', titleKey: 'liveTranscript.theme.contrast' }
+	];
+	const SIZE_OPTIONS: { key: SubtitleSize; label: string; titleKey: TranslationKey }[] = [
+		{ key: 'sm', label: 'A', titleKey: 'liveTranscript.size.sm' },
+		{ key: 'md', label: 'A', titleKey: 'liveTranscript.size.md' },
+		{ key: 'lg', label: 'A', titleKey: 'liveTranscript.size.lg' },
+		{ key: 'xl', label: 'A', titleKey: 'liveTranscript.size.xl' }
+	];
+
+	function onWindowPointerDown(e: PointerEvent) {
+		if (!settingsOpen) return;
+		const target = e.target as HTMLElement | null;
+		if (target && !target.closest('[data-subtitle-settings]')) settingsOpen = false;
+	}
 
 	// ── Fullscreen reading view ─────────────────────────────────
 	// Big dark overlay for comfortable reading (or projecting the text in a
@@ -191,6 +219,7 @@
 
 	onMount(() => {
 		if (!browser) return;
+		subtitlePrefs.init();
 		tickTimer = setInterval(tick, TICK_MS);
 		if (mode === 'live') {
 			void pollLiveState();
@@ -239,7 +268,74 @@
 	let waitingForSync = $derived(mode === 'live' && liveActive && cues.length > 0 && anchorEpochMs === null);
 </script>
 
-<svelte:window onkeydown={handleFullscreenKeydown} />
+<svelte:window onkeydown={handleFullscreenKeydown} onpointerdown={onWindowPointerDown} />
+
+{#snippet appearanceControl(onDark: boolean)}
+	<div class="relative" data-subtitle-settings>
+		<button
+			type="button"
+			onclick={() => (settingsOpen = !settingsOpen)}
+			aria-label={$t('liveTranscript.appearance')}
+			title={$t('liveTranscript.appearance')}
+			aria-expanded={settingsOpen}
+			class="inline-flex items-center gap-1.5 border px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] font-body transition-colors {onDark
+				? 'border-white/20 bg-white/10 text-stone-200 hover:border-white/50 hover:text-white'
+				: 'border-stone-200/60 bg-white/60 text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
+		>
+			<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+				<circle cx="12" cy="12" r="3" />
+				<path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+			</svg>
+			<span>{$t('liveTranscript.appearance')}</span>
+		</button>
+		{#if settingsOpen}
+			<div
+				class="absolute right-0 z-30 mt-2 w-60 border border-stone-200 bg-white p-3.5 shadow-2xl"
+				role="dialog"
+				aria-label={$t('liveTranscript.appearance')}
+			>
+				<p class="mb-1.5 text-[9px] font-bold uppercase tracking-[0.2em] text-stone-400 font-body">
+					{$t('liveTranscript.theme')}
+				</p>
+				<div class="grid grid-cols-4 gap-2">
+					{#each THEME_OPTIONS as opt (opt.key)}
+						<button
+							type="button"
+							onclick={() => subtitlePrefs.setTheme(opt.key)}
+							aria-pressed={$subtitlePrefs.theme === opt.key}
+							title={$t(opt.titleKey)}
+							class="flex h-10 items-center justify-center rounded-md border font-display text-lg transition-all {$subtitlePrefs.theme === opt.key
+								? 'border-missionnaire ring-2 ring-missionnaire/40'
+								: 'border-stone-200 hover:border-stone-400'}"
+							style="background:{opt.swatch};color:{opt.ink}"
+						>
+							A
+						</button>
+					{/each}
+				</div>
+				<p class="mb-1.5 mt-3.5 text-[9px] font-bold uppercase tracking-[0.2em] text-stone-400 font-body">
+					{$t('liveTranscript.textSize')}
+				</p>
+				<div class="grid grid-cols-4 gap-2">
+					{#each SIZE_OPTIONS as opt, i (opt.key)}
+						<button
+							type="button"
+							onclick={() => subtitlePrefs.setSize(opt.key)}
+							aria-pressed={$subtitlePrefs.size === opt.key}
+							aria-label={$t(opt.titleKey)}
+							class="flex h-10 items-center justify-center rounded-md border font-display leading-none transition-all {$subtitlePrefs.size === opt.key
+								? 'border-missionnaire bg-missionnaire/10 text-missionnaire ring-2 ring-missionnaire/30'
+								: 'border-stone-200 text-stone-600 hover:border-stone-400'}"
+							style="font-size:{[13, 16, 19, 23][i]}px"
+						>
+							{opt.label}
+						</button>
+					{/each}
+				</div>
+			</div>
+		{/if}
+	</div>
+{/snippet}
 
 {#if visible}
 	<div class="border border-stone-200/60 bg-white/40 p-5 md:p-6">
@@ -254,6 +350,7 @@
 						{$t('liveTranscript.waitingSync')}
 					</span>
 				{/if}
+				{@render appearanceControl(false)}
 				<button
 					type="button"
 					onclick={openFullscreen}
@@ -279,7 +376,14 @@
 			</div>
 		</div>
 		{#if !isFullscreen}
-			<SyncedLyrics {lines} currentTime={displayTime} pauseOnUserScroll onseek={handleSeek} />
+			<SyncedLyrics
+				{lines}
+				currentTime={displayTime}
+				pauseOnUserScroll
+				themeKey={$subtitlePrefs.theme}
+				sizeKey={$subtitlePrefs.size}
+				onseek={handleSeek}
+			/>
 		{:else}
 			<p class="py-8 text-center text-xs text-stone-400 font-body">
 				{$t('liveTranscript.shownFullscreen')}
@@ -300,6 +404,7 @@
 	<div
 		use:portal
 		class="transcript-fullscreen fixed inset-0 z-[9990] flex flex-col"
+		class:overlay-dark={$subtitlePrefs.theme === 'dark'}
 		role="dialog"
 		aria-modal="true"
 		aria-label={$t('liveTranscript.fullscreenDialogAria')}
@@ -318,10 +423,12 @@
 						<span class="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
 					</span>
 				{/if}
-				<span class="truncate text-[11px] font-bold uppercase tracking-[0.25em] font-body text-stone-500">
+				<span class="transcript-fs-label truncate text-[11px] font-bold uppercase tracking-[0.25em] font-body text-stone-500">
 					{$t('liveTranscript.title')}{mode === 'live' ? ` · ${$t('live.atLive')}` : ''}
 				</span>
 			</div>
+			<div class="flex items-center gap-2">
+				{@render appearanceControl($subtitlePrefs.theme === 'dark')}
 			<button
 				type="button"
 				onclick={closeFullscreen}
@@ -342,12 +449,15 @@
 					<path d="M6 6l12 12M6 18L18 6" />
 				</svg>
 			</button>
+			</div>
 		</div>
 		<SyncedLyrics
 			{lines}
 			currentTime={displayTime}
 			pauseOnUserScroll
 			fullscreenLarge
+			themeKey={$subtitlePrefs.theme}
+			sizeKey={$subtitlePrefs.size}
 			onseek={handleSeek}
 		/>
 		<!-- Thumb-zone close bar: always visible at the bottom so closing never
@@ -385,6 +495,19 @@
 		background:
 			radial-gradient(circle at 50% -10%, rgba(255, 136, 12, 0.05), transparent 55%),
 			linear-gradient(180deg, #ffffff 0%, #faf6f1 100%);
+	}
+
+	/* Soft-dark reading surface for the dark theme — restful in low light. */
+	.transcript-fullscreen.overlay-dark {
+		background:
+			radial-gradient(circle at 50% -10%, rgba(255, 176, 80, 0.06), transparent 55%),
+			linear-gradient(180deg, #16140f 0%, #201c16 100%);
+	}
+	.transcript-fullscreen.overlay-dark .transcript-fullscreen-header {
+		border-bottom-color: rgba(255, 255, 255, 0.08);
+	}
+	.transcript-fullscreen.overlay-dark .transcript-fs-label {
+		color: #b8afa4;
 	}
 
 	/* Keep the header clear of notches/status bars on phones. */

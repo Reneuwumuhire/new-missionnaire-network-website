@@ -43,6 +43,11 @@
 		pauseOnUserScroll?: boolean;
 		fullscreenLarge?: boolean;
 		onseek?: (detail: { time: number }) => void;
+		// Reader-comfort options (used by the transcript; music lyrics leave these
+		// empty so their palette/size are untouched). `themeKey` swaps the colour
+		// palette + out-of-focus contrast; `sizeKey` scales the text.
+		themeKey?: '' | 'cream' | 'sepia' | 'dark' | 'contrast';
+		sizeKey?: '' | 'sm' | 'md' | 'lg' | 'xl';
 	}
 
 	let {
@@ -51,7 +56,9 @@
 		fullscreenMobile = false,
 		pauseOnUserScroll = false,
 		fullscreenLarge = false,
-		onseek
+		onseek,
+		themeKey = '',
+		sizeKey = ''
 	}: Props = $props();
 
 	let panelElement: HTMLDivElement | undefined = $state();
@@ -240,6 +247,14 @@
 	bind:this={panelElement}
 	class:fullscreen-mobile={fullscreenMobile}
 	class:fullscreen-large={fullscreenLarge}
+	class:subtitle-theme-cream={themeKey === 'cream'}
+	class:subtitle-theme-sepia={themeKey === 'sepia'}
+	class:subtitle-theme-dark={themeKey === 'dark'}
+	class:subtitle-theme-contrast={themeKey === 'contrast'}
+	class:subtitle-size-sm={sizeKey === 'sm'}
+	class:subtitle-size-md={sizeKey === 'md'}
+	class:subtitle-size-lg={sizeKey === 'lg'}
+	class:subtitle-size-xl={sizeKey === 'xl'}
 	class="lyrics-panel"
 	role="group"
 	aria-label={$t('syncedLyrics.label')}
@@ -389,7 +404,7 @@
 		   sans-serif music app. Letter-spacing nudged up for breathing room
 		   at large weights. */
 		font-family: var(--font-display, 'Cormorant Garamond', Georgia, serif);
-		font-size: 1.4rem;
+		font-size: calc(1.4rem * var(--lyric-font-scale, 1));
 		font-weight: 500;
 		line-height: 1.5;
 		letter-spacing: 0.005em;
@@ -399,7 +414,7 @@
 
 	@media (min-width: 768px) {
 		.lyric-text {
-			font-size: 1.625rem;
+			font-size: calc(1.625rem * var(--lyric-font-scale, 1));
 			line-height: 1.55;
 		}
 	}
@@ -595,7 +610,7 @@
 		}
 
 		.lyrics-panel.fullscreen-mobile .lyric-text {
-			font-size: 1.45rem;
+			font-size: calc(1.45rem * var(--lyric-font-scale, 1));
 			line-height: 1.5;
 		}
 	}
@@ -616,13 +631,13 @@
 	/* Bigger type for reading at a distance (projection / across the room) */
 	.lyrics-panel.fullscreen-large .lyric-text {
 		max-width: min(100%, 52rem);
-		font-size: 1.7rem;
+		font-size: calc(1.7rem * var(--lyric-font-scale, 1));
 		line-height: 1.55;
 	}
 
 	@media (min-width: 768px) {
 		.lyrics-panel.fullscreen-large .lyric-text {
-			font-size: 2.2rem;
+			font-size: calc(2.2rem * var(--lyric-font-scale, 1));
 			line-height: 1.6;
 		}
 	}
@@ -663,6 +678,146 @@
 
 	.resume-follow:hover {
 		background: rgba(255, 243, 226, 0.98);
+	}
+
+	/* ─── Reader-comfort themes (transcript only) ─────────────────────────
+	   Opt-in via themeKey. Each palette raises the out-of-focus contrast so
+	   non-active lines stay readable, drops the warm text-glow that tires the
+	   eyes on long reads, and marks the active line with a calm pill highlight
+	   instead. Music lyrics pass no themeKey and keep their original look. */
+	.subtitle-theme-cream {
+		--lyric-color-active: #2a2521;
+		--lyric-color-default: #6e655d;
+		--lyric-color-accent: #b9610f;
+		--subtitle-surface: #fbf8f3;
+		--subtitle-active-bg: rgba(255, 136, 12, 0.1);
+		--subtitle-past: 0.58;
+		--subtitle-future: 0.72;
+		--subtitle-scrollbar: rgba(120, 110, 100, 0.35);
+	}
+	.subtitle-theme-sepia {
+		--lyric-color-active: #43361f;
+		--lyric-color-default: #7a6a4d;
+		--lyric-color-accent: #9a6312;
+		--subtitle-surface: #f4ecd9;
+		--subtitle-active-bg: rgba(154, 99, 18, 0.12);
+		--subtitle-past: 0.62;
+		--subtitle-future: 0.76;
+		--subtitle-scrollbar: rgba(120, 96, 56, 0.4);
+	}
+	.subtitle-theme-dark {
+		--lyric-color-active: #f2ece3;
+		--lyric-color-default: #a89e92;
+		--lyric-color-accent: #eda35a;
+		--subtitle-surface: #1c1a17;
+		--subtitle-active-bg: rgba(255, 176, 80, 0.13);
+		--subtitle-past: 0.5;
+		--subtitle-future: 0.68;
+		--subtitle-scrollbar: rgba(200, 190, 175, 0.3);
+	}
+	.subtitle-theme-contrast {
+		--lyric-color-active: #111111;
+		--lyric-color-default: #3d3d3d;
+		--lyric-color-accent: #8a4500;
+		--subtitle-surface: #ffffff;
+		--subtitle-active-bg: rgba(0, 0, 0, 0.06);
+		--subtitle-past: 0.82;
+		--subtitle-future: 0.9;
+		--subtitle-scrollbar: rgba(60, 60, 60, 0.45);
+	}
+
+	.lyrics-panel:is(
+			.subtitle-theme-cream,
+			.subtitle-theme-sepia,
+			.subtitle-theme-dark,
+			.subtitle-theme-contrast
+		) {
+		/* Glow off — soft pill highlight reads calmer over long sessions. */
+		--lyric-glow-active: transparent;
+		background: var(--subtitle-surface);
+		border-radius: 0.85rem;
+		padding: 0.75rem 0.6rem 1.25rem;
+		scrollbar-color: var(--subtitle-scrollbar) transparent;
+	}
+
+	.lyrics-panel:is(
+			.subtitle-theme-cream,
+			.subtitle-theme-sepia,
+			.subtitle-theme-dark,
+			.subtitle-theme-contrast
+		)::-webkit-scrollbar-thumb {
+		background: var(--subtitle-scrollbar);
+	}
+
+	.lyrics-panel:is(
+			.subtitle-theme-cream,
+			.subtitle-theme-sepia,
+			.subtitle-theme-dark,
+			.subtitle-theme-contrast
+		) .lyric-line.past .lyric-text {
+		opacity: var(--subtitle-past);
+	}
+
+	.lyrics-panel:is(
+			.subtitle-theme-cream,
+			.subtitle-theme-sepia,
+			.subtitle-theme-dark,
+			.subtitle-theme-contrast
+		) .lyric-line.future .lyric-text {
+		opacity: var(--subtitle-future);
+	}
+
+	/* Calm highlight on the active line: subtle tinted pill + weight, no glow. */
+	.lyrics-panel:is(
+			.subtitle-theme-cream,
+			.subtitle-theme-sepia,
+			.subtitle-theme-dark,
+			.subtitle-theme-contrast
+		) .lyric-line.active {
+		background: var(--subtitle-active-bg);
+		border-radius: 0.6rem;
+		text-shadow: none;
+		transform: scale(1.012);
+	}
+
+	.lyrics-panel.subtitle-theme-contrast .lyric-line.active .lyric-text {
+		font-weight: 700;
+	}
+
+	/* In the fullscreen overlay the surface comes from the overlay itself, so
+	   the panel stays transparent to let that backdrop through. */
+	.lyrics-panel:is(
+			.subtitle-theme-cream,
+			.subtitle-theme-sepia,
+			.subtitle-theme-dark,
+			.subtitle-theme-contrast
+		).fullscreen-large {
+		background: transparent;
+		border-radius: 0;
+	}
+
+	/* Dark theme needs a lighter "back to current" pill to stay visible. */
+	.lyrics-panel.subtitle-theme-dark .resume-follow {
+		background: rgba(38, 34, 30, 0.92);
+		color: #eda35a;
+		border-color: rgba(237, 163, 90, 0.4);
+	}
+	.lyrics-panel.subtitle-theme-dark .resume-follow:hover {
+		background: rgba(52, 46, 40, 0.96);
+	}
+
+	/* ─── Text size ──────────────────────────────────────────────────────── */
+	.subtitle-size-sm {
+		--lyric-font-scale: 0.9;
+	}
+	.subtitle-size-md {
+		--lyric-font-scale: 1;
+	}
+	.subtitle-size-lg {
+		--lyric-font-scale: 1.16;
+	}
+	.subtitle-size-xl {
+		--lyric-font-scale: 1.34;
 	}
 
 	@media (prefers-reduced-motion: reduce) {
