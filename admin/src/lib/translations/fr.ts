@@ -1110,6 +1110,8 @@ export default {
 	'recordings.scheduled.confirm.deleteTitle': 'Supprimer cette entrée',
 	'recordings.scheduled.confirm.deleteMessage':
 		'« {title} » sera supprimé définitivement. Son lien de partage cessera de fonctionner.',
+	'recordings.scheduled.confirm.endMessage':
+		'« {title} » se terminera maintenant : le site public n’affichera plus le lecteur en direct et l’entrée passera dans l’historique.',
 	'recordings.scheduled.error.alreadyLive':
 		'Un direct est déjà en cours — terminez-le avant d’en démarrer un autre',
 	'recordings.scheduled.toast.createdLinkCopied': 'Direct programmé — lien de partage copié',
@@ -1118,6 +1120,7 @@ export default {
 	'recordings.scheduled.toast.started': 'Le direct a commencé',
 	'recordings.scheduled.toast.cancelled': 'Direct annulé',
 	'recordings.scheduled.toast.deleted': 'Entrée supprimée',
+	'recordings.scheduled.toast.ended': 'Direct terminé',
 	'recordings.subtitles.title': 'Sous-titres du direct',
 	'recordings.subtitles.subtitle': 'Texte synchronisé affiché aux auditeurs pendant la diffusion.',
 	'recordings.subtitles.position': 'Position du texte · décalage {offset}',

@@ -462,6 +462,43 @@
 		}
 	}
 
+	async function endLiveEntry(entry: ScheduledLive) {
+		if (busyId) return;
+		const ok = await confirmDialog.ask({
+			title: $t('recordings.actions.endLive'),
+			message: $t('recordings.scheduled.confirm.endMessage', { title: entry.title }),
+			confirmLabel: $t('recordings.actions.endLive'),
+			cancelLabel: $t('recordings.common.cancel'),
+			tone: 'warning'
+		});
+		if (!ok) return;
+		busyId = entry._id;
+		try {
+			// Canonical close: ends the broadcast gate, the linked entry, and fires
+			// the main-site end-live push. Idempotent — returns alreadyOffline when
+			// the gate is already closed.
+			const res = await fetch('/api/broadcast/end-live', { method: 'POST' });
+			if (!res.ok) {
+				toast.error((await res.text()) || $t('recordings.error.http', { status: res.status }));
+				return;
+			}
+			const data = (await res.json().catch(() => ({}))) as { alreadyOffline?: boolean };
+			// Gate already offline → this entry was stranded on 'live'; end-live left
+			// it untouched, so force-reconcile just this entry.
+			if (data.alreadyOffline) {
+				const endRes = await fetch(`/api/scheduled-lives/${entry._id}/end`, { method: 'POST' });
+				if (!endRes.ok) {
+					toast.error((await endRes.text()) || $t('recordings.error.http', { status: endRes.status }));
+					return;
+				}
+			}
+			toast.success($t('recordings.scheduled.toast.ended'));
+			await invalidateAll();
+		} finally {
+			busyId = null;
+		}
+	}
+
 	function statusBadge(entry: ScheduledLive): { label: TranslationKey; cls: string } {
 		switch (entry.status) {
 			case 'live':
@@ -639,6 +676,20 @@
 									{$t('recordings.scheduled.alreadyLiveShort')}
 								</span>
 							{/if}
+						</div>
+					{:else if entry.status === 'live'}
+						<div class="mt-4 flex flex-wrap items-center gap-2 border-t border-red-100 pt-4">
+							<button
+								type="button"
+								class="inline-flex items-center gap-2 border border-red-200 bg-red-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.15em] text-red-700 transition-all hover:border-red-600 hover:bg-red-600 hover:text-white disabled:opacity-50"
+								disabled={busyId === entry._id}
+								onclick={() => endLiveEntry(entry)}
+							>
+								<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+									<rect x="6" y="6" width="12" height="12" rx="1" />
+								</svg>
+								{$t('recordings.actions.endLive')}
+							</button>
 						</div>
 					{/if}
 				</div>

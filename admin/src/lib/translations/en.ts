@@ -1098,6 +1098,8 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.scheduled.confirm.deleteTitle': 'Delete this entry',
 	'recordings.scheduled.confirm.deleteMessage':
 		'"{title}" will be permanently deleted. Its share link will stop working.',
+	'recordings.scheduled.confirm.endMessage':
+		'"{title}" will end now: the public site stops showing the live player and the entry moves to history.',
 	'recordings.scheduled.error.alreadyLive':
 		'A live is already running — end it before starting another one',
 	'recordings.scheduled.toast.createdLinkCopied': 'Live scheduled — share link copied',
@@ -1106,6 +1108,7 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.scheduled.toast.started': 'The live has started',
 	'recordings.scheduled.toast.cancelled': 'Live cancelled',
 	'recordings.scheduled.toast.deleted': 'Entry deleted',
+	'recordings.scheduled.toast.ended': 'Live ended',
 	'recordings.subtitles.title': 'Live subtitles',
 	'recordings.subtitles.subtitle': 'Synced text shown to listeners during the broadcast.',
 	'recordings.subtitles.position': 'Text position · offset {offset}',
