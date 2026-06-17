@@ -16,7 +16,8 @@ import {
 	setRadioCachedStatus,
 	listStaleScheduledLiveAnnouncements,
 	claimScheduledLiveAnnouncement,
-	claimDueScheduledLiveReminders
+	claimDueScheduledLiveReminders,
+	endScheduledLiveIfLive
 } from '../../../../db/collections';
 
 // Vercel Cron entry point. Replaces the user-driven Icecast probing that
@@ -115,8 +116,18 @@ export async function GET({ request }) {
 		console.error('[CronRadioProbe] Scheduled-live sweep failed:', e);
 	}
 
-	// Fast path: gate closed → no point probing Icecast. Single DB read, done.
+	// Fast path: gate closed → no point probing Icecast. But first reconcile any
+	// scheduled_lives entry left stranded on 'live' — e.g. the broadcast ended by
+	// the stream simply stopping (auto-end closed the gate) before this fix shipped,
+	// or a crash between the gate write and the status write. Guarded on status
+	// 'live', so it's a cheap no-op once the entry is already ended.
 	if (!adminGate.is_live) {
+		if (adminGate.scheduled_live_id) {
+			await endScheduledLiveIfLive(
+				adminGate.scheduled_live_id,
+				adminGate.ended_at ?? new Date().toISOString()
+			);
+		}
 		return json({ ok: true, probed: false, reason: 'gate-closed' });
 	}
 

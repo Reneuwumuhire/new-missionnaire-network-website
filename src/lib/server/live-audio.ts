@@ -1,6 +1,10 @@
 import { env } from '$env/dynamic/private';
 import { normalizeLiveStreamUrl } from '$lib/utils/liveStreamUrl';
-import { setBroadcastAdminState, type BroadcastAdminState } from '../../db/collections';
+import {
+	setBroadcastAdminState,
+	endScheduledLiveIfLive,
+	type BroadcastAdminState
+} from '../../db/collections';
 
 const DEFAULT_LIVE_AUDIO_SOURCE_URL = 'http://localhost:8000/radio.mp3';
 const LIVE_AUDIO_PROBE_TIMEOUT_MS = 4000;
@@ -166,6 +170,12 @@ export async function applyAutoEndSafety(
 			ended_at: endedAt,
 			icecast_offline_since: null
 		});
+		// Close out the linked scheduled_lives entry too — otherwise it stays
+		// stuck on 'live' forever and keeps showing in the admin's "upcoming"
+		// list. The manual End Live path does this; the auto-end must match.
+		if (current.scheduled_live_id) {
+			await endScheduledLiveIfLive(current.scheduled_live_id, endedAt);
+		}
 		return {
 			...current,
 			is_live: false,

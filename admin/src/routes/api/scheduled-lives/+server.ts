@@ -8,7 +8,8 @@ import {
 	parseDescription,
 	parseThumbnailPair,
 	parseSubtitleTriple,
-	parseScheduledAt
+	parseScheduledAt,
+	parseYoutubeUrl
 } from '$lib/server/scheduled-live-validation';
 
 export const POST: RequestHandler = async ({ locals, request, getClientAddress }) => {
@@ -22,6 +23,7 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		subtitle_srt_url?: unknown;
 		subtitle_srt_s3_key?: unknown;
 		subtitle_filename?: unknown;
+		youtube_url?: unknown;
 		scheduled_at?: unknown;
 		announce?: unknown;
 		reminder_enabled?: unknown;
@@ -29,6 +31,7 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 
 	const title = parseTitle(body.title, { required: true });
 	const description = parseDescription(body.description);
+	const youtubeUrl = parseYoutubeUrl(body.youtube_url);
 	let thumbnail = parseThumbnailPair(body.thumbnail_url, body.thumbnail_s3_key);
 	const subtitle = parseSubtitleTriple(
 		body.subtitle_srt_url,
@@ -56,6 +59,7 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		description,
 		thumbnail_url: thumbnail.thumbnail_url,
 		thumbnail_s3_key: thumbnail.thumbnail_s3_key,
+		youtube_url: youtubeUrl,
 		subtitle_srt_url: subtitle.subtitle_srt_url,
 		subtitle_srt_s3_key: subtitle.subtitle_srt_s3_key,
 		subtitle_filename: subtitle.subtitle_filename,

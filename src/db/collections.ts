@@ -1164,6 +1164,23 @@ export async function getScheduledLiveById(id: string): Promise<ScheduledLive | 
 	}
 }
 
+/** Close out a scheduled live the auto-end safety just took off air. Guarded on
+ *  status: 'live' so a concurrent manual End Live (or a re-run of the probe)
+ *  can't clobber an entry that already moved to 'ended'/'cancelled'. Mirrors the
+ *  admin End Live transition (setScheduledLiveStatus → 'ended' + live_ended_at). */
+export async function endScheduledLiveIfLive(id: string, endedAt: string): Promise<void> {
+	try {
+		if (!ObjectId.isValid(id)) return;
+		const db = await getDb();
+		await db.collection('scheduled_lives').updateOne(
+			{ _id: new ObjectId(id), status: 'live' },
+			{ $set: { status: 'ended', live_ended_at: endedAt, updated_at: new Date().toISOString() } }
+		);
+	} catch (e) {
+		console.error('[ScheduledLive] endIfLive error:', e);
+	}
+}
+
 /** The scheduled live a published recording came from — lets the replay page
  *  recover the subtitle file + sync anchor for that broadcast. */
 export async function getScheduledLiveByRecordingId(

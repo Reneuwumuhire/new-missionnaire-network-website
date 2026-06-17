@@ -15,7 +15,8 @@ import {
 	parseDescription,
 	parseThumbnailPair,
 	parseSubtitleTriple,
-	parseScheduledAt
+	parseScheduledAt,
+	parseYoutubeUrl
 } from '$lib/server/scheduled-live-validation';
 
 export const PATCH: RequestHandler = async ({ locals, params, request, getClientAddress }) => {
@@ -35,6 +36,7 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 		subtitle_srt_url?: unknown;
 		subtitle_srt_s3_key?: unknown;
 		subtitle_filename?: unknown;
+		youtube_url?: unknown;
 		scheduled_at?: unknown;
 		reminder_enabled?: unknown;
 		announce?: unknown;
@@ -47,6 +49,7 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 		updates.title = title as string;
 	}
 	if ('description' in body) updates.description = parseDescription(body.description);
+	if ('youtube_url' in body) updates.youtube_url = parseYoutubeUrl(body.youtube_url);
 	if ('scheduled_at' in body) updates.scheduled_at = parseScheduledAt(body.scheduled_at);
 	if ('reminder_enabled' in body) updates.reminder_enabled = body.reminder_enabled === true;
 

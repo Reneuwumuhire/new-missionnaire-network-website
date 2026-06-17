@@ -1037,6 +1037,7 @@ export type ScheduledLive = {
 	description: string | null;
 	thumbnail_url: string | null;
 	thumbnail_s3_key: string | null;
+	youtube_url: string | null;
 	scheduled_at: string; // ISO (stored as BSON Date, serialized on read)
 	status: ScheduledLiveStatus;
 	live_started_at: string | null;
@@ -1091,6 +1092,7 @@ export async function createScheduledLive(input: {
 	description?: string | null;
 	thumbnail_url?: string | null;
 	thumbnail_s3_key?: string | null;
+	youtube_url?: string | null;
 	scheduled_at: Date;
 	status?: 'scheduled' | 'live';
 	live_started_at?: string | null;
@@ -1113,6 +1115,7 @@ export async function createScheduledLive(input: {
 			description: input.description ?? null,
 			thumbnail_url: input.thumbnail_url ?? null,
 			thumbnail_s3_key: input.thumbnail_s3_key ?? null,
+			youtube_url: input.youtube_url ?? null,
 			scheduled_at: input.scheduled_at,
 			status: input.status ?? 'scheduled',
 			live_started_at: input.live_started_at ?? null,
@@ -1172,6 +1175,7 @@ export async function updateScheduledLive(
 		description: string | null;
 		thumbnail_url: string | null;
 		thumbnail_s3_key: string | null;
+		youtube_url: string | null;
 		scheduled_at: Date;
 		announce_pending: boolean;
 		reminder_enabled: boolean;

@@ -81,6 +81,7 @@
 	let formError = $state<string | null>(null);
 	let titleDraft = $state('');
 	let descriptionDraft = $state('');
+	let youtubeUrlDraft = $state('');
 	let scheduledAtDraft = $state(''); // datetime-local value, admin-local time
 	let announceDraft = $state(true);
 	let reminderDraft = $state(false);
@@ -111,6 +112,7 @@
 	function resetForm() {
 		titleDraft = '';
 		descriptionDraft = '';
+		youtubeUrlDraft = '';
 		scheduledAtDraft = '';
 		announceDraft = true;
 		reminderDraft = false;
@@ -142,6 +144,7 @@
 		editingId = entry._id;
 		titleDraft = entry.title;
 		descriptionDraft = entry.description ?? '';
+		youtubeUrlDraft = entry.youtube_url ?? '';
 		scheduledAtDraft = isoToLocalInput(entry.scheduled_at);
 		announceDraft = false; // already created — re-announce only if explicitly re-checked
 		reminderDraft = entry.reminder_enabled;
@@ -313,6 +316,7 @@
 			const body: Record<string, unknown> = {
 				title: titleDraft.trim(),
 				description: descriptionDraft.trim() || null,
+				youtube_url: youtubeUrlDraft.trim() || null,
 				scheduled_at: scheduledIso,
 				reminder_enabled: reminderDraft
 			};
@@ -765,6 +769,21 @@
 						placeholder={$t('recordings.scheduled.descriptionPlaceholder')}
 						class="w-full border border-stone-200 bg-white px-3 py-2 text-sm text-stone-800 focus:border-primary focus:outline-none"
 					></textarea>
+				</div>
+
+				<div>
+					<label for="direct-youtube" class="mb-1 block text-xs font-semibold text-stone-600">
+						{$t('recordings.scheduled.youtubeLabel')}
+						<span class="ml-1 font-normal text-stone-400">{$t('recordings.scheduled.optional')}</span>
+					</label>
+					<input
+						id="direct-youtube"
+						type="url"
+						inputmode="url"
+						bind:value={youtubeUrlDraft}
+						placeholder={$t('recordings.scheduled.youtubePlaceholder')}
+						class="w-full border border-stone-200 bg-white px-3 py-2 text-sm text-stone-800 focus:border-primary focus:outline-none"
+					/>
 				</div>
 
 				<!-- Thumbnail -->

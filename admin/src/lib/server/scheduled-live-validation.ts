@@ -82,6 +82,32 @@ export function parseSubtitleTriple(
 	throw error(400, 'Données de sous-titres invalides');
 }
 
+/** Optional YouTube link. Accepts an empty value (returns null) or a valid
+ *  http(s) YouTube URL (youtube.com / youtu.be). Stored as-is for display. */
+export function parseYoutubeUrl(value: unknown): string | null {
+	if (value === null || value === '' || value === undefined) return null;
+	if (typeof value !== 'string') throw error(400, 'Lien YouTube invalide');
+	const trimmed = value.trim();
+	if (!trimmed) return null;
+	if (trimmed.length > 500) throw error(400, 'Lien YouTube trop long');
+	let url: URL;
+	try {
+		url = new URL(trimmed);
+	} catch {
+		throw error(400, 'Lien YouTube invalide');
+	}
+	const host = url.hostname.replace(/^www\./, '').toLowerCase();
+	const isYoutube =
+		host === 'youtube.com' ||
+		host === 'm.youtube.com' ||
+		host === 'youtu.be' ||
+		host.endsWith('.youtube.com');
+	if ((url.protocol !== 'http:' && url.protocol !== 'https:') || !isYoutube) {
+		throw error(400, 'Lien YouTube invalide');
+	}
+	return trimmed;
+}
+
 /** ISO datetime (UTC from the client's datetime-local conversion). Rejects
  *  past dates with a small grace window so "now-ish" scheduling works. */
 export function parseScheduledAt(value: unknown, { allowPastMs = 5 * 60 * 1000 } = {}): Date {
