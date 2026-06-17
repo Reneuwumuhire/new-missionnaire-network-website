@@ -1531,6 +1531,20 @@
 	let monitorLive = $state(false);
 	let monitorConnecting = false;
 	let monitorRetryTimer: ReturnType<typeof setTimeout> | null = null;
+	// Wall-clock when THIS monitor connection opened — mirrors the public
+	// player's streamConnectEpochMs. The audio the operator hears at the
+	// monitor's currentTime was on air at connectEpoch + currentTime, so this
+	// lets subtitle sync anchor against the broadcast time of what the operator
+	// is actually hearing (their listening latency cancels against the public's,
+	// which uses the identical model) instead of raw Date.now().
+	let monitorConnectEpochMs = $state<number | null>(null);
+
+	/** Broadcast wall-clock of the audio the operator is hearing right now, or
+	 *  null when the monitor isn't playing. Passed to the subtitle sync panel. */
+	function monitorPositionEpochMs(): number | null {
+		if (!monitorLive || !monitorEl || monitorConnectEpochMs === null) return null;
+		return monitorConnectEpochMs + monitorEl.currentTime * 1000;
+	}
 
 	function monitorConnect() {
 		if (!monitorEl || monitorConnecting || monitorLive) return;
@@ -1538,6 +1552,9 @@
 		const sep = data.liveStreamUrl.includes('?') ? '&' : '?';
 		monitorEl.muted = monitorMuted;
 		monitorEl.src = `${data.liveStreamUrl}${sep}t=${Date.now()}`;
+		// Position-0 of a fresh connection is "live at this instant"; record it
+		// so monitorPositionEpochMs() can derive the on-air time of each frame.
+		monitorConnectEpochMs = Date.now();
 		monitorEl.load();
 		monitorEl
 			.play()
@@ -1558,6 +1575,7 @@
 		}
 		monitorLive = false;
 		monitorConnecting = false;
+		monitorConnectEpochMs = null;
 		if (monitorEl) {
 			monitorEl.pause();
 			monitorEl.removeAttribute('src');
@@ -1634,12 +1652,22 @@
 		});
 	}
 
+	/** Body for /api/recordings/start — carries the monitor's on-air position so
+	 *  the subtitle auto-anchor isn't skewed by the operator's listening latency. */
+	function recordingStartInit(): RequestInit {
+		return {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ anchorEpochMs: monitorPositionEpochMs() ?? Date.now() })
+		};
+	}
+
 	async function start() {
 		if (busy) return;
 		busy = true;
 		actionError = null;
 		try {
-			const res = await fetch('/api/recordings/start', { method: 'POST' });
+			const res = await fetch('/api/recordings/start', recordingStartInit());
 			if (!res.ok) {
 				const text = await res.text();
 				actionError = text || $t('recordings.error.http', { status: res.status });
@@ -1869,7 +1897,7 @@
 					(await liveRes.text()) || $t('recordings.error.http', { status: liveRes.status });
 				return;
 			}
-			const recRes = await fetch('/api/recordings/start', { method: 'POST' });
+			const recRes = await fetch('/api/recordings/start', recordingStartInit());
 			if (!recRes.ok) {
 				actionError = $t('recordings.error.startRecordingAfterLive', {
 					detail: (await recRes.text()) || recRes.status
@@ -2539,7 +2567,7 @@
 <!-- Subtitle sync — shown during any live: attach an SRT mid-broadcast if
      the stream started without one, then sync/nudge it. -->
 {#if broadcast.is_live}
-	<SubtitleSyncPanel {broadcast} />
+	<SubtitleSyncPanel {broadcast} getMonitorPositionEpochMs={monitorPositionEpochMs} />
 {/if}
 
 <!-- Scheduled lives — YouTube-style: schedule ahead, get a stable share link

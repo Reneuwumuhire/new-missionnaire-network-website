@@ -9,18 +9,35 @@
 	// Live subtitle sync control — shown under the broadcast card while a live
 	// is on air. The operator clicks "Démarrer" (or a cue in the list) at the
 	// exact moment they HEAR the words in the « Écoute du direct » monitor of
-	// the broadcast card above — that monitor is pause-proof and always at the
-	// live edge, so the stream latency is baked into the anchor. The ±1/5/30s
-	// nudges fine-tune afterwards.
+	// the broadcast card above. The anchor is taken from that monitor's *on-air
+	// position* (connectEpoch + currentTime), NOT wall-clock: the operator's own
+	// listening latency (Icecast burst + buffering) is therefore modelled the
+	// same way the public player models its own, so the two cancel and listeners
+	// get the right line regardless of how far behind live either side sits. The
+	// ±1/5/30s nudges fine-tune any residual.
 	let {
-		broadcast
+		broadcast,
+		getMonitorPositionEpochMs
 	}: {
 		broadcast: {
 			subtitle_srt_url: string | null;
 			subtitle_anchor_epoch_ms: number | null;
 			subtitle_offset_ms: number;
 		};
+		/** Broadcast wall-clock of the audio the operator is hearing in the
+		 *  « Écoute du direct » monitor right now (connectEpoch + currentTime),
+		 *  or null when it isn't playing. Anchoring on this instead of Date.now()
+		 *  bakes the operator's listening latency into the anchor the same way the
+		 *  public player models its own — so the two cancel and listeners' text
+		 *  lands on the right words regardless of buffering depth. */
+		getMonitorPositionEpochMs?: () => number | null;
 	} = $props();
+
+	/** Reference instant for a sync action: the monitor's on-air position when
+	 *  it's playing (latency-aware), else raw wall-clock as a safe fallback. */
+	function syncReferenceEpochMs(): number {
+		return getMonitorPositionEpochMs?.() ?? Date.now();
+	}
 
 	let anchorEpochMs = $state<number | null>(null);
 	let offsetMs = $state(0);
@@ -37,6 +54,9 @@
 	let loadError = $state<string | null>(null);
 	let busy = $state(false);
 	let nowMs = $state(Date.now());
+	// On-air position of the monitor audio, refreshed alongside nowMs. Drives the
+	// operator's "current line" readout so it tracks what they actually hear.
+	let monitorPosMs = $state<number | null>(null);
 	let showCueList = $state(false);
 	let attachBusy = $state(false);
 	let attachError = $state<string | null>(null);
@@ -145,14 +165,20 @@
 	// above is the single audio reference: always live, mute-only.)
 
 	onMount(() => {
-		const tick = setInterval(() => (nowMs = Date.now()), 300);
+		const tick = setInterval(() => {
+			nowMs = Date.now();
+			monitorPosMs = getMonitorPositionEpochMs?.() ?? null;
+		}, 300);
 		if (broadcast.subtitle_srt_url) void loadCues();
 		return () => clearInterval(tick);
 	});
 
-	// Broadcast-side SRT position — ahead of what listeners hear by the
-	// encoder→Icecast→player latency (a few seconds).
-	const srtMs = $derived(anchorEpochMs === null ? null : nowMs - anchorEpochMs + offsetMs);
+	// SRT position of the audio the operator is hearing. Derived from the
+	// monitor's on-air position (so the readout matches their ears, not the live
+	// edge); falls back to wall-clock when the monitor isn't playing.
+	const srtMs = $derived(
+		anchorEpochMs === null ? null : (monitorPosMs ?? nowMs) - anchorEpochMs + offsetMs
+	);
 	const currentIndex = $derived(srtMs === null ? -1 : findCueIndex(cues, srtMs));
 	const currentCue = $derived(currentIndex >= 0 ? cues[currentIndex] : null);
 	const nextCue = $derived(
@@ -197,7 +223,7 @@
 	}
 
 	async function start() {
-		if (await post({ action: 'start', atEpochMs: Date.now() })) {
+		if (await post({ action: 'start', atEpochMs: syncReferenceEpochMs() })) {
 			toast.success($t('recordings.subtitles.toast.started'));
 		}
 	}
@@ -222,7 +248,7 @@
 		// operator miss the moment. The click instant rides along so network
 		// latency doesn't shift the anchor; a wrong click is fixed by simply
 		// clicking the right cue (or nudging).
-		if (await post({ action: 'jump-to-cue', cueStartMs: cue.startMs, atEpochMs: Date.now() })) {
+		if (await post({ action: 'jump-to-cue', cueStartMs: cue.startMs, atEpochMs: syncReferenceEpochMs() })) {
 			toast.success($t('recordings.subtitles.toast.jumped'));
 		}
 	}
