@@ -783,6 +783,7 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.state.streamInactive': 'inactive',
 	'recordings.state.icecastUnreachable': 'Icecast unreachable',
 	'recordings.timer.live': 'Live',
+	'recordings.timer.audience': 'Listeners',
 	'recordings.timer.recording': 'Recording',
 	'recordings.timer.reconnecting': 'Reconnecting',
 	'recordings.timer.segments': '{count} segments',
@@ -829,6 +830,25 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.meta.descriptionPlaceholder': 'Describe this live: topic, speaker, Bible passage…',
 	'recordings.meta.youtubeHint':
 		'Default: the channel /live URL. Replace it with the exact video URL once published.',
+	'recordings.defaults.title': 'Default info',
+	'recordings.defaults.intro':
+		'Used when you start an instant live (not scheduled). A scheduled live keeps its own info.',
+	'recordings.defaults.liveHint': 'A live is on air — these values will apply to the next instant live.',
+	'recordings.defaults.titleLabel': 'Title',
+	'recordings.defaults.titleHint': 'Shown as: “{preview}”',
+	'recordings.defaults.noneThumb': 'No thumbnail',
+	'recordings.defaults.youtubeDefault': '{url} (default)',
+	'recordings.defaults.startNow': 'Go live now',
+	'recordings.defaults.startNowTitle': 'Start a live right now using the default info',
+	'recordings.defaults.startFromDefaults': 'Go live from defaults',
+	'recordings.defaults.startFromDefaultsTitle': 'Start an instant live using the default info above',
+	'recordings.defaults.confirm.start': 'Start an instant live “{title}”?',
+	'recordings.defaults.confirm.startNotifyOne':
+		'Start an instant live “{title}” and notify {count} subscriber?',
+	'recordings.defaults.confirm.startNotifyMany':
+		'Start an instant live “{title}” and notify {count} subscribers?',
+	'recordings.defaults.toast.saved': 'Default info saved.',
+	'recordings.defaults.toast.started': 'Instant live started.',
 	'recordings.toolbar.searchPlaceholder': 'Search by title, author, description…',
 	'recordings.toolbar.filterStatus': 'Filter by status',
 	'recordings.toolbar.allStatuses': 'All statuses',

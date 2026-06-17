@@ -20,6 +20,7 @@ export const PATCH: RequestHandler = async ({ locals, request, getClientAddress 
 		default_description?: unknown;
 		default_thumbnail_url?: unknown;
 		default_thumbnail_s3_key?: unknown;
+		default_youtube_url?: unknown;
 	};
 
 	const updates: {
@@ -27,6 +28,7 @@ export const PATCH: RequestHandler = async ({ locals, request, getClientAddress 
 		default_description?: string | null;
 		default_thumbnail_url?: string | null;
 		default_thumbnail_s3_key?: string | null;
+		default_youtube_url?: string | null;
 	} = {};
 
 	if ('default_title' in body) {
@@ -54,6 +56,25 @@ export const PATCH: RequestHandler = async ({ locals, request, getClientAddress 
 			updates.default_description = normalized || null;
 		} else {
 			throw error(400, 'Description invalide');
+		}
+	}
+
+	if ('default_youtube_url' in body) {
+		// Same permissive check as the live metadata endpoint: any http(s) URL
+		// (channel-live or a specific watch URL). Cleared with null / ''.
+		if (body.default_youtube_url === null || body.default_youtube_url === '') {
+			updates.default_youtube_url = null;
+		} else if (typeof body.default_youtube_url === 'string') {
+			const trimmed = body.default_youtube_url.trim();
+			try {
+				const u = new URL(trimmed);
+				if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error('not http');
+				updates.default_youtube_url = trimmed;
+			} catch {
+				throw error(400, 'URL YouTube invalide');
+			}
+		} else {
+			throw error(400, 'URL YouTube invalide');
 		}
 	}
 

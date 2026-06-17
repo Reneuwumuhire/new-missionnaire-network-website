@@ -11,6 +11,7 @@
 	import SkeletonRows from '$lib/components/SkeletonRows.svelte';
 	import ScheduledLivesPanel from '$lib/components/ScheduledLivesPanel.svelte';
 	import SubtitleSyncPanel from '$lib/components/SubtitleSyncPanel.svelte';
+	import BroadcastDefaultsPanel from '$lib/components/BroadcastDefaultsPanel.svelte';
 
 	// AudioTrimEditor pulls in wavesurfer.js + plugins (~120 kB minified). It's
 	// only used when the admin opens the trim modal, so we load it on demand
@@ -312,7 +313,6 @@
 		next.add(id);
 		failedThumbnails = next;
 	}
-	let broadcastThumbnailBroken = $state(false);
 	// Per-modal flag for the recording edit preview — when the existing thumbnail
 	// URL 403s inside the edit modal, swap to the "no thumbnail" placeholder so
 	// the admin can upload a replacement without the browser's broken-image icon.
@@ -1763,285 +1763,20 @@
 		}
 	}
 
-	// ── Broadcast metadata (single unified edit mode) ─────────────────
-	// One "Modifier" puts the whole section into edit mode; one "Enregistrer"
-	// commits title + description + thumbnail changes in a single flow.
-	let metadataEditing = $state(false);
-	let metadataSaving = $state(false);
-	let titleDraft = $state<string>('');
-	let descriptionDraft = $state<string>('');
-	let youtubeUrlDraft = $state<string>('');
-	let broadcastYoutubeError = $state<string | null>(null);
-	const YOUTUBE_CHANNEL_LIVE_URL = 'https://www.youtube.com/@MissionnaireNetwork/live';
-	// Thumbnail staging — upload deferred to Save so cancel doesn't leave orphans.
-	let thumbnailFile = $state<File | null>(null);
-	let thumbnailPreviewUrl = $state<string | null>(null);
-	let thumbnailAction = $state<'keep' | 'replace' | 'remove'>('keep');
-	let thumbnailError = $state<string | null>(null);
-	let thumbnailExpanded = $state(false);
-	// Also store the freshly-uploaded thumbnail as the channel default — the
-	// fallback used whenever a future live starts without its own thumbnail
-	// (go-live copies it onto the gate, so recordings snapshot it too).
-	let setAsDefaultThumbnail = $state(false);
 	// Default ON: normal broadcasts notify. Uncheck for silent tests/re-broadcasts.
 	let notifyOnGoLive = $state(true);
 
-	function enterEditMode() {
-		titleDraft = broadcast.title ?? '';
-		descriptionDraft = broadcast.description ?? '';
-		// Pre-fill with the channel-live URL when nothing's set, so admin
-		// rarely has to type — they can just paste a specific video URL
-		// once the live ends and the VOD is published.
-		youtubeUrlDraft = broadcast.youtube_url ?? YOUTUBE_CHANNEL_LIVE_URL;
-		broadcastYoutubeError = null;
-		thumbnailFile = null;
-		thumbnailAction = 'keep';
-		if (thumbnailPreviewUrl) URL.revokeObjectURL(thumbnailPreviewUrl);
-		thumbnailPreviewUrl = null;
-		thumbnailError = null;
-		setAsDefaultThumbnail = false;
-		metadataEditing = true;
-	}
-
-	function cancelEditMode() {
-		if (thumbnailPreviewUrl) URL.revokeObjectURL(thumbnailPreviewUrl);
-		thumbnailPreviewUrl = null;
-		thumbnailFile = null;
-		thumbnailAction = 'keep';
-		thumbnailError = null;
-		setAsDefaultThumbnail = false;
-		metadataEditing = false;
-	}
-
-	function berlinDateYmd(d: Date): string {
-		const parts = new Intl.DateTimeFormat('en-CA', {
-			timeZone: 'Europe/Berlin',
-			year: 'numeric',
-			month: '2-digit',
-			day: '2-digit'
-		}).formatToParts(d);
-		const y = parts.find((p) => p.type === 'year')?.value ?? '';
-		const m = parts.find((p) => p.type === 'month')?.value ?? '';
-		const day = parts.find((p) => p.type === 'day')?.value ?? '';
-		return `${y}-${m}-${day}`;
-	}
-
-	// Applies stored defaults directly — no modal. Defaults are managed from
-	// the settings page; this button just pushes them to the live broadcast.
-	let applyingDefaults = $state(false);
-	let applyDefaultsError = $state<string | null>(null);
-
+	// Title template fallback shared with the manual-upload modal: {date} is
+	// substituted with the live’s date when no default title is configured.
 	const FALLBACK_DEFAULT_TITLE = '{date} Missionnaire Network Live audio';
-	const FALLBACK_DEFAULT_DESCRIPTION =
-		'Rediffusion du direct de Missionnaire Network — prédications, enseignements et louanges.';
 
-	function renderTitleTemplate(template: string): string {
-		const date = berlinDateYmd(new Date());
-		// If the template uses {date}, substitute; otherwise prepend so we never
-		// end up with a dateless title (the original spec requires it at start).
-		return template.includes('{date}')
-			? template.replaceAll('{date}', date)
-			: `${date} ${template}`;
-	}
-
-	async function applyDefaultsDirectly() {
-		if (applyingDefaults) return;
-		applyingDefaults = true;
-		applyDefaultsError = null;
-		try {
-			const storedTitle = broadcast.default_title?.trim();
-			const storedDesc = broadcast.default_description?.trim();
-			const patch: Record<string, unknown> = {
-				title: renderTitleTemplate(storedTitle || FALLBACK_DEFAULT_TITLE),
-				description: storedDesc || FALLBACK_DEFAULT_DESCRIPTION
-			};
-			// Point the live broadcast at the stored default thumbnail (no
-			// re-upload — we reuse the existing S3 object). If no default is
-			// set, clear any live thumbnail so the placeholder shows instead.
-			if (broadcast.default_thumbnail_url && broadcast.default_thumbnail_s3_key) {
-				patch.thumbnail_url = broadcast.default_thumbnail_url;
-				patch.thumbnail_s3_key = broadcast.default_thumbnail_s3_key;
-			} else if (broadcast.thumbnail_url) {
-				patch.thumbnail_url = null;
-				patch.thumbnail_s3_key = null;
-			}
-
-			const res = await fetch('/api/broadcast/metadata', {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(patch)
-			});
-			if (!res.ok) {
-				applyDefaultsError =
-					(await res.text()) || $t('recordings.error.http', { status: res.status });
-				return;
-			}
-			await invalidateAll();
-		} finally {
-			applyingDefaults = false;
-		}
-	}
-
-	function onThumbnailFileChange(event: Event) {
-		const input = event.target as HTMLInputElement;
-		const file = input.files?.[0];
-		input.value = '';
-		if (!file) return;
-		if (!file.type.startsWith('image/')) {
-			thumbnailError = $t('recordings.error.selectImage');
-			return;
-		}
-		if (file.size > 5 * 1024 * 1024) {
-			thumbnailError = $t('recordings.error.imageTooLarge');
-			return;
-		}
-		thumbnailError = null;
-		if (thumbnailPreviewUrl) URL.revokeObjectURL(thumbnailPreviewUrl);
-		thumbnailFile = file;
-		thumbnailPreviewUrl = URL.createObjectURL(file);
-		thumbnailAction = 'replace';
-	}
-
-	function markThumbnailForRemoval() {
-		if (thumbnailPreviewUrl) URL.revokeObjectURL(thumbnailPreviewUrl);
-		thumbnailPreviewUrl = null;
-		thumbnailFile = null;
-		thumbnailAction = 'remove';
-	}
-
-	/** Returns the image URL to show in the preview slot during edit mode. */
-	const previewSrc = $derived.by(() => {
-		if (thumbnailPreviewUrl) return thumbnailPreviewUrl;
-		if (thumbnailAction === 'remove') return null;
-		if (broadcastThumbnailBroken) return null;
-		return broadcast.thumbnail_url;
-	});
-
-	async function saveMetadata() {
-		if (metadataSaving) return;
-		metadataSaving = true;
-		thumbnailError = null;
-		try {
-			const patch: Record<string, unknown> = {};
-
-			// Title / description — only send changed fields.
-			const nextTitle = titleDraft.trim() || null;
-			if (nextTitle !== (broadcast.title ?? null)) patch.title = nextTitle;
-			const nextDescription = descriptionDraft.trim() || null;
-			if (nextDescription !== (broadcast.description ?? null)) patch.description = nextDescription;
-
-			// YouTube URL: send raw string; server validates as http(s) URL.
-			// Empty clears (the read side falls back to the channel-live URL).
-			const nextYoutube = youtubeUrlDraft.trim() || null;
-			if (nextYoutube !== (broadcast.youtube_url ?? null)) {
-				patch.youtube_url = nextYoutube;
-			}
-
-			// Thumbnail — upload only if a new file was picked; remove or keep otherwise.
-			if (thumbnailAction === 'replace' && thumbnailFile) {
-				const presignRes = await fetch('/api/broadcast/thumbnail/presign', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ contentType: thumbnailFile.type, size: thumbnailFile.size })
-				});
-				if (!presignRes.ok) {
-					thumbnailError =
-						(await presignRes.text()) || $t('recordings.error.http', { status: presignRes.status });
-					return;
-				}
-				const { uploadUrl, key, publicUrl } = (await presignRes.json()) as {
-					uploadUrl: string;
-					key: string;
-					publicUrl: string;
-				};
-				const uploadRes = await fetch(uploadUrl, {
-					method: 'PUT',
-					headers: { 'Content-Type': thumbnailFile.type },
-					body: thumbnailFile
-				});
-				if (!uploadRes.ok) {
-					thumbnailError = $t('recordings.error.s3UploadFailed');
-					return;
-				}
-				patch.thumbnail_url = publicUrl;
-				patch.thumbnail_s3_key = key;
-			} else if (thumbnailAction === 'remove') {
-				patch.thumbnail_url = null;
-				patch.thumbnail_s3_key = null;
-			}
-
-			if (Object.keys(patch).length === 0) {
-				// Nothing changed — just exit edit mode.
-				cancelEditMode();
-				return;
-			}
-
-			const res = await fetch('/api/broadcast/metadata', {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(patch)
-			});
-			if (!res.ok) {
-				const msg = (await res.text()) || $t('recordings.error.http', { status: res.status });
-				if (msg.includes('YouTube')) broadcastYoutubeError = msg;
-				else thumbnailError = msg;
-				return;
-			}
-
-			// Persist the new thumbnail as the channel default too, if asked.
-			// Separate endpoint so a failure here doesn't undo the metadata save —
-			// just surface it.
-			if (setAsDefaultThumbnail && typeof patch.thumbnail_url === 'string') {
-				const defRes = await fetch('/api/broadcast/defaults', {
-					method: 'PATCH',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						default_thumbnail_url: patch.thumbnail_url,
-						default_thumbnail_s3_key: patch.thumbnail_s3_key
-					})
-				});
-				if (!defRes.ok) {
-					toast.error($t('recordings.toast.defaultThumbnailFailed'));
-				} else {
-					toast.success($t('recordings.toast.defaultThumbnailSet'));
-				}
-			}
-
-			broadcastYoutubeError = null;
-			cancelEditMode();
-			await invalidateAll();
-		} finally {
-			metadataSaving = false;
-		}
-	}
-
-	function openThumbnail() {
-		if (!broadcast.thumbnail_url) return;
-		thumbnailExpanded = true;
-	}
-	function closeThumbnail() {
-		thumbnailExpanded = false;
-	}
 	function onLightboxKeydown(e: KeyboardEvent) {
 		if (e.key !== 'Escape') return;
-		// Layered: thumbnail lightbox → broadcast modal → recording modal
-		// (close the topmost one, one press per close).
-		if (thumbnailExpanded) {
-			closeThumbnail();
-		} else if (metadataEditing && !metadataSaving) {
-			cancelEditMode();
-		} else if (editingRecordingId && !recSaving) {
-			cancelRecordingEdit();
-		}
-	}
-	function onBackdropClick(e: MouseEvent) {
-		if (e.target === e.currentTarget) closeThumbnail();
+		// Escape closes the recording edit modal.
+		if (editingRecordingId && !recSaving) cancelRecordingEdit();
 	}
 	function onEditModalBackdropClick(e: MouseEvent) {
 		if (e.target === e.currentTarget && !recSaving) cancelRecordingEdit();
-	}
-	function onBroadcastModalBackdropClick(e: MouseEvent) {
-		if (e.target === e.currentTarget && !metadataSaving) cancelEditMode();
 	}
 	function getEditingRecording(): Recording | null {
 		if (!editingRecordingId) return null;
@@ -2324,13 +2059,13 @@
 {/snippet}
 
 <div
-	class="mb-8 border bg-white/40 p-6 {broadcast.is_live ? 'border-red-200' : 'border-stone-200/60'}"
+	class="mb-8 border bg-white/40 p-5 {broadcast.is_live ? 'border-red-200' : 'border-stone-200/60'}"
 >
 	<!-- Header: status + timers -->
 	<div class="flex flex-wrap items-center justify-between gap-4">
-		<div class="flex items-center gap-4">
+		<div class="flex items-center gap-3">
 			<div
-				class="flex h-12 w-12 items-center justify-center rounded-full {broadcast.is_live ||
+				class="flex h-10 w-10 items-center justify-center rounded-full {broadcast.is_live ||
 				isRecording
 					? 'bg-red-50'
 					: 'bg-stone-100'}"
@@ -2344,7 +2079,7 @@
 					</span>
 				{:else}
 					<svg
-						class="h-5 w-5 text-stone-400"
+						class="h-4 w-4 text-stone-400"
 						fill="none"
 						viewBox="0 0 24 24"
 						stroke="currentColor"
@@ -2394,10 +2129,7 @@
 						{$t('recordings.state.live')}
 					</p>
 					<p class="text-xs text-stone-500">
-						{$t('recordings.state.startedAt', { time: formatTime(broadcast.started_at) })} · {icecast.listeners !==
-						1
-							? $t('recordings.listenersMany', { count: icecast.listeners })
-							: $t('recordings.listenersOne', { count: icecast.listeners })}
+						{$t('recordings.state.startedAt', { time: formatTime(broadcast.started_at) })}
 						{#if broadcastStartedBy}
 							· {$t('recordings.state.by')}
 							<span class="font-medium text-stone-600"
@@ -2446,6 +2178,19 @@
 		{#if broadcast.is_live || isRecording}
 			<div class="flex w-full items-start gap-6 sm:w-auto sm:items-center sm:gap-5">
 				{#if broadcast.is_live}
+					<!-- Live audience — the concurrent listeners on air right now, the
+					     same figure the public live page shows ("auditeurs"). -->
+					<div class="flex flex-1 flex-col sm:flex-initial sm:items-end">
+						<span class="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-[0.2em] text-stone-500">
+							<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a3 3 0 10-2.5-4.5" />
+							</svg>
+							{$t('recordings.timer.audience')}
+						</span>
+						<span class="font-mono text-2xl font-semibold text-stone-700 tabular-nums leading-tight">
+							{icecast.listeners}
+						</span>
+					</div>
 					<div class="flex flex-1 flex-col sm:flex-initial sm:items-end">
 						<span class="text-[9px] font-bold uppercase tracking-[0.2em] text-red-600"
 							>{$t('recordings.timer.live')}</span
@@ -2523,22 +2268,11 @@
 		</div>
 	{/if}
 
-	<!-- Actions -->
+	<!-- Actions — only when there's a session to control or a source to start
+	     from. Idle-with-no-source shows just the compact monitor strip below. -->
+	{#if icecast.sourceActive || broadcast.is_live || isRecording}
 	<div class="mt-5 border-t border-stone-100 pt-5">
-		{#if !icecast.sourceActive && !broadcast.is_live && !isRecording}
-			<span
-				class="inline-flex items-center gap-2 border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm font-medium text-stone-400"
-			>
-				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-					/>
-				</svg>
-				{$t('recordings.waitingForStream')}
-			</span>
-		{:else if broadcast.is_live && isRecording}
+		{#if broadcast.is_live && isRecording}
 			<!-- All three actions stay visible, equal-height, each with a distinct
 			     tonal identity at rest so they're recognizable at a glance:
 			     stone = direct, rose = enregistrement, red-700 = session totale. -->
@@ -2678,6 +2412,7 @@
 			</div>
 		{/if}
 	</div>
+	{/if}
 
 	{#if recorder.available && 'pendingOrphans' in recorder && recorder.pendingOrphans > 0}
 		<p class="mt-4 bg-amber-50 px-3 py-2 text-xs text-amber-700">
@@ -2773,17 +2508,20 @@
 				</button>
 			</div>
 		{:else}
+			<!-- Idle strip: doubles as the "waiting for a source / start OBS" hint
+			     so the card stays compact instead of carrying a separate pill. -->
 			<div
-				class="flex h-9 flex-1 min-w-[280px] items-center bg-stone-50 px-3 text-[11px] italic text-stone-400"
+				class="flex h-9 flex-1 min-w-[280px] items-center gap-2 bg-stone-50 px-3 text-[11px] text-stone-400"
 			>
-				{$t('recordings.monitor.noSource')}
+				<svg class="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+				</svg>
+				<span class="truncate">{$t('recordings.waitingForStream')}</span>
 			</div>
 		{/if}
-		<span class="text-[11px] text-stone-400">
-			{icecast.sourceActive
-				? $t('recordings.monitor.sourceActive')
-				: $t('recordings.monitor.sourceInactive')}
-		</span>
+		{#if icecast.sourceActive}
+			<span class="text-[11px] text-stone-400">{$t('recordings.monitor.sourceActive')}</span>
+		{/if}
 		<audio
 			bind:this={monitorEl}
 			preload="none"
@@ -2794,207 +2532,9 @@
 		></audio>
 	</div>
 
-	<!-- Broadcast metadata: title + description + thumbnail shown on the public /live page -->
-	<div class="mt-5 border-t border-stone-100 pt-5">
-		<div class="mb-4 flex items-start justify-between gap-4">
-			<div class="min-w-0 flex-1">
-				<p class="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500">
-					{$t('recordings.meta.title')}
-				</p>
-				<p class="mt-1 text-[10px] text-stone-400">
-					{$t('recordings.meta.hint')}
-				</p>
-			</div>
-			<div class="flex shrink-0 items-center gap-2">
-				<button
-					type="button"
-					onclick={applyDefaultsDirectly}
-					disabled={applyingDefaults}
-					title={$t('recordings.meta.applyDefaultsTitle')}
-					class="border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-stone-600 transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
-				>
-					{applyingDefaults ? $t('recordings.meta.applying') : $t('recordings.meta.defaults')}
-				</button>
-				<button
-					type="button"
-					onclick={enterEditMode}
-					class="border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-stone-600 transition-colors hover:border-primary hover:text-primary"
-				>
-					{$t('recordings.common.edit')}
-				</button>
-			</div>
-		</div>
-
-		{#if applyDefaultsError}
-			<p class="mb-3 bg-red-50 px-3 py-2 text-xs text-red-700">{applyDefaultsError}</p>
-		{/if}
-
-		<!-- Full-width reminder banner — spans under the label/button row so the
-		     message reads comfortably regardless of viewport size. -->
-		<div class="mb-4 flex items-start gap-2.5 border border-amber-200 bg-amber-50/80 px-3.5 py-2.5">
-			<svg
-				class="h-4 w-4 shrink-0 text-amber-600 mt-0.5"
-				fill="none"
-				viewBox="0 0 24 24"
-				stroke="currentColor"
-				stroke-width="2"
-				aria-hidden="true"
-			>
-				<path
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					d="M12 9v2m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.2 16c-.77 1.33.2 3 1.73 3z"
-				/>
-			</svg>
-			<p class="text-[11px] leading-snug text-amber-800 sm:text-xs">
-				<strong>{$t('recordings.meta.reminderStrong')}</strong>{$t('recordings.meta.reminderRest')}
-			</p>
-		</div>
-
-		<div class="flex flex-col gap-5 sm:flex-row sm:items-start">
-			<!-- Thumbnail (view-only, click to expand) -->
-			<div class="flex flex-col gap-2">
-				<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
-					>{$t('recordings.common.thumbnail')}</span
-				>
-				{#if broadcast.thumbnail_url && !broadcastThumbnailBroken}
-					<button
-						type="button"
-						onclick={openThumbnail}
-						aria-label={$t('recordings.meta.expandThumbnail')}
-						class="relative h-28 w-44 overflow-hidden border border-stone-300 bg-cream/40 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 group cursor-zoom-in hover:border-primary"
-					>
-						<BlurUpImage
-							src={vercelImage(broadcast.thumbnail_url, 384)}
-							srcset={vercelImageSrcSet(broadcast.thumbnail_url, 192)}
-							placeholderSrc={vercelImagePlaceholder(broadcast.thumbnail_url)}
-							alt={$t('recordings.meta.thumbnailAlt')}
-							width={176}
-							height={112}
-							loading="eager"
-							fetchpriority="high"
-							class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-							on:error={() => (broadcastThumbnailBroken = true)}
-						/>
-						<span
-							class="pointer-events-none absolute inset-0 flex items-end justify-end p-1.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-						>
-							<span
-								class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/90 shadow"
-							>
-								<svg
-									width="11"
-									height="11"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									class="text-stone-700"
-								>
-									<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
-								</svg>
-							</span>
-						</span>
-					</button>
-				{:else}
-					<!-- Default fallback preview — this is what the public site will show -->
-					<div
-						class="relative h-28 w-44 overflow-hidden border border-dashed border-stone-300 default-thumbnail-admin"
-					>
-						<div class="flex h-full w-full flex-col items-center justify-center gap-1.5">
-							<picture>
-								<source srcset="/icons/logo.webp" type="image/webp" />
-								<img
-									src="/icons/logo.png"
-									alt=""
-									class="h-6 w-auto opacity-90"
-									width="150"
-									height="64"
-								/>
-							</picture>
-							<div
-								class="flex items-center gap-1 text-[8px] font-bold uppercase tracking-[0.2em] text-red-600"
-							>
-								<span class="relative inline-flex h-1 w-1">
-									<span
-										class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"
-									></span>
-									<span class="relative inline-flex h-1 w-1 rounded-full bg-red-500"></span>
-								</span>
-								{$t('recordings.state.live')}
-							</div>
-						</div>
-						<span
-							class="absolute bottom-1 left-1 rounded-sm bg-stone-900/70 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wider text-white"
-						>
-							{$t('recordings.meta.defaultBadge')}
-						</span>
-					</div>
-				{/if}
-			</div>
-
-			<!-- Title + Description (view-only) -->
-			<div class="flex flex-1 flex-col gap-4">
-				<div class="flex flex-col gap-2">
-					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
-						>{$t('recordings.meta.liveTitle')}</span
-					>
-					<p class="text-sm {broadcast.title ? 'text-stone-700' : 'text-stone-400 italic'}">
-						{broadcast.title || $t('recordings.meta.noTitle')}
-					</p>
-				</div>
-
-				<div class="flex flex-col gap-2">
-					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
-						>{$t('recordings.common.description')}</span
-					>
-					<p
-						class="text-sm whitespace-pre-wrap {broadcast.description
-							? 'text-stone-700'
-							: 'text-stone-400 italic'}"
-					>
-						{broadcast.description || $t('recordings.meta.noDescription')}
-					</p>
-				</div>
-
-				<!-- YouTube link — view-only. Shows the stored URL, or the channel
-				     /live URL in muted grey when nothing's been pinned yet. -->
-				<div class="flex flex-col gap-2">
-					<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
-						>{$t('recordings.common.youtubeLink')}</span
-					>
-					<a
-						href={broadcast.youtube_url || YOUTUBE_CHANNEL_LIVE_URL}
-						target="_blank"
-						rel="noopener noreferrer"
-						class="inline-flex items-center gap-1.5 text-sm {broadcast.youtube_url
-							? 'text-stone-700 hover:text-primary'
-							: 'text-stone-400 italic hover:text-stone-500'} break-all transition-colors"
-					>
-						<svg
-							width="14"
-							height="14"
-							viewBox="0 0 24 24"
-							fill="currentColor"
-							aria-hidden="true"
-							class="shrink-0"
-						>
-							<path
-								d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"
-							/>
-						</svg>
-						<span
-							>{broadcast.youtube_url ||
-								$t('recordings.meta.youtubeDefault', { url: YOUTUBE_CHANNEL_LIVE_URL })}</span
-						>
-					</a>
-				</div>
-			</div>
-		</div>
-	</div>
 </div>
+
+<BroadcastDefaultsPanel {broadcast} />
 
 <!-- Subtitle sync — shown during any live: attach an SRT mid-broadcast if
      the stream started without one, then sync/nudge it. -->
@@ -3933,228 +3473,6 @@
 	</div>
 {/if}
 
-{#if metadataEditing}
-	<!-- Broadcast metadata edit modal — title, description, thumbnail for the live broadcast. -->
-	<div
-		class="fixed inset-0 z-40 flex items-center justify-center bg-stone-900/60 p-4 backdrop-blur-sm animate-lightbox-in overflow-y-auto"
-		onclick={onBroadcastModalBackdropClick}
-		onkeydown={onLightboxKeydown}
-		role="dialog"
-		aria-modal="true"
-		aria-labelledby="edit-broadcast-title"
-		tabindex="-1"
-	>
-		<div class="w-full max-w-3xl rounded-sm bg-white shadow-2xl my-8">
-			<div class="flex items-center justify-between border-b border-stone-100 px-6 py-4">
-				<h2 id="edit-broadcast-title" class="font-display text-lg font-semibold text-stone-800">
-					{$t('recordings.meta.editTitle')}
-				</h2>
-				<button
-					type="button"
-					onclick={cancelEditMode}
-					disabled={metadataSaving}
-					aria-label={$t('recordings.common.close')}
-					class="flex h-8 w-8 items-center justify-center rounded-full text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 disabled:opacity-50"
-				>
-					<svg
-						width="16"
-						height="16"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						<path d="M6 6l12 12M6 18L18 6" />
-					</svg>
-				</button>
-			</div>
-
-			<div class="px-6 py-6">
-				<div class="flex flex-col gap-5 sm:flex-row sm:items-start">
-					<div class="flex flex-col gap-2 shrink-0">
-						<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
-							>{$t('recordings.common.thumbnail')}</span
-						>
-						{#if previewSrc}
-							<div
-								class="relative aspect-video w-48 overflow-hidden border border-stone-300 bg-cream/40"
-							>
-								<img
-									src={previewSrc}
-									alt=""
-									onerror={() => {
-										if (!thumbnailPreviewUrl) broadcastThumbnailBroken = true;
-									}}
-									class="h-full w-full object-cover"
-								/>
-								{#if metadataSaving && thumbnailAction === 'replace'}
-									<div
-										class="absolute inset-0 flex items-center justify-center bg-white/80 text-xs font-medium text-stone-600"
-									>
-										{$t('recordings.common.uploading')}
-									</div>
-								{/if}
-							</div>
-						{:else}
-							<div
-								class="default-thumbnail-admin relative flex aspect-video w-48 flex-col items-center justify-center gap-1 border border-dashed border-stone-300"
-							>
-								<picture>
-									<source srcset="/icons/logo.webp" type="image/webp" />
-									<img
-										src="/icons/logo.png"
-										alt=""
-										class="h-5 w-auto opacity-90"
-										width="150"
-										height="64"
-									/>
-								</picture>
-								<span class="text-[8px] font-bold uppercase tracking-[0.2em] text-stone-500"
-									>{$t('recordings.common.noThumbnail')}</span
-								>
-							</div>
-						{/if}
-						<div class="flex gap-2">
-							<label
-								class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-primary hover:text-primary"
-							>
-								{previewSrc ? $t('recordings.common.change') : $t('recordings.common.upload')}
-								<input
-									type="file"
-									accept="image/jpeg,image/png,image/webp,image/gif"
-									class="hidden"
-									onchange={onThumbnailFileChange}
-									disabled={metadataSaving}
-								/>
-							</label>
-							{#if previewSrc}
-								<button
-									type="button"
-									onclick={markThumbnailForRemoval}
-									disabled={metadataSaving}
-									class="border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 transition-colors hover:border-red-200 hover:text-red-600 disabled:opacity-50"
-								>
-									{$t('recordings.common.remove')}
-								</button>
-							{/if}
-						</div>
-						<p class="text-[10px] text-stone-400">{$t('recordings.common.imageFormats')}</p>
-						{#if thumbnailAction === 'replace'}
-							<label
-								class="flex w-48 items-start gap-2 border border-stone-100 bg-stone-50/60 px-2.5 py-2"
-							>
-								<input
-									type="checkbox"
-									bind:checked={setAsDefaultThumbnail}
-									disabled={metadataSaving}
-									class="mt-0.5 accent-[#FF880C]"
-								/>
-								<span class="text-[10px] leading-snug text-stone-500">
-									<span class="font-semibold text-stone-600"
-										>{$t('recordings.meta.setDefaultLabel')}</span
-									>
-									{$t('recordings.meta.setDefaultHint')}
-								</span>
-							</label>
-						{/if}
-					</div>
-
-					<div class="flex flex-1 flex-col gap-4">
-						<div class="flex flex-col gap-1.5">
-							<label
-								for="edit-broadcast-title-input"
-								class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
-								>{$t('recordings.meta.liveTitle')}</label
-							>
-							<input
-								id="edit-broadcast-title-input"
-								type="text"
-								bind:value={titleDraft}
-								maxlength="120"
-								disabled={metadataSaving}
-								placeholder={$t('recordings.meta.titlePlaceholder')}
-								class="admin-input text-sm"
-							/>
-							<span class="self-end text-[10px] text-stone-400 tabular-nums"
-								>{titleDraft.length} / 120</span
-							>
-						</div>
-
-						<div class="flex flex-col gap-1.5">
-							<label
-								for="edit-broadcast-desc"
-								class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
-								>{$t('recordings.common.description')}</label
-							>
-							<textarea
-								id="edit-broadcast-desc"
-								bind:value={descriptionDraft}
-								placeholder={$t('recordings.meta.descriptionPlaceholder')}
-								maxlength="2000"
-								rows="6"
-								disabled={metadataSaving}
-								class="admin-input text-sm resize-y min-h-[120px]"
-							></textarea>
-							<span class="self-end text-[10px] text-stone-400 tabular-nums"
-								>{descriptionDraft.length} / 2000</span
-							>
-						</div>
-
-						<!-- YouTube link for the live. Defaults to the channel /live URL
-						     when nothing's stored — admin can replace with a specific
-						     video URL once the live ends and YouTube assigns the VOD id. -->
-						<div class="flex flex-col gap-1.5">
-							<label
-								for="edit-broadcast-youtube"
-								class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
-								>{$t('recordings.common.youtubeLink')}</label
-							>
-							<input
-								id="edit-broadcast-youtube"
-								type="url"
-								bind:value={youtubeUrlDraft}
-								placeholder={YOUTUBE_CHANNEL_LIVE_URL}
-								disabled={metadataSaving}
-								class="admin-input text-sm"
-							/>
-							<span class="text-[10px] text-stone-400">
-								{$t('recordings.meta.youtubeHint')}
-							</span>
-							{#if broadcastYoutubeError}
-								<p class="bg-red-50 px-3 py-2 text-xs text-red-700">{broadcastYoutubeError}</p>
-							{/if}
-						</div>
-
-						{#if thumbnailError}
-							<p class="bg-red-50 px-3 py-2 text-xs text-red-700">{thumbnailError}</p>
-						{/if}
-					</div>
-				</div>
-			</div>
-
-			<div class="flex items-center justify-end gap-2 border-t border-stone-100 px-6 py-4">
-				<button
-					type="button"
-					onclick={cancelEditMode}
-					disabled={metadataSaving}
-					class="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500 hover:bg-stone-100 hover:text-stone-700 disabled:opacity-50"
-				>
-					{$t('recordings.common.cancel')}
-				</button>
-				<button
-					type="button"
-					onclick={saveMetadata}
-					disabled={metadataSaving}
-					class="bg-primary px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-white hover:bg-missionnaire-600 disabled:opacity-50"
-				>
-					{metadataSaving ? $t('recordings.common.saving') : $t('recordings.common.save')}
-				</button>
-			</div>
-		</div>
-	</div>
-{/if}
 
 {#if editingRecordingId}
 	{@const editingRec = getEditingRecording()}
@@ -4897,49 +4215,6 @@
 	/>
 {/if}
 
-{#if thumbnailExpanded && broadcast.thumbnail_url && !broadcastThumbnailBroken}
-	<!-- Lightbox: click backdrop or press Escape to close. -->
-	<div
-		class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-lightbox-in"
-		onclick={onBackdropClick}
-		onkeydown={onLightboxKeydown}
-		role="dialog"
-		aria-modal="true"
-		aria-label={$t('recordings.meta.thumbnailAlt')}
-		tabindex="-1"
-	>
-		<button
-			type="button"
-			onclick={closeThumbnail}
-			aria-label={$t('recordings.common.close')}
-			class="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
-		>
-			<svg
-				width="18"
-				height="18"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-			>
-				<path d="M6 6l12 12M6 18L18 6" />
-			</svg>
-		</button>
-		<!-- Lightbox: skip BlurUpImage here — the image IS the focus, so a
-		     blur-up distracts. Just request the largest optimized variant. -->
-		<img
-			src={vercelImage(broadcast.thumbnail_url, 1920, 85)}
-			alt={broadcast.title || $t('recordings.meta.thumbnailAlt')}
-			onerror={() => {
-				broadcastThumbnailBroken = true;
-				closeThumbnail();
-			}}
-			class="max-h-[90vh] max-w-[90vw] object-contain shadow-2xl"
-		/>
-	</div>
-{/if}
 
 <style>
 	.default-thumbnail-admin {

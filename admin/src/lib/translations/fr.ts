@@ -788,6 +788,7 @@ export default {
 	'recordings.state.streamInactive': 'inactif',
 	'recordings.state.icecastUnreachable': 'Icecast injoignable',
 	'recordings.timer.live': 'Direct',
+	'recordings.timer.audience': 'Auditeurs',
 	'recordings.timer.recording': 'Enregistrement',
 	'recordings.timer.reconnecting': 'Reconnexion en cours',
 	'recordings.timer.segments': '{count} segments',
@@ -835,6 +836,27 @@ export default {
 	'recordings.meta.descriptionPlaceholder': 'Décrivez ce direct : sujet, orateur, texte biblique…',
 	'recordings.meta.youtubeHint':
 		"Par défaut : URL de la chaîne /live. Remplacez par l'URL de la vidéo précise une fois publiée.",
+	'recordings.defaults.title': 'Informations par défaut',
+	'recordings.defaults.intro':
+		"Utilisées quand vous démarrez un direct immédiat (non programmé). Un direct programmé garde ses propres informations.",
+	'recordings.defaults.liveHint':
+		'Un direct est en cours — ces valeurs serviront au prochain direct immédiat.',
+	'recordings.defaults.titleLabel': 'Titre',
+	'recordings.defaults.titleHint': 'Affiché : « {preview} »',
+	'recordings.defaults.noneThumb': 'Aucune vignette',
+	'recordings.defaults.youtubeDefault': '{url} (par défaut)',
+	'recordings.defaults.startNow': 'Direct immédiat',
+	'recordings.defaults.startNowTitle': 'Démarrer un direct tout de suite avec les informations par défaut',
+	'recordings.defaults.startFromDefaults': 'Direct (valeurs par défaut)',
+	'recordings.defaults.startFromDefaultsTitle':
+		'Démarrer un direct immédiat avec les informations par défaut ci-dessus',
+	'recordings.defaults.confirm.start': 'Démarrer un direct immédiat « {title} » ?',
+	'recordings.defaults.confirm.startNotifyOne':
+		'Démarrer un direct immédiat « {title} » et notifier {count} abonné ?',
+	'recordings.defaults.confirm.startNotifyMany':
+		'Démarrer un direct immédiat « {title} » et notifier {count} abonnés ?',
+	'recordings.defaults.toast.saved': 'Informations par défaut enregistrées.',
+	'recordings.defaults.toast.started': 'Direct immédiat démarré.',
 	'recordings.toolbar.searchPlaceholder': 'Rechercher par titre, auteur, description…',
 	'recordings.toolbar.filterStatus': 'Filtrer par statut',
 	'recordings.toolbar.allStatuses': 'Tous statuts',

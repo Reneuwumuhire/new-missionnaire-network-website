@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
-	import type { ScheduledLive } from '../../db/collections';
+	import type { ScheduledLive, BroadcastAdminState } from '../../db/collections';
 	import { confirmDialog } from '$lib/stores/confirm-dialog';
 	import { toast } from '$lib/stores/toast';
 	import { t, type TranslationKey } from '$lib/i18n';
@@ -19,7 +19,7 @@
 	}: {
 		upcoming: ScheduledLive[];
 		past: ScheduledLive[];
-		broadcast: { is_live: boolean };
+		broadcast: BroadcastAdminState;
 		subscriberCount: number;
 		publicBaseUrl: string;
 	} = $props();
@@ -27,6 +27,28 @@
 	function watchUrl(slug: string): string {
 		return `${publicBaseUrl}/live/${slug}`;
 	}
+
+	// Instant-live: the same default info shown in the panel above is what an
+	// unscheduled live airs with. Rendered here for the confirm dialog so the
+	// admin sees the exact title before going live.
+	const FALLBACK_DEFAULT_TITLE = '{date} Missionnaire Network Live audio';
+	function berlinDateYmd(d: Date): string {
+		const parts = new Intl.DateTimeFormat('en-CA', {
+			timeZone: 'Europe/Berlin',
+			year: 'numeric',
+			month: '2-digit',
+			day: '2-digit'
+		}).formatToParts(d);
+		const g = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+		return `${g('year')}-${g('month')}-${g('day')}`;
+	}
+	function renderTitleTemplate(template: string): string {
+		const date = berlinDateYmd(new Date());
+		return template.includes('{date}') ? template.replaceAll('{date}', date) : `${date} ${template}`;
+	}
+	const defaultTitlePreview = $derived(
+		renderTitleTemplate(broadcast.default_title?.trim() || FALLBACK_DEFAULT_TITLE)
+	);
 
 	function fmtDate(iso: string): string {
 		try {
@@ -377,6 +399,47 @@
 
 	// ── Row actions ────────────────────────────────────────────────
 	let busyId = $state<string | null>(null);
+	let startingDefaults = $state(false);
+
+	/** Start an immediate, unscheduled live off the saved default info. Always
+	 *  confirms first — same gate as starting a scheduled entry. */
+	async function startFromDefaults() {
+		if (startingDefaults) return;
+		if (broadcast.is_live) {
+			toast.error($t('recordings.scheduled.error.alreadyLive'));
+			return;
+		}
+		const willNotify = subscriberCount > 0;
+		const ok = await confirmDialog.ask({
+			title: $t('recordings.defaults.startFromDefaults'),
+			message: willNotify
+				? subscriberCount > 1
+					? $t('recordings.defaults.confirm.startNotifyMany', { title: defaultTitlePreview, count: subscriberCount })
+					: $t('recordings.defaults.confirm.startNotifyOne', { title: defaultTitlePreview, count: subscriberCount })
+				: $t('recordings.defaults.confirm.start', { title: defaultTitlePreview }),
+			confirmLabel: willNotify
+				? $t('recordings.confirm.goLive.confirmNotify')
+				: $t('recordings.defaults.startFromDefaults'),
+			cancelLabel: $t('recordings.common.cancel')
+		});
+		if (!ok) return;
+		startingDefaults = true;
+		try {
+			const res = await fetch('/api/broadcast/go-live', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ notify: true, useDefaults: true })
+			});
+			if (!res.ok) {
+				toast.error((await res.text()) || $t('recordings.error.http', { status: res.status }));
+				return;
+			}
+			toast.success($t('recordings.defaults.toast.started'));
+			await invalidateAll();
+		} finally {
+			startingDefaults = false;
+		}
+	}
 
 	async function startLive(entry: ScheduledLive) {
 		if (busyId) return;
@@ -529,16 +592,34 @@
 				{$t('recordings.scheduled.intro')}
 			</p>
 		</div>
-		<button
-			type="button"
-			onclick={openCreate}
-			class="inline-flex shrink-0 items-center gap-1.5 border border-primary bg-primary px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white shadow-sm shadow-primary/25 transition-all hover:bg-primary/90 hover:shadow-md"
-		>
-			<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-			</svg>
-			{$t('recordings.scheduled.schedule')}
-		</button>
+		<div class="flex w-full flex-col gap-2 sm:w-auto sm:shrink-0 sm:flex-row sm:flex-wrap sm:items-center">
+			<!-- Instant live off the saved default info — sits next to "Schedule a
+			     live" so both ways to go on air live in one place. Full-width
+			     stacked on mobile so the labels don't overflow the card. -->
+			<button
+				type="button"
+				onclick={startFromDefaults}
+				disabled={startingDefaults || broadcast.is_live}
+				data-testid="instant-live-btn"
+				title={$t('recordings.defaults.startFromDefaultsTitle')}
+				class="inline-flex w-full items-center justify-center gap-1.5 border border-primary bg-white px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary transition-all hover:bg-primary hover:text-white disabled:opacity-50 sm:w-auto"
+			>
+				<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M5.6 5.6a9 9 0 000 12.8M8.4 8.4a5 5 0 000 7.2m10-12.8a9 9 0 010 12.8m-2.8-9.2a5 5 0 010 7.2M12 12h.01" />
+				</svg>
+				{startingDefaults ? $t('recordings.busy.starting') : $t('recordings.defaults.startFromDefaults')}
+			</button>
+			<button
+				type="button"
+				onclick={openCreate}
+				class="inline-flex w-full items-center justify-center gap-1.5 border border-primary bg-primary px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white shadow-sm shadow-primary/25 transition-all hover:bg-primary/90 hover:shadow-md sm:w-auto"
+			>
+				<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+				</svg>
+				{$t('recordings.scheduled.schedule')}
+			</button>
+		</div>
 	</div>
 
 	<!-- Upcoming -->

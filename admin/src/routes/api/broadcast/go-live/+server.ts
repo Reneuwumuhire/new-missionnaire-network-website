@@ -13,6 +13,33 @@ import {
 	type ScheduledLive
 } from '../../../../db/collections';
 
+// Same fallbacks the upload modal uses when no default has been configured —
+// keeps an ad-hoc live's title/description sensible out of the box.
+const FALLBACK_DEFAULT_TITLE = '{date} Missionnaire Network Live audio';
+const FALLBACK_DEFAULT_DESCRIPTION =
+	'Rediffusion du direct de Missionnaire Network — prédications, enseignements et louanges.';
+
+/** YYYY-MM-DD in the broadcast's home timezone (Berlin), mirroring the
+ *  client-side title rendering so ad-hoc and scheduled lives read the same. */
+function berlinDateYmd(d: Date): string {
+	const parts = new Intl.DateTimeFormat('en-CA', {
+		timeZone: 'Europe/Berlin',
+		year: 'numeric',
+		month: '2-digit',
+		day: '2-digit'
+	}).formatToParts(d);
+	const y = parts.find((p) => p.type === 'year')?.value ?? '';
+	const m = parts.find((p) => p.type === 'month')?.value ?? '';
+	const day = parts.find((p) => p.type === 'day')?.value ?? '';
+	return `${y}-${m}-${day}`;
+}
+
+/** Substitute {date}, or prepend today's date so a title is never dateless. */
+function renderDefaultTitle(template: string): string {
+	const date = berlinDateYmd(new Date());
+	return template.includes('{date}') ? template.replaceAll('{date}', date) : `${date} ${template}`;
+}
+
 export const POST: RequestHandler = async ({ locals, request, getClientAddress }) => {
 	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
 
@@ -20,20 +47,25 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 	// Pass `false` from admin UI to go live silently (local testing, re-broadcasts
 	// after a technical glitch, etc.).
 	// `scheduledLiveId` explicitly attaches this broadcast to a scheduled entry
-	// (the "Démarrer le direct" button on /directs). Without it we auto-link the
-	// nearest upcoming entry, or back-fill a new one so even ad-hoc lives get a
-	// stable watch URL.
+	// (the "Démarrer le direct" button). Without it we auto-link the nearest
+	// upcoming entry, or back-fill a new one so even ad-hoc lives get a stable
+	// watch URL.
+	// `useDefaults` forces an immediate live off the saved default info, skipping
+	// the auto-link — the "go live now with defaults" button for unscheduled lives.
 	let notify = true;
 	let scheduledLiveId: string | null = null;
+	let useDefaults = false;
 	try {
 		const body = (await request.json().catch(() => ({}))) as {
 			notify?: unknown;
 			scheduledLiveId?: unknown;
+			useDefaults?: unknown;
 		};
 		if (body.notify === false) notify = false;
 		if (typeof body.scheduledLiveId === 'string' && body.scheduledLiveId) {
 			scheduledLiveId = body.scheduledLiveId;
 		}
+		if (body.useDefaults === true) useDefaults = true;
 	} catch {
 		// Empty body is fine — stay with defaults.
 	}
@@ -48,7 +80,10 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 
 	const startedAt = new Date().toISOString();
 
-	// Resolve the scheduled_lives entry this broadcast airs.
+	// Resolve the scheduled_lives entry this broadcast airs. This entry is the
+	// single source of truth for the live's metadata — the gate is reset from
+	// it below, so a recording started during this live can never inherit the
+	// title/description/thumbnail of a previous broadcast.
 	let entry: ScheduledLive | null = null;
 	if (scheduledLiveId) {
 		entry = await getScheduledLiveById(scheduledLiveId);
@@ -56,18 +91,22 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		if (entry.status !== 'scheduled') {
 			throw error(400, 'Ce direct programmé a déjà été diffusé ou annulé');
 		}
-	} else {
+	} else if (!useDefaults) {
+		// Plain "Go Live" still attaches to a nearby scheduled entry when one
+		// exists, so its prepared metadata is used. `useDefaults` skips this.
 		entry = await findLinkableScheduledLive(new Date());
 	}
 	if (!entry) {
-		// Ad-hoc live with no upcoming entry: back-fill one so the share link
-		// (/live/<slug>) exists for this broadcast too — and later resolves to
-		// its replay. Metadata mirrors what the public live page will show.
+		// Immediate, unscheduled live: back-fill an entry from the saved default
+		// info so the share link (/live/<slug>) exists and the live + recording
+		// show consistent values. Sourced purely from defaults — never from the
+		// previous broadcast's gate metadata.
 		entry = await createScheduledLive({
-			title: current.title ?? current.default_title ?? 'Direct Missionnaire Network',
-			description: current.description ?? current.default_description ?? null,
-			thumbnail_url: current.thumbnail_url ?? current.default_thumbnail_url ?? null,
-			thumbnail_s3_key: current.thumbnail_s3_key ?? current.default_thumbnail_s3_key ?? null,
+			title: renderDefaultTitle(current.default_title?.trim() || FALLBACK_DEFAULT_TITLE),
+			description: current.default_description?.trim() || FALLBACK_DEFAULT_DESCRIPTION,
+			thumbnail_url: current.default_thumbnail_url ?? null,
+			thumbnail_s3_key: current.default_thumbnail_s3_key ?? null,
+			youtube_url: current.default_youtube_url ?? null,
 			scheduled_at: new Date(startedAt),
 			status: 'live',
 			live_started_at: startedAt,
@@ -75,16 +114,14 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		});
 	}
 
-	// Effective thumbnail for this broadcast, in priority order: the scheduled
-	// entry's own → whatever is already on the gate → the stored default. The
+	// Effective thumbnail for this broadcast: the entry's own, falling back to
+	// the stored default so an instant live still gets the channel image. The
 	// gate value is what the public live page, the push image AND the recorder
-	// snapshot (recordings list thumbnail) all read — resolving the fallback
-	// here once means none of them can end up without a thumbnail while a
-	// default exists.
-	const thumbUrl = entry.thumbnail_url ?? current.thumbnail_url ?? current.default_thumbnail_url;
+	// snapshot (recordings list thumbnail) all read.
+	const thumbUrl = entry.thumbnail_url ?? current.default_thumbnail_url ?? null;
 	const thumbKey = entry.thumbnail_url
 		? entry.thumbnail_s3_key
-		: (current.thumbnail_url ? current.thumbnail_s3_key : current.default_thumbnail_s3_key);
+		: (current.default_thumbnail_url ? current.default_thumbnail_s3_key : null);
 
 	await setBroadcastAdminState({
 		is_live: true,
@@ -95,13 +132,15 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		icecast_offline_since: null,
 		scheduled_live_id: entry._id,
 		scheduled_live_slug: entry.slug,
-		// A scheduled entry carries its own metadata — copy it onto the gate so
-		// the public live page / push / recorder snapshot all show it. Only
-		// overwrite fields the entry actually has, so gate metadata an admin set
-		// manually survives when the entry has none.
-		...(entry.title ? { title: entry.title } : {}),
-		...(entry.description ? { description: entry.description } : {}),
-		...(thumbUrl ? { thumbnail_url: thumbUrl, thumbnail_s3_key: thumbKey ?? null } : {}),
+		// Fully reset the gate metadata from the resolved entry — every field is
+		// written (cleared when the entry has none) so nothing carries over from
+		// a previous live. The public live page / push / recorder snapshot all
+		// read these.
+		title: entry.title,
+		description: entry.description ?? null,
+		thumbnail_url: thumbUrl,
+		thumbnail_s3_key: thumbUrl ? (thumbKey ?? null) : null,
+		youtube_url: entry.youtube_url ?? null,
 		// Subtitle transcript for this broadcast: copied from the entry so the
 		// public radio-state endpoint can serve it without an extra lookup. The
 		// anchor is always reset — it's set by the admin "Start subtitles" button
