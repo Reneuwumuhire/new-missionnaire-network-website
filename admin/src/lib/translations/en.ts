@@ -1070,6 +1070,10 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.scheduled.announced': 'Announced',
 	'recordings.scheduled.reminderOn': 'Reminder enabled',
 	'recordings.scheduled.transcript': 'Transcript',
+	'recordings.scheduled.liveSince': 'Live since {time}',
+	'recordings.scheduled.elapsedJustNow': 'just now',
+	'recordings.scheduled.elapsedMin': 'for {count} min',
+	'recordings.scheduled.elapsedHm': 'for {hours}h {minutes}',
 	'recordings.scheduled.startLive': 'Start the live',
 	'recordings.scheduled.alreadyLiveShort': 'A live is already running',
 	'recordings.scheduled.history': 'History ({count})',
@@ -1077,6 +1081,10 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.scheduled.copyLink': 'Copy link',
 	'recordings.scheduled.editTitle': 'Edit the live',
 	'recordings.scheduled.editHint': 'The share link remains unchanged.',
+	'recordings.scheduled.editLive': 'Edit info',
+	'recordings.scheduled.editLiveTitle': 'Edit the live in progress',
+	'recordings.scheduled.editLiveHint':
+		'Title, description and thumbnail update on the public page in real time. Date and notifications can no longer be changed.',
 	'recordings.scheduled.createHint':
 		'A stable share link is created immediately — shareable before the live.',
 	'recordings.scheduled.dateTimeLabel': 'Date and time',

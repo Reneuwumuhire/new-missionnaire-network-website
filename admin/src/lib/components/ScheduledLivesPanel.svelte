@@ -58,6 +58,34 @@
 		}
 	}
 
+	/** Short clock time (HH:MM) for the "live since" line on an on-air entry. */
+	function fmtTime(iso: string): string {
+		try {
+			return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+		} catch {
+			return iso;
+		}
+	}
+
+	// Tick once a minute so the "live since … (elapsed)" label stays fresh while
+	// an entry is on air. Only runs when something is actually live.
+	let nowMs = $state(Date.now());
+	$effect(() => {
+		if (!upcoming.some((e) => e.status === 'live')) return;
+		const id = setInterval(() => (nowMs = Date.now()), 30_000);
+		return () => clearInterval(id);
+	});
+
+	/** "depuis 12 min" / "depuis 1 h 05" — how long an entry has been on air. */
+	function liveElapsed(iso: string, now: number): string {
+		const diffMs = now - Date.parse(iso);
+		if (!Number.isFinite(diffMs) || diffMs < 60_000) return $t('recordings.scheduled.elapsedJustNow');
+		const minutes = Math.floor(diffMs / 60_000);
+		if (minutes < 60) return $t('recordings.scheduled.elapsedMin', { count: minutes });
+		const hours = Math.floor(minutes / 60);
+		return $t('recordings.scheduled.elapsedHm', { hours, minutes: pad(minutes % 60) });
+	}
+
 	/** Coarse "Dans 3 jours / Dans 2 h / Dans 45 min" chip, YouTube-style.
 	 *  Computed once per render — minute-level drift doesn't matter here. */
 	function relativeUntil(iso: string): string {
@@ -99,6 +127,9 @@
 	// ── Create / edit modal ────────────────────────────────────────
 	let modalOpen = $state(false);
 	let editingId = $state<string | null>(null);
+	// True when editing an entry that's already on air — the modal then hides
+	// the scheduling-only fields and edits the metadata viewers see right now.
+	let editingLive = $state(false);
 	let saving = $state(false);
 	let formError = $state<string | null>(null);
 	let titleDraft = $state('');
@@ -148,6 +179,7 @@
 		existingSubtitleFilename = null;
 		subtitleCueCount = null;
 		subtitleDurationLabel = null;
+		editingLive = false;
 		formError = null;
 	}
 
@@ -164,6 +196,7 @@
 	function openEdit(entry: ScheduledLive) {
 		resetForm();
 		editingId = entry._id;
+		editingLive = entry.status === 'live';
 		titleDraft = entry.title;
 		descriptionDraft = entry.description ?? '';
 		youtubeUrlDraft = entry.youtube_url ?? '';
@@ -327,21 +360,24 @@
 			formError = $t('recordings.error.titleRequired');
 			return;
 		}
-		if (!scheduledAtDraft) {
+		// A live entry has no editable schedule — only the date matters before air.
+		if (!editingLive && !scheduledAtDraft) {
 			formError = $t('recordings.error.dateTimeRequired');
 			return;
 		}
-		const scheduledIso = new Date(scheduledAtDraft).toISOString();
 		saving = true;
 		formError = null;
 		try {
 			const body: Record<string, unknown> = {
 				title: titleDraft.trim(),
 				description: descriptionDraft.trim() || null,
-				youtube_url: youtubeUrlDraft.trim() || null,
-				scheduled_at: scheduledIso,
-				reminder_enabled: reminderDraft
+				youtube_url: youtubeUrlDraft.trim() || null
 			};
+			// Scheduling-only fields are omitted while live (the server freezes them).
+			if (!editingLive) {
+				body.scheduled_at = new Date(scheduledAtDraft).toISOString();
+				body.reminder_enabled = reminderDraft;
+			}
 
 			if (thumbnailAction !== 'keep') {
 				const thumb = await uploadThumbnailIfNeeded();
@@ -691,12 +727,24 @@
 							<h3 class="mt-1.5 truncate font-display text-lg font-semibold text-stone-800">
 								{entry.title}
 							</h3>
-							<p class="inline-flex items-center gap-1.5 text-[13px] text-stone-500">
-								<svg class="h-3.5 w-3.5 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-								</svg>
-								{fmtDate(entry.scheduled_at)}
-							</p>
+							<!-- Once on air the entry stops advertising its (now-past) scheduled
+							     slot and reports the real go-live time + a running elapsed clock. -->
+							{#if entry.status === 'live' && entry.live_started_at}
+								<p class="inline-flex items-center gap-1.5 text-[13px] font-medium text-red-600">
+									<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+									</svg>
+									{$t('recordings.scheduled.liveSince', { time: fmtTime(entry.live_started_at) })}
+									<span class="text-stone-400">· {liveElapsed(entry.live_started_at, nowMs)}</span>
+								</p>
+							{:else}
+								<p class="inline-flex items-center gap-1.5 text-[13px] text-stone-500">
+									<svg class="h-3.5 w-3.5 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+									</svg>
+									{fmtDate(entry.scheduled_at)}
+								</p>
+							{/if}
 
 							<!-- Share link -->
 							<div class="mt-3 flex items-center gap-2">
@@ -770,6 +818,16 @@
 									<rect x="6" y="6" width="12" height="12" rx="1" />
 								</svg>
 								{$t('recordings.actions.endLive')}
+							</button>
+							<!-- Correct the on-air title/description while broadcasting — the
+							     change is mirrored to the public live page immediately. -->
+							<button
+								type="button"
+								class="border border-stone-200 bg-white px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-stone-900 hover:bg-stone-900 hover:text-white disabled:opacity-50"
+								disabled={busyId === entry._id}
+								onclick={() => openEdit(entry)}
+							>
+								{$t('recordings.scheduled.editLive')}
 							</button>
 						</div>
 					{/if}
@@ -853,12 +911,18 @@
 		></button>
 		<div class="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto bg-white p-6 shadow-2xl">
 			<h2 class="font-display text-xl font-semibold text-stone-800">
-				{editingId ? $t('recordings.scheduled.editTitle') : $t('recordings.scheduled.schedule')}
+				{editingLive
+					? $t('recordings.scheduled.editLiveTitle')
+					: editingId
+						? $t('recordings.scheduled.editTitle')
+						: $t('recordings.scheduled.schedule')}
 			</h2>
 			<p class="mt-1 text-xs text-stone-400">
-				{editingId
-					? $t('recordings.scheduled.editHint')
-					: $t('recordings.scheduled.createHint')}
+				{editingLive
+					? $t('recordings.scheduled.editLiveHint')
+					: editingId
+						? $t('recordings.scheduled.editHint')
+						: $t('recordings.scheduled.createHint')}
 			</p>
 
 			<div class="mt-5 space-y-4">
@@ -876,18 +940,20 @@
 					/>
 				</div>
 
-				<div>
-					<label for="direct-datetime" class="mb-1 block text-xs font-semibold text-stone-600">
-						{$t('recordings.scheduled.dateTimeLabel')} <span class="text-rose-500">*</span>
-						<span class="ml-1 font-normal text-stone-400">{$t('recordings.scheduled.localTime')}</span>
-					</label>
-					<input
-						id="direct-datetime"
-						type="datetime-local"
-						bind:value={scheduledAtDraft}
-						class="w-full border border-stone-200 bg-white px-3 py-2 text-sm text-stone-800 focus:border-primary focus:outline-none"
-					/>
-				</div>
+				{#if !editingLive}
+					<div>
+						<label for="direct-datetime" class="mb-1 block text-xs font-semibold text-stone-600">
+							{$t('recordings.scheduled.dateTimeLabel')} <span class="text-rose-500">*</span>
+							<span class="ml-1 font-normal text-stone-400">{$t('recordings.scheduled.localTime')}</span>
+						</label>
+						<input
+							id="direct-datetime"
+							type="datetime-local"
+							bind:value={scheduledAtDraft}
+							class="w-full border border-stone-200 bg-white px-3 py-2 text-sm text-stone-800 focus:border-primary focus:outline-none"
+						/>
+					</div>
+				{/if}
 
 				<div>
 					<label for="direct-description" class="mb-1 block text-xs font-semibold text-stone-600">
@@ -951,7 +1017,9 @@
 					</div>
 				</div>
 
-				<!-- Subtitle (SRT) -->
+				<!-- Subtitle (SRT) — managed from the dedicated sync panel once on air,
+				     so it's hidden when correcting a live entry's metadata. -->
+				{#if !editingLive}
 				<div>
 					<span class="mb-1 block text-xs font-semibold text-stone-600">
 						{$t('recordings.scheduled.srtLabel')}
@@ -1007,6 +1075,7 @@
 						</span>
 					</label>
 				</div>
+				{/if}
 
 				{#if formError}
 					<p class="border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">{formError}</p>

@@ -2562,16 +2562,9 @@
 
 </div>
 
-<BroadcastDefaultsPanel {broadcast} />
-
-<!-- Subtitle sync — shown during any live: attach an SRT mid-broadcast if
-     the stream started without one, then sync/nudge it. -->
-{#if broadcast.is_live}
-	<SubtitleSyncPanel {broadcast} getMonitorPositionEpochMs={monitorPositionEpochMs} />
-{/if}
-
-<!-- Scheduled lives — YouTube-style: schedule ahead, get a stable share link
-     (/live/<slug>) immediately, start the live from its entry when ready. -->
+<!-- Scheduled lives — moved up to the top of the broadcast tools: schedule
+     ahead, get a stable share link (/live/<slug>) immediately, start the live
+     from its entry when ready. -->
 <ScheduledLivesPanel
 	upcoming={data.upcomingLives}
 	past={data.pastLives}
@@ -2579,6 +2572,18 @@
 	{subscriberCount}
 	publicBaseUrl={data.publicBaseUrl}
 />
+
+<!-- Subtitle sync — shown during any live: attach an SRT mid-broadcast if
+     the stream started without one, then sync/nudge it. Stays right under the
+     scheduled lives so the on-air transcript controls are close at hand. -->
+{#if broadcast.is_live}
+	<SubtitleSyncPanel {broadcast} getMonitorPositionEpochMs={monitorPositionEpochMs} />
+{/if}
+
+<!-- Default info — fallback metadata for an unscheduled instant live. Moved
+     below the scheduled lives since it changes rarely and isn't part of the
+     live-from-a-schedule workflow. -->
+<BroadcastDefaultsPanel {broadcast} />
 
 <!-- Search + filters toolbar -->
 <div class="mb-3 flex flex-wrap items-center gap-2 sm:gap-3">

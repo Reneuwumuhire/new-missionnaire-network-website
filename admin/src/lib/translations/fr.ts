@@ -1084,6 +1084,10 @@ export default {
 	'recordings.scheduled.announced': 'Annoncé',
 	'recordings.scheduled.reminderOn': 'Rappel activé',
 	'recordings.scheduled.transcript': 'Transcription',
+	'recordings.scheduled.liveSince': 'En direct depuis {time}',
+	'recordings.scheduled.elapsedJustNow': "à l'instant",
+	'recordings.scheduled.elapsedMin': 'depuis {count} min',
+	'recordings.scheduled.elapsedHm': 'depuis {hours} h {minutes}',
 	'recordings.scheduled.startLive': 'Démarrer le direct',
 	'recordings.scheduled.alreadyLiveShort': 'Un direct est déjà en cours',
 	'recordings.scheduled.history': 'Historique ({count})',
@@ -1091,6 +1095,10 @@ export default {
 	'recordings.scheduled.copyLink': 'Copier le lien',
 	'recordings.scheduled.editTitle': 'Modifier le direct',
 	'recordings.scheduled.editHint': 'Le lien de partage reste inchangé.',
+	'recordings.scheduled.editLive': 'Modifier les infos',
+	'recordings.scheduled.editLiveTitle': 'Modifier le direct en cours',
+	'recordings.scheduled.editLiveHint':
+		'Le titre, la description et la vignette sont mis à jour en direct sur la page publique. La date et les notifications ne sont plus modifiables.',
 	'recordings.scheduled.createHint':
 		'Un lien de partage stable est créé immédiatement — partageable avant le direct.',
 	'recordings.scheduled.dateTimeLabel': 'Date et heure',

@@ -6,6 +6,8 @@ import {
 	updateScheduledLive,
 	deleteScheduledLive,
 	isThumbnailS3KeyReferenced,
+	getBroadcastAdminState,
+	setBroadcastAdminState,
 	logAudit
 } from '../../../../db/collections';
 import { deleteObject } from '$lib/server/s3';
@@ -24,8 +26,12 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 
 	const current = await getScheduledLiveById(params.id);
 	if (!current) throw error(404, 'Direct programmé introuvable');
-	if (current.status !== 'scheduled') {
-		throw error(400, 'Seul un direct encore programmé peut être modifié');
+	// A scheduled entry is fully editable; a live one can have its on-air
+	// metadata (title/description/youtube/thumbnail) corrected mid-broadcast —
+	// scheduling-only fields (date, reminder, announce) are frozen once live.
+	const isLive = current.status === 'live';
+	if (current.status !== 'scheduled' && !isLive) {
+		throw error(400, 'Seul un direct programmé ou en cours peut être modifié');
 	}
 
 	const body = (await request.json()) as {
@@ -50,8 +56,9 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 	}
 	if ('description' in body) updates.description = parseDescription(body.description);
 	if ('youtube_url' in body) updates.youtube_url = parseYoutubeUrl(body.youtube_url);
-	if ('scheduled_at' in body) updates.scheduled_at = parseScheduledAt(body.scheduled_at);
-	if ('reminder_enabled' in body) updates.reminder_enabled = body.reminder_enabled === true;
+	// Date/reminder only make sense before the live starts — ignore them once on air.
+	if (!isLive && 'scheduled_at' in body) updates.scheduled_at = parseScheduledAt(body.scheduled_at);
+	if (!isLive && 'reminder_enabled' in body) updates.reminder_enabled = body.reminder_enabled === true;
 
 	if ('thumbnail_url' in body || 'thumbnail_s3_key' in body) {
 		const pair = parseThumbnailPair(body.thumbnail_url, body.thumbnail_s3_key);
@@ -70,13 +77,40 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 		updates.subtitle_filename = triple.subtitle_filename;
 	}
 
-	// Re-announce request: only meaningful if not already announced/pending.
-	const announce = body.announce === true && !current.announce_pending && !current.announced_at;
+	// Re-announce request: only meaningful before the live, and if not already
+	// announced/pending.
+	const announce =
+		!isLive && body.announce === true && !current.announce_pending && !current.announced_at;
 	if (announce) updates.announce_pending = true;
 
 	if (Object.keys(updates).length === 0) throw error(400, 'Aucune modification fournie');
 
 	await updateScheduledLive(params.id, updates);
+
+	// Editing the entry that's currently on air: mirror its public-facing
+	// metadata into the broadcast gate so the live page, push image and recorder
+	// snapshot pick up the correction immediately. Done before the thumbnail
+	// cleanup below so the reference check sees the gate's new key.
+	if (isLive) {
+		const gate = await getBroadcastAdminState({ fresh: true });
+		if (gate.is_live && gate.scheduled_live_id === params.id) {
+			const gateUpdates: {
+				title?: string | null;
+				description?: string | null;
+				youtube_url?: string | null;
+				thumbnail_url?: string | null;
+				thumbnail_s3_key?: string | null;
+			} = {};
+			if ('title' in updates) gateUpdates.title = updates.title ?? null;
+			if ('description' in updates) gateUpdates.description = updates.description ?? null;
+			if ('youtube_url' in updates) gateUpdates.youtube_url = updates.youtube_url ?? null;
+			if ('thumbnail_url' in updates) {
+				gateUpdates.thumbnail_url = updates.thumbnail_url ?? null;
+				gateUpdates.thumbnail_s3_key = updates.thumbnail_s3_key ?? null;
+			}
+			if (Object.keys(gateUpdates).length > 0) await setBroadcastAdminState(gateUpdates);
+		}
+	}
 
 	// Replacing/clearing the thumbnail: delete the old S3 object unless still
 	// referenced elsewhere (other scheduled lives, recordings, broadcast state).
