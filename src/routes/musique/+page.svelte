@@ -340,8 +340,20 @@
 	onMount(() => {
 		void refreshCachedUrls();
 		updateRecueilsScrollState();
-		const initialPlay = $page.url.searchParams.get('play');
-		if (initialPlay) pendingPlayId = initialPlay;
+	});
+
+	// Track the `play` query param reactively rather than only on mount.
+	// Picking a song from the global search uses a client-side goto, which
+	// updates the URL without remounting this page — so an onMount-only read
+	// would miss it when the user is already on /musique. Reading $page.url
+	// here re-runs on every navigation and queues the newly selected song.
+	$effect(() => {
+		const playParam = $page.url.searchParams.get('play');
+		if (playParam && playParam !== pendingPlayId) {
+			untrack(() => {
+				pendingPlayId = playParam;
+			});
+		}
 	});
 
 	async function resolveSharedSong(key: string): Promise<MusicAudio | null> {
