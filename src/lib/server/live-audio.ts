@@ -7,7 +7,10 @@ import {
 } from '../../db/collections';
 
 const DEFAULT_LIVE_AUDIO_SOURCE_URL = 'http://localhost:8000/radio.mp3';
-const LIVE_AUDIO_PROBE_TIMEOUT_MS = 4000;
+// Must cover the Fly app's measured 4-6s time-to-first-byte plus the two
+// probe reads and the 800ms pause between them. A 4s budget made the probe
+// fail while audio was flowing, which auto-ended live broadcasts.
+const LIVE_AUDIO_PROBE_TIMEOUT_MS = 10_000;
 
 // Grace window before the auto-end safety closes the broadcast gate when
 // Icecast goes offline. Tolerates streamer uplink dropouts on poor networks
@@ -27,6 +30,12 @@ export const ICECAST_OFFLINE_AUTO_END_MS = (() => {
  * Round 1: read ≥ ROUND1_MIN_BYTES  (proves the server responded with data)
  * Wait   : PAUSE_MS
  * Round 2: read ≥ ROUND2_MIN_BYTES  (proves data is still flowing)
+ *
+ * NOTE: since the Icecast silence-fallback mount shipped, bytes flow on
+ * /radio.mp3 even with no broadcaster, so this byte-flow probe alone can no
+ * longer prove "on air". It remains as the fallback path of
+ * `checkLiveAudio()` in $lib/server/icecast.ts, which primarily checks the
+ * status page for the real mount's source.
  */
 const ROUND1_MIN_BYTES = 512;
 const ROUND2_MIN_BYTES = 512;

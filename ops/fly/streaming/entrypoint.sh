@@ -13,6 +13,7 @@ INPUT_PROTOCOL="${INPUT_PROTOCOL:-rtsp}"
 ICECAST_PID=""
 MTX_PID=""
 RECORDER_PID=""
+SILENCE_PID=""
 
 mkdir -p /tmp/icecast
 touch /tmp/icecast/error.log /tmp/icecast/access.log
@@ -20,7 +21,7 @@ chown nobody:nogroup /tmp/icecast /tmp/icecast/error.log /tmp/icecast/access.log
 chmod 775 /tmp/icecast || true
 chmod 664 /tmp/icecast/error.log /tmp/icecast/access.log || true
 mkdir -p /data/recordings
-export ICECAST_SOURCE_PASSWORD ICECAST_ADMIN_USER ICECAST_ADMIN_PASSWORD ICECAST_HOSTNAME
+export ICECAST_SOURCE_PASSWORD ICECAST_ADMIN_USER ICECAST_ADMIN_PASSWORD ICECAST_HOSTNAME AUDIO_MOUNT
 envsubst < /app/icecast.xml.template > /app/icecast.xml
 
 start_icecast() {
@@ -50,13 +51,37 @@ start_recorder() {
 	RECORDER_PID=$!
 }
 
+# Always-on silence source feeding the /silence.mp3 fallback mount. Icecast
+# moves ${AUDIO_MOUNT} listeners here whenever the real source drops (OBS
+# reconnect, transcoder restart) and moves them back when it returns, so
+# their connections survive instead of being torn down. Runs in its own
+# supervisor subshell because the main loop below blocks inside the live
+# transcoder while a broadcast is running and couldn't restart it.
+# Same codec parameters as the live encode so the splice decodes cleanly.
+start_silence_loop() {
+	(
+		sleep 3
+		while true; do
+			ffmpeg -nostdin -hide_banner -loglevel error \
+				-re -f lavfi -i "anullsrc=r=48000:cl=stereo" \
+				-c:a libmp3lame -b:a "${AUDIO_BITRATE}" -ar 48000 -ac 2 \
+				-content_type audio/mpeg \
+				-f mp3 "icecast://source:${ICECAST_SOURCE_PASSWORD}@127.0.0.1:8000/silence.mp3"
+			echo "[silence] ffmpeg exited; retrying in 2s"
+			sleep 2
+		done
+	) &
+	SILENCE_PID=$!
+}
+
 start_icecast
 start_mediamtx
 start_recorder
+start_silence_loop
 
 cleanup() {
 	echo "[stream] stopping child processes"
-	kill -TERM "$ICECAST_PID" "$MTX_PID" ${RECORDER_PID:-} 2>/dev/null || true
+	kill -TERM "$ICECAST_PID" "$MTX_PID" ${RECORDER_PID:-} ${SILENCE_PID:-} 2>/dev/null || true
 	wait || true
 	exit 0
 }
@@ -125,11 +150,16 @@ while true; do
 
 	case "$INPUT_PROTOCOL" in
 	rtsp)
+		# -timeout (µs): RTSP socket read timeout. Without it a half-dead TCP
+		# session wedges this process silently — the Icecast source then sits
+		# idle until source-timeout (60s) kicks it, i.e. up to a minute of dead
+		# air. 10s makes a wedged read die fast so the loop restarts cleanly.
 		ffmpeg -nostdin -hide_banner -loglevel warning \
 			-fflags +genpts+igndts+discardcorrupt \
 			-thread_queue_size 1024 \
 			-rtsp_transport tcp \
 			-allowed_media_types audio \
+			-timeout 10000000 \
 			-i "${INPUT_URL}" \
 			-map 0:a:0? -vn -c:a libmp3lame -b:a "${AUDIO_BITRATE}" -ar 48000 -ac 2 \
 			-content_type audio/mpeg \
@@ -147,6 +177,6 @@ while true; do
 		;;
 	esac
 
-	echo "[stream] ffmpeg stopped; retrying in 2s"
-	sleep 2
+	echo "[stream] ffmpeg stopped; retrying in 1s"
+	sleep 1
 done

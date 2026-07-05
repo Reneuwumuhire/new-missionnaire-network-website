@@ -1569,6 +1569,10 @@
 	}
 
 	function monitorDisconnect() {
+		if (monitorSourceGoneTimer) {
+			clearTimeout(monitorSourceGoneTimer);
+			monitorSourceGoneTimer = null;
+		}
 		if (monitorRetryTimer) {
 			clearTimeout(monitorRetryTimer);
 			monitorRetryTimer = null;
@@ -1607,14 +1611,31 @@
 		if (!monitorMuted && !monitorLive) monitorConnect();
 	}
 
-	// Follow the source: connect when a stream appears, tear down when it ends.
+	// Follow the source: connect when a stream appears. Disconnecting is
+	// debounced: the Icecast silence-fallback mount keeps the monitor's HTTP
+	// connection alive through source blips (OBS reconnects, transcoder
+	// restarts), so tearing it down on the first sourceActive=false poll would
+	// turn every blip into a monitor reload. Only give up once the source has
+	// been gone long enough to mean "broadcast over".
+	const MONITOR_SOURCE_GONE_MS = 3 * 60_000;
+	let monitorSourceGoneTimer: ReturnType<typeof setTimeout> | null = null;
 	let monitorLastSourceActive = false;
 	$effect(() => {
 		const active = icecast.sourceActive;
 		if (active === monitorLastSourceActive) return;
 		monitorLastSourceActive = active;
-		if (active) monitorConnect();
-		else monitorDisconnect();
+		if (active) {
+			if (monitorSourceGoneTimer) {
+				clearTimeout(monitorSourceGoneTimer);
+				monitorSourceGoneTimer = null;
+			}
+			monitorConnect();
+		} else if (!monitorSourceGoneTimer) {
+			monitorSourceGoneTimer = setTimeout(() => {
+				monitorSourceGoneTimer = null;
+				if (!monitorLastSourceActive) monitorDisconnect();
+			}, MONITOR_SOURCE_GONE_MS);
+		}
 	});
 
 	function formatElapsed(sec: number): string {
@@ -2209,13 +2230,28 @@
 					<!-- Live audience — the concurrent listeners on air right now, the
 					     same figure the public live page shows ("auditeurs"). -->
 					<div class="flex flex-1 flex-col sm:flex-initial sm:items-end">
-						<span class="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-[0.2em] text-stone-500">
-							<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a3 3 0 10-2.5-4.5" />
+						<span
+							class="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-[0.2em] text-stone-500"
+						>
+							<svg
+								class="h-3 w-3"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+								stroke-width="2"
+								aria-hidden="true"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a3 3 0 10-2.5-4.5"
+								/>
 							</svg>
 							{$t('recordings.timer.audience')}
 						</span>
-						<span class="font-mono text-2xl font-semibold text-stone-700 tabular-nums leading-tight">
+						<span
+							class="font-mono text-2xl font-semibold text-stone-700 tabular-nums leading-tight"
+						>
 							{icecast.listeners}
 						</span>
 					</div>
@@ -2299,147 +2335,153 @@
 	<!-- Actions — only when there's a session to control or a source to start
 	     from. Idle-with-no-source shows just the compact monitor strip below. -->
 	{#if icecast.sourceActive || broadcast.is_live || isRecording}
-	<div class="mt-5 border-t border-stone-100 pt-5">
-		{#if broadcast.is_live && isRecording}
-			<!-- All three actions stay visible, equal-height, each with a distinct
+		<div class="mt-5 border-t border-stone-100 pt-5">
+			{#if broadcast.is_live && isRecording}
+				<!-- All three actions stay visible, equal-height, each with a distinct
 			     tonal identity at rest so they're recognizable at a glance:
 			     stone = direct, rose = enregistrement, red-700 = session totale. -->
-			<p class="mb-2.5 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400">
-				{$t('recordings.sessionControls')}
-			</p>
-			<div class="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-				<button
-					onclick={endLive}
-					disabled={broadcastBusy}
-					class="inline-flex items-center justify-center gap-2 border border-stone-300 bg-stone-100 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-stone-800 transition-all hover:border-stone-900 hover:bg-stone-900 hover:text-white disabled:opacity-50 sm:order-1"
-				>
-					{@render iconLiveStop()}
-					<span>{broadcastBusy ? '…' : $t('recordings.actions.endLive')}</span>
-				</button>
-				<button
-					onclick={stop}
-					disabled={busy}
-					class="inline-flex items-center justify-center gap-2 border border-rose-200 bg-rose-50 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-rose-700 transition-all hover:border-rose-600 hover:bg-rose-600 hover:text-white disabled:opacity-50 sm:order-2"
-				>
-					{@render iconRecordStop()}
-					<span
-						>{busy ? $t('recordings.busy.stopping') : $t('recordings.actions.stopRecording')}</span
+				<p class="mb-2.5 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400">
+					{$t('recordings.sessionControls')}
+				</p>
+				<div class="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+					<button
+						onclick={endLive}
+						disabled={broadcastBusy}
+						class="inline-flex items-center justify-center gap-2 border border-stone-300 bg-stone-100 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-stone-800 transition-all hover:border-stone-900 hover:bg-stone-900 hover:text-white disabled:opacity-50 sm:order-1"
 					>
-				</button>
-				<button
-					onclick={stopBoth}
-					disabled={broadcastBusy || busy}
-					class="order-first inline-flex items-center justify-center gap-2 bg-red-700 px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white shadow-sm shadow-red-700/30 ring-1 ring-red-700/60 transition-all hover:bg-red-800 hover:shadow-md hover:shadow-red-700/40 disabled:opacity-50 sm:order-3"
-				>
-					{@render iconStop()}
-					<span
-						>{broadcastBusy || busy
-							? $t('recordings.busy.stopping')
-							: $t('recordings.actions.stopAll')}</span
+						{@render iconLiveStop()}
+						<span>{broadcastBusy ? '…' : $t('recordings.actions.endLive')}</span>
+					</button>
+					<button
+						onclick={stop}
+						disabled={busy}
+						class="inline-flex items-center justify-center gap-2 border border-rose-200 bg-rose-50 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-rose-700 transition-all hover:border-rose-600 hover:bg-rose-600 hover:text-white disabled:opacity-50 sm:order-2"
 					>
-				</button>
-			</div>
-		{:else if !broadcast.is_live && !isRecording && icecast.sourceActive}
-			<!-- Mirror of the stop cluster: stone = direct, orange = enregistrement,
+						{@render iconRecordStop()}
+						<span
+							>{busy
+								? $t('recordings.busy.stopping')
+								: $t('recordings.actions.stopRecording')}</span
+						>
+					</button>
+					<button
+						onclick={stopBoth}
+						disabled={broadcastBusy || busy}
+						class="order-first inline-flex items-center justify-center gap-2 bg-red-700 px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white shadow-sm shadow-red-700/30 ring-1 ring-red-700/60 transition-all hover:bg-red-800 hover:shadow-md hover:shadow-red-700/40 disabled:opacity-50 sm:order-3"
+					>
+						{@render iconStop()}
+						<span
+							>{broadcastBusy || busy
+								? $t('recordings.busy.stopping')
+								: $t('recordings.actions.stopAll')}</span
+						>
+					</button>
+				</div>
+			{:else if !broadcast.is_live && !isRecording && icecast.sourceActive}
+				<!-- Mirror of the stop cluster: stone = direct, orange = enregistrement,
 			     emerald = session complète. -->
-			<p class="mb-2.5 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400">
-				{$t('recordings.sessionStart')}
-			</p>
-			<div class="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-				<button
-					onclick={goLive}
-					disabled={broadcastBusy}
-					class="inline-flex items-center justify-center gap-2 border border-stone-300 bg-stone-100 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-stone-800 transition-all hover:border-stone-900 hover:bg-stone-900 hover:text-white disabled:opacity-50 sm:order-1"
-				>
-					{@render iconBroadcast()}
-					<span>{broadcastBusy ? '…' : $t('recordings.actions.goLive')}</span>
-				</button>
-				<button
-					onclick={start}
-					disabled={busy ||
-						!recorder.available ||
-						('pendingOrphans' in recorder && recorder.pendingOrphans > 0)}
-					class="inline-flex items-center justify-center gap-2 border border-orange-200 bg-orange-50 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-primary transition-all hover:border-primary hover:bg-primary hover:text-white disabled:opacity-50 sm:order-2"
-				>
-					{@render iconRecord()}
-					<span>{busy ? '…' : $t('recordings.actions.record')}</span>
-				</button>
-				<button
-					onclick={startBoth}
-					disabled={broadcastBusy ||
-						busy ||
-						!recorder.available ||
-						('pendingOrphans' in recorder && recorder.pendingOrphans > 0)}
-					class="order-first inline-flex items-center justify-center gap-2 bg-emerald-600 px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white shadow-sm shadow-emerald-600/30 ring-1 ring-emerald-600/50 transition-all hover:bg-emerald-700 hover:shadow-md hover:shadow-emerald-600/40 disabled:opacity-50 sm:order-3"
-				>
-					{@render iconBoth()}
-					<span
-						>{broadcastBusy || busy
-							? $t('recordings.busy.starting')
-							: $t('recordings.actions.startAll')}</span
+				<p class="mb-2.5 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400">
+					{$t('recordings.sessionStart')}
+				</p>
+				<div class="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+					<button
+						onclick={goLive}
+						disabled={broadcastBusy}
+						class="inline-flex items-center justify-center gap-2 border border-stone-300 bg-stone-100 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-stone-800 transition-all hover:border-stone-900 hover:bg-stone-900 hover:text-white disabled:opacity-50 sm:order-1"
 					>
-				</button>
-			</div>
-		{:else if broadcast.is_live}
-			<!-- Direct seul : arrêt du direct (tonalité stone) + démarrage de
+						{@render iconBroadcast()}
+						<span>{broadcastBusy ? '…' : $t('recordings.actions.goLive')}</span>
+					</button>
+					<button
+						onclick={start}
+						disabled={busy ||
+							!recorder.available ||
+							('pendingOrphans' in recorder && recorder.pendingOrphans > 0)}
+						class="inline-flex items-center justify-center gap-2 border border-orange-200 bg-orange-50 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-primary transition-all hover:border-primary hover:bg-primary hover:text-white disabled:opacity-50 sm:order-2"
+					>
+						{@render iconRecord()}
+						<span>{busy ? '…' : $t('recordings.actions.record')}</span>
+					</button>
+					<button
+						onclick={startBoth}
+						disabled={broadcastBusy ||
+							busy ||
+							!recorder.available ||
+							('pendingOrphans' in recorder && recorder.pendingOrphans > 0)}
+						class="order-first inline-flex items-center justify-center gap-2 bg-emerald-600 px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white shadow-sm shadow-emerald-600/30 ring-1 ring-emerald-600/50 transition-all hover:bg-emerald-700 hover:shadow-md hover:shadow-emerald-600/40 disabled:opacity-50 sm:order-3"
+					>
+						{@render iconBoth()}
+						<span
+							>{broadcastBusy || busy
+								? $t('recordings.busy.starting')
+								: $t('recordings.actions.startAll')}</span
+						>
+					</button>
+				</div>
+			{:else if broadcast.is_live}
+				<!-- Direct seul : arrêt du direct (tonalité stone) + démarrage de
 			     l'enregistrement (tonalité orange). -->
-			<p class="mb-2.5 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400">
-				{$t('recordings.sessionControls')}
-			</p>
-			<div class="grid gap-2 sm:grid-cols-2">
-				<button
-					onclick={endLive}
-					disabled={broadcastBusy}
-					class="inline-flex items-center justify-center gap-2 bg-stone-800 px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white shadow-sm shadow-stone-900/20 ring-1 ring-stone-900/40 transition-all hover:bg-stone-900 hover:shadow-md hover:shadow-stone-900/30 disabled:opacity-50"
-				>
-					{@render iconLiveStop()}
-					<span
-						>{broadcastBusy
-							? $t('recordings.busy.stopping')
-							: $t('recordings.actions.endLive')}</span
+				<p class="mb-2.5 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400">
+					{$t('recordings.sessionControls')}
+				</p>
+				<div class="grid gap-2 sm:grid-cols-2">
+					<button
+						onclick={endLive}
+						disabled={broadcastBusy}
+						class="inline-flex items-center justify-center gap-2 bg-stone-800 px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white shadow-sm shadow-stone-900/20 ring-1 ring-stone-900/40 transition-all hover:bg-stone-900 hover:shadow-md hover:shadow-stone-900/30 disabled:opacity-50"
 					>
-				</button>
-				<button
-					onclick={start}
-					disabled={busy ||
-						!recorder.available ||
-						('pendingOrphans' in recorder && recorder.pendingOrphans > 0)}
-					class="inline-flex items-center justify-center gap-2 border border-orange-200 bg-orange-50 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-primary transition-all hover:border-primary hover:bg-primary hover:text-white disabled:opacity-50"
-				>
-					{@render iconRecord()}
-					<span
-						>{busy ? $t('recordings.busy.starting') : $t('recordings.actions.startRecording')}</span
+						{@render iconLiveStop()}
+						<span
+							>{broadcastBusy
+								? $t('recordings.busy.stopping')
+								: $t('recordings.actions.endLive')}</span
+						>
+					</button>
+					<button
+						onclick={start}
+						disabled={busy ||
+							!recorder.available ||
+							('pendingOrphans' in recorder && recorder.pendingOrphans > 0)}
+						class="inline-flex items-center justify-center gap-2 border border-orange-200 bg-orange-50 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-primary transition-all hover:border-primary hover:bg-primary hover:text-white disabled:opacity-50"
 					>
-				</button>
-			</div>
-		{:else if isRecording}
-			<!-- Enregistrement seul : arrêt (tonalité rose) + passage en direct
+						{@render iconRecord()}
+						<span
+							>{busy
+								? $t('recordings.busy.starting')
+								: $t('recordings.actions.startRecording')}</span
+						>
+					</button>
+				</div>
+			{:else if isRecording}
+				<!-- Enregistrement seul : arrêt (tonalité rose) + passage en direct
 			     (tonalité stone pour le domaine broadcast). -->
-			<p class="mb-2.5 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400">
-				{$t('recordings.sessionControls')}
-			</p>
-			<div class="grid gap-2 sm:grid-cols-2">
-				<button
-					onclick={stop}
-					disabled={busy}
-					class="inline-flex items-center justify-center gap-2 bg-rose-600 px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white shadow-sm shadow-rose-600/30 ring-1 ring-rose-600/50 transition-all hover:bg-rose-700 hover:shadow-md hover:shadow-rose-600/40 disabled:opacity-50"
-				>
-					{@render iconRecordStop()}
-					<span
-						>{busy ? $t('recordings.busy.stopping') : $t('recordings.actions.stopRecording')}</span
+				<p class="mb-2.5 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400">
+					{$t('recordings.sessionControls')}
+				</p>
+				<div class="grid gap-2 sm:grid-cols-2">
+					<button
+						onclick={stop}
+						disabled={busy}
+						class="inline-flex items-center justify-center gap-2 bg-rose-600 px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white shadow-sm shadow-rose-600/30 ring-1 ring-rose-600/50 transition-all hover:bg-rose-700 hover:shadow-md hover:shadow-rose-600/40 disabled:opacity-50"
 					>
-				</button>
-				<button
-					onclick={goLive}
-					disabled={broadcastBusy}
-					class="inline-flex items-center justify-center gap-2 border border-stone-300 bg-stone-100 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-stone-800 transition-all hover:border-stone-900 hover:bg-stone-900 hover:text-white disabled:opacity-50"
-				>
-					{@render iconBroadcast()}
-					<span>{broadcastBusy ? '…' : $t('recordings.actions.goLive')}</span>
-				</button>
-			</div>
-		{/if}
-	</div>
+						{@render iconRecordStop()}
+						<span
+							>{busy
+								? $t('recordings.busy.stopping')
+								: $t('recordings.actions.stopRecording')}</span
+						>
+					</button>
+					<button
+						onclick={goLive}
+						disabled={broadcastBusy}
+						class="inline-flex items-center justify-center gap-2 border border-stone-300 bg-stone-100 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-stone-800 transition-all hover:border-stone-900 hover:bg-stone-900 hover:text-white disabled:opacity-50"
+					>
+						{@render iconBroadcast()}
+						<span>{broadcastBusy ? '…' : $t('recordings.actions.goLive')}</span>
+					</button>
+				</div>
+			{/if}
+		</div>
 	{/if}
 
 	{#if recorder.available && 'pendingOrphans' in recorder && recorder.pendingOrphans > 0}
@@ -2541,8 +2583,19 @@
 			<div
 				class="flex h-9 flex-1 min-w-[280px] items-center gap-2 bg-stone-50 px-3 text-[11px] text-stone-400"
 			>
-				<svg class="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+				<svg
+					class="h-3.5 w-3.5 shrink-0"
+					fill="none"
+					viewBox="0 0 24 24"
+					stroke="currentColor"
+					stroke-width="2"
+					aria-hidden="true"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+					/>
 				</svg>
 				<span class="truncate">{$t('recordings.waitingForStream')}</span>
 			</div>
@@ -2559,7 +2612,6 @@
 			onerror={onMonitorInterrupted}
 		></audio>
 	</div>
-
 </div>
 
 <!-- Scheduled lives — moved up to the top of the broadcast tools: schedule
@@ -3506,7 +3558,6 @@
 	</div>
 {/if}
 
-
 {#if editingRecordingId}
 	{@const editingRec = getEditingRecording()}
 	{#if editingRec}
@@ -4247,7 +4298,6 @@
 		onSaved={() => closeTrimEditor(true)}
 	/>
 {/if}
-
 
 <style>
 	.default-thumbnail-admin {

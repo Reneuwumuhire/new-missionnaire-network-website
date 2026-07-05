@@ -7,7 +7,11 @@
   <limits>
     <clients>1000</clients>
     <sources>5</sources>
-    <queue-size>524288</queue-size>
+    <!-- 2 MB ≈ 2 min of backlog at 128 kbps. This is how far a listener may
+         fall behind before Icecast force-disconnects them. The old 512 KB
+         (~32 s) kicked anyone on a slow/jittery connection, which showed up
+         as the player "reloading" mid-broadcast. -->
+    <queue-size>2097152</queue-size>
     <client-timeout>30</client-timeout>
     <header-timeout>15</header-timeout>
     <!-- 60s: keeps the /radio.mp3 mount alive through brief streamer
@@ -16,7 +20,12 @@
          multi-segment auto-restart in ops/streaming/recorder/src/ffmpeg.ts. -->
     <source-timeout>60</source-timeout>
     <burst-on-connect>1</burst-on-connect>
-    <burst-size>65535</burst-size>
+    <!-- 256 KB ≈ 16 s of audio sent instantly on connect: players start with a
+         real cushion instead of the previous ~4 s, so brief throughput dips on
+         slow networks no longer stall playback (which tripped the client-side
+         stall watchdog and forced a reconnect). All clients get the same
+         offset, so admin-monitor-anchored subtitle sync is unaffected. -->
+    <burst-size>262144</burst-size>
   </limits>
 
   <authentication>
@@ -32,6 +41,37 @@
   </listen-socket>
 
   <fileserve>1</fileserve>
+
+  <!-- CORS: lets browser audio elements in CORS mode (and fetch()-based
+       probes from other origins) consume the stream and status page. The
+       site's player currently loads live audio without crossorigin, but
+       this removes the landmine for any future CORS-mode consumer. -->
+  <http-headers>
+    <header name="Access-Control-Allow-Origin" value="*" />
+  </http-headers>
+
+  <!-- Listener-connection decoupling. The broadcast chain
+       (OBS → MediaMTX → FFmpeg → this mount) restarts on every upstream
+       hiccup; without a fallback Icecast would drop every listener each
+       time, and all players (public site + admin monitor) had to reconnect
+       — the "stream keeps reloading" symptom. With the fallback, listeners
+       are moved to the always-on silence source during the gap and moved
+       back (fallback-override) the moment the real source returns; their
+       HTTP connections never break. -->
+  <mount type="normal">
+    <mount-name>/${AUDIO_MOUNT}</mount-name>
+    <fallback-mount>/silence.mp3</fallback-mount>
+    <fallback-override>1</fallback-override>
+  </mount>
+
+  <!-- Fed by the silence FFmpeg loop in entrypoint.sh (same codec/params as
+       the live encode so the splice is seamless for MP3 decoders). Hidden so
+       it never appears in status-json.xsl — live detection additionally
+       filters by mount name, so silence can never read as "on air". -->
+  <mount type="normal">
+    <mount-name>/silence.mp3</mount-name>
+    <hidden>1</hidden>
+  </mount>
 
   <paths>
     <basedir>/usr/share/icecast2</basedir>

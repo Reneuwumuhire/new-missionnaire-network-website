@@ -62,6 +62,85 @@ interface ActiveRecording {
 
 let active: ActiveRecording | null = null;
 
+// ── Source-gone watcher ────────────────────────────────────────────
+// Icecast's silence fallback mount keeps /radio.mp3 delivering bytes even when
+// the broadcaster is gone, so ffmpeg's read never EOFs at end-of-broadcast —
+// left alone it would record silence until the MAX_RECORDING_SECONDS cap. This
+// watcher polls status-json while a recording is active and auto-stops once
+// the REAL source mount has been absent for SOURCE_GONE_STOP_SECONDS.
+
+const SOURCE_POLL_INTERVAL_MS = 30_000;
+let sourceWatchTimer: NodeJS.Timeout | null = null;
+let sourceGoneSince: number | null = null;
+
+function streamMountPath(): string {
+	try {
+		return new URL(ENV.ICECAST_URL).pathname;
+	} catch {
+		return '/radio.mp3';
+	}
+}
+
+/** true/false when status-json answered; null when unreachable (unknown —
+ *  never counted as "gone", so a status-page outage can't kill a recording). */
+async function isSourceMountActive(): Promise<boolean | null> {
+	try {
+		const res = await fetch(ENV.ICECAST_STATUS_URL, { signal: AbortSignal.timeout(5_000) });
+		if (!res.ok) return null;
+		const json = (await res.json()) as {
+			icestats?: { source?: { listenurl?: string } | Array<{ listenurl?: string }> };
+		};
+		const source = json.icestats?.source;
+		if (!source) return false;
+		const sources = Array.isArray(source) ? source : [source];
+		const mount = streamMountPath();
+		return sources.some((s) => {
+			if (!s?.listenurl) return false;
+			try {
+				return new URL(s.listenurl).pathname === mount;
+			} catch {
+				return String(s.listenurl).endsWith(mount);
+			}
+		});
+	} catch {
+		return null;
+	}
+}
+
+function startSourceWatch(rec: ActiveRecording): void {
+	sourceGoneSince = null;
+	if (sourceWatchTimer) clearInterval(sourceWatchTimer);
+	sourceWatchTimer = setInterval(() => {
+		void (async () => {
+			const current = active;
+			if (!current || current.idStr !== rec.idStr || current.stopping || current.abandoned) return;
+			const mountActive = await isSourceMountActive();
+			if (mountActive === true) {
+				sourceGoneSince = null;
+				return;
+			}
+			if (mountActive === null) return;
+			sourceGoneSince ??= Date.now();
+			const goneForMs = Date.now() - sourceGoneSince;
+			if (goneForMs < ENV.SOURCE_GONE_STOP_SECONDS * 1000) return;
+			console.warn(
+				`[recorder] ${rec.idStr} source mount absent for ${Math.round(goneForMs / 1000)}s — auto-stopping (silence fallback keeps the stream alive, so this is the end-of-broadcast signal)`
+			);
+			await stopRecording().catch((e) =>
+				console.error(`[recorder] source-gone auto-stop failed for ${rec.idStr}`, e)
+			);
+		})();
+	}, SOURCE_POLL_INTERVAL_MS);
+}
+
+function stopSourceWatch(): void {
+	if (sourceWatchTimer) {
+		clearInterval(sourceWatchTimer);
+		sourceWatchTimer = null;
+	}
+	sourceGoneSince = null;
+}
+
 /** A segment is "healthy" if it ran for at least this long before exiting.
  *  Below this, an exit looks like a failed-restart, not a real dropout. */
 const RESTART_HEALTHY_MS = 5_000;
@@ -179,9 +258,7 @@ async function startSegment(rec: ActiveRecording): Promise<void> {
 		scheduleRestart(current, segmentLifetimeMs);
 	});
 
-	console.log(
-		`[recorder] ${rec.idStr} segment ${segIndex} started -> ${segPath}`
-	);
+	console.log(`[recorder] ${rec.idStr} segment ${segIndex} started -> ${segPath}`);
 }
 
 function scheduleRestart(rec: ActiveRecording, lastSegmentLifetimeMs: number): void {
@@ -308,6 +385,8 @@ export async function startRecording(params: {
 		throw err;
 	}
 
+	startSourceWatch(active);
+
 	console.log(`[recorder] started ${idStr} at ${startedAt.toISOString()}`);
 	return { id: idStr, startedAt: startedAt.toISOString(), title };
 }
@@ -318,6 +397,7 @@ export async function stopRecording(): Promise<{ id: string }> {
 
 	const rec = active;
 	rec.stopping = true;
+	stopSourceWatch();
 	clearTimeout(rec.safetyTimer);
 	if (rec.restartTimer) {
 		clearTimeout(rec.restartTimer);
@@ -346,6 +426,7 @@ export async function stopRecording(): Promise<{ id: string }> {
  *  the admin sees a duration, kick off the upload, and clear active state. */
 async function finalizeAbandoned(rec: ActiveRecording): Promise<void> {
 	rec.stopping = true;
+	stopSourceWatch();
 	clearTimeout(rec.safetyTimer);
 	if (rec.restartTimer) {
 		clearTimeout(rec.restartTimer);

@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
-import { getLiveAudioSourceUrl, probeLiveAudio } from '$lib/server/live-audio';
-import { getIcecastSnapshot } from '$lib/server/icecast';
+import { getLiveAudioSourceUrl } from '$lib/server/live-audio';
+import { checkLiveAudio } from '$lib/server/icecast';
 import {
 	getRadioCachedStatus,
 	getBroadcastAdminState,
@@ -38,12 +38,12 @@ export async function GET({ fetch, setHeaders }) {
 	const cacheAgeMs = checkedAt ? Date.now() - new Date(checkedAt).getTime() : Infinity;
 	if (adminGate.is_live && cacheAgeMs > CACHE_STALE_MS) {
 		try {
-			const probe = await probeLiveAudio(fetch);
-			icecastLive = probe.isLive;
+			const check = await checkLiveAudio(fetch);
+			icecastLive = check.isLive;
 			checkedAt = new Date().toISOString();
-			streamUrl = probe.isLive ? getLiveAudioSourceUrl() : undefined;
-			// Refresh the real listener count from Icecast at the same cadence.
-			listeners = probe.isLive ? (await getIcecastSnapshot()).listeners : 0;
+			streamUrl = check.isLive ? getLiveAudioSourceUrl() : undefined;
+			// Real listener count comes from the same status snapshot.
+			listeners = check.isLive ? check.listeners : 0;
 			await setRadioCachedStatus({ isLive: icecastLive, checkedAt, streamUrl, listeners });
 		} catch {
 			// Probe failed — keep whatever the cache had.

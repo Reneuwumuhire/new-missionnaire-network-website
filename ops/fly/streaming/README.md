@@ -4,8 +4,32 @@ This deploys a single Fly app that runs:
 
 - MediaMTX (RTMP ingest on port `1935`)
 - FFmpeg (audio-only transcoder; reads internal RTSP audio by default for better stability)
+- FFmpeg silence source (always-on, feeds the hidden `/silence.mp3` fallback mount)
 - Icecast (listener stream on port `8000`)
 - **Recorder** (Node HTTP API on port `8080`, exposed publicly on `:8443`) — captures broadcasts on admin command, uploads MP3s to S3, writes metadata to MongoDB
+
+## Listener-stability design
+
+The ingest chain (OBS → MediaMTX → FFmpeg → Icecast) restarts whenever the
+publisher blips; without protection Icecast would disconnect every listener
+each time and all players would visibly reload. Three mechanisms prevent that:
+
+- **Silence fallback mount** — `/radio.mp3` falls back to the always-on
+  `/silence.mp3` source (with `fallback-override`), so listener connections
+  survive source drops: they hear a few seconds of silence instead of being
+  disconnected. Consequences:
+  - "Is the broadcast live?" must be answered from `status-json.xsl` by
+    checking for the `/radio.mp3` **mount specifically** (bytes always flow on
+    the listener URL). Both the site and the admin do this.
+  - The recorder's Icecast read never EOFs at end-of-broadcast; it auto-stops
+    after the real mount has been absent `SOURCE_GONE_STOP_SECONDS`
+    (default 1800).
+- **Icecast buffers** — `burst-size` 256 KB gives every new connection ~16 s
+  of instant cushion; `queue-size` 2 MB lets slow listeners lag ~2 min before
+  being kicked.
+- **Ingest timeouts** — the RTSP transcoder uses a 10 s socket read timeout so
+  a wedged connection dies and restarts instead of holding the source mount
+  silent.
 
 ## 1) Create the app
 
