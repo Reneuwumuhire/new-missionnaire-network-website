@@ -81,14 +81,26 @@ function streamMountPath(): string {
 	}
 }
 
+interface StatusSource {
+	listenurl?: string;
+	stream_start_iso8601?: string;
+	server_type?: string;
+}
+
 /** true/false when status-json answered; null when unreachable (unknown —
- *  never counted as "gone", so a status-page outage can't kill a recording). */
+ *  never counted as "gone", so a status-page outage can't kill a recording).
+ *
+ *  NOTE: because /radio.mp3 is declared in icecast.xml (silence fallback),
+ *  status-json lists the mount even with NO publisher — a dummy entry without
+ *  stream metadata. Only an entry with stream_start/server_type proves a
+ *  connected source; matching by listenurl alone would keep this returning
+ *  true forever and the auto-stop would never fire. */
 async function isSourceMountActive(): Promise<boolean | null> {
 	try {
 		const res = await fetch(ENV.ICECAST_STATUS_URL, { signal: AbortSignal.timeout(5_000) });
 		if (!res.ok) return null;
 		const json = (await res.json()) as {
-			icestats?: { source?: { listenurl?: string } | Array<{ listenurl?: string }> };
+			icestats?: { source?: StatusSource | StatusSource[] };
 		};
 		const source = json.icestats?.source;
 		if (!source) return false;
@@ -96,6 +108,9 @@ async function isSourceMountActive(): Promise<boolean | null> {
 		const mount = streamMountPath();
 		return sources.some((s) => {
 			if (!s?.listenurl) return false;
+			const connected =
+				typeof s.stream_start_iso8601 === 'string' || typeof s.server_type === 'string';
+			if (!connected) return false;
 			try {
 				return new URL(s.listenurl).pathname === mount;
 			} catch {

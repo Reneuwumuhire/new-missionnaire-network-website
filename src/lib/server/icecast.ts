@@ -9,6 +9,7 @@ import { getLiveAudioSourceUrl, probeLiveAudio } from '$lib/server/live-audio';
 interface IcecastSource {
 	listenurl?: string;
 	stream_start_iso8601?: string;
+	server_type?: string;
 	listeners?: number;
 }
 
@@ -69,6 +70,18 @@ function isStreamMount(source: IcecastSource, mount: string): boolean {
 	}
 }
 
+/** Because /radio.mp3 is declared in icecast.xml (for the silence fallback),
+ *  status-json lists the mount even with NO publisher connected — a "dummy"
+ *  entry with only listenurl/listeners. A real connected source always
+ *  carries stream metadata (stream_start / server_type); the dummy carries
+ *  neither. Without this check the admin showed "live detected" and the
+ *  monitor played fallback silence while OBS was off. */
+function hasConnectedSource(source: IcecastSource): boolean {
+	return (
+		typeof source.stream_start_iso8601 === 'string' || typeof source.server_type === 'string'
+	);
+}
+
 export async function getIcecastSnapshot(): Promise<IcecastSnapshot> {
 	try {
 		const controller = new AbortController();
@@ -81,7 +94,7 @@ export async function getIcecastSnapshot(): Promise<IcecastSnapshot> {
 		if (!source) return { reachable: true, sourceActive: false, listeners: 0 };
 		const sources = Array.isArray(source) ? source : [source];
 		const mount = streamMountPath();
-		const mountSources = sources.filter((s) => isStreamMount(s, mount));
+		const mountSources = sources.filter((s) => isStreamMount(s, mount) && hasConnectedSource(s));
 		const listeners = mountSources.reduce((sum, s) => sum + (s.listeners ?? 0), 0);
 		return { reachable: true, sourceActive: mountSources.length > 0, listeners };
 	} catch {
