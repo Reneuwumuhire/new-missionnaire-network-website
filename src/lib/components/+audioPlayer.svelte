@@ -273,12 +273,35 @@
 
 	function seekToLiveEdge() {
 		if (!audio) return;
+		// hls.js idles its loader while paused/behind — nudge it so the edge
+		// fragments start fetching before/with the seek.
+		try {
+			hlsInstance?.startLoad();
+		} catch {
+			/* not attached */
+		}
+		let target: number | null = null;
 		const syncPos = hlsInstance?.liveSyncPosition;
 		if (typeof syncPos === 'number' && Number.isFinite(syncPos)) {
-			audio.currentTime = syncPos;
+			target = syncPos;
 		} else if (audio.seekable.length > 0) {
 			const end = audio.seekable.end(audio.seekable.length - 1);
-			audio.currentTime = Math.max(audio.seekable.start(0), end - 18);
+			target = Math.max(audio.seekable.start(0), end - 18);
+		}
+		if (target !== null) {
+			try {
+				audio.currentTime = target;
+			} catch {
+				/* not seekable yet */
+			}
+			// Reflect the jump immediately: timeupdate won't fire until the new
+			// position has buffered (seconds on a slow link), and a frozen
+			// behind-pill reads as "the click did nothing".
+			currentTime = audio.currentTime;
+			if (audio.seekable.length > 0) {
+				liveSeekStart = audio.seekable.start(0);
+				liveSeekEnd = audio.seekable.end(audio.seekable.length - 1);
+			}
 		}
 		void audio.play().catch(() => {});
 	}
@@ -294,6 +317,13 @@
 		if (liveTicker || !browser) return;
 		liveTicker = setInterval(() => {
 			liveNowMs = Date.now();
+			// While paused no timeupdate fires, but the live edge keeps moving —
+			// refresh the window bounds so the behind-counter ticks up and the
+			// jump-to-live target stays current.
+			if (liveIsHls && audio && audio.seekable.length > 0) {
+				liveSeekStart = audio.seekable.start(0);
+				liveSeekEnd = audio.seekable.end(audio.seekable.length - 1);
+			}
 		}, 1000);
 	}
 	function stopLiveTicker() {
