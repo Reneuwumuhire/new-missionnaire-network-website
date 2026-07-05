@@ -119,6 +119,12 @@ get_active_path() {
 # Runs in its own supervisor subshell with its own publisher polling —
 # independent from the Icecast transcode loop below.
 #
+# Codec: `-c:a copy` — OBS publishes AAC, which goes straight into MPEG-TS
+# segments with ZERO encoding cost. This matters: the shared-cpu machine
+# already runs the MP3 transcoder + silence encoder continuously, and a
+# second full encode starved every service (stream stuttered at <1KB/s).
+# hls.js and Apple's native player both accept AAC (and even MP3) in TS.
+#
 # Flag notes: omit_endlist keeps the playlist "live" across ffmpeg restarts
 # (an ENDLIST would make players treat the stream as finished on every OBS
 # blip); append_list+discont_start resumes the same playlist after a restart
@@ -148,7 +154,7 @@ start_hls_loop() {
 				-allowed_media_types audio \
 				-timeout 10000000 \
 				-i "rtsp://127.0.0.1:8554/${HLS_ACTIVE_PATH}" \
-				-map 0:a:0? -vn -c:a aac -b:a "${AUDIO_BITRATE}" -ar 48000 -ac 2 \
+				-map 0:a:0? -vn -c:a copy \
 				-f hls \
 				-hls_time "${HLS_SEGMENT_SECONDS}" \
 				-hls_list_size "${HLS_DVR_SEGMENTS}" \
