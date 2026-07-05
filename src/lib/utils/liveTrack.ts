@@ -13,12 +13,17 @@ export interface LiveStreamTrack {
 	title: string;
 	/** Direct stream URL (no cache-buster — the player adds one per connect). */
 	url: string;
+	/** HLS DVR playlist. When set the player plays this instead of `url`,
+	 *  gaining server-side pause/resume + seek-back + jump-to-live; `url`
+	 *  (Icecast) remains the fallback if HLS can't start. */
+	hlsUrl: string | null;
 	thumbnail_url: string | null;
 }
 
 export function createLiveStreamTrack(params: {
 	title: string;
 	url: string;
+	hlsUrl?: string | null;
 	thumbnailUrl?: string | null;
 }): LiveStreamTrack {
 	return {
@@ -26,6 +31,7 @@ export function createLiveStreamTrack(params: {
 		isLiveStream: true,
 		title: params.title,
 		url: params.url,
+		hlsUrl: params.hlsUrl ?? null,
 		thumbnail_url: params.thumbnailUrl ?? null
 	};
 }

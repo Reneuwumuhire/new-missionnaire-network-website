@@ -24,6 +24,9 @@ export const ENV = {
 	 *  Default 30 min — parity with the old multi-segment recovery give-up. */
 	SOURCE_GONE_STOP_SECONDS: Number(optional('SOURCE_GONE_STOP_SECONDS', String(30 * 60))),
 	RECORDINGS_DIR: optional('RECORDINGS_DIR', '/data/recordings'),
+	/** Rolling live-DVR HLS window written by the entrypoint's packager and
+	 *  served read-only via GET /hls/:file (unauthenticated). */
+	HLS_DIR: optional('HLS_DIR', '/data/hls'),
 	MAX_RECORDING_SECONDS: Number(optional('MAX_RECORDING_SECONDS', String(4 * 60 * 60))),
 	PORT: Number(optional('PORT', '8080')),
 	MONGODB_URI: required('MONGODB_URI'),

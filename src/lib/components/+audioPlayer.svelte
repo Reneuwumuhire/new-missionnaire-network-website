@@ -41,7 +41,8 @@
 		replayPlayback,
 		livePlayback
 	} from '../stores/global';
-	import { isLiveStreamTrack } from '$lib/utils/liveTrack';
+	import { isLiveStreamTrack, type LiveStreamTrack } from '$lib/utils/liveTrack';
+	import type Hls from 'hls.js';
 	import type { AudioAsset } from '$lib/models/media-assets';
 	import type { MusicAudio } from '$lib/models/music-audio';
 	import type { Sermon } from '$lib/models/sermon';
@@ -160,11 +161,46 @@
 		}
 	}
 
-	/** (Re)connect the live stream at the live edge with a fresh cache-buster. */
-	function connectLiveStream() {
+	// ── Live DVR (HLS) ─────────────────────────────────────────────
+	// When the track carries an hlsUrl the player uses the server-side DVR
+	// window instead of the Icecast byte stream: pause/resume of any length,
+	// seeking back through the window, and an explicit jump-to-live — the
+	// YouTube model. Safari/iOS plays HLS natively; everywhere else hls.js
+	// drives MSE (loaded lazily so music listeners never pay for it).
+	// Icecast (track.url) remains the fallback whenever HLS can't start.
+	let hlsInstance: Hls | null = null;
+	let liveIsHls = $state(false);
+	let liveHlsFailed = false;
+	let liveSeekStart = $state(0);
+	let liveSeekEnd = $state(0);
+	let liveDvrSeeking = $state(false);
+	let liveDvrValue = $state(0);
+	let liveDvrWindowSec = $derived(liveSeekEnd - liveSeekStart);
+	// Only surface the scrubber once there's a meaningful window to seek in.
+	let hasLiveDvr = $derived(isLiveTrack && liveIsHls && liveDvrWindowSec > 45);
+	let liveBehindSec = $derived(Math.max(0, liveSeekEnd - currentTime));
+	// HLS players hold ~3 target durations behind the playlist end while "at
+	// the live edge" — anything under this is not a deliberate rewind.
+	let liveAtEdge = $derived(liveBehindSec < 25);
+
+	function destroyHls() {
+		if (hlsInstance) {
+			try {
+				hlsInstance.destroy();
+			} catch {
+				/* already dead */
+			}
+			hlsInstance = null;
+		}
+	}
+
+	/** Icecast fallback: (re)connect at the live edge with a fresh cache-buster. */
+	function connectLiveIcecast() {
 		if (!audio || !isLiveTrack) return;
 		const rawUrl = getPlayableAudioUrl($selectAudio as PlayableAudio);
 		if (!rawUrl) return;
+		destroyHls();
+		liveIsHls = false;
 		isAudioReady = false;
 		audio.crossOrigin = null; // Icecast sends no CORS headers — see <audio> template comment
 		audio.src = withLiveCacheBuster(encodeUrlPath(rawUrl));
@@ -172,6 +208,100 @@
 		audio.play().catch(() => {
 			// The error/ended handlers schedule the next attempt.
 		});
+	}
+
+	async function connectLiveHlsJs(hlsUrl: string): Promise<boolean> {
+		const mod = await import('hls.js');
+		const HlsCtor = mod.default;
+		if (!HlsCtor.isSupported()) return false;
+		if (!audio || !isLiveTrack) return false;
+		destroyHls();
+		const h = new HlsCtor({ backBufferLength: 90 });
+		hlsInstance = h;
+		h.on(HlsCtor.Events.ERROR, (_event, data) => {
+			if (!data.fatal) return;
+			if (data.type === HlsCtor.ErrorTypes.NETWORK_ERROR) {
+				// Playlist/segment fetch failed — resume loading from the same
+				// position; the DVR window keeps it valid.
+				h.startLoad();
+			} else if (data.type === HlsCtor.ErrorTypes.MEDIA_ERROR) {
+				h.recoverMediaError();
+			} else {
+				console.warn('[AudioPlayer] Fatal HLS error — falling back to Icecast', data);
+				liveHlsFailed = true;
+				destroyHls();
+				if (userWantsToPlay) connectLiveIcecast();
+			}
+		});
+		h.loadSource(hlsUrl);
+		h.attachMedia(audio);
+		audio.play().catch(() => {
+			// Autoplay policy — the canplay/gesture paths retry.
+		});
+		return true;
+	}
+
+	/** Single live entry point: prefer the HLS DVR, fall back to Icecast. */
+	function connectLiveStream() {
+		if (!audio || !isLiveTrack) return;
+		const track = $selectAudio as LiveStreamTrack;
+		const hlsUrl = track.hlsUrl;
+		if (hlsUrl && !liveHlsFailed) {
+			isAudioReady = false;
+			audio.crossOrigin = null;
+			// Safari/iOS: native HLS — seekable ranges and getStartDate() come
+			// straight from the media engine.
+			if (audio.canPlayType('application/vnd.apple.mpegurl')) {
+				destroyHls();
+				liveIsHls = true;
+				audio.src = hlsUrl;
+				audio.load();
+				audio.play().catch(() => {});
+				return;
+			}
+			liveIsHls = true;
+			void connectLiveHlsJs(hlsUrl).then((ok) => {
+				if (!ok) {
+					liveHlsFailed = true;
+					connectLiveIcecast();
+				}
+			});
+			return;
+		}
+		connectLiveIcecast();
+	}
+
+	function seekToLiveEdge() {
+		if (!audio) return;
+		const syncPos = hlsInstance?.liveSyncPosition;
+		if (typeof syncPos === 'number' && Number.isFinite(syncPos)) {
+			audio.currentTime = syncPos;
+		} else if (audio.seekable.length > 0) {
+			const end = audio.seekable.end(audio.seekable.length - 1);
+			audio.currentTime = Math.max(audio.seekable.start(0), end - 18);
+		}
+		void audio.play().catch(() => {});
+	}
+
+	function onLiveDvrInput(event: Event) {
+		liveDvrSeeking = true;
+		liveDvrValue = Number((event.target as HTMLInputElement).value);
+	}
+
+	function onLiveDvrCommit(event: Event) {
+		if (!audio) return;
+		let value = Number((event.target as HTMLInputElement).value);
+		// Keep clear of both bounds: the window's tail is about to be deleted
+		// server-side, and the head stalls if we outrun the last segment.
+		value = Math.min(Math.max(value, liveSeekStart + 2), liveSeekEnd - 8);
+		try {
+			audio.currentTime = value;
+			currentTime = value;
+		} catch {
+			/* not seekable yet */
+		}
+		liveDvrSeeking = false;
+		void audio.play().catch(() => {});
 	}
 
 	function scheduleLiveReconnect() {
@@ -1470,6 +1600,12 @@
 		}
 		shouldAutoplayOnLoad = wantedToPlay;
 		audioPausedAt = 0;
+		// Live: the saved src may be an MSE blob URL (hls.js) — meaningless on
+		// a fresh element. Reconnect through the live dispatcher instead.
+		if (isLiveTrack) {
+			connectLiveStream();
+			return;
+		}
 		audio.src = savedSrc;
 		audio.load();
 	}
@@ -1510,9 +1646,15 @@
 			isChangingSource = false;
 		}
 		resetRememberedPlaybackPosition();
+		// Live routes through the HLS/Icecast dispatcher, never the generic
+		// file path — DVR mode must engage when the track advertises it.
+		if (isLiveTrack) {
+			connectLiveStream();
+			return;
+		}
 		// Belt-and-suspenders with the template's reactive crossorigin: make
-		// sure the mode is right before the fetch starts (live = no CORS).
-		audio.crossOrigin = isLiveTrack ? null : 'anonymous';
+		// sure the mode is right before the fetch starts.
+		audio.crossOrigin = 'anonymous';
 		audio.src = encodedUrl;
 		audio.load();
 	}
@@ -1625,6 +1767,12 @@
 				// current connection is healthy (reset the reconnect backoff).
 				lastLiveProgressMs = Date.now();
 				liveReconnectAttempts = 0;
+				// DVR window bounds for the live scrubber (HLS only — Icecast
+				// exposes no meaningful seekable range).
+				if (liveIsHls && audio.seekable.length > 0) {
+					liveSeekStart = audio.seekable.start(0);
+					liveSeekEnd = audio.seekable.end(audio.seekable.length - 1);
+				}
 			}
 			rememberPlaybackPosition(currentTime, duration);
 			progressBarWidth = (currentTime / duration) * 100;
@@ -1726,6 +1874,15 @@
 		// HMR / unmount safety — never resume a destroyed component's
 		// audio. The deferred `finish()` setTimeout below also rechecks.
 		if (destroyed) return;
+
+		// Live HLS via MSE: load() would tear down hls.js's SourceBuffers.
+		// Play from the current (DVR-valid) position; hls.js owns recovery.
+		if (isLiveTrack && hlsInstance) {
+			audio.play().catch(() => {
+				/* hls.js error handling / gesture paths retry */
+			});
+			return;
+		}
 
 		// Only stamp metadata if it hasn't been bound to the current track
 		// yet — assigning `mediaSession.metadata = new MediaMetadata(...)`
@@ -2505,6 +2662,7 @@
 		stopResumeWatchdog();
 		stopLiveStallWatch();
 		clearLiveReconnectTimer();
+		destroyHls();
 		stopSilentLoop();
 		if (audio) {
 			try {
@@ -2661,11 +2819,13 @@
 			attachAudioListeners(audio);
 			listenersBoundTo = audio;
 			if (audioSrc && !audio.src) {
-				audio.crossOrigin = isLiveTrack ? null : 'anonymous';
-				audio.src = isLiveTrack
-					? withLiveCacheBuster(encodeUrlPath(audioSrc))
-					: encodeUrlPath(audioSrc);
-				audio.load();
+				if (isLiveTrack) {
+					connectLiveStream();
+				} else {
+					audio.crossOrigin = 'anonymous';
+					audio.src = encodeUrlPath(audioSrc);
+					audio.load();
+				}
 			}
 		}
 	});
@@ -2737,23 +2897,46 @@
 			clearLiveReconnectTimer();
 			liveReconnectAttempts = 0;
 			liveConnectEpochMs = null;
+			destroyHls();
+			liveIsHls = false;
+			liveHlsFailed = false;
+			liveSeekStart = 0;
+			liveSeekEnd = 0;
 			if (wasLiveTrack) {
 				wasLiveTrack = false;
 				livePlayback.set({ playing: false, positionEpochMs: null });
 			}
 		}
 	});
-	// Position bridge for the live transcript (mirrors what the old
-	// page-embedded live player published): wall-clock moment of the audio the
-	// listener is hearing = connection epoch + playback position. Pause
-	// freezes it, every reconnect snaps it to "now" via handleLoadStart.
+	// Position bridge for the live transcript: wall-clock moment of the audio
+	// the listener is hearing right now.
+	//  - HLS: EXT-X-PROGRAM-DATE-TIME gives the exact broadcast wall-clock of
+	//    the playing frame (hls.js playingDate / Safari getStartDate) — stays
+	//    correct across pauses of any length and DVR seeks.
+	//  - Icecast fallback: connection epoch + playback position (position 0 of
+	//    a fresh connection is "live at that instant").
 	$effect(() => {
 		if (!browser || !isLiveTrack) return;
-		livePlayback.set({
-			playing: $isPlaying,
-			positionEpochMs:
-				liveConnectEpochMs === null ? null : liveConnectEpochMs + currentTime * 1000
-		});
+		let positionEpochMs: number | null = null;
+		if (liveIsHls) {
+			// currentTime (reactive) retriggers this on every timeupdate; the
+			// date values themselves come from the media engine.
+			void currentTime;
+			const playingDate = hlsInstance?.playingDate;
+			if (playingDate) {
+				positionEpochMs = playingDate.getTime();
+			} else if (audio) {
+				const startDate = (
+					audio as HTMLAudioElement & { getStartDate?: () => Date }
+				).getStartDate?.();
+				if (startDate && !Number.isNaN(startDate.getTime())) {
+					positionEpochMs = startDate.getTime() + currentTime * 1000;
+				}
+			}
+		} else if (liveConnectEpochMs !== null) {
+			positionEpochMs = liveConnectEpochMs + currentTime * 1000;
+		}
+		livePlayback.set({ playing: $isPlaying, positionEpochMs });
 	});
 </script>
 
@@ -3483,10 +3666,104 @@
 				</div>
 			</div>
 		</div>
+
+		<!-- Live DVR scrubber (HLS only): seek back through the server-side
+		     window, see how far behind live you are, and jump back to the
+		     edge — YouTube-style. Hidden for the Icecast fallback, which has
+		     no server-side window. -->
+		{#if hasLiveDvr}
+			<div class="px-5 lg:px-10 max-w-7xl mx-auto pb-2 pt-1 lg:pb-3">
+				<div class="flex items-center gap-3">
+					<input
+						type="range"
+						class="live-dvr-scrubber flex-1 min-w-0"
+						min={liveSeekStart}
+						max={liveSeekEnd}
+						step="1"
+						value={liveDvrSeeking ? liveDvrValue : Math.min(currentTime, liveSeekEnd)}
+						oninput={onLiveDvrInput}
+						onchange={onLiveDvrCommit}
+						aria-label={$t('live.scrubberLabel')}
+						aria-valuetext={liveAtEdge
+							? $t('live.atLive')
+							: $t('live.behindLive', { label: formatTime(liveBehindSec) })}
+					/>
+					{#if !liveAtEdge}
+						<span class="text-[11px] font-mono text-stone-500 tabular-nums shrink-0">
+							-{formatTime(liveBehindSec)}
+						</span>
+					{/if}
+					<button
+						type="button"
+						onclick={seekToLiveEdge}
+						aria-label={liveAtEdge ? $t('live.atLive') : $t('live.backToLive')}
+						title={liveAtEdge ? $t('live.atLive') : $t('live.backToLive')}
+						class="inline-flex items-center gap-1.5 px-3 py-1.5 border text-[10px] font-bold uppercase tracking-[0.15em] font-body transition-all duration-200 shrink-0 {liveAtEdge
+							? 'border-red-500 text-red-600 bg-red-50/60'
+							: 'border-missionnaire text-missionnaire hover:bg-missionnaire hover:text-white'}"
+					>
+						<span class="relative inline-flex h-2 w-2">
+							{#if liveAtEdge}
+								<span
+									class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"
+								></span>
+							{/if}
+							<span
+								class="relative inline-flex h-2 w-2 rounded-full {liveAtEdge
+									? 'bg-red-500'
+									: 'bg-missionnaire'}"
+							></span>
+						</span>
+						{liveAtEdge ? $t('live.atLive') : $t('live.backToLive')}
+					</button>
+				</div>
+			</div>
+		{/if}
 	</div>
 {/if}
 
 <style>
+	/* Live DVR scrubber — same visual language as the old live page slider. */
+	.live-dvr-scrubber {
+		-webkit-appearance: none;
+		appearance: none;
+		height: 3px;
+		background: rgb(229 225 220);
+		border-radius: 9999px;
+		outline: none;
+		cursor: pointer;
+	}
+	.live-dvr-scrubber::-webkit-slider-thumb {
+		-webkit-appearance: none;
+		appearance: none;
+		width: 11px;
+		height: 11px;
+		border-radius: 9999px;
+		background: #ff880c;
+		border: 2px solid white;
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+		cursor: pointer;
+	}
+	.live-dvr-scrubber::-moz-range-thumb {
+		width: 11px;
+		height: 11px;
+		border-radius: 9999px;
+		background: #ff880c;
+		border: 2px solid white;
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+		cursor: pointer;
+	}
+	@media (pointer: coarse) {
+		.live-dvr-scrubber::-webkit-slider-thumb {
+			width: 22px;
+			height: 22px;
+		}
+		.live-dvr-scrubber::-moz-range-thumb {
+			width: 22px;
+			height: 22px;
+		}
+	}
+
 	/* ── Action cluster (favorite, Paroles, Share, ⋮) ─────────────────
 	   One small button family with two shapes: round icon and rounded
 	   pill. Both share the same hover language so they read as a set

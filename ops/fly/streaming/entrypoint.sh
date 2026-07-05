@@ -14,6 +14,7 @@ ICECAST_PID=""
 MTX_PID=""
 RECORDER_PID=""
 SILENCE_PID=""
+HLS_PID=""
 
 mkdir -p /tmp/icecast
 touch /tmp/icecast/error.log /tmp/icecast/access.log
@@ -81,7 +82,7 @@ start_silence_loop
 
 cleanup() {
 	echo "[stream] stopping child processes"
-	kill -TERM "$ICECAST_PID" "$MTX_PID" ${RECORDER_PID:-} ${SILENCE_PID:-} 2>/dev/null || true
+	kill -TERM "$ICECAST_PID" "$MTX_PID" ${RECORDER_PID:-} ${SILENCE_PID:-} ${HLS_PID:-} 2>/dev/null || true
 	wait || true
 	exit 0
 }
@@ -108,6 +109,61 @@ get_active_path() {
 
 	printf '%s' "$api_payload" | jq -r --arg prefix "${RTMP_PATH}/" '.items[]? | select((.ready // false) == true and (.name | startswith($prefix))) | .name' | head -n 1
 }
+
+# ── Live DVR: HLS packager ─────────────────────────────────────────
+# Writes a rolling window of AAC/MPEG-TS segments to HLS_DIR; the recorder
+# serves them read-only at :8443/hls/*. This is what gives listeners
+# YouTube-style pause/resume + seek-back + jump-to-live: unlike the Icecast
+# byte stream, the DVR window lives on the server, so a paused/rewound
+# position stays valid for HLS_DVR_SEGMENTS × HLS_SEGMENT_SECONDS (~3h).
+# Runs in its own supervisor subshell with its own publisher polling —
+# independent from the Icecast transcode loop below.
+#
+# Flag notes: omit_endlist keeps the playlist "live" across ffmpeg restarts
+# (an ENDLIST would make players treat the stream as finished on every OBS
+# blip); append_list+discont_start resumes the same playlist after a restart
+# with a discontinuity marker; program_date_time stamps wall-clock on every
+# segment, which the player uses for exact transcript sync; temp_file stops
+# partially-written segments from ever being served; delete_segments +
+# hls_delete_threshold bounds disk while keeping a grace margin for players
+# parked at the window's tail.
+HLS_DIR="${HLS_DIR:-/data/hls}"
+HLS_SEGMENT_SECONDS="${HLS_SEGMENT_SECONDS:-6}"
+HLS_DVR_SEGMENTS="${HLS_DVR_SEGMENTS:-1800}"
+
+start_hls_loop() {
+	(
+		mkdir -p "${HLS_DIR}"
+		sleep 3
+		while true; do
+			HLS_ACTIVE_PATH="$(get_active_path || true)"
+			if [ -z "$HLS_ACTIVE_PATH" ]; then
+				sleep 2
+				continue
+			fi
+			echo "[hls] packaging from rtsp://127.0.0.1:8554/${HLS_ACTIVE_PATH}"
+			ffmpeg -nostdin -hide_banner -loglevel warning \
+				-fflags +genpts+igndts+discardcorrupt \
+				-rtsp_transport tcp \
+				-allowed_media_types audio \
+				-timeout 10000000 \
+				-i "rtsp://127.0.0.1:8554/${HLS_ACTIVE_PATH}" \
+				-map 0:a:0? -vn -c:a aac -b:a "${AUDIO_BITRATE}" -ar 48000 -ac 2 \
+				-f hls \
+				-hls_time "${HLS_SEGMENT_SECONDS}" \
+				-hls_list_size "${HLS_DVR_SEGMENTS}" \
+				-hls_delete_threshold 20 \
+				-hls_flags delete_segments+append_list+omit_endlist+program_date_time+independent_segments+discont_start+temp_file \
+				-hls_segment_filename "${HLS_DIR}/live-%08d.ts" \
+				"${HLS_DIR}/live.m3u8"
+			echo "[hls] ffmpeg exited; retrying in 1s"
+			sleep 1
+		done
+	) &
+	HLS_PID=$!
+}
+
+start_hls_loop
 
 echo "[stream] waiting for OBS stream on path prefix ${RTMP_PATH}/"
 

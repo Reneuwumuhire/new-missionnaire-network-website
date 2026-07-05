@@ -31,6 +31,30 @@ each time and all players would visibly reload. Three mechanisms prevent that:
   a wedged connection dies and restarts instead of holding the source mount
   silent.
 
+## Live DVR (HLS)
+
+A second FFmpeg packager writes a rolling HLS window (AAC/MPEG-TS, default
+6 s segments × 1800 = ~3 h) to `/data/hls`; the recorder serves it publicly
+(no auth) at:
+
+- Playlist: `https://<your-app-name>.fly.dev:8443/hls/live.m3u8`
+
+This is what gives listeners YouTube-style **pause/resume + seek-back +
+jump-to-live**: the window lives on the server, so a paused or rewound
+position stays valid for hours regardless of the browser's own buffer.
+`omit_endlist` keeps the playlist "live" across OBS blips; `append_list` +
+discontinuity markers resume the same timeline; `program_date_time` gives the
+player exact wall-clock per segment (used for transcript sync).
+
+To enable it in the player, set on the **main site** (Vercel):
+
+- `LIVE_AUDIO_HLS_URL=https://<your-app-name>.fly.dev:8443/hls/live.m3u8`
+
+Without that env the player uses the Icecast stream only (live edge, no DVR).
+Tunables (fly.toml `[env]`): `HLS_SEGMENT_SECONDS` (6), `HLS_DVR_SEGMENTS`
+(1800), `HLS_DIR` (/data/hls). Disk: ~57 MB/h at 128 kbps — the 3 GB volume
+holds the default window with lots of margin.
+
 ## 1) Create the app
 
 ```bash
