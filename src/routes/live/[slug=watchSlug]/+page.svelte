@@ -15,7 +15,11 @@
 	let { data }: Props = $props();
 
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	let bellRef: any = $state();
+	let bellRef: NotificationBell | undefined = $state();
+	// Bound to the bell's $bindable prop — component-instance property access
+	// (bellRef?.isSubscribed) always reads undefined in Svelte 5, which left
+	// this card stuck on "Notify me" even when already subscribed.
+	let bellSubscribed = $state(false);
 
 	// Phase is server-rendered for first paint (possibly ≤60s stale from the
 	// edge cache), then kept current by polling the no-store watch endpoint —
@@ -263,19 +267,19 @@
 			<!-- Notification opt-in — same block as /live -->
 			<button
 				onclick={() => bellRef?.toggle()}
-				class="flex items-center gap-4 w-full text-left border px-5 py-4 mt-6 transition-all duration-300 cursor-pointer group {bellRef?.isSubscribed
+				class="flex items-center gap-4 w-full text-left border px-5 py-4 mt-6 transition-all duration-300 cursor-pointer group {bellSubscribed
 					? 'border-missionnaire/30 bg-missionnaire/5'
 					: 'border-stone-200/60 bg-white/40 hover:border-missionnaire/30 hover:bg-missionnaire/5 hover:-translate-y-0.5 hover:shadow-sm'}"
 			>
 				<div
-					class="w-10 h-10 flex items-center justify-center shrink-0 border transition-colors duration-300 {bellRef?.isSubscribed
+					class="w-10 h-10 flex items-center justify-center shrink-0 border transition-colors duration-300 {bellSubscribed
 						? 'border-missionnaire/30 text-missionnaire'
 						: 'border-stone-200/60 text-stone-400 group-hover:border-missionnaire/30 group-hover:text-missionnaire'}"
 				>
-					<NotificationBell bind:this={bellRef} />
+					<NotificationBell bind:this={bellRef} bind:isSubscribed={bellSubscribed} />
 				</div>
 				<div class="font-body flex-1 min-w-0">
-					{#if bellRef?.isSubscribed}
+					{#if bellSubscribed}
 						<p class="text-sm font-semibold text-missionnaire">{$t('live.notif.enabledTitle')}</p>
 						<p class="text-[11px] text-stone-400 mt-0.5">{$t('live.notif.clickToDisable')}</p>
 					{:else}
@@ -290,11 +294,11 @@
 					{/if}
 				</div>
 				<span
-					class="text-[11px] font-bold uppercase tracking-[0.15em] font-body shrink-0 transition-colors duration-300 {bellRef?.isSubscribed
+					class="text-[11px] font-bold uppercase tracking-[0.15em] font-body shrink-0 transition-colors duration-300 {bellSubscribed
 						? 'text-missionnaire/60'
 						: 'text-stone-300 group-hover:text-missionnaire'}"
 				>
-					{bellRef?.isSubscribed ? $t('live.notif.on') : $t('live.notif.activate')}
+					{bellSubscribed ? $t('live.notif.on') : $t('live.notif.activate')}
 				</span>
 			</button>
 

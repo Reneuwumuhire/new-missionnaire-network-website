@@ -24,8 +24,13 @@
 		permission = Notification.permission;
 
 		if (permission === 'granted') {
-			const reg = await navigator.serviceWorker.ready;
-			const sub = await reg.pushManager.getSubscription();
+			// getRegistration() resolves immediately (undefined when no SW).
+			// navigator.serviceWorker.ready would hang forever when no service
+			// worker is registered — which is always the case in dev, where the
+			// root layout deliberately unregisters them — leaving isSubscribed
+			// stuck at false even for subscribed users.
+			const reg = await navigator.serviceWorker.getRegistration();
+			const sub = reg ? await reg.pushManager.getSubscription() : null;
 			isSubscribed = !!sub;
 		}
 	});
@@ -55,7 +60,13 @@
 
 		if (perm !== 'granted') return;
 
-		const reg = await navigator.serviceWorker.ready;
+		const reg = await navigator.serviceWorker.getRegistration();
+		if (!reg) {
+			// No service worker — push can't work here. Dev mode unregisters
+			// SWs on purpose, so this path is expected there.
+			console.warn('[NotificationBell] No service worker registration — cannot subscribe');
+			return;
+		}
 		const vapidKey = env.PUBLIC_VAPID_KEY;
 
 		if (!vapidKey) {
@@ -89,8 +100,8 @@
 	}
 
 	async function unsubscribe() {
-		const reg = await navigator.serviceWorker.ready;
-		const sub = await reg.pushManager.getSubscription();
+		const reg = await navigator.serviceWorker.getRegistration();
+		const sub = reg ? await reg.pushManager.getSubscription() : null;
 
 		if (sub) {
 			await fetch('/api/notifications/subscribe', {
