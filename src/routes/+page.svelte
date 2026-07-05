@@ -301,8 +301,8 @@
 				<NotificationBell bind:this={bellRef} bind:isSubscribed={bellSubscribed} />
 				<div class="flex-1 min-w-0 text-left">
 					{#if bellSubscribed}
-						<p class="text-sm font-semibold text-missionnaire font-body">Notifications activées</p>
-						<p class="text-[11px] text-stone-400 font-body mt-0.5">Cliquez pour désactiver</p>
+						<p class="text-sm font-semibold text-missionnaire font-body">Désactiver les notifications</p>
+						<p class="text-[11px] text-stone-400 font-body mt-0.5">Notifications activées sur ce navigateur</p>
 					{:else}
 						<p class="text-sm font-medium text-stone-700 font-body">Activer les notifications</p>
 						<p class="text-[11px] text-stone-400 font-body mt-0.5">Soyez alerté quand le direct audio commence</p>

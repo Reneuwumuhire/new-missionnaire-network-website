@@ -100,8 +100,8 @@
 			</div>
 			<div class="font-body flex-1 min-w-0">
 				{#if bellSubscribed}
-					<p class="text-sm font-semibold text-missionnaire">{$t('live.notif.enabledTitle')}</p>
-					<p class="text-[11px] text-stone-400 mt-0.5">{$t('live.notif.clickToDisable')}</p>
+					<p class="text-sm font-semibold text-missionnaire">{$t('live.notif.disableTitle')}</p>
+					<p class="text-[11px] text-stone-400 mt-0.5">{$t('live.notif.enabledSubtitle')}</p>
 				{:else}
 					<p
 						class="text-sm font-semibold text-stone-700 group-hover:text-missionnaire transition-colors"

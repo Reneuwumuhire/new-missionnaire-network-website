@@ -471,6 +471,8 @@ const en: Record<keyof typeof fr, string> = {
 	'live.verseRef': '— Revelation 3:20',
 
 	'live.notif.enabledTitle': 'Notifications enabled',
+	'live.notif.disableTitle': 'Disable notifications',
+	'live.notif.enabledSubtitle': 'Notifications are enabled on this browser',
 	'live.notif.clickToDisable': 'Click to disable',
 	'live.notif.enableTitle': 'Enable notifications',
 	'live.notif.enableSubtitle': 'Get notified when the live audio starts',

@@ -472,6 +472,8 @@ export default {
 	'live.verseRef': '— Apocalypse 3:20',
 
 	'live.notif.enabledTitle': 'Notifications activées',
+	'live.notif.disableTitle': 'Désactiver les notifications',
+	'live.notif.enabledSubtitle': 'Notifications activées sur ce navigateur',
 	'live.notif.clickToDisable': 'Cliquez pour désactiver',
 	'live.notif.enableTitle': 'Activer les notifications',
 	'live.notif.enableSubtitle': 'Soyez alerté quand le direct audio commence',
