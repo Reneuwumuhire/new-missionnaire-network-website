@@ -294,9 +294,9 @@
 
 			<button
 				onclick={() => bellRef?.toggle()}
-				class="group flex items-center gap-4 px-6 py-5 border transition-all duration-200 active:scale-[0.98] cursor-pointer sm:w-auto bg-white/40 {bellSubscribed
-					? 'border-missionnaire/30 bg-orange-50/40'
-					: 'border-stone-200/60 hover:border-missionnaire/30 hover:bg-white/60'}"
+				class="group flex items-center gap-4 px-6 py-5 border-2 transition-all duration-200 active:scale-[0.98] cursor-pointer sm:w-auto {bellSubscribed
+					? 'border-missionnaire bg-orange-50/70'
+					: 'border-stone-200/60 bg-white/40 hover:border-missionnaire/30 hover:bg-white/60'}"
 			>
 				<NotificationBell bind:this={bellRef} bind:isSubscribed={bellSubscribed} />
 				<div class="flex-1 min-w-0 text-left">

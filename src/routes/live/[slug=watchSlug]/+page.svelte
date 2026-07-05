@@ -267,13 +267,13 @@
 			<!-- Notification opt-in — same block as /live -->
 			<button
 				onclick={() => bellRef?.toggle()}
-				class="flex items-center gap-4 w-full text-left border px-5 py-4 mt-6 transition-all duration-300 cursor-pointer group {bellSubscribed
-					? 'border-missionnaire/30 bg-missionnaire/5'
+				class="flex items-center gap-4 w-full text-left border-2 px-5 py-4 mt-6 transition-all duration-300 cursor-pointer group {bellSubscribed
+					? 'border-missionnaire bg-orange-50/70'
 					: 'border-stone-200/60 bg-white/40 hover:border-missionnaire/30 hover:bg-missionnaire/5 hover:-translate-y-0.5 hover:shadow-sm'}"
 			>
 				<div
 					class="w-10 h-10 flex items-center justify-center shrink-0 border transition-colors duration-300 {bellSubscribed
-						? 'border-missionnaire/30 text-missionnaire'
+						? 'border-missionnaire/60 bg-white text-missionnaire'
 						: 'border-stone-200/60 text-stone-400 group-hover:border-missionnaire/30 group-hover:text-missionnaire'}"
 				>
 					<NotificationBell bind:this={bellRef} bind:isSubscribed={bellSubscribed} />
@@ -295,7 +295,7 @@
 				</div>
 				<span
 					class="text-[11px] font-bold uppercase tracking-[0.15em] font-body shrink-0 transition-colors duration-300 {bellSubscribed
-						? 'text-missionnaire/60'
+						? 'text-white bg-missionnaire px-2.5 py-1 rounded-full'
 						: 'text-stone-300 group-hover:text-missionnaire'}"
 				>
 					{bellSubscribed ? $t('live.notif.on') : $t('live.notif.activate')}
