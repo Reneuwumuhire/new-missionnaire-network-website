@@ -8,6 +8,7 @@
 	import type { Sermon } from '$lib/models/sermon';
 	import type { AudioAsset } from '$lib/models/media-assets';
 	import type { MusicAudio } from '$lib/models/music-audio';
+	import type { LiveStreamTrack } from '$lib/utils/liveTrack';
 	import { buildSermonSlug } from '../../utils/sermonSlug';
 	import { formatTime } from '../../utils/FormatTime';
 	import { createPlayableSermon } from '../../utils/audioPlayback';
@@ -41,7 +42,10 @@
 	const desktopSermonGrid = 'md:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.35fr)_110px_80px_120px]';
 
 
-	function isSermonActive(s: Sermon, current: Sermon | AudioAsset | MusicAudio | null) {
+	function isSermonActive(
+		s: Sermon,
+		current: Sermon | AudioAsset | MusicAudio | LiveStreamTrack | null
+	) {
 		// Check for specific english audio URL match
 		if (language === 'english') {
 			if (!s.english_audio_url) return false;

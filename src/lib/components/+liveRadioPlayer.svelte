@@ -1,43 +1,181 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { onDestroy, onMount } from 'svelte';
-	import { radioIsLive as radioIsLiveStore, livePlayback } from '$lib/stores/global';
+	import {
+		radioIsLive as radioIsLiveStore,
+		selectAudio,
+		playlist,
+		basePlaylist,
+		currentIndex,
+		isPlaying
+	} from '$lib/stores/global';
+	import {
+		createLiveStreamTrack,
+		isLiveStreamTrack,
+		type LiveStreamTrack
+	} from '$lib/utils/liveTrack';
 	import LiveTranscript from './+liveTranscript.svelte';
 	import { focusTrap } from '$lib/actions/focusTrap';
 	import { t, type TranslationKey } from '../../i18n';
+
+	// This card no longer embeds its own <audio> element. Playback runs
+	// through the global audio player (the same one used for music/sermons)
+	// via a LiveStreamTrack pseudo-track — the player handles connection,
+	// reconnects, MediaSession and the transcript position bridge. The card
+	// owns broadcast STATUS: is the stream on air, metadata, autoplay, and
+	// tearing the player down when the broadcast ends.
 
 	// Status → translation key; `statusMessage` below resolves through `$t`
 	// so the text follows the FR/EN toggle live.
 	const STATUS_MESSAGE_KEYS: Record<string, TranslationKey> = {
 		offline: 'live.status.offline',
 		listening: 'live.status.listening',
-		connecting: 'live.status.connecting',
-		reconnecting: 'live.status.reconnecting',
 		availablePressPlay: 'live.status.availablePressPlay',
 		waiting: 'live.status.waiting',
 		cannotPlay: 'live.status.cannotPlay',
 		unavailable: 'live.status.unavailable'
 	};
 
-	let audio: HTMLAudioElement | null = $state(null);
-	let isPlaying = $state(false);
-	let isMuted = $state(false);
-	let isBuffering = $state(false);
 	let hasError = $state(false);
 	let lastCheckedAt = $state('');
 	let statusKey = $state('waiting');
 	let pollTimer: ReturnType<typeof setInterval> | null = null;
 	let noAudioGraceTimer: ReturnType<typeof setTimeout> | null = null;
 	let offlineStreak = 0;
-	let userWantsToPlay = false;
 	let listenerCount = $state(0);
 	let keepLiveUi = $state(false);
+	let probeReachable = $state(false);
 	let broadcastTitle: string | null = $state(null);
 	let broadcastDescription: string | null = $state(null);
 	let broadcastThumbnail: string | null = $state(null);
 	let broadcastThumbnailBroken = $state(false);
 	let thumbnailExpanded = $state(false);
 	let descriptionExpanded = $state(false);
+
+	// Direct URL to the audio source, received from the server via radio-state.
+	// Bypasses the serverless proxy which has execution time limits.
+	let directStreamUrl = '';
+	// Fallback proxy URL — used only when the server hasn't sent a direct URL yet.
+	const proxyStreamUrl = '/api/live/audio';
+
+	const OFFLINE_THRESHOLD = 6;
+	const NO_AUDIO_GRACE_MS = 30_000;
+
+	// ── Global-player bridge ───────────────────────────────────────
+
+	let liveTrackSelected = $derived(isLiveStreamTrack($selectAudio));
+	let livePlaying = $derived(liveTrackSelected && $isPlaying);
+	// Sticky "the broadcast is proven on air" flag: set on first successful
+	// playback, cleared only when the stream is confirmed offline. Keeps the
+	// live UI (title, thumbnail, transcript) up across a pause.
+	let confirmedLive = $state(false);
+	$effect(() => {
+		if (livePlaying) confirmedLive = true;
+	});
+	let showLive = $derived(confirmedLive || keepLiveUi);
+	let awaitingPlay = $derived(probeReachable && !livePlaying && !confirmedLive && !keepLiveUi);
+	let canPlay = $derived(probeReachable || livePlaying || confirmedLive);
+	let statusMessage = $derived(
+		STATUS_MESSAGE_KEYS[statusKey] ? $t(STATUS_MESSAGE_KEYS[statusKey]) : ''
+	);
+	let checkedAtLabel = $derived(
+		lastCheckedAt
+			? new Date(lastCheckedAt).toLocaleTimeString('fr-FR', {
+					hour: '2-digit',
+					minute: '2-digit',
+					second: '2-digit'
+				})
+			: ''
+	);
+
+	function buildLiveTrack(): LiveStreamTrack {
+		return createLiveStreamTrack({
+			title: broadcastTitle || $t('live.audioLive'),
+			url: directStreamUrl || proxyStreamUrl,
+			thumbnailUrl: broadcastThumbnail
+		});
+	}
+
+	/** Hand the live stream to the global player and start playback. */
+	function startLivePlayback() {
+		if (!browser) return;
+		if (liveTrackSelected) {
+			// Already loaded (paused, or a blocked autoplay) — the play event
+			// runs the player's gesture-safe resume path synchronously.
+			window.dispatchEvent(new CustomEvent('missionnaire-audio-play'));
+			return;
+		}
+		const track = buildLiveTrack();
+		basePlaylist.set([track]);
+		playlist.set([track]);
+		currentIndex.set(0);
+		selectAudio.set(track);
+		isPlaying.set(true);
+	}
+
+	function pauseLivePlayback() {
+		if (!browser || !liveTrackSelected) return;
+		window.dispatchEvent(new CustomEvent('missionnaire-audio-pause'));
+	}
+
+	/** Broadcast over (or confirmed offline) — close the global player if it
+	 *  is still holding the live track. */
+	function stopLivePlayback() {
+		if (!browser || !liveTrackSelected) return;
+		window.dispatchEvent(new CustomEvent('missionnaire-audio-close'));
+		playlist.set([]);
+		basePlaylist.set([]);
+	}
+
+	const togglePlay = () => {
+		if (livePlaying) {
+			pauseLivePlayback();
+			return;
+		}
+		if (!probeReachable && !liveTrackSelected) {
+			hasError = true;
+			statusKey = 'offline';
+			return;
+		}
+		hasError = false;
+		startLivePlayback();
+	};
+
+	// Keep the selected live track's metadata in sync with what the admin
+	// broadcasts (title/thumbnail edits, or the direct URL arriving after a
+	// proxy start). The URL only changes in the rare proxy→direct case, and
+	// the player ignores metadata-only updates (same URL → no reload).
+	$effect(() => {
+		if (!browser || !liveTrackSelected) return;
+		const current = $selectAudio as LiveStreamTrack;
+		const desiredUrl = directStreamUrl || proxyStreamUrl;
+		const desiredTitle = broadcastTitle || current.title;
+		const desiredThumb = broadcastThumbnail ?? null;
+		if (
+			current.url !== desiredUrl ||
+			current.title !== desiredTitle ||
+			current.thumbnail_url !== desiredThumb
+		) {
+			const track = createLiveStreamTrack({
+				title: desiredTitle,
+				url: desiredUrl,
+				thumbnailUrl: desiredThumb
+			});
+			basePlaylist.set([track]);
+			playlist.set([track]);
+			currentIndex.set(0);
+			selectAudio.set(track);
+		}
+	});
+
+	// Status text follows the player state.
+	$effect(() => {
+		if (livePlaying) {
+			statusKey = 'listening';
+		} else if (probeReachable && statusKey === 'listening') {
+			statusKey = 'availablePressPlay';
+		}
+	});
 
 	function openThumbnail() {
 		if (!broadcastThumbnail) return;
@@ -59,132 +197,49 @@
 		if (e.target === e.currentTarget) closeThumbnail();
 	}
 
-	// DVR / scrubber state.
-	// We derive the seekable window from audio.buffered + a locally-tracked
-	// "liveEdge" (the highest currentTime we've seen while playing forward).
-	// We do NOT use audio.seekable or audio.duration because Icecast MP3
-	// streams report them as Infinity, which breaks arithmetic & UI.
-	let currentTime = $state(0);
-	let bufferStart = $state(0);
-	let liveEdge = $state(0);
-	let isSeeking = $state(false);
-	// True once the user has deliberately scrubbed backward. The button label
-	// is driven by this flag, not by a live-edge time delta — otherwise the
-	// browser's buffer-ahead (5-15s on Icecast) makes the label oscillate
-	// between "En direct" and "Revenir au direct" as playback catches up.
-	let userSeeked = $state(false);
-	const DVR_THRESHOLD_SEC = 3;
-
-	let probeReachable = $state(false);
-	let confirmedLive = $state(false);
-	let playbackFailed = $state(false);
-
-	// Direct URL to the audio source, received from the server via SSE.
-	// Bypasses the serverless proxy which has execution time limits.
-	let directStreamUrl = '';
-
-	// Fallback proxy URL — used only when the server hasn't sent a direct URL yet.
-	const proxyStreamUrl = '/api/live/audio';
-
-	// Auto-reconnect state
-	let reconnectAttempts = 0;
-	let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-	const MAX_RECONNECT_ATTEMPTS = 8;
-	const RECONNECT_DELAYS = [1000, 2000, 3000, 5000, 5000, 10000, 10000, 15000];
-
-	// Stall watchdog. A continuous Icecast/MP3 stream can silently wedge: the
-	// <audio> element fires `waiting`/`stalled` but never `error` or `ended`, so
-	// none of the reconnect paths trigger and the player sits on "reconnecting"
-	// until the listener reloads the page. We track forward playback progress and
-	// force a fresh reconnect when it stops advancing for too long.
-	const STALL_TIMEOUT_MS = 12_000;
-	const STALL_CHECK_INTERVAL_MS = 3_000;
-	let lastProgressMs = 0;
-	let stallWatchTimer: ReturnType<typeof setInterval> | null = null;
-
-	const OFFLINE_THRESHOLD = 6;
-	const NO_AUDIO_GRACE_MS = 30_000;
-
-	// Attempt browser autoplay when the broadcast becomes reachable.
-	// Browsers block `play()` without a prior user gesture (opening a page
-	// doesn't count), so on failure we install a document-wide one-shot
-	// listener: the listener's *first* tap/click/keypress anywhere on the
-	// page starts playback. They never have to find the Lecture button.
+	// ── Autoplay ───────────────────────────────────────────────────
+	// Attempt playback when the broadcast becomes reachable. Browsers block
+	// play() without a prior user gesture, so we also arm a document-wide
+	// one-shot listener: the listener's first tap/click/keypress anywhere on
+	// the page starts playback (the dispatch runs the player's play handler
+	// synchronously inside the gesture stack, which iOS requires).
 	let hasAttemptedAutoplay = false;
 	let autoplayGestureAttached = false;
 
-	/** Get the best stream URL — prefer direct, fall back to proxy */
-	function getStreamUrl(): string {
-		const base = directStreamUrl || proxyStreamUrl;
-		return `${base}${base.includes('?') ? '&' : '?'}t=${Date.now()}`;
+	function tryAutoplay() {
+		if (hasAttemptedAutoplay || !browser) return;
+		if (!probeReachable || livePlaying) return;
+		hasAttemptedAutoplay = true;
+		startLivePlayback();
+		attachAutoplayGestureListener();
 	}
 
-	// Wall-clock epoch at which the CURRENT stream connection was opened.
-	// On a fresh Icecast connection, audio position 0 is "live at that
-	// instant", so the wall-clock moment of what the listener hears at
-	// position t is streamConnectEpochMs + t*1000. The transcript syncs on
-	// this rather than on buffer-edge deltas, which makes pause/resume,
-	// DVR rewind and silent reconnects all correct by construction — a
-	// paused player's frozen currentTime freezes the text, and a long-pause
-	// buffer-expiry reconnect resets the epoch to "now" along with the audio.
-	let streamConnectEpochMs: number | null = $state(null);
-
-	/** Single place every (re)connection goes through. */
-	function connectStream() {
-		if (!audio) return;
-		audio.src = getStreamUrl();
-		audio.load();
-		streamConnectEpochMs = Date.now();
-		// Give the fresh connection a full window before the stall watchdog can
-		// fire — otherwise a stale timestamp would trip it immediately.
-		lastProgressMs = Date.now();
+	function handleAutoplayGesture() {
+		detachAutoplayGestureListener();
+		if (!probeReachable || livePlaying) return;
+		startLivePlayback();
 	}
 
-	let showLive = $derived(confirmedLive || keepLiveUi);
-	let awaitingPlay = $derived(
-		probeReachable && !isPlaying && !isBuffering && !confirmedLive && !keepLiveUi
-	);
-	// Button stays enabled after failure so user can manually retry
-	let canPlay = $derived(probeReachable || confirmedLive || playbackFailed);
-	let statusMessage = $derived(
-		STATUS_MESSAGE_KEYS[statusKey] ? $t(STATUS_MESSAGE_KEYS[statusKey]) : ''
-	);
-	let behindLiveSec = $derived(Math.max(0, liveEdge - currentTime));
-	// Feed the transcript the wall-clock moment of what the listener is
-	// hearing right now (connection epoch + playback position). Frozen while
-	// paused (currentTime doesn't advance), shifted by DVR scrubbing, reset
-	// to "now" on every fresh reconnection — all without buffer-edge math.
+	function attachAutoplayGestureListener() {
+		if (autoplayGestureAttached || !browser) return;
+		autoplayGestureAttached = true;
+		document.addEventListener('pointerdown', handleAutoplayGesture, { capture: true });
+		document.addEventListener('keydown', handleAutoplayGesture, { capture: true });
+	}
+
+	function detachAutoplayGestureListener() {
+		if (!autoplayGestureAttached || !browser) return;
+		autoplayGestureAttached = false;
+		document.removeEventListener('pointerdown', handleAutoplayGesture, { capture: true });
+		document.removeEventListener('keydown', handleAutoplayGesture, { capture: true });
+	}
+
+	// Playback achieved (autoplay or gesture) — the one-shot listener is done.
 	$effect(() => {
-		livePlayback.set({
-			playing: isPlaying,
-			positionEpochMs:
-				streamConnectEpochMs === null ? null : streamConnectEpochMs + currentTime * 1000
-		});
+		if (livePlaying) detachAutoplayGestureListener();
 	});
-	let isAtLive = $derived(!userSeeked);
-	let hasSeekableRange = $derived(
-		Number.isFinite(liveEdge) && Number.isFinite(bufferStart) && liveEdge > bufferStart + 1
-	);
-	let behindLiveLabel = $derived(formatBehindLive(behindLiveSec));
 
-	function formatBehindLive(sec: number): string {
-		if (!Number.isFinite(sec) || sec < 0) return '';
-		const s = Math.floor(sec);
-		const m = Math.floor(s / 60);
-		const rem = s % 60;
-		return `-${m}:${rem.toString().padStart(2, '0')}`;
-	}
-	let checkedAtLabel = $derived(
-		lastCheckedAt
-			? new Date(lastCheckedAt).toLocaleTimeString('fr-FR', {
-					hour: '2-digit',
-					minute: '2-digit',
-					second: '2-digit'
-				})
-			: ''
-	);
-
-	// ── SSE status handler ─────────────────────────────────────────
+	// ── Broadcast status handling ──────────────────────────────────
 
 	function clearNoAudioGraceTimer() {
 		if (noAudioGraceTimer) {
@@ -205,77 +260,31 @@
 		noAudioGraceTimer = setTimeout(() => {
 			noAudioGraceTimer = null;
 			keepLiveUi = false;
-
-			if (confirmedLive) return;
-
-			probeReachable = false;
+			// Still playing (e.g. server-side silence fallback riding out a
+			// source blip) — keep the live UI and let the offline threshold
+			// decide.
+			if (livePlaying) return;
 			confirmedLive = false;
-			playbackFailed = false;
+			probeReachable = false;
 			hasError = false;
 			statusKey = 'offline';
-			stopPlayback();
+			stopLivePlayback();
 		}, NO_AUDIO_GRACE_MS);
 	}
 
-	/** Try browser autoplay the first time the stream becomes reachable.
-	 *  Most browsers block autoplay with sound without a prior user gesture
-	 *  — we catch that rejection and install a document-wide one-shot
-	 *  gesture listener so the listener's first tap anywhere on the page
-	 *  starts playback. No error toasts, no status flicker. */
-	async function tryAutoplay() {
-		if (hasAttemptedAutoplay) return;
-		if (!browser || !audio) return;
-		if (isPlaying || userWantsToPlay || isBuffering) return;
-		if (!probeReachable) return;
-		hasAttemptedAutoplay = true;
-
-		connectStream();
-		isBuffering = true;
-		userWantsToPlay = true;
-		statusKey = 'connecting';
-		try {
-			await audio.play();
-			// handlePlay will flip isPlaying / statusKey = 'listening'.
-			detachAutoplayGestureListener();
-		} catch {
-			// Autoplay blocked (no user gesture yet). Restore the "ready"
-			// state and arm the gesture listener so the next interaction
-			// — anywhere on the page — starts playback.
-			userWantsToPlay = false;
-			isBuffering = false;
-			if (audio) {
-				audio.removeAttribute('src');
-				audio.load();
-			}
-			statusKey = 'availablePressPlay';
-			attachAutoplayGestureListener();
-		}
-	}
-
-	/** Fired by the listener's first tap/click/keypress after autoplay was
-	 *  blocked. We must call audio.play() *synchronously* inside this stack
-	 *  so it inherits the user activation flag (required by iOS Safari);
-	 *  tryAutoplay() does the synchronous src + load + play before any await,
-	 *  so calling it here is safe. */
-	function handleAutoplayGesture() {
-		detachAutoplayGestureListener();
-		if (!probeReachable || isPlaying || isBuffering || userWantsToPlay) return;
+	function goOfflineConfirmed() {
+		cancelNoAudioGrace();
+		confirmedLive = false;
+		probeReachable = false;
+		hasError = false;
+		statusKey = 'offline';
+		// Reset autoplay state so the next live cycle gets a fresh attempt
+		// (and doesn't sit on a dangling gesture listener).
 		hasAttemptedAutoplay = false;
-		void tryAutoplay();
-	}
-
-	function attachAutoplayGestureListener() {
-		if (autoplayGestureAttached || !browser) return;
-		autoplayGestureAttached = true;
-		document.addEventListener('pointerdown', handleAutoplayGesture, { capture: true });
-		document.addEventListener('keydown', handleAutoplayGesture, { capture: true });
-	}
-
-	function detachAutoplayGestureListener() {
-		if (!autoplayGestureAttached || !browser) return;
-		autoplayGestureAttached = false;
-		document.removeEventListener('pointerdown', handleAutoplayGesture, { capture: true });
-		document.removeEventListener('keydown', handleAutoplayGesture, { capture: true });
+		detachAutoplayGestureListener();
+		stopLivePlayback();
+		radioIsLiveStore.set(false);
+		startOfflineWatcher();
 	}
 
 	function handleStatusEvent(
@@ -296,59 +305,40 @@
 			stopOfflineWatcher();
 			offlineStreak = 0;
 			probeReachable = true;
-
-			// If playback previously failed, DON'T update the status text.
-			// The UI stays at offline/unavailable until the user manually
-			// clicks play. This prevents the on/off flicker from an
-			// unreliable probe after the stream ends.
-			if (playbackFailed) return;
-
 			hasError = false;
 
-			if (isPlaying) {
+			if (livePlaying) {
 				statusKey = 'listening';
-			} else if (isBuffering) {
-				statusKey = reconnectAttempts > 0 ? 'reconnecting' : 'connecting';
 			} else {
 				statusKey = 'availablePressPlay';
 				// First time the stream is reachable on this page load — try to
-				// start playback immediately. Fails silently if the browser
-				// requires a user gesture first.
-				void tryAutoplay();
+				// start playback immediately. Falls back to the first-gesture
+				// listener if the browser requires a user gesture.
+				tryAutoplay();
 			}
 		} else {
-			if (confirmedLive || keepLiveUi || isPlaying || isBuffering || probeReachable) {
+			if (livePlaying || keepLiveUi || probeReachable) {
 				startNoAudioGrace();
 			}
 
 			offlineStreak += 1;
 
 			if (offlineStreak >= OFFLINE_THRESHOLD) {
-				cancelNoAudioGrace();
-				probeReachable = false;
-				confirmedLive = false;
-				playbackFailed = false; // Reset — confirmed offline, clean slate
-				hasError = false;
-				statusKey = 'offline';
-				// Reset autoplay state so the next live cycle gets a fresh
-				// attempt (and doesn't sit on a dangling gesture listener).
-				hasAttemptedAutoplay = false;
-				detachAutoplayGestureListener();
-				stopPlayback();
-			} else if (!isPlaying && !isBuffering && !playbackFailed) {
+				goOfflineConfirmed();
+			} else if (!livePlaying) {
 				statusKey = 'waiting';
 			}
 		}
 	}
 
 	// ── State refresh ─────────────────────────────────────────────
-	// No more 10-second polling. State is push-driven:
+	// State is push-driven:
 	//  - SSR seeds initial state via the parent layout's data.
 	//  - One on-mount fetch of /api/live/radio-state hydrates this component.
 	//  - Service-Worker push events flip live state immediately, no network.
-	//  - While audio is actively playing, a slow 60s tick to /api/live/radio-state
-	//    refreshes the listener count (sourced from Icecast, same as Fly) and
-	//    admin-edited metadata (title, thumbnail).
+	//  - While the live stream is playing, a slow 60s tick to
+	//    /api/live/radio-state refreshes the listener count and admin-edited
+	//    metadata (title, thumbnail).
 	//  - Stopping audio or hiding the tab stops the tick entirely.
 
 	const STATE_REFRESH_INTERVAL = 60_000; // 60s — only while playing + visible
@@ -393,16 +383,46 @@
 		}
 	}
 
-	// React to play/pause: only spend network while audio is actually playing
-	// and the tab is visible.
+	// React to play/pause: only spend network while the live stream is
+	// actually playing and the tab is visible.
 	$effect(() => {
 		if (!browser) return;
-		if (isPlaying && document.visibilityState === 'visible') {
+		if (livePlaying && document.visibilityState === 'visible') {
 			startStateRefresh();
 		} else {
 			stopStateRefresh();
 		}
 	});
+
+	// ── Offline watcher ───────────────────────────────────────────
+	// After a confirmed offline, keep checking quietly for a few minutes so a
+	// server-side blip that recovers (Icecast restart) brings the card — and
+	// autoplay — back to life on its own.
+
+	const OFFLINE_WATCH_INTERVAL_MS = 12_000;
+	const OFFLINE_WATCH_WINDOW_MS = 3 * 60_000;
+	let offlineWatchTimer: ReturnType<typeof setInterval> | null = null;
+	let offlineWatchUntil = 0;
+
+	function startOfflineWatcher() {
+		offlineWatchUntil = Date.now() + OFFLINE_WATCH_WINDOW_MS;
+		if (offlineWatchTimer) return;
+		offlineWatchTimer = setInterval(() => {
+			if (Date.now() > offlineWatchUntil) {
+				stopOfflineWatcher();
+				return;
+			}
+			if (document.visibilityState !== 'visible') return;
+			void fetchRadioState();
+		}, OFFLINE_WATCH_INTERVAL_MS);
+	}
+
+	function stopOfflineWatcher() {
+		if (offlineWatchTimer) {
+			clearInterval(offlineWatchTimer);
+			offlineWatchTimer = null;
+		}
+	}
 
 	// ── Push-driven updates (Service Worker → BroadcastChannel) ──
 	let radioBroadcast: BroadcastChannel | null = null;
@@ -421,9 +441,6 @@
 
 		// Initial paint — hydrate live state + listener count.
 		void fetchRadioState();
-
-		// Self-gating: only acts while the listener wants audio. Cheap when idle.
-		startStallWatch();
 
 		document.addEventListener('visibilitychange', handleVisibilityChange);
 
@@ -446,8 +463,6 @@
 	onDestroy(() => {
 		stopStateRefresh();
 		stopOfflineWatcher();
-		stopStallWatch();
-		clearReconnectTimer();
 		clearNoAudioGraceTimer();
 		detachAutoplayGestureListener();
 		if (browser) {
@@ -459,459 +474,19 @@
 			radioBroadcast?.close();
 			radioBroadcast = null;
 		}
+		// NOTE: playback deliberately survives navigation — the global player
+		// keeps the live stream running while the listener browses the site.
 	});
 
 	function handleVisibilityChange() {
 		if (document.visibilityState === 'visible') {
 			// Tab regained focus — refresh once and (if playing) restart the tick.
 			void fetchRadioState();
-			// Background tabs throttle `timeupdate`, so lastProgressMs is stale on
-			// return. Reset it to give the stall watchdog a fresh window instead of
-			// firing on the elapsed-while-hidden gap.
-			lastProgressMs = Date.now();
-			if (isPlaying) startStateRefresh();
-			if (userWantsToPlay && audio && audio.paused && !audio.ended) {
-				attemptReconnect();
-			}
+			if (livePlaying) startStateRefresh();
 		} else {
 			stopStateRefresh();
 		}
 	}
-
-	// ── Reconnect logic ───────────────────────────────────────────
-
-	function clearReconnectTimer() {
-		if (reconnectTimer) {
-			clearTimeout(reconnectTimer);
-			reconnectTimer = null;
-		}
-	}
-
-	// ── Stall watchdog ─────────────────────────────────────────────
-	function startStallWatch() {
-		if (stallWatchTimer || !browser) return;
-		stallWatchTimer = setInterval(() => {
-			if (!audio || !userWantsToPlay) return;
-			// Hidden tabs throttle timers + timeupdate; don't judge staleness then.
-			if (document.visibilityState !== 'visible') return;
-			// A reconnect is already scheduled or being triaged — let it finish.
-			if (reconnectTimer || dropCheckInFlight) return;
-			// `handleTimeUpdate` refreshes lastProgressMs while audio actually
-			// advances; if it hasn't moved for STALL_TIMEOUT_MS the stream is
-			// wedged (buffering forever with no error event) → force a reconnect.
-			if (Date.now() - lastProgressMs < STALL_TIMEOUT_MS) return;
-			// Debounce: push the marker forward so we don't stack triage calls
-			// while this one resolves (or while the new stream warms up).
-			lastProgressMs = Date.now();
-			void handleStreamDrop();
-		}, STALL_CHECK_INTERVAL_MS);
-	}
-
-	function stopStallWatch() {
-		if (stallWatchTimer) {
-			clearInterval(stallWatchTimer);
-			stallWatchTimer = null;
-		}
-	}
-
-	function stopPlayback() {
-		clearReconnectTimer();
-		reconnectAttempts = 0;
-		if (isPlaying || isBuffering || userWantsToPlay) {
-			isPlaying = false;
-			isBuffering = false;
-			userWantsToPlay = false;
-			audio?.pause();
-			if (audio) {
-				audio.removeAttribute('src');
-				audio.load();
-			}
-			streamConnectEpochMs = null;
-		}
-	}
-
-	// ── Stream-drop triage ─────────────────────────────────────────
-	// When playback dies we ask the server whether the broadcast is still on
-	// air before showing any retry UI. A listener-side hiccup keeps the
-	// visible "Reconnexion en cours…" flow; a broadcast that actually ended
-	// flips straight to the calm offline card — no red card stuck on
-	// "reconnecting" while retries hammer a dead stream. A quiet background
-	// watcher keeps checking for a few minutes so a server-side blip that
-	// recovers (Icecast restart) brings the player back to life on its own.
-
-	const OFFLINE_WATCH_INTERVAL_MS = 12_000;
-	const OFFLINE_WATCH_WINDOW_MS = 3 * 60_000;
-	let offlineWatchTimer: ReturnType<typeof setInterval> | null = null;
-	let offlineWatchUntil = 0;
-	let dropCheckInFlight = false;
-
-	async function handleStreamDrop() {
-		if (dropCheckInFlight || !userWantsToPlay) return;
-		dropCheckInFlight = true;
-		try {
-			const res = await fetch('/api/live/radio-state');
-			if (!res.ok) {
-				attemptReconnect(); // can't tell — treat as a hiccup
-				return;
-			}
-			const data = (await res.json()) as { isLive: boolean };
-			if (data.isLive) {
-				attemptReconnect();
-			} else {
-				goOfflineQuietly();
-			}
-		} catch {
-			attemptReconnect();
-		} finally {
-			dropCheckInFlight = false;
-		}
-	}
-
-	/** Broadcast is over (or the source dropped server-side): reset the UI to
-	 *  the plain offline card immediately instead of flashing reconnect
-	 *  states, and watch quietly in the background for a possible return. */
-	function goOfflineQuietly() {
-		cancelNoAudioGrace();
-		stopPlayback();
-		probeReachable = false;
-		confirmedLive = false;
-		playbackFailed = false;
-		hasError = false;
-		offlineStreak = 0;
-		statusKey = 'offline';
-		// Hide the stale scrubber — its buffer window died with the stream.
-		currentTime = 0;
-		bufferStart = 0;
-		liveEdge = 0;
-		userSeeked = false;
-		// Re-arm autoplay so the background watcher can restart playback
-		// seamlessly if the stream comes back.
-		hasAttemptedAutoplay = false;
-		detachAutoplayGestureListener();
-		radioIsLiveStore.set(false);
-		startOfflineWatcher();
-	}
-
-	function startOfflineWatcher() {
-		offlineWatchUntil = Date.now() + OFFLINE_WATCH_WINDOW_MS;
-		if (offlineWatchTimer) return;
-		offlineWatchTimer = setInterval(() => {
-			if (Date.now() > offlineWatchUntil) {
-				stopOfflineWatcher();
-				return;
-			}
-			if (document.visibilityState !== 'visible') return;
-			void fetchRadioState();
-		}, OFFLINE_WATCH_INTERVAL_MS);
-	}
-
-	function stopOfflineWatcher() {
-		if (offlineWatchTimer) {
-			clearInterval(offlineWatchTimer);
-			offlineWatchTimer = null;
-		}
-	}
-
-	function attemptReconnect() {
-		if (!audio || !userWantsToPlay) return;
-		if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-			userWantsToPlay = false;
-			confirmedLive = false;
-			playbackFailed = true;
-			hasError = true;
-			statusKey = 'unavailable';
-			reconnectAttempts = 0;
-			clearReconnectTimer();
-			// Only clear src when fully giving up
-			if (audio) {
-				audio.removeAttribute('src');
-				audio.load();
-			}
-			streamConnectEpochMs = null;
-			return;
-		}
-
-		isBuffering = true;
-		statusKey = 'reconnecting';
-
-		const delay =
-			RECONNECT_DELAYS[reconnectAttempts] ?? RECONNECT_DELAYS[RECONNECT_DELAYS.length - 1];
-		reconnectAttempts += 1;
-
-		clearReconnectTimer();
-		reconnectTimer = setTimeout(() => {
-			if (!audio || !userWantsToPlay) return;
-
-			// Fresh src — the browser reuses the audio session from the
-			// user's initial play tap, so play() works on mobile.
-			connectStream();
-			audio.play().catch(() => {
-				// play() rejected — handleError will fire and retry
-			});
-		}, delay);
-	}
-
-	// ── User controls ──────────────────────────────────────────────
-
-	const togglePlay = async () => {
-		if (!audio) return;
-
-		if (!audio.paused || reconnectTimer) {
-			// Pause only — keep the audio session + buffer intact so
-			// resume plays from where the listener paused (time-shift).
-			// The transcript follows via the connection-epoch math, so a
-			// paused listener's text freezes and resumes in sync.
-			userWantsToPlay = false;
-			clearReconnectTimer();
-			reconnectAttempts = 0;
-			audio.pause();
-			return;
-		}
-
-		if (!probeReachable && !confirmedLive) {
-			hasError = true;
-			statusKey = 'offline';
-			return;
-		}
-
-		hasError = false;
-		userWantsToPlay = true;
-		playbackFailed = false;
-		reconnectAttempts = 0;
-
-		// Only load a fresh stream on first play or after a reconnect cleared src.
-		// Otherwise resume from buffered position.
-		const needsFreshStream = !audio.src || audio.src === location.href || audio.error;
-		if (needsFreshStream) {
-			isBuffering = true;
-			statusKey = 'connecting';
-			connectStream();
-		}
-
-		try {
-			await audio.play();
-		} catch (error) {
-			console.error('[LiveRadio] Playback error:', error);
-			// If resuming from buffered position failed (often because the
-			// buffer expired during a long pause), fall back to a fresh stream.
-			if (!needsFreshStream) {
-				try {
-					isBuffering = true;
-					statusKey = 'reconnecting';
-					connectStream();
-					await audio.play();
-					return;
-				} catch (retryError) {
-					console.error('[LiveRadio] Fresh stream retry failed:', retryError);
-				}
-			}
-			hasError = true;
-			isPlaying = false;
-			isBuffering = false;
-			userWantsToPlay = false;
-			statusKey = 'cannotPlay';
-		}
-	};
-
-	/** Jump the playhead to the current live edge.
-	 *  For Icecast (continuous MP3), the most reliable way to get truly-live
-	 *  audio is to reconnect to a fresh stream — seeking within the buffer
-	 *  only gets you to the end of what the browser has already downloaded. */
-	const backToLive = async () => {
-		if (!audio) return;
-		userWantsToPlay = true;
-		isBuffering = true;
-		statusKey = 'connecting';
-		hasError = false;
-		reconnectAttempts = 0;
-		userSeeked = false;
-		// Reset local tracking so we start a fresh window
-		currentTime = 0;
-		bufferStart = 0;
-		liveEdge = 0;
-		connectStream();
-		try {
-			await audio.play();
-		} catch {
-			// handleError will fire if playback fails
-		}
-	};
-
-	const handleTimeUpdate = () => {
-		if (!audio) return;
-		// Forward progress — resets the stall watchdog. `timeupdate` only fires
-		// while the media position actually changes, so it goes quiet the moment
-		// the stream wedges.
-		lastProgressMs = Date.now();
-		if (!isSeeking) {
-			currentTime = audio.currentTime;
-		}
-		if (!isSeeking && isPlaying && audio.currentTime > liveEdge) {
-			liveEdge = audio.currentTime;
-		}
-		updateBufferRange();
-	};
-
-	const handleProgress = () => {
-		if (!audio) return;
-		updateBufferRange();
-	};
-
-	/** Snap the scrubber bounds to the contiguous buffered range that contains
-	 *  the playhead. Icecast doesn't support server-side seeking, so seeking
-	 *  outside the buffered range stalls indefinitely. */
-	function updateBufferRange() {
-		if (!audio || audio.buffered.length === 0) return;
-		const t = audio.currentTime;
-		let idx = -1;
-		for (let i = 0; i < audio.buffered.length; i++) {
-			const s = audio.buffered.start(i);
-			const e = audio.buffered.end(i);
-			if (t >= s - 0.5 && t <= e + 0.5) {
-				idx = i;
-				break;
-			}
-		}
-		// If the playhead isn't in any range (stalled in a gap), use the latest range.
-		if (idx === -1) idx = audio.buffered.length - 1;
-		const start = audio.buffered.start(idx);
-		const end = audio.buffered.end(idx);
-		if (Number.isFinite(start)) bufferStart = start;
-		if (Number.isFinite(end) && end > liveEdge) liveEdge = end;
-	}
-
-	const onSeekInput = (event: Event) => {
-		if (!audio) return;
-		const target = event.target as HTMLInputElement;
-		const value = Number(target.value);
-		isSeeking = true;
-		currentTime = value;
-	};
-
-	const onSeekCommit = (event: Event) => {
-		if (!audio) return;
-		const target = event.target as HTMLInputElement;
-		let value = Number(target.value);
-		// Re-check buffered ranges at commit time — they may have shifted since
-		// the user started dragging. Clamp to the latest contiguous range so
-		// we never seek into purged/non-existent data (which on Icecast would
-		// stall the player indefinitely).
-		if (audio.buffered.length > 0) {
-			const last = audio.buffered.length - 1;
-			const safeStart = audio.buffered.start(last);
-			const safeEnd = audio.buffered.end(last);
-			if (Number.isFinite(safeStart) && Number.isFinite(safeEnd)) {
-				value = Math.max(safeStart, Math.min(safeEnd, value));
-			}
-		}
-		try {
-			audio.currentTime = value;
-			currentTime = value;
-			// Enter DVR mode only when the user drops the scrubber meaningfully
-			// behind the buffered live edge. Scrubbing forward to near the edge
-			// exits DVR mode.
-			userSeeked = liveEdge - value > DVR_THRESHOLD_SEC;
-		} catch {
-			// ignore
-		}
-		isSeeking = false;
-	};
-
-	const toggleMute = () => {
-		if (!audio) return;
-		audio.muted = !audio.muted;
-		isMuted = audio.muted;
-	};
-
-	// ── Audio element event handlers ───────────────────────────────
-
-	const handlePlay = () => {
-		// Playback started by any path (autoplay, gesture-retry, manual
-		// Lecture button) — we no longer need the gesture listener.
-		detachAutoplayGestureListener();
-		cancelNoAudioGrace();
-		isPlaying = true;
-		isBuffering = false;
-		hasError = false;
-		confirmedLive = true;
-		playbackFailed = false;
-		reconnectAttempts = 0;
-		lastProgressMs = Date.now();
-		clearReconnectTimer();
-		statusKey = 'listening';
-	};
-
-	const handlePause = () => {
-		isPlaying = false;
-		isBuffering = false;
-
-		if (probeReachable && !userWantsToPlay) {
-			cancelNoAudioGrace();
-			statusKey = 'availablePressPlay';
-		}
-	};
-
-	const handleWaiting = () => {
-		// 'waiting' fires during normal buffering (network hiccup).
-		// This is completely normal on mobile — don't treat as error.
-		isBuffering = true;
-		if (userWantsToPlay) {
-			statusKey = reconnectAttempts > 0 ? 'reconnecting' : 'connecting';
-		}
-	};
-
-	const handleStalled = () => {
-		// 'stalled' means data stopped arriving — common on mobile networks.
-		// NOT an error. The browser will keep trying. Just show buffering.
-		if (isPlaying || userWantsToPlay) {
-			isBuffering = true;
-			statusKey = 'connecting';
-		}
-	};
-
-	const handleCanPlay = () => {
-		isBuffering = false;
-		if (isPlaying) {
-			statusKey = 'listening';
-		}
-	};
-
-	const handleEnded = () => {
-		isPlaying = false;
-		isBuffering = false;
-		confirmedLive = false;
-		playbackFailed = false;
-		startNoAudioGrace();
-
-		if (userWantsToPlay) {
-			void handleStreamDrop();
-		} else {
-			statusKey = 'waiting';
-		}
-	};
-
-	const handleError = () => {
-		// Don't react to errors on an empty src (we cleared it intentionally)
-		if (!audio?.src || audio.src === location.href) return;
-
-		isPlaying = false;
-		isBuffering = false;
-		confirmedLive = false;
-
-		if (userWantsToPlay) {
-			// Don't clear the src or give up — just set a fresh URL and
-			// let the audio element reconnect. This is mobile-friendly:
-			// the browser reuses the existing audio session from the
-			// user's initial tap, so no autoplay policy issues.
-			startNoAudioGrace();
-			playbackFailed = false; // allow UI updates during reconnect
-			void handleStreamDrop();
-		} else {
-			playbackFailed = false;
-			startNoAudioGrace();
-			statusKey = 'waiting';
-		}
-	};
 </script>
 
 <div class="space-y-4">
@@ -989,7 +564,8 @@
 					</p>
 				{/if}
 
-				<!-- Controls -->
+				<!-- Controls: play/pause hands off to the global bottom player,
+				     which carries the full control set (volume, sleep timer…). -->
 				<div class="flex items-center gap-2 md:gap-3 mt-4 md:mt-6">
 					<button
 						class="inline-flex items-center gap-2 px-4 py-2.5 md:px-6 md:py-3 min-h-11 text-[12px] font-bold uppercase tracking-[0.15em] font-body whitespace-nowrap transition-all duration-300 {canPlay
@@ -998,10 +574,10 @@
 								: 'bg-stone-900 hover:bg-missionnaire text-white'
 							: 'bg-stone-200 text-stone-400 cursor-not-allowed'}"
 						onclick={togglePlay}
-						aria-label={isPlaying ? $t('live.pause') : $t('live.listen')}
+						aria-label={livePlaying ? $t('live.pause') : $t('live.listen')}
 						disabled={!canPlay}
 					>
-						{#if isPlaying}
+						{#if livePlaying}
 							<svg viewBox="0 0 24 24" class="h-4 w-4 fill-current" aria-hidden="true">
 								<path d="M8 5h3v14H8zm5 0h3v14h-3z" />
 							</svg>
@@ -1011,48 +587,6 @@
 								<path d="M8 5v14l11-7z" />
 							</svg>
 							<span>{$t('player.play')}</span>
-						{/if}
-					</button>
-
-					<button
-						class="inline-flex items-center gap-2 px-4 py-2.5 md:px-5 md:py-3 min-h-11 border text-[12px] font-semibold font-body whitespace-nowrap transition-all duration-300 {canPlay
-							? 'border-stone-200/60 text-stone-600 hover:border-missionnaire hover:text-missionnaire'
-							: 'border-stone-200/40 text-stone-300 cursor-not-allowed'}"
-						onclick={toggleMute}
-						aria-label={isMuted ? $t('player.unmute') : $t('player.mute')}
-						disabled={!canPlay}
-					>
-						{#if isMuted}
-							<svg
-								width="16"
-								height="16"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2"
-								stroke-linecap="round"
-								><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><line
-									x1="23"
-									y1="9"
-									x2="17"
-									y2="15"
-								/><line x1="17" y1="9" x2="23" y2="15" /></svg
-							>
-							<span>{$t('live.muted')}</span>
-						{:else}
-							<svg
-								width="16"
-								height="16"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2"
-								stroke-linecap="round"
-								><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path
-									d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"
-								/></svg
-							>
-							<span>{$t('player.mute')}</span>
 						{/if}
 					</button>
 				</div>
@@ -1138,66 +672,6 @@
 				</div>
 			{/if}
 		</div>
-
-		<!-- Buffering indicator -->
-		{#if isBuffering}
-			<div class="flex items-center gap-2 mt-4">
-				<div class="animate-spin h-3.5 w-3.5 border-t-2 border-missionnaire rounded-full"></div>
-				<span class="text-[11px] text-stone-400 font-body">{$t('list.loading')}</span>
-			</div>
-		{/if}
-
-		<!-- Scrubber (only shown when there's a seekable buffer) -->
-		{#if hasSeekableRange}
-			<div class="mt-6">
-				<div class="flex items-center gap-3">
-					<input
-						type="range"
-						class="live-scrubber flex-1 min-w-0"
-						min={bufferStart}
-						max={liveEdge}
-						step="0.1"
-						value={currentTime}
-						oninput={onSeekInput}
-						onchange={onSeekCommit}
-						aria-label={$t('live.scrubberLabel')}
-						aria-valuetext={isAtLive
-							? $t('live.atLive')
-							: $t('live.behindLive', { label: behindLiveLabel })}
-					/>
-					{#if !isAtLive}
-						<span class="text-[11px] font-mono text-stone-500 tabular-nums shrink-0">
-							{behindLiveLabel}
-						</span>
-					{/if}
-					<button
-						type="button"
-						onclick={backToLive}
-						aria-label={isAtLive ? $t('live.reload') : $t('live.backToLive')}
-						title={isAtLive ? $t('live.reload') : $t('live.backToLive')}
-						class="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-11 border text-[10px] font-bold uppercase tracking-[0.15em] font-body transition-all duration-200 shrink-0 {isAtLive
-							? 'border-red-500 text-red-600 bg-red-50/60 hover:bg-red-100'
-							: 'border-missionnaire text-missionnaire hover:bg-missionnaire hover:text-white'}"
-					>
-						{#if isAtLive}
-							<span class="relative inline-flex h-2 w-2">
-								<span
-									class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"
-								></span>
-								<span class="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
-							</span>
-							{$t('live.atLive')}
-						{:else}
-							<span class="hidden sm:inline">{$t('live.backToLive')}</span>
-							<span class="sm:hidden">{$t('live.atLiveShort')}</span>
-						{/if}
-					</button>
-				</div>
-				<p class="mt-3 text-[10px] leading-relaxed text-stone-400/90 font-body">
-					{$t('live.dvrHint')}
-				</p>
-			</div>
-		{/if}
 	</div>
 
 	<!-- Description (YouTube-style expandable block under the player) -->
@@ -1229,7 +703,8 @@
 	{/if}
 
 	<!-- Synced transcript — renders nothing unless the broadcast has an SRT
-	     attached (the component polls radio-state itself). -->
+	     attached (the component polls radio-state itself). Position comes from
+	     the global player via the livePlayback store. -->
 	{#if showLive}
 		<LiveTranscript />
 	{/if}
@@ -1244,22 +719,6 @@
 				{$t('live.notAvailableYet')}
 			</p>
 		</div>
-	{/if}
-
-	{#if browser}
-		<audio
-			bind:this={audio}
-			preload="none"
-			onplay={handlePlay}
-			onpause={handlePause}
-			onwaiting={handleWaiting}
-			onstalled={handleStalled}
-			oncanplay={handleCanPlay}
-			onerror={handleError}
-			onended={handleEnded}
-			ontimeupdate={handleTimeUpdate}
-			onprogress={handleProgress}
-		></audio>
 	{/if}
 </div>
 
@@ -1321,53 +780,6 @@
 		}
 		50% {
 			box-shadow: 0 0 0 6px rgba(255, 136, 12, 0.12);
-		}
-	}
-
-	/* Minimal cross-browser scrubber styling */
-	.live-scrubber {
-		-webkit-appearance: none;
-		appearance: none;
-		height: 3px;
-		background: rgb(229 225 220);
-		border-radius: 9999px;
-		outline: none;
-		cursor: pointer;
-	}
-	.live-scrubber::-webkit-slider-thumb {
-		-webkit-appearance: none;
-		appearance: none;
-		width: 11px;
-		height: 11px;
-		border-radius: 9999px;
-		background: #ff880c;
-		border: 2px solid white;
-		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
-		cursor: pointer;
-	}
-	.live-scrubber::-moz-range-thumb {
-		width: 11px;
-		height: 11px;
-		border-radius: 9999px;
-		background: #ff880c;
-		border: 2px solid white;
-		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
-		cursor: pointer;
-	}
-	.live-scrubber:focus-visible::-webkit-slider-thumb {
-		box-shadow: 0 0 0 3px rgba(255, 136, 12, 0.3);
-	}
-
-	/* Touch devices: a bigger thumb gives a comfortable hit target while the
-	   3px track keeps its slim look. */
-	@media (pointer: coarse) {
-		.live-scrubber::-webkit-slider-thumb {
-			width: 22px;
-			height: 22px;
-		}
-		.live-scrubber::-moz-range-thumb {
-			width: 22px;
-			height: 22px;
 		}
 	}
 

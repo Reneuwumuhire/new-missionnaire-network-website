@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import type { Sermon } from '$lib/models/sermon';
+	import type { LiveStreamTrack } from '$lib/utils/liveTrack';
 	import { basePlaylist, currentIndex, isPlaying, playlist, selectAudio } from '$lib/stores/global';
 	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
 	import { onMount } from 'svelte';
@@ -13,7 +14,9 @@
 	let { data }: Props = $props();
 
 
-	function getCurrentAudioUrl(current: Sermon | Record<string, unknown> | null): string | null {
+	function getCurrentAudioUrl(
+		current: Sermon | LiveStreamTrack | Record<string, unknown> | null
+	): string | null {
 		if (!current) return null;
 		if ('mp3_url' in current && typeof current.mp3_url === 'string') return current.mp3_url;
 		if ('s3_url' in current && typeof current.s3_url === 'string') return current.s3_url;

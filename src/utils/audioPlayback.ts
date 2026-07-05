@@ -1,8 +1,9 @@
 import type { AudioAsset } from '$lib/models/media-assets';
 import type { MusicAudio } from '$lib/models/music-audio';
 import type { Sermon } from '$lib/models/sermon';
+import type { LiveStreamTrack } from '$lib/utils/liveTrack';
 
-export type PlayableAudio = AudioAsset | MusicAudio | Sermon;
+export type PlayableAudio = AudioAsset | MusicAudio | Sermon | LiveStreamTrack;
 export type SermonPlaybackLanguage = 'french' | 'english';
 
 // Some s3_url values stored in MongoDB contain literal spaces or `+`

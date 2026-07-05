@@ -26,6 +26,7 @@
 		selectAudio
 	} from '$lib/stores/global';
 	import { getPlayableAudioUrl, type PlayableAudio } from '../../utils/audioPlayback';
+	import { isLiveStreamTrack } from '$lib/utils/liveTrack';
 
 	const SAVE_INTERVAL_MS = 5000;
 
@@ -157,6 +158,11 @@
 		// left alone; on cold load the `intendsToPlay` gate decides whether to
 		// surface it.
 		if (!sel) return;
+		// Never snapshot the live broadcast: there's no position to resume (a
+		// cold reload should reconnect at the live edge via the live page, or
+		// not at all if the broadcast has ended) — and rehydrating a stale live
+		// track would auto-play a dead stream URL.
+		if (isLiveStreamTrack(sel)) return;
 		// No live audio element yet — rehydration just primed the stores but
 		// the AudioPlayer hasn't created the <audio> element. Saving now would
 		// clobber the previous snapshot's currentTime with 0 (and intendsToPlay

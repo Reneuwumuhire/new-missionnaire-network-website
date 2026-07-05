@@ -8,6 +8,7 @@
 	import type { AudioAsset } from '$lib/models/media-assets';
 	import type { MusicAudio } from '$lib/models/music-audio';
 	import type { Sermon } from '$lib/models/sermon';
+	import type { LiveStreamTrack } from '$lib/utils/liveTrack';
 	import { formatTime } from '../../utils/FormatTime';
 	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
 	import { downloadAudioFile } from '../../utils/downloadAudio';
@@ -26,7 +27,9 @@
 
 
 
-	function isRecordingActive(current: Sermon | AudioAsset | MusicAudio | null): boolean {
+	function isRecordingActive(
+		current: Sermon | AudioAsset | MusicAudio | LiveStreamTrack | null
+	): boolean {
 		if (!current) return false;
 		const currentUrl =
 			'mp3_url' in current

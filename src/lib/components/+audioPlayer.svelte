@@ -38,8 +38,10 @@
 		isPlaying,
 		playbackIntent,
 		repeatOne,
-		replayPlayback
+		replayPlayback,
+		livePlayback
 	} from '../stores/global';
+	import { isLiveStreamTrack } from '$lib/utils/liveTrack';
 	import type { AudioAsset } from '$lib/models/media-assets';
 	import type { MusicAudio } from '$lib/models/music-audio';
 	import type { Sermon } from '$lib/models/sermon';
@@ -122,6 +124,106 @@
 	let sleepTimerTick: ReturnType<typeof setInterval> | null = null;
 	let customSleepTime = $state('');
 	let hasPlaylistNavigation = $derived($playlist.length > 1);
+
+	// ── Live broadcast mode ────────────────────────────────────────
+	// The live radio stream plays through this player as a pseudo-track
+	// (see $lib/utils/liveTrack). Broadcast behavior differs from files:
+	// Icecast reports Infinity duration so seeking/progress are meaningless,
+	// "ended" means the connection dropped (reconnect at the live edge, not
+	// next-track), and position save/restore must never apply.
+	let isLiveTrack = $derived(isLiveStreamTrack($selectAudio));
+	// Wall-clock epoch of the current stream connection: position 0 of a
+	// fresh Icecast connection is "live at that instant". Stamped on every
+	// `loadstart` so ALL reconnect paths (safePlay reload, element rebuild,
+	// explicit live reconnect) keep the transcript sync correct.
+	let liveConnectEpochMs: number | null = $state(null);
+	let lastLiveProgressMs = 0;
+	let liveReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+	let liveReconnectAttempts = 0;
+	const LIVE_RECONNECT_DELAYS = [1000, 2000, 3000, 5000, 10000, 15000];
+	const LIVE_MAX_RECONNECT_ATTEMPTS = 8;
+	// Icecast's silence fallback keeps bytes flowing through source blips, so
+	// a wedged stream (no forward progress while playing) is a client-side
+	// connection problem — reconnecting gets a fresh burst at the live edge.
+	const LIVE_STALL_TIMEOUT_MS = 15_000;
+	const LIVE_STALL_CHECK_INTERVAL_MS = 3_000;
+	let liveStallTimer: ReturnType<typeof setInterval> | null = null;
+
+	function withLiveCacheBuster(url: string): string {
+		return `${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}`;
+	}
+
+	function clearLiveReconnectTimer() {
+		if (liveReconnectTimer) {
+			clearTimeout(liveReconnectTimer);
+			liveReconnectTimer = null;
+		}
+	}
+
+	/** (Re)connect the live stream at the live edge with a fresh cache-buster. */
+	function connectLiveStream() {
+		if (!audio || !isLiveTrack) return;
+		const rawUrl = getPlayableAudioUrl($selectAudio as PlayableAudio);
+		if (!rawUrl) return;
+		isAudioReady = false;
+		audio.crossOrigin = null; // Icecast sends no CORS headers — see <audio> template comment
+		audio.src = withLiveCacheBuster(encodeUrlPath(rawUrl));
+		audio.load();
+		audio.play().catch(() => {
+			// The error/ended handlers schedule the next attempt.
+		});
+	}
+
+	function scheduleLiveReconnect() {
+		if (liveReconnectTimer) return;
+		if (liveReconnectAttempts >= LIVE_MAX_RECONNECT_ATTEMPTS) {
+			liveReconnectAttempts = 0;
+			setUserWantsToPlay(false);
+			isPlaying.set(false);
+			return;
+		}
+		const delay =
+			LIVE_RECONNECT_DELAYS[Math.min(liveReconnectAttempts, LIVE_RECONNECT_DELAYS.length - 1)];
+		liveReconnectAttempts += 1;
+		liveReconnectTimer = setTimeout(() => {
+			liveReconnectTimer = null;
+			if (!isLiveTrack || !userWantsToPlay) return;
+			connectLiveStream();
+		}, delay);
+	}
+
+	function startLiveStallWatch() {
+		if (liveStallTimer || !browser) return;
+		lastLiveProgressMs = Date.now();
+		liveStallTimer = setInterval(() => {
+			if (!audio || !isLiveTrack || !userWantsToPlay) return;
+			// Hidden tabs throttle timers and timeupdate — don't judge staleness.
+			if (document.visibilityState !== 'visible' || audio.paused) {
+				lastLiveProgressMs = Date.now();
+				return;
+			}
+			if (liveReconnectTimer) return;
+			if (Date.now() - lastLiveProgressMs < LIVE_STALL_TIMEOUT_MS) return;
+			lastLiveProgressMs = Date.now();
+			console.warn('[AudioPlayer] Live stream stalled — reconnecting at the live edge');
+			connectLiveStream();
+		}, LIVE_STALL_CHECK_INTERVAL_MS);
+	}
+
+	function stopLiveStallWatch() {
+		if (liveStallTimer) {
+			clearInterval(liveStallTimer);
+			liveStallTimer = null;
+		}
+	}
+
+	/** Fresh connection: position 0 is "live at this instant". Fires on every
+	 *  load() regardless of which recovery path triggered it. */
+	function handleLoadStart() {
+		if (!isLiveTrack) return;
+		liveConnectEpochMs = Date.now();
+		lastLiveProgressMs = Date.now();
+	}
 	let lyricsLines: LyricLine[] = $state([]);
 	let lyricsPanelOpen = $state(false);
 	let hasLyrics = $derived(lyricsLines.length > 0);
@@ -331,6 +433,9 @@
 		time = audio?.currentTime ?? 0,
 		mediaDuration = audio?.duration ?? 0
 	) {
+		// Live: there is no meaningful position to remember — every resume
+		// reconnects at the live edge.
+		if (isLiveTrack) return;
 		if (!Number.isFinite(time) || time < 0) return;
 		lastKnownPlaybackTime = time;
 		if (Number.isFinite(mediaDuration) && mediaDuration > 0) {
@@ -345,7 +450,7 @@
 	}
 
 	function getReliablePlaybackTime() {
-		if (!audio) return 0;
+		if (!audio || isLiveTrack) return 0;
 		const liveTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
 		// audio.load() can temporarily report 0 during an OS interruption. Keep
 		// the last real playback position so the next play() does not restart.
@@ -356,6 +461,9 @@
 	}
 
 	function restorePlaybackPosition(time: number) {
+		// Live: seeking a continuous Icecast stream stalls the element — a
+		// reconnect at the live edge is always the right recovery instead.
+		if (isLiveTrack) return false;
 		if (!audio || !Number.isFinite(time) || time <= 0) return false;
 		try {
 			audio.currentTime = time;
@@ -639,6 +747,10 @@
 	// older ObjectId-style shares keep working.
 	function buildShareUrl(audio: any): string {
 		if (!audio || !browser) return '';
+		// The live broadcast shares the live page itself, not a track link.
+		if (isLiveStreamTrack(audio)) {
+			return `${window.location.origin}/live`;
+		}
 		const id = typeof audio._id === 'string' ? audio._id.trim() : '';
 		// Live rediffusions (past broadcasts) are shaped as MusicAudio with
 		// `category: 'Direct'`, but they live under /live/rediffusions/<id>,
@@ -831,6 +943,15 @@
 
 	function handleEnded() {
 		console.log('[Audio] ended event');
+		// A live stream only "ends" when the connection breaks (Icecast
+		// restart, network drop) — reconnect at the live edge instead of
+		// advancing a playlist. The live page closes the player when the
+		// broadcast is actually over.
+		if (isLiveTrack) {
+			isPlaying.set(false);
+			if (userWantsToPlay) scheduleLiveReconnect();
+			return;
+		}
 		if ($repeatOne && audio) {
 			currentTime = 0;
 			progressBarWidth = 0;
@@ -1122,6 +1243,12 @@
 		}
 
 		if (!userWantsToPlay) return;
+
+		// Live: connection-level recovery is owned by the ended/error handlers
+		// and the stall watchdog; OS interruptions (phone call) resume via the
+		// visibility-return path. The file-oriented resume watchdog would race
+		// those with competing play()/load() probes.
+		if (isLiveTrack) return;
 		currentTrackInterrupted = true;
 
 		// Two distinct kinds of OS-driven pause:
@@ -1238,6 +1365,11 @@
 		isPlaying.set(false);
 		isAudioReady = false;
 		shouldAutoplayOnLoad = false;
+		// Live: a media error usually means the connection died mid-stream.
+		// Keep the listener's intent and retry at the live edge with backoff.
+		if (isLiveTrack && userWantsToPlay && audio?.src && audio.src !== location.href) {
+			scheduleLiveReconnect();
+		}
 	}
 
 	// Diagnostic-only listeners. Help debug iOS lock-screen / Bluetooth /
@@ -1249,6 +1381,7 @@
 	const logAbort = () => console.log('[Audio] abort');
 
 	function attachAudioListeners(el: HTMLAudioElement) {
+		el.addEventListener('loadstart', handleLoadStart);
 		el.addEventListener('ended', handleEnded);
 		el.addEventListener('timeupdate', updateAudioTime);
 		el.addEventListener('timeupdate', updateIndicator);
@@ -1265,6 +1398,7 @@
 	}
 
 	function detachAudioListeners(el: HTMLAudioElement) {
+		el.removeEventListener('loadstart', handleLoadStart);
 		el.removeEventListener('ended', handleEnded);
 		el.removeEventListener('timeupdate', updateAudioTime);
 		el.removeEventListener('timeupdate', updateIndicator);
@@ -1343,7 +1477,11 @@
 	function updateAudioSource(url: string) {
 		if (!url) return;
 
-		const encodedUrl = encodeUrlPath(url);
+		// Live streams get a per-connect cache-buster so every (re)connect is a
+		// fresh Icecast session at the live edge, never a stale cached response.
+		const encodedUrl = isLiveTrack
+			? withLiveCacheBuster(encodeUrlPath(url))
+			: encodeUrlPath(url);
 		console.log('[AudioPlayer] Updating source to:', encodedUrl);
 		// New track — drop any "previous track was interrupted" carry-over.
 		currentTrackInterrupted = false;
@@ -1372,6 +1510,9 @@
 			isChangingSource = false;
 		}
 		resetRememberedPlaybackPosition();
+		// Belt-and-suspenders with the template's reactive crossorigin: make
+		// sure the mode is right before the fetch starts (live = no CORS).
+		audio.crossOrigin = isLiveTrack ? null : 'anonymous';
 		audio.src = encodedUrl;
 		audio.load();
 	}
@@ -1438,7 +1579,7 @@
 	};
 
 	const seekForward = (seconds: number = 5) => {
-		if (!audio) return;
+		if (!audio || isLiveTrack) return;
 		audio.currentTime += seconds;
 		rememberPlaybackPosition();
 		updateAudioTime();
@@ -1446,7 +1587,7 @@
 	};
 
 	const seekBackward = (seconds: number = 5) => {
-		if (!audio) return;
+		if (!audio || isLiveTrack) return;
 		audio.currentTime -= seconds;
 		rememberPlaybackPosition();
 		updateAudioTime();
@@ -1479,6 +1620,12 @@
 		if (audio) {
 			currentTime = audio.currentTime;
 			duration = audio.duration;
+			if (isLiveTrack) {
+				// Forward progress — feeds the stall watchdog and confirms the
+				// current connection is healthy (reset the reconnect backoff).
+				lastLiveProgressMs = Date.now();
+				liveReconnectAttempts = 0;
+			}
 			rememberPlaybackPosition(currentTime, duration);
 			progressBarWidth = (currentTime / duration) * 100;
 			pushMediaSessionPosition();
@@ -2097,7 +2244,7 @@
 					boundInstanceId: audio?.dataset.instanceId ?? null,
 					seekTime: details.seekTime
 				});
-				if (!audio || details.seekTime == null) return;
+				if (!audio || details.seekTime == null || isLiveTrack) return;
 				if (details.fastSeek && 'fastSeek' in audio) {
 					audio.fastSeek(details.seekTime);
 				} else {
@@ -2201,13 +2348,15 @@
 				: isSermon
 					? (current as Sermon).author
 					: 'Missionnaire Network',
-			album: isMusic
-				? (current as MusicAudio).book_full_name ||
-					(current as MusicAudio).category ||
-					'Missionnaire Network'
-				: isSermon
-					? (current as Sermon).iso_date || 'Prédication'
-					: 'Missionnaire Network',
+			album: isLiveStreamTrack(current)
+				? 'En direct'
+				: isMusic
+					? (current as MusicAudio).book_full_name ||
+						(current as MusicAudio).category ||
+						'Missionnaire Network'
+					: isSermon
+						? (current as Sermon).iso_date || 'Prédication'
+						: 'Missionnaire Network',
 			artwork: [
 				{ src: artworkUrl, sizes: '96x96', type: 'image/png' },
 				{ src: artworkUrl, sizes: '192x192', type: 'image/png' },
@@ -2303,6 +2452,7 @@
 		window.addEventListener('missionnaire-audio-toggle', handleExternalToggle);
 		window.addEventListener('missionnaire-audio-play', playCurrentAudio);
 		window.addEventListener('missionnaire-audio-pause', pauseCurrentAudio);
+		window.addEventListener('missionnaire-audio-close', closeAudioPlayer);
 		window.addEventListener('missionnaire-audio-seek', handleExternalSeek as EventListener);
 
 		if (typeof ResizeObserver !== 'undefined' && playerShell) {
@@ -2316,6 +2466,7 @@
 			window.removeEventListener('missionnaire-audio-toggle', handleExternalToggle);
 			window.removeEventListener('missionnaire-audio-play', playCurrentAudio);
 			window.removeEventListener('missionnaire-audio-pause', pauseCurrentAudio);
+			window.removeEventListener('missionnaire-audio-close', closeAudioPlayer);
 			window.removeEventListener('missionnaire-audio-seek', handleExternalSeek as EventListener);
 			playerResizeObserver?.disconnect();
 			playerResizeObserver = null;
@@ -2352,6 +2503,8 @@
 		shouldAutoplayOnLoad = false;
 		clearSleepTimer({ persist: false });
 		stopResumeWatchdog();
+		stopLiveStallWatch();
+		clearLiveReconnectTimer();
 		stopSilentLoop();
 		if (audio) {
 			try {
@@ -2413,7 +2566,10 @@
 	let currentFavId = $derived(getAudioFavId($selectAudio));
 	let isCurrentFavorite = $derived(isFavorite(currentFavId, $favorites));
 	let canShareCurrent = $derived(!!($selectAudio && ($selectAudio as any)?._id));
-	let canDownloadCurrent = $derived(!!getPlayableAudioUrl($selectAudio as PlayableAudio));
+	// A live stream has a URL but nothing downloadable behind it.
+	let canDownloadCurrent = $derived(
+		!isLiveTrack && !!getPlayableAudioUrl($selectAudio as PlayableAudio)
+	);
 	$effect(() => {
 		if (browser) {
 			const lyricsAudioId = getLyricsAudioId($selectAudio);
@@ -2433,14 +2589,17 @@
 	// flips its badge from "not cached" to "cached" without a refresh).
 	$effect(() => {
 		if (browser && $selectAudio) {
-			const url = getPlayableAudioUrl($selectAudio as PlayableAudio);
 			isCurrentTrackCached = null;
 			cacheCheckToken++;
-			void refreshCachedFlag(url, cacheCheckToken);
+			// Live streams are never SW-cached — leave the badge state null.
+			if (!isLiveTrack) {
+				const url = getPlayableAudioUrl($selectAudio as PlayableAudio);
+				void refreshCachedFlag(url, cacheCheckToken);
+			}
 		}
 	});
 	$effect(() => {
-		if (browser && $isPlaying && $selectAudio) {
+		if (browser && $isPlaying && $selectAudio && !isLiveTrack) {
 			const url = getPlayableAudioUrl($selectAudio as PlayableAudio);
 			const token = ++cacheCheckToken;
 			// Small delay: let the SW finish writing the response to cache
@@ -2502,7 +2661,10 @@
 			attachAudioListeners(audio);
 			listenersBoundTo = audio;
 			if (audioSrc && !audio.src) {
-				audio.src = encodeUrlPath(audioSrc);
+				audio.crossOrigin = isLiveTrack ? null : 'anonymous';
+				audio.src = isLiveTrack
+					? withLiveCacheBuster(encodeUrlPath(audioSrc))
+					: encodeUrlPath(audioSrc);
 				audio.load();
 			}
 		}
@@ -2559,6 +2721,40 @@
 			void tick().then(syncPlayerInset);
 		}
 	});
+
+	// ── Live mode wiring ───────────────────────────────────────────
+	// Stall watchdog runs only while the live track is selected; leaving live
+	// mode (track change, close) also clears reconnect state so the next live
+	// session starts clean.
+	let wasLiveTrack = false;
+	$effect(() => {
+		if (!browser) return;
+		if (isLiveTrack) {
+			wasLiveTrack = true;
+			startLiveStallWatch();
+		} else {
+			stopLiveStallWatch();
+			clearLiveReconnectTimer();
+			liveReconnectAttempts = 0;
+			liveConnectEpochMs = null;
+			if (wasLiveTrack) {
+				wasLiveTrack = false;
+				livePlayback.set({ playing: false, positionEpochMs: null });
+			}
+		}
+	});
+	// Position bridge for the live transcript (mirrors what the old
+	// page-embedded live player published): wall-clock moment of the audio the
+	// listener is hearing = connection epoch + playback position. Pause
+	// freezes it, every reconnect snaps it to "now" via handleLoadStart.
+	$effect(() => {
+		if (!browser || !isLiveTrack) return;
+		livePlayback.set({
+			playing: $isPlaying,
+			positionEpochMs:
+				liveConnectEpochMs === null ? null : liveConnectEpochMs + currentTime * 1000
+		});
+	});
 </script>
 
 <svelte:window
@@ -2581,7 +2777,18 @@
 	without affecting playback behavior.
 -->
 {#key audioElementKey}
-	<audio bind:this={audio} crossorigin="anonymous" playsinline preload="auto" hidden></audio>
+	<!-- crossorigin: S3 tracks are fetched in CORS mode (the bucket sends
+	     Access-Control-Allow-Origin). The live Icecast stream does NOT send
+	     CORS headers, and an element in CORS mode hard-rejects such media —
+	     the controls toggle but no audio ever arrives. Live therefore loads
+	     with no crossorigin attribute. -->
+	<audio
+		bind:this={audio}
+		crossorigin={isLiveTrack ? null : 'anonymous'}
+		playsinline
+		preload="auto"
+		hidden
+	></audio>
 {/key}
 
 <!--
@@ -2653,41 +2860,44 @@
 			<Icon src={BsX} size="20" />
 		</button>
 
-		<!-- Top Progress Bar -->
-		<div
-			bind:this={progressBarElement}
-			class="absolute top-0 left-0 w-full h-8 [@media(pointer:coarse)]:h-11 -translate-y-1/2 cursor-pointer group/progress flex items-center justify-start z-50 touch-none select-none"
-			onmousedown={startDrag}
-			use:nonpassiveTouchstart={startDrag}
-			onclick={seekTo}
-			onkeydown={handleProgressKeydown}
-			role="slider"
-			tabindex="0"
-			aria-label={$t('player.progressLabel')}
-			aria-valuemin={0}
-			aria-valuemax={duration}
-			aria-valuenow={currentTime}
-			aria-valuetext={$t('player.timeOf', {
-				current: formatTime(currentTime),
-				total: formatTime(duration)
-			})}
-		>
-			<!-- Visual Track -->
-			<div class="w-full h-[4px] bg-stone-200 relative overflow-visible rounded-full">
-				<!-- Active Progress -->
-				<div
-					class="h-full bg-missionnaire rounded-full relative"
-					style="width: {progressBarWidth}%"
-				>
-					<!-- Indicator Knob -->
+		<!-- Top Progress Bar (hidden for the live stream — a continuous
+		     Icecast broadcast has no finite timeline to scrub) -->
+		{#if !isLiveTrack}
+			<div
+				bind:this={progressBarElement}
+				class="absolute top-0 left-0 w-full h-8 [@media(pointer:coarse)]:h-11 -translate-y-1/2 cursor-pointer group/progress flex items-center justify-start z-50 touch-none select-none"
+				onmousedown={startDrag}
+				use:nonpassiveTouchstart={startDrag}
+				onclick={seekTo}
+				onkeydown={handleProgressKeydown}
+				role="slider"
+				tabindex="0"
+				aria-label={$t('player.progressLabel')}
+				aria-valuemin={0}
+				aria-valuemax={duration}
+				aria-valuenow={currentTime}
+				aria-valuetext={$t('player.timeOf', {
+					current: formatTime(currentTime),
+					total: formatTime(duration)
+				})}
+			>
+				<!-- Visual Track -->
+				<div class="w-full h-[4px] bg-stone-200 relative overflow-visible rounded-full">
+					<!-- Active Progress -->
 					<div
-						class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-4 h-4 bg-missionnaire border-[3px] border-white rounded-full shadow-md transform transition-transform duration-100 {isDragging
-							? 'scale-125'
-							: 'scale-100'} md:scale-0 md:group-hover/progress:scale-100"
-					></div>
+						class="h-full bg-missionnaire rounded-full relative"
+						style="width: {progressBarWidth}%"
+					>
+						<!-- Indicator Knob -->
+						<div
+							class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-4 h-4 bg-missionnaire border-[3px] border-white rounded-full shadow-md transform transition-transform duration-100 {isDragging
+								? 'scale-125'
+								: 'scale-100'} md:scale-0 md:group-hover/progress:scale-100"
+						></div>
+					</div>
 				</div>
 			</div>
-		</div>
+		{/if}
 
 		<div
 			class="player-main px-5 lg:px-10 max-w-7xl mx-auto flex flex-col lg:flex-row lg:items-center lg:gap-8"
@@ -2698,7 +2908,19 @@
 					<div
 						class="text-[10px] uppercase tracking-[0.2em] font-bold text-missionnaire mb-0.5 opacity-80 flex flex-wrap items-center gap-x-2 gap-y-0.5 whitespace-nowrap"
 					>
-						<span>{$t('player.nowPlaying')}</span>
+						{#if isLiveTrack}
+							<span class="inline-flex items-center gap-1.5 text-red-600">
+								<span class="relative inline-flex h-2 w-2">
+									<span
+										class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"
+									></span>
+									<span class="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
+								</span>
+								{$t('live.atLive')}
+							</span>
+						{:else}
+							<span>{$t('player.nowPlaying')}</span>
+						{/if}
 						<!-- ── BEGIN: cache indicator badge (added) ──────────── -->
 						{#if isCurrentTrackCached === true}
 							<span
@@ -2777,11 +2999,13 @@
 							{$t('list.loading')}
 						</div>
 					{/if}
-					<div class="flex items-center gap-2 mt-0.5 lg:hidden">
-						<span class="text-[10px] font-medium text-stone-400">{formatTime(currentTime)}</span>
-						<div class="w-1 h-1 rounded-full bg-stone-200"></div>
-						<span class="text-[10px] font-medium text-stone-400">{formatTime(duration)}</span>
-					</div>
+					{#if !isLiveTrack}
+						<div class="flex items-center gap-2 mt-0.5 lg:hidden">
+							<span class="text-[10px] font-medium text-stone-400">{formatTime(currentTime)}</span>
+							<div class="w-1 h-1 rounded-full bg-stone-200"></div>
+							<span class="text-[10px] font-medium text-stone-400">{formatTime(duration)}</span>
+						</div>
+					{/if}
 				</div>
 
 				<!-- Action cluster: favorite anchors next to the title, then the
@@ -2789,16 +3013,18 @@
 				     then the options ⋮ tails out. Order chosen to match the
 				     audio-app convention: emotional toggle → content → social
 				     → utility. -->
-				<button
-					class="player-action-icon flex-shrink-0 {isCurrentFavorite
-						? 'text-red-500 hover:text-red-600'
-						: 'text-stone-300 hover:text-red-400'}"
-					onclick={handleToggleFavorite}
-					aria-label={isCurrentFavorite ? $t('player.unfavorite') : $t('player.favorite')}
-					title={isCurrentFavorite ? $t('player.unfavorite') : $t('player.favorite')}
-				>
-					<Icon src={isCurrentFavorite ? BsHeartFill : BsHeart} size="18" />
-				</button>
+				{#if !isLiveTrack}
+					<button
+						class="player-action-icon flex-shrink-0 {isCurrentFavorite
+							? 'text-red-500 hover:text-red-600'
+							: 'text-stone-300 hover:text-red-400'}"
+						onclick={handleToggleFavorite}
+						aria-label={isCurrentFavorite ? $t('player.unfavorite') : $t('player.favorite')}
+						title={isCurrentFavorite ? $t('player.unfavorite') : $t('player.favorite')}
+					>
+						<Icon src={isCurrentFavorite ? BsHeartFill : BsHeart} size="18" />
+					</button>
+				{/if}
 
 				{#if hasLyrics}
 					<button
@@ -2989,6 +3215,7 @@
 								{/if}
 							</div>
 
+							{#if !isLiveTrack}
 							<button
 								type="button"
 								class="mb-3 flex w-full items-center justify-between gap-3 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-left transition-colors hover:border-missionnaire hover:bg-missionnaire/5"
@@ -3011,6 +3238,7 @@
 									{$repeatOne ? 'On' : 'Off'}
 								</span>
 							</button>
+							{/if}
 
 							<div class="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-400">
 								{$t('player.sleepTimerHeading')}
@@ -3102,7 +3330,7 @@
 							>
 								<Icon src={BsSkipStartFill} size="20" />
 							</button>
-						{:else}
+						{:else if !isLiveTrack}
 							<button
 								onclick={() => seekBackward()}
 								class="flex h-11 w-11 items-center justify-center rounded-full bg-stone-50 text-stone-400 transition-colors hover:bg-stone-100 hover:text-missionnaire lg:hidden"
@@ -3112,13 +3340,15 @@
 							</button>
 						{/if}
 
-						<button
-							onclick={() => seekBackward()}
-							class="hidden lg:block p-2 text-stone-300 hover:text-missionnaire transition-colors"
-							title="-5s"
-						>
-							<Icon src={BsSkipBackwardFill} size="16" />
-						</button>
+						{#if !isLiveTrack}
+							<button
+								onclick={() => seekBackward()}
+								class="hidden lg:block p-2 text-stone-300 hover:text-missionnaire transition-colors"
+								title="-5s"
+							>
+								<Icon src={BsSkipBackwardFill} size="16" />
+							</button>
+						{/if}
 
 						<button
 							onclick={togglePlay}
@@ -3131,13 +3361,15 @@
 							{/if}
 						</button>
 
-						<button
-							onclick={() => seekForward()}
-							class="hidden lg:block p-2 text-stone-300 hover:text-missionnaire transition-colors"
-							title="+5s"
-						>
-							<Icon src={BsSkipForwardFill} size="16" />
-						</button>
+						{#if !isLiveTrack}
+							<button
+								onclick={() => seekForward()}
+								class="hidden lg:block p-2 text-stone-300 hover:text-missionnaire transition-colors"
+								title="+5s"
+							>
+								<Icon src={BsSkipForwardFill} size="16" />
+							</button>
+						{/if}
 
 						{#if hasPlaylistNavigation}
 							<button
@@ -3148,7 +3380,7 @@
 							>
 								<Icon src={BsSkipEndFill} size="20" />
 							</button>
-						{:else}
+						{:else if !isLiveTrack}
 							<button
 								onclick={() => seekForward()}
 								class="flex h-11 w-11 items-center justify-center rounded-full bg-stone-50 text-stone-400 transition-colors hover:bg-stone-100 hover:text-missionnaire lg:hidden"
@@ -3182,9 +3414,21 @@
 				<!-- Time & Extra Controls (Desktop) -->
 				<div class="hidden lg:flex items-center gap-6">
 					<div class="flex items-center gap-1.5 font-bold text-[13px] text-stone-500 min-w-[90px]">
-						<span class="text-stone-500">{formatTime(currentTime)}</span>
-						<span class="text-stone-300">/</span>
-						<span>{formatTime(duration)}</span>
+						{#if isLiveTrack}
+							<span class="inline-flex items-center gap-1.5 text-red-600 uppercase text-[11px] tracking-[0.15em]">
+								<span class="relative inline-flex h-2 w-2">
+									<span
+										class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"
+									></span>
+									<span class="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
+								</span>
+								{$t('live.atLive')}
+							</span>
+						{:else}
+							<span class="text-stone-500">{formatTime(currentTime)}</span>
+							<span class="text-stone-300">/</span>
+							<span>{formatTime(duration)}</span>
+						{/if}
 					</div>
 
 					<div class="flex items-center gap-2 border-l border-stone-100 pl-6">
@@ -3200,19 +3444,21 @@
 							</button>
 						{/if}
 
-						<button
-							onclick={toggleRepeatOne}
-							class="p-2.5 rounded-full transition-all flex items-center gap-2 {$repeatOne
-								? 'bg-missionnaire text-white shadow-md shadow-missionnaire/20'
-								: 'bg-stone-50 text-stone-400 hover:bg-stone-100'}"
-							title={$repeatOne ? $t('player.repeatOn') : $t('player.repeatOff')}
-						>
-							<Icon
-								src={RiMediaRepeatOneLine}
-								size="20"
-								color={$repeatOne ? '#ffffff' : '#a8a29e'}
-							/>
-						</button>
+						{#if !isLiveTrack}
+							<button
+								onclick={toggleRepeatOne}
+								class="p-2.5 rounded-full transition-all flex items-center gap-2 {$repeatOne
+									? 'bg-missionnaire text-white shadow-md shadow-missionnaire/20'
+									: 'bg-stone-50 text-stone-400 hover:bg-stone-100'}"
+								title={$repeatOne ? $t('player.repeatOn') : $t('player.repeatOff')}
+							>
+								<Icon
+									src={RiMediaRepeatOneLine}
+									size="20"
+									color={$repeatOne ? '#ffffff' : '#a8a29e'}
+								/>
+							</button>
+						{/if}
 
 						<div class="flex items-center gap-2 ml-2">
 							<button

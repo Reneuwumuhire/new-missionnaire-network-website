@@ -3,6 +3,7 @@
 	import { page } from '$app/stores';
 	import { t } from '../../i18n';
 	import type { MusicAudio } from '$lib/models/music-audio';
+	import type { LiveStreamTrack } from '$lib/utils/liveTrack';
 	import type { AudioAsset } from '$lib/models/media-assets';
 	import type { Sermon } from '$lib/models/sermon';
 	import { getPlayableAudioUrl } from '../../utils/audioPlayback';
@@ -677,7 +678,9 @@
 		addToRecentlyPlayed(song as any);
 	}
 
-	function isMusicAudio(current: MusicAudio | AudioAsset | Sermon | null): current is MusicAudio {
+	function isMusicAudio(
+		current: MusicAudio | AudioAsset | Sermon | LiveStreamTrack | null
+	): current is MusicAudio {
 		return !!current && 's3_url' in current;
 	}
 
@@ -709,7 +712,10 @@
 			window.open(url, '_blank');
 		}
 	}
-	function isSongActive(song: MusicAudio, current: MusicAudio | AudioAsset | Sermon | null) {
+	function isSongActive(
+		song: MusicAudio,
+		current: MusicAudio | AudioAsset | Sermon | LiveStreamTrack | null
+	) {
 		if (!current) return false;
 		const activeUrl =
 			's3_url' in current
