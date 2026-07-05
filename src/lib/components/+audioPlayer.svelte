@@ -283,6 +283,47 @@
 		void audio.play().catch(() => {});
 	}
 
+	// ── Behind-live indicator (both modes) ─────────────────────────
+	// HLS: distance to the DVR window's end. Icecast: wall-clock elapsed
+	// beyond the audio being heard (connection epoch + position) — grows
+	// while paused, resets on the fresh-connection reconnect. The 1s ticker
+	// keeps it counting while paused, when no timeupdate fires.
+	let liveNowMs = $state(Date.now());
+	let liveTicker: ReturnType<typeof setInterval> | null = null;
+	function startLiveTicker() {
+		if (liveTicker || !browser) return;
+		liveTicker = setInterval(() => {
+			liveNowMs = Date.now();
+		}, 1000);
+	}
+	function stopLiveTicker() {
+		if (liveTicker) {
+			clearInterval(liveTicker);
+			liveTicker = null;
+		}
+	}
+	let liveIcecastBehindSec = $derived(
+		!liveIsHls && liveConnectEpochMs !== null
+			? Math.max(0, (liveNowMs - (liveConnectEpochMs + currentTime * 1000)) / 1000)
+			: 0
+	);
+	let liveBehindDisplaySec = $derived(liveIsHls ? liveBehindSec : liveIcecastBehindSec);
+	// Normal playback sits ~15-20s behind on HLS and ~5-15s on Icecast (burst
+	// buffer) — only call it "behind" past deliberate-pause territory.
+	let liveIsBehind = $derived(liveIsHls ? liveBehindSec >= 25 : liveIcecastBehindSec >= 45);
+
+	/** The bottom-bar EN DIRECT button: snap back to the live edge. */
+	function goToLiveEdge() {
+		if (!audio || !isLiveTrack) return;
+		setUserWantsToPlay(true);
+		if (liveIsHls) {
+			seekToLiveEdge();
+			return;
+		}
+		// Icecast has no seekable window — a fresh connection IS the live edge.
+		connectLiveStream();
+	}
+
 	function onLiveDvrInput(event: Event) {
 		liveDvrSeeking = true;
 		liveDvrValue = Number((event.target as HTMLInputElement).value);
@@ -1875,11 +1916,27 @@
 		// audio. The deferred `finish()` setTimeout below also rechecks.
 		if (destroyed) return;
 
-		// Live HLS via MSE: load() would tear down hls.js's SourceBuffers.
-		// Play from the current (DVR-valid) position; hls.js owns recovery.
-		if (isLiveTrack && hlsInstance) {
+		// Live resume paths — never the generic load-and-restore dance:
+		//  - HLS (MSE or native): the paused position stays valid inside the
+		//    server-side DVR window, and load() would tear down hls.js's
+		//    SourceBuffers — a plain play() resumes instantly in place.
+		//  - Icecast short pause: resume from the browser buffer.
+		//  - Icecast long pause: the buffer is stale/dead — reconnect straight
+		//    at the live edge instead of a slow reload+restore.
+		if (isLiveTrack) {
+			if (hlsInstance || liveIsHls) {
+				audio.play().catch(() => {
+					/* hls.js error handling / gesture paths retry */
+				});
+				return;
+			}
+			const livePausedMs = audioPausedAt > 0 ? Date.now() - audioPausedAt : 0;
+			if (reasonHint === 'long' || livePausedMs >= PAUSE_RELOAD_THRESHOLD_MS) {
+				connectLiveStream();
+				return;
+			}
 			audio.play().catch(() => {
-				/* hls.js error handling / gesture paths retry */
+				/* error handler schedules a live reconnect */
 			});
 			return;
 		}
@@ -2661,6 +2718,7 @@
 		clearSleepTimer({ persist: false });
 		stopResumeWatchdog();
 		stopLiveStallWatch();
+		stopLiveTicker();
 		clearLiveReconnectTimer();
 		destroyHls();
 		stopSilentLoop();
@@ -2892,7 +2950,9 @@
 		if (isLiveTrack) {
 			wasLiveTrack = true;
 			startLiveStallWatch();
+			startLiveTicker();
 		} else {
+			stopLiveTicker();
 			stopLiveStallWatch();
 			clearLiveReconnectTimer();
 			liveReconnectAttempts = 0;
@@ -3187,6 +3247,32 @@
 							<span class="text-[10px] font-medium text-stone-400">{formatTime(currentTime)}</span>
 							<div class="w-1 h-1 rounded-full bg-stone-200"></div>
 							<span class="text-[10px] font-medium text-stone-400">{formatTime(duration)}</span>
+						</div>
+					{:else}
+						<!-- Mobile: behind-live counter + tap to jump back to live -->
+						<div class="mt-0.5 lg:hidden">
+							<button
+								type="button"
+								onclick={goToLiveEdge}
+								aria-label={liveIsBehind ? $t('live.backToLive') : $t('live.atLive')}
+								class="inline-flex items-center gap-1.5 uppercase text-[10px] font-bold tracking-[0.15em] px-2 py-0.5 rounded-full border transition-colors {liveIsBehind
+									? 'border-missionnaire bg-missionnaire text-white'
+									: 'border-transparent text-red-600 -ml-2'}"
+							>
+								<span class="relative inline-flex h-1.5 w-1.5">
+									{#if !liveIsBehind}
+										<span
+											class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"
+										></span>
+									{/if}
+									<span
+										class="relative inline-flex h-1.5 w-1.5 rounded-full {liveIsBehind
+											? 'bg-white'
+											: 'bg-red-500'}"
+									></span>
+								</span>
+								{$t('live.atLive')}{#if liveIsBehind}&nbsp;· -{formatTime(liveBehindDisplaySec)}{/if}
+							</button>
 						</div>
 					{/if}
 				</div>
@@ -3598,15 +3684,29 @@
 				<div class="hidden lg:flex items-center gap-6">
 					<div class="flex items-center gap-1.5 font-bold text-[13px] text-stone-500 min-w-[90px]">
 						{#if isLiveTrack}
-							<span class="inline-flex items-center gap-1.5 text-red-600 uppercase text-[11px] tracking-[0.15em]">
+							<button
+								type="button"
+								onclick={goToLiveEdge}
+								title={$t('live.backToLive')}
+								aria-label={liveIsBehind ? $t('live.backToLive') : $t('live.atLive')}
+								class="inline-flex items-center gap-1.5 uppercase text-[11px] tracking-[0.15em] px-2.5 py-1 rounded-full border transition-colors {liveIsBehind
+									? 'border-missionnaire bg-missionnaire text-white hover:bg-orange-600'
+									: 'border-transparent text-red-600 hover:border-red-200'}"
+							>
 								<span class="relative inline-flex h-2 w-2">
+									{#if !liveIsBehind}
+										<span
+											class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"
+										></span>
+									{/if}
 									<span
-										class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"
+										class="relative inline-flex h-2 w-2 rounded-full {liveIsBehind
+											? 'bg-white'
+											: 'bg-red-500'}"
 									></span>
-									<span class="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
 								</span>
-								{$t('live.atLive')}
-							</span>
+								{$t('live.atLive')}{#if liveIsBehind}&nbsp;· -{formatTime(liveBehindDisplaySec)}{/if}
+							</button>
 						{:else}
 							<span class="text-stone-500">{formatTime(currentTime)}</span>
 							<span class="text-stone-300">/</span>
