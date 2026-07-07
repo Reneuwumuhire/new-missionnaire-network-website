@@ -74,7 +74,28 @@ function hasConnectedSource(source: IcecastSource): boolean {
 	);
 }
 
-export async function getIcecastSnapshot(): Promise<IcecastSnapshot> {
+/** Distinct clients currently pulling the HLS DVR feed (the default playback
+ *  path — these never open an Icecast connection, so the mount count alone
+ *  misses them, including the admin's own HLS monitor). Served by the
+ *  recorder at /hls-stats. 0 when unconfigured or unreachable. */
+async function fetchHlsListenerCount(): Promise<number> {
+	const hlsUrl = liveAudioHlsUrl();
+	if (!hlsUrl) return 0;
+	try {
+		const statsUrl = new URL('/hls-stats', hlsUrl).toString();
+		const controller = new AbortController();
+		const timeout = setTimeout(() => controller.abort(), 10_000);
+		const res = await fetch(statsUrl, { signal: controller.signal });
+		clearTimeout(timeout);
+		if (!res.ok) return 0;
+		const json = (await res.json()) as { listeners?: number };
+		return typeof json.listeners === 'number' && json.listeners > 0 ? json.listeners : 0;
+	} catch {
+		return 0;
+	}
+}
+
+async function fetchIcecastStatus(): Promise<IcecastSnapshot> {
 	try {
 		const controller = new AbortController();
 		// Production TTFB from the Fly app is 4-6s under load; a 3s timeout
@@ -94,4 +115,14 @@ export async function getIcecastSnapshot(): Promise<IcecastSnapshot> {
 	} catch {
 		return { reachable: false, sourceActive: false, listeners: 0 };
 	}
+}
+
+export async function getIcecastSnapshot(): Promise<IcecastSnapshot> {
+	// Total audience = Icecast connections (fallback-mode listeners, the
+	// recorder) + HLS DVR clients. Parallel; the HLS count fails soft to 0.
+	const [snapshot, hlsListeners] = await Promise.all([
+		fetchIcecastStatus(),
+		fetchHlsListenerCount()
+	]);
+	return { ...snapshot, listeners: snapshot.listeners + hlsListeners };
 }

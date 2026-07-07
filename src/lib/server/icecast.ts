@@ -1,5 +1,5 @@
 import { env } from '$env/dynamic/private';
-import { getLiveAudioSourceUrl, probeLiveAudio } from '$lib/server/live-audio';
+import { getLiveAudioHlsUrl, getLiveAudioSourceUrl, probeLiveAudio } from '$lib/server/live-audio';
 
 // Reads the real listener count from Icecast's public `/status-json.xsl`, the
 // same source the Fly dashboard reports. This replaces the old per-browser
@@ -82,7 +82,29 @@ function hasConnectedSource(source: IcecastSource): boolean {
 	);
 }
 
-export async function getIcecastSnapshot(): Promise<IcecastSnapshot> {
+/** Distinct clients currently pulling the HLS DVR feed (the default playback
+ *  path since the DVR shipped — these never open an Icecast connection, so
+ *  the mount count alone misses them). Served by the recorder at /hls-stats,
+ *  derived from the playlist URL. 0 when HLS isn't configured or the recorder
+ *  is unreachable. */
+async function fetchHlsListenerCount(): Promise<number> {
+	const hlsUrl = getLiveAudioHlsUrl();
+	if (!hlsUrl) return 0;
+	try {
+		const statsUrl = new URL('/hls-stats', hlsUrl).toString();
+		const controller = new AbortController();
+		const timeout = setTimeout(() => controller.abort(), STATUS_FETCH_TIMEOUT_MS);
+		const res = await fetch(statsUrl, { signal: controller.signal });
+		clearTimeout(timeout);
+		if (!res.ok) return 0;
+		const json = (await res.json()) as { listeners?: number };
+		return typeof json.listeners === 'number' && json.listeners > 0 ? json.listeners : 0;
+	} catch {
+		return 0;
+	}
+}
+
+async function fetchIcecastStatus(): Promise<IcecastSnapshot> {
 	try {
 		const controller = new AbortController();
 		const timeout = setTimeout(() => controller.abort(), STATUS_FETCH_TIMEOUT_MS);
@@ -100,6 +122,17 @@ export async function getIcecastSnapshot(): Promise<IcecastSnapshot> {
 	} catch {
 		return { reachable: false, sourceActive: false, listeners: 0 };
 	}
+}
+
+export async function getIcecastSnapshot(): Promise<IcecastSnapshot> {
+	// Total audience = Icecast connections (fallback-mode listeners, the
+	// recorder) + HLS DVR clients. Fetched in parallel — the HLS count adds
+	// no latency and fails soft to 0.
+	const [snapshot, hlsListeners] = await Promise.all([
+		fetchIcecastStatus(),
+		fetchHlsListenerCount()
+	]);
+	return { ...snapshot, listeners: snapshot.listeners + hlsListeners };
 }
 
 export interface LiveAudioCheck {

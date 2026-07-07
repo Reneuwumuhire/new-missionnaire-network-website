@@ -13,7 +13,7 @@ import { ensureRecordingsDir } from './sidecar.js';
 const app = Fastify({ logger: true });
 
 app.addHook('preHandler', async (req: FastifyRequest, reply: FastifyReply) => {
-	if (req.url === '/health' || req.url.startsWith('/hls/')) return;
+	if (req.url === '/health' || req.url === '/hls-stats' || req.url.startsWith('/hls/')) return;
 	const auth = req.headers.authorization;
 	if (!auth || auth !== `Bearer ${ENV.RECORDER_TOKEN}`) {
 		reply.code(401).send({ error: 'unauthorized' });
@@ -21,6 +21,37 @@ app.addHook('preHandler', async (req: FastifyRequest, reply: FastifyReply) => {
 });
 
 app.get('/health', async () => ({ ok: true }));
+
+// ── HLS listener accounting ───────────────────────────────────────
+// HLS has no persistent connections (Icecast counts those natively), so a
+// "listener" is a distinct client that requested a playlist/segment within a
+// sliding window. hls.js keeps refreshing the live playlist every target
+// duration even while paused, so paused DVR listeners stay counted — parity
+// with Icecast counting its held connections. Keyed by client IP + UA; the
+// Fly proxy carries the real client address in Fly-Client-IP.
+const HLS_SESSION_WINDOW_MS = 90_000;
+const hlsSessions = new Map<string, number>();
+
+function trackHlsSession(req: FastifyRequest): void {
+	const ip = (req.headers['fly-client-ip'] as string | undefined) ?? req.ip;
+	hlsSessions.set(`${ip}|${String(req.headers['user-agent'] ?? '')}`, Date.now());
+}
+
+function countHlsListeners(): number {
+	const cutoff = Date.now() - HLS_SESSION_WINDOW_MS;
+	for (const [key, lastSeen] of hlsSessions) {
+		if (lastSeen < cutoff) hlsSessions.delete(key);
+	}
+	return hlsSessions.size;
+}
+
+/** Public: current HLS listener count. The site and admin add this to the
+ *  Icecast mount count for the total displayed to operators and listeners. */
+app.get('/hls-stats', async (_req, reply) => {
+	reply.header('Access-Control-Allow-Origin', '*');
+	reply.header('Cache-Control', 'no-store');
+	return { listeners: countHlsListeners() };
+});
 
 // ── Live DVR delivery (public, read-only) ─────────────────────────
 // Serves the rolling HLS window the entrypoint's packager writes to HLS_DIR.
@@ -46,6 +77,7 @@ app.get<{ Params: { file: string } }>('/hls/:file', async (req, reply) => {
 	} catch {
 		return reply.code(404).send({ error: 'not_found' });
 	}
+	trackHlsSession(req);
 	reply.header('Access-Control-Allow-Origin', '*');
 	reply.header(
 		'Cache-Control',
