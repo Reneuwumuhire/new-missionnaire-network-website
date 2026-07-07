@@ -1561,6 +1561,7 @@
 			.then(() => {
 				monitorConnecting = false;
 				monitorLive = true;
+				startMonitorStallWatch();
 			})
 			.catch(() => {
 				monitorConnecting = false;
@@ -1568,7 +1569,47 @@
 			});
 	}
 
+	// ── Stall watchdog ────────────────────────────────────────────
+	// The Icecast silence fallback keeps bytes flowing through source blips,
+	// so a monitor whose clock stops advancing while "playing" is a wedged
+	// client connection — no pause/ended/error event ever fires for it. The
+	// only recovery is a fresh connection at the live edge (same fix as the
+	// public player's stall watchdog).
+	const MONITOR_STALL_MS = 15_000;
+	let monitorLastProgressMs = 0;
+	let monitorStallTimer: ReturnType<typeof setInterval> | null = null;
+
+	function onMonitorTimeUpdate() {
+		monitorLastProgressMs = Date.now();
+	}
+
+	function startMonitorStallWatch() {
+		if (monitorStallTimer) return;
+		monitorLastProgressMs = Date.now();
+		monitorStallTimer = setInterval(() => {
+			if (!monitorEl || !monitorLive) return;
+			// Hidden tabs throttle timers and timeupdate — don't judge staleness.
+			if (document.visibilityState !== 'visible' || monitorEl.paused) {
+				monitorLastProgressMs = Date.now();
+				return;
+			}
+			if (Date.now() - monitorLastProgressMs < MONITOR_STALL_MS) return;
+			monitorLastProgressMs = Date.now();
+			console.warn('[Monitor] live stream wedged — reconnecting at the live edge');
+			monitorLive = false;
+			monitorConnect();
+		}, 3000);
+	}
+
+	function stopMonitorStallWatch() {
+		if (monitorStallTimer) {
+			clearInterval(monitorStallTimer);
+			monitorStallTimer = null;
+		}
+	}
+
 	function monitorDisconnect() {
+		stopMonitorStallWatch();
 		if (monitorSourceGoneTimer) {
 			clearTimeout(monitorSourceGoneTimer);
 			monitorSourceGoneTimer = null;
@@ -2607,6 +2648,7 @@
 			bind:this={monitorEl}
 			preload="none"
 			muted
+			ontimeupdate={onMonitorTimeUpdate}
 			onpause={onMonitorInterrupted}
 			onended={onMonitorInterrupted}
 			onerror={onMonitorInterrupted}

@@ -195,6 +195,15 @@
 	let liveDvrSeeking = $state(false);
 	let liveDvrValue = $state(0);
 	let liveDvrWindowSec = $derived(liveSeekEnd - liveSeekStart);
+	let liveDvrDisplayValue = $derived(
+		liveDvrSeeking ? liveDvrValue : Math.min(currentTime, liveSeekEnd)
+	);
+	// Filled-track percentage (YouTube-style: red up to the playhead).
+	let liveDvrFillPct = $derived(
+		liveDvrWindowSec > 0
+			? Math.min(100, Math.max(0, ((liveDvrDisplayValue - liveSeekStart) / liveDvrWindowSec) * 100))
+			: 0
+	);
 	// Only surface the scrubber once there's a meaningful window to seek in.
 	let hasLiveDvr = $derived(isLiveTrack && liveIsHls && liveDvrWindowSec > 45);
 	let liveBehindSec = $derived(Math.max(0, liveSeekEnd - currentTime));
@@ -3886,10 +3895,11 @@
 					<input
 						type="range"
 						class="live-dvr-scrubber flex-1 min-w-0"
+						style="--dvr-fill: {liveDvrFillPct}%"
 						min={liveSeekStart}
 						max={liveSeekEnd}
 						step="1"
-						value={liveDvrSeeking ? liveDvrValue : Math.min(currentTime, liveSeekEnd)}
+						value={liveDvrDisplayValue}
 						oninput={onLiveDvrInput}
 						onchange={onLiveDvrCommit}
 						aria-label={$t('live.scrubberLabel')}
@@ -3932,12 +3942,18 @@
 {/if}
 
 <style>
-	/* Live DVR scrubber — same visual language as the old live page slider. */
+	/* Live DVR scrubber — YouTube-style: red fill up to the playhead
+	   (--dvr-fill set inline from the player state), grey remainder, solid
+	   red round thumb that grows slightly on hover. */
 	.live-dvr-scrubber {
 		-webkit-appearance: none;
 		appearance: none;
-		height: 3px;
-		background: rgb(229 225 220);
+		height: 5px;
+		background: linear-gradient(
+			to right,
+			#dc2626 var(--dvr-fill, 0%),
+			rgb(229 225 220) var(--dvr-fill, 0%)
+		);
 		border-radius: 9999px;
 		outline: none;
 		cursor: pointer;
@@ -3945,22 +3961,32 @@
 	.live-dvr-scrubber::-webkit-slider-thumb {
 		-webkit-appearance: none;
 		appearance: none;
-		width: 11px;
-		height: 11px;
+		width: 15px;
+		height: 15px;
 		border-radius: 9999px;
-		background: #ff880c;
-		border: 2px solid white;
-		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+		background: #dc2626;
+		border: none;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 		cursor: pointer;
+		transition: transform 0.15s ease;
 	}
 	.live-dvr-scrubber::-moz-range-thumb {
-		width: 11px;
-		height: 11px;
+		width: 15px;
+		height: 15px;
 		border-radius: 9999px;
-		background: #ff880c;
-		border: 2px solid white;
-		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+		background: #dc2626;
+		border: none;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 		cursor: pointer;
+		transition: transform 0.15s ease;
+	}
+	.live-dvr-scrubber:hover::-webkit-slider-thumb,
+	.live-dvr-scrubber:active::-webkit-slider-thumb {
+		transform: scale(1.25);
+	}
+	.live-dvr-scrubber:hover::-moz-range-thumb,
+	.live-dvr-scrubber:active::-moz-range-thumb {
+		transform: scale(1.25);
 	}
 	@media (pointer: coarse) {
 		.live-dvr-scrubber::-webkit-slider-thumb {
