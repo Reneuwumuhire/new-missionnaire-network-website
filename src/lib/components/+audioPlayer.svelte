@@ -171,6 +171,10 @@
 	let hlsInstance: Hls | null = null;
 	let liveIsHls = $state(false);
 	let liveHlsFailed = false;
+	// Media errors from the NATIVE HLS path (no hls.js instance to observe) —
+	// after a couple the whole HLS mode is marked failed so reconnects land on
+	// Icecast instead of looping through a broken native attempt.
+	let nativeHlsFailures = 0;
 	// Generation counter: every connectLiveStream() bumps it, and async
 	// continuations (the hls.js dynamic import, the HLS→Icecast fallback)
 	// abort if a newer connect superseded them. Without it, a resume racing
@@ -238,9 +242,12 @@
 		destroyHls();
 		const h = new HlsCtor({ backBufferLength: 90, maxBufferLength: 60 });
 		hlsInstance = h;
-		// Fatal network errors get a bounded number of resume attempts; a dead
-		// or missing playlist must land on Icecast, not retry silently forever.
+		// Fatal errors get a bounded number of recovery attempts; a dead
+		// playlist or an undecodable codec must land on Icecast, not retry
+		// silently forever (e.g. Chromium builds without AAC support fatal
+		// out on every recoverMediaError attempt).
 		let fatalNetworkRetries = 0;
+		let fatalMediaRetries = 0;
 		h.on(HlsCtor.Events.ERROR, (_event, data) => {
 			if (!data.fatal || h !== hlsInstance) return;
 			if (data.type === HlsCtor.ErrorTypes.NETWORK_ERROR && fatalNetworkRetries < 3) {
@@ -248,7 +255,8 @@
 				// position; the DVR window keeps it valid.
 				fatalNetworkRetries += 1;
 				h.startLoad();
-			} else if (data.type === HlsCtor.ErrorTypes.MEDIA_ERROR) {
+			} else if (data.type === HlsCtor.ErrorTypes.MEDIA_ERROR && fatalMediaRetries < 2) {
+				fatalMediaRetries += 1;
 				h.recoverMediaError();
 			} else {
 				console.warn('[AudioPlayer] Fatal HLS error — falling back to Icecast', data);
@@ -278,22 +286,24 @@
 		if (hlsUrl && !liveHlsFailed) {
 			isAudioReady = false;
 			audio.crossOrigin = null;
-			// Safari/iOS: native HLS — seekable ranges and getStartDate() come
-			// straight from the media engine.
-			if (audio.canPlayType('application/vnd.apple.mpegurl')) {
-				destroyHls();
-				liveIsHls = true;
-				audio.src = hlsUrl;
-				audio.load();
-				if (liveWantsPlayback()) audio.play().catch(() => {});
-				return;
-			}
 			liveIsHls = true;
+			// hls.js (MSE) FIRST, even on browsers whose canPlayType claims
+			// native HLS: desktop Chrome answers "maybe" but can't actually
+			// stream it (no seekable window → no DVR scrubber, no progress →
+			// endless reconnects). Native is the fallback for iOS Safari,
+			// where MSE is unavailable and native HLS is the real engine.
 			void connectLiveHlsJs(hlsUrl, seq).then((ok) => {
-				if (!ok && seq === liveConnectSeq) {
-					liveHlsFailed = true;
-					connectLiveIcecast();
+				if (ok || seq !== liveConnectSeq) return;
+				if (audio && audio.canPlayType('application/vnd.apple.mpegurl')) {
+					destroyHls();
+					liveIsHls = true;
+					audio.src = hlsUrl;
+					audio.load();
+					if (liveWantsPlayback()) audio.play().catch(() => {});
+					return;
 				}
+				liveHlsFailed = true;
+				connectLiveIcecast();
 			});
 			return;
 		}
@@ -1627,6 +1637,12 @@
 		isPlaying.set(false);
 		isAudioReady = false;
 		shouldAutoplayOnLoad = false;
+		// Native-HLS failures (no hls.js instance watching) count toward
+		// abandoning HLS mode — the reconnect below then lands on Icecast.
+		if (isLiveTrack && liveIsHls && !hlsInstance) {
+			nativeHlsFailures += 1;
+			if (nativeHlsFailures >= 2) liveHlsFailed = true;
+		}
 		// Live: a media error usually means the connection died mid-stream.
 		// Keep the listener's intent and retry at the live edge with backoff.
 		if (isLiveTrack && userWantsToPlay && audio?.src && audio.src !== location.href) {
@@ -3052,6 +3068,7 @@
 			destroyHls();
 			liveIsHls = false;
 			liveHlsFailed = false;
+			nativeHlsFailures = 0;
 			liveSeekStart = 0;
 			liveSeekEnd = 0;
 			if (wasLiveTrack) {
