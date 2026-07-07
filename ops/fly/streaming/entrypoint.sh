@@ -136,6 +136,12 @@ get_active_path() {
 HLS_DIR="${HLS_DIR:-/data/hls}"
 HLS_SEGMENT_SECONDS="${HLS_SEGMENT_SECONDS:-6}"
 HLS_DVR_SEGMENTS="${HLS_DVR_SEGMENTS:-1800}"
+# Publisher gap (seconds) beyond which the next publisher counts as a NEW
+# broadcast: the previous DVR window is wiped so listeners get a fresh
+# timeline instead of one polluted with hours of a past broadcast (and so
+# the playlist doesn't keep growing across sessions). Short gaps (OBS blip,
+# transcoder restart) stay well under this and keep appending.
+HLS_NEW_SESSION_GAP_SECONDS="${HLS_NEW_SESSION_GAP_SECONDS:-300}"
 
 start_hls_loop() {
 	(
@@ -146,6 +152,16 @@ start_hls_loop() {
 			if [ -z "$HLS_ACTIVE_PATH" ]; then
 				sleep 2
 				continue
+			fi
+			# Freshness check via the playlist's mtime (persisted on the /data
+			# volume, so this survives machine restarts): a playlist last
+			# written more than the gap ago belongs to a previous broadcast.
+			if [ -f "${HLS_DIR}/live.m3u8" ]; then
+				m3u8_age=$(( $(date +%s) - $(stat -c %Y "${HLS_DIR}/live.m3u8" 2>/dev/null || echo 0) ))
+				if [ "$m3u8_age" -gt "$HLS_NEW_SESSION_GAP_SECONDS" ]; then
+					echo "[hls] new broadcast session (playlist ${m3u8_age}s old) — clearing previous DVR window"
+					rm -f "${HLS_DIR}/live.m3u8" "${HLS_DIR}"/live-*.ts
+				fi
 			fi
 			echo "[hls] packaging from rtsp://127.0.0.1:8554/${HLS_ACTIVE_PATH}"
 			ffmpeg -nostdin -hide_banner -loglevel warning \

@@ -171,6 +171,21 @@
 	let hlsInstance: Hls | null = null;
 	let liveIsHls = $state(false);
 	let liveHlsFailed = false;
+	// Generation counter: every connectLiveStream() bumps it, and async
+	// continuations (the hls.js dynamic import, the HLS→Icecast fallback)
+	// abort if a newer connect superseded them. Without it, a resume racing
+	// a reconnect leaves two connection setups fighting over the element.
+	let liveConnectSeq = 0;
+	// One startLoad() nudge per stall before escalating to a full reconnect —
+	// tearing everything down every 15s on a slow link is what "breaks" audio.
+	let liveStallNudged = false;
+
+	/** Should a (re)connect start audible playback? Any of the intent signals
+	 *  counts — but a listener who just pressed pause must stay paused even if
+	 *  a connect was already in flight. */
+	function liveWantsPlayback(): boolean {
+		return userWantsToPlay || shouldAutoplayOnLoad || get(isPlaying);
+	}
 	let liveSeekStart = $state(0);
 	let liveSeekEnd = $state(0);
 	let liveDvrSeeking = $state(false);
@@ -205,24 +220,33 @@
 		audio.crossOrigin = null; // Icecast sends no CORS headers — see <audio> template comment
 		audio.src = withLiveCacheBuster(encodeUrlPath(rawUrl));
 		audio.load();
-		audio.play().catch(() => {
-			// The error/ended handlers schedule the next attempt.
-		});
+		if (liveWantsPlayback()) {
+			audio.play().catch(() => {
+				// The error/ended handlers schedule the next attempt.
+			});
+		}
 	}
 
-	async function connectLiveHlsJs(hlsUrl: string): Promise<boolean> {
+	async function connectLiveHlsJs(hlsUrl: string, seq: number): Promise<boolean> {
 		const mod = await import('hls.js');
 		const HlsCtor = mod.default;
 		if (!HlsCtor.isSupported()) return false;
+		// A newer connect superseded this one while the module loaded — it owns
+		// the element now. Report success so the caller doesn't fall back.
+		if (seq !== liveConnectSeq) return true;
 		if (!audio || !isLiveTrack) return false;
 		destroyHls();
-		const h = new HlsCtor({ backBufferLength: 90 });
+		const h = new HlsCtor({ backBufferLength: 90, maxBufferLength: 60 });
 		hlsInstance = h;
+		// Fatal network errors get a bounded number of resume attempts; a dead
+		// or missing playlist must land on Icecast, not retry silently forever.
+		let fatalNetworkRetries = 0;
 		h.on(HlsCtor.Events.ERROR, (_event, data) => {
-			if (!data.fatal) return;
-			if (data.type === HlsCtor.ErrorTypes.NETWORK_ERROR) {
+			if (!data.fatal || h !== hlsInstance) return;
+			if (data.type === HlsCtor.ErrorTypes.NETWORK_ERROR && fatalNetworkRetries < 3) {
 				// Playlist/segment fetch failed — resume loading from the same
 				// position; the DVR window keeps it valid.
+				fatalNetworkRetries += 1;
 				h.startLoad();
 			} else if (data.type === HlsCtor.ErrorTypes.MEDIA_ERROR) {
 				h.recoverMediaError();
@@ -230,20 +254,25 @@
 				console.warn('[AudioPlayer] Fatal HLS error — falling back to Icecast', data);
 				liveHlsFailed = true;
 				destroyHls();
-				if (userWantsToPlay) connectLiveIcecast();
+				connectLiveIcecast();
 			}
 		});
 		h.loadSource(hlsUrl);
 		h.attachMedia(audio);
-		audio.play().catch(() => {
-			// Autoplay policy — the canplay/gesture paths retry.
-		});
+		if (liveWantsPlayback()) {
+			audio.play().catch(() => {
+				// Autoplay policy — the canplay/gesture paths retry.
+			});
+		}
 		return true;
 	}
 
 	/** Single live entry point: prefer the HLS DVR, fall back to Icecast. */
 	function connectLiveStream() {
 		if (!audio || !isLiveTrack) return;
+		const seq = ++liveConnectSeq;
+		clearLiveReconnectTimer();
+		liveStallNudged = false;
 		const track = $selectAudio as LiveStreamTrack;
 		const hlsUrl = track.hlsUrl;
 		if (hlsUrl && !liveHlsFailed) {
@@ -256,12 +285,12 @@
 				liveIsHls = true;
 				audio.src = hlsUrl;
 				audio.load();
-				audio.play().catch(() => {});
+				if (liveWantsPlayback()) audio.play().catch(() => {});
 				return;
 			}
 			liveIsHls = true;
-			void connectLiveHlsJs(hlsUrl).then((ok) => {
-				if (!ok) {
+			void connectLiveHlsJs(hlsUrl, seq).then((ok) => {
+				if (!ok && seq === liveConnectSeq) {
 					liveHlsFailed = true;
 					connectLiveIcecast();
 				}
@@ -273,6 +302,8 @@
 
 	function seekToLiveEdge() {
 		if (!audio) return;
+		// Jumping to live is an explicit "play from here" gesture.
+		setUserWantsToPlay(true);
 		// hls.js idles its loader while paused/behind — nudge it so the edge
 		// fragments start fetching before/with the seek.
 		try {
@@ -406,6 +437,21 @@
 			if (liveReconnectTimer) return;
 			if (Date.now() - lastLiveProgressMs < LIVE_STALL_TIMEOUT_MS) return;
 			lastLiveProgressMs = Date.now();
+			// HLS first gets a loader nudge — on a slow link a full teardown
+			// discards everything buffered and restarts the whole handshake,
+			// which turns a hiccup into a long dropout. Only escalate to a
+			// reconnect if the nudge didn't restore progress within the next
+			// stall window.
+			if (liveIsHls && hlsInstance && !liveStallNudged) {
+				liveStallNudged = true;
+				console.warn('[AudioPlayer] Live HLS stalled — nudging the loader');
+				try {
+					hlsInstance.startLoad();
+				} catch {
+					/* not attached */
+				}
+				return;
+			}
 			console.warn('[AudioPlayer] Live stream stalled — reconnecting at the live edge');
 			connectLiveStream();
 		}, LIVE_STALL_CHECK_INTERVAL_MS);
@@ -460,9 +506,19 @@
 	}
 
 	function pauseCurrentAudio() {
-		if (!audio || audio.paused) return;
-		setPendingPlaybackIntent('pause');
+		if (!audio) return;
+		// Record the intent BEFORE the already-paused early-return. A live
+		// (re)connect can be in flight with the element still paused while it
+		// loads — a pause pressed in that window must stick, otherwise the
+		// connect completes and starts audio the listener just refused.
 		setUserWantsToPlay(false);
+		shouldAutoplayOnLoad = false;
+		if (audio.paused) {
+			setPendingPlaybackIntent(null);
+			isPlaying.set(false);
+			return;
+		}
+		setPendingPlaybackIntent('pause');
 		rememberPlaybackPosition();
 		// Start silent loop before pausing main so the AVAudioSession
 		// stays alive — covers the "user paused in-app then locked
@@ -688,11 +744,16 @@
 
 	function handleExternalToggle() {
 		if (!audio) return;
-		if (audio.paused) {
-			playCurrentAudio();
+		// Key off the user-visible playing state ($isPlaying drives the button
+		// icon), not just `audio.paused`: while a live (re)connect buffers the
+		// element sits paused even though the UI says "playing" — keying off
+		// the element alone made a pause press during that window restart
+		// playback instead of stopping it.
+		if (get(isPlaying) || !audio.paused) {
+			pauseCurrentAudio();
 			return;
 		}
-		pauseCurrentAudio();
+		playCurrentAudio();
 	}
 
 	// Tracks the listener's *intent* to play, separate from whether the audio
@@ -1838,6 +1899,7 @@
 				// current connection is healthy (reset the reconnect backoff).
 				lastLiveProgressMs = Date.now();
 				liveReconnectAttempts = 0;
+				liveStallNudged = false;
 				// DVR window bounds for the live scrubber (HLS only — Icecast
 				// exposes no meaningful seekable range).
 				if (liveIsHls && audio.seekable.length > 0) {

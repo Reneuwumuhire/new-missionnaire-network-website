@@ -1,8 +1,9 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import { ObjectId } from 'mongodb';
 import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
+import { gzipSync } from 'node:zlib';
 import { ENV } from './env.js';
 import { currentStatus, isRecording, retryUpload, startRecording, stopRecording } from './ffmpeg.js';
 import { isRecovering, pendingOrphans, recoverOrphans } from './recover.js';
@@ -51,6 +52,19 @@ app.get<{ Params: { file: string } }>('/hls/:file', async (req, reply) => {
 		ext === '.m3u8' ? 'no-store, no-cache' : 'public, max-age=31536000, immutable'
 	);
 	reply.type(HLS_CONTENT_TYPES[ext]);
+	if (ext === '.m3u8') {
+		// The playlist is refetched every segment interval and grows with the
+		// DVR window (hundreds of KB at a full window) — on slow links the
+		// uncompressed playlist alone can outweigh the audio. Text compresses
+		// ~20×, so gzip whenever the client accepts it.
+		const body = await readFile(fullPath);
+		reply.header('Vary', 'Accept-Encoding');
+		if (/\bgzip\b/i.test(String(req.headers['accept-encoding'] ?? ''))) {
+			reply.header('Content-Encoding', 'gzip');
+			return reply.send(gzipSync(body));
+		}
+		return reply.send(body);
+	}
 	return reply.send(createReadStream(fullPath));
 });
 

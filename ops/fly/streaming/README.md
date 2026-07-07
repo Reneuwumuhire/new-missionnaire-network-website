@@ -52,8 +52,13 @@ To enable it in the player, set on the **main site** (Vercel):
 
 Without that env the player uses the Icecast stream only (live edge, no DVR).
 Tunables (fly.toml `[env]`): `HLS_SEGMENT_SECONDS` (6), `HLS_DVR_SEGMENTS`
-(1800), `HLS_DIR` (/data/hls). Disk: ~57 MB/h at 128 kbps — the 3 GB volume
-holds the default window with lots of margin.
+(1800), `HLS_DIR` (/data/hls), `HLS_NEW_SESSION_GAP_SECONDS` (300 — a
+publisher arriving after a longer gap than this counts as a new broadcast
+and the previous DVR window is wiped, so each broadcast gets a fresh
+timeline). Disk: ~57 MB/h at 128 kbps — the 3 GB volume holds the default
+window with lots of margin. The recorder gzips playlist responses (the
+playlist grows with the window and is refetched every segment interval;
+compressed it stays a few KB).
 
 ## 1) Create the app
 
