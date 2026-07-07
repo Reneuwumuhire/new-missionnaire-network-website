@@ -173,6 +173,7 @@ start_hls_loop() {
 				-map 0:a:0? -vn -c:a copy \
 				-f hls \
 				-hls_time "${HLS_SEGMENT_SECONDS}" \
+				-hls_init_time 2 \
 				-hls_list_size "${HLS_DVR_SEGMENTS}" \
 				-hls_delete_threshold 20 \
 				-hls_flags delete_segments+append_list+omit_endlist+program_date_time+independent_segments+discont_start+temp_file \

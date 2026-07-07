@@ -1584,6 +1584,60 @@
 		}
 	}
 
+	// ── HLS readiness ─────────────────────────────────────────────
+	// The monitor connects the instant OBS appears — usually BEFORE the HLS
+	// packager has written its first segments. Attaching hls.js to a 404 or a
+	// stale previous-broadcast playlist wedges it in retry loops ("Connecting
+	// to stream…" for tens of seconds), while Icecast has audio immediately.
+	// So: one cheap probe decides; Icecast bridges the gap; the upgrade timer
+	// promotes to HLS (and PDT-exact anchoring) as soon as it's ready.
+	const MONITOR_HLS_UPGRADE_CHECK_MS = 20_000;
+	const MONITOR_HLS_CONNECT_DEADLINE_MS = 15_000;
+	let monitorHlsUpgradeTimer: ReturnType<typeof setTimeout> | null = null;
+
+	async function monitorPlaylistLooksLive(hlsUrl: string): Promise<boolean> {
+		try {
+			const controller = new AbortController();
+			const timeout = setTimeout(() => controller.abort(), 5000);
+			const res = await fetch(hlsUrl, { signal: controller.signal, cache: 'no-store' });
+			clearTimeout(timeout);
+			if (!res.ok) return false;
+			const text = await res.text();
+			const stamps = text.match(/#EXT-X-PROGRAM-DATE-TIME:[^\r\n]+/g);
+			if (!stamps || stamps.length === 0) return false;
+			const lastStamp = stamps[stamps.length - 1];
+			const last = new Date(lastStamp.slice(lastStamp.indexOf(':') + 1));
+			if (Number.isNaN(last.getTime())) return false;
+			return Math.abs(Date.now() - last.getTime()) < 90_000;
+		} catch {
+			return false;
+		}
+	}
+
+	function scheduleMonitorHlsUpgrade() {
+		if (monitorHlsUpgradeTimer) return;
+		monitorHlsUpgradeTimer = setTimeout(async () => {
+			monitorHlsUpgradeTimer = null;
+			if (!monitorLive || monitorIsHls || monitorHlsFailed || !data.liveHlsUrl) return;
+			const fresh = await monitorPlaylistLooksLive(data.liveHlsUrl);
+			if (!monitorLive || monitorIsHls) return;
+			if (fresh) {
+				console.log('[Monitor] HLS ready — switching from Icecast for PDT-exact sync');
+				monitorLive = false;
+				monitorConnect();
+			} else {
+				scheduleMonitorHlsUpgrade();
+			}
+		}, MONITOR_HLS_UPGRADE_CHECK_MS);
+	}
+
+	function clearMonitorHlsUpgradeTimer() {
+		if (monitorHlsUpgradeTimer) {
+			clearTimeout(monitorHlsUpgradeTimer);
+			monitorHlsUpgradeTimer = null;
+		}
+	}
+
 	/** Shared tail of every connect path: start playback, arm the watchdog. */
 	function monitorFinishConnect() {
 		if (!monitorEl) return;
@@ -1611,6 +1665,8 @@
 		monitorConnectEpochMs = Date.now();
 		monitorEl.load();
 		monitorFinishConnect();
+		// Promote to HLS (PDT-exact anchoring) once the packager is up.
+		if (data.liveHlsUrl && !monitorHlsFailed) scheduleMonitorHlsUpgrade();
 	}
 
 	async function monitorConnectHls(hlsUrl: string): Promise<boolean> {
@@ -1641,6 +1697,15 @@
 			h.attachMedia(monitorEl);
 			monitorIsHls = true;
 			monitorFinishConnect();
+			// Deadline: if HLS hasn't produced audio in time (packager racing
+			// the broadcast start), don't sit in "Connecting…" — Icecast now,
+			// upgrade later.
+			setTimeout(() => {
+				if (monitorLive || !monitorIsHls || h !== monitorHls) return;
+				console.warn('[Monitor] HLS connect deadline hit — bridging with Icecast');
+				monitorConnecting = false;
+				monitorConnectIcecast();
+			}, MONITOR_HLS_CONNECT_DEADLINE_MS);
 			return true;
 		}
 		// No MSE (iOS/desktop Safari without it) — native HLS still carries PDT
@@ -1662,15 +1727,25 @@
 		monitorEl.muted = monitorMuted;
 		const hlsUrl = data.liveHlsUrl;
 		if (hlsUrl && !monitorHlsFailed) {
-			void monitorConnectHls(hlsUrl).then((ok) => {
-				if (!ok) {
-					monitorHlsFailed = true;
-					monitorConnectIcecast();
-				}
-			});
+			void monitorConnectHlsRoute(hlsUrl);
 			return;
 		}
 		monitorConnectIcecast();
+	}
+
+	async function monitorConnectHlsRoute(hlsUrl: string) {
+		// Freshness gate — see the HLS-readiness note above.
+		const fresh = await monitorPlaylistLooksLive(hlsUrl);
+		if (!monitorEl || monitorLive) return;
+		if (!fresh) {
+			monitorConnectIcecast();
+			return;
+		}
+		const ok = await monitorConnectHls(hlsUrl);
+		if (!ok) {
+			monitorHlsFailed = true;
+			monitorConnectIcecast();
+		}
 	}
 
 	// ── Stall watchdog ────────────────────────────────────────────
@@ -1714,6 +1789,7 @@
 
 	function monitorDisconnect() {
 		stopMonitorStallWatch();
+		clearMonitorHlsUpgradeTimer();
 		monitorDestroyHls();
 		monitorIsHls = false;
 		// A fresh broadcast deserves a fresh HLS attempt.

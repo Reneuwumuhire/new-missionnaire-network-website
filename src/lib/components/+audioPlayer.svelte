@@ -170,7 +170,13 @@
 	// Icecast (track.url) remains the fallback whenever HLS can't start.
 	let hlsInstance: Hls | null = null;
 	let liveIsHls = $state(false);
-	let liveHlsFailed = false;
+	// HLS is temporarily off-limits until this timestamp — set on fatal HLS
+	// failures and on a stale/missing playlist (broadcast just starting, the
+	// packager hasn't written its first segments yet). Icecast serves in the
+	// meantime and the upgrade timer below promotes back to HLS when ready.
+	let liveHlsBlockedUntil = 0;
+	let liveHlsUpgradeTimer: ReturnType<typeof setTimeout> | null = null;
+	const LIVE_HLS_UPGRADE_CHECK_MS = 45_000;
 	// Media errors from the NATIVE HLS path (no hls.js instance to observe) —
 	// after a couple the whole HLS mode is marked failed so reconnects land on
 	// Icecast instead of looping through a broken native attempt.
@@ -238,6 +244,66 @@
 				// The error/ended handlers schedule the next attempt.
 			});
 		}
+		// Self-healing: whenever we land on Icecast while the track advertises
+		// HLS, keep probing and promote back once the packager is healthy.
+		scheduleLiveHlsUpgrade();
+	}
+
+	/** One cheap GET of the (gzipped, ~2 KB) playlist to decide routing: true
+	 *  when it exists and its newest PROGRAM-DATE-TIME is recent, i.e. the
+	 *  packager is actively writing. At broadcast start the packager needs a
+	 *  few seconds for its first segments — attaching hls.js to a 404 or to a
+	 *  stale previous-broadcast window wedges it in retry loops for tens of
+	 *  seconds, while Icecast would deliver audio immediately. */
+	async function hlsPlaylistLooksLive(hlsUrl: string): Promise<boolean> {
+		try {
+			const controller = new AbortController();
+			const timeout = setTimeout(() => controller.abort(), 5000);
+			const res = await fetch(hlsUrl, { signal: controller.signal, cache: 'no-store' });
+			clearTimeout(timeout);
+			if (!res.ok) return false;
+			const text = await res.text();
+			const stamps = text.match(/#EXT-X-PROGRAM-DATE-TIME:[^\r\n]+/g);
+			if (!stamps || stamps.length === 0) return false;
+			const lastStamp = stamps[stamps.length - 1];
+			const last = new Date(lastStamp.slice(lastStamp.indexOf(':') + 1));
+			if (Number.isNaN(last.getTime())) return false;
+			// Client clock: a device minutes off lands on Icecast + upgrade
+			// probes — degraded, never broken.
+			return Math.abs(Date.now() - last.getTime()) < 90_000;
+		} catch {
+			return false;
+		}
+	}
+
+	/** While on Icecast with an hlsUrl available, periodically re-probe and
+	 *  reconnect through the dispatcher once HLS is ready. The switch costs a
+	 *  ~1s blip once, early in the broadcast — the price of gaining the DVR
+	 *  scrubber and PDT-exact subtitles for the rest of it. */
+	function scheduleLiveHlsUpgrade() {
+		if (liveHlsUpgradeTimer || !browser) return;
+		liveHlsUpgradeTimer = setTimeout(async () => {
+			liveHlsUpgradeTimer = null;
+			if (!isLiveTrack || liveIsHls || !audio) return;
+			const track = $selectAudio as LiveStreamTrack;
+			if (!track?.hlsUrl) return;
+			const fresh = await hlsPlaylistLooksLive(track.hlsUrl);
+			if (!isLiveTrack || liveIsHls) return;
+			if (fresh) {
+				console.log('[AudioPlayer] HLS DVR available — upgrading from Icecast');
+				liveHlsBlockedUntil = 0;
+				connectLiveStream();
+			} else {
+				scheduleLiveHlsUpgrade();
+			}
+		}, LIVE_HLS_UPGRADE_CHECK_MS);
+	}
+
+	function clearLiveHlsUpgradeTimer() {
+		if (liveHlsUpgradeTimer) {
+			clearTimeout(liveHlsUpgradeTimer);
+			liveHlsUpgradeTimer = null;
+		}
 	}
 
 	async function connectLiveHlsJs(hlsUrl: string, seq: number): Promise<boolean> {
@@ -269,7 +335,7 @@
 				h.recoverMediaError();
 			} else {
 				console.warn('[AudioPlayer] Fatal HLS error — falling back to Icecast', data);
-				liveHlsFailed = true;
+				liveHlsBlockedUntil = Date.now() + 60_000;
 				destroyHls();
 				connectLiveIcecast();
 			}
@@ -292,30 +358,44 @@
 		liveStallNudged = false;
 		const track = $selectAudio as LiveStreamTrack;
 		const hlsUrl = track.hlsUrl;
-		if (hlsUrl && !liveHlsFailed) {
+		if (hlsUrl && Date.now() >= liveHlsBlockedUntil) {
 			isAudioReady = false;
 			audio.crossOrigin = null;
 			liveIsHls = true;
-			// hls.js (MSE) FIRST, even on browsers whose canPlayType claims
-			// native HLS: desktop Chrome answers "maybe" but can't actually
-			// stream it (no seekable window → no DVR scrubber, no progress →
-			// endless reconnects). Native is the fallback for iOS Safari,
-			// where MSE is unavailable and native HLS is the real engine.
-			void connectLiveHlsJs(hlsUrl, seq).then((ok) => {
-				if (ok || seq !== liveConnectSeq) return;
-				if (audio && audio.canPlayType('application/vnd.apple.mpegurl')) {
-					destroyHls();
-					liveIsHls = true;
-					audio.src = hlsUrl;
-					audio.load();
-					if (liveWantsPlayback()) audio.play().catch(() => {});
-					return;
-				}
-				liveHlsFailed = true;
-				connectLiveIcecast();
-			});
+			void connectLiveHlsRoute(hlsUrl, seq);
 			return;
 		}
+		connectLiveIcecast();
+	}
+
+	async function connectLiveHlsRoute(hlsUrl: string, seq: number) {
+		// Freshness gate: a missing or stale playlist (broadcast just starting,
+		// packager not up yet) must route to Icecast NOW — instant audio —
+		// instead of wedging hls.js in manifest-retry loops. The upgrade timer
+		// promotes back to HLS once the packager is writing.
+		const fresh = await hlsPlaylistLooksLive(hlsUrl);
+		if (seq !== liveConnectSeq || !audio || !isLiveTrack) return;
+		if (!fresh) {
+			liveHlsBlockedUntil = Date.now() + 30_000;
+			connectLiveIcecast();
+			return;
+		}
+		// hls.js (MSE) FIRST, even on browsers whose canPlayType claims
+		// native HLS: desktop Chrome answers "maybe" but can't actually
+		// stream it (no seekable window → no DVR scrubber, no progress →
+		// endless reconnects). Native is the fallback for iOS Safari,
+		// where MSE is unavailable and native HLS is the real engine.
+		const ok = await connectLiveHlsJs(hlsUrl, seq);
+		if (ok || seq !== liveConnectSeq) return;
+		if (audio && audio.canPlayType('application/vnd.apple.mpegurl')) {
+			destroyHls();
+			liveIsHls = true;
+			audio.src = hlsUrl;
+			audio.load();
+			if (liveWantsPlayback()) audio.play().catch(() => {});
+			return;
+		}
+		liveHlsBlockedUntil = Date.now() + 60_000;
 		connectLiveIcecast();
 	}
 
@@ -1650,7 +1730,7 @@
 		// abandoning HLS mode — the reconnect below then lands on Icecast.
 		if (isLiveTrack && liveIsHls && !hlsInstance) {
 			nativeHlsFailures += 1;
-			if (nativeHlsFailures >= 2) liveHlsFailed = true;
+			if (nativeHlsFailures >= 2) liveHlsBlockedUntil = Date.now() + 60_000;
 		}
 		// Live: a media error usually means the connection died mid-stream.
 		// Keep the listener's intent and retry at the live edge with backoff.
@@ -2837,6 +2917,7 @@
 		stopLiveStallWatch();
 		stopLiveTicker();
 		clearLiveReconnectTimer();
+		clearLiveHlsUpgradeTimer();
 		destroyHls();
 		stopSilentLoop();
 		if (audio) {
@@ -3076,8 +3157,9 @@
 			liveConnectEpochMs = null;
 			destroyHls();
 			liveIsHls = false;
-			liveHlsFailed = false;
+			liveHlsBlockedUntil = 0;
 			nativeHlsFailures = 0;
+			clearLiveHlsUpgradeTimer();
 			liveSeekStart = 0;
 			liveSeekEnd = 0;
 			if (wasLiveTrack) {
