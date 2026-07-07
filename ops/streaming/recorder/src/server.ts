@@ -1,5 +1,9 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import { ObjectId } from 'mongodb';
+import { createReadStream } from 'node:fs';
+import { readFile, stat } from 'node:fs/promises';
+import path from 'node:path';
+import { gzipSync } from 'node:zlib';
 import { ENV } from './env.js';
 import { currentStatus, isRecording, retryUpload, startRecording, stopRecording } from './ffmpeg.js';
 import { isRecovering, pendingOrphans, recoverOrphans } from './recover.js';
@@ -9,7 +13,7 @@ import { ensureRecordingsDir } from './sidecar.js';
 const app = Fastify({ logger: true });
 
 app.addHook('preHandler', async (req: FastifyRequest, reply: FastifyReply) => {
-	if (req.url === '/health') return;
+	if (req.url === '/health' || req.url === '/hls-stats' || req.url.startsWith('/hls/')) return;
 	const auth = req.headers.authorization;
 	if (!auth || auth !== `Bearer ${ENV.RECORDER_TOKEN}`) {
 		reply.code(401).send({ error: 'unauthorized' });
@@ -17,6 +21,84 @@ app.addHook('preHandler', async (req: FastifyRequest, reply: FastifyReply) => {
 });
 
 app.get('/health', async () => ({ ok: true }));
+
+// ── HLS listener accounting ───────────────────────────────────────
+// HLS has no persistent connections (Icecast counts those natively), so a
+// "listener" is a distinct client that requested a playlist/segment within a
+// sliding window. hls.js keeps refreshing the live playlist every target
+// duration even while paused, so paused DVR listeners stay counted — parity
+// with Icecast counting its held connections. Keyed by client IP + UA; the
+// Fly proxy carries the real client address in Fly-Client-IP.
+const HLS_SESSION_WINDOW_MS = 90_000;
+const hlsSessions = new Map<string, number>();
+
+function trackHlsSession(req: FastifyRequest): void {
+	const ip = (req.headers['fly-client-ip'] as string | undefined) ?? req.ip;
+	hlsSessions.set(`${ip}|${String(req.headers['user-agent'] ?? '')}`, Date.now());
+}
+
+function countHlsListeners(): number {
+	const cutoff = Date.now() - HLS_SESSION_WINDOW_MS;
+	for (const [key, lastSeen] of hlsSessions) {
+		if (lastSeen < cutoff) hlsSessions.delete(key);
+	}
+	return hlsSessions.size;
+}
+
+/** Public: current HLS listener count. The site and admin add this to the
+ *  Icecast mount count for the total displayed to operators and listeners. */
+app.get('/hls-stats', async (_req, reply) => {
+	reply.header('Access-Control-Allow-Origin', '*');
+	reply.header('Cache-Control', 'no-store');
+	return { listeners: countHlsListeners() };
+});
+
+// ── Live DVR delivery (public, read-only) ─────────────────────────
+// Serves the rolling HLS window the entrypoint's packager writes to HLS_DIR.
+// The playlist must never be cached (it changes every segment); segments are
+// content-immutable so they can be cached hard. CORS is open — hls.js in the
+// public player fetches these cross-origin.
+const HLS_CONTENT_TYPES: Record<string, string> = {
+	'.m3u8': 'application/vnd.apple.mpegurl',
+	'.ts': 'video/mp2t'
+};
+
+app.get<{ Params: { file: string } }>('/hls/:file', async (req, reply) => {
+	const { file } = req.params;
+	// Strict allowlist — this handler must never traverse outside HLS_DIR.
+	if (!/^[A-Za-z0-9][A-Za-z0-9_-]*\.(m3u8|ts)$/.test(file)) {
+		return reply.code(404).send({ error: 'not_found' });
+	}
+	const ext = path.extname(file);
+	const fullPath = path.join(ENV.HLS_DIR, file);
+	try {
+		const info = await stat(fullPath);
+		if (!info.isFile()) return reply.code(404).send({ error: 'not_found' });
+	} catch {
+		return reply.code(404).send({ error: 'not_found' });
+	}
+	trackHlsSession(req);
+	reply.header('Access-Control-Allow-Origin', '*');
+	reply.header(
+		'Cache-Control',
+		ext === '.m3u8' ? 'no-store, no-cache' : 'public, max-age=31536000, immutable'
+	);
+	reply.type(HLS_CONTENT_TYPES[ext]);
+	if (ext === '.m3u8') {
+		// The playlist is refetched every segment interval and grows with the
+		// DVR window (hundreds of KB at a full window) — on slow links the
+		// uncompressed playlist alone can outweigh the audio. Text compresses
+		// ~20×, so gzip whenever the client accepts it.
+		const body = await readFile(fullPath);
+		reply.header('Vary', 'Accept-Encoding');
+		if (/\bgzip\b/i.test(String(req.headers['accept-encoding'] ?? ''))) {
+			reply.header('Content-Encoding', 'gzip');
+			return reply.send(gzipSync(body));
+		}
+		return reply.send(body);
+	}
+	return reply.send(createReadStream(fullPath));
+});
 
 app.get('/status', async () => ({
 	...currentStatus(),

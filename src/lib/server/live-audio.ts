@@ -56,6 +56,13 @@ export function getLiveAudioSourceUrl(): string {
 	return DEFAULT_LIVE_AUDIO_SOURCE_URL;
 }
 
+/** HLS DVR playlist URL (Fly recorder `/hls/live.m3u8`). Empty string when
+ *  not configured — the player then falls back to the Icecast byte stream
+ *  (live-edge only, no server-side pause/seek window). */
+export function getLiveAudioHlsUrl(): string {
+	return normalizeLiveStreamUrl(env.LIVE_AUDIO_HLS_URL);
+}
+
 /** Read at least `minBytes` from a ReadableStreamDefaultReader. */
 async function readAtLeast(
 	reader: ReadableStreamDefaultReader<Uint8Array>,

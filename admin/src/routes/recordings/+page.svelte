@@ -2,6 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
 	import type { PageData } from './$types';
+	import type HlsType from 'hls.js';
 	import type { Recording, RecordingStatus } from '$lib/models/recording';
 	import { confirmDialog } from '$lib/stores/confirm-dialog';
 	import { toast } from '$lib/stores/toast';
@@ -1526,41 +1527,126 @@
 	// browsers) and the only control is the mute toggle. Any interruption
 	// (OS pause, stream hiccup) reconnects fresh at the live edge rather
 	// than ever sitting on stale buffered audio.
+	//
+	// Source: the HLS DVR feed when available. Its EXT-X-PROGRAM-DATE-TIME
+	// gives the EXACT broadcast wall-clock of every frame the operator hears
+	// (hls.js `playingDate`), so the subtitle anchor is exact for all
+	// listeners — the operator's own latency stops mattering. Icecast is the
+	// fallback, with its connect-epoch estimate corrected for the burst
+	// backlog the server front-loads.
 	let monitorEl = $state<HTMLAudioElement | null>(null);
 	let monitorMuted = $state(true);
 	let monitorLive = $state(false);
 	let monitorConnecting = false;
 	let monitorRetryTimer: ReturnType<typeof setTimeout> | null = null;
-	// Wall-clock when THIS monitor connection opened — mirrors the public
-	// player's streamConnectEpochMs. The audio the operator hears at the
-	// monitor's currentTime was on air at connectEpoch + currentTime, so this
-	// lets subtitle sync anchor against the broadcast time of what the operator
-	// is actually hearing (their listening latency cancels against the public's,
-	// which uses the identical model) instead of raw Date.now().
+	let monitorHls: HlsType | null = null;
+	let monitorIsHls = false;
+	let monitorHlsFailed = false;
+	// Wall-clock when THIS monitor connection opened — the Icecast-fallback
+	// position model (position 0 of a fresh connection ≈ live at that instant,
+	// minus the burst correction below).
 	let monitorConnectEpochMs = $state<number | null>(null);
+	// Icecast front-loads its burst buffer on connect, so position 0 is audio
+	// from ~burst seconds BEFORE the connection: burst-size 262144 B at
+	// 128 kbps ≈ 16 s (ops/fly/streaming/icecast.xml.template). The public
+	// player applies the same correction, keeping both frames of reference
+	// aligned with the PDT-based (true wall-clock) anchor.
+	const ICECAST_BURST_ESTIMATE_MS = 16_000;
 
 	/** Broadcast wall-clock of the audio the operator is hearing right now, or
-	 *  null when the monitor isn't playing. Passed to the subtitle sync panel. */
+	 *  null when the monitor isn't playing. Passed to the subtitle sync panel.
+	 *  HLS: exact per-frame PDT. Icecast fallback: burst-corrected estimate. */
 	function monitorPositionEpochMs(): number | null {
-		if (!monitorLive || !monitorEl || monitorConnectEpochMs === null) return null;
-		return monitorConnectEpochMs + monitorEl.currentTime * 1000;
+		if (!monitorLive || !monitorEl) return null;
+		if (monitorIsHls) {
+			const playingDate = monitorHls?.playingDate;
+			if (playingDate) return playingDate.getTime();
+			const startDate = (
+				monitorEl as HTMLAudioElement & { getStartDate?: () => Date }
+			).getStartDate?.();
+			if (startDate && !Number.isNaN(startDate.getTime())) {
+				return startDate.getTime() + monitorEl.currentTime * 1000;
+			}
+			return null;
+		}
+		if (monitorConnectEpochMs === null) return null;
+		return monitorConnectEpochMs + monitorEl.currentTime * 1000 - ICECAST_BURST_ESTIMATE_MS;
 	}
 
-	function monitorConnect() {
-		if (!monitorEl || monitorConnecting || monitorLive) return;
-		monitorConnecting = true;
-		const sep = data.liveStreamUrl.includes('?') ? '&' : '?';
-		monitorEl.muted = monitorMuted;
-		monitorEl.src = `${data.liveStreamUrl}${sep}t=${Date.now()}`;
-		// Position-0 of a fresh connection is "live at this instant"; record it
-		// so monitorPositionEpochMs() can derive the on-air time of each frame.
-		monitorConnectEpochMs = Date.now();
-		monitorEl.load();
+	function monitorDestroyHls() {
+		if (monitorHls) {
+			try {
+				monitorHls.destroy();
+			} catch {
+				/* already dead */
+			}
+			monitorHls = null;
+		}
+	}
+
+	// ── HLS readiness ─────────────────────────────────────────────
+	// The monitor connects the instant OBS appears — usually BEFORE the HLS
+	// packager has written its first segments. Attaching hls.js to a 404 or a
+	// stale previous-broadcast playlist wedges it in retry loops ("Connecting
+	// to stream…" for tens of seconds), while Icecast has audio immediately.
+	// So: one cheap probe decides; Icecast bridges the gap; the upgrade timer
+	// promotes to HLS (and PDT-exact anchoring) as soon as it's ready.
+	const MONITOR_HLS_UPGRADE_CHECK_MS = 20_000;
+	const MONITOR_HLS_CONNECT_DEADLINE_MS = 15_000;
+	let monitorHlsUpgradeTimer: ReturnType<typeof setTimeout> | null = null;
+
+	async function monitorPlaylistLooksLive(hlsUrl: string): Promise<boolean> {
+		try {
+			const controller = new AbortController();
+			const timeout = setTimeout(() => controller.abort(), 5000);
+			const res = await fetch(hlsUrl, { signal: controller.signal, cache: 'no-store' });
+			clearTimeout(timeout);
+			if (!res.ok) return false;
+			const text = await res.text();
+			const stamps = text.match(/#EXT-X-PROGRAM-DATE-TIME:[^\r\n]+/g);
+			if (!stamps || stamps.length === 0) return false;
+			const lastStamp = stamps[stamps.length - 1];
+			const last = new Date(lastStamp.slice(lastStamp.indexOf(':') + 1));
+			if (Number.isNaN(last.getTime())) return false;
+			return Math.abs(Date.now() - last.getTime()) < 90_000;
+		} catch {
+			return false;
+		}
+	}
+
+	function scheduleMonitorHlsUpgrade() {
+		if (monitorHlsUpgradeTimer) return;
+		monitorHlsUpgradeTimer = setTimeout(async () => {
+			monitorHlsUpgradeTimer = null;
+			if (!monitorLive || monitorIsHls || monitorHlsFailed || !data.liveHlsUrl) return;
+			const fresh = await monitorPlaylistLooksLive(data.liveHlsUrl);
+			if (!monitorLive || monitorIsHls) return;
+			if (fresh) {
+				console.log('[Monitor] HLS ready — switching from Icecast for PDT-exact sync');
+				monitorLive = false;
+				monitorConnect();
+			} else {
+				scheduleMonitorHlsUpgrade();
+			}
+		}, MONITOR_HLS_UPGRADE_CHECK_MS);
+	}
+
+	function clearMonitorHlsUpgradeTimer() {
+		if (monitorHlsUpgradeTimer) {
+			clearTimeout(monitorHlsUpgradeTimer);
+			monitorHlsUpgradeTimer = null;
+		}
+	}
+
+	/** Shared tail of every connect path: start playback, arm the watchdog. */
+	function monitorFinishConnect() {
+		if (!monitorEl) return;
 		monitorEl
 			.play()
 			.then(() => {
 				monitorConnecting = false;
 				monitorLive = true;
+				startMonitorStallWatch();
 			})
 			.catch(() => {
 				monitorConnecting = false;
@@ -1568,7 +1654,146 @@
 			});
 	}
 
+	function monitorConnectIcecast() {
+		if (!monitorEl) return;
+		monitorDestroyHls();
+		monitorIsHls = false;
+		const sep = data.liveStreamUrl.includes('?') ? '&' : '?';
+		monitorEl.src = `${data.liveStreamUrl}${sep}t=${Date.now()}`;
+		// Position-0 of a fresh connection ≈ live at this instant (see the
+		// burst correction in monitorPositionEpochMs).
+		monitorConnectEpochMs = Date.now();
+		monitorEl.load();
+		monitorFinishConnect();
+		// Promote to HLS (PDT-exact anchoring) once the packager is up.
+		if (data.liveHlsUrl && !monitorHlsFailed) scheduleMonitorHlsUpgrade();
+	}
+
+	async function monitorConnectHls(hlsUrl: string): Promise<boolean> {
+		const mod = await import('hls.js');
+		const HlsCtor = mod.default;
+		if (!monitorEl) return false;
+		if (HlsCtor.isSupported()) {
+			monitorDestroyHls();
+			const h = new HlsCtor({ backBufferLength: 60 });
+			monitorHls = h;
+			let fatalRetries = 0;
+			h.on(HlsCtor.Events.ERROR, (_event, errData) => {
+				if (!errData.fatal || h !== monitorHls) return;
+				if (errData.type === HlsCtor.ErrorTypes.NETWORK_ERROR && fatalRetries < 3) {
+					fatalRetries += 1;
+					h.startLoad();
+				} else if (errData.type === HlsCtor.ErrorTypes.MEDIA_ERROR && fatalRetries < 3) {
+					fatalRetries += 1;
+					h.recoverMediaError();
+				} else {
+					console.warn('[Monitor] fatal HLS error — falling back to Icecast', errData);
+					monitorHlsFailed = true;
+					monitorLive = false;
+					monitorConnectIcecast();
+				}
+			});
+			h.loadSource(hlsUrl);
+			h.attachMedia(monitorEl);
+			monitorIsHls = true;
+			monitorFinishConnect();
+			// Deadline: if HLS hasn't produced audio in time (packager racing
+			// the broadcast start), don't sit in "Connecting…" — Icecast now,
+			// upgrade later.
+			setTimeout(() => {
+				if (monitorLive || !monitorIsHls || h !== monitorHls) return;
+				console.warn('[Monitor] HLS connect deadline hit — bridging with Icecast');
+				monitorConnecting = false;
+				monitorConnectIcecast();
+			}, MONITOR_HLS_CONNECT_DEADLINE_MS);
+			return true;
+		}
+		// No MSE (iOS/desktop Safari without it) — native HLS still carries PDT
+		// via getStartDate().
+		if (monitorEl.canPlayType('application/vnd.apple.mpegurl')) {
+			monitorDestroyHls();
+			monitorIsHls = true;
+			monitorEl.src = hlsUrl;
+			monitorEl.load();
+			monitorFinishConnect();
+			return true;
+		}
+		return false;
+	}
+
+	function monitorConnect() {
+		if (!monitorEl || monitorConnecting || monitorLive) return;
+		monitorConnecting = true;
+		monitorEl.muted = monitorMuted;
+		const hlsUrl = data.liveHlsUrl;
+		if (hlsUrl && !monitorHlsFailed) {
+			void monitorConnectHlsRoute(hlsUrl);
+			return;
+		}
+		monitorConnectIcecast();
+	}
+
+	async function monitorConnectHlsRoute(hlsUrl: string) {
+		// Freshness gate — see the HLS-readiness note above.
+		const fresh = await monitorPlaylistLooksLive(hlsUrl);
+		if (!monitorEl || monitorLive) return;
+		if (!fresh) {
+			monitorConnectIcecast();
+			return;
+		}
+		const ok = await monitorConnectHls(hlsUrl);
+		if (!ok) {
+			monitorHlsFailed = true;
+			monitorConnectIcecast();
+		}
+	}
+
+	// ── Stall watchdog ────────────────────────────────────────────
+	// The Icecast silence fallback keeps bytes flowing through source blips,
+	// so a monitor whose clock stops advancing while "playing" is a wedged
+	// client connection — no pause/ended/error event ever fires for it. The
+	// only recovery is a fresh connection at the live edge (same fix as the
+	// public player's stall watchdog).
+	const MONITOR_STALL_MS = 15_000;
+	let monitorLastProgressMs = 0;
+	let monitorStallTimer: ReturnType<typeof setInterval> | null = null;
+
+	function onMonitorTimeUpdate() {
+		monitorLastProgressMs = Date.now();
+	}
+
+	function startMonitorStallWatch() {
+		if (monitorStallTimer) return;
+		monitorLastProgressMs = Date.now();
+		monitorStallTimer = setInterval(() => {
+			if (!monitorEl || !monitorLive) return;
+			// Hidden tabs throttle timers and timeupdate — don't judge staleness.
+			if (document.visibilityState !== 'visible' || monitorEl.paused) {
+				monitorLastProgressMs = Date.now();
+				return;
+			}
+			if (Date.now() - monitorLastProgressMs < MONITOR_STALL_MS) return;
+			monitorLastProgressMs = Date.now();
+			console.warn('[Monitor] live stream wedged — reconnecting at the live edge');
+			monitorLive = false;
+			monitorConnect();
+		}, 3000);
+	}
+
+	function stopMonitorStallWatch() {
+		if (monitorStallTimer) {
+			clearInterval(monitorStallTimer);
+			monitorStallTimer = null;
+		}
+	}
+
 	function monitorDisconnect() {
+		stopMonitorStallWatch();
+		clearMonitorHlsUpgradeTimer();
+		monitorDestroyHls();
+		monitorIsHls = false;
+		// A fresh broadcast deserves a fresh HLS attempt.
+		monitorHlsFailed = false;
 		if (monitorSourceGoneTimer) {
 			clearTimeout(monitorSourceGoneTimer);
 			monitorSourceGoneTimer = null;
@@ -2607,6 +2832,7 @@
 			bind:this={monitorEl}
 			preload="none"
 			muted
+			ontimeupdate={onMonitorTimeUpdate}
 			onpause={onMonitorInterrupted}
 			onended={onMonitorInterrupted}
 			onerror={onMonitorInterrupted}

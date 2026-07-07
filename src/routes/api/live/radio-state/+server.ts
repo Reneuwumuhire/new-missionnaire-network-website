@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { getLiveAudioSourceUrl } from '$lib/server/live-audio';
+import { getLiveAudioSourceUrl, getLiveAudioHlsUrl } from '$lib/server/live-audio';
 import { checkLiveAudio } from '$lib/server/icecast';
 import {
 	getRadioCachedStatus,
@@ -58,6 +58,9 @@ export async function GET({ fetch, setHeaders }) {
 		checkedAt: checkedAt ?? new Date().toISOString(),
 		listeners,
 		streamUrl: isLive ? (streamUrl ?? getLiveAudioSourceUrl()) : undefined,
+		// DVR playlist — lets the player offer pause/resume + seek-back +
+		// jump-to-live. Absent when LIVE_AUDIO_HLS_URL isn't configured.
+		hlsUrl: isLive ? getLiveAudioHlsUrl() || undefined : undefined,
 		title: adminGate.title,
 		description: adminGate.description,
 		thumbnailUrl: adminGate.thumbnail_url,

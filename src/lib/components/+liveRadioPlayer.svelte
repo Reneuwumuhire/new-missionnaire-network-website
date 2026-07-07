@@ -55,6 +55,9 @@
 	// Direct URL to the audio source, received from the server via radio-state.
 	// Bypasses the serverless proxy which has execution time limits.
 	let directStreamUrl = '';
+	// HLS DVR playlist (when the server advertises one) — preferred by the
+	// player for pause/resume + seek-back + jump-to-live.
+	let hlsStreamUrl = '';
 	// Fallback proxy URL — used only when the server hasn't sent a direct URL yet.
 	const proxyStreamUrl = '/api/live/audio';
 
@@ -92,6 +95,7 @@
 		return createLiveStreamTrack({
 			title: broadcastTitle || $t('live.audioLive'),
 			url: directStreamUrl || proxyStreamUrl,
+			hlsUrl: hlsStreamUrl || null,
 			thumbnailUrl: broadcastThumbnail
 		});
 	}
@@ -149,16 +153,19 @@
 		if (!browser || !liveTrackSelected) return;
 		const current = $selectAudio as LiveStreamTrack;
 		const desiredUrl = directStreamUrl || proxyStreamUrl;
+		const desiredHls = hlsStreamUrl || null;
 		const desiredTitle = broadcastTitle || current.title;
 		const desiredThumb = broadcastThumbnail ?? null;
 		if (
 			current.url !== desiredUrl ||
+			current.hlsUrl !== desiredHls ||
 			current.title !== desiredTitle ||
 			current.thumbnail_url !== desiredThumb
 		) {
 			const track = createLiveStreamTrack({
 				title: desiredTitle,
 				url: desiredUrl,
+				hlsUrl: desiredHls,
 				thumbnailUrl: desiredThumb
 			});
 			basePlaylist.set([track]);
@@ -291,11 +298,13 @@
 		liveNow: boolean,
 		checkedAt: string,
 		listeners: number,
-		streamUrl?: string
+		streamUrl?: string,
+		hlsUrl?: string
 	) {
 		lastCheckedAt = checkedAt;
 		listenerCount = listeners;
 		if (streamUrl) directStreamUrl = streamUrl;
+		if (hlsUrl) hlsStreamUrl = hlsUrl;
 
 		// Update the global store so the banner and other components react
 		radioIsLiveStore.set(liveNow);
@@ -348,6 +357,7 @@
 		checkedAt: string;
 		listeners: number;
 		streamUrl?: string;
+		hlsUrl?: string;
 		title?: string | null;
 		description?: string | null;
 		thumbnailUrl?: string | null;
@@ -363,7 +373,13 @@
 			const nextThumb = data.thumbnailUrl ?? null;
 			if (nextThumb !== broadcastThumbnail) broadcastThumbnailBroken = false;
 			broadcastThumbnail = nextThumb;
-			handleStatusEvent(data.isLive, data.checkedAt, data.listeners, data.streamUrl);
+			handleStatusEvent(
+				data.isLive,
+				data.checkedAt,
+				data.listeners,
+				data.streamUrl,
+				data.hlsUrl
+			);
 		} catch {
 			// Network error — keep current state.
 		}

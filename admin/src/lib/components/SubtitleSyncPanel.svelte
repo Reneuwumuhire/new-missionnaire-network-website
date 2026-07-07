@@ -9,12 +9,13 @@
 	// Live subtitle sync control — shown under the broadcast card while a live
 	// is on air. The operator clicks "Démarrer" (or a cue in the list) at the
 	// exact moment they HEAR the words in the « Écoute du direct » monitor of
-	// the broadcast card above. The anchor is taken from that monitor's *on-air
-	// position* (connectEpoch + currentTime), NOT wall-clock: the operator's own
-	// listening latency (Icecast burst + buffering) is therefore modelled the
-	// same way the public player models its own, so the two cancel and listeners
-	// get the right line regardless of how far behind live either side sits. The
-	// ±1/5/30s nudges fine-tune any residual.
+	// the broadcast card above. The anchor is that monitor's *on-air position*:
+	// with the HLS monitor this is the frame's EXT-X-PROGRAM-DATE-TIME — the
+	// true broadcast wall-clock — so the operator's own listening latency
+	// cannot skew the anchor, and every listener (HLS exact via PDT, Icecast
+	// via its burst-corrected estimate) lands on the right line no matter how
+	// far behind live they sit, paused or rewound. The ±1/5/30s nudges
+	// fine-tune any residual.
 	let {
 		broadcast,
 		getMonitorPositionEpochMs
@@ -25,11 +26,11 @@
 			subtitle_offset_ms: number;
 		};
 		/** Broadcast wall-clock of the audio the operator is hearing in the
-		 *  « Écoute du direct » monitor right now (connectEpoch + currentTime),
-		 *  or null when it isn't playing. Anchoring on this instead of Date.now()
-		 *  bakes the operator's listening latency into the anchor the same way the
-		 *  public player models its own — so the two cancel and listeners' text
-		 *  lands on the right words regardless of buffering depth. */
+		 *  « Écoute du direct » monitor right now (HLS: exact per-frame PDT;
+		 *  Icecast fallback: burst-corrected connect-epoch estimate), or null
+		 *  when it isn't playing. Anchoring on this instead of Date.now() makes
+		 *  the anchor identify the true broadcast moment of the words heard,
+		 *  independent of the operator's own buffering depth. */
 		getMonitorPositionEpochMs?: () => number | null;
 	} = $props();
 

@@ -196,7 +196,7 @@
 				srtSec = null;
 				return;
 			}
-			const { positionEpochMs } = $livePlayback;
+			const { positionEpochMs, pdt } = $livePlayback;
 			if (positionEpochMs === null) {
 				// No stream connected yet — nothing is being heard, no highlight.
 				srtSec = null;
@@ -204,7 +204,11 @@
 			}
 			// positionEpochMs is frozen while paused and shifts with DVR
 			// scrubbing, so the text always tracks the audio actually heard.
-			srtSec = (positionEpochMs + clockSkewMs - anchorEpochMs + offsetMs) / 1000;
+			// Clock-skew correction applies ONLY to the Icecast estimate (built
+			// from the listener's own clock); PDT positions are already server
+			// wall-clock — adding skew there would punish devices with a wrong
+			// clock in the exact mode that is otherwise exact.
+			srtSec = (positionEpochMs + (pdt ? 0 : clockSkewMs) - anchorEpochMs + offsetMs) / 1000;
 		} else {
 			const { trackId: playingId, timeSec } = $replayPlayback;
 			if (!trackId || playingId !== trackId) {
