@@ -3082,20 +3082,26 @@
 			liveSeekEnd = 0;
 			if (wasLiveTrack) {
 				wasLiveTrack = false;
-				livePlayback.set({ playing: false, positionEpochMs: null });
+				livePlayback.set({ playing: false, positionEpochMs: null, pdt: false });
 			}
 		}
 	});
 	// Position bridge for the live transcript: wall-clock moment of the audio
 	// the listener is hearing right now.
 	//  - HLS: EXT-X-PROGRAM-DATE-TIME gives the exact broadcast wall-clock of
-	//    the playing frame (hls.js playingDate / Safari getStartDate) — stays
-	//    correct across pauses of any length and DVR seeks.
-	//  - Icecast fallback: connection epoch + playback position (position 0 of
-	//    a fresh connection is "live at that instant").
+	//    the playing frame (hls.js playingDate / Safari getStartDate) — server
+	//    clock, stays correct across pauses of any length and DVR seeks.
+	//  - Icecast fallback: connection epoch + playback position, corrected for
+	//    the burst backlog Icecast front-loads on connect (position 0 is audio
+	//    from ~burst seconds BEFORE the connection: 262144 B at 128 kbps ≈ 16 s
+	//    — see ops/fly/streaming/icecast.xml.template). The subtitle anchor is
+	//    PDT-based (true wall-clock), so this estimate must aim at true
+	//    wall-clock too.
+	const LIVE_ICECAST_BURST_ESTIMATE_MS = 16_000;
 	$effect(() => {
 		if (!browser || !isLiveTrack) return;
 		let positionEpochMs: number | null = null;
+		let pdt = false;
 		if (liveIsHls) {
 			// currentTime (reactive) retriggers this on every timeupdate; the
 			// date values themselves come from the media engine.
@@ -3103,18 +3109,20 @@
 			const playingDate = hlsInstance?.playingDate;
 			if (playingDate) {
 				positionEpochMs = playingDate.getTime();
+				pdt = true;
 			} else if (audio) {
 				const startDate = (
 					audio as HTMLAudioElement & { getStartDate?: () => Date }
 				).getStartDate?.();
 				if (startDate && !Number.isNaN(startDate.getTime())) {
 					positionEpochMs = startDate.getTime() + currentTime * 1000;
+					pdt = true;
 				}
 			}
 		} else if (liveConnectEpochMs !== null) {
-			positionEpochMs = liveConnectEpochMs + currentTime * 1000;
+			positionEpochMs = liveConnectEpochMs + currentTime * 1000 - LIVE_ICECAST_BURST_ESTIMATE_MS;
 		}
-		livePlayback.set({ playing: $isPlaying, positionEpochMs });
+		livePlayback.set({ playing: $isPlaying, positionEpochMs, pdt });
 	});
 </script>
 

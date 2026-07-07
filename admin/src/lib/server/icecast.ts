@@ -29,6 +29,17 @@ export function icecastStreamUrl(): string {
 	return icecastStatusUrl().replace(/\/status-json\.xsl$/, '/radio.mp3');
 }
 
+/** HLS DVR playlist (PDT-stamped) served by the recorder. Preferred source for
+ *  the live monitor: hls.js `playingDate` gives the exact broadcast wall-clock
+ *  of the audio the operator hears, which makes the subtitle-sync anchor exact
+ *  for every listener regardless of anyone's buffering latency. Derives from
+ *  RECORDER_URL (the recorder serves /hls/*) unless overridden. */
+export function liveAudioHlsUrl(): string | null {
+	if (env.LIVE_AUDIO_HLS_URL) return env.LIVE_AUDIO_HLS_URL;
+	if (env.RECORDER_URL) return `${env.RECORDER_URL.replace(/\/$/, '')}/hls/live.m3u8`;
+	return null;
+}
+
 /** Mount path of the real broadcast stream (e.g. `/radio.mp3`). Detection must
  *  be mount-specific: the Fly stack also runs a permanent silence source on
  *  `/silence.mp3` (the fallback that keeps listener connections alive through

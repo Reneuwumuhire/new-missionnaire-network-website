@@ -9,7 +9,7 @@ import {
 	countPushSubscriptions
 } from '../../db/collections';
 import { RecorderError, recorderStatus, type RecorderStatus } from '$lib/server/recorder-client';
-import { getIcecastSnapshot, icecastStreamUrl } from '$lib/server/icecast';
+import { getIcecastSnapshot, icecastStreamUrl, liveAudioHlsUrl } from '$lib/server/icecast';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
@@ -46,6 +46,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 		recorder,
 		icecast,
 		liveStreamUrl: icecastStreamUrl(),
+		// HLS DVR feed for the live monitor — PDT gives the exact on-air time
+		// of what the operator hears, making the subtitle anchor exact.
+		liveHlsUrl: liveAudioHlsUrl(),
 		broadcast,
 		subscriberCount,
 		upcomingLives,

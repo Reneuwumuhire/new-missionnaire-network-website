@@ -32,14 +32,21 @@ export const filteredVideos = writable<YoutubeVideo[]>();
 // Radio live status — shared across components (banner, homepage, radio player)
 export const radioIsLive = writable<boolean>(false);
 
-// Live player playback position bridge — written by +liveRadioPlayer, read by
-// the live transcript. positionEpochMs = wall-clock ms of the audio the
-// listener is hearing right now (stream connection epoch + playback
-// position); null when no stream is connected. Pause freezes it, DVR
-// rewind shifts it back, reconnects snap it to "now".
-export const livePlayback = writable<{ playing: boolean; positionEpochMs: number | null }>({
+// Live player playback position bridge — written by the global audio player,
+// read by the live transcript. positionEpochMs = wall-clock ms of the audio
+// the listener is hearing right now; null when no stream is connected. Pause
+// freezes it, DVR rewind shifts it back, reconnects snap it to "now".
+// pdt: true when the position comes from HLS EXT-X-PROGRAM-DATE-TIME — i.e.
+// it is SERVER wall-clock, exact, and must NOT get the client clock-skew
+// correction the Icecast estimate (client clock) needs.
+export const livePlayback = writable<{
+	playing: boolean;
+	positionEpochMs: number | null;
+	pdt?: boolean;
+}>({
 	playing: false,
-	positionEpochMs: null
+	positionEpochMs: null,
+	pdt: false
 });
 
 // Global audio player position bridge — written by +audioPlayer (throttled),
