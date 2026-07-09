@@ -566,6 +566,9 @@ function csvCell(value: unknown) {
 }
 
 export type LyricSection = {
+	// Set only when the section came from a paragraph the user typed, so the
+	// editor can rebuild the exact same paragraphs. Scraped sections omit it.
+	block?: number;
 	label: string;
 	lines: LyricSourceLine[];
 	title: string;
@@ -601,11 +604,9 @@ function extractLyricSections(html: string) {
 				currentSection = { label: '', lines: [], title: '' };
 				sections.push(currentSection);
 			}
-			currentSection.lines.push(
-				createLyricSourceLine(text, {
-					role: isRefrainBlock(blockHtml, text) ? 'refrain' : 'line'
-				})
-			);
+			pushBlockLines(currentSection, text, {
+				role: isRefrainBlock(blockHtml, text) ? 'refrain' : 'line'
+			});
 			continue;
 		}
 
@@ -614,7 +615,7 @@ function extractLyricSections(html: string) {
 				currentSection = { label: '', lines: [], title: '' };
 				sections.push(currentSection);
 			}
-			currentSection.title = text;
+			currentSection.title = collapseWhitespace(text);
 			continue;
 		}
 
@@ -622,15 +623,34 @@ function extractLyricSections(html: string) {
 			currentSection = { label: '', lines: [], title: '' };
 			sections.push(currentSection);
 		}
-		currentSection.lines.push(
-			createLyricSourceLine(text, {
-				role: isRefrainBlock(blockHtml, text) ? 'refrain' : 'verse',
-				verseNumber: parseOlStart(match[3])
-			})
-		);
+		pushBlockLines(currentSection, text, {
+			role: isRefrainBlock(blockHtml, text) ? 'refrain' : 'verse',
+			verseNumber: parseOlStart(match[3])
+		});
 	}
 
 	return sections.filter((section) => section.title || section.lines.length > 0);
+}
+
+// A `<br>` inside a block is a real line break, so each of its lines becomes
+// its own lyric line. Only the first carries the stanza's verse number.
+function pushBlockLines(
+	section: LyricSection,
+	text: string,
+	options: { role?: LyricSourceLine['role']; verseNumber?: number | null }
+) {
+	text
+		.split('\n')
+		.map((line) => line.trim())
+		.filter(Boolean)
+		.forEach((line, index) => {
+			section.lines.push(
+				createLyricSourceLine(line, {
+					role: options.role,
+					verseNumber: index === 0 ? options.verseNumber : null
+				})
+			);
+		});
 }
 
 function createLyricSourceLine(
@@ -734,19 +754,26 @@ function normalizeText(value?: string) {
 
 function extractFirstText(html: string, regex: RegExp) {
 	const match = regex.exec(html);
-	return match ? htmlToText(match[1]) : '';
+	return match ? collapseWhitespace(htmlToText(match[1])) : '';
 }
 
+// Keeps the line breaks a `<br>` stands for. Callers that need a single line
+// (titles, section labels) run the result through collapseWhitespace.
 function htmlToText(html: string) {
 	return decodeHtmlEntities(
 		html
 			.replace(/<br\s*\/?>/gi, '\n')
 			.replace(/<[^>]+>/g, '')
+			.replace(/[^\S\n]+/g, ' ')
 			.replace(/[ \t]+\n/g, '\n')
-			.replace(/\n{3,}/g, '\n\n')
-			.replace(/\s+/g, ' ')
+			.replace(/\n[ \t]+/g, '\n')
+			.replace(/\n{2,}/g, '\n')
 			.trim()
 	);
+}
+
+function collapseWhitespace(text: string) {
+	return text.replace(/\s+/g, ' ').trim();
 }
 
 function decodeHtmlEntities(text: string) {

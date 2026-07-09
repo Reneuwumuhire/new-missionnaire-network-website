@@ -12,6 +12,7 @@ import {
 export type LyricsLineKind = 'heading' | 'line';
 
 export type LyricsLine = {
+	block?: number;
 	id: string;
 	kind: LyricsLineKind;
 	order: number;
@@ -526,6 +527,7 @@ function createManualLyricSections(
 		const sectionIndex = sections.length;
 
 		sections.push({
+			block: sectionIndex,
 			label:
 				sectionIndex === 0 && !hasStandaloneHeading && !pendingHeading
 					? String(options.sourceNumber ?? '').trim()
@@ -566,9 +568,11 @@ function flattenLyricSections(sections: LyricSection[]) {
 	let order = 0;
 
 	sections.forEach((section, sectionIndex) => {
+		const block = typeof section.block === 'number' ? { block: section.block } : {};
 		const heading = [section.label, section.title].filter(Boolean).join(' - ');
 		if (heading) {
 			lines.push({
+				...block,
 				id: `s${sectionIndex}-h`,
 				kind: 'heading',
 				order,
@@ -582,6 +586,7 @@ function flattenLyricSections(sections: LyricSection[]) {
 		section.lines.forEach((sourceLine, lineIndex) => {
 			const line = normalizeSourceLine(sourceLine);
 			lines.push({
+				...block,
 				id: `s${sectionIndex}-l${lineIndex}`,
 				kind: 'line',
 				order,

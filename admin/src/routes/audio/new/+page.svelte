@@ -3,15 +3,10 @@
 	import { toast } from '$lib/stores/toast';
 	import { t } from '$lib/i18n';
 	import FileDropZone from '$lib/components/FileDropZone.svelte';
+	import { formatExtractedLyrics } from '$lib/lyricsFormat';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
-
-	type ExtractedSection = {
-		label: string;
-		title: string;
-		lines: Array<string | { role?: string; text?: string; verse_number?: number | null }>;
-	};
 
 	// File state
 	let file: File | null = $state(null);
@@ -91,45 +86,6 @@
 		} finally {
 			lyricsUrlLoading = false;
 		}
-	}
-
-	function formatExtractedLyrics(
-		sections: ExtractedSection[] | undefined,
-		lines: string[] | undefined
-	) {
-		if (sections && sections.length > 0) {
-			const blocks: string[][] = [];
-			let inRefrain = false;
-
-			for (const section of sections) {
-				for (const sourceLine of section.lines ?? []) {
-					const text =
-						typeof sourceLine === 'string' ? sourceLine.trim() : (sourceLine.text ?? '').trim();
-					if (!text) continue;
-					const role = typeof sourceLine === 'string' ? '' : (sourceLine.role ?? '');
-					const verseNumber =
-						typeof sourceLine === 'string' ? null : (sourceLine.verse_number ?? null);
-					const formatted =
-						typeof verseNumber === 'number' && verseNumber > 0 ? `${verseNumber}. ${text}` : text;
-
-					if (role === 'refrain') {
-						if (!inRefrain) {
-							blocks.push(['Refrain']);
-							inRefrain = true;
-						}
-						blocks[blocks.length - 1].push(formatted);
-						continue;
-					}
-
-					blocks.push([formatted]);
-					inRefrain = false;
-				}
-			}
-
-			return blocks.map((block) => block.join('\n')).join('\n\n');
-		}
-
-		return (lines ?? []).filter(Boolean).join('\n\n');
 	}
 
 	async function uploadToS3() {
