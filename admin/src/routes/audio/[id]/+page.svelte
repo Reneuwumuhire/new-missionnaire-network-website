@@ -6,6 +6,7 @@
 	import { audioPreview } from '$lib/stores/audio-preview';
 	import { t } from '$lib/i18n';
 	import AudioPreviewPlayer from '$lib/components/AudioPreviewPlayer.svelte';
+	import { formatExtractedLyrics } from '$lib/lyricsFormat';
 	import type { PageData } from './$types';
 
 	type PublishedLyrics = {
@@ -18,12 +19,6 @@
 		synced_at?: string;
 		synced_by?: string;
 		timeline_status?: string;
-	};
-
-	type ExtractedSection = {
-		label: string;
-		title: string;
-		lines: Array<string | { role?: string; text?: string; verse_number?: number | null }>;
 	};
 
 	let { data }: { data: PageData } = $props();
@@ -123,14 +118,48 @@
 		return Number.isFinite(verseNumber) && verseNumber > 0 ? `${verseNumber}. ${text}` : text;
 	}
 
+	function lineBlock(line: unknown) {
+		if (!line || typeof line !== 'object') return null;
+		const block = Number((line as { block?: unknown }).block);
+		return Number.isFinite(block) ? block : null;
+	}
+
+	function sectionHeading(line: unknown) {
+		if (!line || typeof line !== 'object') return '';
+		const record = line as { section_label?: unknown; section_title?: unknown };
+		// A section that carries a title is the song header the editor injects,
+		// not something the user typed. Only a bare label ("Refrain",
+		// "Couplet 2") belongs back in the textarea.
+		if (String(record.section_title ?? '').trim()) return '';
+		return String(record.section_label ?? '').trim();
+	}
+
 	function buildLyricsText(lines: unknown[] | undefined) {
 		const blocks: string[][] = [];
 		let inRefrain = false;
+		let currentBlock: number | null = null;
 
 		for (const line of lines ?? []) {
 			const text = formatLineForEditing(line);
 			if (!text) continue;
 
+			// Lyrics published from this editor remember the paragraphs the user
+			// typed, so rebuild them verbatim instead of guessing from the role.
+			const block = lineBlock(line);
+			if (block !== null) {
+				inRefrain = false;
+				if (block !== currentBlock) {
+					currentBlock = block;
+					const heading = sectionHeading(line) || (lineRole(line) === 'refrain' ? 'Refrain' : '');
+					blocks.push(heading ? [heading] : []);
+				}
+				blocks[blocks.length - 1].push(text);
+				continue;
+			}
+
+			// Scraped lyrics have no paragraph information: keep one line per
+			// block and only group the refrain.
+			currentBlock = null;
 			if (lineRole(line) === 'refrain') {
 				if (!inRefrain) {
 					blocks.push(['Refrain']);
@@ -257,42 +286,6 @@
 		} finally {
 			lyricsUrlLoading = false;
 		}
-	}
-
-	function formatExtractedLyrics(sections: ExtractedSection[] | undefined, lines: string[] | undefined) {
-		if (sections && sections.length > 0) {
-			const blocks: string[][] = [];
-			let inRefrain = false;
-
-			for (const section of sections) {
-				for (const sourceLine of section.lines ?? []) {
-					const text =
-						typeof sourceLine === 'string' ? sourceLine.trim() : (sourceLine.text ?? '').trim();
-					if (!text) continue;
-					const role = typeof sourceLine === 'string' ? '' : (sourceLine.role ?? '');
-					const verseNumber =
-						typeof sourceLine === 'string' ? null : (sourceLine.verse_number ?? null);
-					const formatted =
-						typeof verseNumber === 'number' && verseNumber > 0 ? `${verseNumber}. ${text}` : text;
-
-					if (role === 'refrain') {
-						if (!inRefrain) {
-							blocks.push(['Refrain']);
-							inRefrain = true;
-						}
-						blocks[blocks.length - 1].push(formatted);
-						continue;
-					}
-
-					blocks.push([formatted]);
-					inRefrain = false;
-				}
-			}
-
-			return blocks.map((block) => block.join('\n')).join('\n\n');
-		}
-
-		return (lines ?? []).filter(Boolean).join('\n\n');
 	}
 
 	async function publishLyrics() {

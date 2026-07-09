@@ -18,6 +18,7 @@
 				end?: unknown;
 				end_time?: unknown;
 				endTime?: unknown;
+				block?: unknown;
 				kind?: unknown;
 				role?: unknown;
 				section_label?: unknown;
@@ -156,6 +157,31 @@
 		return getStringField(line, 'kind') === 'heading';
 	}
 
+	function getBlock(line: LyricLine): number | null {
+		if (!line || typeof line !== 'object') return null;
+		const value = Number(line.block);
+		return Number.isFinite(value) ? value : null;
+	}
+
+	// Lyrics published from the admin carry the paragraph the editor typed, so
+	// lines inside one verse hug each other and only the paragraph break
+	// breathes. Older lyrics have no paragraph info: every line stands alone,
+	// which is the spacing they have always had.
+	function continuesBlock(index: number) {
+		if (index === 0) return false;
+		const block = getBlock(lines[index]);
+		if (block === null) return false;
+		const previous = lines[index - 1];
+		return !isHeading(previous) && getBlock(previous) === block;
+	}
+
+	// A paragraph that follows another paragraph, with no heading between them
+	// to space the two apart.
+	function startsBlock(index: number) {
+		if (index === 0 || getBlock(lines[index]) === null) return false;
+		return !isHeading(lines[index - 1]) && !continuesBlock(index);
+	}
+
 	function isChorus(line: LyricLine) {
 		const searchable = [
 			getLineText(line),
@@ -268,6 +294,8 @@
 		{@const heading = isHeading(line)}
 		{@const chorus = isChorus(line)}
 		{@const verseNumber = getVerseNumber(line)}
+		{@const continues = continuesBlock(index)}
+		{@const blockStart = startsBlock(index)}
 		{#if heading}
 			<div
 				bind:this={lineElements[index]}
@@ -292,6 +320,8 @@
 				bind:this={lineElements[index]}
 				class="lyric-line timed"
 				class:active={index === activeLineIndex}
+				class:continues
+				class:block-start={blockStart}
 				class:chorus={chorus}
 				class:past={activeLineIndex >= 0 && index < activeLineIndex}
 				class:future={activeLineIndex >= 0 && index > activeLineIndex}
@@ -308,6 +338,8 @@
 			<div
 				bind:this={lineElements[index]}
 				class="lyric-line untimed"
+				class:continues
+				class:block-start={blockStart}
 				class:chorus={chorus}
 				class:past={activeLineIndex >= 0 && index < activeLineIndex}
 				class:future={activeLineIndex >= 0 && index > activeLineIndex}
@@ -390,6 +422,31 @@
 
 	.lyric-line:first-child {
 		margin-top: 0;
+	}
+
+	/* ─── Paragraphs, when the lyrics carry them ─────────────────────────
+	   Lines inside one verse hug each other and the paragraph break carries
+	   the air, so the song reads the way it was typed in the admin. Lyrics
+	   published before paragraphs were recorded have neither class and keep
+	   the uniform per-line rhythm.
+
+	   Collapsing the margin is not enough on its own: each line also carries
+	   0.45rem of vertical padding, and that padding — not the margin — is what
+	   pushes the lines of a verse apart. Inside a paragraph it shrinks to a
+	   hairline so only the leading separates the lines, the way a hymnal sets
+	   them. The last line of a paragraph keeps its full padding, so the
+	   chorus's tinted backdrop still breathes. */
+	.lyric-line.continues {
+		margin-top: 0;
+		padding-top: 0.08rem;
+	}
+
+	.lyric-line:has(:global(+ .lyric-line.continues)) {
+		padding-bottom: 0.08rem;
+	}
+
+	.lyric-line.block-start {
+		margin-top: 1.5rem;
 	}
 
 	.lyric-line.timed {
