@@ -65,7 +65,7 @@
 
 <section class="flex h-full min-h-0 flex-col">
 	<header class="flex items-center justify-between border-b border-ink-700 px-3 py-2">
-		<h2 class="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">Mixage audio</h2>
+		<h2 class="text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">Mixage audio</h2>
 		<div class="flex items-center gap-3">
 			<label class="flex cursor-pointer items-center gap-1.5 text-[11px] text-white/50">
 				<input

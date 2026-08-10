@@ -143,7 +143,7 @@
 	<!-- ── Scenes ─────────────────────────────────────────── -->
 	<section class="flex min-h-0 flex-1 flex-col">
 		<header class="flex items-center justify-between px-3 py-2">
-			<h2 class="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">Scènes</h2>
+			<h2 class="text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">Scènes</h2>
 			<button class="studio-icon-btn" title="Nouvelle scène" onclick={addScene} aria-label="Nouvelle scène">+</button>
 		</header>
 		<ul class="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
@@ -192,7 +192,7 @@
 	<!-- ── Sources of the active scene ────────────────────── -->
 	<section class="flex min-h-0 flex-[1.4] flex-col">
 		<header class="relative flex items-center justify-between px-3 py-2">
-			<h2 class="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">Sources</h2>
+			<h2 class="text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">Sources</h2>
 			<button class="studio-icon-btn" title="Ajouter une source" aria-label="Ajouter une source" onclick={() => (adding = !adding)}>+</button>
 			{#if adding}
 				<div class="absolute right-2 top-9 z-20 w-60 border border-ink-600 bg-ink-850 py-1 shadow-2xl shadow-black/70">

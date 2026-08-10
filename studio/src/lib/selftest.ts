@@ -25,6 +25,7 @@ export async function runSelftest(target: string, canvas: () => HTMLCanvasElemen
 	const offline = studio.scenes.find(
 		(scene) => !scene.layers.some((l) => l.kind === 'camera' || l.kind === 'screen')
 	);
+	const previousScene = studio.activeSceneId;
 	if (offline) studio.activeSceneId = offline.id;
 	await say(`SELFTEST scene=${offline?.name ?? '(aucune sans caméra)'}`);
 
@@ -60,6 +61,7 @@ export async function runSelftest(target: string, canvas: () => HTMLCanvasElemen
 	for (const line of broadcast.log.slice(-8)) await say(`SELFTEST ffmpeg| ${line}`);
 
 	await stopBroadcast();
+	studio.activeSceneId = previousScene;
 	await wait(1200);
 	const ok = Boolean(stats && stats.frames > 30 && !broadcast.error);
 	await say(`SELFTEST ${ok ? 'OK' : 'FAIL'} — terminé`);

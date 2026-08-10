@@ -107,7 +107,7 @@
 	<!-- ── On-air readout ─────────────────────────────────── -->
 	<div class="border-b border-ink-700 bg-ink-850 px-4 py-3">
 		<div class="flex items-center justify-between">
-			<span class="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">À l’antenne</span>
+			<span class="text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">À l’antenne</span>
 			<button
 				class="studio-chip {lyrics.onAir ? 'bg-emerald-500/15 text-emerald-300' : 'bg-red-500/20 text-red-300'}"
 				onclick={() => (lyrics.onAir = !lyrics.onAir)}

@@ -248,7 +248,7 @@
 						class="flex-1 border-b-2 px-2 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] transition-colors {tab ===
 						value
 							? 'border-primary text-white'
-							: 'border-transparent text-white/35 hover:text-white/70'}"
+							: 'border-transparent text-white/45 hover:text-white/80'}"
 						onclick={() => (tab = value)}>{label}</button
 					>
 				{/each}
