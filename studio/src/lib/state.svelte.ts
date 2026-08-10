@@ -4,6 +4,7 @@
 
 import type { FitMode, Rect } from './geom';
 import { FULL_FRAME } from './geom';
+import { t } from './i18n.svelte';
 import { DEFAULT_LAYOUT, type Layout } from './layout';
 
 export type LayerKind = 'camera' | 'screen' | 'image' | 'video' | 'text' | 'lyrics' | 'color';
@@ -144,36 +145,36 @@ function starterScenes(): Scene[] {
 	return [
 		{
 			id: id(),
-			name: 'Direct',
+			name: t('scenes.starterLive'),
 			layers: [
-				makeLayer('lyrics', 'Paroles', {
+				makeLayer('lyrics', t('lyrics.starterLayer'), {
 					rect: { x: 0.06, y: 0.7, w: 0.88, h: 0.24 },
 					fit: 'contain',
 					showNext: true,
 					style: { ...DEFAULT_TEXT_STYLE }
 				}),
-				makeLayer('camera', 'Caméra'),
-				makeLayer('color', 'Fond', { color: '#0B0B0D' })
+				makeLayer('camera', t('sources.camera')),
+				makeLayer('color', t('sources.starterBackground'), { color: '#0B0B0D' })
 			]
 		},
 		{
 			id: id(),
-			name: 'Écran',
+			name: t('scenes.starterScreen'),
 			layers: [
-				makeLayer('screen', 'Partage écran', { fit: 'contain' }),
-				makeLayer('color', 'Fond', { color: '#0B0B0D' })
+				makeLayer('screen', t('sources.screen'), { fit: 'contain' }),
+				makeLayer('color', t('sources.starterBackground'), { color: '#0B0B0D' })
 			]
 		},
 		{
 			id: id(),
-			name: 'Pause',
+			name: t('scenes.starterBreak'),
 			layers: [
-				makeLayer('text', 'Message', {
-					text: 'Le direct reprend dans un instant',
+				makeLayer('text', t('sources.starterMessage'), {
+					text: t('sources.starterBreakText'),
 					rect: { x: 0.1, y: 0.4, w: 0.8, h: 0.2 },
 					style: { ...DEFAULT_TEXT_STYLE, valign: 'middle', background: 'transparent', size: 0.08 }
 				}),
-				makeLayer('color', 'Fond', { color: '#111114' })
+				makeLayer('color', t('sources.starterBackground'), { color: '#111114' })
 			]
 		}
 	];
@@ -196,11 +197,11 @@ function load(): Persisted {
 		scenes,
 		activeSceneId: scenes[0].id,
 		programSceneId: scenes[0].id,
-		audioSources: [{ id: id(), name: 'Micro', gain: 1, muted: false }],
+		audioSources: [{ id: id(), name: t('mixer.starterMic'), gain: 1, muted: false }],
 		destinations: [
 			{
 				id: id(),
-				name: 'Missionnaire (app + radio)',
+				name: t('stream.presetMissionnaire'),
 				url: 'rtmp://localhost:1935/live',
 				key: 'obs',
 				enabled: true

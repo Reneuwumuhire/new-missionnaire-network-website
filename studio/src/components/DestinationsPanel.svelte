@@ -1,18 +1,27 @@
 <script lang="ts">
 	import { broadcast } from '../lib/broadcast.svelte';
 	import Icon from './Icon.svelte';
+	import { t } from '../lib/i18n.svelte';
 	import { destinationUrl, id, persist, studio, type Destination } from '../lib/state.svelte';
 
 	let revealed = $state<Record<string, boolean>>({});
 
-	const PRESETS: { name: string; url: string; hint: string }[] = [
+	const PRESETS = [
 		{
-			name: 'Missionnaire (app + radio)',
+			name: () => t('stream.presetMissionnaire'),
 			url: 'rtmp://localhost:1935/live',
-			hint: 'Votre serveur MediaMTX — alimente la radio et l’app.'
+			hint: () => t('stream.presetMissionnaireHint')
 		},
-		{ name: 'YouTube', url: 'rtmp://a.rtmp.youtube.com/live2', hint: 'Clé dans YouTube Studio › Direct.' },
-		{ name: 'Facebook', url: 'rtmps://live-api-s.facebook.com:443/rtmp', hint: 'Clé dans Facebook Live Producer.' }
+		{
+			name: () => t('stream.presetYouTube'),
+			url: 'rtmp://a.rtmp.youtube.com/live2',
+			hint: () => t('stream.presetYouTubeHint')
+		},
+		{
+			name: () => t('stream.presetFacebook'),
+			url: 'rtmps://live-api-s.facebook.com:443/rtmp',
+			hint: () => t('stream.presetFacebookHint')
+		}
 	];
 
 	function add(preset?: (typeof PRESETS)[number]) {
@@ -20,7 +29,7 @@
 			...studio.destinations,
 			{
 				id: id(),
-				name: preset?.name ?? 'Nouvelle destination',
+				name: preset?.name() ?? t('stream.newDestination'),
 				url: preset?.url ?? 'rtmp://',
 				key: '',
 				enabled: false
@@ -43,18 +52,15 @@
 
 	function problem(destination: Destination): string | null {
 		const url = destination.url.trim();
-		if (!url) return 'URL manquante';
-		if (!/^rtmps?:\/\//.test(url)) return 'L’URL doit commencer par rtmp:// ou rtmps://';
-		if (/[|[\]'"\\\s]/.test(destinationUrl(destination))) return 'Caractère interdit dans l’URL ou la clé';
+		if (!url) return t('stream.missingUrl');
+		if (!/^rtmps?:\/\//.test(url)) return t('stream.badScheme');
+		if (/[|[\]'"\\\s]/.test(destinationUrl(destination))) return t('stream.badCharacter');
 		return null;
 	}
 </script>
 
 <div class="space-y-3 p-4">
-	<p class="text-[11px] leading-relaxed text-white/40">
-		Chaque destination activée reçoit le même encodage. Si l’une refuse la connexion, les autres
-		continuent — YouTube ne peut pas faire tomber la radio.
-	</p>
+	<p class="text-[11px] leading-relaxed text-white/40">{t('stream.intro')}</p>
 
 	{#each studio.destinations as destination (destination.id)}
 		{@const issue = problem(destination)}
@@ -82,13 +88,13 @@
 						persist();
 					}}
 				/>
-				<button class="studio-icon-btn" title="Retirer" aria-label="Retirer" onclick={() => remove(destination)}><Icon name="trash" size={14} /></button>
+				<button class="studio-icon-btn" title={t('common.remove')} aria-label={t('common.remove')} onclick={() => remove(destination)}><Icon name="trash" size={14} /></button>
 			</div>
 
 			<div class="mt-2 space-y-1.5">
 				<input
 					class="studio-input w-full font-mono text-[11px]"
-					placeholder="rtmp://serveur/application"
+					placeholder={t('stream.urlPlaceholder')}
 					value={destination.url}
 					onchange={(e) => {
 						destination.url = (e.currentTarget as HTMLInputElement).value;
@@ -99,7 +105,7 @@
 					<input
 						class="studio-input min-w-0 flex-1 font-mono text-[11px]"
 						type={revealed[destination.id] ? 'text' : 'password'}
-						placeholder="clé de flux"
+						placeholder={t('stream.keyPlaceholder')}
 						value={destination.key}
 						onchange={(e) => {
 							destination.key = (e.currentTarget as HTMLInputElement).value;
@@ -109,7 +115,7 @@
 					<button
 						class="studio-chip"
 						onclick={() => (revealed[destination.id] = !revealed[destination.id])}
-						>{revealed[destination.id] ? 'Cacher' : 'Voir'}</button
+						>{revealed[destination.id] ? t('stream.hideKey') : t('stream.showKey')}</button
 					>
 				</div>
 			</div>
@@ -123,14 +129,11 @@
 	{/each}
 
 	<div class="flex flex-wrap gap-1.5 border-t border-ink-700 pt-3">
-		{#each PRESETS as preset (preset.name)}
-			<button class="studio-chip" title={preset.hint} onclick={() => add(preset)}>+ {preset.name}</button>
+		{#each PRESETS as preset (preset.url)}
+			<button class="studio-chip" title={preset.hint()} onclick={() => add(preset)}>+ {preset.name()}</button>
 		{/each}
-		<button class="studio-chip" onclick={() => add()}>+ Vide</button>
+		<button class="studio-chip" onclick={() => add()}>+ {t('stream.presetBlank')}</button>
 	</div>
 
-	<p class="text-[11px] leading-relaxed text-white/30">
-		Les clés sont enregistrées en clair dans les données de l’application, comme le fait OBS. Ne
-		partagez pas de capture d’écran avec la clé affichée.
-	</p>
+	<p class="text-[11px] leading-relaxed text-white/30">{t('stream.keyWarning')}</p>
 </div>

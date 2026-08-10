@@ -2,6 +2,7 @@
 // or an HTMLVideoElement behind a Proxy stops working in subtle ways. Everything
 // here is keyed by layer id and torn down explicitly.
 
+import { t } from './i18n.svelte';
 import type { Layer } from './state.svelte';
 
 export interface Handle {
@@ -121,7 +122,7 @@ export function openFile(layer: Layer, file: File): Handle {
 		el.src = url;
 		const h: Handle = { kind: 'image', el, stream: null, error: null, objectUrl: url };
 		el.onerror = () => {
-			h.error = 'Image illisible';
+			h.error = t('source.badImage');
 			mediaVersion.n++;
 		};
 		el.onload = () => mediaVersion.n++;
@@ -136,7 +137,7 @@ export function openFile(layer: Layer, file: File): Handle {
 	el.muted = true;
 	const h: Handle = { kind: 'video', el, stream: null, error: null, objectUrl: url };
 	el.onerror = () => {
-		h.error = 'Vidéo illisible';
+		h.error = t('source.badVideo');
 		mediaVersion.n++;
 	};
 	el.onloadedmetadata = () => mediaVersion.n++;
@@ -148,13 +149,13 @@ function describe(err: unknown): string {
 	if (!(err instanceof Error)) return String(err);
 	switch (err.name) {
 		case 'NotAllowedError':
-			return "Accès refusé — autorisez la caméra/l'écran dans Réglages › Confidentialité";
+			return t('source.denied');
 		case 'NotFoundError':
-			return 'Aucun appareil trouvé';
+			return t('source.notFound');
 		case 'NotReadableError':
-			return 'Appareil déjà utilisé par une autre application';
+			return t('source.busy');
 		case 'OverconstrainedError':
-			return 'Appareil indisponible dans cette résolution';
+			return t('source.overconstrained');
 		default:
 			return err.message || err.name;
 	}
@@ -172,7 +173,7 @@ export async function listDevices(kind: 'videoinput' | 'audioinput'): Promise<De
 		const devices = await navigator.mediaDevices.enumerateDevices();
 		return devices
 			.filter((d) => d.kind === kind)
-			.map((d, i) => ({ deviceId: d.deviceId, label: d.label || `Appareil ${i + 1}` }));
+			.map((d, i) => ({ deviceId: d.deviceId, label: d.label || `#${i + 1}` }));
 	} catch {
 		return [];
 	}

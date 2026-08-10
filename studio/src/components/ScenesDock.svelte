@@ -3,6 +3,7 @@
 	import { release } from '../lib/media.svelte';
 	import Dock from './Dock.svelte';
 	import Icon from './Icon.svelte';
+	import { t } from '../lib/i18n.svelte';
 	import { id, makeLayer, onAirSceneId, persist, studio } from '../lib/state.svelte';
 
 	let renamingId = $state<string | null>(null);
@@ -10,7 +11,7 @@
 	function addScene() {
 		const scene = {
 			id: id(),
-			name: `Scène ${studio.scenes.length + 1}`,
+			name: t('scenes.new', { number: studio.scenes.length + 1 }),
 			layers: [makeLayer('color', 'Fond', { color: '#0B0B0D' })]
 		};
 		studio.scenes = [...studio.scenes, scene];
@@ -42,7 +43,7 @@
 	const selectedIndex = $derived(studio.scenes.findIndex((s) => s.id === studio.activeSceneId));
 </script>
 
-<Dock id="scenes" title="Scènes">
+<Dock id="scenes" title={t('dock.scenes')}>
 	<ul>
 		{#each studio.scenes as scene, index (scene.id)}
 			<li class="group flex items-center">
@@ -66,8 +67,8 @@
 					<button
 						class="flex min-w-0 flex-1 items-center gap-2 px-3 py-1.5 text-left text-[13px] transition-colors {scene.id ===
 						studio.activeSceneId
-							? 'bg-primary/20 text-white'
-							: 'text-white/65 hover:bg-white/5'}"
+							? 'bg-primary font-medium text-black'
+							: 'text-white/70 hover:bg-white/5'}"
 						onclick={() => selectScene(scene.id)}
 						ondblclick={() => (renamingId = scene.id)}
 					>
@@ -76,8 +77,10 @@
 						{#if scene.id === onAirSceneId()}
 							<!-- Which scene is actually on air. Only ambiguous in Studio Mode,
 							     but that is exactly when getting it wrong matters. -->
-							<span class="shrink-0 bg-red-600/25 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-red-400">
-								Air
+							<span
+								class="shrink-0 bg-red-600 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-white"
+							>
+								{t('preview.onAir')}
 							</span>
 						{/if}
 					</button>
@@ -87,32 +90,32 @@
 	</ul>
 
 	{#snippet footer()}
-		<button class="studio-icon-btn" title="Ajouter une scène" aria-label="Ajouter une scène" onclick={addScene}><Icon name="plus" /></button>
+		<button class="studio-icon-btn" title={t('scenes.addScene')} aria-label={t('scenes.addScene')} onclick={addScene}><Icon name="plus" /></button>
 		<button
 			class="studio-icon-btn"
-			title="Supprimer la scène"
-			aria-label="Supprimer la scène"
+			title={t('scenes.removeScene')}
+			aria-label={t('scenes.removeScene')}
 			disabled={studio.scenes.length === 1}
 			onclick={() => removeScene(studio.activeSceneId)}><Icon name="trash" /></button
 		>
 		<button
 			class="studio-icon-btn"
-			title="Renommer"
-			aria-label="Renommer"
+			title={t('common.rename')}
+			aria-label={t('common.rename')}
 			onclick={() => (renamingId = studio.activeSceneId)}><Icon name="pencil" /></button
 		>
 		<span class="mx-1 h-4 w-px bg-ink-600"></span>
 		<button
 			class="studio-icon-btn"
-			title="Monter"
-			aria-label="Monter"
+			title={t('common.moveUp')}
+			aria-label={t('common.moveUp')}
 			disabled={selectedIndex <= 0}
 			onclick={() => move(studio.activeSceneId, -1)}><Icon name="up" /></button
 		>
 		<button
 			class="studio-icon-btn"
-			title="Descendre"
-			aria-label="Descendre"
+			title={t('common.moveDown')}
+			aria-label={t('common.moveDown')}
 			disabled={selectedIndex === studio.scenes.length - 1}
 			onclick={() => move(studio.activeSceneId, 1)}><Icon name="down" /></button
 		>

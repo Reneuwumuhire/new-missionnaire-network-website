@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { FULL_FRAME } from '../lib/geom';
 	import Icon, { type IconName } from './Icon.svelte';
+	import { t } from '../lib/i18n.svelte';
 	import { handleFor, listDevices, openCamera, type DeviceOption } from '../lib/media.svelte';
 	import { onMount } from 'svelte';
 	import { DEFAULT_TEXT_STYLE, persist, selectedLayer, studio } from '../lib/state.svelte';
@@ -26,12 +27,12 @@
 
 {#if !layer}
 	<p class="p-6 text-center text-[11px] leading-relaxed text-white/30">
-		Sélectionnez une source dans la liste, ou cliquez-la directement dans l’aperçu.
+		{t('props.empty')}
 	</p>
 {:else}
 	<div class="space-y-5 p-4">
 		<div>
-			<span class="studio-label">Nom</span>
+			<span class="studio-label">{t('common.name')}</span>
 			<input
 				class="studio-input w-full"
 				value={layer.name}
@@ -44,7 +45,7 @@
 
 		{#if layer.kind === 'camera'}
 			<div>
-				<span class="studio-label">Appareil</span>
+				<span class="studio-label">{t('props.device')}</span>
 				<select
 					class="studio-input w-full"
 					value={layer.deviceId ?? ''}
@@ -55,7 +56,7 @@
 						cameras = await listDevices('videoinput');
 					}}
 				>
-					<option value="">Caméra par défaut</option>
+					<option value="">{t('props.defaultCamera')}</option>
 					{#each cameras as camera (camera.deviceId)}
 						<option value={camera.deviceId}>{camera.label}</option>
 					{/each}
@@ -68,7 +69,7 @@
 
 		{#if layer.kind === 'color'}
 			<div>
-				<span class="studio-label">Couleur</span>
+				<span class="studio-label">{t('props.color')}</span>
 				<input
 					type="color"
 					class="h-10 w-full cursor-pointer border border-ink-600 bg-ink-800"
@@ -83,7 +84,7 @@
 
 		{#if layer.kind === 'text'}
 			<div>
-				<span class="studio-label">Texte</span>
+				<span class="studio-label">{t('props.text')}</span>
 				<textarea
 					class="studio-input h-24 w-full resize-none"
 					value={layer.text ?? ''}
@@ -106,7 +107,7 @@
 						commit();
 					}}
 				/>
-				Afficher aussi la ligne suivante
+				{t('props.showNextLine')}
 			</label>
 		{/if}
 
@@ -117,25 +118,25 @@
 					class="studio-chip"
 					onclick={() => {
 						if (el instanceof HTMLVideoElement) void el.play();
-					}}>Lecture</button
+					}}>{t('props.play')}</button
 				>
 				<button
 					class="studio-chip"
 					onclick={() => {
 						if (el instanceof HTMLVideoElement) el.pause();
-					}}>Pause</button
+					}}>{t('props.pause')}</button
 				>
 				<button
 					class="studio-chip"
 					onclick={() => {
 						if (el instanceof HTMLVideoElement) el.currentTime = 0;
-					}}>Début</button
+					}}>{t('props.restart')}</button
 				>
 				<button
 					class="studio-chip {el instanceof HTMLVideoElement && el.loop ? 'bg-primary/20 text-primary' : ''}"
 					onclick={() => {
 						if (el instanceof HTMLVideoElement) el.loop = !el.loop;
-					}}>Boucle</button
+					}}>{t('props.loop')}</button
 				>
 			</div>
 		{/if}
@@ -143,13 +144,13 @@
 		<!-- ── Geometry ─────────────────────────────────────── -->
 		<div>
 			<div class="mb-1.5 flex items-center justify-between">
-				<span class="studio-label mb-0">Position (% du cadre)</span>
+				<span class="studio-label mb-0">{t('props.position')}</span>
 				<button
 					class="studio-chip"
 					onclick={() => {
 						layer.rect = { ...FULL_FRAME };
 						commit();
-					}}>Plein cadre</button
+					}}>{t('props.fullFrame')}</button
 				>
 			</div>
 			<div class="grid grid-cols-4 gap-1.5">
@@ -176,9 +177,9 @@
 
 		{#if ['camera', 'screen', 'image', 'video'].includes(layer.kind)}
 			<div>
-				<span class="studio-label">Cadrage</span>
+				<span class="studio-label">{t('props.crop')}</span>
 				<div class="flex gap-1">
-					{#each [['cover', 'Remplir'], ['contain', 'Entier'], ['stretch', 'Étirer']] as [mode, label] (mode)}
+					{#each [['cover', t('props.cover')], ['contain', t('props.contain')], ['stretch', t('props.stretch')]] as [mode, label] (mode)}
 						<button
 							class="studio-chip flex-1 {layer.fit === mode ? 'bg-primary/20 text-primary' : ''}"
 							onclick={() => {
@@ -192,7 +193,7 @@
 		{/if}
 
 		<label class="block">
-			<span class="studio-label">Opacité — {Math.round(layer.opacity * 100)}%</span>
+			<span class="studio-label">{t('props.opacity', { percent: Math.round(layer.opacity * 100) })}</span>
 			<input
 				type="range"
 				min="0"
@@ -211,11 +212,11 @@
 		{#if layer.kind === 'text' || layer.kind === 'lyrics'}
 			{@const s = (ensureStyle(), layer.style ?? DEFAULT_TEXT_STYLE)}
 			<div class="space-y-3 border-t border-ink-700 pt-4">
-				<span class="studio-label">Style du texte</span>
+				<span class="studio-label">{t('props.textStyle')}</span>
 
 				<label class="block">
 					<span class="mb-1 block text-[11px] text-white/40">
-						Taille — {Math.round(s.size * 100)}% de la hauteur
+						{t('props.size', { percent: Math.round(s.size * 100) })}
 					</span>
 					<input
 						type="range"
@@ -233,7 +234,7 @@
 
 				<div class="grid grid-cols-2 gap-2">
 					<label class="block">
-						<span class="mb-1 block text-[11px] text-white/40">Couleur</span>
+						<span class="mb-1 block text-[11px] text-white/40">{t('props.color')}</span>
 						<input
 							type="color"
 							class="h-9 w-full cursor-pointer border border-ink-600 bg-ink-800"
@@ -245,7 +246,7 @@
 						/>
 					</label>
 					<label class="block">
-						<span class="mb-1 block text-[11px] text-white/40">Police</span>
+						<span class="mb-1 block text-[11px] text-white/40">{t('props.font')}</span>
 						<select
 							class="studio-input w-full"
 							value={s.font}
@@ -254,15 +255,15 @@
 								commit();
 							}}
 						>
-							<option value="body">Outfit (sans)</option>
-							<option value="display">Cormorant (serif)</option>
+							<option value="body">{t('props.fontBody')}</option>
+							<option value="display">{t('props.fontDisplay')}</option>
 						</select>
 					</label>
 				</div>
 
 				<div class="grid grid-cols-2 gap-2">
 					<div>
-						<span class="mb-1 block text-[11px] text-white/40">Alignement</span>
+						<span class="mb-1 block text-[11px] text-white/40">{t('props.align')}</span>
 						<div class="flex gap-1">
 							{#each [['left', 'alignLeft'], ['center', 'alignCenter'], ['right', 'alignRight']] as [value, icon] (value)}
 								<button
@@ -279,7 +280,7 @@
 						</div>
 					</div>
 					<div>
-						<span class="mb-1 block text-[11px] text-white/40">Vertical</span>
+						<span class="mb-1 block text-[11px] text-white/40">{t('props.valign')}</span>
 						<div class="flex gap-1">
 							<!-- Same glyphs turned a quarter: top/middle/bottom read as
 							     left/centre/right rotated, which is how they behave. -->
@@ -300,9 +301,9 @@
 				</div>
 
 				<div>
-					<span class="mb-1 block text-[11px] text-white/40">Fond</span>
+					<span class="mb-1 block text-[11px] text-white/40">{t('props.background')}</span>
 					<div class="flex flex-wrap gap-1">
-						{#each [['transparent', 'Aucun'], ['rgba(0,0,0,0.55)', 'Sombre'], ['rgba(0,0,0,0.85)', 'Opaque'], ['rgba(255,136,12,0.85)', 'Orange']] as [value, label] (value)}
+						{#each [['transparent', t('props.bgNone')], ['rgba(0,0,0,0.55)', t('props.bgDark')], ['rgba(0,0,0,0.85)', t('props.bgSolid')], ['rgba(255,136,12,0.85)', t('props.bgAccent')]] as [value, label] (value)}
 							<button
 								class="studio-chip {s.background === value ? 'bg-primary/20 text-primary' : ''}"
 								onclick={() => {
@@ -325,7 +326,7 @@
 								commit();
 							}}
 						/>
-						Ombre portée
+						{t('props.shadow')}
 					</label>
 					<label class="flex items-center gap-2 text-[12px] text-white/60">
 						<input
@@ -337,7 +338,7 @@
 								commit();
 							}}
 						/>
-						Majuscules
+						{t('props.uppercase')}
 					</label>
 				</div>
 			</div>

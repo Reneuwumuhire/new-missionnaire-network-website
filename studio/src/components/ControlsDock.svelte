@@ -1,16 +1,15 @@
 <script lang="ts">
 	import { broadcast } from '../lib/broadcast.svelte';
 	import Dock from './Dock.svelte';
+	import { t } from '../lib/i18n.svelte';
 	import { destinationUrl, persist, studio } from '../lib/state.svelte';
 
 	let {
 		onToggleLive,
-		onDestinations,
 		onSettings,
 		confirmStop
 	}: {
 		onToggleLive: () => void;
-		onDestinations: () => void;
 		onSettings: () => void;
 		confirmStop: boolean;
 	} = $props();
@@ -18,10 +17,10 @@
 	const enabled = $derived(studio.destinations.filter((d) => d.enabled && destinationUrl(d).length > 8));
 </script>
 
-<Dock id="controls" title="Contrôles">
+<Dock id="controls" title={t('dock.controls')}>
 	<div class="space-y-1.5 p-2">
 		<button
-			class="h-10 w-full text-[11px] font-semibold uppercase tracking-[0.16em] transition-colors {broadcast.live
+			class="h-10 w-full text-[13px] font-medium transition-colors {broadcast.live
 				? confirmStop
 					? 'bg-red-600 text-white'
 					: 'border border-red-500/50 text-red-400 hover:bg-red-600/15'
@@ -30,16 +29,16 @@
 			onclick={onToggleLive}
 		>
 			{#if broadcast.starting}
-				Démarrage…
+				{t('controls.starting')}
 			{:else if broadcast.live}
-				{confirmStop ? 'Confirmer l’arrêt' : 'Arrêter la diffusion'}
+				{confirmStop ? t('controls.confirmStop') : t('controls.stopStreaming')}
 			{:else}
-				Passer en direct
+				{t('controls.startStreaming')}
 			{/if}
 		</button>
 
 		<button
-			class="h-9 w-full border text-[11px] uppercase tracking-[0.14em] transition-colors {studio.settings
+			class="h-9 w-full border text-[13px] transition-colors {studio.settings
 				.studioMode
 				? 'border-primary/60 bg-primary/15 text-primary'
 				: 'border-ink-600 text-white/60 hover:border-ink-500 hover:text-white'}"
@@ -50,17 +49,19 @@
 				if (!studio.settings.studioMode) studio.programSceneId = studio.activeSceneId;
 				studio.settings.studioMode = !studio.settings.studioMode;
 				persist();
-			}}>Mode studio</button
+			}}>{t('controls.studioMode')}</button
 		>
 
-		<button class="h-9 w-full border border-ink-600 text-[11px] uppercase tracking-[0.14em] text-white/60 transition-colors hover:border-ink-500 hover:text-white" onclick={onDestinations}>
-			Destinations
-			<span class="ml-1 font-mono text-[10px] {enabled.length ? 'text-emerald-400' : 'text-amber-400'}"
-				>{enabled.length}</span
-			>
-		</button>
-		<button class="h-9 w-full border border-ink-600 text-[11px] uppercase tracking-[0.14em] text-white/60 transition-colors hover:border-ink-500 hover:text-white" onclick={onSettings}>
-			Réglages
+		<button
+			class="h-9 w-full border border-ink-600 text-[13px] text-white/70 transition-colors hover:border-ink-500 hover:text-white"
+			onclick={onSettings}
+		>
+			{t('controls.settings')}
+			<!-- No enabled destination means Start Streaming is disabled; say so
+			     here rather than leaving a dead button with no explanation. -->
+			{#if enabled.length === 0}
+				<span class="ml-1 font-mono text-[10px] text-amber-400">!</span>
+			{/if}
 		</button>
 	</div>
 </Dock>

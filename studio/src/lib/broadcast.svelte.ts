@@ -9,6 +9,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { t } from './i18n.svelte';
 import { destinationUrl, studio } from './state.svelte';
 
 const MIME_PREFERENCE = [
@@ -79,10 +80,10 @@ export async function startBroadcast(
 			studio.destinations
 				.filter((d) => d.enabled && d.url.trim())
 				.map((d) => ({ name: d.name, url: destinationUrl(d) }));
-		if (enabled.length === 0) throw new Error('Activez au moins une destination');
+		if (enabled.length === 0) throw new Error(t('error.noDestination'));
 
 		const mime = pickMimeType();
-		if (!mime) throw new Error("Ce système ne sait pas encoder la vidéo (MediaRecorder indisponible)");
+		if (!mime) throw new Error(t('error.noRecorder'));
 
 		const { settings } = studio;
 		const command = await invoke<string[]>('start_stream', {
@@ -117,7 +118,7 @@ export async function startBroadcast(
 				});
 		};
 		recorder.onerror = (event) => {
-			broadcast.error = `Encodeur: ${(event as ErrorEvent).error ?? 'erreur inconnue'}`;
+			broadcast.error = t('error.encoder', { message: String((event as ErrorEvent).error ?? '?') });
 			void stopBroadcast();
 		};
 		// 250 ms slices: small enough that a viewer's latency is dominated by the
@@ -150,8 +151,11 @@ async function attachListeners() {
 			broadcast.live = false;
 			broadcast.error =
 				event.payload.code === 0
-					? 'La diffusion s’est arrêtée.'
-					: `ffmpeg s’est arrêté (code ${event.payload.code}) : ${event.payload.log.slice(-3).join(' | ')}`;
+					? t('error.stoppedCleanly')
+					: t('error.ffmpegExited', {
+							code: event.payload.code,
+							log: event.payload.log.slice(-3).join(' | ')
+						});
 			stopRecorder();
 		})
 	];

@@ -13,6 +13,7 @@
 		timedPositionMs
 	} from '../lib/lyrics.svelte';
 	import { findCueIndex } from '../lib/srt';
+	import { t } from '../lib/i18n.svelte';
 
 	let fileInput = $state<HTMLInputElement | null>(null);
 	let pasteOpen = $state(false);
@@ -54,16 +55,16 @@
 		const text = await file.text();
 		if (file.name.toLowerCase().endsWith('.srt')) {
 			const count = loadSrt(text, file.name);
-			notice = count ? `${count} répliques chargées` : 'Aucune réplique lisible dans ce .srt';
+			notice = count ? t('lyrics.loadedCues', { count }) : t('lyrics.unreadableSrt');
 		} else {
 			const count = loadLines(text, file.name);
-			notice = count ? `${count} lignes chargées` : 'Fichier vide';
+			notice = count ? t('lyrics.loadedLines', { count }) : t('lyrics.emptyFile');
 		}
 	}
 
 	function applyPaste() {
-		const count = loadLines(pasteText, 'Collé');
-		notice = count ? `${count} lignes chargées` : 'Rien à charger';
+		const count = loadLines(pasteText, t('lyrics.pastedName'));
+		notice = count ? t('lyrics.loadedLines', { count }) : t('lyrics.nothingToLoad');
 		pasteOpen = false;
 		pasteText = '';
 	}
@@ -71,13 +72,13 @@
 	function downloadSrt() {
 		const srt = exportManualSrt();
 		if (!srt.trim()) {
-			notice = 'Aucune ligne minutée pour l’instant';
+			notice = t('lyrics.noTimings');
 			return;
 		}
 		const url = URL.createObjectURL(new Blob([srt], { type: 'text/plain;charset=utf-8' }));
 		const a = document.createElement('a');
 		a.href = url;
-		a.download = `${(lyrics.fileName || 'paroles').replace(/\.[^.]+$/, '')}.srt`;
+		a.download = `${(lyrics.fileName || 'lyrics').replace(/\.[^.]+$/, '')}.srt`;
 		a.click();
 		URL.revokeObjectURL(url);
 	}
@@ -107,13 +108,13 @@
 	<!-- ── On-air readout ─────────────────────────────────── -->
 	<div class="border-b border-ink-700 bg-ink-850 px-4 py-3">
 		<div class="flex items-center justify-between">
-			<span class="text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">À l’antenne</span>
+			<span class="text-[11px] font-semibold text-white/60">{t('lyrics.onAir')}</span>
 			<button
 				class="studio-chip {lyrics.onAir ? 'bg-emerald-500/15 text-emerald-300' : 'bg-red-500/20 text-red-300'}"
 				onclick={() => (lyrics.onAir = !lyrics.onAir)}
-				title="Masque ou affiche instantanément toutes les couches Paroles"
+				title={t('lyrics.toggleHint')}
 			>
-				{lyrics.onAir ? 'Affiché' : 'Masqué'}
+				{lyrics.onAir ? t('lyrics.shown') : t('lyrics.hidden')}
 			</button>
 		</div>
 		<p class="mt-2 min-h-[2.5rem] text-lg leading-snug text-white">{live.current || '—'}</p>
@@ -124,11 +125,11 @@
 
 	<!-- ── Load ───────────────────────────────────────────── -->
 	<div class="flex flex-wrap items-center gap-2 border-b border-ink-700 px-3 py-2">
-		<button class="studio-chip" onclick={() => fileInput?.click()}>Ouvrir .srt / .txt</button>
-		<button class="studio-chip" onclick={() => (pasteOpen = !pasteOpen)}>Coller des paroles</button>
+		<button class="studio-chip" onclick={() => fileInput?.click()}>{t('lyrics.open')}</button>
+		<button class="studio-chip" onclick={() => (pasteOpen = !pasteOpen)}>{t('lyrics.paste')}</button>
 		{#if lyrics.mode === 'manual' && lyrics.lines.length > 0}
-			<button class="studio-chip" onclick={downloadSrt} title="Exporte les minutages tapés">
-				Exporter .srt
+			<button class="studio-chip" onclick={downloadSrt} title={t('lyrics.exportHint')}>
+				{t('lyrics.exportSrt')}
 			</button>
 		{/if}
 		{#if lyrics.fileName}
@@ -140,12 +141,12 @@
 		<div class="border-b border-ink-700 p-3">
 			<textarea
 				class="studio-input h-32 w-full resize-none font-mono text-xs"
-				placeholder="Une ligne par écran…"
+				placeholder={t('lyrics.pastePlaceholder')}
 				bind:value={pasteText}
 			></textarea>
 			<div class="mt-2 flex gap-2">
-				<button class="studio-btn-primary" onclick={applyPaste}>Charger</button>
-				<button class="studio-chip" onclick={() => (pasteOpen = false)}>Annuler</button>
+				<button class="studio-btn-primary" onclick={applyPaste}>{t('lyrics.load')}</button>
+				<button class="studio-chip" onclick={() => (pasteOpen = false)}>{t('common.cancel')}</button>
 			</div>
 		</div>
 	{/if}
@@ -158,42 +159,44 @@
 	{#if lyrics.mode === 'timed'}
 		<div class="border-b border-ink-700 px-3 py-2.5">
 			{#if lyrics.cues.length === 0}
-				<p class="text-[11px] leading-relaxed text-white/40">
-					Chargez un .srt minuté, ou collez des paroles pour les faire défiler à la main.
-				</p>
+				<p class="text-[11px] leading-relaxed text-white/40">{t('lyrics.hintTimed')}</p>
 			{:else if lyrics.anchorEpochMs === null}
 				<button class="studio-btn-primary w-full" onclick={() => anchorAt(0)}>
-					Démarrer — la 1<sup>re</sup> réplique commence maintenant
+					{t('lyrics.start')}
 				</button>
-				<p class="mt-2 text-[11px] leading-relaxed text-white/40">
-					Appuyez au moment exact où la première phrase est prononcée. Sinon, cliquez la réplique en
-					cours dans la liste ci-dessous.
-				</p>
+				<p class="mt-2 text-[11px] leading-relaxed text-white/40">{t('lyrics.startHint')}</p>
 			{:else}
 				<div class="flex items-center justify-between">
 					<span class="font-mono text-sm text-white/80">{fmt(positionMs ?? 0)}</span>
 					<span class="text-[11px] text-white/35">
-						décalage {lyrics.offsetMs > 0 ? '+' : ''}{(lyrics.offsetMs / 1000).toFixed(1)}s
+						{t('lyrics.offset', {
+							value: `${lyrics.offsetMs > 0 ? '+' : ''}${(lyrics.offsetMs / 1000).toFixed(1)}`
+						})}
 					</span>
 				</div>
 				<div class="mt-2 flex flex-wrap items-center gap-1">
-					<span class="text-[10px] uppercase tracking-wider text-white/30">retard</span>
+					<span class="text-[10px] text-white/30">{t('lyrics.behind')}</span>
 					{#each [-30000, -5000, -1000, 1000, 5000, 30000] as delta (delta)}
 						<button class="studio-chip font-mono" onclick={() => nudge(delta)}>
 							{delta > 0 ? '+' : '−'}{Math.abs(delta) / 1000}s
 						</button>
 					{/each}
-					<span class="text-[10px] uppercase tracking-wider text-white/30">avance</span>
-					<button class="studio-chip ml-auto" onclick={clearSync}>Arrêter</button>
+					<span class="text-[10px] text-white/30">{t('lyrics.ahead')}</span>
+					<button class="studio-chip ml-auto" onclick={clearSync}>{t('lyrics.stop')}</button>
 				</div>
 			{/if}
 		</div>
 	{:else}
 		<div class="flex items-center gap-2 border-b border-ink-700 px-3 py-2.5">
-			<button class="studio-chip" onclick={() => goTo(-1)} title="Écran vide">Vider</button>
-			<button class="studio-chip" onclick={() => goTo(Math.max(0, lyrics.index - 1))}>← Préc.</button>
+			<button class="studio-chip" onclick={() => goTo(-1)} title={t('lyrics.clearHint')}>
+				{t('lyrics.clear')}
+			</button>
+			<button class="studio-chip" onclick={() => goTo(Math.max(0, lyrics.index - 1))}>
+				{t('lyrics.previous')}
+			</button>
 			<button class="studio-btn-primary flex-1" onclick={() => goTo(lyrics.index + 1)}>
-				Ligne suivante <span class="ml-2 font-mono text-[10px] opacity-60">Espace</span>
+				{t('lyrics.next')}
+				<span class="ml-2 font-mono text-[10px] opacity-60">{t('lyrics.spaceKey')}</span>
 			</button>
 			<span class="font-mono text-[11px] text-white/35">
 				{lyrics.index + 1}/{lyrics.lines.length}
@@ -212,7 +215,7 @@
 					: ''}"
 				onclick={() =>
 					lyrics.mode === 'timed' ? anchorAt(lyrics.cues[row.index].startMs) : goTo(row.index)}
-				title={lyrics.mode === 'timed' ? 'Cette réplique est dite maintenant' : 'Afficher cette ligne'}
+				title={lyrics.mode === 'timed' ? t('lyrics.cueHintTimed') : t('lyrics.cueHintManual')}
 			>
 				<span class="w-12 shrink-0 pt-0.5 font-mono text-[10px] text-white/30">{row.time}</span>
 				<span class="min-w-0 flex-1 whitespace-pre-wrap text-[13px] leading-snug text-white/75"
@@ -220,7 +223,7 @@
 				>
 			</button>
 		{:else}
-			<p class="px-3 py-6 text-center text-[11px] text-white/30">Aucune parole chargée</p>
+			<p class="px-3 py-6 text-center text-[11px] text-white/30">{t('lyrics.emptyList')}</p>
 		{/each}
 	</div>
 </div>

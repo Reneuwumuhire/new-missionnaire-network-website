@@ -3,6 +3,7 @@
 	import Dock from './Dock.svelte';
 	import Icon, { type IconName } from './Icon.svelte';
 	import { popoverFit } from '../lib/layout';
+	import { t } from '../lib/i18n.svelte';
 	import {
 		DEFAULT_TEXT_STYLE,
 		activeScene,
@@ -50,14 +51,19 @@
 	let fileInput = $state<HTMLInputElement | null>(null);
 	let pendingFileLayer = $state<Layer | null>(null);
 
-	const SOURCE_KINDS: { kind: LayerKind; label: string; hint: string; icon: IconName }[] = [
-		{ kind: 'camera', label: 'Caméra', hint: 'Webcam ou boîtier de capture', icon: 'camera' },
-		{ kind: 'screen', label: 'Écran / fenêtre', hint: 'Partage un écran ou une application', icon: 'monitor' },
-		{ kind: 'image', label: 'Image', hint: 'Logo, verset, arrière-plan', icon: 'image' },
-		{ kind: 'video', label: 'Vidéo', hint: 'Clip ou boucle, avec son', icon: 'film' },
-		{ kind: 'text', label: 'Texte', hint: 'Titre, message fixe', icon: 'text' },
-		{ kind: 'lyrics', label: 'Paroles', hint: 'Ligne en cours du panneau Paroles', icon: 'music' },
-		{ kind: 'color', label: 'Fond uni', hint: 'Couleur pleine', icon: 'droplet' }
+	const SOURCE_KINDS: {
+		kind: LayerKind;
+		label: () => string;
+		hint: () => string;
+		icon: IconName;
+	}[] = [
+		{ kind: 'camera', label: () => t('sources.camera'), hint: () => t('sources.cameraHint'), icon: 'camera' },
+		{ kind: 'screen', label: () => t('sources.screen'), hint: () => t('sources.screenHint'), icon: 'monitor' },
+		{ kind: 'image', label: () => t('sources.image'), hint: () => t('sources.imageHint'), icon: 'image' },
+		{ kind: 'video', label: () => t('sources.video'), hint: () => t('sources.videoHint'), icon: 'film' },
+		{ kind: 'text', label: () => t('sources.text'), hint: () => t('sources.textHint'), icon: 'text' },
+		{ kind: 'lyrics', label: () => t('sources.lyrics'), hint: () => t('sources.lyricsHint'), icon: 'music' },
+		{ kind: 'color', label: () => t('sources.color'), hint: () => t('sources.colorHint'), icon: 'droplet' }
 	];
 
 	const iconFor = (kind: LayerKind): IconName =>
@@ -65,9 +71,9 @@
 
 	async function addSource(kind: LayerKind) {
 		adding = false;
-		const label = SOURCE_KINDS.find((s) => s.kind === kind)?.label ?? kind;
+		const label = SOURCE_KINDS.find((s) => s.kind === kind)?.label() ?? kind;
 		const layer = makeLayer(kind, label, {
-			...(kind === 'text' ? { text: 'Texte', style: { ...DEFAULT_TEXT_STYLE } } : {}),
+			...(kind === 'text' ? { text: t('sources.text'), style: { ...DEFAULT_TEXT_STYLE } } : {}),
 			...(kind === 'lyrics'
 				? {
 						rect: { x: 0.06, y: 0.7, w: 0.88, h: 0.24 },
@@ -148,20 +154,20 @@
 		void mediaVersion.n;
 		const handle = handleFor(layer.id);
 		if (handle?.error) return handle.error;
-		if (!handle?.el) return 'Non connectée';
+		if (!handle?.el) return t('source.notConnected');
 		return null;
 	}
 </script>
 
 <input bind:this={fileInput} type="file" class="hidden" onchange={onFileChosen} />
 
-<Dock id="sources" title="Sources">
+<Dock id="sources" title={t('dock.sources')}>
 	<ul>
 		{#each activeScene().layers as layer (layer.id)}
 			{@const issue = problem(layer)}
 			<li
 				class="group flex items-center gap-1 pr-1 {layer.id === studio.selectedLayerId
-					? 'bg-primary/20'
+					? 'bg-primary text-black'
 					: 'hover:bg-white/5'}"
 			>
 				<button
@@ -169,22 +175,30 @@
 					onclick={() => (studio.selectedLayerId = layer.id)}
 					ondblclick={onproperties}
 				>
-					<Icon name={iconFor(layer.kind)} size={13} class="text-white/45" />
-					<span class="min-w-0 flex-1 truncate text-[13px] {layer.visible ? 'text-white/85' : 'text-white/35'}"
-						>{layer.name}</span
+					<Icon
+						name={iconFor(layer.kind)}
+						size={13}
+						class={layer.id === studio.selectedLayerId ? 'text-black/60' : 'text-white/45'}
+					/>
+					<span
+						class="min-w-0 flex-1 truncate text-[13px] {layer.id === studio.selectedLayerId
+							? 'font-medium'
+							: layer.visible
+								? 'text-white/85'
+								: 'text-white/35'}">{layer.name}</span
 					>
 				</button>
 				{#if issue}
 					<button
 						class="shrink-0 bg-amber-500/15 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-amber-400 hover:bg-amber-500/30"
 						title={issue}
-						onclick={() => reconnect(layer)}>Reconnecter</button
+						onclick={() => reconnect(layer)}>{t('sources.reconnect')}</button
 					>
 				{/if}
 				<button
 					class="studio-icon-btn"
-					title={layer.visible ? 'Masquer' : 'Afficher'}
-					aria-label={layer.visible ? 'Masquer' : 'Afficher'}
+					title={layer.visible ? t('common.hide') : t('common.show')}
+					aria-label={layer.visible ? t('common.hide') : t('common.show')}
 					onclick={() => {
 						layer.visible = !layer.visible;
 						persist();
@@ -193,8 +207,8 @@
 				</button>
 				<button
 					class="studio-icon-btn"
-					title={layer.locked ? 'Déverrouiller' : 'Verrouiller'}
-					aria-label={layer.locked ? 'Déverrouiller' : 'Verrouiller'}
+					title={layer.locked ? t('common.unlock') : t('common.lock')}
+					aria-label={layer.locked ? t('common.unlock') : t('common.lock')}
 					onclick={() => {
 						layer.locked = !layer.locked;
 						persist();
@@ -203,7 +217,7 @@
 				</button>
 			</li>
 		{:else}
-			<p class="px-3 py-4 text-[11px] text-white/30">Aucune source. Cliquez + ci-dessous.</p>
+			<p class="px-3 py-6 text-center text-[11px] leading-relaxed text-white/30">{t('sources.empty')}</p>
 		{/each}
 	</ul>
 
@@ -212,8 +226,8 @@
 			<button
 				bind:this={addButton}
 				class="studio-icon-btn"
-				title="Ajouter une source"
-				aria-label="Ajouter une source"
+				title={t('sources.addSource')}
+				aria-label={t('sources.addSource')}
 				onclick={openMenu}
 			>
 				<Icon name="plus" />
@@ -236,22 +250,22 @@
 						>
 							<Icon name={source.icon} size={14} class="mt-0.5 text-white/45" />
 							<span class="min-w-0">
-								<span class="block text-[13px] text-white/90">{source.label}</span>
-								<span class="block text-[11px] text-white/40">{source.hint}</span>
+								<span class="block text-[13px] text-white/90">{source.label()}</span>
+								<span class="block text-[11px] text-white/40">{source.hint()}</span>
 							</span>
 						</button>
 					{/each}
 				</div>
 			{/if}
 		</div>
-		<button class="studio-icon-btn" title="Supprimer" aria-label="Supprimer" disabled={!selected} onclick={() => removeLayer(selected)}><Icon name="trash" /></button>
-		<button class="studio-icon-btn" title="Propriétés" aria-label="Propriétés" disabled={!selected} onclick={onproperties}><Icon name="gear" /></button>
+		<button class="studio-icon-btn" title={t('common.delete')} aria-label={t('common.delete')} disabled={!selected} onclick={() => removeLayer(selected)}><Icon name="trash" /></button>
+		<button class="studio-icon-btn" title={t('common.properties')} aria-label={t('common.properties')} disabled={!selected} onclick={onproperties}><Icon name="gear" /></button>
 		<span class="mx-1 h-4 w-px bg-ink-600"></span>
-		<button class="studio-icon-btn" title="Monter" aria-label="Monter" disabled={selectedIndex <= 0} onclick={() => move(selected, -1)}><Icon name="up" /></button>
+		<button class="studio-icon-btn" title={t('common.moveUp')} aria-label={t('common.moveUp')} disabled={selectedIndex <= 0} onclick={() => move(selected, -1)}><Icon name="up" /></button>
 		<button
 			class="studio-icon-btn"
-			title="Descendre"
-			aria-label="Descendre"
+			title={t('common.moveDown')}
+			aria-label={t('common.moveDown')}
 			disabled={selectedIndex < 0 || selectedIndex === activeScene().layers.length - 1}
 			onclick={() => move(selected, 1)}>↓</button
 		>

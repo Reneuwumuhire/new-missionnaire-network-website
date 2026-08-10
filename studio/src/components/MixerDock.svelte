@@ -5,6 +5,7 @@
 	import type { Mixer } from '../lib/mixer';
 	import Dock from './Dock.svelte';
 	import Icon from './Icon.svelte';
+	import { t } from '../lib/i18n.svelte';
 	import { id, liveAudioLayers, persist, studio, type AudioSource, type Layer } from '../lib/state.svelte';
 
 	let { mixer }: { mixer: Mixer | null } = $props();
@@ -48,7 +49,7 @@
 	function addMic() {
 		studio.audioSources = [
 			...studio.audioSources,
-			{ id: id(), name: `Micro ${studio.audioSources.length + 1}`, gain: 1, muted: false }
+			{ id: id(), name: t('mixer.micName', { number: studio.audioSources.length + 1 }), gain: 1, muted: false }
 		];
 		persist();
 	}
@@ -81,7 +82,7 @@
 	}
 </script>
 
-<Dock id="mixer" title="Mixage audio">
+<Dock id="mixer" title={t('dock.audioMixer')}>
 	{#snippet actions()}
 		<label class="mr-1 flex cursor-pointer items-center gap-1.5 text-[10px] text-white/45">
 			<input
@@ -94,14 +95,14 @@
 					persist();
 				}}
 			/>
-			Écoute
+			{t('mixer.monitor')}
 		</label>
-		<button class="studio-icon-btn" title="Ajouter un micro" aria-label="Ajouter un micro" onclick={addMic}><Icon name="plus" /></button>
+		<button class="studio-icon-btn" title={t('mixer.addMic')} aria-label={t('mixer.addMic')} onclick={addMic}><Icon name="plus" /></button>
 	{/snippet}
 
 	{#if studio.settings.monitorAudio}
 		<p class="border-b border-amber-500/20 bg-amber-500/10 px-3 py-1 text-[10px] text-amber-300/90">
-			Écoute locale active — au casque, sinon le micro capte les haut-parleurs.
+			{t('mixer.monitorWarning')}
 		</p>
 	{/if}
 
@@ -128,8 +129,8 @@
 				{#if strip.isMic}
 					<button
 						class="studio-icon-btn opacity-0 group-hover:opacity-100"
-						title="Choisir l’entrée"
-						aria-label="Choisir l’entrée"
+						title={t('mixer.chooseInput')}
+						aria-label={t('mixer.chooseInput')}
 						onclick={() => (devicesOpen = devicesOpen === strip.id ? null : strip.id)}>
 							<Icon name="more" size={14} />
 						</button>
@@ -148,15 +149,15 @@
 							void connect(strip.source as AudioSource);
 						}}
 					>
-						<option value="">Entrée par défaut</option>
+						<option value="">{t('mixer.defaultInput')}</option>
 						{#each inputs as device (device.deviceId)}
 							<option value={device.deviceId}>{device.label}</option>
 						{/each}
 					</select>
 					<button
 						class="studio-icon-btn"
-						title="Retirer"
-						aria-label="Retirer"
+						title={t('common.remove')}
+						aria-label={t('common.remove')}
 						onclick={() => removeMic(strip.source as AudioSource)}>
 						<Icon name="trash" size={14} />
 					</button>
@@ -189,8 +190,8 @@
 				<div class="mt-0.5 flex items-center gap-2">
 					<button
 						class="shrink-0 text-sm {strip.source.muted ? 'text-red-400' : 'text-white/50 hover:text-white'}"
-						title={strip.source.muted ? 'Réactiver' : 'Couper'}
-						aria-label={strip.source.muted ? 'Réactiver' : 'Couper'}
+						title={strip.source.muted ? t('mixer.unmute') : t('mixer.mute')}
+						aria-label={strip.source.muted ? t('mixer.unmute') : t('mixer.mute')}
 						onclick={() => setLevel(strip, strip.source.gain, !strip.source.muted)}
 					>
 						<Icon name={strip.source.muted ? 'volumeOff' : 'volume'} size={16} />
@@ -208,13 +209,13 @@
 				</div>
 			{:else if strip.isMic}
 				<button class="studio-chip mt-1.5 w-full text-left text-[11px]" onclick={() => connect(strip.source as AudioSource)}>
-					{handleFor(strip.id)?.error ?? 'Connecter le micro'}
+					{handleFor(strip.id)?.error ?? t('mixer.connect')}
 				</button>
 			{:else}
-				<p class="mt-1.5 text-[11px] text-white/30">{handleFor(strip.id)?.error ?? 'Pas de piste audio'}</p>
+				<p class="mt-1.5 text-[11px] text-white/30">{handleFor(strip.id)?.error ?? t('mixer.noAudioTrack')}</p>
 			{/if}
 		</div>
 	{:else}
-		<p class="px-3 py-4 text-[11px] text-white/30">Aucune source audio.</p>
+		<p class="px-3 py-4 text-[11px] text-white/30">{t('mixer.empty')}</p>
 	{/each}
 </Dock>
