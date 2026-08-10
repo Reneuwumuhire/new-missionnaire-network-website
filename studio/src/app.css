@@ -2,16 +2,42 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Dark, low-chrome surfaces: this sits next to a lit stage and must never be
-   the brightest thing in the room. Accent and typography match the admin
-   panel so the two feel like one product. */
+/* Two themes off one set of variables. `ink` is a scale of surface depth
+   rather than luminance — ink-950 is always the page, ink-700 always a border
+   — so every component works in both without a single dark: variant.
+   Dark is the default: this sits next to a lit stage and should not be the
+   brightest thing in the room. */
+
+:root {
+	--fg: 255 255 255;
+	--ink-950: 11 11 13;
+	--ink-900: 17 17 20;
+	--ink-850: 22 22 26;
+	--ink-800: 28 28 33;
+	--ink-700: 38 38 45;
+	--ink-600: 51 51 60;
+	--ink-500: 74 74 86;
+	--scrollbar: 51 51 60;
+}
+
+:root.light {
+	--fg: 24 24 27;
+	--ink-950: 236 235 232;
+	--ink-900: 250 249 247;
+	--ink-850: 242 241 238;
+	--ink-800: 255 255 255;
+	--ink-700: 214 211 205;
+	--ink-600: 198 194 187;
+	--ink-500: 150 146 140;
+	--scrollbar: 198 194 187;
+}
 
 html,
 body,
 #app {
 	height: 100%;
 	margin: 0;
-	background: #0b0b0d;
+	background: rgb(var(--ink-950));
 	overflow: hidden;
 }
 
@@ -42,11 +68,11 @@ textarea {
 	background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-	background: #33333c;
+	background: rgb(var(--scrollbar));
 	border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-	background: #4a4a56;
+	background: rgb(var(--ink-500));
 }
 
 :focus-visible {
@@ -57,21 +83,21 @@ textarea {
 @layer components {
 	/* Sharp corners throughout, like the admin panel's editorial CTAs. */
 	.studio-input {
-		@apply border border-ink-600 bg-ink-800 px-2.5 py-2 text-sm text-white/90 transition-colors placeholder:text-white/25 focus:border-primary focus:outline-none;
+		@apply border border-ink-600 bg-ink-800 px-2.5 py-2 text-sm text-fg/90 transition-colors placeholder:text-fg/25 focus:border-primary focus:outline-none;
 	}
 
 	/* Inline editing (scene names, mixer strip names): looks like text until
 	   you touch it, so the panels stay quiet. */
 	.studio-input-flush {
-		@apply border border-transparent bg-transparent px-1 py-0.5 text-white/85 transition-colors hover:border-ink-600 focus:border-primary focus:bg-ink-800 focus:outline-none;
+		@apply border border-transparent bg-transparent px-1 py-0.5 text-fg/85 transition-colors hover:border-ink-600 focus:border-primary focus:bg-ink-800 focus:outline-none;
 	}
 
 	.studio-label {
-		@apply mb-1.5 block text-[10px] font-bold uppercase tracking-[0.16em] text-white/35;
+		@apply mb-1.5 block text-[10px] font-bold uppercase tracking-[0.16em] text-fg/35;
 	}
 
 	.studio-chip {
-		@apply border border-ink-600 bg-ink-800 px-2.5 py-1.5 text-[11px] text-white/60 transition-colors hover:border-ink-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-30;
+		@apply border border-ink-600 bg-ink-800 px-2.5 py-1.5 text-[11px] text-fg/60 transition-colors hover:border-ink-500 hover:text-fg disabled:cursor-not-allowed disabled:opacity-30;
 	}
 
 	.studio-btn-primary {
@@ -79,6 +105,6 @@ textarea {
 	}
 
 	.studio-icon-btn {
-		@apply flex h-6 w-6 shrink-0 items-center justify-center text-sm text-white/35 transition-colors hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-20;
+		@apply flex h-6 w-6 shrink-0 items-center justify-center text-sm text-fg/35 transition-colors hover:bg-fg/10 hover:text-fg disabled:pointer-events-none disabled:opacity-20;
 	}
 }

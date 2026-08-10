@@ -95,7 +95,7 @@ export interface Settings {
 	encoder: 'hardware' | 'software';
 	/** Kept apart from the duration on purpose: switching to Cut and back used
 	 *  to throw away whatever duration the operator had chosen. */
-	transitionType: 'fade' | 'cut';
+	transitionType: 'fade' | 'cut' | 'fadeToBlack';
 	transitionMs: number;
 	/** OBS's Studio Mode: edit a scene on the left while a different one stays
 	 *  on air on the right, then cut to it deliberately. */

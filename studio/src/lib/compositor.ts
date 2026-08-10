@@ -9,15 +9,16 @@ import { onAirLines } from './lyrics.svelte';
 import { onAirSceneId, persist, studio, type Layer, type TextStyle } from './state.svelte';
 import { DEFAULT_TEXT_STYLE } from './state.svelte';
 
-export interface Transition {
-	fromSceneId: string;
-	startedAt: number;
-	durationMs: number;
-}
+export type TransitionType = 'cut' | 'fade' | 'fadeToBlack';
 
 export interface TransitionPlan {
 	fromSceneId: string;
 	durationMs: number;
+	type: TransitionType;
+}
+
+export interface Transition extends TransitionPlan {
+	startedAt: number;
 }
 
 let transition: Transition | null = null;
@@ -31,13 +32,13 @@ export const frameCount = () => frames;
 export function transitionPlan(
 	from: string,
 	to: string,
-	type: 'fade' | 'cut',
+	type: TransitionType,
 	durationMs: number
 ): TransitionPlan | null {
 	if (type === 'cut' || durationMs <= 0) return null;
 	// Re-taking the scene already on air is a no-op, not a fade to itself.
 	if (from === to) return null;
-	return { fromSceneId: from, durationMs };
+	return { fromSceneId: from, durationMs, type };
 }
 
 /** Put a scene on air, fading from whatever was there. This is the only way
@@ -46,9 +47,11 @@ export function transitionPlan(
 export function takeToProgram(
 	sceneId: string,
 	durationMs = studio.settings.transitionMs,
-	from = onAirSceneId()
+	from = onAirSceneId(),
+	/** Quick-transition override: take with this instead of the configured one. */
+	type: TransitionType = studio.settings.transitionType
 ): TransitionPlan | null {
-	const plan = transitionPlan(from, sceneId, studio.settings.transitionType, durationMs);
+	const plan = transitionPlan(from, sceneId, type, durationMs);
 	studio.programSceneId = sceneId;
 	transition = plan ? { ...plan, startedAt: performance.now() } : null;
 	persist();
@@ -276,17 +279,25 @@ export function renderFrame(
 		if (t >= 1) {
 			transition = null;
 		} else {
-			drawScene(ctx, transition.fromSceneId, nowMs);
-			const incoming = scratchContext(ctx.canvas.width, ctx.canvas.height);
-			if (incoming) {
-				drawScene(incoming, sceneId, nowMs);
-				ctx.globalAlpha = t;
-				ctx.drawImage(incoming.canvas, 0, 0);
+			const scene = scratchContext(ctx.canvas.width, ctx.canvas.height);
+			if (!scene) {
+				// No scratch context: cut rather than freeze the outgoing scene
+				// for the length of the transition.
+				drawScene(ctx, sceneId, nowMs);
+			} else if (transition.type === 'fadeToBlack') {
+				// Out to black over the first half, in from black over the second.
+				// The canvas is already black, so only one scene is ever drawn.
+				const first = t < 0.5;
+				drawScene(scene, first ? transition.fromSceneId : sceneId, nowMs);
+				ctx.globalAlpha = first ? 1 - t * 2 : (t - 0.5) * 2;
+				ctx.drawImage(scene.canvas, 0, 0);
 				ctx.globalAlpha = 1;
 			} else {
-				// No scratch context: cut rather than show the outgoing scene
-				// frozen for the length of the transition.
-				drawScene(ctx, sceneId, nowMs);
+				drawScene(ctx, transition.fromSceneId, nowMs);
+				drawScene(scene, sceneId, nowMs);
+				ctx.globalAlpha = t;
+				ctx.drawImage(scene.canvas, 0, 0);
+				ctx.globalAlpha = 1;
 			}
 			ctx.restore();
 			return;

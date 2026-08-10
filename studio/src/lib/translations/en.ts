@@ -97,6 +97,8 @@ const en = {
 	// ── Transitions ─────────────────────────────────────────────
 	'transitions.fade': 'Fade',
 	'transitions.cut': 'Cut',
+	'transitions.fadeToBlack': 'Fade to Black',
+	'transitions.quick': 'Quick transitions',
 	'transitions.duration': 'Duration',
 
 	// ── Controls ────────────────────────────────────────────────
@@ -106,6 +108,24 @@ const en = {
 	'controls.starting': 'Starting…',
 	'controls.studioMode': 'Studio Mode',
 	'controls.settings': 'Settings',
+
+	// ── Stream health (OBS's Stats dock, with what ffmpeg can tell us) ──
+	'health.title': 'Stream health',
+	'health.bitrate': 'Bitrate',
+	'health.dataOut': 'Total data out',
+	'health.droppedNetwork': 'Dropped frames (network)',
+	'health.encodingLag': 'Skipped chunks (encoder / uplink)',
+	'health.renderingLag': 'Frames missed (rendering lag)',
+	'health.speed': 'Encoder speed',
+	'health.congested': 'Uplink cannot keep up — lower the video bitrate',
+	'health.renderSlow': 'Compositor behind — lower the resolution or fps',
+	'health.good': 'Healthy',
+	'target.connecting': 'Connecting…',
+	'target.live': 'Connected',
+	'target.failed': 'Failed',
+	'controls.reaching': 'Reaching servers…',
+	'controls.goLiveYouTube': 'Go Live on YouTube',
+	'controls.goLiveHint': 'YouTube is receiving. Press Go Live in Studio to publish it.',
 
 	// ── Status ──────────────────────────────────────────────────
 	'status.offline': 'Offline',
@@ -199,6 +219,9 @@ const en = {
 	'settings.video': 'Video',
 	'settings.layout': 'Layout',
 	'settings.about': 'About',
+	'settings.theme': 'Theme',
+	'settings.themeDark': 'Dark',
+	'settings.themeLight': 'Light',
 	'settings.language': 'Language',
 	'settings.liveWarning': 'Encoder settings apply to the next broadcast.',
 	'settings.resolution': 'Base resolution',

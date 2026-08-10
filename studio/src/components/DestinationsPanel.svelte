@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { broadcast } from '../lib/broadcast.svelte';
+	import { broadcast, isStreaming } from '../lib/broadcast.svelte';
 	import Icon from './Icon.svelte';
 	import { t } from '../lib/i18n.svelte';
 	import { destinationUrl, id, persist, studio, type Destination } from '../lib/state.svelte';
@@ -60,7 +60,7 @@
 </script>
 
 <div class="space-y-3 p-4">
-	<p class="text-[11px] leading-relaxed text-white/40">{t('stream.intro')}</p>
+	<p class="text-[11px] leading-relaxed text-fg/40">{t('stream.intro')}</p>
 
 	{#each studio.destinations as destination (destination.id)}
 		{@const issue = problem(destination)}
@@ -74,7 +74,7 @@
 					type="checkbox"
 					class="h-4 w-4 accent-primary"
 					checked={destination.enabled}
-					disabled={broadcast.live}
+					disabled={isStreaming()}
 					onchange={(e) => {
 						destination.enabled = (e.currentTarget as HTMLInputElement).checked;
 						persist();
@@ -123,7 +123,7 @@
 			{#if issue}
 				<p class="mt-2 text-[11px] text-amber-400/90">{issue}</p>
 			{:else}
-				<p class="mt-2 truncate font-mono text-[10px] text-white/25">{preview(destination)}</p>
+				<p class="mt-2 truncate font-mono text-[10px] text-fg/25">{preview(destination)}</p>
 			{/if}
 		</div>
 	{/each}
@@ -135,5 +135,5 @@
 		<button class="studio-chip" onclick={() => add()}>+ {t('stream.presetBlank')}</button>
 	</div>
 
-	<p class="text-[11px] leading-relaxed text-white/30">{t('stream.keyWarning')}</p>
+	<p class="text-[11px] leading-relaxed text-fg/30">{t('stream.keyWarning')}</p>
 </div>

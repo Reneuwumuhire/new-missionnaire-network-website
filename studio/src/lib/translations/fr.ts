@@ -99,6 +99,8 @@ const fr: Record<keyof typeof en, string> = {
 	// ── Transitions ─────────────────────────────────────────────
 	'transitions.fade': 'Fondu',
 	'transitions.cut': 'Coupure',
+	'transitions.fadeToBlack': 'Fondu au noir',
+	'transitions.quick': 'Transitions rapides',
 	'transitions.duration': 'Durée',
 
 	// ── Controls ────────────────────────────────────────────────
@@ -108,6 +110,24 @@ const fr: Record<keyof typeof en, string> = {
 	'controls.starting': 'Démarrage…',
 	'controls.studioMode': 'Mode Studio',
 	'controls.settings': 'Paramètres',
+
+	// ── Stream health ───────────────────────────────────────────
+	'health.title': 'État de la diffusion',
+	'health.bitrate': 'Débit',
+	'health.dataOut': 'Données envoyées',
+	'health.droppedNetwork': 'Images perdues (réseau)',
+	'health.encodingLag': 'Blocs abandonnés (encodeur / envoi)',
+	'health.renderingLag': 'Images manquées (rendu)',
+	'health.speed': 'Vitesse d’encodage',
+	'health.congested': 'L’envoi ne suit pas — baissez le débit vidéo',
+	'health.renderSlow': 'Le compositeur est en retard — baissez la résolution ou les ips',
+	'health.good': 'Bonne',
+	'target.connecting': 'Connexion…',
+	'target.live': 'Connectée',
+	'target.failed': 'Échec',
+	'controls.reaching': 'Connexion aux serveurs…',
+	'controls.goLiveYouTube': 'Passer en direct sur YouTube',
+	'controls.goLiveHint': 'YouTube reçoit le flux. Appuyez sur Go Live dans Studio pour le publier.',
 
 	// ── Status ──────────────────────────────────────────────────
 	'status.offline': 'Hors ligne',
@@ -201,6 +221,9 @@ const fr: Record<keyof typeof en, string> = {
 	'settings.video': 'Vidéo',
 	'settings.layout': 'Disposition',
 	'settings.about': 'À propos',
+	'settings.theme': 'Thème',
+	'settings.themeDark': 'Sombre',
+	'settings.themeLight': 'Clair',
 	'settings.language': 'Langue',
 	'settings.liveWarning': 'Les réglages d’encodage s’appliqueront à la prochaine diffusion.',
 	'settings.resolution': 'Résolution de base',

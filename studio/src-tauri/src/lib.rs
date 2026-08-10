@@ -48,6 +48,30 @@ fn selftest_target() -> Option<String> {
 	std::env::var("STUDIO_SELFTEST").ok().filter(|v| !v.is_empty())
 }
 
+/// Open an external page in the operator's browser — used for the "YouTube is
+/// receiving, go live over there" button. https only: this hands a string to
+/// the OS shell, so it must not be able to name a file or a script.
+#[tauri::command]
+fn open_url(url: String) -> Result<(), String> {
+	if !url.starts_with("https://") || url.len() > 2048 {
+		return Err("URL non supportée".into());
+	}
+	if url.chars().any(|c| c.is_control() || c.is_whitespace()) {
+		return Err("URL invalide".into());
+	}
+	#[cfg(target_os = "macos")]
+	let opener = "open";
+	#[cfg(target_os = "linux")]
+	let opener = "xdg-open";
+	#[cfg(target_os = "windows")]
+	let opener = "explorer";
+	std::process::Command::new(opener)
+		.arg(&url)
+		.spawn()
+		.map(|_| ())
+		.map_err(|e| e.to_string())
+}
+
 /// Bridge for webview logging — a packaged .app has no devtools console you can
 /// reach from a terminal, so the UI sends anything worth seeing through here.
 #[tauri::command]
@@ -94,6 +118,7 @@ pub fn run() {
 			stop_stream,
 			stream_running,
 			selftest_target,
+			open_url,
 			report
 		])
 		.on_window_event(|window, event| {

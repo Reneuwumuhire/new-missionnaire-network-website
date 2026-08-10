@@ -1,47 +1,88 @@
 <script lang="ts">
-	import { broadcast } from '../lib/broadcast.svelte';
+	import { invoke } from '@tauri-apps/api/core';
+	import { broadcast, formatBytes, isStreaming } from '../lib/broadcast.svelte';
 	import Dock from './Dock.svelte';
+	import Icon from './Icon.svelte';
 	import { t } from '../lib/i18n.svelte';
 	import { destinationUrl, persist, studio } from '../lib/state.svelte';
 
 	let {
 		onToggleLive,
 		onSettings,
-		confirmStop
+		confirmStop,
+		/** Frames the compositor failed to paint on time — OBS's rendering lag. */
+		renderMissed
 	}: {
 		onToggleLive: () => void;
 		onSettings: () => void;
 		confirmStop: boolean;
+		renderMissed: number;
 	} = $props();
 
-	const enabled = $derived(studio.destinations.filter((d) => d.enabled && destinationUrl(d).length > 8));
+	const enabled = $derived(
+		studio.destinations.filter((d) => d.enabled && destinationUrl(d).length > 8)
+	);
+
+	// YouTube only publishes once you press its own Go Live; all this app can
+	// honestly do is say the ingest is receiving and take you there.
+	const youtubeReady = $derived(
+		broadcast.targets.some((target) => target.youtube && target.state === 'live')
+	);
+
+	const stats = $derived(broadcast.stats);
+	const congested = $derived(
+		Boolean(stats && (stats.discarded_chunks > 0 || stats.speed < 0.95 || stats.dropped_frames > 0))
+	);
+
+	function label(state: string): string {
+		if (state === 'live') return t('target.live');
+		if (state === 'failed') return t('target.failed');
+		return t('target.connecting');
+	}
+
+	function dot(state: string): string {
+		if (state === 'live') return 'bg-emerald-400';
+		if (state === 'failed') return 'bg-red-500';
+		return 'animate-pulse bg-amber-400';
+	}
 </script>
 
 <Dock id="controls" title={t('dock.controls')}>
 	<div class="space-y-1.5 p-2">
 		<button
-			class="h-10 w-full text-[13px] font-medium transition-colors {broadcast.live
+			class="h-10 w-full text-[13px] font-medium transition-colors {isStreaming()
 				? confirmStop
-					? 'bg-red-600 text-white'
+					? 'bg-red-600 text-fg'
 					: 'border border-red-500/50 text-red-400 hover:bg-red-600/15'
 				: 'bg-primary text-black hover:bg-missionnaire-400'} disabled:cursor-not-allowed disabled:opacity-40"
-			disabled={broadcast.starting || (!broadcast.live && enabled.length === 0)}
+			disabled={broadcast.starting || (!isStreaming() && enabled.length === 0)}
 			onclick={onToggleLive}
 		>
 			{#if broadcast.starting}
 				{t('controls.starting')}
-			{:else if broadcast.live}
+			{:else if broadcast.phase === 'connecting'}
+				{t('controls.reaching')}
+			{:else if broadcast.phase === 'live'}
 				{confirmStop ? t('controls.confirmStop') : t('controls.stopStreaming')}
 			{:else}
 				{t('controls.startStreaming')}
 			{/if}
 		</button>
 
+		{#if youtubeReady}
+			<button
+				class="h-9 w-full bg-red-600 text-[13px] font-medium text-fg transition-colors hover:bg-red-500"
+				title={t('controls.goLiveHint')}
+				onclick={() => invoke('open_url', { url: 'https://studio.youtube.com/' })}
+			>
+				{t('controls.goLiveYouTube')}
+			</button>
+		{/if}
+
 		<button
-			class="h-9 w-full border text-[13px] transition-colors {studio.settings
-				.studioMode
+			class="h-9 w-full border text-[13px] transition-colors {studio.settings.studioMode
 				? 'border-primary/60 bg-primary/15 text-primary'
-				: 'border-ink-600 text-white/60 hover:border-ink-500 hover:text-white'}"
+				: 'border-ink-600 text-fg/60 hover:border-ink-500 hover:text-fg'}"
 			onclick={() => {
 				// Entering Studio Mode, the scene on air is whatever is showing now.
 				// Leaving it, the edit scene becomes the program scene by definition
@@ -53,7 +94,7 @@
 		>
 
 		<button
-			class="h-9 w-full border border-ink-600 text-[13px] text-white/70 transition-colors hover:border-ink-500 hover:text-white"
+			class="h-9 w-full border border-ink-600 text-[13px] text-fg/70 transition-colors hover:border-ink-500 hover:text-fg"
 			onclick={onSettings}
 		>
 			{t('controls.settings')}
@@ -64,4 +105,83 @@
 			{/if}
 		</button>
 	</div>
+
+	<!-- ── Per-destination connection state ───────────────── -->
+	{#if broadcast.targets.length > 0}
+		<div class="border-t border-ink-700 px-2 py-2">
+			{#each broadcast.targets as target (target.name + target.host)}
+				<div class="flex items-center gap-2" title={target.reason ?? ''}>
+					<span class="h-1.5 w-1.5 shrink-0 rounded-full {dot(target.state)}"></span>
+					<span class="min-w-0 flex-1 truncate text-[12px] text-fg/75">{target.name}</span>
+					<span
+						class="shrink-0 text-[10px] {target.state === 'failed'
+							? 'text-red-400'
+							: target.state === 'live'
+								? 'text-emerald-400'
+								: 'text-amber-400'}">{label(target.state)}</span
+					>
+				</div>
+				<p class="mb-1 truncate pl-3.5 font-mono text-[9px] text-fg/25">{target.host}</p>
+			{/each}
+		</div>
+	{/if}
+
+	<!-- ── Stream health: the Stats-dock fields ffmpeg can actually source ── -->
+	{#if stats}
+		<div class="border-t border-ink-700 px-2 py-2">
+			<div class="mb-1 flex items-center justify-between">
+				<span class="text-[10px] font-semibold uppercase tracking-wider text-fg/35">
+					{t('health.title')}
+				</span>
+				<span class="text-[10px] {congested ? 'text-amber-400' : 'text-emerald-400'}">
+					{congested ? '⚠' : t('health.good')}
+				</span>
+			</div>
+
+			<dl class="space-y-0.5 font-mono text-[10px]">
+				<div class="flex justify-between gap-2">
+					<dt class="truncate text-fg/40">{t('health.bitrate')}</dt>
+					<dd class="shrink-0 text-fg/70">
+						{Math.round(stats.bitrate_kbps)} / {studio.settings.videoBitrateKbps +
+							studio.settings.audioBitrateKbps}
+					</dd>
+				</div>
+				<div class="flex justify-between gap-2">
+					<dt class="truncate text-fg/40">{t('health.dataOut')}</dt>
+					<dd class="shrink-0 text-fg/70">{formatBytes(stats.total_bytes)}</dd>
+				</div>
+				<div class="flex justify-between gap-2">
+					<dt class="truncate text-fg/40">{t('health.droppedNetwork')}</dt>
+					<dd class="shrink-0 {stats.dropped_frames > 0 ? 'text-amber-400' : 'text-fg/70'}">
+						{stats.dropped_frames}
+					</dd>
+				</div>
+				<div class="flex justify-between gap-2">
+					<dt class="truncate text-fg/40">{t('health.encodingLag')}</dt>
+					<dd class="shrink-0 {stats.discarded_chunks > 0 ? 'text-amber-400' : 'text-fg/70'}">
+						{stats.discarded_chunks}
+					</dd>
+				</div>
+				<div class="flex justify-between gap-2">
+					<dt class="truncate text-fg/40">{t('health.renderingLag')}</dt>
+					<dd class="shrink-0 {renderMissed > 0 ? 'text-amber-400' : 'text-fg/70'}">
+						{renderMissed}
+					</dd>
+				</div>
+				<div class="flex justify-between gap-2">
+					<dt class="truncate text-fg/40">{t('health.speed')}</dt>
+					<dd class="shrink-0 {stats.speed < 0.95 ? 'text-amber-400' : 'text-fg/70'}">
+						{stats.speed.toFixed(2)}×
+					</dd>
+				</div>
+			</dl>
+
+			{#if congested}
+				<p class="mt-1.5 flex items-start gap-1 text-[10px] leading-snug text-amber-400/90">
+					<Icon name="more" size={10} class="mt-px" />
+					{t('health.congested')}
+				</p>
+			{/if}
+		</div>
+	{/if}
 </Dock>

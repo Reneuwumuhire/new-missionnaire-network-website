@@ -4,7 +4,15 @@ import { studio } from './state.svelte';
 
 describe('transitionPlan', () => {
 	it('fades between two different scenes', () => {
-		expect(transitionPlan('a', 'b', 'fade', 350)).toEqual({ fromSceneId: 'a', durationMs: 350 });
+		expect(transitionPlan('a', 'b', 'fade', 350)).toEqual({
+			fromSceneId: 'a',
+			durationMs: 350,
+			type: 'fade'
+		});
+	});
+
+	it('carries the transition type so the compositor knows how to draw it', () => {
+		expect(transitionPlan('a', 'b', 'fadeToBlack', 700)?.type).toBe('fadeToBlack');
 	});
 
 	it('cuts when the type is Cut, whatever duration is remembered', () => {
@@ -42,7 +50,7 @@ describe('putting a scene on air', () => {
 		studio.activeSceneId = first.id;
 		studio.programSceneId = first.id;
 		const plan = takeToProgram(second.id, 350, first.id);
-		expect(plan).toEqual({ fromSceneId: first.id, durationMs: 350 });
+		expect(plan).toEqual({ fromSceneId: first.id, durationMs: 350, type: 'fade' });
 	});
 
 	it('reports the cut it made so callers are not guessing', () => {
@@ -51,6 +59,14 @@ describe('putting a scene on air', () => {
 		expect(takeToProgram(second.id, 350, first.id)).toBeNull();
 		// The scene still goes on air — a cut is a transition, just an instant one.
 		expect(studio.programSceneId).toBe(second.id);
+	});
+
+	it('quick transitions override the configured type without changing it', () => {
+		// OBS's Quick Transitions: take with Fade to Black once, but the dock
+		// still says Fade afterwards.
+		const [first, second] = studio.scenes;
+		expect(takeToProgram(second.id, 700, first.id, 'fadeToBlack')?.type).toBe('fadeToBlack');
+		expect(studio.settings.transitionType).toBe('fade');
 	});
 
 	it('cuts instantly when a caller asks for zero, e.g. deleting the live scene', () => {
@@ -67,7 +83,7 @@ describe('putting a scene on air', () => {
 		expect(studio.programSceneId).toBe(first.id);
 
 		const plan = takeToProgram(second.id);
-		expect(plan).toEqual({ fromSceneId: first.id, durationMs: 350 });
+		expect(plan).toEqual({ fromSceneId: first.id, durationMs: 350, type: 'fade' });
 		expect(studio.programSceneId).toBe(second.id);
 	});
 });

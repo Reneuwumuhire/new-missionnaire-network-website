@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { invoke } from '@tauri-apps/api/core';
-	import { broadcast, pickMimeType } from '../lib/broadcast.svelte';
+	import { broadcast, isStreaming, pickMimeType } from '../lib/broadcast.svelte';
 	import DestinationsPanel from './DestinationsPanel.svelte';
 	import Icon, { type IconName } from './Icon.svelte';
-	import { LOCALES, i18n, setLocale, t } from '../lib/i18n.svelte';
+	import { LOCALES, applyTheme, i18n, setLocale, t, theme } from '../lib/i18n.svelte';
 	import { DEFAULT_LAYOUT } from '../lib/layout';
 	import { persist, studio } from '../lib/state.svelte';
 
@@ -73,7 +73,7 @@
 				class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] transition-colors {page ===
 				entry.id
 					? 'bg-primary text-black'
-					: 'text-white/65 hover:bg-white/5 hover:text-white'}"
+					: 'text-fg/65 hover:bg-fg/5 hover:text-fg'}"
 				onclick={() => (page = entry.id)}
 			>
 				<Icon name={entry.icon} size={14} />
@@ -104,7 +104,7 @@
 				{/if}
 
 				{#if page === 'output'}
-					{#if broadcast.live}
+					{#if isStreaming()}
 						<p class="border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-300">
 							{t('settings.liveWarning')}
 						</p>
@@ -128,7 +128,7 @@
 								persist();
 							}}
 						/>
-						<span class="text-[11px] text-white/30">
+						<span class="text-[11px] text-fg/30">
 							{t('settings.uploadHint', { mbps: uploadMbps })}
 						</span>
 					</label>
@@ -173,7 +173,7 @@
 								}}>{t('settings.software')}</button
 							>
 						</div>
-						<p class="mt-1 text-[11px] text-white/30">{t('settings.encoderHint')}</p>
+						<p class="mt-1 text-[11px] text-fg/30">{t('settings.encoderHint')}</p>
 					</div>
 				{/if}
 
@@ -223,7 +223,7 @@
 								persist();
 							}}>{t('settings.resetLayout')}</button
 						>
-						<p class="mt-1 text-[11px] leading-relaxed text-white/30">{t('settings.layoutHint')}</p>
+						<p class="mt-1 text-[11px] leading-relaxed text-fg/30">{t('settings.layoutHint')}</p>
 					</div>
 				{/if}
 
@@ -233,9 +233,9 @@
 						{#if ffmpegError}
 							<p class="text-red-400">{ffmpegError}</p>
 						{:else if ffmpeg}
-							<p class="text-white/45">{ffmpeg.version}</p>
-							<p class="text-white/25">{ffmpeg.path}</p>
-							<p class="text-white/45">
+							<p class="text-fg/45">{ffmpeg.version}</p>
+							<p class="text-fg/25">{ffmpeg.path}</p>
+							<p class="text-fg/45">
 								{t('settings.hardwareEncoding', {
 									state: ffmpeg.hardware_h264
 										? t('settings.available')
@@ -243,20 +243,20 @@
 								})}
 							</p>
 						{:else}
-							<p class="text-white/30">{t('settings.checking')}</p>
+							<p class="text-fg/30">{t('settings.checking')}</p>
 						{/if}
-						<p class="text-white/45">
+						<p class="text-fg/45">
 							{t('settings.capture', { mime: mime ?? t('settings.unavailable') })}
 						</p>
 					</div>
 
 					{#if broadcast.command.length > 0}
 						<details class="border-t border-ink-700 pt-4">
-							<summary class="cursor-pointer text-[11px] text-white/40">
+							<summary class="cursor-pointer text-[11px] text-fg/40">
 								{t('settings.ffmpegCommand')}
 							</summary>
 							<pre
-								class="mt-2 overflow-x-auto whitespace-pre-wrap break-all bg-ink-950 p-2 font-mono text-[10px] text-white/40">{broadcast.command.join(
+								class="mt-2 overflow-x-auto whitespace-pre-wrap break-all bg-ink-950 p-2 font-mono text-[10px] text-fg/40">{broadcast.command.join(
 									' '
 								)}</pre>
 						</details>
@@ -264,11 +264,11 @@
 
 					{#if broadcast.log.length > 0}
 						<details class="border-t border-ink-700 pt-4">
-							<summary class="cursor-pointer text-[11px] text-white/40">
+							<summary class="cursor-pointer text-[11px] text-fg/40">
 								{t('settings.ffmpegLog', { count: broadcast.log.length })}
 							</summary>
 							<pre
-								class="mt-2 max-h-52 overflow-y-auto whitespace-pre-wrap break-all bg-ink-950 p-2 font-mono text-[10px] text-white/40">{broadcast.log
+								class="mt-2 max-h-52 overflow-y-auto whitespace-pre-wrap break-all bg-ink-950 p-2 font-mono text-[10px] text-fg/40">{broadcast.log
 									.slice(-40)
 									.join('\n')}</pre>
 						</details>

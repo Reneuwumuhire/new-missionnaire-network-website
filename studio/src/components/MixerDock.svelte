@@ -84,7 +84,7 @@
 
 <Dock id="mixer" title={t('dock.audioMixer')}>
 	{#snippet actions()}
-		<label class="mr-1 flex cursor-pointer items-center gap-1.5 text-[10px] text-white/45">
+		<label class="mr-1 flex cursor-pointer items-center gap-1.5 text-[10px] text-fg/45">
 			<input
 				type="checkbox"
 				class="accent-primary"
@@ -121,9 +121,9 @@
 						}}
 					/>
 				{:else}
-					<span class="min-w-0 flex-1 truncate px-1 text-[12px] text-white/80">{strip.name}</span>
+					<span class="min-w-0 flex-1 truncate px-1 text-[12px] text-fg/80">{strip.name}</span>
 				{/if}
-				<span class="shrink-0 font-mono text-[10px] {connected ? 'text-white/50' : 'text-white/20'}">
+				<span class="shrink-0 font-mono text-[10px] {connected ? 'text-fg/50' : 'text-fg/20'}">
 					{connected && level ? formatDb(level.db) : '—'}
 				</span>
 				{#if strip.isMic}
@@ -175,13 +175,13 @@
 					></div>
 					<div class="absolute inset-y-0 right-0 bg-ink-950/95" style="left: {meterFraction(level?.db ?? -Infinity) * 100}%"></div>
 					{#if level && level.hold > 0.01}
-						<div class="absolute inset-y-0 w-0.5 bg-white/70" style="left: {level.hold * 100}%"></div>
+						<div class="absolute inset-y-0 w-0.5 bg-fg/70" style="left: {level.hold * 100}%"></div>
 					{/if}
 				</div>
 				<div class="relative mt-0.5 h-3">
 					{#each METER_TICKS as tick (tick)}
 						<span
-							class="absolute top-0 -translate-x-1/2 font-mono text-[8px] text-white/25"
+							class="absolute top-0 -translate-x-1/2 font-mono text-[8px] text-fg/25"
 							style="left: {meterFraction(tick) * 100}%">{tick}</span
 						>
 					{/each}
@@ -189,7 +189,7 @@
 
 				<div class="mt-0.5 flex items-center gap-2">
 					<button
-						class="shrink-0 text-sm {strip.source.muted ? 'text-red-400' : 'text-white/50 hover:text-white'}"
+						class="shrink-0 text-sm {strip.source.muted ? 'text-red-400' : 'text-fg/50 hover:text-fg'}"
 						title={strip.source.muted ? t('mixer.unmute') : t('mixer.mute')}
 						aria-label={strip.source.muted ? t('mixer.unmute') : t('mixer.mute')}
 						onclick={() => setLevel(strip, strip.source.gain, !strip.source.muted)}
@@ -212,10 +212,10 @@
 					{handleFor(strip.id)?.error ?? t('mixer.connect')}
 				</button>
 			{:else}
-				<p class="mt-1.5 text-[11px] text-white/30">{handleFor(strip.id)?.error ?? t('mixer.noAudioTrack')}</p>
+				<p class="mt-1.5 text-[11px] text-fg/30">{handleFor(strip.id)?.error ?? t('mixer.noAudioTrack')}</p>
 			{/if}
 		</div>
 	{:else}
-		<p class="px-3 py-4 text-[11px] text-white/30">{t('mixer.empty')}</p>
+		<p class="px-3 py-4 text-[11px] text-fg/30">{t('mixer.empty')}</p>
 	{/each}
 </Dock>

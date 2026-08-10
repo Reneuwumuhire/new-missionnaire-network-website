@@ -75,9 +75,11 @@ with the scene collection. The dividers also take focus, so arrow keys resize
 back. Docks are laid out by proportion, so the row still fills the window
 whatever size you drag it to.
 
-**Scene Transitions** holds the type (Fade or Cut) and the duration, as OBS
-does. They are separate settings: switching to Cut and back keeps the duration
-you chose.
+**Scene Transitions** holds the type (Fade, Cut or Fade to Black) and the
+duration, as OBS does. They are separate settings: switching to Cut and back
+keeps the duration you chose. In Studio Mode the column between the two
+canvases also has OBS's **Quick Transitions** — take with one specific
+transition without changing the configured default.
 
 **Studio Mode** (Controls → *Studio Mode*) splits the preview in two: the left
 canvas is the scene you are editing, the right one is what is actually going
@@ -87,6 +89,37 @@ being broadcast — setting up a scene never leaks its sound.
 
 Keyboard: **Space** next lyric line, **1–9** switch scene, **Enter** transition
 in Studio Mode.
+
+Dark and light themes are in **Settings → General → Theme**. Every surface comes
+from one set of CSS variables, so nothing is styled twice.
+
+## Going live
+
+**Start Streaming** opens the connections; the button reads *Reaching servers…*
+until ffmpeg has actually pushed something, and only then does the clock start
+and the header say LIVE. You are never told you are on air before you are.
+
+Controls lists every destination with its own state — Connecting / Connected /
+Failed, and the host it is talking to. A destination that fails is named: with
+several destinations ffmpeg's `tee` reports which slave died, so YouTube
+refusing a key shows up against YouTube and the church stream carries on.
+
+**YouTube publishes on its own Go Live, not ours.** Once the YouTube ingest is
+receiving, a *Go Live on YouTube* button appears and opens YouTube Studio, where
+you press their button. Nothing here can publish for you.
+
+### Stream health
+
+The fields OBS's Stats dock shows, sourced from ffmpeg:
+
+| Field | What it means when it climbs |
+| --- | --- |
+| Dropped frames (network) | ffmpeg gave up on frames it could not send |
+| Skipped chunks (encoder / uplink) | the queue to ffmpeg overflowed — a slow uplink blocks its output, which backs up the pipe. **This is the congestion signal to watch** |
+| Frames missed (rendering lag) | the compositor could not paint at the target fps — lower the resolution or fps |
+| Encoder speed | below 1.00× means encoding slower than real time |
+
+Bitrate is shown against what you asked for, plus total data sent.
 
 ## Destinations
 
@@ -106,6 +139,12 @@ Stream keys are stored in the app's local data in clear, the same as OBS stores
 its own. Don't screenshot the Stream page with a key revealed.
 
 ## Lyrics
+
+A **lyrics ribbon sits directly above the Program canvas**: the line on air is
+large and lit, the two either side are dimmed and smaller, and the column glides
+rather than jumps — the way a lyrics app shows a song. It follows the program,
+not the scene you are editing, so it always matches the picture going out. The
+badge next to it blanks every Lyrics source at once.
 
 The `Lyrics` dock drives every Lyrics source in every scene, and there are two
 ways to run a service:
@@ -147,7 +186,7 @@ a token endpoint on the admin app.
 Unit tests:
 
 ```bash
-pnpm test                        # geometry, srt, lyrics timing, metering, layout, i18n
+pnpm test                        # geometry, srt, lyrics, metering, layout, i18n, transitions
 cd src-tauri && cargo test       # ffmpeg argument building, key redaction
 ```
 

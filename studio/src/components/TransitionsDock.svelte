@@ -16,19 +16,19 @@
 			value={studio.settings.transitionType}
 			onchange={(e) => {
 				studio.settings.transitionType = (e.currentTarget as HTMLSelectElement).value as
-					| 'fade'
-					| 'cut';
+					typeof studio.settings.transitionType;
 				persist();
 			}}
 		>
 			<option value="fade">{t('transitions.fade')}</option>
 			<option value="cut">{t('transitions.cut')}</option>
+			<option value="fadeToBlack">{t('transitions.fadeToBlack')}</option>
 		</select>
 
 		<!-- Shown even for Cut, greyed rather than hidden: the chosen duration is
 		     remembered, and a control that vanishes reads as a bug. -->
 		<div class={studio.settings.transitionType === 'cut' ? 'opacity-40' : ''}>
-			<span class="mb-1 block text-[11px] text-white/45">{t('transitions.duration')}</span>
+			<span class="mb-1 block text-[11px] text-fg/45">{t('transitions.duration')}</span>
 			<div class="flex flex-wrap gap-1">
 				{#each DURATIONS as ms (ms)}
 					<button

@@ -3,6 +3,7 @@
 	import ControlsDock from './components/ControlsDock.svelte';
 	import Icon from './components/Icon.svelte';
 	import LyricsPanel from './components/LyricsPanel.svelte';
+	import LyricsRibbon from './components/LyricsRibbon.svelte';
 	import MixerDock from './components/MixerDock.svelte';
 	import Modal from './components/Modal.svelte';
 	import Preview from './components/Preview.svelte';
@@ -12,8 +13,8 @@
 	import SourcesDock from './components/SourcesDock.svelte';
 	import Splitter from './components/Splitter.svelte';
 	import TransitionsDock from './components/TransitionsDock.svelte';
-	import { broadcast, startBroadcast, stopBroadcast, uptimeLabel } from './lib/broadcast.svelte';
-	import { frameCount, selectScene, takeToProgram } from './lib/compositor';
+	import { broadcast, isStreaming, startBroadcast, stopBroadcast, uptimeLabel } from './lib/broadcast.svelte';
+	import { frameCount, selectScene, takeToProgram, type TransitionType } from './lib/compositor';
 	import { lyrics, step } from './lib/lyrics.svelte';
 	import { handleFor, mediaVersion, openCamera, releaseAll } from './lib/media.svelte';
 	import { Mixer } from './lib/mixer';
@@ -30,6 +31,10 @@
 	/** Frames actually painted per second — the readout OBS puts in its status
 	 *  bar, and the first number to look at when the picture stutters. */
 	let renderFps = $state(0);
+	/** Frames the compositor should have painted but did not — OBS calls this
+	 *  rendering lag, and it is the first thing to look at when the picture
+	 *  stutters but the encoder says it is fine. */
+	let renderMissed = $state(0);
 
 	onMount(() => {
 		mixer = new Mixer();
@@ -66,6 +71,7 @@
 			// Two canvases are painting in Studio Mode; report per-canvas rate.
 			renderFps = Math.round((frames - lastFrames) / (studio.settings.studioMode ? 2 : 1));
 			lastFrames = frames;
+			if (isStreaming()) renderMissed += Math.max(0, studio.settings.fps - renderFps);
 		}, 1000);
 		return () => {
 			clearInterval(clock);
@@ -143,7 +149,7 @@
 	}
 
 	async function toggleLive() {
-		if (broadcast.live) {
+		if (isStreaming()) {
 			// A misclick must not end a service; the button asks once.
 			if (!confirmStop) {
 				confirmStop = true;
@@ -155,6 +161,7 @@
 			return;
 		}
 		if (!programCanvas) return;
+		renderMissed = 0;
 		await mixer?.resume();
 		await startBroadcast(programCanvas, mixer?.audioTrack);
 	}
@@ -164,7 +171,11 @@
 	);
 	const health = $derived.by(() => {
 		const stats = broadcast.stats;
-		if (!broadcast.live) return { tone: 'idle', label: t('status.offline') };
+		if (!isStreaming()) return { tone: 'idle', label: t('status.offline') };
+		if (broadcast.phase === 'connecting') return { tone: 'idle', label: t('status.connecting') };
+		if (broadcast.targets.some((target) => target.state === 'failed')) {
+			return { tone: 'warn', label: t('target.failed') };
+		}
 		if (!stats) return { tone: 'idle', label: t('status.connecting') };
 		if (stats.discarded_chunks > 0 || stats.speed < 0.9) {
 			return { tone: 'warn', label: t('status.behind') };
@@ -172,6 +183,12 @@
 		return { tone: 'ok', label: t('status.stable') };
 	});
 	const canTake = $derived(studio.activeSceneId !== onAirSceneId());
+
+	const QUICK: { type: TransitionType; label: () => string }[] = [
+		{ type: 'cut', label: () => t('transitions.cut') },
+		{ type: 'fade', label: () => t('transitions.fade') },
+		{ type: 'fadeToBlack', label: () => t('transitions.fadeToBlack') }
+	];
 
 	// ── Panel resizing ────────────────────────────────────
 	let dockRow = $state<HTMLDivElement | null>(null);
@@ -202,16 +219,16 @@
 
 <svelte:window onkeydown={onKeydown} />
 
-<div class="flex h-full flex-col bg-ink-950 font-body text-white/90">
+<div class="flex h-full flex-col bg-ink-950 font-body text-fg/90">
 	<!-- ── Title bar ──────────────────────────────────────── -->
 	<header
 		data-tauri-drag-region
 		class="flex h-9 shrink-0 items-center gap-4 border-b border-ink-700 bg-ink-900 pl-[86px] pr-3"
 	>
-		<h1 class="pointer-events-none select-none text-[10px] font-semibold uppercase tracking-[0.28em] text-white/45">
+		<h1 class="pointer-events-none select-none text-[10px] font-semibold uppercase tracking-[0.28em] text-fg/45">
 			Missionnaire <span class="text-primary">Studio</span>
 		</h1>
-		{#if broadcast.live}
+		{#if broadcast.phase === 'live'}
 			<span class="flex items-center gap-2 bg-red-600/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-red-400">
 				<span class="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500"></span>
 				{t('status.live')}
@@ -223,7 +240,7 @@
 				? 'text-amber-400'
 				: health.tone === 'ok'
 					? 'text-emerald-400'
-					: 'text-white/30'}">{health.label}</span
+					: 'text-fg/30'}">{health.label}</span
 		>
 	</header>
 
@@ -236,8 +253,9 @@
 
 	<!-- ── Preview + lyrics ───────────────────────────────── -->
 	<div class="flex min-h-0 flex-1">
-		<div class="flex min-w-0 flex-1 flex-col bg-black/40 px-4 pb-1 pt-1.5">
-			<div class="flex min-h-0 flex-1 gap-4">
+		<div class="flex min-w-0 flex-1 flex-col">
+			<LyricsRibbon />
+			<div class="flex min-h-0 flex-1 gap-4 bg-ink-950 px-4 pt-1.5">
 				{#if studio.settings.studioMode}
 					<Preview
 						label="{t('preview.preview')}: {activeScene().name}"
@@ -245,24 +263,42 @@
 						program={false}
 						editable={true}
 					/>
-					<div class="flex shrink-0 flex-col justify-center">
+					<div class="flex w-32 shrink-0 flex-col justify-center gap-1.5">
 						<button
-							class="h-10 w-28 text-[13px] font-medium leading-tight transition-colors {canTake
+							class="h-10 w-full text-[13px] font-medium leading-tight transition-colors {canTake
 								? 'bg-primary text-black hover:bg-missionnaire-400'
-								: 'border border-ink-600 text-white/25'}"
+								: 'border border-ink-600 text-fg/25'}"
 							disabled={!canTake}
 							title={t('preview.transitionHint')}
 							onclick={() => takeToProgram(studio.activeSceneId)}
 						>
 							{t('preview.transition')}
 						</button>
+						<!-- OBS's Quick Transitions: take with a specific transition
+						     without disturbing the configured default. -->
+						<span class="text-[9px] uppercase tracking-wider text-fg/30">
+							{t('transitions.quick')}
+						</span>
+						{#each QUICK as quick (quick.type)}
+							<button
+								class="studio-chip w-full justify-center text-[10px] disabled:opacity-30"
+								disabled={!canTake}
+								onclick={() =>
+									takeToProgram(
+										studio.activeSceneId,
+										quick.type === 'cut' ? 0 : studio.settings.transitionMs,
+										undefined,
+										quick.type
+									)}>{quick.label()}</button
+							>
+						{/each}
 					</div>
 					<Preview
 						label={t('preview.program')}
 						sceneId={onAirSceneId}
 						program={true}
 						editable={false}
-						live={broadcast.live}
+						live={broadcast.phase === 'live'}
 						oncanvas={(canvas) => (programCanvas = canvas)}
 					/>
 				{:else}
@@ -271,20 +307,20 @@
 						sceneId={onAirSceneId}
 						program={true}
 						editable={true}
-						live={broadcast.live}
+						live={broadcast.phase === 'live'}
 						oncanvas={(canvas) => (programCanvas = canvas)}
 					/>
 				{/if}
 			</div>
 
 			<!-- Selected-source strip, where OBS puts its Properties/Filters bar. -->
-			<div class="mt-1.5 flex h-8 shrink-0 items-center gap-3 border-t border-ink-700 px-1 pt-1">
-				<span class="font-mono text-[10px] text-white/30">
+			<div class="flex h-9 shrink-0 items-center gap-3 border-t border-ink-700 bg-ink-950 px-5">
+				<span class="font-mono text-[10px] text-fg/30">
 					{t('preview.canvas', { width: studio.settings.width, height: studio.settings.height })}
 				</span>
 				<span class="h-3 w-px bg-ink-600"></span>
 				<span
-					class="min-w-0 flex-1 truncate text-[12px] {selectedLayer ? 'text-white/70' : 'text-white/25'}"
+					class="min-w-0 flex-1 truncate text-[12px] {selectedLayer ? 'text-fg/70' : 'text-fg/25'}"
 					>{selectedLayer ? selectedLayer.name : t('preview.noSource')}</span
 				>
 				<button class="studio-chip" disabled={!selectedLayer} onclick={() => (dialog = 'properties')}>
@@ -297,7 +333,7 @@
 
 		<aside class="flex shrink-0 flex-col bg-ink-900" style="width: {layout.lyricsWidth}px">
 			<div class="flex h-8 shrink-0 items-center border-b border-ink-700 bg-ink-850 px-3">
-				<h2 class="text-[12px] font-semibold text-white/80">{t('dock.lyrics')}</h2>
+				<h2 class="text-[12px] font-semibold text-fg/80">{t('dock.lyrics')}</h2>
 			</div>
 			<div class="flex min-h-0 flex-1 flex-col">
 				<LyricsPanel />
@@ -325,15 +361,16 @@
 			{confirmStop}
 			onToggleLive={toggleLive}
 			onSettings={() => (dialog = 'settings')}
+			{renderMissed}
 		/>
 	</div>
 
 	<!-- ── Status bar ─────────────────────────────────────── -->
 	<footer
-		class="flex h-6 shrink-0 items-center gap-4 border-t border-ink-700 bg-ink-850 px-3 font-mono text-[10px] text-white/35"
+		class="flex h-6 shrink-0 items-center gap-4 border-t border-ink-700 bg-ink-850 px-3 font-mono text-[10px] text-fg/35"
 	>
 		<span class="flex items-center gap-1.5">
-			<span class="h-1.5 w-1.5 rounded-full {broadcast.live ? 'bg-red-500' : 'bg-white/20'}"></span>
+			<span class="h-1.5 w-1.5 rounded-full {broadcast.phase === 'live' ? 'bg-red-500' : 'bg-fg/20'}"></span>
 			{t('status.live')}: {uptimeLabel(now)}
 		</span>
 		<span class={renderFps > 0 && renderFps < studio.settings.fps - 5 ? 'text-amber-400' : ''}>

@@ -8,6 +8,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { broadcast, chunkCount, startBroadcast, stopBroadcast } from './broadcast.svelte';
 import { frameCount, takeToProgram } from './compositor';
+ import { applyTheme } from './i18n.svelte';
 import { id, makeLayer, persist, studio } from './state.svelte';
 
 const say = (line: string) => invoke('report', { line }).catch(() => console.log(line));
@@ -56,13 +57,25 @@ async function checkFade(canvas: HTMLCanvasElement) {
 	const blended = before < 40 && after > 215 && middle > 60 && middle < 200;
 	await say(`SELFTEST fade before=${before} middle=${middle} after=${after} ${blended ? 'BLENDED' : 'NOT BLENDED'}`);
 
+	// Fade to black goes white → black → white: the quarter and three-quarter
+	// points must both be darker than either end.
+	takeToProgram(black.id, 0);
+	await wait(250);
+	takeToProgram(white.id, 1200, undefined, 'fadeToBlack');
+	await wait(550);
+	const dip = sample();
+	await wait(1000);
+	const settled = sample();
+	const dipped = dip < 60 && settled > 215;
+	await say(`SELFTEST fadeToBlack dip=${dip} settled=${settled} ${dipped ? 'DIPPED' : 'NO DIP'}`);
+
 	studio.scenes = restore.scenes;
 	studio.activeSceneId = restore.activeSceneId;
 	studio.programSceneId = restore.programSceneId;
 	studio.settings.transitionType = restore.type;
 	studio.settings.transitionMs = restore.ms;
 	persist();
-	return blended;
+	return blended && dipped;
 }
 
 export async function runSelftest(target: string, canvas: () => HTMLCanvasElement | null, audio: () => MediaStreamTrack | undefined) {
@@ -105,6 +118,9 @@ export async function runSelftest(target: string, canvas: () => HTMLCanvasElemen
 			? `SELFTEST stats frames=${stats.frames} fps=${stats.fps} bitrate=${stats.bitrate_kbps}kbps out=${stats.out_time_ms}ms dropped=${stats.dropped_frames} discarded=${stats.discarded_chunks} speed=${stats.speed}`
 			: 'SELFTEST stats: aucune (ffmpeg n’a rien rapporté)'
 	);
+	await say(
+		`SELFTEST targets ${broadcast.targets.map((target) => `${target.name}:${target.state}`).join(', ') || 'none'} phase=${broadcast.phase}`
+	);
 	if (broadcast.error) await say(`SELFTEST erreur: ${broadcast.error}`);
 	for (const line of broadcast.log.slice(-8)) await say(`SELFTEST ffmpeg| ${line}`);
 
@@ -112,6 +128,15 @@ export async function runSelftest(target: string, canvas: () => HTMLCanvasElemen
 	const faded = await checkFade(el);
 	studio.activeSceneId = previousScene;
 	await wait(1200);
-	const ok = Boolean(stats && stats.frames > 30 && !broadcast.error) && faded;
+	// Both themes must at least resolve their variables to different surfaces.
+	applyTheme('light');
+	await wait(150);
+	const lightBg = getComputedStyle(document.body).backgroundColor;
+	applyTheme('dark');
+	await wait(150);
+	const darkBg = getComputedStyle(document.body).backgroundColor;
+	await say(`SELFTEST theme light=${lightBg} dark=${darkBg} ${lightBg !== darkBg ? 'OK' : 'SAME'}`);
+
+	const ok = Boolean(stats && stats.frames > 30 && !broadcast.error) && faded && lightBg !== darkBg;
 	await say(`SELFTEST ${ok ? 'OK' : 'FAIL'} — terminé`);
 }

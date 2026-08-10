@@ -168,7 +168,7 @@
 			<li
 				class="group flex items-center gap-1 pr-1 {layer.id === studio.selectedLayerId
 					? 'bg-primary text-black'
-					: 'hover:bg-white/5'}"
+					: 'hover:bg-fg/5'}"
 			>
 				<button
 					class="flex min-w-0 flex-1 items-center gap-2 py-1.5 pl-3 text-left"
@@ -178,14 +178,14 @@
 					<Icon
 						name={iconFor(layer.kind)}
 						size={13}
-						class={layer.id === studio.selectedLayerId ? 'text-black/60' : 'text-white/45'}
+						class={layer.id === studio.selectedLayerId ? 'text-black/60' : 'text-fg/45'}
 					/>
 					<span
 						class="min-w-0 flex-1 truncate text-[13px] {layer.id === studio.selectedLayerId
 							? 'font-medium'
 							: layer.visible
-								? 'text-white/85'
-								: 'text-white/35'}">{layer.name}</span
+								? 'text-fg/85'
+								: 'text-fg/35'}">{layer.name}</span
 					>
 				</button>
 				{#if issue}
@@ -217,7 +217,7 @@
 				</button>
 			</li>
 		{:else}
-			<p class="px-3 py-6 text-center text-[11px] leading-relaxed text-white/30">{t('sources.empty')}</p>
+			<p class="px-3 py-6 text-center text-[11px] leading-relaxed text-fg/30">{t('sources.empty')}</p>
 		{/each}
 	</ul>
 
@@ -248,10 +248,10 @@
 							class="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-primary/15"
 							onclick={() => addSource(source.kind)}
 						>
-							<Icon name={source.icon} size={14} class="mt-0.5 text-white/45" />
+							<Icon name={source.icon} size={14} class="mt-0.5 text-fg/45" />
 							<span class="min-w-0">
-								<span class="block text-[13px] text-white/90">{source.label()}</span>
-								<span class="block text-[11px] text-white/40">{source.hint()}</span>
+								<span class="block text-[13px] text-fg/90">{source.label()}</span>
+								<span class="block text-[11px] text-fg/40">{source.hint()}</span>
 							</span>
 						</button>
 					{/each}

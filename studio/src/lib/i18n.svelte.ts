@@ -47,6 +47,30 @@ export function setLocale(next: Locale) {
 	}
 }
 
+export type Theme = 'dark' | 'light';
+
+const THEME_KEY = 'missionnaire-studio-theme';
+
+function loadTheme(): Theme {
+	try {
+		return localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark';
+	} catch {
+		return 'dark';
+	}
+}
+
+export const theme = $state({ current: loadTheme() });
+
+export function applyTheme(next: Theme = theme.current) {
+	theme.current = next;
+	try {
+		document.documentElement.classList.toggle('light', next === 'light');
+		localStorage.setItem(THEME_KEY, next);
+	} catch {
+		/* no DOM or no storage — the choice simply is not remembered */
+	}
+}
+
 /** `t('dock.scenes')`, or with placeholders `t('preview.canvas', { width, height })`.
  *  A key missing from French falls back to English rather than showing the raw
  *  key on air. */

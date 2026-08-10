@@ -25,19 +25,41 @@ export interface Stats {
 	out_time_ms: number;
 	dropped_frames: number;
 	speed: number;
+	total_bytes: number;
 	discarded_chunks: number;
 }
 
+export type TargetState = 'connecting' | 'live' | 'failed';
+
+export interface TargetStatus {
+	name: string;
+	/** Host only — shown instead of the URL so a key never lands on screen. */
+	host: string;
+	state: TargetState;
+	reason: string | null;
+	/** Recognised as a YouTube ingest, which needs its own Go Live in Studio. */
+	youtube: boolean;
+}
+
+/** `idle` → `connecting` (ffmpeg up, nothing acknowledged yet) → `live` (the
+ *  encoder is producing output, so we are reaching the servers). The clock
+ *  starts at `live`, not at the click: that is the moment you are actually on. */
+export type Phase = 'idle' | 'connecting' | 'live';
+
 export const broadcast = $state({
-	live: false,
+	phase: 'idle' as Phase,
 	starting: false,
 	error: null as string | null,
 	stats: null as Stats | null,
+	targets: [] as TargetStatus[],
 	log: [] as string[],
 	/** ffmpeg command line, stream keys already redacted by the Rust side. */
 	command: [] as string[],
 	startedAt: null as number | null
 });
+
+/** Anything past `idle` is holding connections open and must be stopped. */
+export const isStreaming = () => broadcast.phase !== 'idle';
 
 let recorder: MediaRecorder | null = null;
 let unlisteners: UnlistenFn[] = [];
@@ -71,7 +93,7 @@ export async function startBroadcast(
 	audioTrack?: MediaStreamTrack,
 	targets?: Ingest[]
 ) {
-	if (broadcast.live || broadcast.starting) return;
+	if (isStreaming() || broadcast.starting) return;
 	broadcast.error = null;
 	broadcast.starting = true;
 	try {
@@ -97,6 +119,13 @@ export async function startBroadcast(
 			}
 		});
 		broadcast.command = command;
+		broadcast.targets = enabled.map((target) => ({
+			name: target.name,
+			host: hostOf(target.url),
+			state: 'connecting' as TargetState,
+			reason: null,
+			youtube: /\byoutube\b/i.test(target.url)
+		}));
 
 		const stream = canvas.captureStream(settings.fps);
 		if (audioTrack) stream.addTrack(audioTrack);
@@ -125,8 +154,10 @@ export async function startBroadcast(
 		// CDN rather than by us, large enough that IPC overhead stays invisible.
 		recorder.start(250);
 
-		broadcast.live = true;
-		broadcast.startedAt = Date.now();
+		// Connecting, not live: `live` is set by the first stats frame, which is
+		// ffmpeg telling us it has actually pushed something to the servers.
+		broadcast.phase = 'connecting';
+		broadcast.startedAt = null;
 		await attachListeners();
 	} catch (err) {
 		broadcast.error = err instanceof Error ? err.message : String(err);
@@ -141,14 +172,35 @@ async function attachListeners() {
 	unlisteners = [
 		await listen<Stats>('stream://stats', (event) => {
 			broadcast.stats = event.payload;
+			// Output is flowing — every target that has not reported a failure is
+			// connected, and this is the instant we count as on air.
+			if (broadcast.phase === 'connecting' && event.payload.frames > 0) {
+				broadcast.phase = 'live';
+				broadcast.startedAt = Date.now();
+			}
+			if (broadcast.phase === 'live') {
+				for (const target of broadcast.targets) {
+					if (target.state === 'connecting') target.state = 'live';
+				}
+			}
 		}),
+		await listen<{ index: number; state: TargetState; reason: string }>(
+			'stream://target',
+			(event) => {
+				const target = broadcast.targets[event.payload.index];
+				if (!target) return;
+				target.state = event.payload.state;
+				target.reason = event.payload.reason;
+			}
+		),
 		await listen<string>('stream://log', (event) => {
 			broadcast.log = [...broadcast.log.slice(-199), event.payload];
 		}),
 		await listen<{ code: number; log: string[] }>('stream://exited', (event) => {
-			if (!broadcast.live) return;
+			if (!isStreaming()) return;
 			// ffmpeg died on its own — never leave the UI showing "on air".
-			broadcast.live = false;
+			broadcast.phase = 'idle';
+			broadcast.targets = broadcast.targets.map((target) => ({ ...target, state: 'failed' }));
 			broadcast.error =
 				event.payload.code === 0
 					? t('error.stoppedCleanly')
@@ -183,10 +235,26 @@ export async function stopBroadcast() {
 	await invoke('stop_stream').catch((err) => {
 		broadcast.error = String(err);
 	});
-	broadcast.live = false;
+	broadcast.phase = 'idle';
 	broadcast.startedAt = null;
 	broadcast.stats = null;
+	broadcast.targets = [];
 	await detachListeners();
+}
+
+/** Host of an ingest URL, for showing which server a destination is on
+ *  without ever putting the stream key on screen. */
+export function hostOf(url: string): string {
+	const match = url.match(/^rtmps?:\/\/([^/:]+)/i);
+	return match ? match[1] : url;
+}
+
+/** Bytes sent, as OBS's "total data output" reads. */
+export function formatBytes(bytes: number): string {
+	if (bytes < 1024) return `${bytes} B`;
+	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+	if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+	return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
 }
 
 export function uptimeLabel(nowMs: number): string {

@@ -26,7 +26,7 @@
 </script>
 
 {#if !layer}
-	<p class="p-6 text-center text-[11px] leading-relaxed text-white/30">
+	<p class="p-6 text-center text-[11px] leading-relaxed text-fg/30">
 		{t('props.empty')}
 	</p>
 {:else}
@@ -97,7 +97,7 @@
 		{/if}
 
 		{#if layer.kind === 'lyrics'}
-			<label class="flex items-center gap-2 text-sm text-white/70">
+			<label class="flex items-center gap-2 text-sm text-fg/70">
 				<input
 					type="checkbox"
 					class="accent-primary"
@@ -156,7 +156,7 @@
 			<div class="grid grid-cols-4 gap-1.5">
 				{#each [['x', 'X'], ['y', 'Y'], ['w', 'L'], ['h', 'H']] as [key, label] (key)}
 					<label class="block">
-						<span class="mb-0.5 block text-center text-[10px] text-white/30">{label}</span>
+						<span class="mb-0.5 block text-center text-[10px] text-fg/30">{label}</span>
 						<input
 							type="number"
 							step="0.5"
@@ -215,7 +215,7 @@
 				<span class="studio-label">{t('props.textStyle')}</span>
 
 				<label class="block">
-					<span class="mb-1 block text-[11px] text-white/40">
+					<span class="mb-1 block text-[11px] text-fg/40">
 						{t('props.size', { percent: Math.round(s.size * 100) })}
 					</span>
 					<input
@@ -234,7 +234,7 @@
 
 				<div class="grid grid-cols-2 gap-2">
 					<label class="block">
-						<span class="mb-1 block text-[11px] text-white/40">{t('props.color')}</span>
+						<span class="mb-1 block text-[11px] text-fg/40">{t('props.color')}</span>
 						<input
 							type="color"
 							class="h-9 w-full cursor-pointer border border-ink-600 bg-ink-800"
@@ -246,7 +246,7 @@
 						/>
 					</label>
 					<label class="block">
-						<span class="mb-1 block text-[11px] text-white/40">{t('props.font')}</span>
+						<span class="mb-1 block text-[11px] text-fg/40">{t('props.font')}</span>
 						<select
 							class="studio-input w-full"
 							value={s.font}
@@ -263,7 +263,7 @@
 
 				<div class="grid grid-cols-2 gap-2">
 					<div>
-						<span class="mb-1 block text-[11px] text-white/40">{t('props.align')}</span>
+						<span class="mb-1 block text-[11px] text-fg/40">{t('props.align')}</span>
 						<div class="flex gap-1">
 							{#each [['left', 'alignLeft'], ['center', 'alignCenter'], ['right', 'alignRight']] as [value, icon] (value)}
 								<button
@@ -280,7 +280,7 @@
 						</div>
 					</div>
 					<div>
-						<span class="mb-1 block text-[11px] text-white/40">{t('props.valign')}</span>
+						<span class="mb-1 block text-[11px] text-fg/40">{t('props.valign')}</span>
 						<div class="flex gap-1">
 							<!-- Same glyphs turned a quarter: top/middle/bottom read as
 							     left/centre/right rotated, which is how they behave. -->
@@ -301,7 +301,7 @@
 				</div>
 
 				<div>
-					<span class="mb-1 block text-[11px] text-white/40">{t('props.background')}</span>
+					<span class="mb-1 block text-[11px] text-fg/40">{t('props.background')}</span>
 					<div class="flex flex-wrap gap-1">
 						{#each [['transparent', t('props.bgNone')], ['rgba(0,0,0,0.55)', t('props.bgDark')], ['rgba(0,0,0,0.85)', t('props.bgSolid')], ['rgba(255,136,12,0.85)', t('props.bgAccent')]] as [value, label] (value)}
 							<button
@@ -316,7 +316,7 @@
 				</div>
 
 				<div class="flex flex-wrap gap-3">
-					<label class="flex items-center gap-2 text-[12px] text-white/60">
+					<label class="flex items-center gap-2 text-[12px] text-fg/60">
 						<input
 							type="checkbox"
 							class="accent-primary"
@@ -328,7 +328,7 @@
 						/>
 						{t('props.shadow')}
 					</label>
-					<label class="flex items-center gap-2 text-[12px] text-white/60">
+					<label class="flex items-center gap-2 text-[12px] text-fg/60">
 						<input
 							type="checkbox"
 							class="accent-primary"

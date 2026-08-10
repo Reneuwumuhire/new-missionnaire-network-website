@@ -68,17 +68,17 @@
 						class="flex min-w-0 flex-1 items-center gap-2 px-3 py-1.5 text-left text-[13px] transition-colors {scene.id ===
 						studio.activeSceneId
 							? 'bg-primary font-medium text-black'
-							: 'text-white/70 hover:bg-white/5'}"
+							: 'text-fg/70 hover:bg-fg/5'}"
 						onclick={() => selectScene(scene.id)}
 						ondblclick={() => (renamingId = scene.id)}
 					>
-						<span class="w-3 shrink-0 font-mono text-[10px] text-white/25">{index + 1}</span>
+						<span class="w-3 shrink-0 font-mono text-[10px] text-fg/25">{index + 1}</span>
 						<span class="min-w-0 flex-1 truncate">{scene.name}</span>
 						{#if scene.id === onAirSceneId()}
 							<!-- Which scene is actually on air. Only ambiguous in Studio Mode,
 							     but that is exactly when getting it wrong matters. -->
 							<span
-								class="shrink-0 bg-red-600 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-white"
+								class="shrink-0 bg-red-600 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-fg"
 							>
 								{t('preview.onAir')}
 							</span>

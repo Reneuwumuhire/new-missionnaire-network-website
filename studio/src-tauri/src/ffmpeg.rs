@@ -62,7 +62,11 @@ pub struct StreamStats {
 	pub out_time_ms: u64,
 	pub dropped_frames: u64,
 	pub speed: f64,
-	/// Chunks the queue had to discard because ffmpeg could not keep up.
+	/// Bytes handed to the muxers so far — OBS's "total data output".
+	pub total_bytes: u64,
+	/// Chunks the queue had to discard because ffmpeg could not keep up. With
+	/// RTMP this is the network signal: a slow uplink blocks ffmpeg's output,
+	/// which backs up the input pipe until this queue overflows.
 	pub discarded_chunks: u64,
 }
 
@@ -135,6 +139,34 @@ pub fn probe_ffmpeg() -> Result<FfmpegInfo, String> {
 		version,
 		hardware_h264: encoders.contains("h264_videotoolbox") || encoders.contains("h264_nvenc"),
 	})
+}
+
+/// Which target (if any) an ffmpeg stderr line is complaining about, and the
+/// reason. `tee` numbers its slaves in the order they were listed.
+pub fn parse_target_failure(line: &str, single_target: bool) -> Option<(usize, String)> {
+	// tee: "Slave muxer #1 failed: Connection refused, continuing with 1/2 slaves."
+	if let Some(rest) = line.split("Slave muxer #").nth(1) {
+		let mut parts = rest.splitn(2, ' ');
+		let index: usize = parts.next()?.trim().parse().ok()?;
+		let reason = parts
+			.next()
+			.unwrap_or("failed")
+			.trim_start_matches("failed:")
+			.trim()
+			.trim_end_matches('.')
+			.to_string();
+		return Some((index, reason));
+	}
+	// Single destination: there is no tee, so a connection error is target 0.
+	if single_target
+		&& (line.contains("Cannot open connection")
+			|| line.contains("Connection refused")
+			|| line.contains("Connection timed out")
+			|| line.contains("Server returned 4"))
+	{
+		return Some((0, line.trim().to_string()));
+	}
+	None
 }
 
 // ── argument building ─────────────────────────────────────────────
@@ -310,6 +342,7 @@ impl Encoder {
 					"drop_frames" => {
 						stats.dropped_frames = value.parse().unwrap_or(stats.dropped_frames)
 					}
+					"total_size" => stats.total_bytes = value.parse().unwrap_or(stats.total_bytes),
 					"speed" => {
 						stats.speed = value.trim_end_matches('x').parse().unwrap_or(stats.speed)
 					}
@@ -323,6 +356,7 @@ impl Encoder {
 		});
 
 		// stderr reader: surfaces ffmpeg's own words, and the exit reason.
+		let target_count = cfg.targets.len();
 		let app_log = app.clone();
 		let child_handle = Arc::new(Mutex::new(child));
 		let child_wait = child_handle.clone();
@@ -333,6 +367,12 @@ impl Encoder {
 					tail.pop_front();
 				}
 				tail.push_back(line.clone());
+				if let Some((index, reason)) = parse_target_failure(&line, target_count == 1) {
+					let _ = app_log.emit(
+						"stream://target",
+						serde_json::json!({ "index": index, "state": "failed", "reason": reason }),
+					);
+				}
 				let _ = app_log.emit("stream://log", line);
 			}
 			// stderr closed → the process is on its way out. Reap it and tell
@@ -459,6 +499,30 @@ mod tests {
 		assert_eq!(args[pos + 1], "60");
 		let pos = args.iter().position(|a| a == "-b:v").unwrap();
 		assert_eq!(args[pos + 1], "20000k");
+	}
+
+	#[test]
+	fn reads_tee_slave_failures_back_to_the_right_destination() {
+		let line = "[tee @ 0x1] Slave muxer #1 failed: Connection refused, continuing with 1/2 slaves.";
+		let (index, reason) = parse_target_failure(line, false).unwrap();
+		assert_eq!(index, 1);
+		assert!(reason.contains("Connection refused"), "{reason}");
+	}
+
+	#[test]
+	fn blames_target_zero_when_there_is_no_tee() {
+		// With one destination ffmpeg writes flv directly, so nothing numbers
+		// the failure — it can only be the single target.
+		let line = "[rtmp @ 0x1] Cannot open connection tcp://host:1935";
+		assert_eq!(parse_target_failure(line, true).unwrap().0, 0);
+		// The same line with several targets is the tee's job to attribute.
+		assert!(parse_target_failure(line, false).is_none());
+	}
+
+	#[test]
+	fn ordinary_log_lines_are_not_failures() {
+		assert!(parse_target_failure("frame= 120 fps=30", false).is_none());
+		assert!(parse_target_failure("[libx264] using cpu capabilities", true).is_none());
 	}
 
 	#[test]

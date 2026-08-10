@@ -24,7 +24,7 @@
 		aria-label={title}
 	>
 		<header class="flex h-11 shrink-0 items-center justify-between border-b border-ink-700 px-4">
-			<h2 class="text-[13px] font-semibold text-white/85">{title}</h2>
+			<h2 class="text-[13px] font-semibold text-fg/85">{title}</h2>
 			<button class="studio-icon-btn" aria-label={t('common.close')} onclick={onclose}><Icon name="close" /></button>
 		</header>
 		<div class="min-h-0 flex-1 overflow-y-auto">

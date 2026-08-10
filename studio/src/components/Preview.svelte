@@ -109,7 +109,7 @@
 		<span
 			class="text-[9px] font-bold uppercase tracking-[0.2em] {live
 				? 'text-red-400'
-				: 'text-white/35'}">{label}</span
+				: 'text-fg/35'}">{label}</span
 		>
 		{#if live}
 			<span class="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500"></span>
