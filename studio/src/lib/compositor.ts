@@ -6,7 +6,7 @@
 import { drawBox, toPixels, type Rect } from './geom';
 import { handleFor } from './media.svelte';
 import { onAirLines } from './lyrics.svelte';
-import { activeScene, studio, type Layer, type TextStyle } from './state.svelte';
+import { persist, studio, type Layer, type TextStyle } from './state.svelte';
 import { DEFAULT_TEXT_STYLE } from './state.svelte';
 
 export interface Transition {
@@ -21,12 +21,24 @@ let frames = 0;
 /** Diagnostics only: frames the compositor has actually painted. */
 export const frameCount = () => frames;
 
-export function beginTransition(fromSceneId: string, durationMs: number) {
-	if (durationMs <= 0 || fromSceneId === studio.activeSceneId) {
-		transition = null;
-		return;
-	}
-	transition = { fromSceneId, startedAt: performance.now(), durationMs };
+/** Put a scene on air, fading from whatever was there. This is the only way
+ *  the program scene should ever change — it is what the encoder is reading. */
+export function takeToProgram(sceneId: string, durationMs = studio.settings.transitionMs) {
+	const from = studio.programSceneId;
+	studio.programSceneId = sceneId;
+	transition = durationMs > 0 && from !== sceneId
+		? { fromSceneId: from, startedAt: performance.now(), durationMs }
+		: null;
+	persist();
+}
+
+/** Select a scene for editing. Outside Studio Mode that also puts it on air —
+ *  which is exactly how OBS behaves with Studio Mode off. */
+export function selectScene(sceneId: string) {
+	studio.activeSceneId = sceneId;
+	studio.selectedLayerId = null;
+	if (!studio.settings.studioMode) takeToProgram(sceneId);
+	else persist();
 }
 
 const FONTS = {
@@ -197,27 +209,34 @@ function drawScene(ctx: CanvasRenderingContext2D, sceneId: string, nowMs: number
 	}
 }
 
-export function renderFrame(ctx: CanvasRenderingContext2D, nowMs = Date.now()) {
+/** Paint `sceneId` into `ctx`. `withTransition` is true only for the program
+ *  canvas — the edit preview shows its scene outright, so the operator sees
+ *  what they are building rather than a fade they did not ask for. */
+export function renderFrame(
+	ctx: CanvasRenderingContext2D,
+	sceneId: string,
+	withTransition: boolean,
+	nowMs = Date.now()
+) {
 	frames++;
 	ctx.save();
 	ctx.fillStyle = '#000000';
 	ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-	const active = activeScene();
-	if (transition) {
+	if (withTransition && transition) {
 		const t = (performance.now() - transition.startedAt) / transition.durationMs;
 		if (t >= 1) {
 			transition = null;
 		} else {
 			drawScene(ctx, transition.fromSceneId, nowMs);
 			ctx.globalAlpha = t;
-			drawScene(ctx, active.id, nowMs);
+			drawScene(ctx, sceneId, nowMs);
 			ctx.globalAlpha = 1;
 			ctx.restore();
 			return;
 		}
 	}
-	drawScene(ctx, active.id, nowMs);
+	drawScene(ctx, sceneId, nowMs);
 	ctx.restore();
 }
 
@@ -228,7 +247,12 @@ export function renderFrame(ctx: CanvasRenderingContext2D, nowMs = Date.now()) {
  *  stuttering picture beats a frozen one. macOS window-occlusion detection is
  *  disabled at startup (see src-tauri/src/lib.rs) so merely covering the window
  *  does not count as hidden; minimising it still does. */
-export function startRenderLoop(canvas: HTMLCanvasElement, fps: () => number): () => void {
+export function startRenderLoop(
+	canvas: HTMLCanvasElement,
+	sceneId: () => string,
+	withTransition: boolean,
+	fps: () => number
+): () => void {
 	const ctx = canvas.getContext('2d', { alpha: false });
 	if (!ctx) throw new Error('Canvas 2D indisponible');
 	let stopped = false;
@@ -241,7 +265,7 @@ export function startRenderLoop(canvas: HTMLCanvasElement, fps: () => number): (
 		const interval = 1000 / Math.max(1, fps());
 		if (now - last >= interval - 1) {
 			last = now;
-			renderFrame(ctx);
+			renderFrame(ctx, sceneId(), withTransition);
 		}
 		schedule();
 	};

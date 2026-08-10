@@ -1,32 +1,32 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import ControlsDock from './components/ControlsDock.svelte';
 	import DestinationsPanel from './components/DestinationsPanel.svelte';
 	import LyricsPanel from './components/LyricsPanel.svelte';
-	import MixerPanel from './components/MixerPanel.svelte';
+	import MixerDock from './components/MixerDock.svelte';
+	import Modal from './components/Modal.svelte';
 	import Preview from './components/Preview.svelte';
 	import PropertiesPanel from './components/PropertiesPanel.svelte';
-	import ScenePanel from './components/ScenePanel.svelte';
+	import ScenesDock from './components/ScenesDock.svelte';
 	import SettingsPanel from './components/SettingsPanel.svelte';
+	import SourcesDock from './components/SourcesDock.svelte';
+	import TransitionsDock from './components/TransitionsDock.svelte';
 	import { broadcast, startBroadcast, stopBroadcast, uptimeLabel } from './lib/broadcast.svelte';
-	import { beginTransition, startRenderLoop } from './lib/compositor';
+	import { frameCount, selectScene, takeToProgram } from './lib/compositor';
 	import { lyrics, step } from './lib/lyrics.svelte';
 	import { handleFor, mediaVersion, openCamera, releaseAll } from './lib/media.svelte';
 	import { Mixer } from './lib/mixer';
 	import { runSelftest, selftestTarget } from './lib/selftest';
-	import { liveAudioLayers, persist, studio } from './lib/state.svelte';
+	import { activeScene, liveAudioLayers, studio } from './lib/state.svelte';
 
 	let programCanvas = $state<HTMLCanvasElement | null>(null);
 	let mixer = $state<Mixer | null>(null);
 	let now = $state(Date.now());
-	let tab = $state<'lyrics' | 'properties' | 'destinations' | 'settings'>('lyrics');
 	let confirmStop = $state(false);
-
-	const TABS: [typeof tab, string][] = [
-		['lyrics', 'Paroles'],
-		['properties', 'Propriétés'],
-		['destinations', 'Destinations'],
-		['settings', 'Réglages']
-	];
+	let dialog = $state<'properties' | 'destinations' | 'settings' | null>(null);
+	/** Frames actually painted per second — the readout OBS puts in its status
+	 *  bar, and the first number to look at when the picture stutters. */
+	let renderFps = $state(0);
 
 	onMount(() => {
 		mixer = new Mixer();
@@ -56,7 +56,14 @@
 			}
 		})();
 
-		const clock = setInterval(() => (now = Date.now()), 500);
+		let lastFrames = frameCount();
+		const clock = setInterval(() => {
+			now = Date.now();
+			const frames = frameCount();
+			// Two canvases are painting in Studio Mode; report per-canvas rate.
+			renderFps = Math.round((frames - lastFrames) / (studio.settings.studioMode ? 2 : 1));
+			lastFrames = frames;
+		}, 1000);
 		return () => {
 			clearInterval(clock);
 			window.removeEventListener('pointerdown', wake);
@@ -64,11 +71,6 @@
 			releaseAll();
 			mixer?.close();
 		};
-	});
-
-	$effect(() => {
-		if (!programCanvas) return;
-		return startRenderLoop(programCanvas, () => studio.settings.fps);
 	});
 
 	// Keep the mixer's strips in step with what is actually on air. Reads
@@ -105,9 +107,7 @@
 	function isTyping(target: EventTarget | null): boolean {
 		const el = target as HTMLElement | null;
 		if (!el) return false;
-		return (
-			el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)
-		);
+		return el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName);
 	}
 
 	function onKeydown(event: KeyboardEvent) {
@@ -128,19 +128,20 @@
 			}
 			return;
 		}
+		if (event.key === 'Enter' && studio.settings.studioMode) {
+			event.preventDefault();
+			takeToProgram(studio.activeSceneId);
+			return;
+		}
 		if (/^[1-9]$/.test(event.key)) {
 			const scene = studio.scenes[Number(event.key) - 1];
-			if (scene && scene.id !== studio.activeSceneId) {
-				beginTransition(studio.activeSceneId, studio.settings.transitionMs);
-				studio.activeSceneId = scene.id;
-				studio.selectedLayerId = null;
-				persist();
-			}
+			if (scene) selectScene(scene.id);
 		}
 	}
 
 	async function toggleLive() {
 		if (broadcast.live) {
+			// A misclick must not end a service; the button asks once.
 			if (!confirmStop) {
 				confirmStop = true;
 				setTimeout(() => (confirmStop = false), 4000);
@@ -155,15 +156,19 @@
 		await startBroadcast(programCanvas, mixer?.audioTrack);
 	}
 
-	const enabledCount = $derived(studio.destinations.filter((d) => d.enabled && d.url.trim()).length);
+	const selectedLayer = $derived(
+		activeScene().layers.find((l) => l.id === studio.selectedLayerId) ?? null
+	);
 	const health = $derived.by(() => {
 		const stats = broadcast.stats;
-		if (!broadcast.live || !stats) return { tone: 'idle', label: 'Hors ligne' };
+		if (!broadcast.live) return { tone: 'idle', label: 'Hors ligne' };
+		if (!stats) return { tone: 'idle', label: 'Connexion…' };
 		if (stats.discarded_chunks > 0 || stats.speed < 0.9) {
 			return { tone: 'warn', label: 'Encodage en retard' };
 		}
 		return { tone: 'ok', label: 'Stable' };
 	});
+	const canTake = $derived(studio.activeSceneId !== studio.programSceneId);
 </script>
 
 <svelte:window onkeydown={onKeydown} />
@@ -172,51 +177,25 @@
 	<!-- ── Title bar ──────────────────────────────────────── -->
 	<header
 		data-tauri-drag-region
-		class="flex shrink-0 items-center gap-4 border-b border-ink-700 bg-ink-900 py-2 pl-[86px] pr-3"
+		class="flex h-9 shrink-0 items-center gap-4 border-b border-ink-700 bg-ink-900 pl-[86px] pr-3"
 	>
-		<h1 class="pointer-events-none select-none text-[11px] font-semibold uppercase tracking-[0.28em] text-white/45">
+		<h1 class="pointer-events-none select-none text-[10px] font-semibold uppercase tracking-[0.28em] text-white/45">
 			Missionnaire <span class="text-primary">Studio</span>
 		</h1>
-
 		{#if broadcast.live}
-			<span class="flex items-center gap-2 bg-red-600/15 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-red-400">
-				<span class="h-2 w-2 animate-pulse rounded-full bg-red-500"></span>
+			<span class="flex items-center gap-2 bg-red-600/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-red-400">
+				<span class="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500"></span>
 				En direct
 				<span class="font-mono tracking-normal text-red-300/80">{uptimeLabel(now)}</span>
 			</span>
 		{/if}
-
-		<div class="ml-auto flex items-center gap-3">
-			{#if broadcast.stats}
-				<span class="font-mono text-[11px] text-white/35">
-					{Math.round(broadcast.stats.fps)} fps · {Math.round(broadcast.stats.bitrate_kbps)} kbps
-				</span>
-			{/if}
-			<span
-				class="text-[11px] {health.tone === 'warn'
-					? 'text-amber-400'
-					: health.tone === 'ok'
-						? 'text-emerald-400'
-						: 'text-white/30'}">{health.label}</span
-			>
-			<button
-				class="h-9 px-5 text-[11px] font-semibold uppercase tracking-[0.18em] transition-colors {broadcast.live
-					? confirmStop
-						? 'bg-red-600 text-white'
-						: 'border border-red-500/50 text-red-400 hover:bg-red-600/15'
-					: 'bg-primary text-black hover:bg-missionnaire-400'} disabled:opacity-40"
-				disabled={broadcast.starting || (!broadcast.live && enabledCount === 0)}
-				onclick={toggleLive}
-			>
-				{#if broadcast.starting}
-					Démarrage…
-				{:else if broadcast.live}
-					{confirmStop ? 'Confirmer l’arrêt' : 'Arrêter'}
-				{:else}
-					Passer en direct{enabledCount > 1 ? ` (${enabledCount})` : ''}
-				{/if}
-			</button>
-		</div>
+		<span
+			class="ml-auto text-[10px] {health.tone === 'warn'
+				? 'text-amber-400'
+				: health.tone === 'ok'
+					? 'text-emerald-400'
+					: 'text-white/30'}">{health.label}</span
+		>
 	</header>
 
 	{#if broadcast.error}
@@ -226,64 +205,125 @@
 		</div>
 	{/if}
 
-	<!-- ── Body ───────────────────────────────────────────── -->
+	<!-- ── Preview + lyrics ───────────────────────────────── -->
 	<div class="flex min-h-0 flex-1">
-		<aside class="w-60 shrink-0 border-r border-ink-700 bg-ink-900">
-			<ScenePanel />
-		</aside>
-
-		<main class="flex min-w-0 flex-1 flex-col">
-			<div class="min-h-0 flex-[1.6]">
-				<Preview oncanvas={(canvas) => (programCanvas = canvas)} />
-			</div>
-			<div class="min-h-0 flex-1 border-t border-ink-700 bg-ink-900">
-				<MixerPanel {mixer} />
-			</div>
-		</main>
-
-		<aside class="flex w-[26rem] shrink-0 flex-col border-l border-ink-700 bg-ink-900">
-			<nav class="flex shrink-0 border-b border-ink-700">
-				{#each TABS as [value, label] (value)}
-					<button
-						class="flex-1 border-b-2 px-2 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] transition-colors {tab ===
-						value
-							? 'border-primary text-white'
-							: 'border-transparent text-white/45 hover:text-white/80'}"
-						onclick={() => (tab = value)}>{label}</button
-					>
-				{/each}
-			</nav>
-			<div class="flex min-h-0 flex-1 flex-col">
-				{#if tab === 'lyrics'}
-					<LyricsPanel />
-				{:else if tab === 'properties'}
-					<PropertiesPanel />
-				{:else if tab === 'destinations'}
-					<DestinationsPanel />
+		<div class="flex min-w-0 flex-1 flex-col bg-black/40 px-4 pb-1 pt-1.5">
+			<div class="flex min-h-0 flex-1 gap-4">
+				{#if studio.settings.studioMode}
+					<Preview
+						label="Aperçu — {activeScene().name}"
+						sceneId={() => studio.activeSceneId}
+						program={false}
+						editable={true}
+					/>
+					<div class="flex shrink-0 flex-col justify-center">
+						<button
+							class="h-16 w-24 text-[11px] font-semibold uppercase leading-tight tracking-[0.14em] transition-colors {canTake
+								? 'bg-primary text-black hover:bg-missionnaire-400'
+								: 'border border-ink-600 text-white/25'}"
+							disabled={!canTake}
+							title="Envoie la scène en aperçu à l’antenne (Entrée)"
+							onclick={() => takeToProgram(studio.activeSceneId)}
+						>
+							Envoyer<br /><span class="font-mono text-[9px] opacity-60">Entrée</span>
+						</button>
+					</div>
+					<Preview
+						label="À l’antenne"
+						sceneId={() => studio.programSceneId}
+						program={true}
+						editable={false}
+						live={broadcast.live}
+						oncanvas={(canvas) => (programCanvas = canvas)}
+					/>
 				{:else}
-					<SettingsPanel />
+					<Preview
+						label="Programme — {activeScene().name}"
+						sceneId={() => studio.programSceneId}
+						program={true}
+						editable={true}
+						live={broadcast.live}
+						oncanvas={(canvas) => (programCanvas = canvas)}
+					/>
 				{/if}
+			</div>
+
+			<!-- Selected-source strip, where OBS puts its Properties/Filters bar. -->
+			<div class="mt-1.5 flex h-8 shrink-0 items-center gap-3 border-t border-ink-700 px-1 pt-1">
+				<span class="font-mono text-[10px] text-white/30">
+					Canvas {studio.settings.width}×{studio.settings.height}
+				</span>
+				<span class="h-3 w-px bg-ink-600"></span>
+				<span
+					class="min-w-0 flex-1 truncate text-[12px] {selectedLayer ? 'text-white/70' : 'text-white/25'}"
+					>{selectedLayer ? selectedLayer.name : 'Aucune source sélectionnée'}</span
+				>
+				<button class="studio-chip" disabled={!selectedLayer} onclick={() => (dialog = 'properties')}>
+					Propriétés
+				</button>
+			</div>
+		</div>
+
+		<aside class="flex w-[23rem] shrink-0 flex-col border-l border-ink-700 bg-ink-900">
+			<div class="flex h-8 shrink-0 items-center border-b border-ink-700 bg-ink-850 px-3">
+				<h2 class="text-[10px] font-bold uppercase tracking-[0.18em] text-white/55">Paroles</h2>
+			</div>
+			<div class="flex min-h-0 flex-1 flex-col">
+				<LyricsPanel />
 			</div>
 		</aside>
 	</div>
 
+	<!-- ── Dock row ───────────────────────────────────────── -->
+	<div class="flex h-[15rem] shrink-0 border-t border-ink-700 bg-ink-900">
+		<ScenesDock />
+		<SourcesDock onproperties={() => (dialog = 'properties')} />
+		<MixerDock {mixer} />
+		<TransitionsDock />
+		<ControlsDock
+			{confirmStop}
+			onToggleLive={toggleLive}
+			onDestinations={() => (dialog = 'destinations')}
+			onSettings={() => (dialog = 'settings')}
+		/>
+	</div>
+
 	<!-- ── Status bar ─────────────────────────────────────── -->
 	<footer
-		class="flex shrink-0 items-center gap-4 border-t border-ink-700 bg-ink-900 px-4 py-1.5 font-mono text-[10px] text-white/30"
+		class="flex h-6 shrink-0 items-center gap-4 border-t border-ink-700 bg-ink-850 px-3 font-mono text-[10px] text-white/35"
 	>
-		<span>{studio.settings.width}×{studio.settings.height} · {studio.settings.fps} fps</span>
-		<span>{studio.settings.encoder === 'hardware' ? 'matériel' : 'x264'}</span>
-		<span>{enabledCount} destination{enabledCount > 1 ? 's' : ''}</span>
+		<span class="flex items-center gap-1.5">
+			<span class="h-1.5 w-1.5 rounded-full {broadcast.live ? 'bg-red-500' : 'bg-white/20'}"></span>
+			{uptimeLabel(now)}
+		</span>
+		<span class={renderFps > 0 && renderFps < studio.settings.fps - 5 ? 'text-amber-400' : ''}>
+			{renderFps} / {studio.settings.fps} fps
+		</span>
 		{#if broadcast.stats}
+			<span>{Math.round(broadcast.stats.bitrate_kbps)} kbps</span>
 			<span class={broadcast.stats.dropped_frames > 0 ? 'text-amber-400' : ''}>
-				{broadcast.stats.dropped_frames} img. perdues
+				{broadcast.stats.dropped_frames} perdues
 			</span>
 			<span class={broadcast.stats.discarded_chunks > 0 ? 'text-amber-400' : ''}>
-				{broadcast.stats.discarded_chunks} blocs abandonnés
+				{broadcast.stats.discarded_chunks} abandonnés
 			</span>
 		{/if}
 		<span class="ml-auto font-body">
-			Espace = ligne suivante · 1-9 = scène
+			Espace = ligne suivante · 1-9 = scène{studio.settings.studioMode ? ' · Entrée = envoyer' : ''}
 		</span>
 	</footer>
 </div>
+
+{#if dialog === 'properties'}
+	<Modal title="Propriétés de la source" onclose={() => (dialog = null)}>
+		<PropertiesPanel />
+	</Modal>
+{:else if dialog === 'destinations'}
+	<Modal title="Destinations" onclose={() => (dialog = null)}>
+		<DestinationsPanel />
+	</Modal>
+{:else if dialog === 'settings'}
+	<Modal title="Réglages" onclose={() => (dialog = null)}>
+		<SettingsPanel />
+	</Modal>
+{/if}

@@ -92,6 +92,9 @@ export interface Settings {
 	audioBitrateKbps: number;
 	encoder: 'hardware' | 'software';
 	transitionMs: number;
+	/** OBS's Studio Mode: edit a scene on the left while a different one stays
+	 *  on air on the right, then cut to it deliberately. */
+	studioMode: boolean;
 	monitorAudio: boolean;
 	/** Admin panel base URL + shared token, for driving Go Live and the live
 	 *  transcript from here instead of a second browser tab. Optional. */
@@ -107,6 +110,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	audioBitrateKbps: 160,
 	encoder: 'hardware',
 	transitionMs: 350,
+	studioMode: false,
 	monitorAudio: false,
 	adminUrl: '',
 	adminToken: ''
@@ -176,6 +180,7 @@ const STORE_KEY = 'missionnaire-studio-v1';
 interface Persisted {
 	scenes: Scene[];
 	activeSceneId: string;
+	programSceneId: string;
 	audioSources: AudioSource[];
 	destinations: Destination[];
 	settings: Settings;
@@ -186,6 +191,7 @@ function load(): Persisted {
 	const fallback: Persisted = {
 		scenes,
 		activeSceneId: scenes[0].id,
+		programSceneId: scenes[0].id,
 		audioSources: [{ id: id(), name: 'Micro', gain: 1, muted: false }],
 		destinations: [
 			{
@@ -213,6 +219,7 @@ function load(): Persisted {
 		return {
 			scenes: parsed.scenes,
 			activeSceneId: parsed.activeSceneId ?? parsed.scenes[0].id,
+			programSceneId: parsed.programSceneId ?? parsed.activeSceneId ?? parsed.scenes[0].id,
 			audioSources: parsed.audioSources ?? fallback.audioSources,
 			destinations: parsed.destinations ?? fallback.destinations,
 			// Merge, so a setting added in a later version gets its default
@@ -228,7 +235,11 @@ const initial = load();
 
 export const studio = $state({
 	scenes: initial.scenes,
+	/** The scene being edited — what the Sources dock and the left preview show. */
 	activeSceneId: initial.activeSceneId,
+	/** The scene actually going out. Same as activeSceneId unless Studio Mode
+	 *  is on; this is the one the program canvas paints and the encoder sees. */
+	programSceneId: initial.programSceneId,
 	selectedLayerId: null as string | null,
 	audioSources: initial.audioSources,
 	destinations: initial.destinations,
@@ -242,6 +253,7 @@ export function persist() {
 			JSON.stringify({
 				scenes: studio.scenes,
 				activeSceneId: studio.activeSceneId,
+				programSceneId: studio.programSceneId,
 				audioSources: studio.audioSources,
 				destinations: studio.destinations,
 				settings: studio.settings
@@ -256,13 +268,19 @@ export function activeScene(): Scene {
 	return studio.scenes.find((s) => s.id === studio.activeSceneId) ?? studio.scenes[0];
 }
 
+export function programScene(): Scene {
+	return studio.scenes.find((s) => s.id === studio.programSceneId) ?? activeScene();
+}
+
 export function selectedLayer(): Layer | null {
 	return activeScene().layers.find((l) => l.id === studio.selectedLayerId) ?? null;
 }
 
-/** Audio-bearing layers of the scene currently on air. */
+/** Audio-bearing layers of the scene currently ON AIR — the program scene, not
+ *  the one being edited. Setting up a scene in Studio Mode must not push its
+ *  audio out over the live one. */
 export function liveAudioLayers(): Layer[] {
-	return activeScene().layers.filter((l) => l.hasAudio && l.visible);
+	return programScene().layers.filter((l) => l.hasAudio && l.visible);
 }
 
 /** Full ingest URL for a destination. Slashes are normalised because operators

@@ -1,0 +1,216 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import { handleFor, listDevices, openMic, release, type DeviceOption } from '../lib/media.svelte';
+	import { METER_TICKS, decayHold, formatDb, meterFraction, toDb } from '../lib/meter';
+	import type { Mixer } from '../lib/mixer';
+	import Dock from './Dock.svelte';
+	import { id, liveAudioLayers, persist, studio, type AudioSource, type Layer } from '../lib/state.svelte';
+
+	let { mixer }: { mixer: Mixer | null } = $props();
+
+	let inputs = $state<DeviceOption[]>([]);
+	let levels = $state<Record<string, { db: number; hold: number }>>({});
+	let devicesOpen = $state<string | null>(null);
+
+	onMount(() => {
+		void refreshDevices();
+		let last = performance.now();
+		// 30 Hz: enough for a meter to look alive without burning a core.
+		const timer = setInterval(() => {
+			if (!mixer) return;
+			const now = performance.now();
+			const elapsed = now - last;
+			last = now;
+			const next: Record<string, { db: number; hold: number }> = {};
+			for (const stripId of mixer.ids()) {
+				const db = toDb(mixer.peak(stripId));
+				next[stripId] = {
+					db,
+					hold: decayHold(levels[stripId]?.hold ?? 0, meterFraction(db), elapsed)
+				};
+			}
+			levels = next;
+		}, 33);
+		return () => clearInterval(timer);
+	});
+
+	async function refreshDevices() {
+		inputs = await listDevices('audioinput');
+	}
+
+	async function connect(source: AudioSource) {
+		await openMic(source.id, source.deviceId);
+		// Labels stay blank until permission is granted, so re-read after.
+		await refreshDevices();
+	}
+
+	function addMic() {
+		studio.audioSources = [
+			...studio.audioSources,
+			{ id: id(), name: `Micro ${studio.audioSources.length + 1}`, gain: 1, muted: false }
+		];
+		persist();
+	}
+
+	function removeMic(source: AudioSource) {
+		release(source.id);
+		mixer?.remove(source.id);
+		studio.audioSources = studio.audioSources.filter((s) => s.id !== source.id);
+		persist();
+	}
+
+	interface Strip {
+		id: string;
+		name: string;
+		isMic: boolean;
+		source: AudioSource | Layer;
+	}
+
+	/** Global mics first, then whatever the scene ON AIR contributes. */
+	const strips = $derived<Strip[]>([
+		...studio.audioSources.map((source) => ({ id: source.id, name: source.name, isMic: true, source })),
+		...liveAudioLayers().map((layer) => ({ id: layer.id, name: layer.name, isMic: false, source: layer }))
+	]);
+
+	function setLevel(strip: Strip, gain: number, muted: boolean) {
+		strip.source.gain = gain;
+		strip.source.muted = muted;
+		mixer?.setLevel(strip.id, gain, muted);
+		persist();
+	}
+</script>
+
+<Dock title="Mixage audio" grow={2.4}>
+	{#snippet actions()}
+		<label class="mr-1 flex cursor-pointer items-center gap-1.5 text-[10px] text-white/45">
+			<input
+				type="checkbox"
+				class="accent-primary"
+				checked={studio.settings.monitorAudio}
+				onchange={(e) => {
+					studio.settings.monitorAudio = (e.currentTarget as HTMLInputElement).checked;
+					mixer?.setMonitor(studio.settings.monitorAudio);
+					persist();
+				}}
+			/>
+			Écoute
+		</label>
+		<button class="studio-icon-btn" title="Ajouter un micro" aria-label="Ajouter un micro" onclick={addMic}>+</button>
+	{/snippet}
+
+	{#if studio.settings.monitorAudio}
+		<p class="border-b border-amber-500/20 bg-amber-500/10 px-3 py-1 text-[10px] text-amber-300/90">
+			Écoute locale active — au casque, sinon le micro capte les haut-parleurs.
+		</p>
+	{/if}
+
+	{#each strips as strip (strip.id)}
+		{@const connected = mixer?.has(strip.id) ?? false}
+		{@const level = levels[strip.id]}
+		<div class="group border-b border-ink-800 px-3 py-2">
+			<div class="flex items-baseline gap-2">
+				{#if strip.isMic}
+					<input
+						class="studio-input-flush min-w-0 flex-1 text-[12px]"
+						value={strip.name}
+						onchange={(e) => {
+							strip.source.name = (e.currentTarget as HTMLInputElement).value;
+							persist();
+						}}
+					/>
+				{:else}
+					<span class="min-w-0 flex-1 truncate px-1 text-[12px] text-white/80">{strip.name}</span>
+				{/if}
+				<span class="shrink-0 font-mono text-[10px] {connected ? 'text-white/50' : 'text-white/20'}">
+					{connected && level ? formatDb(level.db) : '—'}
+				</span>
+				{#if strip.isMic}
+					<button
+						class="studio-icon-btn opacity-0 group-hover:opacity-100"
+						title="Choisir l’entrée"
+						aria-label="Choisir l’entrée"
+						onclick={() => (devicesOpen = devicesOpen === strip.id ? null : strip.id)}>⋮</button
+					>
+				{/if}
+			</div>
+
+			{#if devicesOpen === strip.id && strip.isMic}
+				<div class="mt-1 flex gap-1">
+					<select
+						class="studio-input h-7 min-w-0 flex-1 py-0 text-[11px]"
+						value={(strip.source as AudioSource).deviceId ?? ''}
+						onchange={(e) => {
+							(strip.source as AudioSource).deviceId =
+								(e.currentTarget as HTMLSelectElement).value || undefined;
+							persist();
+							void connect(strip.source as AudioSource);
+						}}
+					>
+						<option value="">Entrée par défaut</option>
+						{#each inputs as device (device.deviceId)}
+							<option value={device.deviceId}>{device.label}</option>
+						{/each}
+					</select>
+					<button
+						class="studio-icon-btn"
+						title="Retirer"
+						aria-label="Retirer"
+						onclick={() => removeMic(strip.source as AudioSource)}>🗑</button
+					>
+				</div>
+			{/if}
+
+			{#if connected}
+				<!-- dBFS meter. The gradient underneath is the whole −60→0 scale, and
+				     the overlay masks everything above the current level — so a given
+				     colour always sits at the same dB, which is the point of a meter. -->
+				<div class="relative mt-1.5 h-2.5 w-full bg-ink-950">
+					<div
+						class="absolute inset-0"
+						style="background: linear-gradient(to right, #10b981 0%, #10b981 66%, #fbbf24 66%, #fbbf24 85%, #ef4444 85%, #ef4444 100%)"
+					></div>
+					<div class="absolute inset-y-0 right-0 bg-ink-950/95" style="left: {meterFraction(level?.db ?? -Infinity) * 100}%"></div>
+					{#if level && level.hold > 0.01}
+						<div class="absolute inset-y-0 w-0.5 bg-white/70" style="left: {level.hold * 100}%"></div>
+					{/if}
+				</div>
+				<div class="relative mt-0.5 h-3">
+					{#each METER_TICKS as tick (tick)}
+						<span
+							class="absolute top-0 -translate-x-1/2 font-mono text-[8px] text-white/25"
+							style="left: {meterFraction(tick) * 100}%">{tick}</span
+						>
+					{/each}
+				</div>
+
+				<div class="mt-0.5 flex items-center gap-2">
+					<button
+						class="shrink-0 text-sm {strip.source.muted ? 'text-red-400' : 'text-white/50 hover:text-white'}"
+						title={strip.source.muted ? 'Réactiver' : 'Couper'}
+						aria-label={strip.source.muted ? 'Réactiver' : 'Couper'}
+						onclick={() => setLevel(strip, strip.source.gain, !strip.source.muted)}
+						>{strip.source.muted ? '🔇' : '🔊'}</button
+					>
+					<input
+						type="range"
+						min="0"
+						max="1.5"
+						step="0.01"
+						class="min-w-0 flex-1 accent-primary"
+						value={strip.source.gain}
+						oninput={(e) =>
+							setLevel(strip, Number((e.currentTarget as HTMLInputElement).value), strip.source.muted)}
+					/>
+				</div>
+			{:else if strip.isMic}
+				<button class="studio-chip mt-1.5 w-full text-left text-[11px]" onclick={() => connect(strip.source as AudioSource)}>
+					{handleFor(strip.id)?.error ?? 'Connecter le micro'}
+				</button>
+			{:else}
+				<p class="mt-1.5 text-[11px] text-white/30">{handleFor(strip.id)?.error ?? 'Pas de piste audio'}</p>
+			{/if}
+		</div>
+	{:else}
+		<p class="px-3 py-4 text-[11px] text-white/30">Aucune source audio.</p>
+	{/each}
+</Dock>
