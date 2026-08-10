@@ -7,14 +7,62 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { broadcast, chunkCount, startBroadcast, stopBroadcast } from './broadcast.svelte';
-import { frameCount } from './compositor';
-import { studio } from './state.svelte';
+import { frameCount, takeToProgram } from './compositor';
+import { id, makeLayer, persist, studio } from './state.svelte';
 
 const say = (line: string) => invoke('report', { line }).catch(() => console.log(line));
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function selftestTarget(): Promise<string | null> {
 	return invoke<string | null>('selftest_target').catch(() => null);
+}
+
+/** Proves the cross-fade actually blends. Two throwaway colour-only scenes,
+ *  black then white: halfway through a 1 s fade the centre pixel must be grey.
+ *  Before the compositing fix it jumped straight to white, because each layer
+ *  reset globalAlpha and wiped the transition's. */
+async function checkFade(canvas: HTMLCanvasElement) {
+	const restore = {
+		scenes: studio.scenes,
+		activeSceneId: studio.activeSceneId,
+		programSceneId: studio.programSceneId,
+		type: studio.settings.transitionType,
+		ms: studio.settings.transitionMs
+	};
+	const black = { id: id(), name: '__fade_from', layers: [makeLayer('color', 'a', { color: '#000000' })] };
+	const white = { id: id(), name: '__fade_to', layers: [makeLayer('color', 'b', { color: '#ffffff' })] };
+	studio.scenes = [...studio.scenes, black, white];
+	studio.settings.transitionType = 'fade';
+	studio.settings.transitionMs = 1000;
+
+	const context = canvas.getContext('2d');
+	const sample = () => {
+		const data = context?.getImageData(Math.floor(canvas.width / 2), Math.floor(canvas.height / 2), 1, 1)
+			.data;
+		return data ? data[0] : -1;
+	};
+
+	takeToProgram(black.id, 0);
+	await wait(300);
+	const before = sample();
+
+	takeToProgram(white.id, 1000);
+	await wait(500);
+	const middle = sample();
+
+	await wait(900);
+	const after = sample();
+
+	const blended = before < 40 && after > 215 && middle > 60 && middle < 200;
+	await say(`SELFTEST fade before=${before} middle=${middle} after=${after} ${blended ? 'BLENDED' : 'NOT BLENDED'}`);
+
+	studio.scenes = restore.scenes;
+	studio.activeSceneId = restore.activeSceneId;
+	studio.programSceneId = restore.programSceneId;
+	studio.settings.transitionType = restore.type;
+	studio.settings.transitionMs = restore.ms;
+	persist();
+	return blended;
 }
 
 export async function runSelftest(target: string, canvas: () => HTMLCanvasElement | null, audio: () => MediaStreamTrack | undefined) {
@@ -48,7 +96,7 @@ export async function runSelftest(target: string, canvas: () => HTMLCanvasElemen
 		await wait(1000);
 		const st = broadcast.stats;
 		await say(
-			`SELFTEST t=${i} wall=${Date.now() - t0}ms vis=${document.visibilityState} frames=${frameCount()} chunks=${chunkCount()} encoded=${st ? `${st.frames}f/${Math.round(st.bitrate_kbps)}kbps` : 'none'} err=${broadcast.error ?? '-'}`
+			`SELFTEST t=${i} wall=${Date.now() - t0}ms studio=${studio.settings.studioMode} canvases=${document.querySelectorAll('canvas').length} vis=${document.visibilityState} frames=${frameCount()} chunks=${chunkCount()} encoded=${st ? `${st.frames}f/${Math.round(st.bitrate_kbps)}kbps` : 'none'} err=${broadcast.error ?? '-'}`
 		);
 	}
 	const stats = broadcast.stats;
@@ -61,8 +109,9 @@ export async function runSelftest(target: string, canvas: () => HTMLCanvasElemen
 	for (const line of broadcast.log.slice(-8)) await say(`SELFTEST ffmpeg| ${line}`);
 
 	await stopBroadcast();
+	const faded = await checkFade(el);
 	studio.activeSceneId = previousScene;
 	await wait(1200);
-	const ok = Boolean(stats && stats.frames > 30 && !broadcast.error);
+	const ok = Boolean(stats && stats.frames > 30 && !broadcast.error) && faded;
 	await say(`SELFTEST ${ok ? 'OK' : 'FAIL'} — terminé`);
 }

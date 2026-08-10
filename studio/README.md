@@ -75,6 +75,10 @@ with the scene collection. The dividers also take focus, so arrow keys resize
 back. Docks are laid out by proportion, so the row still fills the window
 whatever size you drag it to.
 
+**Scene Transitions** holds the type (Fade or Cut) and the duration, as OBS
+does. They are separate settings: switching to Cut and back keeps the duration
+you chose.
+
 **Studio Mode** (Controls → *Studio Mode*) splits the preview in two: the left
 canvas is the scene you are editing, the right one is what is actually going
 out. Build the next scene, then **Transition** (or `Enter`) cuts to it. The scene

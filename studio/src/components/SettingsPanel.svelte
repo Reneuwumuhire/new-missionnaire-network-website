@@ -101,25 +101,6 @@
 							{/each}
 						</div>
 					</div>
-
-					<label class="block">
-						<span class="studio-label">
-							{t('settings.transitionDuration', { ms: studio.settings.transitionMs })}
-						</span>
-						<input
-							type="range"
-							min="0"
-							max="1500"
-							step="50"
-							class="w-full accent-primary"
-							value={studio.settings.transitionMs}
-							oninput={(e) => {
-								studio.settings.transitionMs = Number((e.currentTarget as HTMLInputElement).value);
-								persist();
-							}}
-						/>
-						<span class="text-[11px] text-white/30">{t('settings.cutHint')}</span>
-					</label>
 				{/if}
 
 				{#if page === 'output'}

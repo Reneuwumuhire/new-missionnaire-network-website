@@ -93,6 +93,9 @@ export interface Settings {
 	videoBitrateKbps: number;
 	audioBitrateKbps: number;
 	encoder: 'hardware' | 'software';
+	/** Kept apart from the duration on purpose: switching to Cut and back used
+	 *  to throw away whatever duration the operator had chosen. */
+	transitionType: 'fade' | 'cut';
 	transitionMs: number;
 	/** OBS's Studio Mode: edit a scene on the left while a different one stays
 	 *  on air on the right, then cut to it deliberately. */
@@ -113,6 +116,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	videoBitrateKbps: 3500,
 	audioBitrateKbps: 160,
 	encoder: 'hardware',
+	transitionType: 'fade',
 	transitionMs: 350,
 	studioMode: false,
 	monitorAudio: false,

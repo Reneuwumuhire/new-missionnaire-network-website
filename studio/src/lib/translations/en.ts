@@ -210,8 +210,6 @@ const en = {
 	'settings.hardware': 'Hardware',
 	'settings.software': 'Software (x264)',
 	'settings.encoderHint': 'Hardware spares the CPU. Switch to software if the picture stutters.',
-	'settings.transitionDuration': 'Scene transition — {ms} ms',
-	'settings.cutHint': '0 = hard cut.',
 	'settings.resetLayout': 'Reset panels',
 	'settings.layoutHint': 'Drag the dividers between panels to resize them.',
 	'settings.system': 'System',

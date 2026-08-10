@@ -15,29 +15,56 @@ export interface Transition {
 	durationMs: number;
 }
 
+export interface TransitionPlan {
+	fromSceneId: string;
+	durationMs: number;
+}
+
 let transition: Transition | null = null;
 let frames = 0;
 
 /** Diagnostics only: frames the compositor has actually painted. */
 export const frameCount = () => frames;
 
+/** Whether a scene change should fade, and for how long. Null means cut.
+ *  Pure, so the decision can be tested without a canvas. */
+export function transitionPlan(
+	from: string,
+	to: string,
+	type: 'fade' | 'cut',
+	durationMs: number
+): TransitionPlan | null {
+	if (type === 'cut' || durationMs <= 0) return null;
+	// Re-taking the scene already on air is a no-op, not a fade to itself.
+	if (from === to) return null;
+	return { fromSceneId: from, durationMs };
+}
+
 /** Put a scene on air, fading from whatever was there. This is the only way
- *  the program scene should ever change — it is what the encoder is reading. */
-export function takeToProgram(sceneId: string, durationMs = studio.settings.transitionMs) {
-	const from = onAirSceneId();
+ *  the program scene should ever change — it is what the encoder is reading.
+ *  Returns the plan it made, which is what makes the behaviour testable. */
+export function takeToProgram(
+	sceneId: string,
+	durationMs = studio.settings.transitionMs,
+	from = onAirSceneId()
+): TransitionPlan | null {
+	const plan = transitionPlan(from, sceneId, studio.settings.transitionType, durationMs);
 	studio.programSceneId = sceneId;
-	transition = durationMs > 0 && from !== sceneId
-		? { fromSceneId: from, startedAt: performance.now(), durationMs }
-		: null;
+	transition = plan ? { ...plan, startedAt: performance.now() } : null;
 	persist();
+	return plan;
 }
 
 /** Select a scene for editing. Outside Studio Mode that also puts it on air —
  *  which is exactly how OBS behaves with Studio Mode off. */
 export function selectScene(sceneId: string) {
+	// Read what is on air BEFORE moving the edit selection: outside Studio Mode
+	// the on-air scene IS the edit scene, so assigning first would make the
+	// transition think it was already showing the new scene and cut instead.
+	const from = onAirSceneId();
 	studio.activeSceneId = sceneId;
 	studio.selectedLayerId = null;
-	if (!studio.settings.studioMode) takeToProgram(sceneId);
+	if (!studio.settings.studioMode) takeToProgram(sceneId, studio.settings.transitionMs, from);
 	else persist();
 }
 
@@ -209,6 +236,27 @@ function drawScene(ctx: CanvasRenderingContext2D, sceneId: string, nowMs: number
 	}
 }
 
+/** Scratch canvas for cross-fades. The incoming scene has to be composited
+ *  whole before it is faded in: drawing its layers straight onto the program
+ *  canvas at a reduced alpha does not work, because every layer sets its own
+ *  globalAlpha and wipes the transition's. It also looks wrong — you would see
+ *  each layer of the new scene through the others instead of one picture
+ *  dissolving into another. */
+let scratch: HTMLCanvasElement | null = null;
+
+function scratchContext(width: number, height: number): CanvasRenderingContext2D | null {
+	if (!scratch) scratch = document.createElement('canvas');
+	if (scratch.width !== width || scratch.height !== height) {
+		scratch.width = width;
+		scratch.height = height;
+	}
+	const context = scratch.getContext('2d');
+	// Transparent, not black: filling black first would dip the fade through
+	// a dark frame instead of dissolving cleanly.
+	context?.clearRect(0, 0, width, height);
+	return context;
+}
+
 /** Paint `sceneId` into `ctx`. `withTransition` is true only for the program
  *  canvas — the edit preview shows its scene outright, so the operator sees
  *  what they are building rather than a fade they did not ask for. */
@@ -229,9 +277,17 @@ export function renderFrame(
 			transition = null;
 		} else {
 			drawScene(ctx, transition.fromSceneId, nowMs);
-			ctx.globalAlpha = t;
-			drawScene(ctx, sceneId, nowMs);
-			ctx.globalAlpha = 1;
+			const incoming = scratchContext(ctx.canvas.width, ctx.canvas.height);
+			if (incoming) {
+				drawScene(incoming, sceneId, nowMs);
+				ctx.globalAlpha = t;
+				ctx.drawImage(incoming.canvas, 0, 0);
+				ctx.globalAlpha = 1;
+			} else {
+				// No scratch context: cut rather than show the outgoing scene
+				// frozen for the length of the transition.
+				drawScene(ctx, sceneId, nowMs);
+			}
 			ctx.restore();
 			return;
 		}
@@ -264,7 +320,11 @@ export function startRenderLoop(
 		if (stopped) return;
 		const interval = 1000 / Math.max(1, fps());
 		if (now - last >= interval - 1) {
-			last = now;
+			// Carry the leftover instead of snapping to `now`: on a display whose
+			// refresh is not a multiple of the target (100 Hz against 30 fps) the
+			// error compounds and every render slips to the next tick — 25 fps
+			// delivered for 30 asked. Keeping the phase averages out to the target.
+			last = now - ((now - last) % interval);
 			renderFrame(ctx, sceneId(), withTransition);
 		}
 		schedule();

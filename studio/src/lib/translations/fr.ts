@@ -213,8 +213,6 @@ const fr: Record<keyof typeof en, string> = {
 	'settings.software': 'Logiciel (x264)',
 	'settings.encoderHint':
 		'Matériel décharge le processeur. Passez en logiciel si l’image saccade.',
-	'settings.transitionDuration': 'Transition de scène — {ms} ms',
-	'settings.cutHint': '0 = coupure franche.',
 	'settings.resetLayout': 'Réinitialiser les panneaux',
 	'settings.layoutHint':
 		'Faites glisser les séparateurs entre les panneaux pour les redimensionner.',
