@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { broadcast } from '../lib/broadcast.svelte';
+	import Icon from './Icon.svelte';
 	import { destinationUrl, id, persist, studio, type Destination } from '../lib/state.svelte';
 
 	let revealed = $state<Record<string, boolean>>({});
@@ -81,7 +82,7 @@
 						persist();
 					}}
 				/>
-				<button class="studio-icon-btn" title="Retirer" aria-label="Retirer" onclick={() => remove(destination)}>×</button>
+				<button class="studio-icon-btn" title="Retirer" aria-label="Retirer" onclick={() => remove(destination)}><Icon name="trash" size={14} /></button>
 			</div>
 
 			<div class="mt-2 space-y-1.5">

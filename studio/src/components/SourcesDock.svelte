@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { handleFor, mediaVersion, openCamera, openFile, openScreen, release } from '../lib/media.svelte';
 	import Dock from './Dock.svelte';
+	import Icon, { type IconName } from './Icon.svelte';
 	import {
 		DEFAULT_TEXT_STYLE,
 		activeScene,
@@ -14,20 +15,40 @@
 	let { onproperties }: { onproperties: () => void } = $props();
 
 	let adding = $state(false);
+
+	/** Any click that is not on the menu closes it — a menu you can only
+	 *  dismiss by picking something is a trap. Capture phase so it runs before
+	 *  the toggle button's own handler re-opens it. */
+	$effect(() => {
+		if (!adding) return;
+		const close = (event: Event) => {
+			if (!(event.target as HTMLElement | null)?.closest('[data-add-menu]')) adding = false;
+		};
+		const onKey = (event: KeyboardEvent) => {
+			if (event.key === 'Escape') adding = false;
+		};
+		window.addEventListener('pointerdown', close);
+		window.addEventListener('keydown', onKey);
+		return () => {
+			window.removeEventListener('pointerdown', close);
+			window.removeEventListener('keydown', onKey);
+		};
+	});
 	let fileInput = $state<HTMLInputElement | null>(null);
 	let pendingFileLayer = $state<Layer | null>(null);
 
-	const SOURCE_KINDS: { kind: LayerKind; label: string; hint: string; glyph: string }[] = [
-		{ kind: 'camera', label: 'Caméra', hint: 'Webcam ou boîtier de capture', glyph: '📷' },
-		{ kind: 'screen', label: 'Écran / fenêtre', hint: 'Partage un écran ou une application', glyph: '🖥' },
-		{ kind: 'image', label: 'Image', hint: 'Logo, verset, arrière-plan', glyph: '🖼' },
-		{ kind: 'video', label: 'Vidéo', hint: 'Clip ou boucle, avec son', glyph: '🎞' },
-		{ kind: 'text', label: 'Texte', hint: 'Titre, message fixe', glyph: 'T' },
-		{ kind: 'lyrics', label: 'Paroles', hint: 'Ligne en cours du panneau Paroles', glyph: '♪' },
-		{ kind: 'color', label: 'Fond uni', hint: 'Couleur pleine', glyph: '▩' }
+	const SOURCE_KINDS: { kind: LayerKind; label: string; hint: string; icon: IconName }[] = [
+		{ kind: 'camera', label: 'Caméra', hint: 'Webcam ou boîtier de capture', icon: 'camera' },
+		{ kind: 'screen', label: 'Écran / fenêtre', hint: 'Partage un écran ou une application', icon: 'monitor' },
+		{ kind: 'image', label: 'Image', hint: 'Logo, verset, arrière-plan', icon: 'image' },
+		{ kind: 'video', label: 'Vidéo', hint: 'Clip ou boucle, avec son', icon: 'film' },
+		{ kind: 'text', label: 'Texte', hint: 'Titre, message fixe', icon: 'text' },
+		{ kind: 'lyrics', label: 'Paroles', hint: 'Ligne en cours du panneau Paroles', icon: 'music' },
+		{ kind: 'color', label: 'Fond uni', hint: 'Couleur pleine', icon: 'droplet' }
 	];
 
-	const glyphFor = (kind: LayerKind) => SOURCE_KINDS.find((s) => s.kind === kind)?.glyph ?? '•';
+	const iconFor = (kind: LayerKind): IconName =>
+		SOURCE_KINDS.find((s) => s.kind === kind)?.icon ?? 'droplet';
 
 	async function addSource(kind: LayerKind) {
 		adding = false;
@@ -135,7 +156,7 @@
 					onclick={() => (studio.selectedLayerId = layer.id)}
 					ondblclick={onproperties}
 				>
-					<span class="w-4 shrink-0 text-center text-[11px] text-white/40">{glyphFor(layer.kind)}</span>
+					<Icon name={iconFor(layer.kind)} size={13} class="text-white/45" />
 					<span class="min-w-0 flex-1 truncate text-[13px] {layer.visible ? 'text-white/85' : 'text-white/35'}"
 						>{layer.name}</span
 					>
@@ -154,8 +175,9 @@
 					onclick={() => {
 						layer.visible = !layer.visible;
 						persist();
-					}}>{layer.visible ? '👁' : '⃠'}</button
-				>
+					}}>
+					<Icon name={layer.visible ? 'eye' : 'eyeOff'} size={14} />
+				</button>
 				<button
 					class="studio-icon-btn"
 					title={layer.locked ? 'Déverrouiller' : 'Verrouiller'}
@@ -163,25 +185,30 @@
 					onclick={() => {
 						layer.locked = !layer.locked;
 						persist();
-					}}>{layer.locked ? '🔒' : '🔓'}</button
-				>
+					}}>
+					<Icon name={layer.locked ? 'lock' : 'unlock'} size={13} />
+				</button>
 			</li>
 		{:else}
 			<p class="px-3 py-4 text-[11px] text-white/30">Aucune source. Cliquez + ci-dessous.</p>
 		{/each}
 	</ul>
 
-	{#snippet actions()}
-		<div class="relative">
-			<button class="studio-icon-btn" title="Ajouter une source" aria-label="Ajouter une source" onclick={() => (adding = !adding)}>+</button>
+	{#snippet footer()}
+		<div class="relative" data-add-menu>
+			<button class="studio-icon-btn" title="Ajouter une source" aria-label="Ajouter une source" onclick={() => (adding = !adding)}>
+				<Icon name="plus" />
+			</button>
 			{#if adding}
-				<div class="absolute right-0 top-7 z-30 w-60 border border-ink-600 bg-ink-850 py-1 shadow-2xl shadow-black/70">
+				<!-- Opens upward: the dock row is shorter than this menu, so anchoring
+				     it to the top would clip the last entries off the window. -->
+				<div class="absolute bottom-8 left-0 z-30 w-60 border border-ink-600 bg-ink-850 py-1 shadow-2xl shadow-black/70">
 					{#each SOURCE_KINDS as source (source.kind)}
 						<button
 							class="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-primary/15"
 							onclick={() => addSource(source.kind)}
 						>
-							<span class="w-4 shrink-0 pt-0.5 text-center text-[11px] text-white/40">{source.glyph}</span>
+							<Icon name={source.icon} size={14} class="mt-0.5 text-white/45" />
 							<span class="min-w-0">
 								<span class="block text-[13px] text-white/90">{source.label}</span>
 								<span class="block text-[11px] text-white/40">{source.hint}</span>
@@ -191,14 +218,10 @@
 				</div>
 			{/if}
 		</div>
-	{/snippet}
-
-	{#snippet footer()}
-		<button class="studio-icon-btn" title="Ajouter" aria-label="Ajouter" onclick={() => (adding = !adding)}>+</button>
-		<button class="studio-icon-btn" title="Supprimer" aria-label="Supprimer" disabled={!selected} onclick={() => removeLayer(selected)}>🗑</button>
-		<button class="studio-icon-btn" title="Propriétés" aria-label="Propriétés" disabled={!selected} onclick={onproperties}>⚙</button>
+		<button class="studio-icon-btn" title="Supprimer" aria-label="Supprimer" disabled={!selected} onclick={() => removeLayer(selected)}><Icon name="trash" /></button>
+		<button class="studio-icon-btn" title="Propriétés" aria-label="Propriétés" disabled={!selected} onclick={onproperties}><Icon name="gear" /></button>
 		<span class="mx-1 h-4 w-px bg-ink-600"></span>
-		<button class="studio-icon-btn" title="Monter" aria-label="Monter" disabled={selectedIndex <= 0} onclick={() => move(selected, -1)}>↑</button>
+		<button class="studio-icon-btn" title="Monter" aria-label="Monter" disabled={selectedIndex <= 0} onclick={() => move(selected, -1)}><Icon name="up" /></button>
 		<button
 			class="studio-icon-btn"
 			title="Descendre"

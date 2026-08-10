@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { FULL_FRAME } from '../lib/geom';
+	import Icon, { type IconName } from './Icon.svelte';
 	import { handleFor, listDevices, openCamera, type DeviceOption } from '../lib/media.svelte';
 	import { onMount } from 'svelte';
 	import { DEFAULT_TEXT_STYLE, persist, selectedLayer, studio } from '../lib/state.svelte';
@@ -263,13 +264,16 @@
 					<div>
 						<span class="mb-1 block text-[11px] text-white/40">Alignement</span>
 						<div class="flex gap-1">
-							{#each [['left', '⇤'], ['center', '↔'], ['right', '⇥']] as [value, glyph] (value)}
+							{#each [['left', 'alignLeft'], ['center', 'alignCenter'], ['right', 'alignRight']] as [value, icon] (value)}
 								<button
-									class="studio-chip flex-1 {s.align === value ? 'bg-primary/20 text-primary' : ''}"
+									class="studio-chip flex flex-1 justify-center {s.align === value
+										? 'bg-primary/20 text-primary'
+										: ''}"
+									aria-label={value}
 									onclick={() => {
 										s.align = value as typeof s.align;
 										commit();
-									}}>{glyph}</button
+									}}><Icon name={icon as IconName} size={14} /></button
 								>
 							{/each}
 						</div>
@@ -277,13 +281,18 @@
 					<div>
 						<span class="mb-1 block text-[11px] text-white/40">Vertical</span>
 						<div class="flex gap-1">
-							{#each [['top', '⇡'], ['middle', '↕'], ['bottom', '⇣']] as [value, glyph] (value)}
+							<!-- Same glyphs turned a quarter: top/middle/bottom read as
+							     left/centre/right rotated, which is how they behave. -->
+							{#each [['top', 'alignLeft'], ['middle', 'alignCenter'], ['bottom', 'alignRight']] as [value, icon] (value)}
 								<button
-									class="studio-chip flex-1 {s.valign === value ? 'bg-primary/20 text-primary' : ''}"
+									class="studio-chip flex flex-1 justify-center {s.valign === value
+										? 'bg-primary/20 text-primary'
+										: ''}"
+									aria-label={value}
 									onclick={() => {
 										s.valign = value as typeof s.valign;
 										commit();
-									}}>{glyph}</button
+									}}><Icon name={icon as IconName} size={14} rotate={1} /></button
 								>
 							{/each}
 						</div>

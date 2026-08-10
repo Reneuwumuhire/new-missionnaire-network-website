@@ -268,8 +268,16 @@ export function activeScene(): Scene {
 	return studio.scenes.find((s) => s.id === studio.activeSceneId) ?? studio.scenes[0];
 }
 
+/** The scene actually going out. Outside Studio Mode the edit scene IS the
+ *  program scene — deriving that rather than storing it twice means the two can
+ *  never drift, which they did: leaving Studio Mode left a stale programSceneId
+ *  painting one scene while the docks edited another. */
+export function onAirSceneId(): string {
+	return studio.settings.studioMode ? studio.programSceneId : studio.activeSceneId;
+}
+
 export function programScene(): Scene {
-	return studio.scenes.find((s) => s.id === studio.programSceneId) ?? activeScene();
+	return studio.scenes.find((s) => s.id === onAirSceneId()) ?? activeScene();
 }
 
 export function selectedLayer(): Layer | null {

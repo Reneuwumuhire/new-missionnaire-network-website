@@ -4,6 +4,7 @@
 	import { METER_TICKS, decayHold, formatDb, meterFraction, toDb } from '../lib/meter';
 	import type { Mixer } from '../lib/mixer';
 	import Dock from './Dock.svelte';
+	import Icon from './Icon.svelte';
 	import { id, liveAudioLayers, persist, studio, type AudioSource, type Layer } from '../lib/state.svelte';
 
 	let { mixer }: { mixer: Mixer | null } = $props();
@@ -95,7 +96,7 @@
 			/>
 			Écoute
 		</label>
-		<button class="studio-icon-btn" title="Ajouter un micro" aria-label="Ajouter un micro" onclick={addMic}>+</button>
+		<button class="studio-icon-btn" title="Ajouter un micro" aria-label="Ajouter un micro" onclick={addMic}><Icon name="plus" /></button>
 	{/snippet}
 
 	{#if studio.settings.monitorAudio}
@@ -129,8 +130,9 @@
 						class="studio-icon-btn opacity-0 group-hover:opacity-100"
 						title="Choisir l’entrée"
 						aria-label="Choisir l’entrée"
-						onclick={() => (devicesOpen = devicesOpen === strip.id ? null : strip.id)}>⋮</button
-					>
+						onclick={() => (devicesOpen = devicesOpen === strip.id ? null : strip.id)}>
+							<Icon name="more" size={14} />
+						</button>
 				{/if}
 			</div>
 
@@ -155,8 +157,9 @@
 						class="studio-icon-btn"
 						title="Retirer"
 						aria-label="Retirer"
-						onclick={() => removeMic(strip.source as AudioSource)}>🗑</button
-					>
+						onclick={() => removeMic(strip.source as AudioSource)}>
+						<Icon name="trash" size={14} />
+					</button>
 				</div>
 			{/if}
 
@@ -189,8 +192,9 @@
 						title={strip.source.muted ? 'Réactiver' : 'Couper'}
 						aria-label={strip.source.muted ? 'Réactiver' : 'Couper'}
 						onclick={() => setLevel(strip, strip.source.gain, !strip.source.muted)}
-						>{strip.source.muted ? '🔇' : '🔊'}</button
 					>
+						<Icon name={strip.source.muted ? 'volumeOff' : 'volume'} size={16} />
+					</button>
 					<input
 						type="range"
 						min="0"

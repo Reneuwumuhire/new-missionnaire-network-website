@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import ControlsDock from './components/ControlsDock.svelte';
 	import DestinationsPanel from './components/DestinationsPanel.svelte';
+	import Icon from './components/Icon.svelte';
 	import LyricsPanel from './components/LyricsPanel.svelte';
 	import MixerDock from './components/MixerDock.svelte';
 	import Modal from './components/Modal.svelte';
@@ -17,7 +18,7 @@
 	import { handleFor, mediaVersion, openCamera, releaseAll } from './lib/media.svelte';
 	import { Mixer } from './lib/mixer';
 	import { runSelftest, selftestTarget } from './lib/selftest';
-	import { activeScene, liveAudioLayers, studio } from './lib/state.svelte';
+	import { activeScene, liveAudioLayers, onAirSceneId, studio } from './lib/state.svelte';
 
 	let programCanvas = $state<HTMLCanvasElement | null>(null);
 	let mixer = $state<Mixer | null>(null);
@@ -168,7 +169,7 @@
 		}
 		return { tone: 'ok', label: 'Stable' };
 	});
-	const canTake = $derived(studio.activeSceneId !== studio.programSceneId);
+	const canTake = $derived(studio.activeSceneId !== onAirSceneId());
 </script>
 
 <svelte:window onkeydown={onKeydown} />
@@ -201,7 +202,7 @@
 	{#if broadcast.error}
 		<div class="flex shrink-0 items-start gap-3 border-b border-red-500/30 bg-red-950/40 px-4 py-2">
 			<p class="flex-1 text-[12px] leading-relaxed text-red-300">{broadcast.error}</p>
-			<button class="studio-icon-btn" aria-label="Fermer" onclick={() => (broadcast.error = null)}>×</button>
+			<button class="studio-icon-btn" aria-label="Fermer" onclick={() => (broadcast.error = null)}><Icon name="close" /></button>
 		</div>
 	{/if}
 
@@ -230,7 +231,7 @@
 					</div>
 					<Preview
 						label="À l’antenne"
-						sceneId={() => studio.programSceneId}
+						sceneId={onAirSceneId}
 						program={true}
 						editable={false}
 						live={broadcast.live}
@@ -239,7 +240,7 @@
 				{:else}
 					<Preview
 						label="Programme — {activeScene().name}"
-						sceneId={() => studio.programSceneId}
+						sceneId={onAirSceneId}
 						program={true}
 						editable={true}
 						live={broadcast.live}

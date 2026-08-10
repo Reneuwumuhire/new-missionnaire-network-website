@@ -44,10 +44,11 @@
 				? 'border-primary/60 bg-primary/15 text-primary'
 				: 'border-ink-600 text-white/60 hover:border-ink-500 hover:text-white'}"
 			onclick={() => {
+				// Entering Studio Mode, the scene on air is whatever is showing now.
+				// Leaving it, the edit scene becomes the program scene by definition
+				// (see onAirSceneId), so there is nothing to reconcile.
+				if (!studio.settings.studioMode) studio.programSceneId = studio.activeSceneId;
 				studio.settings.studioMode = !studio.settings.studioMode;
-				// Leaving Studio Mode, the scene you were editing is not necessarily
-				// the one on air; follow the one on air so the panels stop lying.
-				if (!studio.settings.studioMode) studio.activeSceneId = studio.programSceneId;
 				persist();
 			}}>Mode studio</button
 		>

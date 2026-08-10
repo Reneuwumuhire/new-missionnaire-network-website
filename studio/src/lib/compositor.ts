@@ -6,7 +6,7 @@
 import { drawBox, toPixels, type Rect } from './geom';
 import { handleFor } from './media.svelte';
 import { onAirLines } from './lyrics.svelte';
-import { persist, studio, type Layer, type TextStyle } from './state.svelte';
+import { onAirSceneId, persist, studio, type Layer, type TextStyle } from './state.svelte';
 import { DEFAULT_TEXT_STYLE } from './state.svelte';
 
 export interface Transition {
@@ -24,7 +24,7 @@ export const frameCount = () => frames;
 /** Put a scene on air, fading from whatever was there. This is the only way
  *  the program scene should ever change — it is what the encoder is reading. */
 export function takeToProgram(sceneId: string, durationMs = studio.settings.transitionMs) {
-	const from = studio.programSceneId;
+	const from = onAirSceneId();
 	studio.programSceneId = sceneId;
 	transition = durationMs > 0 && from !== sceneId
 		? { fromSceneId: from, startedAt: performance.now(), durationMs }

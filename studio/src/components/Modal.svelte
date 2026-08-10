@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import Icon from './Icon.svelte';
 
 	// Settings, Properties and Destinations are dialogs, not permanent panels —
 	// the same call OBS makes. They are opened rarely and need room when they
@@ -23,7 +24,7 @@
 	>
 		<header class="flex h-11 shrink-0 items-center justify-between border-b border-ink-700 px-4">
 			<h2 class="text-[11px] font-bold uppercase tracking-[0.18em] text-white/70">{title}</h2>
-			<button class="studio-icon-btn" aria-label="Fermer" onclick={onclose}>×</button>
+			<button class="studio-icon-btn" aria-label="Fermer" onclick={onclose}><Icon name="close" /></button>
 		</header>
 		<div class="min-h-0 flex-1 overflow-y-auto">
 			{@render children()}
