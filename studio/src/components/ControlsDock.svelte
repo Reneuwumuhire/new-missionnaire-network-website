@@ -18,7 +18,7 @@
 	const enabled = $derived(studio.destinations.filter((d) => d.enabled && destinationUrl(d).length > 8));
 </script>
 
-<Dock title="Contrôles" grow={1.05}>
+<Dock id="controls" title="Contrôles">
 	<div class="space-y-1.5 p-2">
 		<button
 			class="h-10 w-full text-[11px] font-semibold uppercase tracking-[0.16em] transition-colors {broadcast.live

@@ -81,7 +81,7 @@
 	}
 </script>
 
-<Dock title="Mixage audio" grow={2.4}>
+<Dock id="mixer" title="Mixage audio">
 	{#snippet actions()}
 		<label class="mr-1 flex cursor-pointer items-center gap-1.5 text-[10px] text-white/45">
 			<input

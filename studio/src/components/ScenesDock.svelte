@@ -42,7 +42,7 @@
 	const selectedIndex = $derived(studio.scenes.findIndex((s) => s.id === studio.activeSceneId));
 </script>
 
-<Dock title="Scènes" grow={1}>
+<Dock id="scenes" title="Scènes">
 	<ul>
 		{#each studio.scenes as scene, index (scene.id)}
 			<li class="group flex items-center">

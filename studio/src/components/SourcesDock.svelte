@@ -2,6 +2,7 @@
 	import { handleFor, mediaVersion, openCamera, openFile, openScreen, release } from '../lib/media.svelte';
 	import Dock from './Dock.svelte';
 	import Icon, { type IconName } from './Icon.svelte';
+	import { popoverFit } from '../lib/layout';
 	import {
 		DEFAULT_TEXT_STYLE,
 		activeScene,
@@ -15,6 +16,18 @@
 	let { onproperties }: { onproperties: () => void } = $props();
 
 	let adding = $state(false);
+	let addButton = $state<HTMLButtonElement | null>(null);
+	// Measured on open: the docks are resizable, so how much room a menu has
+	// is not something the stylesheet can know.
+	let menuFit = $state({ direction: 'up' as 'up' | 'down', maxHeight: 320 });
+
+	function openMenu() {
+		if (!adding && addButton) {
+			const rect = addButton.getBoundingClientRect();
+			menuFit = popoverFit(rect.top, rect.bottom, window.innerHeight);
+		}
+		adding = !adding;
+	}
 
 	/** Any click that is not on the menu closes it — a menu you can only
 	 *  dismiss by picking something is a trap. Capture phase so it runs before
@@ -142,7 +155,7 @@
 
 <input bind:this={fileInput} type="file" class="hidden" onchange={onFileChosen} />
 
-<Dock title="Sources" grow={1.3}>
+<Dock id="sources" title="Sources">
 	<ul>
 		{#each activeScene().layers as layer (layer.id)}
 			{@const issue = problem(layer)}
@@ -196,13 +209,26 @@
 
 	{#snippet footer()}
 		<div class="relative" data-add-menu>
-			<button class="studio-icon-btn" title="Ajouter une source" aria-label="Ajouter une source" onclick={() => (adding = !adding)}>
+			<button
+				bind:this={addButton}
+				class="studio-icon-btn"
+				title="Ajouter une source"
+				aria-label="Ajouter une source"
+				onclick={openMenu}
+			>
 				<Icon name="plus" />
 			</button>
 			{#if adding}
-				<!-- Opens upward: the dock row is shorter than this menu, so anchoring
-				     it to the top would clip the last entries off the window. -->
-				<div class="absolute bottom-8 left-0 z-30 w-60 border border-ink-600 bg-ink-850 py-1 shadow-2xl shadow-black/70">
+				<!-- Flips to whichever side has more room and scrolls inside what is
+				     left, so no entry is ever clipped off the window however the
+				     operator has sized the docks. -->
+				<div
+					class="absolute left-0 z-30 w-60 overflow-y-auto border border-ink-600 bg-ink-850 py-1 shadow-2xl shadow-black/70 {menuFit.direction ===
+					'up'
+						? 'bottom-8'
+						: 'top-8'}"
+					style="max-height: {menuFit.maxHeight}px"
+				>
 					{#each SOURCE_KINDS as source (source.kind)}
 						<button
 							class="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-primary/15"

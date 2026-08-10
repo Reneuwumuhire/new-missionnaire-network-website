@@ -4,6 +4,7 @@
 
 import type { FitMode, Rect } from './geom';
 import { FULL_FRAME } from './geom';
+import { DEFAULT_LAYOUT, type Layout } from './layout';
 
 export type LayerKind = 'camera' | 'screen' | 'image' | 'video' | 'text' | 'lyrics' | 'color';
 
@@ -96,6 +97,8 @@ export interface Settings {
 	 *  on air on the right, then cut to it deliberately. */
 	studioMode: boolean;
 	monitorAudio: boolean;
+	/** Panel sizes the operator has dragged to. */
+	layout: Layout;
 	/** Admin panel base URL + shared token, for driving Go Live and the live
 	 *  transcript from here instead of a second browser tab. Optional. */
 	adminUrl: string;
@@ -112,6 +115,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	transitionMs: 350,
 	studioMode: false,
 	monitorAudio: false,
+	layout: DEFAULT_LAYOUT,
 	adminUrl: '',
 	adminToken: ''
 };
@@ -209,7 +213,10 @@ function load(): Persisted {
 				enabled: false
 			}
 		],
-		settings: { ...DEFAULT_SETTINGS }
+		settings: {
+			...DEFAULT_SETTINGS,
+			layout: { ...DEFAULT_LAYOUT, weights: { ...DEFAULT_LAYOUT.weights } }
+		}
 	};
 	try {
 		const raw = localStorage.getItem(STORE_KEY);
@@ -223,8 +230,17 @@ function load(): Persisted {
 			audioSources: parsed.audioSources ?? fallback.audioSources,
 			destinations: parsed.destinations ?? fallback.destinations,
 			// Merge, so a setting added in a later version gets its default
-			// instead of `undefined` reaching ffmpeg.
-			settings: { ...DEFAULT_SETTINGS, ...parsed.settings }
+			// instead of `undefined` reaching ffmpeg. Layout is merged a level
+			// deeper for the same reason — a new dock must get a weight.
+			settings: {
+				...DEFAULT_SETTINGS,
+				...parsed.settings,
+				layout: {
+					...DEFAULT_LAYOUT,
+					...parsed.settings?.layout,
+					weights: { ...DEFAULT_LAYOUT.weights, ...parsed.settings?.layout?.weights }
+				}
+			}
 		};
 	} catch {
 		return fallback;

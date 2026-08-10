@@ -57,9 +57,16 @@ permission. Screen recording additionally needs the app ticked in
 ```
 
 Same muscle memory as OBS: click a scene to cut to it, eye and padlock on every
-source, `+ 🗑 ⚙ ↑ ↓` under Scènes and Sources, big stacked buttons in Contrôles.
-Propriétés, Destinations and Réglages are dialogs rather than permanent panels,
-as they are in OBS.
+source, add/delete/properties/reorder buttons under Scènes and Sources, big
+stacked buttons in Contrôles. Propriétés, Destinations and Réglages are dialogs
+rather than permanent panels, as they are in OBS.
+
+**Every seam is draggable** — between the preview and the dock row, between the
+lyrics column and the preview, and between each pair of docks. Sizes are saved
+with the scene collection. The dividers also take focus, so arrow keys resize
+(hold shift for bigger steps). *Réglages → Réinitialiser les panneaux* puts them
+back. Docks are laid out by proportion, so the row still fills the window
+whatever size you drag it to.
 
 **Studio Mode** (Contrôles → *Mode studio*) splits the preview in two: the left
 canvas is the scene you are editing, the right one is what is actually going

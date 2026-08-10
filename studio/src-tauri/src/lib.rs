@@ -67,10 +67,8 @@ fn report(line: String) {
 #[cfg(target_os = "macos")]
 fn keep_rendering_when_covered() {
 	use objc2_foundation::{NSString, NSUserDefaults};
-	unsafe {
-		let defaults = NSUserDefaults::standardUserDefaults();
-		defaults.setBool_forKey(false, &NSString::from_str("NSWindowOcclusionDetectionEnabled"));
-	}
+	let defaults = NSUserDefaults::standardUserDefaults();
+	defaults.setBool_forKey(false, &NSString::from_str("NSWindowOcclusionDetectionEnabled"));
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

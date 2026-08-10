@@ -29,7 +29,7 @@
 		Sélectionnez une source dans la liste, ou cliquez-la directement dans l’aperçu.
 	</p>
 {:else}
-	<div class="space-y-5 overflow-y-auto p-4">
+	<div class="space-y-5 p-4">
 		<div>
 			<span class="studio-label">Nom</span>
 			<input

@@ -1,25 +1,29 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import type { DockId } from '../lib/layout';
+	import { studio } from '../lib/state.svelte';
 
 	// OBS's dock: a titled panel in the bottom row. Same chrome everywhere so
 	// the row reads as one strip of tools rather than five different panels.
+	// Width comes from the operator's dragged layout, keyed by id.
 	let {
+		id,
 		title,
-		grow = 1,
 		actions,
 		footer,
 		children
 	}: {
+		id: DockId;
 		title: string;
-		/** flex-grow, so the mixer gets the room and Transitions does not. */
-		grow?: number;
 		actions?: Snippet;
 		footer?: Snippet;
 		children: Snippet;
 	} = $props();
+
+	const weight = $derived(studio.settings.layout.weights[id] ?? 1);
 </script>
 
-<section class="flex min-w-0 flex-col border-r border-ink-700 last:border-r-0" style="flex: {grow} 1 0">
+<section class="flex min-w-0 flex-col" style="flex: {weight} 1 0">
 	<header class="flex h-8 shrink-0 items-center justify-between border-b border-ink-700 bg-ink-850 px-3">
 		<h2 class="truncate text-[10px] font-bold uppercase tracking-[0.18em] text-white/55">{title}</h2>
 		{#if actions}

@@ -50,7 +50,7 @@
 	}
 </script>
 
-<div class="space-y-3 overflow-y-auto p-4">
+<div class="space-y-3 p-4">
 	<p class="text-[11px] leading-relaxed text-white/40">
 		Chaque destination activée reçoit le même encodage. Si l’une refuse la connexion, les autres
 		continuent — YouTube ne peut pas faire tomber la radio.

@@ -11,14 +11,16 @@
 	import ScenesDock from './components/ScenesDock.svelte';
 	import SettingsPanel from './components/SettingsPanel.svelte';
 	import SourcesDock from './components/SourcesDock.svelte';
+	import Splitter from './components/Splitter.svelte';
 	import TransitionsDock from './components/TransitionsDock.svelte';
 	import { broadcast, startBroadcast, stopBroadcast, uptimeLabel } from './lib/broadcast.svelte';
 	import { frameCount, selectScene, takeToProgram } from './lib/compositor';
 	import { lyrics, step } from './lib/lyrics.svelte';
 	import { handleFor, mediaVersion, openCamera, releaseAll } from './lib/media.svelte';
 	import { Mixer } from './lib/mixer';
+	import { clamp, splitWeights, type DockId } from './lib/layout';
 	import { runSelftest, selftestTarget } from './lib/selftest';
-	import { activeScene, liveAudioLayers, onAirSceneId, studio } from './lib/state.svelte';
+	import { activeScene, liveAudioLayers, onAirSceneId, persist, studio } from './lib/state.svelte';
 
 	let programCanvas = $state<HTMLCanvasElement | null>(null);
 	let mixer = $state<Mixer | null>(null);
@@ -170,6 +172,32 @@
 		return { tone: 'ok', label: 'Stable' };
 	});
 	const canTake = $derived(studio.activeSceneId !== onAirSceneId());
+
+	// ── Panel resizing ────────────────────────────────────
+	let dockRow = $state<HTMLDivElement | null>(null);
+	const layout = $derived(studio.settings.layout);
+
+	/** Dragging down grows the preview, so the dock row loses that much. Capped
+	 *  so neither the docks nor the preview can be squeezed out of existence. */
+	function resizeDockRow(delta: number) {
+		layout.dockHeight = clamp(layout.dockHeight - delta, 120, window.innerHeight - 320);
+		persist();
+	}
+
+	function resizeLyrics(delta: number) {
+		layout.lyricsWidth = clamp(layout.lyricsWidth - delta, 240, window.innerWidth - 560);
+		persist();
+	}
+
+	function resizeDocks(left: DockId, right: DockId, delta: number) {
+		const total = Object.values(layout.weights).reduce((sum, w) => sum + w, 0);
+		const pxPerWeight = (dockRow?.clientWidth ?? 0) / total;
+		const [a, b] = splitWeights(layout.weights[left], layout.weights[right], delta, pxPerWeight);
+		layout.weights[left] = a;
+		layout.weights[right] = b;
+		persist();
+	}
+
 </script>
 
 <svelte:window onkeydown={onKeydown} />
@@ -265,7 +293,9 @@
 			</div>
 		</div>
 
-		<aside class="flex w-[23rem] shrink-0 flex-col border-l border-ink-700 bg-ink-900">
+		<Splitter orientation="vertical" label="Largeur du panneau Paroles" onmove={resizeLyrics} />
+
+		<aside class="flex shrink-0 flex-col bg-ink-900" style="width: {layout.lyricsWidth}px">
 			<div class="flex h-8 shrink-0 items-center border-b border-ink-700 bg-ink-850 px-3">
 				<h2 class="text-[10px] font-bold uppercase tracking-[0.18em] text-white/55">Paroles</h2>
 			</div>
@@ -276,11 +306,21 @@
 	</div>
 
 	<!-- ── Dock row ───────────────────────────────────────── -->
-	<div class="flex h-[15rem] shrink-0 border-t border-ink-700 bg-ink-900">
+	<Splitter orientation="horizontal" label="Hauteur des panneaux" onmove={resizeDockRow} />
+
+	<div
+		bind:this={dockRow}
+		class="flex shrink-0 bg-ink-900"
+		style="height: {layout.dockHeight}px"
+	>
 		<ScenesDock />
+		<Splitter orientation="vertical" label="Largeur Scènes" onmove={(d) => resizeDocks('scenes', 'sources', d)} />
 		<SourcesDock onproperties={() => (dialog = 'properties')} />
+		<Splitter orientation="vertical" label="Largeur Sources" onmove={(d) => resizeDocks('sources', 'mixer', d)} />
 		<MixerDock {mixer} />
+		<Splitter orientation="vertical" label="Largeur Mixage" onmove={(d) => resizeDocks('mixer', 'transition', d)} />
 		<TransitionsDock />
+		<Splitter orientation="vertical" label="Largeur Transition" onmove={(d) => resizeDocks('transition', 'controls', d)} />
 		<ControlsDock
 			{confirmStop}
 			onToggleLive={toggleLive}

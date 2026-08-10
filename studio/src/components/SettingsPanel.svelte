@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { invoke } from '@tauri-apps/api/core';
 	import { broadcast, pickMimeType } from '../lib/broadcast.svelte';
+	import { DEFAULT_LAYOUT } from '../lib/layout';
 	import { persist, studio } from '../lib/state.svelte';
 
 	interface FfmpegInfo {
@@ -43,7 +44,7 @@
 	}
 </script>
 
-<div class="space-y-5 overflow-y-auto p-4">
+<div class="space-y-5 p-4">
 	{#if broadcast.live}
 		<p class="border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-300">
 			Les réglages d’encodage s’appliqueront à la prochaine diffusion.
@@ -154,6 +155,20 @@
 		/>
 		<span class="text-[11px] text-white/30">0 = coupure franche.</span>
 	</label>
+
+	<div class="border-t border-ink-700 pt-4">
+		<span class="studio-label">Disposition</span>
+		<button
+			class="studio-chip"
+			onclick={() => {
+				studio.settings.layout = { ...DEFAULT_LAYOUT, weights: { ...DEFAULT_LAYOUT.weights } };
+				persist();
+			}}>Réinitialiser les panneaux</button
+		>
+		<p class="mt-1 text-[11px] text-white/30">
+			Faites glisser les séparateurs entre les panneaux pour les redimensionner.
+		</p>
+	</div>
 
 	<!-- ── Diagnostics ───────────────────────────────────── -->
 	<div class="space-y-1.5 border-t border-ink-700 pt-4 font-mono text-[11px]">

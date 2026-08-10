@@ -8,7 +8,7 @@
 	const DURATIONS = [0, 150, 350, 700, 1000];
 </script>
 
-<Dock title="Transition" grow={0.85}>
+<Dock id="transition" title="Transition">
 	<div class="space-y-2 p-2">
 		<select
 			class="studio-input h-8 w-full py-0 text-[12px]"
