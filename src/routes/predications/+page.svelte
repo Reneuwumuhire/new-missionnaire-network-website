@@ -97,7 +97,6 @@
 			: []);
 
 	const desktopSermonGrid = 'md:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.35fr)_110px_80px_120px]';
-	const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 	let authors = $derived(['Tous', ...(availableAuthors ?? [])]);
 
 	// "Filtres" sheet — bottom sheet on mobile, centered dialog on sm+
@@ -921,18 +920,22 @@
 		}}
 	>
 		<div
-			class="filters-sheet flex max-h-[85dvh] w-full max-w-md flex-col overflow-hidden border border-stone-200 bg-white shadow-2xl"
+			class="filters-sheet flex max-h-[88dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white shadow-2xl sm:max-h-[85dvh] sm:rounded-none"
 			role="dialog"
 			aria-modal="true"
 			aria-label={$t('predications.filters')}
 			use:focusTrap={{ onEscape: closeFilters }}
 		>
+			<!-- Grab handle — reads as a draggable bottom sheet on mobile. -->
+			<div class="pt-2.5 sm:hidden" aria-hidden="true">
+				<div class="mx-auto h-1 w-10 rounded-full bg-stone-300"></div>
+			</div>
 			<div class="flex items-center justify-between border-b border-stone-100 px-5 py-4">
 				<p class="text-[10px] font-bold uppercase tracking-[0.25em] text-missionnaire">
 					{$t('predications.filters')}
 				</p>
 				<button
-					class="p-1 text-stone-400 transition-colors duration-150 hover:text-stone-700"
+					class="-mr-1 flex h-11 w-11 items-center justify-center text-stone-400 transition-colors duration-150 hover:text-stone-700"
 					onclick={closeFilters}
 					aria-label={$t('misc.close')}
 				>
@@ -940,33 +943,9 @@
 				</button>
 			</div>
 
-			<div class="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">
-				<!-- Alphabet -->
-				{#if !blendedOnly}
-					<section>
-						<h3 class="mb-2 text-[10px] font-bold uppercase tracking-widest text-stone-400">
-							{$t('predications.alphabetical')}
-						</h3>
-						<div class="grid grid-cols-7 gap-1.5">
-							{#each alphabet as letter}
-								<button
-									class="flex h-9 items-center justify-center border text-xs font-bold transition-colors duration-150 {currentAlpha ===
-									letter
-										? 'bg-missionnaire border-missionnaire text-white'
-										: 'border-stone-200 bg-white text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
-									aria-pressed={currentAlpha === letter}
-									onclick={() => {
-										handleAlphaChange(letter);
-										closeFilters();
-									}}
-								>
-									{letter}
-								</button>
-							{/each}
-						</div>
-					</section>
-				{/if}
-
+			<div
+				class="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-4"
+			>
 				<!-- Years (old sidebar) -->
 				{#if years.length > 0}
 					<section>

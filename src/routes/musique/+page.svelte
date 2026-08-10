@@ -470,8 +470,6 @@
 		if (currentSearch) handleSearch();
 	}
 
-	const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-
 	const categories = [
 		'All',
 		'Sur les Ailes de la Foi',
@@ -1719,18 +1717,22 @@
 		}}
 	>
 		<div
-			class="filters-sheet flex max-h-[85dvh] w-full max-w-md flex-col overflow-hidden border border-stone-200 bg-white shadow-2xl"
+			class="filters-sheet flex max-h-[88dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white shadow-2xl sm:max-h-[85dvh] sm:rounded-none"
 			role="dialog"
 			aria-modal="true"
 			aria-label={$t('music.filters')}
 			use:focusTrap={{ onEscape: closeFilters }}
 		>
+			<!-- Grab handle — reads as a draggable bottom sheet on mobile. -->
+			<div class="pt-2.5 sm:hidden" aria-hidden="true">
+				<div class="mx-auto h-1 w-10 rounded-full bg-stone-300"></div>
+			</div>
 			<div class="flex items-center justify-between border-b border-stone-100 px-5 py-4">
 				<p class="text-[10px] font-bold uppercase tracking-[0.25em] text-missionnaire">
 					{$t('music.filters')}
 				</p>
 				<button
-					class="p-1 text-stone-400 transition-colors duration-150 hover:text-stone-700"
+					class="-mr-1 flex h-11 w-11 items-center justify-center text-stone-400 transition-colors duration-150 hover:text-stone-700"
 					onclick={closeFilters}
 					aria-label={$t('misc.close')}
 				>
@@ -1738,9 +1740,12 @@
 				</button>
 			</div>
 
-			<div class="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">
+			<!-- Column layout, not a scrolling body: the artist list is the only
+			     scroller in the sheet. A list nested inside a scrolling body is
+			     what makes a filter sheet feel broken under a thumb. -->
+			<div class="flex min-h-0 flex-1 flex-col gap-5 px-5 py-4">
 				<!-- Sort -->
-				<section>
+				<section class="shrink-0">
 					<h3 class="mb-2 text-[10px] font-bold uppercase tracking-widest text-stone-400">
 						{$t('music.sortBy')}
 					</h3>
@@ -1773,36 +1778,14 @@
 					</div>
 				</section>
 
-				<!-- Alphabet -->
-				<section>
-					<h3 class="mb-2 text-[10px] font-bold uppercase tracking-widest text-stone-400">
-						{$t('music.firstLetter')}
-					</h3>
-					<div class="grid grid-cols-7 gap-1.5">
-						{#each alphabet as letter}
-							<button
-								class="flex h-9 items-center justify-center border text-xs font-bold transition-colors duration-150 {currentAlpha ===
-								letter
-									? 'bg-missionnaire border-missionnaire text-white'
-									: 'border-stone-200 bg-white text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
-								aria-pressed={currentAlpha === letter}
-								onclick={() => {
-									handleAlphaChange(letter);
-									closeFilters();
-								}}
-							>
-								{letter}
-							</button>
-						{/each}
-					</div>
-				</section>
-
 				<!-- Artist picker (moved here from the old "Artiste" dropdown) -->
-				<section>
-					<h3 class="mb-2 text-[10px] font-bold uppercase tracking-widest text-stone-400">
+				<section class="flex min-h-0 flex-1 flex-col">
+					<h3 class="mb-2 shrink-0 text-[10px] font-bold uppercase tracking-widest text-stone-400">
 						{$t('music.artist')}
 					</h3>
-					<div class="mb-2 flex items-center gap-2 border border-stone-200 bg-stone-50 px-2.5 py-2">
+					<div
+						class="mb-2 flex shrink-0 items-center gap-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2.5 focus-within:border-missionnaire/60 focus-within:bg-white"
+					>
 						<Icon src={BsSearch} size="12" color="#999" />
 						<input
 							type="text"
@@ -1810,16 +1793,25 @@
 							class="w-full border-none bg-transparent font-body text-sm text-stone-700 outline-none placeholder:text-stone-400"
 							bind:value={artistSearch}
 						/>
+						{#if artistSearch}
+							<button
+								class="-mr-1 flex h-8 w-8 shrink-0 items-center justify-center text-stone-400 transition-colors duration-150 hover:text-stone-700"
+								onclick={() => (artistSearch = '')}
+								aria-label={$t('music.clearSearch')}
+							>
+								<Icon src={BsX} size="16" />
+							</button>
+						{/if}
 					</div>
-					<div class="max-h-48 space-y-1 overflow-y-auto custom-scrollbar">
+					<div class="artist-scroll min-h-[7rem] flex-1 overflow-y-auto overscroll-contain">
 						{#if filteredArtists.length === 0}
-							<div class="px-3 py-4 text-center text-xs italic text-stone-400">
+							<div class="px-3 py-6 text-center text-xs italic text-stone-400">
 								{$t('music.noArtistFound')}
 							</div>
 						{:else}
 							<button
-								class="w-full px-3 py-2 text-left text-xs font-bold transition-colors duration-150 {!currentArtist
-									? 'bg-stone-100 text-missionnaire'
+								class="flex min-h-11 w-full items-center rounded-lg px-3 text-left text-sm font-bold transition-colors duration-150 {!currentArtist
+									? 'bg-missionnaire/10 text-missionnaire'
 									: 'text-stone-500 hover:bg-stone-50'}"
 								onclick={() => {
 									handleArtistChange('');
@@ -1830,16 +1822,16 @@
 							</button>
 							{#each filteredArtists as artist}
 								<button
-									class="w-full px-3 py-2 text-left text-xs font-medium transition-colors duration-150 {currentArtist ===
+									class="flex min-h-11 w-full items-center rounded-lg px-3 text-left text-sm transition-colors duration-150 {currentArtist ===
 									artist
-										? 'bg-stone-100 font-bold text-missionnaire'
-										: 'text-stone-600 hover:bg-stone-50'}"
+										? 'bg-missionnaire/10 font-bold text-missionnaire'
+										: 'font-medium text-stone-600 hover:bg-stone-50'}"
 									onclick={() => {
 										handleArtistChange(artist);
 										closeFilters();
 									}}
 								>
-									{artist}
+									<span class="truncate">{artist}</span>
 								</button>
 							{/each}
 						{/if}
@@ -1848,7 +1840,9 @@
 			</div>
 
 			<!-- Utilities (moved from the old pill row) -->
-			<div class="flex items-center gap-2 border-t border-stone-100 bg-stone-50/50 px-5 py-3">
+			<div
+				class="flex shrink-0 items-center gap-2 border-t border-stone-100 bg-stone-50/50 px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-3"
+			>
 				<button
 					class="inline-flex h-10 flex-1 items-center justify-center gap-1.5 border border-stone-200 bg-white px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-stone-600 transition-colors duration-150 hover:border-missionnaire hover:text-missionnaire"
 					onclick={() => {
@@ -2046,6 +2040,24 @@
 	   entirely for prefers-reduced-motion. */
 	.filters-sheet {
 		animation: sheet-up 0.18s ease-out;
+	}
+
+	/* Artist list — the sheet's only scroller. Momentum scrolling on iOS, a
+	   hairline scrollbar instead of the platform default, and a bottom fade
+	   so a long list reads as "keeps going". */
+	.artist-scroll {
+		-webkit-overflow-scrolling: touch;
+		scrollbar-width: thin;
+		mask-image: linear-gradient(to bottom, #000 calc(100% - 20px), transparent);
+	}
+
+	.artist-scroll::-webkit-scrollbar {
+		width: 4px;
+	}
+
+	.artist-scroll::-webkit-scrollbar-thumb {
+		background: theme('colors.stone.300');
+		border-radius: 9999px;
 	}
 
 	@keyframes sheet-up {

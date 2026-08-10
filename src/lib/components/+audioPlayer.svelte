@@ -594,13 +594,6 @@
 		// gesture so iOS's mediaserverd attributes the audio session to
 		// this PWA. safePlay deliberately no longer does this on its own.
 		applyMediaSessionMetadata();
-		// ZERO-GAP TRANSITION (mirrors the MediaSession 'play' handler):
-		// keep the silent loop alive across the play() call — iOS releases
-		// the AVAudioSession in any gap between silent.pause() and main's
-		// play promise resolving. handleAudioPlay stops the loop once main
-		// is actually producing audio. While the keeper held the session
-		// during the pause, a plain play() is reliable — no reload needed.
-		resumeSessionHeld = silentLoopRunning;
 		safePlay('auto');
 	}
 
@@ -619,24 +612,8 @@
 		}
 		setPendingPlaybackIntent('pause');
 		rememberPlaybackPosition();
-		// Start silent loop before pausing main so the AVAudioSession
-		// stays alive — covers the "user paused in-app then locked
-		// the device" path, where they later expect to resume from
-		// the lock screen. Silent loop is iOS-PWA only (gated inside
-		// startSilentLoop).
-		startSilentLoop();
 		audio.pause();
 		if ('mediaSession' in navigator) {
-			// Re-stamp metadata so iOS doesn't attribute the Now-Playing
-			// widget to the silent loop (which has no metadata) and unmount
-			// it — symptom: lock screen shows "playing" with no audio after
-			// an in-app pause. Force-bypass the fingerprint memo first.
-			lastMetadataKey = '';
-			applyMediaSessionMetadata();
-			// Defensive: starting the silent loop can cause the browser to
-			// auto-flip playbackState back to 'playing' (silent is actively
-			// playing media on the page). Re-stamp 'paused' explicitly so
-			// the lock screen and hardware media keys see the correct state.
 			navigator.mediaSession.playbackState = 'paused';
 		}
 	}
@@ -645,7 +622,6 @@
 		setUserWantsToPlay(false);
 		shouldAutoplayOnLoad = false;
 		stopResumeWatchdog();
-		stopSilentLoop();
 		rememberPlaybackPosition();
 
 		if (audio && !audio.paused) {
@@ -665,7 +641,6 @@
 		setUserWantsToPlay(false);
 		shouldAutoplayOnLoad = false;
 		stopResumeWatchdog();
-		stopSilentLoop();
 
 		if (audio && !audio.paused) {
 			setPendingPlaybackIntent('pause');
@@ -918,13 +893,6 @@
 	let lastSuccessfulPlayAt = 0;
 	let consecutiveFailedResumes = 0;
 
-	/** True when the silent-loop keeper held the AVAudioSession across the
-	 *  pause we're now resuming from (iOS standalone PWA). In that case the
-	 *  output route never tore down, so safePlay can use an instant plain
-	 *  play() instead of the 1-2s load()-reload — the single biggest
-	 *  "doesn't feel native" cost on in-app pause→resume. Consumed (reset)
-	 *  by the next safePlay call. */
-	let resumeSessionHeld = false;
 	/** One-shot guard so the stuck-playback verifier escalates at most once
 	 *  per resume attempt. Re-armed on each user-initiated resume. */
 	let stuckVerifierArmed = false;
@@ -1513,9 +1481,6 @@
 		if (autoplay) {
 			shouldAutoplayOnLoad = true;
 			isPlaying.set(true);
-			// Make sure silent loop is OFF — new main track will be the
-			// active audio source.
-			stopSilentLoop();
 		}
 	}
 
@@ -1573,9 +1538,6 @@
 			// live session. Idempotent and cheap.
 			if (!mediaSessionHandlersBound) registerMediaSessionHandlers();
 		}
-		// Defensive: main is now producing audio, so silent loop must
-		// not be. Idempotent — bails if it's already stopped.
-		stopSilentLoop();
 	}
 
 	function handleAudioPause() {
@@ -1585,6 +1547,13 @@
 			isChangingSource
 		});
 		if (isChangingSource) return;
+		// End of media. WebKit fires `pause` just before `ended`; treating it
+		// as an OS interruption would set currentTrackInterrupted and start
+		// the resume watchdog, which then pushes handleEnded down its
+		// load()+canplay path — asynchronous, and therefore blocked while the
+		// screen is locked. Symptom: the PWA plays one track and only advances
+		// once the user unlocks and brings it to the foreground.
+		if (audio?.ended) return;
 		setPendingPlaybackIntent(null);
 		rememberPlaybackPosition();
 		// Note: we do NOT clear userWantsToPlay here. A `pause` event
@@ -2164,12 +2133,10 @@
 			Number.isFinite(seekHint.time) &&
 			seekHint.time > 0;
 
-		const sessionHeld = resumeSessionHeld;
-		resumeSessionHeld = false;
 		const needsReload =
 			reasonHint === 'long' ||
 			hasOverrideSeek ||
-			(reasonHint === 'auto' && pausedMs >= PAUSE_RELOAD_THRESHOLD_MS && !sessionHeld);
+			(reasonHint === 'auto' && pausedMs >= PAUSE_RELOAD_THRESHOLD_MS);
 
 		if (!needsReload) {
 			// Don't probe with play() while a reload is in flight — the
@@ -2292,12 +2259,19 @@
 			// in-flight finish() will start playback once canplay fires.
 			if (isReloadingSession) return;
 			resumeWatchdogAttempts++;
-			// First attempt and every ~30s afterwards does a full reload to
-			// rebuild the audio session / Bluetooth route. Intermediate ticks
-			// just probe with plain play() — cheap, no data usage on reject.
+			// Never rebuild the audio session while we're backgrounded. A
+			// plain play() is rejected by iOS for as long as an AVAudioSession
+			// interruption (phone call, Siri) is active, and succeeds the
+			// instant it ends — precisely the "pause for the call, resume
+			// after" behaviour we want. safePlay('long') instead calls load(),
+			// which builds a *fresh* session that iOS happily grants mid-call:
+			// that is what made the music keep playing over an answered call.
+			// Keep the rebuild for the foreground case, where it recovers a
+			// lost Bluetooth output route rather than fighting the OS.
 			if (
-				resumeWatchdogAttempts === 1 ||
-				resumeWatchdogAttempts % RESUME_RELOAD_EVERY_N_ATTEMPTS === 0
+				!document.hidden &&
+				(resumeWatchdogAttempts === 1 ||
+					resumeWatchdogAttempts % RESUME_RELOAD_EVERY_N_ATTEMPTS === 0)
 			) {
 				safePlay('long');
 			} else {
@@ -2445,84 +2419,6 @@
 	}
 
 
-	// ── Silent-loop session keeper (iOS standalone PWA workaround) ──
-	// In iOS standalone PWA mode, audio.pause() on the main element
-	// releases the AVAudioSession's output route. The next play() resolves
-	// but produces no sound until the app returns to the foreground.
-	// Tested workaround: a second hidden <audio> element loops a tiny
-	// silent .mp3 continuously. Its decoded (silent) output keeps the
-	// AVAudioSession alive across pauses of the main element, so
-	// lock-screen play/pause cycles on the main element work reliably.
-	//
-	// MediaSession transport ownership: iOS binds Now-Playing to the page
-	// (not to a specific element). We start the silent loop AFTER the
-	// main element's first user-gesture play() resolves, so the user-
-	// visible "primary" media is unambiguous from iOS's perspective.
-	let silentAudio: HTMLAudioElement | null = $state(null);
-	let silentLoopRunning = false;
-
-	/** Detect iOS standalone PWA mode (installed-to-home-screen Safari).
-	 *  The silent-loop AVAudioSession workaround only applies there. */
-	function isIOSStandalonePWA(): boolean {
-		if (!browser) return false;
-		const nav = navigator as Navigator & {
-			standalone?: boolean;
-			maxTouchPoints?: number;
-		};
-		const ua = nav.userAgent || '';
-		const isIOS =
-			/iPad|iPhone|iPod/.test(ua) ||
-			(ua.includes('Mac') && (nav.maxTouchPoints ?? 0) > 1);
-		if (!isIOS) return false;
-		return nav.standalone === true;
-	}
-
-	function startSilentLoop(): Promise<void> {
-		if (!browser || !silentAudio) return Promise.resolve();
-		// The silent loop is an iOS standalone-PWA workaround for the
-		// AVAudioSession releasing its output route on audio.pause(). On
-		// macOS / desktop / Android, a hidden audio element actively
-		// playing in the background causes Chrome's hardware-media-key-
-		// handling layer to treat the page as "playing" — auto-flipping
-		// playbackState back to 'playing' even after we set 'paused'. The
-		// next press of the play/pause media key then dispatches 'pause'
-		// (a no-op since main is paused) instead of 'play', and resume
-		// feels broken. Skip the loop on those platforms.
-		if (!isIOSStandalonePWA()) return Promise.resolve();
-		if (silentLoopRunning) return Promise.resolve();
-		// `playsinline` + `muted=false` (a fully-silent file is enough —
-		// muting would tell iOS to skip decoding and we'd be back at the
-		// original suspension bug).
-		silentAudio.loop = true;
-		silentAudio.volume = 1;
-		const p = silentAudio.play();
-		if (!p || typeof p.then !== 'function') {
-			silentLoopRunning = true;
-			console.log('[SilentLoop] started (sync)');
-			return Promise.resolve();
-		}
-		return p
-			.then(() => {
-				silentLoopRunning = true;
-				console.log('[SilentLoop] started');
-			})
-			.catch((err) => {
-				console.warn('[SilentLoop] failed to start', err);
-			});
-	}
-
-	function stopSilentLoop() {
-		if (!silentAudio || !silentLoopRunning) return;
-		try {
-			silentAudio.pause();
-			silentAudio.currentTime = 0;
-		} catch {
-			/* ignore */
-		}
-		silentLoopRunning = false;
-		console.log('[SilentLoop] stopped');
-	}
-
 	// Idempotent registration. iOS's mediaserverd can tear down the audio
 	// session after a long background pause; Control Center caches handler
 	// availability against the *last* session metadata was applied with, so
@@ -2532,12 +2428,11 @@
 	function registerMediaSessionHandlers() {
 		if (!browser || !('mediaSession' in navigator)) return;
 		try {
-			navigator.mediaSession.setActionHandler('play', async () => {
+			navigator.mediaSession.setActionHandler('play', () => {
 				console.log('[REMOTE COMMAND RECEIVED] play', {
 					boundInstanceId: audio?.dataset.instanceId ?? null,
 					currentSeq: audioInstanceSeq,
 					hidden: document.hidden,
-					silentLoopRunning,
 					ts: Date.now()
 				});
 				if (!audio) return;
@@ -2551,88 +2446,27 @@
 					navigator.mediaSession.playbackState = 'playing';
 					return;
 				}
-				setUserWantsToPlay(true);
-				consecutiveFailedResumes = 0;
-				audioElementRebuilt = false;
-				// INSTANT VISUAL FEEDBACK: stamp playbackState BEFORE
-				// awaiting audio.play(). The play promise takes
-				// ~100-500ms to resolve; without this the lock-screen
-				// UI shows "paused" the whole time, and listeners
-				// (rationally) tap play again. We'll revert to 'paused'
-				// in the catch block if play() actually fails.
+				// INSTANT VISUAL FEEDBACK: stamp playbackState before the
+				// play promise resolves (~100-500ms), otherwise the lock
+				// screen shows "paused" the whole time and invites a second
+				// tap. handleAudioPause re-stamps 'paused' if play fails.
 				navigator.mediaSession.playbackState = 'playing';
-
-				// ZERO-GAP TRANSITION: don't stop silent loop until
-				// main is decoding. iOS releases AVAudioSession in any
-				// microtask gap between silent.pause() and main play
-				// promise resolution. Keep silent alive across the
-				// await; stop it once main has confirmed play.
-
-				if (audio.duration && audio.currentTime >= audio.duration) {
-					audio.currentTime = 0;
-				}
-				if (audio.readyState === 0) {
-					try { audio.load(); } catch {}
-				}
-
-				try {
-					await audio.play();
-					// Main is decoding. Release the silent loop.
-					stopSilentLoop();
-					// Re-stamp metadata so iOS rebinds the Now-Playing
-					// widget cleanly to main. After the silent→main
-					// handoff, iOS sometimes keeps the widget bound to
-					// the now-stopped silent element (which has no
-					// metadata) and unmounts it. Force-bypass the
-					// fingerprint memo by clearing it first.
-					lastMetadataKey = '';
-					applyMediaSessionMetadata();
-					navigator.mediaSession.playbackState = 'playing';
-				} catch (err) {
-					console.error('[MediaSession] play failed', err);
-					try {
-						audio.muted = true;
-						await audio.play();
-						audio.muted = false;
-						stopSilentLoop();
-					} catch (err2) {
-						audio.muted = false;
-						console.error('[MediaSession] muted fallback failed', err2);
-						// Play genuinely failed. Revert the optimistic
-						// UI stamp so the lock screen reflects reality.
-						navigator.mediaSession.playbackState = 'paused';
-					}
-				}
+				// Same path as the in-app play button, so there is exactly one
+				// resume policy: safePlay owns the "was this pause long enough
+				// to need a session reload" decision that restores the
+				// Bluetooth output route.
+				playCurrentAudio();
 			});
-			navigator.mediaSession.setActionHandler('pause', async () => {
+			navigator.mediaSession.setActionHandler('pause', () => {
 				console.log('[REMOTE COMMAND RECEIVED] pause', {
 					boundInstanceId: audio?.dataset.instanceId ?? null,
 					currentSeq: audioInstanceSeq,
 					hidden: document.hidden,
-					silentLoopRunning,
 					ts: Date.now()
 				});
 				if (!audio) return;
-				// Idempotent guard: iOS sometimes dispatches the pause
-				// command multiple times for the same locked session.
-				if (audio.paused) {
-					navigator.mediaSession.playbackState = 'paused';
-					return;
-				}
-				setUserWantsToPlay(false);
-				setPendingPlaybackIntent('pause');
 				navigator.mediaSession.playbackState = 'paused';
-				rememberPlaybackPosition();
-				// ZERO-GAP TRANSITION (see comment in 'play' handler).
-				await startSilentLoop();
-				audio.pause();
-				// Re-stamp metadata so iOS doesn't attribute the
-				// Now-Playing widget to the silent loop (which has no
-				// metadata) and unmount it. Force-bypass the fingerprint
-				// memo by clearing it first.
-				lastMetadataKey = '';
-				applyMediaSessionMetadata();
-				navigator.mediaSession.playbackState = 'paused';
+				pauseCurrentAudio();
 			});
 			syncMediaSessionPlaylistHandlers();
 			navigator.mediaSession.setActionHandler('seekbackward', (details) => {
@@ -2919,7 +2753,6 @@
 		clearLiveReconnectTimer();
 		clearLiveHlsUpgradeTimer();
 		destroyHls();
-		stopSilentLoop();
 		if (audio) {
 			try {
 				audio.pause();
@@ -3242,22 +3075,6 @@
 	></audio>
 {/key}
 
-<!--
-	Silent-loop element — keeps the AVAudioSession alive across pauses of
-	the main element in iOS standalone PWA mode. Sourced from a 1-second
-	silent .mp3 in /static; loops forever once started by a user gesture.
-	`preload="auto"` is intentional — we want the bytes ready before the
-	user taps play on the main element so startSilentLoop() never stalls.
--->
-<audio
-	bind:this={silentAudio}
-	src="/silence.mp3"
-	loop
-	playsinline
-	preload="auto"
-	hidden
-	data-role="silent-loop"
-></audio>
 
 {#if $selectAudio}
 	<div
