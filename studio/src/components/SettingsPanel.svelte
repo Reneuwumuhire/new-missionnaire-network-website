@@ -210,6 +210,26 @@
 					</div>
 				{/if}
 
+				{#if page === 'video'}
+					<label class="flex items-start gap-2 border-t border-ink-700 pt-4 text-[13px] text-fg/75">
+						<input
+							type="checkbox"
+							class="mt-0.5 accent-primary"
+							checked={studio.settings.barsWhenNoSource}
+							onchange={(e) => {
+								studio.settings.barsWhenNoSource = (e.currentTarget as HTMLInputElement).checked;
+								persist();
+							}}
+						/>
+						<span>
+							{t('settings.testPattern')}
+							<span class="mt-0.5 block text-[11px] leading-relaxed text-fg/35">
+								{t('settings.testPatternHint')}
+							</span>
+						</span>
+					</label>
+				{/if}
+
 				{#if page === 'layout'}
 					<div>
 						<span class="studio-label">{t('settings.layout')}</span>

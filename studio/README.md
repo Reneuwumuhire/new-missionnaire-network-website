@@ -166,6 +166,17 @@ their transcript from the admin panel's own live-subtitle sync
 studio's anchor straight into the admin gate is the obvious next step; it needs
 a token endpoint on the admin app.
 
+## No-signal test pattern
+
+When a scene has a camera, screen share or media file that is **not producing a
+picture**, the frame is replaced with SMPTE-style colour bars. Black looks
+exactly like a dead encoder; bars say the stream is alive and the source is not.
+
+The rule is deliberately narrow: bars appear only when a scene owns at least one
+video source and none of them drew, or when the scene draws nothing at all. A
+scene made of a colour and some text — a "back shortly" card — is a deliberate
+slate and is left alone. Turn it off in **Settings → Video**.
+
 ## Things worth knowing
 
 - **Don't minimise the window while live.** WebKit stops the render loop for a

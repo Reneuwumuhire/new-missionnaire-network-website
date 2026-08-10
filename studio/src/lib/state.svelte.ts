@@ -97,6 +97,8 @@ export interface Settings {
 	 *  to throw away whatever duration the operator had chosen. */
 	transitionType: 'fade' | 'cut' | 'fadeToBlack';
 	transitionMs: number;
+	/** Show colour bars when a scene's video sources produce nothing. */
+	barsWhenNoSource: boolean;
 	/** OBS's Studio Mode: edit a scene on the left while a different one stays
 	 *  on air on the right, then cut to it deliberately. */
 	studioMode: boolean;
@@ -118,6 +120,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	encoder: 'hardware',
 	transitionType: 'fade',
 	transitionMs: 350,
+	barsWhenNoSource: true,
 	studioMode: false,
 	monitorAudio: false,
 	layout: DEFAULT_LAYOUT,

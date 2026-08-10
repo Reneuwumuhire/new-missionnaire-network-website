@@ -3,10 +3,14 @@
 // YouTube. Switching scenes only changes what the next frame draws, which is
 // why a scene change never interrupts the encoder or the RTMP connections.
 
+import { drawColorBars, shouldShowBars } from './bars';
 import { drawBox, toPixels, type Rect } from './geom';
 import { handleFor } from './media.svelte';
 import { onAirLines } from './lyrics.svelte';
 import { onAirSceneId, persist, studio, type Layer, type TextStyle } from './state.svelte';
+
+// Re-exported so callers driving a take do not need two imports to do it right.
+export { onAirSceneId };
 import { DEFAULT_TEXT_STYLE } from './state.svelte';
 
 export type TransitionType = 'cut' | 'fade' | 'fadeToBlack';
@@ -173,8 +177,11 @@ function drawTextBlocks(
 	ctx.globalAlpha = 1;
 }
 
-function drawLayer(ctx: CanvasRenderingContext2D, layer: Layer, nowMs: number) {
-	if (!layer.visible) return;
+const MEDIA_KINDS: Layer['kind'][] = ['camera', 'screen', 'image', 'video'];
+
+/** Did this layer actually put pixels on the canvas? */
+function drawLayer(ctx: CanvasRenderingContext2D, layer: Layer, nowMs: number): boolean {
+	if (!layer.visible) return false;
 	const box = toPixels(layer.rect, ctx.canvas.width, ctx.canvas.height);
 	ctx.globalAlpha = layer.opacity;
 
@@ -182,15 +189,18 @@ function drawLayer(ctx: CanvasRenderingContext2D, layer: Layer, nowMs: number) {
 		ctx.fillStyle = layer.color ?? '#000000';
 		ctx.fillRect(box.x, box.y, box.w, box.h);
 		ctx.globalAlpha = 1;
-		return;
+		return true;
 	}
 
 	if (layer.kind === 'text' || layer.kind === 'lyrics') {
 		const style = layer.style ?? DEFAULT_TEXT_STYLE;
+		let wrote = false;
 		if (layer.kind === 'text') {
+			wrote = Boolean(layer.text?.trim());
 			drawTextBlocks(ctx, [{ text: layer.text ?? '', alpha: 1, scale: 1 }], box, style);
 		} else {
 			const { current, next } = onAirLines(nowMs);
+			wrote = Boolean(current.trim());
 			drawTextBlocks(
 				ctx,
 				[
@@ -204,14 +214,14 @@ function drawLayer(ctx: CanvasRenderingContext2D, layer: Layer, nowMs: number) {
 			);
 		}
 		ctx.globalAlpha = 1;
-		return;
+		return wrote;
 	}
 
 	const handle = handleFor(layer.id);
 	const el = handle?.el;
 	if (!el) {
 		ctx.globalAlpha = 1;
-		return;
+		return false;
 	}
 	const srcW = el instanceof HTMLVideoElement ? el.videoWidth : el.naturalWidth;
 	const srcH = el instanceof HTMLVideoElement ? el.videoHeight : el.naturalHeight;
@@ -219,23 +229,43 @@ function drawLayer(ctx: CanvasRenderingContext2D, layer: Layer, nowMs: number) {
 	// throws in some engines and draws garbage in others.
 	if (!srcW || !srcH) {
 		ctx.globalAlpha = 1;
-		return;
+		return false;
 	}
 	const d = drawBox(srcW, srcH, box, layer.fit);
+	let drawn = false;
 	try {
 		ctx.drawImage(el, d.sx, d.sy, d.sw, d.sh, d.dx, d.dy, d.dw, d.dh);
+		drawn = true;
 	} catch {
 		// Source went away between the check and the draw — skip this frame.
 	}
 	ctx.globalAlpha = 1;
+	return drawn;
 }
 
+/** Paint a scene, then stand colour bars in its place if it turns out to have
+ *  a video source that produced nothing. Every path that shows a scene goes
+ *  through here, so the preview, the program and both halves of a transition
+ *  all fall back the same way. */
 function drawScene(ctx: CanvasRenderingContext2D, sceneId: string, nowMs: number) {
 	const scene = studio.scenes.find((s) => s.id === sceneId);
 	if (!scene) return;
+
+	let painted = false;
+	let mediaLayers = 0;
+	let mediaDrawn = 0;
 	// Index 0 is the top layer (OBS order), so paint back to front.
 	for (let i = scene.layers.length - 1; i >= 0; i--) {
-		drawLayer(ctx, scene.layers[i], nowMs);
+		const layer = scene.layers[i];
+		const isMedia = layer.visible && MEDIA_KINDS.includes(layer.kind);
+		if (isMedia) mediaLayers++;
+		const drew = drawLayer(ctx, layer, nowMs);
+		if (drew) painted = true;
+		if (isMedia && drew) mediaDrawn++;
+	}
+
+	if (shouldShowBars(mediaLayers, mediaDrawn, painted, studio.settings.barsWhenNoSource)) {
+		drawColorBars(ctx);
 	}
 }
 

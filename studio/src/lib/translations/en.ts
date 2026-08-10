@@ -224,6 +224,8 @@ const en = {
 	'settings.themeLight': 'Light',
 	'settings.language': 'Language',
 	'settings.liveWarning': 'Encoder settings apply to the next broadcast.',
+	'settings.testPattern': 'No-signal test pattern',
+	'settings.testPatternHint': 'Show colour bars when a scene\u2019s camera, screen share or media file is not producing a picture. Black looks the same as a dead stream.',
 	'settings.resolution': 'Base resolution',
 	'settings.fps': 'Frames per second',
 	'settings.videoBitrate': 'Video bitrate — {kbps} kbps',

@@ -226,6 +226,8 @@ const fr: Record<keyof typeof en, string> = {
 	'settings.themeLight': 'Clair',
 	'settings.language': 'Langue',
 	'settings.liveWarning': 'Les réglages d’encodage s’appliqueront à la prochaine diffusion.',
+	'settings.testPattern': 'Mire en l\u2019absence de signal',
+	'settings.testPatternHint': 'Affiche une mire quand la cam\u00e9ra, le partage d\u2019\u00e9cran ou le fichier d\u2019une sc\u00e8ne ne produit aucune image. Le noir ressemble \u00e0 un flux mort.',
 	'settings.resolution': 'Résolution de base',
 	'settings.fps': 'Images par seconde',
 	'settings.videoBitrate': 'Débit vidéo — {kbps} kb/s',

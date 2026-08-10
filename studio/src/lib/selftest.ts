@@ -7,7 +7,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { broadcast, chunkCount, startBroadcast, stopBroadcast } from './broadcast.svelte';
-import { frameCount, takeToProgram } from './compositor';
+import { frameCount, onAirSceneId, renderFrame, takeToProgram } from './compositor';
  import { applyTheme } from './i18n.svelte';
 import { id, makeLayer, persist, studio } from './state.svelte';
 
@@ -43,11 +43,20 @@ async function checkFade(canvas: HTMLCanvasElement) {
 		return data ? data[0] : -1;
 	};
 
-	takeToProgram(black.id, 0);
+	// Drive the same path a scene click does — read what is on air, move the
+	// edit selection, then take. Taking alone only moves the program canvas in
+	// Studio Mode, which is why this check used to pass only by accident.
+	const take = (sceneId: string, ms: number, type?: 'fade' | 'cut' | 'fadeToBlack') => {
+		const from = onAirSceneId();
+		studio.activeSceneId = sceneId;
+		takeToProgram(sceneId, ms, from, type);
+	};
+
+	take(black.id, 0);
 	await wait(300);
 	const before = sample();
 
-	takeToProgram(white.id, 1000);
+	take(white.id, 1000);
 	await wait(500);
 	const middle = sample();
 
@@ -59,15 +68,40 @@ async function checkFade(canvas: HTMLCanvasElement) {
 
 	// Fade to black goes white → black → white: the quarter and three-quarter
 	// points must both be darker than either end.
-	takeToProgram(black.id, 0);
+	take(black.id, 0);
 	await wait(250);
-	takeToProgram(white.id, 1200, undefined, 'fadeToBlack');
+	take(white.id, 1200, 'fadeToBlack');
 	await wait(550);
 	const dip = sample();
 	await wait(1000);
 	const settled = sample();
 	const dipped = dip < 60 && settled > 215;
 	await say(`SELFTEST fadeToBlack dip=${dip} settled=${settled} ${dipped ? 'DIPPED' : 'NO DIP'}`);
+
+	// Colour bars: a scene with a camera source that has no stream must paint
+	// bars, and the same scene with the setting off must not.
+	const broken = {
+		id: id(),
+		name: '__bars',
+		layers: [makeLayer('camera', 'missing'), makeLayer('color', 'bg', { color: '#000000' })]
+	};
+	studio.scenes = [...studio.scenes, broken];
+	const probe = (x: number) => {
+		const data = context?.getImageData(x, Math.floor(canvas.height * 0.3), 1, 1).data;
+		return data ? `${data[0]},${data[1]},${data[2]}` : '?';
+	};
+	if (context) {
+		studio.settings.barsWhenNoSource = true;
+		renderFrame(context, broken.id, false);
+		const white = probe(Math.floor(canvas.width * 0.05));
+		const yellow = probe(Math.floor(canvas.width * 0.2));
+		studio.settings.barsWhenNoSource = false;
+		renderFrame(context, broken.id, false);
+		const off = probe(Math.floor(canvas.width * 0.2));
+		studio.settings.barsWhenNoSource = true;
+		const ok = white === '255,255,255' && yellow === '255,255,0' && off === '0,0,0';
+		await say(`SELFTEST bars white=${white} yellow=${yellow} disabled=${off} ${ok ? 'OK' : 'WRONG'}`);
+	}
 
 	studio.scenes = restore.scenes;
 	studio.activeSceneId = restore.activeSceneId;
