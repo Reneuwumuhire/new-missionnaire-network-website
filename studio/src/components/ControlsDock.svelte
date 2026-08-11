@@ -23,8 +23,10 @@
 		studio.destinations.filter((d) => d.enabled && destinationUrl(d).length > 8)
 	);
 
-	// YouTube only publishes once you press its own Go Live; all this app can
-	// honestly do is say the ingest is receiving and take you there.
+	// This app has no YouTube API and cannot publish or stop a broadcast. With a
+	// default stream key YouTube auto-starts as soon as the ingest connects, so
+	// by the time this shows it is usually already live; a scheduled stream
+	// still waits for Go Live in Studio. Either way the honest offer is a link.
 	const youtubeReady = $derived(
 		broadcast.targets.some((target) => target.youtube && target.state === 'live')
 	);
@@ -72,10 +74,10 @@
 		{#if youtubeReady}
 			<button
 				class="h-9 w-full bg-red-600 text-[13px] font-medium text-fg transition-colors hover:bg-red-500"
-				title={t('controls.goLiveHint')}
+				title={t('controls.openYouTubeHint')}
 				onclick={() => invoke('open_url', { url: 'https://studio.youtube.com/' })}
 			>
-				{t('controls.goLiveYouTube')}
+				{t('controls.openYouTube')}
 			</button>
 		{/if}
 

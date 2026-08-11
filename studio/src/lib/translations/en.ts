@@ -124,8 +124,9 @@ const en = {
 	'target.live': 'Connected',
 	'target.failed': 'Failed',
 	'controls.reaching': 'Reaching servers…',
-	'controls.goLiveYouTube': 'Go Live on YouTube',
-	'controls.goLiveHint': 'YouTube is receiving. Press Go Live in Studio to publish it.',
+	'controls.openYouTube': 'Open YouTube Studio',
+	'controls.openYouTubeHint':
+		'YouTube is receiving this stream. With a default stream key it publishes itself the moment it connects; a scheduled stream waits for Go Live in Studio. Either way this app cannot start or stop it.',
 
 	// ── Status ──────────────────────────────────────────────────
 	'status.offline': 'Offline',

@@ -104,9 +104,19 @@ Failed, and the host it is talking to. A destination that fails is named: with
 several destinations ffmpeg's `tee` reports which slave died, so YouTube
 refusing a key shows up against YouTube and the church stream carries on.
 
-**YouTube publishes on its own Go Live, not ours.** Once the YouTube ingest is
-receiving, a *Go Live on YouTube* button appears and opens YouTube Studio, where
-you press their button. Nothing here can publish for you.
+**This app cannot start or stop a YouTube broadcast** — it has no YouTube API,
+only an RTMP push. What happens after the stream reaches YouTube is YouTube's
+decision:
+
+- **Default stream key** (Studio → Go live → Stream): auto-start is on, so the
+  broadcast **publishes itself the moment ffmpeg connects**. You are live before
+  you touch anything here.
+- **Scheduled stream** with auto-start off: YouTube holds it in preview until
+  you press Go Live in Studio.
+
+Once the YouTube ingest is receiving, an *Open YouTube Studio* button appears.
+It opens a browser tab, nothing more. If you want the two-stage behaviour,
+schedule the stream in YouTube Studio and turn auto-start off there.
 
 ### Stream health
 

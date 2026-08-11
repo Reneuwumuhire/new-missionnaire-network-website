@@ -126,8 +126,9 @@ const fr: Record<keyof typeof en, string> = {
 	'target.live': 'Connectée',
 	'target.failed': 'Échec',
 	'controls.reaching': 'Connexion aux serveurs…',
-	'controls.goLiveYouTube': 'Passer en direct sur YouTube',
-	'controls.goLiveHint': 'YouTube reçoit le flux. Appuyez sur Go Live dans Studio pour le publier.',
+	'controls.openYouTube': 'Ouvrir YouTube Studio',
+	'controls.openYouTubeHint':
+		'YouTube reçoit ce flux. Avec une clé de flux par défaut, il se publie tout seul dès la connexion ; un direct programmé attend le Go Live dans Studio. Dans les deux cas cette application ne peut ni le démarrer ni l’arrêter.',
 
 	// ── Status ──────────────────────────────────────────────────
 	'status.offline': 'Hors ligne',
