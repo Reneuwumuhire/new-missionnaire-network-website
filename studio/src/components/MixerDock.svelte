@@ -28,7 +28,7 @@
 	let { mixer }: { mixer: Mixer | null } = $props();
 
 	let inputs = $state<DeviceOption[]>([]);
-	let levels = $state<Record<string, { db: number; hold: number }>>({});
+	let levels = $state<Record<string, { peaks: [number, number]; hold: [number, number] }>>({});
 	let devicesOpen = $state<string | null>(null);
 
 	onMount(() => {
@@ -40,12 +40,16 @@
 			const now = performance.now();
 			const elapsed = now - last;
 			last = now;
-			const next: Record<string, { db: number; hold: number }> = {};
+			const next: Record<string, { peaks: [number, number]; hold: [number, number] }> = {};
 			for (const stripId of mixer.ids()) {
-				const db = toDb(mixer.peak(stripId));
+				const peaks = mixer.peaks(stripId);
+				const previous = levels[stripId]?.hold ?? [0, 0];
 				next[stripId] = {
-					db,
-					hold: decayHold(levels[stripId]?.hold ?? 0, meterFraction(db), elapsed)
+					peaks,
+					hold: [
+						decayHold(previous[0], meterFraction(toDb(peaks[0])), elapsed),
+						decayHold(previous[1], meterFraction(toDb(peaks[1])), elapsed)
+					]
 				};
 			}
 			levels = next;
@@ -182,7 +186,7 @@
 	{#each strips as strip (strip.id)}
 		{@const connected = mixer?.has(strip.id) ?? false}
 		{@const level = levels[strip.id]}
-		<div class="group border-b border-ink-800 px-3 py-2">
+		<div class="group border-b border-ink-800 px-3 py-1.5">
 			<div class="flex items-baseline gap-2">
 				{#if strip.isMic}
 					<input
@@ -196,18 +200,16 @@
 				{:else}
 					<span class="min-w-0 flex-1 truncate px-1 text-[12px] text-fg/80">{strip.name}</span>
 				{/if}
-				<span class="shrink-0 font-mono text-[10px] {connected ? 'text-fg/50' : 'text-fg/20'}">
-					{connected && level ? formatDb(level.db) : '—'}
+				<!-- The fader's value, which is what OBS puts here. The moving bar
+				     below is the level; a number that jumps with the audio is
+				     unreadable and tells you nothing you can act on. -->
+				<span
+					class="shrink-0 font-mono text-[10px] {strip.source.muted
+						? 'text-red-400/70 line-through'
+						: 'text-fg/55'}"
+				>
+					{formatDb(faderDb(gainPosition(strip.source.gain)))}
 				</span>
-				{#if strip.isMic}
-					<button
-						class="studio-icon-btn opacity-0 group-hover:opacity-100"
-						title={t('mixer.chooseInput')}
-						aria-label={t('mixer.chooseInput')}
-						onclick={() => (devicesOpen = devicesOpen === strip.id ? null : strip.id)}>
-							<Icon name="more" size={14} />
-						</button>
-				{/if}
 			</div>
 
 			{#if devicesOpen === strip.id && strip.isMic}
@@ -252,6 +254,11 @@
 						</select>
 					{/if}
 					<button
+						class="studio-chip px-2 text-[10px]"
+						title={t('mixer.unity')}
+						onclick={() => setLevel(strip, 1, strip.source.muted)}>0 dB</button
+					>
+					<button
 						class="studio-icon-btn"
 						title={t('common.remove')}
 						aria-label={t('common.remove')}
@@ -262,20 +269,32 @@
 			{/if}
 
 			{#if connected}
-				<!-- dBFS meter. The gradient underneath is the whole −60→0 scale, and
-				     the overlay masks everything above the current level — so a given
-				     colour always sits at the same dB, which is the point of a meter. -->
-				<div class="relative mt-1.5 h-2.5 w-full bg-ink-950">
-					<div
-						class="absolute inset-0"
-						style="background: linear-gradient(to right, #10b981 0%, #10b981 66%, #fbbf24 66%, #fbbf24 85%, #ef4444 85%, #ef4444 100%)"
-					></div>
-					<div class="absolute inset-y-0 right-0 bg-ink-950/95" style="left: {meterFraction(level?.db ?? -Infinity) * 100}%"></div>
-					{#if level && level.hold > 0.01}
-						<div class="absolute inset-y-0 w-0.5 bg-fg/70" style="left: {level.hold * 100}%"></div>
-					{/if}
+				<!-- One bar per channel. The gradient underneath is the whole −60→0
+				     scale and the overlay masks everything above the current level,
+				     so a given colour always sits at the same dB. Two bars because a
+				     desk feed with a dead leg meters fine when it is summed. -->
+				<div class="mt-1 space-y-px">
+					{#each [0, 1] as channel (channel)}
+						{@const fraction = meterFraction(toDb(level?.peaks[channel] ?? 0))}
+						<div class="relative h-[5px] w-full bg-ink-950">
+							<div
+								class="absolute inset-0"
+								style="background: linear-gradient(to right, #10b981 0%, #10b981 66%, #fbbf24 66%, #fbbf24 85%, #ef4444 85%, #ef4444 100%)"
+							></div>
+							<div
+								class="absolute inset-y-0 right-0 bg-ink-950/95"
+								style="left: {fraction * 100}%"
+							></div>
+							{#if level && level.hold[channel] > 0.01}
+								<div
+									class="absolute inset-y-0 w-px bg-fg/70"
+									style="left: {level.hold[channel] * 100}%"
+								></div>
+							{/if}
+						</div>
+					{/each}
 				</div>
-				<div class="relative mt-0.5 h-3">
+				<div class="relative mt-0.5 h-2.5">
 					{#each METER_TICKS as tick (tick)}
 						<span
 							class="absolute top-0 -translate-x-1/2 font-mono text-[8px] text-fg/25"
@@ -308,15 +327,19 @@
 								strip.source.muted
 							)}
 					/>
-					<!-- Where the fader is, which is a different number from the meter
-					     above it and the one an operator calls out. -->
-					<button
-						class="w-14 shrink-0 text-right font-mono text-[10px] text-fg/45 transition-colors hover:text-fg"
-						title={t('mixer.unity')}
-						onclick={() => setLevel(strip, 1, strip.source.muted)}
-					>
-						{formatDb(faderDb(gainPosition(strip.source.gain)))}
-					</button>
+					{#if strip.isMic}
+						<!-- Only where it opens something. A scene layer's audio has no
+						     device to choose, and a gear that does nothing is worse
+						     than no gear. -->
+						<button
+							class="studio-icon-btn"
+							title={t('mixer.options')}
+							aria-label={t('mixer.options')}
+							onclick={() => (devicesOpen = devicesOpen === strip.id ? null : strip.id)}
+						>
+							<Icon name="gear" size={14} />
+						</button>
+					{/if}
 				</div>
 			{:else if strip.isMic}
 				{@const source = strip.source as AudioSource}

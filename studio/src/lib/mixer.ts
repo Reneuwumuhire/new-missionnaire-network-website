@@ -5,7 +5,10 @@
 export interface Strip {
 	id: string;
 	gain: GainNode;
-	analyser: AnalyserNode;
+	/** One analyser per channel: a desk feed with a dead right leg looks
+	 *  perfectly healthy on a summed meter, which is exactly the fault you want
+	 *  a meter to show you. */
+	analysers: [AnalyserNode, AnalyserNode];
 	node: AudioNode;
 	/** Element sources can only be tapped once per element, ever. */
 	element: HTMLMediaElement | null;
@@ -53,13 +56,30 @@ export class Mixer {
 
 	private makeStrip(id: string, node: AudioNode, element: HTMLMediaElement | null): Strip {
 		const gain = this.ctx.createGain();
-		const analyser = this.ctx.createAnalyser();
-		analyser.fftSize = 1024;
-		analyser.smoothingTimeConstant = 0.4;
+		// Force two channels so a mono source is upmixed to both legs rather
+		// than metering as a dead right channel.
+		gain.channelCount = 2;
+		gain.channelCountMode = 'explicit';
+		gain.channelInterpretation = 'speakers';
+
+		const analysers = [this.ctx.createAnalyser(), this.ctx.createAnalyser()] as [
+			AnalyserNode,
+			AnalyserNode
+		];
+		const splitter = this.ctx.createChannelSplitter(2);
+		for (const [channel, analyser] of analysers.entries()) {
+			analyser.fftSize = 1024;
+			analyser.smoothingTimeConstant = 0.4;
+			splitter.connect(analyser, channel);
+		}
+
 		node.connect(gain);
-		gain.connect(analyser);
-		analyser.connect(this.master);
-		const strip: Strip = { id, gain, analyser, node, element };
+		// The meters tap the signal; the master takes it from the gain node
+		// directly, so an analyser can never sit in the audio path.
+		gain.connect(splitter);
+		gain.connect(this.master);
+
+		const strip: Strip = { id, gain, analysers, node, element };
 		this.strips.set(id, strip);
 		return strip;
 	}
@@ -104,7 +124,7 @@ export class Mixer {
 		try {
 			strip.node.disconnect();
 			strip.gain.disconnect();
-			strip.analyser.disconnect();
+			strip.analysers.forEach((analyser) => analyser.disconnect());
 		} catch {
 			// Already torn down by a stopped track — nothing to do.
 		}
@@ -135,12 +155,16 @@ export class Mixer {
 		param.linearRampToValueAtTime(target, now + 0.015);
 	}
 
-	/** Peak level 0..1 for a meter. Reads the time-domain buffer rather than
-	 *  the FFT so it reflects what a VU meter would show. */
-	peak(id: string): number {
+	/** Peak level 0..1 per channel. Reads the time-domain buffer rather than the
+	 *  FFT so it reflects what a VU meter would show. */
+	peaks(id: string): [number, number] {
 		const strip = this.strips.get(id);
-		if (!strip) return 0;
-		strip.analyser.getByteTimeDomainData(this.meterBuffer);
+		if (!strip) return [0, 0];
+		return [this.peakOf(strip.analysers[0]), this.peakOf(strip.analysers[1])];
+	}
+
+	private peakOf(analyser: AnalyserNode): number {
+		analyser.getByteTimeDomainData(this.meterBuffer);
 		let peak = 0;
 		for (let i = 0; i < this.meterBuffer.length; i++) {
 			const v = Math.abs(this.meterBuffer[i] - 128) / 128;

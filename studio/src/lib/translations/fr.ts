@@ -102,6 +102,7 @@ const fr: Record<keyof typeof en, string> = {
 	'mixer.defaultInput': 'Entrée par défaut',
 	'mixer.chooseInput': 'Choisir l’entrée',
 	'mixer.fader': 'Niveau',
+	'mixer.options': 'Options de la source',
 	'mixer.unity': 'Cliquer pour l\u2019unit\u00e9 (0 dB)',
 	'mixer.mute': 'Couper',
 	'mixer.unmute': 'Réactiver',

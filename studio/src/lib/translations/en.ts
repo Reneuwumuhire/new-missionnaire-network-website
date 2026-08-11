@@ -100,6 +100,7 @@ const en = {
 	'mixer.defaultInput': 'Default input',
 	'mixer.chooseInput': 'Choose input',
 	'mixer.fader': 'Level',
+	'mixer.options': 'Source options',
 	'mixer.unity': 'Click for unity (0 dB)',
 	'mixer.mute': 'Mute',
 	'mixer.unmute': 'Unmute',
