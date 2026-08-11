@@ -217,6 +217,20 @@ interface Persisted {
 	settings: Settings;
 }
 
+/** Ids have to be unique or the docks take the whole app down with them: a
+ *  keyed `{#each}` throws on a duplicate key, and a throw during render is a
+ *  black window with nothing on the terminal. A saved file can hold anything —
+ *  a session that was killed mid-write, two machines syncing the same folder —
+ *  so the last thing read wins and the rest are dropped. */
+export function uniqueById<T extends { id?: string }>(items: T[] | undefined): T[] {
+	const seen = new Set<string>();
+	return (items ?? []).filter((item) => {
+		if (!item || typeof item.id !== 'string' || seen.has(item.id)) return false;
+		seen.add(item.id);
+		return true;
+	});
+}
+
 function load(): Persisted {
 	const scenes = starterScenes();
 	const fallback: Persisted = {
@@ -255,18 +269,21 @@ function load(): Persisted {
 		const parsed = JSON.parse(raw) as Partial<Persisted>;
 		if (!parsed.scenes?.length) return fallback;
 		return {
-			scenes: parsed.scenes,
+			scenes: uniqueById(parsed.scenes).map((scene) => ({
+				...scene,
+				layers: uniqueById(scene.layers)
+			})),
 			activeSceneId: parsed.activeSceneId ?? parsed.scenes[0].id,
 			programSceneId: parsed.programSceneId ?? parsed.activeSceneId ?? parsed.scenes[0].id,
 			// `kind` arrived after the first shows were saved; anything without one
 			// is a capture device.
-			audioSources: (parsed.audioSources ?? fallback.audioSources).map((source) => ({
+			audioSources: uniqueById(parsed.audioSources ?? fallback.audioSources).map((source) => ({
 				...source,
 				kind: source.kind ?? 'input'
 			})),
 			// `hold` arrived later; anything saved without it kept the old
 			// behaviour of connecting immediately.
-			destinations: (parsed.destinations ?? fallback.destinations).map((destination) => ({
+			destinations: uniqueById(parsed.destinations ?? fallback.destinations).map((destination) => ({
 				...destination,
 				hold: destination.hold ?? false
 			})),

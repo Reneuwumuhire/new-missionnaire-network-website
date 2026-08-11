@@ -127,6 +127,11 @@ export async function openMic(layerId: string, deviceId?: string): Promise<Handl
 		// app capture, and WebKit does not resample a stream into a context with
 		// a different rate — it plays silence. A device that cannot do 48 kHz
 		// ignores this and is reported below.
+		// The channel count is deliberately not asked for. A mono device handed
+		// a request for two gives back a node that claims stereo and carries
+		// silence on the right, which meters as a dead leg and puts the preacher
+		// on one side of the stream. Left alone it reports one channel, and the
+		// mixer duplicates it properly.
 		const shared = {
 			echoCancellation: false,
 			noiseSuppression: false,

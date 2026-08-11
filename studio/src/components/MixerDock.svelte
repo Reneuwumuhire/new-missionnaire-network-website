@@ -325,8 +325,13 @@
 	{/if}
 
 	{#each strips as strip (strip.id)}
-		{@const connected = mixer?.has(strip.id) ?? false}
 		{@const level = levels[strip.id]}
+		<!-- Connected is read from the levels poll, not from mixer.has(): the
+		     mixer's strips live in a plain Map, so a check against it tracks
+		     nothing and Svelte never re-runs it. The row was built the instant
+		     the source was added — before the device had opened — and kept that
+		     answer, which is why the meter appeared only sometimes. -->
+		{@const connected = Boolean(level)}
 		<div class="group border-b border-ink-800 px-3 py-1.5">
 			<div class="flex items-baseline gap-2">
 				{#if strip.isMic}
@@ -408,7 +413,7 @@
 				     scale and the overlay masks everything above the current level,
 				     so a given colour always sits at the same dB. Two bars because a
 				     desk feed with a dead leg meters fine when it is summed. -->
-				<div class="mt-1 space-y-px">
+				<div class="mt-1 space-y-px" data-meter={strip.id}>
 					{#each [0, 1] as channel (channel)}
 						{@const fraction = meterFraction(toDb(level?.peaks[channel] ?? 0))}
 						<div class="relative h-[5px] w-full bg-ink-950">

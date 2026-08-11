@@ -180,13 +180,17 @@ export async function runAudioSelftest(): Promise<void> {
 		return;
 	}
 	let ok = true;
+	// Anything a previous run left behind goes first: a probe id that is already
+	// in the saved state would be added twice, and two sources with one id is a
+	// duplicate key, which takes the whole window down.
+	studio.audioSources = studio.audioSources.filter((source) => !source.id.startsWith('__'));
 	const restoreSources = studio.audioSources;
 	// The reconciler tears down any strip that is not a source it knows about —
 	// which is right in a show and fatal to a probe. So each probe is a real
 	// source for as long as it is measured, and the list is put back after.
 	const asSource = (probeId: string) => {
 		studio.audioSources = [
-			...studio.audioSources,
+			...studio.audioSources.filter((source) => source.id !== probeId),
 			{ id: probeId, name: probeId, kind: 'app' as const, gain: 1, muted: false }
 		];
 	};
@@ -227,8 +231,29 @@ export async function runAudioSelftest(): Promise<void> {
 	const meterOk = Math.abs(toneDb + 20) < 3;
 	await say(`AUDIOTEST meter tone=${toneDb.toFixed(1)}dB expected=-20dB ${meterOk ? 'OK' : 'WRONG'}`);
 	if (!meterOk) ok = false;
+
+	// Stereo, or dual mono? Hard-panning the tone must show on one bar only. If
+	// this passes, anything that meters the same on both legs is a mono source,
+	// not a bus that has collapsed it.
+	// Remove first: the mixer disconnects a strip's node on the way out, which
+	// would cut the very connection this is about to make.
+	bus.remove('__tone');
+	const panner = bus.ctx.createStereoPanner();
+	gain.disconnect();
+	gain.connect(panner);
+	bus.addNode('__tone', panner);
+	panner.pan.value = -1;
+	await wait(400);
+	const [leftL, leftR] = bus.peaks('__tone');
+	panner.pan.value = 1;
+	await wait(400);
+	const [rightL, rightR] = bus.peaks('__tone');
+	const stereo = leftL > leftR * 4 && rightR > rightL * 4;
+	await say(
+		`AUDIOTEST stereo panned-left=${leftL.toFixed(3)}/${leftR.toFixed(3)} panned-right=${rightL.toFixed(3)}/${rightR.toFixed(3)} ${stereo ? 'OK' : 'COLLAPSED'}`
+	);
+	if (!stereo) ok = false;
 	osc.stop();
-	gain.disconnect(probe);
 	bus.remove('__tone');
 
 	// 2. A microphone: it must open, run at the mixer's rate — WebKit plays
@@ -244,12 +269,19 @@ export async function runAudioSelftest(): Promise<void> {
 	if (handle.stream) {
 		const strip = bus.addStream('__selftest_mic', handle.stream);
 		await wait(800);
-		const room = toDb(Math.max(...bus.peaks('__selftest_mic')));
+		const legs = bus.peaks('__selftest_mic');
+		const room = toDb(Math.max(...legs));
 		// A silent room is not a failure; a missing strip is.
 		await say(
-			`AUDIOTEST mic strip=${strip ? 'yes' : 'NO'} room=${Number.isFinite(room) ? `${room.toFixed(1)}dB` : 'silence'}`
+			`AUDIOTEST mic strip=${strip ? 'yes' : 'NO'} room=${Number.isFinite(room) ? `${room.toFixed(1)}dB` : 'silence'} L/R=${legs[0].toFixed(4)}/${legs[1].toFixed(4)} node-channels=${strip?.node.channelCount ?? '?'} both-legs=${legs[0] > 0 && legs[1] > 0}`
 		);
 		if (!strip) ok = false;
+		// Silence meters as silence on both legs, so this only judges a room that
+		// is making some noise at all.
+		if (legs[0] > 0.0005 && legs[1] === 0) {
+			await say('AUDIOTEST mic FAIL: right leg dead — mono source not up-mixed');
+			ok = false;
+		}
 		if (settings?.sampleRate && settings.sampleRate !== bus.ctx.sampleRate) ok = false;
 		bus.remove('__selftest_mic');
 	} else {
@@ -274,8 +306,9 @@ export async function runAudioSelftest(): Promise<void> {
 		const started = await startAppAudio(bus, '__selftest_app', app);
 		await wait(2500);
 		const peak = toDb(Math.max(...bus.peaks('__selftest_app')));
+		const legs = bus.peaks('__selftest_app');
 		await say(
-			`AUDIOTEST appaudio app=${app.name} started=${started} blocks=${received.blocks} bytes=${received.bytes} peak=${Number.isFinite(peak) ? `${peak.toFixed(1)}dB` : 'silence'} err=${appAudio.error ?? '-'}`
+			`AUDIOTEST appaudio app=${app.name} started=${started} blocks=${received.blocks} bytes=${received.bytes} peak=${Number.isFinite(peak) ? `${peak.toFixed(1)}dB` : 'silence'} L/R=${legs[0].toFixed(4)}/${legs[1].toFixed(4)} err=${appAudio.error ?? '-'}`
 		);
 		if (!started || received.blocks === 0) ok = false;
 
@@ -341,6 +374,7 @@ export async function runAudioSelftest(): Promise<void> {
 		studio.scenes = restoreScenes;
 		studio.programSceneId = restoreProgram;
 		studio.activeSceneId = restoreActive;
+		persist();
 	}
 
 	// 4. Delete an input and add another: the new one must open by itself. The
@@ -349,6 +383,18 @@ export async function runAudioSelftest(): Promise<void> {
 	const first = addAudioInput();
 	await wait(2500);
 	const firstUp = Boolean(handleFor(first.id)?.stream) && bus.has(first.id);
+	// On screen, not just on the bus. A strip can exist in the mixer and still
+	// show the operator nothing — which is exactly what happened when the row's
+	// "connected" answer was computed once, before the device had opened.
+	const meterShown = Boolean(document.querySelector(`[data-meter="${first.id}"]`));
+	// And it must keep moving: a meter that paints once is not a meter.
+	const before = bus.peaks(first.id).join();
+	await wait(700);
+	const moving = bus.peaks(first.id).join() !== before;
+	await say(
+		`AUDIOTEST input meter-visible=${meterShown} meter-moving=${moving} strips-drawn=${document.querySelectorAll('[data-meter]').length}`
+	);
+	if (!meterShown) ok = false;
 	release(first.id);
 	bus.remove(first.id);
 	studio.audioSources = studio.audioSources.filter((s) => s.id !== first.id);
@@ -402,7 +448,10 @@ export async function runAudioSelftest(): Promise<void> {
 		await say(`AUDIOTEST share refused: ${err}`);
 	}
 
+	// Written back to disk, not just to memory: a probe source left in the saved
+	// state is a duplicate id waiting to take the next launch down.
 	studio.audioSources = restoreSources;
+	persist();
 	await say(`AUDIOTEST ${ok ? 'OK' : 'FAIL'} — terminé`);
 }
 

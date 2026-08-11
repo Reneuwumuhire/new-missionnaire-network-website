@@ -73,7 +73,12 @@ export class Mixer {
 		return this.ctx.state === 'suspended' ? this.ctx.resume() : Promise.resolve();
 	}
 
-	private makeStrip(id: string, node: AudioNode, element: HTMLMediaElement | null): Strip {
+	private makeStrip(
+		id: string,
+		node: AudioNode,
+		element: HTMLMediaElement | null,
+		mono = false
+	): Strip {
 		const gain = this.ctx.createGain();
 		// Force two channels so a mono source is upmixed to both legs rather
 		// than metering as a dead right channel.
@@ -92,7 +97,21 @@ export class Mixer {
 			splitter.connect(analyser, channel);
 		}
 
-		node.connect(gain);
+		// A mono source has to reach both legs. WebKit will not do the up-mix an
+		// explicit stereo node is supposed to do — a webcam mic arrives on the
+		// left with silence on the right, which is half a preacher on air and a
+		// meter with one dead bar — and its node claims two channels either way,
+		// so the node cannot be asked. The caller says instead.
+		if (mono) {
+			const split = this.ctx.createChannelSplitter(2);
+			const merger = this.ctx.createChannelMerger(2);
+			node.connect(split);
+			split.connect(merger, 0, 0);
+			split.connect(merger, 0, 1);
+			merger.connect(gain);
+		} else {
+			node.connect(gain);
+		}
 		// The meters tap the signal; the master takes it from the gain node
 		// directly, so an analyser can never sit in the audio path.
 		gain.connect(splitter);
@@ -105,8 +124,15 @@ export class Mixer {
 
 	addStream(id: string, stream: MediaStream): Strip | null {
 		if (this.strips.has(id)) return this.strips.get(id)!;
-		if (stream.getAudioTracks().length === 0) return null;
-		return this.makeStrip(id, this.ctx.createMediaStreamSource(stream), null);
+		const track = stream.getAudioTracks()[0];
+		if (!track) return null;
+		// A device that does not declare two channels is treated as mono, and a
+		// mono device is the normal case for a microphone. Getting that wrong the
+		// other way is silence on one side of the broadcast.
+		// ponytail: a stereo interface that declares nothing is folded to its
+		// left leg — give the strip a stereo switch if one ever turns up.
+		const mono = (track.getSettings().channelCount ?? 1) < 2;
+		return this.makeStrip(id, this.ctx.createMediaStreamSource(stream), null, mono);
 	}
 
 	/** Load the PCM worklet, once. */
