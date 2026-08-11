@@ -680,7 +680,7 @@
 
 <div
 	use:portal
-	class="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/50 p-4"
+	class="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/50 p-4 lg:pl-64"
 	role="dialog"
 	aria-modal="true"
 	aria-labelledby="trim-title"

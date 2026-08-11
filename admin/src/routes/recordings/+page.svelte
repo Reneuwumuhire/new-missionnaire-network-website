@@ -3563,7 +3563,7 @@
 	<!-- Backfill upload modal — add a recording for a missed live (audio we have
 	     from YouTube/elsewhere). Date is backdated; audio uploads to S3. -->
 	<div
-		class="fixed inset-0 z-40 flex items-center justify-center overflow-y-auto bg-stone-900/60 p-4 backdrop-blur-sm animate-lightbox-in"
+		class="fixed inset-0 z-40 flex items-center justify-center overflow-y-auto lg:pl-64 bg-stone-900/60 p-4 backdrop-blur-sm animate-lightbox-in"
 		onclick={(e) => {
 			if (e.target === e.currentTarget) closeUploadModal();
 		}}
@@ -3847,7 +3847,7 @@
 	{#if editingRec}
 		<!-- Recording metadata edit modal — focused editing with thumbnail + title + description. -->
 		<div
-			class="fixed inset-0 z-40 flex items-center justify-center overflow-y-auto overflow-x-hidden bg-stone-900/60 p-3 backdrop-blur-sm animate-lightbox-in sm:p-4"
+			class="fixed inset-0 z-40 flex items-center justify-center overflow-y-auto lg:pl-64 overflow-x-hidden bg-stone-900/60 p-3 backdrop-blur-sm animate-lightbox-in sm:p-4"
 			onclick={onEditModalBackdropClick}
 			onkeydown={onLightboxKeydown}
 			role="dialog"

@@ -917,7 +917,7 @@
 
 <!-- Create / edit modal -->
 {#if modalOpen}
-	<div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+	<div class="fixed inset-0 z-50 flex items-center justify-center p-4 lg:pl-64">
 		<button
 			type="button"
 			class="absolute inset-0 bg-stone-900/40 backdrop-blur-[2px]"
