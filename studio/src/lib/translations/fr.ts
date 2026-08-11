@@ -97,6 +97,7 @@ const fr: Record<keyof typeof en, string> = {
 	'mixer.addApp': 'Audio d\u2019une application',
 	'mixer.addAppHint': 'Le son jou\u00e9 par une autre application',
 	'mixer.chooseApp': 'Choisir une application',
+	'mixer.desktopAudio': 'Son du bureau (tout l\u2019\u00e9cran)',
 	'mixer.appGone': 'Cette application ne tourne plus \u2014 en choisir une autre',
 	'mixer.refreshApps': 'Actualiser la liste',
 	'mixer.appAudioUnsupported': 'L\u2019audio par application n\u00e9cessite macOS 13 ou plus r\u00e9cent',

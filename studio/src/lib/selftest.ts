@@ -16,6 +16,7 @@ import {
 import { frameCount, onAirSceneId, renderFrame, takeToProgram } from './compositor';
  import { applyTheme } from './i18n.svelte';
  import {
+	DESKTOP_AUDIO,
 	appAudio,
 	listWindows,
 	matchWindow,
@@ -296,6 +297,20 @@ export async function runAudioSelftest(): Promise<void> {
 		}
 		await stopAppAudio(bus, '__selftest_app');
 		await say(`AUDIOTEST appaudio after-stop capturing=${appAudio.capturing.length} strip=${bus.has('__selftest_app')}`);
+
+		// The whole desktop, which is what a shared screen sounds like.
+		received.bytes = 0;
+		received.blocks = 0;
+		const desk = await startAppAudio(bus, '__selftest_app', {
+			id: DESKTOP_AUDIO,
+			name: 'desktop'
+		});
+		await wait(2000);
+		await say(
+			`AUDIOTEST desktop started=${desk} blocks=${received.blocks} bytes=${received.bytes} err=${appAudio.error ?? '-'}`
+		);
+		if (!desk || received.blocks === 0) ok = false;
+		await stopAppAudio(bus, '__selftest_app');
 	}
 
 	// 4. The automatic association: every window on screen must be recognisable
@@ -312,6 +327,30 @@ export async function runAudioSelftest(): Promise<void> {
 			(w) => matchWindow('', { width: w.width, height: w.height }, windows)?.appId === w.appId
 		);
 		await say(`AUDIOTEST match by-size ${bySize.length}/${windows.length} unique`);
+	}
+
+	// 5. The share itself. This is the one link a unit test cannot reach: what
+	//    the engine tells us about the surface the operator picked is what the
+	//    application behind it is matched from. If the picker needs a human the
+	//    request simply times out, and that is worth knowing too.
+	try {
+		const shared = await Promise.race([
+			navigator.mediaDevices.getDisplayMedia({ video: true, audio: true }),
+			new Promise<null>((resolve) => setTimeout(() => resolve(null), 12000))
+		]);
+		if (!shared) {
+			await say('AUDIOTEST share: no answer in 12s — the picker is waiting for a human');
+		} else {
+			const video = shared.getVideoTracks()[0];
+			const settings = video?.getSettings() as MediaTrackSettings & { displaySurface?: string };
+			const guess = matchWindow(video?.label ?? '', settings ?? {}, windows);
+			await say(
+				`AUDIOTEST share label=${JSON.stringify(video?.label ?? '')} surface=${settings?.displaySurface ?? '?'} size=${settings?.width}x${settings?.height} audio=${shared.getAudioTracks().length} matched=${guess?.appName ?? 'none'}`
+			);
+			shared.getTracks().forEach((track) => track.stop());
+		}
+	} catch (err) {
+		await say(`AUDIOTEST share refused: ${err}`);
 	}
 
 	studio.audioSources = restoreSources;

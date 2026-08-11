@@ -218,11 +218,6 @@ mod platform {
 
 			let content = SCShareableContent::get()
 				.map_err(|e| format!("Contenu partageable indisponible: {e:?}"))?;
-			let app = content
-				.applications()
-				.into_iter()
-				.find(|a| a.bundle_identifier() == bundle_id)
-				.ok_or("Application introuvable — a-t-elle été fermée ?")?;
 			let display = content
 				.displays()
 				.into_iter()
@@ -232,10 +227,23 @@ mod platform {
 			// Audio only. SCK still wants a video configuration, so it gets the
 			// smallest one that is legal rather than a second full-size capture
 			// running for nothing.
-			let filter = SCContentFilter::create()
-				.with_display(&display)
-				.with_including_applications(&[&app], &[])
-				.build();
+			//
+			// No bundle id means the whole desktop, which is what a shared screen
+			// sounds like and what OBS calls Desktop Audio. Naming an application
+			// narrows it to that application.
+			let filter = if bundle_id.is_empty() {
+				SCContentFilter::create().with_display(&display).build()
+			} else {
+				let app = content
+					.applications()
+					.into_iter()
+					.find(|a| a.bundle_identifier() == bundle_id)
+					.ok_or("Application introuvable — a-t-elle été fermée ?")?;
+				SCContentFilter::create()
+					.with_display(&display)
+					.with_including_applications(&[&app], &[])
+					.build()
+			};
 
 			let mut config = SCStreamConfiguration::new();
 			config

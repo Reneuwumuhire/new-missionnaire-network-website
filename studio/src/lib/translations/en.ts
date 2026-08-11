@@ -95,6 +95,7 @@ const en = {
 	'mixer.addApp': 'Application audio',
 	'mixer.addAppHint': 'The sound another app is playing',
 	'mixer.chooseApp': 'Choose an application',
+	'mixer.desktopAudio': 'Desktop audio (whole screen)',
 	'mixer.appGone': 'That application is no longer running \u2014 choose another',
 	'mixer.refreshApps': 'Refresh the list',
 	'mixer.appAudioUnsupported': 'Application audio needs macOS 13 or later',

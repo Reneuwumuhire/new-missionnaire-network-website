@@ -12,6 +12,7 @@
 		type DeviceOption
 	} from '../lib/media.svelte';
 	import {
+		DESKTOP_AUDIO,
 		appAudio,
 		refreshApps,
 		startAppAudio,
@@ -360,13 +361,16 @@
 							class="studio-input h-7 min-w-0 flex-1 py-0 text-[11px]"
 							value={strip.source.appId ?? ''}
 							onchange={(e) => {
-								const app = appAudio.apps.find(
-									(a) => a.id === (e.currentTarget as HTMLSelectElement).value
-								);
+								const picked = (e.currentTarget as HTMLSelectElement).value;
+								const app =
+									picked === DESKTOP_AUDIO
+										? { id: DESKTOP_AUDIO, name: t('mixer.desktopAudio') }
+										: appAudio.apps.find((a) => a.id === picked);
 								if (app) void captureApp(strip, app);
 							}}
 						>
 							<option value="">{t('mixer.chooseApp')}</option>
+							<option value={DESKTOP_AUDIO}>{t('mixer.desktopAudio')}</option>
 							{#each appAudio.apps as app (app.id)}
 								<option value={app.id}>{app.name}</option>
 							{/each}

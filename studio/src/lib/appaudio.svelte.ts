@@ -54,6 +54,11 @@ export function matchApp(label: string, apps: AudioApp[]): AudioApp | null {
 	);
 }
 
+/** Sound of the whole desktop rather than one application — what a shared
+ *  screen sounds like, and what OBS calls Desktop Audio. Held in the same
+ *  `appId` field because from the capture on it is the same strip. */
+export const DESKTOP_AUDIO = '__desktop';
+
 export interface AudioWindow {
 	appId: string;
 	appName: string;
@@ -135,7 +140,13 @@ export async function startAppAudio(
 			node.port.postMessage(new Float32Array(bytes));
 		};
 
-		await invoke('start_app_audio', { id: sourceId, bundleId: app.id, channel });
+		// The sentinel travels as an empty bundle id, which the native side reads
+		// as "the whole display".
+		await invoke('start_app_audio', {
+			id: sourceId,
+			bundleId: app.id === DESKTOP_AUDIO ? '' : app.id,
+			channel
+		});
 		nodes.set(sourceId, node);
 		mixer.addNode(sourceId, node);
 		if (!appAudio.capturing.includes(sourceId)) appAudio.capturing = [...appAudio.capturing, sourceId];

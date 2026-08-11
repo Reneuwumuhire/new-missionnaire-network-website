@@ -8,7 +8,14 @@
 		release,
 		report
 	} from '../lib/media.svelte';
-	import { appAudio, listWindows, matchApp, matchWindow, refreshApps } from '../lib/appaudio.svelte';
+	import {
+		DESKTOP_AUDIO,
+		appAudio,
+		listWindows,
+		matchApp,
+		matchWindow,
+		refreshApps
+	} from '../lib/appaudio.svelte';
 	import { addAppAudio, addAudioInput } from '../lib/state.svelte';
 	import Dock from './Dock.svelte';
 	import Icon, { type IconName } from './Icon.svelte';
@@ -146,11 +153,17 @@
 		const label = track.label ?? '';
 		const size = track.getSettings();
 		const [windows] = await Promise.all([listWindows(), refreshApps()]);
-		// The window's own application first, then anything the label names.
+		// The window's own application first, then anything the label names, and
+		// for a whole screen the desktop itself — a shared display has no single
+		// application behind it, but it certainly has a sound.
+		const surface = (size as MediaTrackSettings & { displaySurface?: string }).displaySurface;
 		const window = matchWindow(label, size, windows);
-		const app = window
-			? { id: window.appId, name: window.appName }
-			: matchApp(label, appAudio.apps);
+		const app =
+			surface === 'monitor'
+				? { id: DESKTOP_AUDIO, name: t('mixer.desktopAudio') }
+				: window
+					? { id: window.appId, name: window.appName }
+					: matchApp(label, appAudio.apps);
 		// No guess is not a failure: the mixer strip offers the list.
 		if (app) layer.appId = app.id;
 		// What the engine actually said about the share. Without this line a bad

@@ -220,6 +220,14 @@ the window's own strip — fader, meter, mute — so a shared video plays out li
 and can be ridden against the preacher's mic. If the guess is wrong, or there
 was none, the strip's gear opens the list of applications.
 
+The match works from what the engine says about the surface it shared: the
+capture track's label against every on-screen window's title, then against
+application names, and failing both a window whose size on screen is unique.
+Sharing a whole display attaches **Desktop audio** instead — a screen has no
+one application behind it, but it does have a sound. Every share prints what it
+was given (`share label=… size=… matched=…`) to the terminal, which is the
+first thing to read if the wrong application comes up.
+
 Application sound carries across scenes. A window's picture stops when its
 scene goes off air, but the application it is capturing keeps playing — cutting
 to a slide or a break card does not stop the music. The same is true of the
@@ -231,6 +239,23 @@ A camera's or media file's audio is still the scene's, and stops with it.
 
 The studio excludes its own output from the capture, so monitoring cannot feed
 back into the mix.
+
+### Checking the audio chain without a human
+
+```bash
+STUDIO_SELFTEST=audio pnpm studio
+```
+
+Prints to the terminal and exercises what would otherwise have to be heard: a
+−20 dBFS tone must meter −20 dB, a microphone must open at the mixer's rate and
+land on the bus, an application's capture must deliver PCM blocks, two
+applications must capture at once without silencing each other, desktop audio
+must deliver, and every window on screen must be traceable back to its
+application. It ends in `AUDIOTEST OK` or `AUDIOTEST FAIL`.
+
+One link it cannot reach: `getDisplayMedia` refuses to run outside a user
+gesture, so what the engine says about a shared surface can only be seen by
+sharing one by hand — which is what the `share label=…` line is for.
 
 ### Permissions
 
