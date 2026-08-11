@@ -46,6 +46,13 @@ export interface Layer {
 	fit: FitMode;
 	/** camera / screen: which device. Empty = system default. */
 	deviceId?: string;
+	/** screen: the application whose own audio stands in for the share's sound,
+	 *  because the engine hands a window over without any. Same field, same
+	 *  meaning as on an `app` audio source. */
+	appId?: string;
+	/** screen: leave the mouse pointer out of the shared window, where the
+	 *  engine lets us ask. */
+	hideCursor?: boolean;
 	/** text / lyrics content, or the flat colour for `color`. */
 	text?: string;
 	color?: string;
@@ -314,6 +321,30 @@ export function persist() {
 	}
 }
 
+/** Add a capture device to the mixer. Audio sources are global on purpose —
+ *  they are added from either dock and belong to the show, not to a scene. */
+export function addAudioInput(): AudioSource {
+	const source: AudioSource = {
+		id: id(),
+		name: t('mixer.micName', { number: studio.audioSources.length + 1 }),
+		kind: 'input',
+		gain: 1,
+		muted: false
+	};
+	studio.audioSources = [...studio.audioSources, source];
+	persist();
+	return source;
+}
+
+/** Add an application's own output to the mixer, already named and ready to
+ *  capture — the strip picks it up from `appId`. */
+export function addAppAudio(appId: string, name: string): AudioSource {
+	const source: AudioSource = { id: id(), name, kind: 'app', appId, gain: 1, muted: false };
+	studio.audioSources = [...studio.audioSources, source];
+	persist();
+	return source;
+}
+
 export function activeScene(): Scene {
 	return studio.scenes.find((s) => s.id === studio.activeSceneId) ?? studio.scenes[0];
 }
@@ -334,11 +365,27 @@ export function selectedLayer(): Layer | null {
 	return activeScene().layers.find((l) => l.id === studio.selectedLayerId) ?? null;
 }
 
-/** Audio-bearing layers of the scene currently ON AIR — the program scene, not
- *  the one being edited. Setting up a scene in Studio Mode must not push its
- *  audio out over the live one. */
-export function liveAudioLayers(): Layer[] {
-	return programScene().layers.filter((l) => l.hasAudio && l.visible);
+/** The layers that get a mixer strip.
+ *
+ *  Audio-bearing layers of the scene currently ON AIR — the program scene, not
+ *  the one being edited, so setting up a scene in Studio Mode does not push its
+ *  audio out over the live one.
+ *
+ *  Plus every window capturing an application, whatever scene it sits in: that
+ *  sound belongs to the application, not to the scene, and cutting to a slide
+ *  must not stop the music. Its picture still comes and goes with its scene —
+ *  only the sound carries. The eye icon remains the way to silence it. */
+export function audioLayers(): Layer[] {
+	const strips = new Map<string, Layer>();
+	for (const layer of programScene().layers) {
+		if (layer.hasAudio && layer.visible) strips.set(layer.id, layer);
+	}
+	for (const scene of studio.scenes) {
+		for (const layer of scene.layers) {
+			if (layer.appId && layer.visible) strips.set(layer.id, layer);
+		}
+	}
+	return [...strips.values()];
 }
 
 /** Full ingest URL for a destination. Slashes are normalised because operators

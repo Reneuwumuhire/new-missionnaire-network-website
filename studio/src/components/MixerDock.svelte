@@ -1,9 +1,18 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { handleFor, listDevices, openMic, release, type DeviceOption } from '../lib/media.svelte';
+	import {
+		askForMicrophone,
+		handleFor,
+		listDevices,
+		mediaVersion,
+		openMic,
+		openPrivacySettings,
+		permissions,
+		release,
+		type DeviceOption
+	} from '../lib/media.svelte';
 	import {
 		appAudio,
-		isCapturing,
 		refreshApps,
 		startAppAudio,
 		stopAppAudio,
@@ -23,7 +32,15 @@
 	import Dock from './Dock.svelte';
 	import Icon from './Icon.svelte';
 	import { t } from '../lib/i18n.svelte';
-	import { id, liveAudioLayers, persist, studio, type AudioSource, type Layer } from '../lib/state.svelte';
+	import {
+		addAppAudio,
+		addAudioInput,
+		audioLayers,
+		persist,
+		studio,
+		type AudioSource,
+		type Layer
+	} from '../lib/state.svelte';
 
 	let { mixer }: { mixer: Mixer | null } = $props();
 
@@ -33,6 +50,9 @@
 
 	onMount(() => {
 		void refreshDevices();
+		// A USB interface plugged in mid-service has to show up in the menu
+		// without restarting the studio.
+		navigator.mediaDevices.addEventListener('devicechange', refreshDevices);
 		let last = performance.now();
 		// 30 Hz: enough for a meter to look alive without burning a core.
 		const timer = setInterval(() => {
@@ -54,12 +74,18 @@
 			}
 			levels = next;
 		}, 33);
-		return () => clearInterval(timer);
+		return () => {
+			clearInterval(timer);
+			navigator.mediaDevices.removeEventListener('devicechange', refreshDevices);
+		};
 	});
 
 	async function refreshDevices() {
 		inputs = await listDevices('audioinput');
 	}
+
+	/** Input sources with a request already in flight — see the effect below. */
+	const opening = new Set<string>();
 
 	async function connect(source: AudioSource) {
 		await openMic(source.id, source.deviceId);
@@ -67,35 +93,38 @@
 		await refreshDevices();
 	}
 
-	let adding = $state(false);
+	/** null closed, 'menu' the two kinds, 'apps' the list of applications. */
+	let adding = $state<'menu' | 'apps' | null>(null);
 
-	function addSource(kind: 'input' | 'app') {
-		adding = false;
-		studio.audioSources = [
-			...studio.audioSources,
-			{
-				id: id(),
-				name:
-					kind === 'app'
-						? t('mixer.appName')
-						: t('mixer.micName', { number: studio.audioSources.length + 1 }),
-				kind,
-				gain: 1,
-				muted: false
-			}
-		];
-		persist();
-		if (kind === 'app') void refreshApps();
+	function addInput() {
+		adding = null;
+		// The effect below opens it: existing is what makes a source live.
+		addAudioInput();
 	}
 
-	/** Attach an application to an app source and start capturing it. */
-	async function captureApp(source: AudioSource, app: AudioApp) {
+	/** OBS asks which application before the source exists, and so does this.
+	 *  A strip that says "Choose an application" is not a source, it is a chore
+	 *  left in the mixer — the list comes first, and the strip that appears is
+	 *  named after the app and already capturing (the effect below sees the
+	 *  appId and starts it). */
+	function addAppSource(app: AudioApp) {
+		adding = null;
+		addAppAudio(app.id, app.name);
+	}
+
+	/** Attach an application to a strip and start capturing it. An "Application
+	 *  audio" source and a shared window take the same path from here on: the
+	 *  same worklet, fader, meter and route to the encoder. */
+	async function captureApp(strip: Strip, app: AudioApp) {
 		if (!mixer) return;
-		source.appId = app.id;
-		source.name = app.name;
+		strip.source.appId = app.id;
+		// The window keeps the name the operator gave it; a placeholder app
+		// source has nothing better to be called than the app.
+		if (strip.isMic) strip.source.name = app.name;
+		failed.delete(strip.id);
 		persist();
 		devicesOpen = null;
-		await startAppAudio(mixer, source.id, app);
+		await startAppAudio(mixer, strip.id, app);
 	}
 
 	function removeSource(source: AudioSource) {
@@ -113,22 +142,68 @@
 		source: AudioSource | Layer;
 	}
 
-	/** Global mics first, then whatever the scene ON AIR contributes. */
+	/** Global mics first, then the layers that carry sound: what the scene ON AIR
+	 *  contributes, plus any window capturing an application wherever it lives. */
 	const strips = $derived<Strip[]>([
 		...studio.audioSources.map((source) => ({ id: source.id, name: source.name, isMic: true, source })),
-		...liveAudioLayers().map((layer) => ({ id: layer.id, name: layer.name, isMic: false, source: layer }))
+		...audioLayers().map((layer) => ({ id: layer.id, name: layer.name, isMic: false, source: layer }))
 	]);
 
-	/** Why a strip is silent. A screen or window share that connected but
-	 *  carries no audio track is the WebKit limitation, not a broken source —
-	 *  saying "No audio track" and stopping there leaves the operator hunting
-	 *  for a fault that is not theirs. */
+	/** Strips whose sound comes from the native per-application capture: an
+	 *  "Application audio" source, and every window or screen share — the engine
+	 *  hands those over silent, so the application's own output stands in. */
+	function isAppStrip(strip: Strip): boolean {
+		return strip.isMic
+			? (strip.source as AudioSource).kind === 'app'
+			: (strip.source as Layer).kind === 'screen';
+	}
+
+	/** Captures that came back with an error, so a failing one is not retried
+	 *  forever by the effect below. Choosing an application clears its entry. */
+	const failed = new Set<string>();
+
+	/** Every strip that knows its application captures it, without being asked
+	 *  twice: a window whose app was recognised on sharing, and an application
+	 *  source coming back after a restart. OBS behaves this way — a configured
+	 *  source is live as soon as it is in the scene, never a strip waiting for
+	 *  the operator to re-pick what it already knows. */
+	$effect(() => {
+		void mediaVersion.n;
+		const bus = mixer;
+		if (!bus) return;
+
+		// An input device is open because the source exists, not because someone
+		// pressed Connect: a strip restored from the last service, or one added
+		// before the microphone was allowed, would otherwise sit there saying
+		// "Connect input" with an empty device menu behind it.
+		//
+		// `opening` is what keeps it to one attempt. openMic releases the old
+		// handle before it asks for the new stream, and a released handle is a
+		// change this effect watches — so without the guard every pending
+		// request spawns another, and the device never settles.
+		for (const source of studio.audioSources) {
+			if (source.kind !== 'input' || handleFor(source.id) || opening.has(source.id)) continue;
+			opening.add(source.id);
+			void connect(source).finally(() => opening.delete(source.id));
+		}
+
+		const wanting = [...studio.audioSources.filter((s) => s.kind === 'app'), ...audioLayers()];
+		for (const source of wanting) {
+			if (!source.appId || bus.has(source.id) || failed.has(source.id)) continue;
+			void startAppAudio(bus, source.id, { id: source.appId, name: source.name }).then((ok) => {
+				// One shot per strip: a closed application must not be retried on
+				// every frame. Picking one again clears the mark.
+				if (!ok) failed.add(source.id);
+			});
+		}
+	});
+
+	/** Why a strip is silent — a source that connected without audio is not a
+	 *  broken source, and "No audio track" on its own leaves the operator
+	 *  hunting for a fault that is not theirs. */
 	function silenceReason(strip: Strip): { label: string; hint: string } {
 		const handle = handleFor(strip.id);
 		if (handle?.error) return { label: handle.error, hint: handle.error };
-		if (!strip.isMic && (strip.source as Layer).kind === 'screen' && handle?.stream) {
-			return { label: t('mixer.noSurfaceAudio'), hint: t('mixer.noSurfaceAudioHint') };
-		}
 		return { label: t('mixer.noAudioTrack'), hint: '' };
 	}
 
@@ -139,6 +214,27 @@
 		persist();
 	}
 </script>
+
+<!-- The device menu. Shown both in a connected strip's options and on a strip
+     that has not come up yet — choosing the device is how you connect it, so
+     hiding the list behind a gear you cannot reach is a dead end. -->
+{#snippet deviceSelect(source: AudioSource)}
+	<select
+		class="studio-input h-7 min-w-0 flex-1 py-0 text-[11px]"
+		aria-label={t('mixer.chooseInput')}
+		value={source.deviceId ?? ''}
+		onchange={(e) => {
+			source.deviceId = (e.currentTarget as HTMLSelectElement).value || undefined;
+			persist();
+			void connect(source);
+		}}
+	>
+		<option value="">{t('mixer.defaultInput')}</option>
+		{#each inputs as device (device.deviceId)}
+			<option value={device.deviceId}>{device.label}</option>
+		{/each}
+	</select>
+{/snippet}
 
 <Dock id="mixer" title={t('dock.audioMixer')}>
 	{#snippet actions()}
@@ -160,22 +256,66 @@
 				class="studio-icon-btn"
 				title={t('mixer.addSource')}
 				aria-label={t('mixer.addSource')}
-				onclick={() => (adding = !adding)}><Icon name="plus" /></button
+				onclick={() => (adding = adding ? null : 'menu')}><Icon name="plus" /></button
 			>
-			{#if adding}
+			{#if adding === 'menu'}
 				<div class="absolute right-0 top-7 z-30 w-56 border border-ink-600 bg-ink-850 py-1 shadow-2xl shadow-black/70">
-					<button class="block w-full px-3 py-2 text-left hover:bg-primary/15" onclick={() => addSource('input')}>
+					<button class="block w-full px-3 py-2 text-left hover:bg-primary/15" onclick={addInput}>
 						<span class="block text-[13px] text-fg/90">{t('mixer.addMic')}</span>
 						<span class="block text-[11px] text-fg/40">{t('mixer.addMicHint')}</span>
 					</button>
-					<button class="block w-full px-3 py-2 text-left hover:bg-primary/15" onclick={() => addSource('app')}>
+					<button
+						class="block w-full px-3 py-2 text-left hover:bg-primary/15"
+						onclick={async () => {
+							adding = 'apps';
+							await refreshApps();
+						}}
+					>
 						<span class="block text-[13px] text-fg/90">{t('mixer.addApp')}</span>
 						<span class="block text-[11px] text-fg/40">{t('mixer.addAppHint')}</span>
 					</button>
 				</div>
+			{:else if adding === 'apps'}
+				<!-- Which application, before the strip exists — the source is created
+				     already named and already capturing, as OBS creates one from its
+				     properties dialog. -->
+				<div
+					class="absolute right-0 top-7 z-30 max-h-72 w-56 overflow-y-auto border border-ink-600 bg-ink-850 py-1 shadow-2xl shadow-black/70"
+				>
+					{#each appAudio.apps as app (app.id)}
+						<button
+							class="block w-full truncate px-3 py-1.5 text-left text-[12px] text-fg/85 hover:bg-primary/15"
+							onclick={() => addAppSource(app)}>{app.name}</button
+						>
+					{:else}
+						<p class="px-3 py-2 text-[11px] leading-snug text-fg/40">
+							{appAudio.error ?? t('mixer.appAudioUnsupported')}
+						</p>
+					{/each}
+				</div>
 			{/if}
 		</div>
 	{/snippet}
+
+	{#if permissions.microphone === 'denied'}
+		<!-- A refusal cannot be undone from in here, so say what happened and
+		     point at the one place it can be changed. -->
+		<div class="flex items-center gap-2 border-b border-red-500/25 bg-red-500/10 px-3 py-1.5">
+			<p class="min-w-0 flex-1 text-[10px] leading-snug text-red-300/90">
+				{t('mixer.micDenied')}
+				{permissions.message}
+			</p>
+			<button class="studio-chip shrink-0 text-[10px]" onclick={() => askForMicrophone()}>
+				{t('mixer.micRetry')}
+			</button>
+			<button
+				class="studio-chip shrink-0 text-[10px]"
+				onclick={() => openPrivacySettings('microphone')}
+			>
+				{t('mixer.openPrivacy')}
+			</button>
+		</div>
+	{/if}
 
 	{#if studio.settings.monitorAudio}
 		<p class="border-b border-amber-500/20 bg-amber-500/10 px-3 py-1 text-[10px] text-amber-300/90">
@@ -212,18 +352,18 @@
 				</span>
 			</div>
 
-			{#if devicesOpen === strip.id && strip.isMic}
+			{#if devicesOpen === strip.id}
 				{@const source = strip.source as AudioSource}
 				<div class="mt-1 flex gap-1">
-					{#if source.kind === 'app'}
+					{#if isAppStrip(strip)}
 						<select
 							class="studio-input h-7 min-w-0 flex-1 py-0 text-[11px]"
-							value={source.appId ?? ''}
+							value={strip.source.appId ?? ''}
 							onchange={(e) => {
 								const app = appAudio.apps.find(
 									(a) => a.id === (e.currentTarget as HTMLSelectElement).value
 								);
-								if (app) void captureApp(source, app);
+								if (app) void captureApp(strip, app);
 							}}
 						>
 							<option value="">{t('mixer.chooseApp')}</option>
@@ -238,33 +378,24 @@
 							onclick={() => refreshApps()}><Icon name="refresh" size={13} /></button
 						>
 					{:else}
-						<select
-							class="studio-input h-7 min-w-0 flex-1 py-0 text-[11px]"
-							value={source.deviceId ?? ''}
-							onchange={(e) => {
-								source.deviceId = (e.currentTarget as HTMLSelectElement).value || undefined;
-								persist();
-								void connect(source);
-							}}
-						>
-							<option value="">{t('mixer.defaultInput')}</option>
-							{#each inputs as device (device.deviceId)}
-								<option value={device.deviceId}>{device.label}</option>
-							{/each}
-						</select>
+						{@render deviceSelect(source)}
 					{/if}
 					<button
 						class="studio-chip px-2 text-[10px]"
 						title={t('mixer.unity')}
 						onclick={() => setLevel(strip, 1, strip.source.muted)}>0 dB</button
 					>
-					<button
-						class="studio-icon-btn"
-						title={t('common.remove')}
-						aria-label={t('common.remove')}
-						onclick={() => removeSource(source)}>
-						<Icon name="trash" size={14} />
-					</button>
+					{#if strip.isMic}
+						<!-- A window's strip belongs to the source in the Sources dock;
+						     deleting it from here would leave the picture behind. -->
+						<button
+							class="studio-icon-btn"
+							title={t('common.remove')}
+							aria-label={t('common.remove')}
+							onclick={() => removeSource(source)}>
+							<Icon name="trash" size={14} />
+						</button>
+					{/if}
 				</div>
 			{/if}
 
@@ -327,9 +458,9 @@
 								strip.source.muted
 							)}
 					/>
-					{#if strip.isMic}
-						<!-- Only where it opens something. A scene layer's audio has no
-						     device to choose, and a gear that does nothing is worse
+					{#if strip.isMic || isAppStrip(strip)}
+						<!-- Only where it opens something. A camera or media layer has
+						     nothing to choose, and a gear that does nothing is worse
 						     than no gear. -->
 						<button
 							class="studio-icon-btn"
@@ -341,26 +472,61 @@
 						</button>
 					{/if}
 				</div>
-			{:else if strip.isMic}
-				{@const source = strip.source as AudioSource}
-				{#if source.kind === 'app'}
+			{:else if isAppStrip(strip)}
+				<!-- Only two ways to be here: the chosen application is gone, or none
+				     was ever chosen. Either way the answer is the list, and the gear
+				     next to it removes a strip that is no longer wanted. -->
+				<div class="mt-1.5 flex gap-1">
 					<button
-						class="studio-chip mt-1.5 w-full text-left text-[11px]"
+						class="studio-chip min-w-0 flex-1 truncate text-left text-[11px]"
 						onclick={async () => {
 							await refreshApps();
 							devicesOpen = strip.id;
 						}}
 					>
 						{appAudio.error ??
-							(appAudio.supported ? t('mixer.chooseApp') : t('mixer.appAudioUnsupported'))}
+							(appAudio.supported
+								? strip.source.appId
+									? t('mixer.appGone')
+									: t('mixer.chooseApp')
+								: t('mixer.appAudioUnsupported'))}
 					</button>
-				{:else}
+					{#if strip.isMic}
+						<button
+							class="studio-icon-btn"
+							title={t('common.remove')}
+							aria-label={t('common.remove')}
+							onclick={() => removeSource(strip.source as AudioSource)}
+						>
+							<Icon name="trash" size={14} />
+						</button>
+					{/if}
+				</div>
+				{#if !appAudio.supported && !strip.isMic}
+					<p class="mt-0.5 text-[10px] leading-snug text-fg/25">{t('mixer.noSurfaceAudioHint')}</p>
+				{/if}
+			{:else if strip.isMic}
+				{@const source = strip.source as AudioSource}
+				{@const error = handleFor(strip.id)?.error}
+				<div class="mt-1.5 flex gap-1">
+					{@render deviceSelect(source)}
 					<button
-						class="studio-chip mt-1.5 w-full text-left text-[11px]"
-						onclick={() => connect(source)}
+						class="studio-icon-btn"
+						title={t('mixer.connect')}
+						aria-label={t('mixer.connect')}
+						onclick={() => connect(source)}><Icon name="refresh" size={13} /></button
 					>
-						{handleFor(strip.id)?.error ?? t('mixer.connect')}
+					<button
+						class="studio-icon-btn"
+						title={t('common.remove')}
+						aria-label={t('common.remove')}
+						onclick={() => removeSource(source)}
+					>
+						<Icon name="trash" size={14} />
 					</button>
+				</div>
+				{#if error}
+					<p class="mt-0.5 text-[10px] leading-snug text-amber-400/80">{error}</p>
 				{/if}
 			{:else}
 				{@const reason = silenceReason(strip)}

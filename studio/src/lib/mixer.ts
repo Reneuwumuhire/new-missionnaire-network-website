@@ -2,6 +2,11 @@
 // Monitoring is off by default — a laptop speaker plus the room mic is a
 // feedback loop, and finding that out on air is how services get ruined.
 
+/** The whole desk runs at 48 kHz: the native app capture arrives at that rate,
+ *  and a mic asked for anything else would have to be resampled by the engine —
+ *  which WebKit does not do for a MediaStream source. */
+export const MIX_RATE = 48000;
+
 export interface Strip {
 	id: string;
 	gain: GainNode;
@@ -12,6 +17,16 @@ export interface Strip {
 	node: AudioNode;
 	/** Element sources can only be tapped once per element, ever. */
 	element: HTMLMediaElement | null;
+}
+
+/** Strips the on-air scene no longer justifies. Global sources — the mixer's
+ *  own inputs: mics and application audio — are never in the answer: they
+ *  belong to the show, not to a scene, exactly as a device in OBS's
+ *  Settings → Audio keeps running whatever is on air. Only a scene's own
+ *  layers come and go with it. */
+export function stripsToDrop(global: string[], onAir: Iterable<string>, inBus: string[]): string[] {
+	const keep = new Set<string>([...global, ...onAir]);
+	return inBus.filter((id) => !keep.has(id));
 }
 
 export class Mixer {
@@ -25,11 +40,15 @@ export class Mixer {
 	/** addModule is once per context; every app-audio strip shares the module. */
 	private workletReady: Promise<void> | null = null;
 	/** Scratch buffer for the meters — reused so a 30 Hz UI poll allocates
-	 *  nothing. Sized to the analyser's fftSize. */
-	private readonly meterBuffer = new Uint8Array(1024);
+	 *  nothing. Sized to the analyser's fftSize.
+	 *
+	 *  Float, not bytes: a byte sample cannot go finer than 1/128 of full
+	 *  scale, so a byte meter bottoms out at −42 dB and the whole lower half of
+	 *  a −60..0 scale is a lie. */
+	private readonly meterBuffer = new Float32Array(1024);
 
 	constructor() {
-		this.ctx = new AudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
+		this.ctx = new AudioContext({ sampleRate: MIX_RATE, latencyHint: 'interactive' });
 		this.master = this.ctx.createGain();
 		this.destination = this.ctx.createMediaStreamDestination();
 		this.monitor = this.ctx.createGain();
@@ -164,10 +183,10 @@ export class Mixer {
 	}
 
 	private peakOf(analyser: AnalyserNode): number {
-		analyser.getByteTimeDomainData(this.meterBuffer);
+		analyser.getFloatTimeDomainData(this.meterBuffer);
 		let peak = 0;
 		for (let i = 0; i < this.meterBuffer.length; i++) {
-			const v = Math.abs(this.meterBuffer[i] - 128) / 128;
+			const v = Math.abs(this.meterBuffer[i]);
 			if (v > peak) peak = v;
 		}
 		return peak;

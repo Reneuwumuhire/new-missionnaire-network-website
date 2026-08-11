@@ -13,15 +13,16 @@
 	import SourcesDock from './components/SourcesDock.svelte';
 	import Splitter from './components/Splitter.svelte';
 	import TransitionsDock from './components/TransitionsDock.svelte';
+	import { stopAppAudio } from './lib/appaudio.svelte';
 	import { broadcast, isStreaming, startBroadcast, stopBroadcast, uptimeLabel } from './lib/broadcast.svelte';
 	import { frameCount, selectScene, takeToProgram, type TransitionType } from './lib/compositor';
 	import { lyrics, step } from './lib/lyrics.svelte';
-	import { handleFor, mediaVersion, openCamera, releaseAll } from './lib/media.svelte';
-	import { Mixer } from './lib/mixer';
+	import { askForMicrophone, handleFor, mediaVersion, openCamera, releaseAll } from './lib/media.svelte';
+	import { Mixer, stripsToDrop } from './lib/mixer';
 	import { t } from './lib/i18n.svelte';
 	import { clamp, splitWeights, type DockId } from './lib/layout';
-	import { runSelftest, selftestMixer, selftestTarget } from './lib/selftest';
-	import { activeScene, liveAudioLayers, onAirSceneId, persist, studio } from './lib/state.svelte';
+	import { runAudioSelftest, runSelftest, selftestMixer, selftestTarget } from './lib/selftest';
+	import { activeScene, audioLayers, onAirSceneId, persist, studio } from './lib/state.svelte';
 
 	let programCanvas = $state<HTMLCanvasElement | null>(null);
 	let mixer = $state<Mixer | null>(null);
@@ -47,12 +48,22 @@
 
 		void (async () => {
 			const target = await selftestTarget();
+			// `STUDIO_SELFTEST=audio` checks the audio chain only — no ffmpeg, no
+			// RTMP, nothing that needs a human at the keyboard.
+			if (target === 'audio') {
+				await runAudioSelftest();
+				return;
+			}
 			if (target) {
 				// Diagnostic run: no camera, so nothing blocks on a permission
 				// prompt while the broadcast chain is being verified.
 				await runSelftest(target, () => programCanvas, () => mixer?.audioTrack);
 				return;
 			}
+			// Ask for the microphone before anything needs it: macOS only lists an
+			// application under Privacy & Security once it has asked, and until the
+			// answer is yes the engine reports no input devices at all.
+			await askForMicrophone();
 			// Bring cameras up straight away so the operator sees a picture without
 			// hunting for a button. Each layer opens its own stream; if a device is
 			// already taken the layer says so instead of failing silently.
@@ -107,11 +118,19 @@
 			if (bus.addStream(source.id, handle.stream)) {
 				wanted.add(source.id);
 				bus.setLevel(source.id, source.gain, source.muted);
+				// A context still suspended renders nothing at all, so the meter
+				// sits flat however loud the room is.
+				void bus.resume();
 			}
 		}
-		for (const layer of liveAudioLayers()) {
+		for (const layer of audioLayers()) {
 			const handle = handleFor(layer.id);
-			if (handle?.stream && bus.addStream(layer.id, handle.stream)) {
+			// A shared window's sound is the native app capture, which is already
+			// a strip and has no media handle. Claim it first, or the sweep below
+			// would tear it down a frame after it started.
+			if (bus.has(layer.id)) {
+				wanted.add(layer.id);
+			} else if (handle?.stream && bus.addStream(layer.id, handle.stream)) {
 				wanted.add(layer.id);
 			} else if (handle?.el instanceof HTMLVideoElement && !handle.stream) {
 				bus.addElement(layer.id, handle.el);
@@ -119,8 +138,16 @@
 			}
 			if (wanted.has(layer.id)) bus.setLevel(layer.id, layer.gain, layer.muted);
 		}
-		for (const existing of bus.ids()) {
-			if (!wanted.has(existing)) bus.remove(existing);
+		// Only the scene's own layers come and go. A mic or an application strip
+		// is the show's, not the scene's, so cutting to a scene with no audio of
+		// its own must never take the preacher off air.
+		const globalIds = studio.audioSources.map((source) => source.id);
+		for (const existing of stripsToDrop(globalIds, wanted, bus.ids())) {
+			bus.remove(existing);
+			// Deleting the source, hiding it or cutting to another scene has to
+			// stop the capture behind it too — otherwise the application keeps
+			// playing into the mix with no strip left to turn it down.
+			void stopAppAudio(bus, existing);
 		}
 	});
 

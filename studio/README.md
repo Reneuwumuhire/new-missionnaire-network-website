@@ -203,21 +203,58 @@ The browser engine cannot do this — WebKit ignores audio on `getDisplayMedia`
 entirely — so it is captured natively instead, with **ScreenCaptureKit** on
 macOS 13+.
 
-**Audio Mixer → + → Application audio**, then pick the app. Its sound arrives as
-an ordinary strip: its own fader, its own meter, monitored through the same bus
-and encoded through the same mix. No virtual audio device, no BlackHole.
+**Audio Mixer → + → Application audio** asks which application first, the way
+OBS asks in a source's properties before the source exists; the strip that
+appears is named after the app and already capturing. Its sound is an ordinary
+strip: its own fader, its own meter, monitored through the same bus and encoded
+through the same mix. No virtual audio device, no BlackHole.
 
-It is a separate strip from the screen share on purpose. Capture the window as
-a video source and its audio as an audio source, and you can ride the clip
-against the preacher's mic instead of being stuck with whatever balance the app
-happened to send.
+Several applications can be captured at once — each strip owns its own stream,
+and stopping one leaves the others playing. Configured strips start themselves:
+after a restart, or when a scene comes back on air, a strip that already knows
+its application does not ask again.
+
+Adding a **Display / Window Capture** does this by itself: the shared window is
+matched to the application behind it and that application's sound comes up on
+the window's own strip — fader, meter, mute — so a shared video plays out live
+and can be ridden against the preacher's mic. If the guess is wrong, or there
+was none, the strip's gear opens the list of applications.
+
+Application sound carries across scenes. A window's picture stops when its
+scene goes off air, but the application it is capturing keeps playing — cutting
+to a slide or a break card does not stop the music. The same is true of the
+mixer's own inputs: a mic or an application source belongs to the show, not to
+a scene, the way a device in OBS's **Settings → Audio** does. The eye icon on
+the source is what silences it, and deleting it stops its capture.
+
+A camera's or media file's audio is still the scene's, and stops with it.
 
 The studio excludes its own output from the capture, so monitoring cannot feed
 back into the mix.
 
+### Permissions
+
+The studio asks for the **microphone** on launch rather than waiting for a
+source to need it: until the answer is yes, the engine reports no input devices
+at all, so the mixer's device menu is empty with nothing to explain why. If it
+is refused, the mixer shows a red bar with **Ask again** and a button that opens
+the Privacy pane. Camera and screen sharing ask for themselves when a source is
+added.
+
+An application only appears under **Privacy & Security › Microphone** once it
+has asked. Under `pnpm studio` (dev) the binary is not a bundle, so macOS
+attributes the request to whatever launched it — your terminal — and
+"Missionnaire Studio" never appears in that list. Run `pnpm studio:build` and
+launch the built `.app` to get an entry of its own.
+
 Needs **Screen Recording** permission (System Settings › Privacy & Security);
 macOS asks the first time. Video of a shared window still comes from the
 webview's own picker — only the audio is native.
+
+**Properties → Hide the mouse pointer** asks the engine to leave the cursor out
+of a share. It is a request: WebKit does not implement the `cursor` constraint
+and paints the pointer in before we see the frame, so on macOS the panel says
+so instead of pretending the switch worked. Chromium honours it.
 
 ## Windows
 

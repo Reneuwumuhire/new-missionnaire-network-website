@@ -17,6 +17,19 @@ pub struct AudioApp {
 	pub name: String,
 }
 
+/// An on-screen window and the application behind it. The webview shares a
+/// window through the OS picker and tells us almost nothing about what was
+/// picked, so this is what the choice is matched against.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AudioWindow {
+	pub app_id: String,
+	pub app_name: String,
+	pub title: String,
+	pub width: u32,
+	pub height: u32,
+}
+
 /// ScreenCaptureKit delivers 32-bit float planar — one buffer per channel. The
 /// webview's worklet wants one interleaved stereo block, so it can copy
 /// straight out without knowing the layout.
@@ -89,7 +102,8 @@ mod tests {
 
 #[cfg(target_os = "macos")]
 mod platform {
-	use super::AudioApp;
+	use super::{AudioApp, AudioWindow};
+	use std::collections::HashMap;
 	use std::sync::Mutex;
 
 	use screencapturekit::cm::{CMSampleBuffer, CMSampleBufferExt};
@@ -126,7 +140,12 @@ mod platform {
 
 	// SCStream is an ObjC object driven from its own dispatch queue. Holding it
 	// behind a mutex is only so stop() can find it again.
-	pub struct Capture(Mutex<Option<SCStream>>);
+	//
+	// One stream per mixer strip, keyed by the strip's id: OBS lets you capture
+	// several applications at once, and a single slot here meant the second
+	// strip killed the first one's stream and left it in the mix, metering
+	// nothing, forever.
+	pub struct Capture(Mutex<HashMap<String, SCStream>>);
 
 	// SAFETY: the stream is only created, kept, and stopped; every callback runs
 	// on SCK's queue and touches nothing in here.
@@ -135,8 +154,35 @@ mod platform {
 
 	impl Default for Capture {
 		fn default() -> Self {
-			Self(Mutex::new(None))
+			Self(Mutex::new(HashMap::new()))
 		}
+	}
+
+	/// Every on-screen window with the application behind it, so a share picked
+	/// in the OS panel can be traced back to the app whose sound it is.
+	pub fn list_windows() -> Result<Vec<AudioWindow>, String> {
+		let content = SCShareableContent::get()
+			.map_err(|e| format!("Partage d'écran non autorisé ou indisponible: {e:?}"))?;
+		Ok(content
+			.windows()
+			.into_iter()
+			.filter(|window| window.is_on_screen())
+			.filter_map(|window| {
+				let app = window.owning_application()?;
+				let app_id = app.bundle_identifier();
+				if app_id.is_empty() || app_id == "network.missionnaire.studio" {
+					return None;
+				}
+				let frame = window.frame();
+				Some(AudioWindow {
+					app_id,
+					app_name: app.application_name(),
+					title: window.title().unwrap_or_default(),
+					width: frame.size.width as u32,
+					height: frame.size.height as u32,
+				})
+			})
+			.collect())
 	}
 
 	pub fn list() -> Result<Vec<AudioApp>, String> {
@@ -164,10 +210,11 @@ mod platform {
 	impl Capture {
 		pub fn start(
 			&self,
+			id: &str,
 			bundle_id: &str,
 			channel: Channel<InvokeResponseBody>,
 		) -> Result<(), String> {
-			self.stop();
+			self.stop(Some(id));
 
 			let content = SCShareableContent::get()
 				.map_err(|e| format!("Contenu partageable indisponible: {e:?}"))?;
@@ -207,14 +254,27 @@ mod platform {
 				.start_capture()
 				.map_err(|e| format!("Capture audio impossible: {e:?}"))?;
 
-			*self.0.lock().map_err(|e| e.to_string())? = Some(stream);
+			self.0
+				.lock()
+				.map_err(|e| e.to_string())?
+				.insert(id.to_string(), stream);
 			Ok(())
 		}
 
-		pub fn stop(&self) {
+		/// One strip, or every strip when the window is going away.
+		pub fn stop(&self, id: Option<&str>) {
 			if let Ok(mut guard) = self.0.lock() {
-				if let Some(stream) = guard.take() {
-					let _ = stream.stop_capture();
+				match id {
+					Some(id) => {
+						if let Some(stream) = guard.remove(id) {
+							let _ = stream.stop_capture();
+						}
+					}
+					None => {
+						for (_, stream) in guard.drain() {
+							let _ = stream.stop_capture();
+						}
+					}
 				}
 			}
 		}
@@ -223,11 +283,15 @@ mod platform {
 
 #[cfg(not(target_os = "macos"))]
 mod platform {
-	use super::AudioApp;
+	use super::{AudioApp, AudioWindow};
 	use tauri::ipc::{Channel, InvokeResponseBody};
 
 	#[derive(Default)]
 	pub struct Capture;
+
+	pub fn list_windows() -> Result<Vec<AudioWindow>, String> {
+		Ok(Vec::new())
+	}
 
 	/// Windows can do this through WASAPI process loopback and Linux through
 	/// PipeWire; neither is written yet. Returning an empty list rather than an
@@ -237,12 +301,17 @@ mod platform {
 	}
 
 	impl Capture {
-		pub fn start(&self, _bundle_id: &str, _channel: Channel<InvokeResponseBody>) -> Result<(), String> {
+		pub fn start(
+			&self,
+			_id: &str,
+			_bundle_id: &str,
+			_channel: Channel<InvokeResponseBody>,
+		) -> Result<(), String> {
 			Err("La capture audio par application n'est pas encore disponible sur ce système.".into())
 		}
 
-		pub fn stop(&self) {}
+		pub fn stop(&self, _id: Option<&str>) {}
 	}
 }
 
-pub use platform::{list, Capture};
+pub use platform::{list, list_windows, Capture};

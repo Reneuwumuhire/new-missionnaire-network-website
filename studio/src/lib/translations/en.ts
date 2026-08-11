@@ -52,6 +52,10 @@ const en = {
 	'sources.empty': 'You don’t have any sources. Click the + button below.',
 	'sources.addSource': 'Add source',
 	'sources.reconnect': 'Reconnect',
+	'sources.audioInput': 'Audio Input Capture',
+	'sources.audioInputHint': 'Microphone or line in \u2014 appears in the Audio Mixer',
+	'sources.audioApp': 'Application Audio Capture',
+	'sources.audioAppHint': 'The sound another app is playing \u2014 appears in the Audio Mixer',
 	'sources.camera': 'Camera',
 	'sources.cameraHint': 'Webcam or capture device',
 	'sources.screen': 'Display / Window Capture',
@@ -80,6 +84,9 @@ const en = {
 	'source.badVideo': 'Unreadable video',
 
 	// ── Audio mixer ─────────────────────────────────────────────
+	'mixer.micDenied': 'No access to the microphone, so this system reports no input devices.',
+	'mixer.micRetry': 'Ask again',
+	'mixer.openPrivacy': 'Open Privacy settings',
 	'mixer.monitor': 'Monitor',
 	'mixer.monitorWarning':
 		'Monitoring is on — use headphones, or the mic will pick up the speakers.',
@@ -87,14 +94,13 @@ const en = {
 	'mixer.addMicHint': 'Microphone or capture device',
 	'mixer.addApp': 'Application audio',
 	'mixer.addAppHint': 'The sound another app is playing',
-	'mixer.appName': 'Application',
 	'mixer.chooseApp': 'Choose an application',
+	'mixer.appGone': 'That application is no longer running \u2014 choose another',
 	'mixer.refreshApps': 'Refresh the list',
 	'mixer.appAudioUnsupported': 'Application audio needs macOS 13 or later',
 	'mixer.addMic': 'Add audio input',
 	'mixer.connect': 'Connect input',
 	'mixer.noAudioTrack': 'No audio track',
-	'mixer.noSurfaceAudio': 'This system cannot capture app audio',
 	'mixer.noSurfaceAudioHint':
 		'macOS gives the browser engine picture only when you share a window or screen \u2014 no application or tab sound, and no error to say so. Route the app\u2019s output through a virtual audio device (BlackHole, Loopback) and add that device here as an audio input.',
 	'mixer.defaultInput': 'Default input',
@@ -206,6 +212,9 @@ const en = {
 	'props.color': 'Color',
 	'props.text': 'Text',
 	'props.showNextLine': 'Also show the next line',
+	'props.hideCursor': 'Hide the mouse pointer',
+	'props.hideCursorUnsupported':
+		'This system paints the pointer into the shared window before we see it, so the switch has no effect here. It is kept for the machines that honour it.',
 	'props.play': 'Play',
 	'props.pause': 'Pause',
 	'props.restart': 'Restart',

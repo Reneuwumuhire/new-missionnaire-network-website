@@ -57,21 +57,33 @@ fn list_audio_apps() -> Result<Vec<appaudio::AudioApp>, String> {
 	appaudio::list()
 }
 
-/// Start capturing one application's audio. PCM arrives on `channel` as
-/// interleaved stereo f32 at 48 kHz — the rate the webview's AudioContext runs
-/// at, so nothing has to resample.
+/// Every on-screen window with the application behind it. The webview's own
+/// picker does not say what was shared, so the choice is matched against this.
+#[tauri::command]
+fn list_windows() -> Result<Vec<appaudio::AudioWindow>, String> {
+	appaudio::list_windows()
+}
+
+/// Start capturing one application's audio for the mixer strip `id`. PCM
+/// arrives on `channel` as interleaved stereo f32 at 48 kHz — the rate the
+/// webview's AudioContext runs at, so nothing has to resample.
+///
+/// Several strips can capture different applications at once, as they can in
+/// OBS; each one owns its own stream and stopping it leaves the others alone.
 #[tauri::command]
 fn start_app_audio(
 	capture: State<'_, appaudio::Capture>,
+	id: String,
 	bundle_id: String,
 	channel: tauri::ipc::Channel<tauri::ipc::InvokeResponseBody>,
 ) -> Result<(), String> {
-	capture.start(&bundle_id, channel)
+	capture.start(&id, &bundle_id, channel)
 }
 
+/// One strip, or all of them when `id` is absent.
 #[tauri::command]
-fn stop_app_audio(capture: State<'_, appaudio::Capture>) {
-	capture.stop();
+fn stop_app_audio(capture: State<'_, appaudio::Capture>, id: Option<String>) {
+	capture.stop(id.as_deref());
 }
 
 /// Open an external page in the operator's browser — used for the "YouTube is
@@ -96,6 +108,34 @@ fn open_url(url: String) -> Result<(), String> {
 		.spawn()
 		.map(|_| ())
 		.map_err(|e| e.to_string())
+}
+
+/// Open the macOS privacy pane for a device class, so a refused microphone has
+/// somewhere to be un-refused. A fixed set rather than a URL from the webview:
+/// this hands a string to the OS shell.
+#[tauri::command]
+fn open_privacy_settings(pane: String) -> Result<(), String> {
+	let anchor = match pane.as_str() {
+		"microphone" => "Privacy_Microphone",
+		"camera" => "Privacy_Camera",
+		"screen" => "Privacy_ScreenCapture",
+		_ => return Err("Volet inconnu".into()),
+	};
+	#[cfg(target_os = "macos")]
+	{
+		std::process::Command::new("open")
+			.arg(format!(
+				"x-apple.systempreferences:com.apple.preference.security?{anchor}"
+			))
+			.spawn()
+			.map(|_| ())
+			.map_err(|e| e.to_string())
+	}
+	#[cfg(not(target_os = "macos"))]
+	{
+		let _ = anchor;
+		Err("Disponible sur macOS uniquement".into())
+	}
 }
 
 /// Bridge for webview logging — a packaged .app has no devtools console you can
@@ -146,7 +186,9 @@ pub fn run() {
 			stream_running,
 			selftest_target,
 			open_url,
+			open_privacy_settings,
 			list_audio_apps,
+			list_windows,
 			start_app_audio,
 			stop_app_audio,
 			report
@@ -159,7 +201,7 @@ pub fn run() {
 					let _ = encoder.stop();
 				}
 				if let Some(capture) = window.app_handle().try_state::<appaudio::Capture>() {
-					capture.stop();
+					capture.stop(None);
 				}
 			}
 		})

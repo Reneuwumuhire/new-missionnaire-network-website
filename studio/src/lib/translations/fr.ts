@@ -53,6 +53,10 @@ const fr: Record<keyof typeof en, string> = {
 	'sources.empty': 'Vous n’avez aucune source. Cliquez sur le bouton + ci-dessous.',
 	'sources.addSource': 'Ajouter une source',
 	'sources.reconnect': 'Reconnecter',
+	'sources.audioInput': 'Capture d\u2019entr\u00e9e audio',
+	'sources.audioInputHint': 'Micro ou entr\u00e9e ligne \u2014 appara\u00eet dans le m\u00e9langeur audio',
+	'sources.audioApp': 'Capture audio d\u2019application',
+	'sources.audioAppHint': 'Le son jou\u00e9 par une autre application \u2014 appara\u00eet dans le m\u00e9langeur audio',
 	'sources.camera': 'Caméra',
 	'sources.cameraHint': 'Webcam ou boîtier de capture',
 	'sources.screen': 'Capture d’écran / de fenêtre',
@@ -82,6 +86,9 @@ const fr: Record<keyof typeof en, string> = {
 	'source.badVideo': 'Vidéo illisible',
 
 	// ── Audio mixer ─────────────────────────────────────────────
+	'mixer.micDenied': 'Pas d\u2019acc\u00e8s au micro : ce syst\u00e8me n\u2019annonce alors aucune entr\u00e9e audio.',
+	'mixer.micRetry': 'Redemander',
+	'mixer.openPrivacy': 'Ouvrir Confidentialit\u00e9',
 	'mixer.monitor': 'Écoute',
 	'mixer.monitorWarning':
 		'Écoute locale active — au casque, sinon le micro capte les haut-parleurs.',
@@ -89,14 +96,13 @@ const fr: Record<keyof typeof en, string> = {
 	'mixer.addMicHint': 'Micro ou p\u00e9riph\u00e9rique de capture',
 	'mixer.addApp': 'Audio d\u2019une application',
 	'mixer.addAppHint': 'Le son jou\u00e9 par une autre application',
-	'mixer.appName': 'Application',
 	'mixer.chooseApp': 'Choisir une application',
+	'mixer.appGone': 'Cette application ne tourne plus \u2014 en choisir une autre',
 	'mixer.refreshApps': 'Actualiser la liste',
 	'mixer.appAudioUnsupported': 'L\u2019audio par application n\u00e9cessite macOS 13 ou plus r\u00e9cent',
 	'mixer.addMic': 'Ajouter une entrée audio',
 	'mixer.connect': 'Connecter l’entrée',
 	'mixer.noAudioTrack': 'Pas de piste audio',
-	'mixer.noSurfaceAudio': 'Ce syst\u00e8me ne peut pas capter le son des applications',
 	'mixer.noSurfaceAudioHint':
 		'Sur macOS, le partage d\u2019une fen\u00eatre ou d\u2019un \u00e9cran ne fournit que l\u2019image \u2014 aucun son d\u2019application ni d\u2019onglet, et aucune erreur pour le signaler. Faites passer le son de l\u2019application par un p\u00e9riph\u00e9rique audio virtuel (BlackHole, Loopback) et ajoutez-le ici comme entr\u00e9e audio.',
 	'mixer.defaultInput': 'Entrée par défaut',
@@ -208,6 +214,9 @@ const fr: Record<keyof typeof en, string> = {
 	'props.color': 'Couleur',
 	'props.text': 'Texte',
 	'props.showNextLine': 'Afficher aussi la ligne suivante',
+	'props.hideCursor': 'Masquer le pointeur de la souris',
+	'props.hideCursorUnsupported':
+		'Ce syst\u00e8me dessine le pointeur dans la fen\u00eatre partag\u00e9e avant que nous la recevions : l\u2019option reste sans effet ici. Elle est conserv\u00e9e pour les machines qui la respectent.',
 	'props.play': 'Lecture',
 	'props.pause': 'Pause',
 	'props.restart': 'Début',

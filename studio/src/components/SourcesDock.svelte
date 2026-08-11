@@ -1,5 +1,15 @@
 <script lang="ts">
-	import { handleFor, mediaVersion, openCamera, openFile, openScreen, release } from '../lib/media.svelte';
+	import {
+		handleFor,
+		mediaVersion,
+		openCamera,
+		openFile,
+		openScreen,
+		release,
+		report
+	} from '../lib/media.svelte';
+	import { appAudio, listWindows, matchApp, matchWindow, refreshApps } from '../lib/appaudio.svelte';
+	import { addAppAudio, addAudioInput } from '../lib/state.svelte';
 	import Dock from './Dock.svelte';
 	import Icon, { type IconName } from './Icon.svelte';
 	import { popoverFit } from '../lib/layout';
@@ -16,7 +26,8 @@
 
 	let { onproperties }: { onproperties: () => void } = $props();
 
-	let adding = $state(false);
+	/** false closed, 'menu' the source kinds, 'apps' the list of applications. */
+	let adding = $state<'menu' | 'apps' | false>(false);
 	let addButton = $state<HTMLButtonElement | null>(null);
 	// Measured on open: the docks are resizable, so how much room a menu has
 	// is not something the stylesheet can know.
@@ -27,7 +38,7 @@
 			const rect = addButton.getBoundingClientRect();
 			menuFit = popoverFit(rect.top, rect.bottom, window.innerHeight);
 		}
-		adding = !adding;
+		adding = adding ? false : 'menu';
 	}
 
 	/** Any click that is not on the menu closes it — a menu you can only
@@ -51,12 +62,29 @@
 	let fileInput = $state<HTMLInputElement | null>(null);
 	let pendingFileLayer = $state<Layer | null>(null);
 
+	/** The two audio kinds are not layers: they have no picture, and they are
+	 *  global to the show. They are offered here because OBS offers them here,
+	 *  and appear where they belong — in the Audio Mixer. */
+	type MenuKind = LayerKind | 'audioInput' | 'audioApp';
+
 	const SOURCE_KINDS: {
-		kind: LayerKind;
+		kind: MenuKind;
 		label: () => string;
 		hint: () => string;
 		icon: IconName;
 	}[] = [
+		{
+			kind: 'audioInput',
+			label: () => t('sources.audioInput'),
+			hint: () => t('sources.audioInputHint'),
+			icon: 'mic'
+		},
+		{
+			kind: 'audioApp',
+			label: () => t('sources.audioApp'),
+			hint: () => t('sources.audioAppHint'),
+			icon: 'volume'
+		},
 		{ kind: 'camera', label: () => t('sources.camera'), hint: () => t('sources.cameraHint'), icon: 'camera' },
 		{ kind: 'screen', label: () => t('sources.screen'), hint: () => t('sources.screenHint'), icon: 'monitor' },
 		{ kind: 'image', label: () => t('sources.image'), hint: () => t('sources.imageHint'), icon: 'image' },
@@ -69,7 +97,20 @@
 	const iconFor = (kind: LayerKind): IconName =>
 		SOURCE_KINDS.find((s) => s.kind === kind)?.icon ?? 'droplet';
 
-	async function addSource(kind: LayerKind) {
+	async function addSource(kind: MenuKind) {
+		if (kind === 'audioInput') {
+			adding = false;
+			// The mixer opens it: an input device is live because the source
+			// exists, not because someone pressed Connect.
+			addAudioInput();
+			return;
+		}
+		if (kind === 'audioApp') {
+			// Which application first, then the strip — same as the mixer's own +.
+			adding = 'apps';
+			await refreshApps();
+			return;
+		}
 		adding = false;
 		const label = SOURCE_KINDS.find((s) => s.kind === kind)?.label() ?? kind;
 		const layer = makeLayer(kind, label, {
@@ -90,8 +131,34 @@
 		persist();
 
 		if (kind === 'camera') await openCamera(layer, studio.settings.width, studio.settings.height);
-		if (kind === 'screen') await openScreen(layer);
+		if (kind === 'screen') await shareScreen(layer);
 		if (kind === 'image' || kind === 'video') pickFile(layer);
+	}
+
+	/** Share a window, then aim the native audio capture at whichever
+	 *  application it belongs to: the engine hands the window over silent, so
+	 *  without this the operator shares a video call or a player and gets a
+	 *  picture with no sound and nothing in the mixer to fix it with. */
+	async function shareScreen(layer: Layer) {
+		const handle = await openScreen(layer);
+		const track = handle.stream?.getVideoTracks()[0];
+		if (!track) return;
+		const label = track.label ?? '';
+		const size = track.getSettings();
+		const [windows] = await Promise.all([listWindows(), refreshApps()]);
+		// The window's own application first, then anything the label names.
+		const window = matchWindow(label, size, windows);
+		const app = window
+			? { id: window.appId, name: window.appName }
+			: matchApp(label, appAudio.apps);
+		// No guess is not a failure: the mixer strip offers the list.
+		if (app) layer.appId = app.id;
+		// What the engine actually said about the share. Without this line a bad
+		// guess is unexplainable after the fact.
+		report(
+			`share label=${JSON.stringify(label)} size=${size.width}x${size.height} windows=${windows.length} matched=${app?.name ?? 'none'}`
+		);
+		persist();
 	}
 
 	function pickFile(layer: Layer) {
@@ -140,7 +207,7 @@
 	 *  from the menu bar, a file lost across a restart. */
 	async function reconnect(layer: Layer) {
 		if (layer.kind === 'camera') await openCamera(layer, studio.settings.width, studio.settings.height);
-		else if (layer.kind === 'screen') await openScreen(layer);
+		else if (layer.kind === 'screen') await shareScreen(layer);
 		else pickFile(layer);
 	}
 
@@ -243,18 +310,34 @@
 						: 'top-8'}"
 					style="max-height: {menuFit.maxHeight}px"
 				>
-					{#each SOURCE_KINDS as source (source.kind)}
-						<button
-							class="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-primary/15"
-							onclick={() => addSource(source.kind)}
-						>
-							<Icon name={source.icon} size={14} class="mt-0.5 text-fg/45" />
-							<span class="min-w-0">
-								<span class="block text-[13px] text-fg/90">{source.label()}</span>
-								<span class="block text-[11px] text-fg/40">{source.hint()}</span>
-							</span>
-						</button>
-					{/each}
+					{#if adding === 'apps'}
+						{#each appAudio.apps as app (app.id)}
+							<button
+								class="block w-full truncate px-3 py-1.5 text-left text-[12px] text-fg/85 hover:bg-primary/15"
+								onclick={() => {
+									adding = false;
+									addAppAudio(app.id, app.name);
+								}}>{app.name}</button
+							>
+						{:else}
+							<p class="px-3 py-2 text-[11px] leading-snug text-fg/40">
+								{appAudio.error ?? t('mixer.appAudioUnsupported')}
+							</p>
+						{/each}
+					{:else}
+						{#each SOURCE_KINDS as source (source.kind)}
+							<button
+								class="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-primary/15"
+								onclick={() => addSource(source.kind)}
+							>
+								<Icon name={source.icon} size={14} class="mt-0.5 text-fg/45" />
+								<span class="min-w-0">
+									<span class="block text-[13px] text-fg/90">{source.label()}</span>
+									<span class="block text-[11px] text-fg/40">{source.hint()}</span>
+								</span>
+							</button>
+						{/each}
+					{/if}
 				</div>
 			{/if}
 		</div>

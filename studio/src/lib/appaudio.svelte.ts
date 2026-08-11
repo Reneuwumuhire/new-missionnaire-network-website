@@ -17,8 +17,9 @@ export interface AudioApp {
 export const appAudio = $state({
 	/** Applications offered in the picker, refreshed when it opens. */
 	apps: [] as AudioApp[],
-	/** Source id currently capturing — the native side does one at a time. */
-	capturing: null as string | null,
+	/** Strip ids capturing right now. Several at once, as in OBS: a window
+	 *  share and an application source are separate captures. */
+	capturing: [] as string[],
 	error: null as string | null,
 	/** False once the system has told us it cannot do this. */
 	supported: true
@@ -35,6 +36,71 @@ export async function refreshApps(): Promise<void> {
 		appAudio.apps = [];
 		appAudio.error = String(err);
 	}
+}
+
+/** Guess which application a shared window belongs to, from the label the
+ *  engine puts on the capture track (an app name, or a window title carrying
+ *  it). A wrong guess shows on the meter and is one click to change, which
+ *  beats hunting the app in a list every time a window is shared.
+ *  ponytail: substring match, no fuzzy scoring — upgrade if labels get noisy. */
+export function matchApp(label: string, apps: AudioApp[]): AudioApp | null {
+	const haystack = label.toLowerCase();
+	if (!haystack) return null;
+	return (
+		[...apps]
+			// Longest name first, so "Google Chrome" wins over a bare "Chrome".
+			.sort((a, b) => b.name.length - a.name.length)
+			.find((app) => app.name.length >= 3 && haystack.includes(app.name.toLowerCase())) ?? null
+	);
+}
+
+export interface AudioWindow {
+	appId: string;
+	appName: string;
+	title: string;
+	width: number;
+	height: number;
+}
+
+export async function listWindows(): Promise<AudioWindow[]> {
+	return invoke<AudioWindow[]>('list_windows').catch(() => []);
+}
+
+/** Which window did the operator just share? The OS picker answers to the
+ *  engine, not to us, so this works back from what the capture track says:
+ *  its label first — a window title, or an application name — and failing
+ *  that its size.
+ *
+ *  ponytail: the size is a last resort and only trusted when exactly one
+ *  window on screen has it. A wrong guess is one click to change on the strip;
+ *  no guess means the operator hunts for the app by hand every time. */
+export function matchWindow(
+	label: string,
+	size: { width?: number; height?: number },
+	windows: AudioWindow[]
+): AudioWindow | null {
+	const haystack = label.toLowerCase().trim();
+	if (haystack) {
+		// Longest first: a title wins over an app name it happens to contain.
+		const byTitle = windows
+			.filter((w) => w.title.length >= 3 && haystack.includes(w.title.toLowerCase()))
+			.sort((a, b) => b.title.length - a.title.length)[0];
+		if (byTitle) return byTitle;
+		const byApp = windows
+			.filter((w) => w.appName.length >= 3 && haystack.includes(w.appName.toLowerCase()))
+			.sort((a, b) => b.appName.length - a.appName.length)[0];
+		if (byApp) return byApp;
+	}
+	const { width, height } = size;
+	if (!width || !height) return null;
+	// The capture is in pixels and a window frame is in points, so a retina
+	// share comes back at twice the size.
+	const sized = windows.filter(
+		(w) =>
+			(w.width === width && w.height === height) ||
+			(w.width * 2 === width && w.height * 2 === height)
+	);
+	return sized.length === 1 ? sized[0] : null;
 }
 
 const nodes = new Map<string, AudioWorkletNode>();
@@ -69,15 +135,14 @@ export async function startAppAudio(
 			node.port.postMessage(new Float32Array(bytes));
 		};
 
-		await invoke('start_app_audio', { bundleId: app.id, channel });
+		await invoke('start_app_audio', { id: sourceId, bundleId: app.id, channel });
 		nodes.set(sourceId, node);
 		mixer.addNode(sourceId, node);
-		appAudio.capturing = sourceId;
+		if (!appAudio.capturing.includes(sourceId)) appAudio.capturing = [...appAudio.capturing, sourceId];
 		appAudio.error = null;
 		return true;
 	} catch (err) {
 		appAudio.error = String(err);
-		appAudio.capturing = null;
 		return false;
 	}
 }
@@ -90,10 +155,11 @@ export async function stopAppAudio(mixer: Mixer, sourceId: string): Promise<void
 		nodes.delete(sourceId);
 	}
 	mixer.remove(sourceId);
-	if (appAudio.capturing === sourceId) {
-		appAudio.capturing = null;
-		await invoke('stop_app_audio').catch(() => {});
+	if (appAudio.capturing.includes(sourceId)) {
+		appAudio.capturing = appAudio.capturing.filter((id) => id !== sourceId);
+		// Only this strip's stream — the other applications keep playing.
+		await invoke('stop_app_audio', { id: sourceId }).catch(() => {});
 	}
 }
 
-export const isCapturing = (sourceId: string) => appAudio.capturing === sourceId;
+export const isCapturing = (sourceId: string) => appAudio.capturing.includes(sourceId);

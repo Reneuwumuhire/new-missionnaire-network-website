@@ -2,7 +2,14 @@
 	import { FULL_FRAME } from '../lib/geom';
 	import Icon, { type IconName } from './Icon.svelte';
 	import { t } from '../lib/i18n.svelte';
-	import { handleFor, listDevices, openCamera, type DeviceOption } from '../lib/media.svelte';
+	import {
+		applyCursor,
+		canHideCursor,
+		handleFor,
+		listDevices,
+		openCamera,
+		type DeviceOption
+	} from '../lib/media.svelte';
 	import { onMount } from 'svelte';
 	import { DEFAULT_TEXT_STYLE, persist, selectedLayer, studio } from '../lib/state.svelte';
 
@@ -63,6 +70,29 @@
 				</select>
 				{#if handleFor(layer.id)?.error}
 					<p class="mt-1 text-[11px] text-amber-400/80">{handleFor(layer.id)?.error}</p>
+				{/if}
+			</div>
+		{/if}
+
+			{#if layer.kind === 'screen'}
+			<div class="space-y-1">
+				<label class="flex items-center gap-2 text-sm text-fg/70">
+					<input
+						type="checkbox"
+						class="accent-primary"
+						checked={layer.hideCursor ?? false}
+						onchange={async (e) => {
+							layer.hideCursor = (e.currentTarget as HTMLInputElement).checked;
+							commit();
+							// Applied to the share already running, so the switch does not
+							// wait for a reconnect and another trip through the picker.
+							await applyCursor(layer);
+						}}
+					/>
+					{t('props.hideCursor')}
+				</label>
+				{#if !canHideCursor()}
+					<p class="text-[11px] leading-snug text-fg/35">{t('props.hideCursorUnsupported')}</p>
 				{/if}
 			</div>
 		{/if}

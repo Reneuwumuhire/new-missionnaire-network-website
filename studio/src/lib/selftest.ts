@@ -15,8 +15,17 @@ import {
 } from './broadcast.svelte';
 import { frameCount, onAirSceneId, renderFrame, takeToProgram } from './compositor';
  import { applyTheme } from './i18n.svelte';
- import { appAudio, received, startAppAudio, stopAppAudio } from './appaudio.svelte';
+ import {
+	appAudio,
+	listWindows,
+	matchWindow,
+	received,
+	startAppAudio,
+	stopAppAudio
+} from './appaudio.svelte';
  import type { Mixer } from './mixer';
+import { toDb } from './meter';
+import { listDevices, openMic, release } from './media.svelte';
 import { id, makeLayer, persist, studio } from './state.svelte';
 
 const say = (line: string) => invoke('report', { line }).catch(() => console.log(line));
@@ -157,6 +166,157 @@ async function checkHold(
 }
 
 let restoreMainUrl = '';
+
+/** `STUDIO_SELFTEST=audio` — the audio chain on its own, no ffmpeg and no RTMP.
+ *  Everything here is something a human would otherwise have to hear: that the
+ *  meter moves, that a microphone opens at the mixer's rate, that an
+ *  application's sound actually arrives, and that a shared window can be traced
+ *  back to the application behind it. */
+export async function runAudioSelftest(): Promise<void> {
+	const bus = mixerRef;
+	if (!bus) {
+		await say('AUDIOTEST FAIL: no mixer');
+		return;
+	}
+	let ok = true;
+	const restoreSources = studio.audioSources;
+	// The reconciler tears down any strip that is not a source it knows about —
+	// which is right in a show and fatal to a probe. So each probe is a real
+	// source for as long as it is measured, and the list is put back after.
+	const asSource = (probeId: string) => {
+		studio.audioSources = [
+			...studio.audioSources,
+			{ id: probeId, name: probeId, kind: 'app' as const, gain: 1, muted: false }
+		];
+	};
+	await bus.resume();
+	await say(`AUDIOTEST context state=${bus.ctx.state} rate=${bus.ctx.sampleRate}`);
+	if (bus.ctx.state !== 'running') ok = false;
+
+	// 1. The meter itself: a −20 dBFS tone must read −20 dB on the strip. This
+	//    is the whole visualiser path — analyser, float samples, dB scale.
+	asSource('__tone');
+	const osc = bus.ctx.createOscillator();
+	const gain = bus.ctx.createGain();
+	gain.gain.value = 0.1;
+	osc.connect(gain);
+	osc.start();
+	const strip = bus.addNode('__tone', gain);
+	// A analyser of our own on the same node, read both ways: if the strip's
+	// meter is flat and this one is not, the fault is in the wiring; if float is
+	// flat and bytes are not, it is the engine's float API.
+	const probe = bus.ctx.createAnalyser();
+	probe.fftSize = 1024;
+	gain.connect(probe);
+	const floats = new Float32Array(1024);
+	const bytes = new Uint8Array(1024);
+	for (let i = 1; i <= 3; i++) {
+		await wait(400);
+		probe.getFloatTimeDomainData(floats);
+		probe.getByteTimeDomainData(bytes);
+		const probeFloat = Math.max(...Array.from(floats, Math.abs));
+		const probeByte = Math.max(...Array.from(bytes, (v) => Math.abs(v - 128) / 128));
+		const stripPeak = Math.max(...bus.peaks('__tone'));
+		await say(
+			`AUDIOTEST meter t=${i} strip=${stripPeak.toFixed(4)} probe-float=${probeFloat.toFixed(4)} probe-byte=${probeByte.toFixed(4)} has=${bus.has('__tone')} chans=${strip.analysers[0].channelCount}`
+		);
+	}
+	const tone = Math.max(...bus.peaks('__tone'));
+	const toneDb = toDb(tone);
+	const meterOk = Math.abs(toneDb + 20) < 3;
+	await say(`AUDIOTEST meter tone=${toneDb.toFixed(1)}dB expected=-20dB ${meterOk ? 'OK' : 'WRONG'}`);
+	if (!meterOk) ok = false;
+	osc.stop();
+	gain.disconnect(probe);
+	bus.remove('__tone');
+
+	// 2. A microphone: it must open, run at the mixer's rate — WebKit plays
+	//    silence rather than resampling — and land on the bus as a strip.
+	asSource('__selftest_mic');
+	const handle = await openMic('__selftest_mic');
+	const track = handle.stream?.getAudioTracks()[0];
+	const settings = track?.getSettings();
+	const devices = await listDevices('audioinput');
+	await say(
+		`AUDIOTEST mic error=${handle.error ?? '-'} label=${JSON.stringify(track?.label ?? '')} rate=${settings?.sampleRate ?? '?'} channels=${settings?.channelCount ?? '?'} devices=${devices.length}`
+	);
+	if (handle.stream) {
+		const strip = bus.addStream('__selftest_mic', handle.stream);
+		await wait(800);
+		const room = toDb(Math.max(...bus.peaks('__selftest_mic')));
+		// A silent room is not a failure; a missing strip is.
+		await say(
+			`AUDIOTEST mic strip=${strip ? 'yes' : 'NO'} room=${Number.isFinite(room) ? `${room.toFixed(1)}dB` : 'silence'}`
+		);
+		if (!strip) ok = false;
+		if (settings?.sampleRate && settings.sampleRate !== bus.ctx.sampleRate) ok = false;
+		bus.remove('__selftest_mic');
+	} else {
+		ok = false;
+	}
+	release('__selftest_mic');
+
+	// 3. Application audio, the native capture: it must deliver PCM. Silence
+	//    still produces buffers, so blocks separate "started" from "delivering".
+	const apps = await invoke<{ id: string; name: string }[]>('list_audio_apps').catch(() => []);
+	const windows = await listWindows();
+	await say(`AUDIOTEST apps=${apps.length} windows=${windows.length}`);
+	if (apps.length === 0) {
+		await say('AUDIOTEST FAIL: no applications — Screen Recording permission?');
+		ok = false;
+	} else {
+		asSource('__selftest_app');
+		asSource('__selftest_app2');
+		const app = apps.find((a) => /arc|chrome|safari|music|vlc|spotify/i.test(a.name)) ?? apps[0];
+		received.bytes = 0;
+		received.blocks = 0;
+		const started = await startAppAudio(bus, '__selftest_app', app);
+		await wait(2500);
+		const peak = toDb(Math.max(...bus.peaks('__selftest_app')));
+		await say(
+			`AUDIOTEST appaudio app=${app.name} started=${started} blocks=${received.blocks} bytes=${received.bytes} peak=${Number.isFinite(peak) ? `${peak.toFixed(1)}dB` : 'silence'} err=${appAudio.error ?? '-'}`
+		);
+		if (!started || received.blocks === 0) ok = false;
+
+		// Two at once: OBS captures several applications, and the second must
+		// not silence the first.
+		const other = apps.find((a) => a.id !== app.id);
+		if (other) {
+			const secondStarted = await startAppAudio(bus, '__selftest_app2', other);
+			await wait(1500);
+			const first = bus.has('__selftest_app');
+			await say(
+				`AUDIOTEST appaudio two-at-once second=${other.name} started=${secondStarted} first-still-there=${first} capturing=${appAudio.capturing.length}`
+			);
+			const both =
+				appAudio.capturing.includes('__selftest_app') &&
+				appAudio.capturing.includes('__selftest_app2');
+			if (!secondStarted || !first || !both) ok = false;
+			await stopAppAudio(bus, '__selftest_app2');
+		}
+		await stopAppAudio(bus, '__selftest_app');
+		await say(`AUDIOTEST appaudio after-stop capturing=${appAudio.capturing.length} strip=${bus.has('__selftest_app')}`);
+	}
+
+	// 4. The automatic association: every window on screen must be recognisable
+	//    from its own title, which is what a shared window gives us to go on.
+	if (windows.length > 0) {
+		const named = windows.filter((w) => w.title.length >= 3).slice(0, 5);
+		const hits = named.filter((w) => matchWindow(w.title, {}, windows)?.appId === w.appId);
+		await say(
+			`AUDIOTEST match by-title ${hits.length}/${named.length} e.g. ${named[0]?.title ?? '-'} → ${matchWindow(named[0]?.title ?? '', {}, windows)?.appName ?? 'none'}`
+		);
+		if (named.length > 0 && hits.length < named.length) ok = false;
+		// And by size, which is the fallback when the engine gives no label.
+		const bySize = windows.filter(
+			(w) => matchWindow('', { width: w.width, height: w.height }, windows)?.appId === w.appId
+		);
+		await say(`AUDIOTEST match by-size ${bySize.length}/${windows.length} unique`);
+	}
+
+	studio.audioSources = restoreSources;
+	await say(`AUDIOTEST ${ok ? 'OK' : 'FAIL'} — terminé`);
+}
 
 export async function runSelftest(target: string, canvas: () => HTMLCanvasElement | null, audio: () => MediaStreamTrack | undefined) {
 	const [mainUrl, heldUrl] = target.split(',');

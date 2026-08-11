@@ -2,8 +2,45 @@
 // or an HTMLVideoElement behind a Proxy stops working in subtle ways. Everything
 // here is keyed by layer id and torn down explicitly.
 
+import { invoke } from '@tauri-apps/api/core';
 import { t } from './i18n.svelte';
+import { MIX_RATE } from './mixer';
 import type { Layer } from './state.svelte';
+
+/** Print to the terminal the studio was launched from. A packaged .app has no
+ *  console anyone can reach, and a silent failure at 9 on a Sunday morning is
+ *  worth a line of stdout. */
+export const report = (line: string) => void invoke('report', { line }).catch(() => {});
+
+/** Whether the operator has let us near the devices. macOS only records an
+ *  application in Privacy & Security once it has actually asked, which is why
+ *  the studio asks on launch instead of waiting for the first source. */
+export const permissions = $state({
+	microphone: 'unknown' as 'unknown' | 'granted' | 'denied',
+	message: ''
+});
+
+/** Ask for the microphone, once, and let it go again. The stream is not what
+ *  we are after — the grant is: until it exists the engine reports no input
+ *  devices at all, so the mixer has an empty device menu and no way to explain
+ *  why. Cameras and screen sharing ask for themselves when a source is added. */
+export async function askForMicrophone(): Promise<void> {
+	try {
+		const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+		stream.getTracks().forEach((track) => track.stop());
+		permissions.microphone = 'granted';
+		permissions.message = '';
+	} catch (err) {
+		permissions.microphone = 'denied';
+		permissions.message = describe(err);
+	}
+}
+
+/** Open the macOS pane where the answer can be changed — a refusal is not
+ *  recoverable from inside the app, so pointing at it is all we can do. */
+export function openPrivacySettings(pane: 'microphone' | 'camera' | 'screen'): void {
+	void invoke('open_privacy_settings', { pane }).catch(() => {});
+}
 
 export interface Handle {
 	kind: Layer['kind'];
@@ -82,12 +119,30 @@ export async function openCamera(layer: Layer, width: number, height: number): P
 export async function openMic(layerId: string, deviceId?: string): Promise<Handle> {
 	release(layerId);
 	try {
+		// The processing is off because this is a broadcast desk, not a phone
+		// call: the operator rides the level, and gates chewing the front of a
+		// word cannot be undone downstream.
+		//
+		// The rate is asked for because the mixer runs at 48 kHz for the native
+		// app capture, and WebKit does not resample a stream into a context with
+		// a different rate — it plays silence. A device that cannot do 48 kHz
+		// ignores this and is reported below.
+		const shared = {
+			echoCancellation: false,
+			noiseSuppression: false,
+			autoGainControl: false,
+			sampleRate: MIX_RATE
+		};
 		const stream = await navigator.mediaDevices.getUserMedia({
-			audio: deviceId
-				? { deviceId: { exact: deviceId }, echoCancellation: false, noiseSuppression: false, autoGainControl: false }
-				: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+			audio: deviceId ? { deviceId: { exact: deviceId }, ...shared } : shared,
 			video: false
 		});
+		const rate = stream.getAudioTracks()[0]?.getSettings().sampleRate;
+		if (rate && rate !== MIX_RATE) {
+			// Nothing to be done from here, but a flat meter with no explanation
+			// is the worst possible half hour before a service.
+			report(`input device runs at ${rate} Hz, mixer at ${MIX_RATE} Hz — WebKit may deliver silence`);
+		}
 		const h: Handle = { kind: 'camera', el: null, stream, error: null, objectUrl: null };
 		set(layerId, h);
 		return h;
@@ -110,7 +165,10 @@ export async function openScreen(layer: Layer): Promise<Handle> {
 		// so and points at the way round it. Chromium (the Windows webview) does
 		// honour this, which is why it is still requested.
 		// ponytail: real per-app audio needs ScreenCaptureKit on the Rust side.
-		const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+		const stream = await navigator.mediaDevices.getDisplayMedia({
+			video: cursorConstraint(layer),
+			audio: true
+		});
 		const h: Handle = { kind: 'screen', el: videoEl(stream), stream, error: null, objectUrl: null };
 		set(layer.id, h);
 		return h;
@@ -119,6 +177,29 @@ export async function openScreen(layer: Layer): Promise<Handle> {
 		set(layer.id, h);
 		return h;
 	}
+}
+
+/** The pointer is painted into the shared frame by the OS, so leaving it out
+ *  can only be asked for, never done here. `cursor` is the constraint for it. */
+type CursorConstraints = MediaTrackConstraints & { cursor?: 'always' | 'motion' | 'never' };
+
+function cursorConstraint(layer: Layer): CursorConstraints {
+	return { cursor: layer.hideCursor ? 'never' : 'always' };
+}
+
+/** Whether this engine admits to understanding the cursor constraint. WebKit
+ *  does not, and keeps drawing the pointer whatever is asked — the UI says so
+ *  rather than offering a switch that quietly does nothing. */
+export const canHideCursor = (): boolean =>
+	'cursor' in navigator.mediaDevices.getSupportedConstraints();
+
+/** Apply the choice to a share already running, so the toggle does not wait
+ *  for a reconnect and a second trip through the OS picker. */
+export async function applyCursor(layer: Layer): Promise<void> {
+	const track = handleFor(layer.id)?.stream?.getVideoTracks()[0];
+	// An engine that ignores the constraint also rejects it here; the setting
+	// is kept either way and applied to the next share.
+	await track?.applyConstraints(cursorConstraint(layer)).catch(() => {});
 }
 
 export function openFile(layer: Layer, file: File): Handle {

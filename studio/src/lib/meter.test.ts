@@ -11,6 +11,7 @@ import {
 	meterFraction,
 	toDb
 } from './meter';
+import { stripsToDrop } from './mixer';
 
 describe('dBFS metering', () => {
 	it('maps full scale to 0 dB and half amplitude to −6 dB', () => {
@@ -96,5 +97,25 @@ describe('fader taper', () => {
 		expect(faderDb(2)).toBe(FADER_MAX_DB);
 		expect(gainPosition(0.0001)).toBe(0);
 		expect(FADER_MIN_DB).toBeLessThan(0);
+	});
+});
+
+describe('what a scene change may take off the bus', () => {
+	const MIC = 'mic-1';
+	const APP = 'app-arc';
+	const WINDOW = 'layer-window';
+
+	it('keeps the mixer inputs when cutting to a scene with no audio', () => {
+		// The scene going on air contributes nothing, so nothing of its own is
+		// on air — but the mic and the application strip stay.
+		expect(stripsToDrop([MIC, APP], [], [MIC, APP, WINDOW])).toEqual([WINDOW]);
+	});
+
+	it('drops a scene layer that is no longer on air', () => {
+		expect(stripsToDrop([MIC], [MIC], [MIC, WINDOW])).toEqual([WINDOW]);
+	});
+
+	it('drops a deleted input, which is no longer global', () => {
+		expect(stripsToDrop([], [], [MIC])).toEqual([MIC]);
 	});
 });
