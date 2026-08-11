@@ -86,6 +86,9 @@ const en = {
 	'mixer.addMic': 'Add audio input',
 	'mixer.connect': 'Connect input',
 	'mixer.noAudioTrack': 'No audio track',
+	'mixer.noSurfaceAudio': 'This system cannot capture app audio',
+	'mixer.noSurfaceAudioHint':
+		'macOS gives the browser engine picture only when you share a window or screen \u2014 no application or tab sound, and no error to say so. Route the app\u2019s output through a virtual audio device (BlackHole, Loopback) and add that device here as an audio input.',
 	'mixer.defaultInput': 'Default input',
 	'mixer.chooseInput': 'Choose input',
 	'mixer.mute': 'Mute',

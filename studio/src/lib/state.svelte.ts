@@ -143,7 +143,9 @@ export function makeLayer(kind: LayerKind, name: string, patch: Partial<Layer> =
 		fit: 'cover',
 		hasAudio: audioKinds.includes(kind),
 		gain: 1,
-		muted: kind === 'screen', // desktop audio surprises people mid-service
+		// Not muted: adding a screen or media source is asking for its sound. A
+		// source that arrives silent for no stated reason is worse than a loud one.
+		muted: false,
 		...patch
 	};
 }

@@ -103,6 +103,13 @@ export async function openScreen(layer: Layer): Promise<Handle> {
 	try {
 		// The picker is the OS one — which window/screen is the operator's call,
 		// so there is nothing for us to configure here.
+		//
+		// `audio` is asked for and WebKit ignores it: it does not implement audio
+		// capture of the shared surface, and returns video only without an error.
+		// So on macOS a shared tab arrives silent no matter what — the mixer says
+		// so and points at the way round it. Chromium (the Windows webview) does
+		// honour this, which is why it is still requested.
+		// ponytail: real per-app audio needs ScreenCaptureKit on the Rust side.
 		const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
 		const h: Handle = { kind: 'screen', el: videoEl(stream), stream, error: null, objectUrl: null };
 		set(layer.id, h);

@@ -187,6 +187,30 @@ video source and none of them drew, or when the scene draws nothing at all. A
 scene made of a colour and some text — a "back shortly" card — is a deliberate
 slate and is left alone. Turn it off in **Settings → Video**.
 
+## Sharing a window or tab: the sound
+
+**The picture comes through; the sound does not.** macOS's browser engine
+(WKWebView, which is what Tauri uses) does not implement audio capture of a
+shared window or screen — it accepts the request, returns video only, and
+raises no error. Chromium does this; WebKit does not. No change in this app can
+work around it, so the mixer says so on the strip instead of leaving you hunting
+for a fault that is not yours.
+
+The way round it, and what every macOS streamer does:
+
+1. Install a virtual audio device — [BlackHole](https://existential.audio/blackhole/)
+   (free) or Loopback.
+2. Send the app's output to it. Simplest is a **Multi-Output Device** in
+   *Audio MIDI Setup* containing both your speakers and BlackHole, selected as
+   the system output — you still hear it, and BlackHole gets a copy.
+3. In the studio's Audio Mixer, **+ → BlackHole** as an audio input.
+
+Now the tab's sound is a normal strip with its own fader and meter, which is
+better than a bundled track anyway: you can ride it against the preacher's mic.
+
+Real per-app capture without the virtual device would mean ScreenCaptureKit on
+the Rust side (macOS 13+). It is a genuine option, just a much larger one.
+
 ## Things worth knowing
 
 - **Don't minimise the window while live.** WebKit stops the render loop for a

@@ -74,6 +74,19 @@
 		...liveAudioLayers().map((layer) => ({ id: layer.id, name: layer.name, isMic: false, source: layer }))
 	]);
 
+	/** Why a strip is silent. A screen or window share that connected but
+	 *  carries no audio track is the WebKit limitation, not a broken source —
+	 *  saying "No audio track" and stopping there leaves the operator hunting
+	 *  for a fault that is not theirs. */
+	function silenceReason(strip: Strip): { label: string; hint: string } {
+		const handle = handleFor(strip.id);
+		if (handle?.error) return { label: handle.error, hint: handle.error };
+		if (!strip.isMic && (strip.source as Layer).kind === 'screen' && handle?.stream) {
+			return { label: t('mixer.noSurfaceAudio'), hint: t('mixer.noSurfaceAudioHint') };
+		}
+		return { label: t('mixer.noAudioTrack'), hint: '' };
+	}
+
 	function setLevel(strip: Strip, gain: number, muted: boolean) {
 		strip.source.gain = gain;
 		strip.source.muted = muted;
@@ -212,7 +225,13 @@
 					{handleFor(strip.id)?.error ?? t('mixer.connect')}
 				</button>
 			{:else}
-				<p class="mt-1.5 text-[11px] text-fg/30">{handleFor(strip.id)?.error ?? t('mixer.noAudioTrack')}</p>
+				{@const reason = silenceReason(strip)}
+				<p class="mt-1.5 text-[11px] leading-snug text-fg/35" title={reason.hint}>
+					{reason.label}
+				</p>
+				{#if reason.hint}
+					<p class="mt-0.5 text-[10px] leading-snug text-fg/25">{reason.hint}</p>
+				{/if}
 			{/if}
 		</div>
 	{:else}
