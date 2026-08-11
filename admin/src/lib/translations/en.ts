@@ -903,6 +903,8 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.upload.titlePlaceholder': 'E.g. 2025-05-30 Missionnaire Network Live audio',
 	'recordings.upload.descriptionPlaceholder': 'Topic, speaker, Bible passage…',
 	'recordings.upload.publishNow': 'Publish immediately (visible on the public site)',
+	'recordings.upload.attachIntro':
+		'Replay for the live “{title}”. The MP3 (and the PDF, if a YouTube link is filled in) attaches to this live: once published, its public link points at the replay again.',
 	'recordings.edit.title': 'Edit recording',
 	'recordings.edit.titlePlaceholder': 'E.g. Sunday sermon — Faith and prayer',
 	'recordings.edit.descriptionPlaceholder':
@@ -993,6 +995,7 @@ const en: Record<keyof typeof fr, string> = {
 		'Recording created but publishing failed — publish it from the list.',
 	'recordings.toast.uploaded': 'Recording uploaded',
 	'recordings.toast.uploadedAndPublished': 'Recording uploaded and published',
+	'recordings.toast.replayAttached': 'Replay attached — the live link works again',
 	'recordings.toast.audioSaved': 'Audio saved',
 	'recordings.toast.pdfReplaced': 'PDF transcript replaced',
 	'recordings.toast.pdfAdded': 'PDF transcript added',
@@ -1079,6 +1082,9 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.scheduled.history': 'History ({count})',
 	'recordings.scheduled.replay': 'Replay',
 	'recordings.scheduled.copyLink': 'Copy link',
+	'recordings.scheduled.attachReplay': 'Attach replay',
+	'recordings.scheduled.attachReplayTitle':
+		'This live ended with no recording — upload the audio to bring its shared link back to life',
 	'recordings.scheduled.editTitle': 'Edit the live',
 	'recordings.scheduled.editHint': 'The share link remains unchanged.',
 	'recordings.scheduled.editLive': 'Edit info',

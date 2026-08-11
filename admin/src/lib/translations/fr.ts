@@ -912,6 +912,8 @@ export default {
 	'recordings.upload.titlePlaceholder': 'Ex. 2025-05-30 Missionnaire Network Live audio',
 	'recordings.upload.descriptionPlaceholder': 'Sujet, orateur, texte biblique…',
 	'recordings.upload.publishNow': 'Publier immédiatement (visible sur le site public)',
+	'recordings.upload.attachIntro':
+		'Rediffusion du direct « {title} ». Le MP3 (et le PDF si un lien YouTube est renseigné) sera attaché à ce direct : une fois publié, son lien public repointe vers la rediffusion.',
 	'recordings.edit.title': "Modifier l'enregistrement",
 	'recordings.edit.titlePlaceholder': 'Ex. Prédication du dimanche — Foi et prière',
 	'recordings.edit.descriptionPlaceholder':
@@ -1003,6 +1005,7 @@ export default {
 		'Enregistrement créé mais publication échouée — publiez-le depuis la liste.',
 	'recordings.toast.uploaded': 'Enregistrement téléversé',
 	'recordings.toast.uploadedAndPublished': 'Enregistrement téléversé et publié',
+	'recordings.toast.replayAttached': 'Rediffusion attachée — le lien du direct est de nouveau actif',
 	'recordings.toast.audioSaved': 'Audio enregistré',
 	'recordings.toast.pdfReplaced': 'Transcription PDF remplacée',
 	'recordings.toast.pdfAdded': 'Transcription PDF ajoutée',
@@ -1093,6 +1096,9 @@ export default {
 	'recordings.scheduled.history': 'Historique ({count})',
 	'recordings.scheduled.replay': 'Rediffusion',
 	'recordings.scheduled.copyLink': 'Copier le lien',
+	'recordings.scheduled.attachReplay': 'Attacher la rediffusion',
+	'recordings.scheduled.attachReplayTitle':
+		"Ce direct s'est terminé sans enregistrement — téléversez l'audio pour réactiver son lien partagé",
 	'recordings.scheduled.editTitle': 'Modifier le direct',
 	'recordings.scheduled.editHint': 'Le lien de partage reste inchangé.',
 	'recordings.scheduled.editLive': 'Modifier les infos',

@@ -1,7 +1,12 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
-import { createRecording, logAudit } from '../../../../../db/collections';
+import {
+	createRecording,
+	getScheduledLiveById,
+	setScheduledLiveRecordingId,
+	logAudit
+} from '../../../../../db/collections';
 import {
 	ensureVideoForRecording,
 	extractYoutubeVideoId,
@@ -29,6 +34,7 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		youtube_url?: unknown;
 		thumbnail_url?: unknown;
 		thumbnail_s3_key?: unknown;
+		scheduled_live_id?: unknown;
 	};
 
 	const title = typeof body.title === 'string' ? body.title.trim() : '';
@@ -79,6 +85,18 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		}
 	}
 
+	// Backfilling the replay of a past scheduled live: the entry must exist and
+	// must not already own a recording (re-linking would orphan the first one —
+	// the admin edits that recording instead).
+	let scheduledLiveId: string | null = null;
+	if (body.scheduled_live_id != null) {
+		if (typeof body.scheduled_live_id !== 'string') throw error(400, 'Direct programmé invalide');
+		const entry = await getScheduledLiveById(body.scheduled_live_id);
+		if (!entry) throw error(404, 'Direct programmé introuvable');
+		if (entry.recording_id) throw error(400, 'Ce direct a déjà une rediffusion');
+		scheduledLiveId = entry._id;
+	}
+
 	// If a YouTube link was given, make sure a matching `videos` doc exists
 	// (so the public page's YouTube link + transcript resolve just like an
 	// edited recording) and auto-attach any transcript already on that video.
@@ -112,6 +130,22 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		created_by: locals.user.email,
 		created_by_name: locals.user.name ?? null
 	});
+
+	// Point the scheduled live at its new replay — the public /live/<slug> link
+	// starts resolving to it as soon as the recording is published. Status,
+	// dates and the rest of the history entry stay as they were.
+	if (scheduledLiveId) {
+		await setScheduledLiveRecordingId(scheduledLiveId, id);
+		await logAudit({
+			user_id: locals.user.email,
+			user_email: locals.user.email,
+			action: 'update',
+			target_collection: 'scheduled_lives',
+			target_id: scheduledLiveId,
+			changes: { recording_id: { old: null, new: id } },
+			ip_address: getClientAddress()
+		});
+	}
 
 	await logAudit({
 		user_id: locals.user.email,

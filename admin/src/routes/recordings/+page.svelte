@@ -4,6 +4,7 @@
 	import type { PageData } from './$types';
 	import type HlsType from 'hls.js';
 	import type { Recording, RecordingStatus } from '$lib/models/recording';
+	import type { ScheduledLive } from '../../db/collections';
 	import { confirmDialog } from '$lib/stores/confirm-dialog';
 	import { toast } from '$lib/stores/toast';
 	import { t, type TranslationKey } from '$lib/i18n';
@@ -463,6 +464,13 @@
 	let uploadPublishNow = $state(false);
 	let uploadSaving = $state(false);
 	let uploadError = $state<string | null>(null);
+	// Set when the upload backfills the replay of a past scheduled live: the
+	// created recording is linked back to that entry so its public /live/<slug>
+	// link resolves again. Its thumbnail is reused as-is (already in S3) unless
+	// the admin picks a new file.
+	let uploadScheduledLive = $state<ScheduledLive | null>(null);
+	let uploadThumbnailExisting = $state<{ url: string; key: string } | null>(null);
+	const uploadThumbnailSrc = $derived(uploadThumbnailPreviewUrl ?? uploadThumbnailExisting?.url ?? null);
 
 	function toLocalDatetimeValue(d: Date): string {
 		const pad = (n: number) => String(n).padStart(2, '0');
@@ -477,6 +485,7 @@
 		if (uploadThumbnailPreviewUrl) URL.revokeObjectURL(uploadThumbnailPreviewUrl);
 		uploadThumbnailPreviewUrl = null;
 		uploadThumbnailFile = null;
+		uploadThumbnailExisting = null;
 		uploadThumbnailError = null;
 	}
 
@@ -488,6 +497,7 @@
 	}
 
 	function openUploadModal() {
+		uploadScheduledLive = null;
 		const now = new Date();
 		uploadStartedAt = toLocalDatetimeValue(now);
 		const ymd = uploadStartedAt.slice(0, 10);
@@ -508,7 +518,32 @@
 		if (uploadSaving) return;
 		clearUploadThumbnail();
 		clearUploadAudio();
+		uploadScheduledLive = null;
 		uploadModalOpen = false;
+	}
+
+	/** "Attacher la rediffusion" from the scheduled-lives history: same upload
+	 *  modal, prefilled from the entry that aired. The MP3 (and, via the YouTube
+	 *  link, the PDF transcript) attach to the created recording; publishing it
+	 *  makes the entry's public link resolve to the replay again. */
+	function attachReplayToScheduledLive(entry: ScheduledLive) {
+		uploadScheduledLive = entry;
+		uploadStartedAt = toLocalDatetimeValue(new Date(entry.live_started_at ?? entry.scheduled_at));
+		uploadTitle = entry.title;
+		// Prefilled from the live, not from the date template — don't overwrite it
+		// if the admin adjusts the date.
+		uploadTitleDirty = true;
+		uploadDescription = entry.description ?? '';
+		uploadYoutubeUrl = entry.youtube_url ?? '';
+		uploadYoutubeError = null;
+		clearUploadThumbnail();
+		clearUploadAudio();
+		if (entry.thumbnail_url && entry.thumbnail_s3_key) {
+			uploadThumbnailExisting = { url: entry.thumbnail_url, key: entry.thumbnail_s3_key };
+		}
+		uploadPublishNow = true;
+		uploadError = null;
+		uploadModalOpen = true;
 	}
 
 	// Re-render the title's date prefix when the admin changes the date, but
@@ -623,6 +658,10 @@
 				}
 				thumbnail_url = presign.publicUrl;
 				thumbnail_s3_key = presign.key;
+			} else if (uploadThumbnailExisting) {
+				// Backfill: reuse the scheduled live's thumbnail object as-is.
+				thumbnail_url = uploadThumbnailExisting.url;
+				thumbnail_s3_key = uploadThumbnailExisting.key;
 			}
 
 			// 2. Create the recording doc (status 'uploading').
@@ -635,7 +674,8 @@
 					description: uploadDescription.trim() || null,
 					youtube_url: uploadYoutubeUrl.trim() || null,
 					thumbnail_url,
-					thumbnail_s3_key
+					thumbnail_s3_key,
+					scheduled_live_id: uploadScheduledLive?._id ?? null
 				})
 			});
 			if (!createRes.ok) {
@@ -699,15 +739,22 @@
 				}
 			}
 
+			const wasBackfill = Boolean(uploadScheduledLive);
 			toast.success(
-				uploadPublishNow
-					? $t('recordings.toast.uploadedAndPublished')
-					: $t('recordings.toast.uploaded')
+				wasBackfill && uploadPublishNow
+					? $t('recordings.toast.replayAttached')
+					: uploadPublishNow
+						? $t('recordings.toast.uploadedAndPublished')
+						: $t('recordings.toast.uploaded')
 			);
 			uploadModalOpen = false;
 			clearUploadThumbnail();
 			clearUploadAudio();
+			uploadScheduledLive = null;
 			await refreshVisibleRecordings();
+			// The history row now owns a replay — reload the panel's data so it
+			// shows the link instead of the attach button.
+			if (wasBackfill) await invalidateAll();
 		} catch (err) {
 			uploadError = err instanceof Error ? err.message : $t('recordings.error.uploadFailed');
 		} finally {
@@ -2850,6 +2897,7 @@
 	{broadcast}
 	{subscriberCount}
 	publicBaseUrl={data.publicBaseUrl}
+	onAttachReplay={attachReplayToScheduledLive}
 />
 
 <!-- Subtitle sync — shown during any live: attach an SRT mid-broadcast if
@@ -3555,9 +3603,18 @@
 			</div>
 
 			<div class="flex flex-col gap-5 px-6 py-6">
-				<p class="text-xs text-stone-500">
-					{$t('recordings.upload.intro')}
-				</p>
+				{#if uploadScheduledLive}
+					<p class="border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-stone-600">
+						{$t('recordings.upload.attachIntro', { title: uploadScheduledLive.title })}
+						<span class="mt-1 block break-all font-mono text-[11px] text-stone-500">
+							{data.publicBaseUrl}/live/{uploadScheduledLive.slug}
+						</span>
+					</p>
+				{:else}
+					<p class="text-xs text-stone-500">
+						{$t('recordings.upload.intro')}
+					</p>
+				{/if}
 
 				<!-- Audio file (required) -->
 				<div class="flex flex-col gap-1.5">
@@ -3683,11 +3740,11 @@
 						>{$t('recordings.common.thumbnail')}</span
 					>
 					<div class="flex items-start gap-4">
-						{#if uploadThumbnailPreviewUrl}
+						{#if uploadThumbnailSrc}
 							<div
 								class="relative aspect-video w-40 shrink-0 overflow-hidden border border-stone-300 bg-cream/40"
 							>
-								<img src={uploadThumbnailPreviewUrl} alt="" class="h-full w-full object-cover" />
+								<img src={uploadThumbnailSrc} alt="" class="h-full w-full object-cover" />
 							</div>
 						{:else}
 							<div
@@ -3715,7 +3772,7 @@
 										? 'pointer-events-none opacity-50'
 										: ''}"
 								>
-									{uploadThumbnailPreviewUrl
+									{uploadThumbnailSrc
 										? $t('recordings.common.change')
 										: $t('recordings.common.upload')}
 									<input
@@ -3726,7 +3783,7 @@
 										disabled={uploadSaving}
 									/>
 								</label>
-								{#if uploadThumbnailPreviewUrl}
+								{#if uploadThumbnailSrc}
 									<button
 										type="button"
 										onclick={clearUploadThumbnail}
