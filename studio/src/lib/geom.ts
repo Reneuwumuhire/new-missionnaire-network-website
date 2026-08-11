@@ -90,6 +90,25 @@ export function hitHandle(rect: Rect, px: number, py: number, tolerance = 0.02):
 	return inside ? 'move' : null;
 }
 
+/** The pointer shape for a handle. Corners on the same diagonal share a
+ *  cursor: nw and se both run ↖↘, ne and sw both run ↗↙ — which is what tells
+ *  the operator they are about to resize rather than move. `dragging` only
+ *  changes the grab hand to a closed one. */
+export function cursorForHandle(handle: Handle | null, dragging = false): string {
+	switch (handle) {
+		case 'nw':
+		case 'se':
+			return 'nwse-resize';
+		case 'ne':
+		case 'sw':
+			return 'nesw-resize';
+		case 'move':
+			return dragging ? 'grabbing' : 'grab';
+		default:
+			return 'default';
+	}
+}
+
 const MIN_SIZE = 0.03;
 
 /** Apply a drag. Resizing keeps the opposite corner pinned; a layer can be

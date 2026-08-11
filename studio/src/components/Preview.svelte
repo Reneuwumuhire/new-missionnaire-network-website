@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { startRenderLoop } from '../lib/compositor';
-	import { applyDrag, hitHandle, type Handle } from '../lib/geom';
+	import { applyDrag, cursorForHandle, hitHandle, type Handle } from '../lib/geom';
 	import { activeScene, persist, studio } from '../lib/state.svelte';
 
 	// A canvas rendered at broadcast resolution and scaled down with CSS — what
@@ -28,6 +28,9 @@
 	let box = $state<HTMLDivElement | null>(null);
 	let area = $state<HTMLDivElement | null>(null);
 	let drag = $state<{ handle: Handle; startX: number; startY: number; layerId: string } | null>(null);
+	/** Handle under the pointer when nothing is being dragged, so the cursor
+	 *  announces what a press would do before it is pressed. */
+	let hover = $state<Handle | null>(null);
 	let fitted = $state({ w: 0, h: 0 });
 
 	$effect(() => {
@@ -70,27 +73,38 @@
 		};
 	}
 
+	/** Topmost unlocked layer under the point, and which of its handles —
+	 *  matching every editor, and the same search the cursor and the drag use. */
+	function handleAt(point: { x: number; y: number }): { layerId: string; handle: Handle } | null {
+		for (const layer of activeScene().layers) {
+			if (layer.locked || !layer.visible) continue;
+			const handle = hitHandle(layer.rect, point.x, point.y);
+			if (handle) return { layerId: layer.id, handle };
+		}
+		return null;
+	}
+
 	function onPointerDown(event: PointerEvent) {
 		if (!editable) return;
 		const point = normalisedPoint(event);
 		if (!point) return;
-		// Topmost unlocked layer under the cursor wins, matching every editor.
-		for (const layer of activeScene().layers) {
-			if (layer.locked || !layer.visible) continue;
-			const handle = hitHandle(layer.rect, point.x, point.y);
-			if (!handle) continue;
-			studio.selectedLayerId = layer.id;
-			drag = { handle, startX: point.x, startY: point.y, layerId: layer.id };
-			(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+		const hit = handleAt(point);
+		if (!hit) {
+			studio.selectedLayerId = null;
 			return;
 		}
-		studio.selectedLayerId = null;
+		studio.selectedLayerId = hit.layerId;
+		drag = { handle: hit.handle, startX: point.x, startY: point.y, layerId: hit.layerId };
+		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
 	}
 
 	function onPointerMove(event: PointerEvent) {
-		if (!drag) return;
 		const point = normalisedPoint(event);
 		if (!point) return;
+		if (!drag) {
+			hover = editable ? (handleAt(point)?.handle ?? null) : null;
+			return;
+		}
 		const layer = activeScene().layers.find((l) => l.id === drag!.layerId);
 		if (!layer) return;
 		layer.rect = applyDrag(layer.rect, drag.handle, point.x - drag.startX, point.y - drag.startY);
@@ -102,6 +116,8 @@
 		if (drag) persist();
 		drag = null;
 	}
+
+	const cursor = $derived(cursorForHandle(drag?.handle ?? hover, drag !== null));
 </script>
 
 <div class="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -121,13 +137,12 @@
 			role="application"
 			aria-label={label}
 			class="relative ring-1 {live ? 'ring-red-500/70' : 'ring-ink-700'}"
-			style="width: {fitted.w}px; height: {fitted.h}px; cursor: {drag?.handle === 'move'
-				? 'grabbing'
-				: 'default'}"
+			style="width: {fitted.w}px; height: {fitted.h}px; cursor: {cursor}"
 			onpointerdown={onPointerDown}
 			onpointermove={onPointerMove}
 			onpointerup={onPointerUp}
 			onpointercancel={onPointerUp}
+			onpointerleave={() => (hover = null)}
 		>
 			<canvas
 				bind:this={canvas}

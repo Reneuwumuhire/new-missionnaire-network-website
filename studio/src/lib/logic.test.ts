@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyDrag, centeredRect, drawBox, hitHandle, toPixels } from './geom';
+import { applyDrag, centeredRect, cursorForHandle, drawBox, hitHandle, toPixels } from './geom';
 import { findCueIndex, parseLyricLines, parseSrt, toSrt } from './srt';
 
 describe('drawBox', () => {
@@ -66,6 +66,20 @@ describe('layer manipulation', () => {
 	it('allows a layer to be pushed partly off-frame', () => {
 		// A half-off logo is a legitimate look, not an error to clamp away.
 		expect(applyDrag(rect, 'move', -0.5, 0).x).toBeCloseTo(-0.25);
+	});
+
+	it('shows a resize cursor on the corners and a hand on the body', () => {
+		// Opposite corners share a diagonal, so they share a cursor — getting
+		// this pairing backwards points the arrow the wrong way.
+		expect(cursorForHandle('nw')).toBe('nwse-resize');
+		expect(cursorForHandle('se')).toBe('nwse-resize');
+		expect(cursorForHandle('ne')).toBe('nesw-resize');
+		expect(cursorForHandle('sw')).toBe('nesw-resize');
+		expect(cursorForHandle('move')).toBe('grab');
+		expect(cursorForHandle('move', true)).toBe('grabbing');
+		expect(cursorForHandle(null)).toBe('default');
+		// Resizing looks the same whether or not the button is down.
+		expect(cursorForHandle('se', true)).toBe('nwse-resize');
 	});
 
 	it('centres a new source at the frame aspect', () => {
