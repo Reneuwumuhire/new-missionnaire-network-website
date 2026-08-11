@@ -2,6 +2,14 @@
 	import { onMount } from 'svelte';
 	import { handleFor, listDevices, openMic, release, type DeviceOption } from '../lib/media.svelte';
 	import {
+		appAudio,
+		isCapturing,
+		refreshApps,
+		startAppAudio,
+		stopAppAudio,
+		type AudioApp
+	} from '../lib/appaudio.svelte';
+	import {
 		METER_TICKS,
 		decayHold,
 		faderDb,
@@ -55,16 +63,40 @@
 		await refreshDevices();
 	}
 
-	function addMic() {
+	let adding = $state(false);
+
+	function addSource(kind: 'input' | 'app') {
+		adding = false;
 		studio.audioSources = [
 			...studio.audioSources,
-			{ id: id(), name: t('mixer.micName', { number: studio.audioSources.length + 1 }), gain: 1, muted: false }
+			{
+				id: id(),
+				name:
+					kind === 'app'
+						? t('mixer.appName')
+						: t('mixer.micName', { number: studio.audioSources.length + 1 }),
+				kind,
+				gain: 1,
+				muted: false
+			}
 		];
 		persist();
+		if (kind === 'app') void refreshApps();
 	}
 
-	function removeMic(source: AudioSource) {
+	/** Attach an application to an app source and start capturing it. */
+	async function captureApp(source: AudioSource, app: AudioApp) {
+		if (!mixer) return;
+		source.appId = app.id;
+		source.name = app.name;
+		persist();
+		devicesOpen = null;
+		await startAppAudio(mixer, source.id, app);
+	}
+
+	function removeSource(source: AudioSource) {
 		release(source.id);
+		if (mixer) void stopAppAudio(mixer, source.id);
 		mixer?.remove(source.id);
 		studio.audioSources = studio.audioSources.filter((s) => s.id !== source.id);
 		persist();
@@ -119,7 +151,26 @@
 			/>
 			{t('mixer.monitor')}
 		</label>
-		<button class="studio-icon-btn" title={t('mixer.addMic')} aria-label={t('mixer.addMic')} onclick={addMic}><Icon name="plus" /></button>
+		<div class="relative">
+			<button
+				class="studio-icon-btn"
+				title={t('mixer.addSource')}
+				aria-label={t('mixer.addSource')}
+				onclick={() => (adding = !adding)}><Icon name="plus" /></button
+			>
+			{#if adding}
+				<div class="absolute right-0 top-7 z-30 w-56 border border-ink-600 bg-ink-850 py-1 shadow-2xl shadow-black/70">
+					<button class="block w-full px-3 py-2 text-left hover:bg-primary/15" onclick={() => addSource('input')}>
+						<span class="block text-[13px] text-fg/90">{t('mixer.addMic')}</span>
+						<span class="block text-[11px] text-fg/40">{t('mixer.addMicHint')}</span>
+					</button>
+					<button class="block w-full px-3 py-2 text-left hover:bg-primary/15" onclick={() => addSource('app')}>
+						<span class="block text-[13px] text-fg/90">{t('mixer.addApp')}</span>
+						<span class="block text-[11px] text-fg/40">{t('mixer.addAppHint')}</span>
+					</button>
+				</div>
+			{/if}
+		</div>
 	{/snippet}
 
 	{#if studio.settings.monitorAudio}
@@ -160,27 +211,51 @@
 			</div>
 
 			{#if devicesOpen === strip.id && strip.isMic}
+				{@const source = strip.source as AudioSource}
 				<div class="mt-1 flex gap-1">
-					<select
-						class="studio-input h-7 min-w-0 flex-1 py-0 text-[11px]"
-						value={(strip.source as AudioSource).deviceId ?? ''}
-						onchange={(e) => {
-							(strip.source as AudioSource).deviceId =
-								(e.currentTarget as HTMLSelectElement).value || undefined;
-							persist();
-							void connect(strip.source as AudioSource);
-						}}
-					>
-						<option value="">{t('mixer.defaultInput')}</option>
-						{#each inputs as device (device.deviceId)}
-							<option value={device.deviceId}>{device.label}</option>
-						{/each}
-					</select>
+					{#if source.kind === 'app'}
+						<select
+							class="studio-input h-7 min-w-0 flex-1 py-0 text-[11px]"
+							value={source.appId ?? ''}
+							onchange={(e) => {
+								const app = appAudio.apps.find(
+									(a) => a.id === (e.currentTarget as HTMLSelectElement).value
+								);
+								if (app) void captureApp(source, app);
+							}}
+						>
+							<option value="">{t('mixer.chooseApp')}</option>
+							{#each appAudio.apps as app (app.id)}
+								<option value={app.id}>{app.name}</option>
+							{/each}
+						</select>
+						<button
+							class="studio-icon-btn"
+							title={t('mixer.refreshApps')}
+							aria-label={t('mixer.refreshApps')}
+							onclick={() => refreshApps()}><Icon name="refresh" size={13} /></button
+						>
+					{:else}
+						<select
+							class="studio-input h-7 min-w-0 flex-1 py-0 text-[11px]"
+							value={source.deviceId ?? ''}
+							onchange={(e) => {
+								source.deviceId = (e.currentTarget as HTMLSelectElement).value || undefined;
+								persist();
+								void connect(source);
+							}}
+						>
+							<option value="">{t('mixer.defaultInput')}</option>
+							{#each inputs as device (device.deviceId)}
+								<option value={device.deviceId}>{device.label}</option>
+							{/each}
+						</select>
+					{/if}
 					<button
 						class="studio-icon-btn"
 						title={t('common.remove')}
 						aria-label={t('common.remove')}
-						onclick={() => removeMic(strip.source as AudioSource)}>
+						onclick={() => removeSource(source)}>
 						<Icon name="trash" size={14} />
 					</button>
 				</div>
@@ -244,9 +319,26 @@
 					</button>
 				</div>
 			{:else if strip.isMic}
-				<button class="studio-chip mt-1.5 w-full text-left text-[11px]" onclick={() => connect(strip.source as AudioSource)}>
-					{handleFor(strip.id)?.error ?? t('mixer.connect')}
-				</button>
+				{@const source = strip.source as AudioSource}
+				{#if source.kind === 'app'}
+					<button
+						class="studio-chip mt-1.5 w-full text-left text-[11px]"
+						onclick={async () => {
+							await refreshApps();
+							devicesOpen = strip.id;
+						}}
+					>
+						{appAudio.error ??
+							(appAudio.supported ? t('mixer.chooseApp') : t('mixer.appAudioUnsupported'))}
+					</button>
+				{:else}
+					<button
+						class="studio-chip mt-1.5 w-full text-left text-[11px]"
+						onclick={() => connect(source)}
+					>
+						{handleFor(strip.id)?.error ?? t('mixer.connect')}
+					</button>
+				{/if}
 			{:else}
 				{@const reason = silenceReason(strip)}
 				<p class="mt-1.5 text-[11px] leading-snug text-fg/35" title={reason.hint}>

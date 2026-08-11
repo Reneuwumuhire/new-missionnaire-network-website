@@ -9,6 +9,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { broadcast, chunkCount, startBroadcast, stopBroadcast } from './broadcast.svelte';
 import { frameCount, onAirSceneId, renderFrame, takeToProgram } from './compositor';
  import { applyTheme } from './i18n.svelte';
+ import { appAudio, received, startAppAudio, stopAppAudio } from './appaudio.svelte';
+ import type { Mixer } from './mixer';
 import { id, makeLayer, persist, studio } from './state.svelte';
 
 const say = (line: string) => invoke('report', { line }).catch(() => console.log(line));
@@ -112,6 +114,12 @@ async function checkFade(canvas: HTMLCanvasElement) {
 	return blended && dipped;
 }
 
+/** The self-test needs the live mixer to prove app audio reaches it. */
+let mixerRef: Mixer | null = null;
+export function selftestMixer(mixer: Mixer | null) {
+	mixerRef = mixer;
+}
+
 export async function runSelftest(target: string, canvas: () => HTMLCanvasElement | null, audio: () => MediaStreamTrack | undefined) {
 	await say(`SELFTEST target=${target}`);
 
@@ -170,6 +178,34 @@ export async function runSelftest(target: string, canvas: () => HTMLCanvasElemen
 	await wait(150);
 	const darkBg = getComputedStyle(document.body).backgroundColor;
 	await say(`SELFTEST theme light=${lightBg} dark=${darkBg} ${lightBg !== darkBg ? 'OK' : 'SAME'}`);
+
+	// ScreenCaptureKit reachable at all? It needs Screen Recording permission,
+	// so a refusal here is information rather than a failure.
+	try {
+		const apps = await invoke<{ id: string; name: string }[]>('list_audio_apps');
+		const sample = apps
+			.slice(0, 3)
+			.map((app) => app.name)
+			.join(', ');
+		await say(
+			`SELFTEST appaudio apps=${apps.length}${apps.length ? ` e.g. ${sample}` : ' (no permission, or unsupported system)'}`
+		);
+		// Start one and see whether PCM actually arrives. Silence still produces
+		// buffers, so this separates "the stream started" from "it delivers".
+		if (apps.length > 0 && mixerRef) {
+			const app = apps.find((a) => /arc|chrome|safari|music|vlc/i.test(a.name)) ?? apps[0];
+			received.bytes = 0;
+			received.blocks = 0;
+			const started = await startAppAudio(mixerRef, '__selftest_app', app);
+			await wait(2000);
+			await say(
+				`SELFTEST appaudio capture=${app.name} started=${started} blocks=${received.blocks} bytes=${received.bytes} ${appAudio.error ?? ''}`
+			);
+			await stopAppAudio(mixerRef, '__selftest_app');
+		}
+	} catch (err) {
+		await say(`SELFTEST appaudio FAILED ${err}`);
+	}
 
 	const ok = Boolean(stats && stats.frames > 30 && !broadcast.error) && faded && lightBg !== darkBg;
 	await say(`SELFTEST ${ok ? 'OK' : 'FAIL'} — terminé`);

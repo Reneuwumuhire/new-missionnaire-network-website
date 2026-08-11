@@ -187,29 +187,43 @@ video source and none of them drew, or when the scene draws nothing at all. A
 scene made of a colour and some text — a "back shortly" card — is a deliberate
 slate and is left alone. Turn it off in **Settings → Video**.
 
-## Sharing a window or tab: the sound
+## Capturing an application's sound
 
-**The picture comes through; the sound does not.** macOS's browser engine
-(WKWebView, which is what Tauri uses) does not implement audio capture of a
-shared window or screen — it accepts the request, returns video only, and
-raises no error. Chromium does this; WebKit does not. No change in this app can
-work around it, so the mixer says so on the strip instead of leaving you hunting
-for a fault that is not yours.
+The browser engine cannot do this — WebKit ignores audio on `getDisplayMedia`
+entirely — so it is captured natively instead, with **ScreenCaptureKit** on
+macOS 13+.
 
-The way round it, and what every macOS streamer does:
+**Audio Mixer → + → Application audio**, then pick the app. Its sound arrives as
+an ordinary strip: its own fader, its own meter, monitored through the same bus
+and encoded through the same mix. No virtual audio device, no BlackHole.
 
-1. Install a virtual audio device — [BlackHole](https://existential.audio/blackhole/)
-   (free) or Loopback.
-2. Send the app's output to it. Simplest is a **Multi-Output Device** in
-   *Audio MIDI Setup* containing both your speakers and BlackHole, selected as
-   the system output — you still hear it, and BlackHole gets a copy.
-3. In the studio's Audio Mixer, **+ → BlackHole** as an audio input.
+It is a separate strip from the screen share on purpose. Capture the window as
+a video source and its audio as an audio source, and you can ride the clip
+against the preacher's mic instead of being stuck with whatever balance the app
+happened to send.
 
-Now the tab's sound is a normal strip with its own fader and meter, which is
-better than a bundled track anyway: you can ride it against the preacher's mic.
+The studio excludes its own output from the capture, so monitoring cannot feed
+back into the mix.
 
-Real per-app capture without the virtual device would mean ScreenCaptureKit on
-the Rust side (macOS 13+). It is a genuine option, just a much larger one.
+Needs **Screen Recording** permission (System Settings › Privacy & Security);
+macOS asks the first time. Video of a shared window still comes from the
+webview's own picker — only the audio is native.
+
+## Windows
+
+The app builds and runs on Windows: the webview there is Chromium, which does
+support display-capture audio, and `pnpm studio:build` produces an installer.
+Two differences to know about:
+
+- **Application audio capture is macOS-only for now.** The module is
+  platform-gated; on Windows the picker reports that the system cannot do it
+  rather than failing. WASAPI process loopback is the equivalent API and is not
+  written yet.
+- `ffmpeg` must be on `PATH` (or in `FFMPEG_PATH`) — the bundled search paths
+  are the Homebrew/MacPorts ones.
+
+Everything else — compositing, scenes, transitions, the mixer, RTMP output —
+is platform-independent.
 
 ## Things worth knowing
 

@@ -1,3 +1,4 @@
+mod appaudio;
 mod ffmpeg;
 
 use ffmpeg::{Encoder, FfmpegInfo, StreamConfig};
@@ -46,6 +47,30 @@ fn stream_running(encoder: State<'_, Encoder>) -> bool {
 #[tauri::command]
 fn selftest_target() -> Option<String> {
 	std::env::var("STUDIO_SELFTEST").ok().filter(|v| !v.is_empty())
+}
+
+/// Applications whose audio can be captured. Empty on systems without a
+/// per-application capture API, which the UI reports as such.
+#[tauri::command]
+fn list_audio_apps() -> Result<Vec<appaudio::AudioApp>, String> {
+	appaudio::list()
+}
+
+/// Start capturing one application's audio. PCM arrives on `channel` as
+/// interleaved stereo f32 at 48 kHz — the rate the webview's AudioContext runs
+/// at, so nothing has to resample.
+#[tauri::command]
+fn start_app_audio(
+	capture: State<'_, appaudio::Capture>,
+	bundle_id: String,
+	channel: tauri::ipc::Channel<tauri::ipc::InvokeResponseBody>,
+) -> Result<(), String> {
+	capture.start(&bundle_id, channel)
+}
+
+#[tauri::command]
+fn stop_app_audio(capture: State<'_, appaudio::Capture>) {
+	capture.stop();
 }
 
 /// Open an external page in the operator's browser — used for the "YouTube is
@@ -102,6 +127,7 @@ pub fn run() {
 
 	tauri::Builder::default()
 		.manage(Encoder::default())
+		.manage(appaudio::Capture::default())
 		.setup(|app| {
 			// Bring the window to the front on launch. Beyond being polite, a
 			// window that never activates is reported as hidden by WebKit, which
@@ -119,6 +145,9 @@ pub fn run() {
 			stream_running,
 			selftest_target,
 			open_url,
+			list_audio_apps,
+			start_app_audio,
+			stop_app_audio,
 			report
 		])
 		.on_window_event(|window, event| {
@@ -127,6 +156,9 @@ pub fn run() {
 			if let tauri::WindowEvent::Destroyed = event {
 				if let Some(encoder) = window.app_handle().try_state::<Encoder>() {
 					let _ = encoder.stop();
+				}
+				if let Some(capture) = window.app_handle().try_state::<appaudio::Capture>() {
+					capture.stop();
 				}
 			}
 		})

@@ -19,6 +19,8 @@ export class Mixer {
 	private readonly strips = new Map<string, Strip>();
 	/** createMediaElementSource throws if called twice on one element. */
 	private readonly elementTaps = new WeakMap<HTMLMediaElement, MediaElementAudioSourceNode>();
+	/** addModule is once per context; every app-audio strip shares the module. */
+	private workletReady: Promise<void> | null = null;
 	/** Scratch buffer for the meters — reused so a 30 Hz UI poll allocates
 	 *  nothing. Sized to the analyser's fftSize. */
 	private readonly meterBuffer = new Uint8Array(1024);
@@ -66,6 +68,23 @@ export class Mixer {
 		if (this.strips.has(id)) return this.strips.get(id)!;
 		if (stream.getAudioTracks().length === 0) return null;
 		return this.makeStrip(id, this.ctx.createMediaStreamSource(stream), null);
+	}
+
+	/** Load the PCM worklet, once. */
+	async ensureWorklet(moduleUrl: string): Promise<void> {
+		if (!this.workletReady) {
+			this.workletReady = this.ctx.audioWorklet.addModule(moduleUrl);
+		}
+		return this.workletReady;
+	}
+
+	/** Any node as a strip — used by the native app-audio capture, which
+	 *  arrives as a worklet rather than a device stream but is otherwise an
+	 *  ordinary source with a fader, a meter and monitoring. */
+	addNode(id: string, node: AudioNode): Strip {
+		const existing = this.strips.get(id);
+		if (existing) return existing;
+		return this.makeStrip(id, node, null);
 	}
 
 	addElement(id: string, element: HTMLMediaElement): Strip {

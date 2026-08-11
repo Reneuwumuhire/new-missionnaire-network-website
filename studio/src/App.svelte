@@ -20,7 +20,7 @@
 	import { Mixer } from './lib/mixer';
 	import { t } from './lib/i18n.svelte';
 	import { clamp, splitWeights, type DockId } from './lib/layout';
-	import { runSelftest, selftestTarget } from './lib/selftest';
+	import { runSelftest, selftestMixer, selftestTarget } from './lib/selftest';
 	import { activeScene, liveAudioLayers, onAirSceneId, persist, studio } from './lib/state.svelte';
 
 	let programCanvas = $state<HTMLCanvasElement | null>(null);
@@ -38,6 +38,7 @@
 
 	onMount(() => {
 		mixer = new Mixer();
+		selftestMixer(mixer);
 		mixer.setMonitor(studio.settings.monitorAudio);
 		// The audio context starts suspended until the page has been interacted
 		// with; a first click is enough and always happens before going live.
@@ -91,6 +92,16 @@
 		const wanted = new Set<string>();
 
 		for (const source of studio.audioSources) {
+			// App audio is a worklet the native capture owns, not a device stream.
+			// It has no media handle, so without this the reconciler would decide
+			// nothing wanted it and tear the strip down a frame after it started.
+			if (source.kind === 'app') {
+				if (bus.has(source.id)) {
+					wanted.add(source.id);
+					bus.setLevel(source.id, source.gain, source.muted);
+				}
+				continue;
+			}
 			const handle = handleFor(source.id);
 			if (!handle?.stream) continue;
 			if (bus.addStream(source.id, handle.stream)) {

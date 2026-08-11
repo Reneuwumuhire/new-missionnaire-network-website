@@ -73,7 +73,12 @@ export interface Scene {
 export interface AudioSource {
 	id: string;
 	name: string;
+	/** `input` is a capture device; `app` is another application's own output,
+	 *  captured natively because the browser engine cannot. */
+	kind: 'input' | 'app';
 	deviceId?: string;
+	/** Bundle identifier of the captured application, for `app` sources. */
+	appId?: string;
 	gain: number;
 	muted: boolean;
 }
@@ -206,7 +211,7 @@ function load(): Persisted {
 		scenes,
 		activeSceneId: scenes[0].id,
 		programSceneId: scenes[0].id,
-		audioSources: [{ id: id(), name: t('mixer.starterMic'), gain: 1, muted: false }],
+		audioSources: [{ id: id(), name: t('mixer.starterMic'), kind: 'input', gain: 1, muted: false }],
 		destinations: [
 			{
 				id: id(),
@@ -237,7 +242,12 @@ function load(): Persisted {
 			scenes: parsed.scenes,
 			activeSceneId: parsed.activeSceneId ?? parsed.scenes[0].id,
 			programSceneId: parsed.programSceneId ?? parsed.activeSceneId ?? parsed.scenes[0].id,
-			audioSources: parsed.audioSources ?? fallback.audioSources,
+			// `kind` arrived after the first shows were saved; anything without one
+			// is a capture device.
+			audioSources: (parsed.audioSources ?? fallback.audioSources).map((source) => ({
+				...source,
+				kind: source.kind ?? 'input'
+			})),
 			destinations: parsed.destinations ?? fallback.destinations,
 			// Merge, so a setting added in a later version gets its default
 			// instead of `undefined` reaching ffmpeg. Layout is merged a level

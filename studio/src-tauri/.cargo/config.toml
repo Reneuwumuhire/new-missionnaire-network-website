@@ -1,0 +1,10 @@
+# screencapturekit links a Swift helper, which pulls in the Swift concurrency
+# runtime. macOS keeps that in /usr/lib/swift, and nothing puts it on the
+# binary's search path by default — without this the test binary aborts at
+# load with "Library not loaded: @rpath/libswift_Concurrency.dylib" and the
+# whole Rust suite becomes unrunnable.
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-Wl,-rpath,/usr/lib/swift"]
+
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "link-arg=-Wl,-rpath,/usr/lib/swift"]
