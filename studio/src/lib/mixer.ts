@@ -15,6 +15,8 @@ export interface Strip {
 	 *  a meter to show you. */
 	analysers: [AnalyserNode, AnalyserNode];
 	node: AudioNode;
+	/** The stream this strip was built from, so a device change is noticed. */
+	stream: MediaStream | null;
 	/** Element sources can only be tapped once per element, ever. */
 	element: HTMLMediaElement | null;
 }
@@ -77,7 +79,8 @@ export class Mixer {
 		id: string,
 		node: AudioNode,
 		element: HTMLMediaElement | null,
-		mono = false
+		mono = false,
+		stream: MediaStream | null = null
 	): Strip {
 		const gain = this.ctx.createGain();
 		// Force two channels so a mono source is upmixed to both legs rather
@@ -117,13 +120,22 @@ export class Mixer {
 		gain.connect(splitter);
 		gain.connect(this.master);
 
-		const strip: Strip = { id, gain, analysers, node, element };
+		const strip: Strip = { id, gain, analysers, node, stream, element };
 		this.strips.set(id, strip);
 		return strip;
 	}
 
 	addStream(id: string, stream: MediaStream): Strip | null {
-		if (this.strips.has(id)) return this.strips.get(id)!;
+		const existing = this.strips.get(id);
+		if (existing) {
+			if (existing.stream === stream) return existing;
+			// A different stream under the same id is the operator changing
+			// device. The strip is deliberately kept alive across the gap — it is
+			// global, and a scene change must not drop it — so without this the
+			// strip would keep the node of a track that has already been stopped
+			// and meter nothing for the rest of the service.
+			this.remove(id);
+		}
 		const track = stream.getAudioTracks()[0];
 		if (!track) return null;
 		// A device that does not declare two channels is treated as mono, and a
@@ -132,7 +144,7 @@ export class Mixer {
 		// ponytail: a stereo interface that declares nothing is folded to its
 		// left leg — give the strip a stereo switch if one ever turns up.
 		const mono = (track.getSettings().channelCount ?? 1) < 2;
-		return this.makeStrip(id, this.ctx.createMediaStreamSource(stream), null, mono);
+		return this.makeStrip(id, this.ctx.createMediaStreamSource(stream), null, mono, stream);
 	}
 
 	/** Load the PCM worklet, once. */

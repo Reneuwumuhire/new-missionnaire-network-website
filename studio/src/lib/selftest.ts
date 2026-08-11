@@ -403,6 +403,22 @@ export async function runAudioSelftest(): Promise<void> {
 	await wait(2500);
 	const secondUp = Boolean(handleFor(second.id)?.stream) && bus.has(second.id);
 	await say(`AUDIOTEST input add=${firstUp} delete-then-add=${secondUp} label=${JSON.stringify(handleFor(second.id)?.stream?.getAudioTracks()[0]?.label ?? '')}`);
+
+	// Choosing a device again is the same call the select makes. The strip is
+	// kept alive across the gap because it is global, so the mixer has to notice
+	// the stream underneath it has been replaced — otherwise it holds the node
+	// of a stopped track and meters nothing for the rest of the service.
+	const wasStrip = bus.addStream(second.id, handleFor(second.id)!.stream!);
+	await openMic(second.id);
+	await wait(1500);
+	const rebuilt = bus.addStream(second.id, handleFor(second.id)!.stream!);
+	const reselected =
+		Boolean(rebuilt) && rebuilt !== wasStrip && rebuilt?.stream === handleFor(second.id)?.stream;
+	const legs = bus.peaks(second.id);
+	await say(
+		`AUDIOTEST input re-select rebuilt=${reselected} L/R=${legs[0].toFixed(4)}/${legs[1].toFixed(4)} strip=${bus.has(second.id)}`
+	);
+	if (!reselected) ok = false;
 	if (!firstUp || !secondUp) ok = false;
 	release(second.id);
 	bus.remove(second.id);
