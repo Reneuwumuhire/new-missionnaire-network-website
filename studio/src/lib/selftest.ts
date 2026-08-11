@@ -26,8 +26,8 @@ import { frameCount, onAirSceneId, renderFrame, takeToProgram } from './composit
 } from './appaudio.svelte';
  import type { Mixer } from './mixer';
 import { toDb } from './meter';
-import { listDevices, openMic, release } from './media.svelte';
-import { id, makeLayer, persist, studio } from './state.svelte';
+import { handleFor, listDevices, openMic, release } from './media.svelte';
+import { addAudioInput, id, makeLayer, persist, studio } from './state.svelte';
 
 const say = (line: string) => invoke('report', { line }).catch(() => console.log(line));
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -311,7 +311,56 @@ export async function runAudioSelftest(): Promise<void> {
 		);
 		if (!desk || received.blocks === 0) ok = false;
 		await stopAppAudio(bus, '__selftest_app');
+
+		// A window carrying an application's sound must keep it when the
+		// programme cuts to a scene that does not contain the window. This is
+		// the one the operator hit twice: the music stopped at the transition.
+		const restoreScenes = studio.scenes;
+		const restoreProgram = studio.programSceneId;
+		const restoreActive = studio.activeSceneId;
+		const shared = makeLayer('screen', '__shared_window', { appId: app.id });
+		const withWindow = { id: id(), name: '__with', layers: [shared] };
+		const without = { id: id(), name: '__without', layers: [makeLayer('color', 'bg')] };
+		studio.scenes = [...studio.scenes, withWindow, without];
+		studio.activeSceneId = withWindow.id;
+		studio.programSceneId = withWindow.id;
+		// The mixer's own effect starts it, exactly as it would for the operator.
+		await wait(2500);
+		const onAir = bus.has(shared.id);
+		studio.activeSceneId = without.id;
+		studio.programSceneId = without.id;
+		await wait(2000);
+		const afterCut = bus.has(shared.id);
+		received.blocks = 0;
+		await wait(1200);
+		await say(
+			`AUDIOTEST scene-cut strip-before=${onAir} strip-after=${afterCut} still-delivering=${received.blocks > 0} capturing=${appAudio.capturing.includes(shared.id)}`
+		);
+		if (!onAir || !afterCut || received.blocks === 0) ok = false;
+		await stopAppAudio(bus, shared.id);
+		studio.scenes = restoreScenes;
+		studio.programSceneId = restoreProgram;
+		studio.activeSceneId = restoreActive;
 	}
+
+	// 4. Delete an input and add another: the new one must open by itself. The
+	//    guard against re-entering openMic while a request is in flight is what
+	//    this would catch if it regressed.
+	const first = addAudioInput();
+	await wait(2500);
+	const firstUp = Boolean(handleFor(first.id)?.stream) && bus.has(first.id);
+	release(first.id);
+	bus.remove(first.id);
+	studio.audioSources = studio.audioSources.filter((s) => s.id !== first.id);
+	await wait(500);
+	const second = addAudioInput();
+	await wait(2500);
+	const secondUp = Boolean(handleFor(second.id)?.stream) && bus.has(second.id);
+	await say(`AUDIOTEST input add=${firstUp} delete-then-add=${secondUp} label=${JSON.stringify(handleFor(second.id)?.stream?.getAudioTracks()[0]?.label ?? '')}`);
+	if (!firstUp || !secondUp) ok = false;
+	release(second.id);
+	bus.remove(second.id);
+	studio.audioSources = studio.audioSources.filter((s) => s.id !== second.id);
 
 	// 4. The automatic association: every window on screen must be recognisable
 	//    from its own title, which is what a shared window gives us to go on.
