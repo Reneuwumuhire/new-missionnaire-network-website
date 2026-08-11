@@ -103,8 +103,17 @@ export class Mixer {
 	setLevel(id: string, gain: number, muted: boolean) {
 		const strip = this.strips.get(id);
 		if (!strip) return;
-		// Ramp instead of jumping — an instant gain change clicks audibly.
-		strip.gain.gain.setTargetAtTime(muted ? 0 : gain, this.ctx.currentTime, 0.02);
+		const target = muted ? 0 : gain;
+		const now = this.ctx.currentTime;
+		const param = strip.gain.gain;
+		// A short linear ramp, not setTargetAtTime. The exponential approach
+		// only ever nears its target, so dragging a fader — which reschedules on
+		// every pointer event — leaves the level permanently chasing the thumb,
+		// and a mute never quite reaches silence. Cancelling first stops a ramp
+		// already in flight from fighting this one.
+		param.cancelScheduledValues(now);
+		param.setValueAtTime(param.value, now);
+		param.linearRampToValueAtTime(target, now + 0.015);
 	}
 
 	/** Peak level 0..1 for a meter. Reads the time-domain buffer rather than

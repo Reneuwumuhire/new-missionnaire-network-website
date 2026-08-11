@@ -1,7 +1,16 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { handleFor, listDevices, openMic, release, type DeviceOption } from '../lib/media.svelte';
-	import { METER_TICKS, decayHold, formatDb, meterFraction, toDb } from '../lib/meter';
+	import {
+		METER_TICKS,
+		decayHold,
+		faderDb,
+		faderGain,
+		formatDb,
+		gainPosition,
+		meterFraction,
+		toDb
+	} from '../lib/meter';
 	import type { Mixer } from '../lib/mixer';
 	import Dock from './Dock.svelte';
 	import Icon from './Icon.svelte';
@@ -212,13 +221,27 @@
 					<input
 						type="range"
 						min="0"
-						max="1.5"
-						step="0.01"
+						max="1"
+						step="0.005"
 						class="min-w-0 flex-1 accent-primary"
-						value={strip.source.gain}
+						aria-label={t('mixer.fader')}
+						value={gainPosition(strip.source.gain)}
 						oninput={(e) =>
-							setLevel(strip, Number((e.currentTarget as HTMLInputElement).value), strip.source.muted)}
+							setLevel(
+								strip,
+								faderGain(Number((e.currentTarget as HTMLInputElement).value)),
+								strip.source.muted
+							)}
 					/>
+					<!-- Where the fader is, which is a different number from the meter
+					     above it and the one an operator calls out. -->
+					<button
+						class="w-14 shrink-0 text-right font-mono text-[10px] text-fg/45 transition-colors hover:text-fg"
+						title={t('mixer.unity')}
+						onclick={() => setLevel(strip, 1, strip.source.muted)}
+					>
+						{formatDb(faderDb(gainPosition(strip.source.gain)))}
+					</button>
 				</div>
 			{:else if strip.isMic}
 				<button class="studio-chip mt-1.5 w-full text-left text-[11px]" onclick={() => connect(strip.source as AudioSource)}>

@@ -93,6 +93,8 @@ const fr: Record<keyof typeof en, string> = {
 		'Sur macOS, le partage d\u2019une fen\u00eatre ou d\u2019un \u00e9cran ne fournit que l\u2019image \u2014 aucun son d\u2019application ni d\u2019onglet, et aucune erreur pour le signaler. Faites passer le son de l\u2019application par un p\u00e9riph\u00e9rique audio virtuel (BlackHole, Loopback) et ajoutez-le ici comme entr\u00e9e audio.',
 	'mixer.defaultInput': 'Entrée par défaut',
 	'mixer.chooseInput': 'Choisir l’entrée',
+	'mixer.fader': 'Niveau',
+	'mixer.unity': 'Cliquer pour l\u2019unit\u00e9 (0 dB)',
 	'mixer.mute': 'Couper',
 	'mixer.unmute': 'Réactiver',
 	'mixer.empty': 'Aucune source audio.',

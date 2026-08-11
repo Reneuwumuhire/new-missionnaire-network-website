@@ -20,6 +20,37 @@ export function formatDb(db: number): string {
 	return `${db > 0 ? '+' : ''}${db.toFixed(1)} dB`;
 }
 
+// ── Fader taper ─────────────────────────────────────────────────
+// A fader travels in dB, not in amplitude. Linear amplitude puts unity at two
+// thirds of the way up and squashes everything below −20 dB into the bottom
+// few percent, which is why a linear fader feels like it does nothing and then
+// everything. −60 dB at the bottom, unity at 10/11, +6 dB at the top.
+
+export const FADER_MIN_DB = -60;
+export const FADER_MAX_DB = 6;
+
+/** Fader position (0..1) as dB. Position 0 is off, not −60 dB. */
+export function faderDb(position: number): number {
+	if (position <= 0) return -Infinity;
+	const p = Math.min(1, position);
+	return FADER_MIN_DB + p * (FADER_MAX_DB - FADER_MIN_DB);
+}
+
+/** Fader position (0..1) as a linear amplitude for a GainNode. */
+export function faderGain(position: number): number {
+	const db = faderDb(position);
+	return Number.isFinite(db) ? 10 ** (db / 20) : 0;
+}
+
+/** Where a stored amplitude sits on the fader — the inverse, so a level saved
+ *  before this existed still lands the thumb in the right place. */
+export function gainPosition(gain: number): number {
+	if (gain <= 0) return 0;
+	const db = 20 * Math.log10(gain);
+	if (db <= FADER_MIN_DB) return 0;
+	return Math.min(1, (db - FADER_MIN_DB) / (FADER_MAX_DB - FADER_MIN_DB));
+}
+
 /** Ticks drawn under a strip, matching OBS's spacing. */
 export const METER_TICKS = [-60, -50, -40, -30, -20, -10, 0];
 

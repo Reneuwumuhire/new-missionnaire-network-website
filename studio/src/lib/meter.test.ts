@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { FLOOR_DB, decayHold, formatDb, meterFraction, toDb } from './meter';
+import {
+	FADER_MAX_DB,
+	FADER_MIN_DB,
+	FLOOR_DB,
+	decayHold,
+	faderDb,
+	faderGain,
+	formatDb,
+	gainPosition,
+	meterFraction,
+	toDb
+} from './meter';
 
 describe('dBFS metering', () => {
 	it('maps full scale to 0 dB and half amplitude to −6 dB', () => {
@@ -49,5 +60,41 @@ describe('peak hold', () => {
 
 	it('never falls below the live level', () => {
 		expect(decayHold(0.5, 0.4, 100_000)).toBe(0.4);
+	});
+});
+
+describe('fader taper', () => {
+	it('travels in dB, so unity is near the top rather than two thirds up', () => {
+		expect(faderDb(1)).toBe(FADER_MAX_DB);
+		expect(faderGain(1)).toBeCloseTo(10 ** (6 / 20), 3);
+		// Unity gain sits where 0 dB falls on a -60..+6 scale.
+		expect(gainPosition(1)).toBeCloseTo(60 / 66, 3);
+	});
+
+	it('is silent at the bottom, not merely quiet', () => {
+		// -60 dB is still audible; an operator pulling a fader to the floor
+		// means off.
+		expect(faderDb(0)).toBe(-Infinity);
+		expect(faderGain(0)).toBe(0);
+		expect(gainPosition(0)).toBe(0);
+	});
+
+	it('round-trips a stored amplitude back to the same thumb position', () => {
+		for (const position of [0.1, 0.35, 0.6, 60 / 66, 1]) {
+			expect(gainPosition(faderGain(position))).toBeCloseTo(position, 5);
+		}
+	});
+
+	it('puts a level saved before the taper existed somewhere sensible', () => {
+		// Old stores held linear amplitude, 1 being unity.
+		expect(gainPosition(1)).toBeCloseTo(60 / 66, 3);
+		expect(gainPosition(0.5)).toBeGreaterThan(0.7);
+		expect(gainPosition(1.5)).toBeLessThanOrEqual(1);
+	});
+
+	it('clamps rather than running off either end', () => {
+		expect(faderDb(2)).toBe(FADER_MAX_DB);
+		expect(gainPosition(0.0001)).toBe(0);
+		expect(FADER_MIN_DB).toBeLessThan(0);
 	});
 });

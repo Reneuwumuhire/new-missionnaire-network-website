@@ -91,6 +91,8 @@ const en = {
 		'macOS gives the browser engine picture only when you share a window or screen \u2014 no application or tab sound, and no error to say so. Route the app\u2019s output through a virtual audio device (BlackHole, Loopback) and add that device here as an audio input.',
 	'mixer.defaultInput': 'Default input',
 	'mixer.chooseInput': 'Choose input',
+	'mixer.fader': 'Level',
+	'mixer.unity': 'Click for unity (0 dB)',
 	'mixer.mute': 'Mute',
 	'mixer.unmute': 'Unmute',
 	'mixer.empty': 'No audio sources.',
