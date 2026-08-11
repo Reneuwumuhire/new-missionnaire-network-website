@@ -140,6 +140,12 @@ const fr: Record<keyof typeof en, string> = {
 	'target.live': 'Connectée',
 	'target.failed': 'Échec',
 	'controls.reaching': 'Connexion aux serveurs…',
+	'controls.goLive': 'Passer en public ({count})',
+	'controls.goLiveHint':
+		'Commence \u00e0 envoyer vers les destinations retenues. Jusqu\u2019ici elles n\u2019ont rien re\u00e7u du tout.',
+	'controls.stopHeld': 'Arr\u00eater le public ({count})',
+	'controls.stopHeldHint':
+		'Arr\u00eate d\u2019alimenter les destinations retenues. La diffusion principale continue. YouTube termine son direct depuis Studio.',
 	'controls.openYouTube': 'Ouvrir YouTube Studio',
 	'controls.openYouTubeHint':
 		'YouTube reçoit ce flux. Avec une clé de flux par défaut, il se publie tout seul dès la connexion ; un direct programmé attend le Go Live dans Studio. Dans les deux cas cette application ne peut ni le démarrer ni l’arrêter.',
@@ -271,6 +277,9 @@ const fr: Record<keyof typeof en, string> = {
 	'stream.newDestination': 'Nouvelle destination',
 	'stream.urlPlaceholder': 'rtmp://serveur/application',
 	'stream.keyPlaceholder': 'clé de flux',
+	'stream.hold': 'Attendre le Go Live',
+	'stream.holdHint':
+		'Rien n\u2019est envoy\u00e9 ici au d\u00e9marrage de la diffusion. Avec une cl\u00e9 par d\u00e9faut, YouTube publie d\u00e8s la premi\u00e8re image re\u00e7ue : le retenir est le seul moyen de choisir le moment de passer en public.',
 	'stream.showKey': 'Voir',
 	'stream.hideKey': 'Cacher',
 	'stream.missingUrl': 'URL manquante',
@@ -287,6 +296,8 @@ const fr: Record<keyof typeof en, string> = {
 		'Les clés sont enregistrées en clair dans les données de l’application, comme le fait OBS. Ne partagez pas de capture d’écran avec une clé affichée.',
 
 	// ── Errors ──────────────────────────────────────────────────
+	'error.noImmediateDestination':
+		'Toutes les destinations activ\u00e9es attendent le Go Live. D\u00e9cochez \u00ab Retenir \u00bb sur au moins une, sinon il n\u2019y a rien \u00e0 d\u00e9marrer.',
 	'error.noDestination': 'Activez au moins une destination',
 	'error.noRecorder': 'Ce système ne sait pas encoder la vidéo (MediaRecorder indisponible)',
 	'error.encoder': 'Encodeur : {message}',

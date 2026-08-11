@@ -104,19 +104,29 @@ Failed, and the host it is talking to. A destination that fails is named: with
 several destinations ffmpeg's `tee` reports which slave died, so YouTube
 refusing a key shows up against YouTube and the church stream carries on.
 
-**This app cannot start or stop a YouTube broadcast** — it has no YouTube API,
-only an RTMP push. What happens after the stream reaches YouTube is YouTube's
-decision:
+### Holding a destination back
 
-- **Default stream key** (Studio → Go live → Stream): auto-start is on, so the
-  broadcast **publishes itself the moment ffmpeg connects**. You are live before
-  you touch anything here.
-- **Scheduled stream** with auto-start off: YouTube holds it in preview until
-  you press Go Live in Studio.
+YouTube publishes the instant its ingest sees a frame when you use a default
+stream key — auto-start is on and cannot be turned off for that key. So
+"Start Streaming" would put you live in public whether you meant to or not.
 
-Once the YouTube ingest is receiving, an *Open YouTube Studio* button appears.
-It opens a browser tab, nothing more. If you want the two-stage behaviour,
-schedule the stream in YouTube Studio and turn auto-start off there.
+Tick **Wait for Go Live** on a destination (*Settings → Stream*; it is on by
+default for YouTube, Facebook and Twitch) and **nothing is sent there at all**
+when streaming starts. YouTube sees no stream, so it has nothing to publish.
+A **Go Live** button then appears in Controls; press it and the held
+destinations connect.
+
+They get their own encoder rather than joining the running one, because an
+output cannot be added to a live ffmpeg and restarting it would drop the
+congregation's stream to bring up a public one. The cost is a second encode
+while both run.
+
+**This app still cannot stop a YouTube broadcast** — it has no YouTube API. Go
+Live stops *feeding* YouTube; ending the broadcast is done in Studio, and the
+*Open YouTube Studio* button takes you there.
+
+If you would rather have YouTube's own two-stage flow, schedule the stream in
+Studio and turn auto-start off there; the hold works either way.
 
 ### Stream health
 

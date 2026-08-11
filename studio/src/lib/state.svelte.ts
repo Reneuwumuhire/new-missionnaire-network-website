@@ -89,6 +89,11 @@ export interface Destination {
 	url: string;
 	key: string;
 	enabled: boolean;
+	/** Hold this one back until the operator presses Go Live, rather than
+	 *  connecting it with Start Streaming. Nothing reaches the service at all
+	 *  until then, so a platform that auto-publishes on first frame — which is
+	 *  what YouTube's default stream key does — cannot jump the gun. */
+	hold: boolean;
 }
 
 export interface Settings {
@@ -218,14 +223,18 @@ function load(): Persisted {
 				name: t('stream.presetMissionnaire'),
 				url: 'rtmp://localhost:1935/live',
 				key: 'obs',
-				enabled: true
+				enabled: true,
+				hold: false
 			},
 			{
 				id: id(),
+				// Held by default: going live publicly should be a decision, not a
+				// side effect of pressing Start Streaming.
 				name: 'YouTube',
 				url: 'rtmp://a.rtmp.youtube.com/live2',
 				key: '',
-				enabled: false
+				enabled: false,
+				hold: true
 			}
 		],
 		settings: {
@@ -248,7 +257,12 @@ function load(): Persisted {
 				...source,
 				kind: source.kind ?? 'input'
 			})),
-			destinations: parsed.destinations ?? fallback.destinations,
+			// `hold` arrived later; anything saved without it kept the old
+			// behaviour of connecting immediately.
+			destinations: (parsed.destinations ?? fallback.destinations).map((destination) => ({
+				...destination,
+				hold: destination.hold ?? false
+			})),
 			// Merge, so a setting added in a later version gets its default
 			// instead of `undefined` reaching ffmpeg. Layout is merged a level
 			// deeper for the same reason — a new dock must get a weight.

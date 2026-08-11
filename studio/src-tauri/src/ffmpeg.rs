@@ -6,7 +6,7 @@
 //! webview — switching scenes is just drawing something else, so the encoder
 //! and the RTMP connections never restart mid-broadcast.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
@@ -76,8 +76,22 @@ struct Running {
 	discarded: Arc<AtomicU64>,
 }
 
+/// Encoders run in named groups so a destination can be held back without
+/// touching the one already on air. `main` starts with Start Streaming; a
+/// held group (YouTube, typically) starts only when the operator says so, and
+/// gets its own ffmpeg fed the same chunks — adding an output to a running
+/// ffmpeg is not possible, and restarting it would drop the congregation's
+/// stream to add a public one.
 #[derive(Default)]
-pub struct Encoder(Mutex<Option<Running>>);
+pub struct Encoder {
+	groups: Mutex<HashMap<String, Running>>,
+	/// The first chunk MediaRecorder produced this session: the EBML header,
+	/// segment and track definitions. An encoder started later would otherwise
+	/// be handed a WebM stream beginning in the middle, which ffmpeg cannot
+	/// parse at all — it exits immediately. Replaying the header first is what
+	/// lets a held destination join a recording already in progress.
+	header: Mutex<Option<Vec<u8>>>,
+}
 
 // ── ffmpeg discovery ──────────────────────────────────────────────
 // A macOS .app is launched by Finder, which does not source a login shell, so
@@ -279,13 +293,25 @@ pub fn redact(args: &[String]) -> Vec<String> {
 
 impl Encoder {
 	pub fn is_running(&self) -> bool {
-		self.0.lock().map(|g| g.is_some()).unwrap_or(false)
+		self.groups.lock().map(|g| !g.is_empty()).unwrap_or(false)
 	}
 
-	pub fn start(&self, app: &AppHandle, cfg: StreamConfig) -> Result<Vec<String>, String> {
-		let mut guard = self.0.lock().map_err(|e| e.to_string())?;
-		if guard.is_some() {
-			return Err("Une diffusion est déjà en cours".into());
+	pub fn start(
+		&self,
+		app: &AppHandle,
+		cfg: StreamConfig,
+		group: &str,
+	) -> Result<Vec<String>, String> {
+		let mut guard = self.groups.lock().map_err(|e| e.to_string())?;
+		if guard.contains_key(group) {
+			return Err("Cette diffusion est déjà en cours".into());
+		}
+		// First encoder of a session: the recorder is about to be created, so
+		// the header we are holding belongs to the previous one.
+		if guard.is_empty() {
+			if let Ok(mut header) = self.header.lock() {
+				*header = None;
+			}
 		}
 		let bin = resolve_ffmpeg()?;
 		let args = build_args(&cfg)?;
@@ -320,6 +346,7 @@ impl Encoder {
 		// Progress reader: `-progress pipe:1` emits key=value blocks terminated
 		// by `progress=continue`.
 		let app_stats = app.clone();
+		let group_stats = group.to_string();
 		let discarded_stats = discarded.clone();
 		thread::spawn(move || {
 			let mut stats = StreamStats::default();
@@ -348,7 +375,10 @@ impl Encoder {
 					}
 					"progress" => {
 						stats.discarded_chunks = discarded_stats.load(Ordering::Relaxed);
-						let _ = app_stats.emit("stream://stats", stats.clone());
+						let _ = app_stats.emit(
+							"stream://stats",
+							serde_json::json!({ "group": group_stats, "stats": stats.clone() }),
+						);
 					}
 					_ => {}
 				}
@@ -358,6 +388,7 @@ impl Encoder {
 		// stderr reader: surfaces ffmpeg's own words, and the exit reason.
 		let target_count = cfg.targets.len();
 		let app_log = app.clone();
+		let group_log = group.to_string();
 		let child_handle = Arc::new(Mutex::new(child));
 		let child_wait = child_handle.clone();
 		thread::spawn(move || {
@@ -370,7 +401,12 @@ impl Encoder {
 				if let Some((index, reason)) = parse_target_failure(&line, target_count == 1) {
 					let _ = app_log.emit(
 						"stream://target",
-						serde_json::json!({ "index": index, "state": "failed", "reason": reason }),
+						serde_json::json!({
+							"group": group_log,
+							"index": index,
+							"state": "failed",
+							"reason": reason
+						}),
 					);
 				}
 				let _ = app_log.emit("stream://log", line);
@@ -382,39 +418,80 @@ impl Encoder {
 			let _ = app_log.emit(
 				"stream://exited",
 				serde_json::json!({
+					"group": group_log,
 					"code": code,
 					"log": tail.iter().cloned().collect::<Vec<_>>(),
 				}),
 			);
 		});
 
-		*guard = Some(Running {
-			tx: Some(tx),
-			child: child_handle,
-			discarded,
-		});
+		// A group joining a session already under way needs the stream's opening
+		// bytes before any cluster, or ffmpeg sees a headerless stream.
+		if let Ok(header) = self.header.lock() {
+			if let Some(bytes) = header.as_ref() {
+				let _ = tx.try_send(bytes.clone());
+			}
+		}
+
+		guard.insert(
+			group.to_string(),
+			Running {
+				tx: Some(tx),
+				child: child_handle,
+				discarded,
+			},
+		);
 		Ok(redact(&args))
 	}
 
+	/// Every running group gets the same chunk. A group that has died is not
+	/// allowed to fail the others — the held YouTube encoder dropping out must
+	/// not take the church's own stream with it.
 	pub fn push(&self, bytes: &[u8]) -> Result<(), String> {
-		let guard = self.0.lock().map_err(|e| e.to_string())?;
+		// ponytail: the whole first chunk is kept as the header. MediaRecorder
+		// puts the EBML header and track definitions in it and starts clusters
+		// after, so this is a little more than strictly needed but never less.
+		// Parse the EBML properly if a held encoder ever starts on a bad frame.
+		if let Ok(mut header) = self.header.lock() {
+			if header.is_none() {
+				*header = Some(bytes.to_vec());
+			}
+		}
+		let guard = self.groups.lock().map_err(|e| e.to_string())?;
 		// A chunk arriving after stop() is normal — MediaRecorder flushes one
 		// last blob on its way down. Silently ignore it.
-		let Some(run) = guard.as_ref() else { return Ok(()) };
-		let Some(tx) = run.tx.as_ref() else { return Ok(()) };
-		match tx.try_send(bytes.to_vec()) {
-			Ok(()) => Ok(()),
-			Err(TrySendError::Full(_)) => {
-				run.discarded.fetch_add(1, Ordering::Relaxed);
-				Ok(())
+		for run in guard.values() {
+			let Some(tx) = run.tx.as_ref() else { continue };
+			match tx.try_send(bytes.to_vec()) {
+				Ok(()) => {}
+				Err(TrySendError::Full(_)) => {
+					run.discarded.fetch_add(1, Ordering::Relaxed);
+				}
+				Err(TrySendError::Disconnected(_)) => {}
 			}
-			Err(TrySendError::Disconnected(_)) => Err("Le flux ffmpeg s'est arrêté".into()),
 		}
+		Ok(())
+	}
+
+	/// Stop one group, or every group when `group` is None.
+	pub fn stop_group(&self, group: Option<&str>) -> Result<(), String> {
+		let mut guard = self.groups.lock().map_err(|e| e.to_string())?;
+		let names: Vec<String> = match group {
+			Some(name) => vec![name.to_string()],
+			None => guard.keys().cloned().collect()
+		};
+		for name in names {
+			let Some(mut run) = guard.remove(&name) else { continue };
+			Self::shut_down(&mut run);
+		}
+		Ok(())
 	}
 
 	pub fn stop(&self) -> Result<(), String> {
-		let mut guard = self.0.lock().map_err(|e| e.to_string())?;
-		let Some(mut run) = guard.take() else { return Ok(()) };
+		self.stop_group(None)
+	}
+
+	fn shut_down(run: &mut Running) {
 		// Drop the sender → writer thread finishes the queue, closes stdin,
 		// ffmpeg writes its trailer and exits. The stderr thread reaps it.
 		run.tx = None;
@@ -428,7 +505,6 @@ impl Encoder {
 				}
 			}
 		});
-		Ok(())
 	}
 }
 

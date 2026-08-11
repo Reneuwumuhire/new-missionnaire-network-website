@@ -1,6 +1,13 @@
 <script lang="ts">
 	import { invoke } from '@tauri-apps/api/core';
-	import { broadcast, formatBytes, isStreaming } from '../lib/broadcast.svelte';
+	import {
+		broadcast,
+		formatBytes,
+		goLiveHeld,
+		heldDestinations,
+		isStreaming,
+		stopHeld
+	} from '../lib/broadcast.svelte';
 	import Dock from './Dock.svelte';
 	import Icon from './Icon.svelte';
 	import { t } from '../lib/i18n.svelte';
@@ -23,12 +30,14 @@
 		studio.destinations.filter((d) => d.enabled && destinationUrl(d).length > 8)
 	);
 
-	// This app has no YouTube API and cannot publish or stop a broadcast. With a
-	// default stream key YouTube auto-starts as soon as the ingest connects, so
-	// by the time this shows it is usually already live; a scheduled stream
-	// still waits for Go Live in Studio. Either way the honest offer is a link.
+	// Held destinations get nothing at all until this is pressed, so a platform
+	// that publishes on first frame cannot go public on its own. Once connected
+	// the app still cannot stop YouTube's broadcast — only stop feeding it —
+	// which is why the button below opens Studio rather than claiming to.
+	const held = $derived(heldDestinations());
+	const canGoLive = $derived(broadcast.phase === 'live' && held.length > 0);
 	const youtubeReady = $derived(
-		broadcast.targets.some((target) => target.youtube && target.state === 'live')
+		broadcast.heldLive && broadcast.targets.some((target) => target.youtube && target.state === 'live')
 	);
 
 	const stats = $derived(broadcast.stats);

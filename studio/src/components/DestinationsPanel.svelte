@@ -32,7 +32,10 @@
 				name: preset?.name() ?? t('stream.newDestination'),
 				url: preset?.url ?? 'rtmp://',
 				key: '',
-				enabled: false
+				enabled: false,
+				// Public platforms default to held: several publish the instant
+				// their ingest sees a frame, and that should not be a surprise.
+				hold: /youtube|facebook|twitch/i.test(preset?.url ?? '')
 			}
 		];
 		persist();
@@ -119,6 +122,25 @@
 					>
 				</div>
 			</div>
+
+			<label class="mt-2 flex items-start gap-2 text-[11px] text-fg/60">
+				<input
+					type="checkbox"
+					class="mt-0.5 accent-primary"
+					checked={destination.hold}
+					disabled={isStreaming()}
+					onchange={(e) => {
+						destination.hold = (e.currentTarget as HTMLInputElement).checked;
+						persist();
+					}}
+				/>
+				<span>
+					{t('stream.hold')}
+					<span class="mt-0.5 block text-[10px] leading-relaxed text-fg/35">
+						{t('stream.holdHint')}
+					</span>
+				</span>
+			</label>
 
 			{#if issue}
 				<p class="mt-2 text-[11px] text-amber-400/90">{issue}</p>

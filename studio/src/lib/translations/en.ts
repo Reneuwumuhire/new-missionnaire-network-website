@@ -138,6 +138,12 @@ const en = {
 	'target.live': 'Connected',
 	'target.failed': 'Failed',
 	'controls.reaching': 'Reaching servers…',
+	'controls.goLive': 'Go Live ({count})',
+	'controls.goLiveHint':
+		'Start sending to the destinations you held back. Until now they have received nothing at all.',
+	'controls.stopHeld': 'Stop public ({count})',
+	'controls.stopHeldHint':
+		'Stop feeding the held destinations. The main stream keeps running. YouTube ends its own broadcast in Studio.',
 	'controls.openYouTube': 'Open YouTube Studio',
 	'controls.openYouTubeHint':
 		'YouTube is receiving this stream. With a default stream key it publishes itself the moment it connects; a scheduled stream waits for Go Live in Studio. Either way this app cannot start or stop it.',
@@ -267,6 +273,9 @@ const en = {
 	'stream.newDestination': 'New destination',
 	'stream.urlPlaceholder': 'rtmp://server/application',
 	'stream.keyPlaceholder': 'stream key',
+	'stream.hold': 'Wait for Go Live',
+	'stream.holdHint':
+		'Nothing is sent here when streaming starts. YouTube publishes the moment its ingest sees a frame with a default stream key, so holding it back is the only way to decide when you go public.',
 	'stream.showKey': 'Show',
 	'stream.hideKey': 'Hide',
 	'stream.missingUrl': 'Missing URL',
@@ -283,6 +292,8 @@ const en = {
 		'Keys are stored in the clear in the app’s data, the same as OBS stores its own. Don’t share a screenshot with a key revealed.',
 
 	// ── Errors ──────────────────────────────────────────────────
+	'error.noImmediateDestination':
+		'Every enabled destination is set to wait for Go Live. Untick \u201cHold\u201d on at least one, or there is nothing to start.',
 	'error.noDestination': 'Enable at least one destination',
 	'error.noRecorder': 'This system cannot encode video (MediaRecorder unavailable)',
 	'error.encoder': 'Encoder: {message}',

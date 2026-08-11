@@ -31,8 +31,12 @@ export interface Stats {
 
 export type TargetState = 'connecting' | 'live' | 'failed';
 
+export type StreamGroup = 'main' | 'held';
+
 export interface TargetStatus {
 	name: string;
+	/** Which encoder carries it — `held` only exists once Go Live is pressed. */
+	group: StreamGroup;
 	/** Host only — shown instead of the URL so a key never lands on screen. */
 	host: string;
 	state: TargetState;
@@ -48,6 +52,8 @@ export type Phase = 'idle' | 'connecting' | 'live';
 
 export const broadcast = $state({
 	phase: 'idle' as Phase,
+	/** True once the held destinations have their own encoder running. */
+	heldLive: false,
 	starting: false,
 	error: null as string | null,
 	stats: null as Stats | null,
@@ -100,15 +106,16 @@ export async function startBroadcast(
 		const enabled =
 			targets ??
 			studio.destinations
-				.filter((d) => d.enabled && d.url.trim())
+				.filter((d) => d.enabled && !d.hold && d.url.trim())
 				.map((d) => ({ name: d.name, url: destinationUrl(d) }));
-		if (enabled.length === 0) throw new Error(t('error.noDestination'));
+		if (enabled.length === 0) throw new Error(t('error.noImmediateDestination'));
 
 		const mime = pickMimeType();
 		if (!mime) throw new Error(t('error.noRecorder'));
 
 		const { settings } = studio;
 		const command = await invoke<string[]>('start_stream', {
+			group: 'main',
 			config: {
 				container: containerOf(mime),
 				targets: enabled,
@@ -124,6 +131,7 @@ export async function startBroadcast(
 			host: hostOf(target.url),
 			state: 'connecting' as TargetState,
 			reason: null,
+			group: 'main' as StreamGroup,
 			youtube: /\byoutube\b/i.test(target.url)
 		}));
 
@@ -170,24 +178,30 @@ export async function startBroadcast(
 async function attachListeners() {
 	await detachListeners();
 	unlisteners = [
-		await listen<Stats>('stream://stats', (event) => {
-			broadcast.stats = event.payload;
+		await listen<{ group: StreamGroup; stats: Stats }>('stream://stats', (event) => {
+			if (event.payload.group !== 'main') return;
+			broadcast.stats = event.payload.stats;
 			// Output is flowing — every target that has not reported a failure is
 			// connected, and this is the instant we count as on air.
-			if (broadcast.phase === 'connecting' && event.payload.frames > 0) {
+			if (broadcast.phase === 'connecting' && event.payload.stats.frames > 0) {
 				broadcast.phase = 'live';
 				broadcast.startedAt = Date.now();
 			}
 			if (broadcast.phase === 'live') {
 				for (const target of broadcast.targets) {
-					if (target.state === 'connecting') target.state = 'live';
+					// A held target is only connected once its own encoder runs.
+					if (target.state !== 'connecting') continue;
+					if (target.group === 'main' || broadcast.heldLive) target.state = 'live';
 				}
 			}
 		}),
-		await listen<{ index: number; state: TargetState; reason: string }>(
+		await listen<{ group: StreamGroup; index: number; state: TargetState; reason: string }>(
 			'stream://target',
 			(event) => {
-				const target = broadcast.targets[event.payload.index];
+				// Indices are per encoder, so the group picks the list first.
+				const target = broadcast.targets.filter((t) => t.group === event.payload.group)[
+					event.payload.index
+				];
 				if (!target) return;
 				target.state = event.payload.state;
 				target.reason = event.payload.reason;
@@ -196,8 +210,16 @@ async function attachListeners() {
 		await listen<string>('stream://log', (event) => {
 			broadcast.log = [...broadcast.log.slice(-199), event.payload];
 		}),
-		await listen<{ code: number; log: string[] }>('stream://exited', (event) => {
+		await listen<{ group: StreamGroup; code: number; log: string[] }>('stream://exited', (event) => {
 			if (!isStreaming()) return;
+			if (event.payload.group === 'held') {
+				// Losing the held encoder must not take the main stream down.
+				broadcast.heldLive = false;
+				for (const target of broadcast.targets) {
+					if (target.group === 'held') target.state = 'failed';
+				}
+				return;
+			}
 			// ffmpeg died on its own — never leave the UI showing "on air".
 			broadcast.phase = 'idle';
 			broadcast.targets = broadcast.targets.map((target) => ({ ...target, state: 'failed' }));
@@ -232,10 +254,11 @@ export async function stopBroadcast() {
 	// Let the queued chunks land before closing ffmpeg's stdin, so the last
 	// second of the service is not truncated.
 	await chain.catch(() => {});
-	await invoke('stop_stream').catch((err) => {
+	await invoke('stop_stream', { group: null }).catch((err) => {
 		broadcast.error = String(err);
 	});
 	broadcast.phase = 'idle';
+	broadcast.heldLive = false;
 	broadcast.startedAt = null;
 	broadcast.stats = null;
 	broadcast.targets = [];
@@ -255,6 +278,59 @@ export function formatBytes(bytes: number): string {
 	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
 	if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 	return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
+}
+
+/** Held destinations that are enabled and configured. */
+export function heldDestinations() {
+	return studio.destinations.filter((d) => d.enabled && d.hold && d.url.trim());
+}
+
+/** Connect the held destinations. Their own ffmpeg is started and fed the same
+ *  chunks, so the stream already on air is not touched — an output cannot be
+ *  added to a running ffmpeg, and restarting it to add one would drop the
+ *  congregation's stream to bring up a public one. */
+export async function goLiveHeld(): Promise<void> {
+	if (broadcast.phase !== 'live' || broadcast.heldLive) return;
+	const held = heldDestinations();
+	if (held.length === 0) return;
+	const mime = pickMimeType();
+	if (!mime) return;
+
+	const { settings } = studio;
+	try {
+		await invoke<string[]>('start_stream', {
+			group: 'held',
+			config: {
+				container: containerOf(mime),
+				targets: held.map((d) => ({ name: d.name, url: destinationUrl(d) })),
+				fps: settings.fps,
+				video_bitrate_kbps: settings.videoBitrateKbps,
+				audio_bitrate_kbps: settings.audioBitrateKbps,
+				encoder: settings.encoder
+			}
+		});
+		broadcast.targets = [
+			...broadcast.targets,
+			...held.map((d) => ({
+				name: d.name,
+				host: hostOf(destinationUrl(d)),
+				state: 'connecting' as TargetState,
+				reason: null,
+				group: 'held' as StreamGroup,
+				youtube: /\byoutube\b/i.test(d.url)
+			}))
+		];
+		broadcast.heldLive = true;
+	} catch (err) {
+		broadcast.error = err instanceof Error ? err.message : String(err);
+	}
+}
+
+/** Disconnect the held destinations, leaving the main stream running. */
+export async function stopHeld(): Promise<void> {
+	await invoke('stop_stream', { group: 'held' }).catch(() => {});
+	broadcast.heldLive = false;
+	broadcast.targets = broadcast.targets.filter((target) => target.group !== 'held');
 }
 
 export function uptimeLabel(nowMs: number): string {

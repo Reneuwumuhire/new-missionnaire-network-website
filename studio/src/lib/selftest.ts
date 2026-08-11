@@ -6,7 +6,13 @@
 //   STUDIO_SELFTEST=rtmp://127.0.0.1:1935/live/test pnpm studio
 
 import { invoke } from '@tauri-apps/api/core';
-import { broadcast, chunkCount, startBroadcast, stopBroadcast } from './broadcast.svelte';
+import {
+	broadcast,
+	chunkCount,
+	goLiveHeld,
+	startBroadcast,
+	stopBroadcast
+} from './broadcast.svelte';
 import { frameCount, onAirSceneId, renderFrame, takeToProgram } from './compositor';
  import { applyTheme } from './i18n.svelte';
  import { appAudio, received, startAppAudio, stopAppAudio } from './appaudio.svelte';
@@ -120,8 +126,43 @@ export function selftestMixer(mixer: Mixer | null) {
 	mixerRef = mixer;
 }
 
+/** `STUDIO_SELFTEST=main,held` exercises the hold: the held destination must
+ *  receive nothing at all until Go Live is pressed. */
+async function checkHold(
+	heldUrl: string,
+	canvas: HTMLCanvasElement,
+	audio: MediaStreamTrack | undefined
+) {
+	const restore = studio.destinations;
+	studio.destinations = [
+		{ id: 'st-main', name: 'main', url: restoreMainUrl, key: '', enabled: true, hold: false },
+		{ id: 'st-held', name: 'held', url: heldUrl, key: '', enabled: true, hold: true }
+	];
+
+	await startBroadcast(canvas, audio);
+	await say(`SELFTEST hold started phase=${broadcast.phase} heldLive=${broadcast.heldLive}`);
+	await wait(6000);
+	await say(
+		`SELFTEST hold before-golive phase=${broadcast.phase} heldLive=${broadcast.heldLive} targets=${broadcast.targets.map((t) => `${t.name}/${t.group}:${t.state}`).join(' ')}`
+	);
+
+	await goLiveHeld();
+	await wait(6000);
+	await say(
+		`SELFTEST hold after-golive heldLive=${broadcast.heldLive} targets=${broadcast.targets.map((t) => `${t.name}/${t.group}:${t.state}`).join(' ')}`
+	);
+
+	await stopBroadcast();
+	studio.destinations = restore;
+}
+
+let restoreMainUrl = '';
+
 export async function runSelftest(target: string, canvas: () => HTMLCanvasElement | null, audio: () => MediaStreamTrack | undefined) {
-	await say(`SELFTEST target=${target}`);
+	const [mainUrl, heldUrl] = target.split(',');
+	restoreMainUrl = mainUrl;
+	target = mainUrl;
+	await say(`SELFTEST target=${target}${heldUrl ? ` held=${heldUrl}` : ''}`);
 
 	// A scene with no camera or screen source: nothing that would sit on an OS
 	// permission prompt.
@@ -136,6 +177,16 @@ export async function runSelftest(target: string, canvas: () => HTMLCanvasElemen
 	const el = canvas();
 	if (!el) {
 		await say('SELFTEST FAIL: pas de canvas');
+		return;
+	}
+
+	if (heldUrl) {
+		// A one-shot ffmpeg listener accepts a single publisher, so running the
+		// ordinary broadcast first would consume it and the hold check would
+		// fail to connect for reasons of its own making.
+		await checkHold(heldUrl, el, audio());
+		const faded = await checkFade(el);
+		await say(`SELFTEST ${faded ? 'OK' : 'FAIL'} — terminé (hold run)`);
 		return;
 	}
 
@@ -167,6 +218,7 @@ export async function runSelftest(target: string, canvas: () => HTMLCanvasElemen
 	for (const line of broadcast.log.slice(-8)) await say(`SELFTEST ffmpeg| ${line}`);
 
 	await stopBroadcast();
+
 	const faded = await checkFade(el);
 	studio.activeSceneId = previousScene;
 	await wait(1200);

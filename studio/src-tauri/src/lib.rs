@@ -16,8 +16,9 @@ fn start_stream(
 	app: AppHandle,
 	encoder: State<'_, Encoder>,
 	config: StreamConfig,
+	group: String,
 ) -> Result<Vec<String>, String> {
-	encoder.start(&app, config)
+	encoder.start(&app, config, &group)
 }
 
 /// Media chunks arrive as a raw IPC body (not JSON) — a JSON number array
@@ -31,8 +32,8 @@ fn push_chunk(encoder: State<'_, Encoder>, request: tauri::ipc::Request<'_>) -> 
 }
 
 #[tauri::command]
-fn stop_stream(encoder: State<'_, Encoder>) -> Result<(), String> {
-	encoder.stop()
+fn stop_stream(encoder: State<'_, Encoder>, group: Option<String>) -> Result<(), String> {
+	encoder.stop_group(group.as_deref())
 }
 
 #[tauri::command]
