@@ -206,6 +206,13 @@ const en = {
 	'lyrics.starterLayer': 'Lyrics',
 
 	// ── Properties ──────────────────────────────────────────────
+	'media.needsFile': 'Pick the file again \u2014 Sources \u203a Reconnect',
+	'media.transport': 'Media transport',
+	'media.back': 'Back ten seconds',
+	'media.forward': 'Forward ten seconds',
+	'media.scrub': 'Position in the recording',
+	'media.followShort': 'Lyrics',
+	'props.transportMoved': 'Play, pause and scrubbing are on the transport bar under the preview, where they stay in reach during a service.',
 	'props.title': 'Source properties',
 	'props.empty': 'Select a source in the list, or click it in the preview.',
 	'props.device': 'Device',

@@ -208,6 +208,13 @@ const fr: Record<keyof typeof en, string> = {
 	'lyrics.starterLayer': 'Paroles',
 
 	// ── Properties ──────────────────────────────────────────────
+	'media.needsFile': 'Rechoisir le fichier \u2014 Sources \u203a Reconnecter',
+	'media.transport': 'Lecture du m\u00e9dia',
+	'media.back': 'Dix secondes en arri\u00e8re',
+	'media.forward': 'Dix secondes en avant',
+	'media.scrub': 'Position dans l\u2019enregistrement',
+	'media.followShort': 'Paroles',
+	'props.transportMoved': 'La lecture, la pause et le d\u00e9filement sont sur la barre sous l\u2019aper\u00e7u, \u00e0 port\u00e9e pendant le culte.',
 	'props.title': 'Propriétés de la source',
 	'props.empty': 'Sélectionnez une source dans la liste, ou cliquez-la dans l’aperçu.',
 	'props.device': 'Appareil',

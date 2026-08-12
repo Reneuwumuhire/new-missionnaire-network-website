@@ -4,6 +4,7 @@
 	import Icon from './components/Icon.svelte';
 	import LyricsPanel from './components/LyricsPanel.svelte';
 	import LyricsRibbon from './components/LyricsRibbon.svelte';
+	import MediaBar from './components/MediaBar.svelte';
 	import MixerDock from './components/MixerDock.svelte';
 	import Modal from './components/Modal.svelte';
 	import Preview from './components/Preview.svelte';
@@ -350,6 +351,10 @@
 					/>
 				{/if}
 			</div>
+
+			<!-- The transport sits above the source strip, always in reach: a
+			     recording is paused and wound back while the service runs. -->
+			<MediaBar />
 
 			<!-- Selected-source strip, where OBS puts its Properties/Filters bar. -->
 			<div class="flex h-9 shrink-0 items-center gap-3 border-t border-ink-700 bg-ink-950 px-5">

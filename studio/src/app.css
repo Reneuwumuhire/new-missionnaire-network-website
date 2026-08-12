@@ -104,6 +104,35 @@ textarea {
 		@apply bg-primary px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-black transition-colors hover:bg-missionnaire-400 disabled:cursor-not-allowed disabled:opacity-40;
 	}
 
+	/* The transport's position bar. WebKit paints an unstyled range track
+	   near-white, which on this page reads as a lit bar rather than a control,
+	   so the track is drawn from the palette: played in the accent, the rest in
+	   a border tone, and a thin bright thumb that says exactly where you are. */
+	.studio-scrub {
+		@apply h-4 w-full cursor-pointer appearance-none bg-transparent disabled:cursor-not-allowed disabled:opacity-40;
+	}
+
+	.studio-scrub::-webkit-slider-runnable-track {
+		height: 3px;
+		background: linear-gradient(
+			to right,
+			#ff880c var(--played, 0%),
+			rgb(var(--ink-700)) var(--played, 0%)
+		);
+	}
+
+	.studio-scrub::-webkit-slider-thumb {
+		@apply appearance-none;
+		width: 3px;
+		height: 13px;
+		margin-top: -5px;
+		background: rgb(var(--fg) / 0.85);
+	}
+
+	.studio-scrub:focus-visible::-webkit-slider-thumb {
+		background: #ff880c;
+	}
+
 	.studio-icon-btn {
 		@apply flex h-6 w-6 shrink-0 items-center justify-center text-sm text-fg/35 transition-colors hover:bg-fg/10 hover:text-fg disabled:pointer-events-none disabled:opacity-20;
 	}

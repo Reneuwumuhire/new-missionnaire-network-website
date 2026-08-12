@@ -187,59 +187,9 @@
 		{/if}
 
 		{#if layer.kind === 'video'}
-			{@const el = media}
-			<div class="space-y-2">
-				<!-- A recording played during a service is scrubbed, not just
-				     started: the operator lands on the wrong verse, winds back ten
-				     seconds and carries on. -->
-				<input
-					type="range"
-					min="0"
-					max={Math.max(1, duration)}
-					step="0.1"
-					class="w-full accent-primary"
-					aria-label={t('props.position')}
-					value={position}
-					disabled={!el}
-					oninput={(e) => seek(Number((e.currentTarget as HTMLInputElement).value))}
-				/>
-				<div class="flex items-center gap-2">
-					<span class="shrink-0 font-mono text-[11px] text-fg/50">
-						{clock(position)} / {clock(duration)}
-					</span>
-					<span class="flex-1"></span>
-					<button class="studio-chip font-mono" disabled={!el} onclick={() => skip(-10)}>−10s</button>
-					<button
-						class="studio-chip bg-primary/15 px-3 text-primary"
-						disabled={!el}
-						onclick={togglePlay}>{playing ? t('props.pause') : t('props.play')}</button
-					>
-					<button class="studio-chip font-mono" disabled={!el} onclick={() => skip(10)}>+10s</button>
-					<button class="studio-chip" disabled={!el} onclick={() => seek(0)}>{t('props.restart')}</button>
-					<button
-						class="studio-chip {el?.loop ? 'bg-primary/20 text-primary' : ''}"
-						disabled={!el}
-						onclick={() => {
-							if (el) el.loop = !el.loop;
-						}}>{t('props.loop')}</button
-					>
-				</div>
-				<label class="flex items-start gap-2 text-[12px] text-fg/70">
-					<input
-						type="checkbox"
-						class="mt-0.5 accent-primary"
-						checked={lyrics.followLayerId === layer.id}
-						onchange={(e) =>
-							followMedia((e.currentTarget as HTMLInputElement).checked ? layer.id : null)}
-					/>
-					<span>
-						{t('props.followLyrics')}
-						<span class="mt-0.5 block text-[11px] leading-relaxed text-fg/35">
-							{t('props.followLyricsHint')}
-						</span>
-					</span>
-				</label>
-			</div>
+			<!-- The transport lives under the preview, not behind a dialog: this
+			     panel is for what a source *is*, not for driving it mid-service. -->
+			<p class="text-[11px] leading-relaxed text-fg/35">{t('props.transportMoved')}</p>
 		{/if}
 
 		<!-- ── Geometry ─────────────────────────────────────── -->
