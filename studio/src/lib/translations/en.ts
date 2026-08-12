@@ -244,6 +244,10 @@ const en = {
 
 	// ── Settings ────────────────────────────────────────────────
 	'settings.title': 'Settings',
+	'settings.apply': 'Apply',
+	'settings.save': 'Save',
+	'settings.unsaved': 'Unsaved changes',
+	'settings.saved': 'Everything is applied',
 	'settings.general': 'General',
 	'settings.stream': 'Stream',
 	'settings.output': 'Output',

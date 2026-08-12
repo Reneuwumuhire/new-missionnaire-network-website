@@ -362,6 +362,14 @@ export function addAppAudio(appId: string, name: string): AudioSource {
 	return source;
 }
 
+/** The settings a dialog may stage and apply as a set. The layout is left out
+ *  on purpose: the splitters write to it while the dialog is open, so applying
+ *  a copy taken when it opened would undo whatever was dragged in the meantime. */
+export function stageableSettings(from: Settings): Omit<Settings, 'layout'> {
+	const { layout: _live, ...rest } = $state.snapshot(from) as Settings;
+	return rest;
+}
+
 export function activeScene(): Scene {
 	return studio.scenes.find((s) => s.id === studio.activeSceneId) ?? studio.scenes[0];
 }

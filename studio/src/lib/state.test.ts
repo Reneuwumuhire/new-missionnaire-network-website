@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { audioLayers, makeLayer, studio, uniqueById } from './state.svelte';
+import { audioLayers, makeLayer, stageableSettings, studio, uniqueById } from './state.svelte';
 
 describe('which layers get a mixer strip', () => {
 	const window = makeLayer('screen', 'Arc', { appId: 'company.thebrowser.Browser' });
@@ -44,5 +44,16 @@ describe('a saved file that would take the app down', () => {
 			{ id: 'app', name: 'c' }
 		] as { id?: string; name: string }[]);
 		expect(kept.map((item) => item.name)).toEqual(['a', 'c']);
+	});
+});
+
+describe('what the settings dialog stages', () => {
+	it('carries every setting except the layout', () => {
+		// The splitters write the layout from outside the dialog; applying a copy
+		// taken when it opened would undo whatever was dragged in the meantime.
+		const staged = stageableSettings(studio.settings);
+		expect(staged).not.toHaveProperty('layout');
+		expect(staged.fps).toBe(studio.settings.fps);
+		expect(staged.encoder).toBe(studio.settings.encoder);
 	});
 });

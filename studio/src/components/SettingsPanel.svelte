@@ -6,7 +6,35 @@
 	import Icon, { type IconName } from './Icon.svelte';
 	import { LOCALES, applyTheme, i18n, setLocale, t, theme } from '../lib/i18n.svelte';
 	import { DEFAULT_LAYOUT } from '../lib/layout';
-	import { persist, studio } from '../lib/state.svelte';
+	import { persist, stageableSettings, studio, type Destination } from '../lib/state.svelte';
+
+	let { onclose }: { onclose: () => void } = $props();
+
+	// Nothing here reaches the show until Apply, the way OBS's Settings window
+	// works. Changing the resolution or the bitrate mid-service by mis-clicking
+	// a chip is not something an operator should be able to do by accident.
+	//
+	// The layout is not staged: the splitters write to it from outside this
+	// dialog, so applying a copy taken when it opened would undo whatever was
+	// dragged in the meantime. Reset Layout stays an immediate action for the
+	// same reason — it is a command, not a setting.
+	let draft = $state({
+		settings: stageableSettings(studio.settings),
+		destinations: $state.snapshot(studio.destinations) as Destination[],
+		locale: i18n.locale
+	});
+
+	const dirty = $derived(
+		JSON.stringify(draft.settings) !== JSON.stringify(stageableSettings(studio.settings)) ||
+			JSON.stringify(draft.destinations) !== JSON.stringify($state.snapshot(studio.destinations)) ||
+			draft.locale !== i18n.locale
+	);
+
+	function apply() {
+		Object.assign(studio.settings, $state.snapshot(draft.settings));
+		studio.destinations = $state.snapshot(draft.destinations) as Destination[];
+		if (draft.locale !== i18n.locale) setLocale(draft.locale);
+	}
 
 	// Categories down the left, one page at a time — OBS's Settings window.
 	// Destinations live under `Stream` here for the same reason they do there.
@@ -35,9 +63,8 @@
 	onMount(async () => {
 		try {
 			ffmpeg = await invoke<FfmpegInfo>('check_ffmpeg');
-			if (!ffmpeg.hardware_h264 && studio.settings.encoder === 'hardware') {
-				studio.settings.encoder = 'software';
-				persist();
+			if (!ffmpeg.hardware_h264 && draft.settings.encoder === 'hardware') {
+				draft.settings.encoder = 'software';
 			}
 		} catch (err) {
 			ffmpegError = String(err);
@@ -54,14 +81,13 @@
 	const SUGGESTED: Record<string, number> = { '480p': 1800, '720p': 3500, '1080p': 6000 };
 
 	function setResolution(width: number, height: number, label: string) {
-		studio.settings.width = width;
-		studio.settings.height = height;
-		studio.settings.videoBitrateKbps = SUGGESTED[label];
-		persist();
+		draft.settings.width = width;
+		draft.settings.height = height;
+		draft.settings.videoBitrateKbps = SUGGESTED[label];
 	}
 
 	const uploadMbps = $derived(
-		Math.round(((studio.settings.videoBitrateKbps + studio.settings.audioBitrateKbps) * 1.3) / 100) /
+		Math.round(((draft.settings.videoBitrateKbps + draft.settings.audioBitrateKbps) * 1.3) / 100) /
 			10
 	);
 </script>
@@ -84,7 +110,7 @@
 
 	<div class="min-w-0 flex-1">
 		{#if page === 'stream'}
-			<DestinationsPanel />
+			<DestinationsPanel bind:destinations={draft.destinations} />
 		{:else}
 			<div class="space-y-5 p-4">
 				{#if page === 'general'}
@@ -93,10 +119,10 @@
 						<div class="flex gap-1">
 							{#each LOCALES as option (option.id)}
 								<button
-									class="studio-chip flex-1 {i18n.locale === option.id
+									class="studio-chip flex-1 {draft.locale === option.id
 										? 'bg-primary/20 text-primary'
 										: ''}"
-									onclick={() => setLocale(option.id)}>{option.label}</button
+									onclick={() => (draft.locale = option.id)}>{option.label}</button
 								>
 							{/each}
 						</div>
@@ -112,7 +138,7 @@
 
 					<label class="block">
 						<span class="studio-label">
-							{t('settings.videoBitrate', { kbps: studio.settings.videoBitrateKbps })}
+							{t('settings.videoBitrate', { kbps: draft.settings.videoBitrateKbps })}
 						</span>
 						<input
 							type="range"
@@ -120,12 +146,11 @@
 							max="9000"
 							step="100"
 							class="w-full accent-primary"
-							value={studio.settings.videoBitrateKbps}
+							value={draft.settings.videoBitrateKbps}
 							oninput={(e) => {
-								studio.settings.videoBitrateKbps = Number(
+								draft.settings.videoBitrateKbps = Number(
 									(e.currentTarget as HTMLInputElement).value
 								);
-								persist();
 							}}
 						/>
 						<span class="text-[11px] text-fg/30">
@@ -138,12 +163,11 @@
 						<div class="flex gap-1">
 							{#each [96, 128, 160, 192] as kbps (kbps)}
 								<button
-									class="studio-chip flex-1 {studio.settings.audioBitrateKbps === kbps
+									class="studio-chip flex-1 {draft.settings.audioBitrateKbps === kbps
 										? 'bg-primary/20 text-primary'
 										: ''}"
 									onclick={() => {
-										studio.settings.audioBitrateKbps = kbps;
-										persist();
+										draft.settings.audioBitrateKbps = kbps;
 									}}>{kbps}</button
 								>
 							{/each}
@@ -154,22 +178,20 @@
 						<span class="studio-label">{t('settings.encoder')}</span>
 						<div class="flex gap-1">
 							<button
-								class="studio-chip flex-1 {studio.settings.encoder === 'hardware'
+								class="studio-chip flex-1 {draft.settings.encoder === 'hardware'
 									? 'bg-primary/20 text-primary'
 									: ''}"
 								disabled={ffmpeg ? !ffmpeg.hardware_h264 : false}
 								onclick={() => {
-									studio.settings.encoder = 'hardware';
-									persist();
+									draft.settings.encoder = 'hardware';
 								}}>{t('settings.hardware')}</button
 							>
 							<button
-								class="studio-chip flex-1 {studio.settings.encoder === 'software'
+								class="studio-chip flex-1 {draft.settings.encoder === 'software'
 									? 'bg-primary/20 text-primary'
 									: ''}"
 								onclick={() => {
-									studio.settings.encoder = 'software';
-									persist();
+									draft.settings.encoder = 'software';
 								}}>{t('settings.software')}</button
 							>
 						</div>
@@ -183,7 +205,7 @@
 						<div class="flex gap-1">
 							{#each RESOLUTIONS as [width, height, label] (label)}
 								<button
-									class="studio-chip flex-1 {studio.settings.width === width
+									class="studio-chip flex-1 {draft.settings.width === width
 										? 'bg-primary/20 text-primary'
 										: ''}"
 									onclick={() => setResolution(width, height, label)}>{label}</button
@@ -197,12 +219,11 @@
 						<div class="flex gap-1">
 							{#each [24, 25, 30, 60] as fps (fps)}
 								<button
-									class="studio-chip flex-1 {studio.settings.fps === fps
+									class="studio-chip flex-1 {draft.settings.fps === fps
 										? 'bg-primary/20 text-primary'
 										: ''}"
 									onclick={() => {
-										studio.settings.fps = fps;
-										persist();
+										draft.settings.fps = fps;
 									}}>{fps}</button
 								>
 							{/each}
@@ -215,10 +236,9 @@
 						<input
 							type="checkbox"
 							class="mt-0.5 accent-primary"
-							checked={studio.settings.barsWhenNoSource}
+							checked={draft.settings.barsWhenNoSource}
 							onchange={(e) => {
-								studio.settings.barsWhenNoSource = (e.currentTarget as HTMLInputElement).checked;
-								persist();
+								draft.settings.barsWhenNoSource = (e.currentTarget as HTMLInputElement).checked;
 							}}
 						/>
 						<span>
@@ -240,7 +260,6 @@
 									...DEFAULT_LAYOUT,
 									weights: { ...DEFAULT_LAYOUT.weights }
 								};
-								persist();
 							}}>{t('settings.resetLayout')}</button
 						>
 						<p class="mt-1 text-[11px] leading-relaxed text-fg/30">{t('settings.layoutHint')}</p>
@@ -298,3 +317,24 @@
 		{/if}
 	</div>
 </div>
+
+<!-- OBS's Cancel / Apply / OK, and for the same reason: an operator who
+     mis-clicks a resolution chip during a service has not changed anything
+     until they say so. Closing the dialog any other way — Escape, the cross,
+     a click outside — discards, which is what Cancel means. -->
+<footer
+	class="sticky bottom-0 z-10 flex shrink-0 items-center gap-2 border-t border-ink-700 bg-ink-850 px-4 py-3"
+>
+	<span class="min-w-0 flex-1 truncate text-[11px] {dirty ? 'text-amber-300/90' : 'text-fg/30'}">
+		{dirty ? t('settings.unsaved') : t('settings.saved')}
+	</span>
+	<button class="studio-chip px-3" onclick={onclose}>{t('common.cancel')}</button>
+	<button class="studio-chip px-3" disabled={!dirty} onclick={apply}>{t('settings.apply')}</button>
+	<button
+		class="studio-chip bg-primary/20 px-3 text-primary"
+		onclick={() => {
+			apply();
+			onclose();
+		}}>{t('settings.save')}</button
+	>
+</footer>

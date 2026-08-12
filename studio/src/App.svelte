@@ -435,6 +435,6 @@
 	</Modal>
 {:else if dialog === 'settings'}
 	<Modal title={t('settings.title')} onclose={() => (dialog = null)}>
-		<SettingsPanel />
+		<SettingsPanel onclose={() => (dialog = null)} />
 	</Modal>
 {/if}

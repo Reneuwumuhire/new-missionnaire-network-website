@@ -246,6 +246,10 @@ const fr: Record<keyof typeof en, string> = {
 
 	// ── Settings ────────────────────────────────────────────────
 	'settings.title': 'Paramètres',
+	'settings.apply': 'Appliquer',
+	'settings.save': 'Enregistrer',
+	'settings.unsaved': 'Modifications non appliqu\u00e9es',
+	'settings.saved': 'Tout est appliqu\u00e9',
 	'settings.general': 'Général',
 	'settings.stream': 'Flux',
 	'settings.output': 'Sortie',

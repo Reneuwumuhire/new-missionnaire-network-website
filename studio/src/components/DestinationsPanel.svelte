@@ -2,7 +2,11 @@
 	import { broadcast, isStreaming } from '../lib/broadcast.svelte';
 	import Icon from './Icon.svelte';
 	import { t } from '../lib/i18n.svelte';
-	import { destinationUrl, id, persist, studio, type Destination } from '../lib/state.svelte';
+	import { destinationUrl, id, type Destination } from '../lib/state.svelte';
+
+	// The list belongs to the Settings dialog, which stages every change and
+	// only puts them into the show on Apply. Nothing here writes to the store.
+	let { destinations = $bindable([] as Destination[]) } = $props();
 
 	let revealed = $state<Record<string, boolean>>({});
 
@@ -25,8 +29,8 @@
 	];
 
 	function add(preset?: (typeof PRESETS)[number]) {
-		studio.destinations = [
-			...studio.destinations,
+		destinations = [
+			...destinations,
 			{
 				id: id(),
 				name: preset?.name() ?? t('stream.newDestination'),
@@ -38,12 +42,10 @@
 				hold: /youtube|facebook|twitch/i.test(preset?.url ?? '')
 			}
 		];
-		persist();
 	}
 
 	function remove(destination: Destination) {
-		studio.destinations = studio.destinations.filter((d) => d.id !== destination.id);
-		persist();
+		destinations = destinations.filter((d) => d.id !== destination.id);
 	}
 
 	/** What the operator sees before going live, so a typo in the path is caught
@@ -65,7 +67,7 @@
 <div class="space-y-3 p-4">
 	<p class="text-[11px] leading-relaxed text-fg/40">{t('stream.intro')}</p>
 
-	{#each studio.destinations as destination (destination.id)}
+	{#each destinations as destination (destination.id)}
 		{@const issue = problem(destination)}
 		<div
 			class="border p-3 {destination.enabled
@@ -80,7 +82,6 @@
 					disabled={isStreaming()}
 					onchange={(e) => {
 						destination.enabled = (e.currentTarget as HTMLInputElement).checked;
-						persist();
 					}}
 				/>
 				<input
@@ -88,7 +89,6 @@
 					value={destination.name}
 					onchange={(e) => {
 						destination.name = (e.currentTarget as HTMLInputElement).value;
-						persist();
 					}}
 				/>
 				<button class="studio-icon-btn" title={t('common.remove')} aria-label={t('common.remove')} onclick={() => remove(destination)}><Icon name="trash" size={14} /></button>
@@ -101,7 +101,6 @@
 					value={destination.url}
 					onchange={(e) => {
 						destination.url = (e.currentTarget as HTMLInputElement).value;
-						persist();
 					}}
 				/>
 				<div class="flex gap-1.5">
@@ -112,7 +111,6 @@
 						value={destination.key}
 						onchange={(e) => {
 							destination.key = (e.currentTarget as HTMLInputElement).value;
-							persist();
 						}}
 					/>
 					<button
@@ -131,7 +129,6 @@
 					disabled={isStreaming()}
 					onchange={(e) => {
 						destination.hold = (e.currentTarget as HTMLInputElement).checked;
-						persist();
 					}}
 				/>
 				<span>
