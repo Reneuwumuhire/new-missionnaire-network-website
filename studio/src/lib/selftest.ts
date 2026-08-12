@@ -664,3 +664,100 @@ export async function runSelftest(target: string, canvas: () => HTMLCanvasElemen
 	const ok = Boolean(stats && stats.frames > 30 && !broadcast.error) && faded && lightBg !== darkBg;
 	await say(`SELFTEST ${ok ? 'OK' : 'FAIL'} — terminé`);
 }
+
+/** `STUDIO_SELFTEST=fetch` — the YouTube link source, end to end and for real.
+ *
+ *  The point of this one is the last link in the chain, which no unit test can
+ *  reach: bytes come back over IPC, become a Blob, become a `<video>`, and get
+ *  drawn onto a canvas that must stay origin-clean. If it ever taints,
+ *  captureStream() throws and the broadcast stops — so that is asserted here
+ *  rather than discovered on a Sunday. */
+export async function runFetchSelftest(): Promise<void> {
+	let ok = true;
+	// 19 seconds, and the oldest clip on the site — small enough to download in
+	// a self-test, and it is not going anywhere.
+	const SHORT = 'https://www.youtube.com/watch?v=jNQXAC9IVRw';
+	const LIVE = 'https://www.youtube.com/@NASA/live';
+
+	try {
+		const probed = await invoke<{ title: string; isLive: boolean; duration: number }>(
+			'probe_media',
+			{ url: SHORT }
+		);
+		await say(
+			`FETCHTEST probe title=${JSON.stringify(probed.title)} live=${probed.isLive} duration=${probed.duration}`
+		);
+		if (probed.isLive || !probed.title) ok = false;
+	} catch (err) {
+		ok = false;
+		await say(`FETCHTEST probe FAILED ${err}`);
+	}
+
+	// A live stream must be refused rather than started: a download that never
+	// ends would sit there filling the disk.
+	try {
+		const live = await invoke<{ isLive: boolean }>('probe_media', { url: LIVE });
+		await say(`FETCHTEST live probe isLive=${live.isLive}`);
+		if (!live.isLive) ok = false;
+		try {
+			await invoke('fetch_media', { url: LIVE, audioOnly: true });
+			ok = false;
+			await say('FETCHTEST live FAIL — a live stream started downloading');
+		} catch (err) {
+			await say(`FETCHTEST live refused: ${String(err).slice(0, 90)}`);
+		}
+	} catch (err) {
+		await say(`FETCHTEST live probe FAILED ${err}`);
+	}
+
+	// With picture, because the canvas check needs something to draw.
+	try {
+		const started = performance.now();
+		const buffer = await invoke<ArrayBuffer>('fetch_media', { url: SHORT, audioOnly: false });
+		const bytes = buffer.byteLength;
+		await say(`FETCHTEST download bytes=${bytes} in=${Math.round(performance.now() - started)}ms`);
+		if (bytes < 10_000) ok = false;
+
+		const layer = makeLayer('video', '__fetch_probe', { fit: 'contain' });
+		const handle = openFile(layer, new Blob([buffer], { type: 'video/mp4' }));
+		const el = handle.el as HTMLVideoElement;
+		await new Promise<void>((resolve) => {
+			if (el.readyState >= 1) return resolve();
+			el.onloadedmetadata = () => resolve();
+			setTimeout(resolve, 8000);
+		});
+		await say(
+			`FETCHTEST element ${el.videoWidth}x${el.videoHeight} duration=${el.duration?.toFixed(1)} error=${el.error?.code ?? 'none'}`
+		);
+		if (!el.videoWidth || !(el.duration > 0)) ok = false;
+
+		// The whole reason the app downloads instead of letting the webview load
+		// the URL: draw it, then prove the canvas is still readable and still
+		// capturable. A tainted canvas throws on both.
+		const canvas = document.createElement('canvas');
+		canvas.width = 320;
+		canvas.height = 180;
+		const ctx = canvas.getContext('2d');
+		el.currentTime = 1;
+		await wait(500);
+		let clean = false;
+		let capturable = false;
+		try {
+			ctx?.drawImage(el, 0, 0, canvas.width, canvas.height);
+			ctx?.getImageData(0, 0, 1, 1);
+			clean = true;
+			capturable = canvas.captureStream(1).getVideoTracks().length > 0;
+		} catch (err) {
+			await say(`FETCHTEST canvas TAINTED ${err}`);
+		}
+		await say(`FETCHTEST canvas readable=${clean} capturable=${capturable}`);
+		if (!clean || !capturable) ok = false;
+
+		release(layer.id);
+	} catch (err) {
+		ok = false;
+		await say(`FETCHTEST download FAILED ${err}`);
+	}
+
+	await say(`FETCHTEST ${ok ? 'OK' : 'FAIL'} — terminé`);
+}

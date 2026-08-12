@@ -1,4 +1,5 @@
 mod appaudio;
+mod fetch;
 mod ffmpeg;
 
 use ffmpeg::{Encoder, FfmpegInfo, StreamConfig};
@@ -138,6 +139,33 @@ fn open_privacy_settings(pane: String) -> Result<(), String> {
 	}
 }
 
+/// What a URL is, before committing to downloading it. Cheap, and it tells the
+/// operator the title they are about to add.
+#[tauri::command]
+async fn probe_media(url: String) -> Result<fetch::Fetched, String> {
+	tauri::async_runtime::spawn_blocking(move || fetch::probe(&url))
+		.await
+		.map_err(|e| e.to_string())?
+}
+
+/// Download a URL and hand back the file itself. Raw bytes rather than a path:
+/// the webview turns them into a blob, which is same-origin and so can be drawn
+/// onto the program canvas without tainting it. See fetch.rs for why that
+/// matters.
+#[tauri::command]
+async fn fetch_media(
+	app: AppHandle,
+	url: String,
+	audio_only: bool,
+) -> Result<tauri::ipc::Response, String> {
+	// spawn_blocking, not the async pool: this runs a subprocess to completion
+	// and would otherwise hold a runtime thread for the length of a download.
+	let bytes = tauri::async_runtime::spawn_blocking(move || fetch::fetch(&app, &url, audio_only))
+		.await
+		.map_err(|e| e.to_string())??;
+	Ok(tauri::ipc::Response::new(bytes))
+}
+
 /// Bridge for webview logging — a packaged .app has no devtools console you can
 /// reach from a terminal, so the UI sends anything worth seeing through here.
 #[tauri::command]
@@ -191,6 +219,8 @@ pub fn run() {
 			list_windows,
 			start_app_audio,
 			stop_app_audio,
+			probe_media,
+			fetch_media,
 			report
 		])
 		.on_window_event(|window, event| {

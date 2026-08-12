@@ -17,6 +17,7 @@
 		refreshApps
 	} from '../lib/appaudio.svelte';
 	import { addAppAudio, addAudioInput } from '../lib/state.svelte';
+	import AddFromUrl from './AddFromUrl.svelte';
 	import Dock from './Dock.svelte';
 	import Icon, { type IconName } from './Icon.svelte';
 	import { popoverFit } from '../lib/layout';
@@ -72,7 +73,7 @@
 	/** The two audio kinds are not layers: they have no picture, and they are
 	 *  global to the show. They are offered here because OBS offers them here,
 	 *  and appear where they belong — in the Audio Mixer. */
-	type MenuKind = LayerKind | 'audioInput' | 'audioApp';
+	type MenuKind = LayerKind | 'audioInput' | 'audioApp' | 'url';
 
 	const SOURCE_KINDS: {
 		kind: MenuKind;
@@ -96,6 +97,7 @@
 		{ kind: 'screen', label: () => t('sources.screen'), hint: () => t('sources.screenHint'), icon: 'monitor' },
 		{ kind: 'image', label: () => t('sources.image'), hint: () => t('sources.imageHint'), icon: 'image' },
 		{ kind: 'video', label: () => t('sources.video'), hint: () => t('sources.videoHint'), icon: 'film' },
+		{ kind: 'url', label: () => t('sources.url'), hint: () => t('sources.urlHint'), icon: 'link' },
 		{ kind: 'text', label: () => t('sources.text'), hint: () => t('sources.textHint'), icon: 'text' },
 		{ kind: 'lyrics', label: () => t('sources.lyrics'), hint: () => t('sources.lyricsHint'), icon: 'music' },
 		{ kind: 'color', label: () => t('sources.color'), hint: () => t('sources.colorHint'), icon: 'droplet' }
@@ -116,6 +118,13 @@
 			// Which application first, then the strip — same as the mixer's own +.
 			adding = 'apps';
 			await refreshApps();
+			return;
+		}
+		if (kind === 'url') {
+			// The layer is made only once the download succeeds: a failed link
+			// should leave nothing behind to tidy up.
+			adding = false;
+			urlOpen = true;
 			return;
 		}
 		adding = false;
@@ -171,6 +180,24 @@
 		report(
 			`share label=${JSON.stringify(label)} size=${size.width}x${size.height} windows=${windows.length} matched=${app?.name ?? 'none'}`
 		);
+		persist();
+	}
+
+	let urlOpen = $state(false);
+
+	/** A finished download becomes an ordinary media layer — the compositor, the
+	 *  mixer and the transport bar have no idea it came from a link. */
+	function addFetched(blob: Blob, title: string, audioOnly: boolean) {
+		urlOpen = false;
+		const layer = makeLayer('video', title || t('sources.url'), {
+			fit: 'contain',
+			audioOnly,
+			fileName: title
+		});
+		const scene = activeScene();
+		scene.layers = [layer, ...scene.layers];
+		studio.selectedLayerId = layer.id;
+		openFile(layer, blob);
 		persist();
 	}
 
@@ -243,6 +270,10 @@
 </script>
 
 <input bind:this={fileInput} type="file" class="hidden" onchange={onFileChosen} />
+
+{#if urlOpen}
+	<AddFromUrl onclose={() => (urlOpen = false)} onready={addFetched} />
+{/if}
 
 <Dock id="sources" title={t('dock.sources')}>
 	<ul>

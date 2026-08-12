@@ -22,7 +22,13 @@
 	import { Mixer, stripsToDrop } from './lib/mixer';
 	import { t } from './lib/i18n.svelte';
 	import { clamp, splitWeights, type DockId } from './lib/layout';
-	import { runAudioSelftest, runSelftest, selftestMixer, selftestTarget } from './lib/selftest';
+	import {
+		runAudioSelftest,
+		runFetchSelftest,
+		runSelftest,
+		selftestMixer,
+		selftestTarget
+	} from './lib/selftest';
 	import { activeScene, audioLayers, onAirSceneId, persist, studio } from './lib/state.svelte';
 
 	let programCanvas = $state<HTMLCanvasElement | null>(null);
@@ -53,6 +59,12 @@
 			// RTMP, nothing that needs a human at the keyboard.
 			if (target === 'audio') {
 				await runAudioSelftest();
+				return;
+			}
+			// `STUDIO_SELFTEST=fetch` downloads a short clip and proves it can be
+			// drawn and captured — no ffmpeg, no RTMP, no human.
+			if (target === 'fetch') {
+				await runFetchSelftest();
 				return;
 			}
 			if (target) {

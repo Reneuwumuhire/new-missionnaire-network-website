@@ -216,7 +216,10 @@ export function clampTime(seconds: number, duration: number): number {
 	return Math.max(0, Math.min(seconds, end));
 }
 
-export function openFile(layer: Layer, file: File): Handle {
+/** `Blob`, not `File`: a download fetched by the Rust side arrives as bytes and
+ *  becomes a blob here. Same object URL, same element, same everything after —
+ *  and a blob is same-origin, which is what keeps the program canvas untainted. */
+export function openFile(layer: Layer, file: Blob): Handle {
 	release(layer.id);
 	const url = URL.createObjectURL(file);
 	if (layer.kind === 'image') {
