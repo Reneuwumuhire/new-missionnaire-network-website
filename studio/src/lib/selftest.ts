@@ -27,7 +27,8 @@ import { frameCount, onAirSceneId, renderFrame, takeToProgram } from './composit
 } from './appaudio.svelte';
  import type { Mixer } from './mixer';
 import { toDb } from './meter';
-import { handleFor, listDevices, openMic, release } from './media.svelte';
+import { handleFor, listDevices, openFile, openMic, release } from './media.svelte';
+import { followMedia, timedPositionMs } from './lyrics.svelte';
 import { addAudioInput, id, makeLayer, persist, studio } from './state.svelte';
 
 const say = (line: string) => invoke('report', { line }).catch(() => console.log(line));
@@ -476,6 +477,56 @@ export async function runAudioSelftest(): Promise<void> {
 			(w) => matchWindow('', { width: w.width, height: w.height }, windows)?.appId === w.appId
 		);
 		await say(`AUDIOTEST match by-size ${bySize.length}/${windows.length} unique`);
+	}
+
+	// 4b. A recording, the way a service plays one: a real file through the real
+	//     path — picked, opened, put in the on-air scene, tapped by the mixer.
+	//     `public/__audiotest.mp3` is a fixture; without it this is skipped.
+	try {
+		const response = await fetch('/__audiotest.mp3');
+		if (!response.ok) throw new Error(`no fixture (${response.status})`);
+		const file = new File([await response.blob()], 'recording.mp3', { type: 'audio/mpeg' });
+		const restoreScenes = studio.scenes;
+		const restoreProgram = studio.programSceneId;
+		const track = makeLayer('video', '__recording', { audioOnly: true, fileName: file.name });
+		const scene = { id: id(), name: '__recorded', layers: [track] };
+		studio.scenes = [...studio.scenes, scene];
+		studio.programSceneId = scene.id;
+		const handle = openFile(track, file);
+		const el = handle.el as HTMLVideoElement | null;
+		// Metadata first: duration is NaN until it lands, and everything below
+		// depends on the file having actually decoded.
+		await Promise.race([
+			new Promise((resolve) => el?.addEventListener('loadedmetadata', resolve, { once: true })),
+			wait(8000)
+		]);
+		await say(
+			`AUDIOTEST media loaded=${Boolean(el)} error=${handle.error ?? '-'} duration=${el ? Math.round(el.duration) : '?'}s readyState=${el?.readyState ?? '?'} muted=${el?.muted}`
+		);
+		if (el) {
+			await el.play().catch((err) => say(`AUDIOTEST media play refused: ${err}`));
+			await wait(2500);
+			const peaks = bus.peaks(track.id);
+			const heard = Math.max(...peaks);
+			await say(
+				`AUDIOTEST media playing=${!el.paused} at=${el.currentTime.toFixed(1)}s strip=${bus.has(track.id)} L/R=${peaks[0].toFixed(4)}/${peaks[1].toFixed(4)} ${heard > 0.001 ? 'AUDIBLE' : 'SILENT'}`
+			);
+			if (!bus.has(track.id) || heard <= 0.001) ok = false;
+			// And the transcript follows it: seek, and the position must follow.
+			followMedia(track.id);
+			el.currentTime = 60;
+			await wait(300);
+			await say(`AUDIOTEST media follow position=${timedPositionMs()}ms expected~60000ms`);
+			if (Math.abs((timedPositionMs() ?? 0) - 60000) > 1500) ok = false;
+			followMedia(null);
+			el.pause();
+		}
+		release(track.id);
+		studio.scenes = restoreScenes;
+		studio.programSceneId = restoreProgram;
+		persist();
+	} catch (err) {
+		await say(`AUDIOTEST media skipped: ${err}`);
 	}
 
 	// 5. The share itself. This is the one link a unit test cannot reach: what

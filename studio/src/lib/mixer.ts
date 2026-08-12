@@ -172,12 +172,19 @@ export class Mixer {
 			tap = this.ctx.createMediaElementSource(element);
 			this.elementTaps.set(element, tap);
 		}
+		// Now that the signal is routed into the graph it no longer reaches the
+		// speakers, so the mute that kept it quiet until this moment has to come
+		// off — it applies before the tap, and would hand the mix silence.
+		element.muted = false;
 		return this.makeStrip(id, tap, element);
 	}
 
 	remove(id: string) {
 		const strip = this.strips.get(id);
 		if (!strip) return;
+		// Off the bus is out of the mix, and an untapped element plays straight
+		// out of the laptop — which is a feedback loop with an open microphone.
+		if (strip.element) strip.element.muted = true;
 		try {
 			strip.node.disconnect();
 			strip.gain.disconnect();

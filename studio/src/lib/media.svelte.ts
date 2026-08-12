@@ -235,7 +235,11 @@ export function openFile(layer: Layer, file: File): Handle {
 	el.src = url;
 	el.loop = false;
 	el.playsInline = true;
-	// Muted here means "not through the speakers"; the mixer taps the element.
+	// Muted only until the mixer taps it. Muting is applied before the element
+	// reaches a MediaElementAudioSourceNode, so a muted element feeds the mix
+	// silence — the recording played, the meter never moved and nothing went to
+	// air. The tap is what keeps it out of the speakers, and Mixer.addElement
+	// unmutes as it takes the signal.
 	el.muted = true;
 	const h: Handle = { kind: 'video', el, stream: null, error: null, objectUrl: url };
 	el.onerror = () => {
