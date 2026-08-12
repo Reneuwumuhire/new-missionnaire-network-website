@@ -219,6 +219,8 @@ const en = {
 	'props.play': 'Play',
 	'props.pause': 'Pause',
 	'props.restart': 'Restart',
+	'props.followLyrics': 'Lyrics follow this recording',
+	'props.followLyricsHint': 'The .srt runs off the track\u2019s own position, so pausing or winding back takes the lyrics with it.',
 	'props.loop': 'Loop',
 	'props.position': 'Position (% of frame)',
 	'props.fullFrame': 'Fit to screen',

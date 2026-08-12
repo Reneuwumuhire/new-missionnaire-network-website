@@ -63,6 +63,9 @@ export interface Layer {
 	hasAudio: boolean;
 	gain: number;
 	muted: boolean;
+	/** video: the file is a recording with no picture. It still carries sound
+	 *  into the mix, but it is not a video source that has failed to draw. */
+	audioOnly?: boolean;
 	/** Display-only: the file the operator picked. Blobs cannot be persisted,
 	 *  so after a restart the layer asks for the file again. */
 	fileName?: string;

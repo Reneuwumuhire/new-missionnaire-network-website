@@ -257,7 +257,10 @@ function drawScene(ctx: CanvasRenderingContext2D, sceneId: string, nowMs: number
 	// Index 0 is the top layer (OBS order), so paint back to front.
 	for (let i = scene.layers.length - 1; i >= 0; i--) {
 		const layer = scene.layers[i];
-		const isMedia = layer.visible && MEDIA_KINDS.includes(layer.kind);
+		// An audio-only media source has no picture to fail at, so it must not
+		// count as a video source that produced nothing — otherwise playing a
+		// recording puts colour bars over the whole service.
+		const isMedia = layer.visible && MEDIA_KINDS.includes(layer.kind) && !layer.audioOnly;
 		if (isMedia) mediaLayers++;
 		const drew = drawLayer(ctx, layer, nowMs);
 		if (drew) painted = true;

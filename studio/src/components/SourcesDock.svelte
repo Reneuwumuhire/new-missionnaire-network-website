@@ -177,7 +177,9 @@
 	function pickFile(layer: Layer) {
 		pendingFileLayer = layer;
 		if (fileInput) {
-			fileInput.accept = layer.kind === 'image' ? 'image/*' : 'video/*';
+			// Audio too: a service often plays a recording that was made earlier,
+			// and it belongs in the mixer like any other media source.
+			fileInput.accept = layer.kind === 'image' ? 'image/*' : 'video/*,audio/*';
 			fileInput.click();
 		}
 	}
@@ -188,6 +190,7 @@
 		input.value = '';
 		if (!file || !pendingFileLayer) return;
 		pendingFileLayer.fileName = file.name;
+		pendingFileLayer.audioOnly = file.type.startsWith('audio/');
 		pendingFileLayer.name = file.name.replace(/\.[^.]+$/, '');
 		openFile(pendingFileLayer, file);
 		persist();

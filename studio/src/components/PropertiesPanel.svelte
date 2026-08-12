@@ -5,12 +5,14 @@
 	import {
 		applyCursor,
 		canHideCursor,
+		clampTime,
 		handleFor,
 		listDevices,
 		openCamera,
 		type DeviceOption
 	} from '../lib/media.svelte';
 	import { onMount } from 'svelte';
+	import { followMedia, lyrics } from '../lib/lyrics.svelte';
 	import { DEFAULT_TEXT_STYLE, persist, selectedLayer, studio } from '../lib/state.svelte';
 
 	let cameras = $state<DeviceOption[]>([]);
@@ -19,6 +21,49 @@
 	});
 
 	const layer = $derived(selectedLayer());
+
+	// The transport reads the element, which is not reactive state — so it is
+	// polled while this panel is open. `timeupdate` alone fires about four times
+	// a second, which is too coarse for a scrub bar to feel attached to the
+	// thumb.
+	let media = $state<HTMLVideoElement | null>(null);
+	let position = $state(0);
+	let duration = $state(0);
+	let playing = $state(false);
+
+	$effect(() => {
+		const el = layer?.kind === 'video' ? handleFor(layer.id)?.el : null;
+		media = el instanceof HTMLVideoElement ? el : null;
+		const timer = setInterval(() => {
+			if (!media) return;
+			position = media.currentTime;
+			duration = Number.isFinite(media.duration) ? media.duration : 0;
+			playing = !media.paused && !media.ended;
+		}, 100);
+		return () => clearInterval(timer);
+	});
+
+	function seek(seconds: number) {
+		if (!media) return;
+		media.currentTime = clampTime(seconds, media.duration);
+		position = media.currentTime;
+	}
+
+	const skip = (delta: number) => seek((media?.currentTime ?? 0) + delta);
+
+	function togglePlay() {
+		if (!media) return;
+		if (media.paused) void media.play();
+		else media.pause();
+		playing = !media.paused;
+	}
+
+	/** m:ss, which is all a service needs. */
+	function clock(seconds: number): string {
+		if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
+		const total = Math.floor(seconds);
+		return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+	}
 	const style = $derived(layer?.style ?? null);
 
 	function commit() {
@@ -142,32 +187,58 @@
 		{/if}
 
 		{#if layer.kind === 'video'}
-			{@const el = handleFor(layer.id)?.el}
-			<div class="flex gap-2">
-				<button
-					class="studio-chip"
-					onclick={() => {
-						if (el instanceof HTMLVideoElement) void el.play();
-					}}>{t('props.play')}</button
-				>
-				<button
-					class="studio-chip"
-					onclick={() => {
-						if (el instanceof HTMLVideoElement) el.pause();
-					}}>{t('props.pause')}</button
-				>
-				<button
-					class="studio-chip"
-					onclick={() => {
-						if (el instanceof HTMLVideoElement) el.currentTime = 0;
-					}}>{t('props.restart')}</button
-				>
-				<button
-					class="studio-chip {el instanceof HTMLVideoElement && el.loop ? 'bg-primary/20 text-primary' : ''}"
-					onclick={() => {
-						if (el instanceof HTMLVideoElement) el.loop = !el.loop;
-					}}>{t('props.loop')}</button
-				>
+			{@const el = media}
+			<div class="space-y-2">
+				<!-- A recording played during a service is scrubbed, not just
+				     started: the operator lands on the wrong verse, winds back ten
+				     seconds and carries on. -->
+				<input
+					type="range"
+					min="0"
+					max={Math.max(1, duration)}
+					step="0.1"
+					class="w-full accent-primary"
+					aria-label={t('props.position')}
+					value={position}
+					disabled={!el}
+					oninput={(e) => seek(Number((e.currentTarget as HTMLInputElement).value))}
+				/>
+				<div class="flex items-center gap-2">
+					<span class="shrink-0 font-mono text-[11px] text-fg/50">
+						{clock(position)} / {clock(duration)}
+					</span>
+					<span class="flex-1"></span>
+					<button class="studio-chip font-mono" disabled={!el} onclick={() => skip(-10)}>−10s</button>
+					<button
+						class="studio-chip bg-primary/15 px-3 text-primary"
+						disabled={!el}
+						onclick={togglePlay}>{playing ? t('props.pause') : t('props.play')}</button
+					>
+					<button class="studio-chip font-mono" disabled={!el} onclick={() => skip(10)}>+10s</button>
+					<button class="studio-chip" disabled={!el} onclick={() => seek(0)}>{t('props.restart')}</button>
+					<button
+						class="studio-chip {el?.loop ? 'bg-primary/20 text-primary' : ''}"
+						disabled={!el}
+						onclick={() => {
+							if (el) el.loop = !el.loop;
+						}}>{t('props.loop')}</button
+					>
+				</div>
+				<label class="flex items-start gap-2 text-[12px] text-fg/70">
+					<input
+						type="checkbox"
+						class="mt-0.5 accent-primary"
+						checked={lyrics.followLayerId === layer.id}
+						onchange={(e) =>
+							followMedia((e.currentTarget as HTMLInputElement).checked ? layer.id : null)}
+					/>
+					<span>
+						{t('props.followLyrics')}
+						<span class="mt-0.5 block text-[11px] leading-relaxed text-fg/35">
+							{t('props.followLyricsHint')}
+						</span>
+					</span>
+				</label>
 			</div>
 		{/if}
 

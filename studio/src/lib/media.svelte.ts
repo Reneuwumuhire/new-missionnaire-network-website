@@ -207,6 +207,15 @@ export async function applyCursor(layer: Layer): Promise<void> {
 	await track?.applyConstraints(cursorConstraint(layer)).catch(() => {});
 }
 
+/** A seek target that a media element will actually accept: never before the
+ *  start, never past the end, and never NaN — the duration is unknown until the
+ *  file's metadata has loaded, and setting currentTime to NaN throws. */
+export function clampTime(seconds: number, duration: number): number {
+	if (!Number.isFinite(seconds)) return 0;
+	const end = Number.isFinite(duration) && duration > 0 ? duration : Infinity;
+	return Math.max(0, Math.min(seconds, end));
+}
+
 export function openFile(layer: Layer, file: File): Handle {
 	release(layer.id);
 	const url = URL.createObjectURL(file);

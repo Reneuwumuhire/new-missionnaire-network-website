@@ -7,6 +7,7 @@
 //  • manual — pasted lyrics with no timings. The operator taps through. Taps
 //    are timestamped, so the service can be exported as a .srt afterwards.
 
+import { handleFor } from './media.svelte';
 import { findCueIndex, parseLyricLines, parseSrt, toSrt, type SrtCue } from './srt';
 
 export type LyricsMode = 'timed' | 'manual';
@@ -25,7 +26,11 @@ export const lyrics = $state({
 	startedAtEpochMs: null as number | null,
 	/** Master on-air switch for every lyrics layer, so the operator can clear
 	 *  the screen instantly without hunting for the layer. */
-	onAir: true
+	onAir: true,
+	/** A media source whose own clock drives the transcript. A recording made
+	 *  earlier carries its own timeline: pause it and the lyrics stop with it,
+	 *  wind it back and they follow. A wall clock cannot do either. */
+	followLayerId: null as string | null
 });
 
 export function loadSrt(text: string, fileName: string): number {
@@ -62,6 +67,7 @@ export function nudge(deltaMs: number) {
 }
 
 export function clearSync() {
+	lyrics.followLayerId = null;
 	lyrics.anchorEpochMs = null;
 	lyrics.offsetMs = 0;
 	lyrics.index = -1;
@@ -81,8 +87,27 @@ export function goTo(index: number, atEpochMs = Date.now()) {
 	lyrics.taps[index] = atEpochMs - lyrics.startedAtEpochMs;
 }
 
+/** Follow a media source's own clock, or nothing. */
+export function followMedia(layerId: string | null) {
+	lyrics.followLayerId = layerId;
+	lyrics.offsetMs = 0;
+}
+
+/** Where the followed recording has got to, as an SRT position. Pure, so the
+ *  arithmetic can be checked without a media element. */
+export function positionFromMedia(currentTimeSec: number, offsetMs: number): number {
+	return Math.round(currentTimeSec * 1000) + offsetMs;
+}
+
 /** SRT position, in ms, of the line that should be showing now. */
 export function timedPositionMs(nowMs = Date.now()): number | null {
+	if (lyrics.followLayerId) {
+		const el = handleFor(lyrics.followLayerId)?.el;
+		// A source that has gone away leaves the transcript where it was rather
+		// than snapping to zero and flashing the first line on air.
+		if (el instanceof HTMLVideoElement) return positionFromMedia(el.currentTime, lyrics.offsetMs);
+		return null;
+	}
 	if (lyrics.anchorEpochMs === null) return null;
 	return nowMs - lyrics.anchorEpochMs + lyrics.offsetMs;
 }

@@ -9,10 +9,12 @@ import {
 	lyrics,
 	nudge,
 	onAirLines,
+	positionFromMedia,
 	step,
 	timedPositionMs
 } from './lyrics.svelte';
 import { parseSrt } from './srt';
+import { clampTime } from './media.svelte';
 
 const SRT = `1
 00:00:10,000 --> 00:00:14,000
@@ -119,5 +121,26 @@ describe('manual run', () => {
 		goTo(0, 1000);
 		goTo(2, 4000);
 		expect(parseSrt(exportManualSrt()).map((c) => c.text)).toEqual(['Un', 'Trois']);
+	});
+});
+
+describe('a transcript that follows a recording', () => {
+	it('reads the position from the track, offset and all', () => {
+		// A recording carries its own timeline: 12.34 s in is 12340 ms into the
+		// .srt, and the nudge offset still applies on top.
+		expect(positionFromMedia(12.34, 0)).toBe(12340);
+		expect(positionFromMedia(12.34, -500)).toBe(11840);
+		expect(positionFromMedia(0, 0)).toBe(0);
+	});
+});
+
+describe('seeking a recording', () => {
+	it('never lands outside the file', () => {
+		expect(clampTime(-5, 100)).toBe(0);
+		expect(clampTime(150, 100)).toBe(100);
+		expect(clampTime(42, 100)).toBe(42);
+		// Duration is NaN until the metadata loads; a seek then must still work.
+		expect(clampTime(42, NaN)).toBe(42);
+		expect(clampTime(NaN, 100)).toBe(0);
 	});
 });

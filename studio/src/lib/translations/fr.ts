@@ -221,6 +221,8 @@ const fr: Record<keyof typeof en, string> = {
 	'props.play': 'Lecture',
 	'props.pause': 'Pause',
 	'props.restart': 'Début',
+	'props.followLyrics': 'Les paroles suivent cet enregistrement',
+	'props.followLyricsHint': 'Le .srt suit la position de la piste : mettre en pause ou revenir en arri\u00e8re emm\u00e8ne les paroles avec.',
 	'props.loop': 'Boucle',
 	'props.position': 'Position (% du cadre)',
 	'props.fullFrame': 'Plein cadre',
