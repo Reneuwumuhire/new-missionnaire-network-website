@@ -18,6 +18,7 @@ import { frameCount, onAirSceneId, renderFrame, takeToProgram } from './composit
  import {
 	DESKTOP_AUDIO,
 	appAudio,
+	capturingApp,
 	listWindows,
 	matchWindow,
 	received,
@@ -370,6 +371,43 @@ export async function runAudioSelftest(): Promise<void> {
 			`AUDIOTEST scene-cut strip-before=${onAir} strip-after=${afterCut} still-delivering=${received.blocks > 0} capturing=${appAudio.capturing.includes(shared.id)}`
 		);
 		if (!onAir || !afterCut || received.blocks === 0) ok = false;
+
+		// And back again, which is the round trip an operator makes all service:
+		// away to a slide, then back to the window.
+		studio.activeSceneId = withWindow.id;
+		studio.programSceneId = withWindow.id;
+		await wait(2500);
+		received.blocks = 0;
+		await wait(1200);
+		await say(
+			`AUDIOTEST scene-return strip=${bus.has(shared.id)} delivering=${received.blocks > 0} meter-visible=${Boolean(document.querySelector(`[data-meter="${shared.id}"]`))} capturing=${appAudio.capturing.includes(shared.id)} err=${appAudio.error ?? '-'}`
+		);
+		if (!bus.has(shared.id) || received.blocks === 0) ok = false;
+
+		// Re-sharing the source: the window is pointed at another application and
+		// then back. The strip already exists throughout, so the capture has to
+		// follow the application rather than sit on the first one it was given.
+		const elsewhere = apps.find((a) => a.id !== app.id);
+		// Through the store, not the object that was handed to it: state is
+		// proxied on the way in, and writing to the original notifies nobody —
+		// which is what the UI would never do, and what made this check pass by
+		// accident the first time.
+		const live = studio.scenes.find((scene) => scene.id === withWindow.id)!.layers[0];
+		if (elsewhere) {
+			live.appId = elsewhere.id;
+			await wait(2500);
+			const followed = capturingApp(shared.id) === elsewhere.id;
+			live.appId = app.id;
+			await wait(2500);
+			received.blocks = 0;
+			await wait(1000);
+			const cameBack = capturingApp(shared.id) === app.id;
+			await say(
+				`AUDIOTEST re-share followed=${followed} back=${cameBack} strip=${bus.has(shared.id)} meter-visible=${Boolean(document.querySelector(`[data-meter="${shared.id}"]`))} delivering=${received.blocks > 0}`
+			);
+			if (!followed || !cameBack || !bus.has(shared.id)) ok = false;
+		}
+
 		await stopAppAudio(bus, shared.id);
 		studio.scenes = restoreScenes;
 		studio.programSceneId = restoreProgram;

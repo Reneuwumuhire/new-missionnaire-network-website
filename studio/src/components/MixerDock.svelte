@@ -14,6 +14,7 @@
 	import {
 		DESKTOP_AUDIO,
 		appAudio,
+		capturingApp,
 		refreshApps,
 		startAppAudio,
 		stopAppAudio,
@@ -122,7 +123,7 @@
 		// The window keeps the name the operator gave it; a placeholder app
 		// source has nothing better to be called than the app.
 		if (strip.isMic) strip.source.name = app.name;
-		failed.delete(strip.id);
+		failed.delete(attempt(strip.id, app.id));
 		persist();
 		devicesOpen = null;
 		await startAppAudio(mixer, strip.id, app);
@@ -160,8 +161,12 @@
 	}
 
 	/** Captures that came back with an error, so a failing one is not retried
-	 *  forever by the effect below. Choosing an application clears its entry. */
+	 *  forever by the effect below. Keyed by strip *and* application: pointing a
+	 *  source at a different window is a different attempt, and refusing to make
+	 *  it because an earlier application failed is how a strip stays dark for the
+	 *  rest of the service. Choosing an application clears its entry. */
 	const failed = new Set<string>();
+	const attempt = (id: string, appId: string) => `${id}:${appId}`;
 
 	/** Every strip that knows its application captures it, without being asked
 	 *  twice: a window whose app was recognised on sharing, and an application
@@ -190,11 +195,19 @@
 
 		const wanting = [...studio.audioSources.filter((s) => s.kind === 'app'), ...audioLayers()];
 		for (const source of wanting) {
-			if (!source.appId || bus.has(source.id) || failed.has(source.id)) continue;
+			if (!source.appId) continue;
+			// What the strip is actually capturing, not merely whether it has one.
+			// Re-sharing a window points the source at another application, and a
+			// strip left running the old one is a meter that never matches the
+			// picture — or, when the new share had no sound to find, nothing at all.
+			if (capturingApp(source.id) === source.appId) continue;
+			const key = attempt(source.id, source.appId);
+			if (failed.has(key)) continue;
+			failed.add(key);
 			void startAppAudio(bus, source.id, { id: source.appId, name: source.name }).then((ok) => {
-				// One shot per strip: a closed application must not be retried on
-				// every frame. Picking one again clears the mark.
-				if (!ok) failed.add(source.id);
+				// One shot per application: a closed one must not be retried on
+				// every frame. A different application is a different attempt.
+				if (ok) failed.delete(key);
 			});
 		}
 	});

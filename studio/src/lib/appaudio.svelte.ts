@@ -109,6 +109,14 @@ export function matchWindow(
 }
 
 const nodes = new Map<string, AudioWorkletNode>();
+/** Which application each strip is actually capturing. A strip existing is not
+ *  the same as it capturing the right thing: re-sharing a window points the
+ *  source at another application, and without this the old capture stays put
+ *  and the new one never starts. */
+const capturedApp = new Map<string, string>();
+
+/** The application a strip is capturing right now, if any. */
+export const capturingApp = (sourceId: string): string | undefined => capturedApp.get(sourceId);
 
 /** Bytes of PCM handed to the worklet — diagnostics only, but the only way to
  *  tell "capture started" from "capture is actually delivering". */
@@ -148,6 +156,7 @@ export async function startAppAudio(
 			channel
 		});
 		nodes.set(sourceId, node);
+		capturedApp.set(sourceId, app.id);
 		mixer.addNode(sourceId, node);
 		if (!appAudio.capturing.includes(sourceId)) appAudio.capturing = [...appAudio.capturing, sourceId];
 		appAudio.error = null;
@@ -159,6 +168,7 @@ export async function startAppAudio(
 }
 
 export async function stopAppAudio(mixer: Mixer, sourceId: string): Promise<void> {
+	capturedApp.delete(sourceId);
 	const node = nodes.get(sourceId);
 	if (node) {
 		node.port.onmessage = null;
