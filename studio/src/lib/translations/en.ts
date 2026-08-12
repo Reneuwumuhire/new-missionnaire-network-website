@@ -65,19 +65,17 @@ const en = {
 	'sources.video': 'Media Source',
 	'sources.videoHint': 'Clip or loop, with sound',
 	'sources.url': 'YouTube / Link',
-	'sources.urlHint': 'Download a video or a song and play it like any media source',
+	'sources.urlHint': 'Play a video or a song from a link, like any media source',
 	'web.title': 'Add from a link',
 	'web.url': 'Address',
 	'web.audioOnly': 'Sound only',
 	'web.withPicture': 'With picture',
-	'web.add': 'Download',
-	'web.fetching': 'Downloading…',
+	'web.add': 'Add',
 	'web.reading': 'Reading the link…',
-	'web.merging': 'Assembling…',
-	'web.hint':
-		'The video is downloaded first so it can go out on the broadcast, not just play here. Sound only is smaller and is all you need for music.',
-	'web.liveHint':
-		'This is a live stream, so there is nothing to download. Put it on air with Display / Window Capture on the browser window, and add that browser under Application Audio Capture for its sound.',
+	'web.hintAudio':
+		'Plays straight away, at full quality, and nothing is saved to disk. It streams while you are on air, so it needs the internet to keep working.',
+	'web.hintVideo':
+		'Plays straight away, but YouTube only serves picture and sound together at up to 360p, so it will look soft on a 1080p broadcast. Sound only is unaffected.',
 	'sources.text': 'Text',
 	'sources.textHint': 'Title, standing message',
 	'sources.lyrics': 'Lyrics',

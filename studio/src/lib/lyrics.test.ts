@@ -14,7 +14,7 @@ import {
 	timedPositionMs
 } from './lyrics.svelte';
 import { parseSrt } from './srt';
-import { clampTime } from './media.svelte';
+import { clampTime, shownDuration } from './media.svelte';
 
 const SRT = `1
 00:00:10,000 --> 00:00:14,000
@@ -142,5 +142,18 @@ describe('seeking a recording', () => {
 		// Duration is NaN until the metadata loads; a seek then must still work.
 		expect(clampTime(42, NaN)).toBe(42);
 		expect(clampTime(NaN, 100)).toBe(0);
+	});
+
+	it('trusts the link over the element, which doubles a streamed track', () => {
+		// Measured: WebKit reads YouTube's audio-only container as 1269.2 s for a
+		// track the link says is 635.0 s. Believing the element would end the song
+		// halfway along the scrub bar.
+		expect(shownDuration(635, 1269.2)).toBe(635);
+		expect(shownDuration(19, 38.1)).toBe(19);
+		// A file from disk states nothing, so its own element is the only source.
+		expect(shownDuration(undefined, 212)).toBe(212);
+		expect(shownDuration(0, 212)).toBe(212);
+		// Neither knows yet: better a bar that reads zero than one reading NaN.
+		expect(shownDuration(undefined, NaN)).toBe(0);
 	});
 });

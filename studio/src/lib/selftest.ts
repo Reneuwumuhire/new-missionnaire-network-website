@@ -27,7 +27,7 @@ import { frameCount, onAirSceneId, renderFrame, takeToProgram } from './composit
 } from './appaudio.svelte';
  import type { Mixer } from './mixer';
 import { toDb } from './meter';
-import { handleFor, listDevices, openFile, openMic, release } from './media.svelte';
+import { handleFor, listDevices, openFile, openMic, openStream, release } from './media.svelte';
 import { followMedia, timedPositionMs } from './lyrics.svelte';
 import { addAudioInput, id, makeLayer, persist, studio } from './state.svelte';
 
@@ -668,78 +668,117 @@ export async function runSelftest(target: string, canvas: () => HTMLCanvasElemen
 /** `STUDIO_SELFTEST=fetch` — the YouTube link source, end to end and for real.
  *
  *  The point of this one is the last link in the chain, which no unit test can
- *  reach: bytes come back over IPC, become a Blob, become a `<video>`, and get
- *  drawn onto a canvas that must stay origin-clean. If it ever taints,
- *  captureStream() throws and the broadcast stops — so that is asserted here
- *  rather than discovered on a Sunday. */
+ *  reach: the element plays through the `ytstream` proxy and gets drawn onto a
+ *  canvas that must stay origin-clean. If it ever taints, captureStream()
+ *  throws and the broadcast stops — so that is asserted here rather than
+ *  discovered on a Sunday. */
 export async function runFetchSelftest(): Promise<void> {
 	let ok = true;
-	// 19 seconds, and the oldest clip on the site — small enough to download in
-	// a self-test, and it is not going anywhere.
+	// 19 seconds, and the oldest clip on the site — small, and not going away.
 	const SHORT = 'https://www.youtube.com/watch?v=jNQXAC9IVRw';
 	const LIVE = 'https://www.youtube.com/@NASA/live';
 
+	// A live stream must be refused rather than relayed: its HLS manifest names
+	// segments by absolute googlevideo URL, which would leave the proxy and
+	// taint the canvas on the first segment.
 	try {
-		const probed = await invoke<{ title: string; isLive: boolean; duration: number }>(
-			'probe_media',
-			{ url: SHORT }
-		);
-		await say(
-			`FETCHTEST probe title=${JSON.stringify(probed.title)} live=${probed.isLive} duration=${probed.duration}`
-		);
-		if (probed.isLive || !probed.title) ok = false;
-	} catch (err) {
+		await invoke('resolve_media', { url: LIVE, audioOnly: true });
 		ok = false;
-		await say(`FETCHTEST probe FAILED ${err}`);
+		await say('FETCHTEST live FAIL — a live stream resolved');
+	} catch (err) {
+		await say(`FETCHTEST live refused: ${String(err).slice(0, 80)}`);
 	}
 
-	// A live stream must be refused rather than started: a download that never
-	// ends would sit there filling the disk.
-	try {
-		const live = await invoke<{ isLive: boolean }>('probe_media', { url: LIVE });
-		await say(`FETCHTEST live probe isLive=${live.isLive}`);
-		if (!live.isLive) ok = false;
+	// Sound only is the common errand, and it takes the other format branch —
+	// one AAC track rather than a muxed file — so it is worth its own check.
+	// Two of them: an old clip whose audio is 22 kHz HE-AAC, and a modern
+	// encode. What the element believes the duration is has to match what the
+	// link actually says, or the transport bar scrubs against a made-up length.
+	for (const [name, link] of [
+		['old', SHORT],
+		['modern', 'https://www.youtube.com/watch?v=aqz-KE-bpKQ']
+	] as const) {
 		try {
-			await invoke('fetch_media', { url: LIVE, audioOnly: true });
-			ok = false;
-			await say('FETCHTEST live FAIL — a live stream started downloading');
+			const song = await invoke<{ token: string; title: string; duration: number }>(
+				'resolve_media',
+				{ url: link, audioOnly: true }
+			);
+			const layer = makeLayer('video', `__fetch_audio_${name}`, { audioOnly: true });
+			const el = openStream(layer, song.token).el as HTMLVideoElement;
+			await new Promise<void>((resolve) => {
+				if (el.readyState >= 1) return resolve();
+				el.onloadedmetadata = () => resolve();
+				el.onerror = () => resolve();
+				setTimeout(resolve, 15000);
+			});
+			const drift = Math.abs(el.duration - song.duration);
+			await say(
+				`FETCHTEST audio ${name} element=${el.duration?.toFixed(1)} link=${song.duration.toFixed(1)} drift=${drift.toFixed(1)} error=${el.error?.code ?? 'none'}`
+			);
+			// Seeking is measured against what the element believes, so a wrong
+			// duration and a wrong seek are the same defect seen twice.
+			const target = Math.min(10, song.duration / 2);
+			el.currentTime = target;
+			await new Promise<void>((resolve) => {
+				el.onseeked = () => resolve();
+				setTimeout(resolve, 6000);
+			});
+			await say(
+				`FETCHTEST audio ${name} seek to=${target.toFixed(1)} landed=${el.currentTime.toFixed(2)}`
+			);
+			if (!(el.duration > 0) || el.error) ok = false;
+			release(layer.id);
 		} catch (err) {
-			await say(`FETCHTEST live refused: ${String(err).slice(0, 90)}`);
+			ok = false;
+			await say(`FETCHTEST audio ${name} FAILED ${err}`);
 		}
-	} catch (err) {
-		await say(`FETCHTEST live probe FAILED ${err}`);
 	}
 
 	// With picture, because the canvas check needs something to draw.
 	try {
 		const started = performance.now();
-		const buffer = await invoke<ArrayBuffer>('fetch_media', { url: SHORT, audioOnly: false });
-		const bytes = buffer.byteLength;
-		await say(`FETCHTEST download bytes=${bytes} in=${Math.round(performance.now() - started)}ms`);
-		if (bytes < 10_000) ok = false;
+		const found = await invoke<{ token: string; title: string; duration: number; reduced: boolean }>(
+			'resolve_media',
+			{ url: SHORT, audioOnly: false }
+		);
+		await say(
+			`FETCHTEST resolve title=${JSON.stringify(found.title)} token=${found.token} reduced=${found.reduced} in=${Math.round(performance.now() - started)}ms`
+		);
+		if (!found.token || !found.title) ok = false;
 
 		const layer = makeLayer('video', '__fetch_probe', { fit: 'contain' });
-		const handle = openFile(layer, new Blob([buffer], { type: 'video/mp4' }));
+		const handle = openStream(layer, found.token);
 		const el = handle.el as HTMLVideoElement;
+		const ready = performance.now();
 		await new Promise<void>((resolve) => {
-			if (el.readyState >= 1) return resolve();
-			el.onloadedmetadata = () => resolve();
-			setTimeout(resolve, 8000);
+			if (el.readyState >= 2) return resolve();
+			el.oncanplay = () => resolve();
+			el.onerror = () => resolve();
+			setTimeout(resolve, 15000);
 		});
 		await say(
-			`FETCHTEST element ${el.videoWidth}x${el.videoHeight} duration=${el.duration?.toFixed(1)} error=${el.error?.code ?? 'none'}`
+			`FETCHTEST element ${el.videoWidth}x${el.videoHeight} duration=${el.duration?.toFixed(1)} firstFrame=${Math.round(performance.now() - ready)}ms error=${el.error?.code ?? 'none'}`
 		);
 		if (!el.videoWidth || !(el.duration > 0)) ok = false;
 
-		// The whole reason the app downloads instead of letting the webview load
-		// the URL: draw it, then prove the canvas is still readable and still
-		// capturable. A tainted canvas throws on both.
+		// Seeking is the reason Range requests are forwarded at all: without it
+		// the transport bar cannot scrub a link.
+		el.currentTime = 10;
+		await new Promise<void>((resolve) => {
+			el.onseeked = () => resolve();
+			setTimeout(resolve, 6000);
+		});
+		const seeked = Math.abs(el.currentTime - 10) < 1.5;
+		await say(`FETCHTEST seek to=10 landed=${el.currentTime.toFixed(2)} ok=${seeked}`);
+		if (!seeked) ok = false;
+
+		// The whole reason the app proxies instead of letting the webview load
+		// the address: draw it, then prove the canvas is still readable and
+		// still capturable. A tainted canvas throws on both.
 		const canvas = document.createElement('canvas');
 		canvas.width = 320;
 		canvas.height = 180;
 		const ctx = canvas.getContext('2d');
-		el.currentTime = 1;
-		await wait(500);
 		let clean = false;
 		let capturable = false;
 		try {
@@ -756,7 +795,7 @@ export async function runFetchSelftest(): Promise<void> {
 		release(layer.id);
 	} catch (err) {
 		ok = false;
-		await say(`FETCHTEST download FAILED ${err}`);
+		await say(`FETCHTEST stream FAILED ${err}`);
 	}
 
 	await say(`FETCHTEST ${ok ? 'OK' : 'FAIL'} — terminé`);

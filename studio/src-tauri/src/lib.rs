@@ -139,31 +139,22 @@ fn open_privacy_settings(pane: String) -> Result<(), String> {
 	}
 }
 
-/// What a URL is, before committing to downloading it. Cheap, and it tells the
-/// operator the title they are about to add.
+/// Turn a link into something the webview can play immediately: a token for the
+/// `ytstream` protocol below. Nothing is downloaded here — only the address is
+/// worked out, which takes a second or two.
 #[tauri::command]
-async fn probe_media(url: String) -> Result<fetch::Fetched, String> {
-	tauri::async_runtime::spawn_blocking(move || fetch::probe(&url))
-		.await
-		.map_err(|e| e.to_string())?
-}
-
-/// Download a URL and hand back the file itself. Raw bytes rather than a path:
-/// the webview turns them into a blob, which is same-origin and so can be drawn
-/// onto the program canvas without tainting it. See fetch.rs for why that
-/// matters.
-#[tauri::command]
-async fn fetch_media(
+async fn resolve_media(
 	app: AppHandle,
 	url: String,
 	audio_only: bool,
-) -> Result<tauri::ipc::Response, String> {
-	// spawn_blocking, not the async pool: this runs a subprocess to completion
-	// and would otherwise hold a runtime thread for the length of a download.
-	let bytes = tauri::async_runtime::spawn_blocking(move || fetch::fetch(&app, &url, audio_only))
-		.await
-		.map_err(|e| e.to_string())??;
-	Ok(tauri::ipc::Response::new(bytes))
+) -> Result<fetch::Resolved, String> {
+	// spawn_blocking, not the async pool: this runs yt-dlp to completion and
+	// would otherwise hold a runtime thread while it works.
+	tauri::async_runtime::spawn_blocking(move || {
+		fetch::resolve(&app.state::<fetch::Streams>(), &url, audio_only)
+	})
+	.await
+	.map_err(|e| e.to_string())?
 }
 
 /// Bridge for webview logging — a packaged .app has no devtools console you can
@@ -197,6 +188,70 @@ pub fn run() {
 	tauri::Builder::default()
 		.manage(Encoder::default())
 		.manage(appaudio::Capture::default())
+		.manage(fetch::Streams::default())
+		// The media proxy. A `<video>` playing ytstream://s?id=… lands here, and
+		// the answer carries the CORS header googlevideo never sends — which is
+		// what keeps the program canvas untainted and capturable. Asynchronous
+		// so a slow range never blocks the UI thread.
+		.register_asynchronous_uri_scheme_protocol("ytstream", |ctx, request, responder| {
+			let streams = ctx.app_handle().state::<fetch::Streams>();
+			// The page sends a token, never an address: the proxy can only fetch
+			// something this app resolved itself.
+			let token = request
+				.uri()
+				.query()
+				.and_then(|q| {
+					q.split('&')
+						.find_map(|pair| pair.strip_prefix("id="))
+				})
+				.unwrap_or_default()
+				.to_string();
+			let url = streams.get(&token);
+			let range = request
+				.headers()
+				.get("range")
+				.and_then(|v| v.to_str().ok())
+				.map(str::to_string);
+
+			std::thread::spawn(move || {
+				let Some(url) = url else {
+					responder.respond(
+						tauri::http::Response::builder()
+							.status(404)
+							.header("Access-Control-Allow-Origin", "*")
+							.body(Vec::new())
+							.unwrap(),
+					);
+					return;
+				};
+				match fetch::chunk(&url, range.as_deref()) {
+					Ok(part) => {
+						let mut build = tauri::http::Response::builder()
+							.status(part.status)
+							.header("Access-Control-Allow-Origin", "*")
+							.header("Content-Type", part.content_type)
+							// Without this the element downloads the whole track
+							// before it will let anyone scrub it.
+							.header("Accept-Ranges", "bytes")
+							.header("Content-Length", part.body.len().to_string());
+						if let Some(range) = part.content_range {
+							build = build.header("Content-Range", range);
+						}
+						responder.respond(build.body(part.body).unwrap());
+					}
+					Err(err) => {
+						eprintln!("[studio] ytstream {err}");
+						responder.respond(
+							tauri::http::Response::builder()
+								.status(502)
+								.header("Access-Control-Allow-Origin", "*")
+								.body(Vec::new())
+								.unwrap(),
+						);
+					}
+				}
+			});
+		})
 		.setup(|app| {
 			// Bring the window to the front on launch. Beyond being polite, a
 			// window that never activates is reported as hidden by WebKit, which
@@ -219,8 +274,7 @@ pub fn run() {
 			list_windows,
 			start_app_audio,
 			stop_app_audio,
-			probe_media,
-			fetch_media,
+			resolve_media,
 			report
 		])
 		.on_window_event(|window, event| {

@@ -5,6 +5,7 @@
 		openCamera,
 		openFile,
 		openScreen,
+		openStream,
 		release,
 		report
 	} from '../lib/media.svelte';
@@ -185,19 +186,20 @@
 
 	let urlOpen = $state(false);
 
-	/** A finished download becomes an ordinary media layer — the compositor, the
-	 *  mixer and the transport bar have no idea it came from a link. */
-	function addFetched(blob: Blob, title: string, audioOnly: boolean) {
+	/** A resolved link becomes an ordinary media layer — the compositor, the
+	 *  mixer and the transport bar have no idea it is being streamed. */
+	function addFetched(token: string, title: string, audioOnly: boolean, duration: number) {
 		urlOpen = false;
 		const layer = makeLayer('video', title || t('sources.url'), {
 			fit: 'contain',
 			audioOnly,
-			fileName: title
+			fileName: title,
+			duration
 		});
 		const scene = activeScene();
 		scene.layers = [layer, ...scene.layers];
 		studio.selectedLayerId = layer.id;
-		openFile(layer, blob);
+		openStream(layer, token);
 		persist();
 	}
 

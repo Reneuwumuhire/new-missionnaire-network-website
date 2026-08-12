@@ -210,15 +210,53 @@ export async function applyCursor(layer: Layer): Promise<void> {
 /** A seek target that a media element will actually accept: never before the
  *  start, never past the end, and never NaN — the duration is unknown until the
  *  file's metadata has loaded, and setting currentTime to NaN throws. */
+/** How long the track really is.
+ *
+ *  WebKit reads YouTube's audio-only container as exactly twice its length —
+ *  38.1 s for a 19.0 s clip, 1269.2 s for a 635.0 s one — so where the link
+ *  stated a duration, that wins. Its `currentTime` is right and seeking lands
+ *  where it should; only the total is invented. A file picked from disk states
+ *  nothing, and its element is trustworthy. */
+export function shownDuration(stated: number | undefined, element: number): number {
+	if (stated && stated > 0) return stated;
+	return Number.isFinite(element) && element > 0 ? element : 0;
+}
+
 export function clampTime(seconds: number, duration: number): number {
 	if (!Number.isFinite(seconds)) return 0;
 	const end = Number.isFinite(duration) && duration > 0 ? duration : Infinity;
 	return Math.max(0, Math.min(seconds, end));
 }
 
-/** `Blob`, not `File`: a download fetched by the Rust side arrives as bytes and
- *  becomes a blob here. Same object URL, same element, same everything after —
- *  and a blob is same-origin, which is what keeps the program canvas untainted. */
+/** Play a link the Rust side resolved, through the `ytstream` proxy.
+ *
+ *  `crossOrigin` is the whole point: the proxy answers with
+ *  Access-Control-Allow-Origin, so the element is origin-clean and the program
+ *  canvas stays capturable. Without it the first frame drawn would taint the
+ *  canvas and captureStream() would throw mid-broadcast. */
+export function openStream(layer: Layer, token: string): Handle {
+	release(layer.id);
+	const el = document.createElement('video');
+	el.crossOrigin = 'anonymous';
+	el.preload = 'auto';
+	el.loop = false;
+	el.playsInline = true;
+	// Muted until the mixer taps it — same reason as openFile below.
+	el.muted = true;
+	el.src = `ytstream://localhost/media?id=${encodeURIComponent(token)}`;
+	const h: Handle = { kind: 'video', el, stream: null, error: null, objectUrl: null };
+	el.onerror = () => {
+		h.error = t('source.badVideo');
+		mediaVersion.n++;
+	};
+	el.onloadedmetadata = () => mediaVersion.n++;
+	set(layer.id, h);
+	return h;
+}
+
+/** `Blob`, not `File`: callers other than the file picker hand over bytes they
+ *  already hold. Same object URL, same element, same everything after — and a
+ *  blob is same-origin, which is what keeps the program canvas untainted. */
 export function openFile(layer: Layer, file: Blob): Handle {
 	release(layer.id);
 	const url = URL.createObjectURL(file);

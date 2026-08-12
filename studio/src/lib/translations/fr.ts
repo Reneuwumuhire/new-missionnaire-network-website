@@ -66,19 +66,17 @@ const fr: Record<keyof typeof en, string> = {
 	'sources.video': 'Source multimédia',
 	'sources.videoHint': 'Clip ou boucle, avec son',
 	'sources.url': 'YouTube / Lien',
-	'sources.urlHint': 'Télécharger une vidéo ou un chant et le lire comme toute autre source',
+	'sources.urlHint': 'Lire une vidéo ou un chant depuis un lien, comme toute autre source',
 	'web.title': 'Ajouter depuis un lien',
 	'web.url': 'Adresse',
 	'web.audioOnly': 'Son seul',
 	'web.withPicture': 'Avec l’image',
-	'web.add': 'Télécharger',
-	'web.fetching': 'Téléchargement…',
+	'web.add': 'Ajouter',
 	'web.reading': 'Lecture du lien…',
-	'web.merging': 'Assemblage…',
-	'web.hint':
-		'La vidéo est téléchargée d’abord afin de partir sur la diffusion, et pas seulement d’être lue ici. Le son seul est plus léger et suffit pour la musique.',
-	'web.liveHint':
-		'C’est un direct : il n’y a rien à télécharger. Mettez-le à l’antenne avec une capture de fenêtre du navigateur, et ajoutez ce navigateur dans la capture audio d’application pour le son.',
+	'web.hintAudio':
+		'Lecture immédiate, en pleine qualité, et rien n’est enregistré sur le disque. Le flux est lu pendant l’antenne : il faut donc garder la connexion.',
+	'web.hintVideo':
+		'Lecture immédiate, mais YouTube ne sert l’image et le son ensemble qu’en 360p au plus : ce sera flou sur une diffusion 1080p. Le son seul n’est pas concerné.',
 	'sources.text': 'Texte',
 	'sources.textHint': 'Titre, message fixe',
 	'sources.lyrics': 'Paroles',

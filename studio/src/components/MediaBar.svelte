@@ -6,7 +6,7 @@
 
 	import Icon from './Icon.svelte';
 	import { t } from '../lib/i18n.svelte';
-	import { clampTime, handleFor, mediaVersion } from '../lib/media.svelte';
+	import { clampTime, handleFor, mediaVersion, shownDuration } from '../lib/media.svelte';
 	import { followMedia, lyrics } from '../lib/lyrics.svelte';
 	import { programScene, selectedLayer, type Layer } from '../lib/state.svelte';
 
@@ -39,7 +39,10 @@
 				return;
 			}
 			if (!scrubbing) position = element.currentTime;
-			duration = Number.isFinite(element.duration) ? element.duration : 0;
+			// The link's own length wins where there is one: WebKit doubles it for
+			// a streamed audio track, which would put the end of the song at the
+			// middle of this bar.
+			duration = shownDuration(layer?.duration, element.duration);
 			playing = !element.paused && !element.ended;
 		}, 100);
 		return () => clearInterval(timer);
@@ -47,7 +50,9 @@
 
 	function seek(seconds: number) {
 		if (!element) return;
-		element.currentTime = clampTime(seconds, element.duration);
+		// Clamped against the length shown, not the element's — otherwise a
+		// streamed track lets you scrub into a second half that does not exist.
+		element.currentTime = clampTime(seconds, duration || element.duration);
 		position = element.currentTime;
 	}
 

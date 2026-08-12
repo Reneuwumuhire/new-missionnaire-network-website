@@ -69,6 +69,12 @@ export interface Layer {
 	/** Display-only: the file the operator picked. Blobs cannot be persisted,
 	 *  so after a restart the layer asks for the file again. */
 	fileName?: string;
+	/** Seconds, from the link itself, for a streamed source. WebKit reads
+	 *  YouTube's audio-only container as exactly twice its real length —
+	 *  measured at 38.1 s for a 19.0 s clip and 1269.2 s for a 635.0 s one — so
+	 *  the element cannot be asked how long the track is. Its currentTime is
+	 *  right and seeking lands where it should; only the total is invented. */
+	duration?: number;
 }
 
 export interface Scene {
