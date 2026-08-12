@@ -268,14 +268,15 @@
 			Missionnaire <span class="text-primary">Studio</span>
 		</h1>
 		{#if broadcast.phase === 'live'}
-			<span class="flex items-center gap-2 bg-red-600/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-red-400">
+			<!-- pointer-events-none so the whole title bar drags, not just the gaps. -->
+			<span class="pointer-events-none flex items-center gap-2 bg-red-600/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-red-400">
 				<span class="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500"></span>
 				{t('status.live')}
 				<span class="font-mono tracking-normal text-red-300/80">{uptimeLabel(now)}</span>
 			</span>
 		{/if}
 		<span
-			class="ml-auto text-[10px] {health.tone === 'warn'
+			class="pointer-events-none ml-auto text-[10px] {health.tone === 'warn'
 				? 'text-amber-400'
 				: health.tone === 'ok'
 					? 'text-emerald-400'
