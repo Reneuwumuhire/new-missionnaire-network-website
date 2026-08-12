@@ -18,6 +18,7 @@
 		refreshApps
 	} from '../lib/appaudio.svelte';
 	import { addAppAudio, addAudioInput } from '../lib/state.svelte';
+	import { invoke } from '@tauri-apps/api/core';
 	import AddFromUrl from './AddFromUrl.svelte';
 	import Dock from './Dock.svelte';
 	import Icon, { type IconName } from './Icon.svelte';
@@ -28,6 +29,7 @@
 		activeScene,
 		makeLayer,
 		persist,
+		reconnectWith,
 		studio,
 		type Layer,
 		type LayerKind
@@ -122,8 +124,8 @@
 			return;
 		}
 		if (kind === 'url') {
-			// The layer is made only once the download succeeds: a failed link
-			// should leave nothing behind to tidy up.
+			// The layer is made only once the link resolves: a bad link should
+			// leave nothing behind to tidy up.
 			adding = false;
 			urlOpen = true;
 			return;
@@ -188,19 +190,52 @@
 
 	/** A resolved link becomes an ordinary media layer — the compositor, the
 	 *  mixer and the transport bar have no idea it is being streamed. */
-	function addFetched(token: string, title: string, audioOnly: boolean, duration: number) {
+	function addFetched(
+		found: { token: string; title: string; duration: number },
+		url: string,
+		audioOnly: boolean
+	) {
 		urlOpen = false;
-		const layer = makeLayer('video', title || t('sources.url'), {
+		const layer = makeLayer('video', found.title || t('sources.url'), {
 			fit: 'contain',
 			audioOnly,
-			fileName: title,
-			duration
+			fileName: found.title,
+			duration: found.duration,
+			url
 		});
 		const scene = activeScene();
 		scene.layers = [layer, ...scene.layers];
 		studio.selectedLayerId = layer.id;
-		openStream(layer, token);
+		openStream(layer, found.token);
 		persist();
+	}
+
+	/** Layers whose link is being resolved again. Resolving takes about twelve
+	 *  seconds, and a button that does nothing visible for that long reads as
+	 *  broken — so it says what it is doing. */
+	let relinking = $state(new Set<string>());
+
+	/** Resolve a saved link again and put the source back. The address behind it
+	 *  has expired by now, so this is the only thing that can work — and it
+	 *  needs nothing from the operator, which is why it is not a dialog. */
+	async function relink(layer: Layer) {
+		if (!layer.url || relinking.has(layer.id)) return;
+		relinking = new Set(relinking).add(layer.id);
+		try {
+			const found = await invoke<{ token: string; title: string; duration: number }>(
+				'resolve_media',
+				{ url: layer.url, audioOnly: Boolean(layer.audioOnly) }
+			);
+			layer.duration = found.duration;
+			openStream(layer, found.token);
+			persist();
+		} catch (err) {
+			report(`relink ${layer.url} failed: ${err}`);
+		} finally {
+			const next = new Set(relinking);
+			next.delete(layer.id);
+			relinking = next;
+		}
 	}
 
 	function pickFile(layer: Layer) {
@@ -251,9 +286,19 @@
 	/** Re-open a source: a camera taken by another app, a screen share ended
 	 *  from the menu bar, a file lost across a restart. */
 	async function reconnect(layer: Layer) {
-		if (layer.kind === 'camera') await openCamera(layer, studio.settings.width, studio.settings.height);
-		else if (layer.kind === 'screen') await shareScreen(layer);
-		else pickFile(layer);
+		switch (reconnectWith(layer)) {
+			case 'camera':
+				await openCamera(layer, studio.settings.width, studio.settings.height);
+				return;
+			case 'screen':
+				await shareScreen(layer);
+				return;
+			case 'link':
+				await relink(layer);
+				return;
+			default:
+				pickFile(layer);
+		}
 	}
 
 	const selected = $derived(activeScene().layers.find((l) => l.id === studio.selectedLayerId) ?? null);
@@ -308,7 +353,9 @@
 					<button
 						class="shrink-0 bg-amber-500/15 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-amber-400 hover:bg-amber-500/30"
 						title={issue}
-						onclick={() => reconnect(layer)}>{t('sources.reconnect')}</button
+						disabled={relinking.has(layer.id)}
+						onclick={() => reconnect(layer)}
+						>{relinking.has(layer.id) ? t('web.reading') : t('sources.reconnect')}</button
 					>
 				{/if}
 				<button

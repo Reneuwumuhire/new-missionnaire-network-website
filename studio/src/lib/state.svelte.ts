@@ -69,6 +69,12 @@ export interface Layer {
 	/** Display-only: the file the operator picked. Blobs cannot be persisted,
 	 *  so after a restart the layer asks for the file again. */
 	fileName?: string;
+	/** The page this source was added from, for a streamed one. Kept so
+	 *  Reconnect can resolve it again rather than asking for it back: the signed
+	 *  media address behind it expires after a few hours, so re-resolving is the
+	 *  only thing that ever works — and it is exactly what the operator would
+	 *  have to do by hand. */
+	url?: string;
 	/** Seconds, from the link itself, for a streamed source. WebKit reads
 	 *  YouTube's audio-only container as exactly twice its real length —
 	 *  measured at 38.1 s for a 19.0 s clip and 1269.2 s for a 635.0 s one — so
@@ -155,6 +161,18 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 export const id = () => Math.random().toString(36).slice(2, 10);
+
+/** How a source that lost its media gets it back.
+ *
+ *  A link has no file to pick: it is re-resolved from the page it came from,
+ *  because the signed address behind it has expired. Sending the operator to
+ *  the file picker for one asks them to find something that never existed on
+ *  this machine. */
+export function reconnectWith(layer: Layer): 'camera' | 'screen' | 'link' | 'file' {
+	if (layer.kind === 'camera') return 'camera';
+	if (layer.kind === 'screen') return 'screen';
+	return layer.url ? 'link' : 'file';
+}
 
 export function makeLayer(kind: LayerKind, name: string, patch: Partial<Layer> = {}): Layer {
 	const audioKinds: LayerKind[] = ['camera', 'screen', 'video'];

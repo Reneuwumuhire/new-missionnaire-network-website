@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { audioLayers, makeLayer, stageableSettings, studio, uniqueById } from './state.svelte';
+import {
+	audioLayers,
+	makeLayer,
+	reconnectWith,
+	stageableSettings,
+	studio,
+	uniqueById
+} from './state.svelte';
 
 describe('which layers get a mixer strip', () => {
 	const window = makeLayer('screen', 'Arc', { appId: 'company.thebrowser.Browser' });
@@ -55,5 +62,17 @@ describe('what the settings dialog stages', () => {
 		expect(staged).not.toHaveProperty('layout');
 		expect(staged.fps).toBe(studio.settings.fps);
 		expect(staged.encoder).toBe(studio.settings.encoder);
+	});
+});
+
+describe('getting a lost source back', () => {
+	it('sends a link to be resolved again, never to the file picker', () => {
+		const link = makeLayer('video', 'song', { url: 'https://www.youtube.com/watch?v=x' });
+		// The file picker would ask for something that was never on this machine.
+		expect(reconnectWith(link)).toBe('link');
+		expect(reconnectWith(makeLayer('video', 'clip'))).toBe('file');
+		expect(reconnectWith(makeLayer('image', 'logo'))).toBe('file');
+		expect(reconnectWith(makeLayer('camera', 'cam'))).toBe('camera');
+		expect(reconnectWith(makeLayer('screen', 'win'))).toBe('screen');
 	});
 });

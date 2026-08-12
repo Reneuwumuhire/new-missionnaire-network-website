@@ -10,17 +10,17 @@
 	import Modal from './Modal.svelte';
 	import { t } from '../lib/i18n.svelte';
 
-	let { onclose, onready }: {
-		onclose: () => void;
-		onready: (token: string, title: string, audioOnly: boolean, duration: number) => void;
-	} = $props();
-
 	interface Resolved {
 		token: string;
 		title: string;
 		duration: number;
 		reduced: boolean;
 	}
+
+	let { onclose, onready }: {
+		onclose: () => void;
+		onready: (found: Resolved, url: string, audioOnly: boolean) => void;
+	} = $props();
 
 	let url = $state('');
 	/** Audio by default: playing a song from YouTube is the common errand, and
@@ -38,7 +38,7 @@
 				url: url.trim(),
 				audioOnly
 			});
-			onready(found.token, found.title, audioOnly, found.duration);
+			onready(found, url.trim(), audioOnly);
 		} catch (e) {
 			error = String(e);
 		} finally {

@@ -90,9 +90,12 @@
 			{layer.fileName || layer.name}
 		</span>
 		{#if !element}
-			<!-- A blob cannot survive a restart, so the file has to be picked again.
-			     Dead controls with no reason given is the worst version of that. -->
-			<span class="shrink-0 text-[11px] text-amber-400/80">{t('media.needsFile')}</span>
+			<!-- Neither a blob nor a signed link survives a restart, so the source
+			     has to be fetched again. Dead controls with no reason given is the
+			     worst version of that — and the two need different actions. -->
+			<span class="shrink-0 text-[11px] text-amber-400/80">
+				{layer.url ? t('media.needsLink') : t('media.needsFile')}
+			</span>
 		{/if}
 
 		<button
