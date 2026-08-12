@@ -47,13 +47,22 @@ export function setLocale(next: Locale) {
 	}
 }
 
-export type Theme = 'dark' | 'light';
+export type Theme = 'dark' | 'light' | 'midnight';
+
+/** Dark is first because it is the default, and the order is the order the
+ *  picker shows: by how much light the room has. */
+export const THEMES: { id: Theme; label: () => string }[] = [
+	{ id: 'dark', label: () => t('settings.themeDark') },
+	{ id: 'light', label: () => t('settings.themeLight') },
+	{ id: 'midnight', label: () => t('settings.themeMidnight') }
+];
 
 const THEME_KEY = 'missionnaire-studio-theme';
 
 function loadTheme(): Theme {
 	try {
-		return localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark';
+		const saved = localStorage.getItem(THEME_KEY);
+		return THEMES.some((option) => option.id === saved) ? (saved as Theme) : 'dark';
 	} catch {
 		return 'dark';
 	}
@@ -64,7 +73,12 @@ export const theme = $state({ current: loadTheme() });
 export function applyTheme(next: Theme = theme.current) {
 	theme.current = next;
 	try {
-		document.documentElement.classList.toggle('light', next === 'light');
+		// Every theme but the default owns a class, and only one may be on: the
+		// tokens all live at the same specificity, so two classes would leave the
+		// winner to source order rather than to the choice.
+		const root = document.documentElement;
+		for (const option of THEMES) root.classList.toggle(option.id, option.id === next);
+		root.classList.remove('dark');
 		localStorage.setItem(THEME_KEY, next);
 	} catch {
 		/* no DOM or no storage — the choice simply is not remembered */

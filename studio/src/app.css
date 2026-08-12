@@ -2,11 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Two themes off one set of variables. `ink` is a scale of surface depth
+/* Three themes off one set of variables. `ink` is a scale of surface depth
    rather than luminance — ink-950 is always the page, ink-700 always a border
-   — so every component works in both without a single dark: variant.
+   — so every component works in all of them without a single dark: variant.
    Dark is the default: this sits next to a lit stage and should not be the
-   brightest thing in the room. */
+   brightest thing in the room.
+
+   Each one is picked from a room, not a taste:
+     dark      a normal control desk, lights up, neutral graphite
+     light     daylight, a bright hall, a projector-lit room at the back
+     midnight  a darkened auditorium, where the desk itself must not glow —
+               cooler and deeper, and the foreground pulled off pure white so
+               the screen stops being a lamp pointed at the operator. */
 
 :root {
 	--fg: 255 255 255;
@@ -30,6 +37,74 @@
 	--ink-600: 198 194 187;
 	--ink-500: 150 146 140;
 	--scrollbar: 198 194 187;
+}
+
+/* These take their colour from @apply inside the component layer, not from a
+   utility in the DOM, so the remap below never reaches them. Kept above it so
+   an active chip's `text-primary` still wins on a specificity tie. */
+:root.light .studio-chip { color: rgb(var(--fg) / 0.8); }
+:root.light .studio-label { color: rgb(var(--fg) / 0.62); }
+:root.light .studio-input { color: rgb(var(--fg) / 0.95); }
+:root.light .studio-input-flush { color: rgb(var(--fg) / 0.92); }
+:root.light .studio-icon-btn { color: rgb(var(--fg) / 0.62); }
+
+/* Disabled must read as inert, not as absent. Thirty percent of white on a
+   dark panel is still legible; thirty percent of near-black on paper is not,
+   so the quick-transition buttons vanished entirely rather than looking off. */
+:root.light .disabled\:opacity-20:disabled,
+:root.light .disabled\:opacity-30:disabled { opacity: 0.5; }
+:root.light .disabled\:opacity-40:disabled { opacity: 0.55; }
+
+/* The app mutes text by fading the foreground, which only works over a dark
+   surface: white at 35% on near-black still reads, near-black at 35% on
+   near-white lands at about 2.4:1 and every secondary label in the app goes
+   pale. Alpha cannot be fixed by picking a darker --fg — even pure black at
+   35% over white is 2.6:1 — so the steps themselves are remapped here, once,
+   instead of in the fifteen components that use them. The hierarchy is kept;
+   only the floor moves, and the smallest body text now clears 4.5:1. */
+:root.light .text-fg\/15 { color: rgb(var(--fg) / 0.38); }
+:root.light .text-fg\/25 { color: rgb(var(--fg) / 0.52); }
+:root.light .text-fg\/30 { color: rgb(var(--fg) / 0.56); }
+:root.light .text-fg\/35 { color: rgb(var(--fg) / 0.62); }
+:root.light .text-fg\/40 { color: rgb(var(--fg) / 0.66); }
+:root.light .text-fg\/45 { color: rgb(var(--fg) / 0.7); }
+:root.light .text-fg\/50 { color: rgb(var(--fg) / 0.74); }
+:root.light .text-fg\/55 { color: rgb(var(--fg) / 0.78); }
+:root.light .text-fg\/60 { color: rgb(var(--fg) / 0.8); }
+:root.light .text-fg\/65 { color: rgb(var(--fg) / 0.84); }
+:root.light .text-fg\/70 { color: rgb(var(--fg) / 0.86); }
+:root.light .text-fg\/75 { color: rgb(var(--fg) / 0.88); }
+:root.light .text-fg\/80 { color: rgb(var(--fg) / 0.9); }
+:root.light .text-fg\/85 { color: rgb(var(--fg) / 0.92); }
+:root.light .text-fg\/90 { color: rgb(var(--fg) / 0.95); }
+
+/* Status colours are chosen to glow on black — the 300/400 steps. On paper
+   they are highlighter pens. Same hue, same meaning, darkened to carry. */
+:root.light .text-amber-400 { color: #b45309; }
+:root.light .text-amber-300 { color: #92400e; }
+:root.light .text-red-400 { color: #dc2626; }
+:root.light .text-red-300 { color: #b91c1c; }
+:root.light .text-emerald-400 { color: #047857; }
+:root.light .text-emerald-300 { color: #065f46; }
+/* The brand orange is a fill colour, not an ink: #FF880C on white is 2.5:1.
+   Kept for anything it sits *behind* (buttons, badges), deepened where it has
+   to be read as text. */
+:root.light .text-primary { color: #a3560a; }
+
+/* Blue-black rather than a darker grey: at these levels a neutral surface
+   goes muddy, and the slight cool cast keeps the orange accent reading as
+   the one warm thing on screen. Deeper than `dark` throughout, and the
+   foreground is off-white so a dim room is not lit by the monitor. */
+:root.midnight {
+	--fg: 235 240 248;
+	--ink-950: 8 11 20;
+	--ink-900: 13 17 28;
+	--ink-850: 17 22 36;
+	--ink-800: 22 28 45;
+	--ink-700: 31 41 62;
+	--ink-600: 44 57 84;
+	--ink-500: 68 85 120;
+	--scrollbar: 44 57 84;
 }
 
 html,

@@ -4,7 +4,7 @@
 	import { broadcast, isStreaming, pickMimeType } from '../lib/broadcast.svelte';
 	import DestinationsPanel from './DestinationsPanel.svelte';
 	import Icon, { type IconName } from './Icon.svelte';
-	import { LOCALES, applyTheme, i18n, setLocale, t, theme } from '../lib/i18n.svelte';
+	import { LOCALES, THEMES, applyTheme, i18n, setLocale, t, theme } from '../lib/i18n.svelte';
 	import { DEFAULT_LAYOUT } from '../lib/layout';
 	import { persist, stageableSettings, studio, type Destination } from '../lib/state.svelte';
 
@@ -126,6 +126,25 @@
 								>
 							{/each}
 						</div>
+					</div>
+
+					<div>
+						<span class="studio-label">{t('settings.theme')}</span>
+						<!-- Applied on click rather than staged behind Apply, like the
+						     layout above it: which theme suits the room is a question you
+						     answer by looking, and nothing on air changes either way. -->
+						<div class="flex gap-1">
+							{#each THEMES as option (option.id)}
+								<button
+									class="studio-chip flex-1 {theme.current === option.id
+										? 'bg-primary/20 text-primary'
+										: ''}"
+									aria-pressed={theme.current === option.id}
+									onclick={() => applyTheme(option.id)}>{option.label()}</button
+								>
+							{/each}
+						</div>
+						<p class="mt-1.5 text-[11px] leading-relaxed text-fg/45">{t('settings.themeHint')}</p>
 					</div>
 				{/if}
 

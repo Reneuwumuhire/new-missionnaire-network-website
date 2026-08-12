@@ -14,7 +14,7 @@ import {
 	stopBroadcast
 } from './broadcast.svelte';
 import { frameCount, onAirSceneId, renderFrame, takeToProgram } from './compositor';
- import { applyTheme } from './i18n.svelte';
+import { THEMES, applyTheme, theme } from './i18n.svelte';
  import {
 	DESKTOP_AUDIO,
 	appAudio,
@@ -624,14 +624,27 @@ export async function runSelftest(target: string, canvas: () => HTMLCanvasElemen
 	const faded = await checkFade(el);
 	studio.activeSceneId = previousScene;
 	await wait(1200);
-	// Both themes must at least resolve their variables to different surfaces.
-	applyTheme('light');
-	await wait(150);
-	const lightBg = getComputedStyle(document.body).backgroundColor;
-	applyTheme('dark');
-	await wait(150);
-	const darkBg = getComputedStyle(document.body).backgroundColor;
-	await say(`SELFTEST theme light=${lightBg} dark=${darkBg} ${lightBg !== darkBg ? 'OK' : 'SAME'}`);
+	// Every theme must resolve to a surface of its own, and none may leave a
+	// stale class behind: two theme classes at once would let source order pick
+	// the winner instead of the operator.
+	const chosen = theme.current;
+	const surfaces = new Map<string, string>();
+	for (const option of THEMES) {
+		applyTheme(option.id);
+		await wait(150);
+		const classes = [...document.documentElement.classList].filter((c) =>
+			THEMES.some((other) => other.id === c)
+		);
+		surfaces.set(
+			`${option.id}${classes.length > 1 ? `(+${classes.join('/')})` : ''}`,
+			getComputedStyle(document.body).backgroundColor
+		);
+	}
+	applyTheme(chosen);
+	const distinct = new Set(surfaces.values()).size === THEMES.length;
+	await say(
+		`SELFTEST theme ${[...surfaces].map(([k, v]) => `${k}=${v}`).join(' ')} ${distinct ? 'OK' : 'CLASH'}`
+	);
 
 	// ScreenCaptureKit reachable at all? It needs Screen Recording permission,
 	// so a refusal here is information rather than a failure.
@@ -661,7 +674,7 @@ export async function runSelftest(target: string, canvas: () => HTMLCanvasElemen
 		await say(`SELFTEST appaudio FAILED ${err}`);
 	}
 
-	const ok = Boolean(stats && stats.frames > 30 && !broadcast.error) && faded && lightBg !== darkBg;
+	const ok = Boolean(stats && stats.frames > 30 && !broadcast.error) && faded && distinct;
 	await say(`SELFTEST ${ok ? 'OK' : 'FAIL'} — terminé`);
 }
 

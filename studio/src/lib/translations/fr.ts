@@ -281,6 +281,9 @@ const fr: Record<keyof typeof en, string> = {
 	'settings.theme': 'Thème',
 	'settings.themeDark': 'Sombre',
 	'settings.themeLight': 'Clair',
+	'settings.themeMidnight': 'Minuit',
+	'settings.themeHint':
+		'Choisissez selon la salle : Clair en plein jour, Minuit dans une salle sombre o\u00f9 la r\u00e9gie ne doit pas \u00e9clairer.',
 	'settings.language': 'Langue',
 	'settings.liveWarning': 'Les réglages d’encodage s’appliqueront à la prochaine diffusion.',
 	'settings.testPattern': 'Mire en l\u2019absence de signal',

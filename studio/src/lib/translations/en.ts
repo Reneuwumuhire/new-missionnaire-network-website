@@ -279,6 +279,9 @@ const en = {
 	'settings.theme': 'Theme',
 	'settings.themeDark': 'Dark',
 	'settings.themeLight': 'Light',
+	'settings.themeMidnight': 'Midnight',
+	'settings.themeHint':
+		'Pick the one that suits the room: Light for daylight, Midnight for a darkened hall where the desk should not glow.',
 	'settings.language': 'Language',
 	'settings.liveWarning': 'Encoder settings apply to the next broadcast.',
 	'settings.testPattern': 'No-signal test pattern',
