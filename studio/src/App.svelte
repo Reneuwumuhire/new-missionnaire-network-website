@@ -427,7 +427,15 @@
 	>
 		<span class="flex items-center gap-1.5">
 			<span class="h-1.5 w-1.5 rounded-full {broadcast.phase === 'live' ? 'bg-red-500' : 'bg-fg/20'}"></span>
-			{t('status.live')}: {uptimeLabel(now)}
+			<!-- Never the word LIVE while off air. It read "LIVE: 00:00:00" with the
+			     dot grey and the title bar saying Offline — the one word in this app
+			     that must not be on screen when it is not true. -->
+			{#if broadcast.phase === 'live'}
+				<span class="text-red-400">{t('status.live')}</span>
+				{uptimeLabel(now)}
+			{:else}
+				{t('status.offline')}
+			{/if}
 		</span>
 		<span class={renderFps > 0 && renderFps < studio.settings.fps - 5 ? 'text-amber-400' : ''}>
 			{t('status.fps', { actual: renderFps, target: studio.settings.fps })}

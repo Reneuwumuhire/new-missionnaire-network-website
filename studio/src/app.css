@@ -133,6 +133,40 @@ textarea {
 		background: #ff880c;
 	}
 
+	/* The mixer fader. Left alone, WebKit paints accent-color as a thick solid
+	   bar the full width of the strip — directly under the real meter, louder
+	   than it, and the wrong thing to read first. Drawn instead: a thin track,
+	   a handle wide enough to aim at, and the travelled part in a plain
+	   foreground tint so colour stays a property of the meter alone. */
+	.studio-fader {
+		@apply h-4 w-full cursor-pointer appearance-none bg-transparent disabled:cursor-not-allowed disabled:opacity-40;
+	}
+
+	.studio-fader::-webkit-slider-runnable-track {
+		height: 3px;
+		background: linear-gradient(
+			to right,
+			rgb(var(--fg) / 0.45) var(--level, 0%),
+			rgb(var(--ink-700)) var(--level, 0%)
+		);
+	}
+
+	.studio-fader::-webkit-slider-thumb {
+		@apply appearance-none transition-colors;
+		width: 6px;
+		height: 15px;
+		margin-top: -6px;
+		background: rgb(var(--fg) / 0.8);
+	}
+
+	.studio-fader:hover::-webkit-slider-thumb {
+		background: rgb(var(--fg));
+	}
+
+	.studio-fader:focus-visible::-webkit-slider-thumb {
+		background: #ff880c;
+	}
+
 	.studio-icon-btn {
 		@apply flex h-6 w-6 shrink-0 items-center justify-center text-sm text-fg/35 transition-colors hover:bg-fg/10 hover:text-fg disabled:pointer-events-none disabled:opacity-20;
 	}

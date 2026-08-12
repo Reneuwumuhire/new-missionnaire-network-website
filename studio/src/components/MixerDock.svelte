@@ -422,6 +422,7 @@
 			{/if}
 
 			{#if connected}
+				{@const position = gainPosition(strip.source.gain)}
 				<!-- One bar per channel. The gradient underneath is the whole −60→0
 				     scale and the overlay masks everything above the current level,
 				     so a given colour always sits at the same dB. Two bars because a
@@ -434,8 +435,11 @@
 								class="absolute inset-0"
 								style="background: linear-gradient(to right, #10b981 0%, #10b981 66%, #fbbf24 66%, #fbbf24 85%, #ef4444 85%, #ef4444 100%)"
 							></div>
+							<!-- Opaque, not 95%: the gradient underneath bled through the
+							     mask, so a silent strip showed a warm smudge sitting in the
+							     -20..0 zone and read as a signal close to clipping. -->
 							<div
-								class="absolute inset-y-0 right-0 bg-ink-950/95"
+								class="absolute inset-y-0 right-0 bg-ink-950"
 								style="left: {fraction * 100}%"
 							></div>
 							{#if level && level.hold[channel] > 0.01}
@@ -448,9 +452,16 @@
 					{/each}
 				</div>
 				<div class="relative mt-0.5 h-2.5">
-					{#each METER_TICKS as tick (tick)}
+					{#each METER_TICKS as tick, i (tick)}
+						<!-- The end labels are pulled inside the row rather than centred on
+						     their mark: centred, half of -60 and half of 0 fell off the
+						     ends and the scale looked cropped. -->
 						<span
-							class="absolute top-0 -translate-x-1/2 font-mono text-[8px] text-fg/25"
+							class="absolute top-0 font-mono text-[8px] text-fg/25 {i === 0
+								? ''
+								: i === METER_TICKS.length - 1
+									? '-translate-x-full'
+									: '-translate-x-1/2'}"
 							style="left: {meterFraction(tick) * 100}%">{tick}</span
 						>
 					{/each}
@@ -465,21 +476,31 @@
 					>
 						<Icon name={strip.source.muted ? 'volumeOff' : 'volume'} size={16} />
 					</button>
-					<input
-						type="range"
-						min="0"
-						max="1"
-						step="0.005"
-						class="min-w-0 flex-1 accent-primary"
-						aria-label={t('mixer.fader')}
-						value={gainPosition(strip.source.gain)}
-						oninput={(e) =>
-							setLevel(
-								strip,
-								faderGain(Number((e.currentTarget as HTMLInputElement).value)),
-								strip.source.muted
-							)}
-					/>
+						<div class="relative min-w-0 flex-1">
+						<!-- Unity, marked on the track. Finding 0 dB by dragging until the
+						     number reads right is the kind of fiddling nobody has time for
+						     with a service running. -->
+						<span
+							class="pointer-events-none absolute top-1/2 h-2.5 w-px -translate-y-1/2 bg-fg/30"
+							style="left: {gainPosition(1) * 100}%"
+						></span>
+						<input
+							type="range"
+							min="0"
+							max="1"
+							step="0.005"
+							class="studio-fader"
+							style="--level: {position * 100}%"
+							aria-label={t('mixer.fader')}
+							value={position}
+							oninput={(e) =>
+								setLevel(
+									strip,
+									faderGain(Number((e.currentTarget as HTMLInputElement).value)),
+									strip.source.muted
+								)}
+						/>
+					</div>
 					{#if strip.isMic || isAppStrip(strip)}
 						<!-- Only where it opens something. A camera or media layer has
 						     nothing to choose, and a gear that does nothing is worse
