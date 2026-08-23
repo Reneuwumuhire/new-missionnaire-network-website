@@ -1016,6 +1016,13 @@ export type BroadcastAdminState = {
 	started_by_name: string | null;
 	icecast_offline_since: string | null;
 	notification_pending: boolean;
+	is_test: boolean;
+	/** Admin-owned defaults for an unscheduled Studio test/live. */
+	default_title: string | null;
+	default_description: string | null;
+	default_thumbnail_url: string | null;
+	default_thumbnail_s3_key: string | null;
+	default_youtube_url: string | null;
 	title: string | null;
 	description: string | null;
 	thumbnail_url: string | null;
@@ -1043,6 +1050,12 @@ const BROADCAST_DEFAULT: BroadcastAdminState = {
 	started_by_name: null,
 	icecast_offline_since: null,
 	notification_pending: false,
+	is_test: false,
+	default_title: null,
+	default_description: null,
+	default_thumbnail_url: null,
+	default_thumbnail_s3_key: null,
+	default_youtube_url: null,
 	title: null,
 	description: null,
 	thumbnail_url: null,
@@ -1071,6 +1084,12 @@ export async function getBroadcastAdminState(): Promise<BroadcastAdminState> {
 			started_by_name: (doc.started_by_name as string | null) ?? null,
 			icecast_offline_since: (doc.icecast_offline_since as string | null) ?? null,
 			notification_pending: Boolean(doc.notification_pending),
+			is_test: Boolean(doc.is_test),
+			default_title: (doc.default_title as string | null) ?? null,
+			default_description: (doc.default_description as string | null) ?? null,
+			default_thumbnail_url: (doc.default_thumbnail_url as string | null) ?? null,
+			default_thumbnail_s3_key: (doc.default_thumbnail_s3_key as string | null) ?? null,
+			default_youtube_url: (doc.default_youtube_url as string | null) ?? null,
 			title: (doc.title as string | null) ?? null,
 			description: (doc.description as string | null) ?? null,
 			thumbnail_url: (doc.thumbnail_url as string | null) ?? null,
@@ -1130,6 +1149,8 @@ export type ScheduledLive = {
 	announced_at: string | null;
 	reminder_enabled: boolean;
 	reminder_sent_at: string | null;
+	/** Unlisted operator-only smoke test. It is never announced or listed. */
+	is_test: boolean;
 	/** Pre-made SRT transcript for the broadcast audio. anchor/offset are
 	 *  mirrored here by the admin sync actions so the replay can recompute the
 	 *  transcript position against recording.started_at. */
@@ -1155,34 +1176,44 @@ export async function getStudioAuthorization(code: string): Promise<{ email: str
 	}
 }
 
+export async function revokeStudioAuthorization(code: string): Promise<void> {
+	if (!code) return;
+	const db = await getDb();
+	await db.collection('studio_authorizations').deleteOne({ code });
+}
+
 export async function listStudioScheduledLives(): Promise<ScheduledLive[]> {
 	const db = await getDb();
-	const cutoff = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString();
-	const docs = await db.collection('scheduled_lives').find({
-		$or: [
-			{ status: { $in: ['scheduled', 'live'] } },
-			{ status: { $in: ['ended', 'cancelled'] }, updated_at: { $gte: cutoff } }
-		]
-	}).sort({ scheduled_at: 1 }).limit(100).toArray();
+	// Studio selects the next service to air. Completed/cancelled sessions stay
+	// in Mongo for admin's history and recording workflow, never in this picker.
+	const docs = await db.collection('scheduled_lives')
+		.find({ status: 'scheduled', is_test: { $ne: true } })
+		.sort({ scheduled_at: 1 })
+		.limit(50)
+		.toArray();
 	return docs.map((doc) => serializeDocument<ScheduledLive>(doc));
 }
 
 export async function createStudioScheduledLive(
-	title: string,
-	scheduledAt: Date,
-	createdBy: string
+	input: {
+		title: string; scheduledAt: Date; createdBy: string; description?: string | null;
+		youtubeUrl?: string | null; thumbnailUrl?: string | null; thumbnailKey?: string | null;
+		subtitleUrl?: string | null; subtitleKey?: string | null; subtitleFilename?: string | null;
+		announce?: boolean; reminderEnabled?: boolean; testAccessToken?: string;
+	}
 ): Promise<ScheduledLive> {
 	const db = await getDb();
 	const now = new Date().toISOString();
 	for (let attempt = 0; attempt < 5; attempt++) {
 		const doc = {
-			slug: randomBytes(8).toString('base64url'), title, description: null,
-			thumbnail_url: null, thumbnail_s3_key: null, youtube_url: null,
-			scheduled_at: scheduledAt, status: 'scheduled', live_started_at: null, live_ended_at: null,
-			recording_id: null, announce_pending: false, announced_at: null,
-			reminder_enabled: false, reminder_sent_at: null, subtitle_srt_url: null,
-			subtitle_srt_s3_key: null, subtitle_filename: null, subtitle_anchor_epoch_ms: null,
-			subtitle_offset_ms: 0, created_by: createdBy, created_at: now, updated_at: now
+			slug: randomBytes(8).toString('base64url'), title: input.title, description: input.description ?? null,
+			thumbnail_url: input.thumbnailUrl ?? null, thumbnail_s3_key: input.thumbnailKey ?? null, youtube_url: input.youtubeUrl ?? null,
+			scheduled_at: input.scheduledAt, status: 'scheduled', live_started_at: null, live_ended_at: null,
+			recording_id: null, announce_pending: input.announce === true, announced_at: null,
+			reminder_enabled: input.reminderEnabled === true, reminder_sent_at: null, is_test: Boolean(input.testAccessToken),
+			...(input.testAccessToken ? { test_access_token: input.testAccessToken } : {}), subtitle_srt_url: input.subtitleUrl ?? null,
+			subtitle_srt_s3_key: input.subtitleKey ?? null, subtitle_filename: input.subtitleFilename ?? null, subtitle_anchor_epoch_ms: null,
+			subtitle_offset_ms: 0, created_by: input.createdBy, created_at: now, updated_at: now
 		};
 		try {
 			const result = await db.collection('scheduled_lives').insertOne(doc);
@@ -1214,6 +1245,15 @@ export async function getScheduledLiveBySlug(slug: string): Promise<ScheduledLiv
 		console.error('[ScheduledLive] getBySlug error:', e);
 		return null;
 	}
+}
+
+/** A test URL is a capability link, never a subscriber-facing live. */
+export async function canAccessStudioTest(id: string | null, token: string | null): Promise<boolean> {
+	if (!id || !token || !ObjectId.isValid(id)) return false;
+	const db = await getDb();
+	return Boolean(await db.collection('scheduled_lives').findOne({
+		_id: new ObjectId(id), is_test: true, test_access_token: token
+	}, { projection: { _id: 1 } }));
 }
 
 export async function getScheduledLiveById(id: string): Promise<ScheduledLive | null> {

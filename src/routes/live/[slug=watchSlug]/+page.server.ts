@@ -21,7 +21,7 @@ function formatScheduledAtFr(iso: string): string {
 }
 
 export const load: PageServerLoad = async ({ params, url, setHeaders }) => {
-	const state = await getWatchState(params.slug);
+	const state = await getWatchState(params.slug, url.searchParams.get('test'));
 	if (!state) throw error(404, 'Direct introuvable');
 	const { live, phase, isLive, replayPath } = state;
 
@@ -86,7 +86,8 @@ export const load: PageServerLoad = async ({ params, url, setHeaders }) => {
 			thumbnailUrl: live.thumbnail_url,
 			scheduledAt: live.scheduled_at,
 			phase,
-			isLive
+			isLive,
+			isTest: live.is_test
 		},
 		meta: {
 			title: metaTitle,

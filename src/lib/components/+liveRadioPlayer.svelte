@@ -18,6 +18,8 @@
 	import { focusTrap } from '$lib/actions/focusTrap';
 	import { t, type TranslationKey } from '../../i18n';
 
+	let { testToken = null }: { testToken?: string | null } = $props();
+
 	// This card no longer embeds its own <audio> element. Playback runs
 	// through the global audio player (the same one used for music/sermons)
 	// via a LiveStreamTrack pseudo-track — the player handles connection,
@@ -365,7 +367,7 @@
 
 	async function fetchRadioState(): Promise<void> {
 		try {
-			const response = await fetch('/api/live/radio-state');
+			const response = await fetch(`/api/live/radio-state${testToken ? `?test=${encodeURIComponent(testToken)}` : ''}`);
 			if (!response.ok) return;
 			const data = (await response.json()) as RadioStatePayload;
 			broadcastTitle = data.title ?? null;

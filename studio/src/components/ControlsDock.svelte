@@ -13,6 +13,7 @@
 	import { t } from '../lib/i18n.svelte';
 	import { destinationUrl, persist, studio } from '../lib/state.svelte';
 	import { liveSession } from '../lib/live-session.svelte';
+	import { recording, recordsCloud, recordsLocal, startCloudRecording, stopCloudRecording } from '../lib/recording.svelte';
 
 	let {
 		onToggleLive,
@@ -34,7 +35,15 @@
 	);
 	const recordingMode = $derived(studio.settings.recordingMode);
 	const recordingLabel = $derived(t(`recording.${recordingMode}` as never));
-	const selectedSession = $derived(liveSession.sessions.find((session) => session._id === liveSession.selectedId));
+	const selectedSession = $derived(liveSession.sessions.find((session) => session._id === (liveSession.activeId ?? liveSession.selectedId)));
+	const recordingActive = $derived(Boolean(recording.localPath) || recording.cloud);
+	let now = $state(Date.now());
+	$effect(() => {
+		const timer = setInterval(() => (now = Date.now()), 1000);
+		return () => clearInterval(timer);
+	});
+	const recordingDuration = $derived(recording.startedAt ? Math.floor((now - recording.startedAt) / 1000) : 0);
+	const clock = (seconds: number) => new Date(seconds * 1000).toISOString().slice(11, 19);
 
 	// Held destinations get nothing at all until this is pressed, so a platform
 	// that publishes on first frame cannot go public on its own. Once connected
@@ -50,6 +59,14 @@
 	const congested = $derived(
 		Boolean(stats && (stats.discarded_chunks > 0 || stats.speed < 0.95 || stats.dropped_frames > 0))
 	);
+	let copiedTestLink = $state(false);
+
+	async function copyTestLink() {
+		if (!liveSession.testUrl) return;
+		await navigator.clipboard.writeText(liveSession.testUrl);
+		copiedTestLink = true;
+		setTimeout(() => (copiedTestLink = false), 1500);
+	}
 
 	function label(state: string): string {
 		if (state === 'live') return t('target.live');
@@ -85,18 +102,27 @@
 				{t('controls.startStreaming')}
 			{/if}
 		</button>
-		{#if liveSession.operatorName}
-			<p class="px-1 text-[10px] text-fg/35">Signed in: {liveSession.operatorName}</p>
+		{#if selectedSession?.is_test && liveSession.testUrl}
+			<div class="grid grid-cols-[1fr_auto] gap-1" title={liveSession.testUrl}>
+				<button class="h-8 border border-primary/40 text-[11px] text-primary hover:bg-primary/10" onclick={() => void invoke('open_url', { url: liveSession.testUrl! })}>Open private test link</button>
+				<button class="h-8 border border-ink-600 px-2 text-[10px] text-fg/65 hover:text-fg" onclick={() => void copyTestLink()}>{copiedTestLink ? 'Copied' : 'Copy'}</button>
+			</div>
 		{/if}
-
 		<button
 			class="flex h-8 w-full items-center justify-between border border-ink-700 px-2 text-[11px] text-fg/60 transition-colors hover:border-ink-500 hover:text-fg"
+			disabled={isStreaming()}
 			onclick={onSelectSession}
-			title="Choose or create the public live session"
+			title={isStreaming() ? 'Live session is locked while streaming' : 'Choose or create the public live session'}
 		>
 			<span>Live session</span>
 			<span class={selectedSession ? 'max-w-36 truncate text-emerald-300' : 'text-amber-300'}>{selectedSession?.title ?? 'Choose one'}</span>
 		</button>
+		{#if isStreaming() && (recordsCloud() || recordsLocal())}
+			<button class="flex h-8 w-full items-center justify-between border border-ink-700 px-2 text-[11px] {recordingActive ? 'text-red-300' : 'text-fg/60'}" disabled={recordsLocal() && !recordsCloud()} onclick={() => recording.cloud ? void stopCloudRecording() : void startCloudRecording()}>
+				<span>{recordsCloud() ? (recording.cloud ? 'Stop recording' : 'Start recording') : (recording.startedAt ? 'Recording local' : 'Local recording armed')}</span>
+				<span class="font-mono">{recordingActive ? clock(recordingDuration) : '00:00:00'}</span>
+			</button>
+		{/if}
 
 		<button
 			class="flex h-8 w-full items-center justify-between border border-ink-700 px-2 text-[11px] text-fg/60 transition-colors hover:border-ink-500 hover:text-fg"

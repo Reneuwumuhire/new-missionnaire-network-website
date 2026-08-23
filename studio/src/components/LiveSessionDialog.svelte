@@ -1,23 +1,24 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { connectWithAdmin, createSession, liveSession, refreshSessions } from '../lib/live-session.svelte';
+	import { invoke } from '@tauri-apps/api/core';
+	import { connectWithAdmin, createQuickTest, liveSession, refreshSessions } from '../lib/live-session.svelte';
 
-	let { onchoose }: { onchoose: () => void } = $props();
-	let title = $state('');
-	let scheduledAt = $state('');
+	let { onchoose, onnew }: { onchoose: () => void; onnew: () => void } = $props();
 	onMount(() => { if (liveSession.pairingCode) void refreshSessions(); });
 </script>
 
 <div class="space-y-3 p-4">
-	<p class="text-[12px] text-fg/60">Choose a public link, or create a new service. Recent sessions remain available for one month.</p>
-	<button class="studio-chip w-full" onclick={() => void connectWithAdmin()}>Continue with admin</button>
-	{#if liveSession.pairingCode}<button class="studio-chip w-full" onclick={() => void refreshSessions()}>I approved it — refresh</button>{/if}
+	<p class="text-[12px] text-fg/60">Choose an upcoming public link, or create a new service. Past sessions are managed in admin.</p>
+	{#if !liveSession.operatorName}
+		<button class="studio-chip w-full" onclick={() => void connectWithAdmin()}>Continue with admin</button>
+		{#if liveSession.pairingCode}<button class="studio-chip w-full" onclick={() => void refreshSessions()}>I approved it — refresh</button>{/if}
+	{/if}
 	{#if liveSession.operatorName}
-		<div class="border border-ink-700 p-3">
-			<p class="mb-2 text-[10px] uppercase tracking-wider text-fg/40">New public session</p>
-			<div class="flex gap-2"><input class="studio-input min-w-0 flex-1" bind:value={title} placeholder="Sunday morning service" /><button class="studio-chip" onclick={async () => { if (await createSession(title, scheduledAt ? new Date(scheduledAt).toISOString() : undefined)) onchoose(); }}>Create</button></div>
-			<input class="studio-input mt-2 w-full" type="datetime-local" bind:value={scheduledAt} />
+		<div class="grid grid-cols-2 gap-2">
+			<button class="studio-chip" onclick={onnew}>New public session</button>
+			<button class="studio-chip border-primary/50 text-primary" onclick={async () => { const link = await createQuickTest(); if (link) { await invoke('open_url', { url: link }); onchoose(); } }}>Quick private test</button>
 		</div>
+		<p class="text-[10px] leading-relaxed text-fg/35">Uses the admin default information. The unlisted link is only opened here and never notifies subscribers.</p>
 	{/if}
 	{#if liveSession.sessions.length > 0}
 		<div class="space-y-1">
@@ -29,7 +30,7 @@
 			{/each}
 		</div>
 	{:else if !liveSession.error}
-		<p class="py-6 text-center text-[12px] text-fg/40">No scheduled live session found.</p>
+		<p class="py-6 text-center text-[12px] text-fg/40">No upcoming live session found.</p>
 	{/if}
 	{#if liveSession.error}<p class="text-[12px] text-red-400">{liveSession.error}</p>{/if}
 </div>

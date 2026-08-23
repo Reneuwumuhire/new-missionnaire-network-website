@@ -890,6 +890,7 @@ export type BroadcastAdminState = {
 	started_by_name: string | null;
 	icecast_offline_since: string | null;
 	notification_pending: boolean;
+	is_test: boolean;
 	title: string | null;
 	description: string | null;
 	thumbnail_url: string | null;
@@ -923,6 +924,7 @@ const BROADCAST_DEFAULT: BroadcastAdminState = {
 	started_by_name: null,
 	icecast_offline_since: null,
 	notification_pending: false,
+	is_test: false,
 	title: null,
 	description: null,
 	thumbnail_url: null,
@@ -977,6 +979,7 @@ export async function getBroadcastAdminState(opts?: {
 		started_by_name: (doc.started_by_name as string | null) ?? null,
 		icecast_offline_since: (doc.icecast_offline_since as string | null) ?? null,
 		notification_pending: Boolean(doc.notification_pending),
+		is_test: Boolean(doc.is_test),
 		title: (doc.title as string | null) ?? null,
 		description: (doc.description as string | null) ?? null,
 		thumbnail_url: (doc.thumbnail_url as string | null) ?? null,

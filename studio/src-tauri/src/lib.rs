@@ -188,7 +188,10 @@ fn stop_app_audio(capture: State<'_, appaudio::Capture>, id: Option<String>) {
 /// the OS shell, so it must not be able to name a file or a script.
 #[tauri::command]
 fn open_url(url: String) -> Result<(), String> {
-	if !url.starts_with("https://") || url.len() > 2048 {
+	let loopback = url.starts_with("http://localhost")
+		|| url.starts_with("http://127.0.0.1")
+		|| url.starts_with("http://[::1]");
+	if (!url.starts_with("https://") && !loopback) || url.len() > 2048 {
 		return Err("URL non supportée".into());
 	}
 	if url.chars().any(|c| c.is_control() || c.is_whitespace()) {

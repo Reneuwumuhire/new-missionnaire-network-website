@@ -5,6 +5,7 @@
 	import LyricsPanel from './components/LyricsPanel.svelte';
 	import LyricsRibbon from './components/LyricsRibbon.svelte';
 	import LiveSessionDialog from './components/LiveSessionDialog.svelte';
+	import NewSessionDialog from './components/NewSessionDialog.svelte';
 	import MediaBar from './components/MediaBar.svelte';
 	import MixerDock from './components/MixerDock.svelte';
 	import Modal from './components/Modal.svelte';
@@ -31,13 +32,14 @@
 		selftestTarget
 	} from './lib/selftest';
 	import { activeScene, audioLayers, onAirSceneId, persist, studio } from './lib/state.svelte';
-	import { liveSession } from './lib/live-session.svelte';
+	import { liveSession, logoutStudio } from './lib/live-session.svelte';
+	import { recording } from './lib/recording.svelte';
 
 	let programCanvas = $state<HTMLCanvasElement | null>(null);
 	let mixer = $state<Mixer | null>(null);
 	let now = $state(Date.now());
 	let confirmStop = $state(false);
-	let dialog = $state<'properties' | 'settings' | 'live-session' | null>(null);
+	let dialog = $state<'properties' | 'settings' | 'live-session' | 'new-session' | null>(null);
 	/** Frames actually painted per second — the readout OBS puts in its status
 	 *  bar, and the first number to look at when the picture stutters. */
 	let renderFps = $state(0);
@@ -227,7 +229,7 @@
 		activeScene().layers.find((l) => l.id === studio.selectedLayerId) ?? null
 	);
 	const selectedLiveSession = $derived(
-		liveSession.sessions.find((session) => session._id === liveSession.selectedId) ?? null
+		liveSession.sessions.find((session) => session._id === (liveSession.activeId ?? liveSession.selectedId)) ?? null
 	);
 	const health = $derived.by(() => {
 		const stats = broadcast.stats;
@@ -243,6 +245,8 @@
 		return { tone: 'ok', label: t('status.stable') };
 	});
 	const canTake = $derived(studio.activeSceneId !== onAirSceneId());
+	const recordingDuration = $derived(recording.startedAt ? Math.max(0, Math.floor((now - recording.startedAt) / 1000)) : 0);
+	const durationLabel = (seconds: number) => new Date(seconds * 1000).toISOString().slice(11, 19);
 
 	const QUICK: { type: TransitionType; label: () => string }[] = [
 		{ type: 'cut', label: () => t('transitions.cut') },
@@ -296,8 +300,13 @@
 				<span class="font-mono tracking-normal text-red-300/80">{uptimeLabel(now)}</span>
 			</span>
 		{/if}
+		{#if liveSession.operatorName}
+			<button class="ml-auto text-[10px] text-fg/45 hover:text-fg" onclick={() => void logoutStudio()} title="Sign out of Studio">
+				{liveSession.operatorName} · Sign out
+			</button>
+		{/if}
 		<span
-			class="pointer-events-none ml-auto text-[10px] {health.tone === 'warn'
+			class="pointer-events-none {liveSession.operatorName ? '' : 'ml-auto'} text-[10px] {health.tone === 'warn'
 				? 'text-amber-400'
 				: health.tone === 'ok'
 					? 'text-emerald-400'
@@ -448,6 +457,8 @@
 				{t('status.offline')}
 			{/if}
 		</span>
+		<span>Local {new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+		{#if recording.startedAt}<span class="text-red-300">REC {durationLabel(recordingDuration)}</span>{/if}
 		<span class={renderFps > 0 && renderFps < studio.settings.fps - 5 ? 'text-amber-400' : ''}>
 			{t('status.fps', { actual: renderFps, target: studio.settings.fps })}
 		</span>
@@ -476,6 +487,10 @@
 	</Modal>
 {:else if dialog === 'live-session'}
 	<Modal title="Choose live session" onclose={() => (dialog = null)}>
-		<LiveSessionDialog onchoose={() => (dialog = null)} />
+		<LiveSessionDialog onchoose={() => (dialog = null)} onnew={() => (dialog = 'new-session')} />
+	</Modal>
+{:else if dialog === 'new-session'}
+	<Modal title="New public session" onclose={() => (dialog = 'live-session')}>
+		<NewSessionDialog oncreated={() => (dialog = null)} />
 	</Modal>
 {/if}

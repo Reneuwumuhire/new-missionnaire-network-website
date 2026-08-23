@@ -26,6 +26,8 @@
 	// that's what flips the waiting room into the live player without a reload.
 	let phase = $state(data.watch.phase);
 	let watch = $derived(data.watch);
+	let isTest = $derived(watch.isTest);
+	let testToken = $derived(browser ? new URLSearchParams(window.location.search).get('test') : null);
 
 	let shareUrl = $derived(browser
 		? `${window.location.origin}/live/${watch.slug}`
@@ -64,7 +66,7 @@
 
 	async function poll(): Promise<void> {
 		try {
-			const res = await fetch(`/api/live/watch/${watch.slug}`);
+			const res = await fetch(`/api/live/watch/${watch.slug}${testToken ? `?test=${encodeURIComponent(testToken)}` : ''}`);
 			if (!res.ok) return;
 			const state = (await res.json()) as { phase: typeof phase; replayPath: string | null };
 			if (state.replayPath) {
@@ -139,13 +141,15 @@
 				{/if}
 			</div>
 
-			<LiveRadioPlayer />
+			<LiveRadioPlayer {testToken} />
 
-			<ShareLive
-				{shareUrl}
-				title={`🔴 ${watch.title}`}
-				text={$t('live.shareLiveText', { title: watch.title })}
-			/>
+			{#if !isTest}
+				<ShareLive
+					{shareUrl}
+					title={`🔴 ${watch.title}`}
+					text={$t('live.shareLiveText', { title: watch.title })}
+				/>
+			{/if}
 		{:else if phase === 'scheduled'}
 			<!-- ── Waiting room (YouTube-style) ── -->
 			<div class="text-center mb-5 md:mb-8">
@@ -264,7 +268,8 @@
 				</p>
 			{/if}
 
-			<!-- Notification opt-in — same block as /live -->
+			<!-- A capability test link is intentionally neither shareable nor subscribable. -->
+			{#if !isTest}
 			<button
 				onclick={() => bellRef?.toggle()}
 				class="flex items-center gap-4 w-full text-left border-2 px-5 py-4 mt-6 transition-all duration-300 cursor-pointer group {bellSubscribed
@@ -307,6 +312,7 @@
 				title={$t('liveWatch.shareScheduledTitle', { title: watch.title })}
 				text={$t('liveWatch.shareScheduledText', { title: watch.title })}
 			/>
+			{/if}
 		{:else if phase === 'ended_pending'}
 			<!-- ── Live over, replay not published yet ── -->
 			<div class="text-center mb-6 md:mb-10">
@@ -325,11 +331,13 @@
 				</p>
 			</div>
 
-			<ShareLive
-				{shareUrl}
-				title={watch.title}
-				text={$t('liveWatch.shareEndedText', { title: watch.title })}
-			/>
+			{#if !isTest}
+				<ShareLive
+					{shareUrl}
+					title={watch.title}
+					text={$t('liveWatch.shareEndedText', { title: watch.title })}
+				/>
+			{/if}
 
 			<div class="mt-6 text-center">
 				<a

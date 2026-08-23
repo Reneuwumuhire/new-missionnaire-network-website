@@ -10,7 +10,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { t } from './i18n.svelte';
-import { recording, recordsLocal, startCloudRecording, stopCloudRecording } from './recording.svelte';
+import { clearRecording, recording, recordsLocal, stopCloudRecording } from './recording.svelte';
 import { endSelectedSession, startSelectedSession } from './live-session.svelte';
 import { destinationUrl, studio } from './state.svelte';
 
@@ -192,7 +192,6 @@ async function attachListeners() {
 			if (broadcast.phase === 'connecting' && event.payload.stats.frames > 0) {
 				broadcast.phase = 'live';
 				broadcast.startedAt = Date.now();
-				void startCloudRecording();
 				void startSelectedSession();
 			}
 			if (broadcast.phase === 'live') {
@@ -273,7 +272,7 @@ export async function stopBroadcast() {
 	broadcast.stats = null;
 	broadcast.targets = [];
 	broadcast.localRecordingPath = null;
-	recording.localPath = null;
+	clearRecording();
 	await detachListeners();
 	await stopCloudRecording();
 	await endSelectedSession();

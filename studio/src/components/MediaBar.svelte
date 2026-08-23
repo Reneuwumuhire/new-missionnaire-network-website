@@ -8,6 +8,8 @@
 	import { t } from '../lib/i18n.svelte';
 	import { clampTime, handleFor, mediaVersion, shownDuration } from '../lib/media.svelte';
 	import { followMedia, lyrics } from '../lib/lyrics.svelte';
+	import { isStreaming } from '../lib/broadcast.svelte';
+	import { markProgrammeRecordingStarted, startCloudRecording } from '../lib/recording.svelte';
 	import { programScene, selectedLayer, type Layer } from '../lib/state.svelte';
 
 	/** The recording this bar drives: whichever media source is selected, else
@@ -48,6 +50,19 @@
 		return () => clearInterval(timer);
 	});
 
+	// A timed SRT selected alongside an audio/video source belongs to that
+	// source. Starting it should never require a second "follow" click: its
+	// own clock also covers pause, seek and resume automatically.
+	$effect(() => {
+		const source = element;
+		const sourceId = layer?.id;
+		if (!source || !sourceId || lyrics.mode !== 'timed' || lyrics.cues.length === 0) return;
+		const sync = () => followMedia(sourceId);
+		source.addEventListener('play', sync);
+		if (!source.paused) sync();
+		return () => source.removeEventListener('play', sync);
+	});
+
 	function seek(seconds: number) {
 		if (!element) return;
 		// Clamped against the length shown, not the element's — otherwise a
@@ -60,7 +75,16 @@
 
 	function toggle() {
 		if (!element) return;
-		if (element.paused) void element.play();
+		if (element.paused) {
+			if (lyrics.mode === 'timed' && lyrics.cues.length > 0) {
+				followMedia(layer!.id);
+				if (isStreaming()) {
+					markProgrammeRecordingStarted();
+					void startCloudRecording();
+				}
+			}
+			void element.play();
+		}
 		else element.pause();
 		playing = !element.paused;
 	}
