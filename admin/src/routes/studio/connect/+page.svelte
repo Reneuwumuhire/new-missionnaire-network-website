@@ -11,7 +11,7 @@
 		{#if form?.approved}
 			<p class="mt-4 text-emerald-700">Studio is connected. Return to the desktop app and refresh the sessions.</p>
 		{:else}
-			<p class="mt-3 text-sm text-stone-600">Signed in as {data.name}. Allow this Studio computer to manage live sessions for 30 minutes?</p>
+			<p class="mt-3 text-sm text-stone-600">Signed in as {data.name}. Allow this Studio computer to manage live sessions for 30 days?</p>
 			<form method="POST" class="mt-6"><input type="hidden" name="code" value={data.code} /><button class="admin-btn-primary">Continue with this session</button></form>
 		{/if}
 	</div>
