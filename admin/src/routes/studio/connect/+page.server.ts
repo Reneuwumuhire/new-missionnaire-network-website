@@ -24,7 +24,7 @@ export const actions: Actions = {
 		const db = await getDb();
 		await db.collection('studio_authorizations').updateOne(
 			{ code },
-			{ $set: { code, user_email: locals.user.email, user_name: locals.user.name, approved_at: now, expires_at: new Date(now.getTime() + 30 * 60 * 1000) } },
+			{ $set: { code, user_email: locals.user.email, user_name: locals.user.name, approved_at: now, expires_at: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) } },
 			{ upsert: true }
 		);
 		return { approved: true };
