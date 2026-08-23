@@ -21,6 +21,7 @@ import {
 	parseTitle
 } from '$lib/server/scheduled-live-validation';
 import { buildWatchUrl, pingBroadcastEvent } from '$lib/server/main-site';
+import { generatePresignedUploadUrl, getS3Url } from '$lib/server/s3';
 
 async function operator(request: Request): Promise<{ email: string; name: string }> {
 	const code = request.headers.get('authorization')?.replace(/^Bearer\s+/, '') ?? '';
@@ -52,9 +53,48 @@ export async function POST({ request, getClientAddress }) {
 		subtitleFilename?: unknown;
 		announce?: unknown;
 		reminderEnabled?: unknown;
+		filename?: unknown;
+		contentType?: unknown;
+		size?: unknown;
 	};
 	if (body.action === 'status')
 		return json({ operator: user, ...(await youtubeConnection(user.email)) });
+	if (body.action === 'presign-thumbnail') {
+		const contentType = typeof body.contentType === 'string' ? body.contentType : '';
+		const size = typeof body.size === 'number' ? body.size : 0;
+		const ext = (
+			{
+				'image/jpeg': 'jpg',
+				'image/png': 'png',
+				'image/webp': 'webp',
+				'image/gif': 'gif'
+			} as Record<string, string>
+		)[contentType];
+		if (!ext || size <= 0 || size > 5 * 1024 * 1024) {
+			throw error(400, 'Thumbnail must be a JPEG, PNG, WebP or GIF under 5 MB');
+		}
+		const key = `broadcast-thumbnails/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+		return json({
+			uploadUrl: await generatePresignedUploadUrl(key, contentType),
+			key,
+			publicUrl: getS3Url(key)
+		});
+	}
+	if (body.action === 'presign-subtitle') {
+		const filename = typeof body.filename === 'string' ? body.filename : '';
+		const size = typeof body.size === 'number' ? body.size : 0;
+		if (!filename.toLowerCase().endsWith('.srt') || size <= 0 || size > 2 * 1024 * 1024) {
+			throw error(400, 'Subtitle must be an .srt file under 2 MB');
+		}
+		const key = `subtitles/${Date.now()}-${crypto.randomUUID()}.srt`;
+		const contentType = 'text/plain; charset=utf-8';
+		return json({
+			uploadUrl: await generatePresignedUploadUrl(key, contentType),
+			key,
+			publicUrl: getS3Url(key),
+			contentType
+		});
+	}
 	if (body.action === 'schedule') {
 		const title = parseTitle(body.title, { required: true }) as string;
 		if (title.length > 100) throw error(400, 'YouTube titles are limited to 100 characters');
