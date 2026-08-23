@@ -1,5 +1,18 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 
+export const YOUTUBE_THUMBNAIL_MAX_BYTES = 2 * 1024 * 1024;
+
+export function validateYouTubeThumbnail(contentType: string, size: number): 'image/jpeg' | 'image/png' {
+	const normalized = contentType.split(';', 1)[0].trim().toLowerCase();
+	if (normalized !== 'image/jpeg' && normalized !== 'image/png') {
+		throw new Error('YouTube thumbnail must be a JPEG or PNG image');
+	}
+	if (size <= 0 || size > YOUTUBE_THUMBNAIL_MAX_BYTES) {
+		throw new Error('YouTube thumbnail must be under 2 MB');
+	}
+	return normalized;
+}
+
 export function youtubeBroadcastId(value: string): string | null {
 	const text = value.trim();
 	if (/^[A-Za-z0-9_-]{11}$/.test(text)) return text;
@@ -60,6 +73,7 @@ export function scheduledBroadcastBody(input: {
 	description: string | null;
 	scheduledAt: Date;
 	privacyStatus: 'private' | 'unlisted' | 'public';
+	madeForKids: boolean;
 }) {
 	return {
 		snippet: {
@@ -67,7 +81,10 @@ export function scheduledBroadcastBody(input: {
 			description: input.description ?? '',
 			scheduledStartTime: input.scheduledAt.toISOString()
 		},
-		status: { privacyStatus: input.privacyStatus },
+		status: {
+			privacyStatus: input.privacyStatus,
+			selfDeclaredMadeForKids: input.madeForKids
+		},
 		contentDetails: {
 			enableAutoStart: false,
 			enableAutoStop: false,
