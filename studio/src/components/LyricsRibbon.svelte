@@ -3,6 +3,9 @@
 	import { lyrics, onAirLines, step, timedPositionMs } from '../lib/lyrics.svelte';
 	import { findCueIndex } from '../lib/srt';
 	import { t } from '../lib/i18n.svelte';
+	import { broadcast } from '../lib/broadcast.svelte';
+	import { liveSession } from '../lib/live-session.svelte';
+	import { recording } from '../lib/recording.svelte';
 
 	// Sits directly above the Program canvas and shows what is on air, the way a
 	// lyrics app does it: the line being sung is large and lit, its neighbours
@@ -27,6 +30,13 @@
 		return position === null ? -1 : findCueIndex(lyrics.cues, position);
 	});
 	const live = $derived(onAirLines(now));
+	const elapsed = (startedAt: number | null) =>
+		startedAt ? Math.max(0, Math.floor((now - startedAt) / 1000)) : 0;
+	const duration = (seconds: number) => new Date(seconds * 1000).toISOString().slice(11, 19);
+	const programmeStartedAt = $derived(liveSession.activeStartedAt ?? broadcast.startedAt);
+	const programmeLabel = $derived(
+		liveSession.activeStartedAt ? 'LIVE' : broadcast.startedAt ? 'PREVIEW' : 'OFF AIR'
+	);
 
 	/** Two lines either side of the current one. Blank entries keep the current
 	 *  line pinned to the middle instead of letting it slide about at the ends. */
@@ -105,4 +115,41 @@
 	{#if !live.current && lyrics.onAir && linesSource.length > 0}
 		<span class="shrink-0 text-[10px] text-fg/25">—</span>
 	{/if}
+
+	<div class="ml-2 flex h-[76px] w-[420px] shrink-0 overflow-hidden border border-ink-600 bg-ink-950/70">
+		<div class="flex min-w-0 flex-1 flex-col justify-center border-r border-ink-600 px-5">
+			<span class="flex items-center gap-2 text-[9px] font-semibold tracking-[0.18em] {liveSession.activeStartedAt
+				? 'text-red-400'
+				: broadcast.startedAt
+					? 'text-amber-300'
+					: 'text-fg/30'}">
+				<span class="h-1.5 w-1.5 rounded-full {liveSession.activeStartedAt
+					? 'animate-pulse bg-red-500'
+					: broadcast.startedAt
+						? 'bg-amber-400'
+						: 'bg-fg/20'}"></span>
+				{programmeLabel}
+			</span>
+			<span class="font-mono text-[28px] leading-none tracking-tight text-fg">
+				{duration(elapsed(programmeStartedAt))}
+			</span>
+		</div>
+		<div class="grid w-[190px] grid-cols-2 divide-x divide-ink-600">
+			<div class="flex flex-col items-center justify-center">
+				<span class="text-[9px] font-semibold tracking-[0.16em] text-fg/30">LOCAL</span>
+				<span class="font-mono text-[14px] text-fg/75">
+					{new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+				</span>
+			</div>
+			<div class="flex flex-col items-center justify-center bg-red-500/[0.03]">
+				<span class="flex items-center gap-1.5 text-[9px] font-semibold tracking-[0.16em] {recording.startedAt ? 'text-red-400' : 'text-fg/30'}">
+					{#if recording.startedAt}<span class="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500"></span>{/if}
+					REC
+				</span>
+				<span class="font-mono text-[14px] {recording.startedAt ? 'text-red-300' : 'text-fg/30'}">
+					{recording.startedAt ? duration(elapsed(recording.startedAt)) : '--:--:--'}
+				</span>
+			</div>
+		</div>
+	</div>
 </div>
