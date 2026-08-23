@@ -61,7 +61,7 @@
 	>
 	<label class="block"
 		><span class="studio-label">Date and time *</span><input
-			class="studio-input w-full"
+			class="studio-input studio-datetime w-full"
 			required
 			type="datetime-local"
 			bind:value={scheduledAt}

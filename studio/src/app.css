@@ -161,6 +161,26 @@ textarea {
 		@apply border border-ink-600 bg-ink-800 px-2.5 py-2 text-sm text-fg/90 transition-colors placeholder:text-fg/25 focus:border-primary focus:outline-none;
 	}
 
+	/* Keep WebKit's accessible native date/time picker, but present it like a
+	   macOS control instead of the browser's default rectangular text field. */
+	.studio-datetime {
+		color-scheme: dark;
+		@apply rounded-lg px-3 font-mono tabular-nums shadow-inner focus:ring-2 focus:ring-primary/25;
+	}
+
+	:root.light .studio-datetime {
+		color-scheme: light;
+	}
+
+	.studio-datetime::-webkit-calendar-picker-indicator {
+		cursor: pointer;
+		opacity: 0.7;
+	}
+
+	.studio-datetime:hover::-webkit-calendar-picker-indicator {
+		opacity: 1;
+	}
+
 	/* Inline editing (scene names, mixer strip names): looks like text until
 	   you touch it, so the panels stay quiet. */
 	.studio-input-flush {
