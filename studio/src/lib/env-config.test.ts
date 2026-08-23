@@ -29,6 +29,9 @@ describe('Studio .env import', () => {
 		expect(parseStudioEnv('MAIN_SITE_URL=https://missionnaire.net').mainSiteUrl).toBe(
 			'https://www.missionnaire.net'
 		);
+		expect(
+			parseStudioEnv('ADMIN_SITE_URL=https://www.admin.missionnaire.net').adminSiteUrl
+		).toBe('https://admin.missionnaire.net');
 	});
 
 	it('updates the existing destinations without creating duplicates', () => {

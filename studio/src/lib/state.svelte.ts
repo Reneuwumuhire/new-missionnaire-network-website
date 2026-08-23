@@ -329,6 +329,10 @@ function load(): Persisted {
 					/^https:\/\/missionnaire\.net\/?$/,
 					'https://www.missionnaire.net'
 				),
+				adminSiteUrl: (parsed.settings?.adminSiteUrl ?? DEFAULT_SETTINGS.adminSiteUrl).replace(
+					/^https:\/\/www\.admin\.missionnaire\.net\/?$/,
+					'https://admin.missionnaire.net'
+				),
 				// These names were reserved but never used; keep old local settings
 				// useful if an early Studio build happened to save them.
 				recorderUrl: parsed.settings?.recorderUrl ?? (parsed.settings as { adminUrl?: string } | undefined)?.adminUrl ?? '',

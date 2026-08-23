@@ -33,6 +33,10 @@ function first(env: Record<string, string>, ...keys: string[]): string | undefin
 function webUrl(value: string | undefined, label: string): string | undefined {
 	if (!value) return undefined;
 	value = value.replace(/^https:\/\/missionnaire\.net(?=\/|$)/, 'https://www.missionnaire.net');
+	value = value.replace(
+		/^https:\/\/www\.admin\.missionnaire\.net(?=\/|$)/,
+		'https://admin.missionnaire.net'
+	);
 	const loopback = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?(?:\/|$)/.test(value);
 	if (!value.startsWith('https://') && !loopback) throw new Error(`${label} must use https:// (or local http://).`);
 	return value.replace(/\/+$/, '');
