@@ -78,7 +78,8 @@ export async function GET({ fetch, url, setHeaders }) {
 				? {
 						url: `/api/subtitles/file?key=${encodeURIComponent(adminGate.subtitle_srt_s3_key)}`,
 						anchorEpochMs: adminGate.subtitle_anchor_epoch_ms,
-						offsetMs: adminGate.subtitle_offset_ms ?? 0
+						offsetMs: adminGate.subtitle_offset_ms ?? 0,
+						pausedPositionMs: adminGate.subtitle_paused_position_ms
 					}
 				: null,
 		serverNowMs: Date.now()

@@ -353,3 +353,35 @@ export async function transitionYouTubeLive(
 	});
 	return { broadcastId, status: result.status?.lifeCycleStatus ?? 'live' };
 }
+
+export async function completeYouTubeLive(
+	userEmail: string,
+	youtubeUrl: string
+): Promise<{ broadcastId: string; status: string }> {
+	const broadcastId = youtubeBroadcastId(youtubeUrl);
+	if (!broadcastId) throw new Error('The session needs a scheduled YouTube video link');
+	const token = await accessToken(userEmail);
+	const currentUrl = new URL('https://www.googleapis.com/youtube/v3/liveBroadcasts');
+	currentUrl.search = new URLSearchParams({ part: 'id,status', id: broadcastId }).toString();
+	const current = await google<{ items?: Array<{ status?: { lifeCycleStatus?: string } }> }>(
+		currentUrl.toString(),
+		{ headers: { Authorization: `Bearer ${token}` } }
+	);
+	const currentStatus = current.items?.[0]?.status?.lifeCycleStatus;
+	if (!currentStatus)
+		throw new Error('Scheduled YouTube broadcast not found on the connected channel');
+	if (currentStatus === 'complete') return { broadcastId, status: currentStatus };
+	if (currentStatus !== 'live') throw new Error(`YouTube broadcast is not live (${currentStatus})`);
+
+	const url = new URL('https://www.googleapis.com/youtube/v3/liveBroadcasts/transition');
+	url.search = new URLSearchParams({
+		part: 'id,status',
+		id: broadcastId,
+		broadcastStatus: 'complete'
+	}).toString();
+	const result = await google<{ status?: { lifeCycleStatus?: string } }>(url.toString(), {
+		method: 'POST',
+		headers: { Authorization: `Bearer ${token}` }
+	});
+	return { broadcastId, status: result.status?.lifeCycleStatus ?? 'complete' };
+}
