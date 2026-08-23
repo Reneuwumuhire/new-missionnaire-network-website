@@ -1,6 +1,12 @@
 import { env } from '$env/dynamic/private';
 import { getDb } from '../../db/mongo';
-import { authorizationUrl, decryptToken, encryptToken, youtubeBroadcastId } from './youtube-oauth-core';
+import {
+	authorizationUrl,
+	decryptToken,
+	encryptToken,
+	scheduledBroadcastBody,
+	youtubeBroadcastId
+} from './youtube-oauth-core';
 
 const REDIRECT_URI = 'https://admin.missionnaire.net/api/youtube/oauth/callback';
 
@@ -26,7 +32,8 @@ async function google<T>(url: string, init: RequestInit): Promise<T> {
 		error_description?: string;
 	};
 	if (!response.ok) {
-		const message = data.error_description || (typeof data.error === 'string' ? data.error : data.error?.message);
+		const message =
+			data.error_description || (typeof data.error === 'string' ? data.error : data.error?.message);
 		throw new Error(message || `YouTube request failed (${response.status})`);
 	}
 	return data;
@@ -46,21 +53,35 @@ export async function beginYouTubeOAuth(userEmail: string, studioCode: string): 
 	return authorizationUrl({ clientId, redirectUri, state });
 }
 
-export async function finishYouTubeOAuth(code: string, state: string): Promise<{ channelTitle: string }> {
+export async function finishYouTubeOAuth(
+	code: string,
+	state: string
+): Promise<{ channelTitle: string }> {
 	const db = await getDb();
 	const pending = await db.collection('youtube_oauth_states').findOneAndDelete({
 		state,
 		expires_at: { $gt: new Date() }
 	});
-	if (!pending || typeof pending.user_email !== 'string') throw new Error('YouTube connection expired; start again from Studio');
+	if (!pending || typeof pending.user_email !== 'string')
+		throw new Error('YouTube connection expired; start again from Studio');
 
 	const { clientId, clientSecret, encryptionSecret, redirectUri } = config();
-	const token = await google<{ access_token: string; refresh_token?: string }>('https://oauth2.googleapis.com/token', {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-		body: new URLSearchParams({ code, client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, grant_type: 'authorization_code' })
-	});
-	if (!token.refresh_token) throw new Error('Google did not return an offline token; reconnect and approve access');
+	const token = await google<{ access_token: string; refresh_token?: string }>(
+		'https://oauth2.googleapis.com/token',
+		{
+			method: 'POST',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+			body: new URLSearchParams({
+				code,
+				client_id: clientId,
+				client_secret: clientSecret,
+				redirect_uri: redirectUri,
+				grant_type: 'authorization_code'
+			})
+		}
+	);
+	if (!token.refresh_token)
+		throw new Error('Google did not return an offline token; reconnect and approve access');
 
 	const channels = await google<{ items?: Array<{ id: string; snippet?: { title?: string } }> }>(
 		'https://www.googleapis.com/youtube/v3/channels?part=id,snippet&mine=true',
@@ -86,17 +107,34 @@ export async function finishYouTubeOAuth(code: string, state: string): Promise<{
 	return { channelTitle };
 }
 
-export async function youtubeConnection(userEmail: string): Promise<{ connected: boolean; channelTitle: string | null }> {
-	const doc = await (await getDb()).collection('youtube_authorizations').findOne(
-		{ user_email: userEmail },
-		{ projection: { channel_title: 1 } }
-	);
-	return { connected: Boolean(doc), channelTitle: typeof doc?.channel_title === 'string' ? doc.channel_title : null };
+export async function youtubeConnection(
+	userEmail: string
+): Promise<{ connected: boolean; channelTitle: string | null }> {
+	const doc = await (await getDb())
+		.collection('youtube_authorizations')
+		.findOne({ user_email: userEmail }, { projection: { channel_title: 1 } });
+	return {
+		connected: Boolean(doc),
+		channelTitle: typeof doc?.channel_title === 'string' ? doc.channel_title : null
+	};
 }
 
 async function accessToken(userEmail: string): Promise<string> {
-	const doc = await (await getDb()).collection('youtube_authorizations').findOne({ user_email: userEmail });
-	if (!doc || typeof doc.refresh_token !== 'string') throw new Error('Connect the YouTube account first');
+	return (await authorization(userEmail)).token;
+}
+
+type YouTubeIngest = { url: string; key: string };
+
+async function authorization(userEmail: string): Promise<{
+	token: string;
+	channelId: string;
+	encryptionSecret: string;
+}> {
+	const db = await getDb();
+	const doc = await db.collection('youtube_authorizations').findOne({ user_email: userEmail });
+	if (!doc || typeof doc.refresh_token !== 'string' || typeof doc.channel_id !== 'string') {
+		throw new Error('Connect the YouTube account first');
+	}
 	const { clientId, clientSecret, encryptionSecret } = config();
 	const token = await google<{ access_token: string }>('https://oauth2.googleapis.com/token', {
 		method: 'POST',
@@ -108,10 +146,144 @@ async function accessToken(userEmail: string): Promise<string> {
 			grant_type: 'refresh_token'
 		})
 	});
-	return token.access_token;
+	return { token: token.access_token, channelId: doc.channel_id, encryptionSecret };
 }
 
-export async function transitionYouTubeLive(userEmail: string, youtubeUrl: string): Promise<{ broadcastId: string; status: string }> {
+async function reusableStream(userEmail: string): Promise<{
+	token: string;
+	streamId: string;
+	ingest: YouTubeIngest;
+}> {
+	const { token, channelId, encryptionSecret } = await authorization(userEmail);
+	const db = await getDb();
+	const saved = await db.collection('youtube_studio_streams').findOne({ channel_id: channelId });
+	if (
+		typeof saved?.stream_id === 'string' &&
+		typeof saved?.ingestion_address === 'string' &&
+		typeof saved?.stream_name === 'string'
+	) {
+		return {
+			token,
+			streamId: saved.stream_id,
+			ingest: {
+				url: saved.ingestion_address,
+				key: decryptToken(saved.stream_name, encryptionSecret)
+			}
+		};
+	}
+
+	const created = await google<{
+		id?: string;
+		cdn?: { ingestionInfo?: { ingestionAddress?: string; streamName?: string } };
+	}>(
+		'https://www.googleapis.com/youtube/v3/liveStreams?part=id,snippet,cdn,contentDetails,status',
+		{
+			method: 'POST',
+			headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				snippet: { title: 'Missionnaire Studio' },
+				cdn: { ingestionType: 'rtmp', resolution: 'variable', frameRate: 'variable' },
+				contentDetails: { isReusable: true }
+			})
+		}
+	);
+	const address = created.cdn?.ingestionInfo?.ingestionAddress;
+	const streamName = created.cdn?.ingestionInfo?.streamName;
+	if (!created.id || !address || !streamName)
+		throw new Error('YouTube did not return stream credentials');
+	await db.collection('youtube_studio_streams').updateOne(
+		{ channel_id: channelId },
+		{
+			$set: {
+				channel_id: channelId,
+				stream_id: created.id,
+				ingestion_address: address,
+				stream_name: encryptToken(streamName, encryptionSecret),
+				updated_at: new Date()
+			}
+		},
+		{ upsert: true }
+	);
+	return { token, streamId: created.id, ingest: { url: address, key: streamName } };
+}
+
+export async function scheduleYouTubeLive(
+	userEmail: string,
+	input: {
+		title: string;
+		description: string | null;
+		scheduledAt: Date;
+		privacyStatus: 'private' | 'unlisted' | 'public';
+	}
+): Promise<{ broadcastId: string; youtubeUrl: string; ingest: YouTubeIngest }> {
+	const { token, streamId, ingest } = await reusableStream(userEmail);
+	const created = await google<{ id?: string }>(
+		'https://www.googleapis.com/youtube/v3/liveBroadcasts?part=id,snippet,status,contentDetails',
+		{
+			method: 'POST',
+			headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+			body: JSON.stringify(scheduledBroadcastBody(input))
+		}
+	);
+	if (!created.id) throw new Error('YouTube did not return a scheduled broadcast');
+	try {
+		const bind = new URL('https://www.googleapis.com/youtube/v3/liveBroadcasts/bind');
+		bind.search = new URLSearchParams({
+			part: 'id,contentDetails,status',
+			id: created.id,
+			streamId
+		}).toString();
+		await google(bind.toString(), {
+			method: 'POST',
+			headers: { Authorization: `Bearer ${token}` }
+		});
+	} catch (cause) {
+		await google(
+			`https://www.googleapis.com/youtube/v3/liveBroadcasts?id=${encodeURIComponent(created.id)}`,
+			{
+				method: 'DELETE',
+				headers: { Authorization: `Bearer ${token}` }
+			}
+		).catch(() => {});
+		throw cause;
+	}
+	return {
+		broadcastId: created.id,
+		youtubeUrl: `https://www.youtube.com/watch?v=${created.id}`,
+		ingest
+	};
+}
+
+export async function deleteYouTubeLive(userEmail: string, broadcastId: string): Promise<void> {
+	const token = await accessToken(userEmail);
+	await google(
+		`https://www.googleapis.com/youtube/v3/liveBroadcasts?id=${encodeURIComponent(broadcastId)}`,
+		{
+			method: 'DELETE',
+			headers: { Authorization: `Bearer ${token}` }
+		}
+	);
+}
+
+export async function youtubeIngest(userEmail: string, youtubeUrl: string): Promise<YouTubeIngest> {
+	const broadcastId = youtubeBroadcastId(youtubeUrl);
+	if (!broadcastId) throw new Error('The session needs a scheduled YouTube video link');
+	const { token, streamId, ingest } = await reusableStream(userEmail);
+	const url = new URL('https://www.googleapis.com/youtube/v3/liveBroadcasts');
+	url.search = new URLSearchParams({ part: 'id,contentDetails', id: broadcastId }).toString();
+	const broadcast = await google<{
+		items?: Array<{ contentDetails?: { boundStreamId?: string } }>;
+	}>(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
+	if (broadcast.items?.[0]?.contentDetails?.boundStreamId !== streamId) {
+		throw new Error('This YouTube broadcast was not created by Missionnaire Studio');
+	}
+	return ingest;
+}
+
+export async function transitionYouTubeLive(
+	userEmail: string,
+	youtubeUrl: string
+): Promise<{ broadcastId: string; status: string }> {
 	const broadcastId = youtubeBroadcastId(youtubeUrl);
 	if (!broadcastId) throw new Error('The session needs a scheduled YouTube video link');
 	const token = await accessToken(userEmail);
@@ -121,13 +293,39 @@ export async function transitionYouTubeLive(userEmail: string, youtubeUrl: strin
 		currentUrl.toString(),
 		{ headers: { Authorization: `Bearer ${token}` } }
 	);
-	const currentStatus = current.items?.[0]?.status?.lifeCycleStatus;
-	if (!currentStatus) throw new Error('Scheduled YouTube broadcast not found on the connected channel');
+	let currentStatus = current.items?.[0]?.status?.lifeCycleStatus;
+	if (!currentStatus)
+		throw new Error('Scheduled YouTube broadcast not found on the connected channel');
 	if (currentStatus === 'live') return { broadcastId, status: currentStatus };
-	if (currentStatus !== 'testing') throw new Error(`YouTube preview is not ready (${currentStatus})`);
+	if (currentStatus === 'ready') {
+		const testingUrl = new URL('https://www.googleapis.com/youtube/v3/liveBroadcasts/transition');
+		testingUrl.search = new URLSearchParams({
+			part: 'id,status',
+			id: broadcastId,
+			broadcastStatus: 'testing'
+		}).toString();
+		const testing = await google<{ status?: { lifeCycleStatus?: string } }>(testingUrl.toString(), {
+			method: 'POST',
+			headers: { Authorization: `Bearer ${token}` }
+		});
+		currentStatus = testing.status?.lifeCycleStatus;
+		for (let attempt = 0; currentStatus === 'testStarting' && attempt < 10; attempt++) {
+			await new Promise((resolve) => setTimeout(resolve, 1000));
+			const refreshed = await google<{
+				items?: Array<{ status?: { lifeCycleStatus?: string } }>;
+			}>(currentUrl.toString(), { headers: { Authorization: `Bearer ${token}` } });
+			currentStatus = refreshed.items?.[0]?.status?.lifeCycleStatus;
+		}
+	}
+	if (currentStatus !== 'testing')
+		throw new Error(`YouTube preview is not ready (${currentStatus ?? 'unknown'})`);
 
 	const url = new URL('https://www.googleapis.com/youtube/v3/liveBroadcasts/transition');
-	url.search = new URLSearchParams({ part: 'id,status', id: broadcastId, broadcastStatus: 'live' }).toString();
+	url.search = new URLSearchParams({
+		part: 'id,status',
+		id: broadcastId,
+		broadcastStatus: 'live'
+	}).toString();
 	const result = await google<{ status?: { lifeCycleStatus?: string } }>(url.toString(), {
 		method: 'POST',
 		headers: { Authorization: `Bearer ${token}` }
