@@ -17,7 +17,6 @@
 	import LiveTranscript from './+liveTranscript.svelte';
 	import { focusTrap } from '$lib/actions/focusTrap';
 	import { t, type TranslationKey } from '../../i18n';
-
 	let { testToken = null }: { testToken?: string | null } = $props();
 
 	// This card no longer embeds its own <audio> element. Playback runs
