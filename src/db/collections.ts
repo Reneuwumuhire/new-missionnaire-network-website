@@ -1154,24 +1154,13 @@ export async function getStudioAuthorization(code: string): Promise<{ email: str
 	}
 }
 
-/** Studio owns the operational lifecycle; the public site owns the shared
- * session data so `/live/<slug>` never depends on the retiring admin app. */
 export async function listStudioScheduledLives(): Promise<ScheduledLive[]> {
 	const db = await getDb();
-	const docs = await db
-		.collection('scheduled_lives')
-		.find({ status: { $in: ['scheduled', 'live'] } })
-		.sort({ scheduled_at: 1 })
-		.limit(50)
-		.toArray();
+	const docs = await db.collection('scheduled_lives').find({ status: { $in: ['scheduled', 'live'] } }).sort({ scheduled_at: 1 }).limit(50).toArray();
 	return docs.map((doc) => serializeDocument<ScheduledLive>(doc));
 }
 
-export async function setStudioScheduledLiveStatus(
-	id: string,
-	status: ScheduledLiveStatus,
-	at: string
-): Promise<boolean> {
+export async function setStudioScheduledLiveStatus(id: string, status: ScheduledLiveStatus, at: string): Promise<boolean> {
 	if (!ObjectId.isValid(id)) return false;
 	const db = await getDb();
 	const extra = status === 'live' ? { live_started_at: at } : { live_ended_at: at };

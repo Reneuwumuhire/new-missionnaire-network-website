@@ -15,13 +15,17 @@
 		past,
 		broadcast,
 		subscriberCount,
-		publicBaseUrl
+		publicBaseUrl,
+		onAttachReplay
 	}: {
 		upcoming: ScheduledLive[];
 		past: ScheduledLive[];
 		broadcast: BroadcastAdminState;
 		subscriberCount: number;
 		publicBaseUrl: string;
+		/** Ended entry with no replay: hands it to the page's upload modal so the
+		 *  admin can attach the audio after the fact and revive the public link. */
+		onAttachReplay: (entry: ScheduledLive) => void;
 	} = $props();
 
 	function watchUrl(slug: string): string {
@@ -876,6 +880,17 @@
 								>
 									{$t('recordings.scheduled.replay')}
 								</a>
+							{:else if entry.status === 'ended'}
+								<!-- Live ended without a recording: the shared link is dead until a
+								     replay exists. Attach the audio now and it comes back to life. -->
+								<button
+									type="button"
+									class="border border-orange-200 bg-orange-50 px-2.5 py-1 text-[11px] font-semibold text-primary transition-colors hover:border-primary hover:bg-primary hover:text-white"
+									title={$t('recordings.scheduled.attachReplayTitle')}
+									onclick={() => onAttachReplay(entry)}
+								>
+									{$t('recordings.scheduled.attachReplay')}
+								</button>
 							{/if}
 							<button
 								type="button"
@@ -902,7 +917,7 @@
 
 <!-- Create / edit modal -->
 {#if modalOpen}
-	<div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+	<div class="fixed inset-0 z-50 flex items-center justify-center p-4 lg:pl-64">
 		<button
 			type="button"
 			class="absolute inset-0 bg-stone-900/40 backdrop-blur-[2px]"

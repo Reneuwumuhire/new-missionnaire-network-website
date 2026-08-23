@@ -125,9 +125,11 @@ export const POST: RequestHandler = async ({ locals, params, request, getClientA
 
 	// A backfilled upload (createRecording) sits in 'uploading' with no audio
 	// until this point — landing the MP3 is what makes it a real recording, so
-	// promote it to 'ready'. An already-ready recording having its audio
-	// replaced keeps its status untouched.
-	const promoteToReady = current.status === 'uploading';
+	// promote it to 'ready'. Same for a capture the recorder marked 'failed':
+	// the admin has just supplied the audio by hand, so the row is real again
+	// (and 'failed' rows are invisible to the public site, published or not).
+	// An already-ready recording having its audio replaced keeps its status.
+	const promoteToReady = current.status === 'uploading' || current.status === 'failed';
 	// Audio changed — always set peaks fields (to the fresh values if the
 	// client sent them, otherwise to null) so the admin editor never
 	// renders a stale waveform that doesn't match the new bytes.

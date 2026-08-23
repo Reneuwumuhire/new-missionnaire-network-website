@@ -1213,6 +1213,24 @@ export async function setScheduledLiveStatus(
 	return result.matchedCount > 0;
 }
 
+/** Link an entry to its replay without touching status/history — used when an
+ *  admin backfills the audio for a live that ended with no recording. Mirrors
+ *  setScheduledLiveRecordingId in main src/db/collections.ts. */
+export async function setScheduledLiveRecordingId(
+	id: string,
+	recordingId: string
+): Promise<boolean> {
+	if (!ObjectId.isValid(id)) return false;
+	const db = await getDb();
+	const result = await db
+		.collection('scheduled_lives')
+		.updateOne(
+			{ _id: new ObjectId(id) },
+			{ $set: { recording_id: recordingId, updated_at: new Date().toISOString() } }
+		);
+	return result.matchedCount > 0;
+}
+
 export async function deleteScheduledLive(
 	id: string
 ): Promise<{ thumbnail_s3_key: string | null; subtitle_srt_s3_key: string | null } | null> {
