@@ -13,6 +13,7 @@
 	import PropertiesPanel from './components/PropertiesPanel.svelte';
 	import ScenesDock from './components/ScenesDock.svelte';
 	import SettingsPanel from './components/SettingsPanel.svelte';
+	import SetupDialog from './components/SetupDialog.svelte';
 	import SourcesDock from './components/SourcesDock.svelte';
 	import Splitter from './components/Splitter.svelte';
 	import TransitionsDock from './components/TransitionsDock.svelte';
@@ -39,7 +40,14 @@
 	let mixer = $state<Mixer | null>(null);
 	let now = $state(Date.now());
 	let confirmStop = $state(false);
-	let dialog = $state<'properties' | 'settings' | 'live-session' | 'new-session' | null>(null);
+	const SETUP_KEY = 'missionnaire-studio-configured-v1';
+	const needsSetup = localStorage.getItem(SETUP_KEY) !== '1';
+	let setupOpen = $state(needsSetup);
+	let releaseSetup: (() => void) | null = null;
+	const setupReady = needsSetup
+		? new Promise<void>((resolve) => (releaseSetup = resolve))
+		: Promise.resolve();
+	let dialog = $state<'properties' | 'settings' | 'setup' | 'live-session' | 'new-session' | null>(null);
 	/** Frames actually painted per second — the readout OBS puts in its status
 	 *  bar, and the first number to look at when the picture stutters. */
 	let renderFps = $state(0);
@@ -77,6 +85,7 @@
 				await runSelftest(target, () => programCanvas, () => mixer?.audioTrack);
 				return;
 			}
+			await setupReady;
 			// Ask for the microphone before anything needs it: macOS only lists an
 			// application under Privacy & Security once it has asked, and until the
 			// answer is yes the engine reports no input devices at all.
@@ -110,6 +119,14 @@
 			mixer?.close();
 		};
 	});
+
+	function finishSetup() {
+		localStorage.setItem(SETUP_KEY, '1');
+		setupOpen = false;
+		dialog = null;
+		releaseSetup?.();
+		releaseSetup = null;
+	}
 
 	// Keep the mixer's strips in step with what is actually on air. Reads
 	// mediaVersion so a source connecting or dying re-runs this.
@@ -483,7 +500,7 @@
 	</Modal>
 {:else if dialog === 'settings'}
 	<Modal title={t('settings.title')} onclose={() => (dialog = null)}>
-		<SettingsPanel onclose={() => (dialog = null)} />
+		<SettingsPanel onclose={() => (dialog = null)} onconfigure={() => (dialog = 'setup')} />
 	</Modal>
 {:else if dialog === 'live-session'}
 	<Modal title="Choose live session" onclose={() => (dialog = null)}>
@@ -492,5 +509,11 @@
 {:else if dialog === 'new-session'}
 	<Modal title="New public session" onclose={() => (dialog = 'live-session')}>
 		<NewSessionDialog oncreated={() => (dialog = null)} />
+	</Modal>
+{/if}
+
+{#if setupOpen || dialog === 'setup'}
+	<Modal title="Studio setup" onclose={finishSetup}>
+		<SetupDialog oncomplete={finishSetup} />
 	</Modal>
 {/if}

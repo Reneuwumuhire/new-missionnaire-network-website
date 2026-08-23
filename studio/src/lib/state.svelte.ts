@@ -119,6 +119,8 @@ export interface Destination {
 }
 
 export interface Settings {
+	mainSiteUrl: string;
+	adminSiteUrl: string;
 	width: number;
 	height: number;
 	fps: number;
@@ -144,6 +146,8 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
+	mainSiteUrl: 'https://missionnaire.net',
+	adminSiteUrl: 'https://admin.missionnaire.net',
 	width: 1280,
 	height: 720,
 	fps: 30,

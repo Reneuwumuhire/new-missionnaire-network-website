@@ -143,6 +143,20 @@ Bitrate is shown against what you asked for, plus total data sent.
 
 ## Destinations
 
+On first launch, Studio can import or paste a small `.env` configuration. It recognizes only these keys (unrelated database and AWS secrets are ignored):
+
+```dotenv
+MAIN_SITE_URL=https://missionnaire.net
+ADMIN_SITE_URL=https://admin.missionnaire.net
+RECORDER_URL=https://<your-fly-app>.fly.dev:8443
+RECORDER_TOKEN=<recorder-token>
+MISSIONNAIRE_RTMP_URL=rtmp://<your-fly-app>.fly.dev/live
+MISSIONNAIRE_STREAM_KEY=<stream-key>
+YOUTUBE_STREAM_KEY=<youtube-stream-key>
+```
+
+The same importer remains available under *Settings → General*.
+
 *Settings → Stream*. The two that matter:
 
 | Where | URL | Key |

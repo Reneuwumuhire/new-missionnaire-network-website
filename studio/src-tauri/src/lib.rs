@@ -14,6 +14,39 @@ struct StartedStream {
 	local_recording_path: Option<String>,
 }
 
+fn allowed_web_url(url: &str) -> bool {
+	if url.chars().any(|c| c.is_control() || c.is_whitespace()) {
+		return false;
+	}
+	if url.starts_with("https://") {
+		return true;
+	}
+	let Some(rest) = url.strip_prefix("http://") else {
+		return false;
+	};
+	let authority = rest.split('/').next().unwrap_or_default();
+	if authority == "[::1]" {
+		return true;
+	}
+	let (host, port) = authority.rsplit_once(':').unwrap_or((authority, ""));
+	(host == "localhost" || host == "127.0.0.1" || host == "[::1]")
+		&& (port.is_empty() || port.chars().all(|c| c.is_ascii_digit()))
+}
+
+#[cfg(test)]
+mod url_tests {
+	use super::allowed_web_url;
+
+	#[test]
+	fn only_https_or_real_loopback_is_allowed() {
+		assert!(allowed_web_url("https://missionnaire.net"));
+		assert!(allowed_web_url("http://localhost:8081"));
+		assert!(allowed_web_url("http://127.0.0.1/api"));
+		assert!(!allowed_web_url("http://localhost.example/api"));
+		assert!(!allowed_web_url("http://example.com"));
+	}
+}
+
 #[tauri::command]
 fn check_ffmpeg() -> Result<FfmpegInfo, String> {
 	ffmpeg::probe_ffmpeg()
@@ -39,9 +72,7 @@ fn recorder_post(base_url: String, token: String, path: String) -> Result<(), St
 	if !matches!(path.as_str(), "/start" | "/stop") || token.is_empty() {
 		return Err("Commande d’enregistrement non autorisée".into());
 	}
-	if !(base_url.starts_with("https://") || base_url.starts_with("http://localhost") || base_url.starts_with("http://127.0.0.1"))
-		|| base_url.chars().any(|c| c.is_control() || c.is_whitespace())
-	{
+	if !allowed_web_url(&base_url) {
 		return Err("URL du recorder invalide".into());
 	}
 	let output = Command::new("curl")
@@ -60,15 +91,12 @@ fn recorder_post(base_url: String, token: String, path: String) -> Result<(), St
 /// The public site's Studio-only session endpoint. Keeping the path fixed here
 /// means a saved setting cannot turn the desktop app into a general HTTP client.
 #[tauri::command]
-fn studio_live_post(body: String, authorization: String) -> Result<String, String> {
-	let base_url = studio_main_url();
+fn studio_live_post(body: String, authorization: String, base_url: String) -> Result<String, String> {
 	if authorization.len() < 20 { return Err("Connectez Studio à l’administration d’abord".into()); }
 	if body.len() > 2048 {
 		return Err("Commande Studio non autorisée".into());
 	}
-	if !(base_url.starts_with("https://") || base_url.starts_with("http://localhost") || base_url.starts_with("http://127.0.0.1"))
-		|| base_url.chars().any(|c| c.is_control() || c.is_whitespace())
-	{
+	if !allowed_web_url(&base_url) {
 		return Err("URL du site invalide".into());
 	}
 	let output = Command::new("curl")
@@ -85,28 +113,12 @@ fn studio_live_post(body: String, authorization: String) -> Result<String, Strin
 	String::from_utf8(output.stdout).map_err(|e| e.to_string())
 }
 
-fn studio_main_url() -> String {
-	let mut main_url = std::env::var("MAIN_SITE_URL").ok();
-	// Development convenience only: Studio launched from this repository shares
-	// the existing root .env.local. Packaged Studio receives the same two vars
-	// from its managed launch environment.
-	if main_url.is_none() {
-		let path = format!("{}/../../.env.local", env!("CARGO_MANIFEST_DIR"));
-		if let Ok(contents) = std::fs::read_to_string(path) {
-			for line in contents.lines() {
-				let Some((key, value)) = line.split_once('=') else { continue };
-				let value = value.trim().trim_matches('"').to_string();
-				if (key.trim() == "MAIN_SITE_URL" || key.trim() == "PUBLIC_MAIN_URL") && main_url.is_none() { main_url = Some(value); }
-			}
-		}
-	}
-	main_url.unwrap_or_else(|| "https://missionnaire.net".into())
-}
-
 #[tauri::command]
-fn studio_open_login(code: String) -> Result<(), String> {
+fn studio_open_login(code: String, admin_url: String) -> Result<(), String> {
 	if code.len() < 20 || code.chars().any(|c| !c.is_ascii_alphanumeric() && c != '-') { return Err("Code Studio invalide".into()); }
-	let admin_url = std::env::var("ADMIN_SITE_URL").unwrap_or_else(|_| "https://admin.missionnaire.net".into());
+	if !allowed_web_url(&admin_url) {
+		return Err("URL d’administration invalide".into());
+	}
 	open_url(format!("{}/studio/connect?code={code}", admin_url.trim_end_matches('/')))
 }
 
@@ -188,14 +200,8 @@ fn stop_app_audio(capture: State<'_, appaudio::Capture>, id: Option<String>) {
 /// the OS shell, so it must not be able to name a file or a script.
 #[tauri::command]
 fn open_url(url: String) -> Result<(), String> {
-	let loopback = url.starts_with("http://localhost")
-		|| url.starts_with("http://127.0.0.1")
-		|| url.starts_with("http://[::1]");
-	if (!url.starts_with("https://") && !loopback) || url.len() > 2048 {
+	if !allowed_web_url(&url) || url.len() > 2048 {
 		return Err("URL non supportée".into());
-	}
-	if url.chars().any(|c| c.is_control() || c.is_whitespace()) {
-		return Err("URL invalide".into());
 	}
 	#[cfg(target_os = "macos")]
 	let opener = "open";

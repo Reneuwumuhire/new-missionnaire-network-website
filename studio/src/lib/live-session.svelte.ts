@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { studio } from './state.svelte';
 
 export type LiveSession = { _id: string; slug: string; title: string; scheduled_at: string; status: 'scheduled' | 'live' | 'ended' | 'cancelled'; is_test?: boolean };
 export type NewSession = {
@@ -19,12 +20,16 @@ export const liveSession = $state({
 
 async function post<T>(body: object): Promise<T> {
 	if (!liveSession.pairingCode) throw new Error('Continue with admin first.');
-	return JSON.parse(await invoke<string>('studio_live_post', { body: JSON.stringify(body), authorization: liveSession.pairingCode })) as T;
+	return JSON.parse(await invoke<string>('studio_live_post', {
+		body: JSON.stringify(body),
+		authorization: liveSession.pairingCode,
+		baseUrl: studio.settings.mainSiteUrl
+	})) as T;
 }
 
 export async function connectWithAdmin() {
 	if (!liveSession.pairingCode) liveSession.pairingCode = crypto.randomUUID();
-	await invoke('studio_open_login', { code: liveSession.pairingCode });
+	await invoke('studio_open_login', { code: liveSession.pairingCode, adminUrl: studio.settings.adminSiteUrl });
 	// The browser completes approval; this short poll detects it and brings
 	// Studio forward without asking the operator to switch applications back.
 	for (let i = 0; i < 20; i++) {

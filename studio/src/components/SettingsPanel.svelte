@@ -8,7 +8,7 @@
 	import { DEFAULT_LAYOUT } from '../lib/layout';
 	import { persist, stageableSettings, studio, type Destination } from '../lib/state.svelte';
 
-	let { onclose }: { onclose: () => void } = $props();
+	let { onclose, onconfigure }: { onclose: () => void; onconfigure: () => void } = $props();
 
 	// Nothing here reaches the show until Apply, the way OBS's Settings window
 	// works. Changing the resolution or the bitrate mid-service by mis-clicking
@@ -114,6 +114,12 @@
 		{:else}
 			<div class="space-y-5 p-4">
 				{#if page === 'general'}
+					<div class="grid grid-cols-2 gap-3">
+						<label class="block"><span class="studio-label">Main site URL</span><input class="studio-input w-full" type="url" bind:value={draft.settings.mainSiteUrl} /></label>
+						<label class="block"><span class="studio-label">Admin site URL</span><input class="studio-input w-full" type="url" bind:value={draft.settings.adminSiteUrl} /></label>
+					</div>
+					<button class="studio-chip" onclick={onconfigure}>Import configuration (.env)</button>
+
 					<div>
 						<span class="studio-label">{t('settings.language')}</span>
 						<div class="flex gap-1">
