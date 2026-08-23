@@ -144,7 +144,18 @@ export async function connectYouTube() {
 
 export async function goLiveYouTube() {
 	if (!liveSession.selectedId) throw new Error('Choose a live session first.');
-	await adminPost({ action: 'go-live', sessionId: liveSession.selectedId });
+	for (let attempt = 0; attempt < 45; attempt++) {
+		const { status } = await adminPost<{ status: string }>({
+			action: 'go-live',
+			sessionId: liveSession.selectedId
+		});
+		if (status === 'live') return;
+		if (!['testStarting', 'testing', 'liveStarting'].includes(status)) {
+			throw new Error(`YouTube cannot go live (${status}).`);
+		}
+		await new Promise((resolve) => setTimeout(resolve, 2000));
+	}
+	throw new Error('YouTube is still preparing after 90 seconds. Check YouTube Studio and try again.');
 }
 
 async function upload(file: File, action: 'presign-thumbnail' | 'presign-subtitle') {
