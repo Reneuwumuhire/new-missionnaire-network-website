@@ -13,6 +13,7 @@ import {
 	youtubeConnection,
 	youtubeIngest
 } from '$lib/server/youtube-oauth';
+import { validateYouTubeThumbnail } from '$lib/server/youtube-oauth-core';
 import {
 	parseDescription,
 	parseScheduledAt,
@@ -21,7 +22,7 @@ import {
 	parseTitle
 } from '$lib/server/scheduled-live-validation';
 import { buildWatchUrl, pingBroadcastEvent } from '$lib/server/main-site';
-import { generatePresignedUploadUrl, getS3Url } from '$lib/server/s3';
+import { generatePresignedUploadUrl, getObjectBytes, getS3Url } from '$lib/server/s3';
 
 async function operator(request: Request): Promise<{ email: string; name: string }> {
 	const code = request.headers.get('authorization')?.replace(/^Bearer\s+/, '') ?? '';
@@ -46,6 +47,7 @@ export async function POST({ request, getClientAddress }) {
 		description?: unknown;
 		scheduledAt?: unknown;
 		privacyStatus?: unknown;
+		madeForKids?: unknown;
 		thumbnailUrl?: unknown;
 		thumbnailKey?: unknown;
 		subtitleUrl?: unknown;
@@ -62,17 +64,12 @@ export async function POST({ request, getClientAddress }) {
 	if (body.action === 'presign-thumbnail') {
 		const contentType = typeof body.contentType === 'string' ? body.contentType : '';
 		const size = typeof body.size === 'number' ? body.size : 0;
-		const ext = (
-			{
-				'image/jpeg': 'jpg',
-				'image/png': 'png',
-				'image/webp': 'webp',
-				'image/gif': 'gif'
-			} as Record<string, string>
-		)[contentType];
-		if (!ext || size <= 0 || size > 5 * 1024 * 1024) {
-			throw error(400, 'Thumbnail must be a JPEG, PNG, WebP or GIF under 5 MB');
+		try {
+			validateYouTubeThumbnail(contentType, size);
+		} catch (cause) {
+			throw error(400, cause instanceof Error ? cause.message : 'Invalid YouTube thumbnail');
 		}
+		const ext = contentType === 'image/png' ? 'png' : 'jpg';
 		const key = `broadcast-thumbnails/${Date.now()}-${crypto.randomUUID()}.${ext}`;
 		return json({
 			uploadUrl: await generatePresignedUploadUrl(key, contentType),
@@ -105,6 +102,7 @@ export async function POST({ request, getClientAddress }) {
 			body.privacyStatus === 'private' || body.privacyStatus === 'public'
 				? body.privacyStatus
 				: 'unlisted';
+		const madeForKids = body.madeForKids === true;
 		let thumbnail = parseThumbnailPair(body.thumbnailUrl, body.thumbnailKey);
 		const subtitle = parseSubtitleTriple(body.subtitleUrl, body.subtitleKey, body.subtitleFilename);
 		if (!thumbnail.thumbnail_url) {
@@ -119,11 +117,21 @@ export async function POST({ request, getClientAddress }) {
 
 		let youtube;
 		try {
+			let youtubeThumbnail;
+			if (thumbnail.thumbnail_s3_key) {
+				youtubeThumbnail = await getObjectBytes(thumbnail.thumbnail_s3_key);
+				validateYouTubeThumbnail(
+					youtubeThumbnail.contentType,
+					youtubeThumbnail.bytes.byteLength
+				);
+			}
 			youtube = await scheduleYouTubeLive(user.email, {
 				title,
 				description,
 				scheduledAt: youtubeScheduledAt,
-				privacyStatus
+				privacyStatus,
+				madeForKids,
+				thumbnail: youtubeThumbnail
 			});
 		} catch (cause) {
 			throw error(

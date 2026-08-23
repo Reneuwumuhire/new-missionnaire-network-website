@@ -5,6 +5,7 @@ import {
 	decryptToken,
 	encryptToken,
 	scheduledBroadcastBody,
+	validateYouTubeThumbnail,
 	youtubeBroadcastId
 } from './youtube-oauth-core';
 
@@ -39,9 +40,18 @@ test('scheduled broadcasts wait for the operator to go live', () => {
 		title: 'Sunday service',
 		description: null,
 		scheduledAt: new Date('2026-08-30T08:00:00.000Z'),
-		privacyStatus: 'public'
+		privacyStatus: 'public',
+		madeForKids: true
 	});
 	assert.equal(body.snippet.scheduledStartTime, '2026-08-30T08:00:00.000Z');
 	assert.equal(body.contentDetails.enableAutoStart, false);
 	assert.equal(body.contentDetails.monitorStream.enableMonitorStream, true);
+	assert.equal(body.status.selfDeclaredMadeForKids, true);
+});
+
+test('YouTube thumbnails accept JPEG/PNG up to 2 MB', () => {
+	assert.equal(validateYouTubeThumbnail('image/jpeg', 1024), 'image/jpeg');
+	assert.equal(validateYouTubeThumbnail('image/png; charset=binary', 2 * 1024 * 1024), 'image/png');
+	assert.throws(() => validateYouTubeThumbnail('image/webp', 1024), /JPEG or PNG/);
+	assert.throws(() => validateYouTubeThumbnail('image/jpeg', 2 * 1024 * 1024 + 1), /under 2 MB/);
 });

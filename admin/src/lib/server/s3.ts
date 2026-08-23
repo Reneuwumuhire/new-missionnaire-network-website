@@ -1,6 +1,7 @@
 import {
 	S3Client,
 	PutObjectCommand,
+	GetObjectCommand,
 	DeleteObjectCommand,
 	DeleteObjectsCommand,
 	CopyObjectCommand
@@ -68,6 +69,20 @@ export async function generatePresignedUploadUrl(
 		ContentType: contentType
 	});
 	return getSignedUrl(s3, command, { expiresIn: 900 }); // 15 minutes
+}
+
+export async function getObjectBytes(
+	key: string
+): Promise<{ bytes: ArrayBuffer; contentType: string }> {
+	const object = await s3.send(new GetObjectCommand({ Bucket: AWS_S3_BUCKET, Key: key }));
+	if (!object.Body) throw new Error('Uploaded thumbnail could not be read');
+	const downloaded = await object.Body.transformToByteArray();
+	const bytes = new ArrayBuffer(downloaded.byteLength);
+	new Uint8Array(bytes).set(downloaded);
+	return {
+		bytes,
+		contentType: object.ContentType ?? 'application/octet-stream'
+	};
 }
 
 function sanitizeDownloadName(input: string): string {
