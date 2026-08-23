@@ -7,6 +7,7 @@ import {
 	logAudit
 } from '../../../../db/collections';
 import {
+	completeYouTubeLive,
 	deleteYouTubeLive,
 	scheduleYouTubeLive,
 	transitionYouTubeLive,
@@ -213,6 +214,18 @@ export async function POST({ request, getClientAddress }) {
 			return json({ ok: true, ...(await transitionYouTubeLive(user.email, session.youtube_url)) });
 		} catch (cause) {
 			throw error(409, cause instanceof Error ? cause.message : 'YouTube could not go live');
+		}
+	}
+	if (body.action === 'end-live') {
+		if (typeof body.sessionId !== 'string') throw error(400, 'A scheduled session is required');
+		const session = await getScheduledLiveById(body.sessionId);
+		if (!session || session.is_test) throw error(404, 'Scheduled session not found');
+		if (!session.youtube_url)
+			throw error(400, 'Add the scheduled YouTube link to this session first');
+		try {
+			return json({ ok: true, ...(await completeYouTubeLive(user.email, session.youtube_url)) });
+		} catch (cause) {
+			throw error(409, cause instanceof Error ? cause.message : 'YouTube could not end the live');
 		}
 	}
 	throw error(400, 'Unknown action');

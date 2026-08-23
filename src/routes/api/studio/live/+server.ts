@@ -40,7 +40,6 @@ export async function POST({ request, url }) {
 		filename?: string; contentType?: string; size?: number;
 		positionMs?: number; offsetMs?: number; atEpochMs?: number; paused?: boolean;
 	};
-
 	if (body.action === 'list') return json({ operator, sessions: await listStudioScheduledLives() });
 	if (body.action === 'logout') {
 		await revokeStudioAuthorization(operator.code);
@@ -107,21 +106,11 @@ export async function POST({ request, url }) {
 		} else if (!current.subtitle_srt_s3_key) {
 			throw error(400, 'Attach an .srt file first');
 		}
-
 		const at = Number(body.atEpochMs ?? Date.now());
 		const clickedAt = Number.isFinite(at) && Math.abs(at - Date.now()) <= 60_000 ? at : Date.now();
 		const paused = body.paused === true;
 		const anchorEpochMs = Math.round(clickedAt - positionMs);
 		const pausedPositionMs = paused ? Math.max(0, Math.round(positionMs + offsetMs)) : null;
-		await setBroadcastAdminState({
-			...(attached ? {
-				subtitle_srt_url: body.subtitleUrl!,
-				subtitle_srt_s3_key: body.subtitleKey!
-			} : {}),
-			subtitle_anchor_epoch_ms: anchorEpochMs,
-			subtitle_offset_ms: Math.round(offsetMs),
-			subtitle_paused_position_ms: pausedPositionMs
-		});
 		await updateStudioLiveSubtitles(body.sessionId, {
 			...(attached ? {
 				subtitle_srt_url: body.subtitleUrl!,
@@ -130,6 +119,16 @@ export async function POST({ request, url }) {
 			} : {}),
 			subtitle_anchor_epoch_ms: anchorEpochMs,
 			subtitle_offset_ms: Math.round(offsetMs)
+		});
+		// Make the proxy lookup valid before exposing the key to listeners.
+		await setBroadcastAdminState({
+			...(attached ? {
+				subtitle_srt_url: body.subtitleUrl!,
+				subtitle_srt_s3_key: body.subtitleKey!
+			} : {}),
+			subtitle_anchor_epoch_ms: anchorEpochMs,
+			subtitle_offset_ms: Math.round(offsetMs),
+			subtitle_paused_position_ms: pausedPositionMs
 		});
 		return json({ ok: true, anchorEpochMs, offsetMs, pausedPositionMs });
 	}
