@@ -4,6 +4,7 @@ import { checkLiveAudio } from '$lib/server/icecast';
 import {
 	getRadioCachedStatus,
 	getBroadcastAdminState,
+	canAccessStudioTest,
 	setRadioCachedStatus
 } from '../../../../db/collections';
 
@@ -15,13 +16,16 @@ import {
 // the cache write so concurrent listeners don't each hammer Icecast.
 const CACHE_STALE_MS = 20_000;
 
-export async function GET({ fetch, setHeaders }) {
+export async function GET({ fetch, url, setHeaders }) {
 	setHeaders({
 		'Cache-Control': 'no-store, no-cache, must-revalidate',
 		Pragma: 'no-cache'
 	});
 
 	const [status, adminGate] = await Promise.all([getRadioCachedStatus(), getBroadcastAdminState()]);
+	if (adminGate.is_test && !(await canAccessStudioTest(adminGate.scheduled_live_id, url.searchParams.get('test')))) {
+		return json({ isLive: false, checkedAt: new Date().toISOString(), listeners: 0 });
+	}
 
 	// Listener count comes from the cached Icecast snapshot (same source Fly
 	// reports). The self-heal probe below refreshes it when the cache is stale.

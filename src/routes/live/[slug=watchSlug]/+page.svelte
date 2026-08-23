@@ -26,6 +26,7 @@
 	// that's what flips the waiting room into the live player without a reload.
 	let phase = $state(data.watch.phase);
 	let watch = $derived(data.watch);
+	let testToken = $derived(browser ? new URLSearchParams(window.location.search).get('test') : null);
 
 	let shareUrl = $derived(browser
 		? `${window.location.origin}/live/${watch.slug}`
@@ -64,7 +65,7 @@
 
 	async function poll(): Promise<void> {
 		try {
-			const res = await fetch(`/api/live/watch/${watch.slug}`);
+			const res = await fetch(`/api/live/watch/${watch.slug}${testToken ? `?test=${encodeURIComponent(testToken)}` : ''}`);
 			if (!res.ok) return;
 			const state = (await res.json()) as { phase: typeof phase; replayPath: string | null };
 			if (state.replayPath) {
@@ -139,7 +140,7 @@
 				{/if}
 			</div>
 
-			<LiveRadioPlayer />
+			<LiveRadioPlayer {testToken} />
 
 			<ShareLive
 				{shareUrl}

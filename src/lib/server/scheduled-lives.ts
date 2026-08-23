@@ -1,5 +1,6 @@
 import {
 	getScheduledLiveBySlug,
+	canAccessStudioTest,
 	getBroadcastAdminState,
 	getRadioCachedStatus,
 	setScheduledLiveRecordingId,
@@ -28,9 +29,10 @@ export interface WatchState {
 	replayPath: string | null;
 }
 
-export async function getWatchState(slug: string): Promise<WatchState | null> {
+export async function getWatchState(slug: string, testToken?: string | null): Promise<WatchState | null> {
 	const live = await getScheduledLiveBySlug(slug);
 	if (!live) return null;
+	if (live.is_test && !(await canAccessStudioTest(live._id, testToken ?? null))) return null;
 
 	if (live.status === 'cancelled') {
 		return { live, phase: 'cancelled', isLive: false, replayPath: null };

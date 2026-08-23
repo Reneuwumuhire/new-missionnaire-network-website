@@ -1,6 +1,7 @@
 import { getDb } from './mongo';
 import { availableTypesTag } from '../utils/data';
 import { ObjectId, MongoServerError, type Document, type Filter, type Sort } from 'mongodb';
+import { randomBytes } from 'node:crypto';
 import type { YoutubeVideo } from '$lib/models/youtube';
 import type { AudioAsset } from '$lib/models/media-assets';
 import type { MusicAudio } from '$lib/models/music-audio';
@@ -1015,6 +1016,12 @@ export type BroadcastAdminState = {
 	started_by_name: string | null;
 	icecast_offline_since: string | null;
 	notification_pending: boolean;
+	is_test: boolean;
+	default_title: string | null;
+	default_description: string | null;
+	default_thumbnail_url: string | null;
+	default_thumbnail_s3_key: string | null;
+	default_youtube_url: string | null;
 	title: string | null;
 	description: string | null;
 	thumbnail_url: string | null;
@@ -1042,6 +1049,9 @@ const BROADCAST_DEFAULT: BroadcastAdminState = {
 	started_by_name: null,
 	icecast_offline_since: null,
 	notification_pending: false,
+	is_test: false,
+	default_title: null, default_description: null, default_thumbnail_url: null,
+	default_thumbnail_s3_key: null, default_youtube_url: null,
 	title: null,
 	description: null,
 	thumbnail_url: null,
@@ -1070,6 +1080,12 @@ export async function getBroadcastAdminState(): Promise<BroadcastAdminState> {
 			started_by_name: (doc.started_by_name as string | null) ?? null,
 			icecast_offline_since: (doc.icecast_offline_since as string | null) ?? null,
 			notification_pending: Boolean(doc.notification_pending),
+			is_test: Boolean(doc.is_test),
+			default_title: (doc.default_title as string | null) ?? null,
+			default_description: (doc.default_description as string | null) ?? null,
+			default_thumbnail_url: (doc.default_thumbnail_url as string | null) ?? null,
+			default_thumbnail_s3_key: (doc.default_thumbnail_s3_key as string | null) ?? null,
+			default_youtube_url: (doc.default_youtube_url as string | null) ?? null,
 			title: (doc.title as string | null) ?? null,
 			description: (doc.description as string | null) ?? null,
 			thumbnail_url: (doc.thumbnail_url as string | null) ?? null,
@@ -1129,6 +1145,7 @@ export type ScheduledLive = {
 	announced_at: string | null;
 	reminder_enabled: boolean;
 	reminder_sent_at: string | null;
+	is_test: boolean;
 	/** Pre-made SRT transcript for the broadcast audio. anchor/offset are
 	 *  mirrored here by the admin sync actions so the replay can recompute the
 	 *  transcript position against recording.started_at. */
@@ -1156,7 +1173,7 @@ export async function getStudioAuthorization(code: string): Promise<{ email: str
 
 export async function listStudioScheduledLives(): Promise<ScheduledLive[]> {
 	const db = await getDb();
-	const docs = await db.collection('scheduled_lives').find({ status: { $in: ['scheduled', 'live'] } }).sort({ scheduled_at: 1 }).limit(50).toArray();
+	const docs = await db.collection('scheduled_lives').find({ status: { $in: ['scheduled', 'live'] }, is_test: { $ne: true } }).sort({ scheduled_at: 1 }).limit(50).toArray();
 	return docs.map((doc) => serializeDocument<ScheduledLive>(doc));
 }
 
@@ -1169,6 +1186,20 @@ export async function setStudioScheduledLiveStatus(id: string, status: Scheduled
 		{ $set: { status, ...extra, updated_at: new Date().toISOString() } }
 	);
 	return result.matchedCount > 0;
+}
+
+export async function createStudioTestLive(input: { title: string; description: string | null; thumbnailUrl: string | null; thumbnailKey: string | null; youtubeUrl: string | null; createdBy: string; token: string }): Promise<ScheduledLive> {
+	const db = await getDb();
+	const now = new Date().toISOString();
+	const doc = { slug: randomBytes(8).toString('base64url'), title: input.title, description: input.description, thumbnail_url: input.thumbnailUrl, thumbnail_s3_key: input.thumbnailKey, youtube_url: input.youtubeUrl, scheduled_at: now, status: 'scheduled', live_started_at: null, live_ended_at: null, recording_id: null, announce_pending: false, announced_at: null, reminder_enabled: false, reminder_sent_at: null, is_test: true, test_access_token: input.token, subtitle_srt_url: null, subtitle_srt_s3_key: null, subtitle_filename: null, subtitle_anchor_epoch_ms: null, subtitle_offset_ms: 0, created_by: input.createdBy, created_at: now, updated_at: now };
+	const result = await db.collection('scheduled_lives').insertOne(doc);
+	return serializeDocument<ScheduledLive>({ ...doc, _id: result.insertedId });
+}
+
+export async function canAccessStudioTest(id: string | null, token: string | null): Promise<boolean> {
+	if (!id || !token || !ObjectId.isValid(id)) return false;
+	const db = await getDb();
+	return Boolean(await db.collection('scheduled_lives').findOne({ _id: new ObjectId(id), is_test: true, test_access_token: token }, { projection: { _id: 1 } }));
 }
 
 export async function getScheduledLiveBySlug(slug: string): Promise<ScheduledLive | null> {
