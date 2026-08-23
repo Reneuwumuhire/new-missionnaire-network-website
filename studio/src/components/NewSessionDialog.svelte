@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { createSession } from '../lib/live-session.svelte';
+	import { createSession, liveSession } from '../lib/live-session.svelte';
 
 	let { oncreated }: { oncreated: () => void } = $props();
 	let title = $state('');
@@ -17,7 +17,7 @@
 		if (!title.trim() || !scheduledAt) { formError = 'Title and scheduled time are required.'; return; }
 		saving = true; formError = null;
 		if (await createSession({ title, scheduledAt, description, youtubeUrl, thumbnail, subtitle, announce, reminderEnabled })) oncreated();
-		else formError = 'Session could not be created. Check the connection and upload files.';
+		else formError = liveSession.error || 'Session could not be created.';
 		saving = false;
 	}
 </script>

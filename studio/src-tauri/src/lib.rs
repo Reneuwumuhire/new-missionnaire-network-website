@@ -97,7 +97,7 @@ fn studio_post(body: String, authorization: String, base_url: String, path: &str
 		return Err("URL du site invalide".into());
 	}
 	let output = Command::new("curl")
-		.args(["--fail-with-body", "--silent", "--show-error", "--max-time", "20", "-X", "POST"])
+		.args(["--fail-with-body", "--silent", "--show-error", "--retry", "2", "--retry-all-errors", "--retry-delay", "1", "--max-time", "20", "-X", "POST"])
 		.arg("-H").arg(format!("Authorization: Bearer {authorization}"))
 		.args(["-H", "Content-Type: application/json", "--data"])
 		.arg(body)
@@ -105,7 +105,12 @@ fn studio_post(body: String, authorization: String, base_url: String, path: &str
 		.output()
 		.map_err(|e| format!("Site inaccessible: {e}"))?;
 	if !output.status.success() {
-		return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+		let body = String::from_utf8_lossy(&output.stdout);
+		return Err(if body.trim().is_empty() {
+			String::from_utf8_lossy(&output.stderr).trim().to_string()
+		} else {
+			body.trim().to_string()
+		});
 	}
 	String::from_utf8(output.stdout).map_err(|e| e.to_string())
 }
