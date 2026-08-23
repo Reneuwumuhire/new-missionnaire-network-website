@@ -261,7 +261,9 @@
 		}
 		return { tone: 'ok', label: t('status.stable') };
 	});
-	const canTake = $derived(studio.activeSceneId !== onAirSceneId());
+	// Program is a frozen snapshot in Studio Mode, so even edits to the same
+	// scene (visibility, crop, layout, properties) are valid takes.
+	const canTake = $derived(studio.settings.studioMode || studio.activeSceneId !== onAirSceneId());
 	const recordingDuration = $derived(recording.startedAt ? Math.max(0, Math.floor((now - recording.startedAt) / 1000)) : 0);
 	const durationLabel = (seconds: number) => new Date(seconds * 1000).toISOString().slice(11, 19);
 	const publicDuration = $derived(liveSession.activeStartedAt ? Math.max(0, Math.floor((now - liveSession.activeStartedAt) / 1000)) : 0);
