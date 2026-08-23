@@ -4,13 +4,13 @@ import { getWatchState } from '$lib/server/scheduled-lives';
 // Client polling endpoint for the watch page (/live/<slug>). The page itself
 // is edge-cached for first paint; THIS endpoint is what drives the live
 // waiting-room → player → replay transitions, so it must never be cached.
-export async function GET({ params, setHeaders }) {
+export async function GET({ params, url, setHeaders }) {
 	setHeaders({
 		'Cache-Control': 'no-store, no-cache, must-revalidate',
 		Pragma: 'no-cache'
 	});
 
-	const state = await getWatchState(params.slug);
+	const state = await getWatchState(params.slug, url.searchParams.get('test'));
 	if (!state) throw error(404, 'Direct introuvable');
 
 	return json({

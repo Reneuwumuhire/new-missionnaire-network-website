@@ -151,7 +151,8 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		subtitle_offset_ms: 0,
 		// Picked up by the main-site radio-poll endpoint, which fires the actual
 		// push notification (VAPID keys + web-push live there, not in admin).
-		notification_pending: notify
+		notification_pending: notify,
+		is_test: false
 	});
 
 	if (entry.status !== 'live') {
