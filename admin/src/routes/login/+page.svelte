@@ -3,7 +3,7 @@
 	import type { ActionData } from './$types';
 	import { t } from '$lib/i18n';
 
-	let { form }: { form: ActionData } = $props();
+	let { form, data }: { form: ActionData; data: { next: string } } = $props();
 	let loading = $state(false);
 </script>
 
@@ -46,6 +46,7 @@
 					};
 				}}
 			>
+				<input type="hidden" name="next" value={data.next} />
 				<div class="mb-5">
 					<label for="email" class="admin-label">{$t('auth.email')}</label>
 					<input

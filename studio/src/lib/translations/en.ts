@@ -141,6 +141,8 @@ const en = {
 	'controls.starting': 'Starting…',
 	'controls.studioMode': 'Studio Mode',
 	'controls.settings': 'Settings',
+	'controls.recording': 'Recording',
+	'controls.recordingHint': 'Choose Local, Cloud or Both in Settings → Output. Recording starts and stops with the broadcast.',
 
 	// ── Stream health (OBS's Stats dock, with what ffmpeg can tell us) ──
 	'health.title': 'Stream health',
@@ -284,6 +286,14 @@ const en = {
 		'Pick the one that suits the room: Light for daylight, Midnight for a darkened hall where the desk should not glow.',
 	'settings.language': 'Language',
 	'settings.liveWarning': 'Encoder settings apply to the next broadcast.',
+	'settings.recording': 'Recording',
+	'settings.recordingHint': 'Local files save in Movies/Missionnaire Studio. Cloud uses the streaming recorder directly.',
+	'settings.recorderUrl': 'Cloud recorder URL',
+	'settings.recorderToken': 'Cloud recorder token',
+	'recording.off': 'Off',
+	'recording.local': 'Local',
+	'recording.cloud': 'Cloud',
+	'recording.both': 'Both',
 	'settings.testPattern': 'No-signal test pattern',
 	'settings.testPatternHint': 'Show colour bars when a scene\u2019s camera, screen share or media file is not producing a picture. Black looks the same as a dead stream.',
 	'settings.resolution': 'Base resolution',

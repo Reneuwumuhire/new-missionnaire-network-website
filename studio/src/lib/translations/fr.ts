@@ -143,6 +143,8 @@ const fr: Record<keyof typeof en, string> = {
 	'controls.starting': 'Démarrage…',
 	'controls.studioMode': 'Mode Studio',
 	'controls.settings': 'Paramètres',
+	'controls.recording': 'Enregistrement',
+	'controls.recordingHint': 'Choisissez Local, Cloud ou Les deux dans Paramètres → Sortie. L’enregistrement démarre et s’arrête avec la diffusion.',
 
 	// ── Stream health ───────────────────────────────────────────
 	'health.title': 'État de la diffusion',
@@ -286,6 +288,14 @@ const fr: Record<keyof typeof en, string> = {
 		'Choisissez selon la salle : Clair en plein jour, Minuit dans une salle sombre o\u00f9 la r\u00e9gie ne doit pas \u00e9clairer.',
 	'settings.language': 'Langue',
 	'settings.liveWarning': 'Les réglages d’encodage s’appliqueront à la prochaine diffusion.',
+	'settings.recording': 'Enregistrement',
+	'settings.recordingHint': 'Les fichiers locaux sont enregistrés dans Films/Missionnaire Studio. Le cloud utilise directement le recorder.',
+	'settings.recorderUrl': 'URL du recorder cloud',
+	'settings.recorderToken': 'Jeton du recorder cloud',
+	'recording.off': 'Désactivé',
+	'recording.local': 'Local',
+	'recording.cloud': 'Cloud',
+	'recording.both': 'Les deux',
 	'settings.testPattern': 'Mire en l\u2019absence de signal',
 	'settings.testPatternHint': 'Affiche une mire quand la cam\u00e9ra, le partage d\u2019\u00e9cran ou le fichier d\u2019une sc\u00e8ne ne produit aucune image. Le noir ressemble \u00e0 un flux mort.',
 	'settings.resolution': 'Résolution de base',

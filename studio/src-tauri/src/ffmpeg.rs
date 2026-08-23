@@ -9,6 +9,7 @@
 use std::collections::{HashMap, VecDeque};
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
+use std::fs;
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{sync_channel, SyncSender, TrySendError};
@@ -45,6 +46,7 @@ pub struct StreamConfig {
 	pub audio_bitrate_kbps: u32,
 	/// "hardware" (VideoToolbox on macOS) or "software" (libx264).
 	pub encoder: String,
+	pub record_local: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -206,7 +208,11 @@ fn validate_url(url: &str) -> Result<(), String> {
 }
 
 pub fn build_args(cfg: &StreamConfig) -> Result<Vec<String>, String> {
-	if cfg.targets.is_empty() {
+	build_args_with_path(cfg, None)
+}
+
+fn build_args_with_path(cfg: &StreamConfig, local_path: Option<&str>) -> Result<Vec<String>, String> {
+	if cfg.targets.is_empty() && local_path.is_none() {
 		return Err("Aucune destination activée".into());
 	}
 	for t in &cfg.targets {
@@ -253,19 +259,24 @@ pub fn build_args(cfg: &StreamConfig) -> Result<Vec<String>, String> {
 	push!("-c:a", "aac", "-b:a", format!("{ak}k"), "-ar", "48000", "-ac", "2");
 	push!("-nostats", "-progress", "pipe:1");
 
-	if cfg.targets.len() == 1 {
+	let mut outputs = cfg
+		.targets
+		.iter()
+		.map(|t| format!("[f=flv:onfail=ignore]{}", t.url))
+		.collect::<Vec<_>>();
+	if let Some(path) = local_path {
+		outputs.push(format!("[f=mp4:movflags=+frag_keyframe+empty_moov]{}", path));
+	}
+	if outputs.len() == 1 && local_path.is_none() {
 		push!("-f", "flv", cfg.targets[0].url);
+	} else if outputs.len() == 1 {
+		push!("-movflags", "+frag_keyframe+empty_moov", "-f", "mp4", local_path.unwrap());
 	} else {
 		// tee fans one encode out to every destination. `onfail=ignore` is the
 		// point: YouTube rejecting the key must not take the church's own
 		// stream down with it.
 		push!("-flags", "+global_header", "-f", "tee");
-		push!(cfg
-			.targets
-			.iter()
-			.map(|t| format!("[f=flv:onfail=ignore]{}", t.url))
-			.collect::<Vec<_>>()
-			.join("|"));
+		push!(outputs.join("|"));
 	}
 	Ok(a)
 }
@@ -301,7 +312,7 @@ impl Encoder {
 		app: &AppHandle,
 		cfg: StreamConfig,
 		group: &str,
-	) -> Result<Vec<String>, String> {
+	) -> Result<(Vec<String>, Option<String>), String> {
 		let mut guard = self.groups.lock().map_err(|e| e.to_string())?;
 		if guard.contains_key(group) {
 			return Err("Cette diffusion est déjà en cours".into());
@@ -314,7 +325,13 @@ impl Encoder {
 			}
 		}
 		let bin = resolve_ffmpeg()?;
-		let args = build_args(&cfg)?;
+		let local_path = if cfg.record_local {
+			let base = std::env::var("HOME").map(PathBuf::from).unwrap_or(std::env::current_dir().map_err(|e| e.to_string())?);
+			let dir = base.join("Movies").join("Missionnaire Studio");
+			fs::create_dir_all(&dir).map_err(|e| format!("Dossier d’enregistrement impossible: {e}"))?;
+			Some(dir.join(format!("Missionnaire Studio {}.mp4", chrono_stamp())).to_string_lossy().to_string())
+		} else { None };
+		let args = build_args_with_path(&cfg, local_path.as_deref())?;
 
 		let mut child = Command::new(&bin)
 			.args(&args)
@@ -441,7 +458,7 @@ impl Encoder {
 				discarded,
 			},
 		);
-		Ok(redact(&args))
+		Ok((redact(&args), local_path))
 	}
 
 	/// Every running group gets the same chunk. A group that has died is not
@@ -508,6 +525,13 @@ impl Encoder {
 	}
 }
 
+fn chrono_stamp() -> u64 {
+	std::time::SystemTime::now()
+		.duration_since(std::time::UNIX_EPOCH)
+		.unwrap_or_default()
+		.as_secs()
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -523,6 +547,7 @@ mod tests {
 			video_bitrate_kbps: 4500,
 			audio_bitrate_kbps: 160,
 			encoder: "hardware".into(),
+			record_local: false,
 		}
 	}
 

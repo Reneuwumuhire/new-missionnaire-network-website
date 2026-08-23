@@ -3,7 +3,16 @@ mod fetch;
 mod ffmpeg;
 
 use ffmpeg::{Encoder, FfmpegInfo, StreamConfig};
+use serde::Serialize;
+use std::process::Command;
 use tauri::{AppHandle, Manager, State};
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StartedStream {
+	command: Vec<String>,
+	local_recording_path: Option<String>,
+}
 
 #[tauri::command]
 fn check_ffmpeg() -> Result<FfmpegInfo, String> {
@@ -18,8 +27,87 @@ fn start_stream(
 	encoder: State<'_, Encoder>,
 	config: StreamConfig,
 	group: String,
-) -> Result<Vec<String>, String> {
-	encoder.start(&app, config, &group)
+) -> Result<StartedStream, String> {
+	let (command, local_recording_path) = encoder.start(&app, config, &group)?;
+	Ok(StartedStream { command, local_recording_path })
+}
+
+/// Direct control of the streaming recorder. It is deliberately limited to
+/// its two lifecycle routes so Studio never needs the retiring admin app.
+#[tauri::command]
+fn recorder_post(base_url: String, token: String, path: String) -> Result<(), String> {
+	if !matches!(path.as_str(), "/start" | "/stop") || token.is_empty() {
+		return Err("Commande d’enregistrement non autorisée".into());
+	}
+	if !(base_url.starts_with("https://") || base_url.starts_with("http://localhost") || base_url.starts_with("http://127.0.0.1"))
+		|| base_url.chars().any(|c| c.is_control() || c.is_whitespace())
+	{
+		return Err("URL du recorder invalide".into());
+	}
+	let output = Command::new("curl")
+		.args(["--fail-with-body", "--silent", "--show-error", "--max-time", "20", "-X", "POST"])
+		.arg("-H").arg(format!("Authorization: Bearer {token}"))
+		.args(["-H", "Content-Type: application/json", "--data", "{\"createdBy\":\"missionnaire-studio\",\"createdByName\":\"Missionnaire Studio\"}"])
+		.arg(format!("{}{}", base_url.trim_end_matches('/'), path))
+		.output()
+		.map_err(|e| format!("Recorder inaccessible: {e}"))?;
+	if !output.status.success() {
+		return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+	}
+	Ok(())
+}
+
+/// The public site's Studio-only session endpoint. Keeping the path fixed here
+/// means a saved setting cannot turn the desktop app into a general HTTP client.
+#[tauri::command]
+fn studio_live_post(body: String, authorization: String) -> Result<String, String> {
+	let base_url = studio_main_url();
+	if authorization.len() < 20 { return Err("Connectez Studio à l’administration d’abord".into()); }
+	if body.len() > 2048 {
+		return Err("Commande Studio non autorisée".into());
+	}
+	if !(base_url.starts_with("https://") || base_url.starts_with("http://localhost") || base_url.starts_with("http://127.0.0.1"))
+		|| base_url.chars().any(|c| c.is_control() || c.is_whitespace())
+	{
+		return Err("URL du site invalide".into());
+	}
+	let output = Command::new("curl")
+		.args(["--fail-with-body", "--silent", "--show-error", "--max-time", "20", "-X", "POST"])
+		.arg("-H").arg(format!("Authorization: Bearer {authorization}"))
+		.args(["-H", "Content-Type: application/json", "--data"])
+		.arg(body)
+		.arg(format!("{}/api/studio/live", base_url.trim_end_matches('/')))
+		.output()
+		.map_err(|e| format!("Site inaccessible: {e}"))?;
+	if !output.status.success() {
+		return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+	}
+	String::from_utf8(output.stdout).map_err(|e| e.to_string())
+}
+
+fn studio_main_url() -> String {
+	let mut main_url = std::env::var("MAIN_SITE_URL").ok();
+	// Development convenience only: Studio launched from this repository shares
+	// the existing root .env.local. Packaged Studio receives the same two vars
+	// from its managed launch environment.
+	if main_url.is_none() {
+		let path = format!("{}/../../.env.local", env!("CARGO_MANIFEST_DIR"));
+		if let Ok(contents) = std::fs::read_to_string(path) {
+			for line in contents.lines() {
+				let Some((key, value)) = line.split_once('=') else { continue };
+				let value = value.trim().trim_matches('"').to_string();
+				if (key.trim() == "MAIN_SITE_URL" || key.trim() == "PUBLIC_MAIN_URL") && main_url.is_none() { main_url = Some(value); }
+			}
+		}
+	}
+	main_url.unwrap_or_else(|| "https://missionnaire.net".into())
+}
+
+#[tauri::command]
+fn studio_open_login(code: String) -> Result<(), String> {
+	if code.len() < 20 || code.chars().any(|c| !c.is_ascii_alphanumeric() && c != '-') { return Err("Code Studio invalide".into()); }
+	let admin_url = std::env::var("ADMIN_SITE_URL").unwrap_or_else(|_| "https://admin.missionnaire.net".into());
+	open_url(format!("{}/studio/connect?code={code}", admin_url.trim_end_matches('/')))
 }
 
 /// Media chunks arrive as a raw IPC body (not JSON) — a JSON number array
@@ -264,6 +352,9 @@ pub fn run() {
 		.invoke_handler(tauri::generate_handler![
 			check_ffmpeg,
 			start_stream,
+			recorder_post,
+			studio_live_post,
+			studio_open_login,
 			push_chunk,
 			stop_stream,
 			stream_running,

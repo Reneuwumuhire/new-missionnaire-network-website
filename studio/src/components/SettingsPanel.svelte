@@ -149,6 +149,20 @@
 				{/if}
 
 				{#if page === 'output'}
+					<div>
+						<span class="studio-label">{t('settings.recording')}</span>
+						<div class="flex gap-1">
+							{#each ['off', 'local', 'cloud', 'both'] as mode}
+								<button class="studio-chip flex-1 {draft.settings.recordingMode === mode ? 'bg-primary/20 text-primary' : ''}" onclick={() => (draft.settings.recordingMode = mode as typeof draft.settings.recordingMode)}>{t(`recording.${mode}` as never)}</button>
+							{/each}
+						</div>
+						<p class="mt-1 text-[11px] text-fg/35">{t('settings.recordingHint')}</p>
+					</div>
+					{#if draft.settings.recordingMode === 'cloud' || draft.settings.recordingMode === 'both'}
+						<label class="block"><span class="studio-label">{t('settings.recorderUrl')}</span><input class="studio-input w-full" type="url" bind:value={draft.settings.recorderUrl} /></label>
+						<label class="block"><span class="studio-label">{t('settings.recorderToken')}</span><input class="studio-input w-full" type="password" bind:value={draft.settings.recorderToken} /></label>
+					{/if}
+
 					{#if isStreaming()}
 						<p class="border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-300">
 							{t('settings.liveWarning')}

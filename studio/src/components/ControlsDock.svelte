@@ -12,16 +12,19 @@
 	import Icon from './Icon.svelte';
 	import { t } from '../lib/i18n.svelte';
 	import { destinationUrl, persist, studio } from '../lib/state.svelte';
+	import { liveSession } from '../lib/live-session.svelte';
 
 	let {
 		onToggleLive,
 		onSettings,
+		onSelectSession,
 		confirmStop,
 		/** Frames the compositor failed to paint on time — OBS's rendering lag. */
 		renderMissed
 	}: {
 		onToggleLive: () => void;
 		onSettings: () => void;
+		onSelectSession: () => void;
 		confirmStop: boolean;
 		renderMissed: number;
 	} = $props();
@@ -29,6 +32,9 @@
 	const enabled = $derived(
 		studio.destinations.filter((d) => d.enabled && destinationUrl(d).length > 8)
 	);
+	const recordingMode = $derived(studio.settings.recordingMode);
+	const recordingLabel = $derived(t(`recording.${recordingMode}` as never));
+	const selectedSession = $derived(liveSession.sessions.find((session) => session._id === liveSession.selectedId));
 
 	// Held destinations get nothing at all until this is pressed, so a platform
 	// that publishes on first frame cannot go public on its own. Once connected
@@ -66,7 +72,7 @@
 					? 'bg-red-600 text-fg'
 					: 'border border-red-500/50 text-red-400 hover:bg-red-600/15'
 				: 'bg-primary text-black hover:bg-missionnaire-400'} disabled:cursor-not-allowed disabled:opacity-40"
-			disabled={broadcast.starting || (!isStreaming() && enabled.length === 0)}
+			disabled={broadcast.starting || (!isStreaming() && (enabled.length === 0 || !liveSession.selectedId))}
 			onclick={onToggleLive}
 		>
 			{#if broadcast.starting}
@@ -78,6 +84,27 @@
 			{:else}
 				{t('controls.startStreaming')}
 			{/if}
+		</button>
+		{#if liveSession.operatorName}
+			<p class="px-1 text-[10px] text-fg/35">Signed in: {liveSession.operatorName}</p>
+		{/if}
+
+		<button
+			class="flex h-8 w-full items-center justify-between border border-ink-700 px-2 text-[11px] text-fg/60 transition-colors hover:border-ink-500 hover:text-fg"
+			onclick={onSelectSession}
+			title="Choose or create the public live session"
+		>
+			<span>Live session</span>
+			<span class={selectedSession ? 'max-w-36 truncate text-emerald-300' : 'text-amber-300'}>{selectedSession?.title ?? 'Choose one'}</span>
+		</button>
+
+		<button
+			class="flex h-8 w-full items-center justify-between border border-ink-700 px-2 text-[11px] text-fg/60 transition-colors hover:border-ink-500 hover:text-fg"
+			onclick={onSettings}
+			title={t('controls.recordingHint')}
+		>
+			<span>{t('controls.recording')}</span>
+			<span class={recordingMode === 'off' ? 'text-fg/35' : 'text-emerald-300'}>{recordingLabel}</span>
 		</button>
 
 		{#if youtubeReady}

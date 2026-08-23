@@ -4,6 +4,7 @@
 	import Icon from './components/Icon.svelte';
 	import LyricsPanel from './components/LyricsPanel.svelte';
 	import LyricsRibbon from './components/LyricsRibbon.svelte';
+	import LiveSessionDialog from './components/LiveSessionDialog.svelte';
 	import MediaBar from './components/MediaBar.svelte';
 	import MixerDock from './components/MixerDock.svelte';
 	import Modal from './components/Modal.svelte';
@@ -30,12 +31,13 @@
 		selftestTarget
 	} from './lib/selftest';
 	import { activeScene, audioLayers, onAirSceneId, persist, studio } from './lib/state.svelte';
+	import { liveSession } from './lib/live-session.svelte';
 
 	let programCanvas = $state<HTMLCanvasElement | null>(null);
 	let mixer = $state<Mixer | null>(null);
 	let now = $state(Date.now());
 	let confirmStop = $state(false);
-	let dialog = $state<'properties' | 'settings' | null>(null);
+	let dialog = $state<'properties' | 'settings' | 'live-session' | null>(null);
 	/** Frames actually painted per second — the readout OBS puts in its status
 	 *  bar, and the first number to look at when the picture stutters. */
 	let renderFps = $state(0);
@@ -211,6 +213,10 @@
 			await stopBroadcast();
 			return;
 		}
+		if (!liveSession.selectedId) {
+			dialog = 'live-session';
+			return;
+		}
 		if (!programCanvas) return;
 		renderMissed = 0;
 		await mixer?.resume();
@@ -219,6 +225,9 @@
 
 	const selectedLayer = $derived(
 		activeScene().layers.find((l) => l.id === studio.selectedLayerId) ?? null
+	);
+	const selectedLiveSession = $derived(
+		liveSession.sessions.find((session) => session._id === liveSession.selectedId) ?? null
 	);
 	const health = $derived.by(() => {
 		const stats = broadcast.stats;
@@ -417,6 +426,7 @@
 			{confirmStop}
 			onToggleLive={toggleLive}
 			onSettings={() => (dialog = 'settings')}
+			onSelectSession={() => (dialog = 'live-session')}
 			{renderMissed}
 		/>
 	</div>
@@ -433,6 +443,7 @@
 			{#if broadcast.phase === 'live'}
 				<span class="text-red-400">{t('status.live')}</span>
 				{uptimeLabel(now)}
+				{#if selectedLiveSession}<span class="max-w-80 truncate font-body text-fg/70">{selectedLiveSession.title}</span>{/if}
 			{:else}
 				{t('status.offline')}
 			{/if}
@@ -462,5 +473,9 @@
 {:else if dialog === 'settings'}
 	<Modal title={t('settings.title')} onclose={() => (dialog = null)}>
 		<SettingsPanel onclose={() => (dialog = null)} />
+	</Modal>
+{:else if dialog === 'live-session'}
+	<Modal title="Choose live session" onclose={() => (dialog = null)}>
+		<LiveSessionDialog onchoose={() => (dialog = null)} />
 	</Modal>
 {/if}

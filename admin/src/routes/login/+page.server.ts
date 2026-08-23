@@ -10,12 +10,16 @@ import {
 } from '../../db/collections';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ cookies }) => {
+function safeNext(value: string | null): string {
+	return value?.startsWith('/') && !value.startsWith('//') ? value : '/';
+}
+
+export const load: PageServerLoad = async ({ cookies, url }) => {
 	const token = cookies.get(SESSION_COOKIE);
 	if (token) {
-		throw redirect(303, '/');
+		throw redirect(303, safeNext(url.searchParams.get('next')));
 	}
-	return {};
+	return { next: safeNext(url.searchParams.get('next')) };
 };
 
 export const actions: Actions = {
@@ -23,6 +27,7 @@ export const actions: Actions = {
 		const formData = await request.formData();
 		const email = formData.get('email')?.toString()?.trim();
 		const password = formData.get('password')?.toString();
+		const next = safeNext(formData.get('next')?.toString() ?? null);
 
 		if (!email || !password) {
 			return fail(400, { error: 'Email et mot de passe requis', email: email ?? '' });
@@ -68,6 +73,6 @@ export const actions: Actions = {
 			ip_address: ip
 		});
 
-		throw redirect(303, '/');
+		throw redirect(303, next);
 	}
 };

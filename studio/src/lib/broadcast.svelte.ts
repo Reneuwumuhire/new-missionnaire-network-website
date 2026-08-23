@@ -10,6 +10,8 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { t } from './i18n.svelte';
+import { recording, recordsLocal, startCloudRecording, stopCloudRecording } from './recording.svelte';
+import { endSelectedSession, startSelectedSession } from './live-session.svelte';
 import { destinationUrl, studio } from './state.svelte';
 
 const MIME_PREFERENCE = [
@@ -61,7 +63,8 @@ export const broadcast = $state({
 	log: [] as string[],
 	/** ffmpeg command line, stream keys already redacted by the Rust side. */
 	command: [] as string[],
-	startedAt: null as number | null
+	startedAt: null as number | null,
+	localRecordingPath: null as string | null
 });
 
 /** Anything past `idle` is holding connections open and must be stopped. */
@@ -108,13 +111,13 @@ export async function startBroadcast(
 			studio.destinations
 				.filter((d) => d.enabled && !d.hold && d.url.trim())
 				.map((d) => ({ name: d.name, url: destinationUrl(d) }));
-		if (enabled.length === 0) throw new Error(t('error.noImmediateDestination'));
+		if (enabled.length === 0 && !recordsLocal()) throw new Error(t('error.noImmediateDestination'));
 
 		const mime = pickMimeType();
 		if (!mime) throw new Error(t('error.noRecorder'));
 
 		const { settings } = studio;
-		const command = await invoke<string[]>('start_stream', {
+		const result = await invoke<{ command: string[]; localRecordingPath: string | null }>('start_stream', {
 			group: 'main',
 			config: {
 				container: containerOf(mime),
@@ -122,10 +125,13 @@ export async function startBroadcast(
 				fps: settings.fps,
 				video_bitrate_kbps: settings.videoBitrateKbps,
 				audio_bitrate_kbps: settings.audioBitrateKbps,
-				encoder: settings.encoder
+				encoder: settings.encoder,
+				record_local: recordsLocal()
 			}
 		});
-		broadcast.command = command;
+		broadcast.command = result.command;
+		broadcast.localRecordingPath = result.localRecordingPath;
+		recording.localPath = result.localRecordingPath;
 		broadcast.targets = enabled.map((target) => ({
 			name: target.name,
 			host: hostOf(target.url),
@@ -186,6 +192,8 @@ async function attachListeners() {
 			if (broadcast.phase === 'connecting' && event.payload.stats.frames > 0) {
 				broadcast.phase = 'live';
 				broadcast.startedAt = Date.now();
+				void startCloudRecording();
+				void startSelectedSession();
 			}
 			if (broadcast.phase === 'live') {
 				for (const target of broadcast.targets) {
@@ -231,6 +239,8 @@ async function attachListeners() {
 							log: event.payload.log.slice(-3).join(' | ')
 						});
 			stopRecorder();
+			void stopCloudRecording();
+			void endSelectedSession();
 		})
 	];
 }
@@ -262,7 +272,11 @@ export async function stopBroadcast() {
 	broadcast.startedAt = null;
 	broadcast.stats = null;
 	broadcast.targets = [];
+	broadcast.localRecordingPath = null;
+	recording.localPath = null;
 	await detachListeners();
+	await stopCloudRecording();
+	await endSelectedSession();
 }
 
 /** Host of an ingest URL, for showing which server a destination is on
@@ -306,7 +320,8 @@ export async function goLiveHeld(): Promise<void> {
 				fps: settings.fps,
 				video_bitrate_kbps: settings.videoBitrateKbps,
 				audio_bitrate_kbps: settings.audioBitrateKbps,
-				encoder: settings.encoder
+				encoder: settings.encoder,
+				record_local: false
 			}
 		});
 		broadcast.targets = [

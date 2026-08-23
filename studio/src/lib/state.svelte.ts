@@ -137,10 +137,10 @@ export interface Settings {
 	monitorAudio: boolean;
 	/** Panel sizes the operator has dragged to. */
 	layout: Layout;
-	/** Admin panel base URL + shared token, for driving Go Live and the live
-	 *  transcript from here instead of a second browser tab. Optional. */
-	adminUrl: string;
-	adminToken: string;
+	recordingMode: 'off' | 'local' | 'cloud' | 'both';
+	/** Existing streaming recorder service, not the admin app. */
+	recorderUrl: string;
+	recorderToken: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -156,8 +156,9 @@ export const DEFAULT_SETTINGS: Settings = {
 	studioMode: false,
 	monitorAudio: false,
 	layout: DEFAULT_LAYOUT,
-	adminUrl: '',
-	adminToken: ''
+	recordingMode: 'off',
+	recorderUrl: '',
+	recorderToken: '',
 };
 
 export const id = () => Math.random().toString(36).slice(2, 10);
@@ -320,6 +321,10 @@ function load(): Persisted {
 			settings: {
 				...DEFAULT_SETTINGS,
 				...parsed.settings,
+				// These names were reserved but never used; keep old local settings
+				// useful if an early Studio build happened to save them.
+				recorderUrl: parsed.settings?.recorderUrl ?? (parsed.settings as { adminUrl?: string } | undefined)?.adminUrl ?? '',
+				recorderToken: parsed.settings?.recorderToken ?? (parsed.settings as { adminToken?: string } | undefined)?.adminToken ?? '',
 				layout: {
 					...DEFAULT_LAYOUT,
 					...parsed.settings?.layout,
