@@ -10,6 +10,22 @@
 	} from '../lib/live-session.svelte';
 
 	let { onchoose, onnew }: { onchoose: () => void; onnew: () => void } = $props();
+	let quickTestLoading = $state(false);
+
+	async function openQuickTest() {
+		if (quickTestLoading) return;
+		quickTestLoading = true;
+		try {
+			const link = await createQuickTest();
+			if (link) {
+				await invoke('open_url', { url: link });
+				onchoose();
+			}
+		} finally {
+			quickTestLoading = false;
+		}
+	}
+
 	onMount(() => {
 		if (liveSession.pairingCode) void refreshSessions();
 	});
@@ -33,13 +49,16 @@
 			<button class="studio-chip" onclick={onnew}>New public session</button>
 			<button
 				class="studio-chip border-primary/50 text-primary"
-				onclick={async () => {
-					const link = await createQuickTest();
-					if (link) {
-						await invoke('open_url', { url: link });
-						onchoose();
-					}
-				}}>Quick private test</button
+				disabled={quickTestLoading}
+				onclick={openQuickTest}
+			>
+				{#if quickTestLoading}
+					<span class="h-3 w-3 animate-spin rounded-full border border-primary/30 border-t-primary"></span>
+					Creating test…
+				{:else}
+					Quick private test
+				{/if}
+			</button
 			>
 		</div>
 		<p class="text-[10px] leading-relaxed text-fg/35">

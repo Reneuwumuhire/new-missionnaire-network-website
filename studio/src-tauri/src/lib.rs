@@ -120,13 +120,17 @@ fn studio_post(body: String, authorization: String, base_url: String, path: &str
 
 /// Fixed paths keep saved settings from turning Studio into a general HTTP client.
 #[tauri::command]
-fn studio_live_post(body: String, authorization: String, base_url: String) -> Result<String, String> {
-	studio_post(body, authorization, base_url, "/api/studio/live")
+async fn studio_live_post(body: String, authorization: String, base_url: String) -> Result<String, String> {
+	tauri::async_runtime::spawn_blocking(move || studio_post(body, authorization, base_url, "/api/studio/live"))
+		.await
+		.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-fn studio_youtube_post(body: String, authorization: String, admin_url: String) -> Result<String, String> {
-	studio_post(body, authorization, admin_url, "/api/studio/youtube")
+async fn studio_youtube_post(body: String, authorization: String, admin_url: String) -> Result<String, String> {
+	tauri::async_runtime::spawn_blocking(move || studio_post(body, authorization, admin_url, "/api/studio/youtube"))
+		.await
+		.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
