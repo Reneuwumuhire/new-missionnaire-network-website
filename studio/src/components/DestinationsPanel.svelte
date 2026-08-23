@@ -13,7 +13,7 @@
 	const PRESETS = [
 		{
 			name: () => t('stream.presetMissionnaire'),
-			url: 'rtmp://localhost:1935/live',
+			url: 'rtmp://missionnaire-streaming-app.fly.dev:1935/live',
 			hint: () => t('stream.presetMissionnaireHint')
 		},
 		{
