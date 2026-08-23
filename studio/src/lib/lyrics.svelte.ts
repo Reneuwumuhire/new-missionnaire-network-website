@@ -15,6 +15,7 @@ export type LyricsMode = 'timed' | 'manual';
 export const lyrics = $state({
 	mode: 'timed' as LyricsMode,
 	fileName: '',
+	srtText: '',
 	/** timed mode */
 	cues: [] as SrtCue[],
 	anchorEpochMs: null as number | null,
@@ -38,6 +39,7 @@ export function loadSrt(text: string, fileName: string): number {
 	lyrics.mode = 'timed';
 	lyrics.cues = cues;
 	lyrics.fileName = fileName;
+	lyrics.srtText = text;
 	lyrics.anchorEpochMs = null;
 	lyrics.offsetMs = 0;
 	return cues.length;
@@ -50,6 +52,7 @@ export function loadLines(text: string, fileName = ''): number {
 	lyrics.taps = lines.map(() => null);
 	lyrics.index = -1;
 	lyrics.fileName = fileName;
+	lyrics.srtText = '';
 	lyrics.startedAtEpochMs = null;
 	return lines.length;
 }

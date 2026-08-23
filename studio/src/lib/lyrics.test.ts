@@ -35,6 +35,13 @@ beforeEach(() => {
 });
 
 describe('timed transcript', () => {
+	it('keeps the source SRT available for the live website upload', () => {
+		loadSrt(SRT, 'test.srt');
+		expect(lyrics.srtText).toBe(SRT);
+		loadLines('Manual lyrics');
+		expect(lyrics.srtText).toBe('');
+	});
+
 	it('shows nothing until it is anchored', () => {
 		loadSrt(SRT, 'test.srt');
 		expect(lyrics.cues).toHaveLength(2);

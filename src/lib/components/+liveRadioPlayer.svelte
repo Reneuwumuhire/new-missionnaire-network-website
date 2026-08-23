@@ -723,7 +723,7 @@
 	     attached (the component polls radio-state itself). Position comes from
 	     the global player via the livePlayback store. -->
 	{#if showLive}
-		<LiveTranscript />
+		<LiveTranscript {testToken} />
 	{/if}
 
 	<!-- Offline: only surface a message when the listener tapped Lecture

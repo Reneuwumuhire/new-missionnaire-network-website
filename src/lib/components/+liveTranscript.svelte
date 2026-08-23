@@ -40,13 +40,16 @@
 		/** Replay mode only — recording id; the transcript only follows the global
 	 *  player while this track is the one playing. */
 		trackId?: string | null;
+		/** Capability token for an unlisted Studio quick-test. */
+		testToken?: string | null;
 	}
 
 	let {
 		mode = 'live',
 		url = null,
 		offsetIntoRecordingMs = 0,
-		trackId = null
+		trackId = null,
+		testToken = null
 	}: Props = $props();
 
 	const LIVE_POLL_MS = 8_000; // bounds how fast admin nudges reach listeners
@@ -60,6 +63,7 @@
 	let liveUrl: string | null = $state(null);
 	let anchorEpochMs: number | null = $state(null);
 	let offsetMs = 0;
+	let pausedPositionMs: number | null = $state(null);
 	let clockSkewMs = 0;
 	let liveActive = $state(false); // gate open + SRT attached
 
@@ -159,12 +163,13 @@
 		url: string;
 		anchorEpochMs: number | null;
 		offsetMs: number;
+		pausedPositionMs?: number | null;
 	} | null;
 
 	async function pollLiveState() {
 		if (document.hidden) return;
 		try {
-			const res = await fetch('/api/live/radio-state');
+			const res = await fetch(`/api/live/radio-state${testToken ? `?test=${encodeURIComponent(testToken)}` : ''}`);
 			if (!res.ok) return;
 			const data = (await res.json()) as {
 				isLive: boolean;
@@ -180,6 +185,7 @@
 				liveUrl = subs.url;
 				anchorEpochMs = subs.anchorEpochMs;
 				offsetMs = subs.offsetMs ?? 0;
+				pausedPositionMs = subs.pausedPositionMs ?? null;
 			} else {
 				// Broadcast ended or subtitles cleared — freeze the transcript as-is
 				// (the watch page redirects to the replay shortly after).
@@ -208,7 +214,8 @@
 			// from the listener's own clock); PDT positions are already server
 			// wall-clock — adding skew there would punish devices with a wrong
 			// clock in the exact mode that is otherwise exact.
-			srtSec = (positionEpochMs + (pdt ? 0 : clockSkewMs) - anchorEpochMs + offsetMs) / 1000;
+			const position = positionEpochMs + (pdt ? 0 : clockSkewMs) - anchorEpochMs + offsetMs;
+			srtSec = Math.min(position, pausedPositionMs ?? position) / 1000;
 		} else {
 			const { trackId: playingId, timeSec } = $replayPlayback;
 			if (!trackId || playingId !== trackId) {

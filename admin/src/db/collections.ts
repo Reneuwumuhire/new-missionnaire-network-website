@@ -913,6 +913,7 @@ export type BroadcastAdminState = {
 	subtitle_srt_s3_key: string | null;
 	subtitle_anchor_epoch_ms: number | null;
 	subtitle_offset_ms: number;
+	subtitle_paused_position_ms: number | null;
 	updated_at: string;
 };
 
@@ -941,6 +942,7 @@ const BROADCAST_DEFAULT: BroadcastAdminState = {
 	subtitle_srt_s3_key: null,
 	subtitle_anchor_epoch_ms: null,
 	subtitle_offset_ms: 0,
+	subtitle_paused_position_ms: null,
 	updated_at: new Date(0).toISOString()
 };
 
@@ -997,6 +999,10 @@ export async function getBroadcastAdminState(opts?: {
 		subtitle_anchor_epoch_ms:
 			typeof doc.subtitle_anchor_epoch_ms === 'number' ? doc.subtitle_anchor_epoch_ms : null,
 		subtitle_offset_ms: typeof doc.subtitle_offset_ms === 'number' ? doc.subtitle_offset_ms : 0,
+		subtitle_paused_position_ms:
+			typeof doc.subtitle_paused_position_ms === 'number'
+				? doc.subtitle_paused_position_ms
+				: null,
 		updated_at: (doc.updated_at as string) ?? new Date(0).toISOString()
 	};
 	cachedBroadcast = { value, cachedAt: Date.now() };

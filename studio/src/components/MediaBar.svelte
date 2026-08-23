@@ -10,6 +10,7 @@
 	import { followMedia, lyrics } from '../lib/lyrics.svelte';
 	import { isStreaming } from '../lib/broadcast.svelte';
 	import { markProgrammeRecordingStarted, startCloudRecording } from '../lib/recording.svelte';
+	import { syncLiveLyrics } from '../lib/live-session.svelte';
 	import { programScene, selectedLayer, type Layer } from '../lib/state.svelte';
 
 	/** The recording this bar drives: whichever media source is selected, else
@@ -57,10 +58,20 @@
 		const source = element;
 		const sourceId = layer?.id;
 		if (!source || !sourceId || lyrics.mode !== 'timed' || lyrics.cues.length === 0) return;
-		const sync = () => followMedia(sourceId);
+		const sync = () => {
+			followMedia(sourceId);
+			void syncLiveLyrics();
+		};
+		const update = () => void syncLiveLyrics();
 		source.addEventListener('play', sync);
+		source.addEventListener('pause', update);
+		source.addEventListener('seeked', update);
 		if (!source.paused) sync();
-		return () => source.removeEventListener('play', sync);
+		return () => {
+			source.removeEventListener('play', sync);
+			source.removeEventListener('pause', update);
+			source.removeEventListener('seeked', update);
+		};
 	});
 
 	function seek(seconds: number) {

@@ -1,4 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
+import { lyrics } from './lyrics.svelte';
+import { handleFor } from './media.svelte';
 import { studio } from './state.svelte';
 
 export type LiveSession = { _id: string; slug: string; title: string; scheduled_at: string; status: 'scheduled' | 'live' | 'ended' | 'cancelled'; is_test?: boolean };
@@ -49,6 +51,58 @@ async function upload(file: File, action: 'presign-thumbnail' | 'presign-subtitl
 	const response = await fetch(signed.uploadUrl, { method: 'PUT', headers: { 'Content-Type': signed.contentType ?? file.type }, body: file });
 	if (!response.ok) throw new Error(`Upload failed (${response.status})`);
 	return { url: signed.publicUrl, key: signed.key };
+}
+
+let uploadedSubtitle: { text: string; url: string; key: string } | null = null;
+let subtitleUpload: Promise<{ url: string; key: string }> | null = null;
+let attachedSessionId: string | null = null;
+
+async function ensureTimedSubtitle() {
+	if (uploadedSubtitle?.text === lyrics.srtText) return uploadedSubtitle;
+	if (!subtitleUpload) {
+		const text = lyrics.srtText;
+		const file = new File(
+			[text],
+			lyrics.fileName.toLowerCase().endsWith('.srt') ? lyrics.fileName : 'studio.srt',
+			{ type: 'text/plain' }
+		);
+		subtitleUpload = upload(file, 'presign-subtitle').then((result) => {
+			uploadedSubtitle = { text, ...result };
+			return result;
+		}).finally(() => (subtitleUpload = null));
+	}
+	return subtitleUpload;
+}
+
+/** Publish the same timed lyrics Studio is drawing into the video to the
+ * audio-only website. The media clock is authoritative for play/pause/seek. */
+export async function syncLiveLyrics() {
+	if (!liveSession.activeId || lyrics.mode !== 'timed' || !lyrics.srtText || lyrics.cues.length === 0) return;
+	try {
+		const uploaded = await ensureTimedSubtitle();
+		const media = lyrics.followLayerId ? handleFor(lyrics.followLayerId)?.el : null;
+		const followsMedia = media instanceof HTMLVideoElement;
+		const positionMs = followsMedia
+			? Math.round(media.currentTime * 1000)
+			: Math.max(0, Date.now() - (lyrics.anchorEpochMs ?? Date.now()));
+		const attach = attachedSessionId !== liveSession.activeId;
+		await post({
+			action: 'sync-subtitles',
+			sessionId: liveSession.activeId,
+			positionMs,
+			offsetMs: lyrics.offsetMs,
+			atEpochMs: Date.now(),
+			paused: followsMedia ? media.paused : lyrics.anchorEpochMs === null,
+			...(attach ? {
+				subtitleUrl: uploaded.url,
+				subtitleKey: uploaded.key,
+				subtitleFilename: lyrics.fileName
+			} : {})
+		});
+		attachedSessionId = liveSession.activeId;
+	} catch (error) {
+		liveSession.error = error instanceof Error ? error.message : String(error);
+	}
 }
 
 export async function createSession(draft: NewSession) {
@@ -106,6 +160,7 @@ export async function logoutStudio() {
 	liveSession.sessions = [];
 	liveSession.testUrl = null;
 	liveSession.error = null;
+	attachedSessionId = null;
 }
 
 export async function startSelectedSession() {
@@ -114,6 +169,8 @@ export async function startSelectedSession() {
 	try {
 		await post({ action: 'start', sessionId: liveSession.selectedId });
 		liveSession.activeId = liveSession.selectedId;
+		attachedSessionId = null;
+		void syncLiveLyrics();
 	}
 	catch (error) { liveSession.error = error instanceof Error ? error.message : String(error); }
 	finally { liveSession.starting = false; }
@@ -123,5 +180,5 @@ export async function endSelectedSession() {
 	if (!liveSession.activeId) return;
 	try { await post({ action: 'end', sessionId: liveSession.activeId }); }
 	catch (error) { liveSession.error = error instanceof Error ? error.message : String(error); }
-	finally { liveSession.activeId = null; }
+	finally { liveSession.activeId = null; attachedSessionId = null; }
 }

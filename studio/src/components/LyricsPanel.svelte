@@ -14,6 +14,7 @@
 	} from '../lib/lyrics.svelte';
 	import { findCueIndex } from '../lib/srt';
 	import { t } from '../lib/i18n.svelte';
+	import { syncLiveLyrics } from '../lib/live-session.svelte';
 
 	let fileInput = $state<HTMLInputElement | null>(null);
 	let pasteOpen = $state(false);
@@ -56,10 +57,21 @@
 		if (file.name.toLowerCase().endsWith('.srt')) {
 			const count = loadSrt(text, file.name);
 			notice = count ? t('lyrics.loadedCues', { count }) : t('lyrics.unreadableSrt');
+			if (count) void syncLiveLyrics();
 		} else {
 			const count = loadLines(text, file.name);
 			notice = count ? t('lyrics.loadedLines', { count }) : t('lyrics.emptyFile');
 		}
+	}
+
+	function startTimed(cueStartMs: number) {
+		anchorAt(cueStartMs);
+		void syncLiveLyrics();
+	}
+
+	function adjust(deltaMs: number) {
+		nudge(deltaMs);
+		void syncLiveLyrics();
 	}
 
 	function applyPaste() {
@@ -161,7 +173,7 @@
 			{#if lyrics.cues.length === 0}
 				<p class="text-[11px] leading-relaxed text-fg/40">{t('lyrics.hintTimed')}</p>
 			{:else if lyrics.anchorEpochMs === null}
-				<button class="studio-btn-primary w-full" onclick={() => anchorAt(0)}>
+				<button class="studio-btn-primary w-full" onclick={() => startTimed(0)}>
 					{t('lyrics.start')}
 				</button>
 				<p class="mt-2 text-[11px] leading-relaxed text-fg/40">{t('lyrics.startHint')}</p>
@@ -177,7 +189,7 @@
 				<div class="mt-2 flex flex-wrap items-center gap-1">
 					<span class="text-[10px] text-fg/30">{t('lyrics.behind')}</span>
 					{#each [-30000, -5000, -1000, 1000, 5000, 30000] as delta (delta)}
-						<button class="studio-chip font-mono" onclick={() => nudge(delta)}>
+						<button class="studio-chip font-mono" onclick={() => adjust(delta)}>
 							{delta > 0 ? '+' : '−'}{Math.abs(delta) / 1000}s
 						</button>
 					{/each}
@@ -214,7 +226,7 @@
 					? 'bg-primary/15'
 					: ''}"
 				onclick={() =>
-					lyrics.mode === 'timed' ? anchorAt(lyrics.cues[row.index].startMs) : goTo(row.index)}
+					lyrics.mode === 'timed' ? startTimed(lyrics.cues[row.index].startMs) : goTo(row.index)}
 				title={lyrics.mode === 'timed' ? t('lyrics.cueHintTimed') : t('lyrics.cueHintManual')}
 			>
 				<span class="w-12 shrink-0 pt-0.5 font-mono text-[10px] text-fg/30">{row.time}</span>

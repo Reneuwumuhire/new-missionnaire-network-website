@@ -7,7 +7,8 @@ import {
 	getScheduledLiveById,
 	listStudioScheduledLives,
 	setBroadcastAdminState,
-	setStudioScheduledLiveStatus
+	setStudioScheduledLiveStatus,
+	updateStudioLiveSubtitles
 } from '../../../../db/collections';
 import { presignUpload, s3Url } from '$lib/server/s3';
 
@@ -37,6 +38,7 @@ export async function POST({ request, url }) {
 		subtitleUrl?: string; subtitleKey?: string; subtitleFilename?: string;
 		announce?: boolean; reminderEnabled?: boolean;
 		filename?: string; contentType?: string; size?: number;
+		positionMs?: number; offsetMs?: number; atEpochMs?: number; paused?: boolean;
 	};
 
 	if (body.action === 'list') return json({ operator, sessions: await listStudioScheduledLives() });
@@ -83,6 +85,54 @@ export async function POST({ request, url }) {
 		});
 	}
 	if (!body.sessionId) throw error(400, 'sessionId required');
+	if (body.action === 'sync-subtitles') {
+		const current = await getBroadcastAdminState();
+		if (!current.is_live || current.scheduled_live_id !== body.sessionId) {
+			throw error(409, 'This session is not live');
+		}
+		const positionMs = Number(body.positionMs);
+		const offsetMs = Number(body.offsetMs ?? 0);
+		if (!Number.isFinite(positionMs) || positionMs < 0 || positionMs > 24 * 60 * 60 * 1000) {
+			throw error(400, 'Invalid subtitle position');
+		}
+		if (!Number.isFinite(offsetMs) || Math.abs(offsetMs) > 30 * 60 * 1000) {
+			throw error(400, 'Invalid subtitle offset');
+		}
+
+		const attached = Boolean(body.subtitleKey || body.subtitleUrl);
+		if (attached) {
+			if (!body.subtitleKey?.startsWith('subtitles/') || body.subtitleUrl !== s3Url(body.subtitleKey)) {
+				throw error(400, 'Invalid subtitle upload');
+			}
+		} else if (!current.subtitle_srt_s3_key) {
+			throw error(400, 'Attach an .srt file first');
+		}
+
+		const at = Number(body.atEpochMs ?? Date.now());
+		const clickedAt = Number.isFinite(at) && Math.abs(at - Date.now()) <= 60_000 ? at : Date.now();
+		const paused = body.paused === true;
+		const anchorEpochMs = Math.round(clickedAt - positionMs);
+		const pausedPositionMs = paused ? Math.max(0, Math.round(positionMs + offsetMs)) : null;
+		await setBroadcastAdminState({
+			...(attached ? {
+				subtitle_srt_url: body.subtitleUrl!,
+				subtitle_srt_s3_key: body.subtitleKey!
+			} : {}),
+			subtitle_anchor_epoch_ms: anchorEpochMs,
+			subtitle_offset_ms: Math.round(offsetMs),
+			subtitle_paused_position_ms: pausedPositionMs
+		});
+		await updateStudioLiveSubtitles(body.sessionId, {
+			...(attached ? {
+				subtitle_srt_url: body.subtitleUrl!,
+				subtitle_srt_s3_key: body.subtitleKey!,
+				subtitle_filename: body.subtitleFilename?.slice(0, 255) || 'studio.srt'
+			} : {}),
+			subtitle_anchor_epoch_ms: anchorEpochMs,
+			subtitle_offset_ms: Math.round(offsetMs)
+		});
+		return json({ ok: true, anchorEpochMs, offsetMs, pausedPositionMs });
+	}
 	if (body.action === 'start') {
 		const session = await getScheduledLiveById(body.sessionId);
 		if (!session) throw error(404, 'Session not found');
@@ -113,7 +163,8 @@ export async function POST({ request, url }) {
 			subtitle_srt_url: session.subtitle_srt_url,
 			subtitle_srt_s3_key: session.subtitle_srt_s3_key,
 			subtitle_anchor_epoch_ms: null,
-			subtitle_offset_ms: 0
+			subtitle_offset_ms: 0,
+			subtitle_paused_position_ms: null
 		});
 		return json({ ok: true, startedAt, watchPath: `/live/${session.slug}` });
 	}
@@ -122,7 +173,13 @@ export async function POST({ request, url }) {
 		const current = await getBroadcastAdminState();
 		if (!current.is_live || current.scheduled_live_id !== body.sessionId) return json({ ok: true });
 		const endedAt = new Date().toISOString();
-		await setBroadcastAdminState({ is_live: false, ended_at: endedAt, notification_pending: false, is_test: false });
+		await setBroadcastAdminState({
+			is_live: false,
+			ended_at: endedAt,
+			notification_pending: false,
+			is_test: false,
+			subtitle_paused_position_ms: null
+		});
 		await setStudioScheduledLiveStatus(body.sessionId, 'ended', endedAt);
 		return json({ ok: true, endedAt });
 	}

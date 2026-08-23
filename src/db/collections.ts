@@ -1039,6 +1039,7 @@ export type BroadcastAdminState = {
 	subtitle_srt_s3_key: string | null;
 	subtitle_anchor_epoch_ms: number | null;
 	subtitle_offset_ms: number;
+	subtitle_paused_position_ms: number | null;
 	updated_at: string;
 };
 
@@ -1066,6 +1067,7 @@ const BROADCAST_DEFAULT: BroadcastAdminState = {
 	subtitle_srt_s3_key: null,
 	subtitle_anchor_epoch_ms: null,
 	subtitle_offset_ms: 0,
+	subtitle_paused_position_ms: null,
 	updated_at: new Date(0).toISOString()
 };
 
@@ -1102,6 +1104,10 @@ export async function getBroadcastAdminState(): Promise<BroadcastAdminState> {
 				typeof doc.subtitle_anchor_epoch_ms === 'number' ? doc.subtitle_anchor_epoch_ms : null,
 			subtitle_offset_ms:
 				typeof doc.subtitle_offset_ms === 'number' ? doc.subtitle_offset_ms : 0,
+			subtitle_paused_position_ms:
+				typeof doc.subtitle_paused_position_ms === 'number'
+					? doc.subtitle_paused_position_ms
+					: null,
 			updated_at: (doc.updated_at as string) ?? new Date(0).toISOString()
 		};
 	} catch (e) {
@@ -1232,6 +1238,21 @@ export async function setStudioScheduledLiveStatus(id: string, status: Scheduled
 	const result = await db.collection('scheduled_lives').updateOne(
 		{ _id: new ObjectId(id), status: status === 'live' ? 'scheduled' : 'live' },
 		{ $set: { status, ...extra, updated_at: new Date().toISOString() } }
+	);
+	return result.matchedCount > 0;
+}
+
+export async function updateStudioLiveSubtitles(
+	id: string,
+	updates: Partial<Pick<ScheduledLive,
+		'subtitle_srt_url' | 'subtitle_srt_s3_key' | 'subtitle_filename' |
+		'subtitle_anchor_epoch_ms' | 'subtitle_offset_ms'>>
+): Promise<boolean> {
+	if (!ObjectId.isValid(id)) return false;
+	const db = await getDb();
+	const result = await db.collection('scheduled_lives').updateOne(
+		{ _id: new ObjectId(id), status: 'live' },
+		{ $set: { ...updates, updated_at: new Date().toISOString() } }
 	);
 	return result.matchedCount > 0;
 }

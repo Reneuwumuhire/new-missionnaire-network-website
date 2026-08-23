@@ -149,6 +149,7 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		subtitle_srt_s3_key: entry.subtitle_srt_s3_key ?? null,
 		subtitle_anchor_epoch_ms: null,
 		subtitle_offset_ms: 0,
+		subtitle_paused_position_ms: null,
 		// Picked up by the main-site radio-poll endpoint, which fires the actual
 		// push notification (VAPID keys + web-push live there, not in admin).
 		notification_pending: notify,
