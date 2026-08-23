@@ -1,6 +1,7 @@
 import { getDb } from './mongo';
 import { availableTypesTag } from '../utils/data';
 import { ObjectId, MongoServerError, type Document, type Filter, type Sort } from 'mongodb';
+import { randomBytes } from 'node:crypto';
 import type { YoutubeVideo } from '$lib/models/youtube';
 import type { AudioAsset } from '$lib/models/media-assets';
 import type { MusicAudio } from '$lib/models/music-audio';
@@ -1156,8 +1157,41 @@ export async function getStudioAuthorization(code: string): Promise<{ email: str
 
 export async function listStudioScheduledLives(): Promise<ScheduledLive[]> {
 	const db = await getDb();
-	const docs = await db.collection('scheduled_lives').find({ status: { $in: ['scheduled', 'live'] } }).sort({ scheduled_at: 1 }).limit(50).toArray();
+	const cutoff = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString();
+	const docs = await db.collection('scheduled_lives').find({
+		$or: [
+			{ status: { $in: ['scheduled', 'live'] } },
+			{ status: { $in: ['ended', 'cancelled'] }, updated_at: { $gte: cutoff } }
+		]
+	}).sort({ scheduled_at: 1 }).limit(100).toArray();
 	return docs.map((doc) => serializeDocument<ScheduledLive>(doc));
+}
+
+export async function createStudioScheduledLive(
+	title: string,
+	scheduledAt: Date,
+	createdBy: string
+): Promise<ScheduledLive> {
+	const db = await getDb();
+	const now = new Date().toISOString();
+	for (let attempt = 0; attempt < 5; attempt++) {
+		const doc = {
+			slug: randomBytes(8).toString('base64url'), title, description: null,
+			thumbnail_url: null, thumbnail_s3_key: null, youtube_url: null,
+			scheduled_at: scheduledAt, status: 'scheduled', live_started_at: null, live_ended_at: null,
+			recording_id: null, announce_pending: false, announced_at: null,
+			reminder_enabled: false, reminder_sent_at: null, subtitle_srt_url: null,
+			subtitle_srt_s3_key: null, subtitle_filename: null, subtitle_anchor_epoch_ms: null,
+			subtitle_offset_ms: 0, created_by: createdBy, created_at: now, updated_at: now
+		};
+		try {
+			const result = await db.collection('scheduled_lives').insertOne(doc);
+			return serializeDocument<ScheduledLive>({ ...doc, _id: result.insertedId });
+		} catch (error) {
+			if ((error as { code?: number }).code !== 11000 || attempt === 4) throw error;
+		}
+	}
+	throw new Error('Could not create Studio session');
 }
 
 export async function setStudioScheduledLiveStatus(id: string, status: ScheduledLiveStatus, at: string): Promise<boolean> {

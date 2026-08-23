@@ -110,6 +110,14 @@ fn studio_open_login(code: String) -> Result<(), String> {
 	open_url(format!("{}/studio/connect?code={code}", admin_url.trim_end_matches('/')))
 }
 
+#[tauri::command]
+fn focus_main_window(app: AppHandle) -> Result<(), String> {
+	app.get_webview_window("main")
+		.ok_or("Fenêtre Studio introuvable")?
+		.set_focus()
+		.map_err(|e| e.to_string())
+}
+
 /// Media chunks arrive as a raw IPC body (not JSON) — a JSON number array
 /// would be ~6× the bytes and would stall the webview at broadcast bitrates.
 #[tauri::command]
@@ -355,6 +363,7 @@ pub fn run() {
 			recorder_post,
 			studio_live_post,
 			studio_open_login,
+			focus_main_window,
 			push_chunk,
 			stop_stream,
 			stream_running,

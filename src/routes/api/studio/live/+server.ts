@@ -1,6 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import {
 	getStudioAuthorization,
+	createStudioScheduledLive,
 	getBroadcastAdminState,
 	getScheduledLiveById,
 	listStudioScheduledLives,
@@ -20,9 +21,19 @@ export async function POST({ request }) {
 	const body = (await request.json().catch(() => ({}))) as {
 		action?: string;
 		sessionId?: string;
+		title?: string;
+		scheduledAt?: string;
 	};
 
 	if (body.action === 'list') return json({ operator, sessions: await listStudioScheduledLives() });
+	if (body.action === 'create') {
+		const title = body.title?.trim();
+		if (!title || title.length > 160) throw error(400, 'A session title is required');
+		const scheduledAt = body.scheduledAt ? new Date(body.scheduledAt) : new Date();
+		if (Number.isNaN(scheduledAt.getTime())) throw error(400, 'Invalid scheduled time');
+		const session = await createStudioScheduledLive(title, scheduledAt, operator.email);
+		return json({ session });
+	}
 	if (!body.sessionId) throw error(400, 'sessionId required');
 	if (body.action === 'start') {
 		const session = await getScheduledLiveById(body.sessionId);

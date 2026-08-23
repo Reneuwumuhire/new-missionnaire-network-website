@@ -1,15 +1,24 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { connectWithAdmin, liveSession, refreshSessions } from '../lib/live-session.svelte';
+	import { connectWithAdmin, createSession, liveSession, refreshSessions } from '../lib/live-session.svelte';
 
 	let { onchoose }: { onchoose: () => void } = $props();
+	let title = $state('');
+	let scheduledAt = $state('');
 	onMount(() => { if (liveSession.pairingCode) void refreshSessions(); });
 </script>
 
 <div class="space-y-3 p-4">
-	<p class="text-[12px] text-fg/60">Choose the already scheduled service. Studio will show this title while streaming and use its public link.</p>
+	<p class="text-[12px] text-fg/60">Choose a public link, or create a new service. Recent sessions remain available for one month.</p>
 	<button class="studio-chip w-full" onclick={() => void connectWithAdmin()}>Continue with admin</button>
 	{#if liveSession.pairingCode}<button class="studio-chip w-full" onclick={() => void refreshSessions()}>I approved it — refresh</button>{/if}
+	{#if liveSession.operatorName}
+		<div class="border border-ink-700 p-3">
+			<p class="mb-2 text-[10px] uppercase tracking-wider text-fg/40">New public session</p>
+			<div class="flex gap-2"><input class="studio-input min-w-0 flex-1" bind:value={title} placeholder="Sunday morning service" /><button class="studio-chip" onclick={async () => { if (await createSession(title, scheduledAt ? new Date(scheduledAt).toISOString() : undefined)) onchoose(); }}>Create</button></div>
+			<input class="studio-input mt-2 w-full" type="datetime-local" bind:value={scheduledAt} />
+		</div>
+	{/if}
 	{#if liveSession.sessions.length > 0}
 		<div class="space-y-1">
 			{#each liveSession.sessions as session (session._id)}
