@@ -6,6 +6,7 @@
 	let scheduledAt = $state('');
 	let description = $state('');
 	let privacyStatus = $state<'private' | 'unlisted' | 'public'>('public');
+	let madeForKids = $state(false);
 	let thumbnail = $state<File | null>(null);
 	let subtitle = $state<File | null>(null);
 	let announce = $state(true);
@@ -26,6 +27,7 @@
 				scheduledAt,
 				description,
 				privacyStatus,
+				madeForKids,
 				thumbnail,
 				subtitle,
 				announce,
@@ -72,7 +74,7 @@
 			placeholder="Shown on the public live page"
 		></textarea></label
 	>
-	<div class="grid gap-3 sm:grid-cols-2">
+	<div class="grid gap-3 sm:grid-cols-3">
 		<label class="block"
 			><span class="studio-label">YouTube visibility</span><select
 				class="studio-input w-full"
@@ -80,6 +82,13 @@
 				><option value="public">Public</option><option value="unlisted">Unlisted</option><option
 					value="private">Private</option
 				></select
+			></label
+		>
+		<label class="block"
+			><span class="studio-label">YouTube audience</span><select
+				class="studio-input w-full"
+				bind:value={madeForKids}
+				><option value={false}>Not made for kids</option><option value={true}>Made for kids</option></select
 			></label
 		>
 		<div class="block">
@@ -97,11 +106,11 @@
 	<div class="grid gap-3 sm:grid-cols-2">
 		<label class="block"
 			><span class="studio-label"
-				>Thumbnail <span class="normal-case text-fg/35">(optional)</span></span
+				>Thumbnail <span class="normal-case text-fg/35">(JPEG/PNG, max 2 MB)</span></span
 			><input
 				class="block w-full text-[11px] text-fg/60"
 				type="file"
-				accept="image/jpeg,image/png,image/webp,image/gif"
+				accept="image/jpeg,image/png"
 				onchange={(event) =>
 					(thumbnail = (event.currentTarget as HTMLInputElement).files?.[0] ?? null)}
 			/></label

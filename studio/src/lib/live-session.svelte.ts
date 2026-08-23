@@ -17,6 +17,7 @@ export type NewSession = {
 	scheduledAt: string;
 	description: string;
 	privacyStatus: 'private' | 'unlisted' | 'public';
+	madeForKids: boolean;
 	thumbnail: File | null;
 	subtitle: File | null;
 	announce: boolean;
@@ -246,6 +247,7 @@ export async function createSession(draft: NewSession) {
 			scheduledAt: new Date(draft.scheduledAt).toISOString(),
 			description: draft.description,
 			privacyStatus: draft.privacyStatus,
+			madeForKids: draft.madeForKids,
 			announce: draft.announce,
 			reminderEnabled: draft.reminderEnabled,
 			thumbnailUrl: thumbnail?.url,
