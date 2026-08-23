@@ -1050,6 +1050,8 @@ export type ScheduledLive = {
 	announced_at: string | null;
 	reminder_enabled: boolean;
 	reminder_sent_at: string | null;
+	/** Unlisted Studio signal test; never transition its YouTube destination. */
+	is_test?: boolean;
 	/** Pre-made SRT transcript for the broadcast audio (uploaded with the
 	 *  schedule). anchor/offset are mirrored here on every sync action so the
 	 *  replay can recompute the transcript position after the gate is reused. */
