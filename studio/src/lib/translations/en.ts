@@ -159,16 +159,19 @@ const en = {
 	'target.live': 'Connected',
 	'target.failed': 'Failed',
 	'controls.reaching': 'Reaching servers…',
-	'controls.goLive': 'Go Live on Missionnaire',
+	'controls.goLive': 'Go Live — YouTube + Missionnaire',
 	'controls.goLiveHint':
-		'Open the selected public link. The encoder signal is already available for checking in admin and YouTube Studio.',
+		'Start the scheduled YouTube broadcast and open the selected Missionnaire public link.',
 	'controls.publicLive': 'Public link is live',
+	'controls.connectYouTube': 'Connect YouTube',
+	'controls.youtubeConnecting': 'Waiting for YouTube…',
+	'controls.youtubeConnected': 'YouTube connected',
 	'controls.stopHeld': 'Stop public ({count})',
 	'controls.stopHeldHint':
 		'Stop feeding the held destinations. The main stream keeps running. YouTube ends its own broadcast in Studio.',
 	'controls.openYouTube': 'Open YouTube Studio',
 	'controls.openYouTubeHint':
-		'YouTube is receiving the preview signal. Keep YouTube Auto-start off, check the sound here, then use YouTube’s Go Live control.',
+		'YouTube is receiving the preview signal. Check its picture, sound and stream health before Go Live.',
 
 	// ── Status ──────────────────────────────────────────────────
 	'status.offline': 'Offline',

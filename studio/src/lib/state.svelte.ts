@@ -118,6 +118,12 @@ export interface Destination {
 	hold: boolean;
 }
 
+export function requiresYouTubeGoLive(destinations: Destination[], isTest = false): boolean {
+	return !isTest && destinations.some((destination) =>
+		destination.enabled && (/youtube/i.test(destination.name) || /youtube/i.test(destination.url))
+	);
+}
+
 export interface Settings {
 	mainSiteUrl: string;
 	adminSiteUrl: string;

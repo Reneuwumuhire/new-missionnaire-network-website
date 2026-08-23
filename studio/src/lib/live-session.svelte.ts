@@ -18,7 +18,11 @@ export const liveSession = $state({
 	starting: false,
 	pairingCode: null as string | null,
 	operatorName: null as string | null,
-	testUrl: null as string | null
+	testUrl: null as string | null,
+	youtubeConnected: false,
+	youtubeChannel: null as string | null,
+	youtubeConnecting: false,
+	youtubeError: null as string | null
 });
 
 async function post<T>(body: object): Promise<T> {
@@ -27,6 +31,15 @@ async function post<T>(body: object): Promise<T> {
 		body: JSON.stringify(body),
 		authorization: liveSession.pairingCode,
 		baseUrl: studio.settings.mainSiteUrl
+	})) as T;
+}
+
+async function adminPost<T>(body: object): Promise<T> {
+	if (!liveSession.pairingCode) throw new Error('Continue with admin first.');
+	return JSON.parse(await invoke<string>('studio_youtube_post', {
+		body: JSON.stringify(body),
+		authorization: liveSession.pairingCode,
+		adminUrl: studio.settings.adminSiteUrl
 	})) as T;
 }
 
@@ -43,6 +56,46 @@ export async function connectWithAdmin() {
 			return;
 		}
 	}
+}
+
+export async function refreshYouTubeStatus() {
+	try {
+		const result = await adminPost<{ connected: boolean; channelTitle: string | null }>({ action: 'status' });
+		liveSession.youtubeConnected = result.connected;
+		liveSession.youtubeChannel = result.channelTitle;
+		liveSession.youtubeError = null;
+	} catch (error) {
+		liveSession.youtubeConnected = false;
+		liveSession.youtubeChannel = null;
+		liveSession.youtubeError = error instanceof Error ? error.message : String(error);
+	}
+}
+
+export async function connectYouTube() {
+	if (!liveSession.pairingCode || liveSession.youtubeConnecting) return;
+	liveSession.youtubeConnecting = true;
+	liveSession.youtubeError = null;
+	try {
+		await invoke('studio_open_youtube_login', {
+			code: liveSession.pairingCode,
+			adminUrl: studio.settings.adminSiteUrl
+		});
+		for (let i = 0; i < 40; i++) {
+			await new Promise((resolve) => setTimeout(resolve, 1500));
+			await refreshYouTubeStatus();
+			if (liveSession.youtubeConnected) {
+				await invoke('focus_main_window');
+				return;
+			}
+		}
+	} finally {
+		liveSession.youtubeConnecting = false;
+	}
+}
+
+export async function goLiveYouTube() {
+	if (!liveSession.selectedId) throw new Error('Choose a live session first.');
+	await adminPost({ action: 'go-live', sessionId: liveSession.selectedId });
 }
 
 async function upload(file: File, action: 'presign-thumbnail' | 'presign-subtitle') {
@@ -147,6 +200,7 @@ export async function refreshSessions() {
 		const result = await post<{ operator: { name: string }; sessions: LiveSession[] }>({ action: 'list' });
 		liveSession.sessions = result.sessions;
 		liveSession.operatorName = result.operator.name;
+		void refreshYouTubeStatus();
 	} catch (error) {
 		liveSession.error = error instanceof Error ? error.message : String(error);
 	}
@@ -162,6 +216,9 @@ export async function logoutStudio() {
 	liveSession.sessions = [];
 	liveSession.testUrl = null;
 	liveSession.error = null;
+	liveSession.youtubeConnected = false;
+	liveSession.youtubeChannel = null;
+	liveSession.youtubeError = null;
 	attachedSessionId = null;
 }
 

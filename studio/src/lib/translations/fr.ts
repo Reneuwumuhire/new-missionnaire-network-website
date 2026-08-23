@@ -161,16 +161,19 @@ const fr: Record<keyof typeof en, string> = {
 	'target.live': 'Connectée',
 	'target.failed': 'Échec',
 	'controls.reaching': 'Connexion aux serveurs…',
-	'controls.goLive': 'Passer en direct sur Missionnaire',
+	'controls.goLive': 'Passer en direct — YouTube + Missionnaire',
 	'controls.goLiveHint':
-		'Ouvre le lien public sélectionné. Le signal est déjà disponible pour vérification dans l’administration et YouTube Studio.',
+		'Démarre le direct YouTube programmé et ouvre le lien public Missionnaire sélectionné.',
 	'controls.publicLive': 'Le lien public est en direct',
+	'controls.connectYouTube': 'Connecter YouTube',
+	'controls.youtubeConnecting': 'En attente de YouTube…',
+	'controls.youtubeConnected': 'YouTube connecté',
 	'controls.stopHeld': 'Arr\u00eater le public ({count})',
 	'controls.stopHeldHint':
 		'Arr\u00eate d\u2019alimenter les destinations retenues. La diffusion principale continue. YouTube termine son direct depuis Studio.',
 	'controls.openYouTube': 'Ouvrir YouTube Studio',
 	'controls.openYouTubeHint':
-		'YouTube reçoit le signal test. Désactivez le démarrage automatique, vérifiez le son ici, puis utilisez la commande Go Live de YouTube.',
+		'YouTube reçoit le signal test. Vérifiez l’image, le son et l’état du flux avant le direct.',
 
 	// ── Status ──────────────────────────────────────────────────
 	'status.offline': 'Hors ligne',

@@ -11,8 +11,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { t } from './i18n.svelte';
 import { clearRecording, recording, recordsLocal, stopCloudRecording } from './recording.svelte';
-import { endSelectedSession, startSelectedSession } from './live-session.svelte';
-import { destinationUrl, studio } from './state.svelte';
+import { endSelectedSession, goLiveYouTube, liveSession, startSelectedSession } from './live-session.svelte';
+import { destinationUrl, requiresYouTubeGoLive, studio } from './state.svelte';
 
 const MIME_PREFERENCE = [
 	'video/webm;codecs=vp8,opus',
@@ -342,7 +342,19 @@ export async function goLiveHeld(): Promise<void> {
  * checked the incoming signal in admin and YouTube Studio. */
 export async function goLivePublic(): Promise<void> {
 	if (broadcast.phase !== 'live') return;
-	await Promise.all([goLiveHeld(), startSelectedSession()]);
+	const session = liveSession.sessions.find((item) => item._id === liveSession.selectedId);
+	const youtube = requiresYouTubeGoLive(studio.destinations, session?.is_test);
+	broadcast.error = null;
+	try {
+		if (youtube) {
+			if (!liveSession.youtubeConnected) throw new Error('Connect YouTube before going live.');
+			await goLiveYouTube();
+		}
+		if (!(await startSelectedSession())) throw new Error(liveSession.error || 'Missionnaire could not go live.');
+		await goLiveHeld();
+	} catch (error) {
+		broadcast.error = error instanceof Error ? error.message : String(error);
+	}
 }
 
 /** Disconnect the held destinations, leaving the main stream running. */

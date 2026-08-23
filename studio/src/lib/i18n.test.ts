@@ -43,7 +43,7 @@ describe('translations', () => {
 
 	it('distinguishes the private preview signal from going public', () => {
 		expect(t('controls.startStreaming')).toBe('Start Preview Signal');
-		expect(t('controls.goLive')).toBe('Go Live on Missionnaire');
+		expect(t('controls.goLive')).toBe('Go Live — YouTube + Missionnaire');
 		expect(t('controls.studioMode')).toBe('Studio Mode');
 		expect(t('dock.sceneTransitions')).toBe('Scene Transitions');
 		setLocale('fr');

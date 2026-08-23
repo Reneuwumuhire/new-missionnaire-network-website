@@ -9,8 +9,8 @@
 	import Dock from './Dock.svelte';
 	import Icon from './Icon.svelte';
 	import { t } from '../lib/i18n.svelte';
-	import { destinationUrl, persist, studio } from '../lib/state.svelte';
-	import { liveSession } from '../lib/live-session.svelte';
+	import { destinationUrl, persist, requiresYouTubeGoLive, studio } from '../lib/state.svelte';
+	import { connectYouTube, liveSession } from '../lib/live-session.svelte';
 	import { recording, recordsCloud, recordsLocal, startCloudRecording, stopCloudRecording } from '../lib/recording.svelte';
 
 	let {
@@ -43,14 +43,12 @@
 	const recordingDuration = $derived(recording.startedAt ? Math.floor((now - recording.startedAt) / 1000) : 0);
 	const clock = (seconds: number) => new Date(seconds * 1000).toISOString().slice(11, 19);
 
-	// Held destinations get nothing at all until this is pressed, so a platform
-	// that publishes on first frame cannot go public on its own. Once connected
-	// the app still cannot stop YouTube's broadcast — only stop feeding it —
-	// which is why the button below opens Studio rather than claiming to.
+	// Keep public destinations held until the operator approves the preview.
 	const canGoLive = $derived(broadcast.phase === 'live' && !liveSession.activeId);
 	const youtubeReady = $derived(
 		broadcast.targets.some((target) => target.youtube && target.state === 'live')
 	);
+	const youtubeRequired = $derived(requiresYouTubeGoLive(studio.destinations, selectedSession?.is_test));
 
 	const stats = $derived(broadcast.stats);
 	const congested = $derived(
@@ -102,7 +100,7 @@
 		{#if canGoLive}
 			<button
 				class="h-10 w-full bg-red-600 text-[13px] font-semibold text-white transition-colors hover:bg-red-500 disabled:cursor-wait disabled:opacity-50"
-				disabled={liveSession.starting}
+				disabled={liveSession.starting || (youtubeRequired && !liveSession.youtubeConnected)}
 				title={t('controls.goLiveHint')}
 				onclick={() => void goLivePublic()}
 			>
@@ -112,6 +110,19 @@
 			<div class="flex h-8 items-center justify-center border border-red-500/40 bg-red-600/10 text-[11px] font-medium text-red-300">
 				{t('controls.publicLive')}
 			</div>
+		{/if}
+		{#if liveSession.operatorName && youtubeRequired}
+			<button
+				class="flex h-8 w-full items-center justify-between border border-ink-700 px-2 text-[11px] transition-colors {liveSession.youtubeConnected ? 'text-emerald-300' : 'text-fg/60 hover:border-red-500/50 hover:text-red-300'}"
+				disabled={liveSession.youtubeConnecting}
+				onclick={() => void connectYouTube()}
+			>
+				<span>{liveSession.youtubeConnecting ? t('controls.youtubeConnecting') : liveSession.youtubeConnected ? t('controls.youtubeConnected') : t('controls.connectYouTube')}</span>
+				<span class="max-w-28 truncate">{liveSession.youtubeChannel ?? ''}</span>
+			</button>
+			{#if liveSession.youtubeError && !liveSession.youtubeConnected}
+				<p class="text-[10px] leading-snug text-red-400">{liveSession.youtubeError}</p>
+			{/if}
 		{/if}
 		{#if selectedSession?.is_test && liveSession.testUrl}
 			<div class="grid grid-cols-[1fr_auto] gap-1" title={liveSession.testUrl}>

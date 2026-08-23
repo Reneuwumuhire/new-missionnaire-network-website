@@ -88,10 +88,7 @@ fn recorder_post(base_url: String, token: String, path: String) -> Result<(), St
 	Ok(())
 }
 
-/// The public site's Studio-only session endpoint. Keeping the path fixed here
-/// means a saved setting cannot turn the desktop app into a general HTTP client.
-#[tauri::command]
-fn studio_live_post(body: String, authorization: String, base_url: String) -> Result<String, String> {
+fn studio_post(body: String, authorization: String, base_url: String, path: &str) -> Result<String, String> {
 	if authorization.len() < 20 { return Err("Connectez Studio à l’administration d’abord".into()); }
 	if body.len() > 2048 {
 		return Err("Commande Studio non autorisée".into());
@@ -104,13 +101,24 @@ fn studio_live_post(body: String, authorization: String, base_url: String) -> Re
 		.arg("-H").arg(format!("Authorization: Bearer {authorization}"))
 		.args(["-H", "Content-Type: application/json", "--data"])
 		.arg(body)
-		.arg(format!("{}/api/studio/live", base_url.trim_end_matches('/')))
+		.arg(format!("{}{path}", base_url.trim_end_matches('/')))
 		.output()
 		.map_err(|e| format!("Site inaccessible: {e}"))?;
 	if !output.status.success() {
 		return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
 	}
 	String::from_utf8(output.stdout).map_err(|e| e.to_string())
+}
+
+/// Fixed paths keep saved settings from turning Studio into a general HTTP client.
+#[tauri::command]
+fn studio_live_post(body: String, authorization: String, base_url: String) -> Result<String, String> {
+	studio_post(body, authorization, base_url, "/api/studio/live")
+}
+
+#[tauri::command]
+fn studio_youtube_post(body: String, authorization: String, admin_url: String) -> Result<String, String> {
+	studio_post(body, authorization, admin_url, "/api/studio/youtube")
 }
 
 #[tauri::command]
@@ -120,6 +128,15 @@ fn studio_open_login(code: String, admin_url: String) -> Result<(), String> {
 		return Err("URL d’administration invalide".into());
 	}
 	open_url(format!("{}/studio/connect?code={code}", admin_url.trim_end_matches('/')))
+}
+
+#[tauri::command]
+fn studio_open_youtube_login(code: String, admin_url: String) -> Result<(), String> {
+	if code.len() < 20 || code.chars().any(|c| !c.is_ascii_alphanumeric() && c != '-') { return Err("Code Studio invalide".into()); }
+	if !allowed_web_url(&admin_url) {
+		return Err("URL d’administration invalide".into());
+	}
+	open_url(format!("{}/studio/youtube?code={code}", admin_url.trim_end_matches('/')))
 }
 
 #[tauri::command]
@@ -371,7 +388,9 @@ pub fn run() {
 			start_stream,
 			recorder_post,
 			studio_live_post,
+			studio_youtube_post,
 			studio_open_login,
+			studio_open_youtube_login,
 			focus_main_window,
 			push_chunk,
 			stop_stream,

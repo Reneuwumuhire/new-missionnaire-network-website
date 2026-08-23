@@ -3,6 +3,7 @@ import {
 	audioLayers,
 	makeLayer,
 	reconnectWith,
+	requiresYouTubeGoLive,
 	stageableSettings,
 	studio,
 	uniqueById
@@ -36,6 +37,16 @@ describe('which layers get a mixer strip', () => {
 		scenes();
 		window.visible = false;
 		expect(audioLayers().map((l) => l.id)).not.toContain(window.id);
+	});
+});
+
+describe('public destinations', () => {
+	const youtube = { id: 'yt', name: 'YouTube', url: 'rtmp://a.rtmp.youtube.com/live2', key: 'key', enabled: true, hold: false };
+
+	it('requires YouTube control only for an enabled public YouTube destination', () => {
+		expect(requiresYouTubeGoLive([youtube])).toBe(true);
+		expect(requiresYouTubeGoLive([{ ...youtube, enabled: false }])).toBe(false);
+		expect(requiresYouTubeGoLive([youtube], true)).toBe(false);
 	});
 });
 
