@@ -5,9 +5,13 @@ export function youtubeBroadcastId(value: string): string | null {
 	if (/^[A-Za-z0-9_-]{11}$/.test(text)) return text;
 	try {
 		const url = new URL(text);
-		if (url.hostname === 'youtu.be') return /^[A-Za-z0-9_-]{11}$/.test(url.pathname.slice(1)) ? url.pathname.slice(1) : null;
+		if (url.hostname === 'youtu.be')
+			return /^[A-Za-z0-9_-]{11}$/.test(url.pathname.slice(1)) ? url.pathname.slice(1) : null;
 		if (!/(^|\.)youtube\.com$/.test(url.hostname)) return null;
-		const id = url.searchParams.get('v') ?? url.pathname.match(/^\/(?:live|embed)\/([A-Za-z0-9_-]{11})/)?.[1] ?? null;
+		const id =
+			url.searchParams.get('v') ??
+			url.pathname.match(/^\/(?:live|embed)\/([A-Za-z0-9_-]{11})/)?.[1] ??
+			null;
 		return id && /^[A-Za-z0-9_-]{11}$/.test(id) ? id : null;
 	} catch {
 		return null;
@@ -33,7 +37,11 @@ export function decryptToken(value: string, secret: string): string {
 	return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8');
 }
 
-export function authorizationUrl(input: { clientId: string; redirectUri: string; state: string }): string {
+export function authorizationUrl(input: {
+	clientId: string;
+	redirectUri: string;
+	state: string;
+}): string {
 	const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
 	url.search = new URLSearchParams({
 		client_id: input.clientId,
@@ -45,4 +53,28 @@ export function authorizationUrl(input: { clientId: string; redirectUri: string;
 		state: input.state
 	}).toString();
 	return url.toString();
+}
+
+export function scheduledBroadcastBody(input: {
+	title: string;
+	description: string | null;
+	scheduledAt: Date;
+	privacyStatus: 'private' | 'unlisted' | 'public';
+}) {
+	return {
+		snippet: {
+			title: input.title,
+			description: input.description ?? '',
+			scheduledStartTime: input.scheduledAt.toISOString()
+		},
+		status: { privacyStatus: input.privacyStatus },
+		contentDetails: {
+			enableAutoStart: false,
+			enableAutoStop: false,
+			enableDvr: true,
+			enableEmbed: true,
+			recordFromStart: true,
+			monitorStream: { enableMonitorStream: true, broadcastStreamDelayMs: 0 }
+		}
+	};
 }
