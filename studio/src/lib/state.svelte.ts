@@ -89,6 +89,10 @@ export interface Scene {
 	layers: Layer[]; // index 0 is the TOP layer, like OBS
 }
 
+export function snapshotScene(scene: Scene): Scene {
+	return structuredClone($state.snapshot(scene)) as Scene;
+}
+
 /** Microphones are global, not per-scene: the preacher must stay audible
  *  through every scene change. Layer audio (camera / screen / video file) is
  *  scene-scoped and stops when you switch away, which is what you want. */
@@ -366,6 +370,11 @@ export const studio = $state({
 	/** The scene actually going out. Same as activeSceneId unless Studio Mode
 	 *  is on; this is the one the program canvas paints and the encoder sees. */
 	programSceneId: initial.programSceneId,
+	/** Frozen layer settings for Program while Studio Mode edits the source
+	 *  scene. Media handles stay shared so cameras and videos keep moving. */
+	programSceneSnapshot: snapshotScene(
+		initial.scenes.find((scene) => scene.id === initial.programSceneId) ?? initial.scenes[0]
+	) as Scene | null,
 	selectedLayerId: null as string | null,
 	audioSources: initial.audioSources,
 	destinations: initial.destinations,
@@ -435,6 +444,9 @@ export function onAirSceneId(): string {
 }
 
 export function programScene(): Scene {
+	if (studio.settings.studioMode && studio.programSceneSnapshot) {
+		return studio.programSceneSnapshot;
+	}
 	return studio.scenes.find((s) => s.id === onAirSceneId()) ?? activeScene();
 }
 

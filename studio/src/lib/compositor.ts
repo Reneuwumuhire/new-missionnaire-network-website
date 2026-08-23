@@ -7,7 +7,17 @@ import { drawColorBars, shouldShowBars } from './bars';
 import { drawBox, toPixels, type Rect } from './geom';
 import { handleFor } from './media.svelte';
 import { onAirLines } from './lyrics.svelte';
-import { onAirSceneId, persist, studio, type Layer, type TextStyle } from './state.svelte';
+import {
+	activeScene,
+	onAirSceneId,
+	persist,
+	programScene,
+	snapshotScene,
+	studio,
+	type Layer,
+	type Scene,
+	type TextStyle
+} from './state.svelte';
 
 // Re-exported so callers driving a take do not need two imports to do it right.
 export { onAirSceneId };
@@ -23,6 +33,7 @@ export interface TransitionPlan {
 
 export interface Transition extends TransitionPlan {
 	startedAt: number;
+	fromScene?: Scene;
 }
 
 let transition: Transition | null = null;
@@ -55,11 +66,31 @@ export function takeToProgram(
 	/** Quick-transition override: take with this instead of the configured one. */
 	type: TransitionType = studio.settings.transitionType
 ): TransitionPlan | null {
-	const plan = transitionPlan(from, sceneId, type, durationMs);
+	const source = studio.scenes.find((scene) => scene.id === sceneId);
+	if (!source) return null;
+	const frozenFrom = studio.settings.studioMode ? snapshotScene(programScene()) : undefined;
+	// Re-taking an edited scene in Studio Mode is still a real transition: its
+	// source id is unchanged, but its frozen Program snapshot is not.
+	const plan = transitionPlan(
+		from,
+		studio.settings.studioMode && from === sceneId ? `${sceneId}:preview` : sceneId,
+		type,
+		durationMs
+	);
 	studio.programSceneId = sceneId;
-	transition = plan ? { ...plan, startedAt: performance.now() } : null;
+	studio.programSceneSnapshot = studio.settings.studioMode ? snapshotScene(source) : null;
+	transition = plan ? { ...plan, startedAt: performance.now(), fromScene: frozenFrom } : null;
 	persist();
 	return plan;
+}
+
+export function setStudioMode(enabled: boolean) {
+	if (studio.settings.studioMode === enabled) return;
+	studio.programSceneId = studio.activeSceneId;
+	studio.programSceneSnapshot = enabled ? snapshotScene(activeScene()) : null;
+	studio.settings.studioMode = enabled;
+	transition = null;
+	persist();
 }
 
 /** Select a scene for editing. Outside Studio Mode that also puts it on air —
@@ -247,8 +278,8 @@ function drawLayer(ctx: CanvasRenderingContext2D, layer: Layer, nowMs: number): 
  *  a video source that produced nothing. Every path that shows a scene goes
  *  through here, so the preview, the program and both halves of a transition
  *  all fall back the same way. */
-function drawScene(ctx: CanvasRenderingContext2D, sceneId: string, nowMs: number) {
-	const scene = studio.scenes.find((s) => s.id === sceneId);
+function drawScene(ctx: CanvasRenderingContext2D, source: string | Scene, nowMs: number) {
+	const scene = typeof source === 'string' ? studio.scenes.find((s) => s.id === source) : source;
 	if (!scene) return;
 
 	let painted = false;
@@ -306,6 +337,7 @@ export function renderFrame(
 	ctx.save();
 	ctx.fillStyle = '#000000';
 	ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+	const currentScene = withTransition && studio.settings.studioMode ? programScene() : sceneId;
 
 	if (withTransition && transition) {
 		const t = (performance.now() - transition.startedAt) / transition.durationMs;
@@ -316,18 +348,18 @@ export function renderFrame(
 			if (!scene) {
 				// No scratch context: cut rather than freeze the outgoing scene
 				// for the length of the transition.
-				drawScene(ctx, sceneId, nowMs);
+				drawScene(ctx, currentScene, nowMs);
 			} else if (transition.type === 'fadeToBlack') {
 				// Out to black over the first half, in from black over the second.
 				// The canvas is already black, so only one scene is ever drawn.
 				const first = t < 0.5;
-				drawScene(scene, first ? transition.fromSceneId : sceneId, nowMs);
+				drawScene(scene, first ? (transition.fromScene ?? transition.fromSceneId) : currentScene, nowMs);
 				ctx.globalAlpha = first ? 1 - t * 2 : (t - 0.5) * 2;
 				ctx.drawImage(scene.canvas, 0, 0);
 				ctx.globalAlpha = 1;
 			} else {
-				drawScene(ctx, transition.fromSceneId, nowMs);
-				drawScene(scene, sceneId, nowMs);
+				drawScene(ctx, transition.fromScene ?? transition.fromSceneId, nowMs);
+				drawScene(scene, currentScene, nowMs);
 				ctx.globalAlpha = t;
 				ctx.drawImage(scene.canvas, 0, 0);
 				ctx.globalAlpha = 1;
@@ -336,7 +368,7 @@ export function renderFrame(
 			return;
 		}
 	}
-	drawScene(ctx, sceneId, nowMs);
+	drawScene(ctx, currentScene, nowMs);
 	ctx.restore();
 }
 

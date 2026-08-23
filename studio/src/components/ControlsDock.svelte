@@ -6,10 +6,11 @@
 		goLivePublic,
 		isStreaming
 	} from '../lib/broadcast.svelte';
+	import { setStudioMode } from '../lib/compositor';
 	import Dock from './Dock.svelte';
 	import Icon from './Icon.svelte';
 	import { t } from '../lib/i18n.svelte';
-	import { destinationUrl, persist, requiresYouTubeGoLive, studio } from '../lib/state.svelte';
+	import { destinationUrl, requiresYouTubeGoLive, studio } from '../lib/state.svelte';
 	import { connectYouTube, liveSession } from '../lib/live-session.svelte';
 	import { recording, recordsCloud, recordsLocal, startCloudRecording, stopCloudRecording } from '../lib/recording.svelte';
 
@@ -170,12 +171,7 @@
 				? 'border-primary/60 bg-primary/15 text-primary'
 				: 'border-ink-600 text-fg/60 hover:border-ink-500 hover:text-fg'}"
 			onclick={() => {
-				// Entering Studio Mode, the scene on air is whatever is showing now.
-				// Leaving it, the edit scene becomes the program scene by definition
-				// (see onAirSceneId), so there is nothing to reconcile.
-				if (!studio.settings.studioMode) studio.programSceneId = studio.activeSceneId;
-				studio.settings.studioMode = !studio.settings.studioMode;
-				persist();
+				setStudioMode(!studio.settings.studioMode);
 			}}>{t('controls.studioMode')}</button
 		>
 

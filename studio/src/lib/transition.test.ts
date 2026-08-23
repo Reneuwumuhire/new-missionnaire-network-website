@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { selectScene, takeToProgram, transitionPlan } from './compositor';
-import { studio } from './state.svelte';
+import { selectScene, setStudioMode, takeToProgram, transitionPlan } from './compositor';
+import { programScene, studio } from './state.svelte';
 
 describe('transitionPlan', () => {
 	it('fades between two different scenes', () => {
@@ -77,7 +77,7 @@ describe('putting a scene on air', () => {
 
 	it('leaves the program scene alone in Studio Mode until it is taken', () => {
 		const [first, second] = studio.scenes;
-		studio.settings.studioMode = true;
+		setStudioMode(true);
 		selectScene(second.id);
 		expect(studio.activeSceneId).toBe(second.id);
 		expect(studio.programSceneId).toBe(first.id);
@@ -85,5 +85,16 @@ describe('putting a scene on air', () => {
 		const plan = takeToProgram(second.id);
 		expect(plan).toEqual({ fromSceneId: first.id, durationMs: 350, type: 'fade' });
 		expect(studio.programSceneId).toBe(second.id);
+	});
+
+	it('stages edits to the current scene until Transition is pressed', () => {
+		const first = studio.scenes[0];
+		setStudioMode(true);
+		const onAirX = programScene().layers[0].rect.x;
+		first.layers[0].rect.x = onAirX + 0.1;
+
+		expect(programScene().layers[0].rect.x).toBe(onAirX);
+		expect(takeToProgram(first.id)).not.toBeNull();
+		expect(programScene().layers[0].rect.x).toBe(onAirX + 0.1);
 	});
 });

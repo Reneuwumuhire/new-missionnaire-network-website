@@ -350,10 +350,21 @@ export async function startSelectedSession(): Promise<boolean> {
 
 export async function endSelectedSession() {
 	if (!liveSession.activeId) return;
+	const sessionId = liveSession.activeId;
+	const session = liveSession.sessions.find((item) => item._id === sessionId);
 	try {
-		await post({ action: 'end', sessionId: liveSession.activeId });
-	} catch (error) {
-		liveSession.error = error instanceof Error ? error.message : String(error);
+		const requests: Promise<unknown>[] = [post({ action: 'end', sessionId })];
+		if (session?.youtube_url && !session.is_test) {
+			requests.push(adminPost({ action: 'end-live', sessionId }));
+		}
+		const failures = (await Promise.allSettled(requests)).filter(
+			(result): result is PromiseRejectedResult => result.status === 'rejected'
+		);
+		if (failures.length) {
+			liveSession.error = failures
+				.map(({ reason }) => (reason instanceof Error ? reason.message : String(reason)))
+				.join(' · ');
+		}
 	} finally {
 		liveSession.activeId = null;
 		liveSession.activeStartedAt = null;

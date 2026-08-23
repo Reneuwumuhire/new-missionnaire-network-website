@@ -257,6 +257,9 @@ function stopRecorder() {
 }
 
 export async function stopBroadcast() {
+	// Complete the public session and YouTube broadcast while the encoder still
+	// has a clean signal; both remote requests are started together.
+	await endSelectedSession();
 	stopRecorder();
 	// Let the queued chunks land before closing ffmpeg's stdin, so the last
 	// second of the service is not truncated.
@@ -273,7 +276,6 @@ export async function stopBroadcast() {
 	clearRecording();
 	await detachListeners();
 	await stopCloudRecording();
-	await endSelectedSession();
 }
 
 /** Host of an ingest URL, for showing which server a destination is on
