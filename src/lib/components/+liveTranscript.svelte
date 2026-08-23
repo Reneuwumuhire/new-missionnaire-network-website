@@ -60,6 +60,7 @@
 	let liveUrl: string | null = $state(null);
 	let anchorEpochMs: number | null = $state(null);
 	let offsetMs = 0;
+	let pausedPositionMs: number | null = $state(null);
 	let clockSkewMs = 0;
 	let liveActive = $state(false); // gate open + SRT attached
 
@@ -159,6 +160,7 @@
 		url: string;
 		anchorEpochMs: number | null;
 		offsetMs: number;
+		pausedPositionMs?: number | null;
 	} | null;
 
 	async function pollLiveState() {
@@ -180,6 +182,7 @@
 				liveUrl = subs.url;
 				anchorEpochMs = subs.anchorEpochMs;
 				offsetMs = subs.offsetMs ?? 0;
+				pausedPositionMs = subs.pausedPositionMs ?? null;
 			} else {
 				// Broadcast ended or subtitles cleared — freeze the transcript as-is
 				// (the watch page redirects to the replay shortly after).
@@ -208,7 +211,8 @@
 			// from the listener's own clock); PDT positions are already server
 			// wall-clock — adding skew there would punish devices with a wrong
 			// clock in the exact mode that is otherwise exact.
-			srtSec = (positionEpochMs + (pdt ? 0 : clockSkewMs) - anchorEpochMs + offsetMs) / 1000;
+			const position = positionEpochMs + (pdt ? 0 : clockSkewMs) - anchorEpochMs + offsetMs;
+			srtSec = Math.min(position, pausedPositionMs ?? position) / 1000;
 		} else {
 			const { trackId: playingId, timeSec } = $replayPlayback;
 			if (!trackId || playingId !== trackId) {
