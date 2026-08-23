@@ -77,7 +77,7 @@
 	<div class="grid gap-3 sm:grid-cols-3">
 		<label class="block"
 			><span class="studio-label">YouTube visibility</span><select
-				class="studio-input w-full"
+				class="studio-input h-[38px] w-full"
 				bind:value={privacyStatus}
 				><option value="public">Public</option><option value="unlisted">Unlisted</option><option
 					value="private">Private</option
@@ -86,7 +86,7 @@
 		>
 		<label class="block"
 			><span class="studio-label">YouTube audience</span><select
-				class="studio-input w-full"
+				class="studio-input h-[38px] w-full"
 				bind:value={madeForKids}
 				><option value={false}>Not made for kids</option><option value={true}>Made for kids</option></select
 			></label
