@@ -100,12 +100,17 @@
 		</button>
 		{#if canGoLive}
 			<button
-				class="h-10 w-full bg-red-600 text-[13px] font-semibold text-white transition-colors hover:bg-red-500 disabled:cursor-wait disabled:opacity-50"
-				disabled={liveSession.starting || (youtubeRequired && !liveSession.youtubeConnected)}
+				class="flex h-10 w-full items-center justify-center gap-2 bg-red-600 text-[13px] font-semibold text-white transition-colors hover:bg-red-500 disabled:cursor-wait disabled:opacity-50"
+				disabled={broadcast.publishing || liveSession.starting || (youtubeRequired && !liveSession.youtubeConnected)}
 				title={t('controls.goLiveHint')}
 				onclick={() => void goLivePublic()}
 			>
-				{liveSession.starting ? t('controls.starting') : t('controls.goLive')}
+				{#if broadcast.publishing || liveSession.starting}
+					<span class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/35 border-t-white"></span>
+					{t('controls.starting')}
+				{:else}
+					{t('controls.goLive')}
+				{/if}
 			</button>
 		{:else if liveSession.activeId}
 			<div class="flex h-8 items-center justify-center border border-red-500/40 bg-red-600/10 text-[11px] font-medium text-red-300">

@@ -56,6 +56,7 @@ export const broadcast = $state({
 	/** True once the held destinations have their own encoder running. */
 	heldLive: false,
 	starting: false,
+	publishing: false,
 	error: null as string | null,
 	stats: null as Stats | null,
 	targets: [] as TargetStatus[],
@@ -343,7 +344,8 @@ export async function goLiveHeld(): Promise<void> {
 /** Open the selected Missionnaire watch page only after the operator has
  * checked the incoming signal in admin and YouTube Studio. */
 export async function goLivePublic(): Promise<void> {
-	if (broadcast.phase !== 'live') return;
+	if (broadcast.phase !== 'live' || broadcast.publishing || liveSession.activeId) return;
+	broadcast.publishing = true;
 	const session = liveSession.sessions.find((item) => item._id === liveSession.selectedId);
 	const youtube = requiresYouTubeGoLive(studio.destinations, session?.is_test);
 	broadcast.error = null;
@@ -356,6 +358,8 @@ export async function goLivePublic(): Promise<void> {
 		await goLiveHeld();
 	} catch (error) {
 		broadcast.error = error instanceof Error ? error.message : String(error);
+	} finally {
+		broadcast.publishing = false;
 	}
 }
 
