@@ -1141,6 +1141,36 @@ export type ScheduledLive = {
 	updated_at: string;
 };
 
+export async function getStudioAuthorization(code: string): Promise<{ email: string; name: string } | null> {
+	try {
+		const db = await getDb();
+		const doc = await db.collection('studio_authorizations').findOne({ code, expires_at: { $gt: new Date() } });
+		return doc && typeof doc.user_email === 'string'
+			? { email: doc.user_email, name: typeof doc.user_name === 'string' ? doc.user_name : doc.user_email }
+			: null;
+	} catch (e) {
+		console.error('[StudioAuthorization] get error:', e);
+		return null;
+	}
+}
+
+export async function listStudioScheduledLives(): Promise<ScheduledLive[]> {
+	const db = await getDb();
+	const docs = await db.collection('scheduled_lives').find({ status: { $in: ['scheduled', 'live'] } }).sort({ scheduled_at: 1 }).limit(50).toArray();
+	return docs.map((doc) => serializeDocument<ScheduledLive>(doc));
+}
+
+export async function setStudioScheduledLiveStatus(id: string, status: ScheduledLiveStatus, at: string): Promise<boolean> {
+	if (!ObjectId.isValid(id)) return false;
+	const db = await getDb();
+	const extra = status === 'live' ? { live_started_at: at } : { live_ended_at: at };
+	const result = await db.collection('scheduled_lives').updateOne(
+		{ _id: new ObjectId(id), status: status === 'live' ? 'scheduled' : 'live' },
+		{ $set: { status, ...extra, updated_at: new Date().toISOString() } }
+	);
+	return result.matchedCount > 0;
+}
+
 export async function getScheduledLiveBySlug(slug: string): Promise<ScheduledLive | null> {
 	try {
 		const db = await getDb();

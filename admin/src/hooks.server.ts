@@ -12,13 +12,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	const token = event.cookies.get(SESSION_COOKIE);
 	if (!token) {
-		throw redirect(303, '/login');
+		throw redirect(303, `/login?next=${encodeURIComponent(pathname + event.url.search)}`);
 	}
 
 	const user = await validateSession(token);
 	if (!user) {
 		event.cookies.delete(SESSION_COOKIE, { path: '/' });
-		throw redirect(303, '/login');
+		throw redirect(303, `/login?next=${encodeURIComponent(pathname + event.url.search)}`);
 	}
 
 	event.locals.user = user;
