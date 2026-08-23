@@ -146,7 +146,7 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-	mainSiteUrl: 'https://missionnaire.net',
+	mainSiteUrl: 'https://www.missionnaire.net',
 	adminSiteUrl: 'https://admin.missionnaire.net',
 	width: 1280,
 	height: 720,
@@ -325,6 +325,10 @@ function load(): Persisted {
 			settings: {
 				...DEFAULT_SETTINGS,
 				...parsed.settings,
+				mainSiteUrl: (parsed.settings?.mainSiteUrl ?? DEFAULT_SETTINGS.mainSiteUrl).replace(
+					/^https:\/\/missionnaire\.net\/?$/,
+					'https://www.missionnaire.net'
+				),
 				// These names were reserved but never used; keep old local settings
 				// useful if an early Studio build happened to save them.
 				recorderUrl: parsed.settings?.recorderUrl ?? (parsed.settings as { adminUrl?: string } | undefined)?.adminUrl ?? '',

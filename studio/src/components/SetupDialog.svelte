@@ -49,7 +49,7 @@
 	<textarea
 		class="studio-input min-h-56 w-full resize-y font-mono text-[11px] leading-relaxed"
 		bind:value={contents}
-		placeholder={'MAIN_SITE_URL=https://missionnaire.net\nADMIN_SITE_URL=https://admin.missionnaire.net\nRECORDER_URL=https://…\nRECORDER_TOKEN=…\nMISSIONNAIRE_RTMP_URL=rtmp://…/live\nMISSIONNAIRE_STREAM_KEY=…\nYOUTUBE_STREAM_KEY=…'}
+		placeholder={'MAIN_SITE_URL=https://www.missionnaire.net\nADMIN_SITE_URL=https://admin.missionnaire.net\nRECORDER_URL=https://…\nRECORDER_TOKEN=…\nMISSIONNAIRE_RTMP_URL=rtmp://…/live\nMISSIONNAIRE_STREAM_KEY=…\nYOUTUBE_STREAM_KEY=…'}
 	></textarea>
 
 	<p class="text-[11px] text-amber-300/80">Stream keys and recorder tokens are stored locally on this computer, like OBS stores them.</p>

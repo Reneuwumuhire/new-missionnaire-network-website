@@ -25,6 +25,12 @@ describe('Studio .env import', () => {
 		});
 	});
 
+	it('uses the canonical production host instead of returning redirect text', () => {
+		expect(parseStudioEnv('MAIN_SITE_URL=https://missionnaire.net').mainSiteUrl).toBe(
+			'https://www.missionnaire.net'
+		);
+	});
+
 	it('updates the existing destinations without creating duplicates', () => {
 		const destinations: Destination[] = [
 			{ id: 'app', name: 'Missionnaire', url: 'rtmp://old/live', key: '', enabled: false, hold: false },

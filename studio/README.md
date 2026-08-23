@@ -146,7 +146,7 @@ Bitrate is shown against what you asked for, plus total data sent.
 On first launch, Studio can import or paste a small `.env` configuration. It recognizes only these keys (unrelated database and AWS secrets are ignored):
 
 ```dotenv
-MAIN_SITE_URL=https://missionnaire.net
+MAIN_SITE_URL=https://www.missionnaire.net
 ADMIN_SITE_URL=https://admin.missionnaire.net
 RECORDER_URL=https://<your-fly-app>.fly.dev:8443
 RECORDER_TOKEN=<recorder-token>
