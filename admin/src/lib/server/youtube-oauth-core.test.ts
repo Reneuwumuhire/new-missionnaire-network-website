@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { authorizationUrl, decryptToken, encryptToken, youtubeBroadcastId } from './youtube-oauth-core';
+import {
+	authorizationUrl,
+	decryptToken,
+	encryptToken,
+	scheduledBroadcastBody,
+	youtubeBroadcastId
+} from './youtube-oauth-core';
 
 test('accepts scheduled YouTube links and rejects channel/default links', () => {
 	assert.equal(youtubeBroadcastId('https://www.youtube.com/watch?v=HzQljJ_464Q'), 'HzQljJ_464Q');
@@ -16,8 +22,26 @@ test('encrypts refresh tokens and authenticates them when reading', () => {
 });
 
 test('OAuth request asks for offline YouTube access and preserves state', () => {
-	const url = new URL(authorizationUrl({ clientId: 'client', redirectUri: 'https://admin.test/callback', state: 'state-1' }));
+	const url = new URL(
+		authorizationUrl({
+			clientId: 'client',
+			redirectUri: 'https://admin.test/callback',
+			state: 'state-1'
+		})
+	);
 	assert.equal(url.searchParams.get('state'), 'state-1');
 	assert.equal(url.searchParams.get('access_type'), 'offline');
 	assert.match(url.searchParams.get('scope') ?? '', /youtube\.force-ssl/);
+});
+
+test('scheduled broadcasts wait for the operator to go live', () => {
+	const body = scheduledBroadcastBody({
+		title: 'Sunday service',
+		description: null,
+		scheduledAt: new Date('2026-08-30T08:00:00.000Z'),
+		privacyStatus: 'public'
+	});
+	assert.equal(body.snippet.scheduledStartTime, '2026-08-30T08:00:00.000Z');
+	assert.equal(body.contentDetails.enableAutoStart, false);
+	assert.equal(body.contentDetails.monitorStream.enableMonitorStream, true);
 });
