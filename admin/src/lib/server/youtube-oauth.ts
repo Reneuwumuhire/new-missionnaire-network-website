@@ -5,6 +5,7 @@ import {
 	decryptToken,
 	encryptToken,
 	scheduledBroadcastBody,
+	validateYouTubeThumbnail,
 	youtubeBroadcastId
 } from './youtube-oauth-core';
 
@@ -214,6 +215,8 @@ export async function scheduleYouTubeLive(
 		description: string | null;
 		scheduledAt: Date;
 		privacyStatus: 'private' | 'unlisted' | 'public';
+		madeForKids: boolean;
+		thumbnail?: { bytes: ArrayBuffer; contentType: string };
 	}
 ): Promise<{ broadcastId: string; youtubeUrl: string; ingest: YouTubeIngest }> {
 	const { token, streamId, ingest } = await reusableStream(userEmail);
@@ -237,6 +240,24 @@ export async function scheduleYouTubeLive(
 			method: 'POST',
 			headers: { Authorization: `Bearer ${token}` }
 		});
+		if (input.thumbnail) {
+			const contentType = validateYouTubeThumbnail(
+				input.thumbnail.contentType,
+				input.thumbnail.bytes.byteLength
+			);
+			const thumbnailUrl = new URL(
+				'https://www.googleapis.com/upload/youtube/v3/thumbnails/set'
+			);
+			thumbnailUrl.search = new URLSearchParams({
+				videoId: created.id,
+				uploadType: 'media'
+			}).toString();
+			await google(thumbnailUrl.toString(), {
+				method: 'POST',
+				headers: { Authorization: `Bearer ${token}`, 'Content-Type': contentType },
+				body: input.thumbnail.bytes
+			});
+		}
 	} catch (cause) {
 		await google(
 			`https://www.googleapis.com/youtube/v3/liveBroadcasts?id=${encodeURIComponent(created.id)}`,
