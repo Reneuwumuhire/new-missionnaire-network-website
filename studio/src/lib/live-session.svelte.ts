@@ -1,13 +1,29 @@
 import { invoke } from '@tauri-apps/api/core';
 import { lyrics } from './lyrics.svelte';
 import { handleFor } from './media.svelte';
-import { studio } from './state.svelte';
+import { id, persist, studio } from './state.svelte';
 
-export type LiveSession = { _id: string; slug: string; title: string; scheduled_at: string; status: 'scheduled' | 'live' | 'ended' | 'cancelled'; is_test?: boolean };
-export type NewSession = {
-	title: string; scheduledAt: string; description: string; youtubeUrl: string;
-	thumbnail: File | null; subtitle: File | null; announce: boolean; reminderEnabled: boolean;
+export type LiveSession = {
+	_id: string;
+	slug: string;
+	title: string;
+	scheduled_at: string;
+	status: 'scheduled' | 'live' | 'ended' | 'cancelled';
+	youtube_url?: string | null;
+	is_test?: boolean;
 };
+export type NewSession = {
+	title: string;
+	scheduledAt: string;
+	description: string;
+	privacyStatus: 'private' | 'unlisted' | 'public';
+	thumbnail: File | null;
+	subtitle: File | null;
+	announce: boolean;
+	reminderEnabled: boolean;
+};
+
+type YouTubeIngest = { url: string; key: string };
 
 export const liveSession = $state({
 	sessions: [] as LiveSession[],
@@ -27,25 +43,55 @@ export const liveSession = $state({
 
 async function post<T>(body: object): Promise<T> {
 	if (!liveSession.pairingCode) throw new Error('Continue with admin first.');
-	return JSON.parse(await invoke<string>('studio_live_post', {
-		body: JSON.stringify(body),
-		authorization: liveSession.pairingCode,
-		baseUrl: studio.settings.mainSiteUrl
-	})) as T;
+	return JSON.parse(
+		await invoke<string>('studio_live_post', {
+			body: JSON.stringify(body),
+			authorization: liveSession.pairingCode,
+			baseUrl: studio.settings.mainSiteUrl
+		})
+	) as T;
 }
 
 async function adminPost<T>(body: object): Promise<T> {
 	if (!liveSession.pairingCode) throw new Error('Continue with admin first.');
-	return JSON.parse(await invoke<string>('studio_youtube_post', {
-		body: JSON.stringify(body),
-		authorization: liveSession.pairingCode,
-		adminUrl: studio.settings.adminSiteUrl
-	})) as T;
+	return JSON.parse(
+		await invoke<string>('studio_youtube_post', {
+			body: JSON.stringify(body),
+			authorization: liveSession.pairingCode,
+			adminUrl: studio.settings.adminSiteUrl
+		})
+	) as T;
+}
+
+function applyYouTubeIngest(ingest: YouTubeIngest) {
+	let destination = studio.destinations.find(
+		(item) => /youtube/i.test(item.name) || /youtube/i.test(item.url)
+	);
+	if (!destination) {
+		destination = {
+			id: id(),
+			name: 'YouTube',
+			url: ingest.url,
+			key: ingest.key,
+			enabled: true,
+			hold: false
+		};
+		studio.destinations = [...studio.destinations, destination];
+	} else {
+		destination.url = ingest.url;
+		destination.key = ingest.key;
+		destination.enabled = true;
+		destination.hold = false;
+	}
+	persist();
 }
 
 export async function connectWithAdmin() {
 	if (!liveSession.pairingCode) liveSession.pairingCode = crypto.randomUUID();
-	await invoke('studio_open_login', { code: liveSession.pairingCode, adminUrl: studio.settings.adminSiteUrl });
+	await invoke('studio_open_login', {
+		code: liveSession.pairingCode,
+		adminUrl: studio.settings.adminSiteUrl
+	});
 	// The browser completes approval; this short poll detects it and brings
 	// Studio forward without asking the operator to switch applications back.
 	for (let i = 0; i < 20; i++) {
@@ -60,7 +106,9 @@ export async function connectWithAdmin() {
 
 export async function refreshYouTubeStatus() {
 	try {
-		const result = await adminPost<{ connected: boolean; channelTitle: string | null }>({ action: 'status' });
+		const result = await adminPost<{ connected: boolean; channelTitle: string | null }>({
+			action: 'status'
+		});
 		liveSession.youtubeConnected = result.connected;
 		liveSession.youtubeChannel = result.channelTitle;
 		liveSession.youtubeError = null;
@@ -99,10 +147,22 @@ export async function goLiveYouTube() {
 }
 
 async function upload(file: File, action: 'presign-thumbnail' | 'presign-subtitle') {
-	const signed = await post<{ uploadUrl: string; key: string; publicUrl: string; contentType?: string }>({
-		action, filename: file.name, contentType: file.type, size: file.size
+	const signed = await adminPost<{
+		uploadUrl: string;
+		key: string;
+		publicUrl: string;
+		contentType?: string;
+	}>({
+		action,
+		filename: file.name,
+		contentType: file.type,
+		size: file.size
 	});
-	const response = await fetch(signed.uploadUrl, { method: 'PUT', headers: { 'Content-Type': signed.contentType ?? file.type }, body: file });
+	const response = await fetch(signed.uploadUrl, {
+		method: 'PUT',
+		headers: { 'Content-Type': signed.contentType ?? file.type },
+		body: file
+	});
 	if (!response.ok) throw new Error(`Upload failed (${response.status})`);
 	return { url: signed.publicUrl, key: signed.key };
 }
@@ -120,10 +180,12 @@ async function ensureTimedSubtitle() {
 			lyrics.fileName.toLowerCase().endsWith('.srt') ? lyrics.fileName : 'studio.srt',
 			{ type: 'text/plain' }
 		);
-		subtitleUpload = upload(file, 'presign-subtitle').then((result) => {
-			uploadedSubtitle = { text, ...result };
-			return result;
-		}).finally(() => (subtitleUpload = null));
+		subtitleUpload = upload(file, 'presign-subtitle')
+			.then((result) => {
+				uploadedSubtitle = { text, ...result };
+				return result;
+			})
+			.finally(() => (subtitleUpload = null));
 	}
 	return subtitleUpload;
 }
@@ -131,7 +193,13 @@ async function ensureTimedSubtitle() {
 /** Publish the same timed lyrics Studio is drawing into the video to the
  * audio-only website. The media clock is authoritative for play/pause/seek. */
 export async function syncLiveLyrics() {
-	if (!liveSession.activeId || lyrics.mode !== 'timed' || !lyrics.srtText || lyrics.cues.length === 0) return;
+	if (
+		!liveSession.activeId ||
+		lyrics.mode !== 'timed' ||
+		!lyrics.srtText ||
+		lyrics.cues.length === 0
+	)
+		return;
 	try {
 		const uploaded = await ensureTimedSubtitle();
 		const media = lyrics.followLayerId ? handleFor(lyrics.followLayerId)?.el : null;
@@ -147,11 +215,13 @@ export async function syncLiveLyrics() {
 			offsetMs: lyrics.offsetMs,
 			atEpochMs: Date.now(),
 			paused: followsMedia ? media.paused : lyrics.anchorEpochMs === null,
-			...(attach ? {
-				subtitleUrl: uploaded.url,
-				subtitleKey: uploaded.key,
-				subtitleFilename: lyrics.fileName
-			} : {})
+			...(attach
+				? {
+						subtitleUrl: uploaded.url,
+						subtitleKey: uploaded.key,
+						subtitleFilename: lyrics.fileName
+					}
+				: {})
 		});
 		attachedSessionId = liveSession.activeId;
 	} catch (error) {
@@ -162,20 +232,51 @@ export async function syncLiveLyrics() {
 export async function createSession(draft: NewSession) {
 	liveSession.error = null;
 	try {
+		if (!liveSession.youtubeConnected)
+			throw new Error('Connect YouTube before creating a public session.');
 		const thumbnail = draft.thumbnail ? await upload(draft.thumbnail, 'presign-thumbnail') : null;
 		const subtitle = draft.subtitle ? await upload(draft.subtitle, 'presign-subtitle') : null;
-		const result = await post<{ session: LiveSession }>({
-			action: 'create', title: draft.title, scheduledAt: new Date(draft.scheduledAt).toISOString(),
-			description: draft.description, youtubeUrl: draft.youtubeUrl, announce: draft.announce,
-			reminderEnabled: draft.reminderEnabled, thumbnailUrl: thumbnail?.url, thumbnailKey: thumbnail?.key,
-			subtitleUrl: subtitle?.url, subtitleKey: subtitle?.key, subtitleFilename: draft.subtitle?.name
+		const result = await adminPost<{
+			session: LiveSession;
+			youtubeUrl: string;
+			ingest: YouTubeIngest;
+		}>({
+			action: 'schedule',
+			title: draft.title,
+			scheduledAt: new Date(draft.scheduledAt).toISOString(),
+			description: draft.description,
+			privacyStatus: draft.privacyStatus,
+			announce: draft.announce,
+			reminderEnabled: draft.reminderEnabled,
+			thumbnailUrl: thumbnail?.url,
+			thumbnailKey: thumbnail?.key,
+			subtitleUrl: subtitle?.url,
+			subtitleKey: subtitle?.key,
+			subtitleFilename: draft.subtitle?.name
 		});
-		liveSession.sessions = [...liveSession.sessions, result.session].sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at));
+		applyYouTubeIngest(result.ingest);
+		liveSession.sessions = [...liveSession.sessions, result.session].sort((a, b) =>
+			a.scheduled_at.localeCompare(b.scheduled_at)
+		);
 		liveSession.selectedId = result.session._id;
 		return result.session;
 	} catch (error) {
 		liveSession.error = error instanceof Error ? error.message : String(error);
 		return null;
+	}
+}
+
+export async function selectSession(sessionId: string) {
+	liveSession.selectedId = sessionId;
+	const session = liveSession.sessions.find((item) => item._id === sessionId);
+	if (!session?.youtube_url || session.is_test || !liveSession.youtubeConnected) return;
+	try {
+		const result = await adminPost<{ ingest: YouTubeIngest }>({ action: 'ingest', sessionId });
+		applyYouTubeIngest(result.ingest);
+		liveSession.youtubeError = null;
+	} catch (error) {
+		// Older links created directly in YouTube keep the manually configured key.
+		liveSession.youtubeError = error instanceof Error ? error.message : String(error);
 	}
 }
 
@@ -197,7 +298,9 @@ export async function createQuickTest() {
 export async function refreshSessions() {
 	liveSession.error = null;
 	try {
-		const result = await post<{ operator: { name: string }; sessions: LiveSession[] }>({ action: 'list' });
+		const result = await post<{ operator: { name: string }; sessions: LiveSession[] }>({
+			action: 'list'
+		});
 		liveSession.sessions = result.sessions;
 		liveSession.operatorName = result.operator.name;
 		void refreshYouTubeStatus();
@@ -226,20 +329,32 @@ export async function startSelectedSession(): Promise<boolean> {
 	if (!liveSession.selectedId || liveSession.starting || liveSession.activeId) return false;
 	liveSession.starting = true;
 	try {
-		const result = await post<{ startedAt: string }>({ action: 'start', sessionId: liveSession.selectedId });
+		const result = await post<{ startedAt: string }>({
+			action: 'start',
+			sessionId: liveSession.selectedId
+		});
 		liveSession.activeId = liveSession.selectedId;
 		liveSession.activeStartedAt = new Date(result.startedAt).getTime();
 		attachedSessionId = null;
 		void syncLiveLyrics();
 		return true;
+	} catch (error) {
+		liveSession.error = error instanceof Error ? error.message : String(error);
+		return false;
+	} finally {
+		liveSession.starting = false;
 	}
-	catch (error) { liveSession.error = error instanceof Error ? error.message : String(error); return false; }
-	finally { liveSession.starting = false; }
 }
 
 export async function endSelectedSession() {
 	if (!liveSession.activeId) return;
-	try { await post({ action: 'end', sessionId: liveSession.activeId }); }
-	catch (error) { liveSession.error = error instanceof Error ? error.message : String(error); }
-	finally { liveSession.activeId = null; liveSession.activeStartedAt = null; attachedSessionId = null; }
+	try {
+		await post({ action: 'end', sessionId: liveSession.activeId });
+	} catch (error) {
+		liveSession.error = error instanceof Error ? error.message : String(error);
+	} finally {
+		liveSession.activeId = null;
+		liveSession.activeStartedAt = null;
+		attachedSessionId = null;
+	}
 }
