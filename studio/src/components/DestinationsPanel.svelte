@@ -37,9 +37,8 @@
 				url: preset?.url ?? 'rtmp://',
 				key: '',
 				enabled: false,
-				// Public platforms default to held: several publish the instant
-				// their ingest sees a frame, and that should not be a surprise.
-				hold: /youtube|facebook|twitch/i.test(preset?.url ?? '')
+				// Preflight is useful only when the destination receives the signal.
+				hold: false
 			}
 		];
 	}

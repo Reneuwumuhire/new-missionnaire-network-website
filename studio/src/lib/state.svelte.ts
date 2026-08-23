@@ -281,13 +281,13 @@ function load(): Persisted {
 			},
 			{
 				id: id(),
-				// Held by default: going live publicly should be a decision, not a
-				// side effect of pressing Start Streaming.
+				// YouTube receives the preflight signal. Keep Auto-start disabled in
+				// YouTube so viewers do not see it before its own Go Live action.
 				name: 'YouTube',
 				url: 'rtmp://a.rtmp.youtube.com/live2',
 				key: '',
 				enabled: false,
-				hold: true
+				hold: false
 			}
 		],
 		settings: {
@@ -313,11 +313,13 @@ function load(): Persisted {
 				...source,
 				kind: source.kind ?? 'input'
 			})),
-			// `hold` arrived later; anything saved without it kept the old
-			// behaviour of connecting immediately.
+			// YouTube must receive the preflight signal so the operator can inspect
+			// it in Live Control Room before opening the public site gate.
 			destinations: uniqueById(parsed.destinations ?? fallback.destinations).map((destination) => ({
 				...destination,
-				hold: destination.hold ?? false
+				hold: /youtube/i.test(destination.name) || /youtube/i.test(destination.url)
+					? false
+					: destination.hold ?? false
 			})),
 			// Merge, so a setting added in a later version gets its default
 			// instead of `undefined` reaching ffmpeg. Layout is merged a level

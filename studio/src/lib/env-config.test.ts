@@ -44,7 +44,7 @@ describe('Studio .env import', () => {
 		});
 		expect(merged).toHaveLength(2);
 		expect(merged[0]).toMatchObject({ url: 'rtmps://radio.example/live', key: 'radio', enabled: true, hold: false });
-		expect(merged[1]).toMatchObject({ key: 'youtube', enabled: true, hold: true });
+		expect(merged[1]).toMatchObject({ key: 'youtube', enabled: true, hold: false });
 	});
 
 	it('rejects an imported insecure remote control URL', () => {

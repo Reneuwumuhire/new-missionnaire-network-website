@@ -264,6 +264,7 @@
 	const canTake = $derived(studio.activeSceneId !== onAirSceneId());
 	const recordingDuration = $derived(recording.startedAt ? Math.max(0, Math.floor((now - recording.startedAt) / 1000)) : 0);
 	const durationLabel = (seconds: number) => new Date(seconds * 1000).toISOString().slice(11, 19);
+	const publicDuration = $derived(liveSession.activeStartedAt ? Math.max(0, Math.floor((now - liveSession.activeStartedAt) / 1000)) : 0);
 
 	const QUICK: { type: TransitionType; label: () => string }[] = [
 		{ type: 'cut', label: () => t('transitions.cut') },
@@ -309,12 +310,17 @@
 		<h1 class="pointer-events-none select-none text-[10px] font-semibold uppercase tracking-[0.28em] text-fg/45">
 			Missionnaire <span class="text-primary">Studio</span>
 		</h1>
-		{#if broadcast.phase === 'live'}
+		{#if liveSession.activeId}
 			<!-- pointer-events-none so the whole title bar drags, not just the gaps. -->
 			<span class="pointer-events-none flex items-center gap-2 bg-red-600/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-red-400">
 				<span class="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500"></span>
 				{t('status.live')}
-				<span class="font-mono tracking-normal text-red-300/80">{uptimeLabel(now)}</span>
+				<span class="font-mono tracking-normal text-red-300/80">{durationLabel(publicDuration)}</span>
+			</span>
+		{:else if broadcast.phase === 'live'}
+			<span class="pointer-events-none flex items-center gap-2 bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-300">
+				<span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span>
+				{t('status.preview')} · {uptimeLabel(now)}
 			</span>
 		{/if}
 		{#if liveSession.operatorName}
@@ -462,14 +468,17 @@
 		class="flex h-6 shrink-0 items-center gap-4 border-t border-ink-700 bg-ink-850 px-3 font-mono text-[10px] text-fg/35"
 	>
 		<span class="flex items-center gap-1.5">
-			<span class="h-1.5 w-1.5 rounded-full {broadcast.phase === 'live' ? 'bg-red-500' : 'bg-fg/20'}"></span>
+			<span class="h-1.5 w-1.5 rounded-full {liveSession.activeId ? 'bg-red-500' : broadcast.phase === 'live' ? 'bg-amber-400' : 'bg-fg/20'}"></span>
 			<!-- Never the word LIVE while off air. It read "LIVE: 00:00:00" with the
 			     dot grey and the title bar saying Offline — the one word in this app
 			     that must not be on screen when it is not true. -->
-			{#if broadcast.phase === 'live'}
+			{#if liveSession.activeId}
 				<span class="text-red-400">{t('status.live')}</span>
-				{uptimeLabel(now)}
+				{durationLabel(publicDuration)}
 				{#if selectedLiveSession}<span class="max-w-80 truncate font-body text-fg/70">{selectedLiveSession.title}</span>{/if}
+			{:else if broadcast.phase === 'live'}
+				<span class="text-amber-300">{t('status.preview')}</span>
+				{uptimeLabel(now)}
 			{:else}
 				{t('status.offline')}
 			{/if}

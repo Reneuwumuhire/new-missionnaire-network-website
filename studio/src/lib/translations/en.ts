@@ -135,7 +135,7 @@ const en = {
 	'transitions.duration': 'Duration',
 
 	// ── Controls ────────────────────────────────────────────────
-	'controls.startStreaming': 'Start Streaming',
+	'controls.startStreaming': 'Start Preview Signal',
 	'controls.stopStreaming': 'Stop Streaming',
 	'controls.confirmStop': 'Confirm stop',
 	'controls.starting': 'Starting…',
@@ -159,15 +159,16 @@ const en = {
 	'target.live': 'Connected',
 	'target.failed': 'Failed',
 	'controls.reaching': 'Reaching servers…',
-	'controls.goLive': 'Go Live ({count})',
+	'controls.goLive': 'Go Live on Missionnaire',
 	'controls.goLiveHint':
-		'Start sending to the destinations you held back. Until now they have received nothing at all.',
+		'Open the selected public link. The encoder signal is already available for checking in admin and YouTube Studio.',
+	'controls.publicLive': 'Public link is live',
 	'controls.stopHeld': 'Stop public ({count})',
 	'controls.stopHeldHint':
 		'Stop feeding the held destinations. The main stream keeps running. YouTube ends its own broadcast in Studio.',
 	'controls.openYouTube': 'Open YouTube Studio',
 	'controls.openYouTubeHint':
-		'YouTube is receiving this stream. With a default stream key it publishes itself the moment it connects; a scheduled stream waits for Go Live in Studio. Either way this app cannot start or stop it.',
+		'YouTube is receiving the preview signal. Keep YouTube Auto-start off, check the sound here, then use YouTube’s Go Live control.',
 
 	// ── Status ──────────────────────────────────────────────────
 	'status.offline': 'Offline',
@@ -175,6 +176,7 @@ const en = {
 	'status.stable': 'Stable',
 	'status.behind': 'Encoder falling behind',
 	'status.live': 'LIVE',
+	'status.preview': 'PREVIEW',
 	'status.fps': '{actual} / {target} fps',
 	'status.bitrate': '{kbps} kbps',
 	'status.dropped': '{count} dropped',

@@ -13,6 +13,7 @@ export const liveSession = $state({
 	sessions: [] as LiveSession[],
 	selectedId: null as string | null,
 	activeId: null as string | null,
+	activeStartedAt: null as number | null,
 	error: null as string | null,
 	starting: false,
 	pairingCode: null as string | null,
@@ -157,22 +158,25 @@ export async function logoutStudio() {
 	liveSession.operatorName = null;
 	liveSession.selectedId = null;
 	liveSession.activeId = null;
+	liveSession.activeStartedAt = null;
 	liveSession.sessions = [];
 	liveSession.testUrl = null;
 	liveSession.error = null;
 	attachedSessionId = null;
 }
 
-export async function startSelectedSession() {
-	if (!liveSession.selectedId || liveSession.starting) return;
+export async function startSelectedSession(): Promise<boolean> {
+	if (!liveSession.selectedId || liveSession.starting || liveSession.activeId) return false;
 	liveSession.starting = true;
 	try {
-		await post({ action: 'start', sessionId: liveSession.selectedId });
+		const result = await post<{ startedAt: string }>({ action: 'start', sessionId: liveSession.selectedId });
 		liveSession.activeId = liveSession.selectedId;
+		liveSession.activeStartedAt = new Date(result.startedAt).getTime();
 		attachedSessionId = null;
 		void syncLiveLyrics();
+		return true;
 	}
-	catch (error) { liveSession.error = error instanceof Error ? error.message : String(error); }
+	catch (error) { liveSession.error = error instanceof Error ? error.message : String(error); return false; }
 	finally { liveSession.starting = false; }
 }
 
@@ -180,5 +184,5 @@ export async function endSelectedSession() {
 	if (!liveSession.activeId) return;
 	try { await post({ action: 'end', sessionId: liveSession.activeId }); }
 	catch (error) { liveSession.error = error instanceof Error ? error.message : String(error); }
-	finally { liveSession.activeId = null; attachedSessionId = null; }
+	finally { liveSession.activeId = null; liveSession.activeStartedAt = null; attachedSessionId = null; }
 }

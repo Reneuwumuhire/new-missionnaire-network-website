@@ -3,10 +3,8 @@
 	import {
 		broadcast,
 		formatBytes,
-		goLiveHeld,
-		heldDestinations,
-		isStreaming,
-		stopHeld
+		goLivePublic,
+		isStreaming
 	} from '../lib/broadcast.svelte';
 	import Dock from './Dock.svelte';
 	import Icon from './Icon.svelte';
@@ -49,10 +47,9 @@
 	// that publishes on first frame cannot go public on its own. Once connected
 	// the app still cannot stop YouTube's broadcast — only stop feeding it —
 	// which is why the button below opens Studio rather than claiming to.
-	const held = $derived(heldDestinations());
-	const canGoLive = $derived(broadcast.phase === 'live' && held.length > 0);
+	const canGoLive = $derived(broadcast.phase === 'live' && !liveSession.activeId);
 	const youtubeReady = $derived(
-		broadcast.heldLive && broadcast.targets.some((target) => target.youtube && target.state === 'live')
+		broadcast.targets.some((target) => target.youtube && target.state === 'live')
 	);
 
 	const stats = $derived(broadcast.stats);
@@ -102,6 +99,20 @@
 				{t('controls.startStreaming')}
 			{/if}
 		</button>
+		{#if canGoLive}
+			<button
+				class="h-10 w-full bg-red-600 text-[13px] font-semibold text-white transition-colors hover:bg-red-500 disabled:cursor-wait disabled:opacity-50"
+				disabled={liveSession.starting}
+				title={t('controls.goLiveHint')}
+				onclick={() => void goLivePublic()}
+			>
+				{liveSession.starting ? t('controls.starting') : t('controls.goLive')}
+			</button>
+		{:else if liveSession.activeId}
+			<div class="flex h-8 items-center justify-center border border-red-500/40 bg-red-600/10 text-[11px] font-medium text-red-300">
+				{t('controls.publicLive')}
+			</div>
+		{/if}
 		{#if selectedSession?.is_test && liveSession.testUrl}
 			<div class="grid grid-cols-[1fr_auto] gap-1" title={liveSession.testUrl}>
 				<button class="h-8 border border-primary/40 text-[11px] text-primary hover:bg-primary/10" onclick={() => void invoke('open_url', { url: liveSession.testUrl! })}>Open private test link</button>

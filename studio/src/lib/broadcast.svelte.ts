@@ -47,9 +47,8 @@ export interface TargetStatus {
 	youtube: boolean;
 }
 
-/** `idle` → `connecting` (ffmpeg up, nothing acknowledged yet) → `live` (the
- *  encoder is producing output, so we are reaching the servers). The clock
- *  starts at `live`, not at the click: that is the moment you are actually on. */
+/** Encoder state only. `live` means the preview signal is reaching ingest;
+ * the selected public session remains closed until Go Live is pressed. */
 export type Phase = 'idle' | 'connecting' | 'live';
 
 export const broadcast = $state({
@@ -192,7 +191,6 @@ async function attachListeners() {
 			if (broadcast.phase === 'connecting' && event.payload.stats.frames > 0) {
 				broadcast.phase = 'live';
 				broadcast.startedAt = Date.now();
-				void startSelectedSession();
 			}
 			if (broadcast.phase === 'live') {
 				for (const target of broadcast.targets) {
@@ -338,6 +336,13 @@ export async function goLiveHeld(): Promise<void> {
 	} catch (err) {
 		broadcast.error = err instanceof Error ? err.message : String(err);
 	}
+}
+
+/** Open the selected Missionnaire watch page only after the operator has
+ * checked the incoming signal in admin and YouTube Studio. */
+export async function goLivePublic(): Promise<void> {
+	if (broadcast.phase !== 'live') return;
+	await Promise.all([goLiveHeld(), startSelectedSession()]);
 }
 
 /** Disconnect the held destinations, leaving the main stream running. */

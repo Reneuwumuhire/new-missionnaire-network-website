@@ -41,8 +41,9 @@ describe('translations', () => {
 		expect(t('status.fps', { actual: 30, target: 30 })).toBe('30 / 30 fps');
 	});
 
-	it('uses OBS wording so a switching operator reads familiar terms', () => {
-		expect(t('controls.startStreaming')).toBe('Start Streaming');
+	it('distinguishes the private preview signal from going public', () => {
+		expect(t('controls.startStreaming')).toBe('Start Preview Signal');
+		expect(t('controls.goLive')).toBe('Go Live on Missionnaire');
 		expect(t('controls.studioMode')).toBe('Studio Mode');
 		expect(t('dock.sceneTransitions')).toBe('Scene Transitions');
 		setLocale('fr');

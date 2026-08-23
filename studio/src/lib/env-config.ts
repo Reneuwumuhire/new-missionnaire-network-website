@@ -70,7 +70,7 @@ export function mergeEnvDestinations(destinations: Destination[], config: Studio
 	return destinations.map((destination) => {
 		const youtube = /youtube/i.test(destination.name) || /youtube/i.test(destination.url);
 		if (youtube && (config.youtubeUrl || config.youtubeKey)) {
-			return { ...destination, url: config.youtubeUrl ?? destination.url, key: config.youtubeKey ?? destination.key, enabled: true, hold: true };
+			return { ...destination, url: config.youtubeUrl ?? destination.url, key: config.youtubeKey ?? destination.key, enabled: true, hold: false };
 		}
 		if (!youtube && (config.missionnaireUrl || config.missionnaireKey)) {
 			return { ...destination, url: config.missionnaireUrl ?? destination.url, key: config.missionnaireKey ?? destination.key, enabled: true, hold: false };
