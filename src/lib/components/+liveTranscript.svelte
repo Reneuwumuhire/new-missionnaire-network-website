@@ -150,9 +150,12 @@
 			if (!res.ok) return;
 			const parsed = parseSrt(await res.text());
 			// The URL may have changed again while we were fetching.
-			if (loadedUrl === target) cues = parsed;
+			if (liveUrl === target || url === target) {
+				cues = parsed;
+				loadedUrl = target;
+			}
 		} catch {
-			// Network error — keep whatever we had; next poll retries via URL change.
+			// Network error — keep whatever we had; the next live poll retries.
 		}
 	}
 
@@ -180,6 +183,7 @@
 			liveActive = Boolean(data.isLive && subs);
 			if (subs) {
 				liveUrl = subs.url;
+				if (subs.url !== loadedUrl) void loadSrt(subs.url);
 				anchorEpochMs = subs.anchorEpochMs;
 				offsetMs = subs.offsetMs ?? 0;
 				pausedPositionMs = subs.pausedPositionMs ?? null;
@@ -260,7 +264,6 @@
 	// the SRT mid-broadcast (new S3 key → new URL in the next poll).
 	$effect(() => {
 		if (browser && srtUrl && srtUrl !== loadedUrl) {
-			loadedUrl = srtUrl;
 			void loadSrt(srtUrl);
 		}
 	});

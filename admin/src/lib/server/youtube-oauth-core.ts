@@ -31,6 +31,14 @@ export function youtubeBroadcastId(value: string): string | null {
 	}
 }
 
+export function youtubeLiveStep(status: string): 'done' | 'wait' | 'start-testing' | 'start-live' {
+	if (status === 'live') return 'done';
+	if (status === 'testStarting' || status === 'liveStarting') return 'wait';
+	if (status === 'ready') return 'start-testing';
+	if (status === 'testing') return 'start-live';
+	throw new Error(`YouTube broadcast cannot go live (${status})`);
+}
+
 function key(secret: string): Buffer {
 	return createHash('sha256').update(`missionnaire-youtube-oauth\0${secret}`).digest();
 }
