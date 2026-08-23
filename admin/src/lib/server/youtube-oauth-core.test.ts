@@ -6,13 +6,22 @@ import {
 	encryptToken,
 	scheduledBroadcastBody,
 	validateYouTubeThumbnail,
-	youtubeBroadcastId
+	youtubeBroadcastId,
+	youtubeLiveStep
 } from './youtube-oauth-core';
 
 test('accepts scheduled YouTube links and rejects channel/default links', () => {
 	assert.equal(youtubeBroadcastId('https://www.youtube.com/watch?v=HzQljJ_464Q'), 'HzQljJ_464Q');
 	assert.equal(youtubeBroadcastId('https://youtu.be/HzQljJ_464Q'), 'HzQljJ_464Q');
 	assert.equal(youtubeBroadcastId('https://www.youtube.com/@MissionnaireNetwork/live'), null);
+});
+
+test('advances YouTube through its asynchronous live states', () => {
+	assert.equal(youtubeLiveStep('ready'), 'start-testing');
+	assert.equal(youtubeLiveStep('testStarting'), 'wait');
+	assert.equal(youtubeLiveStep('testing'), 'start-live');
+	assert.equal(youtubeLiveStep('liveStarting'), 'wait');
+	assert.equal(youtubeLiveStep('live'), 'done');
 });
 
 test('encrypts refresh tokens and authenticates them when reading', () => {

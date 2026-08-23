@@ -58,15 +58,6 @@ export async function POST({ request, url }) {
 			? Math.max(0, Math.round(positionMs + offsetMs))
 			: null;
 
-		await setBroadcastAdminState({
-			...(attached ? {
-				subtitle_srt_url: body.subtitleUrl!,
-				subtitle_srt_s3_key: body.subtitleKey!
-			} : {}),
-			subtitle_anchor_epoch_ms: anchorEpochMs,
-			subtitle_offset_ms: Math.round(offsetMs),
-			subtitle_paused_position_ms: pausedPositionMs
-		});
 		await updateStudioLiveSubtitles(body.sessionId, {
 			...(attached ? {
 				subtitle_srt_url: body.subtitleUrl!,
@@ -75,6 +66,16 @@ export async function POST({ request, url }) {
 			} : {}),
 			subtitle_anchor_epoch_ms: anchorEpochMs,
 			subtitle_offset_ms: Math.round(offsetMs)
+		});
+		// Make the proxy lookup valid before exposing the key to listeners.
+		await setBroadcastAdminState({
+			...(attached ? {
+				subtitle_srt_url: body.subtitleUrl!,
+				subtitle_srt_s3_key: body.subtitleKey!
+			} : {}),
+			subtitle_anchor_epoch_ms: anchorEpochMs,
+			subtitle_offset_ms: Math.round(offsetMs),
+			subtitle_paused_position_ms: pausedPositionMs
 		});
 		return json({ ok: true, anchorEpochMs, offsetMs, pausedPositionMs });
 	}
