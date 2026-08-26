@@ -18,10 +18,11 @@ export function startRadioProbeScheduler(): void {
 	const state = ((globalThis as any)[SCHEDULER_KEY] ??= {}) as SchedulerState;
 	if (state.timer) return;
 
-	const domain = process.env.RAILWAY_PUBLIC_DOMAIN;
+	const domain = process.env.RAILWAY_PRIVATE_DOMAIN;
+	const port = process.env.PORT;
 	const secret = process.env.CRON_SECRET;
-	if (!domain || !secret) {
-		console.warn('[CronRadioProbe] Railway scheduler disabled: domain or CRON_SECRET missing');
+	if (!domain || !port || !secret) {
+		console.warn('[CronRadioProbe] Railway scheduler disabled: private domain, port, or CRON_SECRET missing');
 		return;
 	}
 
@@ -29,7 +30,7 @@ export function startRadioProbeScheduler(): void {
 		if (state.running || !shouldRunRadioProbe(new Date())) return;
 		state.running = true;
 		try {
-			const response = await fetch(`https://${domain}/api/cron/radio-probe`, {
+			const response = await fetch(`http://${domain}:${port}/api/cron/radio-probe`, {
 				headers: { Authorization: `Bearer ${secret}` }
 			});
 			if (!response.ok) console.error(`[CronRadioProbe] Scheduler received ${response.status}`);
