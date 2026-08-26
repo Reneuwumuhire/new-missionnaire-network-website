@@ -1,10 +1,13 @@
-import adapter from '@sveltejs/adapter-vercel';
+import nodeAdapter from '@sveltejs/adapter-node';
+import vercelAdapter from '@sveltejs/adapter-vercel';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
+
+const isNodeDeployment = process.env.DEPLOY_TARGET === 'node';
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
 	kit: {
-		adapter: adapter({
+		adapter: isNodeDeployment ? nodeAdapter() : vercelAdapter({
 			runtime: 'nodejs22.x',
 			// Vercel Image Optimization config must live on the adapter — at build
 			// time, adapter-vercel writes `.vercel/output/config.json` and that
