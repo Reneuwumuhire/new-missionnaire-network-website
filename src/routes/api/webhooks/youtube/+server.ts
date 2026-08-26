@@ -1,4 +1,4 @@
-import { YOUTUBE_API_KEY } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 import type { RequestHandler } from './$types';
 import { checkVideoLiveStatus } from '$lib/server/youtube-poller';
 
@@ -46,7 +46,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		console.log(`[WebSub] Video notification for: ${videoId}`);
 
 		// Check if this video is a live stream (costs 1 quota unit)
-		const apiKey = YOUTUBE_API_KEY;
+		const apiKey = env.YOUTUBE_API_KEY;
 		if (apiKey) {
 			checkVideoLiveStatus(videoId, apiKey).catch((e) =>
 				console.error('[WebSub] Live status check error:', e)

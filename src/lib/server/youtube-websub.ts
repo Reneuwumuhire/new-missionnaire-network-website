@@ -1,4 +1,4 @@
-import { PUBLIC_MAIN_URL } from '$env/static/public';
+import { env } from '$env/dynamic/public';
 import { claimCheckSlot } from '../../db/collections';
 
 const CHANNEL_ID = 'UCS3zqpqnCvT0SFa_jI662Kg';
@@ -55,7 +55,7 @@ export async function ensureWebSubSubscription(): Promise<void> {
 }
 
 function getCallbackUrl(): string | null {
-	const baseUrl = PUBLIC_MAIN_URL;
+	const baseUrl = env.PUBLIC_MAIN_URL;
 	if (!baseUrl) return null;
 
 	// Normalize: remove trailing slash, add webhook path
