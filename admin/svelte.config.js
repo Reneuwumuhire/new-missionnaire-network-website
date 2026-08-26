@@ -1,10 +1,13 @@
+import nodeAdapter from '@sveltejs/adapter-node';
 import adapter from '@sveltejs/adapter-vercel';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
+
+const isNodeDeployment = process.env.DEPLOY_TARGET === 'node';
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
 	kit: {
-		adapter: adapter({
+		adapter: isNodeDeployment ? nodeAdapter() : adapter({
 			runtime: 'nodejs22.x',
 			// Vercel image optimization: exposes `/_vercel/image` for resized,
 			// AVIF/WebP-negotiated, edge-cached thumbnails. Mirrors the public
