@@ -2,7 +2,7 @@ import { Result } from '@badrap/result';
 import type { UseCase } from '..';
 import { InternalFailure } from '../../errors/failures';
 import { type AudioAsset, AudioAssetSchema } from '$lib/models/media-assets';
-import { PUBLIC_MAIN_URL } from '$env/static/public';
+import { env } from '$env/dynamic/public';
 
 export type GetSermonArgsType = {
 	params: Record<string, any>;
@@ -14,7 +14,7 @@ export default class GetSermonsAudioUsecase implements UseCase<GetSermonArgsType
 		fetch
 	}: GetSermonArgsType): Promise<Result<AudioAsset[], InternalFailure>> {
 		try {
-			const url = new URL(`api/audios`, PUBLIC_MAIN_URL);
+			const url = new URL(`api/audios`, env.PUBLIC_MAIN_URL);
 			Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value.toString()));
 			const results = await fetch(url.toString());
 			const jsonData = await results.json();

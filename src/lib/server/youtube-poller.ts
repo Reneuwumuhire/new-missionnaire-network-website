@@ -1,4 +1,4 @@
-import { YOUTUBE_API_KEY } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 import {
 	claimCheckSlot,
 	getYouTubeCachedStatus,
@@ -96,7 +96,7 @@ export async function checkAndIngestLiveStream(force = false) {
 	}
 
 	try {
-		const apiKey = YOUTUBE_API_KEY;
+		const apiKey = env.YOUTUBE_API_KEY;
 		if (!apiKey) {
 			console.warn('[YouTube Poller] YOUTUBE_API_KEY is not defined. Skipping check.');
 			return;
