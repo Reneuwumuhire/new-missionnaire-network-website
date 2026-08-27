@@ -25,7 +25,10 @@ export async function GET({ fetch, url, setHeaders }) {
 	const [status, adminGate] = await Promise.all([getRadioCachedStatus(), getBroadcastAdminState()]);
 	// A Studio quick-test must never turn the public radio/player on. Only its
 	// capability URL can observe this temporary stream.
-	if (adminGate.is_test && !(await canAccessStudioTest(adminGate.scheduled_live_id, url.searchParams.get('test')))) {
+	if (
+		adminGate.is_test &&
+		!(await canAccessStudioTest(adminGate.scheduled_live_id, url.searchParams.get('test')))
+	) {
 		return json({ isLive: false, checkedAt: new Date().toISOString(), listeners: 0 });
 	}
 
@@ -73,8 +76,8 @@ export async function GET({ fetch, url, setHeaders }) {
 		// Live transcript: clients compute their SRT position locally as
 		// (now − anchorEpochMs) + offsetMs − behindLiveEdge, so the polling
 		// delay never shifts the text. serverNowMs lets them correct for
-		// client clock skew. anchorEpochMs stays null until the admin clicks
-		// "Démarrer les sous-titres".
+		// client clock skew. Studio supplies the initial anchor and either Studio
+		// or admin can subsequently re-sync it.
 		subtitles:
 			adminGate.is_live && adminGate.subtitle_srt_s3_key
 				? {
