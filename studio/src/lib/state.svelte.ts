@@ -37,6 +37,9 @@ export const DEFAULT_TEXT_STYLE: TextStyle = {
 
 export interface Layer {
 	id: string;
+	/** Runtime-only handle pinned by a Program snapshot. Never persisted on the
+	 * editable scene; reconnecting the source must not replace what is on air. */
+	mediaHandleId?: string | null;
 	name: string;
 	kind: LayerKind;
 	visible: boolean;
@@ -89,8 +92,16 @@ export interface Scene {
 	layers: Layer[]; // index 0 is the TOP layer, like OBS
 }
 
-export function snapshotScene(scene: Scene): Scene {
-	return structuredClone($state.snapshot(scene)) as Scene;
+export function snapshotScene(scene: Scene, freezeDisconnectedMedia = false): Scene {
+	const snapshot = structuredClone($state.snapshot(scene)) as Scene;
+	if (freezeDisconnectedMedia) {
+		for (const layer of snapshot.layers) {
+			if (['camera', 'screen', 'image', 'video'].includes(layer.kind)) {
+				layer.mediaHandleId = null;
+			}
+		}
+	}
+	return snapshot;
 }
 
 /** Microphones are global, not per-scene: the preacher must stay audible
@@ -370,10 +381,11 @@ export const studio = $state({
 	/** The scene actually going out. Same as activeSceneId unless Studio Mode
 	 *  is on; this is the one the program canvas paints and the encoder sees. */
 	programSceneId: initial.programSceneId,
-	/** Frozen layer settings for Program while Studio Mode edits the source
-	 *  scene. Media handles stay shared so cameras and videos keep moving. */
+	/** Frozen layer settings and media generations for Program while Studio
+	 *  Mode edits or reconnects the source. */
 	programSceneSnapshot: snapshotScene(
-		initial.scenes.find((scene) => scene.id === initial.programSceneId) ?? initial.scenes[0]
+		initial.scenes.find((scene) => scene.id === initial.programSceneId) ?? initial.scenes[0],
+		true
 	) as Scene | null,
 	selectedLayerId: null as string | null,
 	audioSources: initial.audioSources,

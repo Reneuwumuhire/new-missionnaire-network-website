@@ -7,8 +7,9 @@
 //  • manual — pasted lyrics with no timings. The operator taps through. Taps
 //    are timestamped, so the service can be exported as a .srt afterwards.
 
-import { handleFor } from './media.svelte';
+import { handleFor, handleForLayer } from './media.svelte';
 import { findCueIndex, parseLyricLines, parseSrt, toSrt, type SrtCue } from './srt';
+import { programScene } from './state.svelte';
 
 export type LyricsMode = 'timed' | 'manual';
 
@@ -102,10 +103,22 @@ export function positionFromMedia(currentTimeSec: number, offsetMs: number): num
 	return Math.round(currentTimeSec * 1000) + offsetMs;
 }
 
+/** The followed element in Preview or in the frozen Program generation. */
+export function followedMediaElement(onProgram = false): HTMLVideoElement | null {
+	if (!lyrics.followLayerId) return null;
+	if (!onProgram) {
+		const element = handleFor(lyrics.followLayerId)?.el;
+		return element instanceof HTMLVideoElement ? element : null;
+	}
+	const layer = programScene().layers.find(({ id }) => id === lyrics.followLayerId);
+	const element = layer ? handleForLayer(layer)?.el : null;
+	return element instanceof HTMLVideoElement ? element : null;
+}
+
 /** SRT position, in ms, of the line that should be showing now. */
-export function timedPositionMs(nowMs = Date.now()): number | null {
+export function timedPositionMs(nowMs = Date.now(), onProgram = false): number | null {
 	if (lyrics.followLayerId) {
-		const el = handleFor(lyrics.followLayerId)?.el;
+		const el = followedMediaElement(onProgram);
 		// A source that has gone away leaves the transcript where it was rather
 		// than snapping to zero and flashing the first line on air.
 		if (el instanceof HTMLVideoElement) return positionFromMedia(el.currentTime, lyrics.offsetMs);
@@ -122,10 +135,10 @@ export interface OnAirLines {
 	index: number;
 }
 
-export function onAirLines(nowMs = Date.now()): OnAirLines {
+export function onAirLines(nowMs = Date.now(), onProgram = false): OnAirLines {
 	if (!lyrics.onAir) return { current: '', next: '', index: -1 };
 	if (lyrics.mode === 'timed') {
-		const pos = timedPositionMs(nowMs);
+		const pos = timedPositionMs(nowMs, onProgram);
 		if (pos === null) return { current: '', next: '', index: -1 };
 		const i = findCueIndex(lyrics.cues, pos);
 		// Past the end of the file: hold nothing rather than the last line

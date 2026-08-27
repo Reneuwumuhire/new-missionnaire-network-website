@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
-import { lyrics } from './lyrics.svelte';
-import { handleFor } from './media.svelte';
+import { followedMediaElement, lyrics } from './lyrics.svelte';
 import { id, persist, studio } from './state.svelte';
+import { outputAlignedPositionMs, sampleServerClock, serverEpochMs } from './stream-clock';
 
 export type LiveSession = {
 	_id: string;
@@ -214,19 +214,27 @@ export async function syncLiveLyrics() {
 		return;
 	try {
 		const uploaded = await ensureTimedSubtitle();
-		const media = lyrics.followLayerId ? handleFor(lyrics.followLayerId)?.el : null;
-		const followsMedia = media instanceof HTMLVideoElement;
-		const positionMs = followsMedia
+		const media = followedMediaElement(true);
+		const sampledAtMs = Date.now();
+		const sourcePositionMs = media
 			? Math.round(media.currentTime * 1000)
-			: Math.max(0, Date.now() - (lyrics.anchorEpochMs ?? Date.now()));
+			: Math.max(0, sampledAtMs - (lyrics.anchorEpochMs ?? sampledAtMs));
+		const paused = media ? media.paused : lyrics.anchorEpochMs === null;
+		// Once paused, publish the final source position; by the website's next
+		// poll the queued audio has drained and that is the position it must hold.
+		const positionMs = paused
+			? sourcePositionMs
+			: outputAlignedPositionMs(sourcePositionMs, sampledAtMs);
 		const attach = attachedSessionId !== liveSession.activeId;
 		await post({
 			action: 'sync-subtitles',
 			sessionId: liveSession.activeId,
 			positionMs,
 			offsetMs: lyrics.offsetMs,
-			atEpochMs: Date.now(),
-			paused: followsMedia ? media.paused : lyrics.anchorEpochMs === null,
+			// Server clock + ffmpeg's output position keep the sidecar text on the
+			// audio users actually receive, even when Studio is encoding behind.
+			atEpochMs: serverEpochMs(sampledAtMs),
+			paused,
 			...(attach
 				? {
 						subtitleUrl: uploaded.url,
@@ -311,9 +319,21 @@ export async function createQuickTest() {
 export async function refreshSessions() {
 	liveSession.error = null;
 	try {
-		const result = await post<{ operator: { name: string }; sessions: LiveSession[] }>({
+		const sentAtMs = Date.now();
+		const result = await post<{
+			operator: { name: string };
+			sessions: LiveSession[];
+			serverReceivedAtMs: number;
+			serverSentAtMs: number;
+		}>({
 			action: 'list'
 		});
+		sampleServerClock(
+			result.serverReceivedAtMs,
+			result.serverSentAtMs,
+			sentAtMs,
+			Date.now()
+		);
 		liveSession.sessions = result.sessions;
 		liveSession.operatorName = result.operator.name;
 		void refreshYouTubeStatus();

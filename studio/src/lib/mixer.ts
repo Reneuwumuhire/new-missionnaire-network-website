@@ -166,7 +166,10 @@ export class Mixer {
 
 	addElement(id: string, element: HTMLMediaElement): Strip {
 		const existing = this.strips.get(id);
-		if (existing) return existing;
+		if (existing) {
+			if (existing.element === element) return existing;
+			this.remove(id);
+		}
 		let tap = this.elementTaps.get(element);
 		if (!tap) {
 			tap = this.ctx.createMediaElementSource(element);

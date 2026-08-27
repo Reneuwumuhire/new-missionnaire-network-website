@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { selectScene, setStudioMode, takeToProgram, transitionPlan } from './compositor';
+import {
+	selectScene,
+	setStudioMode,
+	snapshotForProgram,
+	takeToProgram,
+	transitionPlan
+} from './compositor';
+import { mediaHandleKey } from './media.svelte';
 import { programScene, studio } from './state.svelte';
 
 describe('transitionPlan', () => {
@@ -96,5 +103,32 @@ describe('putting a scene on air', () => {
 		expect(programScene().layers[0].rect.x).toBe(onAirX);
 		expect(takeToProgram(first.id)).not.toBeNull();
 		expect(programScene().layers[0].rect.x).toBe(onAirX + 0.1);
+	});
+
+	it('pins the exact media generation without changing the Preview layer', () => {
+		const scene = studio.scenes[0];
+		const media = scene.layers.find((layer) =>
+			['camera', 'screen', 'image', 'video'].includes(layer.kind)
+		);
+		if (!media) throw new Error('fixture needs a media layer');
+
+		const snapshot = snapshotForProgram(scene, (id) => `${id}:on-air`);
+		expect(snapshot.layers.find(({ id }) => id === media.id)?.mediaHandleId).toBe(
+			`${media.id}:on-air`
+		);
+		expect(media.mediaHandleId).toBeUndefined();
+	});
+
+	it('keeps a disconnected Program source disconnected until it is taken again', () => {
+		const scene = studio.scenes[0];
+		const media = scene.layers.find((layer) =>
+			['camera', 'screen', 'image', 'video'].includes(layer.kind)
+		);
+		if (!media) throw new Error('fixture needs a media layer');
+
+		const snapshot = snapshotForProgram(scene, () => undefined);
+		const onAirMedia = snapshot.layers.find(({ id }) => id === media.id);
+		expect(onAirMedia?.mediaHandleId).toBeNull();
+		expect(mediaHandleKey(onAirMedia!)).toBeNull();
 	});
 });

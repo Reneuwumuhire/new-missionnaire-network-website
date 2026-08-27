@@ -13,6 +13,7 @@ import { t } from './i18n.svelte';
 import { clearRecording, recording, recordsLocal, stopCloudRecording } from './recording.svelte';
 import { endSelectedSession, goLiveYouTube, liveSession, startSelectedSession } from './live-session.svelte';
 import { destinationUrl, requiresYouTubeGoLive, studio } from './state.svelte';
+import { sampleOutputClock, startStreamClock, stopStreamClock } from './stream-clock';
 
 const MIME_PREFERENCE = [
 	'video/webm;codecs=vp8,opus',
@@ -28,7 +29,7 @@ export interface Stats {
 	dropped_frames: number;
 	speed: number;
 	total_bytes: number;
-	discarded_chunks: number;
+	backpressure_events: number;
 }
 
 export type TargetState = 'connecting' | 'live' | 'failed';
@@ -77,6 +78,7 @@ let unlisteners: UnlistenFn[] = [];
 // on a pool, so serialise here rather than hope.
 let chain: Promise<unknown> = Promise.resolve();
 let chunks = 0;
+let hasAudio = false;
 
 /** Diagnostics only: how many media chunks have been handed to ffmpeg. */
 export const chunkCount = () => chunks;
@@ -126,6 +128,7 @@ export async function startBroadcast(
 				video_bitrate_kbps: settings.videoBitrateKbps,
 				audio_bitrate_kbps: settings.audioBitrateKbps,
 				encoder: settings.encoder,
+				has_audio: Boolean(audioTrack),
 				record_local: recordsLocal()
 			}
 		});
@@ -142,6 +145,7 @@ export async function startBroadcast(
 		}));
 
 		const stream = canvas.captureStream(settings.fps);
+		hasAudio = Boolean(audioTrack);
 		if (audioTrack) stream.addTrack(audioTrack);
 
 		recorder = new MediaRecorder(stream, {
@@ -166,6 +170,7 @@ export async function startBroadcast(
 		};
 		// 250 ms slices: small enough that a viewer's latency is dominated by the
 		// CDN rather than by us, large enough that IPC overhead stays invisible.
+		startStreamClock();
 		recorder.start(250);
 
 		// Connecting, not live: `live` is set by the first stats frame, which is
@@ -187,6 +192,7 @@ async function attachListeners() {
 		await listen<{ group: StreamGroup; stats: Stats }>('stream://stats', (event) => {
 			if (event.payload.group !== 'main') return;
 			broadcast.stats = event.payload.stats;
+			sampleOutputClock(event.payload.stats.out_time_ms);
 			// Output is flowing — every target that has not reported a failure is
 			// connected, and this is the instant we count as on air.
 			if (broadcast.phase === 'connecting' && event.payload.stats.frames > 0) {
@@ -255,6 +261,8 @@ function stopRecorder() {
 		// Already gone.
 	}
 	recorder = null;
+	hasAudio = false;
+	stopStreamClock();
 }
 
 export async function stopBroadcast() {
@@ -321,6 +329,7 @@ export async function goLiveHeld(): Promise<void> {
 				video_bitrate_kbps: settings.videoBitrateKbps,
 				audio_bitrate_kbps: settings.audioBitrateKbps,
 				encoder: settings.encoder,
+				has_audio: hasAudio,
 				record_local: false
 			}
 		});

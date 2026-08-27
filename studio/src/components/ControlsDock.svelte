@@ -53,7 +53,7 @@
 
 	const stats = $derived(broadcast.stats);
 	const congested = $derived(
-		Boolean(stats && (stats.discarded_chunks > 0 || stats.speed < 0.95 || stats.dropped_frames > 0))
+		Boolean(stats && (stats.backpressure_events > 0 || stats.speed < 0.95 || stats.dropped_frames > 0))
 	);
 	let copiedTestLink = $state(false);
 
@@ -245,8 +245,8 @@
 				</div>
 				<div class="flex justify-between gap-2">
 					<dt class="truncate text-fg/40">{t('health.encodingLag')}</dt>
-					<dd class="shrink-0 {stats.discarded_chunks > 0 ? 'text-amber-400' : 'text-fg/70'}">
-						{stats.discarded_chunks}
+					<dd class="shrink-0 {stats.backpressure_events > 0 ? 'text-amber-400' : 'text-fg/70'}">
+						{stats.backpressure_events}
 					</dd>
 				</div>
 				<div class="flex justify-between gap-2">

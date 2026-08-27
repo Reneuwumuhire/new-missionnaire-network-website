@@ -27,6 +27,7 @@ function defaultTitle(template: string | null): string {
 }
 
 export async function POST({ request, url, fetch }) {
+	const serverReceivedAtMs = Date.now();
 	const operator = await authorized(request);
 	const body = (await request.json().catch(() => ({}))) as {
 		action?: string;
@@ -41,7 +42,14 @@ export async function POST({ request, url, fetch }) {
 		filename?: string; contentType?: string; size?: number;
 		positionMs?: number; offsetMs?: number; atEpochMs?: number; paused?: boolean;
 	};
-	if (body.action === 'list') return json({ operator, sessions: await listStudioScheduledLives() });
+	if (body.action === 'list') {
+		return json({
+			operator,
+			sessions: await listStudioScheduledLives(),
+			serverReceivedAtMs,
+			serverSentAtMs: Date.now()
+		});
+	}
 	if (body.action === 'logout') {
 		await revokeStudioAuthorization(operator.code);
 		return json({ ok: true });

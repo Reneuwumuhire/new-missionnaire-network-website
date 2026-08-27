@@ -149,7 +149,7 @@ const en = {
 	'health.bitrate': 'Bitrate',
 	'health.dataOut': 'Total data out',
 	'health.droppedNetwork': 'Dropped frames (network)',
-	'health.encodingLag': 'Skipped chunks (encoder / uplink)',
+	'health.encodingLag': 'Encoder backpressure events',
 	'health.renderingLag': 'Frames missed (rendering lag)',
 	'health.speed': 'Encoder speed',
 	'health.congested': 'Uplink cannot keep up — lower the video bitrate',
@@ -183,7 +183,7 @@ const en = {
 	'status.fps': '{actual} / {target} fps',
 	'status.bitrate': '{kbps} kbps',
 	'status.dropped': '{count} dropped',
-	'status.discarded': '{count} discarded',
+	'status.backpressure': '{count} waits',
 	'status.shortcuts': 'Space = next line · 1-9 = scene',
 	'status.shortcutsStudio': 'Space = next line · 1-9 = scene · Enter = transition',
 

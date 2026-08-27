@@ -151,7 +151,7 @@ const fr: Record<keyof typeof en, string> = {
 	'health.bitrate': 'Débit',
 	'health.dataOut': 'Données envoyées',
 	'health.droppedNetwork': 'Images perdues (réseau)',
-	'health.encodingLag': 'Blocs abandonnés (encodeur / envoi)',
+	'health.encodingLag': 'Attentes de l’encodeur',
 	'health.renderingLag': 'Images manquées (rendu)',
 	'health.speed': 'Vitesse d’encodage',
 	'health.congested': 'L’envoi ne suit pas — baissez le débit vidéo',
@@ -185,7 +185,7 @@ const fr: Record<keyof typeof en, string> = {
 	'status.fps': '{actual} / {target} ips',
 	'status.bitrate': '{kbps} kb/s',
 	'status.dropped': '{count} perdues',
-	'status.discarded': '{count} abandonnés',
+	'status.backpressure': '{count} attentes',
 	'status.shortcuts': 'Espace = ligne suivante · 1-9 = scène',
 	'status.shortcutsStudio': 'Espace = ligne suivante · 1-9 = scène · Entrée = transition',
 

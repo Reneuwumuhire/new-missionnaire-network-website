@@ -610,7 +610,7 @@ export async function runSelftest(target: string, canvas: () => HTMLCanvasElemen
 	const stats = broadcast.stats;
 	await say(
 		stats
-			? `SELFTEST stats frames=${stats.frames} fps=${stats.fps} bitrate=${stats.bitrate_kbps}kbps out=${stats.out_time_ms}ms dropped=${stats.dropped_frames} discarded=${stats.discarded_chunks} speed=${stats.speed}`
+			? `SELFTEST stats frames=${stats.frames} fps=${stats.fps} bitrate=${stats.bitrate_kbps}kbps out=${stats.out_time_ms}ms dropped=${stats.dropped_frames} backpressure=${stats.backpressure_events} speed=${stats.speed}`
 			: 'SELFTEST stats: aucune (ffmpeg n’a rien rapporté)'
 	);
 	await say(

@@ -53,11 +53,44 @@ export interface Handle {
 }
 
 const handles = new Map<string, Handle>();
+const pinnedHandles = new Map<string, Handle>();
+let nextPin = 0;
 /** Bumped every time a handle appears or fails, so Svelte can re-read. */
 export const mediaVersion = $state({ n: 0 });
 
 export function handleFor(layerId: string): Handle | undefined {
-	return handles.get(layerId);
+	return handles.get(layerId) ?? pinnedHandles.get(layerId);
+}
+
+export function mediaHandleKey(layer: Layer): string | null {
+	return layer.mediaHandleId === null ? null : (layer.mediaHandleId ?? layer.id);
+}
+
+export function handleForLayer(layer: Layer): Handle | undefined {
+	const key = mediaHandleKey(layer);
+	return key ? handleFor(key) : undefined;
+}
+
+/** Keep the exact current resource alive for a Program snapshot. */
+export function pinHandle(layerId: string): string | undefined {
+	const handle = handles.get(layerId);
+	if (!handle) return undefined;
+	const pin = `${layerId}:program:${++nextPin}`;
+	pinnedHandles.set(pin, handle);
+	return pin;
+}
+
+/** Release Program generations no longer used by the current frame/transition. */
+export function releaseUnusedPins(keep: Iterable<string | null | undefined>) {
+	const wanted = new Set([...keep].filter((key): key is string => Boolean(key)));
+	let changed = false;
+	for (const [key, handle] of pinnedHandles) {
+		if (wanted.has(key)) continue;
+		pinnedHandles.delete(key);
+		changed = true;
+		if (![...handles.values(), ...pinnedHandles.values()].includes(handle)) destroy(handle);
+	}
+	if (changed) mediaVersion.n++;
 }
 
 function set(layerId: string, handle: Handle) {
@@ -68,6 +101,16 @@ function set(layerId: string, handle: Handle) {
 export function release(layerId: string) {
 	const h = handles.get(layerId);
 	if (!h) return;
+	handles.delete(layerId);
+	if ([...pinnedHandles.values()].some((pinned) => pinned === h)) {
+		mediaVersion.n++;
+		return;
+	}
+	destroy(h);
+	mediaVersion.n++;
+}
+
+function destroy(h: Handle) {
 	h.stream?.getTracks().forEach((t) => t.stop());
 	if (h.el instanceof HTMLVideoElement) {
 		h.el.pause();
@@ -75,12 +118,13 @@ export function release(layerId: string) {
 		h.el.removeAttribute('src');
 	}
 	if (h.objectUrl) URL.revokeObjectURL(h.objectUrl);
-	handles.delete(layerId);
-	mediaVersion.n++;
 }
 
 export function releaseAll() {
-	for (const key of [...handles.keys()]) release(key);
+	for (const handle of new Set([...handles.values(), ...pinnedHandles.values()])) destroy(handle);
+	handles.clear();
+	pinnedHandles.clear();
+	mediaVersion.n++;
 }
 
 function videoEl(stream: MediaStream): HTMLVideoElement {

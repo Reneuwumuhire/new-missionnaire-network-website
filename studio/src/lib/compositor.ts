@@ -5,7 +5,7 @@
 
 import { drawColorBars, shouldShowBars } from './bars';
 import { drawBox, toPixels, type Rect } from './geom';
-import { handleFor } from './media.svelte';
+import { handleForLayer, pinHandle, releaseUnusedPins } from './media.svelte';
 import { onAirLines } from './lyrics.svelte';
 import {
 	activeScene,
@@ -38,9 +38,24 @@ export interface Transition extends TransitionPlan {
 
 let transition: Transition | null = null;
 let frames = 0;
+const MEDIA_KINDS: Layer['kind'][] = ['camera', 'screen', 'image', 'video'];
 
 /** Diagnostics only: frames the compositor has actually painted. */
 export const frameCount = () => frames;
+
+const pinnedIds = (scene?: Scene | null) => scene?.layers.map((layer) => layer.mediaHandleId) ?? [];
+
+/** Freeze both serialisable layer settings and the live media generation. */
+export function snapshotForProgram(
+	scene: Scene,
+	pin: (layerId: string) => string | undefined = pinHandle
+): Scene {
+	const snapshot = snapshotScene(scene, true);
+	for (const layer of snapshot.layers) {
+		if (MEDIA_KINDS.includes(layer.kind)) layer.mediaHandleId = pin(layer.id) ?? null;
+	}
+	return snapshot;
+}
 
 /** Whether a scene change should fade, and for how long. Null means cut.
  *  Pure, so the decision can be tested without a canvas. */
@@ -78,8 +93,13 @@ export function takeToProgram(
 		durationMs
 	);
 	studio.programSceneId = sceneId;
-	studio.programSceneSnapshot = studio.settings.studioMode ? snapshotScene(source) : null;
+	studio.programSceneSnapshot = studio.settings.studioMode ? snapshotForProgram(source) : null;
 	transition = plan ? { ...plan, startedAt: performance.now(), fromScene: frozenFrom } : null;
+	releaseUnusedPins(
+		plan
+			? [...pinnedIds(frozenFrom), ...pinnedIds(studio.programSceneSnapshot)]
+			: pinnedIds(studio.programSceneSnapshot)
+	);
 	persist();
 	return plan;
 }
@@ -87,9 +107,10 @@ export function takeToProgram(
 export function setStudioMode(enabled: boolean) {
 	if (studio.settings.studioMode === enabled) return;
 	studio.programSceneId = studio.activeSceneId;
-	studio.programSceneSnapshot = enabled ? snapshotScene(activeScene()) : null;
+	studio.programSceneSnapshot = enabled ? snapshotForProgram(activeScene()) : null;
 	studio.settings.studioMode = enabled;
 	transition = null;
+	releaseUnusedPins(pinnedIds(studio.programSceneSnapshot));
 	persist();
 }
 
@@ -208,10 +229,13 @@ function drawTextBlocks(
 	ctx.globalAlpha = 1;
 }
 
-const MEDIA_KINDS: Layer['kind'][] = ['camera', 'screen', 'image', 'video'];
-
 /** Did this layer actually put pixels on the canvas? */
-function drawLayer(ctx: CanvasRenderingContext2D, layer: Layer, nowMs: number): boolean {
+function drawLayer(
+	ctx: CanvasRenderingContext2D,
+	layer: Layer,
+	nowMs: number,
+	frozen: boolean
+): boolean {
 	if (!layer.visible) return false;
 	const box = toPixels(layer.rect, ctx.canvas.width, ctx.canvas.height);
 	ctx.globalAlpha = layer.opacity;
@@ -230,7 +254,7 @@ function drawLayer(ctx: CanvasRenderingContext2D, layer: Layer, nowMs: number): 
 			wrote = Boolean(layer.text?.trim());
 			drawTextBlocks(ctx, [{ text: layer.text ?? '', alpha: 1, scale: 1 }], box, style);
 		} else {
-			const { current, next } = onAirLines(nowMs);
+			const { current, next } = onAirLines(nowMs, frozen);
 			wrote = Boolean(current.trim());
 			drawTextBlocks(
 				ctx,
@@ -248,7 +272,7 @@ function drawLayer(ctx: CanvasRenderingContext2D, layer: Layer, nowMs: number): 
 		return wrote;
 	}
 
-	const handle = handleFor(layer.id);
+	const handle = handleForLayer(layer);
 	const el = handle?.el;
 	if (!el) {
 		ctx.globalAlpha = 1;
@@ -281,6 +305,7 @@ function drawLayer(ctx: CanvasRenderingContext2D, layer: Layer, nowMs: number): 
 function drawScene(ctx: CanvasRenderingContext2D, source: string | Scene, nowMs: number) {
 	const scene = typeof source === 'string' ? studio.scenes.find((s) => s.id === source) : source;
 	if (!scene) return;
+	const frozen = typeof source !== 'string';
 
 	let painted = false;
 	let mediaLayers = 0;
@@ -293,7 +318,7 @@ function drawScene(ctx: CanvasRenderingContext2D, source: string | Scene, nowMs:
 		// recording puts colour bars over the whole service.
 		const isMedia = layer.visible && MEDIA_KINDS.includes(layer.kind) && !layer.audioOnly;
 		if (isMedia) mediaLayers++;
-		const drew = drawLayer(ctx, layer, nowMs);
+		const drew = drawLayer(ctx, layer, nowMs, frozen);
 		if (drew) painted = true;
 		if (isMedia && drew) mediaDrawn++;
 	}
@@ -343,6 +368,7 @@ export function renderFrame(
 		const t = (performance.now() - transition.startedAt) / transition.durationMs;
 		if (t >= 1) {
 			transition = null;
+			releaseUnusedPins(pinnedIds(studio.programSceneSnapshot));
 		} else {
 			const scene = scratchContext(ctx.canvas.width, ctx.canvas.height);
 			if (!scene) {
@@ -353,7 +379,11 @@ export function renderFrame(
 				// Out to black over the first half, in from black over the second.
 				// The canvas is already black, so only one scene is ever drawn.
 				const first = t < 0.5;
-				drawScene(scene, first ? (transition.fromScene ?? transition.fromSceneId) : currentScene, nowMs);
+				drawScene(
+					scene,
+					first ? (transition.fromScene ?? transition.fromSceneId) : currentScene,
+					nowMs
+				);
 				ctx.globalAlpha = first ? 1 - t * 2 : (t - 0.5) * 2;
 				ctx.drawImage(scene.canvas, 0, 0);
 				ctx.globalAlpha = 1;

@@ -23,9 +23,9 @@ The canvas **is** the broadcast. Switching a scene only changes what the next
 frame paints, so the encoder and every RTMP connection stay up across a scene
 change — no reconnect, no dropped viewers.
 
-With more than one destination, ffmpeg's `tee` muxer fans one encode out to all
-of them with `onfail=ignore`: **YouTube refusing a stream key cannot take the
-church's own stream down with it.**
+ffmpeg's `tee` muxer fans one encode out to all destinations. Every RTMP output
+has its own packet queue and reconnect loop, with `onfail=ignore`: **a slow or
+reconnecting YouTube output cannot block the church's own stream.**
 
 ## Running it
 
@@ -135,7 +135,7 @@ The fields OBS's Stats dock shows, sourced from ffmpeg:
 | Field | What it means when it climbs |
 | --- | --- |
 | Dropped frames (network) | ffmpeg gave up on frames it could not send |
-| Skipped chunks (encoder / uplink) | the queue to ffmpeg overflowed — a slow uplink blocks its output, which backs up the pipe. **This is the congestion signal to watch** |
+| Encoder backpressure events | ffmpeg briefly could not accept input. Studio waits instead of discarding encoded audio/video; persistent growth means lower the bitrate. |
 | Frames missed (rendering lag) | the compositor could not paint at the target fps — lower the resolution or fps |
 | Encoder speed | below 1.00× means encoding slower than real time |
 
@@ -194,11 +194,11 @@ a real subtitle file for the recording afterwards.
 ### What this does and does not sync
 
 The lyrics are painted into the video, so YouTube viewers and anyone watching
-the video stream see them. Listeners on the **audio-only** radio player get
-their transcript from the admin panel's own live-subtitle sync
-(`/recordings` → *Sous-titres*) — the studio does not drive that yet. Wiring the
-studio's anchor straight into the admin gate is the obvious next step; it needs
-a token endpoint on the admin app.
+the video stream see them on the same frame. For the **audio-only** website,
+Studio publishes the SRT position on ffmpeg's emitted media clock, corrected to
+the website server clock. The player then follows the audio frame it is actually
+playing through HLS `PROGRAM-DATE-TIME`, so network delay, buffering, pause and
+DVR rewind move audio and text together instead of racing two arrival times.
 
 ## No-signal test pattern
 

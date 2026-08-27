@@ -21,7 +21,7 @@
 	import { broadcast, isStreaming, startBroadcast, stopBroadcast, uptimeLabel } from './lib/broadcast.svelte';
 	import { frameCount, selectScene, takeToProgram, type TransitionType } from './lib/compositor';
 	import { lyrics, step } from './lib/lyrics.svelte';
-	import { askForMicrophone, handleFor, mediaVersion, openCamera, releaseAll } from './lib/media.svelte';
+	import { askForMicrophone, handleFor, handleForLayer, mediaVersion, openCamera, releaseAll } from './lib/media.svelte';
 	import { Mixer, stripsToDrop } from './lib/mixer';
 	import { t } from './lib/i18n.svelte';
 	import { clamp, splitWeights, type DockId } from './lib/layout';
@@ -158,7 +158,7 @@
 			}
 		}
 		for (const layer of audioLayers()) {
-			const handle = handleFor(layer.id);
+			const handle = handleForLayer(layer);
 			// A shared window's sound is the native app capture, which is already
 			// a strip and has no media handle. Claim it first, or the sweep below
 			// would tear it down a frame after it started.
@@ -256,7 +256,7 @@
 			return { tone: 'warn', label: t('target.failed') };
 		}
 		if (!stats) return { tone: 'idle', label: t('status.connecting') };
-		if (stats.discarded_chunks > 0 || stats.speed < 0.9) {
+		if (stats.backpressure_events > 0 || stats.speed < 0.9) {
 			return { tone: 'warn', label: t('status.behind') };
 		}
 		return { tone: 'ok', label: t('status.stable') };
@@ -495,8 +495,8 @@
 			<span class={broadcast.stats.dropped_frames > 0 ? 'text-amber-400' : ''}>
 				{t('status.dropped', { count: broadcast.stats.dropped_frames })}
 			</span>
-			<span class={broadcast.stats.discarded_chunks > 0 ? 'text-amber-400' : ''}>
-				{t('status.discarded', { count: broadcast.stats.discarded_chunks })}
+			<span class={broadcast.stats.backpressure_events > 0 ? 'text-amber-400' : ''}>
+				{t('status.backpressure', { count: broadcast.stats.backpressure_events })}
 			</span>
 		{/if}
 		<span class="ml-auto font-body">

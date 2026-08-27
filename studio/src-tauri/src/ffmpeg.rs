@@ -20,9 +20,9 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 
 /// Chunks buffered between the webview and ffmpeg's stdin. MediaRecorder emits
-/// one per timeslice (~250 ms), so this is ~30 s of slack — far more than a
-/// healthy encoder needs, and when it does fill up the network is the problem,
-/// not the buffer.
+/// one per timeslice (~250 ms), so this is ~30 s of slack. A full queue applies
+/// backpressure; encoded WebM chunks must never be discarded because one chunk
+/// can contain reference video frames and audio from the same time range.
 const CHUNK_QUEUE: usize = 120;
 /// stderr lines kept so a crash can be explained instead of just reported.
 const LOG_TAIL: usize = 40;
@@ -46,6 +46,7 @@ pub struct StreamConfig {
 	pub audio_bitrate_kbps: u32,
 	/// "hardware" (VideoToolbox on macOS) or "software" (libx264).
 	pub encoder: String,
+	pub has_audio: bool,
 	pub record_local: bool,
 }
 
@@ -66,16 +67,15 @@ pub struct StreamStats {
 	pub speed: f64,
 	/// Bytes handed to the muxers so far — OBS's "total data output".
 	pub total_bytes: u64,
-	/// Chunks the queue had to discard because ffmpeg could not keep up. With
-	/// RTMP this is the network signal: a slow uplink blocks ffmpeg's output,
-	/// which backs up the input pipe until this queue overflows.
-	pub discarded_chunks: u64,
+	/// Times the input queue filled and the producer had to wait for ffmpeg.
+	/// No media is discarded; this remains the operator's congestion signal.
+	pub backpressure_events: u64,
 }
 
 struct Running {
 	tx: Option<SyncSender<Vec<u8>>>,
 	child: Arc<Mutex<Child>>,
-	discarded: Arc<AtomicU64>,
+	backpressure: Arc<AtomicU64>,
 }
 
 /// Encoders run in named groups so a destination can be held back without
@@ -243,33 +243,59 @@ fn build_args_with_path(cfg: &StreamConfig, local_path: Option<&str>) -> Result<
 	if cfg.encoder == "software" {
 		// Live: no B-frames, no lookahead. Latency over compression ratio.
 		push!("-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency");
-		push!("-profile:v", "main", "-sc_threshold", "0");
+		push!("-profile:v", "high", "-sc_threshold", "0", "-refs", "1");
+		push!("-x264-params", "nal-hrd=cbr:force-cfr=1");
 	} else {
 		// `-allow_sw 1` falls back inside VideoToolbox rather than dying if the
 		// GPU session cannot be created (happens under screen sharing).
 		push!("-c:v", "h264_videotoolbox", "-realtime", "1", "-allow_sw", "1");
-		push!("-profile:v", "main");
+		push!("-constant_bit_rate", "1", "-prio_speed", "1", "-max_ref_frames", "1");
+		push!("-profile:v", "high");
 	}
 	push!("-pix_fmt", "yuv420p");
-	push!("-b:v", format!("{vk}k"), "-maxrate", format!("{vk}k"), "-bufsize", format!("{}k", vk * 2));
+	push!(
+		"-colorspace",
+		"bt709",
+		"-color_primaries",
+		"bt709",
+		"-color_trc",
+		"bt709"
+	);
+	push!("-b:v", format!("{vk}k"), "-minrate", format!("{vk}k"));
+	push!("-maxrate", format!("{vk}k"), "-bufsize", format!("{}k", vk * 2));
 	// 2-second keyframe interval: what YouTube asks for, and what keeps the
 	// HLS packager on the Fly box cutting clean segments.
 	push!("-r", fps, "-g", fps * 2, "-keyint_min", fps);
 
+	if cfg.has_audio {
+		// Correct small WebAudio/MediaRecorder clock drift without changing pitch.
+		push!("-af", "aresample=async=1000:first_pts=0");
+	}
 	push!("-c:a", "aac", "-b:a", format!("{ak}k"), "-ar", "48000", "-ac", "2");
 	push!("-nostats", "-progress", "pipe:1");
 
+	// Each RTMP destination gets an independent packet queue and reconnect loop.
+	// Two backslashes are intentional: tee parses the slave options first, then
+	// the nested fifo dictionary. This keeps a slow destination from blocking
+	// every other destination or backing up the WebM input pipe.
+	const FIFO_OPTIONS: &str = concat!(
+		r"attempt_recovery\\=1\\:recover_any_error\\=1\\:recovery_wait_time\\=1",
+		r"\\:restart_with_keyframe\\=1\\:queue_size\\=600\\:drop_pkts_on_overflow\\=1"
+	);
 	let mut outputs = cfg
 		.targets
 		.iter()
-		.map(|t| format!("[f=flv:onfail=ignore]{}", t.url))
+		.map(|t| {
+			format!(
+				"[f=flv:flvflags=no_duration_filesize:onfail=ignore:use_fifo=1:fifo_options={FIFO_OPTIONS}]{}",
+				t.url
+			)
+		})
 		.collect::<Vec<_>>();
 	if let Some(path) = local_path {
 		outputs.push(format!("[f=mp4:movflags=+frag_keyframe+empty_moov]{}", path));
 	}
-	if outputs.len() == 1 && local_path.is_none() {
-		push!("-f", "flv", cfg.targets[0].url);
-	} else if outputs.len() == 1 {
+	if cfg.targets.is_empty() {
 		push!("-movflags", "+frag_keyframe+empty_moov", "-f", "mp4", local_path.unwrap());
 	} else {
 		// tee fans one encode out to every destination. `onfail=ignore` is the
@@ -346,11 +372,11 @@ impl Encoder {
 		let stderr = child.stderr.take().ok_or("stderr ffmpeg indisponible")?;
 
 		let (tx, rx) = sync_channel::<Vec<u8>>(CHUNK_QUEUE);
-		let discarded = Arc::new(AtomicU64::new(0));
+		let backpressure = Arc::new(AtomicU64::new(0));
 
-		// Writer thread. Owning stdin here is what keeps `push_chunk` from ever
-		// blocking the UI: a stalled upload backs the queue up and we drop
-		// chunks, we never freeze the webview.
+		// Writer thread. Each destination is isolated later by ffmpeg's fifo
+		// muxer, so this input pipe normally drains continuously. If the encoder
+		// itself falls behind, the bounded queue applies lossless backpressure.
 		thread::spawn(move || {
 			for chunk in rx {
 				if stdin.write_all(&chunk).is_err() {
@@ -364,7 +390,7 @@ impl Encoder {
 		// by `progress=continue`.
 		let app_stats = app.clone();
 		let group_stats = group.to_string();
-		let discarded_stats = discarded.clone();
+		let backpressure_stats = backpressure.clone();
 		thread::spawn(move || {
 			let mut stats = StreamStats::default();
 			for line in BufReader::new(stdout).lines().map_while(Result::ok) {
@@ -391,7 +417,7 @@ impl Encoder {
 						stats.speed = value.trim_end_matches('x').parse().unwrap_or(stats.speed)
 					}
 					"progress" => {
-						stats.discarded_chunks = discarded_stats.load(Ordering::Relaxed);
+						stats.backpressure_events = backpressure_stats.load(Ordering::Relaxed);
 						let _ = app_stats.emit(
 							"stream://stats",
 							serde_json::json!({ "group": group_stats, "stats": stats.clone() }),
@@ -455,7 +481,7 @@ impl Encoder {
 			Running {
 				tx: Some(tx),
 				child: child_handle,
-				discarded,
+				backpressure,
 			},
 		);
 		Ok((redact(&args), local_path))
@@ -474,15 +500,24 @@ impl Encoder {
 				*header = Some(bytes.to_vec());
 			}
 		}
-		let guard = self.groups.lock().map_err(|e| e.to_string())?;
+		let runs = self
+			.groups
+			.lock()
+			.map_err(|e| e.to_string())?
+			.values()
+			.filter_map(|run| run.tx.as_ref().map(|tx| (tx.clone(), run.backpressure.clone())))
+			.collect::<Vec<_>>();
 		// A chunk arriving after stop() is normal — MediaRecorder flushes one
 		// last blob on its way down. Silently ignore it.
-		for run in guard.values() {
-			let Some(tx) = run.tx.as_ref() else { continue };
+		for (tx, backpressure) in runs {
 			match tx.try_send(bytes.to_vec()) {
 				Ok(()) => {}
-				Err(TrySendError::Full(_)) => {
-					run.discarded.fetch_add(1, Ordering::Relaxed);
+				Err(TrySendError::Full(chunk)) => {
+					backpressure.fetch_add(1, Ordering::Relaxed);
+					// Backpressure happens off the webview thread. Waiting is safe and
+					// preserves the complete audio/video timeline; stop() can still take
+					// the groups lock and kill a wedged child, which disconnects this send.
+					let _ = tx.send(chunk);
 				}
 				Err(TrySendError::Disconnected(_)) => {}
 			}
@@ -547,16 +582,19 @@ mod tests {
 			video_bitrate_kbps: 4500,
 			audio_bitrate_kbps: 160,
 			encoder: "hardware".into(),
+			has_audio: true,
 			record_local: false,
 		}
 	}
 
 	#[test]
-	fn single_target_uses_flv_not_tee() {
+	fn single_target_uses_recovering_fifo() {
 		let args = build_args(&cfg(&["rtmp://localhost:1935/live/obs"])).unwrap();
-		assert!(!args.iter().any(|a| a == "tee"));
-		assert_eq!(args.last().unwrap(), "rtmp://localhost:1935/live/obs");
-		assert!(args.windows(2).any(|w| w[0] == "-f" && w[1] == "flv"));
+		assert!(args.iter().any(|a| a == "tee"));
+		let spec = args.last().unwrap();
+		assert!(spec.contains("use_fifo=1"));
+		assert!(spec.contains("attempt_recovery"));
+		assert!(spec.ends_with("rtmp://localhost:1935/live/obs"));
 	}
 
 	#[test]
@@ -568,6 +606,7 @@ mod tests {
 		.unwrap();
 		let spec = args.last().unwrap();
 		assert_eq!(spec.matches("onfail=ignore").count(), 2);
+		assert_eq!(spec.matches("use_fifo=1").count(), 2);
 		assert!(spec.contains('|'));
 	}
 
