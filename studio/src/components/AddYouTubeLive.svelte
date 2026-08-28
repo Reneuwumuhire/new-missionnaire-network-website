@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { invoke } from '@tauri-apps/api/core';
 	import { t } from '../lib/i18n.svelte';
-	import { youtubeChatUrl, youtubeVideoId, youtubeWatchUrl } from '../lib/youtube';
+	import { youtubeChatUrl, youtubePlayerUrl, youtubeVideoId } from '../lib/youtube';
 	import Modal from './Modal.svelte';
 
 	let { onclose, onready }: { onclose: () => void; onready: (url: string) => void } = $props();
@@ -10,13 +10,13 @@
 	let opened = $state(false);
 	let error = $state<string | null>(null);
 	const videoId = $derived(youtubeVideoId(value));
-	const watchUrl = $derived(videoId ? youtubeWatchUrl(videoId) : null);
+	const playerUrl = $derived(videoId ? youtubePlayerUrl(videoId) : null);
 
 	async function openPlayer() {
-		if (!watchUrl) return;
+		if (!playerUrl) return;
 		error = null;
 		try {
-			await invoke('open_url', { url: watchUrl });
+			await invoke('open_url', { url: playerUrl });
 			opened = true;
 		} catch (reason) {
 			error = String(reason);
@@ -85,8 +85,8 @@
 			<button class="studio-chip px-3" onclick={onclose}>{t('common.cancel')}</button>
 			<button
 				class="studio-btn-primary"
-				disabled={!watchUrl || !opened}
-				onclick={() => watchUrl && onready(watchUrl)}
+				disabled={!playerUrl || !opened}
+				onclick={() => playerUrl && onready(playerUrl)}
 			>
 				{t('youtubeLive.capture')}
 			</button>

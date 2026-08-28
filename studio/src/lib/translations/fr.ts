@@ -74,14 +74,14 @@ const fr: Record<keyof typeof en, string> = {
 	'youtubeLive.title': 'Ajouter un direct YouTube',
 	'youtubeLive.url': 'Adresse du direct YouTube',
 	'youtubeLive.hint':
-		'Studio ouvre le direct dans votre navigateur, puis le sélecteur système le capture. Utilisez une fenêtre dédiée, gardez-la visible et coupez le son des autres onglets du navigateur.',
+		'Studio ouvre un lecteur épuré dans votre navigateur, puis le sélecteur système le capture. Gardez cette fenêtre visible et coupez le son des autres onglets du même navigateur.',
 	'youtubeLive.invalid': 'Saisissez un lien YouTube vidéo ou direct sécurisé et valide.',
 	'youtubeLive.openPlayer': '1. Ouvrir le direct',
 	'youtubeLive.playerOpened': 'Lecteur ouvert',
 	'youtubeLive.openChat': 'Ouvrir le chat',
 	'youtubeLive.capture': '2. Capturer la fenêtre',
 	'youtubeLive.captureHint':
-		'Choisissez la fenêtre du navigateur que vous venez d’ouvrir. Sous Windows, activez Partager l’audio du système ; si la fenêtre n’a pas de son, agrandissez le navigateur et capturez cet écran. Sous macOS, Studio associe automatiquement le son de l’application.',
+		'Lancez la lecture si nécessaire, ramenez le pointeur sur Studio pour masquer les commandes, puis choisissez cette fenêtre. Sous Windows, activez Partager l’audio du système ; si la fenêtre n’a pas de son, agrandissez-la et capturez cet écran. Sous macOS, Studio associe automatiquement le son du navigateur.',
 	'web.title': 'Ajouter depuis un lien',
 	'web.url': 'Adresse',
 	'web.audioOnly': 'Son seul',

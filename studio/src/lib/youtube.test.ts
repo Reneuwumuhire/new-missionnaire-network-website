@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { youtubeChatUrl, youtubeVideoId, youtubeWatchUrl } from './youtube';
+import { youtubeChatUrl, youtubePlayerUrl, youtubeVideoId } from './youtube';
 
 describe('YouTube live links', () => {
 	it.each([
@@ -16,7 +16,8 @@ describe('YouTube live links', () => {
 	])('rejects %s', (url) => expect(youtubeVideoId(url)).toBeNull());
 
 	it('builds canonical player and chat URLs', () => {
-		expect(youtubeWatchUrl('dQw4w9WgXcQ')).toContain('watch?v=dQw4w9WgXcQ');
+		expect(youtubePlayerUrl('dQw4w9WgXcQ')).toContain('/embed/dQw4w9WgXcQ?');
+		expect(youtubePlayerUrl('dQw4w9WgXcQ')).toContain('controls=1');
 		expect(youtubeChatUrl('dQw4w9WgXcQ')).toContain('live_chat?v=dQw4w9WgXcQ');
 	});
 });

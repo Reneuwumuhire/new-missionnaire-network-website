@@ -22,8 +22,10 @@ export function youtubeVideoId(value: string): string | null {
 	return candidate && VIDEO_ID.test(candidate) ? candidate : null;
 }
 
-export const youtubeWatchUrl = (videoId: string) =>
-	`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
+/** Player-only page for capture: no recommendations or page furniture, while
+ * retaining YouTube's own controls for the occasional pause or rewind. */
+export const youtubePlayerUrl = (videoId: string) =>
+	`https://www.youtube.com/embed/${encodeURIComponent(videoId)}?autoplay=1&controls=1&playsinline=1&rel=0`;
 
 export const youtubeChatUrl = (videoId: string) =>
 	`https://www.youtube.com/live_chat?v=${encodeURIComponent(videoId)}&is_popout=1`;

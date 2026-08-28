@@ -71,14 +71,14 @@ const en = {
 	'youtubeLive.title': 'Add YouTube live',
 	'youtubeLive.url': 'YouTube live address',
 	'youtubeLive.hint':
-		'Studio opens the live in your browser, then the system window picker captures it. Use a dedicated browser window, keep it visible, and mute other tabs in that browser.',
+		'Studio opens a clean live player in your browser, then the system window picker captures it. Keep that window visible and mute other tabs in the same browser.',
 	'youtubeLive.invalid': 'Enter a valid secure YouTube video or live link.',
 	'youtubeLive.openPlayer': '1. Open live player',
 	'youtubeLive.playerOpened': 'Player opened',
 	'youtubeLive.openChat': 'Open live chat',
 	'youtubeLive.capture': '2. Capture window',
 	'youtubeLive.captureHint':
-		'Choose the browser window you just opened. On Windows, enable Share system audio; if window capture has no audio, maximize the browser and capture that display. On macOS, Studio pairs the browser application audio automatically.',
+		'Start playback if needed, move the pointer back over Studio so the player controls fade, then choose that browser window. On Windows, enable Share system audio; if the window has no audio, maximize it and capture that display. On macOS, Studio pairs the browser audio automatically.',
 	'web.title': 'Add from a link',
 	'web.url': 'Address',
 	'web.audioOnly': 'Sound only',

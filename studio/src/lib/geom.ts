@@ -37,7 +37,16 @@ export function toPixels(rect: Rect, canvasW: number, canvasH: number): Rect {
  *  (no bars, no distortion), `contain` letterboxes, `stretch` distorts. */
 export function drawBox(srcW: number, srcH: number, dst: Rect, mode: FitMode): DrawBox {
 	if (srcW <= 0 || srcH <= 0 || dst.w <= 0 || dst.h <= 0) {
-		return { sx: 0, sy: 0, sw: Math.max(srcW, 1), sh: Math.max(srcH, 1), dx: dst.x, dy: dst.y, dw: 0, dh: 0 };
+		return {
+			sx: 0,
+			sy: 0,
+			sw: Math.max(srcW, 1),
+			sh: Math.max(srcH, 1),
+			dx: dst.x,
+			dy: dst.y,
+			dw: 0,
+			dh: 0
+		};
 	}
 	if (mode === 'stretch') {
 		return { sx: 0, sy: 0, sw: srcW, sh: srcH, dx: dst.x, dy: dst.y, dw: dst.w, dh: dst.h };
@@ -72,7 +81,7 @@ export function drawBox(srcW: number, srcH: number, dst: Rect, mode: FitMode): D
 	};
 }
 
-export type Handle = 'move' | 'nw' | 'ne' | 'sw' | 'se';
+export type Handle = 'move' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw';
 
 /** Which grab handle (if any) sits under a normalised point. Handles are sized
  *  in canvas-relative terms so they stay grabbable on a small preview. */
@@ -87,7 +96,12 @@ export function hitHandle(rect: Rect, px: number, py: number, tolerance = 0.02):
 		if (Math.abs(px - cx) <= tolerance && Math.abs(py - cy) <= tolerance) return handle;
 	}
 	const inside = px >= rect.x && px <= rect.x + rect.w && py >= rect.y && py <= rect.y + rect.h;
-	return inside ? 'move' : null;
+	if (!inside) return null;
+	if (Math.abs(py - rect.y) <= tolerance) return 'n';
+	if (Math.abs(px - (rect.x + rect.w)) <= tolerance) return 'e';
+	if (Math.abs(py - (rect.y + rect.h)) <= tolerance) return 's';
+	if (Math.abs(px - rect.x) <= tolerance) return 'w';
+	return 'move';
 }
 
 /** The pointer shape for a handle. Corners on the same diagonal share a
@@ -102,6 +116,12 @@ export function cursorForHandle(handle: Handle | null, dragging = false): string
 		case 'ne':
 		case 'sw':
 			return 'nesw-resize';
+		case 'n':
+		case 's':
+			return 'ns-resize';
+		case 'e':
+		case 'w':
+			return 'ew-resize';
 		case 'move':
 			return dragging ? 'grabbing' : 'grab';
 		default:
@@ -124,16 +144,16 @@ export function applyDrag(rect: Rect, handle: Handle, dx: number, dy: number): R
 	let w = rect.w;
 	let h = rect.h;
 
-	if (handle === 'nw' || handle === 'sw') {
+	if (handle === 'nw' || handle === 'w' || handle === 'sw') {
 		x = Math.min(rect.x + dx, right - MIN_SIZE);
 		w = right - x;
-	} else {
+	} else if (handle === 'ne' || handle === 'e' || handle === 'se') {
 		w = Math.max(MIN_SIZE, rect.w + dx);
 	}
-	if (handle === 'nw' || handle === 'ne') {
+	if (handle === 'nw' || handle === 'n' || handle === 'ne') {
 		y = Math.min(rect.y + dy, bottom - MIN_SIZE);
 		h = bottom - y;
-	} else {
+	} else if (handle === 'sw' || handle === 's' || handle === 'se') {
 		h = Math.max(MIN_SIZE, rect.h + dy);
 	}
 	return { x, y, w, h };

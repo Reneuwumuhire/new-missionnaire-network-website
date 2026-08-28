@@ -44,6 +44,15 @@ describe('layer manipulation', () => {
 		expect(hitHandle(rect, 0.05, 0.05)).toBeNull();
 	});
 
+	it('resizes from every edge as well as the corners', () => {
+		expect(hitHandle(rect, 0.5, 0.25)).toBe('n');
+		expect(hitHandle(rect, 0.75, 0.5)).toBe('e');
+		expect(hitHandle(rect, 0.5, 0.75)).toBe('s');
+		expect(hitHandle(rect, 0.25, 0.5)).toBe('w');
+		expect(applyDrag(rect, 'e', 0.1, 0.2)).toEqual({ x: 0.25, y: 0.25, w: 0.6, h: 0.5 });
+		expect(applyDrag(rect, 'n', 0.2, 0.1)).toEqual({ x: 0.25, y: 0.35, w: 0.5, h: 0.4 });
+	});
+
 	it('moves without resizing', () => {
 		const moved = applyDrag(rect, 'move', 0.1, -0.05);
 		expect(moved).toEqual({ x: 0.35, y: 0.2, w: 0.5, h: 0.5 });
@@ -76,6 +85,8 @@ describe('layer manipulation', () => {
 		expect(cursorForHandle('ne')).toBe('nesw-resize');
 		expect(cursorForHandle('sw')).toBe('nesw-resize');
 		expect(cursorForHandle('move')).toBe('grab');
+		expect(cursorForHandle('n')).toBe('ns-resize');
+		expect(cursorForHandle('e')).toBe('ew-resize');
 		expect(cursorForHandle('move', true)).toBe('grabbing');
 		expect(cursorForHandle(null)).toBe('default');
 		// Resizing looks the same whether or not the button is down.

@@ -26,7 +26,7 @@
 	import { popoverFit } from '../lib/layout';
 	import { t } from '../lib/i18n.svelte';
 	import { observeReferenceStream, useReferenceSource } from '../lib/reference-match.svelte';
-	import { youtubeChatUrl, youtubeVideoId } from '../lib/youtube';
+	import { youtubeChatUrl, youtubePlayerUrl, youtubeVideoId } from '../lib/youtube';
 	import {
 		DEFAULT_TEXT_STYLE,
 		activeScene,
@@ -208,6 +208,10 @@
 	 *  without this the operator shares a video call or a player and gets a
 	 *  picture with no sound and nothing in the mixer to fix it with. */
 	async function shareScreen(layer: Layer) {
+		if (layer.youtubeLiveUrl) {
+			layer.hideCursor = true;
+			layer.fit = 'cover';
+		}
 		const handle = await openScreen(layer);
 		const track = handle.stream?.getVideoTracks()[0];
 		if (!track) return;
@@ -249,7 +253,8 @@
 	async function addYouTubeLive(url: string) {
 		youtubeLiveOpen = false;
 		const layer = makeLayer('screen', t('sources.youtubeLive'), {
-			fit: 'contain',
+			fit: 'cover',
+			hideCursor: true,
 			youtubeLiveUrl: url
 		});
 		const scene = activeScene();
@@ -364,7 +369,10 @@
 	 *  from the menu bar, a file lost across a restart. */
 	async function reconnect(layer: Layer) {
 		if (layer.youtubeLiveUrl) {
-			await invoke('open_url', { url: layer.youtubeLiveUrl });
+			const videoId = youtubeVideoId(layer.youtubeLiveUrl);
+			const playerUrl = videoId ? youtubePlayerUrl(videoId) : layer.youtubeLiveUrl;
+			layer.youtubeLiveUrl = playerUrl;
+			await invoke('open_url', { url: playerUrl });
 			useReferenceSource(layer.id, layer.name);
 			await shareScreen(layer);
 			return;
