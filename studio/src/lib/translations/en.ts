@@ -66,6 +66,19 @@ const en = {
 	'sources.videoHint': 'Clip or loop, with sound',
 	'sources.url': 'YouTube / Link',
 	'sources.urlHint': 'Play a video or a song from a link, like any media source',
+	'sources.youtubeLive': 'YouTube Live Window',
+	'sources.youtubeLiveHint': 'Capture a live player with its exact application audio',
+	'youtubeLive.title': 'Add YouTube live',
+	'youtubeLive.url': 'YouTube live address',
+	'youtubeLive.hint':
+		'Studio opens the live in your browser, then the system window picker captures it. Use a dedicated browser window, keep it visible, and mute other tabs in that browser.',
+	'youtubeLive.invalid': 'Enter a valid secure YouTube video or live link.',
+	'youtubeLive.openPlayer': '1. Open live player',
+	'youtubeLive.playerOpened': 'Player opened',
+	'youtubeLive.openChat': 'Open live chat',
+	'youtubeLive.capture': '2. Capture window',
+	'youtubeLive.captureHint':
+		'In the system picker, choose the browser window you just opened. Studio will pair its picture with that browser application’s audio automatically.',
 	'web.title': 'Add from a link',
 	'web.url': 'Address',
 	'web.audioOnly': 'Sound only',
@@ -142,7 +155,8 @@ const en = {
 	'controls.studioMode': 'Studio Mode',
 	'controls.settings': 'Settings',
 	'controls.recording': 'Recording',
-	'controls.recordingHint': 'Choose Local, Cloud or Both in Settings → Output. Recording starts and stops with the broadcast.',
+	'controls.recordingHint':
+		'Choose Local, Cloud or Both in Settings → Output. Recording starts and stops with the broadcast.',
 
 	// ── Stream health (OBS's Stats dock, with what ffmpeg can tell us) ──
 	'health.title': 'Stream health',
@@ -205,8 +219,7 @@ const en = {
 	'lyrics.emptyFile': 'Empty file',
 	'lyrics.nothingToLoad': 'Nothing to load',
 	'lyrics.noTimings': 'No lines timed yet',
-	'lyrics.hintTimed':
-		'Load a timed .srt, or paste lyrics to step through them by hand.',
+	'lyrics.hintTimed': 'Load a timed .srt, or paste lyrics to step through them by hand.',
 	'lyrics.start': 'Start — first cue begins now',
 	'lyrics.startHint':
 		'Press exactly as the first line is spoken. Or click the line being sung in the list below.',
@@ -223,6 +236,20 @@ const en = {
 	'lyrics.cueHintManual': 'Show this line',
 	'lyrics.pastedName': 'Pasted',
 	'lyrics.starterLayer': 'Lyrics',
+	'lyrics.referenceTitle': 'Automatic sermon sync',
+	'lyrics.referenceAudio': 'Choose reference audio',
+	'lyrics.referenceMissing': 'Load the prepared sermon MP3 and its French .srt.',
+	'lyrics.referenceSourceMissing': 'Add and capture the YouTube live window to provide its audio.',
+	'lyrics.referenceIdle': 'Waiting for reference audio and a captured live source',
+	'lyrics.referenceLoading': 'Preparing the reference audio…',
+	'lyrics.referenceArmed': 'Armed — subtitles remain hidden during songs',
+	'lyrics.referenceSearching': 'Listening for the sermon…',
+	'lyrics.referenceLocked': 'Matched at {position} · confidence {score}%',
+	'lyrics.referenceRecovering': 'Signal changed — subtitles hidden while matching again',
+	'lyrics.referenceResume': 'Resume automatic matching',
+	'lyrics.referenceHide': 'Hide subtitles',
+	'lyrics.referenceFallback': 'Sermon begins now',
+	'lyrics.referenceFallbackHint': 'Fallback only: starts the first subtitle immediately.',
 
 	// ── Properties ──────────────────────────────────────────────
 	'media.needsFile': 'Pick the file again \u2014 Sources \u203a Reconnect',
@@ -232,7 +259,8 @@ const en = {
 	'media.forward': 'Forward ten seconds',
 	'media.scrub': 'Position in the recording',
 	'media.followShort': 'Lyrics',
-	'props.transportMoved': 'Play, pause and scrubbing are on the transport bar under the preview, where they stay in reach during a service.',
+	'props.transportMoved':
+		'Play, pause and scrubbing are on the transport bar under the preview, where they stay in reach during a service.',
 	'props.title': 'Source properties',
 	'props.empty': 'Select a source in the list, or click it in the preview.',
 	'props.device': 'Device',
@@ -247,7 +275,8 @@ const en = {
 	'props.pause': 'Pause',
 	'props.restart': 'Restart',
 	'props.followLyrics': 'Lyrics follow this recording',
-	'props.followLyricsHint': 'The .srt runs off the track\u2019s own position, so pausing or winding back takes the lyrics with it.',
+	'props.followLyricsHint':
+		'The .srt runs off the track\u2019s own position, so pausing or winding back takes the lyrics with it.',
 	'props.loop': 'Loop',
 	'props.position': 'Position (% of frame)',
 	'props.fullFrame': 'Fit to screen',
@@ -292,7 +321,8 @@ const en = {
 	'settings.language': 'Language',
 	'settings.liveWarning': 'Encoder settings apply to the next broadcast.',
 	'settings.recording': 'Recording',
-	'settings.recordingHint': 'Local files save in Movies/Missionnaire Studio. Cloud uses the streaming recorder directly.',
+	'settings.recordingHint':
+		'Local files save in Movies/Missionnaire Studio. Cloud uses the streaming recorder directly.',
 	'settings.recorderUrl': 'Cloud recorder URL',
 	'settings.recorderToken': 'Cloud recorder token',
 	'recording.off': 'Off',
@@ -300,7 +330,8 @@ const en = {
 	'recording.cloud': 'Cloud',
 	'recording.both': 'Both',
 	'settings.testPattern': 'No-signal test pattern',
-	'settings.testPatternHint': 'Show colour bars when a scene\u2019s camera, screen share or media file is not producing a picture. Black looks the same as a dead stream.',
+	'settings.testPatternHint':
+		'Show colour bars when a scene\u2019s camera, screen share or media file is not producing a picture. Black looks the same as a dead stream.',
 	'settings.resolution': 'Base resolution',
 	'settings.fps': 'Frames per second',
 	'settings.videoBitrate': 'Video bitrate — {kbps} kbps',

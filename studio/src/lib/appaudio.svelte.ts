@@ -115,6 +115,16 @@ const nodes = new Map<string, AudioWorkletNode>();
  *  and the new one never starts. */
 const capturedApp = new Map<string, string>();
 
+type PcmObserver = (sourceId: string, samples: Float32Array) => void;
+const pcmObservers = new Set<PcmObserver>();
+
+/** Source-only PCM observers. Matching listens here, before faders and before
+ * microphones join the master bus, so a live translator cannot confuse it. */
+export function observeAppAudio(observer: PcmObserver): () => void {
+	pcmObservers.add(observer);
+	return () => pcmObservers.delete(observer);
+}
+
 /** The application a strip is capturing right now, if any. */
 export const capturingApp = (sourceId: string): string | undefined => capturedApp.get(sourceId);
 
@@ -145,7 +155,9 @@ export async function startAppAudio(
 				payload instanceof ArrayBuffer ? payload : new Uint8Array(payload as number[]).buffer;
 			received.bytes += bytes.byteLength;
 			received.blocks++;
-			node.port.postMessage(new Float32Array(bytes));
+			const samples = new Float32Array(bytes);
+			for (const observer of pcmObservers) observer(sourceId, samples);
+			node.port.postMessage(samples);
 		};
 
 		// The sentinel travels as an empty bundle id, which the native side reads
@@ -158,7 +170,8 @@ export async function startAppAudio(
 		nodes.set(sourceId, node);
 		capturedApp.set(sourceId, app.id);
 		mixer.addNode(sourceId, node);
-		if (!appAudio.capturing.includes(sourceId)) appAudio.capturing = [...appAudio.capturing, sourceId];
+		if (!appAudio.capturing.includes(sourceId))
+			appAudio.capturing = [...appAudio.capturing, sourceId];
 		appAudio.error = null;
 		return true;
 	} catch (err) {

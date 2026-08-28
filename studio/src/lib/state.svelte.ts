@@ -78,6 +78,9 @@ export interface Layer {
 	 *  only thing that ever works — and it is exactly what the operator would
 	 *  have to do by hand. */
 	url?: string;
+	/** A live page opened and captured as a dedicated window. Unlike a fetched
+	 * clip, reconnecting this source reopens the page and the OS window picker. */
+	youtubeLiveUrl?: string;
 	/** Seconds, from the link itself, for a streamed source. WebKit reads
 	 *  YouTube's audio-only container as exactly twice its real length —
 	 *  measured at 38.1 s for a 19.0 s clip and 1269.2 s for a 635.0 s one — so
@@ -134,8 +137,13 @@ export interface Destination {
 }
 
 export function requiresYouTubeGoLive(destinations: Destination[], isTest = false): boolean {
-	return !isTest && destinations.some((destination) =>
-		destination.enabled && (/youtube/i.test(destination.name) || /youtube/i.test(destination.url))
+	return (
+		!isTest &&
+		destinations.some(
+			(destination) =>
+				destination.enabled &&
+				(/youtube/i.test(destination.name) || /youtube/i.test(destination.url))
+		)
 	);
 }
 
@@ -183,7 +191,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	layout: DEFAULT_LAYOUT,
 	recordingMode: 'off',
 	recorderUrl: '',
-	recorderToken: '',
+	recorderToken: ''
 };
 
 export const id = () => Math.random().toString(36).slice(2, 10);
@@ -338,9 +346,10 @@ function load(): Persisted {
 			// it in Live Control Room before opening the public site gate.
 			destinations: uniqueById(parsed.destinations ?? fallback.destinations).map((destination) => ({
 				...destination,
-				hold: /youtube/i.test(destination.name) || /youtube/i.test(destination.url)
-					? false
-					: destination.hold ?? false
+				hold:
+					/youtube/i.test(destination.name) || /youtube/i.test(destination.url)
+						? false
+						: (destination.hold ?? false)
 			})),
 			// Merge, so a setting added in a later version gets its default
 			// instead of `undefined` reaching ffmpeg. Layout is merged a level
@@ -358,8 +367,14 @@ function load(): Persisted {
 				),
 				// These names were reserved but never used; keep old local settings
 				// useful if an early Studio build happened to save them.
-				recorderUrl: parsed.settings?.recorderUrl ?? (parsed.settings as { adminUrl?: string } | undefined)?.adminUrl ?? '',
-				recorderToken: parsed.settings?.recorderToken ?? (parsed.settings as { adminToken?: string } | undefined)?.adminToken ?? '',
+				recorderUrl:
+					parsed.settings?.recorderUrl ??
+					(parsed.settings as { adminUrl?: string } | undefined)?.adminUrl ??
+					'',
+				recorderToken:
+					parsed.settings?.recorderToken ??
+					(parsed.settings as { adminToken?: string } | undefined)?.adminToken ??
+					'',
 				layout: {
 					...DEFAULT_LAYOUT,
 					...parsed.settings?.layout,

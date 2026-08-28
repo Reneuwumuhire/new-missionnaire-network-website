@@ -18,10 +18,23 @@
 	import Splitter from './components/Splitter.svelte';
 	import TransitionsDock from './components/TransitionsDock.svelte';
 	import { stopAppAudio } from './lib/appaudio.svelte';
-	import { broadcast, isStreaming, startBroadcast, stopBroadcast, uptimeLabel } from './lib/broadcast.svelte';
+	import {
+		broadcast,
+		isStreaming,
+		startBroadcast,
+		stopBroadcast,
+		uptimeLabel
+	} from './lib/broadcast.svelte';
 	import { frameCount, selectScene, takeToProgram, type TransitionType } from './lib/compositor';
 	import { lyrics, step } from './lib/lyrics.svelte';
-	import { askForMicrophone, handleFor, handleForLayer, mediaVersion, openCamera, releaseAll } from './lib/media.svelte';
+	import {
+		askForMicrophone,
+		handleFor,
+		handleForLayer,
+		mediaVersion,
+		openCamera,
+		releaseAll
+	} from './lib/media.svelte';
 	import { Mixer, stripsToDrop } from './lib/mixer';
 	import { t } from './lib/i18n.svelte';
 	import { clamp, splitWeights, type DockId } from './lib/layout';
@@ -35,6 +48,7 @@
 	import { activeScene, audioLayers, onAirSceneId, persist, studio } from './lib/state.svelte';
 	import { liveSession, logoutStudio } from './lib/live-session.svelte';
 	import { recording } from './lib/recording.svelte';
+	import { initReferenceMatcher } from './lib/reference-match.svelte';
 
 	let programCanvas = $state<HTMLCanvasElement | null>(null);
 	let mixer = $state<Mixer | null>(null);
@@ -47,7 +61,9 @@
 	const setupReady = needsSetup
 		? new Promise<void>((resolve) => (releaseSetup = resolve))
 		: Promise.resolve();
-	let dialog = $state<'properties' | 'settings' | 'setup' | 'live-session' | 'new-session' | null>(null);
+	let dialog = $state<'properties' | 'settings' | 'setup' | 'live-session' | 'new-session' | null>(
+		null
+	);
 	/** Frames actually painted per second — the readout OBS puts in its status
 	 *  bar, and the first number to look at when the picture stutters. */
 	let renderFps = $state(0);
@@ -57,6 +73,7 @@
 	let renderMissed = $state(0);
 
 	onMount(() => {
+		initReferenceMatcher();
 		mixer = new Mixer();
 		selftestMixer(mixer);
 		mixer.setMonitor(studio.settings.monitorAudio);
@@ -82,7 +99,11 @@
 			if (target) {
 				// Diagnostic run: no camera, so nothing blocks on a permission
 				// prompt while the broadcast chain is being verified.
-				await runSelftest(target, () => programCanvas, () => mixer?.audioTrack);
+				await runSelftest(
+					target,
+					() => programCanvas,
+					() => mixer?.audioTrack
+				);
 				return;
 			}
 			await setupReady;
@@ -246,7 +267,9 @@
 		activeScene().layers.find((l) => l.id === studio.selectedLayerId) ?? null
 	);
 	const selectedLiveSession = $derived(
-		liveSession.sessions.find((session) => session._id === (liveSession.activeId ?? liveSession.selectedId)) ?? null
+		liveSession.sessions.find(
+			(session) => session._id === (liveSession.activeId ?? liveSession.selectedId)
+		) ?? null
 	);
 	const health = $derived.by(() => {
 		const stats = broadcast.stats;
@@ -264,9 +287,15 @@
 	// Program is a frozen snapshot in Studio Mode, so even edits to the same
 	// scene (visibility, crop, layout, properties) are valid takes.
 	const canTake = $derived(studio.settings.studioMode || studio.activeSceneId !== onAirSceneId());
-	const recordingDuration = $derived(recording.startedAt ? Math.max(0, Math.floor((now - recording.startedAt) / 1000)) : 0);
+	const recordingDuration = $derived(
+		recording.startedAt ? Math.max(0, Math.floor((now - recording.startedAt) / 1000)) : 0
+	);
 	const durationLabel = (seconds: number) => new Date(seconds * 1000).toISOString().slice(11, 19);
-	const publicDuration = $derived(liveSession.activeStartedAt ? Math.max(0, Math.floor((now - liveSession.activeStartedAt) / 1000)) : 0);
+	const publicDuration = $derived(
+		liveSession.activeStartedAt
+			? Math.max(0, Math.floor((now - liveSession.activeStartedAt) / 1000))
+			: 0
+	);
 
 	const QUICK: { type: TransitionType; label: () => string }[] = [
 		{ type: 'cut', label: () => t('transitions.cut') },
@@ -298,7 +327,6 @@
 		layout.weights[right] = b;
 		persist();
 	}
-
 </script>
 
 <svelte:window onkeydown={onKeydown} />
@@ -309,29 +337,43 @@
 		data-tauri-drag-region
 		class="flex h-9 shrink-0 items-center gap-4 border-b border-ink-700 bg-ink-900 pl-[86px] pr-3"
 	>
-		<h1 class="pointer-events-none select-none text-[10px] font-semibold uppercase tracking-[0.28em] text-fg/45">
+		<h1
+			class="pointer-events-none select-none text-[10px] font-semibold uppercase tracking-[0.28em] text-fg/45"
+		>
 			Missionnaire <span class="text-primary">Studio</span>
 		</h1>
 		{#if liveSession.activeId}
 			<!-- pointer-events-none so the whole title bar drags, not just the gaps. -->
-			<span class="pointer-events-none flex items-center gap-2 bg-red-600/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-red-400">
+			<span
+				class="pointer-events-none flex items-center gap-2 bg-red-600/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-red-400"
+			>
 				<span class="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500"></span>
 				{t('status.live')}
-				<span class="font-mono tracking-normal text-red-300/80">{durationLabel(publicDuration)}</span>
+				<span class="font-mono tracking-normal text-red-300/80"
+					>{durationLabel(publicDuration)}</span
+				>
 			</span>
 		{:else if broadcast.phase === 'live'}
-			<span class="pointer-events-none flex items-center gap-2 bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-300">
+			<span
+				class="pointer-events-none flex items-center gap-2 bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-300"
+			>
 				<span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span>
 				{t('status.preview')} · {uptimeLabel(now)}
 			</span>
 		{/if}
 		{#if liveSession.operatorName}
-			<button class="ml-auto text-[10px] text-fg/45 hover:text-fg" onclick={() => void logoutStudio()} title="Sign out of Studio">
+			<button
+				class="ml-auto text-[10px] text-fg/45 hover:text-fg"
+				onclick={() => void logoutStudio()}
+				title="Sign out of Studio"
+			>
 				{liveSession.operatorName} · Sign out
 			</button>
 		{/if}
 		<span
-			class="pointer-events-none {liveSession.operatorName ? '' : 'ml-auto'} text-[10px] {health.tone === 'warn'
+			class="pointer-events-none {liveSession.operatorName
+				? ''
+				: 'ml-auto'} text-[10px] {health.tone === 'warn'
 				? 'text-amber-400'
 				: health.tone === 'ok'
 					? 'text-emerald-400'
@@ -342,7 +384,11 @@
 	{#if broadcast.error}
 		<div class="flex shrink-0 items-start gap-3 border-b border-red-500/30 bg-red-950/40 px-4 py-2">
 			<p class="flex-1 text-[12px] leading-relaxed text-red-300">{broadcast.error}</p>
-			<button class="studio-icon-btn" aria-label={t('common.close')} onclick={() => (broadcast.error = null)}><Icon name="close" /></button>
+			<button
+				class="studio-icon-btn"
+				aria-label={t('common.close')}
+				onclick={() => (broadcast.error = null)}><Icon name="close" /></button
+			>
 		</div>
 	{/if}
 
@@ -422,7 +468,11 @@
 					class="min-w-0 flex-1 truncate text-[12px] {selectedLayer ? 'text-fg/70' : 'text-fg/25'}"
 					>{selectedLayer ? selectedLayer.name : t('preview.noSource')}</span
 				>
-				<button class="studio-chip" disabled={!selectedLayer} onclick={() => (dialog = 'properties')}>
+				<button
+					class="studio-chip"
+					disabled={!selectedLayer}
+					onclick={() => (dialog = 'properties')}
+				>
 					{t('common.properties')}
 				</button>
 			</div>
@@ -443,19 +493,31 @@
 	<!-- ── Dock row ───────────────────────────────────────── -->
 	<Splitter orientation="horizontal" label={t('splitter.docks')} onmove={resizeDockRow} />
 
-	<div
-		bind:this={dockRow}
-		class="flex shrink-0 bg-ink-900"
-		style="height: {layout.dockHeight}px"
-	>
+	<div bind:this={dockRow} class="flex shrink-0 bg-ink-900" style="height: {layout.dockHeight}px">
 		<ScenesDock />
-		<Splitter orientation="vertical" label={t('splitter.between', { name: t('dock.scenes') })} onmove={(d) => resizeDocks('scenes', 'sources', d)} />
+		<Splitter
+			orientation="vertical"
+			label={t('splitter.between', { name: t('dock.scenes') })}
+			onmove={(d) => resizeDocks('scenes', 'sources', d)}
+		/>
 		<SourcesDock onproperties={() => (dialog = 'properties')} />
-		<Splitter orientation="vertical" label={t('splitter.between', { name: t('dock.sources') })} onmove={(d) => resizeDocks('sources', 'mixer', d)} />
+		<Splitter
+			orientation="vertical"
+			label={t('splitter.between', { name: t('dock.sources') })}
+			onmove={(d) => resizeDocks('sources', 'mixer', d)}
+		/>
 		<MixerDock {mixer} />
-		<Splitter orientation="vertical" label={t('splitter.between', { name: t('dock.audioMixer') })} onmove={(d) => resizeDocks('mixer', 'transition', d)} />
+		<Splitter
+			orientation="vertical"
+			label={t('splitter.between', { name: t('dock.audioMixer') })}
+			onmove={(d) => resizeDocks('mixer', 'transition', d)}
+		/>
 		<TransitionsDock />
-		<Splitter orientation="vertical" label={t('splitter.between', { name: t('dock.sceneTransitions') })} onmove={(d) => resizeDocks('transition', 'controls', d)} />
+		<Splitter
+			orientation="vertical"
+			label={t('splitter.between', { name: t('dock.sceneTransitions') })}
+			onmove={(d) => resizeDocks('transition', 'controls', d)}
+		/>
 		<ControlsDock
 			{confirmStop}
 			onToggleLive={toggleLive}
@@ -470,14 +532,22 @@
 		class="flex h-6 shrink-0 items-center gap-4 border-t border-ink-700 bg-ink-850 px-3 font-mono text-[10px] text-fg/35"
 	>
 		<span class="flex items-center gap-1.5">
-			<span class="h-1.5 w-1.5 rounded-full {liveSession.activeId ? 'bg-red-500' : broadcast.phase === 'live' ? 'bg-amber-400' : 'bg-fg/20'}"></span>
+			<span
+				class="h-1.5 w-1.5 rounded-full {liveSession.activeId
+					? 'bg-red-500'
+					: broadcast.phase === 'live'
+						? 'bg-amber-400'
+						: 'bg-fg/20'}"
+			></span>
 			<!-- Never the word LIVE while off air. It read "LIVE: 00:00:00" with the
 			     dot grey and the title bar saying Offline — the one word in this app
 			     that must not be on screen when it is not true. -->
 			{#if liveSession.activeId}
 				<span class="text-red-400">{t('status.live')}</span>
 				{durationLabel(publicDuration)}
-				{#if selectedLiveSession}<span class="max-w-80 truncate font-body text-fg/70">{selectedLiveSession.title}</span>{/if}
+				{#if selectedLiveSession}<span class="max-w-80 truncate font-body text-fg/70"
+						>{selectedLiveSession.title}</span
+					>{/if}
 			{:else if broadcast.phase === 'live'}
 				<span class="text-amber-300">{t('status.preview')}</span>
 				{uptimeLabel(now)}
@@ -485,8 +555,15 @@
 				{t('status.offline')}
 			{/if}
 		</span>
-		<span>Local {new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-		{#if recording.startedAt}<span class="text-red-300">REC {durationLabel(recordingDuration)}</span>{/if}
+		<span
+			>Local {new Date(now).toLocaleTimeString([], {
+				hour: '2-digit',
+				minute: '2-digit',
+				second: '2-digit'
+			})}</span
+		>
+		{#if recording.startedAt}<span class="text-red-300">REC {durationLabel(recordingDuration)}</span
+			>{/if}
 		<span class={renderFps > 0 && renderFps < studio.settings.fps - 5 ? 'text-amber-400' : ''}>
 			{t('status.fps', { actual: renderFps, target: studio.settings.fps })}
 		</span>

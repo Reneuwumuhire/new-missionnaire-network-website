@@ -155,7 +155,9 @@ export async function goLiveYouTube() {
 		}
 		await new Promise((resolve) => setTimeout(resolve, 2000));
 	}
-	throw new Error('YouTube is still preparing after 90 seconds. Check YouTube Studio and try again.');
+	throw new Error(
+		'YouTube is still preparing after 90 seconds. Check YouTube Studio and try again.'
+	);
 }
 
 async function upload(file: File, action: 'presign-thumbnail' | 'presign-subtitle') {
@@ -213,8 +215,11 @@ export async function syncLiveLyrics() {
 	)
 		return;
 	try {
-		const uploaded = await ensureTimedSubtitle();
 		const media = followedMediaElement(true);
+		// A captured external live starts with songs. Merely loading its SRT must
+		// not open the public gate before the matcher has found the sermon.
+		if (!media && lyrics.anchorEpochMs === null) return;
+		const uploaded = await ensureTimedSubtitle();
 		const sampledAtMs = Date.now();
 		const sourcePositionMs = media
 			? Math.round(media.currentTime * 1000)
@@ -244,6 +249,17 @@ export async function syncLiveLyrics() {
 				: {})
 		});
 		attachedSessionId = liveSession.activeId;
+	} catch (error) {
+		liveSession.error = error instanceof Error ? error.message : String(error);
+	}
+}
+
+/** Keep an attached SRT ready for a later automatic/manual lock without
+ * exposing it to listeners during songs or a lost source. */
+export async function hideLiveLyrics() {
+	if (!liveSession.activeId) return;
+	try {
+		await post({ action: 'hide-subtitles', sessionId: liveSession.activeId });
 	} catch (error) {
 		liveSession.error = error instanceof Error ? error.message : String(error);
 	}
@@ -328,12 +344,7 @@ export async function refreshSessions() {
 		}>({
 			action: 'list'
 		});
-		sampleServerClock(
-			result.serverReceivedAtMs,
-			result.serverSentAtMs,
-			sentAtMs,
-			Date.now()
-		);
+		sampleServerClock(result.serverReceivedAtMs, result.serverSentAtMs, sentAtMs, Date.now());
 		liveSession.sessions = result.sessions;
 		liveSession.operatorName = result.operator.name;
 		void refreshYouTubeStatus();
@@ -364,7 +375,15 @@ export async function startSelectedSession(): Promise<boolean> {
 	try {
 		const result = await post<{ startedAt: string }>({
 			action: 'start',
-			sessionId: liveSession.selectedId
+			sessionId: liveSession.selectedId,
+			// A captured external live can contain songs before the prerecorded
+			// sermon. Its SRT stays hidden until the matcher (or fallback button)
+			// locates the sermon; file-based services retain start-at-go-live.
+			subtitleMode: studio.scenes.some((scene) =>
+				scene.layers.some((layer) => layer.youtubeLiveUrl)
+			)
+				? 'armed'
+				: 'broadcast'
 		});
 		liveSession.activeId = liveSession.selectedId;
 		liveSession.activeStartedAt = new Date(result.startedAt).getTime();

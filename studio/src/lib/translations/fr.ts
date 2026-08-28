@@ -54,9 +54,11 @@ const fr: Record<keyof typeof en, string> = {
 	'sources.addSource': 'Ajouter une source',
 	'sources.reconnect': 'Reconnecter',
 	'sources.audioInput': 'Capture d\u2019entr\u00e9e audio',
-	'sources.audioInputHint': 'Micro ou entr\u00e9e ligne \u2014 appara\u00eet dans le m\u00e9langeur audio',
+	'sources.audioInputHint':
+		'Micro ou entr\u00e9e ligne \u2014 appara\u00eet dans le m\u00e9langeur audio',
 	'sources.audioApp': 'Capture audio d\u2019application',
-	'sources.audioAppHint': 'Le son jou\u00e9 par une autre application \u2014 appara\u00eet dans le m\u00e9langeur audio',
+	'sources.audioAppHint':
+		'Le son jou\u00e9 par une autre application \u2014 appara\u00eet dans le m\u00e9langeur audio',
 	'sources.camera': 'Caméra',
 	'sources.cameraHint': 'Webcam ou boîtier de capture',
 	'sources.screen': 'Capture d’écran / de fenêtre',
@@ -67,6 +69,19 @@ const fr: Record<keyof typeof en, string> = {
 	'sources.videoHint': 'Clip ou boucle, avec son',
 	'sources.url': 'YouTube / Lien',
 	'sources.urlHint': 'Lire une vidéo ou un chant depuis un lien, comme toute autre source',
+	'sources.youtubeLive': 'Fenêtre YouTube Live',
+	'sources.youtubeLiveHint': 'Capturer un direct avec le son exact de son application',
+	'youtubeLive.title': 'Ajouter un direct YouTube',
+	'youtubeLive.url': 'Adresse du direct YouTube',
+	'youtubeLive.hint':
+		'Studio ouvre le direct dans votre navigateur, puis le sélecteur système le capture. Utilisez une fenêtre dédiée, gardez-la visible et coupez le son des autres onglets du navigateur.',
+	'youtubeLive.invalid': 'Saisissez un lien YouTube vidéo ou direct sécurisé et valide.',
+	'youtubeLive.openPlayer': '1. Ouvrir le direct',
+	'youtubeLive.playerOpened': 'Lecteur ouvert',
+	'youtubeLive.openChat': 'Ouvrir le chat',
+	'youtubeLive.capture': '2. Capturer la fenêtre',
+	'youtubeLive.captureHint':
+		'Dans le sélecteur système, choisissez la fenêtre du navigateur que vous venez d’ouvrir. Studio associera automatiquement son image au son de cette application.',
 	'web.title': 'Ajouter depuis un lien',
 	'web.url': 'Adresse',
 	'web.audioOnly': 'Son seul',
@@ -98,7 +113,8 @@ const fr: Record<keyof typeof en, string> = {
 	'source.badVideo': 'Vidéo illisible',
 
 	// ── Audio mixer ─────────────────────────────────────────────
-	'mixer.micDenied': 'Pas d\u2019acc\u00e8s au micro : ce syst\u00e8me n\u2019annonce alors aucune entr\u00e9e audio.',
+	'mixer.micDenied':
+		'Pas d\u2019acc\u00e8s au micro : ce syst\u00e8me n\u2019annonce alors aucune entr\u00e9e audio.',
 	'mixer.micRetry': 'Redemander',
 	'mixer.openPrivacy': 'Ouvrir Confidentialit\u00e9',
 	'mixer.monitor': 'Écoute',
@@ -112,7 +128,8 @@ const fr: Record<keyof typeof en, string> = {
 	'mixer.desktopAudio': 'Son du bureau (tout l\u2019\u00e9cran)',
 	'mixer.appGone': 'Cette application ne tourne plus \u2014 en choisir une autre',
 	'mixer.refreshApps': 'Actualiser la liste',
-	'mixer.appAudioUnsupported': 'L\u2019audio par application n\u00e9cessite macOS 13 ou plus r\u00e9cent',
+	'mixer.appAudioUnsupported':
+		'L\u2019audio par application n\u00e9cessite macOS 13 ou plus r\u00e9cent',
 	'mixer.addMic': 'Ajouter une entrée audio',
 	'mixer.connect': 'Connecter l’entrée',
 	'mixer.noAudioTrack': 'Pas de piste audio',
@@ -144,7 +161,8 @@ const fr: Record<keyof typeof en, string> = {
 	'controls.studioMode': 'Mode Studio',
 	'controls.settings': 'Paramètres',
 	'controls.recording': 'Enregistrement',
-	'controls.recordingHint': 'Choisissez Local, Cloud ou Les deux dans Paramètres → Sortie. L’enregistrement démarre et s’arrête avec la diffusion.',
+	'controls.recordingHint':
+		'Choisissez Local, Cloud ou Les deux dans Paramètres → Sortie. L’enregistrement démarre et s’arrête avec la diffusion.',
 
 	// ── Stream health ───────────────────────────────────────────
 	'health.title': 'État de la diffusion',
@@ -225,6 +243,22 @@ const fr: Record<keyof typeof en, string> = {
 	'lyrics.cueHintManual': 'Afficher cette ligne',
 	'lyrics.pastedName': 'Collé',
 	'lyrics.starterLayer': 'Paroles',
+	'lyrics.referenceTitle': 'Synchronisation automatique du sermon',
+	'lyrics.referenceAudio': 'Choisir l’audio de référence',
+	'lyrics.referenceMissing': 'Chargez le MP3 préparé du sermon et son fichier .srt français.',
+	'lyrics.referenceSourceMissing':
+		'Ajoutez et capturez la fenêtre YouTube Live pour fournir son audio.',
+	'lyrics.referenceIdle': 'En attente de l’audio de référence et d’une source en direct capturée',
+	'lyrics.referenceLoading': 'Préparation de l’audio de référence…',
+	'lyrics.referenceArmed': 'Armé — les sous-titres restent masqués pendant les chants',
+	'lyrics.referenceSearching': 'Écoute du début du sermon…',
+	'lyrics.referenceLocked': 'Calé à {position} · confiance {score} %',
+	'lyrics.referenceRecovering': 'Le signal a changé — sous-titres masqués pendant le recalage',
+	'lyrics.referenceResume': 'Reprendre la synchronisation automatique',
+	'lyrics.referenceHide': 'Masquer les sous-titres',
+	'lyrics.referenceFallback': 'Le sermon commence maintenant',
+	'lyrics.referenceFallbackHint':
+		'Secours uniquement : démarre immédiatement le premier sous-titre.',
 
 	// ── Properties ──────────────────────────────────────────────
 	'media.needsFile': 'Rechoisir le fichier \u2014 Sources \u203a Reconnecter',
@@ -234,7 +268,8 @@ const fr: Record<keyof typeof en, string> = {
 	'media.forward': 'Dix secondes en avant',
 	'media.scrub': 'Position dans l\u2019enregistrement',
 	'media.followShort': 'Paroles',
-	'props.transportMoved': 'La lecture, la pause et le d\u00e9filement sont sur la barre sous l\u2019aper\u00e7u, \u00e0 port\u00e9e pendant le culte.',
+	'props.transportMoved':
+		'La lecture, la pause et le d\u00e9filement sont sur la barre sous l\u2019aper\u00e7u, \u00e0 port\u00e9e pendant le culte.',
 	'props.title': 'Propriétés de la source',
 	'props.empty': 'Sélectionnez une source dans la liste, ou cliquez-la dans l’aperçu.',
 	'props.device': 'Appareil',
@@ -249,7 +284,8 @@ const fr: Record<keyof typeof en, string> = {
 	'props.pause': 'Pause',
 	'props.restart': 'Début',
 	'props.followLyrics': 'Les paroles suivent cet enregistrement',
-	'props.followLyricsHint': 'Le .srt suit la position de la piste : mettre en pause ou revenir en arri\u00e8re emm\u00e8ne les paroles avec.',
+	'props.followLyricsHint':
+		'Le .srt suit la position de la piste : mettre en pause ou revenir en arri\u00e8re emm\u00e8ne les paroles avec.',
 	'props.loop': 'Boucle',
 	'props.position': 'Position (% du cadre)',
 	'props.fullFrame': 'Plein cadre',
@@ -294,7 +330,8 @@ const fr: Record<keyof typeof en, string> = {
 	'settings.language': 'Langue',
 	'settings.liveWarning': 'Les réglages d’encodage s’appliqueront à la prochaine diffusion.',
 	'settings.recording': 'Enregistrement',
-	'settings.recordingHint': 'Les fichiers locaux sont enregistrés dans Films/Missionnaire Studio. Le cloud utilise directement le recorder.',
+	'settings.recordingHint':
+		'Les fichiers locaux sont enregistrés dans Films/Missionnaire Studio. Le cloud utilise directement le recorder.',
 	'settings.recorderUrl': 'URL du recorder cloud',
 	'settings.recorderToken': 'Jeton du recorder cloud',
 	'recording.off': 'Désactivé',
@@ -302,7 +339,8 @@ const fr: Record<keyof typeof en, string> = {
 	'recording.cloud': 'Cloud',
 	'recording.both': 'Les deux',
 	'settings.testPattern': 'Mire en l\u2019absence de signal',
-	'settings.testPatternHint': 'Affiche une mire quand la cam\u00e9ra, le partage d\u2019\u00e9cran ou le fichier d\u2019une sc\u00e8ne ne produit aucune image. Le noir ressemble \u00e0 un flux mort.',
+	'settings.testPatternHint':
+		'Affiche une mire quand la cam\u00e9ra, le partage d\u2019\u00e9cran ou le fichier d\u2019une sc\u00e8ne ne produit aucune image. Le noir ressemble \u00e0 un flux mort.',
 	'settings.resolution': 'Résolution de base',
 	'settings.fps': 'Images par seconde',
 	'settings.videoBitrate': 'Débit vidéo — {kbps} kb/s',
@@ -311,8 +349,7 @@ const fr: Record<keyof typeof en, string> = {
 	'settings.encoder': 'Encodeur',
 	'settings.hardware': 'Matériel',
 	'settings.software': 'Logiciel (x264)',
-	'settings.encoderHint':
-		'Matériel décharge le processeur. Passez en logiciel si l’image saccade.',
+	'settings.encoderHint': 'Matériel décharge le processeur. Passez en logiciel si l’image saccade.',
 	'settings.resetLayout': 'Réinitialiser les panneaux',
 	'settings.layoutHint':
 		'Faites glisser les séparateurs entre les panneaux pour les redimensionner.',

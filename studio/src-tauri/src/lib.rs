@@ -1,6 +1,7 @@
 mod appaudio;
 mod fetch;
 mod ffmpeg;
+mod reference;
 
 use ffmpeg::{Encoder, FfmpegInfo, StreamConfig};
 use serde::Serialize;
@@ -50,6 +51,13 @@ mod url_tests {
 #[tauri::command]
 fn check_ffmpeg() -> Result<FfmpegInfo, String> {
 	ffmpeg::probe_ffmpeg()
+}
+
+#[tauri::command]
+async fn extract_reference_features(path: String) -> Result<reference::ReferenceFeatures, String> {
+	tauri::async_runtime::spawn_blocking(move || reference::extract(path))
+		.await
+		.map_err(|error| error.to_string())?
 }
 
 /// Returns the ffmpeg command line with stream keys redacted, so the UI can
@@ -245,6 +253,28 @@ fn open_url(url: String) -> Result<(), String> {
 		.map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn open_youtube_chat(app: AppHandle, url: String) -> Result<(), String> {
+	if !allowed_web_url(&url) || !url.starts_with("https://www.youtube.com/live_chat?") {
+		return Err("Invalid YouTube live chat URL".into());
+	}
+	if let Some(existing) = app.get_webview_window("youtube-live-chat") {
+		let _ = existing.close();
+	}
+	let parsed = url.parse().map_err(|_| "Invalid YouTube live chat URL")?;
+	tauri::WebviewWindowBuilder::new(
+		&app,
+		"youtube-live-chat",
+		tauri::WebviewUrl::External(parsed),
+	)
+	.title("YouTube Live Chat")
+	.inner_size(420.0, 760.0)
+	.min_inner_size(320.0, 480.0)
+	.build()
+	.map(|_| ())
+	.map_err(|error| error.to_string())
+}
+
 /// Open the macOS privacy pane for a device class, so a refused microphone has
 /// somewhere to be un-refused. A fixed set rather than a URL from the webview:
 /// this hands a string to the OS shell.
@@ -395,8 +425,10 @@ pub fn run() {
 			}
 			Ok(())
 		})
+		.plugin(tauri_plugin_dialog::init())
 		.invoke_handler(tauri::generate_handler![
 			check_ffmpeg,
+			extract_reference_features,
 			start_stream,
 			recorder_post,
 			studio_live_post,
@@ -409,6 +441,7 @@ pub fn run() {
 			stream_running,
 			selftest_target,
 			open_url,
+			open_youtube_chat,
 			open_privacy_settings,
 			list_audio_apps,
 			list_windows,
@@ -420,7 +453,7 @@ pub fn run() {
 		.on_window_event(|window, event| {
 			// Closing the window while live would orphan ffmpeg holding the RTMP
 			// connections open; YouTube would keep showing a frozen frame.
-			if let tauri::WindowEvent::Destroyed = event {
+			if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
 				if let Some(encoder) = window.app_handle().try_state::<Encoder>() {
 					let _ = encoder.stop();
 				}
