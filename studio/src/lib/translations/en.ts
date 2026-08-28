@@ -78,7 +78,7 @@ const en = {
 	'youtubeLive.openChat': 'Open live chat',
 	'youtubeLive.capture': '2. Capture window',
 	'youtubeLive.captureHint':
-		'In the system picker, choose the browser window you just opened. Studio will pair its picture with that browser application’s audio automatically.',
+		'Choose the browser window you just opened. On Windows, enable Share system audio; if window capture has no audio, maximize the browser and capture that display. On macOS, Studio pairs the browser application audio automatically.',
 	'web.title': 'Add from a link',
 	'web.url': 'Address',
 	'web.audioOnly': 'Sound only',
@@ -128,7 +128,7 @@ const en = {
 	'mixer.connect': 'Connect input',
 	'mixer.noAudioTrack': 'No audio track',
 	'mixer.noSurfaceAudioHint':
-		'macOS gives the browser engine picture only when you share a window or screen \u2014 no application or tab sound, and no error to say so. Route the app\u2019s output through a virtual audio device (BlackHole, Loopback) and add that device here as an audio input.',
+		'This share contains no audio track. On Windows, capture the display and enable Share system audio. On macOS, reconnect the window so Studio can pair its application audio.',
 	'mixer.defaultInput': 'Default input',
 	'mixer.chooseInput': 'Choose input',
 	'mixer.fader': 'Level',

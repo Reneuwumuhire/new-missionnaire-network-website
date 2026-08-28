@@ -25,7 +25,7 @@
 	import Icon, { type IconName } from './Icon.svelte';
 	import { popoverFit } from '../lib/layout';
 	import { t } from '../lib/i18n.svelte';
-	import { useReferenceSource } from '../lib/reference-match.svelte';
+	import { observeReferenceStream, useReferenceSource } from '../lib/reference-match.svelte';
 	import { youtubeChatUrl, youtubeVideoId } from '../lib/youtube';
 	import {
 		DEFAULT_TEXT_STYLE,
@@ -211,26 +211,34 @@
 		const handle = await openScreen(layer);
 		const track = handle.stream?.getVideoTracks()[0];
 		if (!track) return;
+		if (layer.youtubeLiveUrl && handle.stream) {
+			await observeReferenceStream(layer.id, handle.stream);
+		}
 		const label = track.label ?? '';
 		const size = track.getSettings();
 		const [windows] = await Promise.all([listWindows(), refreshApps()]);
+		const hasCapturedAudio = Boolean(handle.stream?.getAudioTracks().length);
 		// The window's own application first, then anything the label names, and
 		// for a whole screen the desktop itself — a shared display has no single
-		// application behind it, but it certainly has a sound.
+		// application behind it, but it certainly has a sound. When Chromium has
+		// already supplied that sound (Windows), keep its stream: replacing it
+		// with the native macOS capture would tear down a working mixer strip.
 		const surface = (size as MediaTrackSettings & { displaySurface?: string }).displaySurface;
 		const window = matchWindow(label, size, windows);
-		const app =
-			surface === 'monitor'
+		const app = hasCapturedAudio
+			? null
+			: surface === 'monitor'
 				? { id: DESKTOP_AUDIO, name: t('mixer.desktopAudio') }
 				: window
 					? { id: window.appId, name: window.appName }
 					: matchApp(label, appAudio.apps);
 		// No guess is not a failure: the mixer strip offers the list.
-		if (app) layer.appId = app.id;
+		if (hasCapturedAudio) delete layer.appId;
+		else if (app) layer.appId = app.id;
 		// What the engine actually said about the share. Without this line a bad
 		// guess is unexplainable after the fact.
 		report(
-			`share label=${JSON.stringify(label)} size=${size.width}x${size.height} windows=${windows.length} matched=${app?.name ?? 'none'}`
+			`share label=${JSON.stringify(label)} size=${size.width}x${size.height} audio=${hasCapturedAudio} windows=${windows.length} matched=${app?.name ?? 'none'}`
 		);
 		persist();
 	}

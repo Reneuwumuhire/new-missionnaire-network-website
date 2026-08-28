@@ -6,7 +6,7 @@
 // same meter, monitored through the same bus, encoded through the same mix.
 
 import { Channel, invoke } from '@tauri-apps/api/core';
-import workletUrl from './pcm-worklet.js?url';
+import workletUrl from './pcm-worklet.js?url&no-inline';
 import type { Mixer } from './mixer';
 
 export interface AudioApp {

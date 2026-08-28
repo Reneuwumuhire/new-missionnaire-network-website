@@ -81,7 +81,7 @@ const fr: Record<keyof typeof en, string> = {
 	'youtubeLive.openChat': 'Ouvrir le chat',
 	'youtubeLive.capture': '2. Capturer la fenêtre',
 	'youtubeLive.captureHint':
-		'Dans le sélecteur système, choisissez la fenêtre du navigateur que vous venez d’ouvrir. Studio associera automatiquement son image au son de cette application.',
+		'Choisissez la fenêtre du navigateur que vous venez d’ouvrir. Sous Windows, activez Partager l’audio du système ; si la fenêtre n’a pas de son, agrandissez le navigateur et capturez cet écran. Sous macOS, Studio associe automatiquement le son de l’application.',
 	'web.title': 'Ajouter depuis un lien',
 	'web.url': 'Adresse',
 	'web.audioOnly': 'Son seul',
@@ -134,7 +134,7 @@ const fr: Record<keyof typeof en, string> = {
 	'mixer.connect': 'Connecter l’entrée',
 	'mixer.noAudioTrack': 'Pas de piste audio',
 	'mixer.noSurfaceAudioHint':
-		'Sur macOS, le partage d\u2019une fen\u00eatre ou d\u2019un \u00e9cran ne fournit que l\u2019image \u2014 aucun son d\u2019application ni d\u2019onglet, et aucune erreur pour le signaler. Faites passer le son de l\u2019application par un p\u00e9riph\u00e9rique audio virtuel (BlackHole, Loopback) et ajoutez-le ici comme entr\u00e9e audio.',
+		'Ce partage ne contient aucune piste audio. Sous Windows, capturez l\u2019écran et activez Partager l\u2019audio du système. Sous macOS, reconnectez la fenêtre afin que Studio associe le son de l\u2019application.',
 	'mixer.defaultInput': 'Entrée par défaut',
 	'mixer.chooseInput': 'Choisir l’entrée',
 	'mixer.fader': 'Niveau',

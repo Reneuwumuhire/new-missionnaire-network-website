@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { observeAppAudio } from './appaudio.svelte';
+import observerWorkletUrl from './reference-observer-worklet.js?url&no-inline';
 import { hideLiveLyrics, syncLiveLyrics } from './live-session.svelte';
 import { anchorAt, clearSync, followMedia, lyrics, timedPositionMs } from './lyrics.svelte';
 import {
@@ -43,6 +44,15 @@ let initialized = false;
 let worker: Worker | null = null;
 let awaitingMatch = false;
 let generation = 0;
+let streamContext: AudioContext | null = null;
+let streamWorkletReady: Promise<void> | null = null;
+let streamTap: {
+	sourceId: string;
+	track: MediaStreamTrack;
+	source: MediaStreamAudioSourceNode;
+	observer: AudioWorkletNode;
+	onEnded: () => void;
+} | null = null;
 
 function resetLiveWindow() {
 	extractor = new LiveFeatureExtractor();
@@ -73,7 +83,63 @@ export function initReferenceMatcher() {
 		referenceMatcher.status = 'error';
 		referenceMatcher.error = event.message;
 	};
-	observeAppAudio((sourceId, samples) => feed(sourceId, samples));
+	// Windows/WebView2 includes the selected display's audio in the media
+	// stream. Prepare one silent tap on the first operator gesture so autoplay
+	// policy cannot block it after the system picker closes.
+	const wakeStreamAudio = () => {
+		if (!streamContext) {
+			streamContext = new AudioContext({ sampleRate: 48_000, latencyHint: 'interactive' });
+			streamWorkletReady = streamContext.audioWorklet.addModule(observerWorkletUrl);
+		}
+		void streamContext.resume();
+	};
+	window.addEventListener('pointerdown', wakeStreamAudio);
+	observeAppAudio((sourceId, samples) => {
+		if (streamTap?.sourceId !== sourceId) feed(sourceId, samples);
+	});
+}
+
+/** Feed a display-capture audio track to the matcher. WebView2 supplies this
+ * on Windows; macOS supplies no track and continues through ScreenCaptureKit. */
+export async function observeReferenceStream(
+	sourceId: string,
+	stream: MediaStream
+): Promise<boolean> {
+	const track = stream.getAudioTracks()[0];
+	if (!track || !streamContext || !streamWorkletReady) return false;
+	disconnectStreamTap();
+	try {
+		await streamWorkletReady;
+		await streamContext.resume();
+		const source = streamContext.createMediaStreamSource(new MediaStream([track]));
+		const observer = new AudioWorkletNode(streamContext, 'reference-observer', {
+			numberOfInputs: 1,
+			numberOfOutputs: 1,
+			outputChannelCount: [2]
+		});
+		observer.port.onmessage = ({ data }: MessageEvent<Float32Array>) => feed(sourceId, data);
+		source.connect(observer);
+		observer.connect(streamContext.destination);
+		const onEnded = () => {
+			if (streamTap?.track === track) disconnectStreamTap();
+		};
+		streamTap = { sourceId, track, source, observer, onEnded };
+		track.addEventListener('ended', onEnded, { once: true });
+		return true;
+	} catch (error) {
+		referenceMatcher.status = 'error';
+		referenceMatcher.error = error instanceof Error ? error.message : String(error);
+		return false;
+	}
+}
+
+function disconnectStreamTap() {
+	if (!streamTap) return;
+	streamTap.track.removeEventListener('ended', streamTap.onEnded);
+	streamTap.source.disconnect();
+	streamTap.observer.disconnect();
+	streamTap.observer.port.onmessage = null;
+	streamTap = null;
 }
 
 export async function chooseReferenceAudio() {
@@ -108,7 +174,10 @@ export async function chooseReferenceAudio() {
 }
 
 export function useReferenceSource(sourceId: string, sourceName: string) {
-	if (referenceMatcher.sourceId !== sourceId) resetLiveWindow();
+	if (referenceMatcher.sourceId !== sourceId) {
+		disconnectStreamTap();
+		resetLiveWindow();
+	}
 	referenceMatcher.sourceId = sourceId;
 	referenceMatcher.sourceName = sourceName;
 	referenceMatcher.enabled = true;
