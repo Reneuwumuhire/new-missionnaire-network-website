@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { sessionYouTubeChannelId, type YouTubeChannel } from './live-session.svelte';
+import {
+	sessionYouTubeChannelId,
+	type YouTubeChannel,
+	youtubeChannelsFromStatus
+} from './live-session.svelte';
 
 const channels: YouTubeChannel[] = [
 	{ id: 'first', title: 'First', updatedAt: '1' },
@@ -15,4 +19,11 @@ describe('a scheduled service YouTube channel', () => {
 		expect(sessionYouTubeChannelId({}, channels.slice(0, 1))).toBe('first');
 		expect(sessionYouTubeChannelId({}, channels)).toBeNull();
 	});
+});
+
+it('accepts the older single-channel admin response', () => {
+	expect(youtubeChannelsFromStatus({ connected: true, channelTitle: 'Missionnaire TV' })).toEqual([
+		{ id: 'legacy:Missionnaire TV', title: 'Missionnaire TV', updatedAt: '' }
+	]);
+	expect(youtubeChannelsFromStatus({ connected: false, channelTitle: null })).toEqual([]);
 });

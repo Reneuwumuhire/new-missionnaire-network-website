@@ -16,6 +16,17 @@ export type LiveSession = {
 };
 export type YouTubeChannel = { id: string; title: string; updatedAt: string };
 
+export function youtubeChannelsFromStatus(status: {
+	channels?: YouTubeChannel[];
+	connected?: boolean;
+	channelTitle?: string | null;
+}): YouTubeChannel[] {
+	if (Array.isArray(status.channels)) return status.channels;
+	return status.connected && status.channelTitle
+		? [{ id: `legacy:${status.channelTitle}`, title: status.channelTitle, updatedAt: '' }]
+		: [];
+}
+
 export function sessionYouTubeChannelId(
 	session: Pick<LiveSession, 'youtube_channel_id'> | null | undefined,
 	channels: YouTubeChannel[]
@@ -138,15 +149,20 @@ export async function connectWithAdmin() {
 
 export async function refreshYouTubeStatus() {
 	try {
-		const result = await adminPost<{ channels: YouTubeChannel[] }>({
+		const result = await adminPost<{
+			channels?: YouTubeChannel[];
+			connected?: boolean;
+			channelTitle?: string | null;
+		}>({
 			action: 'status'
 		});
-		liveSession.youtubeChannels = result.channels;
-		liveSession.youtubeConnected = result.channels.length > 0;
+		const channels = youtubeChannelsFromStatus(result);
+		liveSession.youtubeChannels = channels;
+		liveSession.youtubeConnected = channels.length > 0;
 		selectYouTubeChannel(
-			result.channels.some((channel) => channel.id === liveSession.youtubeChannelId)
+			channels.some((channel) => channel.id === liveSession.youtubeChannelId)
 				? liveSession.youtubeChannelId
-				: (result.channels[0]?.id ?? null)
+				: (channels[0]?.id ?? null)
 		);
 		liveSession.youtubeError = null;
 	} catch (error) {
