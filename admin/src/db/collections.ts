@@ -1000,9 +1000,7 @@ export async function getBroadcastAdminState(opts?: {
 			typeof doc.subtitle_anchor_epoch_ms === 'number' ? doc.subtitle_anchor_epoch_ms : null,
 		subtitle_offset_ms: typeof doc.subtitle_offset_ms === 'number' ? doc.subtitle_offset_ms : 0,
 		subtitle_paused_position_ms:
-			typeof doc.subtitle_paused_position_ms === 'number'
-				? doc.subtitle_paused_position_ms
-				: null,
+			typeof doc.subtitle_paused_position_ms === 'number' ? doc.subtitle_paused_position_ms : null,
 		updated_at: (doc.updated_at as string) ?? new Date(0).toISOString()
 	};
 	cachedBroadcast = { value, cachedAt: Date.now() };
@@ -1047,6 +1045,8 @@ export type ScheduledLive = {
 	thumbnail_url: string | null;
 	thumbnail_s3_key: string | null;
 	youtube_url: string | null;
+	youtube_channel_id: string | null;
+	youtube_channel_title: string | null;
 	scheduled_at: string; // ISO (stored as BSON Date, serialized on read)
 	status: ScheduledLiveStatus;
 	live_started_at: string | null;
@@ -1104,6 +1104,8 @@ export async function createScheduledLive(input: {
 	thumbnail_url?: string | null;
 	thumbnail_s3_key?: string | null;
 	youtube_url?: string | null;
+	youtube_channel_id?: string | null;
+	youtube_channel_title?: string | null;
 	scheduled_at: Date;
 	status?: 'scheduled' | 'live';
 	live_started_at?: string | null;
@@ -1127,6 +1129,8 @@ export async function createScheduledLive(input: {
 			thumbnail_url: input.thumbnail_url ?? null,
 			thumbnail_s3_key: input.thumbnail_s3_key ?? null,
 			youtube_url: input.youtube_url ?? null,
+			youtube_channel_id: input.youtube_channel_id ?? null,
+			youtube_channel_title: input.youtube_channel_title ?? null,
 			scheduled_at: input.scheduled_at,
 			status: input.status ?? 'scheduled',
 			live_started_at: input.live_started_at ?? null,

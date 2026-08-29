@@ -30,20 +30,29 @@
 	// same reason — it is a command, not a setting.
 	let draft = $state({
 		settings: stageableSettings(studio.settings),
-		destinations: $state.snapshot(studio.destinations) as Destination[],
+		destinations: $state.snapshot(
+			studio.destinations.filter((destination) => !destination.managed)
+		) as Destination[],
 		locale: i18n.locale
 	});
 
 	const dirty = $derived(
 		JSON.stringify(draft.settings) !== JSON.stringify(stageableSettings(studio.settings)) ||
-			JSON.stringify(draft.destinations) !== JSON.stringify($state.snapshot(studio.destinations)) ||
+			JSON.stringify(draft.destinations) !==
+				JSON.stringify(
+					$state.snapshot(studio.destinations.filter((destination) => !destination.managed))
+				) ||
 			draft.locale !== i18n.locale
 	);
 
 	function apply() {
 		Object.assign(studio.settings, $state.snapshot(draft.settings));
-		studio.destinations = $state.snapshot(draft.destinations) as Destination[];
+		studio.destinations = [
+			...studio.destinations.filter((destination) => destination.managed),
+			...($state.snapshot(draft.destinations) as Destination[])
+		];
 		if (draft.locale !== i18n.locale) setLocale(draft.locale);
+		persist();
 	}
 
 	// Categories down the left, one page at a time — OBS's Settings window.

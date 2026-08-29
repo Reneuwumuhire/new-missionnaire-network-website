@@ -3,9 +3,10 @@
 	import Icon from './Icon.svelte';
 	import { t } from '../lib/i18n.svelte';
 	import { destinationUrl, id, type Destination } from '../lib/state.svelte';
+	import { connectYouTube, disconnectYouTube, liveSession } from '../lib/live-session.svelte';
 
-	// The list belongs to the Settings dialog, which stages every change and
-	// only puts them into the show on Apply. Nothing here writes to the store.
+	// The RTMP list belongs to the Settings draft and reaches the show only on
+	// Apply. OAuth channel actions are account commands, so they take effect now.
 	let { destinations = $bindable([] as Destination[]) } = $props();
 
 	let revealed = $state<Record<string, boolean>>({});
@@ -14,16 +15,19 @@
 		{
 			name: () => t('stream.presetMissionnaire'),
 			url: 'rtmp://missionnaire-streaming-app.fly.dev:1935/live',
+			platform: 'missionnaire' as const,
 			hint: () => t('stream.presetMissionnaireHint')
 		},
 		{
-			name: () => t('stream.presetYouTube'),
+			name: () => t('stream.presetYouTubeManual'),
 			url: 'rtmp://a.rtmp.youtube.com/live2',
+			platform: 'youtube' as const,
 			hint: () => t('stream.presetYouTubeHint')
 		},
 		{
 			name: () => t('stream.presetFacebook'),
 			url: 'rtmps://live-api-s.facebook.com:443/rtmp',
+			platform: 'facebook' as const,
 			hint: () => t('stream.presetFacebookHint')
 		}
 	];
@@ -37,10 +41,17 @@
 				url: preset?.url ?? 'rtmp://',
 				key: '',
 				enabled: false,
+				platform: preset?.platform ?? 'custom',
+				managed: false,
 				// Preflight is useful only when the destination receives the signal.
 				hold: false
 			}
 		];
+	}
+
+	async function removeChannel(channelId: string, title: string) {
+		if (!confirm(t('stream.disconnectConfirm', { channel: title }))) return;
+		await disconnectYouTube(channelId);
 	}
 
 	function remove(destination: Destination) {
@@ -63,10 +74,54 @@
 	}
 </script>
 
-<div class="space-y-3 p-4">
-	<p class="text-[11px] leading-relaxed text-fg/40">{t('stream.intro')}</p>
+<section class="space-y-3 border-b border-ink-700 p-4">
+	<div>
+		<h3 class="text-[12px] font-semibold text-fg/80">{t('stream.youtubeChannels')}</h3>
+		<p class="mt-1 text-[11px] leading-relaxed text-fg/40">{t('stream.youtubeChannelsHint')}</p>
+	</div>
+	{#if !liveSession.operatorName}
+		<p class="border border-amber-500/25 bg-amber-500/5 p-2 text-[11px] text-amber-300">
+			{t('stream.connectAdminFirst')}
+		</p>
+	{:else if liveSession.youtubeChannels.length === 0}
+		<p class="text-[11px] text-fg/35">{t('stream.noYouTubeChannels')}</p>
+	{:else}
+		<div class="space-y-1.5">
+			{#each liveSession.youtubeChannels as channel (channel.id)}
+				<div class="flex items-center gap-2 border border-ink-700 bg-ink-850 px-3 py-2">
+					<span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+					<span class="min-w-0 flex-1 truncate text-[12px] text-fg/75">{channel.title}</span>
+					<button
+						class="studio-chip text-red-300"
+						disabled={isStreaming()}
+						onclick={() => void removeChannel(channel.id, channel.title)}
+						>{t('stream.disconnectChannel')}</button
+					>
+				</div>
+			{/each}
+		</div>
+	{/if}
+	<button
+		class="studio-chip"
+		disabled={!liveSession.operatorName || liveSession.youtubeConnecting || isStreaming()}
+		onclick={() => void connectYouTube()}
+	>
+		{liveSession.youtubeConnecting
+			? t('controls.youtubeConnecting')
+			: t('stream.addYouTubeChannel')}
+	</button>
+	{#if liveSession.youtubeError}
+		<p class="text-[11px] text-red-400">{liveSession.youtubeError}</p>
+	{/if}
+</section>
 
-	{#each destinations as destination (destination.id)}
+<div class="space-y-3 p-4">
+	<div>
+		<h3 class="text-[12px] font-semibold text-fg/80">{t('stream.manualOutputs')}</h3>
+		<p class="mt-1 text-[11px] leading-relaxed text-fg/40">{t('stream.intro')}</p>
+	</div>
+
+	{#each destinations.filter((destination) => !destination.managed) as destination (destination.id)}
 		{@const issue = problem(destination)}
 		<div
 			class="border p-3 {destination.enabled
@@ -90,7 +145,12 @@
 						destination.name = (e.currentTarget as HTMLInputElement).value;
 					}}
 				/>
-				<button class="studio-icon-btn" title={t('common.remove')} aria-label={t('common.remove')} onclick={() => remove(destination)}><Icon name="trash" size={14} /></button>
+				<button
+					class="studio-icon-btn"
+					title={t('common.remove')}
+					aria-label={t('common.remove')}
+					onclick={() => remove(destination)}><Icon name="trash" size={14} /></button
+				>
 			</div>
 
 			<div class="mt-2 space-y-1.5">
@@ -148,7 +208,9 @@
 
 	<div class="flex flex-wrap gap-1.5 border-t border-ink-700 pt-3">
 		{#each PRESETS as preset (preset.url)}
-			<button class="studio-chip" title={preset.hint()} onclick={() => add(preset)}>+ {preset.name()}</button>
+			<button class="studio-chip" title={preset.hint()} onclick={() => add(preset)}
+				>+ {preset.name()}</button
+			>
 		{/each}
 		<button class="studio-chip" onclick={() => add()}>+ {t('stream.presetBlank')}</button>
 	</div>

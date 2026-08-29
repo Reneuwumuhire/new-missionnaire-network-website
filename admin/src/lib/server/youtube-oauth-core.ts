@@ -2,7 +2,10 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:
 
 export const YOUTUBE_THUMBNAIL_MAX_BYTES = 2 * 1024 * 1024;
 
-export function validateYouTubeThumbnail(contentType: string, size: number): 'image/jpeg' | 'image/png' {
+export function validateYouTubeThumbnail(
+	contentType: string,
+	size: number
+): 'image/jpeg' | 'image/png' {
 	const normalized = contentType.split(';', 1)[0].trim().toLowerCase();
 	if (normalized !== 'image/jpeg' && normalized !== 'image/png') {
 		throw new Error('YouTube thumbnail must be a JPEG or PNG image');
@@ -70,7 +73,7 @@ export function authorizationUrl(input: {
 		response_type: 'code',
 		scope: 'https://www.googleapis.com/auth/youtube.force-ssl',
 		access_type: 'offline',
-		prompt: 'consent',
+		prompt: 'consent select_account',
 		state: input.state
 	}).toString();
 	return url.toString();

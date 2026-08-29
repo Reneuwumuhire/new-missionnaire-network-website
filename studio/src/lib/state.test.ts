@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
 	audioLayers,
+	destinationPlatform,
 	makeLayer,
+	persistableDestinations,
 	reconnectWith,
 	requiresYouTubeGoLive,
 	stageableSettings,
@@ -41,12 +43,31 @@ describe('which layers get a mixer strip', () => {
 });
 
 describe('public destinations', () => {
-	const youtube = { id: 'yt', name: 'YouTube', url: 'rtmp://a.rtmp.youtube.com/live2', key: 'key', enabled: true, hold: false };
+	const youtube = {
+		id: 'yt',
+		name: 'YouTube',
+		url: 'rtmp://a.rtmp.youtube.com/live2',
+		key: 'key',
+		enabled: true,
+		hold: false
+	};
 
 	it('requires YouTube control only for an enabled public YouTube destination', () => {
 		expect(requiresYouTubeGoLive([youtube])).toBe(true);
 		expect(requiresYouTubeGoLive([{ ...youtube, enabled: false }])).toBe(false);
 		expect(requiresYouTubeGoLive([youtube], true)).toBe(false);
+	});
+
+	it('keeps manual YouTube keys outside managed Go Live control', () => {
+		const manual = { ...youtube, platform: 'youtube' as const, managed: false };
+		expect(destinationPlatform(manual)).toBe('youtube');
+		expect(requiresYouTubeGoLive([manual])).toBe(false);
+	});
+
+	it('never persists a managed ingest key', () => {
+		const managed = { ...youtube, platform: 'youtube' as const, managed: true };
+		expect(persistableDestinations([managed])[0]).toMatchObject({ key: '', enabled: false });
+		expect(persistableDestinations([{ ...managed, managed: false }])[0].key).toBe('key');
 	});
 });
 

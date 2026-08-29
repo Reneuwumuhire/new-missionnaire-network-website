@@ -129,11 +129,26 @@ export interface Destination {
 	url: string;
 	key: string;
 	enabled: boolean;
+	platform?: 'missionnaire' | 'youtube' | 'facebook' | 'custom';
+	/** Managed YouTube credentials come from OAuth and never belong in saved
+	 *  frontend settings. Manual RTMP destinations always leave this false. */
+	managed?: boolean;
 	/** Hold this one back until the operator presses Go Live, rather than
 	 *  connecting it with Start Streaming. Nothing reaches the service at all
 	 *  until then, so a platform that auto-publishes on first frame — which is
 	 *  what YouTube's default stream key does — cannot jump the gun. */
 	hold: boolean;
+}
+
+export function destinationPlatform(
+	destination: Pick<Destination, 'name' | 'url' | 'platform'>
+): NonNullable<Destination['platform']> {
+	if (destination.platform) return destination.platform;
+	if (/youtube/i.test(destination.name) || /youtube/i.test(destination.url)) return 'youtube';
+	if (/facebook/i.test(destination.name) || /facebook/i.test(destination.url)) return 'facebook';
+	if (/missionnaire/i.test(destination.name) || /missionnaire/i.test(destination.url))
+		return 'missionnaire';
+	return 'custom';
 }
 
 export function requiresYouTubeGoLive(destinations: Destination[], isTest = false): boolean {
@@ -142,7 +157,8 @@ export function requiresYouTubeGoLive(destinations: Destination[], isTest = fals
 		destinations.some(
 			(destination) =>
 				destination.enabled &&
-				(/youtube/i.test(destination.name) || /youtube/i.test(destination.url))
+				destinationPlatform(destination) === 'youtube' &&
+				destination.managed !== false
 		)
 	);
 }
@@ -306,6 +322,8 @@ function load(): Persisted {
 				url: 'rtmp://localhost:1935/live',
 				key: 'obs',
 				enabled: true,
+				platform: 'missionnaire',
+				managed: false,
 				hold: false
 			},
 			{
@@ -316,6 +334,8 @@ function load(): Persisted {
 				url: 'rtmp://a.rtmp.youtube.com/live2',
 				key: '',
 				enabled: false,
+				platform: 'youtube',
+				managed: true,
 				hold: false
 			}
 		],
@@ -344,13 +364,18 @@ function load(): Persisted {
 			})),
 			// YouTube must receive the preflight signal so the operator can inspect
 			// it in Live Control Room before opening the public site gate.
-			destinations: uniqueById(parsed.destinations ?? fallback.destinations).map((destination) => ({
-				...destination,
-				hold:
-					/youtube/i.test(destination.name) || /youtube/i.test(destination.url)
-						? false
-						: (destination.hold ?? false)
-			})),
+			destinations: uniqueById(parsed.destinations ?? fallback.destinations).map((destination) => {
+				const platform = destinationPlatform(destination);
+				const managed = platform === 'youtube' ? (destination.managed ?? true) : false;
+				return {
+					...destination,
+					platform,
+					managed,
+					key: managed ? '' : destination.key,
+					enabled: managed ? false : destination.enabled,
+					hold: platform === 'youtube' ? false : (destination.hold ?? false)
+				};
+			}),
 			// Merge, so a setting added in a later version gets its default
 			// instead of `undefined` reaching ffmpeg. Layout is merged a level
 			// deeper for the same reason — a new dock must get a weight.
@@ -408,6 +433,12 @@ export const studio = $state({
 	settings: initial.settings
 });
 
+export function persistableDestinations(destinations: Destination[]): Destination[] {
+	return destinations.map((destination) =>
+		destination.managed ? { ...destination, key: '', enabled: false } : destination
+	);
+}
+
 export function persist() {
 	try {
 		localStorage.setItem(
@@ -417,7 +448,7 @@ export function persist() {
 				activeSceneId: studio.activeSceneId,
 				programSceneId: studio.programSceneId,
 				audioSources: studio.audioSources,
-				destinations: studio.destinations,
+				destinations: persistableDestinations(studio.destinations),
 				settings: studio.settings
 			})
 		);

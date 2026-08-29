@@ -416,6 +416,15 @@ const en = {
 	// ── Stream destinations ─────────────────────────────────────
 	'stream.intro':
 		'Every enabled destination gets the same encode. If one refuses the connection the others carry on — YouTube cannot take the radio down.',
+	'stream.youtubeChannels': 'YouTube channels',
+	'stream.youtubeChannelsHint':
+		'Channels are private to the admin who connected them. Choose one when creating a service.',
+	'stream.connectAdminFirst': 'Connect Studio to the admin app before adding a YouTube channel.',
+	'stream.noYouTubeChannels': 'No YouTube channel connected yet.',
+	'stream.addYouTubeChannel': 'Connect another YouTube channel',
+	'stream.disconnectChannel': 'Disconnect',
+	'stream.disconnectConfirm': 'Disconnect {channel} from this admin account?',
+	'stream.manualOutputs': 'RTMP outputs · Advanced',
 	'stream.newDestination': 'New destination',
 	'stream.urlPlaceholder': 'rtmp://server/application',
 	'stream.keyPlaceholder': 'stream key',
@@ -430,12 +439,13 @@ const en = {
 	'stream.presetMissionnaire': 'Missionnaire (app + radio)',
 	'stream.presetMissionnaireHint': 'Your MediaMTX server — feeds the radio and the app.',
 	'stream.presetYouTube': 'YouTube',
+	'stream.presetYouTubeManual': 'YouTube (manual key)',
 	'stream.presetYouTubeHint': 'Key from YouTube Studio › Go live.',
 	'stream.presetFacebook': 'Facebook',
 	'stream.presetFacebookHint': 'Key from Facebook Live Producer.',
 	'stream.presetBlank': 'Blank',
 	'stream.keyWarning':
-		'Keys are stored in the clear in the app’s data, the same as OBS stores its own. Don’t share a screenshot with a key revealed.',
+		'Manual keys are stored in the clear in the app’s data, the same as OBS stores its own. Managed YouTube keys are not saved. Don’t share a screenshot with a key revealed.',
 
 	// ── Errors ──────────────────────────────────────────────────
 	'error.noImmediateDestination':

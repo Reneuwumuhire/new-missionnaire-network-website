@@ -1,18 +1,19 @@
 <script lang="ts">
 	import { invoke } from '@tauri-apps/api/core';
-	import {
-		broadcast,
-		formatBytes,
-		goLivePublic,
-		isStreaming
-	} from '../lib/broadcast.svelte';
+	import { broadcast, formatBytes, goLivePublic, isStreaming } from '../lib/broadcast.svelte';
 	import { setStudioMode } from '../lib/compositor';
 	import Dock from './Dock.svelte';
 	import Icon from './Icon.svelte';
 	import { t } from '../lib/i18n.svelte';
 	import { destinationUrl, requiresYouTubeGoLive, studio } from '../lib/state.svelte';
-	import { connectYouTube, liveSession } from '../lib/live-session.svelte';
-	import { recording, recordsCloud, recordsLocal, startCloudRecording, stopCloudRecording } from '../lib/recording.svelte';
+	import { connectYouTube, liveSession, sessionYouTubeChannelId } from '../lib/live-session.svelte';
+	import {
+		recording,
+		recordsCloud,
+		recordsLocal,
+		startCloudRecording,
+		stopCloudRecording
+	} from '../lib/recording.svelte';
 
 	let {
 		onToggleLive,
@@ -34,14 +35,20 @@
 	);
 	const recordingMode = $derived(studio.settings.recordingMode);
 	const recordingLabel = $derived(t(`recording.${recordingMode}` as never));
-	const selectedSession = $derived(liveSession.sessions.find((session) => session._id === (liveSession.activeId ?? liveSession.selectedId)));
+	const selectedSession = $derived(
+		liveSession.sessions.find(
+			(session) => session._id === (liveSession.activeId ?? liveSession.selectedId)
+		)
+	);
 	const recordingActive = $derived(Boolean(recording.localPath) || recording.cloud);
 	let now = $state(Date.now());
 	$effect(() => {
 		const timer = setInterval(() => (now = Date.now()), 1000);
 		return () => clearInterval(timer);
 	});
-	const recordingDuration = $derived(recording.startedAt ? Math.floor((now - recording.startedAt) / 1000) : 0);
+	const recordingDuration = $derived(
+		recording.startedAt ? Math.floor((now - recording.startedAt) / 1000) : 0
+	);
 	const clock = (seconds: number) => new Date(seconds * 1000).toISOString().slice(11, 19);
 
 	// Keep public destinations held until the operator approves the preview.
@@ -49,11 +56,22 @@
 	const youtubeReady = $derived(
 		broadcast.targets.some((target) => target.youtube && target.state === 'live')
 	);
-	const youtubeRequired = $derived(requiresYouTubeGoLive(studio.destinations, selectedSession?.is_test));
+	const youtubeRequired = $derived(
+		!selectedSession?.is_test &&
+			(Boolean(selectedSession?.youtube_url) || requiresYouTubeGoLive(studio.destinations))
+	);
+	const youtubeSessionConnected = $derived(
+		liveSession.youtubeChannels.some(
+			(channel) =>
+				channel.id === sessionYouTubeChannelId(selectedSession, liveSession.youtubeChannels)
+		)
+	);
 
 	const stats = $derived(broadcast.stats);
 	const congested = $derived(
-		Boolean(stats && (stats.backpressure_events > 0 || stats.speed < 0.95 || stats.dropped_frames > 0))
+		Boolean(
+			stats && (stats.backpressure_events > 0 || stats.speed < 0.95 || stats.dropped_frames > 0)
+		)
 	);
 	let copiedTestLink = $state(false);
 
@@ -85,7 +103,8 @@
 					? 'bg-red-600 text-fg'
 					: 'border border-red-500/50 text-red-400 hover:bg-red-600/15'
 				: 'bg-primary text-black hover:bg-missionnaire-400'} disabled:cursor-not-allowed disabled:opacity-40"
-			disabled={broadcast.starting || (!isStreaming() && (enabled.length === 0 || !liveSession.selectedId))}
+			disabled={broadcast.starting ||
+				(!isStreaming() && (enabled.length === 0 || !liveSession.selectedId))}
 			onclick={onToggleLive}
 		>
 			{#if broadcast.starting}
@@ -101,53 +120,94 @@
 		{#if canGoLive}
 			<button
 				class="flex h-10 w-full items-center justify-center gap-2 bg-red-600 text-[13px] font-semibold text-white transition-colors hover:bg-red-500 disabled:cursor-wait disabled:opacity-50"
-				disabled={broadcast.publishing || liveSession.starting || (youtubeRequired && !liveSession.youtubeConnected)}
+				disabled={broadcast.publishing ||
+					liveSession.starting ||
+					(youtubeRequired && !youtubeSessionConnected)}
 				title={t('controls.goLiveHint')}
 				onclick={() => void goLivePublic()}
 			>
 				{#if broadcast.publishing || liveSession.starting}
-					<span class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/35 border-t-white"></span>
+					<span
+						class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/35 border-t-white"
+					></span>
 					{t('controls.starting')}
 				{:else}
 					{t('controls.goLive')}
 				{/if}
 			</button>
 		{:else if liveSession.activeId}
-			<div class="flex h-8 items-center justify-center border border-red-500/40 bg-red-600/10 text-[11px] font-medium text-red-300">
+			<div
+				class="flex h-8 items-center justify-center border border-red-500/40 bg-red-600/10 text-[11px] font-medium text-red-300"
+			>
 				{t('controls.publicLive')}
 			</div>
 		{/if}
 		{#if liveSession.operatorName && youtubeRequired}
 			<button
-				class="flex h-8 w-full items-center justify-between border border-ink-700 px-2 text-[11px] transition-colors {liveSession.youtubeConnected ? 'text-emerald-300' : 'text-fg/60 hover:border-red-500/50 hover:text-red-300'}"
+				class="flex h-8 w-full items-center justify-between border border-ink-700 px-2 text-[11px] transition-colors {youtubeSessionConnected
+					? 'text-emerald-300'
+					: 'text-fg/60 hover:border-red-500/50 hover:text-red-300'}"
 				disabled={liveSession.youtubeConnecting}
 				onclick={() => void connectYouTube()}
 			>
-				<span>{liveSession.youtubeConnecting ? t('controls.youtubeConnecting') : liveSession.youtubeConnected ? t('controls.youtubeConnected') : t('controls.connectYouTube')}</span>
-				<span class="max-w-28 truncate">{liveSession.youtubeChannel ?? ''}</span>
+				<span
+					>{liveSession.youtubeConnecting
+						? t('controls.youtubeConnecting')
+						: youtubeSessionConnected
+							? t('controls.youtubeConnected')
+							: t('controls.connectYouTube')}</span
+				>
+				<span class="max-w-28 truncate"
+					>{selectedSession?.youtube_channel_title ?? liveSession.youtubeChannel ?? ''}</span
+				>
 			</button>
-			{#if liveSession.youtubeError && !liveSession.youtubeConnected}
+			{#if liveSession.youtubeError && !youtubeSessionConnected}
 				<p class="text-[10px] leading-snug text-red-400">{liveSession.youtubeError}</p>
 			{/if}
 		{/if}
 		{#if selectedSession?.is_test && liveSession.testUrl}
 			<div class="grid grid-cols-[1fr_auto] gap-1" title={liveSession.testUrl}>
-				<button class="h-8 border border-primary/40 text-[11px] text-primary hover:bg-primary/10" onclick={() => void invoke('open_url', { url: liveSession.testUrl! })}>Open private test link</button>
-				<button class="h-8 border border-ink-600 px-2 text-[10px] text-fg/65 hover:text-fg" onclick={() => void copyTestLink()}>{copiedTestLink ? 'Copied' : 'Copy'}</button>
+				<button
+					class="h-8 border border-primary/40 text-[11px] text-primary hover:bg-primary/10"
+					onclick={() => void invoke('open_url', { url: liveSession.testUrl! })}
+					>Open private test link</button
+				>
+				<button
+					class="h-8 border border-ink-600 px-2 text-[10px] text-fg/65 hover:text-fg"
+					onclick={() => void copyTestLink()}>{copiedTestLink ? 'Copied' : 'Copy'}</button
+				>
 			</div>
 		{/if}
 		<button
 			class="flex h-8 w-full items-center justify-between border border-ink-700 px-2 text-[11px] text-fg/60 transition-colors hover:border-ink-500 hover:text-fg"
 			disabled={isStreaming()}
 			onclick={onSelectSession}
-			title={isStreaming() ? 'Live session is locked while streaming' : 'Choose or create the public live session'}
+			title={isStreaming()
+				? 'Live session is locked while streaming'
+				: 'Choose or create the public live session'}
 		>
 			<span>Live session</span>
-			<span class={selectedSession ? 'max-w-36 truncate text-emerald-300' : 'text-amber-300'}>{selectedSession?.title ?? 'Choose one'}</span>
+			<span class={selectedSession ? 'max-w-36 truncate text-emerald-300' : 'text-amber-300'}
+				>{selectedSession?.title ?? 'Choose one'}</span
+			>
 		</button>
 		{#if isStreaming() && (recordsCloud() || recordsLocal())}
-			<button class="flex h-8 w-full items-center justify-between border border-ink-700 px-2 text-[11px] {recordingActive ? 'text-red-300' : 'text-fg/60'}" disabled={recordsLocal() && !recordsCloud()} onclick={() => recording.cloud ? void stopCloudRecording() : void startCloudRecording()}>
-				<span>{recordsCloud() ? (recording.cloud ? 'Stop recording' : 'Start recording') : (recording.startedAt ? 'Recording local' : 'Local recording armed')}</span>
+			<button
+				class="flex h-8 w-full items-center justify-between border border-ink-700 px-2 text-[11px] {recordingActive
+					? 'text-red-300'
+					: 'text-fg/60'}"
+				disabled={recordsLocal() && !recordsCloud()}
+				onclick={() => (recording.cloud ? void stopCloudRecording() : void startCloudRecording())}
+			>
+				<span
+					>{recordsCloud()
+						? recording.cloud
+							? 'Stop recording'
+							: 'Start recording'
+						: recording.startedAt
+							? 'Recording local'
+							: 'Local recording armed'}</span
+				>
 				<span class="font-mono">{recordingActive ? clock(recordingDuration) : '00:00:00'}</span>
 			</button>
 		{/if}
@@ -158,7 +218,9 @@
 			title={t('controls.recordingHint')}
 		>
 			<span>{t('controls.recording')}</span>
-			<span class={recordingMode === 'off' ? 'text-fg/35' : 'text-emerald-300'}>{recordingLabel}</span>
+			<span class={recordingMode === 'off' ? 'text-fg/35' : 'text-emerald-300'}
+				>{recordingLabel}</span
+			>
 		</button>
 
 		{#if youtubeReady}

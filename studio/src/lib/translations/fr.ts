@@ -426,6 +426,16 @@ const fr: Record<keyof typeof en, string> = {
 	// ── Stream destinations ─────────────────────────────────────
 	'stream.intro':
 		'Chaque destination activée reçoit le même encodage. Si l’une refuse la connexion, les autres continuent — YouTube ne peut pas faire tomber la radio.',
+	'stream.youtubeChannels': 'Chaînes YouTube',
+	'stream.youtubeChannelsHint':
+		'Les chaînes restent privées pour l’administrateur qui les a connectées. Choisissez-en une lors de la création du service.',
+	'stream.connectAdminFirst':
+		'Connectez Studio à l’administration avant d’ajouter une chaîne YouTube.',
+	'stream.noYouTubeChannels': 'Aucune chaîne YouTube connectée.',
+	'stream.addYouTubeChannel': 'Connecter une autre chaîne YouTube',
+	'stream.disconnectChannel': 'Déconnecter',
+	'stream.disconnectConfirm': 'Déconnecter {channel} de ce compte administrateur ?',
+	'stream.manualOutputs': 'Sorties RTMP · Avancé',
 	'stream.newDestination': 'Nouvelle destination',
 	'stream.urlPlaceholder': 'rtmp://serveur/application',
 	'stream.keyPlaceholder': 'clé de flux',
@@ -440,12 +450,13 @@ const fr: Record<keyof typeof en, string> = {
 	'stream.presetMissionnaire': 'Missionnaire (app + radio)',
 	'stream.presetMissionnaireHint': 'Votre serveur MediaMTX — alimente la radio et l’app.',
 	'stream.presetYouTube': 'YouTube',
+	'stream.presetYouTubeManual': 'YouTube (clé manuelle)',
 	'stream.presetYouTubeHint': 'Clé dans YouTube Studio › En direct.',
 	'stream.presetFacebook': 'Facebook',
 	'stream.presetFacebookHint': 'Clé dans Facebook Live Producer.',
 	'stream.presetBlank': 'Vide',
 	'stream.keyWarning':
-		'Les clés sont enregistrées en clair dans les données de l’application, comme le fait OBS. Ne partagez pas de capture d’écran avec une clé affichée.',
+		'Les clés manuelles sont enregistrées en clair dans les données de l’application, comme le fait OBS. Les clés YouTube gérées ne sont pas enregistrées. Ne partagez pas de capture d’écran avec une clé affichée.',
 
 	// ── Errors ──────────────────────────────────────────────────
 	'error.noImmediateDestination':

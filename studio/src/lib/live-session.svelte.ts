@@ -10,8 +10,19 @@ export type LiveSession = {
 	scheduled_at: string;
 	status: 'scheduled' | 'live' | 'ended' | 'cancelled';
 	youtube_url?: string | null;
+	youtube_channel_id?: string | null;
+	youtube_channel_title?: string | null;
 	is_test?: boolean;
 };
+export type YouTubeChannel = { id: string; title: string; updatedAt: string };
+
+export function sessionYouTubeChannelId(
+	session: Pick<LiveSession, 'youtube_channel_id'> | null | undefined,
+	channels: YouTubeChannel[]
+): string | null {
+	return session?.youtube_channel_id ?? (channels.length === 1 ? channels[0].id : null);
+}
+
 export type NewSession = {
 	title: string;
 	scheduledAt: string;
@@ -22,6 +33,7 @@ export type NewSession = {
 	subtitle: File | null;
 	announce: boolean;
 	reminderEnabled: boolean;
+	youtubeChannelId: string;
 };
 
 type YouTubeIngest = { url: string; key: string };
@@ -38,6 +50,8 @@ export const liveSession = $state({
 	testUrl: null as string | null,
 	youtubeConnected: false,
 	youtubeChannel: null as string | null,
+	youtubeChannelId: null as string | null,
+	youtubeChannels: [] as YouTubeChannel[],
 	youtubeConnecting: false,
 	youtubeError: null as string | null
 });
@@ -64,27 +78,44 @@ async function adminPost<T>(body: object): Promise<T> {
 	) as T;
 }
 
-function applyYouTubeIngest(ingest: YouTubeIngest) {
-	let destination = studio.destinations.find(
-		(item) => /youtube/i.test(item.name) || /youtube/i.test(item.url)
-	);
+function applyYouTubeIngest(ingest: YouTubeIngest, channel: YouTubeChannel) {
+	let destination = studio.destinations.find((item) => item.platform === 'youtube' && item.managed);
 	if (!destination) {
 		destination = {
 			id: id(),
-			name: 'YouTube',
+			name: `YouTube · ${channel.title}`,
 			url: ingest.url,
 			key: ingest.key,
 			enabled: true,
+			platform: 'youtube',
+			managed: true,
 			hold: false
 		};
 		studio.destinations = [...studio.destinations, destination];
 	} else {
+		destination.name = `YouTube · ${channel.title}`;
 		destination.url = ingest.url;
 		destination.key = ingest.key;
 		destination.enabled = true;
 		destination.hold = false;
 	}
 	persist();
+}
+
+function disableManagedYouTube() {
+	const destination = studio.destinations.find(
+		(item) => item.platform === 'youtube' && item.managed
+	);
+	if (!destination) return;
+	destination.enabled = false;
+	destination.key = '';
+	persist();
+}
+
+export function selectYouTubeChannel(channelId: string | null) {
+	const channel = liveSession.youtubeChannels.find((item) => item.id === channelId) ?? null;
+	liveSession.youtubeChannelId = channel?.id ?? null;
+	liveSession.youtubeChannel = channel?.title ?? null;
 }
 
 export async function connectWithAdmin() {
@@ -107,23 +138,32 @@ export async function connectWithAdmin() {
 
 export async function refreshYouTubeStatus() {
 	try {
-		const result = await adminPost<{ connected: boolean; channelTitle: string | null }>({
+		const result = await adminPost<{ channels: YouTubeChannel[] }>({
 			action: 'status'
 		});
-		liveSession.youtubeConnected = result.connected;
-		liveSession.youtubeChannel = result.channelTitle;
+		liveSession.youtubeChannels = result.channels;
+		liveSession.youtubeConnected = result.channels.length > 0;
+		selectYouTubeChannel(
+			result.channels.some((channel) => channel.id === liveSession.youtubeChannelId)
+				? liveSession.youtubeChannelId
+				: (result.channels[0]?.id ?? null)
+		);
 		liveSession.youtubeError = null;
 	} catch (error) {
 		liveSession.youtubeConnected = false;
-		liveSession.youtubeChannel = null;
+		liveSession.youtubeChannels = [];
+		selectYouTubeChannel(null);
 		liveSession.youtubeError = error instanceof Error ? error.message : String(error);
 	}
 }
 
-export async function connectYouTube() {
-	if (!liveSession.pairingCode || liveSession.youtubeConnecting) return;
+export async function connectYouTube(): Promise<string | null> {
+	if (!liveSession.pairingCode || liveSession.youtubeConnecting) return null;
 	liveSession.youtubeConnecting = true;
 	liveSession.youtubeError = null;
+	const before = new Map(
+		liveSession.youtubeChannels.map((channel) => [channel.id, channel.updatedAt] as const)
+	);
 	try {
 		await invoke('studio_open_youtube_login', {
 			code: liveSession.pairingCode,
@@ -132,13 +172,29 @@ export async function connectYouTube() {
 		for (let i = 0; i < 40; i++) {
 			await new Promise((resolve) => setTimeout(resolve, 1500));
 			await refreshYouTubeStatus();
-			if (liveSession.youtubeConnected) {
+			const connected = liveSession.youtubeChannels.find(
+				(channel) => before.get(channel.id) !== channel.updatedAt
+			);
+			if (connected) {
+				selectYouTubeChannel(connected.id);
 				await invoke('focus_main_window');
-				return;
+				return connected.id;
 			}
 		}
+		liveSession.youtubeError = 'YouTube connection timed out. Try again.';
+		return null;
 	} finally {
 		liveSession.youtubeConnecting = false;
+	}
+}
+
+export async function disconnectYouTube(channelId: string) {
+	try {
+		await adminPost({ action: 'disconnect', channelId });
+		if (liveSession.youtubeChannelId === channelId) disableManagedYouTube();
+		await refreshYouTubeStatus();
+	} catch (error) {
+		liveSession.youtubeError = error instanceof Error ? error.message : String(error);
 	}
 }
 
@@ -268,8 +324,8 @@ export async function hideLiveLyrics() {
 export async function createSession(draft: NewSession) {
 	liveSession.error = null;
 	try {
-		if (!liveSession.youtubeConnected)
-			throw new Error('Connect YouTube before creating a public session.');
+		const channel = liveSession.youtubeChannels.find((item) => item.id === draft.youtubeChannelId);
+		if (!channel) throw new Error('Choose a connected YouTube channel.');
 		const thumbnail = draft.thumbnail ? await upload(draft.thumbnail, 'presign-thumbnail') : null;
 		const subtitle = draft.subtitle ? await upload(draft.subtitle, 'presign-subtitle') : null;
 		const result = await adminPost<{
@@ -285,13 +341,14 @@ export async function createSession(draft: NewSession) {
 			madeForKids: draft.madeForKids,
 			announce: draft.announce,
 			reminderEnabled: draft.reminderEnabled,
+			channelId: channel.id,
 			thumbnailUrl: thumbnail?.url,
 			thumbnailKey: thumbnail?.key,
 			subtitleUrl: subtitle?.url,
 			subtitleKey: subtitle?.key,
 			subtitleFilename: draft.subtitle?.name
 		});
-		applyYouTubeIngest(result.ingest);
+		applyYouTubeIngest(result.ingest, channel);
 		liveSession.sessions = [...liveSession.sessions, result.session].sort((a, b) =>
 			a.scheduled_at.localeCompare(b.scheduled_at)
 		);
@@ -305,11 +362,23 @@ export async function createSession(draft: NewSession) {
 
 export async function selectSession(sessionId: string) {
 	liveSession.selectedId = sessionId;
+	// Never let a previous service's channel/key survive while the next one's
+	// credentials are being resolved.
+	disableManagedYouTube();
 	const session = liveSession.sessions.find((item) => item._id === sessionId);
-	if (!session?.youtube_url || session.is_test || !liveSession.youtubeConnected) return;
+	if (!session?.youtube_url || session.is_test) {
+		return;
+	}
+	const channelId = sessionYouTubeChannelId(session, liveSession.youtubeChannels);
+	const channel = liveSession.youtubeChannels.find((item) => item.id === channelId);
+	if (!channel) {
+		liveSession.youtubeError = 'Connect the YouTube channel used by this service.';
+		return;
+	}
+	selectYouTubeChannel(channel.id);
 	try {
 		const result = await adminPost<{ ingest: YouTubeIngest }>({ action: 'ingest', sessionId });
-		applyYouTubeIngest(result.ingest);
+		applyYouTubeIngest(result.ingest, channel);
 		liveSession.youtubeError = null;
 	} catch (error) {
 		// Older links created directly in YouTube keep the manually configured key.
@@ -364,8 +433,10 @@ export async function logoutStudio() {
 	liveSession.testUrl = null;
 	liveSession.error = null;
 	liveSession.youtubeConnected = false;
-	liveSession.youtubeChannel = null;
+	liveSession.youtubeChannels = [];
+	selectYouTubeChannel(null);
 	liveSession.youtubeError = null;
+	disableManagedYouTube();
 	attachedSessionId = null;
 }
 
