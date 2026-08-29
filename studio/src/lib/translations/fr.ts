@@ -431,6 +431,7 @@ const fr: Record<keyof typeof en, string> = {
 		'Les chaînes restent privées pour l’administrateur qui les a connectées. Choisissez-en une lors de la création du service.',
 	'stream.connectAdminFirst':
 		'Connectez Studio à l’administration avant d’ajouter une chaîne YouTube.',
+	'stream.connectAdmin': 'Connecter Studio à l’administration',
 	'stream.noYouTubeChannels': 'Aucune chaîne YouTube connectée.',
 	'stream.addYouTubeChannel': 'Connecter une autre chaîne YouTube',
 	'stream.disconnectChannel': 'Déconnecter',

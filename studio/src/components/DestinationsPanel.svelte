@@ -3,7 +3,12 @@
 	import Icon from './Icon.svelte';
 	import { t } from '../lib/i18n.svelte';
 	import { destinationUrl, id, type Destination } from '../lib/state.svelte';
-	import { connectYouTube, disconnectYouTube, liveSession } from '../lib/live-session.svelte';
+	import {
+		connectWithAdmin,
+		connectYouTube,
+		disconnectYouTube,
+		liveSession
+	} from '../lib/live-session.svelte';
 
 	// The RTMP list belongs to the Settings draft and reaches the show only on
 	// Apply. OAuth channel actions are account commands, so they take effect now.
@@ -103,12 +108,14 @@
 	{/if}
 	<button
 		class="studio-chip"
-		disabled={!liveSession.operatorName || liveSession.youtubeConnecting || isStreaming()}
-		onclick={() => void connectYouTube()}
+		disabled={liveSession.youtubeConnecting || isStreaming()}
+		onclick={() => void (liveSession.operatorName ? connectYouTube() : connectWithAdmin())}
 	>
 		{liveSession.youtubeConnecting
 			? t('controls.youtubeConnecting')
-			: t('stream.addYouTubeChannel')}
+			: liveSession.operatorName
+				? t('stream.addYouTubeChannel')
+				: t('stream.connectAdmin')}
 	</button>
 	{#if liveSession.youtubeError}
 		<p class="text-[11px] text-red-400">{liveSession.youtubeError}</p>

@@ -420,6 +420,7 @@ const en = {
 	'stream.youtubeChannelsHint':
 		'Channels are private to the admin who connected them. Choose one when creating a service.',
 	'stream.connectAdminFirst': 'Connect Studio to the admin app before adding a YouTube channel.',
+	'stream.connectAdmin': 'Connect Studio to admin',
 	'stream.noYouTubeChannels': 'No YouTube channel connected yet.',
 	'stream.addYouTubeChannel': 'Connect another YouTube channel',
 	'stream.disconnectChannel': 'Disconnect',
