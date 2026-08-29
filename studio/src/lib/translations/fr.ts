@@ -375,6 +375,54 @@ const fr: Record<keyof typeof en, string> = {
 	'update.blocked': 'Terminez la diffusion ou l’enregistrement avant la mise à jour.',
 	'update.error': 'Échec de la recherche de mise à jour : {message}',
 
+	// ── Aide ────────────────────────────────────────────────────
+	'help.title': 'Aide de Missionnaire Studio',
+	'help.gettingStarted': 'Bien démarrer',
+	'help.gettingStartedIntro': 'Un parcours sûr, de la régie vide à la diffusion publique.',
+	'help.chooseSessionTitle': 'Choisir la session en direct',
+	'help.chooseSession':
+		'Dans Contrôles, choisissez ou créez la session publique que les auditeurs ouvriront.',
+	'help.prepareTitle': 'Préparer l’aperçu',
+	'help.prepare':
+		'Ajoutez des caméras, des médias ou une fenêtre YouTube Live à une scène. Connectez chaque source et vérifiez que son vumètre réagit.',
+	'help.programTitle': 'Envoyer l’aperçu au programme',
+	'help.program':
+		'En Mode Studio, les modifications restent privées dans l’aperçu. Appuyez sur Transition uniquement lorsque l’image est prête pour le programme.',
+	'help.subtitlesTitle': 'Préparer les sous-titres du sermon',
+	'help.subtitles':
+		'Chargez le MP3 préparé du sermon et le SRT français, puis capturez la source en direct. La synchronisation automatique attend pendant les chants et les introductions.',
+	'help.goLiveTitle': 'Vérifier, puis passer en direct',
+	'help.goLive':
+		'Démarrez le signal d’aperçu, surveillez la stabilité des IPS et du débit dans la barre inférieure, puis utilisez Go Live pour la session choisie.',
+	'help.safety':
+		'Le programme est ce que les spectateurs reçoivent. Vérifiez toujours le programme — pas seulement l’aperçu — avant de démarrer ou modifier une diffusion.',
+	'help.shortcuts': 'Raccourcis clavier',
+	'help.shortcutsIntro': 'Les raccourcis sont ignorés pendant la saisie dans un champ.',
+	'help.nextSubtitle': 'Sous-titre manuel suivant',
+	'help.previousSubtitle': 'Sous-titre manuel précédent',
+	'help.selectScene': 'Choisir une scène selon sa position',
+	'help.takeScene': 'Transition de l’aperçu au programme en Mode Studio',
+	'help.closeDialog': 'Fermer la fenêtre ouverte',
+	'help.openSettings': 'Ouvrir les paramètres',
+	'help.openHelp': 'Ouvrir l’aide',
+	'help.troubleshooting': 'Dépannage',
+	'help.troubleshootingIntro':
+		'Commencez par le symptôme ci-dessous ; Informations système contient les détails techniques et les journaux.',
+	'help.streamProblem': 'YouTube signale une mauvaise connexion ou des images perdues',
+	'help.streamSolution':
+		'Vérifiez les images perdues, la saturation, les IPS et le débit dans la barre inférieure. Préférez l’encodage matériel et une connexion filaire ; réduisez le débit uniquement si l’envoi disponible est réellement insuffisant.',
+	'help.openOutput': 'Ouvrir les paramètres de sortie',
+	'help.audioProblem': 'Il n’y a pas de son ou une source est trop faible',
+	'help.audioSolution':
+		'Vérifiez que la source est connectée dans le Mélangeur audio, que son vumètre réagit et qu’elle n’est pas coupée. Contrôlez les autorisations du microphone ou d’enregistrement d’écran du système si une source manque.',
+	'help.subtitleProblem': 'Les sous-titres manquent ou sont décalés',
+	'help.subtitleSolution':
+		'Vérifiez que Paroles est affiché, que la bonne session publique est active et que le MP3 de référence et son SRT français sont chargés. La synchronisation automatique a aussi besoin du son de la source capturée ; utilisez « Le sermon commence maintenant » uniquement en secours.',
+	'help.captureProblem': 'Une fenêtre YouTube capturée est mal cadrée',
+	'help.captureSolution':
+		'Utilisez la source Fenêtre YouTube Live dédiée, gardez la vidéo visible dans cette fenêtre, puis recadrez ou redimensionnez la source dans l’aperçu. Envoyez-la au programme seulement lorsque le résultat est propre.',
+	'help.openSystem': 'Ouvrir les informations système',
+
 	// ── Stream destinations ─────────────────────────────────────
 	'stream.intro':
 		'Chaque destination activée reçoit le même encodage. Si l’une refuse la connexion, les autres continuent — YouTube ne peut pas faire tomber la radio.',

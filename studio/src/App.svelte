@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { listen } from '@tauri-apps/api/event';
 	import ControlsDock from './components/ControlsDock.svelte';
+	import HelpPanel, { type HelpSection } from './components/HelpPanel.svelte';
 	import Icon from './components/Icon.svelte';
 	import LyricsPanel from './components/LyricsPanel.svelte';
 	import LyricsRibbon from './components/LyricsRibbon.svelte';
@@ -62,9 +64,12 @@
 	const setupReady = needsSetup
 		? new Promise<void>((resolve) => (releaseSetup = resolve))
 		: Promise.resolve();
-	let dialog = $state<'properties' | 'settings' | 'setup' | 'live-session' | 'new-session' | null>(
-		null
-	);
+	let dialog = $state<
+		'properties' | 'settings' | 'help' | 'setup' | 'live-session' | 'new-session' | null
+	>(null);
+	let settingsPage = $state<'general' | 'output' | 'about'>('general');
+	let helpSection = $state<HelpSection>('getting-started');
+	let stopMenuListener: (() => void) | null = null;
 	/** Frames actually painted per second — the readout OBS puts in its status
 	 *  bar, and the first number to look at when the picture stutters. */
 	let renderFps = $state(0);
@@ -76,6 +81,9 @@
 	onMount(() => {
 		initReferenceMatcher();
 		void initUpdater();
+		void listen<string>('studio://menu', (event) => openMenuItem(event.payload)).then(
+			(unlisten) => (stopMenuListener = unlisten)
+		);
 		mixer = new Mixer();
 		selftestMixer(mixer);
 		mixer.setMonitor(studio.settings.monitorAudio);
@@ -135,6 +143,7 @@
 			if (isStreaming()) renderMissed += Math.max(0, studio.settings.fps - renderFps);
 		}, 1000);
 		return () => {
+			stopMenuListener?.();
 			clearInterval(clock);
 			window.removeEventListener('pointerdown', wake);
 			void stopBroadcast();
@@ -142,6 +151,36 @@
 			mixer?.close();
 		};
 	});
+
+	function openSettings(page: 'general' | 'output' | 'about' = 'general') {
+		settingsPage = page;
+		dialog = 'settings';
+	}
+
+	function openHelp(section: HelpSection = 'getting-started') {
+		helpSection = section;
+		dialog = 'help';
+	}
+
+	function openMenuItem(id: string) {
+		switch (id) {
+			case 'studio-settings':
+				openSettings();
+				break;
+			case 'studio-system-information':
+				openSettings('about');
+				break;
+			case 'studio-keyboard-shortcuts':
+				openHelp('shortcuts');
+				break;
+			case 'studio-troubleshooting':
+				openHelp('troubleshooting');
+				break;
+			case 'studio-help':
+			case 'studio-getting-started':
+				openHelp();
+		}
+	}
 
 	function finishSetup() {
 		localStorage.setItem(SETUP_KEY, '1');
@@ -562,7 +601,7 @@
 		<ControlsDock
 			{confirmStop}
 			onToggleLive={toggleLive}
-			onSettings={() => (dialog = 'settings')}
+			onSettings={() => openSettings()}
 			onSelectSession={() => (dialog = 'live-session')}
 			{renderMissed}
 		/>
@@ -629,7 +668,19 @@
 	</Modal>
 {:else if dialog === 'settings'}
 	<Modal title={t('settings.title')} onclose={() => (dialog = null)}>
-		<SettingsPanel onclose={() => (dialog = null)} onconfigure={() => (dialog = 'setup')} />
+		<SettingsPanel
+			initialPage={settingsPage}
+			onclose={() => (dialog = null)}
+			onconfigure={() => (dialog = 'setup')}
+		/>
+	</Modal>
+{:else if dialog === 'help'}
+	<Modal title={t('help.title')} onclose={() => (dialog = null)}>
+		<HelpPanel
+			section={helpSection}
+			onsection={(section) => (helpSection = section)}
+			onsettings={(page) => openSettings(page)}
+		/>
 	</Modal>
 {:else if dialog === 'live-session'}
 	<Modal title="Choose live session" onclose={() => (dialog = null)}>

@@ -10,7 +10,15 @@
 	import { recording } from '../lib/recording.svelte';
 	import { appUpdate, checkForUpdate, downloadPercent, installUpdate } from '../lib/updater.svelte';
 
-	let { onclose, onconfigure }: { onclose: () => void; onconfigure: () => void } = $props();
+	let {
+		onclose,
+		onconfigure,
+		initialPage = 'general'
+	}: {
+		onclose: () => void;
+		onconfigure: () => void;
+		initialPage?: 'general' | 'output' | 'about';
+	} = $props();
 
 	// Nothing here reaches the show until Apply, the way OBS's Settings window
 	// works. Changing the resolution or the bitrate mid-service by mis-clicking
@@ -51,6 +59,9 @@
 	];
 
 	let page = $state<Page>('general');
+	$effect(() => {
+		page = initialPage;
+	});
 
 	interface FfmpegInfo {
 		path: string;

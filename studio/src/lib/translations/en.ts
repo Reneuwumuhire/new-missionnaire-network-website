@@ -365,6 +365,54 @@ const en = {
 	'update.blocked': 'Finish the live broadcast or recording before updating.',
 	'update.error': 'Update check failed: {message}',
 
+	// ── Help ────────────────────────────────────────────────────
+	'help.title': 'Missionnaire Studio Help',
+	'help.gettingStarted': 'Getting Started',
+	'help.gettingStartedIntro': 'A safe path from an empty desk to a public broadcast.',
+	'help.chooseSessionTitle': 'Choose the live session',
+	'help.chooseSession':
+		'In Controls, choose or create the public session that listeners will open.',
+	'help.prepareTitle': 'Prepare Preview',
+	'help.prepare':
+		'Add cameras, media, or a YouTube Live Window to a scene. Connect every source and confirm its audio meter moves.',
+	'help.programTitle': 'Send Preview to Program',
+	'help.program':
+		'In Studio Mode, edits remain private in Preview. Press Transition only when the picture is ready for Program.',
+	'help.subtitlesTitle': 'Prepare sermon subtitles',
+	'help.subtitles':
+		'Load the prepared sermon MP3 and French SRT, then capture the live source. Automatic sermon sync waits through songs and introductions.',
+	'help.goLiveTitle': 'Verify, then go live',
+	'help.goLive':
+		'Start the Preview Signal, watch the bottom status for stable FPS and bitrate, then use Go Live for the selected session.',
+	'help.safety':
+		'Program is what viewers receive. Always check Program—not only Preview—before starting or changing a broadcast.',
+	'help.shortcuts': 'Keyboard Shortcuts',
+	'help.shortcutsIntro': 'Shortcuts are ignored while you are typing in a field.',
+	'help.nextSubtitle': 'Next manual subtitle',
+	'help.previousSubtitle': 'Previous manual subtitle',
+	'help.selectScene': 'Select scene by position',
+	'help.takeScene': 'Transition Preview to Program in Studio Mode',
+	'help.closeDialog': 'Close the open dialog',
+	'help.openSettings': 'Open Settings',
+	'help.openHelp': 'Open Help',
+	'help.troubleshooting': 'Troubleshooting',
+	'help.troubleshootingIntro':
+		'Start with the symptom below; System Information contains technical details and logs.',
+	'help.streamProblem': 'YouTube reports a bad connection or frames drop',
+	'help.streamSolution':
+		'Check dropped frames, backpressure, FPS, and bitrate in the bottom bar. Prefer hardware encoding and wired internet; lower bitrate only if upload capacity is genuinely below the configured requirement.',
+	'help.openOutput': 'Open Output settings',
+	'help.audioProblem': 'There is no sound or an audio source is quiet',
+	'help.audioSolution':
+		'Confirm the source is connected in Audio Mixer, its meter moves, and it is not muted. Check microphone or screen-recording permission in the operating system when a device or captured app is missing.',
+	'help.subtitleProblem': 'Subtitles are missing or out of sync',
+	'help.subtitleSolution':
+		'Confirm Lyrics is Shown, the correct public session is active, and the reference MP3 and matching French SRT are loaded. Automatic sync also needs audio from the captured live source; use “Sermon begins now” only as the fallback.',
+	'help.captureProblem': 'A captured YouTube window looks wrong',
+	'help.captureSolution':
+		'Use the dedicated YouTube Live Window source, keep the video visible in that window, and crop or resize the source in Preview. Move it to Program only after the result is clean.',
+	'help.openSystem': 'Open System Information',
+
 	// ── Stream destinations ─────────────────────────────────────
 	'stream.intro':
 		'Every enabled destination gets the same encode. If one refuses the connection the others carry on — YouTube cannot take the radio down.',

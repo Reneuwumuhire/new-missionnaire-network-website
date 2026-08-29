@@ -6,7 +6,17 @@ mod reference;
 use ffmpeg::{Encoder, FfmpegInfo, StreamConfig};
 use serde::Serialize;
 use std::process::Command;
-use tauri::{AppHandle, Manager, State};
+use tauri::{
+	menu::{Menu, MenuItem, PredefinedMenuItem, HELP_SUBMENU_ID},
+	AppHandle, Emitter, Manager, State,
+};
+
+const MENU_SETTINGS: &str = "studio-settings";
+const MENU_HELP: &str = "studio-help";
+const MENU_GETTING_STARTED: &str = "studio-getting-started";
+const MENU_SHORTCUTS: &str = "studio-keyboard-shortcuts";
+const MENU_TROUBLESHOOTING: &str = "studio-troubleshooting";
+const MENU_SYSTEM_INFO: &str = "studio-system-information";
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -350,6 +360,63 @@ pub fn run() {
 	keep_rendering_when_covered();
 
 	tauri::Builder::default()
+		.menu(|app| {
+			let menu = Menu::default(app)?;
+			#[cfg(any(target_os = "macos", target_os = "windows"))]
+			{
+				let settings = MenuItem::with_id(
+					app,
+					MENU_SETTINGS,
+					"Settings…",
+					true,
+					Some("CmdOrCtrl+,"),
+				)?;
+				let separator = PredefinedMenuItem::separator(app)?;
+				let top_level = menu.items()?;
+
+				// Settings belongs in the application menu on macOS and in File on
+				// Windows. Both are the first submenu in Tauri's native default menu.
+				if let Some(submenu) = top_level.first().and_then(|item| item.as_submenu()) {
+					#[cfg(target_os = "macos")]
+					let position = 2;
+					#[cfg(target_os = "windows")]
+					let position = 0;
+					submenu.insert_items(&[&settings, &separator], position)?;
+				}
+			}
+
+			if let Some(help) = menu
+				.get(HELP_SUBMENU_ID)
+				.and_then(|item| item.as_submenu().cloned())
+			{
+				let item = |id, text, accelerator| {
+					MenuItem::with_id(app, id, text, true, accelerator)
+				};
+				let help_home = item(
+					MENU_HELP,
+					"Missionnaire Studio Help",
+					Some("CmdOrCtrl+/"),
+				)?;
+				let getting_started = item(MENU_GETTING_STARTED, "Getting Started", None)?;
+				let shortcuts = item(MENU_SHORTCUTS, "Keyboard Shortcuts", None)?;
+				let troubleshooting = item(MENU_TROUBLESHOOTING, "Troubleshooting", None)?;
+				let help_separator = PredefinedMenuItem::separator(app)?;
+				let system_info = item(MENU_SYSTEM_INFO, "System Information", None)?;
+				help.prepend_items(
+					&[
+						&help_home,
+						&getting_started,
+						&shortcuts,
+						&help_separator,
+						&troubleshooting,
+						&system_info,
+					],
+				)?;
+				#[cfg(not(target_os = "macos"))]
+				help.insert(&PredefinedMenuItem::separator(app)?, 6)?;
+			}
+			Ok(menu)
+		})
 		.manage(Encoder::default())
 		.manage(appaudio::Capture::default())
 		.manage(fetch::Streams::default())
@@ -428,6 +495,24 @@ pub fn run() {
 		.plugin(tauri_plugin_dialog::init())
 		.plugin(tauri_plugin_updater::Builder::new().build())
 		.plugin(tauri_plugin_process::init())
+		.on_menu_event(|app, event| {
+			let id = event.id().as_ref();
+			if matches!(
+				id,
+				MENU_SETTINGS
+					| MENU_HELP
+					| MENU_GETTING_STARTED
+					| MENU_SHORTCUTS
+					| MENU_TROUBLESHOOTING
+					| MENU_SYSTEM_INFO
+			) {
+				if let Some(window) = app.get_webview_window("main") {
+					let _ = window.show();
+					let _ = window.set_focus();
+				}
+				let _ = app.emit_to("main", "studio://menu", id);
+			}
+		})
 		.invoke_handler(tauri::generate_handler![
 			check_ffmpeg,
 			extract_reference_features,
