@@ -48,16 +48,21 @@ const YT_THUMB_CACHE = 'yt-thumbnails';
 // app-shell cache miss for navigation requests.
 const OFFLINE_URL = '/offline.html';
 
-// ── Critical app shell (always pre-cached on install) ─────────────
-// `[...build, ...files]` already covers SvelteKit chunks + everything
-// in /static, but we explicitly pin the offline page and root URL so
-// the install step fails loudly if either is missing.
-const APP_SHELL_ASSETS = [...build, ...files, OFFLINE_URL, '/'];
-
 function isAudioRequest(url: URL): boolean {
 	const path = url.pathname.toLowerCase();
 	return AUDIO_EXTENSIONS.some((ext) => path.endsWith(ext));
 }
+
+// ── Critical app shell (always pre-cached on install) ─────────────
+// Audio is deliberately excluded: /static currently contains a 33 MB
+// MP3, and downloading it while iOS is launching/installing the PWA can
+// exhaust WebKit's page process. Audio keeps its own on-demand cache.
+const APP_SHELL_ASSETS = [
+	...build,
+	...files.filter((asset) => !isAudioRequest(new URL(asset, sw.location.origin))),
+	OFFLINE_URL,
+	'/'
+];
 
 // ── Install ───────────────────────────────────────────────────────
 // Pre-cache the app shell so the first paint after install works
@@ -68,23 +73,18 @@ sw.addEventListener('install', (event) => {
 	event.waitUntil(
 		(async () => {
 			const cache = await caches.open(APP_SHELL_CACHE);
-			// Use individual put() calls so a single 404 doesn't fail the
-			// whole install (cache.addAll is all-or-nothing). Build
-			// artefacts are content-hashed, so the HTTP cache is always
-			// safe to share — `cache: 'reload'` was forcing every asset
-			// through the network on each SW install, slamming Vercel's
-			// edge in parallel and competing for bandwidth with the
-			// page's own resource loads on first visit after a deploy.
-			await Promise.all(
-				APP_SHELL_ASSETS.map(async (asset) => {
-					try {
-						const response = await fetch(asset);
-						if (response.ok) await cache.put(asset, response);
-					} catch {
-						/* skip individual failures — best-effort pre-cache */
-					}
-				})
-			);
+			// Cache one asset at a time. iOS runs the service worker beside
+			// the page in a memory-constrained WebKit process, so a burst of
+			// simultaneous fetch + CacheStorage writes can crash the launch.
+			// Individual failures stay best-effort and don't abort install.
+			for (const asset of APP_SHELL_ASSETS) {
+				try {
+					const response = await fetch(asset);
+					if (response.ok) await cache.put(asset, response);
+				} catch {
+					/* skip individual failures — best-effort pre-cache */
+				}
+			}
 
 			// First-install fast path: when there's no previously active
 			// worker, the user has never had a cached shell — take

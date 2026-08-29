@@ -1,5 +1,5 @@
 import { MongoClient, ServerApiVersion } from 'mongodb';
-import { MONGODB_URI } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 
 let client: MongoClient | null = null;
 let isConnecting = false;
@@ -12,6 +12,9 @@ export async function connect() {
 	}
 
 	try {
+		const mongoUri = env.MONGODB_URI;
+		if (!mongoUri) throw new Error('MONGODB_URI is not configured');
+
 		// Reuse the existing pooled client without an explicit ping. The
 		// ping was adding a full Atlas round-trip to *every* server load,
 		// which on Vercel serverless dominates SSR latency for the
@@ -27,7 +30,7 @@ export async function connect() {
 		isConnecting = true;
 		connectionPromise = new Promise((resolve, reject) => {
 			console.log('[MongoDB] Attempting to connect...');
-			const newClient = new MongoClient(MONGODB_URI, {
+			const newClient = new MongoClient(mongoUri, {
 				serverApi: {
 					version: ServerApiVersion.v1,
 					strict: false,

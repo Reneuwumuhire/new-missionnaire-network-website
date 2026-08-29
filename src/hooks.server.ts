@@ -5,6 +5,9 @@ import { redirect, type Handle } from '@sveltejs/kit';
 import { getFullCountryName } from './utils/countries';
 import { classifyDevice } from './utils/botDetection';
 import { getTodayInKigali } from './utils/time';
+import { startRadioProbeScheduler } from '$lib/server/radio-probe-scheduler';
+
+if (process.env.RAILWAY_PRIVATE_DOMAIN) startRadioProbeScheduler();
 
 // Initialize MongoDB on server start, then:
 // 1. Run an initial YouTube check (self-throttled via DB lock)

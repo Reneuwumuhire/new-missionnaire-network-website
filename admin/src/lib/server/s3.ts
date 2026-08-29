@@ -7,18 +7,13 @@ import {
 	CopyObjectCommand
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import {
-	AWS_ACCESS_KEY_ID,
-	AWS_SECRET_ACCESS_KEY,
-	AWS_S3_BUCKET,
-	AWS_S3_REGION
-} from '$env/static/private';
+import { env } from '$env/dynamic/private';
 
 const s3 = new S3Client({
-	region: AWS_S3_REGION,
+	region: env.AWS_S3_REGION,
 	credentials: {
-		accessKeyId: AWS_ACCESS_KEY_ID,
-		secretAccessKey: AWS_SECRET_ACCESS_KEY
+		accessKeyId: env.AWS_ACCESS_KEY_ID,
+		secretAccessKey: env.AWS_SECRET_ACCESS_KEY
 	},
 	// AWS SDK v3.729+ adds a CRC32 checksum to PutObject by default. For
 	// presigned URLs this bakes x-amz-checksum-crc32=AAAAAA== (empty-body
@@ -56,7 +51,7 @@ export function generatePdfS3Key(filename: string, date = new Date()): string {
 
 export function getS3Url(key: string): string {
 	const encodedKey = key.split('/').map(encodeURIComponent).join('/');
-	return `https://${AWS_S3_BUCKET}.s3.${AWS_S3_REGION}.amazonaws.com/${encodedKey}`;
+	return `https://${env.AWS_S3_BUCKET}.s3.${env.AWS_S3_REGION}.amazonaws.com/${encodedKey}`;
 }
 
 export async function generatePresignedUploadUrl(
@@ -64,7 +59,7 @@ export async function generatePresignedUploadUrl(
 	contentType: string
 ): Promise<string> {
 	const command = new PutObjectCommand({
-		Bucket: AWS_S3_BUCKET,
+		Bucket: env.AWS_S3_BUCKET,
 		Key: key,
 		ContentType: contentType
 	});
@@ -74,7 +69,7 @@ export async function generatePresignedUploadUrl(
 export async function getObjectBytes(
 	key: string
 ): Promise<{ bytes: ArrayBuffer; contentType: string }> {
-	const object = await s3.send(new GetObjectCommand({ Bucket: AWS_S3_BUCKET, Key: key }));
+	const object = await s3.send(new GetObjectCommand({ Bucket: env.AWS_S3_BUCKET, Key: key }));
 	if (!object.Body) throw new Error('Uploaded thumbnail could not be read');
 	const downloaded = await object.Body.transformToByteArray();
 	const bytes = new ArrayBuffer(downloaded.byteLength);
@@ -111,9 +106,9 @@ export async function updateDownloadFilename(
 	const filename = `${safe}.mp3`;
 	await s3.send(
 		new CopyObjectCommand({
-			Bucket: AWS_S3_BUCKET,
+			Bucket: env.AWS_S3_BUCKET,
 			Key: key,
-			CopySource: `${AWS_S3_BUCKET}/${encodeURI(key)}`,
+			CopySource: `${env.AWS_S3_BUCKET}/${encodeURI(key)}`,
 			MetadataDirective: 'REPLACE',
 			ContentType: contentType,
 			ContentDisposition: buildContentDisposition(filename),
@@ -125,7 +120,7 @@ export async function updateDownloadFilename(
 export async function deleteObject(key: string): Promise<void> {
 	await s3.send(
 		new DeleteObjectCommand({
-			Bucket: AWS_S3_BUCKET,
+			Bucket: env.AWS_S3_BUCKET,
 			Key: key
 		})
 	);
@@ -143,7 +138,7 @@ export async function deleteObjects(keys: string[]): Promise<void> {
 	for (const batch of batches) {
 		await s3.send(
 			new DeleteObjectsCommand({
-				Bucket: AWS_S3_BUCKET,
+				Bucket: env.AWS_S3_BUCKET,
 				Delete: {
 					Objects: batch.map((key) => ({ Key: key })),
 					Quiet: true
