@@ -362,6 +362,19 @@ const fr: Record<keyof typeof en, string> = {
 	'settings.ffmpegCommand': 'Commande ffmpeg',
 	'settings.ffmpegLog': 'Journal ffmpeg ({count})',
 
+	// ── Mises à jour ────────────────────────────────────────────
+	'update.currentVersion': 'Version {version}',
+	'update.check': 'Rechercher les mises à jour',
+	'update.checking': 'Recherche de mises à jour…',
+	'update.current': 'Vous utilisez la dernière version.',
+	'update.available': 'Missionnaire Studio {version} est disponible.',
+	'update.installRestart': 'Installer et redémarrer',
+	'update.downloading': 'Téléchargement de la mise à jour… {percent} %',
+	'update.installing': 'Installation de la mise à jour…',
+	'update.restarting': 'Redémarrage de Studio…',
+	'update.blocked': 'Terminez la diffusion ou l’enregistrement avant la mise à jour.',
+	'update.error': 'Échec de la recherche de mise à jour : {message}',
+
 	// ── Stream destinations ─────────────────────────────────────
 	'stream.intro':
 		'Chaque destination activée reçoit le même encodage. Si l’une refuse la connexion, les autres continuent — YouTube ne peut pas faire tomber la radio.',

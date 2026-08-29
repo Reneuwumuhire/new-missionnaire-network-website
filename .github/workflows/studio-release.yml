@@ -1,0 +1,68 @@
+name: Release Missionnaire Studio
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'studio-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS universal
+            platform: macos-latest
+            targets: aarch64-apple-darwin,x86_64-apple-darwin
+            args: --target universal-apple-darwin
+            apple_signing_identity: '-'
+          - name: Windows x64
+            platform: windows-latest
+            targets: x86_64-pc-windows-msvc
+            args: ''
+            apple_signing_identity: ''
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: studio/pnpm-lock.yaml
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.targets }}
+
+      - name: Install dependencies
+        working-directory: studio
+        run: pnpm install --frozen-lockfile
+
+      - name: Build, sign, and publish
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ matrix.apple_signing_identity }}
+        with:
+          projectPath: studio
+          tauriScript: pnpm tauri
+          tagName: studio-v__VERSION__
+          releaseName: Missionnaire Studio v__VERSION__
+          releaseBody: Download and install Missionnaire Studio. Existing installations can update from Settings → About.
+          releaseDraft: false
+          prerelease: false
+          updaterJsonPreferNsis: true
+          args: ${{ matrix.args }}

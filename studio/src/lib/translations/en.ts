@@ -352,6 +352,19 @@ const en = {
 	'settings.ffmpegCommand': 'ffmpeg command',
 	'settings.ffmpegLog': 'ffmpeg log ({count})',
 
+	// ── Updates ─────────────────────────────────────────────────
+	'update.currentVersion': 'Version {version}',
+	'update.check': 'Check for updates',
+	'update.checking': 'Checking for updates…',
+	'update.current': 'You’re using the latest version.',
+	'update.available': 'Missionnaire Studio {version} is available.',
+	'update.installRestart': 'Install and restart',
+	'update.downloading': 'Downloading update… {percent}%',
+	'update.installing': 'Installing update…',
+	'update.restarting': 'Restarting Studio…',
+	'update.blocked': 'Finish the live broadcast or recording before updating.',
+	'update.error': 'Update check failed: {message}',
+
 	// ── Stream destinations ─────────────────────────────────────
 	'stream.intro':
 		'Every enabled destination gets the same encode. If one refuses the connection the others carry on — YouTube cannot take the radio down.',

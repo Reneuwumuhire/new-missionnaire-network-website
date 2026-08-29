@@ -31,6 +31,7 @@
 	"bundle": {
 		"active": true,
 		"targets": "all",
+		"createUpdaterArtifacts": true,
 		"icon": [
 			"icons/32x32.png",
 			"icons/128x128.png",
@@ -41,6 +42,17 @@
 		"macOS": {
 			"minimumSystemVersion": "12.0",
 			"entitlements": "entitlements.plist"
+		}
+	},
+	"plugins": {
+		"updater": {
+			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEYzNEZGQTU0RDRCNkJFNjkKUldScHZyYlVWUHBQODlMaldzSks2cFNPRERxUDJvTnRKa3A5RjRSYVRwN1IzOUtXd3NyNGtJU0QK",
+			"endpoints": [
+				"https://github.com/Reneuwumuhire/new-missionnaire-network-website/releases/latest/download/latest.json"
+			],
+			"windows": {
+				"installMode": "passive"
+			}
 		}
 	}
 }

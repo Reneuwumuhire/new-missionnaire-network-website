@@ -49,6 +49,7 @@
 	import { liveSession, logoutStudio } from './lib/live-session.svelte';
 	import { recording } from './lib/recording.svelte';
 	import { initReferenceMatcher } from './lib/reference-match.svelte';
+	import { appUpdate, downloadPercent, initUpdater, installUpdate } from './lib/updater.svelte';
 
 	let programCanvas = $state<HTMLCanvasElement | null>(null);
 	let mixer = $state<Mixer | null>(null);
@@ -74,6 +75,7 @@
 
 	onMount(() => {
 		initReferenceMatcher();
+		void initUpdater();
 		mixer = new Mixer();
 		selftestMixer(mixer);
 		mixer.setMonitor(studio.settings.monitorAudio);
@@ -287,6 +289,7 @@
 	// Program is a frozen snapshot in Studio Mode, so even edits to the same
 	// scene (visibility, crop, layout, properties) are valid takes.
 	const canTake = $derived(studio.settings.studioMode || studio.activeSceneId !== onAirSceneId());
+	const updateBlocked = $derived(isStreaming() || recording.startedAt !== null);
 	const recordingDuration = $derived(
 		recording.startedAt ? Math.max(0, Math.floor((now - recording.startedAt) / 1000)) : 0
 	);
@@ -389,6 +392,44 @@
 				aria-label={t('common.close')}
 				onclick={() => (broadcast.error = null)}><Icon name="close" /></button
 			>
+		</div>
+	{/if}
+
+	{#if ['available', 'downloading', 'installing', 'restarting'].includes(appUpdate.phase)}
+		<div
+			class="flex shrink-0 items-center gap-3 border-b border-primary/30 bg-primary/10 px-4 py-2"
+		>
+			<div class="min-w-0 flex-1">
+				<p class="text-[12px] text-fg/85">
+					{#if appUpdate.phase === 'available'}
+						{t('update.available', { version: appUpdate.availableVersion ?? '' })}
+					{:else if appUpdate.phase === 'downloading'}
+						{t('update.downloading', { percent: downloadPercent() })}
+					{:else if appUpdate.phase === 'installing'}
+						{t('update.installing')}
+					{:else}
+						{t('update.restarting')}
+					{/if}
+				</p>
+				{#if updateBlocked && appUpdate.phase === 'available'}
+					<p class="mt-0.5 text-[10px] text-amber-300">{t('update.blocked')}</p>
+				{/if}
+				{#if appUpdate.phase === 'downloading'}
+					<div class="mt-1 h-1 overflow-hidden rounded-full bg-fg/10">
+						<div
+							class="h-full bg-primary transition-[width]"
+							style="width: {downloadPercent()}%"
+						></div>
+					</div>
+				{/if}
+			</div>
+			{#if appUpdate.phase === 'available'}
+				<button
+					class="studio-chip shrink-0 border-primary/50 bg-primary/20 text-primary"
+					disabled={updateBlocked}
+					onclick={() => void installUpdate()}>{t('update.installRestart')}</button
+				>
+			{/if}
 		</div>
 	{/if}
 
