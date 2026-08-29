@@ -7,7 +7,7 @@ use ffmpeg::{Encoder, FfmpegInfo, StreamConfig};
 use serde::Serialize;
 use std::process::Command;
 use tauri::{
-	menu::{Menu, MenuItem, PredefinedMenuItem, HELP_SUBMENU_ID},
+	menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, HELP_SUBMENU_ID},
 	AppHandle, Emitter, Manager, State,
 };
 
@@ -361,8 +361,37 @@ pub fn run() {
 
 	tauri::Builder::default()
 		.menu(|app| {
+			let app_version = app.package_info().version.to_string();
+			// macOS treats `version` as a build number; an empty value prevents it
+			// from repeating the public version in parentheses.
+			#[cfg(target_os = "macos")]
+			let (version, short_version) = (Some(String::new()), Some(app_version));
+			#[cfg(not(target_os = "macos"))]
+			let (version, short_version) = (Some(app_version), None);
+			let about = PredefinedMenuItem::about(
+				app,
+				None,
+				Some(AboutMetadata {
+					name: Some("Missionnaire Studio".into()),
+					version,
+					short_version,
+					authors: Some(vec!["Missionnaire Network".into()]),
+					comments: Some(
+						"Professional live broadcasting, translation, and synchronized subtitles."
+							.into(),
+					),
+					copyright: Some("© 2026 Missionnaire Network".into()),
+					website: Some("https://www.missionnaire.net".into()),
+					website_label: Some("missionnaire.net".into()),
+					credits: Some(
+						"Live production for Missionnaire Network\nPowered by Tauri & FFmpeg".into(),
+					),
+					..Default::default()
+				}),
+			)?;
 			let menu = Menu::default(app)?;
-			#[cfg(any(target_os = "macos", target_os = "windows"))]
+
+			#[cfg(target_os = "macos")]
 			{
 				let settings = MenuItem::with_id(
 					app,
@@ -374,15 +403,24 @@ pub fn run() {
 				let separator = PredefinedMenuItem::separator(app)?;
 				let top_level = menu.items()?;
 
-				// Settings belongs in the application menu on macOS and in File on
-				// Windows. Both are the first submenu in Tauri's native default menu.
+				// Replace Tauri's sparse About item, then put Settings in the native
+				// application-menu position immediately below it.
 				if let Some(submenu) = top_level.first().and_then(|item| item.as_submenu()) {
-					#[cfg(target_os = "macos")]
-					let position = 2;
-					#[cfg(target_os = "windows")]
-					let position = 0;
-					submenu.insert_items(&[&settings, &separator], position)?;
+					submenu.remove_at(0)?;
+					submenu.insert(&about, 0)?;
+					submenu.insert_items(&[&settings, &separator], 2)?;
 				}
+			}
+			#[cfg(target_os = "windows")]
+			if let Some(file) = menu.items()?.first().and_then(|item| item.as_submenu()) {
+				let settings = MenuItem::with_id(
+					app,
+					MENU_SETTINGS,
+					"Settings…",
+					true,
+					Some("CmdOrCtrl+,"),
+				)?;
+				file.insert_items(&[&settings, &PredefinedMenuItem::separator(app)?], 0)?;
 			}
 
 			if let Some(help) = menu
@@ -402,6 +440,8 @@ pub fn run() {
 				let troubleshooting = item(MENU_TROUBLESHOOTING, "Troubleshooting", None)?;
 				let help_separator = PredefinedMenuItem::separator(app)?;
 				let system_info = item(MENU_SYSTEM_INFO, "System Information", None)?;
+				#[cfg(not(target_os = "macos"))]
+				help.remove_at(0)?;
 				help.prepend_items(
 					&[
 						&help_home,
@@ -413,7 +453,7 @@ pub fn run() {
 					],
 				)?;
 				#[cfg(not(target_os = "macos"))]
-				help.insert(&PredefinedMenuItem::separator(app)?, 6)?;
+				help.append_items(&[&PredefinedMenuItem::separator(app)?, &about])?;
 			}
 			Ok(menu)
 		})
