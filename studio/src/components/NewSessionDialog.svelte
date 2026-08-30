@@ -11,8 +11,17 @@
 	let subtitle = $state<File | null>(null);
 	let announce = $state(true);
 	let reminderEnabled = $state(false);
+	let youtubeChannelId = $state(
+		liveSession.youtubeChannelId ?? liveSession.youtubeChannels[0]?.id ?? ''
+	);
 	let saving = $state(false);
 	let formError = $state<string | null>(null);
+
+	$effect(() => {
+		if (!liveSession.youtubeChannels.some((channel) => channel.id === youtubeChannelId)) {
+			youtubeChannelId = liveSession.youtubeChannelId ?? liveSession.youtubeChannels[0]?.id ?? '';
+		}
+	});
 
 	async function save() {
 		if (!title.trim() || !scheduledAt) {
@@ -31,7 +40,8 @@
 				thumbnail,
 				subtitle,
 				announce,
-				reminderEnabled
+				reminderEnabled,
+				youtubeChannelId
 			})
 		)
 			oncreated();
@@ -88,19 +98,27 @@
 			><span class="studio-label">YouTube audience</span><select
 				class="studio-input h-[38px] w-full"
 				bind:value={madeForKids}
-				><option value={false}>Not made for kids</option><option value={true}>Made for kids</option></select
+				><option value={false}>Not made for kids</option><option value={true}>Made for kids</option
+				></select
 			></label
 		>
 		<div class="block">
-			<span class="studio-label">YouTube channel</span>{#if liveSession.youtubeConnected}<div
-					class="studio-input truncate text-emerald-300"
-				>
-					{liveSession.youtubeChannel}
-				</div>{:else}<button
+			<span class="studio-label">YouTube channel</span>
+			{#if liveSession.youtubeChannels.length > 0}
+				<select class="studio-input h-[38px] w-full" bind:value={youtubeChannelId}>
+					{#each liveSession.youtubeChannels as channel (channel.id)}
+						<option value={channel.id}>{channel.title}</option>
+					{/each}
+				</select>
+			{:else}
+				<button
 					class="studio-chip h-[42px] w-full"
 					type="button"
-					onclick={() => void connectYouTube()}>Connect YouTube</button
-				>{/if}
+					onclick={async () => {
+						youtubeChannelId = (await connectYouTube()) ?? youtubeChannelId;
+					}}>Connect YouTube</button
+				>
+			{/if}
 		</div>
 	</div>
 	<div class="grid gap-3 sm:grid-cols-2">
@@ -136,7 +154,7 @@
 	{#if formError}<p class="text-[12px] text-red-400">{formError}</p>{/if}
 	<button
 		class="h-9 w-full bg-primary text-[12px] font-semibold text-black disabled:opacity-50"
-		disabled={saving || !liveSession.youtubeConnected}
+		disabled={saving || !youtubeChannelId}
 		>{saving ? 'Creating YouTube + Missionnaire…' : 'Create YouTube + Missionnaire session'}</button
 	>
 </form>

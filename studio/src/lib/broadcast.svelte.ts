@@ -11,15 +11,17 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { t } from './i18n.svelte';
 import { clearRecording, recording, recordsLocal, stopCloudRecording } from './recording.svelte';
-import { endSelectedSession, goLiveYouTube, liveSession, startSelectedSession } from './live-session.svelte';
+import {
+	endSelectedSession,
+	goLiveYouTube,
+	liveSession,
+	sessionYouTubeChannelId,
+	startSelectedSession
+} from './live-session.svelte';
 import { destinationUrl, requiresYouTubeGoLive, studio } from './state.svelte';
 import { sampleOutputClock, startStreamClock, stopStreamClock } from './stream-clock';
 
-const MIME_PREFERENCE = [
-	'video/webm;codecs=vp8,opus',
-	'video/webm;codecs=vp9,opus',
-	'video/webm'
-];
+const MIME_PREFERENCE = ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/webm'];
 
 export interface Stats {
 	frames: number;
@@ -119,19 +121,22 @@ export async function startBroadcast(
 		if (!mime) throw new Error(t('error.noRecorder'));
 
 		const { settings } = studio;
-		const result = await invoke<{ command: string[]; localRecordingPath: string | null }>('start_stream', {
-			group: 'main',
-			config: {
-				container: containerOf(mime),
-				targets: enabled,
-				fps: settings.fps,
-				video_bitrate_kbps: settings.videoBitrateKbps,
-				audio_bitrate_kbps: settings.audioBitrateKbps,
-				encoder: settings.encoder,
-				has_audio: Boolean(audioTrack),
-				record_local: recordsLocal()
+		const result = await invoke<{ command: string[]; localRecordingPath: string | null }>(
+			'start_stream',
+			{
+				group: 'main',
+				config: {
+					container: containerOf(mime),
+					targets: enabled,
+					fps: settings.fps,
+					video_bitrate_kbps: settings.videoBitrateKbps,
+					audio_bitrate_kbps: settings.audioBitrateKbps,
+					encoder: settings.encoder,
+					has_audio: Boolean(audioTrack),
+					record_local: recordsLocal()
+				}
 			}
-		});
+		);
 		broadcast.command = result.command;
 		broadcast.localRecordingPath = result.localRecordingPath;
 		recording.localPath = result.localRecordingPath;
@@ -222,30 +227,33 @@ async function attachListeners() {
 		await listen<string>('stream://log', (event) => {
 			broadcast.log = [...broadcast.log.slice(-199), event.payload];
 		}),
-		await listen<{ group: StreamGroup; code: number; log: string[] }>('stream://exited', (event) => {
-			if (!isStreaming()) return;
-			if (event.payload.group === 'held') {
-				// Losing the held encoder must not take the main stream down.
-				broadcast.heldLive = false;
-				for (const target of broadcast.targets) {
-					if (target.group === 'held') target.state = 'failed';
+		await listen<{ group: StreamGroup; code: number; log: string[] }>(
+			'stream://exited',
+			(event) => {
+				if (!isStreaming()) return;
+				if (event.payload.group === 'held') {
+					// Losing the held encoder must not take the main stream down.
+					broadcast.heldLive = false;
+					for (const target of broadcast.targets) {
+						if (target.group === 'held') target.state = 'failed';
+					}
+					return;
 				}
-				return;
+				// ffmpeg died on its own — never leave the UI showing "on air".
+				broadcast.phase = 'idle';
+				broadcast.targets = broadcast.targets.map((target) => ({ ...target, state: 'failed' }));
+				broadcast.error =
+					event.payload.code === 0
+						? t('error.stoppedCleanly')
+						: t('error.ffmpegExited', {
+								code: event.payload.code,
+								log: event.payload.log.slice(-3).join(' | ')
+							});
+				stopRecorder();
+				void stopCloudRecording();
+				void endSelectedSession();
 			}
-			// ffmpeg died on its own — never leave the UI showing "on air".
-			broadcast.phase = 'idle';
-			broadcast.targets = broadcast.targets.map((target) => ({ ...target, state: 'failed' }));
-			broadcast.error =
-				event.payload.code === 0
-					? t('error.stoppedCleanly')
-					: t('error.ffmpegExited', {
-							code: event.payload.code,
-							log: event.payload.log.slice(-3).join(' | ')
-						});
-			stopRecorder();
-			void stopCloudRecording();
-			void endSelectedSession();
-		})
+		)
 	];
 }
 
@@ -356,14 +364,20 @@ export async function goLivePublic(): Promise<void> {
 	if (broadcast.phase !== 'live' || broadcast.publishing || liveSession.activeId) return;
 	broadcast.publishing = true;
 	const session = liveSession.sessions.find((item) => item._id === liveSession.selectedId);
-	const youtube = requiresYouTubeGoLive(studio.destinations, session?.is_test);
+	const youtube =
+		!session?.is_test &&
+		(Boolean(session?.youtube_url) || requiresYouTubeGoLive(studio.destinations));
 	broadcast.error = null;
 	try {
 		if (youtube) {
-			if (!liveSession.youtubeConnected) throw new Error('Connect YouTube before going live.');
+			const channelId = sessionYouTubeChannelId(session, liveSession.youtubeChannels);
+			if (!channelId || !liveSession.youtubeChannels.some((channel) => channel.id === channelId)) {
+				throw new Error(t('error.youtubeChannelMissing'));
+			}
 			await goLiveYouTube();
 		}
-		if (!(await startSelectedSession())) throw new Error(liveSession.error || 'Missionnaire could not go live.');
+		if (!(await startSelectedSession()))
+			throw new Error(liveSession.error || t('error.missionnaireGoLive'));
 		await goLiveHeld();
 	} catch (error) {
 		broadcast.error = error instanceof Error ? error.message : String(error);

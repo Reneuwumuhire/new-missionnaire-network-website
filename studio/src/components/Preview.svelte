@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { startRenderLoop } from '../lib/compositor';
-	import { applyDrag, cursorForHandle, hitHandle, type Handle } from '../lib/geom';
+	import { applyDrag, cursorForHandle, FULL_FRAME, hitHandle, type Handle } from '../lib/geom';
 	import { activeScene, persist, studio } from '../lib/state.svelte';
 
 	// A canvas rendered at broadcast resolution and scaled down with CSS — what
@@ -27,7 +27,9 @@
 	let canvas = $state<HTMLCanvasElement | null>(null);
 	let box = $state<HTMLDivElement | null>(null);
 	let area = $state<HTMLDivElement | null>(null);
-	let drag = $state<{ handle: Handle; startX: number; startY: number; layerId: string } | null>(null);
+	let drag = $state<{ handle: Handle; startX: number; startY: number; layerId: string } | null>(
+		null
+	);
 	/** Handle under the pointer when nothing is being dragged, so the cursor
 	 *  announces what a press would do before it is pressed. */
 	let hover = $state<Handle | null>(null);
@@ -59,12 +61,13 @@
 
 	const selected = $derived(
 		editable
-			? (activeScene().layers.find((l) => l.id === studio.selectedLayerId && !l.locked && l.visible) ??
-				null)
+			? (activeScene().layers.find(
+					(l) => l.id === studio.selectedLayerId && !l.locked && l.visible
+				) ?? null)
 			: null
 	);
 
-	function normalisedPoint(event: PointerEvent): { x: number; y: number } | null {
+	function normalisedPoint(event: MouseEvent): { x: number; y: number } | null {
 		if (!box) return null;
 		const rect = box.getBoundingClientRect();
 		return {
@@ -117,15 +120,28 @@
 		drag = null;
 	}
 
+	/** A full-frame source puts its corners on the preview boundary. Double-click
+	 *  anywhere on a layer for the common reset instead of hunting a tiny handle. */
+	function onDoubleClick(event: MouseEvent) {
+		if (!editable) return;
+		const point = normalisedPoint(event);
+		if (!point) return;
+		const hit = handleAt(point);
+		const layer = hit ? activeScene().layers.find((item) => item.id === hit.layerId) : null;
+		if (!layer) return;
+		layer.rect = { ...FULL_FRAME };
+		studio.selectedLayerId = layer.id;
+		persist();
+	}
+
 	const cursor = $derived(cursorForHandle(drag?.handle ?? hover, drag !== null));
 </script>
 
 <div class="flex min-h-0 min-w-0 flex-1 flex-col">
 	<div class="flex h-5 shrink-0 items-center justify-center gap-2">
 		<span
-			class="text-[9px] font-bold uppercase tracking-[0.2em] {live
-				? 'text-red-400'
-				: 'text-fg/35'}">{label}</span
+			class="text-[9px] font-bold uppercase tracking-[0.2em] {live ? 'text-red-400' : 'text-fg/35'}"
+			>{label}</span
 		>
 		{#if live}
 			<span class="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500"></span>
@@ -143,6 +159,7 @@
 			onpointerup={onPointerUp}
 			onpointercancel={onPointerUp}
 			onpointerleave={() => (hover = null)}
+			ondblclick={onDoubleClick}
 		>
 			<canvas
 				bind:this={canvas}
@@ -156,12 +173,14 @@
 				     starts on a handle keeps tracking outside the frame. -->
 				<div
 					class="pointer-events-none absolute border-2 border-primary/90"
-					style="left:{selected.rect.x * 100}%; top:{selected.rect.y * 100}%; width:{selected.rect.w *
-						100}%; height:{selected.rect.h * 100}%"
+					style="left:{selected.rect.x * 100}%; top:{selected.rect.y * 100}%; width:{selected.rect
+						.w * 100}%; height:{selected.rect.h * 100}%"
 				>
-					{#each [['-5px', '-5px'], ['calc(100% - 5px)', '-5px'], ['-5px', 'calc(100% - 5px)'], ['calc(100% - 5px)', 'calc(100% - 5px)']] as [left, top] (left + top)}
+					<!-- Eight handles, inset so a full-frame layer remains draggable even
+					     when its real edges coincide with the clipped preview boundary. -->
+					{#each [['6px', '6px'], ['50%', '6px'], ['calc(100% - 6px)', '6px'], ['calc(100% - 6px)', '50%'], ['calc(100% - 6px)', 'calc(100% - 6px)'], ['50%', 'calc(100% - 6px)'], ['6px', 'calc(100% - 6px)'], ['6px', '50%']] as [left, top] (left + top)}
 						<span
-							class="absolute h-2.5 w-2.5 border border-black/60 bg-primary"
+							class="absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 border border-black/60 bg-primary"
 							style="left:{left}; top:{top}"
 						></span>
 					{/each}

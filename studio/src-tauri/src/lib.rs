@@ -1,11 +1,22 @@
 mod appaudio;
 mod fetch;
 mod ffmpeg;
+mod reference;
 
 use ffmpeg::{Encoder, FfmpegInfo, StreamConfig};
 use serde::Serialize;
 use std::process::Command;
-use tauri::{AppHandle, Manager, State};
+use tauri::{
+	menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, HELP_SUBMENU_ID},
+	AppHandle, Emitter, Manager, State,
+};
+
+const MENU_SETTINGS: &str = "studio-settings";
+const MENU_HELP: &str = "studio-help";
+const MENU_GETTING_STARTED: &str = "studio-getting-started";
+const MENU_SHORTCUTS: &str = "studio-keyboard-shortcuts";
+const MENU_TROUBLESHOOTING: &str = "studio-troubleshooting";
+const MENU_SYSTEM_INFO: &str = "studio-system-information";
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -50,6 +61,13 @@ mod url_tests {
 #[tauri::command]
 fn check_ffmpeg() -> Result<FfmpegInfo, String> {
 	ffmpeg::probe_ffmpeg()
+}
+
+#[tauri::command]
+async fn extract_reference_features(path: String) -> Result<reference::ReferenceFeatures, String> {
+	tauri::async_runtime::spawn_blocking(move || reference::extract(path))
+		.await
+		.map_err(|error| error.to_string())?
 }
 
 /// Returns the ffmpeg command line with stream keys redacted, so the UI can
@@ -245,6 +263,28 @@ fn open_url(url: String) -> Result<(), String> {
 		.map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn open_youtube_chat(app: AppHandle, url: String) -> Result<(), String> {
+	if !allowed_web_url(&url) || !url.starts_with("https://www.youtube.com/live_chat?") {
+		return Err("Invalid YouTube live chat URL".into());
+	}
+	if let Some(existing) = app.get_webview_window("youtube-live-chat") {
+		let _ = existing.close();
+	}
+	let parsed = url.parse().map_err(|_| "Invalid YouTube live chat URL")?;
+	tauri::WebviewWindowBuilder::new(
+		&app,
+		"youtube-live-chat",
+		tauri::WebviewUrl::External(parsed),
+	)
+	.title("YouTube Live Chat")
+	.inner_size(420.0, 760.0)
+	.min_inner_size(320.0, 480.0)
+	.build()
+	.map(|_| ())
+	.map_err(|error| error.to_string())
+}
+
 /// Open the macOS privacy pane for a device class, so a refused microphone has
 /// somewhere to be un-refused. A fixed set rather than a URL from the webview:
 /// this hands a string to the OS shell.
@@ -320,6 +360,103 @@ pub fn run() {
 	keep_rendering_when_covered();
 
 	tauri::Builder::default()
+		.menu(|app| {
+			let app_version = app.package_info().version.to_string();
+			// macOS treats `version` as a build number; an empty value prevents it
+			// from repeating the public version in parentheses.
+			#[cfg(target_os = "macos")]
+			let (version, short_version) = (Some(String::new()), Some(app_version));
+			#[cfg(not(target_os = "macos"))]
+			let (version, short_version) = (Some(app_version), None);
+			let about = PredefinedMenuItem::about(
+				app,
+				None,
+				Some(AboutMetadata {
+					name: Some("Missionnaire Studio".into()),
+					version,
+					short_version,
+					authors: Some(vec!["Missionnaire Network".into()]),
+					comments: Some(
+						"Professional live broadcasting, translation, and synchronized subtitles."
+							.into(),
+					),
+					copyright: Some("© 2026 Missionnaire Network".into()),
+					website: Some("https://www.missionnaire.net".into()),
+					website_label: Some("missionnaire.net".into()),
+					credits: Some(
+						"Live production for Missionnaire Network\nPowered by Tauri & FFmpeg".into(),
+					),
+					..Default::default()
+				}),
+			)?;
+			let menu = Menu::default(app)?;
+
+			#[cfg(target_os = "macos")]
+			{
+				let settings = MenuItem::with_id(
+					app,
+					MENU_SETTINGS,
+					"Settings…",
+					true,
+					Some("CmdOrCtrl+,"),
+				)?;
+				let separator = PredefinedMenuItem::separator(app)?;
+				let top_level = menu.items()?;
+
+				// Replace Tauri's sparse About item, then put Settings in the native
+				// application-menu position immediately below it.
+				if let Some(submenu) = top_level.first().and_then(|item| item.as_submenu()) {
+					submenu.remove_at(0)?;
+					submenu.insert(&about, 0)?;
+					submenu.insert_items(&[&settings, &separator], 2)?;
+				}
+			}
+			#[cfg(target_os = "windows")]
+			if let Some(file) = menu.items()?.first().and_then(|item| item.as_submenu()) {
+				let settings = MenuItem::with_id(
+					app,
+					MENU_SETTINGS,
+					"Settings…",
+					true,
+					Some("CmdOrCtrl+,"),
+				)?;
+				file.insert_items(&[&settings, &PredefinedMenuItem::separator(app)?], 0)?;
+			}
+
+			if let Some(help) = menu
+				.get(HELP_SUBMENU_ID)
+				.and_then(|item| item.as_submenu().cloned())
+			{
+				let item = |id, text, accelerator| {
+					MenuItem::with_id(app, id, text, true, accelerator)
+				};
+				let help_home = item(
+					MENU_HELP,
+					"Missionnaire Studio Help",
+					Some("CmdOrCtrl+/"),
+				)?;
+				let getting_started = item(MENU_GETTING_STARTED, "Getting Started", None)?;
+				let shortcuts = item(MENU_SHORTCUTS, "Keyboard Shortcuts", None)?;
+				let troubleshooting = item(MENU_TROUBLESHOOTING, "Troubleshooting", None)?;
+				let help_separator = PredefinedMenuItem::separator(app)?;
+				let system_info = item(MENU_SYSTEM_INFO, "System Information", None)?;
+				#[cfg(not(target_os = "macos"))]
+				help.remove_at(0)?;
+				help.prepend_items(
+					&[
+						&help_home,
+						&getting_started,
+						&shortcuts,
+						&help_separator,
+						&troubleshooting,
+						&system_info,
+					],
+				)?;
+				#[cfg(not(target_os = "macos"))]
+				help.append_items(&[&PredefinedMenuItem::separator(app)?, &about])?;
+			}
+			Ok(menu)
+		})
 		.manage(Encoder::default())
 		.manage(appaudio::Capture::default())
 		.manage(fetch::Streams::default())
@@ -395,8 +532,30 @@ pub fn run() {
 			}
 			Ok(())
 		})
+		.plugin(tauri_plugin_dialog::init())
+		.plugin(tauri_plugin_updater::Builder::new().build())
+		.plugin(tauri_plugin_process::init())
+		.on_menu_event(|app, event| {
+			let id = event.id().as_ref();
+			if matches!(
+				id,
+				MENU_SETTINGS
+					| MENU_HELP
+					| MENU_GETTING_STARTED
+					| MENU_SHORTCUTS
+					| MENU_TROUBLESHOOTING
+					| MENU_SYSTEM_INFO
+			) {
+				if let Some(window) = app.get_webview_window("main") {
+					let _ = window.show();
+					let _ = window.set_focus();
+				}
+				let _ = app.emit_to("main", "studio://menu", id);
+			}
+		})
 		.invoke_handler(tauri::generate_handler![
 			check_ffmpeg,
+			extract_reference_features,
 			start_stream,
 			recorder_post,
 			studio_live_post,
@@ -409,6 +568,7 @@ pub fn run() {
 			stream_running,
 			selftest_target,
 			open_url,
+			open_youtube_chat,
 			open_privacy_settings,
 			list_audio_apps,
 			list_windows,
@@ -420,7 +580,7 @@ pub fn run() {
 		.on_window_event(|window, event| {
 			// Closing the window while live would orphan ffmpeg holding the RTMP
 			// connections open; YouTube would keep showing a frozen frame.
-			if let tauri::WindowEvent::Destroyed = event {
+			if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
 				if let Some(encoder) = window.app_handle().try_state::<Encoder>() {
 					let _ = encoder.stop();
 				}

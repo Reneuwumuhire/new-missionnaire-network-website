@@ -12,6 +12,27 @@ import {
 
 const REDIRECT_URI = 'https://admin.missionnaire.net/api/youtube/oauth/callback';
 
+export type YouTubeChannel = {
+	id: string;
+	title: string;
+	updatedAt: string;
+};
+
+let authorizationIndexesEnsured: Promise<void> | null = null;
+async function ensureAuthorizationIndexes(): Promise<void> {
+	if (authorizationIndexesEnsured) return authorizationIndexesEnsured;
+	authorizationIndexesEnsured = (async () => {
+		const db = await getDb();
+		await db
+			.collection('youtube_authorizations')
+			.createIndex({ user_email: 1, channel_id: 1 }, { unique: true, name: 'user_channel_unique' });
+	})().catch((error) => {
+		authorizationIndexesEnsured = null;
+		throw error;
+	});
+	return authorizationIndexesEnsured;
+}
+
 function config() {
 	const clientId = env.YOUTUBE_OAUTH_CLIENT_ID?.trim();
 	const clientSecret = env.YOUTUBE_OAUTH_CLIENT_SECRET?.trim();
@@ -92,8 +113,9 @@ export async function finishYouTubeOAuth(
 	const channel = channels.items?.[0];
 	if (!channel) throw new Error('The connected Google account has no YouTube channel');
 	const channelTitle = channel.snippet?.title || channel.id;
+	await ensureAuthorizationIndexes();
 	await db.collection('youtube_authorizations').updateOne(
-		{ user_email: pending.user_email },
+		{ user_email: pending.user_email, channel_id: channel.id },
 		{
 			$set: {
 				user_email: pending.user_email,
@@ -109,31 +131,59 @@ export async function finishYouTubeOAuth(
 	return { channelTitle };
 }
 
-export async function youtubeConnection(
-	userEmail: string
-): Promise<{ connected: boolean; channelTitle: string | null }> {
-	const doc = await (await getDb())
+export async function youtubeConnection(userEmail: string): Promise<YouTubeChannel[]> {
+	await ensureAuthorizationIndexes();
+	const docs = await (
+		await getDb()
+	)
 		.collection('youtube_authorizations')
-		.findOne({ user_email: userEmail }, { projection: { channel_title: 1 } });
-	return {
-		connected: Boolean(doc),
-		channelTitle: typeof doc?.channel_title === 'string' ? doc.channel_title : null
-	};
+		.find(
+			{ user_email: userEmail },
+			{ projection: { channel_id: 1, channel_title: 1, updated_at: 1 } }
+		)
+		.sort({ updated_at: -1 })
+		.toArray();
+	return docs.flatMap((doc) =>
+		typeof doc.channel_id === 'string'
+			? [
+					{
+						id: doc.channel_id,
+						title: typeof doc.channel_title === 'string' ? doc.channel_title : doc.channel_id,
+						updatedAt:
+							doc.updated_at instanceof Date
+								? doc.updated_at.toISOString()
+								: String(doc.updated_at ?? '')
+					}
+				]
+			: []
+	);
 }
 
-async function accessToken(userEmail: string): Promise<string> {
-	return (await authorization(userEmail)).token;
+export async function disconnectYouTube(userEmail: string, channelId: string): Promise<void> {
+	await (await getDb())
+		.collection('youtube_authorizations')
+		.deleteOne({ user_email: userEmail, channel_id: channelId });
+}
+
+async function accessToken(userEmail: string, channelId: string): Promise<string> {
+	return (await authorization(userEmail, channelId)).token;
 }
 
 type YouTubeIngest = { url: string; key: string };
 
-async function authorization(userEmail: string): Promise<{
+async function authorization(
+	userEmail: string,
+	channelId: string
+): Promise<{
 	token: string;
 	channelId: string;
+	channelTitle: string;
 	encryptionSecret: string;
 }> {
 	const db = await getDb();
-	const doc = await db.collection('youtube_authorizations').findOne({ user_email: userEmail });
+	const doc = await db
+		.collection('youtube_authorizations')
+		.findOne({ user_email: userEmail, channel_id: channelId });
 	if (!doc || typeof doc.refresh_token !== 'string' || typeof doc.channel_id !== 'string') {
 		throw new Error('Connect the YouTube account first');
 	}
@@ -148,15 +198,24 @@ async function authorization(userEmail: string): Promise<{
 			grant_type: 'refresh_token'
 		})
 	});
-	return { token: token.access_token, channelId: doc.channel_id, encryptionSecret };
+	return {
+		token: token.access_token,
+		channelId: doc.channel_id,
+		channelTitle: typeof doc.channel_title === 'string' ? doc.channel_title : doc.channel_id,
+		encryptionSecret
+	};
 }
 
-async function reusableStream(userEmail: string): Promise<{
+async function reusableStream(
+	userEmail: string,
+	channelId: string
+): Promise<{
 	token: string;
 	streamId: string;
 	ingest: YouTubeIngest;
+	channelTitle: string;
 }> {
-	const { token, channelId, encryptionSecret } = await authorization(userEmail);
+	const { token, channelTitle, encryptionSecret } = await authorization(userEmail, channelId);
 	const db = await getDb();
 	const saved = await db.collection('youtube_studio_streams').findOne({ channel_id: channelId });
 	if (
@@ -167,6 +226,7 @@ async function reusableStream(userEmail: string): Promise<{
 		return {
 			token,
 			streamId: saved.stream_id,
+			channelTitle,
 			ingest: {
 				url: saved.ingestion_address,
 				key: decryptToken(saved.stream_name, encryptionSecret)
@@ -206,11 +266,12 @@ async function reusableStream(userEmail: string): Promise<{
 		},
 		{ upsert: true }
 	);
-	return { token, streamId: created.id, ingest: { url: address, key: streamName } };
+	return { token, streamId: created.id, ingest: { url: address, key: streamName }, channelTitle };
 }
 
 export async function scheduleYouTubeLive(
 	userEmail: string,
+	channelId: string,
 	input: {
 		title: string;
 		description: string | null;
@@ -219,8 +280,14 @@ export async function scheduleYouTubeLive(
 		madeForKids: boolean;
 		thumbnail?: { bytes: ArrayBuffer; contentType: string };
 	}
-): Promise<{ broadcastId: string; youtubeUrl: string; ingest: YouTubeIngest }> {
-	const { token, streamId, ingest } = await reusableStream(userEmail);
+): Promise<{
+	broadcastId: string;
+	youtubeUrl: string;
+	ingest: YouTubeIngest;
+	channelId: string;
+	channelTitle: string;
+}> {
+	const { token, streamId, ingest, channelTitle } = await reusableStream(userEmail, channelId);
 	const created = await google<{ id?: string }>(
 		'https://www.googleapis.com/youtube/v3/liveBroadcasts?part=id,snippet,status,contentDetails',
 		{
@@ -246,9 +313,7 @@ export async function scheduleYouTubeLive(
 				input.thumbnail.contentType,
 				input.thumbnail.bytes.byteLength
 			);
-			const thumbnailUrl = new URL(
-				'https://www.googleapis.com/upload/youtube/v3/thumbnails/set'
-			);
+			const thumbnailUrl = new URL('https://www.googleapis.com/upload/youtube/v3/thumbnails/set');
 			thumbnailUrl.search = new URLSearchParams({
 				videoId: created.id,
 				uploadType: 'media'
@@ -272,12 +337,18 @@ export async function scheduleYouTubeLive(
 	return {
 		broadcastId: created.id,
 		youtubeUrl: `https://www.youtube.com/watch?v=${created.id}`,
-		ingest
+		ingest,
+		channelId,
+		channelTitle
 	};
 }
 
-export async function deleteYouTubeLive(userEmail: string, broadcastId: string): Promise<void> {
-	const token = await accessToken(userEmail);
+export async function deleteYouTubeLive(
+	userEmail: string,
+	channelId: string,
+	broadcastId: string
+): Promise<void> {
+	const token = await accessToken(userEmail, channelId);
 	await google(
 		`https://www.googleapis.com/youtube/v3/liveBroadcasts?id=${encodeURIComponent(broadcastId)}`,
 		{
@@ -287,10 +358,14 @@ export async function deleteYouTubeLive(userEmail: string, broadcastId: string):
 	);
 }
 
-export async function youtubeIngest(userEmail: string, youtubeUrl: string): Promise<YouTubeIngest> {
+export async function youtubeIngest(
+	userEmail: string,
+	channelId: string,
+	youtubeUrl: string
+): Promise<YouTubeIngest> {
 	const broadcastId = youtubeBroadcastId(youtubeUrl);
 	if (!broadcastId) throw new Error('The session needs a scheduled YouTube video link');
-	const { token, streamId, ingest } = await reusableStream(userEmail);
+	const { token, streamId, ingest } = await reusableStream(userEmail, channelId);
 	const url = new URL('https://www.googleapis.com/youtube/v3/liveBroadcasts');
 	url.search = new URLSearchParams({ part: 'id,contentDetails', id: broadcastId }).toString();
 	const broadcast = await google<{
@@ -304,11 +379,12 @@ export async function youtubeIngest(userEmail: string, youtubeUrl: string): Prom
 
 export async function transitionYouTubeLive(
 	userEmail: string,
+	channelId: string,
 	youtubeUrl: string
 ): Promise<{ broadcastId: string; status: string }> {
 	const broadcastId = youtubeBroadcastId(youtubeUrl);
 	if (!broadcastId) throw new Error('The session needs a scheduled YouTube video link');
-	const token = await accessToken(userEmail);
+	const token = await accessToken(userEmail, channelId);
 	const currentUrl = new URL('https://www.googleapis.com/youtube/v3/liveBroadcasts');
 	currentUrl.search = new URLSearchParams({ part: 'id,status', id: broadcastId }).toString();
 	const current = await google<{ items?: Array<{ status?: { lifeCycleStatus?: string } }> }>(
@@ -337,11 +413,12 @@ export async function transitionYouTubeLive(
 
 export async function completeYouTubeLive(
 	userEmail: string,
+	channelId: string,
 	youtubeUrl: string
 ): Promise<{ broadcastId: string; status: string }> {
 	const broadcastId = youtubeBroadcastId(youtubeUrl);
 	if (!broadcastId) throw new Error('The session needs a scheduled YouTube video link');
-	const token = await accessToken(userEmail);
+	const token = await accessToken(userEmail, channelId);
 	const currentUrl = new URL('https://www.googleapis.com/youtube/v3/liveBroadcasts');
 	currentUrl.search = new URLSearchParams({ part: 'id,status', id: broadcastId }).toString();
 	const current = await google<{ items?: Array<{ status?: { lifeCycleStatus?: string } }> }>(

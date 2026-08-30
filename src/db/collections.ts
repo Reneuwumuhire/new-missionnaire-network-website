@@ -1142,6 +1142,9 @@ export type ScheduledLive = {
 	description: string | null;
 	thumbnail_url: string | null;
 	thumbnail_s3_key: string | null;
+	youtube_url: string | null;
+	youtube_channel_id: string | null;
+	youtube_channel_title: string | null;
 	scheduled_at: string; // ISO
 	status: ScheduledLiveStatus;
 	live_started_at: string | null;
@@ -1210,6 +1213,8 @@ export async function createStudioScheduledLive(input: {
 	createdBy: string;
 	description?: string | null;
 	youtubeUrl?: string | null;
+	youtubeChannelId?: string | null;
+	youtubeChannelTitle?: string | null;
 	thumbnailUrl?: string | null;
 	thumbnailKey?: string | null;
 	subtitleUrl?: string | null;
@@ -1229,6 +1234,8 @@ export async function createStudioScheduledLive(input: {
 			thumbnail_url: input.thumbnailUrl ?? null,
 			thumbnail_s3_key: input.thumbnailKey ?? null,
 			youtube_url: input.youtubeUrl ?? null,
+			youtube_channel_id: input.youtubeChannelId ?? null,
+			youtube_channel_title: input.youtubeChannelTitle ?? null,
 			scheduled_at: input.scheduledAt,
 			status: 'scheduled',
 			live_started_at: null,

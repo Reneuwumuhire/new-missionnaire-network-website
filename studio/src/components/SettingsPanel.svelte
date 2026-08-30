@@ -7,8 +7,18 @@
 	import { LOCALES, THEMES, applyTheme, i18n, setLocale, t, theme } from '../lib/i18n.svelte';
 	import { DEFAULT_LAYOUT } from '../lib/layout';
 	import { persist, stageableSettings, studio, type Destination } from '../lib/state.svelte';
+	import { recording } from '../lib/recording.svelte';
+	import { appUpdate, checkForUpdate, downloadPercent, installUpdate } from '../lib/updater.svelte';
 
-	let { onclose, onconfigure }: { onclose: () => void; onconfigure: () => void } = $props();
+	let {
+		onclose,
+		onconfigure,
+		initialPage = 'general'
+	}: {
+		onclose: () => void;
+		onconfigure: () => void;
+		initialPage?: 'general' | 'output' | 'about';
+	} = $props();
 
 	// Nothing here reaches the show until Apply, the way OBS's Settings window
 	// works. Changing the resolution or the bitrate mid-service by mis-clicking
@@ -20,20 +30,29 @@
 	// same reason — it is a command, not a setting.
 	let draft = $state({
 		settings: stageableSettings(studio.settings),
-		destinations: $state.snapshot(studio.destinations) as Destination[],
+		destinations: $state.snapshot(
+			studio.destinations.filter((destination) => !destination.managed)
+		) as Destination[],
 		locale: i18n.locale
 	});
 
 	const dirty = $derived(
 		JSON.stringify(draft.settings) !== JSON.stringify(stageableSettings(studio.settings)) ||
-			JSON.stringify(draft.destinations) !== JSON.stringify($state.snapshot(studio.destinations)) ||
+			JSON.stringify(draft.destinations) !==
+				JSON.stringify(
+					$state.snapshot(studio.destinations.filter((destination) => !destination.managed))
+				) ||
 			draft.locale !== i18n.locale
 	);
 
 	function apply() {
 		Object.assign(studio.settings, $state.snapshot(draft.settings));
-		studio.destinations = $state.snapshot(draft.destinations) as Destination[];
+		studio.destinations = [
+			...studio.destinations.filter((destination) => destination.managed),
+			...($state.snapshot(draft.destinations) as Destination[])
+		];
 		if (draft.locale !== i18n.locale) setLocale(draft.locale);
+		persist();
 	}
 
 	// Categories down the left, one page at a time — OBS's Settings window.
@@ -49,6 +68,9 @@
 	];
 
 	let page = $state<Page>('general');
+	$effect(() => {
+		page = initialPage;
+	});
 
 	interface FfmpegInfo {
 		path: string;
@@ -59,6 +81,7 @@
 	let ffmpeg = $state<FfmpegInfo | null>(null);
 	let ffmpegError = $state<string | null>(null);
 	const mime = pickMimeType();
+	const updateBlocked = $derived(isStreaming() || recording.startedAt !== null);
 
 	onMount(async () => {
 		try {
@@ -115,8 +138,20 @@
 			<div class="space-y-5 p-4">
 				{#if page === 'general'}
 					<div class="grid grid-cols-2 gap-3">
-						<label class="block"><span class="studio-label">Main site URL</span><input class="studio-input w-full" type="url" bind:value={draft.settings.mainSiteUrl} /></label>
-						<label class="block"><span class="studio-label">Admin site URL</span><input class="studio-input w-full" type="url" bind:value={draft.settings.adminSiteUrl} /></label>
+						<label class="block"
+							><span class="studio-label">Main site URL</span><input
+								class="studio-input w-full"
+								type="url"
+								bind:value={draft.settings.mainSiteUrl}
+							/></label
+						>
+						<label class="block"
+							><span class="studio-label">Admin site URL</span><input
+								class="studio-input w-full"
+								type="url"
+								bind:value={draft.settings.adminSiteUrl}
+							/></label
+						>
 					</div>
 					<button class="studio-chip" onclick={onconfigure}>Import configuration (.env)</button>
 
@@ -159,18 +194,39 @@
 						<span class="studio-label">{t('settings.recording')}</span>
 						<div class="flex gap-1">
 							{#each ['off', 'local', 'cloud', 'both'] as mode}
-								<button class="studio-chip flex-1 {draft.settings.recordingMode === mode ? 'bg-primary/20 text-primary' : ''}" onclick={() => (draft.settings.recordingMode = mode as typeof draft.settings.recordingMode)}>{t(`recording.${mode}` as never)}</button>
+								<button
+									class="studio-chip flex-1 {draft.settings.recordingMode === mode
+										? 'bg-primary/20 text-primary'
+										: ''}"
+									onclick={() =>
+										(draft.settings.recordingMode = mode as typeof draft.settings.recordingMode)}
+									>{t(`recording.${mode}` as never)}</button
+								>
 							{/each}
 						</div>
 						<p class="mt-1 text-[11px] text-fg/35">{t('settings.recordingHint')}</p>
 					</div>
 					{#if draft.settings.recordingMode === 'cloud' || draft.settings.recordingMode === 'both'}
-						<label class="block"><span class="studio-label">{t('settings.recorderUrl')}</span><input class="studio-input w-full" type="url" bind:value={draft.settings.recorderUrl} /></label>
-						<label class="block"><span class="studio-label">{t('settings.recorderToken')}</span><input class="studio-input w-full" type="password" bind:value={draft.settings.recorderToken} /></label>
+						<label class="block"
+							><span class="studio-label">{t('settings.recorderUrl')}</span><input
+								class="studio-input w-full"
+								type="url"
+								bind:value={draft.settings.recorderUrl}
+							/></label
+						>
+						<label class="block"
+							><span class="studio-label">{t('settings.recorderToken')}</span><input
+								class="studio-input w-full"
+								type="password"
+								bind:value={draft.settings.recorderToken}
+							/></label
+						>
 					{/if}
 
 					{#if isStreaming()}
-						<p class="border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-300">
+						<p
+							class="border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-300"
+						>
 							{t('settings.liveWarning')}
 						</p>
 					{/if}
@@ -306,6 +362,61 @@
 				{/if}
 
 				{#if page === 'about'}
+					<div class="border border-ink-700 bg-ink-850 p-3">
+						<div class="flex items-start justify-between gap-4">
+							<div class="min-w-0">
+								<span class="studio-label">Missionnaire Studio</span>
+								<p class="font-mono text-[11px] text-fg/45">
+									{t('update.currentVersion', { version: appUpdate.currentVersion || '—' })}
+								</p>
+								{#if appUpdate.phase === 'checking'}
+									<p class="mt-1 text-[11px] text-fg/50">{t('update.checking')}</p>
+								{:else if appUpdate.phase === 'current'}
+									<p class="mt-1 text-[11px] text-emerald-400">{t('update.current')}</p>
+								{:else if appUpdate.phase === 'available'}
+									<p class="mt-1 text-[11px] text-primary">
+										{t('update.available', { version: appUpdate.availableVersion ?? '' })}
+									</p>
+								{:else if appUpdate.phase === 'downloading'}
+									<p class="mt-1 text-[11px] text-primary">
+										{t('update.downloading', { percent: downloadPercent() })}
+									</p>
+								{:else if appUpdate.phase === 'installing'}
+									<p class="mt-1 text-[11px] text-primary">{t('update.installing')}</p>
+								{:else if appUpdate.phase === 'restarting'}
+									<p class="mt-1 text-[11px] text-primary">{t('update.restarting')}</p>
+								{:else if appUpdate.phase === 'error'}
+									<p class="mt-1 break-words text-[11px] text-red-400">
+										{t('update.error', { message: appUpdate.error ?? '' })}
+									</p>
+								{/if}
+								{#if updateBlocked && appUpdate.phase === 'available'}
+									<p class="mt-1 text-[11px] text-amber-300">{t('update.blocked')}</p>
+								{/if}
+							</div>
+							{#if appUpdate.phase === 'available'}
+								<button
+									class="studio-chip shrink-0 border-primary/50 bg-primary/20 text-primary"
+									disabled={updateBlocked}
+									onclick={() => void installUpdate()}>{t('update.installRestart')}</button
+								>
+							{:else}
+								<button
+									class="studio-chip shrink-0"
+									disabled={['checking', 'downloading', 'installing', 'restarting'].includes(
+										appUpdate.phase
+									)}
+									onclick={() => void checkForUpdate()}>{t('update.check')}</button
+								>
+							{/if}
+						</div>
+						{#if appUpdate.phase === 'downloading'}
+							<div class="mt-2 h-1 overflow-hidden rounded-full bg-fg/10">
+								<div class="h-full bg-primary" style="width: {downloadPercent()}%"></div>
+							</div>
+						{/if}
+					</div>
+
 					<div class="space-y-1.5 font-mono text-[11px]">
 						<span class="studio-label font-body">{t('settings.system')}</span>
 						{#if ffmpegError}
@@ -315,9 +426,7 @@
 							<p class="text-fg/25">{ffmpeg.path}</p>
 							<p class="text-fg/45">
 								{t('settings.hardwareEncoding', {
-									state: ffmpeg.hardware_h264
-										? t('settings.available')
-										: t('settings.unavailable')
+									state: ffmpeg.hardware_h264 ? t('settings.available') : t('settings.unavailable')
 								})}
 							</p>
 						{:else}

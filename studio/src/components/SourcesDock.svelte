@@ -20,10 +20,13 @@
 	import { addAppAudio, addAudioInput } from '../lib/state.svelte';
 	import { invoke } from '@tauri-apps/api/core';
 	import AddFromUrl from './AddFromUrl.svelte';
+	import AddYouTubeLive from './AddYouTubeLive.svelte';
 	import Dock from './Dock.svelte';
 	import Icon, { type IconName } from './Icon.svelte';
 	import { popoverFit } from '../lib/layout';
 	import { t } from '../lib/i18n.svelte';
+	import { observeReferenceStream, useReferenceSource } from '../lib/reference-match.svelte';
+	import { youtubeChatUrl, youtubePlayerUrl, youtubeVideoId } from '../lib/youtube';
 	import {
 		DEFAULT_TEXT_STYLE,
 		activeScene,
@@ -76,7 +79,7 @@
 	/** The two audio kinds are not layers: they have no picture, and they are
 	 *  global to the show. They are offered here because OBS offers them here,
 	 *  and appear where they belong — in the Audio Mixer. */
-	type MenuKind = LayerKind | 'audioInput' | 'audioApp' | 'url';
+	type MenuKind = LayerKind | 'audioInput' | 'audioApp' | 'url' | 'youtubeLive';
 
 	const SOURCE_KINDS: {
 		kind: MenuKind;
@@ -96,14 +99,55 @@
 			hint: () => t('sources.audioAppHint'),
 			icon: 'volume'
 		},
-		{ kind: 'camera', label: () => t('sources.camera'), hint: () => t('sources.cameraHint'), icon: 'camera' },
-		{ kind: 'screen', label: () => t('sources.screen'), hint: () => t('sources.screenHint'), icon: 'monitor' },
-		{ kind: 'image', label: () => t('sources.image'), hint: () => t('sources.imageHint'), icon: 'image' },
-		{ kind: 'video', label: () => t('sources.video'), hint: () => t('sources.videoHint'), icon: 'film' },
+		{
+			kind: 'camera',
+			label: () => t('sources.camera'),
+			hint: () => t('sources.cameraHint'),
+			icon: 'camera'
+		},
+		{
+			kind: 'screen',
+			label: () => t('sources.screen'),
+			hint: () => t('sources.screenHint'),
+			icon: 'monitor'
+		},
+		{
+			kind: 'image',
+			label: () => t('sources.image'),
+			hint: () => t('sources.imageHint'),
+			icon: 'image'
+		},
+		{
+			kind: 'video',
+			label: () => t('sources.video'),
+			hint: () => t('sources.videoHint'),
+			icon: 'film'
+		},
+		{
+			kind: 'youtubeLive',
+			label: () => t('sources.youtubeLive'),
+			hint: () => t('sources.youtubeLiveHint'),
+			icon: 'monitor'
+		},
 		{ kind: 'url', label: () => t('sources.url'), hint: () => t('sources.urlHint'), icon: 'link' },
-		{ kind: 'text', label: () => t('sources.text'), hint: () => t('sources.textHint'), icon: 'text' },
-		{ kind: 'lyrics', label: () => t('sources.lyrics'), hint: () => t('sources.lyricsHint'), icon: 'music' },
-		{ kind: 'color', label: () => t('sources.color'), hint: () => t('sources.colorHint'), icon: 'droplet' }
+		{
+			kind: 'text',
+			label: () => t('sources.text'),
+			hint: () => t('sources.textHint'),
+			icon: 'text'
+		},
+		{
+			kind: 'lyrics',
+			label: () => t('sources.lyrics'),
+			hint: () => t('sources.lyricsHint'),
+			icon: 'music'
+		},
+		{
+			kind: 'color',
+			label: () => t('sources.color'),
+			hint: () => t('sources.colorHint'),
+			icon: 'droplet'
+		}
 	];
 
 	const iconFor = (kind: LayerKind): IconName =>
@@ -128,6 +172,11 @@
 			// leave nothing behind to tidy up.
 			adding = false;
 			urlOpen = true;
+			return;
+		}
+		if (kind === 'youtubeLive') {
+			adding = false;
+			youtubeLiveOpen = true;
 			return;
 		}
 		adding = false;
@@ -159,34 +208,67 @@
 	 *  without this the operator shares a video call or a player and gets a
 	 *  picture with no sound and nothing in the mixer to fix it with. */
 	async function shareScreen(layer: Layer) {
+		if (layer.youtubeLiveUrl) {
+			layer.hideCursor = true;
+			layer.fit = 'cover';
+		}
 		const handle = await openScreen(layer);
 		const track = handle.stream?.getVideoTracks()[0];
 		if (!track) return;
+		if (layer.youtubeLiveUrl && handle.stream) {
+			await observeReferenceStream(layer.id, handle.stream);
+		}
 		const label = track.label ?? '';
 		const size = track.getSettings();
 		const [windows] = await Promise.all([listWindows(), refreshApps()]);
+		const hasCapturedAudio = Boolean(handle.stream?.getAudioTracks().length);
 		// The window's own application first, then anything the label names, and
 		// for a whole screen the desktop itself — a shared display has no single
-		// application behind it, but it certainly has a sound.
+		// application behind it, but it certainly has a sound. When Chromium has
+		// already supplied that sound (Windows), keep its stream: replacing it
+		// with the native macOS capture would tear down a working mixer strip.
 		const surface = (size as MediaTrackSettings & { displaySurface?: string }).displaySurface;
 		const window = matchWindow(label, size, windows);
-		const app =
-			surface === 'monitor'
+		const app = hasCapturedAudio
+			? null
+			: surface === 'monitor'
 				? { id: DESKTOP_AUDIO, name: t('mixer.desktopAudio') }
 				: window
 					? { id: window.appId, name: window.appName }
 					: matchApp(label, appAudio.apps);
 		// No guess is not a failure: the mixer strip offers the list.
-		if (app) layer.appId = app.id;
+		if (hasCapturedAudio) delete layer.appId;
+		else if (app) layer.appId = app.id;
 		// What the engine actually said about the share. Without this line a bad
 		// guess is unexplainable after the fact.
 		report(
-			`share label=${JSON.stringify(label)} size=${size.width}x${size.height} windows=${windows.length} matched=${app?.name ?? 'none'}`
+			`share label=${JSON.stringify(label)} size=${size.width}x${size.height} audio=${hasCapturedAudio} windows=${windows.length} matched=${app?.name ?? 'none'}`
 		);
 		persist();
 	}
 
 	let urlOpen = $state(false);
+	let youtubeLiveOpen = $state(false);
+
+	async function addYouTubeLive(url: string) {
+		youtubeLiveOpen = false;
+		const layer = makeLayer('screen', t('sources.youtubeLive'), {
+			fit: 'cover',
+			hideCursor: true,
+			youtubeLiveUrl: url
+		});
+		const scene = activeScene();
+		scene.layers = [layer, ...scene.layers];
+		studio.selectedLayerId = layer.id;
+		useReferenceSource(layer.id, layer.name);
+		persist();
+		await shareScreen(layer);
+	}
+
+	async function openLiveChat(url: string) {
+		const videoId = youtubeVideoId(url);
+		if (videoId) await invoke('open_youtube_chat', { url: youtubeChatUrl(videoId) });
+	}
 
 	/** A resolved link becomes an ordinary media layer — the compositor, the
 	 *  mixer and the transport bar have no idea it is being streamed. */
@@ -286,6 +368,15 @@
 	/** Re-open a source: a camera taken by another app, a screen share ended
 	 *  from the menu bar, a file lost across a restart. */
 	async function reconnect(layer: Layer) {
+		if (layer.youtubeLiveUrl) {
+			const videoId = youtubeVideoId(layer.youtubeLiveUrl);
+			const playerUrl = videoId ? youtubePlayerUrl(videoId) : layer.youtubeLiveUrl;
+			layer.youtubeLiveUrl = playerUrl;
+			await invoke('open_url', { url: playerUrl });
+			useReferenceSource(layer.id, layer.name);
+			await shareScreen(layer);
+			return;
+		}
 		switch (reconnectWith(layer)) {
 			case 'camera':
 				await openCamera(layer, studio.settings.width, studio.settings.height);
@@ -301,7 +392,9 @@
 		}
 	}
 
-	const selected = $derived(activeScene().layers.find((l) => l.id === studio.selectedLayerId) ?? null);
+	const selected = $derived(
+		activeScene().layers.find((l) => l.id === studio.selectedLayerId) ?? null
+	);
 	const selectedIndex = $derived(
 		selected ? activeScene().layers.findIndex((l) => l.id === selected.id) : -1
 	);
@@ -320,6 +413,10 @@
 
 {#if urlOpen}
 	<AddFromUrl onclose={() => (urlOpen = false)} onready={addFetched} />
+{/if}
+
+{#if youtubeLiveOpen}
+	<AddYouTubeLive onclose={() => (youtubeLiveOpen = false)} onready={addYouTubeLive} />
 {/if}
 
 <Dock id="sources" title={t('dock.sources')}>
@@ -358,6 +455,16 @@
 						>{relinking.has(layer.id) ? t('web.reading') : t('sources.reconnect')}</button
 					>
 				{/if}
+				{#if layer.youtubeLiveUrl}
+					<button
+						class="studio-icon-btn"
+						title={t('youtubeLive.openChat')}
+						aria-label={t('youtubeLive.openChat')}
+						onclick={() => openLiveChat(layer.youtubeLiveUrl!)}
+					>
+						<Icon name="text" size={13} />
+					</button>
+				{/if}
 				<button
 					class="studio-icon-btn"
 					title={layer.visible ? t('common.hide') : t('common.show')}
@@ -365,7 +472,8 @@
 					onclick={() => {
 						layer.visible = !layer.visible;
 						persist();
-					}}>
+					}}
+				>
 					<Icon name={layer.visible ? 'eye' : 'eyeOff'} size={14} />
 				</button>
 				<button
@@ -375,12 +483,15 @@
 					onclick={() => {
 						layer.locked = !layer.locked;
 						persist();
-					}}>
+					}}
+				>
 					<Icon name={layer.locked ? 'lock' : 'unlock'} size={13} />
 				</button>
 			</li>
 		{:else}
-			<p class="px-3 py-6 text-center text-[11px] leading-relaxed text-fg/30">{t('sources.empty')}</p>
+			<p class="px-3 py-6 text-center text-[11px] leading-relaxed text-fg/30">
+				{t('sources.empty')}
+			</p>
 		{/each}
 	</ul>
 
@@ -437,10 +548,28 @@
 				</div>
 			{/if}
 		</div>
-		<button class="studio-icon-btn" title={t('common.delete')} aria-label={t('common.delete')} disabled={!selected} onclick={() => removeLayer(selected)}><Icon name="trash" /></button>
-		<button class="studio-icon-btn" title={t('common.properties')} aria-label={t('common.properties')} disabled={!selected} onclick={onproperties}><Icon name="gear" /></button>
+		<button
+			class="studio-icon-btn"
+			title={t('common.delete')}
+			aria-label={t('common.delete')}
+			disabled={!selected}
+			onclick={() => removeLayer(selected)}><Icon name="trash" /></button
+		>
+		<button
+			class="studio-icon-btn"
+			title={t('common.properties')}
+			aria-label={t('common.properties')}
+			disabled={!selected}
+			onclick={onproperties}><Icon name="gear" /></button
+		>
 		<span class="mx-1 h-4 w-px bg-ink-600"></span>
-		<button class="studio-icon-btn" title={t('common.moveUp')} aria-label={t('common.moveUp')} disabled={selectedIndex <= 0} onclick={() => move(selected, -1)}><Icon name="up" /></button>
+		<button
+			class="studio-icon-btn"
+			title={t('common.moveUp')}
+			aria-label={t('common.moveUp')}
+			disabled={selectedIndex <= 0}
+			onclick={() => move(selected, -1)}><Icon name="up" /></button
+		>
 		<button
 			class="studio-icon-btn"
 			title={t('common.moveDown')}

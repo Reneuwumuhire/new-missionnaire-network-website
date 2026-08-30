@@ -57,6 +57,7 @@ export async function POST({ request, url, fetch }) {
 		offsetMs?: number;
 		atEpochMs?: number;
 		paused?: boolean;
+		subtitleMode?: 'broadcast' | 'armed';
 	};
 	if (body.action === 'list') {
 		return json({
@@ -144,6 +145,18 @@ export async function POST({ request, url, fetch }) {
 		});
 	}
 	if (!body.sessionId) throw error(400, 'sessionId required');
+	if (body.action === 'hide-subtitles') {
+		const current = await getBroadcastAdminState();
+		if (!current.is_live || current.scheduled_live_id !== body.sessionId) {
+			throw error(409, 'This session is not live');
+		}
+		await updateStudioLiveSubtitles(body.sessionId, { subtitle_anchor_epoch_ms: null });
+		await setBroadcastAdminState({
+			subtitle_anchor_epoch_ms: null,
+			subtitle_paused_position_ms: null
+		});
+		return json({ ok: true });
+	}
 	if (body.action === 'sync-subtitles') {
 		const current = await getBroadcastAdminState();
 		if (!current.is_live || current.scheduled_live_id !== body.sessionId) {
@@ -216,9 +229,10 @@ export async function POST({ request, url, fetch }) {
 		// admin-side edit. Opening the public gate is SRT 00:00 for that file;
 		// Studio's live/media sync can replace this anchor immediately when the
 		// operator has chosen a different cue or is following recorded media.
-		const subtitleAnchorEpochMs = session.subtitle_srt_s3_key
-			? new Date(startedAt).getTime()
-			: null;
+		const subtitleAnchorEpochMs =
+			session.subtitle_srt_s3_key && body.subtitleMode !== 'armed'
+				? new Date(startedAt).getTime()
+				: null;
 		if (subtitleAnchorEpochMs !== null) {
 			await updateStudioLiveSubtitles(session._id, {
 				subtitle_anchor_epoch_ms: subtitleAnchorEpochMs,

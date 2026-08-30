@@ -31,7 +31,7 @@ test('encrypts refresh tokens and authenticates them when reading', () => {
 	assert.throws(() => decryptToken(encrypted, 'wrong-secret'));
 });
 
-test('OAuth request asks for offline YouTube access and preserves state', () => {
+test('OAuth request asks for account selection, offline YouTube access, and preserves state', () => {
 	const url = new URL(
 		authorizationUrl({
 			clientId: 'client',
@@ -40,6 +40,7 @@ test('OAuth request asks for offline YouTube access and preserves state', () => 
 		})
 	);
 	assert.equal(url.searchParams.get('state'), 'state-1');
+	assert.equal(url.searchParams.get('prompt'), 'consent select_account');
 	assert.equal(url.searchParams.get('access_type'), 'offline');
 	assert.match(url.searchParams.get('scope') ?? '', /youtube\.force-ssl/);
 });

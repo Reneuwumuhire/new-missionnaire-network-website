@@ -54,9 +54,11 @@ const fr: Record<keyof typeof en, string> = {
 	'sources.addSource': 'Ajouter une source',
 	'sources.reconnect': 'Reconnecter',
 	'sources.audioInput': 'Capture d\u2019entr\u00e9e audio',
-	'sources.audioInputHint': 'Micro ou entr\u00e9e ligne \u2014 appara\u00eet dans le m\u00e9langeur audio',
+	'sources.audioInputHint':
+		'Micro ou entr\u00e9e ligne \u2014 appara\u00eet dans le m\u00e9langeur audio',
 	'sources.audioApp': 'Capture audio d\u2019application',
-	'sources.audioAppHint': 'Le son jou\u00e9 par une autre application \u2014 appara\u00eet dans le m\u00e9langeur audio',
+	'sources.audioAppHint':
+		'Le son jou\u00e9 par une autre application \u2014 appara\u00eet dans le m\u00e9langeur audio',
 	'sources.camera': 'Caméra',
 	'sources.cameraHint': 'Webcam ou boîtier de capture',
 	'sources.screen': 'Capture d’écran / de fenêtre',
@@ -67,6 +69,19 @@ const fr: Record<keyof typeof en, string> = {
 	'sources.videoHint': 'Clip ou boucle, avec son',
 	'sources.url': 'YouTube / Lien',
 	'sources.urlHint': 'Lire une vidéo ou un chant depuis un lien, comme toute autre source',
+	'sources.youtubeLive': 'Fenêtre YouTube Live',
+	'sources.youtubeLiveHint': 'Capturer un direct avec le son exact de son application',
+	'youtubeLive.title': 'Ajouter un direct YouTube',
+	'youtubeLive.url': 'Adresse du direct YouTube',
+	'youtubeLive.hint':
+		'Studio ouvre un lecteur épuré dans votre navigateur, puis le sélecteur système le capture. Gardez cette fenêtre visible et coupez le son des autres onglets du même navigateur.',
+	'youtubeLive.invalid': 'Saisissez un lien YouTube vidéo ou direct sécurisé et valide.',
+	'youtubeLive.openPlayer': '1. Ouvrir le direct',
+	'youtubeLive.playerOpened': 'Lecteur ouvert',
+	'youtubeLive.openChat': 'Ouvrir le chat',
+	'youtubeLive.capture': '2. Capturer la fenêtre',
+	'youtubeLive.captureHint':
+		'Lancez la lecture si nécessaire, ramenez le pointeur sur Studio pour masquer les commandes, puis choisissez cette fenêtre. Sous Windows, activez Partager l’audio du système ; si la fenêtre n’a pas de son, agrandissez-la et capturez cet écran. Sous macOS, Studio associe automatiquement le son du navigateur.',
 	'web.title': 'Ajouter depuis un lien',
 	'web.url': 'Adresse',
 	'web.audioOnly': 'Son seul',
@@ -98,7 +113,8 @@ const fr: Record<keyof typeof en, string> = {
 	'source.badVideo': 'Vidéo illisible',
 
 	// ── Audio mixer ─────────────────────────────────────────────
-	'mixer.micDenied': 'Pas d\u2019acc\u00e8s au micro : ce syst\u00e8me n\u2019annonce alors aucune entr\u00e9e audio.',
+	'mixer.micDenied':
+		'Pas d\u2019acc\u00e8s au micro : ce syst\u00e8me n\u2019annonce alors aucune entr\u00e9e audio.',
 	'mixer.micRetry': 'Redemander',
 	'mixer.openPrivacy': 'Ouvrir Confidentialit\u00e9',
 	'mixer.monitor': 'Écoute',
@@ -112,12 +128,13 @@ const fr: Record<keyof typeof en, string> = {
 	'mixer.desktopAudio': 'Son du bureau (tout l\u2019\u00e9cran)',
 	'mixer.appGone': 'Cette application ne tourne plus \u2014 en choisir une autre',
 	'mixer.refreshApps': 'Actualiser la liste',
-	'mixer.appAudioUnsupported': 'L\u2019audio par application n\u00e9cessite macOS 13 ou plus r\u00e9cent',
+	'mixer.appAudioUnsupported':
+		'L\u2019audio par application n\u00e9cessite macOS 13 ou plus r\u00e9cent',
 	'mixer.addMic': 'Ajouter une entrée audio',
 	'mixer.connect': 'Connecter l’entrée',
 	'mixer.noAudioTrack': 'Pas de piste audio',
 	'mixer.noSurfaceAudioHint':
-		'Sur macOS, le partage d\u2019une fen\u00eatre ou d\u2019un \u00e9cran ne fournit que l\u2019image \u2014 aucun son d\u2019application ni d\u2019onglet, et aucune erreur pour le signaler. Faites passer le son de l\u2019application par un p\u00e9riph\u00e9rique audio virtuel (BlackHole, Loopback) et ajoutez-le ici comme entr\u00e9e audio.',
+		'Ce partage ne contient aucune piste audio. Sous Windows, capturez l\u2019écran et activez Partager l\u2019audio du système. Sous macOS, reconnectez la fenêtre afin que Studio associe le son de l\u2019application.',
 	'mixer.defaultInput': 'Entrée par défaut',
 	'mixer.chooseInput': 'Choisir l’entrée',
 	'mixer.fader': 'Niveau',
@@ -144,7 +161,8 @@ const fr: Record<keyof typeof en, string> = {
 	'controls.studioMode': 'Mode Studio',
 	'controls.settings': 'Paramètres',
 	'controls.recording': 'Enregistrement',
-	'controls.recordingHint': 'Choisissez Local, Cloud ou Les deux dans Paramètres → Sortie. L’enregistrement démarre et s’arrête avec la diffusion.',
+	'controls.recordingHint':
+		'Choisissez Local, Cloud ou Les deux dans Paramètres → Sortie. L’enregistrement démarre et s’arrête avec la diffusion.',
 
 	// ── Stream health ───────────────────────────────────────────
 	'health.title': 'État de la diffusion',
@@ -174,6 +192,8 @@ const fr: Record<keyof typeof en, string> = {
 	'controls.openYouTube': 'Ouvrir YouTube Studio',
 	'controls.openYouTubeHint':
 		'YouTube reçoit le signal test. Vérifiez l’image, le son et l’état du flux avant le direct.',
+	'error.youtubeChannelMissing': 'Connectez la chaîne YouTube utilisée par ce service.',
+	'error.missionnaireGoLive': 'Missionnaire n’a pas pu passer en direct.',
 
 	// ── Status ──────────────────────────────────────────────────
 	'status.offline': 'Hors ligne',
@@ -225,6 +245,22 @@ const fr: Record<keyof typeof en, string> = {
 	'lyrics.cueHintManual': 'Afficher cette ligne',
 	'lyrics.pastedName': 'Collé',
 	'lyrics.starterLayer': 'Paroles',
+	'lyrics.referenceTitle': 'Synchronisation automatique du sermon',
+	'lyrics.referenceAudio': 'Choisir l’audio de référence',
+	'lyrics.referenceMissing': 'Chargez le MP3 préparé du sermon et son fichier .srt français.',
+	'lyrics.referenceSourceMissing':
+		'Ajoutez et capturez la fenêtre YouTube Live pour fournir son audio.',
+	'lyrics.referenceIdle': 'En attente de l’audio de référence et d’une source en direct capturée',
+	'lyrics.referenceLoading': 'Préparation de l’audio de référence…',
+	'lyrics.referenceArmed': 'Armé — les sous-titres restent masqués pendant les chants',
+	'lyrics.referenceSearching': 'Écoute du début du sermon…',
+	'lyrics.referenceLocked': 'Calé à {position} · confiance {score} %',
+	'lyrics.referenceRecovering': 'Le signal a changé — sous-titres masqués pendant le recalage',
+	'lyrics.referenceResume': 'Reprendre la synchronisation automatique',
+	'lyrics.referenceHide': 'Masquer les sous-titres',
+	'lyrics.referenceFallback': 'Le sermon commence maintenant',
+	'lyrics.referenceFallbackHint':
+		'Secours uniquement : démarre immédiatement le premier sous-titre.',
 
 	// ── Properties ──────────────────────────────────────────────
 	'media.needsFile': 'Rechoisir le fichier \u2014 Sources \u203a Reconnecter',
@@ -234,7 +270,8 @@ const fr: Record<keyof typeof en, string> = {
 	'media.forward': 'Dix secondes en avant',
 	'media.scrub': 'Position dans l\u2019enregistrement',
 	'media.followShort': 'Paroles',
-	'props.transportMoved': 'La lecture, la pause et le d\u00e9filement sont sur la barre sous l\u2019aper\u00e7u, \u00e0 port\u00e9e pendant le culte.',
+	'props.transportMoved':
+		'La lecture, la pause et le d\u00e9filement sont sur la barre sous l\u2019aper\u00e7u, \u00e0 port\u00e9e pendant le culte.',
 	'props.title': 'Propriétés de la source',
 	'props.empty': 'Sélectionnez une source dans la liste, ou cliquez-la dans l’aperçu.',
 	'props.device': 'Appareil',
@@ -249,7 +286,8 @@ const fr: Record<keyof typeof en, string> = {
 	'props.pause': 'Pause',
 	'props.restart': 'Début',
 	'props.followLyrics': 'Les paroles suivent cet enregistrement',
-	'props.followLyricsHint': 'Le .srt suit la position de la piste : mettre en pause ou revenir en arri\u00e8re emm\u00e8ne les paroles avec.',
+	'props.followLyricsHint':
+		'Le .srt suit la position de la piste : mettre en pause ou revenir en arri\u00e8re emm\u00e8ne les paroles avec.',
 	'props.loop': 'Boucle',
 	'props.position': 'Position (% du cadre)',
 	'props.fullFrame': 'Plein cadre',
@@ -294,7 +332,8 @@ const fr: Record<keyof typeof en, string> = {
 	'settings.language': 'Langue',
 	'settings.liveWarning': 'Les réglages d’encodage s’appliqueront à la prochaine diffusion.',
 	'settings.recording': 'Enregistrement',
-	'settings.recordingHint': 'Les fichiers locaux sont enregistrés dans Films/Missionnaire Studio. Le cloud utilise directement le recorder.',
+	'settings.recordingHint':
+		'Les fichiers locaux sont enregistrés dans Films/Missionnaire Studio. Le cloud utilise directement le recorder.',
 	'settings.recorderUrl': 'URL du recorder cloud',
 	'settings.recorderToken': 'Jeton du recorder cloud',
 	'recording.off': 'Désactivé',
@@ -302,7 +341,8 @@ const fr: Record<keyof typeof en, string> = {
 	'recording.cloud': 'Cloud',
 	'recording.both': 'Les deux',
 	'settings.testPattern': 'Mire en l\u2019absence de signal',
-	'settings.testPatternHint': 'Affiche une mire quand la cam\u00e9ra, le partage d\u2019\u00e9cran ou le fichier d\u2019une sc\u00e8ne ne produit aucune image. Le noir ressemble \u00e0 un flux mort.',
+	'settings.testPatternHint':
+		'Affiche une mire quand la cam\u00e9ra, le partage d\u2019\u00e9cran ou le fichier d\u2019une sc\u00e8ne ne produit aucune image. Le noir ressemble \u00e0 un flux mort.',
 	'settings.resolution': 'Résolution de base',
 	'settings.fps': 'Images par seconde',
 	'settings.videoBitrate': 'Débit vidéo — {kbps} kb/s',
@@ -311,8 +351,7 @@ const fr: Record<keyof typeof en, string> = {
 	'settings.encoder': 'Encodeur',
 	'settings.hardware': 'Matériel',
 	'settings.software': 'Logiciel (x264)',
-	'settings.encoderHint':
-		'Matériel décharge le processeur. Passez en logiciel si l’image saccade.',
+	'settings.encoderHint': 'Matériel décharge le processeur. Passez en logiciel si l’image saccade.',
 	'settings.resetLayout': 'Réinitialiser les panneaux',
 	'settings.layoutHint':
 		'Faites glisser les séparateurs entre les panneaux pour les redimensionner.',
@@ -325,9 +364,81 @@ const fr: Record<keyof typeof en, string> = {
 	'settings.ffmpegCommand': 'Commande ffmpeg',
 	'settings.ffmpegLog': 'Journal ffmpeg ({count})',
 
+	// ── Mises à jour ────────────────────────────────────────────
+	'update.currentVersion': 'Version {version}',
+	'update.check': 'Rechercher les mises à jour',
+	'update.checking': 'Recherche de mises à jour…',
+	'update.current': 'Vous utilisez la dernière version.',
+	'update.available': 'Missionnaire Studio {version} est disponible.',
+	'update.installRestart': 'Installer et redémarrer',
+	'update.downloading': 'Téléchargement de la mise à jour… {percent} %',
+	'update.installing': 'Installation de la mise à jour…',
+	'update.restarting': 'Redémarrage de Studio…',
+	'update.blocked': 'Terminez la diffusion ou l’enregistrement avant la mise à jour.',
+	'update.error': 'Échec de la recherche de mise à jour : {message}',
+
+	// ── Aide ────────────────────────────────────────────────────
+	'help.title': 'Aide de Missionnaire Studio',
+	'help.gettingStarted': 'Bien démarrer',
+	'help.gettingStartedIntro': 'Un parcours sûr, de la régie vide à la diffusion publique.',
+	'help.chooseSessionTitle': 'Choisir la session en direct',
+	'help.chooseSession':
+		'Dans Contrôles, choisissez ou créez la session publique que les auditeurs ouvriront.',
+	'help.prepareTitle': 'Préparer l’aperçu',
+	'help.prepare':
+		'Ajoutez des caméras, des médias ou une fenêtre YouTube Live à une scène. Connectez chaque source et vérifiez que son vumètre réagit.',
+	'help.programTitle': 'Envoyer l’aperçu au programme',
+	'help.program':
+		'En Mode Studio, les modifications restent privées dans l’aperçu. Appuyez sur Transition uniquement lorsque l’image est prête pour le programme.',
+	'help.subtitlesTitle': 'Préparer les sous-titres du sermon',
+	'help.subtitles':
+		'Chargez le MP3 préparé du sermon et le SRT français, puis capturez la source en direct. La synchronisation automatique attend pendant les chants et les introductions.',
+	'help.goLiveTitle': 'Vérifier, puis passer en direct',
+	'help.goLive':
+		'Démarrez le signal d’aperçu, surveillez la stabilité des IPS et du débit dans la barre inférieure, puis utilisez Go Live pour la session choisie.',
+	'help.safety':
+		'Le programme est ce que les spectateurs reçoivent. Vérifiez toujours le programme — pas seulement l’aperçu — avant de démarrer ou modifier une diffusion.',
+	'help.shortcuts': 'Raccourcis clavier',
+	'help.shortcutsIntro': 'Les raccourcis sont ignorés pendant la saisie dans un champ.',
+	'help.nextSubtitle': 'Sous-titre manuel suivant',
+	'help.previousSubtitle': 'Sous-titre manuel précédent',
+	'help.selectScene': 'Choisir une scène selon sa position',
+	'help.takeScene': 'Transition de l’aperçu au programme en Mode Studio',
+	'help.closeDialog': 'Fermer la fenêtre ouverte',
+	'help.openSettings': 'Ouvrir les paramètres',
+	'help.openHelp': 'Ouvrir l’aide',
+	'help.troubleshooting': 'Dépannage',
+	'help.troubleshootingIntro':
+		'Commencez par le symptôme ci-dessous ; Informations système contient les détails techniques et les journaux.',
+	'help.streamProblem': 'YouTube signale une mauvaise connexion ou des images perdues',
+	'help.streamSolution':
+		'Vérifiez les images perdues, la saturation, les IPS et le débit dans la barre inférieure. Préférez l’encodage matériel et une connexion filaire ; réduisez le débit uniquement si l’envoi disponible est réellement insuffisant.',
+	'help.openOutput': 'Ouvrir les paramètres de sortie',
+	'help.audioProblem': 'Il n’y a pas de son ou une source est trop faible',
+	'help.audioSolution':
+		'Vérifiez que la source est connectée dans le Mélangeur audio, que son vumètre réagit et qu’elle n’est pas coupée. Contrôlez les autorisations du microphone ou d’enregistrement d’écran du système si une source manque.',
+	'help.subtitleProblem': 'Les sous-titres manquent ou sont décalés',
+	'help.subtitleSolution':
+		'Vérifiez que Paroles est affiché, que la bonne session publique est active et que le MP3 de référence et son SRT français sont chargés. La synchronisation automatique a aussi besoin du son de la source capturée ; utilisez « Le sermon commence maintenant » uniquement en secours.',
+	'help.captureProblem': 'Une fenêtre YouTube capturée est mal cadrée',
+	'help.captureSolution':
+		'Utilisez la source Fenêtre YouTube Live dédiée, gardez la vidéo visible dans cette fenêtre, puis recadrez ou redimensionnez la source dans l’aperçu. Envoyez-la au programme seulement lorsque le résultat est propre.',
+	'help.openSystem': 'Ouvrir les informations système',
+
 	// ── Stream destinations ─────────────────────────────────────
 	'stream.intro':
 		'Chaque destination activée reçoit le même encodage. Si l’une refuse la connexion, les autres continuent — YouTube ne peut pas faire tomber la radio.',
+	'stream.youtubeChannels': 'Chaînes YouTube',
+	'stream.youtubeChannelsHint':
+		'Les chaînes restent privées pour l’administrateur qui les a connectées. Choisissez-en une lors de la création du service.',
+	'stream.connectAdminFirst':
+		'Connectez Studio à l’administration avant d’ajouter une chaîne YouTube.',
+	'stream.connectAdmin': 'Connecter Studio à l’administration',
+	'stream.noYouTubeChannels': 'Aucune chaîne YouTube connectée.',
+	'stream.addYouTubeChannel': 'Connecter une autre chaîne YouTube',
+	'stream.disconnectChannel': 'Déconnecter',
+	'stream.disconnectConfirm': 'Déconnecter {channel} de ce compte administrateur ?',
+	'stream.manualOutputs': 'Sorties RTMP · Avancé',
 	'stream.newDestination': 'Nouvelle destination',
 	'stream.urlPlaceholder': 'rtmp://serveur/application',
 	'stream.keyPlaceholder': 'clé de flux',
@@ -342,12 +453,13 @@ const fr: Record<keyof typeof en, string> = {
 	'stream.presetMissionnaire': 'Missionnaire (app + radio)',
 	'stream.presetMissionnaireHint': 'Votre serveur MediaMTX — alimente la radio et l’app.',
 	'stream.presetYouTube': 'YouTube',
+	'stream.presetYouTubeManual': 'YouTube (clé manuelle)',
 	'stream.presetYouTubeHint': 'Clé dans YouTube Studio › En direct.',
 	'stream.presetFacebook': 'Facebook',
 	'stream.presetFacebookHint': 'Clé dans Facebook Live Producer.',
 	'stream.presetBlank': 'Vide',
 	'stream.keyWarning':
-		'Les clés sont enregistrées en clair dans les données de l’application, comme le fait OBS. Ne partagez pas de capture d’écran avec une clé affichée.',
+		'Les clés manuelles sont enregistrées en clair dans les données de l’application, comme le fait OBS. Les clés YouTube gérées ne sont pas enregistrées. Ne partagez pas de capture d’écran avec une clé affichée.',
 
 	// ── Errors ──────────────────────────────────────────────────
 	'error.noImmediateDestination':

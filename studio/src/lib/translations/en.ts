@@ -66,6 +66,19 @@ const en = {
 	'sources.videoHint': 'Clip or loop, with sound',
 	'sources.url': 'YouTube / Link',
 	'sources.urlHint': 'Play a video or a song from a link, like any media source',
+	'sources.youtubeLive': 'YouTube Live Window',
+	'sources.youtubeLiveHint': 'Capture a live player with its exact application audio',
+	'youtubeLive.title': 'Add YouTube live',
+	'youtubeLive.url': 'YouTube live address',
+	'youtubeLive.hint':
+		'Studio opens a clean live player in your browser, then the system window picker captures it. Keep that window visible and mute other tabs in the same browser.',
+	'youtubeLive.invalid': 'Enter a valid secure YouTube video or live link.',
+	'youtubeLive.openPlayer': '1. Open live player',
+	'youtubeLive.playerOpened': 'Player opened',
+	'youtubeLive.openChat': 'Open live chat',
+	'youtubeLive.capture': '2. Capture window',
+	'youtubeLive.captureHint':
+		'Start playback if needed, move the pointer back over Studio so the player controls fade, then choose that browser window. On Windows, enable Share system audio; if the window has no audio, maximize it and capture that display. On macOS, Studio pairs the browser audio automatically.',
 	'web.title': 'Add from a link',
 	'web.url': 'Address',
 	'web.audioOnly': 'Sound only',
@@ -115,7 +128,7 @@ const en = {
 	'mixer.connect': 'Connect input',
 	'mixer.noAudioTrack': 'No audio track',
 	'mixer.noSurfaceAudioHint':
-		'macOS gives the browser engine picture only when you share a window or screen \u2014 no application or tab sound, and no error to say so. Route the app\u2019s output through a virtual audio device (BlackHole, Loopback) and add that device here as an audio input.',
+		'This share contains no audio track. On Windows, capture the display and enable Share system audio. On macOS, reconnect the window so Studio can pair its application audio.',
 	'mixer.defaultInput': 'Default input',
 	'mixer.chooseInput': 'Choose input',
 	'mixer.fader': 'Level',
@@ -142,7 +155,8 @@ const en = {
 	'controls.studioMode': 'Studio Mode',
 	'controls.settings': 'Settings',
 	'controls.recording': 'Recording',
-	'controls.recordingHint': 'Choose Local, Cloud or Both in Settings → Output. Recording starts and stops with the broadcast.',
+	'controls.recordingHint':
+		'Choose Local, Cloud or Both in Settings → Output. Recording starts and stops with the broadcast.',
 
 	// ── Stream health (OBS's Stats dock, with what ffmpeg can tell us) ──
 	'health.title': 'Stream health',
@@ -172,6 +186,8 @@ const en = {
 	'controls.openYouTube': 'Open YouTube Studio',
 	'controls.openYouTubeHint':
 		'YouTube is receiving the preview signal. Check its picture, sound and stream health before Go Live.',
+	'error.youtubeChannelMissing': 'Connect the YouTube channel used by this service.',
+	'error.missionnaireGoLive': 'Missionnaire could not go live.',
 
 	// ── Status ──────────────────────────────────────────────────
 	'status.offline': 'Offline',
@@ -205,8 +221,7 @@ const en = {
 	'lyrics.emptyFile': 'Empty file',
 	'lyrics.nothingToLoad': 'Nothing to load',
 	'lyrics.noTimings': 'No lines timed yet',
-	'lyrics.hintTimed':
-		'Load a timed .srt, or paste lyrics to step through them by hand.',
+	'lyrics.hintTimed': 'Load a timed .srt, or paste lyrics to step through them by hand.',
 	'lyrics.start': 'Start — first cue begins now',
 	'lyrics.startHint':
 		'Press exactly as the first line is spoken. Or click the line being sung in the list below.',
@@ -223,6 +238,20 @@ const en = {
 	'lyrics.cueHintManual': 'Show this line',
 	'lyrics.pastedName': 'Pasted',
 	'lyrics.starterLayer': 'Lyrics',
+	'lyrics.referenceTitle': 'Automatic sermon sync',
+	'lyrics.referenceAudio': 'Choose reference audio',
+	'lyrics.referenceMissing': 'Load the prepared sermon MP3 and its French .srt.',
+	'lyrics.referenceSourceMissing': 'Add and capture the YouTube live window to provide its audio.',
+	'lyrics.referenceIdle': 'Waiting for reference audio and a captured live source',
+	'lyrics.referenceLoading': 'Preparing the reference audio…',
+	'lyrics.referenceArmed': 'Armed — subtitles remain hidden during songs',
+	'lyrics.referenceSearching': 'Listening for the sermon…',
+	'lyrics.referenceLocked': 'Matched at {position} · confidence {score}%',
+	'lyrics.referenceRecovering': 'Signal changed — subtitles hidden while matching again',
+	'lyrics.referenceResume': 'Resume automatic matching',
+	'lyrics.referenceHide': 'Hide subtitles',
+	'lyrics.referenceFallback': 'Sermon begins now',
+	'lyrics.referenceFallbackHint': 'Fallback only: starts the first subtitle immediately.',
 
 	// ── Properties ──────────────────────────────────────────────
 	'media.needsFile': 'Pick the file again \u2014 Sources \u203a Reconnect',
@@ -232,7 +261,8 @@ const en = {
 	'media.forward': 'Forward ten seconds',
 	'media.scrub': 'Position in the recording',
 	'media.followShort': 'Lyrics',
-	'props.transportMoved': 'Play, pause and scrubbing are on the transport bar under the preview, where they stay in reach during a service.',
+	'props.transportMoved':
+		'Play, pause and scrubbing are on the transport bar under the preview, where they stay in reach during a service.',
 	'props.title': 'Source properties',
 	'props.empty': 'Select a source in the list, or click it in the preview.',
 	'props.device': 'Device',
@@ -247,7 +277,8 @@ const en = {
 	'props.pause': 'Pause',
 	'props.restart': 'Restart',
 	'props.followLyrics': 'Lyrics follow this recording',
-	'props.followLyricsHint': 'The .srt runs off the track\u2019s own position, so pausing or winding back takes the lyrics with it.',
+	'props.followLyricsHint':
+		'The .srt runs off the track\u2019s own position, so pausing or winding back takes the lyrics with it.',
 	'props.loop': 'Loop',
 	'props.position': 'Position (% of frame)',
 	'props.fullFrame': 'Fit to screen',
@@ -292,7 +323,8 @@ const en = {
 	'settings.language': 'Language',
 	'settings.liveWarning': 'Encoder settings apply to the next broadcast.',
 	'settings.recording': 'Recording',
-	'settings.recordingHint': 'Local files save in Movies/Missionnaire Studio. Cloud uses the streaming recorder directly.',
+	'settings.recordingHint':
+		'Local files save in Movies/Missionnaire Studio. Cloud uses the streaming recorder directly.',
 	'settings.recorderUrl': 'Cloud recorder URL',
 	'settings.recorderToken': 'Cloud recorder token',
 	'recording.off': 'Off',
@@ -300,7 +332,8 @@ const en = {
 	'recording.cloud': 'Cloud',
 	'recording.both': 'Both',
 	'settings.testPattern': 'No-signal test pattern',
-	'settings.testPatternHint': 'Show colour bars when a scene\u2019s camera, screen share or media file is not producing a picture. Black looks the same as a dead stream.',
+	'settings.testPatternHint':
+		'Show colour bars when a scene\u2019s camera, screen share or media file is not producing a picture. Black looks the same as a dead stream.',
 	'settings.resolution': 'Base resolution',
 	'settings.fps': 'Frames per second',
 	'settings.videoBitrate': 'Video bitrate — {kbps} kbps',
@@ -321,9 +354,80 @@ const en = {
 	'settings.ffmpegCommand': 'ffmpeg command',
 	'settings.ffmpegLog': 'ffmpeg log ({count})',
 
+	// ── Updates ─────────────────────────────────────────────────
+	'update.currentVersion': 'Version {version}',
+	'update.check': 'Check for updates',
+	'update.checking': 'Checking for updates…',
+	'update.current': 'You’re using the latest version.',
+	'update.available': 'Missionnaire Studio {version} is available.',
+	'update.installRestart': 'Install and restart',
+	'update.downloading': 'Downloading update… {percent}%',
+	'update.installing': 'Installing update…',
+	'update.restarting': 'Restarting Studio…',
+	'update.blocked': 'Finish the live broadcast or recording before updating.',
+	'update.error': 'Update check failed: {message}',
+
+	// ── Help ────────────────────────────────────────────────────
+	'help.title': 'Missionnaire Studio Help',
+	'help.gettingStarted': 'Getting Started',
+	'help.gettingStartedIntro': 'A safe path from an empty desk to a public broadcast.',
+	'help.chooseSessionTitle': 'Choose the live session',
+	'help.chooseSession':
+		'In Controls, choose or create the public session that listeners will open.',
+	'help.prepareTitle': 'Prepare Preview',
+	'help.prepare':
+		'Add cameras, media, or a YouTube Live Window to a scene. Connect every source and confirm its audio meter moves.',
+	'help.programTitle': 'Send Preview to Program',
+	'help.program':
+		'In Studio Mode, edits remain private in Preview. Press Transition only when the picture is ready for Program.',
+	'help.subtitlesTitle': 'Prepare sermon subtitles',
+	'help.subtitles':
+		'Load the prepared sermon MP3 and French SRT, then capture the live source. Automatic sermon sync waits through songs and introductions.',
+	'help.goLiveTitle': 'Verify, then go live',
+	'help.goLive':
+		'Start the Preview Signal, watch the bottom status for stable FPS and bitrate, then use Go Live for the selected session.',
+	'help.safety':
+		'Program is what viewers receive. Always check Program—not only Preview—before starting or changing a broadcast.',
+	'help.shortcuts': 'Keyboard Shortcuts',
+	'help.shortcutsIntro': 'Shortcuts are ignored while you are typing in a field.',
+	'help.nextSubtitle': 'Next manual subtitle',
+	'help.previousSubtitle': 'Previous manual subtitle',
+	'help.selectScene': 'Select scene by position',
+	'help.takeScene': 'Transition Preview to Program in Studio Mode',
+	'help.closeDialog': 'Close the open dialog',
+	'help.openSettings': 'Open Settings',
+	'help.openHelp': 'Open Help',
+	'help.troubleshooting': 'Troubleshooting',
+	'help.troubleshootingIntro':
+		'Start with the symptom below; System Information contains technical details and logs.',
+	'help.streamProblem': 'YouTube reports a bad connection or frames drop',
+	'help.streamSolution':
+		'Check dropped frames, backpressure, FPS, and bitrate in the bottom bar. Prefer hardware encoding and wired internet; lower bitrate only if upload capacity is genuinely below the configured requirement.',
+	'help.openOutput': 'Open Output settings',
+	'help.audioProblem': 'There is no sound or an audio source is quiet',
+	'help.audioSolution':
+		'Confirm the source is connected in Audio Mixer, its meter moves, and it is not muted. Check microphone or screen-recording permission in the operating system when a device or captured app is missing.',
+	'help.subtitleProblem': 'Subtitles are missing or out of sync',
+	'help.subtitleSolution':
+		'Confirm Lyrics is Shown, the correct public session is active, and the reference MP3 and matching French SRT are loaded. Automatic sync also needs audio from the captured live source; use “Sermon begins now” only as the fallback.',
+	'help.captureProblem': 'A captured YouTube window looks wrong',
+	'help.captureSolution':
+		'Use the dedicated YouTube Live Window source, keep the video visible in that window, and crop or resize the source in Preview. Move it to Program only after the result is clean.',
+	'help.openSystem': 'Open System Information',
+
 	// ── Stream destinations ─────────────────────────────────────
 	'stream.intro':
 		'Every enabled destination gets the same encode. If one refuses the connection the others carry on — YouTube cannot take the radio down.',
+	'stream.youtubeChannels': 'YouTube channels',
+	'stream.youtubeChannelsHint':
+		'Channels are private to the admin who connected them. Choose one when creating a service.',
+	'stream.connectAdminFirst': 'Connect Studio to the admin app before adding a YouTube channel.',
+	'stream.connectAdmin': 'Connect Studio to admin',
+	'stream.noYouTubeChannels': 'No YouTube channel connected yet.',
+	'stream.addYouTubeChannel': 'Connect another YouTube channel',
+	'stream.disconnectChannel': 'Disconnect',
+	'stream.disconnectConfirm': 'Disconnect {channel} from this admin account?',
+	'stream.manualOutputs': 'RTMP outputs · Advanced',
 	'stream.newDestination': 'New destination',
 	'stream.urlPlaceholder': 'rtmp://server/application',
 	'stream.keyPlaceholder': 'stream key',
@@ -338,12 +442,13 @@ const en = {
 	'stream.presetMissionnaire': 'Missionnaire (app + radio)',
 	'stream.presetMissionnaireHint': 'Your MediaMTX server — feeds the radio and the app.',
 	'stream.presetYouTube': 'YouTube',
+	'stream.presetYouTubeManual': 'YouTube (manual key)',
 	'stream.presetYouTubeHint': 'Key from YouTube Studio › Go live.',
 	'stream.presetFacebook': 'Facebook',
 	'stream.presetFacebookHint': 'Key from Facebook Live Producer.',
 	'stream.presetBlank': 'Blank',
 	'stream.keyWarning':
-		'Keys are stored in the clear in the app’s data, the same as OBS stores its own. Don’t share a screenshot with a key revealed.',
+		'Manual keys are stored in the clear in the app’s data, the same as OBS stores its own. Managed YouTube keys are not saved. Don’t share a screenshot with a key revealed.',
 
 	// ── Errors ──────────────────────────────────────────────────
 	'error.noImmediateDestination':

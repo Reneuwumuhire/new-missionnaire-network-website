@@ -3,5 +3,11 @@
 	"identifier": "default",
 	"description": "Studio window. Media files are picked with a plain file input in the webview, so no filesystem permission is needed \u2014 everything else goes through this app's own commands.",
 	"windows": ["main"],
-	"permissions": ["core:default", "core:window:allow-start-dragging"]
+	"permissions": [
+		"core:default",
+		"core:window:allow-start-dragging",
+		"dialog:allow-open",
+		"updater:default",
+		"process:allow-restart"
+	]
 }
