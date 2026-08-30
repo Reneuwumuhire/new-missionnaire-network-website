@@ -470,7 +470,9 @@
 	// the admin picks a new file.
 	let uploadScheduledLive = $state<ScheduledLive | null>(null);
 	let uploadThumbnailExisting = $state<{ url: string; key: string } | null>(null);
-	const uploadThumbnailSrc = $derived(uploadThumbnailPreviewUrl ?? uploadThumbnailExisting?.url ?? null);
+	const uploadThumbnailSrc = $derived(
+		uploadThumbnailPreviewUrl ?? uploadThumbnailExisting?.url ?? null
+	);
 
 	function toLocalDatetimeValue(d: Date): string {
 		const pad = (n: number) => String(n).padStart(2, '0');
@@ -3182,7 +3184,7 @@
 			<!-- Audio player (ready recordings only) -->
 			{#if rec.status === 'ready' && rec.s3_url}
 				<div class="border-t border-stone-100 px-4 py-3">
-					<audio src={rec.s3_url} controls preload="none" class="h-9 w-full"></audio>
+					<audio src={rec.s3_url} controls preload="metadata" class="h-9 w-full"></audio>
 				</div>
 			{/if}
 
