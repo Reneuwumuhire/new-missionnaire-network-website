@@ -3,6 +3,7 @@ import {
 	audioLayers,
 	destinationPlatform,
 	makeLayer,
+	migrateDestination,
 	persistableDestinations,
 	reconnectWith,
 	requiresYouTubeGoLive,
@@ -68,6 +69,15 @@ describe('public destinations', () => {
 		const managed = { ...youtube, platform: 'youtube' as const, managed: true };
 		expect(persistableDestinations([managed])[0]).toMatchObject({ key: '', enabled: false });
 		expect(persistableDestinations([{ ...managed, managed: false }])[0].key).toBe('key');
+	});
+
+	it('preserves a legacy manual YouTube key during migration', () => {
+		expect(migrateDestination(youtube)).toMatchObject({
+			platform: 'youtube',
+			managed: false,
+			key: 'key',
+			enabled: true
+		});
 	});
 });
 

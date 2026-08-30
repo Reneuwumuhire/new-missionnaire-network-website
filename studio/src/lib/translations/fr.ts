@@ -192,6 +192,8 @@ const fr: Record<keyof typeof en, string> = {
 	'controls.openYouTube': 'Ouvrir YouTube Studio',
 	'controls.openYouTubeHint':
 		'YouTube reçoit le signal test. Vérifiez l’image, le son et l’état du flux avant le direct.',
+	'error.youtubeChannelMissing': 'Connectez la chaîne YouTube utilisée par ce service.',
+	'error.missionnaireGoLive': 'Missionnaire n’a pas pu passer en direct.',
 
 	// ── Status ──────────────────────────────────────────────────
 	'status.offline': 'Hors ligne',

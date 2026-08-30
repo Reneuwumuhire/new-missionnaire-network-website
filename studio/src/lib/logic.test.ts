@@ -53,6 +53,10 @@ describe('layer manipulation', () => {
 		expect(applyDrag(rect, 'n', 0.2, 0.1)).toEqual({ x: 0.25, y: 0.35, w: 0.5, h: 0.4 });
 	});
 
+	it('keeps a draggable body on layers thinner than the resize handles', () => {
+		expect(hitHandle({ x: 0.25, y: 0.25, w: 0.03, h: 0.03 }, 0.265, 0.265)).toBe('move');
+	});
+
 	it('moves without resizing', () => {
 		const moved = applyDrag(rect, 'move', 0.1, -0.05);
 		expect(moved).toEqual({ x: 0.35, y: 0.2, w: 0.5, h: 0.5 });

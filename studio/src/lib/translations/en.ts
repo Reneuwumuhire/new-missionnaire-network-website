@@ -186,6 +186,8 @@ const en = {
 	'controls.openYouTube': 'Open YouTube Studio',
 	'controls.openYouTubeHint':
 		'YouTube is receiving the preview signal. Check its picture, sound and stream health before Go Live.',
+	'error.youtubeChannelMissing': 'Connect the YouTube channel used by this service.',
+	'error.missionnaireGoLive': 'Missionnaire could not go live.',
 
 	// ── Status ──────────────────────────────────────────────────
 	'status.offline': 'Offline',

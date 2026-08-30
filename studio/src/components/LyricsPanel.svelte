@@ -49,7 +49,8 @@
 
 	$effect(() => {
 		const source = programScene().layers.find((layer) => layer.youtubeLiveUrl);
-		if (source && source.id !== referenceMatcher.sourceId)
+		if (!source && referenceMatcher.sourceId) useReferenceSource(null);
+		else if (source && source.id !== referenceMatcher.sourceId)
 			useReferenceSource(source.id, source.name);
 	});
 

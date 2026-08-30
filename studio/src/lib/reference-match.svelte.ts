@@ -173,15 +173,15 @@ export async function chooseReferenceAudio() {
 	}
 }
 
-export function useReferenceSource(sourceId: string, sourceName: string) {
+export function useReferenceSource(sourceId: string | null, sourceName = '') {
 	if (referenceMatcher.sourceId !== sourceId) {
 		disconnectStreamTap();
 		resetLiveWindow();
 	}
 	referenceMatcher.sourceId = sourceId;
 	referenceMatcher.sourceName = sourceName;
-	referenceMatcher.enabled = true;
-	referenceMatcher.status = hasReference ? 'armed' : 'idle';
+	referenceMatcher.enabled = sourceId !== null;
+	referenceMatcher.status = hasReference && sourceId ? 'armed' : 'idle';
 }
 
 export function resumeReferenceMatching() {

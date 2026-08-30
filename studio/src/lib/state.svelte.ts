@@ -151,6 +151,19 @@ export function destinationPlatform(
 	return 'custom';
 }
 
+export function migrateDestination(destination: Destination): Destination {
+	const platform = destinationPlatform(destination);
+	const managed = platform === 'youtube' && destination.managed === true;
+	return {
+		...destination,
+		platform,
+		managed,
+		key: managed ? '' : destination.key,
+		enabled: managed ? false : destination.enabled,
+		hold: platform === 'youtube' ? false : (destination.hold ?? false)
+	};
+}
+
 export function requiresYouTubeGoLive(destinations: Destination[], isTest = false): boolean {
 	return (
 		!isTest &&
@@ -364,18 +377,9 @@ function load(): Persisted {
 			})),
 			// YouTube must receive the preflight signal so the operator can inspect
 			// it in Live Control Room before opening the public site gate.
-			destinations: uniqueById(parsed.destinations ?? fallback.destinations).map((destination) => {
-				const platform = destinationPlatform(destination);
-				const managed = platform === 'youtube' ? (destination.managed ?? true) : false;
-				return {
-					...destination,
-					platform,
-					managed,
-					key: managed ? '' : destination.key,
-					enabled: managed ? false : destination.enabled,
-					hold: platform === 'youtube' ? false : (destination.hold ?? false)
-				};
-			}),
+			destinations: uniqueById(parsed.destinations ?? fallback.destinations).map(
+				migrateDestination
+			),
 			// Merge, so a setting added in a later version gets its default
 			// instead of `undefined` reaching ffmpeg. Layout is merged a level
 			// deeper for the same reason — a new dock must get a weight.

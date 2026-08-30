@@ -79,12 +79,26 @@ pub fn extract(path: String) -> Result<ReferenceFeatures, String> {
 		.spawn()
 		.map_err(|error| format!("Could not read reference audio: {error}"))?;
 
-	let mut stdout = child.stdout.take().ok_or("Reference decoder did not start")?;
+	let mut stdout = match child.stdout.take() {
+		Some(stdout) => stdout,
+		None => {
+			let _ = child.kill();
+			let _ = child.wait();
+			return Err("Reference decoder did not start".into());
+		}
+	};
 	let mut extractor = Extractor::default();
 	let mut bytes = [0_u8; 32 * 1024];
 	let mut carry = Vec::with_capacity(3);
 	loop {
-		let read = stdout.read(&mut bytes).map_err(|error| error.to_string())?;
+		let read = match stdout.read(&mut bytes) {
+			Ok(read) => read,
+			Err(error) => {
+				let _ = child.kill();
+				let _ = child.wait();
+				return Err(error.to_string());
+			}
+		};
 		if read == 0 {
 			break;
 		}

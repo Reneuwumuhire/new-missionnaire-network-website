@@ -26,7 +26,10 @@ async function ensureAuthorizationIndexes(): Promise<void> {
 		await db
 			.collection('youtube_authorizations')
 			.createIndex({ user_email: 1, channel_id: 1 }, { unique: true, name: 'user_channel_unique' });
-	})();
+	})().catch((error) => {
+		authorizationIndexesEnsured = null;
+		throw error;
+	});
 	return authorizationIndexesEnsured;
 }
 

@@ -86,21 +86,25 @@ export type Handle = 'move' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw';
 /** Which grab handle (if any) sits under a normalised point. Handles are sized
  *  in canvas-relative terms so they stay grabbable on a small preview. */
 export function hitHandle(rect: Rect, px: number, py: number, tolerance = 0.02): Handle | null {
+	const resizeX = rect.w > tolerance * 2;
+	const resizeY = rect.h > tolerance * 2;
 	const corners: [Handle, number, number][] = [
 		['nw', rect.x, rect.y],
 		['ne', rect.x + rect.w, rect.y],
 		['sw', rect.x, rect.y + rect.h],
 		['se', rect.x + rect.w, rect.y + rect.h]
 	];
-	for (const [handle, cx, cy] of corners) {
-		if (Math.abs(px - cx) <= tolerance && Math.abs(py - cy) <= tolerance) return handle;
+	if (resizeX && resizeY) {
+		for (const [handle, cx, cy] of corners) {
+			if (Math.abs(px - cx) <= tolerance && Math.abs(py - cy) <= tolerance) return handle;
+		}
 	}
 	const inside = px >= rect.x && px <= rect.x + rect.w && py >= rect.y && py <= rect.y + rect.h;
 	if (!inside) return null;
-	if (Math.abs(py - rect.y) <= tolerance) return 'n';
-	if (Math.abs(px - (rect.x + rect.w)) <= tolerance) return 'e';
-	if (Math.abs(py - (rect.y + rect.h)) <= tolerance) return 's';
-	if (Math.abs(px - rect.x) <= tolerance) return 'w';
+	if (resizeY && Math.abs(py - rect.y) <= tolerance) return 'n';
+	if (resizeX && Math.abs(px - (rect.x + rect.w)) <= tolerance) return 'e';
+	if (resizeY && Math.abs(py - (rect.y + rect.h)) <= tolerance) return 's';
+	if (resizeX && Math.abs(px - rect.x) <= tolerance) return 'w';
 	return 'move';
 }
 

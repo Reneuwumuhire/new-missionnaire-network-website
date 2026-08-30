@@ -372,12 +372,12 @@ export async function goLivePublic(): Promise<void> {
 		if (youtube) {
 			const channelId = sessionYouTubeChannelId(session, liveSession.youtubeChannels);
 			if (!channelId || !liveSession.youtubeChannels.some((channel) => channel.id === channelId)) {
-				throw new Error('Connect the YouTube channel used by this service.');
+				throw new Error(t('error.youtubeChannelMissing'));
 			}
 			await goLiveYouTube();
 		}
 		if (!(await startSelectedSession()))
-			throw new Error(liveSession.error || 'Missionnaire could not go live.');
+			throw new Error(liveSession.error || t('error.missionnaireGoLive'));
 		await goLiveHeld();
 	} catch (error) {
 		broadcast.error = error instanceof Error ? error.message : String(error);
