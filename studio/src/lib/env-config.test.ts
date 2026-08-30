@@ -8,18 +8,16 @@ describe('Studio .env import', () => {
 			MONGODB_URI=mongodb://do-not-import
 			PUBLIC_MAIN_URL="http://localhost:8081/"
 			ADMIN_SITE_URL=https://admin.missionnaire.net
-			RECORDER_TOKEN=abc=123
+			RECORDER_TOKEN=do-not-import
 			RTMP_URL=rtmp://localhost:1935/live
-			STREAM_KEY=obs
+			STREAM_KEY=abc=123
 			YOUTUBE_STREAM_KEY=youtube-secret
 		`);
 		expect(config).toEqual({
 			mainSiteUrl: 'http://localhost:8081',
 			adminSiteUrl: 'https://admin.missionnaire.net',
-			recorderUrl: undefined,
-			recorderToken: 'abc=123',
 			missionnaireUrl: 'rtmp://localhost:1935/live',
-			missionnaireKey: 'obs',
+			missionnaireKey: 'abc=123',
 			youtubeUrl: undefined,
 			youtubeKey: 'youtube-secret'
 		});
@@ -29,21 +27,42 @@ describe('Studio .env import', () => {
 		expect(parseStudioEnv('MAIN_SITE_URL=https://missionnaire.net').mainSiteUrl).toBe(
 			'https://www.missionnaire.net'
 		);
-		expect(
-			parseStudioEnv('ADMIN_SITE_URL=https://www.admin.missionnaire.net').adminSiteUrl
-		).toBe('https://admin.missionnaire.net');
+		expect(parseStudioEnv('ADMIN_SITE_URL=https://www.admin.missionnaire.net').adminSiteUrl).toBe(
+			'https://admin.missionnaire.net'
+		);
 	});
 
 	it('updates the existing destinations without creating duplicates', () => {
 		const destinations: Destination[] = [
-			{ id: 'app', name: 'Missionnaire', url: 'rtmp://old/live', key: '', enabled: false, hold: false },
-			{ id: 'yt', name: 'YouTube', url: 'rtmp://a.rtmp.youtube.com/live2', key: '', enabled: false, hold: false }
+			{
+				id: 'app',
+				name: 'Missionnaire',
+				url: 'rtmp://old/live',
+				key: '',
+				enabled: false,
+				hold: false
+			},
+			{
+				id: 'yt',
+				name: 'YouTube',
+				url: 'rtmp://a.rtmp.youtube.com/live2',
+				key: '',
+				enabled: false,
+				hold: false
+			}
 		];
 		const merged = mergeEnvDestinations(destinations, {
-			missionnaireUrl: 'rtmps://radio.example/live', missionnaireKey: 'radio', youtubeKey: 'youtube'
+			missionnaireUrl: 'rtmps://radio.example/live',
+			missionnaireKey: 'radio',
+			youtubeKey: 'youtube'
 		});
 		expect(merged).toHaveLength(2);
-		expect(merged[0]).toMatchObject({ url: 'rtmps://radio.example/live', key: 'radio', enabled: true, hold: false });
+		expect(merged[0]).toMatchObject({
+			url: 'rtmps://radio.example/live',
+			key: 'radio',
+			enabled: true,
+			hold: false
+		});
 		expect(merged[1]).toMatchObject({ key: 'youtube', enabled: true, hold: false });
 	});
 

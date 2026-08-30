@@ -313,6 +313,7 @@ const en = {
 	'settings.output': 'Output',
 	'settings.video': 'Video',
 	'settings.layout': 'Layout',
+	'settings.advanced': 'Advanced',
 	'settings.about': 'About',
 	'settings.theme': 'Theme',
 	'settings.themeDark': 'Dark',
@@ -324,9 +325,12 @@ const en = {
 	'settings.liveWarning': 'Encoder settings apply to the next broadcast.',
 	'settings.recording': 'Recording',
 	'settings.recordingHint':
-		'Local files save in Movies/Missionnaire Studio. Cloud uses the streaming recorder directly.',
-	'settings.recorderUrl': 'Cloud recorder URL',
-	'settings.recorderToken': 'Cloud recorder token',
+		'Local files save in Videos/Missionnaire Studio on Windows or Movies/Missionnaire Studio on macOS.',
+	'settings.cloudRecordingManaged':
+		'Cloud recording uses your authorized admin connection. Recorder and AWS credentials remain on the server.',
+	'settings.developerConfiguration': 'Developer configuration',
+	'settings.developerConfigurationHint':
+		'Optional import for local site URLs and manual RTMP keys. Production installs do not need an .env file.',
 	'recording.off': 'Off',
 	'recording.local': 'Local',
 	'recording.cloud': 'Cloud',

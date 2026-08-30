@@ -89,6 +89,10 @@ async function adminPost<T>(body: object): Promise<T> {
 	) as T;
 }
 
+export function controlCloudRecording(action: 'start' | 'stop') {
+	return adminPost<{ id: string }>({ action: `recorder-${action}` });
+}
+
 function applyYouTubeIngest(ingest: YouTubeIngest, channel: YouTubeChannel) {
 	let destination = studio.destinations.find((item) => item.platform === 'youtube' && item.managed);
 	if (!destination) {

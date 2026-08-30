@@ -71,7 +71,7 @@ exactly where OBS keeps them.
 **Every seam is draggable** — between the preview and the dock row, between the
 lyrics column and the preview, and between each pair of docks. Sizes are saved
 with the scene collection. The dividers also take focus, so arrow keys resize
-(hold shift for bigger steps). *Settings → Layout → Reset panels* puts them
+(hold shift for bigger steps). _Settings → Layout → Reset panels_ puts them
 back. Docks are laid out by proportion, so the row still fills the window
 whatever size you drag it to.
 
@@ -81,7 +81,7 @@ keeps the duration you chose. In Studio Mode the column between the two
 canvases also has OBS's **Quick Transitions** — take with one specific
 transition without changing the configured default.
 
-**Studio Mode** (Controls → *Studio Mode*) splits the preview in two: the left
+**Studio Mode** (Controls → _Studio Mode_) splits the preview in two: the left
 canvas is the scene you are editing, the right one is what is actually going
 out. Build the next scene, then **Transition** (or `Enter`) cuts to it. The scene
 on air carries an `AIR` badge in the Scenes dock, and its audio is the audio
@@ -95,7 +95,7 @@ from one set of CSS variables, so nothing is styled twice.
 
 ## Going live
 
-**Start Streaming** opens the connections; the button reads *Reaching servers…*
+**Start Streaming** opens the connections; the button reads _Reaching servers…_
 until ffmpeg has actually pushed something, and only then does the clock start
 and the header say LIVE. You are never told you are on air before you are.
 
@@ -110,7 +110,7 @@ YouTube publishes the instant its ingest sees a frame when you use a default
 stream key — auto-start is on and cannot be turned off for that key. So
 "Start Streaming" would put you live in public whether you meant to or not.
 
-Tick **Wait for Go Live** on a destination (*Settings → Stream*; it is on by
+Tick **Wait for Go Live** on a destination (_Settings → Stream_; it is on by
 default for YouTube, Facebook and Twitch) and **nothing is sent there at all**
 when streaming starts. YouTube sees no stream, so it has nothing to publish.
 A **Go Live** button then appears in Controls; press it and the held
@@ -122,8 +122,8 @@ congregation's stream to bring up a public one. The cost is a second encode
 while both run.
 
 **This app still cannot stop a YouTube broadcast** — it has no YouTube API. Go
-Live stops *feeding* YouTube; ending the broadcast is done in Studio, and the
-*Open YouTube Studio* button takes you there.
+Live stops _feeding_ YouTube; ending the broadcast is done in Studio, and the
+_Open YouTube Studio_ button takes you there.
 
 If you would rather have YouTube's own two-stage flow, schedule the stream in
 Studio and turn auto-start off there; the hold works either way.
@@ -132,37 +132,38 @@ Studio and turn auto-start off there; the hold works either way.
 
 The fields OBS's Stats dock shows, sourced from ffmpeg:
 
-| Field | What it means when it climbs |
-| --- | --- |
-| Dropped frames (network) | ffmpeg gave up on frames it could not send |
-| Encoder backpressure events | ffmpeg briefly could not accept input. Studio waits instead of discarding encoded audio/video; persistent growth means lower the bitrate. |
-| Frames missed (rendering lag) | the compositor could not paint at the target fps — lower the resolution or fps |
-| Encoder speed | below 1.00× means encoding slower than real time |
+| Field                         | What it means when it climbs                                                                                                              |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Dropped frames (network)      | ffmpeg gave up on frames it could not send                                                                                                |
+| Encoder backpressure events   | ffmpeg briefly could not accept input. Studio waits instead of discarding encoded audio/video; persistent growth means lower the bitrate. |
+| Frames missed (rendering lag) | the compositor could not paint at the target fps — lower the resolution or fps                                                            |
+| Encoder speed                 | below 1.00× means encoding slower than real time                                                                                          |
 
 Bitrate is shown against what you asked for, plus total data sent.
 
 ## Destinations
 
-On first launch, Studio can import or paste a small `.env` configuration. It recognizes only these keys (unrelated database and AWS secrets are ignored):
+On first launch, Studio connects to the admin app. That connection manages live
+services, YouTube and cloud recording without copying server credentials to the
+desktop app.
+
+For local development only, _Settings → Advanced_ can import these keys
+(database, AWS and recorder credentials are ignored):
 
 ```dotenv
 MAIN_SITE_URL=https://www.missionnaire.net
 ADMIN_SITE_URL=https://admin.missionnaire.net
-RECORDER_URL=https://<your-fly-app>.fly.dev:8443
-RECORDER_TOKEN=<recorder-token>
 MISSIONNAIRE_RTMP_URL=rtmp://<your-fly-app>.fly.dev/live
 MISSIONNAIRE_STREAM_KEY=<stream-key>
 YOUTUBE_STREAM_KEY=<youtube-stream-key>
 ```
 
-The same importer remains available under *Settings → General*.
+_Settings → Stream_. The two that matter:
 
-*Settings → Stream*. The two that matter:
-
-| Where | URL | Key |
-| --- | --- | --- |
-| App + radio | `rtmp://<your-fly-app>.fly.dev/live` (locally `rtmp://localhost:1935/live`) | `obs`, or your `STREAM_KEY` |
-| YouTube | `rtmp://a.rtmp.youtube.com/live2` | from YouTube Studio › Direct |
+| Where       | URL                                                                         | Key                          |
+| ----------- | --------------------------------------------------------------------------- | ---------------------------- |
+| App + radio | `rtmp://<your-fly-app>.fly.dev/live` (locally `rtmp://localhost:1935/live`) | `obs`, or your `STREAM_KEY`  |
+| YouTube     | `rtmp://a.rtmp.youtube.com/live2`                                           | from YouTube Studio › Direct |
 
 The first one is the same MediaMTX ingest OBS used to publish to, so the whole
 existing chain downstream is untouched: MediaMTX → ffmpeg (strips video) →
@@ -183,12 +184,12 @@ badge next to it blanks every Lyrics source at once.
 The `Lyrics` dock drives every Lyrics source in every scene, and there are two
 ways to run a service:
 
-**Timed** — load a `.srt`. Press *Start* on the first spoken line, or click
+**Timed** — load a `.srt`. Press _Start_ on the first spoken line, or click
 the line being sung right now in the list; nudge ±1/5/30 s if it drifts. Same
 anchor + offset model the admin panel's live-transcript panel already uses.
 
 **Manual** — paste the lyrics, one line per screen, and tap through with
-**Space** (↑/↓ to correct). Every tap is timestamped, so *Export .srt* gives you
+**Space** (↑/↓ to correct). Every tap is timestamped, so _Export .srt_ gives you
 a real subtitle file for the recording afterwards.
 
 ### What this does and does not sync
@@ -314,12 +315,12 @@ is platform-independent.
 ## Things worth knowing
 
 - **Don't minimise the window while live.** WebKit stops the render loop for a
-  hidden page and the picture freezes. Merely *covering* the window is fine —
+  hidden page and the picture freezes. Merely _covering_ the window is fine —
   macOS occlusion detection is switched off at startup for exactly this reason.
 - Media files (image / video layers) are picked with a normal file dialog and
   held as blobs, so after a restart those layers ask for the file again. Scenes,
   layers, levels and destinations all persist.
-- *Monitor* in the mixer is off by default. Turn it on only with headphones —
+- _Monitor_ in the mixer is off by default. Turn it on only with headphones —
   otherwise the room mic picks up the speakers.
 - Meters are dBFS, like a real desk: green to about −20, amber to −9, red above
   that, with a peak-hold marker. Aim for the top of the green.

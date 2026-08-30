@@ -198,9 +198,6 @@ export interface Settings {
 	/** Panel sizes the operator has dragged to. */
 	layout: Layout;
 	recordingMode: 'off' | 'local' | 'cloud' | 'both';
-	/** Existing streaming recorder service, not the admin app. */
-	recorderUrl: string;
-	recorderToken: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -218,9 +215,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	studioMode: false,
 	monitorAudio: false,
 	layout: DEFAULT_LAYOUT,
-	recordingMode: 'off',
-	recorderUrl: '',
-	recorderToken: ''
+	recordingMode: 'off'
 };
 
 export const id = () => Math.random().toString(36).slice(2, 10);
@@ -362,6 +357,33 @@ function load(): Persisted {
 		if (!raw) return fallback;
 		const parsed = JSON.parse(raw) as Partial<Persisted>;
 		if (!parsed.scenes?.length) return fallback;
+		// Recorder credentials from early Studio builds must never survive in
+		// app storage. Cloud recording is now authorized and proxied by admin.
+		const saved = (parsed.settings ?? {}) as Partial<Settings> & {
+			recorderUrl?: string;
+			recorderToken?: string;
+			adminUrl?: string;
+			adminToken?: string;
+		};
+		const {
+			recorderUrl: _recorderUrl,
+			recorderToken: _recorderToken,
+			adminUrl: _adminUrl,
+			adminToken: _adminToken,
+			...savedSettings
+		} = saved;
+		if (
+			_recorderUrl !== undefined ||
+			_recorderToken !== undefined ||
+			_adminUrl !== undefined ||
+			_adminToken !== undefined
+		) {
+			try {
+				localStorage.setItem(STORE_KEY, JSON.stringify({ ...parsed, settings: savedSettings }));
+			} catch {
+				// The sanitized in-memory state is still safe and usable on a full disk.
+			}
+		}
 		return {
 			scenes: uniqueById(parsed.scenes).map((scene) => ({
 				...scene,
@@ -385,29 +407,19 @@ function load(): Persisted {
 			// deeper for the same reason — a new dock must get a weight.
 			settings: {
 				...DEFAULT_SETTINGS,
-				...parsed.settings,
-				mainSiteUrl: (parsed.settings?.mainSiteUrl ?? DEFAULT_SETTINGS.mainSiteUrl).replace(
+				...savedSettings,
+				mainSiteUrl: (saved.mainSiteUrl ?? DEFAULT_SETTINGS.mainSiteUrl).replace(
 					/^https:\/\/missionnaire\.net\/?$/,
 					'https://www.missionnaire.net'
 				),
-				adminSiteUrl: (parsed.settings?.adminSiteUrl ?? DEFAULT_SETTINGS.adminSiteUrl).replace(
+				adminSiteUrl: (saved.adminSiteUrl ?? DEFAULT_SETTINGS.adminSiteUrl).replace(
 					/^https:\/\/www\.admin\.missionnaire\.net\/?$/,
 					'https://admin.missionnaire.net'
 				),
-				// These names were reserved but never used; keep old local settings
-				// useful if an early Studio build happened to save them.
-				recorderUrl:
-					parsed.settings?.recorderUrl ??
-					(parsed.settings as { adminUrl?: string } | undefined)?.adminUrl ??
-					'',
-				recorderToken:
-					parsed.settings?.recorderToken ??
-					(parsed.settings as { adminToken?: string } | undefined)?.adminToken ??
-					'',
 				layout: {
 					...DEFAULT_LAYOUT,
-					...parsed.settings?.layout,
-					weights: { ...DEFAULT_LAYOUT.weights, ...parsed.settings?.layout?.weights }
+					...saved.layout,
+					weights: { ...DEFAULT_LAYOUT.weights, ...saved.layout?.weights }
 				}
 			}
 		};

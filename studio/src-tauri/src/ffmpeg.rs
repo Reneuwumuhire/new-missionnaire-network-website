@@ -7,9 +7,9 @@
 //! and the RTMP connections never restart mid-broadcast.
 
 use std::collections::{HashMap, VecDeque};
+use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
-use std::fs;
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{sync_channel, SyncSender, TrySendError};
@@ -17,7 +17,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 /// Chunks buffered between the webview and ffmpeg's stdin. MediaRecorder emits
 /// one per timeslice (~250 ms), so this is ~30 s of slack. A full queue applies
@@ -352,11 +352,20 @@ impl Encoder {
 		}
 		let bin = resolve_ffmpeg()?;
 		let local_path = if cfg.record_local {
-			let base = std::env::var("HOME").map(PathBuf::from).unwrap_or(std::env::current_dir().map_err(|e| e.to_string())?);
-			let dir = base.join("Movies").join("Missionnaire Studio");
+			let dir = app
+				.path()
+				.video_dir()
+				.map_err(|e| format!("Dossier Vidéos/Films introuvable: {e}"))?
+				.join("Missionnaire Studio");
 			fs::create_dir_all(&dir).map_err(|e| format!("Dossier d’enregistrement impossible: {e}"))?;
-			Some(dir.join(format!("Missionnaire Studio {}.mp4", chrono_stamp())).to_string_lossy().to_string())
-		} else { None };
+			Some(
+				dir.join(format!("Missionnaire Studio {}.mp4", chrono_stamp()))
+					.to_string_lossy()
+					.to_string(),
+			)
+		} else {
+			None
+		};
 		let args = build_args_with_path(&cfg, local_path.as_deref())?;
 
 		let mut child = Command::new(&bin)

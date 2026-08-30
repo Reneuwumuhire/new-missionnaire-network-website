@@ -25,6 +25,7 @@ import {
 } from '$lib/server/scheduled-live-validation';
 import { buildWatchUrl, pingBroadcastEvent } from '$lib/server/main-site';
 import { generatePresignedUploadUrl, getObjectBytes, getS3Url } from '$lib/server/s3';
+import { RecorderError, recorderStart, recorderStop } from '$lib/server/recorder-client';
 
 async function operator(request: Request): Promise<{ email: string; name: string }> {
 	const code = request.headers.get('authorization')?.replace(/^Bearer\s+/, '') ?? '';
@@ -85,6 +86,41 @@ export async function POST({ request, getClientAddress }) {
 		if (typeof body.channelId !== 'string') throw error(400, 'A YouTube channel is required');
 		await disconnectYouTube(user.email, body.channelId);
 		return json({ ok: true });
+	}
+	if (body.action === 'recorder-start') {
+		try {
+			const result = await recorderStart(user.email, user.name || null);
+			await logAudit({
+				user_id: user.email,
+				user_email: user.email,
+				action: 'create',
+				target_collection: 'recordings',
+				target_id: result.id,
+				ip_address: getClientAddress()
+			}).catch((auditError) => console.error('[Studio recorder] start audit failed:', auditError));
+			return json(result);
+		} catch (cause) {
+			if (cause instanceof RecorderError) throw error(cause.status, cause.message);
+			throw cause;
+		}
+	}
+	if (body.action === 'recorder-stop') {
+		try {
+			const result = await recorderStop();
+			await logAudit({
+				user_id: user.email,
+				user_email: user.email,
+				action: 'update',
+				target_collection: 'recordings',
+				target_id: result.id,
+				changes: { status: { old: 'recording', new: 'uploading' } },
+				ip_address: getClientAddress()
+			}).catch((auditError) => console.error('[Studio recorder] stop audit failed:', auditError));
+			return json(result);
+		} catch (cause) {
+			if (cause instanceof RecorderError) throw error(cause.status, cause.message);
+			throw cause;
+		}
 	}
 	if (body.action === 'presign-thumbnail') {
 		const contentType = typeof body.contentType === 'string' ? body.contentType : '';

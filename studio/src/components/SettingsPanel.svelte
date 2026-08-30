@@ -57,13 +57,14 @@
 
 	// Categories down the left, one page at a time — OBS's Settings window.
 	// Destinations live under `Stream` here for the same reason they do there.
-	type Page = 'general' | 'stream' | 'output' | 'video' | 'layout' | 'about';
+	type Page = 'general' | 'stream' | 'output' | 'video' | 'layout' | 'advanced' | 'about';
 	const PAGES: { id: Page; label: () => string; icon: IconName }[] = [
 		{ id: 'general', label: () => t('settings.general'), icon: 'gear' },
 		{ id: 'stream', label: () => t('settings.stream'), icon: 'monitor' },
 		{ id: 'output', label: () => t('settings.output'), icon: 'film' },
 		{ id: 'video', label: () => t('settings.video'), icon: 'image' },
 		{ id: 'layout', label: () => t('settings.layout'), icon: 'alignLeft' },
+		{ id: 'advanced', label: () => t('settings.advanced'), icon: 'gear' },
 		{ id: 'about', label: () => t('settings.about'), icon: 'music' }
 	];
 
@@ -153,8 +154,6 @@
 							/></label
 						>
 					</div>
-					<button class="studio-chip" onclick={onconfigure}>Import configuration (.env)</button>
-
 					<div>
 						<span class="studio-label">{t('settings.language')}</span>
 						<div class="flex gap-1">
@@ -207,20 +206,11 @@
 						<p class="mt-1 text-[11px] text-fg/35">{t('settings.recordingHint')}</p>
 					</div>
 					{#if draft.settings.recordingMode === 'cloud' || draft.settings.recordingMode === 'both'}
-						<label class="block"
-							><span class="studio-label">{t('settings.recorderUrl')}</span><input
-								class="studio-input w-full"
-								type="url"
-								bind:value={draft.settings.recorderUrl}
-							/></label
+						<p
+							class="border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-[11px] leading-relaxed text-emerald-200/80"
 						>
-						<label class="block"
-							><span class="studio-label">{t('settings.recorderToken')}</span><input
-								class="studio-input w-full"
-								type="password"
-								bind:value={draft.settings.recorderToken}
-							/></label
-						>
+							{t('settings.cloudRecordingManaged')}
+						</p>
 					{/if}
 
 					{#if isStreaming()}
@@ -358,6 +348,16 @@
 							}}>{t('settings.resetLayout')}</button
 						>
 						<p class="mt-1 text-[11px] leading-relaxed text-fg/30">{t('settings.layoutHint')}</p>
+					</div>
+				{/if}
+
+				{#if page === 'advanced'}
+					<div>
+						<span class="studio-label">{t('settings.developerConfiguration')}</span>
+						<p class="mb-3 text-[11px] leading-relaxed text-fg/35">
+							{t('settings.developerConfigurationHint')}
+						</p>
+						<button class="studio-chip" onclick={onconfigure}>Import configuration (.env)</button>
 					</div>
 				{/if}
 

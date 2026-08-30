@@ -83,29 +83,6 @@ fn start_stream(
 	Ok(StartedStream { command, local_recording_path })
 }
 
-/// Direct control of the streaming recorder. It is deliberately limited to
-/// its two lifecycle routes so Studio never needs the retiring admin app.
-#[tauri::command]
-fn recorder_post(base_url: String, token: String, path: String) -> Result<(), String> {
-	if !matches!(path.as_str(), "/start" | "/stop") || token.is_empty() {
-		return Err("Commande d’enregistrement non autorisée".into());
-	}
-	if !allowed_web_url(&base_url) {
-		return Err("URL du recorder invalide".into());
-	}
-	let output = Command::new("curl")
-		.args(["--fail-with-body", "--silent", "--show-error", "--max-time", "20", "-X", "POST"])
-		.arg("-H").arg(format!("Authorization: Bearer {token}"))
-		.args(["-H", "Content-Type: application/json", "--data", "{\"createdBy\":\"missionnaire-studio\",\"createdByName\":\"Missionnaire Studio\"}"])
-		.arg(format!("{}{}", base_url.trim_end_matches('/'), path))
-		.output()
-		.map_err(|e| format!("Recorder inaccessible: {e}"))?;
-	if !output.status.success() {
-		return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
-	}
-	Ok(())
-}
-
 fn studio_post(body: String, authorization: String, base_url: String, path: &str) -> Result<String, String> {
 	if authorization.len() < 20 { return Err("Connectez Studio à l’administration d’abord".into()); }
 	if body.len() > 2048 {
@@ -557,7 +534,6 @@ pub fn run() {
 			check_ffmpeg,
 			extract_reference_features,
 			start_stream,
-			recorder_post,
 			studio_live_post,
 			studio_youtube_post,
 			studio_open_login,

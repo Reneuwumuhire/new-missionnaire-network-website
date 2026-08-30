@@ -322,6 +322,7 @@ const fr: Record<keyof typeof en, string> = {
 	'settings.output': 'Sortie',
 	'settings.video': 'Vidéo',
 	'settings.layout': 'Disposition',
+	'settings.advanced': 'Avancé',
 	'settings.about': 'À propos',
 	'settings.theme': 'Thème',
 	'settings.themeDark': 'Sombre',
@@ -333,9 +334,12 @@ const fr: Record<keyof typeof en, string> = {
 	'settings.liveWarning': 'Les réglages d’encodage s’appliqueront à la prochaine diffusion.',
 	'settings.recording': 'Enregistrement',
 	'settings.recordingHint':
-		'Les fichiers locaux sont enregistrés dans Films/Missionnaire Studio. Le cloud utilise directement le recorder.',
-	'settings.recorderUrl': 'URL du recorder cloud',
-	'settings.recorderToken': 'Jeton du recorder cloud',
+		'Les fichiers locaux sont enregistrés dans Vidéos/Missionnaire Studio sous Windows ou Films/Missionnaire Studio sous macOS.',
+	'settings.cloudRecordingManaged':
+		'L’enregistrement cloud utilise la connexion admin autorisée. Les identifiants du recorder et AWS restent sur le serveur.',
+	'settings.developerConfiguration': 'Configuration développeur',
+	'settings.developerConfigurationHint':
+		'Import facultatif pour les URL locales et les clés RTMP manuelles. Une installation de production n’a pas besoin de fichier .env.',
 	'recording.off': 'Désactivé',
 	'recording.local': 'Local',
 	'recording.cloud': 'Cloud',

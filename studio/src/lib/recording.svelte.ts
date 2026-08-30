@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { controlCloudRecording } from './live-session.svelte';
 import { studio } from './state.svelte';
 
 export const recording = $state({
@@ -13,25 +13,25 @@ export const recordsCloud = () => ['cloud', 'both'].includes(studio.settings.rec
 
 export async function startCloudRecording() {
 	if (!recordsCloud() || recording.cloud) return;
-	if (!studio.settings.recorderUrl.trim() || !studio.settings.recorderToken.trim()) {
-		recording.error = 'Cloud recorder URL and token are required.';
-		return;
-	}
 	try {
-		await invoke('recorder_post', { baseUrl: studio.settings.recorderUrl.trim(), token: studio.settings.recorderToken.trim(), path: '/start' });
+		await controlCloudRecording('start');
 		recording.cloud = true;
 		recording.startedAt ??= Date.now();
 		recording.error = null;
-	} catch (error) { recording.error = String(error); }
+	} catch (error) {
+		recording.error = String(error);
+	}
 }
 
 export async function stopCloudRecording() {
 	if (!recording.cloud) return;
 	try {
-		await invoke('recorder_post', { baseUrl: studio.settings.recorderUrl.trim(), token: studio.settings.recorderToken.trim(), path: '/stop' });
+		await controlCloudRecording('stop');
 		recording.cloud = false;
 		if (!recording.localPath) recording.startedAt = null;
-	} catch (error) { recording.error = String(error); }
+	} catch (error) {
+		recording.error = String(error);
+	}
 }
 
 export function markProgrammeRecordingStarted() {

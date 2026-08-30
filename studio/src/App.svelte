@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { listen } from '@tauri-apps/api/event';
 	import ControlsDock from './components/ControlsDock.svelte';
+	import DeveloperConfigDialog from './components/DeveloperConfigDialog.svelte';
 	import HelpPanel, { type HelpSection } from './components/HelpPanel.svelte';
 	import Icon from './components/Icon.svelte';
 	import LyricsPanel from './components/LyricsPanel.svelte';
@@ -65,7 +66,7 @@
 		? new Promise<void>((resolve) => (releaseSetup = resolve))
 		: Promise.resolve();
 	let dialog = $state<
-		'properties' | 'settings' | 'help' | 'setup' | 'live-session' | 'new-session' | null
+		'properties' | 'settings' | 'help' | 'developer' | 'live-session' | 'new-session' | null
 	>(null);
 	let settingsPage = $state<'general' | 'output' | 'about'>('general');
 	let helpSection = $state<HelpSection>('getting-started');
@@ -671,7 +672,7 @@
 		<SettingsPanel
 			initialPage={settingsPage}
 			onclose={() => (dialog = null)}
-			onconfigure={() => (dialog = 'setup')}
+			onconfigure={() => (dialog = 'developer')}
 		/>
 	</Modal>
 {:else if dialog === 'help'}
@@ -692,8 +693,14 @@
 	</Modal>
 {/if}
 
-{#if setupOpen || dialog === 'setup'}
-	<Modal title="Studio setup" onclose={finishSetup}>
+{#if dialog === 'developer'}
+	<Modal title="Developer configuration" onclose={() => (dialog = 'settings')}>
+		<DeveloperConfigDialog oncomplete={() => (dialog = 'settings')} />
+	</Modal>
+{/if}
+
+{#if setupOpen}
+	<Modal title="Connect Missionnaire Studio" onclose={finishSetup}>
 		<SetupDialog oncomplete={finishSetup} />
 	</Modal>
 {/if}
