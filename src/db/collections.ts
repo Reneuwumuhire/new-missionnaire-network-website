@@ -453,10 +453,7 @@ function seededShuffle<T>(items: T[], seed: string): T[] {
 // lambda fetch into a one-time cost per (lambda, seed).
 const RANDOM_MUSIC_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_RANDOM_MUSIC_CACHE_ENTRIES = 20;
-const randomMusicOrderCache = new Map<
-	string,
-	{ ids: string[]; fetchedAt: number }
->();
+const randomMusicOrderCache = new Map<string, { ids: string[]; fetchedAt: number }>();
 
 function buildRandomMusicCacheKey(options: {
 	category?: string;
@@ -1017,6 +1014,7 @@ export type BroadcastAdminState = {
 	icecast_offline_since: string | null;
 	notification_pending: boolean;
 	is_test: boolean;
+	/** Admin-owned defaults for an unscheduled Studio test/live. */
 	default_title: string | null;
 	default_description: string | null;
 	default_thumbnail_url: string | null;
@@ -1032,8 +1030,8 @@ export type BroadcastAdminState = {
 	scheduled_live_id: string | null;
 	scheduled_live_slug: string | null;
 	/** Live transcript: SRT copied from the linked scheduled live at go-live.
-	 *  anchor = wall-clock ms when SRT 00:00:00 started playing on air (set by
-	 *  the admin sync button); offset = manual nudge correction in ms. */
+	 *  anchor = wall-clock ms when SRT 00:00:00 started playing on air; offset
+	 *  = manual nudge correction in ms. */
 	subtitle_srt_url: string | null;
 	subtitle_srt_s3_key: string | null;
 	subtitle_anchor_epoch_ms: number | null;
@@ -1051,8 +1049,11 @@ const BROADCAST_DEFAULT: BroadcastAdminState = {
 	icecast_offline_since: null,
 	notification_pending: false,
 	is_test: false,
-	default_title: null, default_description: null, default_thumbnail_url: null,
-	default_thumbnail_s3_key: null, default_youtube_url: null,
+	default_title: null,
+	default_description: null,
+	default_thumbnail_url: null,
+	default_thumbnail_s3_key: null,
+	default_youtube_url: null,
 	title: null,
 	description: null,
 	thumbnail_url: null,
@@ -1098,8 +1099,7 @@ export async function getBroadcastAdminState(): Promise<BroadcastAdminState> {
 			subtitle_srt_s3_key: (doc.subtitle_srt_s3_key as string | null) ?? null,
 			subtitle_anchor_epoch_ms:
 				typeof doc.subtitle_anchor_epoch_ms === 'number' ? doc.subtitle_anchor_epoch_ms : null,
-			subtitle_offset_ms:
-				typeof doc.subtitle_offset_ms === 'number' ? doc.subtitle_offset_ms : 0,
+			subtitle_offset_ms: typeof doc.subtitle_offset_ms === 'number' ? doc.subtitle_offset_ms : 0,
 			subtitle_paused_position_ms:
 				typeof doc.subtitle_paused_position_ms === 'number'
 					? doc.subtitle_paused_position_ms
@@ -1142,6 +1142,9 @@ export type ScheduledLive = {
 	description: string | null;
 	thumbnail_url: string | null;
 	thumbnail_s3_key: string | null;
+	youtube_url: string | null;
+	youtube_channel_id: string | null;
+	youtube_channel_title: string | null;
 	scheduled_at: string; // ISO
 	status: ScheduledLiveStatus;
 	live_started_at: string | null;
@@ -1151,6 +1154,7 @@ export type ScheduledLive = {
 	announced_at: string | null;
 	reminder_enabled: boolean;
 	reminder_sent_at: string | null;
+	/** Unlisted operator-only smoke test. It is never announced or listed. */
 	is_test: boolean;
 	/** Pre-made SRT transcript for the broadcast audio. anchor/offset are
 	 *  mirrored here by the admin sync actions so the replay can recompute the
@@ -1164,12 +1168,19 @@ export type ScheduledLive = {
 	updated_at: string;
 };
 
-export async function getStudioAuthorization(code: string): Promise<{ email: string; name: string } | null> {
+export async function getStudioAuthorization(
+	code: string
+): Promise<{ email: string; name: string } | null> {
 	try {
 		const db = await getDb();
-		const doc = await db.collection('studio_authorizations').findOne({ code, expires_at: { $gt: new Date() } });
+		const doc = await db
+			.collection('studio_authorizations')
+			.findOne({ code, expires_at: { $gt: new Date() } });
 		return doc && typeof doc.user_email === 'string'
-			? { email: doc.user_email, name: typeof doc.user_name === 'string' ? doc.user_name : doc.user_email }
+			? {
+					email: doc.user_email,
+					name: typeof doc.user_name === 'string' ? doc.user_name : doc.user_email
+				}
 			: null;
 	} catch (e) {
 		console.error('[StudioAuthorization] get error:', e);
@@ -1177,50 +1188,123 @@ export async function getStudioAuthorization(code: string): Promise<{ email: str
 	}
 }
 
+export async function revokeStudioAuthorization(code: string): Promise<void> {
+	if (!code) return;
+	const db = await getDb();
+	await db.collection('studio_authorizations').deleteOne({ code });
+}
+
 export async function listStudioScheduledLives(): Promise<ScheduledLive[]> {
 	const db = await getDb();
-	const docs = await db.collection('scheduled_lives').find({ status: { $in: ['scheduled', 'live'] }, is_test: { $ne: true } }).sort({ scheduled_at: 1 }).limit(50).toArray();
+	// Studio selects the next service to air. Completed/cancelled sessions stay
+	// in Mongo for admin's history and recording workflow, never in this picker.
+	const docs = await db
+		.collection('scheduled_lives')
+		.find({ status: 'scheduled', is_test: { $ne: true } })
+		.sort({ scheduled_at: 1 })
+		.limit(50)
+		.toArray();
 	return docs.map((doc) => serializeDocument<ScheduledLive>(doc));
 }
 
-export async function setStudioScheduledLiveStatus(id: string, status: ScheduledLiveStatus, at: string): Promise<boolean> {
+export async function createStudioScheduledLive(input: {
+	title: string;
+	scheduledAt: Date;
+	createdBy: string;
+	description?: string | null;
+	youtubeUrl?: string | null;
+	youtubeChannelId?: string | null;
+	youtubeChannelTitle?: string | null;
+	thumbnailUrl?: string | null;
+	thumbnailKey?: string | null;
+	subtitleUrl?: string | null;
+	subtitleKey?: string | null;
+	subtitleFilename?: string | null;
+	announce?: boolean;
+	reminderEnabled?: boolean;
+	testAccessToken?: string;
+}): Promise<ScheduledLive> {
+	const db = await getDb();
+	const now = new Date().toISOString();
+	for (let attempt = 0; attempt < 5; attempt++) {
+		const doc = {
+			slug: randomBytes(8).toString('base64url'),
+			title: input.title,
+			description: input.description ?? null,
+			thumbnail_url: input.thumbnailUrl ?? null,
+			thumbnail_s3_key: input.thumbnailKey ?? null,
+			youtube_url: input.youtubeUrl ?? null,
+			youtube_channel_id: input.youtubeChannelId ?? null,
+			youtube_channel_title: input.youtubeChannelTitle ?? null,
+			scheduled_at: input.scheduledAt,
+			status: 'scheduled',
+			live_started_at: null,
+			live_ended_at: null,
+			recording_id: null,
+			announce_pending: input.announce === true,
+			announced_at: null,
+			reminder_enabled: input.reminderEnabled === true,
+			reminder_sent_at: null,
+			is_test: Boolean(input.testAccessToken),
+			...(input.testAccessToken ? { test_access_token: input.testAccessToken } : {}),
+			subtitle_srt_url: input.subtitleUrl ?? null,
+			subtitle_srt_s3_key: input.subtitleKey ?? null,
+			subtitle_filename: input.subtitleFilename ?? null,
+			subtitle_anchor_epoch_ms: null,
+			subtitle_offset_ms: 0,
+			created_by: input.createdBy,
+			created_at: now,
+			updated_at: now
+		};
+		try {
+			const result = await db.collection('scheduled_lives').insertOne(doc);
+			return serializeDocument<ScheduledLive>({ ...doc, _id: result.insertedId });
+		} catch (error) {
+			if ((error as { code?: number }).code !== 11000 || attempt === 4) throw error;
+		}
+	}
+	throw new Error('Could not create Studio session');
+}
+
+export async function setStudioScheduledLiveStatus(
+	id: string,
+	status: ScheduledLiveStatus,
+	at: string
+): Promise<boolean> {
 	if (!ObjectId.isValid(id)) return false;
 	const db = await getDb();
 	const extra = status === 'live' ? { live_started_at: at } : { live_ended_at: at };
-	const result = await db.collection('scheduled_lives').updateOne(
-		{ _id: new ObjectId(id), status: status === 'live' ? 'scheduled' : 'live' },
-		{ $set: { status, ...extra, updated_at: new Date().toISOString() } }
-	);
+	const result = await db
+		.collection('scheduled_lives')
+		.updateOne(
+			{ _id: new ObjectId(id), status: status === 'live' ? 'scheduled' : 'live' },
+			{ $set: { status, ...extra, updated_at: new Date().toISOString() } }
+		);
 	return result.matchedCount > 0;
 }
 
 export async function updateStudioLiveSubtitles(
 	id: string,
-	updates: Partial<Pick<ScheduledLive,
-		'subtitle_srt_url' | 'subtitle_srt_s3_key' | 'subtitle_filename' |
-		'subtitle_anchor_epoch_ms' | 'subtitle_offset_ms'>>
+	updates: Partial<
+		Pick<
+			ScheduledLive,
+			| 'subtitle_srt_url'
+			| 'subtitle_srt_s3_key'
+			| 'subtitle_filename'
+			| 'subtitle_anchor_epoch_ms'
+			| 'subtitle_offset_ms'
+		>
+	>
 ): Promise<boolean> {
 	if (!ObjectId.isValid(id)) return false;
 	const db = await getDb();
-	const result = await db.collection('scheduled_lives').updateOne(
-		{ _id: new ObjectId(id), status: 'live' },
-		{ $set: { ...updates, updated_at: new Date().toISOString() } }
-	);
+	const result = await db
+		.collection('scheduled_lives')
+		.updateOne(
+			{ _id: new ObjectId(id), status: 'live' },
+			{ $set: { ...updates, updated_at: new Date().toISOString() } }
+		);
 	return result.matchedCount > 0;
-}
-
-export async function createStudioTestLive(input: { title: string; description: string | null; thumbnailUrl: string | null; thumbnailKey: string | null; youtubeUrl: string | null; createdBy: string; token: string }): Promise<ScheduledLive> {
-	const db = await getDb();
-	const now = new Date().toISOString();
-	const doc = { slug: randomBytes(8).toString('base64url'), title: input.title, description: input.description, thumbnail_url: input.thumbnailUrl, thumbnail_s3_key: input.thumbnailKey, youtube_url: input.youtubeUrl, scheduled_at: now, status: 'scheduled', live_started_at: null, live_ended_at: null, recording_id: null, announce_pending: false, announced_at: null, reminder_enabled: false, reminder_sent_at: null, is_test: true, test_access_token: input.token, subtitle_srt_url: null, subtitle_srt_s3_key: null, subtitle_filename: null, subtitle_anchor_epoch_ms: null, subtitle_offset_ms: 0, created_by: input.createdBy, created_at: now, updated_at: now };
-	const result = await db.collection('scheduled_lives').insertOne(doc);
-	return serializeDocument<ScheduledLive>({ ...doc, _id: result.insertedId });
-}
-
-export async function canAccessStudioTest(id: string | null, token: string | null): Promise<boolean> {
-	if (!id || !token || !ObjectId.isValid(id)) return false;
-	const db = await getDb();
-	return Boolean(await db.collection('scheduled_lives').findOne({ _id: new ObjectId(id), is_test: true, test_access_token: token }, { projection: { _id: 1 } }));
 }
 
 export async function getScheduledLiveBySlug(slug: string): Promise<ScheduledLive | null> {
@@ -1232,6 +1316,25 @@ export async function getScheduledLiveBySlug(slug: string): Promise<ScheduledLiv
 		console.error('[ScheduledLive] getBySlug error:', e);
 		return null;
 	}
+}
+
+/** A test URL is a capability link, never a subscriber-facing live. */
+export async function canAccessStudioTest(
+	id: string | null,
+	token: string | null
+): Promise<boolean> {
+	if (!id || !token || !ObjectId.isValid(id)) return false;
+	const db = await getDb();
+	return Boolean(
+		await db.collection('scheduled_lives').findOne(
+			{
+				_id: new ObjectId(id),
+				is_test: true,
+				test_access_token: token
+			},
+			{ projection: { _id: 1 } }
+		)
+	);
 }
 
 export async function getScheduledLiveById(id: string): Promise<ScheduledLive | null> {
@@ -1254,10 +1357,12 @@ export async function endScheduledLiveIfLive(id: string, endedAt: string): Promi
 	try {
 		if (!ObjectId.isValid(id)) return;
 		const db = await getDb();
-		await db.collection('scheduled_lives').updateOne(
-			{ _id: new ObjectId(id), status: 'live' },
-			{ $set: { status: 'ended', live_ended_at: endedAt, updated_at: new Date().toISOString() } }
-		);
+		await db
+			.collection('scheduled_lives')
+			.updateOne(
+				{ _id: new ObjectId(id), status: 'live' },
+				{ $set: { status: 'ended', live_ended_at: endedAt, updated_at: new Date().toISOString() } }
+			);
 	} catch (e) {
 		console.error('[ScheduledLive] endIfLive error:', e);
 	}

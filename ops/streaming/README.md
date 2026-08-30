@@ -19,6 +19,10 @@ This stack lets OBS publish a normal stream while your site plays audio-only.
 
 ## Run
 
+For a local recorder, copy `ops/streaming/.env.example` to
+`ops/streaming/.env` and fill the server-only values. Missionnaire Studio does
+not read this file; the authorized admin server controls the recorder for it.
+
 ```bash
 pnpm stream:up
 ```
@@ -100,16 +104,16 @@ The `recordings/` prefix must be public-read so `<audio>` tags on the public sit
 
 ```json
 {
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "PublicReadRecordings",
-      "Effect": "Allow",
-      "Principal": "*",
-      "Action": "s3:GetObject",
-      "Resource": "arn:aws:s3:::<bucket>/recordings/*"
-    }
-  ]
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Sid": "PublicReadRecordings",
+			"Effect": "Allow",
+			"Principal": "*",
+			"Action": "s3:GetObject",
+			"Resource": "arn:aws:s3:::<bucket>/recordings/*"
+		}
+	]
 }
 ```
 

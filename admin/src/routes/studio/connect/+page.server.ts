@@ -17,10 +17,12 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 export const actions: Actions = {
 	default: async ({ request, locals }) => {
 		if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Recording permission required');
-		const code = (await request.formData()).get('code')?.toString() ?? '';
+		const form = await request.formData();
+		const code = form.get('code')?.toString() ?? '';
 		if (!/^[0-9a-f-]{36}$/i.test(code)) throw error(400, 'Invalid Studio connection code');
 		const now = new Date();
-		await (await getDb()).collection('studio_authorizations').updateOne(
+		const db = await getDb();
+		await db.collection('studio_authorizations').updateOne(
 			{ code },
 			{ $set: { code, user_email: locals.user.email, user_name: locals.user.name, approved_at: now, expires_at: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) } },
 			{ upsert: true }

@@ -31,7 +31,8 @@ export const POST: RequestHandler = async ({ locals, getClientAddress }) => {
 		subtitle_srt_url: null,
 		subtitle_srt_s3_key: null,
 		subtitle_anchor_epoch_ms: null,
-		subtitle_offset_ms: 0
+		subtitle_offset_ms: 0,
+		subtitle_paused_position_ms: null
 	});
 
 	// Close out the scheduled_lives entry this broadcast was linked to. The

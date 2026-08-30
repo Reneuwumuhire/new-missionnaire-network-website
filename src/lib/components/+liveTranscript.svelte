@@ -4,11 +4,7 @@
 	import { livePlayback, replayPlayback } from '$lib/stores/global';
 	import { parseSrt, type SrtCue } from '$lib/utils/srt';
 	import { dispatchAudioPlayerSeek } from '$lib/utils/audioPlayerControls';
-	import {
-		subtitlePrefs,
-		type SubtitleTheme,
-		type SubtitleSize
-	} from '$lib/stores/subtitlePrefs';
+	import { subtitlePrefs, type SubtitleTheme, type SubtitleSize } from '$lib/stores/subtitlePrefs';
 	import { t, type TranslationKey } from '../../i18n';
 	import SyncedLyrics from './SyncedLyrics.svelte';
 
@@ -25,11 +21,7 @@
 	//          live together with the audio — text and sound never diverge.
 	// replay — props carry the SRT url + the offset between the recording's
 	//          start and SRT 00:00 (computed server-side); position follows
-	
 
-	
-	
-	
 	interface Props {
 		//          the global audio player via the replayPlayback store.
 		mode?: 'live' | 'replay';
@@ -38,18 +30,21 @@
 		/** Replay mode only — ms into the recording at which SRT 00:00 occurs. */
 		offsetIntoRecordingMs?: number;
 		/** Replay mode only — recording id; the transcript only follows the global
-	 *  player while this track is the one playing. */
+		 *  player while this track is the one playing. */
 		trackId?: string | null;
+		/** Capability token for an unlisted Studio quick-test. */
+		testToken?: string | null;
 	}
 
 	let {
 		mode = 'live',
 		url = null,
 		offsetIntoRecordingMs = 0,
-		trackId = null
+		trackId = null,
+		testToken = null
 	}: Props = $props();
 
-	const LIVE_POLL_MS = 8_000; // bounds how fast admin nudges reach listeners
+	const LIVE_POLL_MS = 2_000; // fast enough that an automatic sermon lock reaches listeners promptly
 	const TICK_MS = 400;
 
 	let cues: SrtCue[] = $state([]);
@@ -71,11 +66,21 @@
 	// Persisted per-listener; lets people pick a palette that's easy on their
 	// eyes and a comfortable text size for long reads.
 	let settingsOpen = $state(false);
-	const THEME_OPTIONS: { key: SubtitleTheme; swatch: string; ink: string; titleKey: TranslationKey }[] = [
+	const THEME_OPTIONS: {
+		key: SubtitleTheme;
+		swatch: string;
+		ink: string;
+		titleKey: TranslationKey;
+	}[] = [
 		{ key: 'cream', swatch: '#fbf8f3', ink: '#2a2521', titleKey: 'liveTranscript.theme.cream' },
 		{ key: 'sepia', swatch: '#f4ecd9', ink: '#43361f', titleKey: 'liveTranscript.theme.sepia' },
 		{ key: 'dark', swatch: '#1c1a17', ink: '#f2ece3', titleKey: 'liveTranscript.theme.dark' },
-		{ key: 'contrast', swatch: '#ffffff', ink: '#111111', titleKey: 'liveTranscript.theme.contrast' }
+		{
+			key: 'contrast',
+			swatch: '#ffffff',
+			ink: '#111111',
+			titleKey: 'liveTranscript.theme.contrast'
+		}
 	];
 	const SIZE_OPTIONS: { key: SubtitleSize; label: string; titleKey: TranslationKey }[] = [
 		{ key: 'sm', label: 'A', titleKey: 'liveTranscript.size.sm' },
@@ -141,9 +146,6 @@
 		swipeStartY = null;
 	}
 
-
-
-
 	async function loadSrt(target: string) {
 		try {
 			const res = await fetch(target);
@@ -169,7 +171,9 @@
 	async function pollLiveState() {
 		if (document.hidden) return;
 		try {
-			const res = await fetch('/api/live/radio-state');
+			const res = await fetch(
+				`/api/live/radio-state${testToken ? `?test=${encodeURIComponent(testToken)}` : ''}`
+			);
 			if (!res.ok) return;
 			const data = (await res.json()) as {
 				isLive: boolean;
@@ -180,7 +184,9 @@
 				clockSkewMs = data.serverNowMs - Date.now();
 			}
 			const subs = data.subtitles ?? null;
-			liveActive = Boolean(data.isLive && subs);
+			// The SRT may be attached before the sermon. A null anchor is the
+			// operator-controlled gate that keeps songs and introductions blank.
+			liveActive = Boolean(data.isLive && subs && subs.anchorEpochMs !== null);
 			if (subs) {
 				liveUrl = subs.url;
 				if (subs.url !== loadedUrl) void loadSrt(subs.url);
@@ -252,7 +258,6 @@
 		dispatchAudioPlayerSeek(detail.time + offsetIntoRecordingMs / 1000);
 	}
 
-
 	// Lock body scroll while the overlay is open.
 	$effect(() => {
 		if (browser) {
@@ -270,13 +275,17 @@
 	// SyncedLyrics highlights the line whose start ≤ currentTime; -1 keeps
 	// everything unhighlighted until a position is known.
 	let displayTime = $derived(srtSec ?? -1);
-	let lines = $derived(cues.map((cue) => ({
-		text: cue.text,
-		start: cue.startMs / 1000,
-		end: cue.endMs / 1000
-	})));
+	let lines = $derived(
+		cues.map((cue) => ({
+			text: cue.text,
+			start: cue.startMs / 1000,
+			end: cue.endMs / 1000
+		}))
+	);
 	let visible = $derived(mode === 'live' ? liveActive && cues.length > 0 : cues.length > 0);
-	let waitingForSync = $derived(mode === 'live' && liveActive && cues.length > 0 && anchorEpochMs === null);
+	let waitingForSync = $derived(
+		mode === 'live' && liveActive && cues.length > 0 && anchorEpochMs === null
+	);
 </script>
 
 <svelte:window onkeydown={handleFullscreenKeydown} onpointerdown={onWindowPointerDown} />
@@ -293,9 +302,21 @@
 				? 'border-white/20 bg-white/10 text-stone-200 hover:border-white/50 hover:text-white'
 				: 'border-stone-200/60 bg-white/60 text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
 		>
-			<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+			<svg
+				width="12"
+				height="12"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
 				<circle cx="12" cy="12" r="3" />
-				<path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+				<path
+					d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"
+				/>
 			</svg>
 			<span>{$t('liveTranscript.appearance')}</span>
 		</button>
@@ -315,7 +336,8 @@
 							onclick={() => subtitlePrefs.setTheme(opt.key)}
 							aria-pressed={$subtitlePrefs.theme === opt.key}
 							title={$t(opt.titleKey)}
-							class="flex h-10 items-center justify-center rounded-md border font-display text-lg transition-all {$subtitlePrefs.theme === opt.key
+							class="flex h-10 items-center justify-center rounded-md border font-display text-lg transition-all {$subtitlePrefs.theme ===
+							opt.key
 								? 'border-missionnaire ring-2 ring-missionnaire/40'
 								: 'border-stone-200 hover:border-stone-400'}"
 							style="background:{opt.swatch};color:{opt.ink}"
@@ -324,7 +346,9 @@
 						</button>
 					{/each}
 				</div>
-				<p class="mb-1.5 mt-3.5 text-[9px] font-bold uppercase tracking-[0.2em] text-stone-400 font-body">
+				<p
+					class="mb-1.5 mt-3.5 text-[9px] font-bold uppercase tracking-[0.2em] text-stone-400 font-body"
+				>
 					{$t('liveTranscript.textSize')}
 				</p>
 				<div class="grid grid-cols-4 gap-2">
@@ -334,7 +358,8 @@
 							onclick={() => subtitlePrefs.setSize(opt.key)}
 							aria-pressed={$subtitlePrefs.size === opt.key}
 							aria-label={$t(opt.titleKey)}
-							class="flex h-10 items-center justify-center rounded-md border font-display leading-none transition-all {$subtitlePrefs.size === opt.key
+							class="flex h-10 items-center justify-center rounded-md border font-display leading-none transition-all {$subtitlePrefs.size ===
+							opt.key
 								? 'border-missionnaire bg-missionnaire/10 text-missionnaire ring-2 ring-missionnaire/30'
 								: 'border-stone-200 text-stone-600 hover:border-stone-400'}"
 							style="font-size:{[13, 16, 19, 23][i]}px"
@@ -356,7 +381,9 @@
 			</p>
 			<div class="flex items-center gap-3">
 				{#if waitingForSync}
-					<span class="inline-flex items-center gap-1.5 text-[10px] font-semibold text-stone-400 font-body">
+					<span
+						class="inline-flex items-center gap-1.5 text-[10px] font-semibold text-stone-400 font-body"
+					>
 						<span class="inline-flex h-1.5 w-1.5 animate-pulse rounded-full bg-stone-300"></span>
 						{$t('liveTranscript.waitingSync')}
 					</span>
@@ -430,36 +457,40 @@
 			<div class="flex items-center gap-2.5 min-w-0">
 				{#if mode === 'live'}
 					<span class="relative inline-flex h-2 w-2 shrink-0">
-						<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"></span>
+						<span
+							class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"
+						></span>
 						<span class="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
 					</span>
 				{/if}
-				<span class="transcript-fs-label truncate text-[11px] font-bold uppercase tracking-[0.25em] font-body text-stone-500">
+				<span
+					class="transcript-fs-label truncate text-[11px] font-bold uppercase tracking-[0.25em] font-body text-stone-500"
+				>
 					{$t('liveTranscript.title')}{mode === 'live' ? ` · ${$t('live.atLive')}` : ''}
 				</span>
 			</div>
 			<div class="flex items-center gap-2">
 				{@render appearanceControl($subtitlePrefs.theme === 'dark')}
-			<button
-				type="button"
-				onclick={closeFullscreen}
-				aria-label={$t('liveTranscript.exitFullscreen')}
-				class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-600 transition-colors hover:bg-stone-200 active:bg-stone-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-400"
-			>
-				<svg
-					width="18"
-					height="18"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					aria-hidden="true"
+				<button
+					type="button"
+					onclick={closeFullscreen}
+					aria-label={$t('liveTranscript.exitFullscreen')}
+					class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-600 transition-colors hover:bg-stone-200 active:bg-stone-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-400"
 				>
-					<path d="M6 6l12 12M6 18L18 6" />
-				</svg>
-			</button>
+					<svg
+						width="18"
+						height="18"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
+					>
+						<path d="M6 6l12 12M6 18L18 6" />
+					</svg>
+				</button>
 			</div>
 		</div>
 		<SyncedLyrics

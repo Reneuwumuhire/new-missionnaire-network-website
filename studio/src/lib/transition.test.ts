@@ -1,0 +1,134 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import {
+	selectScene,
+	setStudioMode,
+	snapshotForProgram,
+	takeToProgram,
+	transitionPlan
+} from './compositor';
+import { mediaHandleKey } from './media.svelte';
+import { programScene, studio } from './state.svelte';
+
+describe('transitionPlan', () => {
+	it('fades between two different scenes', () => {
+		expect(transitionPlan('a', 'b', 'fade', 350)).toEqual({
+			fromSceneId: 'a',
+			durationMs: 350,
+			type: 'fade'
+		});
+	});
+
+	it('carries the transition type so the compositor knows how to draw it', () => {
+		expect(transitionPlan('a', 'b', 'fadeToBlack', 700)?.type).toBe('fadeToBlack');
+	});
+
+	it('cuts when the type is Cut, whatever duration is remembered', () => {
+		// The duration is kept so switching back to Fade restores it; it must
+		// not leak into a Cut.
+		expect(transitionPlan('a', 'b', 'cut', 350)).toBeNull();
+	});
+
+	it('never fades a scene into itself', () => {
+		expect(transitionPlan('a', 'a', 'fade', 350)).toBeNull();
+	});
+
+	it('treats a zero duration as a cut', () => {
+		expect(transitionPlan('a', 'b', 'fade', 0)).toBeNull();
+	});
+});
+
+describe('putting a scene on air', () => {
+	beforeEach(() => {
+		studio.settings.studioMode = false;
+		studio.settings.transitionType = 'fade';
+		studio.settings.transitionMs = 350;
+		studio.activeSceneId = studio.scenes[0].id;
+		studio.programSceneId = studio.scenes[0].id;
+	});
+
+	it('fades from the scene that was on air when clicking a scene', () => {
+		// Regression: selectScene used to move the edit selection first, so the
+		// transition compared the new scene against itself and always cut.
+		const [first, second] = studio.scenes;
+		selectScene(second.id);
+		expect(studio.programSceneId).toBe(second.id);
+		expect(studio.activeSceneId).toBe(second.id);
+
+		studio.activeSceneId = first.id;
+		studio.programSceneId = first.id;
+		const plan = takeToProgram(second.id, 350, first.id);
+		expect(plan).toEqual({ fromSceneId: first.id, durationMs: 350, type: 'fade' });
+	});
+
+	it('reports the cut it made so callers are not guessing', () => {
+		const [first, second] = studio.scenes;
+		studio.settings.transitionType = 'cut';
+		expect(takeToProgram(second.id, 350, first.id)).toBeNull();
+		// The scene still goes on air — a cut is a transition, just an instant one.
+		expect(studio.programSceneId).toBe(second.id);
+	});
+
+	it('quick transitions override the configured type without changing it', () => {
+		// OBS's Quick Transitions: take with Fade to Black once, but the dock
+		// still says Fade afterwards.
+		const [first, second] = studio.scenes;
+		expect(takeToProgram(second.id, 700, first.id, 'fadeToBlack')?.type).toBe('fadeToBlack');
+		expect(studio.settings.transitionType).toBe('fade');
+	});
+
+	it('cuts instantly when a caller asks for zero, e.g. deleting the live scene', () => {
+		const [first, second] = studio.scenes;
+		expect(takeToProgram(second.id, 0, first.id)).toBeNull();
+		expect(studio.programSceneId).toBe(second.id);
+	});
+
+	it('leaves the program scene alone in Studio Mode until it is taken', () => {
+		const [first, second] = studio.scenes;
+		setStudioMode(true);
+		selectScene(second.id);
+		expect(studio.activeSceneId).toBe(second.id);
+		expect(studio.programSceneId).toBe(first.id);
+
+		const plan = takeToProgram(second.id);
+		expect(plan).toEqual({ fromSceneId: first.id, durationMs: 350, type: 'fade' });
+		expect(studio.programSceneId).toBe(second.id);
+	});
+
+	it('stages edits to the current scene until Transition is pressed', () => {
+		const first = studio.scenes[0];
+		setStudioMode(true);
+		const onAirX = programScene().layers[0].rect.x;
+		first.layers[0].rect.x = onAirX + 0.1;
+
+		expect(programScene().layers[0].rect.x).toBe(onAirX);
+		expect(takeToProgram(first.id)).not.toBeNull();
+		expect(programScene().layers[0].rect.x).toBe(onAirX + 0.1);
+	});
+
+	it('pins the exact media generation without changing the Preview layer', () => {
+		const scene = studio.scenes[0];
+		const media = scene.layers.find((layer) =>
+			['camera', 'screen', 'image', 'video'].includes(layer.kind)
+		);
+		if (!media) throw new Error('fixture needs a media layer');
+
+		const snapshot = snapshotForProgram(scene, (id) => `${id}:on-air`);
+		expect(snapshot.layers.find(({ id }) => id === media.id)?.mediaHandleId).toBe(
+			`${media.id}:on-air`
+		);
+		expect(media.mediaHandleId).toBeUndefined();
+	});
+
+	it('keeps a disconnected Program source disconnected until it is taken again', () => {
+		const scene = studio.scenes[0];
+		const media = scene.layers.find((layer) =>
+			['camera', 'screen', 'image', 'video'].includes(layer.kind)
+		);
+		if (!media) throw new Error('fixture needs a media layer');
+
+		const snapshot = snapshotForProgram(scene, () => undefined);
+		const onAirMedia = snapshot.layers.find(({ id }) => id === media.id);
+		expect(onAirMedia?.mediaHandleId).toBeNull();
+		expect(mediaHandleKey(onAirMedia!)).toBeNull();
+	});
+});

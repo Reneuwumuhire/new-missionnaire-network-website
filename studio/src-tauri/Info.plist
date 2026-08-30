@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- macOS shows these strings in the permission prompts. Without them the
+	     process is killed outright the first time it touches the device. -->
+	<key>NSCameraUsageDescription</key>
+	<string>Missionnaire Studio utilise la caméra comme source vidéo du direct.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Missionnaire Studio utilise le micro comme source audio du direct.</string>
+	<key>NSScreenCaptureUsageDescription</key>
+	<string>Missionnaire Studio partage un écran ou une fenêtre dans le direct.</string>
+</dict>
+</plist>

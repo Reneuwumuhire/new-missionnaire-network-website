@@ -65,7 +65,8 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 			subtitle_srt_url: triple.subtitle_srt_url,
 			subtitle_srt_s3_key: triple.subtitle_srt_s3_key,
 			subtitle_anchor_epoch_ms: null,
-			subtitle_offset_ms: 0
+			subtitle_offset_ms: 0,
+			subtitle_paused_position_ms: null
 		});
 		if (gate.scheduled_live_id) {
 			await updateScheduledLive(gate.scheduled_live_id, {
@@ -140,7 +141,8 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 
 	await setBroadcastAdminState({
 		subtitle_anchor_epoch_ms: anchor,
-		subtitle_offset_ms: offset
+		subtitle_offset_ms: offset,
+		subtitle_paused_position_ms: null
 	});
 
 	// Mirror onto the scheduled_lives entry — the replay computes its transcript

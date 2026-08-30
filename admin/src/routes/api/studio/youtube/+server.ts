@@ -9,6 +9,7 @@ import {
 import {
 	completeYouTubeLive,
 	deleteYouTubeLive,
+	disconnectYouTube,
 	scheduleYouTubeLive,
 	transitionYouTubeLive,
 	youtubeConnection,
@@ -24,6 +25,7 @@ import {
 } from '$lib/server/scheduled-live-validation';
 import { buildWatchUrl, pingBroadcastEvent } from '$lib/server/main-site';
 import { generatePresignedUploadUrl, getObjectBytes, getS3Url } from '$lib/server/s3';
+import { RecorderError, recorderStart, recorderStop } from '$lib/server/recorder-client';
 
 async function operator(request: Request): Promise<{ email: string; name: string }> {
 	const code = request.headers.get('authorization')?.replace(/^Bearer\s+/, '') ?? '';
@@ -37,6 +39,16 @@ async function operator(request: Request): Promise<{ email: string; name: string
 		email: doc.user_email,
 		name: typeof doc.user_name === 'string' ? doc.user_name : doc.user_email
 	};
+}
+
+async function sessionChannelId(
+	userEmail: string,
+	saved: string | null | undefined
+): Promise<string> {
+	if (saved) return saved;
+	const channels = await youtubeConnection(userEmail);
+	if (channels.length === 1) return channels[0].id;
+	throw error(409, 'This older session is not linked to one YouTube channel');
 }
 
 export async function POST({ request, getClientAddress }) {
@@ -59,9 +71,57 @@ export async function POST({ request, getClientAddress }) {
 		filename?: unknown;
 		contentType?: unknown;
 		size?: unknown;
+		channelId?: unknown;
 	};
-	if (body.action === 'status')
-		return json({ operator: user, ...(await youtubeConnection(user.email)) });
+	if (body.action === 'status') {
+		const channels = await youtubeConnection(user.email);
+		return json({
+			operator: user,
+			connected: channels.length > 0,
+			channelTitle: channels[0]?.title ?? null,
+			channels
+		});
+	}
+	if (body.action === 'disconnect') {
+		if (typeof body.channelId !== 'string') throw error(400, 'A YouTube channel is required');
+		await disconnectYouTube(user.email, body.channelId);
+		return json({ ok: true });
+	}
+	if (body.action === 'recorder-start') {
+		try {
+			const result = await recorderStart(user.email, user.name || null);
+			await logAudit({
+				user_id: user.email,
+				user_email: user.email,
+				action: 'create',
+				target_collection: 'recordings',
+				target_id: result.id,
+				ip_address: getClientAddress()
+			}).catch((auditError) => console.error('[Studio recorder] start audit failed:', auditError));
+			return json(result);
+		} catch (cause) {
+			if (cause instanceof RecorderError) throw error(cause.status, cause.message);
+			throw cause;
+		}
+	}
+	if (body.action === 'recorder-stop') {
+		try {
+			const result = await recorderStop();
+			await logAudit({
+				user_id: user.email,
+				user_email: user.email,
+				action: 'update',
+				target_collection: 'recordings',
+				target_id: result.id,
+				changes: { status: { old: 'recording', new: 'uploading' } },
+				ip_address: getClientAddress()
+			}).catch((auditError) => console.error('[Studio recorder] stop audit failed:', auditError));
+			return json(result);
+		} catch (cause) {
+			if (cause instanceof RecorderError) throw error(cause.status, cause.message);
+			throw cause;
+		}
+	}
 	if (body.action === 'presign-thumbnail') {
 		const contentType = typeof body.contentType === 'string' ? body.contentType : '';
 		const size = typeof body.size === 'number' ? body.size : 0;
@@ -94,6 +154,7 @@ export async function POST({ request, getClientAddress }) {
 		});
 	}
 	if (body.action === 'schedule') {
+		if (typeof body.channelId !== 'string') throw error(400, 'Choose a YouTube channel');
 		const title = parseTitle(body.title, { required: true }) as string;
 		if (title.length > 100) throw error(400, 'YouTube titles are limited to 100 characters');
 		const description = parseDescription(body.description);
@@ -121,12 +182,9 @@ export async function POST({ request, getClientAddress }) {
 			let youtubeThumbnail;
 			if (thumbnail.thumbnail_s3_key) {
 				youtubeThumbnail = await getObjectBytes(thumbnail.thumbnail_s3_key);
-				validateYouTubeThumbnail(
-					youtubeThumbnail.contentType,
-					youtubeThumbnail.bytes.byteLength
-				);
+				validateYouTubeThumbnail(youtubeThumbnail.contentType, youtubeThumbnail.bytes.byteLength);
 			}
-			youtube = await scheduleYouTubeLive(user.email, {
+			youtube = await scheduleYouTubeLive(user.email, body.channelId, {
 				title,
 				description,
 				scheduledAt: youtubeScheduledAt,
@@ -149,6 +207,8 @@ export async function POST({ request, getClientAddress }) {
 				thumbnail_url: thumbnail.thumbnail_url,
 				thumbnail_s3_key: thumbnail.thumbnail_s3_key,
 				youtube_url: youtube.youtubeUrl,
+				youtube_channel_id: youtube.channelId,
+				youtube_channel_title: youtube.channelTitle,
 				subtitle_srt_url: subtitle.subtitle_srt_url,
 				subtitle_srt_s3_key: subtitle.subtitle_srt_s3_key,
 				subtitle_filename: subtitle.subtitle_filename,
@@ -158,9 +218,11 @@ export async function POST({ request, getClientAddress }) {
 				created_by: user.email
 			});
 		} catch (cause) {
-			await deleteYouTubeLive(user.email, youtube.broadcastId).catch((rollbackError) => {
-				console.error('[studio-youtube] rollback failed', rollbackError);
-			});
+			await deleteYouTubeLive(user.email, youtube.channelId, youtube.broadcastId).catch(
+				(rollbackError) => {
+					console.error('[studio-youtube] rollback failed', rollbackError);
+				}
+			);
 			throw cause;
 		}
 
@@ -194,8 +256,10 @@ export async function POST({ request, getClientAddress }) {
 		if (!session?.youtube_url || session.is_test)
 			throw error(404, 'Scheduled YouTube session not found');
 		try {
+			const channelId = await sessionChannelId(user.email, session.youtube_channel_id);
 			return json({
-				ingest: await youtubeIngest(user.email, session.youtube_url),
+				ingest: await youtubeIngest(user.email, channelId, session.youtube_url),
+				channelId,
 				youtubeUrl: session.youtube_url
 			});
 		} catch (cause) {
@@ -211,7 +275,11 @@ export async function POST({ request, getClientAddress }) {
 		if (!session.youtube_url)
 			throw error(400, 'Add the scheduled YouTube link to this session first');
 		try {
-			return json({ ok: true, ...(await transitionYouTubeLive(user.email, session.youtube_url)) });
+			const channelId = await sessionChannelId(user.email, session.youtube_channel_id);
+			return json({
+				ok: true,
+				...(await transitionYouTubeLive(user.email, channelId, session.youtube_url))
+			});
 		} catch (cause) {
 			throw error(409, cause instanceof Error ? cause.message : 'YouTube could not go live');
 		}
@@ -223,7 +291,11 @@ export async function POST({ request, getClientAddress }) {
 		if (!session.youtube_url)
 			throw error(400, 'Add the scheduled YouTube link to this session first');
 		try {
-			return json({ ok: true, ...(await completeYouTubeLive(user.email, session.youtube_url)) });
+			const channelId = await sessionChannelId(user.email, session.youtube_channel_id);
+			return json({
+				ok: true,
+				...(await completeYouTubeLive(user.email, channelId, session.youtube_url))
+			});
 		} catch (cause) {
 			throw error(409, cause instanceof Error ? cause.message : 'YouTube could not end the live');
 		}

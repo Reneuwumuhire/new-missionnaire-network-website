@@ -1,0 +1,58 @@
+{
+	"$schema": "https://schema.tauri.app/config/2",
+	"productName": "Missionnaire Studio",
+	"version": "0.1.0",
+	"identifier": "network.missionnaire.studio",
+	"build": {
+		"beforeDevCommand": "pnpm dev",
+		"devUrl": "http://localhost:5183",
+		"beforeBuildCommand": "pnpm build",
+		"frontendDist": "../dist"
+	},
+	"app": {
+		"windows": [
+			{
+				"title": "Missionnaire Studio",
+				"width": 1680,
+				"height": 1000,
+				"minWidth": 1100,
+				"minHeight": 700,
+				"resizable": true,
+				"backgroundColor": "#0B0B0D",
+				"titleBarStyle": "Overlay",
+				"hiddenTitle": true
+			}
+		],
+		"macOSPrivateApi": true,
+		"security": {
+			"csp": "default-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: mediastream: ytstream: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' ipc: http://ipc.localhost https: http://localhost:* http://127.0.0.1:*"
+		}
+	},
+	"bundle": {
+		"active": true,
+		"targets": "all",
+		"createUpdaterArtifacts": true,
+		"icon": [
+			"icons/32x32.png",
+			"icons/128x128.png",
+			"icons/128x128@2x.png",
+			"icons/icon.icns",
+			"icons/icon.ico"
+		],
+		"macOS": {
+			"minimumSystemVersion": "12.0",
+			"entitlements": "entitlements.plist"
+		}
+	},
+	"plugins": {
+		"updater": {
+			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEYzNEZGQTU0RDRCNkJFNjkKUldScHZyYlVWUHBQODlMaldzSks2cFNPRERxUDJvTnRKa3A5RjRSYVRwN1IzOUtXd3NyNGtJU0QK",
+			"endpoints": [
+				"https://github.com/Reneuwumuhire/new-missionnaire-network-website/releases/latest/download/latest.json"
+			],
+			"windows": {
+				"installMode": "passive"
+			}
+		}
+	}
+}
