@@ -3,8 +3,12 @@ name: Release Missionnaire Studio
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     tags:
       - 'studio-v*'
+    paths:
+      - 'studio/**'
 
 permissions:
   contents: write
@@ -32,8 +36,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - uses: actions/setup-node@v4
         with:
@@ -44,6 +46,14 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.targets }}
+
+      - name: Set automatic release version
+        if: github.ref_type == 'branch'
+        working-directory: studio
+        shell: bash
+        env:
+          RELEASE_PATCH: ${{ github.run_number }}
+        run: node -e 'const fs = require("node:fs"); for (const file of ["package.json", "src-tauri/tauri.conf.json"]) { const data = JSON.parse(fs.readFileSync(file)); const [major, minor] = data.version.split("."); data.version = [major, minor, process.env.RELEASE_PATCH].join("."); fs.writeFileSync(file, JSON.stringify(data, null, "\t") + "\n"); }'
 
       - name: Install dependencies
         working-directory: studio
