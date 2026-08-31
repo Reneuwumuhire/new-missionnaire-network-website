@@ -374,11 +374,13 @@ const fr: Record<keyof typeof en, string> = {
 	'update.checking': 'Recherche de mises à jour…',
 	'update.current': 'Vous utilisez la dernière version.',
 	'update.available': 'Missionnaire Studio {version} est disponible.',
+	'update.action': 'Mettre à jour',
 	'update.installRestart': 'Installer et redémarrer',
 	'update.downloading': 'Téléchargement de la mise à jour… {percent} %',
 	'update.installing': 'Installation de la mise à jour…',
 	'update.restarting': 'Redémarrage de Studio…',
 	'update.blocked': 'Terminez la diffusion ou l’enregistrement avant la mise à jour.',
+	'update.blockedShort': 'Terminez le direct',
 	'update.error': 'Échec de la recherche de mise à jour : {message}',
 
 	// ── Aide ────────────────────────────────────────────────────
