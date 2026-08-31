@@ -5,6 +5,7 @@
 	import Dock from './Dock.svelte';
 	import Icon from './Icon.svelte';
 	import { t } from '../lib/i18n.svelte';
+	import { streamHealthIssue } from '../lib/stream-health';
 	import { destinationUrl, requiresYouTubeGoLive, studio } from '../lib/state.svelte';
 	import { connectYouTube, liveSession, sessionYouTubeChannelId } from '../lib/live-session.svelte';
 	import {
@@ -68,11 +69,13 @@
 	);
 
 	const stats = $derived(broadcast.stats);
-	const congested = $derived(
-		Boolean(
-			stats && (stats.backpressure_events > 0 || stats.speed < 0.95 || stats.dropped_frames > 0)
-		)
-	);
+	const healthIssue = $derived(streamHealthIssue(stats, broadcast.captureState));
+	const healthMessage = $derived.by(() => {
+		if (healthIssue === 'capture') return t('health.captureRecovering');
+		if (healthIssue === 'pipeline') return t('health.congested');
+		if (healthIssue === 'encoder') return t('health.encoderSlow');
+		return '';
+	});
 	let copiedTestLink = $state(false);
 
 	async function copyTestLink() {
@@ -282,8 +285,8 @@
 				<span class="text-[10px] font-semibold uppercase tracking-wider text-fg/35">
 					{t('health.title')}
 				</span>
-				<span class="text-[10px] {congested ? 'text-amber-400' : 'text-emerald-400'}">
-					{congested ? '⚠' : t('health.good')}
+				<span class="text-[10px] {healthIssue ? 'text-amber-400' : 'text-emerald-400'}">
+					{healthIssue ? '⚠' : t('health.good')}
 				</span>
 			</div>
 
@@ -323,12 +326,18 @@
 						{stats.speed.toFixed(2)}×
 					</dd>
 				</div>
+				{#if broadcast.recoveries > 0}
+					<div class="flex justify-between gap-2">
+						<dt class="truncate text-fg/40">{t('health.recoveries')}</dt>
+						<dd class="shrink-0 text-fg/70">{broadcast.recoveries}</dd>
+					</div>
+				{/if}
 			</dl>
 
-			{#if congested}
+			{#if healthIssue}
 				<p class="mt-1.5 flex items-start gap-1 text-[10px] leading-snug text-amber-400/90">
 					<Icon name="more" size={10} class="mt-px" />
-					{t('health.congested')}
+					{healthMessage}
 				</p>
 			{/if}
 		</div>

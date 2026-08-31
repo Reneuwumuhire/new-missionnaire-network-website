@@ -23,6 +23,7 @@ const MENU_SYSTEM_INFO: &str = "studio-system-information";
 struct StartedStream {
 	command: Vec<String>,
 	local_recording_path: Option<String>,
+	run_id: u64,
 }
 
 fn allowed_web_url(url: &str) -> bool {
@@ -79,8 +80,8 @@ fn start_stream(
 	config: StreamConfig,
 	group: String,
 ) -> Result<StartedStream, String> {
-	let (command, local_recording_path) = encoder.start(&app, config, &group)?;
-	Ok(StartedStream { command, local_recording_path })
+	let (command, local_recording_path, run_id) = encoder.start(&app, config, &group)?;
+	Ok(StartedStream { command, local_recording_path, run_id })
 }
 
 fn studio_post(body: String, authorization: String, base_url: String, path: &str) -> Result<String, String> {
@@ -167,6 +168,11 @@ fn push_chunk(encoder: State<'_, Encoder>, request: tauri::ipc::Request<'_>) -> 
 #[tauri::command]
 fn stop_stream(encoder: State<'_, Encoder>, group: Option<String>) -> Result<(), String> {
 	encoder.stop_group(group.as_deref())
+}
+
+#[tauri::command]
+fn abort_stream(encoder: State<'_, Encoder>, group: Option<String>) -> Result<(), String> {
+	encoder.abort_group(group.as_deref())
 }
 
 #[tauri::command]
@@ -541,6 +547,7 @@ pub fn run() {
 			focus_main_window,
 			push_chunk,
 			stop_stream,
+			abort_stream,
 			stream_running,
 			selftest_target,
 			open_url,

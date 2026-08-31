@@ -168,11 +168,14 @@ const fr: Record<keyof typeof en, string> = {
 	'health.title': 'État de la diffusion',
 	'health.bitrate': 'Débit',
 	'health.dataOut': 'Données envoyées',
-	'health.droppedNetwork': 'Images perdues (réseau)',
+	'health.droppedNetwork': 'Images perdues (encodeur)',
 	'health.encodingLag': 'Attentes de l’encodeur',
 	'health.renderingLag': 'Images manquées (rendu)',
 	'health.speed': 'Vitesse d’encodage',
-	'health.congested': 'L’envoi ne suit pas — baissez le débit vidéo',
+	'health.congested': 'La chaîne de diffusion est bloquée — vérifiez la connexion et l’encodeur',
+	'health.encoderSlow': 'L’encodeur ne suit pas — baissez la résolution ou la fréquence d’images',
+	'health.captureRecovering': 'La capture Studio s’est figée — reconnexion automatique',
+	'health.recoveries': 'Récupérations automatiques',
 	'health.renderSlow': 'Le compositeur est en retard — baissez la résolution ou les ips',
 	'health.good': 'Bonne',
 	'target.connecting': 'Connexion…',
@@ -200,6 +203,7 @@ const fr: Record<keyof typeof en, string> = {
 	'status.connecting': 'Connexion…',
 	'status.stable': 'Stable',
 	'status.behind': 'Encodage en retard',
+	'status.recoveringCapture': 'Récupération de la capture…',
 	'status.live': 'DIRECT',
 	'status.preview': 'TEST',
 	'status.fps': '{actual} / {target} ips',
@@ -480,6 +484,8 @@ const fr: Record<keyof typeof en, string> = {
 	'error.encoder': 'Encodeur : {message}',
 	'error.stoppedCleanly': 'La diffusion s’est arrêtée.',
 	'error.ffmpegExited': 'ffmpeg s’est arrêté (code {code}) : {log}',
+	'error.captureFailed':
+		'La capture Studio s’est arrêtée plusieurs fois. Le direct public reste ouvert ; cliquez sur Démarrer le signal test pour vous reconnecter.',
 
 	// ── Splitters ───────────────────────────────────────────────
 	'splitter.docks': 'Hauteur des panneaux',

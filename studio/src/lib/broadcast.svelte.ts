@@ -20,6 +20,7 @@ import {
 } from './live-session.svelte';
 import { destinationUrl, requiresYouTubeGoLive, studio } from './state.svelte';
 import { sampleOutputClock, startStreamClock, stopStreamClock } from './stream-clock';
+import { captureHasStalled, type CaptureState } from './stream-health';
 
 const MIME_PREFERENCE = ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/webm'];
 
@@ -56,6 +57,8 @@ export type Phase = 'idle' | 'connecting' | 'live';
 
 export const broadcast = $state({
 	phase: 'idle' as Phase,
+	captureState: 'healthy' as CaptureState,
+	recoveries: 0,
 	/** True once the held destinations have their own encoder running. */
 	heldLive: false,
 	starting: false,
@@ -74,6 +77,7 @@ export const broadcast = $state({
 export const isStreaming = () => broadcast.phase !== 'idle';
 
 let recorder: MediaRecorder | null = null;
+let captureVideoTrack: MediaStreamTrack | null = null;
 let unlisteners: UnlistenFn[] = [];
 // Chunks must reach ffmpeg in the order MediaRecorder produced them: a WebM
 // cluster delivered out of order corrupts the stream. Tauri dispatches commands
@@ -81,6 +85,17 @@ let unlisteners: UnlistenFn[] = [];
 let chain: Promise<unknown> = Promise.resolve();
 let chunks = 0;
 let hasAudio = false;
+let runtime: Runtime | null = null;
+let watchdog: ReturnType<typeof setInterval> | null = null;
+let lastChunkAt = 0;
+let recovering = false;
+let stopping = false;
+let lifecycle = 0;
+let recoveryTimes: number[] = [];
+
+const CAPTURE_STALL_MS = 4_000;
+const RECOVERY_WINDOW_MS = 60_000;
+const MAX_RECOVERIES_PER_WINDOW = 3;
 
 /** Diagnostics only: how many media chunks have been handed to ffmpeg. */
 export const chunkCount = () => chunks;
@@ -99,6 +114,203 @@ export interface Ingest {
 	url: string;
 }
 
+interface StreamConfig {
+	container: 'webm' | 'mp4';
+	targets: Ingest[];
+	fps: number;
+	video_bitrate_kbps: number;
+	audio_bitrate_kbps: number;
+	encoder: string;
+	has_audio: boolean;
+	record_local: boolean;
+}
+
+interface StartedStream {
+	command: string[];
+	localRecordingPath: string | null;
+	runId: number;
+}
+
+interface Runtime {
+	canvas: HTMLCanvasElement;
+	audioTrack?: MediaStreamTrack;
+	mime: string;
+	main: StreamConfig;
+	held?: StreamConfig;
+	runIds: Partial<Record<StreamGroup, number>>;
+}
+
+function statuses(config: StreamConfig, group: StreamGroup): TargetStatus[] {
+	return config.targets.map((target) => ({
+		name: target.name,
+		host: hostOf(target.url),
+		state: 'connecting',
+		reason: null,
+		group,
+		youtube: /\byoutube\b/i.test(target.url)
+	}));
+}
+
+async function startEncoder(group: StreamGroup, config: StreamConfig): Promise<StartedStream> {
+	return invoke<StartedStream>('start_stream', { group, config });
+}
+
+function stopWatchdog() {
+	if (watchdog) clearInterval(watchdog);
+	watchdog = null;
+}
+
+function startWatchdog() {
+	stopWatchdog();
+	watchdog = setInterval(() => {
+		if (!runtime || recovering || stopping || broadcast.phase === 'idle') return;
+		const state = recorder?.state ?? 'missing';
+		if (captureHasStalled(state, lastChunkAt, Date.now(), CAPTURE_STALL_MS)) {
+			void recoverCapture();
+		}
+	}, 1_000);
+}
+
+function startRecorder(active: Runtime) {
+	const stream = active.canvas.captureStream(active.main.fps);
+	captureVideoTrack = stream.getVideoTracks()[0] ?? null;
+	hasAudio = Boolean(active.audioTrack);
+	if (active.audioTrack) stream.addTrack(active.audioTrack);
+
+	const current = new MediaRecorder(stream, {
+		mimeType: active.mime,
+		videoBitsPerSecond: active.main.video_bitrate_kbps * 1000,
+		audioBitsPerSecond: active.main.audio_bitrate_kbps * 1000
+	});
+	recorder = current;
+	lastChunkAt = Date.now();
+	current.ondataavailable = (event) => {
+		if (event.data.size === 0 || recorder !== current) return;
+		lastChunkAt = Date.now();
+		if (!recovering) broadcast.captureState = 'healthy';
+		chunks++;
+		chain = chain
+			.then(() => event.data.arrayBuffer())
+			.then((buffer) => invoke('push_chunk', new Uint8Array(buffer)))
+			.catch((err) => {
+				broadcast.error = String(err);
+			});
+	};
+	current.onerror = () => {
+		if (recorder === current) void recoverCapture();
+	};
+	// 250 ms slices keep latency low without making IPC itself significant.
+	startStreamClock();
+	current.start(250);
+	startWatchdog();
+}
+
+async function stopRecorder() {
+	stopWatchdog();
+	const current = recorder;
+	if (current && current.state !== 'inactive') {
+		await new Promise<void>((resolve) => {
+			let done = false;
+			const finish = () => {
+				if (done) return;
+				done = true;
+				resolve();
+			};
+			current.addEventListener('stop', finish, { once: true });
+			try {
+				current.stop();
+			} catch {
+				finish();
+			}
+			setTimeout(finish, 1_000);
+		});
+	}
+	if (recorder === current) recorder = null;
+	captureVideoTrack?.stop();
+	captureVideoTrack = null;
+	stopStreamClock();
+}
+
+async function failCapture() {
+	stopWatchdog();
+	await stopRecorder();
+	await chain.catch(() => {});
+	if (runtime) runtime.runIds = {};
+	await invoke('abort_stream', { group: null }).catch(() => {});
+	broadcast.phase = 'idle';
+	broadcast.heldLive = false;
+	broadcast.captureState = 'failed';
+	broadcast.stats = null;
+	broadcast.startedAt = null;
+	broadcast.targets = broadcast.targets.map((target) => ({ ...target, state: 'failed' }));
+	broadcast.localRecordingPath = null;
+	recording.localPath = null;
+	if (!recording.cloud) recording.startedAt = null;
+	broadcast.error = t('error.captureFailed');
+	runtime = null;
+	hasAudio = false;
+	recovering = false;
+	await detachListeners();
+}
+
+async function recoverCapture() {
+	const active = runtime;
+	const generation = lifecycle;
+	if (!active || recovering || stopping || broadcast.phase === 'idle') return;
+
+	const now = Date.now();
+	recoveryTimes = recoveryTimes.filter((at) => now - at < RECOVERY_WINDOW_MS);
+	if (recoveryTimes.length >= MAX_RECOVERIES_PER_WINDOW) {
+		await failCapture();
+		return;
+	}
+	recoveryTimes.push(now);
+	recovering = true;
+	broadcast.captureState = 'recovering';
+	broadcast.recoveries++;
+	broadcast.log = [...broadcast.log.slice(-199), 'Studio capture stalled; reconnecting encoder.'];
+	void invoke('report', { line: 'capture stalled; reconnecting encoder' });
+
+	try {
+		await stopRecorder();
+		await chain.catch(() => {});
+		if (generation !== lifecycle || stopping) return;
+		active.runIds = {};
+		await invoke('abort_stream', { group: null });
+		if (generation !== lifecycle || stopping) return;
+
+		const main = await startEncoder('main', active.main);
+		if (generation !== lifecycle || stopping) {
+			await invoke('abort_stream', { group: null }).catch(() => {});
+			return;
+		}
+		active.runIds.main = main.runId;
+		broadcast.command = main.command;
+		broadcast.localRecordingPath = main.localRecordingPath;
+		recording.localPath = main.localRecordingPath;
+		if (active.held) {
+			const held = await startEncoder('held', active.held);
+			if (generation !== lifecycle || stopping) {
+				await invoke('abort_stream', { group: null }).catch(() => {});
+				return;
+			}
+			active.runIds.held = held.runId;
+		}
+		broadcast.targets = [
+			...statuses(active.main, 'main'),
+			...(active.held ? statuses(active.held, 'held') : [])
+		];
+		broadcast.stats = null;
+		broadcast.phase = 'connecting';
+		startRecorder(active);
+	} catch (error) {
+		broadcast.log = [...broadcast.log.slice(-199), `Capture recovery failed: ${String(error)}`];
+		await failCapture();
+	} finally {
+		recovering = false;
+	}
+}
+
 /** `targets` overrides the enabled destinations — only the launch self-test
  *  passes it; normal use takes what the operator ticked. */
 export async function startBroadcast(
@@ -107,8 +319,13 @@ export async function startBroadcast(
 	targets?: Ingest[]
 ) {
 	if (isStreaming() || broadcast.starting) return;
+	const generation = ++lifecycle;
 	broadcast.error = null;
 	broadcast.starting = true;
+	broadcast.captureState = 'healthy';
+	broadcast.recoveries = 0;
+	recoveryTimes = [];
+	chain = Promise.resolve();
 	try {
 		const enabled =
 			targets ??
@@ -121,71 +338,42 @@ export async function startBroadcast(
 		if (!mime) throw new Error(t('error.noRecorder'));
 
 		const { settings } = studio;
-		const result = await invoke<{ command: string[]; localRecordingPath: string | null }>(
-			'start_stream',
-			{
-				group: 'main',
-				config: {
-					container: containerOf(mime),
-					targets: enabled,
-					fps: settings.fps,
-					video_bitrate_kbps: settings.videoBitrateKbps,
-					audio_bitrate_kbps: settings.audioBitrateKbps,
-					encoder: settings.encoder,
-					has_audio: Boolean(audioTrack),
-					record_local: recordsLocal()
-				}
-			}
-		);
+		const config: StreamConfig = {
+			container: containerOf(mime),
+			targets: enabled,
+			fps: settings.fps,
+			video_bitrate_kbps: settings.videoBitrateKbps,
+			audio_bitrate_kbps: settings.audioBitrateKbps,
+			encoder: settings.encoder,
+			has_audio: Boolean(audioTrack),
+			record_local: recordsLocal()
+		};
+		runtime = { canvas, audioTrack, mime, main: config, runIds: {} };
+		await attachListeners();
+		if (generation !== lifecycle || stopping) return;
+		const result = await startEncoder('main', config);
+		if (generation !== lifecycle || stopping) {
+			await invoke('abort_stream', { group: null }).catch(() => {});
+			return;
+		}
+		runtime.runIds.main = result.runId;
 		broadcast.command = result.command;
 		broadcast.localRecordingPath = result.localRecordingPath;
 		recording.localPath = result.localRecordingPath;
-		broadcast.targets = enabled.map((target) => ({
-			name: target.name,
-			host: hostOf(target.url),
-			state: 'connecting' as TargetState,
-			reason: null,
-			group: 'main' as StreamGroup,
-			youtube: /\byoutube\b/i.test(target.url)
-		}));
-
-		const stream = canvas.captureStream(settings.fps);
-		hasAudio = Boolean(audioTrack);
-		if (audioTrack) stream.addTrack(audioTrack);
-
-		recorder = new MediaRecorder(stream, {
-			mimeType: mime,
-			videoBitsPerSecond: settings.videoBitrateKbps * 1000,
-			audioBitsPerSecond: settings.audioBitrateKbps * 1000
-		});
+		broadcast.targets = statuses(config, 'main');
 		chunks = 0;
-		recorder.ondataavailable = (event) => {
-			if (event.data.size === 0) return;
-			chunks++;
-			chain = chain
-				.then(() => event.data.arrayBuffer())
-				.then((buffer) => invoke('push_chunk', new Uint8Array(buffer)))
-				.catch((err) => {
-					broadcast.error = String(err);
-				});
-		};
-		recorder.onerror = (event) => {
-			broadcast.error = t('error.encoder', { message: String((event as ErrorEvent).error ?? '?') });
-			void stopBroadcast();
-		};
-		// 250 ms slices: small enough that a viewer's latency is dominated by the
-		// CDN rather than by us, large enough that IPC overhead stays invisible.
-		startStreamClock();
-		recorder.start(250);
-
 		// Connecting, not live: `live` is set by the first stats frame, which is
 		// ffmpeg telling us it has actually pushed something to the servers.
 		broadcast.phase = 'connecting';
 		broadcast.startedAt = null;
-		await attachListeners();
+		startRecorder(runtime);
 	} catch (err) {
 		broadcast.error = err instanceof Error ? err.message : String(err);
-		await invoke('stop_stream').catch(() => {});
+		await stopRecorder();
+		await invoke('abort_stream', { group: null }).catch(() => {});
+		broadcast.phase = 'idle';
+		runtime = null;
+		await detachListeners();
 	} finally {
 		broadcast.starting = false;
 	}
@@ -194,15 +382,15 @@ export async function startBroadcast(
 async function attachListeners() {
 	await detachListeners();
 	unlisteners = [
-		await listen<{ group: StreamGroup; stats: Stats }>('stream://stats', (event) => {
-			if (event.payload.group !== 'main') return;
+		await listen<{ group: StreamGroup; runId: number; stats: Stats }>('stream://stats', (event) => {
+			if (event.payload.group !== 'main' || runtime?.runIds.main !== event.payload.runId) return;
 			broadcast.stats = event.payload.stats;
 			sampleOutputClock(event.payload.stats.out_time_ms);
 			// Output is flowing — every target that has not reported a failure is
 			// connected, and this is the instant we count as on air.
 			if (broadcast.phase === 'connecting' && event.payload.stats.frames > 0) {
 				broadcast.phase = 'live';
-				broadcast.startedAt = Date.now();
+				broadcast.startedAt ??= Date.now();
 			}
 			if (broadcast.phase === 'live') {
 				for (const target of broadcast.targets) {
@@ -212,25 +400,34 @@ async function attachListeners() {
 				}
 			}
 		}),
-		await listen<{ group: StreamGroup; index: number; state: TargetState; reason: string }>(
-			'stream://target',
-			(event) => {
-				// Indices are per encoder, so the group picks the list first.
-				const target = broadcast.targets.filter((t) => t.group === event.payload.group)[
-					event.payload.index
-				];
-				if (!target) return;
-				target.state = event.payload.state;
-				target.reason = event.payload.reason;
-			}
-		),
+		await listen<{
+			group: StreamGroup;
+			runId: number;
+			index: number;
+			state: TargetState;
+			reason: string;
+		}>('stream://target', (event) => {
+			if (runtime?.runIds[event.payload.group] !== event.payload.runId) return;
+			// Indices are per encoder, so the group picks the list first.
+			const target = broadcast.targets.filter((t) => t.group === event.payload.group)[
+				event.payload.index
+			];
+			if (!target) return;
+			target.state = event.payload.state;
+			target.reason = event.payload.reason;
+		}),
 		await listen<string>('stream://log', (event) => {
 			broadcast.log = [...broadcast.log.slice(-199), event.payload];
 		}),
-		await listen<{ group: StreamGroup; code: number; log: string[] }>(
+		await listen<{ group: StreamGroup; runId: number; code: number; log: string[] }>(
 			'stream://exited',
 			(event) => {
-				if (!isStreaming()) return;
+				if (
+					!isStreaming() ||
+					stopping ||
+					runtime?.runIds[event.payload.group] !== event.payload.runId
+				)
+					return;
 				if (event.payload.group === 'held') {
 					// Losing the held encoder must not take the main stream down.
 					broadcast.heldLive = false;
@@ -239,19 +436,9 @@ async function attachListeners() {
 					}
 					return;
 				}
-				// ffmpeg died on its own — never leave the UI showing "on air".
-				broadcast.phase = 'idle';
-				broadcast.targets = broadcast.targets.map((target) => ({ ...target, state: 'failed' }));
-				broadcast.error =
-					event.payload.code === 0
-						? t('error.stoppedCleanly')
-						: t('error.ffmpegExited', {
-								code: event.payload.code,
-								log: event.payload.log.slice(-3).join(' | ')
-							});
-				stopRecorder();
-				void stopCloudRecording();
-				void endSelectedSession();
+				// An unexpected encoder exit is recoverable. Do not end the public
+				// service: YouTube and Missionnaire both accept a reconnect.
+				void recoverCapture();
 			}
 		)
 	];
@@ -262,37 +449,38 @@ async function detachListeners() {
 	unlisteners = [];
 }
 
-function stopRecorder() {
-	try {
-		if (recorder && recorder.state !== 'inactive') recorder.stop();
-	} catch {
-		// Already gone.
-	}
-	recorder = null;
-	hasAudio = false;
-	stopStreamClock();
-}
-
 export async function stopBroadcast() {
-	// Complete the public session and YouTube broadcast while the encoder still
-	// has a clean signal; both remote requests are started together.
-	await endSelectedSession();
-	stopRecorder();
-	// Let the queued chunks land before closing ffmpeg's stdin, so the last
-	// second of the service is not truncated.
-	await chain.catch(() => {});
-	await invoke('stop_stream', { group: null }).catch((err) => {
-		broadcast.error = String(err);
-	});
-	broadcast.phase = 'idle';
-	broadcast.heldLive = false;
-	broadcast.startedAt = null;
-	broadcast.stats = null;
-	broadcast.targets = [];
-	broadcast.localRecordingPath = null;
-	clearRecording();
-	await detachListeners();
-	await stopCloudRecording();
+	++lifecycle;
+	stopping = true;
+	stopWatchdog();
+	try {
+		// Complete the public session and YouTube broadcast while the encoder still
+		// has a clean signal; both remote requests are started together.
+		await endSelectedSession();
+		await stopRecorder();
+		// Let the queued chunks land before closing ffmpeg's stdin, so the last
+		// second of the service is not truncated.
+		await chain.catch(() => {});
+		await invoke('stop_stream', { group: null }).catch((err) => {
+			broadcast.error = String(err);
+		});
+		broadcast.phase = 'idle';
+		broadcast.heldLive = false;
+		broadcast.captureState = 'healthy';
+		broadcast.recoveries = 0;
+		broadcast.startedAt = null;
+		broadcast.stats = null;
+		broadcast.targets = [];
+		broadcast.localRecordingPath = null;
+		runtime = null;
+		hasAudio = false;
+		recoveryTimes = [];
+		clearRecording();
+		await detachListeners();
+		await stopCloudRecording();
+	} finally {
+		stopping = false;
+	}
 }
 
 /** Host of an ingest URL, for showing which server a destination is on
@@ -320,7 +508,7 @@ export function heldDestinations() {
  *  added to a running ffmpeg, and restarting it to add one would drop the
  *  congregation's stream to bring up a public one. */
 export async function goLiveHeld(): Promise<void> {
-	if (broadcast.phase !== 'live' || broadcast.heldLive) return;
+	if (broadcast.phase !== 'live' || broadcast.heldLive || !runtime) return;
 	const held = heldDestinations();
 	if (held.length === 0) return;
 	const mime = pickMimeType();
@@ -328,30 +516,20 @@ export async function goLiveHeld(): Promise<void> {
 
 	const { settings } = studio;
 	try {
-		await invoke<string[]>('start_stream', {
-			group: 'held',
-			config: {
-				container: containerOf(mime),
-				targets: held.map((d) => ({ name: d.name, url: destinationUrl(d) })),
-				fps: settings.fps,
-				video_bitrate_kbps: settings.videoBitrateKbps,
-				audio_bitrate_kbps: settings.audioBitrateKbps,
-				encoder: settings.encoder,
-				has_audio: hasAudio,
-				record_local: false
-			}
-		});
-		broadcast.targets = [
-			...broadcast.targets,
-			...held.map((d) => ({
-				name: d.name,
-				host: hostOf(destinationUrl(d)),
-				state: 'connecting' as TargetState,
-				reason: null,
-				group: 'held' as StreamGroup,
-				youtube: /\byoutube\b/i.test(d.url)
-			}))
-		];
+		const config: StreamConfig = {
+			container: containerOf(mime),
+			targets: held.map((d) => ({ name: d.name, url: destinationUrl(d) })),
+			fps: settings.fps,
+			video_bitrate_kbps: settings.videoBitrateKbps,
+			audio_bitrate_kbps: settings.audioBitrateKbps,
+			encoder: settings.encoder,
+			has_audio: hasAudio,
+			record_local: false
+		};
+		const result = await startEncoder('held', config);
+		runtime.held = config;
+		runtime.runIds.held = result.runId;
+		broadcast.targets = [...broadcast.targets, ...statuses(config, 'held')];
 		broadcast.heldLive = true;
 	} catch (err) {
 		broadcast.error = err instanceof Error ? err.message : String(err);
@@ -388,6 +566,10 @@ export async function goLivePublic(): Promise<void> {
 
 /** Disconnect the held destinations, leaving the main stream running. */
 export async function stopHeld(): Promise<void> {
+	if (runtime) {
+		delete runtime.held;
+		delete runtime.runIds.held;
+	}
 	await invoke('stop_stream', { group: 'held' }).catch(() => {});
 	broadcast.heldLive = false;
 	broadcast.targets = broadcast.targets.filter((target) => target.group !== 'held');
