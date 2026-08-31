@@ -26,14 +26,13 @@ import {
 } from '$lib/server/scheduled-live-validation';
 import { buildWatchUrl, pingBroadcastEvent } from '$lib/server/main-site';
 import { generatePresignedUploadUrl, getObjectBytes, getS3Url } from '$lib/server/s3';
+import { RecorderError, recorderStart, recorderStop } from '$lib/server/recorder-client';
 import {
-	RecorderError,
-	recorderIngest,
-	recorderStart,
-	recorderStop
-} from '$lib/server/recorder-client';
+	missionnaireIngestForAuthorization,
+	revokeMissionnaireIngest
+} from '$lib/server/studio-ingest';
 
-async function operator(request: Request): Promise<{ email: string; name: string }> {
+async function operator(request: Request) {
 	const code = request.headers.get('authorization')?.replace(/^Bearer\s+/, '') ?? '';
 	const doc = await (await getDb()).collection('studio_authorizations').findOne({
 		code,
@@ -46,9 +45,12 @@ async function operator(request: Request): Promise<{ email: string; name: string
 		is_active: { $ne: false }
 	});
 	if (!admin || !getPermissions(admin as unknown as AdminUser).can_manage_recordings) {
+		await revokeMissionnaireIngest(code);
 		throw error(403, 'Broadcasting permission required');
 	}
 	return {
+		code,
+		authorization: doc,
 		email: doc.user_email,
 		name: typeof doc.user_name === 'string' ? doc.user_name : doc.user_email
 	};
@@ -65,7 +67,6 @@ async function sessionChannelId(
 }
 
 export async function POST({ request, getClientAddress }) {
-	const user = await operator(request);
 	const body = (await request.json().catch(() => ({}))) as {
 		action?: string;
 		sessionId?: string;
@@ -86,10 +87,16 @@ export async function POST({ request, getClientAddress }) {
 		size?: unknown;
 		channelId?: unknown;
 	};
+	if (body.action === 'logout') {
+		const code = request.headers.get('authorization')?.replace(/^Bearer\s+/, '') ?? '';
+		await revokeMissionnaireIngest(code);
+		return json({ ok: true });
+	}
+	const user = await operator(request);
 	if (body.action === 'status') {
 		const [channels, missionnaire] = await Promise.all([
 			youtubeConnection(user.email),
-			recorderIngest()
+			missionnaireIngestForAuthorization(user.code, user.authorization)
 				.then((ingest) => ({ ingest, error: null }))
 				.catch((cause) => ({
 					ingest: null,
@@ -97,7 +104,7 @@ export async function POST({ request, getClientAddress }) {
 				}))
 		]);
 		return json({
-			operator: user,
+			operator: { email: user.email, name: user.name },
 			connected: channels.length > 0,
 			channelTitle: channels[0]?.title ?? null,
 			channels,

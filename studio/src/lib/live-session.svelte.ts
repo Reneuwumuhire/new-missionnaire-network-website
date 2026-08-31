@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { followedMediaElement, lyrics } from './lyrics.svelte';
+import { t } from './i18n.svelte';
 import { id, persist, studio } from './state.svelte';
 import { outputAlignedPositionMs, sampleServerClock, serverEpochMs } from './stream-clock';
 
@@ -506,8 +507,17 @@ export async function refreshSessions() {
 	}
 }
 
-export async function logoutStudio() {
-	await post({ action: 'logout' }).catch(() => {});
+export async function logoutStudio(): Promise<boolean> {
+	const attempts = await Promise.allSettled([
+		adminPost({ action: 'logout' }),
+		post({ action: 'logout' })
+	]);
+	// Both endpoints revoke the same database authorization. Either success is
+	// enough; requiring both would strand Studio when only one service is down.
+	if (attempts.every((attempt) => attempt.status === 'rejected')) {
+		liveSession.error = t('stream.disconnectStudioError');
+		return false;
+	}
 	liveSession.pairingCode = null;
 	liveSession.operatorName = null;
 	liveSession.selectedId = null;
@@ -525,6 +535,7 @@ export async function logoutStudio() {
 	liveSession.missionnaireError = null;
 	disableManagedMissionnaire();
 	attachedSessionId = null;
+	return true;
 }
 
 export async function startSelectedSession(): Promise<boolean> {

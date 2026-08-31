@@ -741,6 +741,18 @@ export default {
 	'settings.memberSince': 'Membre depuis',
 	'settings.lastLogin': 'Dernière connexion',
 	'settings.saveProfile': 'Enregistrer le profil',
+	'settings.connectedStudios': 'Studios connectés',
+	'settings.connectedStudiosHint':
+		'Consultez les installations Studio autorisées à diffuser avec votre compte.',
+	'settings.studioConnected': 'Connecté',
+	'settings.studioLastUsed': 'Dernière utilisation',
+	'settings.studioExpires': "Expiration de l'autorisation",
+	'settings.studioRevoke': 'Déconnecter',
+	'settings.studioRevokeConfirm': 'Déconnecter ce Studio ? Il ne sera plus autorisé à diffuser.',
+	'settings.studioNone': "Aucune installation Studio n'est connectée à votre compte.",
+	'settings.studioRevoked': 'Studio déconnecté avec succès.',
+	'settings.studioRevokeError':
+		"Ce Studio n'a pas pu être déconnecté. Actualisez la page et réessayez.",
 	'settings.changePassword': 'Changer le mot de passe',
 	'settings.passwordUpdated': 'Mot de passe mis à jour avec succès',
 	'settings.currentPassword': 'Mot de passe actuel',
@@ -838,7 +850,7 @@ export default {
 		"Par défaut : URL de la chaîne /live. Remplacez par l'URL de la vidéo précise une fois publiée.",
 	'recordings.defaults.title': 'Informations par défaut',
 	'recordings.defaults.intro':
-		"Utilisées quand vous démarrez un direct immédiat (non programmé). Un direct programmé garde ses propres informations.",
+		'Utilisées quand vous démarrez un direct immédiat (non programmé). Un direct programmé garde ses propres informations.',
 	'recordings.defaults.liveHint':
 		'Un direct est en cours — ces valeurs serviront au prochain direct immédiat.',
 	'recordings.defaults.titleLabel': 'Titre',
@@ -846,7 +858,8 @@ export default {
 	'recordings.defaults.noneThumb': 'Aucune vignette',
 	'recordings.defaults.youtubeDefault': '{url} (par défaut)',
 	'recordings.defaults.startNow': 'Direct immédiat',
-	'recordings.defaults.startNowTitle': 'Démarrer un direct tout de suite avec les informations par défaut',
+	'recordings.defaults.startNowTitle':
+		'Démarrer un direct tout de suite avec les informations par défaut',
 	'recordings.defaults.startFromDefaults': 'Direct (valeurs par défaut)',
 	'recordings.defaults.startFromDefaultsTitle':
 		'Démarrer un direct immédiat avec les informations par défaut ci-dessus',
@@ -1005,7 +1018,8 @@ export default {
 		'Enregistrement créé mais publication échouée — publiez-le depuis la liste.',
 	'recordings.toast.uploaded': 'Enregistrement téléversé',
 	'recordings.toast.uploadedAndPublished': 'Enregistrement téléversé et publié',
-	'recordings.toast.replayAttached': 'Rediffusion attachée — le lien du direct est de nouveau actif',
+	'recordings.toast.replayAttached':
+		'Rediffusion attachée — le lien du direct est de nouveau actif',
 	'recordings.toast.audioSaved': 'Audio enregistré',
 	'recordings.toast.pdfReplaced': 'Transcription PDF remplacée',
 	'recordings.toast.pdfAdded': 'Transcription PDF ajoutée',

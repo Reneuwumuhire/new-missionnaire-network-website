@@ -35,7 +35,6 @@ function defaultTitle(template: string | null): string {
 
 export async function POST({ request, url, fetch }) {
 	const serverReceivedAtMs = Date.now();
-	const operator = await authorized(request);
 	const body = (await request.json().catch(() => ({}))) as {
 		action?: string;
 		sessionId?: string;
@@ -59,6 +58,12 @@ export async function POST({ request, url, fetch }) {
 		paused?: boolean;
 		subtitleMode?: 'broadcast' | 'armed';
 	};
+	if (body.action === 'logout') {
+		const code = request.headers.get('authorization')?.replace(/^Bearer\s+/, '') ?? '';
+		await revokeStudioAuthorization(code);
+		return json({ ok: true });
+	}
+	const operator = await authorized(request);
 	if (body.action === 'list') {
 		return json({
 			operator,
@@ -66,10 +71,6 @@ export async function POST({ request, url, fetch }) {
 			serverReceivedAtMs,
 			serverSentAtMs: Date.now()
 		});
-	}
-	if (body.action === 'logout') {
-		await revokeStudioAuthorization(operator.code);
-		return json({ ok: true });
 	}
 	if (body.action === 'presign-thumbnail') {
 		const ext = (

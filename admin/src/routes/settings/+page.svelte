@@ -7,6 +7,7 @@
 
 	let profileLoading = $state(false);
 	let passwordLoading = $state(false);
+	let studioRevoking = $state<string | null>(null);
 	let showCurrentPassword = $state(false);
 	let showNewPassword = $state(false);
 
@@ -51,19 +52,24 @@
 </div>
 
 <div class="mx-auto max-w-2xl space-y-6">
-
 	<!-- Profile card -->
 	<div class="overflow-hidden border border-stone-200/60 bg-white/40">
 		<!-- Header with avatar -->
-		<div class="relative border-b border-stone-100 bg-gradient-to-br from-missionnaire-50 via-cream to-cream-dark px-6 pb-6 pt-8">
+		<div
+			class="relative border-b border-stone-100 bg-gradient-to-br from-missionnaire-50 via-cream to-cream-dark px-6 pb-6 pt-8"
+		>
 			<div class="flex items-center gap-5">
-				<div class="flex h-16 w-16 items-center justify-center rounded-full bg-white text-2xl font-semibold text-primary shadow-sm ring-4 ring-white font-display">
+				<div
+					class="flex h-16 w-16 items-center justify-center rounded-full bg-white text-2xl font-semibold text-primary shadow-sm ring-4 ring-white font-display"
+				>
 					{data.user.name.charAt(0).toUpperCase()}
 				</div>
 				<div>
 					<h2 class="font-display text-xl font-semibold text-stone-800">{data.user.name}</h2>
 					<p class="text-sm text-stone-500">{data.user.email}</p>
-					<span class="mt-1.5 inline-flex items-center rounded-full bg-white/80 px-2.5 py-0.5 text-xs font-medium text-earth shadow-sm">
+					<span
+						class="mt-1.5 inline-flex items-center rounded-full bg-white/80 px-2.5 py-0.5 text-xs font-medium text-earth shadow-sm"
+					>
 						{roleLabel[data.user.role] ? $t(roleLabel[data.user.role]) : data.user.role}
 					</span>
 				</div>
@@ -83,9 +89,15 @@
 			}}
 			class="p-6"
 		>
-			<h3 class="mb-4 flex items-center gap-2 text-sm font-semibold tracking-wide text-stone-500 uppercase">
+			<h3
+				class="mb-4 flex items-center gap-2 text-sm font-semibold tracking-wide text-stone-500 uppercase"
+			>
 				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+					/>
 				</svg>
 				{$t('settings.profile')}
 			</h3>
@@ -110,12 +122,16 @@
 						type="text"
 						required
 						value={data.user.name}
-						class="admin-input {profileFieldError?.field === 'name' ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : ''}"
+						class="admin-input {profileFieldError?.field === 'name'
+							? 'border-red-400 focus:border-red-500 focus:ring-red-200'
+							: ''}"
 						aria-invalid={profileFieldError?.field === 'name' ? 'true' : undefined}
 						aria-describedby={profileFieldError?.field === 'name' ? 'name-error' : undefined}
 					/>
 					{#if profileFieldError?.field === 'name'}
-						<p id="name-error" class="mt-1.5 text-xs text-red-600">{fieldErrorMessage(profileFieldError.code)}</p>
+						<p id="name-error" class="mt-1.5 text-xs text-red-600">
+							{fieldErrorMessage(profileFieldError.code)}
+						</p>
 					{/if}
 				</div>
 
@@ -147,11 +163,26 @@
 			</div>
 
 			<div class="mt-5 flex justify-end">
-				<button type="submit" disabled={profileLoading} class="admin-btn-primary disabled:opacity-50">
+				<button
+					type="submit"
+					disabled={profileLoading}
+					class="admin-btn-primary disabled:opacity-50"
+				>
 					{#if profileLoading}
 						<svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+							<circle
+								class="opacity-25"
+								cx="12"
+								cy="12"
+								r="10"
+								stroke="currentColor"
+								stroke-width="4"
+							/>
+							<path
+								class="opacity-75"
+								fill="currentColor"
+								d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+							/>
 						</svg>
 					{/if}
 					{$t('settings.saveProfile')}
@@ -160,11 +191,89 @@
 		</form>
 	</div>
 
+	<!-- Connected Studio sessions -->
+	<div class="border border-stone-200/60 bg-white/40 p-6">
+		<h3
+			class="flex items-center gap-2 text-sm font-semibold tracking-wide text-stone-500 uppercase"
+		>
+			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+				<path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+				/>
+			</svg>
+			{$t('settings.connectedStudios')}
+		</h3>
+		<p class="mt-2 text-sm text-stone-500">{$t('settings.connectedStudiosHint')}</p>
+
+		{#if form?.studioRevoked}
+			<div class="mt-4 border border-green-200 bg-green-50/80 px-4 py-3 text-sm text-green-700">
+				{$t('settings.studioRevoked')}
+			</div>
+		{/if}
+		{#if form?.studioError}
+			<div class="mt-4 border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-red-700">
+				{$t('settings.studioRevokeError')}
+			</div>
+		{/if}
+
+		{#if data.studioAuthorizations.length === 0}
+			<p class="mt-5 bg-cream/50 px-4 py-3 text-sm text-stone-500">{$t('settings.studioNone')}</p>
+		{:else}
+			<div class="mt-5 divide-y divide-stone-100 border border-stone-200/70">
+				{#each data.studioAuthorizations as authorization, index (authorization.id)}
+					<div class="flex items-center justify-between gap-4 p-4">
+						<div class="min-w-0">
+							<p class="font-medium text-stone-700">Missionnaire Studio {index + 1}</p>
+							<p class="mt-1 text-xs text-stone-400">
+								{$t('settings.studioConnected')}: {formatDate(authorization.approvedAt)}
+								<span class="mx-1">·</span>
+								{$t('settings.studioLastUsed')}: {formatDate(authorization.lastUsedAt)}
+								<span class="mx-1">·</span>
+								{$t('settings.studioExpires')}: {formatDate(authorization.expiresAt)}
+							</p>
+						</div>
+						<form
+							method="POST"
+							action="?/revokeStudio"
+							onsubmit={(event) => {
+								if (!confirm($t('settings.studioRevokeConfirm'))) event.preventDefault();
+							}}
+							use:enhance={() => {
+								studioRevoking = authorization.id;
+								return async ({ update }) => {
+									studioRevoking = null;
+									await update();
+								};
+							}}
+						>
+							<input type="hidden" name="id" value={authorization.id} />
+							<button
+								type="submit"
+								disabled={studioRevoking === authorization.id}
+								class="admin-btn-secondary text-red-600 disabled:opacity-50"
+							>
+								{$t('settings.studioRevoke')}
+							</button>
+						</form>
+					</div>
+				{/each}
+			</div>
+		{/if}
+	</div>
+
 	<!-- Password card -->
 	<div class="border border-stone-200/60 bg-white/40 p-6">
-		<h3 class="mb-5 flex items-center gap-2 text-sm font-semibold tracking-wide text-stone-500 uppercase">
+		<h3
+			class="mb-5 flex items-center gap-2 text-sm font-semibold tracking-wide text-stone-500 uppercase"
+		>
 			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+				<path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+				/>
 			</svg>
 			{$t('settings.changePassword')}
 		</h3>
@@ -206,9 +315,13 @@
 							type={showCurrentPassword ? 'text' : 'password'}
 							required
 							autocomplete="current-password"
-							class="admin-input pr-10 {passwordFieldError?.field === 'currentPassword' ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : ''}"
+							class="admin-input pr-10 {passwordFieldError?.field === 'currentPassword'
+								? 'border-red-400 focus:border-red-500 focus:ring-red-200'
+								: ''}"
 							aria-invalid={passwordFieldError?.field === 'currentPassword' ? 'true' : undefined}
-							aria-describedby={passwordFieldError?.field === 'currentPassword' ? 'currentPassword-error' : undefined}
+							aria-describedby={passwordFieldError?.field === 'currentPassword'
+								? 'currentPassword-error'
+								: undefined}
 						/>
 						<button
 							type="button"
@@ -217,19 +330,45 @@
 							aria-label={showCurrentPassword ? $t('settings.hide') : $t('settings.show')}
 						>
 							{#if showCurrentPassword}
-								<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+								<svg
+									class="h-4 w-4"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
+									/>
 								</svg>
 							{:else}
-								<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-									<path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+								<svg
+									class="h-4 w-4"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+									/>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+									/>
 								</svg>
 							{/if}
 						</button>
 					</div>
 					{#if passwordFieldError?.field === 'currentPassword'}
-						<p id="currentPassword-error" class="mt-1.5 text-xs text-red-600">{fieldErrorMessage(passwordFieldError.code)}</p>
+						<p id="currentPassword-error" class="mt-1.5 text-xs text-red-600">
+							{fieldErrorMessage(passwordFieldError.code)}
+						</p>
 					{/if}
 				</div>
 
@@ -247,10 +386,14 @@
 							required
 							minlength={8}
 							autocomplete="new-password"
-							class="admin-input pr-10 {passwordFieldError?.field === 'newPassword' ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : ''}"
+							class="admin-input pr-10 {passwordFieldError?.field === 'newPassword'
+								? 'border-red-400 focus:border-red-500 focus:ring-red-200'
+								: ''}"
 							placeholder={$t('settings.minChars')}
 							aria-invalid={passwordFieldError?.field === 'newPassword' ? 'true' : undefined}
-							aria-describedby={passwordFieldError?.field === 'newPassword' ? 'newPassword-error' : undefined}
+							aria-describedby={passwordFieldError?.field === 'newPassword'
+								? 'newPassword-error'
+								: undefined}
 						/>
 						<button
 							type="button"
@@ -259,24 +402,52 @@
 							aria-label={showNewPassword ? $t('settings.hide') : $t('settings.show')}
 						>
 							{#if showNewPassword}
-								<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+								<svg
+									class="h-4 w-4"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
+									/>
 								</svg>
 							{:else}
-								<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-									<path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+								<svg
+									class="h-4 w-4"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+									/>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+									/>
 								</svg>
 							{/if}
 						</button>
 					</div>
 					{#if passwordFieldError?.field === 'newPassword'}
-						<p id="newPassword-error" class="mt-1.5 text-xs text-red-600">{fieldErrorMessage(passwordFieldError.code)}</p>
+						<p id="newPassword-error" class="mt-1.5 text-xs text-red-600">
+							{fieldErrorMessage(passwordFieldError.code)}
+						</p>
 					{/if}
 				</div>
 
 				<div>
-					<label for="confirmPassword" class="admin-label">{$t('settings.confirmNewPassword')}</label>
+					<label for="confirmPassword" class="admin-label"
+						>{$t('settings.confirmNewPassword')}</label
+					>
 					<input
 						id="confirmPassword"
 						name="confirmPassword"
@@ -284,23 +455,44 @@
 						required
 						minlength={8}
 						autocomplete="new-password"
-						class="admin-input {passwordFieldError?.field === 'confirmPassword' ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : ''}"
+						class="admin-input {passwordFieldError?.field === 'confirmPassword'
+							? 'border-red-400 focus:border-red-500 focus:ring-red-200'
+							: ''}"
 						placeholder={$t('settings.retypePassword')}
 						aria-invalid={passwordFieldError?.field === 'confirmPassword' ? 'true' : undefined}
-						aria-describedby={passwordFieldError?.field === 'confirmPassword' ? 'confirmPassword-error' : undefined}
+						aria-describedby={passwordFieldError?.field === 'confirmPassword'
+							? 'confirmPassword-error'
+							: undefined}
 					/>
 					{#if passwordFieldError?.field === 'confirmPassword'}
-						<p id="confirmPassword-error" class="mt-1.5 text-xs text-red-600">{fieldErrorMessage(passwordFieldError.code)}</p>
+						<p id="confirmPassword-error" class="mt-1.5 text-xs text-red-600">
+							{fieldErrorMessage(passwordFieldError.code)}
+						</p>
 					{/if}
 				</div>
 			</div>
 
 			<div class="mt-5 flex justify-end">
-				<button type="submit" disabled={passwordLoading} class="admin-btn-primary disabled:opacity-50">
+				<button
+					type="submit"
+					disabled={passwordLoading}
+					class="admin-btn-primary disabled:opacity-50"
+				>
 					{#if passwordLoading}
 						<svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+							<circle
+								class="opacity-25"
+								cx="12"
+								cy="12"
+								r="10"
+								stroke="currentColor"
+								stroke-width="4"
+							/>
+							<path
+								class="opacity-75"
+								fill="currentColor"
+								d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+							/>
 						</svg>
 					{/if}
 					{$t('settings.updatePassword')}

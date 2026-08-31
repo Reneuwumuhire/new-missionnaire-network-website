@@ -11,6 +11,7 @@ import {
 	logAudit
 } from '../../db/collections';
 import { getPermissions } from '$lib/models/admin-user';
+import { revokeStudioAuthorizationsForUser } from '$lib/server/studio-ingest';
 import type { Actions, PageServerLoad } from './$types';
 
 function generatePassword(length = 12): string {
@@ -103,6 +104,7 @@ export const actions: Actions = {
 			return fail(400, { toggleError: 'Vous ne pouvez pas désactiver votre propre compte' });
 		}
 
+		if (action === 'deactivate') await revokeStudioAuthorizationsForUser(email);
 		await toggleAdminUserActive(email, action === 'activate');
 
 		await logAudit({
@@ -134,6 +136,7 @@ export const actions: Actions = {
 
 		const generatedPassword = generatePassword();
 		const hash = await hashPassword(generatedPassword);
+		await revokeStudioAuthorizationsForUser(email);
 		await resetAdminPassword(email, hash);
 
 		await logAudit({
@@ -180,6 +183,10 @@ export const actions: Actions = {
 			can_moderate_questions: canModerateQuestions
 		};
 
+		const targetUser = await findAdminByEmail(email);
+		if (targetUser?.role !== 'superadmin' && !canManageRecordings) {
+			await revokeStudioAuthorizationsForUser(email);
+		}
 		await updateAdminPermissions(email, nextPermissions);
 
 		await logAudit({

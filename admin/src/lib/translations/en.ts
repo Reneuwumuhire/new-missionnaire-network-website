@@ -737,6 +737,19 @@ const en: Record<keyof typeof fr, string> = {
 	'settings.memberSince': 'Member since',
 	'settings.lastLogin': 'Last login',
 	'settings.saveProfile': 'Save profile',
+	'settings.connectedStudios': 'Connected Studios',
+	'settings.connectedStudiosHint':
+		'Review the Studio installations authorized to broadcast with your account.',
+	'settings.studioConnected': 'Connected',
+	'settings.studioLastUsed': 'Last used',
+	'settings.studioExpires': 'Authorization expires',
+	'settings.studioRevoke': 'Disconnect',
+	'settings.studioRevokeConfirm':
+		'Disconnect this Studio? It will stop being authorized to broadcast.',
+	'settings.studioNone': 'No Studio installation is connected to your account.',
+	'settings.studioRevoked': 'Studio disconnected successfully.',
+	'settings.studioRevokeError':
+		'This Studio could not be disconnected. Refresh the page and try again.',
 	'settings.changePassword': 'Change password',
 	'settings.passwordUpdated': 'Password updated successfully',
 	'settings.currentPassword': 'Current password',
@@ -833,7 +846,8 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.defaults.title': 'Default info',
 	'recordings.defaults.intro':
 		'Used when you start an instant live (not scheduled). A scheduled live keeps its own info.',
-	'recordings.defaults.liveHint': 'A live is on air — these values will apply to the next instant live.',
+	'recordings.defaults.liveHint':
+		'A live is on air — these values will apply to the next instant live.',
 	'recordings.defaults.titleLabel': 'Title',
 	'recordings.defaults.titleHint': 'Shown as: “{preview}”',
 	'recordings.defaults.noneThumb': 'No thumbnail',
@@ -841,7 +855,8 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.defaults.startNow': 'Go live now',
 	'recordings.defaults.startNowTitle': 'Start a live right now using the default info',
 	'recordings.defaults.startFromDefaults': 'Go live from defaults',
-	'recordings.defaults.startFromDefaultsTitle': 'Start an instant live using the default info above',
+	'recordings.defaults.startFromDefaultsTitle':
+		'Start an instant live using the default info above',
 	'recordings.defaults.confirm.start': 'Start an instant live “{title}”?',
 	'recordings.defaults.confirm.startNotifyOne':
 		'Start an instant live “{title}” and notify {count} subscriber?',

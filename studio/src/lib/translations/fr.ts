@@ -448,6 +448,8 @@ const fr: Record<keyof typeof en, string> = {
 	'stream.addYouTubeChannel': 'Connecter une autre chaîne YouTube',
 	'stream.disconnectChannel': 'Déconnecter',
 	'stream.disconnectConfirm': 'Déconnecter {channel} de ce compte administrateur ?',
+	'stream.disconnectStudioError':
+		"Studio n'a pas pu se déconnecter. Vérifiez votre connexion et réessayez.",
 	'stream.missionnaireManaged': 'Diffusion Missionnaire',
 	'stream.missionnaireManagedHint':
 		'Studio charge une destination temporaire lorsqu’un diffuseur autorisé se connecte à l’administration. L’identifiant n’est jamais enregistré sur cet ordinateur.',
