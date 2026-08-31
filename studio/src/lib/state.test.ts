@@ -71,6 +71,18 @@ describe('public destinations', () => {
 		expect(persistableDestinations([{ ...managed, managed: false }])[0].key).toBe('key');
 	});
 
+	it('migrates the old localhost Missionnaire default into a disabled managed destination', () => {
+		expect(
+			migrateDestination({
+				...youtube,
+				name: 'Missionnaire (app + radio)',
+				url: 'rtmp://localhost:1935/live',
+				key: 'obs',
+				platform: 'missionnaire'
+			})
+		).toMatchObject({ managed: true, key: '', enabled: false });
+	});
+
 	it('preserves a legacy manual YouTube key during migration', () => {
 		expect(migrateDestination(youtube)).toMatchObject({
 			platform: 'youtube',

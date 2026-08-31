@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  undici: 7.29.0
+
 importers:
 
   .:
@@ -1496,7 +1499,7 @@ packages:
     engines: {node: '>=20.0.0'}
     peerDependencies:
       tough-cookie: ^4.0.0 || ^5.0.0 || ^6.0.0
-      undici: ^7.0.0
+      undici: 7.29.0
     peerDependenciesMeta:
       undici:
         optional: true
@@ -2255,8 +2258,8 @@ packages:
   undici-types@7.16.0:
     resolution: {integrity: sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw==}
 
-  undici@7.25.0:
-    resolution: {integrity: sha512-xXnp4kTyor2Zq+J1FfPI6Eq3ew5h6Vl0F/8d9XU5zZQf1tX9s2Su1/3PiMmUANFULpmksxkClamIZcaUqryHsQ==}
+  undici@7.29.0:
+    resolution: {integrity: sha512-IDxfleLmmbSskfWSUATiN1nfn2rDuvnMOqb5CWR92iIfojA0Ud+ulOAAEQ57LPr9rWmsreUyf5lwyao+7GNNVw==}
     engines: {node: '>=20.18.1'}
 
   update-browserslist-db@1.1.3:
@@ -2613,13 +2616,13 @@ snapshots:
 
   '@distube/ytdl-core@4.16.12':
     dependencies:
-      http-cookie-agent: 7.0.3(tough-cookie@5.1.2)(undici@7.25.0)
+      http-cookie-agent: 7.0.3(tough-cookie@5.1.2)(undici@7.29.0)
       https-proxy-agent: 7.0.6
       m3u8stream: 0.8.6
       miniget: 4.2.3
       sax: 1.4.3
       tough-cookie: 5.1.2
-      undici: 7.25.0
+      undici: 7.29.0
     transitivePeerDependencies:
       - supports-color
 
@@ -3825,12 +3828,12 @@ snapshots:
 
   hls.js@1.6.16: {}
 
-  http-cookie-agent@7.0.3(tough-cookie@5.1.2)(undici@7.25.0):
+  http-cookie-agent@7.0.3(tough-cookie@5.1.2)(undici@7.29.0):
     dependencies:
       agent-base: 7.1.4
       tough-cookie: 5.1.2
     optionalDependencies:
-      undici: 7.25.0
+      undici: 7.29.0
 
   http_ece@1.2.0: {}
 
@@ -4549,7 +4552,7 @@ snapshots:
 
   undici-types@7.16.0: {}
 
-  undici@7.25.0: {}
+  undici@7.29.0: {}
 
   update-browserslist-db@1.1.3(browserslist@4.24.4):
     dependencies:

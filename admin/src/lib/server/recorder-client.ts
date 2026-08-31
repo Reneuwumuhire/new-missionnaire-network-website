@@ -27,6 +27,12 @@ export interface StartResult {
 	title: string;
 }
 
+export interface MissionnaireIngest {
+	url: string;
+	key: string;
+	expiresAt: string;
+}
+
 export class RecorderError extends Error {
 	constructor(
 		message: string,
@@ -75,7 +81,8 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
 	const parsed = text ? (JSON.parse(text) as Record<string, unknown>) : {};
 	if (!res.ok) {
 		const code = typeof parsed.error === 'string' ? parsed.error : undefined;
-		const msg = typeof parsed.message === 'string' ? parsed.message : `Recorder error ${res.status}`;
+		const msg =
+			typeof parsed.message === 'string' ? parsed.message : `Recorder error ${res.status}`;
 		throw new RecorderError(msg, res.status, code);
 	}
 	return parsed as T;
@@ -83,6 +90,10 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export function recorderStatus(): Promise<RecorderStatus> {
 	return call<RecorderStatus>('/status', { method: 'GET' });
+}
+
+export function recorderIngest(): Promise<MissionnaireIngest> {
+	return call<MissionnaireIngest>('/ingest', { method: 'GET' });
 }
 
 export function recorderStart(

@@ -10,6 +10,11 @@ function optional(name: string, fallback: string): string {
 
 export const ENV = {
 	RECORDER_TOKEN: required('RECORDER_TOKEN'),
+	RTMP_PUBLIC_URL: optional(
+		'RTMP_PUBLIC_URL',
+		'rtmps://missionnaire-streaming-app.fly.dev:1936/live'
+	),
+	LEGACY_STREAM_KEY: optional('LEGACY_STREAM_KEY', ''),
 	ICECAST_URL: optional('ICECAST_URL', 'http://icecast:8000/radio.mp3'),
 	/** Icecast status page, used to tell whether the REAL broadcast source is
 	 *  connected. With the silence fallback mount the recording stream never

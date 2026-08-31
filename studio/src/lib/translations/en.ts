@@ -431,6 +431,11 @@ const en = {
 	'stream.addYouTubeChannel': 'Connect another YouTube channel',
 	'stream.disconnectChannel': 'Disconnect',
 	'stream.disconnectConfirm': 'Disconnect {channel} from this admin account?',
+	'stream.missionnaireManaged': 'Missionnaire broadcast',
+	'stream.missionnaireManagedHint':
+		'Studio loads a temporary destination after an authorized broadcaster connects to admin. The credential is never saved on this computer.',
+	'stream.missionnaireReady': 'App and radio destination ready',
+	'stream.missionnaireUnavailable': 'Missionnaire broadcast is unavailable.',
 	'stream.manualOutputs': 'RTMP outputs · Advanced',
 	'stream.newDestination': 'New destination',
 	'stream.urlPlaceholder': 'rtmp://server/application',
@@ -452,7 +457,7 @@ const en = {
 	'stream.presetFacebookHint': 'Key from Facebook Live Producer.',
 	'stream.presetBlank': 'Blank',
 	'stream.keyWarning':
-		'Manual keys are stored in the clear in the app’s data, the same as OBS stores its own. Managed YouTube keys are not saved. Don’t share a screenshot with a key revealed.',
+		'Manual keys are stored in the clear in the app’s data, the same as OBS stores its own. Managed Missionnaire and YouTube credentials are not saved. Don’t share a screenshot with a key revealed.',
 
 	// ── Errors ──────────────────────────────────────────────────
 	'error.noImmediateDestination':

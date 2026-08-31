@@ -48,6 +48,7 @@ export type NewSession = {
 };
 
 type YouTubeIngest = { url: string; key: string };
+type MissionnaireIngest = YouTubeIngest & { expiresAt: string };
 
 export const liveSession = $state({
 	sessions: [] as LiveSession[],
@@ -64,7 +65,9 @@ export const liveSession = $state({
 	youtubeChannelId: null as string | null,
 	youtubeChannels: [] as YouTubeChannel[],
 	youtubeConnecting: false,
-	youtubeError: null as string | null
+	youtubeError: null as string | null,
+	missionnaireReady: false,
+	missionnaireError: null as string | null
 });
 
 async function post<T>(body: object): Promise<T> {
@@ -91,6 +94,52 @@ async function adminPost<T>(body: object): Promise<T> {
 
 export function controlCloudRecording(action: 'start' | 'stop') {
 	return adminPost<{ id: string }>({ action: `recorder-${action}` });
+}
+
+function applyMissionnaireIngest(ingest: MissionnaireIngest) {
+	let destination = studio.destinations.find(
+		(item) => item.platform === 'missionnaire' && item.managed
+	);
+	if (!destination) {
+		destination = {
+			id: id(),
+			name: 'Missionnaire (app + radio)',
+			url: ingest.url,
+			key: ingest.key,
+			enabled: true,
+			platform: 'missionnaire',
+			managed: true,
+			hold: false
+		};
+		studio.destinations = [...studio.destinations, destination];
+	} else {
+		destination.url = ingest.url;
+		destination.key = ingest.key;
+		destination.enabled = true;
+		destination.hold = false;
+	}
+	// Retire the exact localhost/obs placeholder shipped by earlier builds.
+	for (const item of studio.destinations) {
+		if (
+			item !== destination &&
+			item.platform === 'missionnaire' &&
+			item.url === 'rtmp://localhost:1935/live' &&
+			item.key === 'obs'
+		) {
+			item.enabled = false;
+		}
+	}
+	persist();
+}
+
+function disableManagedMissionnaire() {
+	const destination = studio.destinations.find(
+		(item) => item.platform === 'missionnaire' && item.managed
+	);
+	if (!destination) return;
+	destination.enabled = false;
+	destination.key = '';
+	persist();
 }
 
 function applyYouTubeIngest(ingest: YouTubeIngest, channel: YouTubeChannel) {
@@ -157,6 +206,8 @@ export async function refreshYouTubeStatus() {
 			channels?: YouTubeChannel[];
 			connected?: boolean;
 			channelTitle?: string | null;
+			missionnaireIngest?: MissionnaireIngest | null;
+			missionnaireError?: string | null;
 		}>({
 			action: 'status'
 		});
@@ -168,12 +219,25 @@ export async function refreshYouTubeStatus() {
 				? liveSession.youtubeChannelId
 				: (channels[0]?.id ?? null)
 		);
+		if (result.missionnaireIngest) {
+			applyMissionnaireIngest(result.missionnaireIngest);
+			liveSession.missionnaireReady = true;
+			liveSession.missionnaireError = null;
+		} else {
+			disableManagedMissionnaire();
+			liveSession.missionnaireReady = false;
+			liveSession.missionnaireError =
+				result.missionnaireError ?? 'Missionnaire broadcast is unavailable.';
+		}
 		liveSession.youtubeError = null;
 	} catch (error) {
 		liveSession.youtubeConnected = false;
 		liveSession.youtubeChannels = [];
 		selectYouTubeChannel(null);
 		liveSession.youtubeError = error instanceof Error ? error.message : String(error);
+		disableManagedMissionnaire();
+		liveSession.missionnaireReady = false;
+		liveSession.missionnaireError = liveSession.youtubeError;
 	}
 }
 
@@ -457,6 +521,9 @@ export async function logoutStudio() {
 	selectYouTubeChannel(null);
 	liveSession.youtubeError = null;
 	disableManagedYouTube();
+	liveSession.missionnaireReady = false;
+	liveSession.missionnaireError = null;
+	disableManagedMissionnaire();
 	attachedSessionId = null;
 }
 

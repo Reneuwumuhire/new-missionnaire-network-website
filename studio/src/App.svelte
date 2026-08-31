@@ -49,7 +49,7 @@
 		selftestTarget
 	} from './lib/selftest';
 	import { activeScene, audioLayers, onAirSceneId, persist, studio } from './lib/state.svelte';
-	import { liveSession, logoutStudio } from './lib/live-session.svelte';
+	import { liveSession, logoutStudio, refreshYouTubeStatus } from './lib/live-session.svelte';
 	import { recording } from './lib/recording.svelte';
 	import { initReferenceMatcher } from './lib/reference-match.svelte';
 	import { appUpdate, downloadPercent, initUpdater, installUpdate } from './lib/updater.svelte';
@@ -302,6 +302,9 @@
 		if (!programCanvas) return;
 		renderMissed = 0;
 		await mixer?.resume();
+		// Refresh the expiring managed destination immediately before ffmpeg
+		// receives it; Studio may have been left open long before the service.
+		if (liveSession.operatorName) await refreshYouTubeStatus();
 		await startBroadcast(programCanvas, mixer?.audioTrack);
 	}
 

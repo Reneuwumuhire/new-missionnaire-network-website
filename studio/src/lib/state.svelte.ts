@@ -130,8 +130,8 @@ export interface Destination {
 	key: string;
 	enabled: boolean;
 	platform?: 'missionnaire' | 'youtube' | 'facebook' | 'custom';
-	/** Managed YouTube credentials come from OAuth and never belong in saved
-	 *  frontend settings. Manual RTMP destinations always leave this false. */
+	/** Managed service credentials come from the authorized admin API and never
+	 *  belong in saved frontend settings. Manual RTMP destinations leave this false. */
 	managed?: boolean;
 	/** Hold this one back until the operator presses Go Live, rather than
 	 *  connecting it with Start Streaming. Nothing reaches the service at all
@@ -153,7 +153,13 @@ export function destinationPlatform(
 
 export function migrateDestination(destination: Destination): Destination {
 	const platform = destinationPlatform(destination);
-	const managed = platform === 'youtube' && destination.managed === true;
+	const legacyLocalDefault =
+		platform === 'missionnaire' &&
+		destination.url === 'rtmp://localhost:1935/live' &&
+		destination.key === 'obs';
+	const managed =
+		(platform === 'youtube' || platform === 'missionnaire') &&
+		(destination.managed === true || legacyLocalDefault);
 	return {
 		...destination,
 		platform,
@@ -327,11 +333,11 @@ function load(): Persisted {
 			{
 				id: id(),
 				name: t('stream.presetMissionnaire'),
-				url: 'rtmp://localhost:1935/live',
-				key: 'obs',
-				enabled: true,
+				url: '',
+				key: '',
+				enabled: false,
 				platform: 'missionnaire',
-				managed: false,
+				managed: true,
 				hold: false
 			},
 			{
