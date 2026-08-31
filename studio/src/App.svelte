@@ -333,6 +333,20 @@
 	// scene (visibility, crop, layout, properties) are valid takes.
 	const canTake = $derived(studio.settings.studioMode || studio.activeSceneId !== onAirSceneId());
 	const updateBlocked = $derived(isStreaming() || recording.startedAt !== null);
+	const updateStatusLabel = $derived.by(() => {
+		switch (appUpdate.phase) {
+			case 'available':
+				return t('update.available', { version: appUpdate.availableVersion ?? '' });
+			case 'downloading':
+				return t('update.downloading', { percent: downloadPercent() });
+			case 'installing':
+				return t('update.installing');
+			case 'restarting':
+				return t('update.restarting');
+			default:
+				return '';
+		}
+	});
 	const recordingDuration = $derived(
 		recording.startedAt ? Math.max(0, Math.floor((now - recording.startedAt) / 1000)) : 0
 	);
@@ -435,44 +449,6 @@
 				aria-label={t('common.close')}
 				onclick={() => (broadcast.error = null)}><Icon name="close" /></button
 			>
-		</div>
-	{/if}
-
-	{#if ['available', 'downloading', 'installing', 'restarting'].includes(appUpdate.phase)}
-		<div
-			class="flex shrink-0 items-center gap-3 border-b border-primary/30 bg-primary/10 px-4 py-2"
-		>
-			<div class="min-w-0 flex-1">
-				<p class="text-[12px] text-fg/85">
-					{#if appUpdate.phase === 'available'}
-						{t('update.available', { version: appUpdate.availableVersion ?? '' })}
-					{:else if appUpdate.phase === 'downloading'}
-						{t('update.downloading', { percent: downloadPercent() })}
-					{:else if appUpdate.phase === 'installing'}
-						{t('update.installing')}
-					{:else}
-						{t('update.restarting')}
-					{/if}
-				</p>
-				{#if updateBlocked && appUpdate.phase === 'available'}
-					<p class="mt-0.5 text-[10px] text-amber-300">{t('update.blocked')}</p>
-				{/if}
-				{#if appUpdate.phase === 'downloading'}
-					<div class="mt-1 h-1 overflow-hidden rounded-full bg-fg/10">
-						<div
-							class="h-full bg-primary transition-[width]"
-							style="width: {downloadPercent()}%"
-						></div>
-					</div>
-				{/if}
-			</div>
-			{#if appUpdate.phase === 'available'}
-				<button
-					class="studio-chip shrink-0 border-primary/50 bg-primary/20 text-primary"
-					disabled={updateBlocked}
-					onclick={() => void installUpdate()}>{t('update.installRestart')}</button
-				>
-			{/if}
 		</div>
 	{/if}
 
@@ -663,6 +639,25 @@
 		<span class="ml-auto font-body">
 			{studio.settings.studioMode ? t('status.shortcutsStudio') : t('status.shortcuts')}
 		</span>
+		{#if ['available', 'downloading', 'installing', 'restarting'].includes(appUpdate.phase)}
+			{#if updateBlocked}
+				<span class="font-body text-[9px] text-amber-300">{t('update.blockedShort')}</span>
+			{/if}
+			<button
+				type="button"
+				class="flex h-[18px] shrink-0 items-center rounded-full bg-blue-500 px-2.5 font-body text-[10px] font-semibold text-white transition-colors hover:bg-blue-400 disabled:cursor-not-allowed disabled:bg-blue-500/45 disabled:text-white/70"
+				disabled={updateBlocked || appUpdate.phase !== 'available'}
+				aria-label={updateBlocked ? t('update.blocked') : updateStatusLabel}
+				title={updateBlocked ? t('update.blocked') : updateStatusLabel}
+				onclick={() => void installUpdate()}
+			>
+				{t('update.action')}{appUpdate.phase === 'downloading'
+					? ` ${downloadPercent()}%`
+					: appUpdate.phase === 'available'
+						? ''
+						: '…'}
+			</button>
+		{/if}
 	</footer>
 </div>
 
