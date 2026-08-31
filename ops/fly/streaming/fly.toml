@@ -14,6 +14,7 @@ primary_region = "jnb"
 
 [env]
   RTMP_PATH = "live"
+  RTMP_PUBLIC_URL = "rtmps://missionnaire-streaming-app.fly.dev:1936/live"
   AUDIO_MOUNT = "radio.mp3"
   AUDIO_BITRATE = "128k"
   INPUT_PROTOCOL = "rtsp"
@@ -54,6 +55,12 @@ primary_region = "jnb"
 
   [[services.ports]]
     port = 1935
+
+  # Studio uses encrypted RTMP with a short-lived publisher token. Raw 1935
+  # remains available for an orderly migration of existing OBS installations.
+  [[services.ports]]
+    handlers = ["tls"]
+    port = 1936
 
   [[services.tcp_checks]]
     interval = "15s"

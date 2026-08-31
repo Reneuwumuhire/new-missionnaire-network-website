@@ -1,5 +1,12 @@
 logLevel: info
 
+authMethod: http
+authHTTPAddress: http://127.0.0.1:8080/mediamtx-auth
+authHTTPExclude:
+  - action: api
+  - action: metrics
+  - action: pprof
+
 api: yes
 
 rtmp: yes

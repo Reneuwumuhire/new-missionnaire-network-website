@@ -5,7 +5,14 @@ import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { ENV } from './env.js';
-import { currentStatus, isRecording, retryUpload, startRecording, stopRecording } from './ffmpeg.js';
+import {
+	currentStatus,
+	isRecording,
+	retryUpload,
+	startRecording,
+	stopRecording
+} from './ffmpeg.js';
+import { createIngestCredential, verifyIngestCredential } from './ingest-auth.js';
 import { isRecovering, pendingOrphans, recoverOrphans } from './recover.js';
 import { findRecording } from './mongo.js';
 import { ensureRecordingsDir } from './sidecar.js';
@@ -13,14 +20,59 @@ import { ensureRecordingsDir } from './sidecar.js';
 const app = Fastify({ logger: true });
 
 app.addHook('preHandler', async (req: FastifyRequest, reply: FastifyReply) => {
-	if (req.url === '/health' || req.url === '/hls-stats' || req.url.startsWith('/hls/')) return;
+	if (
+		req.url === '/health' ||
+		req.url === '/hls-stats' ||
+		req.url === '/mediamtx-auth' ||
+		req.url.startsWith('/hls/')
+	)
+		return;
 	const auth = req.headers.authorization;
 	if (!auth || auth !== `Bearer ${ENV.RECORDER_TOKEN}`) {
-		reply.code(401).send({ error: 'unauthorized' });
+		return reply.code(401).send({ error: 'unauthorized' });
 	}
 });
 
 app.get('/health', async () => ({ ok: true }));
+
+type MediaMtxAuthBody = {
+	token?: unknown;
+	ip?: unknown;
+	action?: unknown;
+	path?: unknown;
+	protocol?: unknown;
+};
+
+app.post('/mediamtx-auth', async (req, reply) => {
+	const body = (req.body ?? {}) as MediaMtxAuthBody;
+	const path = typeof body.path === 'string' ? body.path : '';
+	const loopback = body.ip === '127.0.0.1' || body.ip === '::1';
+	if (body.action === 'read' && body.protocol === 'rtsp' && loopback && path.startsWith('live/')) {
+		return reply.send({ ok: true });
+	}
+	// ponytail: keep the existing OBS key working during migration; remove this
+	// branch once every operator uses Studio's managed, expiring credentials.
+	if (
+		ENV.LEGACY_STREAM_KEY &&
+		body.action === 'publish' &&
+		body.protocol === 'rtmp' &&
+		path === `live/${ENV.LEGACY_STREAM_KEY}`
+	) {
+		return reply.send({ ok: true });
+	}
+	if (
+		body.action !== 'publish' ||
+		body.protocol !== 'rtmp' ||
+		!path.startsWith('live/') ||
+		typeof body.token !== 'string' ||
+		!verifyIngestCredential(ENV.RECORDER_TOKEN, path, body.token)
+	) {
+		return reply.code(401).send({ error: 'unauthorized' });
+	}
+	return reply.send({ ok: true });
+});
+
+app.get('/ingest', async () => createIngestCredential(ENV.RECORDER_TOKEN, ENV.RTMP_PUBLIC_URL));
 
 // ── HLS listener accounting ───────────────────────────────────────
 // HLS has no persistent connections (Icecast counts those natively), so a

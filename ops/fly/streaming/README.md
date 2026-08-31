@@ -94,13 +94,16 @@ fly secrets set -a <your-app-name> \
 > **Keep `RECORDER_TOKEN` identical to the value in your Vercel admin env vars.**
 > If they drift, every admin call will get `401 unauthorized`.
 
-Optional stream key:
+Optional legacy OBS stream key:
 
 ```bash
 fly secrets set -a <your-app-name> STREAM_KEY="<your-obs-stream-key>"
 ```
 
-If you do not set `STREAM_KEY`, the service auto-detects any active stream under `live/*`.
+Set `STREAM_KEY` only while an existing OBS installation still needs to publish.
+Without it, MediaMTX accepts only the short-lived credentials issued to an
+authorized Missionnaire Studio operator. The audio pipeline still auto-detects
+the active managed stream under `live/*`.
 
 Optional input mode (default is `rtsp`):
 
@@ -174,6 +177,12 @@ OBS settings:
 - Server: `rtmp://<your-app-name>.fly.dev/live`
 - Stream key: your `STREAM_KEY` (default `obs`)
 
+Missionnaire Studio does not need either value entered locally. After an admin
+with recording/broadcast permission approves Studio, the admin service obtains
+a short-lived RTMPS destination from the recorder API. MediaMTX validates that
+signed credential before accepting the publisher; existing OBS installations
+can continue using `STREAM_KEY` during migration.
+
 ## 7) Connect Vercel (website + admin)
 
 **Main site** (`.env` on Vercel):
@@ -197,15 +206,15 @@ bucket public — only the `recordings/` prefix.**
 
 ```json
 {
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "PublicReadRecordings",
-      "Effect": "Allow",
-      "Principal": "*",
-      "Action": "s3:GetObject",
-      "Resource": "arn:aws:s3:::<bucket>/recordings/*"
-    }
-  ]
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Sid": "PublicReadRecordings",
+			"Effect": "Allow",
+			"Principal": "*",
+			"Action": "s3:GetObject",
+			"Resource": "arn:aws:s3:::<bucket>/recordings/*"
+		}
+	]
 }
 ```

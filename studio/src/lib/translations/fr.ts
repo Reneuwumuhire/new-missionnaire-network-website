@@ -442,6 +442,11 @@ const fr: Record<keyof typeof en, string> = {
 	'stream.addYouTubeChannel': 'Connecter une autre chaîne YouTube',
 	'stream.disconnectChannel': 'Déconnecter',
 	'stream.disconnectConfirm': 'Déconnecter {channel} de ce compte administrateur ?',
+	'stream.missionnaireManaged': 'Diffusion Missionnaire',
+	'stream.missionnaireManagedHint':
+		'Studio charge une destination temporaire lorsqu’un diffuseur autorisé se connecte à l’administration. L’identifiant n’est jamais enregistré sur cet ordinateur.',
+	'stream.missionnaireReady': 'Destination application et radio prête',
+	'stream.missionnaireUnavailable': 'La diffusion Missionnaire est indisponible.',
 	'stream.manualOutputs': 'Sorties RTMP · Avancé',
 	'stream.newDestination': 'Nouvelle destination',
 	'stream.urlPlaceholder': 'rtmp://serveur/application',
@@ -463,7 +468,7 @@ const fr: Record<keyof typeof en, string> = {
 	'stream.presetFacebookHint': 'Clé dans Facebook Live Producer.',
 	'stream.presetBlank': 'Vide',
 	'stream.keyWarning':
-		'Les clés manuelles sont enregistrées en clair dans les données de l’application, comme le fait OBS. Les clés YouTube gérées ne sont pas enregistrées. Ne partagez pas de capture d’écran avec une clé affichée.',
+		'Les clés manuelles sont enregistrées en clair dans les données de l’application, comme le fait OBS. Les identifiants Missionnaire et YouTube gérés ne sont pas enregistrés. Ne partagez pas de capture d’écran avec une clé affichée.',
 
 	// ── Errors ──────────────────────────────────────────────────
 	'error.noImmediateDestination':

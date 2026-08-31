@@ -1,4 +1,5 @@
 import { error, json } from '@sveltejs/kit';
+import { getPermissions, type AdminUser } from '$lib/models/admin-user';
 import { getDb } from '../../../../db/mongo';
 import {
 	createScheduledLive,
@@ -25,7 +26,12 @@ import {
 } from '$lib/server/scheduled-live-validation';
 import { buildWatchUrl, pingBroadcastEvent } from '$lib/server/main-site';
 import { generatePresignedUploadUrl, getObjectBytes, getS3Url } from '$lib/server/s3';
-import { RecorderError, recorderStart, recorderStop } from '$lib/server/recorder-client';
+import {
+	RecorderError,
+	recorderIngest,
+	recorderStart,
+	recorderStop
+} from '$lib/server/recorder-client';
 
 async function operator(request: Request): Promise<{ email: string; name: string }> {
 	const code = request.headers.get('authorization')?.replace(/^Bearer\s+/, '') ?? '';
@@ -35,6 +41,13 @@ async function operator(request: Request): Promise<{ email: string; name: string
 	});
 	if (!doc || typeof doc.user_email !== 'string')
 		throw error(401, 'Authorize Studio in the admin app first');
+	const admin = await (await getDb()).collection('admin_users').findOne({
+		email: doc.user_email,
+		is_active: { $ne: false }
+	});
+	if (!admin || !getPermissions(admin as unknown as AdminUser).can_manage_recordings) {
+		throw error(403, 'Broadcasting permission required');
+	}
 	return {
 		email: doc.user_email,
 		name: typeof doc.user_name === 'string' ? doc.user_name : doc.user_email
@@ -74,12 +87,22 @@ export async function POST({ request, getClientAddress }) {
 		channelId?: unknown;
 	};
 	if (body.action === 'status') {
-		const channels = await youtubeConnection(user.email);
+		const [channels, missionnaire] = await Promise.all([
+			youtubeConnection(user.email),
+			recorderIngest()
+				.then((ingest) => ({ ingest, error: null }))
+				.catch((cause) => ({
+					ingest: null,
+					error: cause instanceof Error ? cause.message : 'Missionnaire ingest is unavailable'
+				}))
+		]);
 		return json({
 			operator: user,
 			connected: channels.length > 0,
 			channelTitle: channels[0]?.title ?? null,
-			channels
+			channels,
+			missionnaireIngest: missionnaire.ingest,
+			missionnaireError: missionnaire.error
 		});
 	}
 	if (body.action === 'disconnect') {

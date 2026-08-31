@@ -122,6 +122,29 @@
 	{/if}
 </section>
 
+<section class="space-y-3 border-b border-ink-700 p-4">
+	<div>
+		<h3 class="text-[12px] font-semibold text-fg/80">{t('stream.missionnaireManaged')}</h3>
+		<p class="mt-1 text-[11px] leading-relaxed text-fg/40">
+			{t('stream.missionnaireManagedHint')}
+		</p>
+	</div>
+	{#if !liveSession.operatorName}
+		<p class="border border-amber-500/25 bg-amber-500/5 p-2 text-[11px] text-amber-300">
+			{t('stream.connectAdminFirst')}
+		</p>
+	{:else if liveSession.missionnaireReady}
+		<div class="flex items-center gap-2 border border-emerald-500/20 bg-emerald-500/5 px-3 py-2">
+			<span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+			<span class="text-[12px] text-fg/75">{t('stream.missionnaireReady')}</span>
+		</div>
+	{:else}
+		<p class="border border-red-500/20 bg-red-500/5 p-2 text-[11px] text-red-300">
+			{liveSession.missionnaireError ?? t('stream.missionnaireUnavailable')}
+		</p>
+	{/if}
+</section>
+
 <div class="space-y-3 p-4">
 	<div>
 		<h3 class="text-[12px] font-semibold text-fg/80">{t('stream.manualOutputs')}</h3>

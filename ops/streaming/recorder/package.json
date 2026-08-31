@@ -5,6 +5,7 @@
 	"type": "module",
 	"scripts": {
 		"build": "tsc",
+		"test": "npm run build && node --test dist/ingest-auth.test.js",
 		"start": "node dist/server.js",
 		"dev": "tsc --watch"
 	},
