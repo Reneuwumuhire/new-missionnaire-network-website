@@ -87,6 +87,7 @@ struct Running {
 #[derive(Default)]
 pub struct Encoder {
 	groups: Mutex<HashMap<String, Running>>,
+	next_run_id: AtomicU64,
 	/// The first chunk MediaRecorder produced this session: the EBML header,
 	/// segment and track definitions. An encoder started later would otherwise
 	/// be handed a WebM stream beginning in the middle, which ffmpeg cannot
@@ -338,7 +339,7 @@ impl Encoder {
 		app: &AppHandle,
 		cfg: StreamConfig,
 		group: &str,
-	) -> Result<(Vec<String>, Option<String>), String> {
+	) -> Result<(Vec<String>, Option<String>, u64), String> {
 		let mut guard = self.groups.lock().map_err(|e| e.to_string())?;
 		if guard.contains_key(group) {
 			return Err("Cette diffusion est déjà en cours".into());
@@ -351,6 +352,7 @@ impl Encoder {
 			}
 		}
 		let bin = resolve_ffmpeg()?;
+		let run_id = self.next_run_id.fetch_add(1, Ordering::Relaxed) + 1;
 		let local_path = if cfg.record_local {
 			let dir = app
 				.path()
@@ -429,7 +431,11 @@ impl Encoder {
 						stats.backpressure_events = backpressure_stats.load(Ordering::Relaxed);
 						let _ = app_stats.emit(
 							"stream://stats",
-							serde_json::json!({ "group": group_stats, "stats": stats.clone() }),
+							serde_json::json!({
+								"group": group_stats,
+								"runId": run_id,
+								"stats": stats.clone()
+							}),
 						);
 					}
 					_ => {}
@@ -455,6 +461,7 @@ impl Encoder {
 						"stream://target",
 						serde_json::json!({
 							"group": group_log,
+							"runId": run_id,
 							"index": index,
 							"state": "failed",
 							"reason": reason
@@ -471,6 +478,7 @@ impl Encoder {
 				"stream://exited",
 				serde_json::json!({
 					"group": group_log,
+					"runId": run_id,
 					"code": code,
 					"log": tail.iter().cloned().collect::<Vec<_>>(),
 				}),
@@ -493,7 +501,7 @@ impl Encoder {
 				backpressure,
 			},
 		);
-		Ok((redact(&args), local_path))
+		Ok((redact(&args), local_path, run_id))
 	}
 
 	/// Every running group gets the same chunk. A group that has died is not
@@ -550,6 +558,24 @@ impl Encoder {
 
 	pub fn stop(&self) -> Result<(), String> {
 		self.stop_group(None)
+	}
+
+	/// Recovery cannot wait for a graceful trailer: the remote servers must see
+	/// the dead connection close before the replacement encoder reconnects.
+	pub fn abort_group(&self, group: Option<&str>) -> Result<(), String> {
+		let mut guard = self.groups.lock().map_err(|e| e.to_string())?;
+		let names: Vec<String> = match group {
+			Some(name) => vec![name.to_string()],
+			None => guard.keys().cloned().collect(),
+		};
+		for name in names {
+			let Some(mut run) = guard.remove(&name) else { continue };
+			run.tx = None;
+			if let Ok(mut child) = run.child.lock() {
+				let _ = child.kill();
+			};
+		}
+		Ok(())
 	}
 
 	fn shut_down(run: &mut Running) {

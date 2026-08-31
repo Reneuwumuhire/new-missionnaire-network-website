@@ -162,11 +162,14 @@ const en = {
 	'health.title': 'Stream health',
 	'health.bitrate': 'Bitrate',
 	'health.dataOut': 'Total data out',
-	'health.droppedNetwork': 'Dropped frames (network)',
+	'health.droppedNetwork': 'Dropped frames (encoder)',
 	'health.encodingLag': 'Encoder backpressure events',
 	'health.renderingLag': 'Frames missed (rendering lag)',
 	'health.speed': 'Encoder speed',
-	'health.congested': 'Uplink cannot keep up — lower the video bitrate',
+	'health.congested': 'Streaming pipeline is blocked — check the connection and encoder load',
+	'health.encoderSlow': 'Encoder cannot keep up — lower the resolution or frame rate',
+	'health.captureRecovering': 'Studio capture stalled — reconnecting automatically',
+	'health.recoveries': 'Automatic recoveries',
 	'health.renderSlow': 'Compositor behind — lower the resolution or fps',
 	'health.good': 'Healthy',
 	'target.connecting': 'Connecting…',
@@ -194,6 +197,7 @@ const en = {
 	'status.connecting': 'Connecting…',
 	'status.stable': 'Stable',
 	'status.behind': 'Encoder falling behind',
+	'status.recoveringCapture': 'Recovering capture…',
 	'status.live': 'LIVE',
 	'status.preview': 'PREVIEW',
 	'status.fps': '{actual} / {target} fps',
@@ -467,6 +471,8 @@ const en = {
 	'error.encoder': 'Encoder: {message}',
 	'error.stoppedCleanly': 'The broadcast stopped.',
 	'error.ffmpegExited': 'ffmpeg exited (code {code}): {log}',
+	'error.captureFailed':
+		'Studio capture stopped repeatedly. The public service was kept open; press Start Preview Signal to reconnect.',
 
 	// ── Splitters ───────────────────────────────────────────────
 	'splitter.docks': 'Panel height',

@@ -40,6 +40,7 @@
 	} from './lib/media.svelte';
 	import { Mixer, stripsToDrop } from './lib/mixer';
 	import { t } from './lib/i18n.svelte';
+	import { streamHealthIssue } from './lib/stream-health';
 	import { clamp, splitWeights, type DockId } from './lib/layout';
 	import {
 		runAudioSelftest,
@@ -319,12 +320,15 @@
 	const health = $derived.by(() => {
 		const stats = broadcast.stats;
 		if (!isStreaming()) return { tone: 'idle', label: t('status.offline') };
+		if (broadcast.captureState === 'recovering') {
+			return { tone: 'warn', label: t('status.recoveringCapture') };
+		}
 		if (broadcast.phase === 'connecting') return { tone: 'idle', label: t('status.connecting') };
 		if (broadcast.targets.some((target) => target.state === 'failed')) {
 			return { tone: 'warn', label: t('target.failed') };
 		}
 		if (!stats) return { tone: 'idle', label: t('status.connecting') };
-		if (stats.backpressure_events > 0 || stats.speed < 0.9) {
+		if (streamHealthIssue(stats, broadcast.captureState)) {
 			return { tone: 'warn', label: t('status.behind') };
 		}
 		return { tone: 'ok', label: t('status.stable') };
