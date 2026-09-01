@@ -1191,7 +1191,43 @@ export async function getStudioAuthorization(
 export async function revokeStudioAuthorization(code: string): Promise<void> {
 	if (!code) return;
 	const db = await getDb();
-	await db.collection('studio_authorizations').deleteOne({ code });
+	const authorizations = db.collection('studio_authorizations');
+	const authorization = await authorizations.findOne({ code });
+	const ingest = authorization?.missionnaire_ingest;
+	if (ingest && typeof ingest === 'object') {
+		const value = ingest as Record<string, unknown>;
+		const key = typeof value.key === 'string' ? value.key.split('?', 1)[0] : '';
+		const expiresAt = typeof value.expiresAt === 'string' ? new Date(value.expiresAt) : null;
+		if (
+			typeof value.url === 'string' &&
+			/^[0-9a-f-]{36}$/i.test(key) &&
+			expiresAt &&
+			Number.isFinite(expiresAt.getTime()) &&
+			expiresAt > new Date()
+		) {
+			let path: string | null = null;
+			try {
+				const base = new URL(value.url).pathname.replace(/^\/+|\/+$/g, '');
+				path = base ? `${base}/${key}` : key;
+			} catch {
+				// A malformed legacy value cannot authorize MediaMTX and needs no revocation.
+			}
+			if (path) {
+				const revocations = db.collection<{
+					_id: string;
+					revoked_at: Date;
+					expires_at: Date;
+				}>('studio_ingest_revocations');
+				await revocations.createIndex({ expires_at: 1 }, { expireAfterSeconds: 0 });
+				await revocations.updateOne(
+					{ _id: path },
+					{ $set: { revoked_at: new Date(), expires_at: expiresAt } },
+					{ upsert: true }
+				);
+			}
+		}
+	}
+	await authorizations.deleteOne({ code });
 }
 
 export async function listStudioScheduledLives(): Promise<ScheduledLive[]> {

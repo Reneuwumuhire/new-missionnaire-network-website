@@ -437,6 +437,8 @@ const en = {
 	'stream.addYouTubeChannel': 'Connect another YouTube channel',
 	'stream.disconnectChannel': 'Disconnect',
 	'stream.disconnectConfirm': 'Disconnect {channel} from this admin account?',
+	'stream.disconnectStudioError':
+		'Studio could not disconnect. Check your connection and try again.',
 	'stream.missionnaireManaged': 'Missionnaire broadcast',
 	'stream.missionnaireManagedHint':
 		'Studio loads a temporary destination after an authorized broadcaster connects to admin. The credential is never saved on this computer.',

@@ -14,7 +14,7 @@ import {
 } from './ffmpeg.js';
 import { createIngestCredential, verifyIngestCredential } from './ingest-auth.js';
 import { isRecovering, pendingOrphans, recoverOrphans } from './recover.js';
-import { findRecording } from './mongo.js';
+import { findRecording, isIngestRevoked } from './mongo.js';
 import { ensureRecordingsDir } from './sidecar.js';
 
 const app = Fastify({ logger: true });
@@ -65,7 +65,8 @@ app.post('/mediamtx-auth', async (req, reply) => {
 		body.protocol !== 'rtmp' ||
 		!path.startsWith('live/') ||
 		typeof body.token !== 'string' ||
-		!verifyIngestCredential(ENV.RECORDER_TOKEN, path, body.token)
+		!verifyIngestCredential(ENV.RECORDER_TOKEN, path, body.token) ||
+		(await isIngestRevoked(path))
 	) {
 		return reply.code(401).send({ error: 'unauthorized' });
 	}

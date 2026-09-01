@@ -121,12 +121,17 @@ export async function insertRecordingStarting(params: {
 
 export async function markRecordingStopping(id: ObjectId, endedAt: Date, durationSec: number) {
 	const db = await getDb();
-	await db
-		.collection<RecordingDoc>('recordings')
-		.updateOne(
-			{ _id: id },
-			{ $set: { status: 'uploading', ended_at: endedAt, duration_sec: durationSec, updated_at: new Date() } }
-		);
+	await db.collection<RecordingDoc>('recordings').updateOne(
+		{ _id: id },
+		{
+			$set: {
+				status: 'uploading',
+				ended_at: endedAt,
+				duration_sec: durationSec,
+				updated_at: new Date()
+			}
+		}
+	);
 }
 
 export async function markRecordingReady(
@@ -168,10 +173,27 @@ export async function markRecordingFailed(id: ObjectId, reason: string) {
 	const db = await getDb();
 	await db
 		.collection<RecordingDoc>('recordings')
-		.updateOne({ _id: id }, { $set: { status: 'failed', failure_reason: reason, updated_at: new Date() } });
+		.updateOne(
+			{ _id: id },
+			{ $set: { status: 'failed', failure_reason: reason, updated_at: new Date() } }
+		);
 }
 
 export async function findRecording(id: ObjectId): Promise<RecordingDoc | null> {
 	const db = await getDb();
 	return (await db.collection<RecordingDoc>('recordings').findOne({ _id: id })) ?? null;
+}
+
+/** Revocations are written by the admin app into the shared database. Deny a
+ * new publisher when that security state cannot be checked. */
+export async function isIngestRevoked(path: string): Promise<boolean> {
+	try {
+		const doc = await (await getDb())
+			.collection<{ _id: string; expires_at: Date }>('studio_ingest_revocations')
+			.findOne({ _id: path, expires_at: { $gt: new Date() } });
+		return Boolean(doc);
+	} catch (error) {
+		console.error('[recorder/mongo] failed to check ingest revocation:', error);
+		return true;
+	}
 }

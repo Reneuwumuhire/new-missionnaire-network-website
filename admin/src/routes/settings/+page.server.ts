@@ -6,6 +6,11 @@ import {
 	updateAdminPassword,
 	logAudit
 } from '../../db/collections';
+import {
+	listStudioAuthorizations,
+	revokeStudioAuthorizationById,
+	revokeStudioAuthorizationsForUser
+} from '$lib/server/studio-ingest';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -16,7 +21,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 			role: locals.user.role,
 			created_at: locals.user.created_at,
 			last_login: locals.user.last_login
-		}
+		},
+		studioAuthorizations: await listStudioAuthorizations(locals.user.email)
 	};
 };
 
@@ -93,6 +99,7 @@ export const actions: Actions = {
 
 		try {
 			const hash = await hashPassword(newPassword);
+			await revokeStudioAuthorizationsForUser(locals.user.email);
 			await updateAdminPassword(locals.user.email, hash);
 
 			await logAudit({
@@ -109,5 +116,22 @@ export const actions: Actions = {
 		} catch {
 			return fail(500, { passwordError: 'Erreur lors de la mise à jour', passwordSuccess: false });
 		}
+	},
+
+	revokeStudio: async ({ request, locals, getClientAddress }) => {
+		const id = (await request.formData()).get('id')?.toString();
+		if (!id) return fail(400, { studioError: 'Invalid Studio session' });
+		if (!(await revokeStudioAuthorizationById(id, locals.user.email))) {
+			return fail(404, { studioError: 'Studio session not found' });
+		}
+		await logAudit({
+			user_id: locals.user.email,
+			user_email: locals.user.email,
+			action: 'delete',
+			target_collection: 'studio_authorizations',
+			target_id: id,
+			ip_address: getClientAddress()
+		});
+		return { studioRevoked: true };
 	}
 };
