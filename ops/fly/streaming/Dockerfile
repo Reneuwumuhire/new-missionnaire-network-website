@@ -47,7 +47,8 @@ WORKDIR /app
 COPY ops/fly/streaming/mediamtx.yml /app/mediamtx.yml
 COPY ops/fly/streaming/icecast.xml.template /app/icecast.xml.template
 COPY ops/fly/streaming/entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+COPY ops/fly/streaming/select-publisher.sh /app/select-publisher.sh
+RUN chmod +x /app/entrypoint.sh /app/select-publisher.sh
 
 # Recorder runtime: production deps + compiled JS
 COPY ops/streaming/recorder/package.json /app/recorder/package.json
