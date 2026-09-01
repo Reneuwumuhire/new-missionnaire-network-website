@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { t, type TranslationKey } from '$lib/i18n';
+	import { locale, t, type TranslationKey } from '$lib/i18n';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	let profileLoading = $state(false);
 	let passwordLoading = $state(false);
-	let studioRevoking = $state<string | null>(null);
+	let studioWorking = $state<string | null>(null);
 	let showCurrentPassword = $state(false);
 	let showNewPassword = $state(false);
 
@@ -27,7 +27,7 @@
 
 	function formatDate(date: string | Date | null): string {
 		if (!date) return $t('settings.never');
-		return new Date(date).toLocaleDateString('fr-FR', {
+		return new Date(date).toLocaleDateString($locale === 'en' ? 'en-US' : 'fr-FR', {
 			day: 'numeric',
 			month: 'long',
 			year: 'numeric',
@@ -212,9 +212,19 @@
 				{$t('settings.studioRevoked')}
 			</div>
 		{/if}
+		{#if form?.studioDeleted}
+			<div class="mt-4 border border-green-200 bg-green-50/80 px-4 py-3 text-sm text-green-700">
+				{$t('settings.studioDeleted')}
+			</div>
+		{/if}
 		{#if form?.studioError}
 			<div class="mt-4 border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-red-700">
 				{$t('settings.studioRevokeError')}
+			</div>
+		{/if}
+		{#if form?.studioDeleteError}
+			<div class="mt-4 border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-red-700">
+				{$t('settings.studioDeleteError')}
 			</div>
 		{/if}
 
@@ -222,28 +232,63 @@
 			<p class="mt-5 bg-cream/50 px-4 py-3 text-sm text-stone-500">{$t('settings.studioNone')}</p>
 		{:else}
 			<div class="mt-5 divide-y divide-stone-100 border border-stone-200/70">
-				{#each data.studioAuthorizations as authorization, index (authorization.id)}
-					<div class="flex items-center justify-between gap-4 p-4">
+				{#each data.studioAuthorizations as authorization (authorization.id)}
+					<div class="flex items-start justify-between gap-4 p-4">
 						<div class="min-w-0">
-							<p class="font-medium text-stone-700">Missionnaire Studio {index + 1}</p>
+							<div class="flex flex-wrap items-center gap-2">
+								<p class="font-medium text-stone-700">
+									{authorization.device?.deviceName ?? 'Missionnaire Studio'}
+								</p>
+								<span
+									class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {authorization.online
+										? 'bg-green-100 text-green-700'
+										: authorization.connected
+											? 'bg-amber-100 text-amber-700'
+											: 'bg-stone-100 text-stone-500'}"
+								>
+									{$t(
+										authorization.online
+											? 'settings.studioOnline'
+											: authorization.connected
+												? 'settings.studioOffline'
+												: 'settings.studioDisconnected'
+									)}
+								</span>
+							</div>
+							{#if authorization.device}
+								<p class="mt-1 text-xs text-stone-500">
+									{authorization.device.os ?? $t('settings.studioUnknown')}
+									{#if authorization.device.architecture}
+										· {authorization.device.architecture}{/if}
+									{#if authorization.device.username}
+										· {$t('settings.studioUser')}: {authorization.device.username}{/if}
+									{#if authorization.device.appVersion}
+										· {$t('settings.studioApp')}: {authorization.device.appVersion}{/if}
+								</p>
+							{:else}
+								<p class="mt-1 text-xs text-stone-400">{$t('settings.studioLegacyDevice')}</p>
+							{/if}
 							<p class="mt-1 text-xs text-stone-400">
-								{$t('settings.studioConnected')}: {formatDate(authorization.approvedAt)}
+								{$t('settings.studioAuthorized')}: {formatDate(authorization.approvedAt)}
 								<span class="mx-1">·</span>
-								{$t('settings.studioLastUsed')}: {formatDate(authorization.lastUsedAt)}
+								{$t('settings.studioLastSeen')}: {formatDate(authorization.lastSeenAt)}
 								<span class="mx-1">·</span>
 								{$t('settings.studioExpires')}: {formatDate(authorization.expiresAt)}
 							</p>
 						</div>
 						<form
 							method="POST"
-							action="?/revokeStudio"
+							action={authorization.connected ? '?/revokeStudio' : '?/deleteStudio'}
 							onsubmit={(event) => {
-								if (!confirm($t('settings.studioRevokeConfirm'))) event.preventDefault();
+								const key = authorization.connected
+									? 'settings.studioRevokeConfirm'
+									: 'settings.studioDeleteConfirm';
+								if (!confirm($t(key))) event.preventDefault();
 							}}
 							use:enhance={() => {
-								studioRevoking = authorization.id;
+								studioWorking = authorization.id;
 								return async ({ update }) => {
-									studioRevoking = null;
+									studioWorking = null;
 									await update();
 								};
 							}}
@@ -251,10 +296,10 @@
 							<input type="hidden" name="id" value={authorization.id} />
 							<button
 								type="submit"
-								disabled={studioRevoking === authorization.id}
+								disabled={studioWorking === authorization.id}
 								class="admin-btn-secondary text-red-600 disabled:opacity-50"
 							>
-								{$t('settings.studioRevoke')}
+								{$t(authorization.connected ? 'settings.studioRevoke' : 'settings.studioDelete')}
 							</button>
 						</form>
 					</div>

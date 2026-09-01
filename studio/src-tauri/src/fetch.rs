@@ -210,7 +210,6 @@ pub struct Chunk {
 	pub body: Vec<u8>,
 	pub content_type: String,
 	pub content_range: Option<String>,
-	pub total: Option<u64>,
 }
 
 pub fn chunk(url: &str, range: Option<&str>) -> Result<Chunk, String> {
@@ -254,15 +253,10 @@ pub fn chunk(url: &str, range: Option<&str>) -> Result<Chunk, String> {
 			.map(|(_, v)| v.trim().to_string())
 	};
 	let content_range = header("content-range");
-	let total = content_range
-		.as_deref()
-		.and_then(|v| v.rsplit('/').next())
-		.and_then(|v| v.trim().parse::<u64>().ok());
 	Ok(Chunk {
 		status: if content_range.is_some() { 206 } else { 200 },
 		content_type: header("content-type").unwrap_or_else(|| "application/octet-stream".into()),
 		content_range,
-		total,
 		body: out.stdout,
 	})
 }

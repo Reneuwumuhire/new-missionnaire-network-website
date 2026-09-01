@@ -37,7 +37,8 @@ export const actions: Actions = {
 					user_name: locals.user.name,
 					approved_at: now,
 					expires_at: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
-				}
+				},
+				$unset: { revoked_at: '', device: '', last_seen_at: '', last_used_at: '' }
 			},
 			{ upsert: true }
 		);

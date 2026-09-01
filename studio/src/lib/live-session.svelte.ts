@@ -50,6 +50,23 @@ export type NewSession = {
 
 type YouTubeIngest = { url: string; key: string };
 type MissionnaireIngest = YouTubeIngest & { expiresAt: string };
+type StudioDeviceInfo = {
+	os: string;
+	architecture: string;
+	username: string;
+	deviceName: string;
+	appVersion: string;
+};
+
+let deviceInfoPromise: Promise<StudioDeviceInfo> | null = null;
+
+function studioDeviceInfo() {
+	deviceInfoPromise ??= invoke<StudioDeviceInfo>('studio_device_info').catch((error) => {
+		deviceInfoPromise = null;
+		throw error;
+	});
+	return deviceInfoPromise;
+}
 
 export const liveSession = $state({
 	sessions: [] as LiveSession[],
@@ -203,6 +220,7 @@ export async function connectWithAdmin() {
 
 export async function refreshYouTubeStatus() {
 	try {
+		const deviceInfo = await studioDeviceInfo().catch(() => null);
 		const result = await adminPost<{
 			channels?: YouTubeChannel[];
 			connected?: boolean;
@@ -210,7 +228,8 @@ export async function refreshYouTubeStatus() {
 			missionnaireIngest?: MissionnaireIngest | null;
 			missionnaireError?: string | null;
 		}>({
-			action: 'status'
+			action: 'status',
+			deviceInfo
 		});
 		const channels = youtubeChannelsFromStatus(result);
 		liveSession.youtubeChannels = channels;
@@ -240,6 +259,12 @@ export async function refreshYouTubeStatus() {
 		liveSession.missionnaireReady = false;
 		liveSession.missionnaireError = liveSession.youtubeError;
 	}
+}
+
+export async function heartbeatStudio() {
+	if (!liveSession.pairingCode || !liveSession.operatorName) return;
+	const deviceInfo = await studioDeviceInfo().catch(() => null);
+	await adminPost({ action: 'heartbeat', deviceInfo }).catch(() => undefined);
 }
 
 export async function connectYouTube(): Promise<string | null> {
@@ -540,6 +565,7 @@ export async function logoutStudio(): Promise<boolean> {
 
 export async function startSelectedSession(): Promise<boolean> {
 	if (!liveSession.selectedId || liveSession.starting || liveSession.activeId) return false;
+	liveSession.error = null;
 	liveSession.starting = true;
 	try {
 		const result = await post<{ startedAt: string }>({
@@ -555,6 +581,7 @@ export async function startSelectedSession(): Promise<boolean> {
 				: 'broadcast'
 		});
 		liveSession.activeId = liveSession.selectedId;
+		liveSession.error = null;
 		liveSession.activeStartedAt = new Date(result.startedAt).getTime();
 		attachedSessionId = null;
 		void syncLiveLyrics();

@@ -59,6 +59,13 @@ jobs:
         working-directory: studio
         run: pnpm install --frozen-lockfile
 
+      # Studio is intentionally installable by itself. Vite still discovers
+      # the parent site's tsconfig, whose generated base does not exist in this
+      # Studio-only job, so provide the harmless generated placeholder.
+      - name: Prepare parent TypeScript base
+        run: |
+          node -e 'require("node:fs").mkdirSync(".svelte-kit", { recursive: true }); require("node:fs").writeFileSync(".svelte-kit/tsconfig.json", "{}\n")'
+
       - name: Build, sign, and publish
         uses: tauri-apps/tauri-action@v1
         env:

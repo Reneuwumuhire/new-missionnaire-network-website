@@ -208,7 +208,8 @@ fn validate_url(url: &str) -> Result<(), String> {
 	Ok(())
 }
 
-pub fn build_args(cfg: &StreamConfig) -> Result<Vec<String>, String> {
+#[cfg(test)]
+fn build_args(cfg: &StreamConfig) -> Result<Vec<String>, String> {
 	build_args_with_path(cfg, None)
 }
 
