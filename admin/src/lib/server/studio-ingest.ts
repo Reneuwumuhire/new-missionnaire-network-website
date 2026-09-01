@@ -108,23 +108,27 @@ async function revokeIngest(ingest: MissionnaireIngest | null) {
 }
 
 export async function missionnaireIngestForAuthorization(
-	code: string,
-	authorization?: Authorization
+	code: string
 ): Promise<MissionnaireIngest> {
 	const db = await getDb();
 	const collection = db.collection<Authorization>('studio_authorizations');
-	const doc =
-		authorization ??
-		(await collection.findOne({
-			code,
-			revoked_at: { $exists: false },
-			expires_at: { $gt: new Date() }
-		}));
+	// Always load the current document. A status request started just before
+	// re-approval must never return the credential that re-approval revoked.
+	const doc = await collection.findOne({
+		code,
+		revoked_at: { $exists: false },
+		expires_at: { $gt: new Date() }
+	});
 	if (!doc) throw new Error('Studio authorization not found');
 	const existing = cachedIngest(doc.missionnaire_ingest);
 	if (existing) {
 		const active = await collection.updateOne(
-			{ code, revoked_at: { $exists: false }, expires_at: { $gt: new Date() } },
+			{
+				code,
+				revoked_at: { $exists: false },
+				expires_at: { $gt: new Date() },
+				missionnaire_ingest: doc.missionnaire_ingest
+			},
 			{ $set: { last_used_at: new Date() } }
 		);
 		if (active.matchedCount === 1) return existing;
