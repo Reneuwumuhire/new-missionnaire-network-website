@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	isLatestStatusRequest,
 	sessionYouTubeChannelId,
+	subtitleNeedsAttach,
 	type YouTubeChannel,
 	youtubeChannelsFromStatus
 } from './live-session.svelte';
@@ -32,4 +33,13 @@ it('accepts the older single-channel admin response', () => {
 		{ id: 'legacy:Missionnaire TV', title: 'Missionnaire TV', updatedAt: '' }
 	]);
 	expect(youtubeChannelsFromStatus({ connected: false, channelTitle: null })).toEqual([]);
+});
+
+it('reattaches a subtitle loaded later in the same live session', () => {
+	expect(subtitleNeedsAttach('live-1', 'subtitles/new.srt', 'live-1', 'subtitles/old.srt')).toBe(
+		true
+	);
+	expect(subtitleNeedsAttach('live-1', 'subtitles/new.srt', 'live-1', 'subtitles/new.srt')).toBe(
+		false
+	);
 });

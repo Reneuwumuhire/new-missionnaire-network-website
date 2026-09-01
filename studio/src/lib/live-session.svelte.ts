@@ -360,6 +360,16 @@ async function upload(file: File, action: 'presign-thumbnail' | 'presign-subtitl
 let uploadedSubtitle: { text: string; url: string; key: string } | null = null;
 let subtitleUpload: Promise<{ url: string; key: string }> | null = null;
 let attachedSessionId: string | null = null;
+let attachedSubtitleKey: string | null = null;
+
+export function subtitleNeedsAttach(
+	sessionId: string,
+	subtitleKey: string,
+	attachedSession: string | null,
+	attachedKey: string | null
+) {
+	return sessionId !== attachedSession || subtitleKey !== attachedKey;
+}
 
 async function ensureTimedSubtitle() {
 	if (uploadedSubtitle?.text === lyrics.srtText) return uploadedSubtitle;
@@ -406,7 +416,12 @@ export async function syncLiveLyrics() {
 		const positionMs = paused
 			? sourcePositionMs
 			: outputAlignedPositionMs(sourcePositionMs, sampledAtMs);
-		const attach = attachedSessionId !== liveSession.activeId;
+		const attach = subtitleNeedsAttach(
+			liveSession.activeId,
+			uploaded.key,
+			attachedSessionId,
+			attachedSubtitleKey
+		);
 		await post({
 			action: 'sync-subtitles',
 			sessionId: liveSession.activeId,
@@ -425,6 +440,7 @@ export async function syncLiveLyrics() {
 				: {})
 		});
 		attachedSessionId = liveSession.activeId;
+		attachedSubtitleKey = uploaded.key;
 	} catch (error) {
 		liveSession.error = error instanceof Error ? error.message : String(error);
 	}
@@ -570,6 +586,7 @@ export async function logoutStudio(): Promise<boolean> {
 	liveSession.missionnaireError = null;
 	disableManagedMissionnaire();
 	attachedSessionId = null;
+	attachedSubtitleKey = null;
 	return true;
 }
 
@@ -594,6 +611,7 @@ export async function startSelectedSession(): Promise<boolean> {
 		liveSession.error = null;
 		liveSession.activeStartedAt = new Date(result.startedAt).getTime();
 		attachedSessionId = null;
+		attachedSubtitleKey = null;
 		void syncLiveLyrics();
 		return true;
 	} catch (error) {
@@ -625,5 +643,6 @@ export async function endSelectedSession() {
 		liveSession.activeId = null;
 		liveSession.activeStartedAt = null;
 		attachedSessionId = null;
+		attachedSubtitleKey = null;
 	}
 }
