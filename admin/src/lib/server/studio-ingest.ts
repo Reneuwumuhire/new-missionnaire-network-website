@@ -23,6 +23,7 @@ export type StudioDeviceMetadata = {
 	username: string | null;
 	deviceName: string | null;
 	appVersion: string | null;
+	installationId: string | null;
 };
 
 type IngestRevocation = {
@@ -63,7 +64,12 @@ export function studioDeviceMetadata(value: unknown): StudioDeviceMetadata | nul
 		architecture: safeLabel(device.architecture, 32),
 		username: safeLabel(device.username, 80),
 		deviceName: safeLabel(device.deviceName, 80),
-		appVersion: safeLabel(device.appVersion, 32)
+		appVersion: safeLabel(device.appVersion, 32),
+		installationId:
+			typeof device.installationId === 'string' &&
+			/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(device.installationId)
+				? device.installationId
+				: null
 	};
 	return Object.values(result).some(Boolean) ? result : null;
 }
@@ -72,12 +78,33 @@ export async function updateStudioAuthorizationActivity(code: string, value: unk
 	const device = studioDeviceMetadata(value);
 	const update: Record<string, unknown> = { last_seen_at: new Date() };
 	if (device) update.device = device;
-	await (await getDb())
-		.collection<Authorization>('studio_authorizations')
-		.updateOne(
-			{ code, revoked_at: { $exists: false }, expires_at: { $gt: new Date() } },
-			{ $set: update }
-		);
+	const collection = (await getDb()).collection<Authorization>('studio_authorizations');
+	const active = { code, revoked_at: { $exists: false }, expires_at: { $gt: new Date() } };
+	await collection.updateOne(active, { $set: update });
+	if (!device?.installationId || !device.deviceName || !device.username || !device.os) return;
+	const current = await collection.findOne(active);
+	if (!current || typeof current.user_email !== 'string') return;
+	const duplicates = await collection
+		.find({
+			_id: { $ne: current._id },
+			user_email: current.user_email,
+			$or: [
+				{ 'device.installationId': device.installationId },
+				{
+					'device.installationId': { $exists: false },
+					'device.deviceName': device.deviceName,
+					'device.username': device.username,
+					'device.os': device.os,
+					'device.architecture': device.architecture
+				}
+			]
+		})
+		.toArray();
+	if (duplicates.length === 0) return;
+	await Promise.all(
+		duplicates.map((duplicate) => revokeIngest(cachedIngest(duplicate.missionnaire_ingest, 0)))
+	);
+	await collection.deleteMany({ _id: { $in: duplicates.map(({ _id }) => _id) } });
 }
 
 function ingestPath(ingest: MissionnaireIngest): string | null {

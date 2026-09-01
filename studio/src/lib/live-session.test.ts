@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	isLatestStatusRequest,
+	restoreStudioAuthorization,
 	sessionYouTubeChannelId,
 	type YouTubeChannel,
 	youtubeChannelsFromStatus
@@ -9,6 +10,15 @@ import {
 it('ignores an older status response after a newer refresh starts', () => {
 	expect(isLatestStatusRequest(4, 5)).toBe(false);
 	expect(isLatestStatusRequest(5, 5)).toBe(true);
+});
+
+it('restores only a valid saved Studio authorization', () => {
+	const storage = { getItem: () => '857c4709-a049-43a9-9fe2-b83c5fce22d3' };
+	expect(restoreStudioAuthorization(storage)).toBe('857c4709-a049-43a9-9fe2-b83c5fce22d3');
+	expect(restoreStudioAuthorization({ getItem: () => 'not-an-authorization' })).toBeNull();
+	expect(
+		restoreStudioAuthorization({ getItem: () => '857c4709a049-43a9-9fe2-b83c5fce22d3-' })
+	).toBeNull();
 });
 
 const channels: YouTubeChannel[] = [

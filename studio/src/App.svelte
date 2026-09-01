@@ -54,6 +54,7 @@
 		heartbeatStudio,
 		liveSession,
 		logoutStudio,
+		refreshSessions,
 		refreshYouTubeStatus
 	} from './lib/live-session.svelte';
 	import { recording } from './lib/recording.svelte';
@@ -156,6 +157,7 @@
 		}, 1000);
 		void heartbeatStudio();
 		const heartbeat = setInterval(() => void heartbeatStudio(), 60_000);
+		if (liveSession.pairingCode) void refreshSessions();
 		return () => {
 			stopMenuListener?.();
 			stopCloseListener?.();
