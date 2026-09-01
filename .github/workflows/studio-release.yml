@@ -13,6 +13,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: studio-release
+  cancel-in-progress: true
+
 jobs:
   publish:
     name: ${{ matrix.name }}
@@ -78,7 +82,11 @@ jobs:
           tauriScript: pnpm tauri
           tagName: studio-v__VERSION__
           releaseName: Missionnaire Studio v__VERSION__
-          releaseBody: Download and install Missionnaire Studio. Existing installations can update from Settings → About.
+          releaseBody: |
+            This release includes the latest Missionnaire Studio improvements and fixes.
+
+            Existing installations can update from Settings → About.
+          generateReleaseNotes: true
           releaseDraft: false
           prerelease: false
           updaterJsonPreferNsis: true
