@@ -44,10 +44,10 @@ export class RecorderError extends Error {
 	}
 }
 
-/** Hard cap for any recorder HTTP call. Fly free-tier instances cold-start
- *  in ~5–10s; the page loaders that read recorderStatus() shouldn't block
- *  that long. A 3s timeout matches what icecast.ts uses for the same reason. */
-const RECORDER_TIMEOUT_MS = 3000;
+/** Status reads keep pages responsive. Start/stop may cold-start Fly and stop
+ *  also has to finalize the current segments before it can acknowledge us. */
+const RECORDER_STATUS_TIMEOUT_MS = 3000;
+const RECORDER_COMMAND_TIMEOUT_MS = 20_000;
 
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
 	const baseUrl = env.RECORDER_URL;
@@ -61,17 +61,15 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
 		headers.set('Content-Type', 'application/json');
 	}
 	const controller = new AbortController();
-	const timeout = setTimeout(() => controller.abort(), RECORDER_TIMEOUT_MS);
+	const timeoutMs =
+		init.method === 'GET' ? RECORDER_STATUS_TIMEOUT_MS : RECORDER_COMMAND_TIMEOUT_MS;
+	const timeout = setTimeout(() => controller.abort(), timeoutMs);
 	let res: Response;
 	try {
 		res = await fetch(`${baseUrl}${path}`, { ...init, headers, signal: controller.signal });
 	} catch (err) {
 		if ((err as Error).name === 'AbortError') {
-			throw new RecorderError(
-				`Recorder service timed out after ${RECORDER_TIMEOUT_MS}ms`,
-				504,
-				'timeout'
-			);
+			throw new RecorderError(`Recorder service timed out after ${timeoutMs}ms`, 504, 'timeout');
 		}
 		throw err;
 	} finally {

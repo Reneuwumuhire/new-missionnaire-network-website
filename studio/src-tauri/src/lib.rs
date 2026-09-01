@@ -142,7 +142,19 @@ fn studio_post(body: String, authorization: String, base_url: String, path: &str
 		return Err("URL du site invalide".into());
 	}
 	let output = Command::new("curl")
-		.args(["--fail-with-body", "--silent", "--show-error", "--retry", "2", "--retry-delay", "1", "--max-time", "20", "-X", "POST"])
+		.args([
+			"--fail-with-body",
+			"--silent",
+			"--show-error",
+			"--retry",
+			"2",
+			"--retry-delay",
+			"1",
+			"--max-time",
+			"30",
+			"-X",
+			"POST",
+		])
 		.arg("-H").arg(format!("Authorization: Bearer {authorization}"))
 		.args(["-H", "Content-Type: application/json", "--data"])
 		.arg(body)
