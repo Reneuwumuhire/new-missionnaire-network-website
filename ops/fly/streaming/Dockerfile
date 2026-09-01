@@ -36,7 +36,7 @@ RUN set -eux; \
 	arm64) mtx_arch="arm64" ;; \
 	*) echo "Unsupported architecture: ${arch}" && exit 1 ;; \
 	esac; \
-	curl -fsSL -o /tmp/mediamtx.tar.gz "https://github.com/bluenviron/mediamtx/releases/download/${MEDIAMTX_VERSION}/mediamtx_${MEDIAMTX_VERSION}_linux_${mtx_arch}.tar.gz"; \
+	curl --retry 5 --retry-all-errors --retry-delay 2 -fsSL -o /tmp/mediamtx.tar.gz "https://github.com/bluenviron/mediamtx/releases/download/${MEDIAMTX_VERSION}/mediamtx_${MEDIAMTX_VERSION}_linux_${mtx_arch}.tar.gz"; \
 	mkdir -p /tmp/mediamtx; \
 	tar -xzf /tmp/mediamtx.tar.gz -C /tmp/mediamtx; \
 	install -m 0755 /tmp/mediamtx/mediamtx /usr/local/bin/mediamtx; \
