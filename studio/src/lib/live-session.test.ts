@@ -4,6 +4,7 @@ import {
 	restoreStudioAuthorization,
 	sessionYouTubeChannelId,
 	subtitleNeedsAttach,
+	subtitleSyncAction,
 	type YouTubeChannel,
 	youtubeChannelsFromStatus
 } from './live-session.svelte';
@@ -52,4 +53,10 @@ it('reattaches a subtitle loaded later in the same live session', () => {
 	expect(subtitleNeedsAttach('live-1', 'subtitles/new.srt', 'live-1', 'subtitles/new.srt')).toBe(
 		false
 	);
+});
+
+it('attaches a live subtitle before its timing source is ready', () => {
+	expect(subtitleSyncAction(true, false)).toBe('attach');
+	expect(subtitleSyncAction(false, false)).toBeNull();
+	expect(subtitleSyncAction(true, true)).toBe('sync');
 });
