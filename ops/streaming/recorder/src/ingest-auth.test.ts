@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createIngestCredential, verifyIngestCredential } from './ingest-auth.js';
+import { createIngestCredential, ingestToken, verifyIngestCredential } from './ingest-auth.js';
+
+test('reads RTMP tokens from both MediaMTX auth payload formats', () => {
+	assert.equal(ingestToken('new-format', 'token=old-format'), 'new-format');
+	assert.equal(ingestToken('', 'token=old-format'), 'old-format');
+	assert.equal(ingestToken(undefined, 'user=studio&token=signed%2Etoken'), 'signed.token');
+	assert.equal(ingestToken(undefined, undefined), null);
+});
 
 test('issues a path-bound credential that expires', () => {
 	const now = Date.UTC(2026, 7, 30);

@@ -12,7 +12,7 @@ import {
 	startRecording,
 	stopRecording
 } from './ffmpeg.js';
-import { createIngestCredential, verifyIngestCredential } from './ingest-auth.js';
+import { createIngestCredential, ingestToken, verifyIngestCredential } from './ingest-auth.js';
 import { isRecovering, pendingOrphans, recoverOrphans } from './recover.js';
 import { findRecording, isIngestRevoked } from './mongo.js';
 import { ensureRecordingsDir } from './sidecar.js';
@@ -37,6 +37,7 @@ app.get('/health', async () => ({ ok: true }));
 
 type MediaMtxAuthBody = {
 	token?: unknown;
+	query?: unknown;
 	ip?: unknown;
 	action?: unknown;
 	path?: unknown;
@@ -46,6 +47,7 @@ type MediaMtxAuthBody = {
 app.post('/mediamtx-auth', async (req, reply) => {
 	const body = (req.body ?? {}) as MediaMtxAuthBody;
 	const path = typeof body.path === 'string' ? body.path : '';
+	const token = ingestToken(body.token, body.query);
 	const loopback = body.ip === '127.0.0.1' || body.ip === '::1';
 	if (body.action === 'read' && body.protocol === 'rtsp' && loopback && path.startsWith('live/')) {
 		return reply.send({ ok: true });
@@ -64,8 +66,8 @@ app.post('/mediamtx-auth', async (req, reply) => {
 		body.action !== 'publish' ||
 		body.protocol !== 'rtmp' ||
 		!path.startsWith('live/') ||
-		typeof body.token !== 'string' ||
-		!verifyIngestCredential(ENV.RECORDER_TOKEN, path, body.token) ||
+		!token ||
+		!verifyIngestCredential(ENV.RECORDER_TOKEN, path, token) ||
 		(await isIngestRevoked(path))
 	) {
 		return reply.code(401).send({ error: 'unauthorized' });

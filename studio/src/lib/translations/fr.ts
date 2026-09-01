@@ -31,6 +31,7 @@ const fr: Record<keyof typeof en, string> = {
 	'common.unlock': 'Déverrouiller',
 	'common.name': 'Nom',
 	'common.none': 'Aucun',
+	'error.stopBeforeClose': 'Arrêtez la diffusion avant de fermer Missionnaire Studio.',
 
 	// ── Preview ─────────────────────────────────────────────────
 	'preview.preview': 'Aperçu',
