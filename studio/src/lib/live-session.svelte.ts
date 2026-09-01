@@ -56,20 +56,62 @@ type StudioDeviceInfo = {
 	username: string;
 	deviceName: string;
 	appVersion: string;
+	installationId: string;
 };
 
 let deviceInfoPromise: Promise<StudioDeviceInfo> | null = null;
 let youtubeStatusRequest = 0;
+const AUTH_STORAGE_KEY = 'missionnaire-studio-authorization-v1';
+const INSTALLATION_STORAGE_KEY = 'missionnaire-studio-installation-v1';
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type AuthorizationStorage = Pick<Storage, 'getItem'>;
+
+export function restoreStudioAuthorization(storage: AuthorizationStorage): string | null {
+	try {
+		const code = storage.getItem(AUTH_STORAGE_KEY);
+		return code && UUID_PATTERN.test(code) ? code : null;
+	} catch {
+		return null;
+	}
+}
+
+function studioInstallationId(): string {
+	if (typeof localStorage !== 'undefined') {
+		try {
+			const saved = localStorage.getItem(INSTALLATION_STORAGE_KEY);
+			if (saved && UUID_PATTERN.test(saved)) return saved;
+			const created = crypto.randomUUID();
+			localStorage.setItem(INSTALLATION_STORAGE_KEY, created);
+			return created;
+		} catch {
+			// A stable id is helpful, not required for broadcasting.
+		}
+	}
+	return crypto.randomUUID();
+}
+
+function saveStudioAuthorization(code: string | null) {
+	if (typeof localStorage === 'undefined') return;
+	try {
+		if (code) localStorage.setItem(AUTH_STORAGE_KEY, code);
+		else localStorage.removeItem(AUTH_STORAGE_KEY);
+	} catch {
+		// Storage failure leaves the current session usable until Studio closes.
+	}
+}
 
 export function isLatestStatusRequest(request: number, latest: number): boolean {
 	return request === latest;
 }
 
 function studioDeviceInfo() {
-	deviceInfoPromise ??= invoke<StudioDeviceInfo>('studio_device_info').catch((error) => {
-		deviceInfoPromise = null;
-		throw error;
-	});
+	deviceInfoPromise ??= invoke<Omit<StudioDeviceInfo, 'installationId'>>('studio_device_info')
+		.then((device) => ({ ...device, installationId: studioInstallationId() }))
+		.catch((error) => {
+			deviceInfoPromise = null;
+			throw error;
+		});
 	return deviceInfoPromise;
 }
 
@@ -80,7 +122,8 @@ export const liveSession = $state({
 	activeStartedAt: null as number | null,
 	error: null as string | null,
 	starting: false,
-	pairingCode: null as string | null,
+	pairingCode:
+		typeof localStorage === 'undefined' ? null : restoreStudioAuthorization(localStorage),
 	operatorName: null as string | null,
 	testUrl: null as string | null,
 	youtubeConnected: false,
@@ -206,7 +249,10 @@ export function selectYouTubeChannel(channelId: string | null) {
 }
 
 export async function connectWithAdmin() {
-	if (!liveSession.pairingCode) liveSession.pairingCode = crypto.randomUUID();
+	if (!liveSession.pairingCode) {
+		liveSession.pairingCode = crypto.randomUUID();
+		saveStudioAuthorization(liveSession.pairingCode);
+	}
 	await invoke('studio_open_login', {
 		code: liveSession.pairingCode,
 		adminUrl: studio.settings.adminSiteUrl
@@ -570,6 +616,7 @@ export async function logoutStudio(): Promise<boolean> {
 		return false;
 	}
 	liveSession.pairingCode = null;
+	saveStudioAuthorization(null);
 	liveSession.operatorName = null;
 	liveSession.selectedId = null;
 	liveSession.activeId = null;

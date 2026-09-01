@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	cachedIngest,
 	missionnaireIngestForAuthorization,
-	studioDeviceMetadata
+	studioDeviceMetadata,
+	updateStudioAuthorizationActivity
 } from './studio-ingest';
 
 const mocks = vi.hoisted(() => ({
@@ -62,6 +63,7 @@ describe('Studio device metadata', () => {
 				username: ' rene ',
 				deviceName: 'Studio Mac',
 				appVersion: '0.1.4',
+				installationId: '857c4709-a049-43a9-9fe2-b83c5fce22d3',
 				extra: 'ignored'
 			})
 		).toEqual({
@@ -69,11 +71,37 @@ describe('Studio device metadata', () => {
 			architecture: 'a'.repeat(32),
 			username: 'rene',
 			deviceName: 'Studio Mac',
-			appVersion: '0.1.4'
+			appVersion: '0.1.4',
+			installationId: '857c4709-a049-43a9-9fe2-b83c5fce22d3'
 		});
 	});
 
 	it('rejects non-object metadata', () => {
 		expect(studioDeviceMetadata('Windows')).toBeNull();
+	});
+
+	it('removes an older authorization for the same installation', async () => {
+		const deleteMany = vi.fn().mockResolvedValue({ deletedCount: 1 });
+		const collection = {
+			updateOne: vi.fn().mockResolvedValue({ matchedCount: 1 }),
+			findOne: vi.fn().mockResolvedValue({ _id: 'current', user_email: 'rene@example.com' }),
+			find: vi.fn().mockReturnValue({ toArray: () => Promise.resolve([{ _id: 'old' }]) }),
+			deleteMany
+		};
+		mocks.getDb.mockResolvedValue({ collection: () => collection });
+
+		await updateStudioAuthorizationActivity('current-code', {
+			os: 'macOS',
+			architecture: 'aarch64',
+			username: 'rene',
+			deviceName: 'renes-mac-mini',
+			appVersion: '0.1.12',
+			installationId: '857c4709-a049-43a9-9fe2-b83c5fce22d3'
+		});
+
+		expect(collection.find).toHaveBeenCalledWith(
+			expect.objectContaining({ user_email: 'rene@example.com' })
+		);
+		expect(deleteMany).toHaveBeenCalledWith({ _id: { $in: ['old'] } });
 	});
 });
