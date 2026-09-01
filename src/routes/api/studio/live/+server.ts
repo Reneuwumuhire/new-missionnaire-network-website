@@ -32,6 +32,15 @@ function defaultTitle(template: string | null): string {
 	return value.includes('{date}') ? value.replaceAll('{date}', date) : `${date} ${value}`;
 }
 
+function validSubtitleUpload(key?: string, url?: string): boolean {
+	return (
+		typeof key === 'string' &&
+		typeof url === 'string' &&
+		key.startsWith('subtitles/') &&
+		url === s3Url(key)
+	);
+}
+
 export async function POST({ request, url }) {
 	const serverReceivedAtMs = Date.now();
 	const body = (await request.json().catch(() => ({}))) as {
@@ -145,6 +154,30 @@ export async function POST({ request, url }) {
 		});
 	}
 	if (!body.sessionId) throw error(400, 'sessionId required');
+	if (body.action === 'attach-subtitles') {
+		const current = await getBroadcastAdminState();
+		if (!current.is_live || current.scheduled_live_id !== body.sessionId) {
+			throw error(409, 'This session is not live');
+		}
+		if (!validSubtitleUpload(body.subtitleKey, body.subtitleUrl)) {
+			throw error(400, 'Invalid subtitle upload');
+		}
+		await updateStudioLiveSubtitles(body.sessionId, {
+			subtitle_srt_url: body.subtitleUrl!,
+			subtitle_srt_s3_key: body.subtitleKey!,
+			subtitle_filename: body.subtitleFilename?.slice(0, 255) || 'studio.srt',
+			subtitle_anchor_epoch_ms: null,
+			subtitle_offset_ms: 0
+		});
+		await setBroadcastAdminState({
+			subtitle_srt_url: body.subtitleUrl!,
+			subtitle_srt_s3_key: body.subtitleKey!,
+			subtitle_anchor_epoch_ms: null,
+			subtitle_offset_ms: 0,
+			subtitle_paused_position_ms: null
+		});
+		return json({ ok: true });
+	}
 	if (body.action === 'hide-subtitles') {
 		const current = await getBroadcastAdminState();
 		if (!current.is_live || current.scheduled_live_id !== body.sessionId) {
@@ -173,10 +206,7 @@ export async function POST({ request, url }) {
 
 		const attached = Boolean(body.subtitleKey || body.subtitleUrl);
 		if (attached) {
-			if (
-				!body.subtitleKey?.startsWith('subtitles/') ||
-				body.subtitleUrl !== s3Url(body.subtitleKey)
-			) {
+			if (!validSubtitleUpload(body.subtitleKey, body.subtitleUrl)) {
 				throw error(400, 'Invalid subtitle upload');
 			}
 		} else if (!current.subtitle_srt_s3_key) {

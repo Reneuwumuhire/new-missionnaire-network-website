@@ -417,6 +417,10 @@ export function subtitleNeedsAttach(
 	return sessionId !== attachedSession || subtitleKey !== attachedKey;
 }
 
+export function subtitleSyncAction(needsAttach: boolean, hasTimingSource: boolean) {
+	return hasTimingSource ? 'sync' : needsAttach ? 'attach' : null;
+}
+
 async function ensureTimedSubtitle() {
 	if (uploadedSubtitle?.text === lyrics.srtText) return uploadedSubtitle;
 	if (!subtitleUpload) {
@@ -448,10 +452,29 @@ export async function syncLiveLyrics() {
 		return;
 	try {
 		const media = followedMediaElement(true);
-		// A captured external live starts with songs. Merely loading its SRT must
-		// not open the public gate before the matcher has found the sermon.
-		if (!media && lyrics.anchorEpochMs === null) return;
 		const uploaded = await ensureTimedSubtitle();
+		const attach = subtitleNeedsAttach(
+			liveSession.activeId,
+			uploaded.key,
+			attachedSessionId,
+			attachedSubtitleKey
+		);
+		const action = subtitleSyncAction(attach, Boolean(media || lyrics.anchorEpochMs !== null));
+		// Keep a newly loaded SRT attached to the live immediately. Its clock stays
+		// closed until the matcher, media source, or operator establishes timing.
+		if (action === 'attach') {
+			await post({
+				action: 'attach-subtitles',
+				sessionId: liveSession.activeId,
+				subtitleUrl: uploaded.url,
+				subtitleKey: uploaded.key,
+				subtitleFilename: lyrics.fileName
+			});
+			attachedSessionId = liveSession.activeId;
+			attachedSubtitleKey = uploaded.key;
+			return;
+		}
+		if (!action) return;
 		const sampledAtMs = Date.now();
 		const sourcePositionMs = media
 			? Math.round(media.currentTime * 1000)
@@ -462,12 +485,6 @@ export async function syncLiveLyrics() {
 		const positionMs = paused
 			? sourcePositionMs
 			: outputAlignedPositionMs(sourcePositionMs, sampledAtMs);
-		const attach = subtitleNeedsAttach(
-			liveSession.activeId,
-			uploaded.key,
-			attachedSessionId,
-			attachedSubtitleKey
-		);
 		await post({
 			action: 'sync-subtitles',
 			sessionId: liveSession.activeId,
