@@ -1,7 +1,12 @@
 import { redirect, type Handle } from '@sveltejs/kit';
 import { validateSession, SESSION_COOKIE } from '$lib/server/auth';
 
-const PUBLIC_PATHS = ['/login', '/api/youtube/oauth/callback', '/api/studio/youtube'];
+const PUBLIC_PATHS = [
+	'/login',
+	'/api/youtube/oauth/callback',
+	'/api/studio/youtube',
+	'/api/studio/update'
+];
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const { pathname } = event.url;
