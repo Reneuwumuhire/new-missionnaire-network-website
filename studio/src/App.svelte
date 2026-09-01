@@ -77,6 +77,7 @@
 	let settingsPage = $state<'general' | 'output' | 'about'>('general');
 	let helpSection = $state<HelpSection>('getting-started');
 	let stopMenuListener: (() => void) | null = null;
+	let stopCloseListener: (() => void) | null = null;
 	/** Frames actually painted per second — the readout OBS puts in its status
 	 *  bar, and the first number to look at when the picture stutters. */
 	let renderFps = $state(0);
@@ -91,6 +92,10 @@
 		void listen<string>('studio://menu', (event) => openMenuItem(event.payload)).then(
 			(unlisten) => (stopMenuListener = unlisten)
 		);
+		void listen(
+			'studio://close-blocked',
+			() => (broadcast.error = t('error.stopBeforeClose'))
+		).then((unlisten) => (stopCloseListener = unlisten));
 		mixer = new Mixer();
 		selftestMixer(mixer);
 		mixer.setMonitor(studio.settings.monitorAudio);
@@ -153,6 +158,7 @@
 		const heartbeat = setInterval(() => void heartbeatStudio(), 60_000);
 		return () => {
 			stopMenuListener?.();
+			stopCloseListener?.();
 			clearInterval(clock);
 			clearInterval(heartbeat);
 			window.removeEventListener('pointerdown', wake);

@@ -30,6 +30,7 @@ const en = {
 	'common.unlock': 'Unlock',
 	'common.name': 'Name',
 	'common.none': 'None',
+	'error.stopBeforeClose': 'Stop streaming before closing Missionnaire Studio.',
 
 	// ── Preview ─────────────────────────────────────────────────
 	'preview.preview': 'Preview',

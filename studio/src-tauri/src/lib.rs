@@ -18,6 +18,14 @@ const MENU_SHORTCUTS: &str = "studio-keyboard-shortcuts";
 const MENU_TROUBLESHOOTING: &str = "studio-troubleshooting";
 const MENU_SYSTEM_INFO: &str = "studio-system-information";
 
+fn notify_close_blocked(app: &AppHandle) {
+	if let Some(window) = app.get_webview_window("main") {
+		let _ = window.show();
+		let _ = window.set_focus();
+	}
+	let _ = app.emit_to("main", "studio://close-blocked", ());
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct StartedStream {
@@ -603,17 +611,42 @@ pub fn run() {
 			report
 		])
 		.on_window_event(|window, event| {
-			// Closing the window while live would orphan ffmpeg holding the RTMP
-			// connections open; YouTube would keep showing a frozen frame.
-			if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
-				if let Some(encoder) = window.app_handle().try_state::<Encoder>() {
-					let _ = encoder.stop();
+			if window.label() != "main" {
+				return;
+			}
+			match event {
+				tauri::WindowEvent::CloseRequested { api, .. } => {
+					if window
+						.app_handle()
+						.try_state::<Encoder>()
+						.is_some_and(|encoder| encoder.is_running())
+					{
+						api.prevent_close();
+						notify_close_blocked(window.app_handle());
+					}
 				}
-				if let Some(capture) = window.app_handle().try_state::<appaudio::Capture>() {
-					capture.stop(None);
+				tauri::WindowEvent::Destroyed => {
+					if let Some(encoder) = window.app_handle().try_state::<Encoder>() {
+						let _ = encoder.stop();
+					}
+					if let Some(capture) = window.app_handle().try_state::<appaudio::Capture>() {
+						capture.stop(None);
+					}
 				}
+				_ => {}
 			}
 		})
-		.run(tauri::generate_context!())
-		.expect("error while running Missionnaire Studio");
+		.build(tauri::generate_context!())
+		.expect("error while building Missionnaire Studio")
+		.run(|app, event| {
+			if let tauri::RunEvent::ExitRequested { api, .. } = event {
+				if app
+					.try_state::<Encoder>()
+					.is_some_and(|encoder| encoder.is_running())
+				{
+					api.prevent_exit();
+					notify_close_blocked(app);
+				}
+			}
+		});
 }
