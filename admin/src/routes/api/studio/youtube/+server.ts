@@ -52,7 +52,6 @@ async function operator(request: Request) {
 	}
 	return {
 		code,
-		authorization: doc,
 		email: doc.user_email,
 		name: typeof doc.user_name === 'string' ? doc.user_name : doc.user_email
 	};
@@ -103,7 +102,7 @@ export async function POST({ request, getClientAddress }) {
 	if (body.action === 'status') {
 		const [channels, missionnaire] = await Promise.all([
 			youtubeConnection(user.email),
-			missionnaireIngestForAuthorization(user.code, user.authorization)
+			missionnaireIngestForAuthorization(user.code)
 				.then((ingest) => ({ ingest, error: null }))
 				.catch((cause) => ({
 					ingest: null,

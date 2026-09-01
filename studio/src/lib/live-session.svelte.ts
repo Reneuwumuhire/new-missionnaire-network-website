@@ -59,6 +59,11 @@ type StudioDeviceInfo = {
 };
 
 let deviceInfoPromise: Promise<StudioDeviceInfo> | null = null;
+let youtubeStatusRequest = 0;
+
+export function isLatestStatusRequest(request: number, latest: number): boolean {
+	return request === latest;
+}
 
 function studioDeviceInfo() {
 	deviceInfoPromise ??= invoke<StudioDeviceInfo>('studio_device_info').catch((error) => {
@@ -219,6 +224,7 @@ export async function connectWithAdmin() {
 }
 
 export async function refreshYouTubeStatus() {
+	const request = ++youtubeStatusRequest;
 	try {
 		const deviceInfo = await studioDeviceInfo().catch(() => null);
 		const result = await adminPost<{
@@ -231,6 +237,9 @@ export async function refreshYouTubeStatus() {
 			action: 'status',
 			deviceInfo
 		});
+		// Re-approval revokes the previous managed ingest key. Ignore any older,
+		// slower response that arrives after the fresh credential.
+		if (!isLatestStatusRequest(request, youtubeStatusRequest)) return;
 		const channels = youtubeChannelsFromStatus(result);
 		liveSession.youtubeChannels = channels;
 		liveSession.youtubeConnected = channels.length > 0;
@@ -251,6 +260,7 @@ export async function refreshYouTubeStatus() {
 		}
 		liveSession.youtubeError = null;
 	} catch (error) {
+		if (!isLatestStatusRequest(request, youtubeStatusRequest)) return;
 		liveSession.youtubeConnected = false;
 		liveSession.youtubeChannels = [];
 		selectYouTubeChannel(null);
