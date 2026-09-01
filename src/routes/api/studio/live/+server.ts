@@ -1,5 +1,4 @@
 import { json, error } from '@sveltejs/kit';
-import { checkLiveAudio } from '$lib/server/icecast';
 import {
 	getStudioAuthorization,
 	revokeStudioAuthorization,
@@ -33,7 +32,7 @@ function defaultTitle(template: string | null): string {
 	return value.includes('{date}') ? value.replaceAll('{date}', date) : `${date} ${value}`;
 }
 
-export async function POST({ request, url, fetch }) {
+export async function POST({ request, url }) {
 	const serverReceivedAtMs = Date.now();
 	const body = (await request.json().catch(() => ({}))) as {
 		action?: string;
@@ -214,9 +213,6 @@ export async function POST({ request, url, fetch }) {
 		return json({ ok: true, anchorEpochMs, offsetMs, pausedPositionMs });
 	}
 	if (body.action === 'start') {
-		if (!(await checkLiveAudio(fetch)).isLive) {
-			throw error(409, 'No live audio detected. Check the Missionnaire preview in admin first.');
-		}
 		const session = await getScheduledLiveById(body.sessionId);
 		if (!session) throw error(404, 'Session not found');
 		if (session.status !== 'scheduled') throw error(400, 'Session is no longer available');

@@ -50,7 +50,12 @@
 		selftestTarget
 	} from './lib/selftest';
 	import { activeScene, audioLayers, onAirSceneId, persist, studio } from './lib/state.svelte';
-	import { liveSession, logoutStudio, refreshYouTubeStatus } from './lib/live-session.svelte';
+	import {
+		heartbeatStudio,
+		liveSession,
+		logoutStudio,
+		refreshYouTubeStatus
+	} from './lib/live-session.svelte';
 	import { recording } from './lib/recording.svelte';
 	import { initReferenceMatcher } from './lib/reference-match.svelte';
 	import { appUpdate, downloadPercent, initUpdater, installUpdate } from './lib/updater.svelte';
@@ -144,9 +149,12 @@
 			lastFrames = frames;
 			if (isStreaming()) renderMissed += Math.max(0, studio.settings.fps - renderFps);
 		}, 1000);
+		void heartbeatStudio();
+		const heartbeat = setInterval(() => void heartbeatStudio(), 60_000);
 		return () => {
 			stopMenuListener?.();
 			clearInterval(clock);
+			clearInterval(heartbeat);
 			window.removeEventListener('pointerdown', wake);
 			void stopBroadcast();
 			releaseAll();

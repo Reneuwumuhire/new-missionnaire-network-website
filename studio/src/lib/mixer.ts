@@ -36,6 +36,7 @@ export class Mixer {
 	readonly master: GainNode;
 	readonly destination: MediaStreamAudioDestinationNode;
 	private readonly monitor: GainNode;
+	private readonly silence: ConstantSourceNode;
 	private readonly strips = new Map<string, Strip>();
 	/** createMediaElementSource throws if called twice on one element. */
 	private readonly elementTaps = new WeakMap<HTMLMediaElement, MediaElementAudioSourceNode>();
@@ -54,6 +55,12 @@ export class Mixer {
 		this.master = this.ctx.createGain();
 		this.destination = this.ctx.createMediaStreamDestination();
 		this.monitor = this.ctx.createGain();
+		// WebKit does not advance an otherwise empty audio graph. Keep a zero
+		// source running so preview starts immediately and real inputs can join it.
+		this.silence = this.ctx.createConstantSource();
+		this.silence.offset.value = 0;
+		this.silence.connect(this.master);
+		this.silence.start();
 		this.monitor.gain.value = 0;
 		this.master.connect(this.destination);
 		this.master.connect(this.monitor);
@@ -241,6 +248,7 @@ export class Mixer {
 	}
 
 	close() {
+		this.silence.stop();
 		for (const id of this.ids()) this.remove(id);
 		void this.ctx.close();
 	}

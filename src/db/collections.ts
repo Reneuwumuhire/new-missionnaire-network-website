@@ -1175,7 +1175,7 @@ export async function getStudioAuthorization(
 		const db = await getDb();
 		const doc = await db
 			.collection('studio_authorizations')
-			.findOne({ code, expires_at: { $gt: new Date() } });
+			.findOne({ code, revoked_at: { $exists: false }, expires_at: { $gt: new Date() } });
 		return doc && typeof doc.user_email === 'string'
 			? {
 					email: doc.user_email,
@@ -1192,7 +1192,10 @@ export async function revokeStudioAuthorization(code: string): Promise<void> {
 	if (!code) return;
 	const db = await getDb();
 	const authorizations = db.collection('studio_authorizations');
-	const authorization = await authorizations.findOne({ code });
+	const authorization = await authorizations.findOneAndUpdate(
+		{ code },
+		{ $set: { revoked_at: new Date() }, $unset: { missionnaire_ingest: '' } }
+	);
 	const ingest = authorization?.missionnaire_ingest;
 	if (ingest && typeof ingest === 'object') {
 		const value = ingest as Record<string, unknown>;
@@ -1227,7 +1230,6 @@ export async function revokeStudioAuthorization(code: string): Promise<void> {
 			}
 		}
 	}
-	await authorizations.deleteOne({ code });
 }
 
 export async function listStudioScheduledLives(): Promise<ScheduledLive[]> {

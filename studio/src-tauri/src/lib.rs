@@ -26,6 +26,47 @@ struct StartedStream {
 	run_id: u64,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StudioDeviceInfo {
+	os: &'static str,
+	architecture: &'static str,
+	username: String,
+	device_name: String,
+	app_version: String,
+}
+
+#[tauri::command]
+fn studio_device_info(app: AppHandle) -> StudioDeviceInfo {
+	let os = match std::env::consts::OS {
+		"macos" => "macOS",
+		"windows" => "Windows",
+		"linux" => "Linux",
+		other => other,
+	};
+	let username = std::env::var("USER")
+		.or_else(|_| std::env::var("USERNAME"))
+		.unwrap_or_else(|_| "Unknown user".into());
+	let device_name = std::env::var("COMPUTERNAME")
+		.ok()
+		.or_else(|| std::env::var("HOSTNAME").ok())
+		.or_else(|| {
+			Command::new("hostname")
+				.output()
+				.ok()
+				.map(|output| String::from_utf8_lossy(&output.stdout).trim().to_owned())
+		})
+		.filter(|name| !name.is_empty())
+		.unwrap_or_else(|| "Unknown device".into());
+	StudioDeviceInfo {
+		os,
+		architecture: std::env::consts::ARCH,
+		username,
+		device_name,
+		app_version: app.package_info().version.to_string(),
+	}
+}
+
 fn allowed_web_url(url: &str) -> bool {
 	if url.chars().any(|c| c.is_control() || c.is_whitespace()) {
 		return false;
@@ -538,6 +579,7 @@ pub fn run() {
 		})
 		.invoke_handler(tauri::generate_handler![
 			check_ffmpeg,
+			studio_device_info,
 			extract_reference_features,
 			start_stream,
 			studio_live_post,

@@ -11,7 +11,18 @@ type Authorization = Document & {
 	approved_at?: unknown;
 	expires_at?: unknown;
 	last_used_at?: unknown;
+	last_seen_at?: unknown;
+	revoked_at?: unknown;
+	device?: unknown;
 	missionnaire_ingest?: unknown;
+};
+
+export type StudioDeviceMetadata = {
+	os: string | null;
+	architecture: string | null;
+	username: string | null;
+	deviceName: string | null;
+	appVersion: string | null;
 };
 
 type IngestRevocation = {
@@ -33,6 +44,40 @@ export function cachedIngest(value: unknown, now = Date.now()): MissionnaireInge
 	)
 		return null;
 	return { url: item.url, key: item.key, expiresAt: item.expiresAt };
+}
+
+function safeLabel(value: unknown, limit: number): string | null {
+	if (typeof value !== 'string') return null;
+	const label = value
+		.replace(/[\u0000-\u001f\u007f]/g, '')
+		.trim()
+		.slice(0, limit);
+	return label || null;
+}
+
+export function studioDeviceMetadata(value: unknown): StudioDeviceMetadata | null {
+	if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+	const device = value as Record<string, unknown>;
+	const result = {
+		os: safeLabel(device.os, 80),
+		architecture: safeLabel(device.architecture, 32),
+		username: safeLabel(device.username, 80),
+		deviceName: safeLabel(device.deviceName, 80),
+		appVersion: safeLabel(device.appVersion, 32)
+	};
+	return Object.values(result).some(Boolean) ? result : null;
+}
+
+export async function updateStudioAuthorizationActivity(code: string, value: unknown) {
+	const device = studioDeviceMetadata(value);
+	const update: Record<string, unknown> = { last_seen_at: new Date() };
+	if (device) update.device = device;
+	await (await getDb())
+		.collection<Authorization>('studio_authorizations')
+		.updateOne(
+			{ code, revoked_at: { $exists: false }, expires_at: { $gt: new Date() } },
+			{ $set: update }
+		);
 }
 
 function ingestPath(ingest: MissionnaireIngest): string | null {
@@ -68,18 +113,38 @@ export async function missionnaireIngestForAuthorization(
 ): Promise<MissionnaireIngest> {
 	const db = await getDb();
 	const collection = db.collection<Authorization>('studio_authorizations');
-	const doc = authorization ?? (await collection.findOne({ code }));
+	const doc =
+		authorization ??
+		(await collection.findOne({
+			code,
+			revoked_at: { $exists: false },
+			expires_at: { $gt: new Date() }
+		}));
 	if (!doc) throw new Error('Studio authorization not found');
 	const existing = cachedIngest(doc.missionnaire_ingest);
 	if (existing) {
-		await collection.updateOne({ code }, { $set: { last_used_at: new Date() } });
-		return existing;
+		const active = await collection.updateOne(
+			{ code, revoked_at: { $exists: false }, expires_at: { $gt: new Date() } },
+			{ $set: { last_used_at: new Date() } }
+		);
+		if (active.matchedCount === 1) return existing;
+		throw new Error('Studio authorization is no longer active');
 	}
 	const ingest = await recorderIngest();
 	const refreshFilter =
 		doc.missionnaire_ingest === undefined
-			? { code, missionnaire_ingest: { $exists: false } }
-			: { code, missionnaire_ingest: doc.missionnaire_ingest };
+			? {
+					code,
+					revoked_at: { $exists: false },
+					expires_at: { $gt: new Date() },
+					missionnaire_ingest: { $exists: false }
+				}
+			: {
+					code,
+					revoked_at: { $exists: false },
+					expires_at: { $gt: new Date() },
+					missionnaire_ingest: doc.missionnaire_ingest
+				};
 	const updated = await collection.updateOne(refreshFilter, {
 		$set: { missionnaire_ingest: ingest, last_used_at: new Date() }
 	});
@@ -88,7 +153,11 @@ export async function missionnaireIngestForAuthorization(
 	// Another status request refreshed this pairing first. Revoke this unused
 	// credential so only the value stored on the authorization stays valid.
 	await revokeIngest(ingest);
-	const winner = await collection.findOne({ code });
+	const winner = await collection.findOne({
+		code,
+		revoked_at: { $exists: false },
+		expires_at: { $gt: new Date() }
+	});
 	const current = cachedIngest(winner?.missionnaire_ingest);
 	if (!current) throw new Error('Studio authorization changed while refreshing ingest');
 	return current;
@@ -97,9 +166,11 @@ export async function missionnaireIngestForAuthorization(
 export async function revokeMissionnaireIngest(code: string) {
 	const db = await getDb();
 	const collection = db.collection<Authorization>('studio_authorizations');
-	const doc = await collection.findOne({ code });
+	const doc = await collection.findOneAndUpdate(
+		{ code },
+		{ $set: { revoked_at: new Date() }, $unset: { missionnaire_ingest: '' } }
+	);
 	await revokeIngest(cachedIngest(doc?.missionnaire_ingest, 0));
-	await collection.deleteOne({ code });
 }
 
 export async function revokeStudioAuthorizationsForUser(email: string) {
@@ -107,22 +178,37 @@ export async function revokeStudioAuthorizationsForUser(email: string) {
 	const collection = db.collection<Authorization>('studio_authorizations');
 	const docs = await collection.find({ user_email: email }).toArray();
 	await Promise.all(docs.map((doc) => revokeIngest(cachedIngest(doc.missionnaire_ingest, 0))));
-	await collection.deleteMany({ user_email: email });
+	await collection.updateMany(
+		{ user_email: email, revoked_at: { $exists: false } },
+		{ $set: { revoked_at: new Date() }, $unset: { missionnaire_ingest: '' } }
+	);
 }
 
 export async function listStudioAuthorizations(email: string) {
-	const docs = await (
-		await getDb()
-	)
+	const docs = await (await getDb())
 		.collection<Authorization>('studio_authorizations')
-		.find({ user_email: email, expires_at: { $gt: new Date() } })
+		.find({ user_email: email })
 		.sort({ approved_at: -1 })
+		.limit(50)
 		.toArray();
+	const now = Date.now();
 	return docs.map((doc) => ({
 		id: String(doc._id),
+		connected:
+			!(doc.revoked_at instanceof Date) &&
+			doc.expires_at instanceof Date &&
+			doc.expires_at.getTime() > now,
+		online:
+			!(doc.revoked_at instanceof Date) &&
+			doc.expires_at instanceof Date &&
+			doc.expires_at.getTime() > now &&
+			doc.last_seen_at instanceof Date &&
+			now - doc.last_seen_at.getTime() < 2 * 60 * 1000,
 		approvedAt: doc.approved_at instanceof Date ? doc.approved_at.toISOString() : null,
 		lastUsedAt: doc.last_used_at instanceof Date ? doc.last_used_at.toISOString() : null,
-		expiresAt: doc.expires_at instanceof Date ? doc.expires_at.toISOString() : null
+		lastSeenAt: doc.last_seen_at instanceof Date ? doc.last_seen_at.toISOString() : null,
+		expiresAt: doc.expires_at instanceof Date ? doc.expires_at.toISOString() : null,
+		device: studioDeviceMetadata(doc.device)
 	}));
 }
 
@@ -130,9 +216,35 @@ export async function revokeStudioAuthorizationById(id: string, email: string): 
 	if (!ObjectId.isValid(id)) return false;
 	const db = await getDb();
 	const collection = db.collection<Authorization>('studio_authorizations');
-	const doc = await collection.findOne({ _id: new ObjectId(id), user_email: email });
+	const doc = await collection.findOneAndUpdate(
+		{ _id: new ObjectId(id), user_email: email },
+		{ $set: { revoked_at: new Date() }, $unset: { missionnaire_ingest: '' } }
+	);
 	if (!doc) return false;
 	await revokeIngest(cachedIngest(doc.missionnaire_ingest, 0));
-	await collection.deleteOne({ _id: doc._id });
 	return true;
+}
+
+export async function deleteDisconnectedStudioAuthorizationById(
+	id: string,
+	email: string
+): Promise<boolean> {
+	if (!ObjectId.isValid(id)) return false;
+	const collection = (await getDb()).collection<Authorization>('studio_authorizations');
+	const doc = await collection.findOne({ _id: new ObjectId(id), user_email: email });
+	if (!doc) return false;
+	const active =
+		!(doc.revoked_at instanceof Date) &&
+		doc.expires_at instanceof Date &&
+		doc.expires_at > new Date();
+	if (active) return false;
+	return (
+		(
+			await collection.deleteOne({
+				_id: doc._id,
+				user_email: email,
+				$or: [{ revoked_at: { $exists: true } }, { expires_at: { $lte: new Date() } }]
+			})
+		).deletedCount === 1
+	);
 }
