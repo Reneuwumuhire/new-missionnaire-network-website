@@ -48,7 +48,9 @@
 	}
 	function renderTitleTemplate(template: string): string {
 		const date = berlinDateYmd(new Date());
-		return template.includes('{date}') ? template.replaceAll('{date}', date) : `${date} ${template}`;
+		return template.includes('{date}')
+			? template.replaceAll('{date}', date)
+			: `${date} ${template}`;
 	}
 	const defaultTitlePreview = $derived(
 		renderTitleTemplate(broadcast.default_title?.trim() || FALLBACK_DEFAULT_TITLE)
@@ -83,7 +85,8 @@
 	/** "depuis 12 min" / "depuis 1 h 05" — how long an entry has been on air. */
 	function liveElapsed(iso: string, now: number): string {
 		const diffMs = now - Date.parse(iso);
-		if (!Number.isFinite(diffMs) || diffMs < 60_000) return $t('recordings.scheduled.elapsedJustNow');
+		if (!Number.isFinite(diffMs) || diffMs < 60_000)
+			return $t('recordings.scheduled.elapsedJustNow');
 		const minutes = Math.floor(diffMs / 60_000);
 		if (minutes < 60) return $t('recordings.scheduled.elapsedMin', { count: minutes });
 		const hours = Math.floor(minutes / 60);
@@ -140,8 +143,9 @@
 	let descriptionDraft = $state('');
 	let youtubeUrlDraft = $state('');
 	let scheduledAtDraft = $state(''); // datetime-local value, admin-local time
-	let announceDraft = $state(true);
+	let announceDraft = $state(false);
 	let reminderDraft = $state(false);
+	let notifyOnStartDraft = $state(false);
 	// Thumbnail staging — uploaded on save so cancel doesn't leave S3 orphans.
 	let thumbnailFile = $state<File | null>(null);
 	let thumbnailPreviewUrl = $state<string | null>(null);
@@ -171,8 +175,9 @@
 		descriptionDraft = '';
 		youtubeUrlDraft = '';
 		scheduledAtDraft = '';
-		announceDraft = true;
+		announceDraft = false;
 		reminderDraft = false;
+		notifyOnStartDraft = false;
 		if (thumbnailPreviewUrl) URL.revokeObjectURL(thumbnailPreviewUrl);
 		thumbnailPreviewUrl = null;
 		thumbnailFile = null;
@@ -207,6 +212,7 @@
 		scheduledAtDraft = isoToLocalInput(entry.scheduled_at);
 		announceDraft = false; // already created — re-announce only if explicitly re-checked
 		reminderDraft = entry.reminder_enabled;
+		notifyOnStartDraft = entry.notify_on_start === true;
 		existingThumbnailUrl = entry.thumbnail_url;
 		existingSubtitleFilename = entry.subtitle_filename;
 		modalOpen = true;
@@ -270,7 +276,9 @@
 		subtitleCueCount = cues.length;
 		const totalMin = Math.round(cues[cues.length - 1].endMs / 60_000);
 		subtitleDurationLabel =
-			totalMin >= 60 ? `${Math.floor(totalMin / 60)}h${String(totalMin % 60).padStart(2, '0')}` : $t('recordings.scheduled.durationMin', { count: totalMin });
+			totalMin >= 60
+				? `${Math.floor(totalMin / 60)}h${String(totalMin % 60).padStart(2, '0')}`
+				: $t('recordings.scheduled.durationMin', { count: totalMin });
 	}
 
 	function markSubtitleForRemoval() {
@@ -297,7 +305,8 @@
 			body: JSON.stringify({ filename: subtitleFile.name, size: subtitleFile.size })
 		});
 		if (!presignRes.ok) {
-			formError = (await presignRes.text()) || $t('recordings.error.http', { status: presignRes.status });
+			formError =
+				(await presignRes.text()) || $t('recordings.error.http', { status: presignRes.status });
 			return null;
 		}
 		const { uploadUrl, key, publicUrl, contentType } = (await presignRes.json()) as {
@@ -338,7 +347,8 @@
 			body: JSON.stringify({ contentType: thumbnailFile.type, size: thumbnailFile.size })
 		});
 		if (!presignRes.ok) {
-			formError = (await presignRes.text()) || $t('recordings.error.http', { status: presignRes.status });
+			formError =
+				(await presignRes.text()) || $t('recordings.error.http', { status: presignRes.status });
 			return null;
 		}
 		const { uploadUrl, key, publicUrl } = (await presignRes.json()) as {
@@ -381,6 +391,7 @@
 			if (!editingLive) {
 				body.scheduled_at = new Date(scheduledAtDraft).toISOString();
 				body.reminder_enabled = reminderDraft;
+				body.notify_on_start = notifyOnStartDraft;
 			}
 
 			if (thumbnailAction !== 'keep') {
@@ -440,6 +451,7 @@
 	// ── Row actions ────────────────────────────────────────────────
 	let busyId = $state<string | null>(null);
 	let startingDefaults = $state(false);
+	let notifyFromDefaults = $state(false);
 
 	/** Start an immediate, unscheduled live off the saved default info. Always
 	 *  confirms first — same gate as starting a scheduled entry. */
@@ -449,13 +461,19 @@
 			toast.error($t('recordings.scheduled.error.alreadyLive'));
 			return;
 		}
-		const willNotify = subscriberCount > 0;
+		const willNotify = notifyFromDefaults && subscriberCount > 0;
 		const ok = await confirmDialog.ask({
 			title: $t('recordings.defaults.startFromDefaults'),
 			message: willNotify
 				? subscriberCount > 1
-					? $t('recordings.defaults.confirm.startNotifyMany', { title: defaultTitlePreview, count: subscriberCount })
-					: $t('recordings.defaults.confirm.startNotifyOne', { title: defaultTitlePreview, count: subscriberCount })
+					? $t('recordings.defaults.confirm.startNotifyMany', {
+							title: defaultTitlePreview,
+							count: subscriberCount
+						})
+					: $t('recordings.defaults.confirm.startNotifyOne', {
+							title: defaultTitlePreview,
+							count: subscriberCount
+						})
 				: $t('recordings.defaults.confirm.start', { title: defaultTitlePreview }),
 			confirmLabel: willNotify
 				? $t('recordings.confirm.goLive.confirmNotify')
@@ -468,12 +486,13 @@
 			const res = await fetch('/api/broadcast/go-live', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ notify: true, useDefaults: true })
+				body: JSON.stringify({ notify: notifyFromDefaults, useDefaults: true })
 			});
 			if (!res.ok) {
 				toast.error((await res.text()) || $t('recordings.error.http', { status: res.status }));
 				return;
 			}
+			notifyFromDefaults = false;
 			toast.success($t('recordings.defaults.toast.started'));
 			await invalidateAll();
 		} finally {
@@ -487,15 +506,24 @@
 			toast.error($t('recordings.scheduled.error.alreadyLive'));
 			return;
 		}
-		const willNotify = subscriberCount > 0;
+		const notify = entry.notify_on_start === true;
+		const willNotify = notify && subscriberCount > 0;
 		const ok = await confirmDialog.ask({
 			title: $t('recordings.scheduled.startLive'),
 			message: willNotify
 				? subscriberCount > 1
-					? $t('recordings.scheduled.confirm.startNotifyMany', { title: entry.title, count: subscriberCount })
-					: $t('recordings.scheduled.confirm.startNotifyOne', { title: entry.title, count: subscriberCount })
+					? $t('recordings.scheduled.confirm.startNotifyMany', {
+							title: entry.title,
+							count: subscriberCount
+						})
+					: $t('recordings.scheduled.confirm.startNotifyOne', {
+							title: entry.title,
+							count: subscriberCount
+						})
 				: $t('recordings.scheduled.confirm.start', { title: entry.title }),
-			confirmLabel: willNotify ? $t('recordings.confirm.goLive.confirmNotify') : $t('recordings.scheduled.startLive'),
+			confirmLabel: willNotify
+				? $t('recordings.confirm.goLive.confirmNotify')
+				: $t('recordings.scheduled.startLive'),
 			cancelLabel: $t('recordings.common.cancel')
 		});
 		if (!ok) return;
@@ -504,7 +532,7 @@
 			const res = await fetch('/api/broadcast/go-live', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ notify: true, scheduledLiveId: entry._id })
+				body: JSON.stringify({ notify, scheduledLiveId: entry._id })
 			});
 			if (!res.ok) {
 				toast.error((await res.text()) || $t('recordings.error.http', { status: res.status }));
@@ -591,7 +619,9 @@
 			if (data.alreadyOffline) {
 				const endRes = await fetch(`/api/scheduled-lives/${entry._id}/end`, { method: 'POST' });
 				if (!endRes.ok) {
-					toast.error((await endRes.text()) || $t('recordings.error.http', { status: endRes.status }));
+					toast.error(
+						(await endRes.text()) || $t('recordings.error.http', { status: endRes.status })
+					);
 					return;
 				}
 			}
@@ -605,13 +635,25 @@
 	function statusBadge(entry: ScheduledLive): { label: TranslationKey; cls: string } {
 		switch (entry.status) {
 			case 'live':
-				return { label: 'recordings.scheduled.status.live', cls: 'bg-red-50 text-red-700 border-red-200' };
+				return {
+					label: 'recordings.scheduled.status.live',
+					cls: 'bg-red-50 text-red-700 border-red-200'
+				};
 			case 'scheduled':
-				return { label: 'recordings.scheduled.status.scheduled', cls: 'bg-orange-50 text-primary border-orange-200' };
+				return {
+					label: 'recordings.scheduled.status.scheduled',
+					cls: 'bg-orange-50 text-primary border-orange-200'
+				};
 			case 'ended':
-				return { label: 'recordings.scheduled.status.ended', cls: 'bg-stone-100 text-stone-600 border-stone-200' };
+				return {
+					label: 'recordings.scheduled.status.ended',
+					cls: 'bg-stone-100 text-stone-600 border-stone-200'
+				};
 			default:
-				return { label: 'recordings.scheduled.status.cancelled', cls: 'bg-stone-50 text-stone-400 border-stone-200' };
+				return {
+					label: 'recordings.scheduled.status.cancelled',
+					cls: 'bg-stone-50 text-stone-400 border-stone-200'
+				};
 		}
 	}
 </script>
@@ -623,7 +665,9 @@
 			<p class="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500">
 				{$t('recordings.scheduled.title')}
 				{#if upcoming.length > 0}
-					<span class="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary/10 px-1 text-[9px] font-bold text-primary">
+					<span
+						class="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary/10 px-1 text-[9px] font-bold text-primary"
+					>
 						{upcoming.length}
 					</span>
 				{/if}
@@ -632,7 +676,15 @@
 				{$t('recordings.scheduled.intro')}
 			</p>
 		</div>
-		<div class="flex w-full flex-col gap-2 sm:w-auto sm:shrink-0 sm:flex-row sm:flex-wrap sm:items-center">
+		<div
+			class="flex w-full flex-col gap-2 sm:w-auto sm:shrink-0 sm:flex-row sm:flex-wrap sm:items-center"
+		>
+			<label
+				class="flex cursor-pointer items-center gap-2 border border-stone-200 bg-stone-50 px-3 py-2 text-[10px] font-semibold text-stone-600"
+			>
+				<input type="checkbox" bind:checked={notifyFromDefaults} class="accent-[#FF880C]" />
+				{$t('recordings.scheduled.notifyThisStart')}
+			</label>
 			<!-- Instant live off the saved default info — sits next to "Schedule a
 			     live" so both ways to go on air live in one place. Full-width
 			     stacked on mobile so the labels don't overflow the card. -->
@@ -644,17 +696,37 @@
 				title={$t('recordings.defaults.startFromDefaultsTitle')}
 				class="inline-flex w-full items-center justify-center gap-1.5 border border-primary bg-white px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary transition-all hover:bg-primary hover:text-white disabled:opacity-50 sm:w-auto"
 			>
-				<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M5.6 5.6a9 9 0 000 12.8M8.4 8.4a5 5 0 000 7.2m10-12.8a9 9 0 010 12.8m-2.8-9.2a5 5 0 010 7.2M12 12h.01" />
+				<svg
+					class="h-3 w-3"
+					fill="none"
+					viewBox="0 0 24 24"
+					stroke="currentColor"
+					stroke-width="2"
+					aria-hidden="true"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						d="M5.6 5.6a9 9 0 000 12.8M8.4 8.4a5 5 0 000 7.2m10-12.8a9 9 0 010 12.8m-2.8-9.2a5 5 0 010 7.2M12 12h.01"
+					/>
 				</svg>
-				{startingDefaults ? $t('recordings.busy.starting') : $t('recordings.defaults.startFromDefaults')}
+				{startingDefaults
+					? $t('recordings.busy.starting')
+					: $t('recordings.defaults.startFromDefaults')}
 			</button>
 			<button
 				type="button"
 				onclick={openCreate}
 				class="inline-flex w-full items-center justify-center gap-1.5 border border-primary bg-primary px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white shadow-sm shadow-primary/25 transition-all hover:bg-primary/90 hover:shadow-md sm:w-auto"
 			>
-				<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+				<svg
+					class="h-3 w-3"
+					fill="none"
+					viewBox="0 0 24 24"
+					stroke="currentColor"
+					stroke-width="2.5"
+					aria-hidden="true"
+				>
 					<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
 				</svg>
 				{$t('recordings.scheduled.schedule')}
@@ -664,9 +736,22 @@
 
 	<!-- Upcoming -->
 	{#if upcoming.length === 0}
-		<div class="mt-5 flex flex-col items-center border border-dashed border-stone-200 bg-stone-50/40 px-6 py-8 text-center">
-			<svg class="mb-2.5 h-8 w-8 text-stone-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+		<div
+			class="mt-5 flex flex-col items-center border border-dashed border-stone-200 bg-stone-50/40 px-6 py-8 text-center"
+		>
+			<svg
+				class="mb-2.5 h-8 w-8 text-stone-300"
+				fill="none"
+				viewBox="0 0 24 24"
+				stroke="currentColor"
+				stroke-width="1.5"
+				aria-hidden="true"
+			>
+				<path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+				/>
 			</svg>
 			<p class="text-sm font-medium text-stone-500">{$t('recordings.scheduled.emptyTitle')}</p>
 			<p class="mt-1 max-w-sm text-xs leading-relaxed text-stone-400">
@@ -677,16 +762,36 @@
 		<div class="mt-5 space-y-4">
 			{#each upcoming as entry (entry._id)}
 				{@const badge = statusBadge(entry)}
-				<div class="border bg-white/60 p-5 {entry.status === 'live' ? 'border-red-200' : 'border-stone-200/60'}">
+				<div
+					class="border bg-white/60 p-5 {entry.status === 'live'
+						? 'border-red-200'
+						: 'border-stone-200/60'}"
+				>
 					<div class="flex flex-col gap-4 sm:flex-row">
 						<!-- Thumbnail -->
-						<div class="h-24 w-full shrink-0 overflow-hidden border border-stone-200/60 bg-stone-100 sm:w-40">
+						<div
+							class="h-24 w-full shrink-0 overflow-hidden border border-stone-200/60 bg-stone-100 sm:w-40"
+						>
 							{#if entry.thumbnail_url}
-								<img src={entry.thumbnail_url} alt={entry.title} class="h-full w-full object-cover" />
+								<img
+									src={entry.thumbnail_url}
+									alt={entry.title}
+									class="h-full w-full object-cover"
+								/>
 							{:else}
 								<div class="flex h-full w-full items-center justify-center text-stone-300">
-									<svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-										<path stroke-linecap="round" stroke-linejoin="round" d="M5.6 5.6a9 9 0 000 12.8M8.4 8.4a5 5 0 000 7.2m10-12.8a9 9 0 010 12.8m-2.8-9.2a5 5 0 010 7.2M12 12h.01" />
+									<svg
+										class="h-7 w-7"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+										stroke-width="1.5"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											d="M5.6 5.6a9 9 0 000 12.8M8.4 8.4a5 5 0 000 7.2m10-12.8a9 9 0 010 12.8m-2.8-9.2a5 5 0 010 7.2M12 12h.01"
+										/>
 									</svg>
 								</div>
 							{/if}
@@ -695,17 +800,30 @@
 						<!-- Infos -->
 						<div class="min-w-0 flex-1">
 							<div class="flex flex-wrap items-center gap-2">
-								<span class="border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.15em] {badge.cls}">
+								<span
+									class="border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.15em] {badge.cls}"
+								>
 									{$t(badge.label)}
 								</span>
 								{#if entry.status === 'scheduled'}
-									<span class="border border-stone-200 bg-stone-50 px-2 py-0.5 text-[10px] font-semibold text-stone-500">
+									<span
+										class="border border-stone-200 bg-stone-50 px-2 py-0.5 text-[10px] font-semibold text-stone-500"
+									>
 										{relativeUntil(entry.scheduled_at)}
 									</span>
 								{/if}
 								{#if entry.announced_at}
-									<span class="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-emerald-600">
-										<svg class="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3" aria-hidden="true">
+									<span
+										class="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-emerald-600"
+									>
+										<svg
+											class="h-2.5 w-2.5"
+											fill="none"
+											viewBox="0 0 24 24"
+											stroke="currentColor"
+											stroke-width="3"
+											aria-hidden="true"
+										>
 											<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 										</svg>
 										{$t('recordings.scheduled.announced')}
@@ -716,13 +834,29 @@
 										{$t('recordings.scheduled.reminderOn')}
 									</span>
 								{/if}
+								{#if entry.notify_on_start}
+									<span class="text-[10px] font-semibold uppercase tracking-[0.1em] text-sky-600">
+										{$t('recordings.scheduled.liveAlertOn')}
+									</span>
+								{/if}
 								{#if entry.subtitle_filename}
 									<span
 										class="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-sky-600"
 										title={entry.subtitle_filename}
 									>
-										<svg class="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-											<path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h10" />
+										<svg
+											class="h-2.5 w-2.5"
+											fill="none"
+											viewBox="0 0 24 24"
+											stroke="currentColor"
+											stroke-width="2.5"
+											aria-hidden="true"
+										>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												d="M4 6h16M4 12h16M4 18h10"
+											/>
 										</svg>
 										{$t('recordings.scheduled.transcript')}
 									</span>
@@ -735,16 +869,38 @@
 							     slot and reports the real go-live time + a running elapsed clock. -->
 							{#if entry.status === 'live' && entry.live_started_at}
 								<p class="inline-flex items-center gap-1.5 text-[13px] font-medium text-red-600">
-									<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-										<path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+									<svg
+										class="h-3.5 w-3.5"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+										stroke-width="1.75"
+										aria-hidden="true"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+										/>
 									</svg>
 									{$t('recordings.scheduled.liveSince', { time: fmtTime(entry.live_started_at) })}
 									<span class="text-stone-400">· {liveElapsed(entry.live_started_at, nowMs)}</span>
 								</p>
 							{:else}
 								<p class="inline-flex items-center gap-1.5 text-[13px] text-stone-500">
-									<svg class="h-3.5 w-3.5 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-										<path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+									<svg
+										class="h-3.5 w-3.5 text-stone-400"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+										stroke-width="1.75"
+										aria-hidden="true"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+										/>
 									</svg>
 									{fmtDate(entry.scheduled_at)}
 								</p>
@@ -752,7 +908,9 @@
 
 							<!-- Share link -->
 							<div class="mt-3 flex items-center gap-2">
-								<code class="min-w-0 flex-1 truncate border border-stone-200/60 bg-stone-50 px-3 py-1.5 text-[11px] text-stone-500">
+								<code
+									class="min-w-0 flex-1 truncate border border-stone-200/60 bg-stone-50 px-3 py-1.5 text-[11px] text-stone-500"
+								>
 									{watchUrl(entry.slug)}
 								</code>
 								<button
@@ -783,8 +941,18 @@
 								disabled={busyId === entry._id || broadcast.is_live}
 								onclick={() => startLive(entry)}
 							>
-								<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M5.6 5.6a9 9 0 000 12.8M8.4 8.4a5 5 0 000 7.2m10-12.8a9 9 0 010 12.8m-2.8-9.2a5 5 0 010 7.2M12 12h.01" />
+								<svg
+									class="h-3.5 w-3.5"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										d="M5.6 5.6a9 9 0 000 12.8M8.4 8.4a5 5 0 000 7.2m10-12.8a9 9 0 010 12.8m-2.8-9.2a5 5 0 010 7.2M12 12h.01"
+									/>
 								</svg>
 								{$t('recordings.scheduled.startLive')}
 							</button>
@@ -818,7 +986,13 @@
 								disabled={busyId === entry._id}
 								onclick={() => endLiveEntry(entry)}
 							>
-								<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+								<svg
+									class="h-3.5 w-3.5"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+									stroke-width="2"
+								>
 									<rect x="6" y="6" width="12" height="12" rx="1" />
 								</svg>
 								{$t('recordings.actions.endLive')}
@@ -862,8 +1036,12 @@
 			<div class="mt-3 divide-y divide-stone-100 border border-stone-200/60 bg-white/60">
 				{#each past as entry (entry._id)}
 					{@const badge = statusBadge(entry)}
-					<div class="flex flex-wrap items-center gap-3 px-5 py-3.5 transition-colors hover:bg-stone-50/60">
-						<span class="border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.15em] {badge.cls}">
+					<div
+						class="flex flex-wrap items-center gap-3 px-5 py-3.5 transition-colors hover:bg-stone-50/60"
+					>
+						<span
+							class="border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.15em] {badge.cls}"
+						>
 							{$t(badge.label)}
 						</span>
 						<div class="min-w-0 flex-1">
@@ -959,7 +1137,9 @@
 					<div>
 						<label for="direct-datetime" class="mb-1 block text-xs font-semibold text-stone-600">
 							{$t('recordings.scheduled.dateTimeLabel')} <span class="text-rose-500">*</span>
-							<span class="ml-1 font-normal text-stone-400">{$t('recordings.scheduled.localTime')}</span>
+							<span class="ml-1 font-normal text-stone-400"
+								>{$t('recordings.scheduled.localTime')}</span
+							>
 						</label>
 						<input
 							id="direct-datetime"
@@ -987,7 +1167,9 @@
 				<div>
 					<label for="direct-youtube" class="mb-1 block text-xs font-semibold text-stone-600">
 						{$t('recordings.scheduled.youtubeLabel')}
-						<span class="ml-1 font-normal text-stone-400">{$t('recordings.scheduled.optional')}</span>
+						<span class="ml-1 font-normal text-stone-400"
+							>{$t('recordings.scheduled.optional')}</span
+						>
 					</label>
 					<input
 						id="direct-youtube"
@@ -1001,13 +1183,21 @@
 
 				<!-- Thumbnail -->
 				<div>
-					<span class="mb-1 block text-xs font-semibold text-stone-600">{$t('recordings.common.thumbnail')}</span>
+					<span class="mb-1 block text-xs font-semibold text-stone-600"
+						>{$t('recordings.common.thumbnail')}</span
+					>
 					<div class="flex items-center gap-3">
 						<div class="h-16 w-28 shrink-0 overflow-hidden border border-stone-200 bg-stone-50">
 							{#if previewSrc}
-								<img src={previewSrc} alt={$t('recordings.common.thumbnail')} class="h-full w-full object-cover" />
+								<img
+									src={previewSrc}
+									alt={$t('recordings.common.thumbnail')}
+									class="h-full w-full object-cover"
+								/>
 							{:else}
-								<div class="flex h-full w-full items-center justify-center text-[10px] text-stone-300">
+								<div
+									class="flex h-full w-full items-center justify-center text-[10px] text-stone-300"
+								>
 									{$t('recordings.scheduled.noneThumb')}
 								</div>
 							{/if}
@@ -1016,8 +1206,15 @@
 							<label
 								class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-center text-[11px] font-semibold text-stone-600 transition-colors hover:border-primary hover:text-primary"
 							>
-								{previewSrc ? $t('recordings.common.replace') : $t('recordings.scheduled.chooseImage')}
-								<input type="file" accept="image/*" class="hidden" onchange={onThumbnailFileChange} />
+								{previewSrc
+									? $t('recordings.common.replace')
+									: $t('recordings.scheduled.chooseImage')}
+								<input
+									type="file"
+									accept="image/*"
+									class="hidden"
+									onchange={onThumbnailFileChange}
+								/>
 							</label>
 							{#if previewSrc}
 								<button
@@ -1035,65 +1232,89 @@
 				<!-- Subtitle (SRT) — managed from the dedicated sync panel once on air,
 				     so it's hidden when correcting a live entry's metadata. -->
 				{#if !editingLive}
-				<div>
-					<span class="mb-1 block text-xs font-semibold text-stone-600">
-						{$t('recordings.scheduled.srtLabel')}
-					</span>
-					<p class="mb-2 text-[11px] leading-relaxed text-stone-400">
-						{$t('recordings.scheduled.srtHint')}
-					</p>
-					<div class="flex items-center gap-3">
-						{#if subtitleDisplayName}
-							<div class="min-w-0 flex-1 border border-stone-200 bg-stone-50 px-3 py-2">
-								<p class="truncate text-xs font-medium text-stone-700">{subtitleDisplayName}</p>
-								{#if subtitleCueCount !== null}
-									<p class="text-[10px] text-stone-400">
-										{$t('recordings.scheduled.cueCount', { count: subtitleCueCount })}{subtitleDurationLabel ? ` · ${subtitleDurationLabel}` : ''}
-									</p>
+					<div>
+						<span class="mb-1 block text-xs font-semibold text-stone-600">
+							{$t('recordings.scheduled.srtLabel')}
+						</span>
+						<p class="mb-2 text-[11px] leading-relaxed text-stone-400">
+							{$t('recordings.scheduled.srtHint')}
+						</p>
+						<div class="flex items-center gap-3">
+							{#if subtitleDisplayName}
+								<div class="min-w-0 flex-1 border border-stone-200 bg-stone-50 px-3 py-2">
+									<p class="truncate text-xs font-medium text-stone-700">{subtitleDisplayName}</p>
+									{#if subtitleCueCount !== null}
+										<p class="text-[10px] text-stone-400">
+											{$t('recordings.scheduled.cueCount', {
+												count: subtitleCueCount
+											})}{subtitleDurationLabel ? ` · ${subtitleDurationLabel}` : ''}
+										</p>
+									{/if}
+								</div>
+							{/if}
+							<div class="flex shrink-0 flex-col gap-1.5">
+								<label
+									class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-center text-[11px] font-semibold text-stone-600 transition-colors hover:border-primary hover:text-primary"
+								>
+									{subtitleDisplayName
+										? $t('recordings.common.replace')
+										: $t('recordings.scheduled.chooseSrt')}
+									<input type="file" accept=".srt" class="hidden" onchange={onSubtitleFileChange} />
+								</label>
+								{#if subtitleDisplayName}
+									<button
+										type="button"
+										class="border border-transparent px-3 py-1 text-[11px] font-semibold text-stone-400 hover:text-rose-600"
+										onclick={markSubtitleForRemoval}
+									>
+										{$t('recordings.common.remove')}
+									</button>
 								{/if}
 							</div>
-						{/if}
-						<div class="flex shrink-0 flex-col gap-1.5">
-							<label
-								class="cursor-pointer border border-stone-200 bg-white px-3 py-1.5 text-center text-[11px] font-semibold text-stone-600 transition-colors hover:border-primary hover:text-primary"
-							>
-								{subtitleDisplayName ? $t('recordings.common.replace') : $t('recordings.scheduled.chooseSrt')}
-								<input type="file" accept=".srt" class="hidden" onchange={onSubtitleFileChange} />
-							</label>
-							{#if subtitleDisplayName}
-								<button
-									type="button"
-									class="border border-transparent px-3 py-1 text-[11px] font-semibold text-stone-400 hover:text-rose-600"
-									onclick={markSubtitleForRemoval}
-								>
-									{$t('recordings.common.remove')}
-								</button>
-							{/if}
 						</div>
 					</div>
-				</div>
 
-				<!-- Notifications -->
-				<div class="space-y-2 border border-stone-100 bg-stone-50/60 p-3">
-					<label class="flex items-start gap-2.5">
-						<input type="checkbox" bind:checked={announceDraft} class="mt-0.5 accent-[#FF880C]" />
-						<span class="text-xs text-stone-600">
-							<span class="font-semibold">{$t('recordings.scheduled.announceLabel')}</span>
-							({subscriberCount > 1 ? $t('recordings.subscribersMany', { count: subscriberCount }) : $t('recordings.subscribersOne', { count: subscriberCount })}) {$t('recordings.scheduled.announceHint')}
-							{editingId ? $t('recordings.scheduled.afterEdit') : $t('recordings.scheduled.atCreation')}
-						</span>
-					</label>
-					<label class="flex items-start gap-2.5">
-						<input type="checkbox" bind:checked={reminderDraft} class="mt-0.5 accent-[#FF880C]" />
-						<span class="text-xs text-stone-600">
-							<span class="font-semibold">{$t('recordings.scheduled.reminderLabel')}</span> {$t('recordings.scheduled.reminderHint')}
-						</span>
-					</label>
-				</div>
+					<!-- Notifications -->
+					<div class="space-y-2 border border-stone-100 bg-stone-50/60 p-3">
+						<label class="flex items-start gap-2.5">
+							<input type="checkbox" bind:checked={announceDraft} class="mt-0.5 accent-[#FF880C]" />
+							<span class="text-xs text-stone-600">
+								<span class="font-semibold">{$t('recordings.scheduled.announceLabel')}</span>
+								({subscriberCount > 1
+									? $t('recordings.subscribersMany', { count: subscriberCount })
+									: $t('recordings.subscribersOne', { count: subscriberCount })}) {$t(
+									'recordings.scheduled.announceHint'
+								)}
+								{editingId
+									? $t('recordings.scheduled.afterEdit')
+									: $t('recordings.scheduled.atCreation')}
+							</span>
+						</label>
+						<label class="flex items-start gap-2.5">
+							<input type="checkbox" bind:checked={reminderDraft} class="mt-0.5 accent-[#FF880C]" />
+							<span class="text-xs text-stone-600">
+								<span class="font-semibold">{$t('recordings.scheduled.reminderLabel')}</span>
+								{$t('recordings.scheduled.reminderHint')}
+							</span>
+						</label>
+						<label class="flex items-start gap-2.5">
+							<input
+								type="checkbox"
+								bind:checked={notifyOnStartDraft}
+								class="mt-0.5 accent-[#FF880C]"
+							/>
+							<span class="text-xs text-stone-600">
+								<span class="font-semibold">{$t('recordings.scheduled.notifyOnStartLabel')}</span>
+								{$t('recordings.scheduled.notifyOnStartHint')}
+							</span>
+						</label>
+					</div>
 				{/if}
 
 				{#if formError}
-					<p class="border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">{formError}</p>
+					<p class="border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+						{formError}
+					</p>
 				{/if}
 			</div>
 
@@ -1101,8 +1322,17 @@
 				<button type="button" class="admin-btn-secondary" onclick={closeModal} disabled={saving}>
 					{$t('recordings.common.cancel')}
 				</button>
-				<button type="button" class="admin-btn-primary disabled:opacity-50" onclick={saveEntry} disabled={saving}>
-					{saving ? $t('recordings.common.saving') : editingId ? $t('recordings.common.save') : $t('recordings.scheduled.scheduleAction')}
+				<button
+					type="button"
+					class="admin-btn-primary disabled:opacity-50"
+					onclick={saveEntry}
+					disabled={saving}
+				>
+					{saving
+						? $t('recordings.common.saving')
+						: editingId
+							? $t('recordings.common.save')
+							: $t('recordings.scheduled.scheduleAction')}
 				</button>
 			</div>
 		</div>

@@ -57,6 +57,7 @@ export async function POST({ request, url }) {
 		subtitleFilename?: string;
 		announce?: boolean;
 		reminderEnabled?: boolean;
+		notifyOnStart?: boolean;
 		filename?: string;
 		contentType?: string;
 		size?: number;
@@ -126,7 +127,8 @@ export async function POST({ request, url }) {
 			subtitleKey: body.subtitleKey ?? null,
 			subtitleFilename: body.subtitleFilename ?? null,
 			announce: body.announce === true,
-			reminderEnabled: body.reminderEnabled === true
+			reminderEnabled: body.reminderEnabled === true,
+			notifyOnStart: body.notifyOnStart === true
 		});
 		return json({ session });
 	}
@@ -276,7 +278,7 @@ export async function POST({ request, url }) {
 			is_test: Boolean(session.is_test),
 			// Test links are deliberately unlisted and silent: no subscriber push
 			// may be sent merely because an operator is checking the signal.
-			notification_pending: !session.is_test,
+			notification_pending: !session.is_test && session.notify_on_start === true,
 			title: session.title,
 			description: session.description,
 			thumbnail_url: session.thumbnail_url,

@@ -45,6 +45,7 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 		youtube_url?: unknown;
 		scheduled_at?: unknown;
 		reminder_enabled?: unknown;
+		notify_on_start?: unknown;
 		announce?: unknown;
 	};
 
@@ -58,7 +59,9 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 	if ('youtube_url' in body) updates.youtube_url = parseYoutubeUrl(body.youtube_url);
 	// Date/reminder only make sense before the live starts — ignore them once on air.
 	if (!isLive && 'scheduled_at' in body) updates.scheduled_at = parseScheduledAt(body.scheduled_at);
-	if (!isLive && 'reminder_enabled' in body) updates.reminder_enabled = body.reminder_enabled === true;
+	if (!isLive && 'reminder_enabled' in body)
+		updates.reminder_enabled = body.reminder_enabled === true;
+	if (!isLive && 'notify_on_start' in body) updates.notify_on_start = body.notify_on_start === true;
 
 	if ('thumbnail_url' in body || 'thumbnail_s3_key' in body) {
 		const pair = parseThumbnailPair(body.thumbnail_url, body.thumbnail_s3_key);

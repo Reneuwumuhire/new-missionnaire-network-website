@@ -1154,6 +1154,7 @@ export type ScheduledLive = {
 	announced_at: string | null;
 	reminder_enabled: boolean;
 	reminder_sent_at: string | null;
+	notify_on_start: boolean;
 	/** Unlisted operator-only smoke test. It is never announced or listed. */
 	is_test: boolean;
 	/** Pre-made SRT transcript for the broadcast audio. anchor/offset are
@@ -1260,6 +1261,7 @@ export async function createStudioScheduledLive(input: {
 	subtitleFilename?: string | null;
 	announce?: boolean;
 	reminderEnabled?: boolean;
+	notifyOnStart?: boolean;
 	testAccessToken?: string;
 }): Promise<ScheduledLive> {
 	const db = await getDb();
@@ -1283,6 +1285,7 @@ export async function createStudioScheduledLive(input: {
 			announced_at: null,
 			reminder_enabled: input.reminderEnabled === true,
 			reminder_sent_at: null,
+			notify_on_start: input.notifyOnStart === true,
 			is_test: Boolean(input.testAccessToken),
 			...(input.testAccessToken ? { test_access_token: input.testAccessToken } : {}),
 			subtitle_srt_url: input.subtitleUrl ?? null,

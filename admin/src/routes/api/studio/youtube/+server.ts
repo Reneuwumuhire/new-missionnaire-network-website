@@ -83,6 +83,7 @@ export async function POST({ request, getClientAddress }) {
 		subtitleFilename?: unknown;
 		announce?: unknown;
 		reminderEnabled?: unknown;
+		notifyOnStart?: unknown;
 		filename?: unknown;
 		contentType?: unknown;
 		size?: unknown;
@@ -251,6 +252,7 @@ export async function POST({ request, getClientAddress }) {
 				scheduled_at: scheduledAt,
 				announce: body.announce === true,
 				reminder_enabled: body.reminderEnabled === true,
+				notify_on_start: body.notifyOnStart === true,
 				created_by: user.email
 			});
 		} catch (cause) {
