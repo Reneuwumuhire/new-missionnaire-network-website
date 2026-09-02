@@ -45,6 +45,7 @@ export type NewSession = {
 	subtitle: File | null;
 	announce: boolean;
 	reminderEnabled: boolean;
+	notifyOnStart: boolean;
 	youtubeChannelId: string;
 };
 
@@ -540,6 +541,7 @@ export async function createSession(draft: NewSession) {
 			madeForKids: draft.madeForKids,
 			announce: draft.announce,
 			reminderEnabled: draft.reminderEnabled,
+			notifyOnStart: draft.notifyOnStart,
 			channelId: channel.id,
 			thumbnailUrl: thumbnail?.url,
 			thumbnailKey: thumbnail?.key,

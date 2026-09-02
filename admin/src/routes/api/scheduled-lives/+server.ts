@@ -27,6 +27,7 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		scheduled_at?: unknown;
 		announce?: unknown;
 		reminder_enabled?: unknown;
+		notify_on_start?: unknown;
 	};
 
 	const title = parseTitle(body.title, { required: true });
@@ -66,6 +67,7 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		scheduled_at: scheduledAt,
 		announce,
 		reminder_enabled: body.reminder_enabled === true,
+		notify_on_start: body.notify_on_start === true,
 		created_by: locals.user.email
 	});
 

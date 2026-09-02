@@ -10,8 +10,9 @@
 	let madeForKids = $state(false);
 	let thumbnail = $state<File | null>(null);
 	let subtitle = $state<File | null>(null);
-	let announce = $state(true);
+	let announce = $state(false);
 	let reminderEnabled = $state(false);
+	let notifyOnStart = $state(false);
 	let youtubeChannelId = $state(
 		liveSession.youtubeChannelId ?? liveSession.youtubeChannels[0]?.id ?? ''
 	);
@@ -42,6 +43,7 @@
 				subtitle,
 				announce,
 				reminderEnabled,
+				notifyOnStart,
 				youtubeChannelId
 			})
 		)
@@ -209,7 +211,7 @@
 				/>
 			</label>
 		</div>
-		<div class="grid gap-2 sm:grid-cols-2">
+		<div class="grid gap-2 sm:grid-cols-3">
 			<label
 				class="group flex cursor-pointer items-start gap-3 border border-ink-700 bg-ink-800/50 p-3 transition-colors hover:border-ink-500"
 			>
@@ -226,9 +228,31 @@
 					>
 				</span>
 				<span>
-					<strong class="block text-[12px] font-medium text-fg/80">Announce to subscribers</strong>
+					<strong class="block text-[12px] font-medium text-fg/80">Announce when scheduled</strong>
 					<span class="mt-0.5 block text-[10px] leading-relaxed text-fg/40"
-						>Publish the service announcement.</span
+						>Send an “upcoming live” alert now.</span
+					>
+				</span>
+			</label>
+			<label
+				class="group flex cursor-pointer items-start gap-3 border border-ink-700 bg-ink-800/50 p-3 transition-colors hover:border-ink-500"
+			>
+				<input class="peer sr-only" type="checkbox" bind:checked={notifyOnStart} />
+				<span
+					class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center border border-ink-500 bg-ink-800 text-transparent transition-colors peer-checked:border-primary peer-checked:bg-primary peer-checked:text-black peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-primary"
+				>
+					<svg
+						viewBox="0 0 16 16"
+						class="h-3 w-3"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2.5"><path d="m3 8 3 3 7-7" /></svg
+					>
+				</span>
+				<span>
+					<strong class="block text-[12px] font-medium text-fg/80">Notify when live starts</strong>
+					<span class="mt-0.5 block text-[10px] leading-relaxed text-fg/40"
+						>Send an alert only when selected.</span
 					>
 				</span>
 			</label>

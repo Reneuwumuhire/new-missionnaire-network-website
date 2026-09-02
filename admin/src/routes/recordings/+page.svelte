@@ -2038,6 +2038,7 @@
 				const text = await res.text();
 				actionError = text || $t('recordings.error.http', { status: res.status });
 			} else {
+				notifyOnGoLive = false;
 				// The handler links (or back-fills) a scheduled_lives entry and
 				// returns its stable watch URL — surface it right away.
 				const payload = (await res.json().catch(() => null)) as { watchPath?: string } | null;
@@ -2087,8 +2088,9 @@
 		}
 	}
 
-	// Default ON: normal broadcasts notify. Uncheck for silent tests/re-broadcasts.
-	let notifyOnGoLive = $state(true);
+	// Subscriber alerts are always explicit. Starting a live is silent unless
+	// the operator selects this option for the current start action.
+	let notifyOnGoLive = $state(false);
 
 	// Title template fallback shared with the manual-upload modal: {date} is
 	// substituted with the live’s date when no default title is configured.
@@ -2170,12 +2172,12 @@
 	 *  but leave the broadcast running — admin can retry recording separately. */
 	async function startBoth() {
 		if (broadcastBusy || busy) return;
-		const msg =
-			subscriberCount > 0
-				? subscriberCount > 1
-					? $t('recordings.confirm.startAll.notifyMany', { count: subscriberCount })
-					: $t('recordings.confirm.startAll.notifyOne', { count: subscriberCount })
-				: $t('recordings.confirm.startAll.message');
+		const willNotify = notifyOnGoLive && subscriberCount > 0;
+		const msg = willNotify
+			? subscriberCount > 1
+				? $t('recordings.confirm.startAll.notifyMany', { count: subscriberCount })
+				: $t('recordings.confirm.startAll.notifyOne', { count: subscriberCount })
+			: $t('recordings.confirm.startAll.message');
 		const ok = await confirmDialog.ask({
 			title: $t('recordings.actions.startAll'),
 			message: msg,
@@ -2187,12 +2189,17 @@
 		busy = true;
 		actionError = null;
 		try {
-			const liveRes = await fetch('/api/broadcast/go-live', { method: 'POST' });
+			const liveRes = await fetch('/api/broadcast/go-live', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ notify: notifyOnGoLive })
+			});
 			if (!liveRes.ok) {
 				actionError =
 					(await liveRes.text()) || $t('recordings.error.http', { status: liveRes.status });
 				return;
 			}
+			notifyOnGoLive = false;
 			const recRes = await fetch('/api/recordings/start', recordingStartInit());
 			if (!recRes.ok) {
 				actionError = $t('recordings.error.startRecordingAfterLive', {
@@ -2611,6 +2618,21 @@
 	     from. Idle-with-no-source shows just the compact monitor strip below. -->
 	{#if icecast.sourceActive || broadcast.is_live || isRecording}
 		<div class="mt-5 border-t border-stone-100 pt-5">
+			{#if !broadcast.is_live}
+				<label
+					class="mb-3 flex cursor-pointer items-start gap-3 border border-stone-200 bg-stone-50 px-3 py-2.5"
+				>
+					<input type="checkbox" bind:checked={notifyOnGoLive} class="mt-0.5 accent-[#FF880C]" />
+					<span>
+						<strong class="block text-[11px] font-semibold text-stone-700">
+							{$t('recordings.notifications.liveStartLabel')}
+						</strong>
+						<span class="mt-0.5 block text-[10px] text-stone-400">
+							{$t('recordings.notifications.liveStartHint', { count: subscriberCount })}
+						</span>
+					</span>
+				</label>
+			{/if}
 			{#if broadcast.is_live && isRecording}
 				<!-- All three actions stay visible, equal-height, each with a distinct
 			     tonal identity at rest so they're recognizable at a glance:

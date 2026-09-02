@@ -994,6 +994,9 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.confirm.goLive.noSubscribers': 'No notification subscribers yet. Go live anyway?',
 	'recordings.confirm.goLive.silent': 'Go live WITHOUT notifying subscribers.',
 	'recordings.confirm.goLive.confirmNotify': 'Broadcast and notify',
+	'recordings.notifications.liveStartLabel': 'Notify subscribers when this live starts',
+	'recordings.notifications.liveStartHint':
+		'Optional · currently {count} notification subscribers. Leave unchecked to start silently.',
 	'recordings.confirm.endLive.message': 'The public site will no longer show the live player.',
 	'recordings.confirm.stopAll.message': 'End the live AND stop the current recording?',
 	'recordings.confirm.startAll.message': 'Go live AND start recording.',
@@ -1091,7 +1094,7 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.scheduled.scheduleAction': 'Schedule',
 	'recordings.scheduled.emptyTitle': 'No scheduled live',
 	'recordings.scheduled.emptyBody':
-		'Schedule a live to instantly get a share link and announce the broadcast to subscribers.',
+		'Schedule a live to instantly get a share link, with notifications only when you choose them.',
 	'recordings.scheduled.imminent': 'Imminent',
 	'recordings.scheduled.inMinutes': 'In {count} min',
 	'recordings.scheduled.inHours': 'In {count} h',
@@ -1099,6 +1102,8 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.scheduled.inDaysMany': 'In {count} days',
 	'recordings.scheduled.announced': 'Announced',
 	'recordings.scheduled.reminderOn': 'Reminder enabled',
+	'recordings.scheduled.liveAlertOn': 'Live alert enabled',
+	'recordings.scheduled.notifyThisStart': 'Notify for this instant live',
 	'recordings.scheduled.transcript': 'Transcript',
 	'recordings.scheduled.liveSince': 'Live since {time}',
 	'recordings.scheduled.elapsedJustNow': 'just now',
@@ -1142,6 +1147,9 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.scheduled.reminderLabel': 'Automatic reminder',
 	'recordings.scheduled.reminderHint':
 		'— "starting soon" notification about 30 minutes before the start',
+	'recordings.scheduled.notifyOnStartLabel': 'Notify when the live starts',
+	'recordings.scheduled.notifyOnStartHint':
+		'— sends the “now live” alert; leave unchecked to start silently',
 	'recordings.scheduled.status.live': 'Live',
 	'recordings.scheduled.status.scheduled': 'Scheduled',
 	'recordings.scheduled.status.ended': 'Ended',
