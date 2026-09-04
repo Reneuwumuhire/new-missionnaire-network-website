@@ -199,17 +199,21 @@
 				class="flex h-8 w-full items-center justify-between border border-ink-700 px-2 text-[11px] {recordingActive
 					? 'text-red-300'
 					: 'text-fg/60'}"
-				disabled={recordsLocal() && !recordsCloud()}
+				disabled={(recordsLocal() && !recordsCloud()) || recording.cloudPending}
 				onclick={() => (recording.cloud ? void stopCloudRecording() : void startCloudRecording())}
 			>
 				<span
-					>{recordsCloud()
+					>{recording.cloudPending
 						? recording.cloud
-							? 'Stop recording'
-							: 'Start recording'
-						: recording.startedAt
-							? 'Recording local'
-							: 'Local recording armed'}</span
+							? 'Stopping recording…'
+							: 'Starting recording…'
+						: recordsCloud()
+							? recording.cloud
+								? 'Stop recording'
+								: 'Start recording'
+							: recording.startedAt
+								? 'Recording local'
+								: 'Local recording armed'}</span
 				>
 				<span class="font-mono">{recordingActive ? clock(recordingDuration) : '00:00:00'}</span>
 			</button>

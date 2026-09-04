@@ -18,6 +18,14 @@ const MENU_SHORTCUTS: &str = "studio-keyboard-shortcuts";
 const MENU_TROUBLESHOOTING: &str = "studio-troubleshooting";
 const MENU_SYSTEM_INFO: &str = "studio-system-information";
 
+fn notify_close_blocked(app: &AppHandle) {
+	if let Some(window) = app.get_webview_window("main") {
+		let _ = window.show();
+		let _ = window.set_focus();
+	}
+	let _ = app.emit_to("main", "studio://close-blocked", ());
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct StartedStream {
@@ -77,6 +85,47 @@ fn available_space(path: &std::path::Path) -> Result<u64, String> {
 		.trim()
 		.parse::<u64>()
 		.map_err(|error| format!("Espace disque invalide: {error}"))
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StudioDeviceInfo {
+	os: &'static str,
+	architecture: &'static str,
+	username: String,
+	device_name: String,
+	app_version: String,
+}
+
+#[tauri::command]
+fn studio_device_info(app: AppHandle) -> StudioDeviceInfo {
+	let os = match std::env::consts::OS {
+		"macos" => "macOS",
+		"windows" => "Windows",
+		"linux" => "Linux",
+		other => other,
+	};
+	let username = std::env::var("USER")
+		.or_else(|_| std::env::var("USERNAME"))
+		.unwrap_or_else(|_| "Unknown user".into());
+	let device_name = std::env::var("COMPUTERNAME")
+		.ok()
+		.or_else(|| std::env::var("HOSTNAME").ok())
+		.or_else(|| {
+			Command::new("hostname")
+				.output()
+				.ok()
+				.map(|output| String::from_utf8_lossy(&output.stdout).trim().to_owned())
+		})
+		.filter(|name| !name.is_empty())
+		.unwrap_or_else(|| "Unknown device".into());
+	StudioDeviceInfo {
+		os,
+		architecture: std::env::consts::ARCH,
+		username,
+		device_name,
+		app_version: app.package_info().version.to_string(),
+	}
 }
 
 fn allowed_web_url(url: &str) -> bool {
@@ -160,7 +209,19 @@ fn studio_post(body: String, authorization: String, base_url: String, path: &str
 		return Err("URL du site invalide".into());
 	}
 	let output = Command::new("curl")
-		.args(["--fail-with-body", "--silent", "--show-error", "--retry", "2", "--retry-delay", "1", "--max-time", "20", "-X", "POST"])
+		.args([
+			"--fail-with-body",
+			"--silent",
+			"--show-error",
+			"--retry",
+			"2",
+			"--retry-delay",
+			"1",
+			"--max-time",
+			"30",
+			"-X",
+			"POST",
+		])
 		.arg("-H").arg(format!("Authorization: Bearer {authorization}"))
 		.args(["-H", "Content-Type: application/json", "--data"])
 		.arg(body)
@@ -606,6 +667,7 @@ pub fn run() {
 		.invoke_handler(tauri::generate_handler![
 			check_ffmpeg,
 			recording_space,
+			studio_device_info,
 			extract_reference_features,
 			start_stream,
 			studio_live_post,
@@ -629,17 +691,42 @@ pub fn run() {
 			report
 		])
 		.on_window_event(|window, event| {
-			// Closing the window while live would orphan ffmpeg holding the RTMP
-			// connections open; YouTube would keep showing a frozen frame.
-			if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
-				if let Some(encoder) = window.app_handle().try_state::<Encoder>() {
-					let _ = encoder.stop();
+			if window.label() != "main" {
+				return;
+			}
+			match event {
+				tauri::WindowEvent::CloseRequested { api, .. } => {
+					if window
+						.app_handle()
+						.try_state::<Encoder>()
+						.is_some_and(|encoder| encoder.is_running())
+					{
+						api.prevent_close();
+						notify_close_blocked(window.app_handle());
+					}
 				}
-				if let Some(capture) = window.app_handle().try_state::<appaudio::Capture>() {
-					capture.stop(None);
+				tauri::WindowEvent::Destroyed => {
+					if let Some(encoder) = window.app_handle().try_state::<Encoder>() {
+						let _ = encoder.stop();
+					}
+					if let Some(capture) = window.app_handle().try_state::<appaudio::Capture>() {
+						capture.stop(None);
+					}
 				}
+				_ => {}
 			}
 		})
-		.run(tauri::generate_context!())
-		.expect("error while running Missionnaire Studio");
+		.build(tauri::generate_context!())
+		.expect("error while building Missionnaire Studio")
+		.run(|app, event| {
+			if let tauri::RunEvent::ExitRequested { api, .. } = event {
+				if app
+					.try_state::<Encoder>()
+					.is_some_and(|encoder| encoder.is_running())
+				{
+					api.prevent_exit();
+					notify_close_blocked(app);
+				}
+			}
+		});
 }

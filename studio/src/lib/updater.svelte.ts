@@ -24,6 +24,19 @@ export const appUpdate = $state({
 let pending: Update | null = null;
 let checking: Promise<void> | null = null;
 
+export async function retry<T>(operation: () => Promise<T>, delayMs = 500): Promise<T> {
+	let lastError: unknown;
+	for (let attempt = 0; attempt < 3; attempt++) {
+		try {
+			return await operation();
+		} catch (error) {
+			lastError = error;
+			if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, delayMs * 2 ** attempt));
+		}
+	}
+	throw lastError;
+}
+
 export function downloadPercent(
 	downloaded = appUpdate.downloaded,
 	total = appUpdate.total
@@ -39,12 +52,18 @@ export async function initUpdater(): Promise<void> {
 /** Silent startup checks do not turn a temporary network problem into a red
  * banner; a manual check in About still reports the same error. */
 export async function checkForUpdate(silent = false): Promise<void> {
-	if (checking) return checking;
+	if (checking) {
+		await checking;
+		// A click during the silent startup check must still perform a visible
+		// check if that background request failed.
+		if (!silent && appUpdate.phase === 'idle') await checkForUpdate();
+		return;
+	}
 	checking = (async () => {
 		appUpdate.phase = 'checking';
 		appUpdate.error = null;
 		try {
-			const found = await check({ timeout: 15_000 });
+			const found = await retry(() => check({ timeout: 15_000 }));
 			if (pending && pending !== found) await pending.close().catch(() => {});
 			pending = found;
 			appUpdate.availableVersion = found?.version ?? null;

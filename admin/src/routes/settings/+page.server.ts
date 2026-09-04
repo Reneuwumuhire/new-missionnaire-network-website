@@ -7,6 +7,7 @@ import {
 	logAudit
 } from '../../db/collections';
 import {
+	deleteDisconnectedStudioAuthorizationById,
 	listStudioAuthorizations,
 	revokeStudioAuthorizationById,
 	revokeStudioAuthorizationsForUser
@@ -127,11 +128,28 @@ export const actions: Actions = {
 		await logAudit({
 			user_id: locals.user.email,
 			user_email: locals.user.email,
-			action: 'delete',
+			action: 'update',
 			target_collection: 'studio_authorizations',
 			target_id: id,
 			ip_address: getClientAddress()
 		});
 		return { studioRevoked: true };
+	},
+
+	deleteStudio: async ({ request, locals, getClientAddress }) => {
+		const id = (await request.formData()).get('id')?.toString();
+		if (!id) return fail(400, { studioDeleteError: true });
+		if (!(await deleteDisconnectedStudioAuthorizationById(id, locals.user.email))) {
+			return fail(409, { studioDeleteError: true });
+		}
+		await logAudit({
+			user_id: locals.user.email,
+			user_email: locals.user.email,
+			action: 'delete',
+			target_collection: 'studio_authorizations',
+			target_id: id,
+			ip_address: getClientAddress()
+		});
+		return { studioDeleted: true };
 	}
 };

@@ -29,13 +29,15 @@ import { generatePresignedUploadUrl, getObjectBytes, getS3Url } from '$lib/serve
 import { RecorderError, recorderStart, recorderStop } from '$lib/server/recorder-client';
 import {
 	missionnaireIngestForAuthorization,
-	revokeMissionnaireIngest
+	revokeMissionnaireIngest,
+	updateStudioAuthorizationActivity
 } from '$lib/server/studio-ingest';
 
 async function operator(request: Request) {
 	const code = request.headers.get('authorization')?.replace(/^Bearer\s+/, '') ?? '';
 	const doc = await (await getDb()).collection('studio_authorizations').findOne({
 		code,
+		revoked_at: { $exists: false },
 		expires_at: { $gt: new Date() }
 	});
 	if (!doc || typeof doc.user_email !== 'string')
@@ -50,7 +52,6 @@ async function operator(request: Request) {
 	}
 	return {
 		code,
-		authorization: doc,
 		email: doc.user_email,
 		name: typeof doc.user_name === 'string' ? doc.user_name : doc.user_email
 	};
@@ -82,10 +83,12 @@ export async function POST({ request, getClientAddress }) {
 		subtitleFilename?: unknown;
 		announce?: unknown;
 		reminderEnabled?: unknown;
+		notifyOnStart?: unknown;
 		filename?: unknown;
 		contentType?: unknown;
 		size?: unknown;
 		channelId?: unknown;
+		deviceInfo?: unknown;
 	};
 	if (body.action === 'logout') {
 		const code = request.headers.get('authorization')?.replace(/^Bearer\s+/, '') ?? '';
@@ -93,10 +96,14 @@ export async function POST({ request, getClientAddress }) {
 		return json({ ok: true });
 	}
 	const user = await operator(request);
+	if (body.action === 'status' || body.action === 'heartbeat') {
+		await updateStudioAuthorizationActivity(user.code, body.deviceInfo);
+	}
+	if (body.action === 'heartbeat') return json({ ok: true });
 	if (body.action === 'status') {
 		const [channels, missionnaire] = await Promise.all([
 			youtubeConnection(user.email),
-			missionnaireIngestForAuthorization(user.code, user.authorization)
+			missionnaireIngestForAuthorization(user.code)
 				.then((ingest) => ({ ingest, error: null }))
 				.catch((cause) => ({
 					ingest: null,
@@ -245,6 +252,7 @@ export async function POST({ request, getClientAddress }) {
 				scheduled_at: scheduledAt,
 				announce: body.announce === true,
 				reminder_enabled: body.reminderEnabled === true,
+				notify_on_start: body.notifyOnStart === true,
 				created_by: user.email
 			});
 		} catch (cause) {

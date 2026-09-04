@@ -1,5 +1,4 @@
 import { json, error } from '@sveltejs/kit';
-import { checkLiveAudio } from '$lib/server/icecast';
 import {
 	getStudioAuthorization,
 	revokeStudioAuthorization,
@@ -33,7 +32,16 @@ function defaultTitle(template: string | null): string {
 	return value.includes('{date}') ? value.replaceAll('{date}', date) : `${date} ${value}`;
 }
 
-export async function POST({ request, url, fetch }) {
+function validSubtitleUpload(key?: string, url?: string): boolean {
+	return (
+		typeof key === 'string' &&
+		typeof url === 'string' &&
+		key.startsWith('subtitles/') &&
+		url === s3Url(key)
+	);
+}
+
+export async function POST({ request, url }) {
 	const serverReceivedAtMs = Date.now();
 	const body = (await request.json().catch(() => ({}))) as {
 		action?: string;
@@ -49,6 +57,7 @@ export async function POST({ request, url, fetch }) {
 		subtitleFilename?: string;
 		announce?: boolean;
 		reminderEnabled?: boolean;
+		notifyOnStart?: boolean;
 		filename?: string;
 		contentType?: string;
 		size?: number;
@@ -118,7 +127,8 @@ export async function POST({ request, url, fetch }) {
 			subtitleKey: body.subtitleKey ?? null,
 			subtitleFilename: body.subtitleFilename ?? null,
 			announce: body.announce === true,
-			reminderEnabled: body.reminderEnabled === true
+			reminderEnabled: body.reminderEnabled === true,
+			notifyOnStart: body.notifyOnStart === true
 		});
 		return json({ session });
 	}
@@ -146,6 +156,30 @@ export async function POST({ request, url, fetch }) {
 		});
 	}
 	if (!body.sessionId) throw error(400, 'sessionId required');
+	if (body.action === 'attach-subtitles') {
+		const current = await getBroadcastAdminState();
+		if (!current.is_live || current.scheduled_live_id !== body.sessionId) {
+			throw error(409, 'This session is not live');
+		}
+		if (!validSubtitleUpload(body.subtitleKey, body.subtitleUrl)) {
+			throw error(400, 'Invalid subtitle upload');
+		}
+		await updateStudioLiveSubtitles(body.sessionId, {
+			subtitle_srt_url: body.subtitleUrl!,
+			subtitle_srt_s3_key: body.subtitleKey!,
+			subtitle_filename: body.subtitleFilename?.slice(0, 255) || 'studio.srt',
+			subtitle_anchor_epoch_ms: null,
+			subtitle_offset_ms: 0
+		});
+		await setBroadcastAdminState({
+			subtitle_srt_url: body.subtitleUrl!,
+			subtitle_srt_s3_key: body.subtitleKey!,
+			subtitle_anchor_epoch_ms: null,
+			subtitle_offset_ms: 0,
+			subtitle_paused_position_ms: null
+		});
+		return json({ ok: true });
+	}
 	if (body.action === 'hide-subtitles') {
 		const current = await getBroadcastAdminState();
 		if (!current.is_live || current.scheduled_live_id !== body.sessionId) {
@@ -174,10 +208,7 @@ export async function POST({ request, url, fetch }) {
 
 		const attached = Boolean(body.subtitleKey || body.subtitleUrl);
 		if (attached) {
-			if (
-				!body.subtitleKey?.startsWith('subtitles/') ||
-				body.subtitleUrl !== s3Url(body.subtitleKey)
-			) {
+			if (!validSubtitleUpload(body.subtitleKey, body.subtitleUrl)) {
 				throw error(400, 'Invalid subtitle upload');
 			}
 		} else if (!current.subtitle_srt_s3_key) {
@@ -214,9 +245,6 @@ export async function POST({ request, url, fetch }) {
 		return json({ ok: true, anchorEpochMs, offsetMs, pausedPositionMs });
 	}
 	if (body.action === 'start') {
-		if (!(await checkLiveAudio(fetch)).isLive) {
-			throw error(409, 'No live audio detected. Check the Missionnaire preview in admin first.');
-		}
 		const session = await getScheduledLiveById(body.sessionId);
 		if (!session) throw error(404, 'Session not found');
 		if (session.status !== 'scheduled') throw error(400, 'Session is no longer available');
@@ -250,7 +278,7 @@ export async function POST({ request, url, fetch }) {
 			is_test: Boolean(session.is_test),
 			// Test links are deliberately unlisted and silent: no subscriber push
 			// may be sent merely because an operator is checking the signal.
-			notification_pending: !session.is_test,
+			notification_pending: !session.is_test && session.notify_on_start === true,
 			title: session.title,
 			description: session.description,
 			thumbnail_url: session.thumbnail_url,

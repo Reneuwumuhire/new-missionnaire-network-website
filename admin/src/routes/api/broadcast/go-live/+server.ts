@@ -43,16 +43,14 @@ function renderDefaultTitle(template: string): string {
 export const POST: RequestHandler = async ({ locals, request, getClientAddress }) => {
 	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
 
-	// `notify` is optional: defaults to true (normal behavior = fire push).
-	// Pass `false` from admin UI to go live silently (local testing, re-broadcasts
-	// after a technical glitch, etc.).
+	// Notifications are opt-in. Missing or malformed input always starts silently.
 	// `scheduledLiveId` explicitly attaches this broadcast to a scheduled entry
 	// (the "Démarrer le direct" button). Without it we auto-link the nearest
 	// upcoming entry, or back-fill a new one so even ad-hoc lives get a stable
 	// watch URL.
 	// `useDefaults` forces an immediate live off the saved default info, skipping
 	// the auto-link — the "go live now with defaults" button for unscheduled lives.
-	let notify = true;
+	let notify = false;
 	let scheduledLiveId: string | null = null;
 	let useDefaults = false;
 	try {
@@ -61,7 +59,7 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 			scheduledLiveId?: unknown;
 			useDefaults?: unknown;
 		};
-		if (body.notify === false) notify = false;
+		if (body.notify === true) notify = true;
 		if (typeof body.scheduledLiveId === 'string' && body.scheduledLiveId) {
 			scheduledLiveId = body.scheduledLiveId;
 		}
@@ -121,7 +119,9 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 	const thumbUrl = entry.thumbnail_url ?? current.default_thumbnail_url ?? null;
 	const thumbKey = entry.thumbnail_url
 		? entry.thumbnail_s3_key
-		: (current.default_thumbnail_url ? current.default_thumbnail_s3_key : null);
+		: current.default_thumbnail_url
+			? current.default_thumbnail_s3_key
+			: null;
 
 	await setBroadcastAdminState({
 		is_live: true,

@@ -2,6 +2,14 @@ import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 
 const INGEST_TTL_MS = 12 * 60 * 60 * 1000;
 
+/** MediaMTX versions before token extraction support pass RTMP query
+ * parameters only through `query`; newer versions also populate `token`. */
+export function ingestToken(token: unknown, query: unknown): string | null {
+	if (typeof token === 'string' && token) return token;
+	if (typeof query !== 'string') return null;
+	return new URLSearchParams(query).get('token');
+}
+
 function signature(secret: string, path: string, expiresAt: number): Buffer {
 	return createHmac('sha256', secret).update(`${path}\0${expiresAt}`).digest();
 }

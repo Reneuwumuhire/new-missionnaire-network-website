@@ -148,12 +148,26 @@ HLS_NEW_SESSION_GAP_SECONDS="${HLS_NEW_SESSION_GAP_SECONDS:-300}"
 start_hls_loop() {
 	(
 		mkdir -p "${HLS_DIR}"
+		HLS_PATH_FILE="${HLS_DIR}/active-path.sha256"
+		HLS_LAST_PATH_ID="$(cat "$HLS_PATH_FILE" 2>/dev/null || true)"
+		# Older releases reused segment URLs forever while marking them as
+		# immutable. Drop that legacy playlist once so clients cannot replay a
+		# cached segment from a past broadcast.
+		if [ -z "$HLS_LAST_PATH_ID" ] && [ -f "${HLS_DIR}/live.m3u8" ]; then
+			echo "[hls] clearing legacy DVR window with reusable segment names"
+			rm -f "${HLS_DIR}/live.m3u8" "${HLS_DIR}"/live-*.ts
+		fi
 		sleep 3
 		while true; do
 			HLS_ACTIVE_PATH="$(get_active_path || true)"
 			if [ -z "$HLS_ACTIVE_PATH" ]; then
 				sleep 2
 				continue
+			fi
+			HLS_ACTIVE_PATH_ID="$(printf '%s' "$HLS_ACTIVE_PATH" | sha256sum | cut -d ' ' -f 1)"
+			if [ -n "$HLS_LAST_PATH_ID" ] && [ "$HLS_ACTIVE_PATH_ID" != "$HLS_LAST_PATH_ID" ]; then
+				echo "[hls] publisher changed — clearing the previous Studio's DVR window"
+				rm -f "${HLS_DIR}/live.m3u8" "${HLS_DIR}"/live-*.ts
 			fi
 			# Freshness check via the playlist's mtime (persisted on the /data
 			# volume, so this survives machine restarts): a playlist last
@@ -165,6 +179,8 @@ start_hls_loop() {
 					rm -f "${HLS_DIR}/live.m3u8" "${HLS_DIR}"/live-*.ts
 				fi
 			fi
+			HLS_LAST_PATH_ID="$HLS_ACTIVE_PATH_ID"
+			printf '%s\n' "$HLS_ACTIVE_PATH_ID" > "$HLS_PATH_FILE"
 			echo "[hls] packaging from rtsp://127.0.0.1:8554/${HLS_ACTIVE_PATH}"
 			ffmpeg -nostdin -hide_banner -loglevel warning \
 				-fflags +genpts+igndts+discardcorrupt \
@@ -178,6 +194,7 @@ start_hls_loop() {
 				-hls_init_time 2 \
 				-hls_list_size "${HLS_DVR_SEGMENTS}" \
 				-hls_delete_threshold 20 \
+				-hls_start_number_source epoch_us \
 				-hls_flags delete_segments+append_list+omit_endlist+program_date_time+independent_segments+discont_start+temp_file \
 				-hls_segment_filename "${HLS_DIR}/live-%08d.ts" \
 				"${HLS_DIR}/live.m3u8"

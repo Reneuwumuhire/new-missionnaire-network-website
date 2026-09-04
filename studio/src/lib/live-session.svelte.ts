@@ -45,11 +45,76 @@ export type NewSession = {
 	subtitle: File | null;
 	announce: boolean;
 	reminderEnabled: boolean;
+	notifyOnStart: boolean;
 	youtubeChannelId: string;
 };
 
 type YouTubeIngest = { url: string; key: string };
 type MissionnaireIngest = YouTubeIngest & { expiresAt: string };
+type StudioDeviceInfo = {
+	os: string;
+	architecture: string;
+	username: string;
+	deviceName: string;
+	appVersion: string;
+	installationId: string;
+};
+
+let deviceInfoPromise: Promise<StudioDeviceInfo> | null = null;
+let youtubeStatusRequest = 0;
+const AUTH_STORAGE_KEY = 'missionnaire-studio-authorization-v1';
+const INSTALLATION_STORAGE_KEY = 'missionnaire-studio-installation-v1';
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type AuthorizationStorage = Pick<Storage, 'getItem'>;
+
+export function restoreStudioAuthorization(storage: AuthorizationStorage): string | null {
+	try {
+		const code = storage.getItem(AUTH_STORAGE_KEY);
+		return code && UUID_PATTERN.test(code) ? code : null;
+	} catch {
+		return null;
+	}
+}
+
+function studioInstallationId(): string {
+	if (typeof localStorage !== 'undefined') {
+		try {
+			const saved = localStorage.getItem(INSTALLATION_STORAGE_KEY);
+			if (saved && UUID_PATTERN.test(saved)) return saved;
+			const created = crypto.randomUUID();
+			localStorage.setItem(INSTALLATION_STORAGE_KEY, created);
+			return created;
+		} catch {
+			// A stable id is helpful, not required for broadcasting.
+		}
+	}
+	return crypto.randomUUID();
+}
+
+function saveStudioAuthorization(code: string | null) {
+	if (typeof localStorage === 'undefined') return;
+	try {
+		if (code) localStorage.setItem(AUTH_STORAGE_KEY, code);
+		else localStorage.removeItem(AUTH_STORAGE_KEY);
+	} catch {
+		// Storage failure leaves the current session usable until Studio closes.
+	}
+}
+
+export function isLatestStatusRequest(request: number, latest: number): boolean {
+	return request === latest;
+}
+
+function studioDeviceInfo() {
+	deviceInfoPromise ??= invoke<Omit<StudioDeviceInfo, 'installationId'>>('studio_device_info')
+		.then((device) => ({ ...device, installationId: studioInstallationId() }))
+		.catch((error) => {
+			deviceInfoPromise = null;
+			throw error;
+		});
+	return deviceInfoPromise;
+}
 
 export const liveSession = $state({
 	sessions: [] as LiveSession[],
@@ -58,7 +123,8 @@ export const liveSession = $state({
 	activeStartedAt: null as number | null,
 	error: null as string | null,
 	starting: false,
-	pairingCode: null as string | null,
+	pairingCode:
+		typeof localStorage === 'undefined' ? null : restoreStudioAuthorization(localStorage),
 	operatorName: null as string | null,
 	testUrl: null as string | null,
 	youtubeConnected: false,
@@ -184,7 +250,10 @@ export function selectYouTubeChannel(channelId: string | null) {
 }
 
 export async function connectWithAdmin() {
-	if (!liveSession.pairingCode) liveSession.pairingCode = crypto.randomUUID();
+	if (!liveSession.pairingCode) {
+		liveSession.pairingCode = crypto.randomUUID();
+		saveStudioAuthorization(liveSession.pairingCode);
+	}
 	await invoke('studio_open_login', {
 		code: liveSession.pairingCode,
 		adminUrl: studio.settings.adminSiteUrl
@@ -202,7 +271,9 @@ export async function connectWithAdmin() {
 }
 
 export async function refreshYouTubeStatus() {
+	const request = ++youtubeStatusRequest;
 	try {
+		const deviceInfo = await studioDeviceInfo().catch(() => null);
 		const result = await adminPost<{
 			channels?: YouTubeChannel[];
 			connected?: boolean;
@@ -210,8 +281,12 @@ export async function refreshYouTubeStatus() {
 			missionnaireIngest?: MissionnaireIngest | null;
 			missionnaireError?: string | null;
 		}>({
-			action: 'status'
+			action: 'status',
+			deviceInfo
 		});
+		// Re-approval revokes the previous managed ingest key. Ignore any older,
+		// slower response that arrives after the fresh credential.
+		if (!isLatestStatusRequest(request, youtubeStatusRequest)) return;
 		const channels = youtubeChannelsFromStatus(result);
 		liveSession.youtubeChannels = channels;
 		liveSession.youtubeConnected = channels.length > 0;
@@ -232,6 +307,7 @@ export async function refreshYouTubeStatus() {
 		}
 		liveSession.youtubeError = null;
 	} catch (error) {
+		if (!isLatestStatusRequest(request, youtubeStatusRequest)) return;
 		liveSession.youtubeConnected = false;
 		liveSession.youtubeChannels = [];
 		selectYouTubeChannel(null);
@@ -240,6 +316,12 @@ export async function refreshYouTubeStatus() {
 		liveSession.missionnaireReady = false;
 		liveSession.missionnaireError = liveSession.youtubeError;
 	}
+}
+
+export async function heartbeatStudio() {
+	if (!liveSession.pairingCode || !liveSession.operatorName) return;
+	const deviceInfo = await studioDeviceInfo().catch(() => null);
+	await adminPost({ action: 'heartbeat', deviceInfo }).catch(() => undefined);
 }
 
 export async function connectYouTube(): Promise<string | null> {
@@ -325,6 +407,20 @@ async function upload(file: File, action: 'presign-thumbnail' | 'presign-subtitl
 let uploadedSubtitle: { text: string; url: string; key: string } | null = null;
 let subtitleUpload: Promise<{ url: string; key: string }> | null = null;
 let attachedSessionId: string | null = null;
+let attachedSubtitleKey: string | null = null;
+
+export function subtitleNeedsAttach(
+	sessionId: string,
+	subtitleKey: string,
+	attachedSession: string | null,
+	attachedKey: string | null
+) {
+	return sessionId !== attachedSession || subtitleKey !== attachedKey;
+}
+
+export function subtitleSyncAction(needsAttach: boolean, hasTimingSource: boolean) {
+	return hasTimingSource ? 'sync' : needsAttach ? 'attach' : null;
+}
 
 async function ensureTimedSubtitle() {
 	if (uploadedSubtitle?.text === lyrics.srtText) return uploadedSubtitle;
@@ -357,10 +453,29 @@ export async function syncLiveLyrics() {
 		return;
 	try {
 		const media = followedMediaElement(true);
-		// A captured external live starts with songs. Merely loading its SRT must
-		// not open the public gate before the matcher has found the sermon.
-		if (!media && lyrics.anchorEpochMs === null) return;
 		const uploaded = await ensureTimedSubtitle();
+		const attach = subtitleNeedsAttach(
+			liveSession.activeId,
+			uploaded.key,
+			attachedSessionId,
+			attachedSubtitleKey
+		);
+		const action = subtitleSyncAction(attach, Boolean(media || lyrics.anchorEpochMs !== null));
+		// Keep a newly loaded SRT attached to the live immediately. Its clock stays
+		// closed until the matcher, media source, or operator establishes timing.
+		if (action === 'attach') {
+			await post({
+				action: 'attach-subtitles',
+				sessionId: liveSession.activeId,
+				subtitleUrl: uploaded.url,
+				subtitleKey: uploaded.key,
+				subtitleFilename: lyrics.fileName
+			});
+			attachedSessionId = liveSession.activeId;
+			attachedSubtitleKey = uploaded.key;
+			return;
+		}
+		if (!action) return;
 		const sampledAtMs = Date.now();
 		const sourcePositionMs = media
 			? Math.round(media.currentTime * 1000)
@@ -371,7 +486,6 @@ export async function syncLiveLyrics() {
 		const positionMs = paused
 			? sourcePositionMs
 			: outputAlignedPositionMs(sourcePositionMs, sampledAtMs);
-		const attach = attachedSessionId !== liveSession.activeId;
 		await post({
 			action: 'sync-subtitles',
 			sessionId: liveSession.activeId,
@@ -390,6 +504,7 @@ export async function syncLiveLyrics() {
 				: {})
 		});
 		attachedSessionId = liveSession.activeId;
+		attachedSubtitleKey = uploaded.key;
 	} catch (error) {
 		liveSession.error = error instanceof Error ? error.message : String(error);
 	}
@@ -426,6 +541,7 @@ export async function createSession(draft: NewSession) {
 			madeForKids: draft.madeForKids,
 			announce: draft.announce,
 			reminderEnabled: draft.reminderEnabled,
+			notifyOnStart: draft.notifyOnStart,
 			channelId: channel.id,
 			thumbnailUrl: thumbnail?.url,
 			thumbnailKey: thumbnail?.key,
@@ -519,6 +635,7 @@ export async function logoutStudio(): Promise<boolean> {
 		return false;
 	}
 	liveSession.pairingCode = null;
+	saveStudioAuthorization(null);
 	liveSession.operatorName = null;
 	liveSession.selectedId = null;
 	liveSession.activeId = null;
@@ -535,11 +652,13 @@ export async function logoutStudio(): Promise<boolean> {
 	liveSession.missionnaireError = null;
 	disableManagedMissionnaire();
 	attachedSessionId = null;
+	attachedSubtitleKey = null;
 	return true;
 }
 
 export async function startSelectedSession(): Promise<boolean> {
 	if (!liveSession.selectedId || liveSession.starting || liveSession.activeId) return false;
+	liveSession.error = null;
 	liveSession.starting = true;
 	try {
 		const result = await post<{ startedAt: string }>({
@@ -555,8 +674,10 @@ export async function startSelectedSession(): Promise<boolean> {
 				: 'broadcast'
 		});
 		liveSession.activeId = liveSession.selectedId;
+		liveSession.error = null;
 		liveSession.activeStartedAt = new Date(result.startedAt).getTime();
 		attachedSessionId = null;
+		attachedSubtitleKey = null;
 		void syncLiveLyrics();
 		return true;
 	} catch (error) {
@@ -588,5 +709,6 @@ export async function endSelectedSession() {
 		liveSession.activeId = null;
 		liveSession.activeStartedAt = null;
 		attachedSessionId = null;
+		attachedSubtitleKey = null;
 	}
 }

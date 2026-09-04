@@ -51,7 +51,13 @@
 		selftestTarget
 	} from './lib/selftest';
 	import { activeScene, audioLayers, onAirSceneId, persist, studio } from './lib/state.svelte';
-	import { liveSession, logoutStudio, refreshYouTubeStatus } from './lib/live-session.svelte';
+	import {
+		heartbeatStudio,
+		liveSession,
+		logoutStudio,
+		refreshSessions,
+		refreshYouTubeStatus
+	} from './lib/live-session.svelte';
 	import { recording } from './lib/recording.svelte';
 	import { initReferenceMatcher } from './lib/reference-match.svelte';
 	import { appUpdate, downloadPercent, initUpdater, installUpdate } from './lib/updater.svelte';
@@ -80,6 +86,7 @@
 	let settingsPage = $state<'general' | 'output' | 'about'>('general');
 	let helpSection = $state<HelpSection>('getting-started');
 	let stopMenuListener: (() => void) | null = null;
+	let stopCloseListener: (() => void) | null = null;
 	/** Frames actually painted per second — the readout OBS puts in its status
 	 *  bar, and the first number to look at when the picture stutters. */
 	let renderFps = $state(0);
@@ -94,6 +101,10 @@
 		void listen<string>('studio://menu', (event) => openMenuItem(event.payload)).then(
 			(unlisten) => (stopMenuListener = unlisten)
 		);
+		void listen(
+			'studio://close-blocked',
+			() => (broadcast.error = t('error.stopBeforeClose'))
+		).then((unlisten) => (stopCloseListener = unlisten));
 		mixer = new Mixer();
 		selftestMixer(mixer);
 		mixer.setMonitor(studio.settings.monitorAudio);
@@ -152,9 +163,14 @@
 			lastFrames = frames;
 			if (isStreaming()) renderMissed += Math.max(0, studio.settings.fps - renderFps);
 		}, 1000);
+		void heartbeatStudio();
+		const heartbeat = setInterval(() => void heartbeatStudio(), 60_000);
+		if (liveSession.pairingCode) void refreshSessions();
 		return () => {
 			stopMenuListener?.();
+			stopCloseListener?.();
 			clearInterval(clock);
+			clearInterval(heartbeat);
 			window.removeEventListener('pointerdown', wake);
 			void stopBroadcast();
 			releaseAll();

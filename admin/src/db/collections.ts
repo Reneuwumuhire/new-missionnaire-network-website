@@ -1056,6 +1056,7 @@ export type ScheduledLive = {
 	announced_at: string | null;
 	reminder_enabled: boolean;
 	reminder_sent_at: string | null;
+	notify_on_start: boolean;
 	/** Unlisted Studio signal test; never transition its YouTube destination. */
 	is_test?: boolean;
 	/** Pre-made SRT transcript for the broadcast audio (uploaded with the
@@ -1111,6 +1112,7 @@ export async function createScheduledLive(input: {
 	live_started_at?: string | null;
 	announce?: boolean;
 	reminder_enabled?: boolean;
+	notify_on_start?: boolean;
 	subtitle_srt_url?: string | null;
 	subtitle_srt_s3_key?: string | null;
 	subtitle_filename?: string | null;
@@ -1140,6 +1142,7 @@ export async function createScheduledLive(input: {
 			announced_at: null,
 			reminder_enabled: Boolean(input.reminder_enabled),
 			reminder_sent_at: null,
+			notify_on_start: Boolean(input.notify_on_start),
 			subtitle_srt_url: input.subtitle_srt_url ?? null,
 			subtitle_srt_s3_key: input.subtitle_srt_s3_key ?? null,
 			subtitle_filename: input.subtitle_filename ?? null,
@@ -1194,6 +1197,7 @@ export async function updateScheduledLive(
 		scheduled_at: Date;
 		announce_pending: boolean;
 		reminder_enabled: boolean;
+		notify_on_start: boolean;
 		subtitle_srt_url: string | null;
 		subtitle_srt_s3_key: string | null;
 		subtitle_filename: string | null;

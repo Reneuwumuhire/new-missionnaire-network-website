@@ -21,3 +21,4 @@ srt: no
 paths:
   all_others:
     source: publisher
+    runOnReady: /app/select-publisher.sh
