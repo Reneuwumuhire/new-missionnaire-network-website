@@ -33,12 +33,6 @@ const en: Record<keyof typeof fr, string> = {
 	'dashboard.pageTitle': 'Dashboard - Missionnaire Admin',
 	'dashboard.title': 'Dashboard',
 	'dashboard.subtitle': 'Overview of your audio library',
-	'dashboard.liveDetectedTitle': 'Live stream detected — ready to go live',
-	'dashboard.liveDetectedBody':
-		'The audio stream is active on Icecast but the audience cannot see it yet. Click to go live.',
-	'dashboard.notRecordingTitle': 'Live — no recording in progress',
-	'dashboard.notRecordingBody':
-		'The live stream is being broadcast but nothing is being saved. Click to start recording.',
 	'dashboard.importOne': 'Import an audio',
 	'dashboard.totalTracks': 'Audio tracks',
 	'dashboard.totalStorage': 'Total storage',
@@ -57,6 +51,42 @@ const en: Record<keyof typeof fr, string> = {
 	'dashboard.actionBulkUpdate': 'Bulk update',
 	'dashboard.actionLogin': 'Login',
 	'dashboard.actionLogout': 'Logout',
+
+	// ── Operational alerts ─────────────────────────────────────
+	'operations.title': 'Operational alerts',
+	'operations.refresh': 'Refresh',
+	'operations.checkedAt': 'Checked at {time}',
+	'operations.broadcastOfflineTitle': 'Live broadcast interrupted',
+	'operations.broadcastOfflineBody':
+		'The broadcast is marked live, but no audio source is reaching the streaming server.',
+	'operations.streamingServerUnavailableTitle': 'Streaming server unavailable',
+	'operations.streamingServerUnavailableBody':
+		'The admin app cannot reach the audio streaming service. Check it before the next broadcast.',
+	'operations.streamReconnectingTitle': 'Live stream reconnecting',
+	'operations.streamReconnectingBody':
+		'The audio source dropped and the recorder is attempting to reconnect automatically.',
+	'operations.recorderUnavailableTitle': 'Recorder service unavailable',
+	'operations.recorderUnavailableBody':
+		'Recording status cannot be reached. Check the recorder service before continuing.',
+	'operations.liveNotRecordingTitle': 'Live audio is not being recorded',
+	'operations.liveNotRecordingBody':
+		'The stream is active, but no recording is currently being saved.',
+	'operations.streamReadyTitle': 'Audio source ready to broadcast',
+	'operations.streamReadyBody':
+		'Studio is sending audio, but the public broadcast has not been started.',
+	'operations.uploadRecoveryTitle': 'Recording recovery in progress',
+	'operations.uploadRecoveryBody': 'The recorder is recovering {count} unfinished recording(s).',
+	'operations.failedRecordingsTitle': '{count} recording(s) need attention',
+	'operations.failedRecordingsBody': 'Review failed recordings and retry or remove them.',
+	'operations.streamRecoveredTitle': 'Stream connection recovered',
+	'operations.streamRecoveredBody':
+		'Recording resumed in a new segment after a temporary source interruption.',
+	'operations.monitorUnavailableTitle': 'Operational monitoring unavailable',
+	'operations.monitorUnavailableBody':
+		'The admin app could not refresh streaming health. Check your connection and try again.',
+	'operations.systemsRecoveredTitle': 'Streaming services recovered',
+	'operations.systemsRecoveredBody':
+		'The previously reported operational issue is no longer detected.',
 
 	// ── Auth (login) ────────────────────────────────────────────
 	'auth.pageTitle': 'Sign in - Missionnaire Admin',

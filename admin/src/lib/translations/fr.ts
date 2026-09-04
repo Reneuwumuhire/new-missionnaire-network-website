@@ -32,12 +32,6 @@ export default {
 	'dashboard.pageTitle': 'Tableau de bord - Missionnaire Admin',
 	'dashboard.title': 'Tableau de bord',
 	'dashboard.subtitle': "Vue d'ensemble de votre bibliothèque audio",
-	'dashboard.liveDetectedTitle': 'Direct détecté — prêt à passer en direct',
-	'dashboard.liveDetectedBody':
-		"Le flux audio est actif sur Icecast mais l'audience ne le voit pas encore. Cliquez pour aller en direct.",
-	'dashboard.notRecordingTitle': 'En direct — aucun enregistrement en cours',
-	'dashboard.notRecordingBody':
-		"Le direct est diffusé mais rien n'est sauvegardé. Cliquez pour démarrer l'enregistrement.",
 	'dashboard.importOne': 'Importer un audio',
 	'dashboard.totalTracks': 'Pistes audio',
 	'dashboard.totalStorage': 'Stockage total',
@@ -56,6 +50,43 @@ export default {
 	'dashboard.actionBulkUpdate': 'Modification groupée',
 	'dashboard.actionLogin': 'Connexion',
 	'dashboard.actionLogout': 'Déconnexion',
+
+	// ── Alertes opérationnelles ────────────────────────────────
+	'operations.title': 'Alertes opérationnelles',
+	'operations.refresh': 'Actualiser',
+	'operations.checkedAt': 'Vérifié à {time}',
+	'operations.broadcastOfflineTitle': 'Direct interrompu',
+	'operations.broadcastOfflineBody':
+		"Le direct est déclaré actif, mais aucune source audio n'atteint le serveur de diffusion.",
+	'operations.streamingServerUnavailableTitle': 'Serveur de diffusion indisponible',
+	'operations.streamingServerUnavailableBody':
+		"L'administration ne peut pas joindre le service de diffusion audio. Vérifiez-le avant le prochain direct.",
+	'operations.streamReconnectingTitle': 'Reconnexion du direct',
+	'operations.streamReconnectingBody':
+		"La source audio a été interrompue et l'enregistreur tente de se reconnecter automatiquement.",
+	'operations.recorderUnavailableTitle': "Service d'enregistrement indisponible",
+	'operations.recorderUnavailableBody':
+		"L'état de l'enregistrement est inaccessible. Vérifiez le service avant de continuer.",
+	'operations.liveNotRecordingTitle': "L'audio en direct n'est pas enregistré",
+	'operations.liveNotRecordingBody':
+		"Le flux est actif, mais aucun enregistrement n'est sauvegardé.",
+	'operations.streamReadyTitle': 'Source audio prête à diffuser',
+	'operations.streamReadyBody':
+		"Studio envoie l'audio, mais le direct public n'a pas encore démarré.",
+	'operations.uploadRecoveryTitle': "Récupération d'enregistrements en cours",
+	'operations.uploadRecoveryBody': "L'enregistreur récupère {count} enregistrement(s) inachevé(s).",
+	'operations.failedRecordingsTitle': '{count} enregistrement(s) à vérifier',
+	'operations.failedRecordingsBody':
+		'Vérifiez les enregistrements échoués pour les relancer ou les supprimer.',
+	'operations.streamRecoveredTitle': 'Connexion du direct rétablie',
+	'operations.streamRecoveredBody':
+		"L'enregistrement a repris dans un nouveau segment après une interruption temporaire.",
+	'operations.monitorUnavailableTitle': 'Surveillance opérationnelle indisponible',
+	'operations.monitorUnavailableBody':
+		"L'administration n'a pas pu actualiser l'état de la diffusion. Vérifiez votre connexion et réessayez.",
+	'operations.systemsRecoveredTitle': 'Services de diffusion rétablis',
+	'operations.systemsRecoveredBody':
+		"L'incident opérationnel signalé précédemment n'est plus détecté.",
 
 	// ── Auth (login) ────────────────────────────────────────────
 	'auth.pageTitle': 'Connexion - Missionnaire Admin',
