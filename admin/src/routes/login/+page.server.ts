@@ -1,9 +1,11 @@
 import { dev } from '$app/environment';
 import { fail, redirect } from '@sveltejs/kit';
-import { login, SESSION_COOKIE } from '$lib/server/auth';
+import { authenticatePassword, completeLogin, SESSION_COOKIE } from '$lib/server/auth';
+import { TWO_FACTOR_CHALLENGE_COOKIE } from '$lib/server/two-factor-auth';
 import {
 	clearLoginFailures,
 	countRecentLoginFailures,
+	createLoginChallenge,
 	logAudit,
 	LOGIN_ATTEMPT_MAX_FAILURES,
 	recordLoginFailure
@@ -47,14 +49,32 @@ export const actions: Actions = {
 			return fail(429, { error: 'auth.tooManyAttempts', errorIsKey: true, email });
 		}
 
-		const result = await login(email, password, ip, userAgent);
+		const user = await authenticatePassword(email, password);
 
-		if (!result) {
+		if (!user) {
 			await recordLoginFailure(email, ip);
 			return fail(401, { error: 'Email ou mot de passe incorrect', email });
 		}
 
 		await clearLoginFailures(email, ip);
+		if (user.role === 'superadmin' && user.two_factor_enabled) {
+			const challenge = await createLoginChallenge({
+				user_id: user.email,
+				ip_address: ip,
+				user_agent: userAgent,
+				next
+			});
+			cookies.set(TWO_FACTOR_CHALLENGE_COOKIE, challenge.token, {
+				path: '/login',
+				httpOnly: true,
+				secure: !dev,
+				sameSite: 'lax',
+				expires: challenge.expires_at
+			});
+			throw redirect(303, '/login/verify');
+		}
+
+		const result = await completeLogin(user, ip, userAgent);
 
 		cookies.set(SESSION_COOKIE, result.token, {
 			path: '/',
@@ -70,6 +90,7 @@ export const actions: Actions = {
 			action: 'login',
 			target_collection: 'admin_users',
 			target_id: result.user._id ?? null,
+			changes: result.isNewDevice ? { security_event: { old: null, new: 'new_device' } } : null,
 			ip_address: ip
 		});
 
