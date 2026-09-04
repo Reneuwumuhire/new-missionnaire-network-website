@@ -92,44 +92,6 @@
 		<ListSkeleton variant="panel" rows={6} />
 	</div>
 {:then dash}
-	{#if dash.liveButNotBroadcasting}
-		<a
-			href="/recordings"
-			class="mb-6 flex items-start gap-3 border border-green-200 bg-green-50/80 p-5 transition-colors hover:bg-green-50"
-		>
-			<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100">
-				<span class="relative inline-flex h-2.5 w-2.5">
-					<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75"></span>
-					<span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-600"></span>
-				</span>
-			</div>
-			<div class="min-w-0 flex-1">
-				<p class="text-sm font-semibold text-green-800">{$t('dashboard.liveDetectedTitle')}</p>
-				<p class="mt-1 text-xs text-green-700">
-					{$t('dashboard.liveDetectedBody')}
-				</p>
-			</div>
-		</a>
-	{:else if dash.liveButNotRecording}
-		<a
-			href="/recordings"
-			class="mb-6 flex items-start gap-3 border border-amber-200 bg-amber-50/80 p-5 transition-colors hover:bg-amber-50"
-		>
-			<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100">
-				<svg class="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-					<circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" />
-					<path stroke-linecap="round" stroke-linejoin="round" d="M12 3a9 9 0 109 9" />
-				</svg>
-			</div>
-			<div class="min-w-0 flex-1">
-				<p class="text-sm font-semibold text-amber-800">{$t('dashboard.notRecordingTitle')}</p>
-				<p class="mt-1 text-xs text-amber-700">
-					{$t('dashboard.notRecordingBody')}
-				</p>
-			</div>
-		</a>
-	{/if}
-
 	<!-- Stats cards -->
 	<div class="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
 		<!-- Total tracks -->

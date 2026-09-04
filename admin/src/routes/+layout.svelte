@@ -4,6 +4,7 @@
 	import Toast from '$lib/components/Toast.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import PullToRefresh from '$lib/components/PullToRefresh.svelte';
+	import OperationalAlerts from '$lib/components/OperationalAlerts.svelte';
 	import type { LayoutData } from './$types';
 	import type { Snippet } from 'svelte';
 	import { navigating } from '$app/state';
@@ -58,6 +59,9 @@
 		<!-- Main content -->
 		<main class="lg:pl-64">
 			<div class="page-transition-enter px-4 py-6 sm:px-8 lg:px-10 lg:py-8">
+				{#if data.user.permissions.can_manage_recordings}
+					<OperationalAlerts />
+				{/if}
 				{@render children()}
 			</div>
 		</main>
