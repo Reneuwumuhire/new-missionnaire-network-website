@@ -174,6 +174,7 @@ const en = {
 	'health.renderSlow': 'Compositor behind — lower the resolution or fps',
 	'health.good': 'Healthy',
 	'target.connecting': 'Connecting…',
+	'target.reconnecting': 'Reconnecting…',
 	'target.live': 'Connected',
 	'target.failed': 'Failed',
 	'controls.reaching': 'Reaching servers…',
@@ -519,6 +520,8 @@ const en = {
 	'error.ffmpegExited': 'ffmpeg exited (code {code}): {log}',
 	'error.captureFailed':
 		'Studio capture stopped repeatedly. The public service was kept open; press Start Preview Signal to reconnect.',
+	'error.destinationRecoveryFailed':
+		'A public destination could not reconnect after three attempts. Stop and restart the preview signal.',
 
 	// ── Splitters ───────────────────────────────────────────────
 	'splitter.docks': 'Panel height',

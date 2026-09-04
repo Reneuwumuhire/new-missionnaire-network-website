@@ -20,7 +20,7 @@ import {
 } from './live-session.svelte';
 import { destinationUrl, requiresYouTubeGoLive, studio } from './state.svelte';
 import { sampleOutputClock, startStreamClock, stopStreamClock } from './stream-clock';
-import { captureHasStalled, type CaptureState } from './stream-health';
+import { captureHasStalled, retryRecovery, type CaptureState } from './stream-health';
 
 const MIME_PREFERENCE = ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/webm'];
 
@@ -35,7 +35,7 @@ export interface Stats {
 	backpressure_events: number;
 }
 
-export type TargetState = 'connecting' | 'live' | 'failed';
+export type TargetState = 'connecting' | 'reconnecting' | 'live' | 'failed';
 
 export type StreamGroup = 'main' | 'held';
 
@@ -89,9 +89,12 @@ let runtime: Runtime | null = null;
 let watchdog: ReturnType<typeof setInterval> | null = null;
 let lastChunkAt = 0;
 let recovering = false;
+let heldRecoveryEpoch = 0;
+let heldRecoveryTask: Promise<void> | null = null;
 let stopping = false;
 let lifecycle = 0;
 let recoveryTimes: number[] = [];
+let heldRecoveryTimes: number[] = [];
 
 const CAPTURE_STALL_MS = 4_000;
 const RECOVERY_WINDOW_MS = 60_000;
@@ -233,6 +236,7 @@ async function stopRecorder() {
 
 async function failCapture() {
 	stopWatchdog();
+	await cancelHeldRecovery();
 	await stopRecorder();
 	await chain.catch(() => {});
 	if (runtime) runtime.runIds = {};
@@ -253,10 +257,105 @@ async function failCapture() {
 	await detachListeners();
 }
 
+async function restartEncoder(
+	group: StreamGroup,
+	config: StreamConfig,
+	stillCurrent: () => boolean
+): Promise<StartedStream | null> {
+	const result = await retryRecovery(async () => {
+		await invoke('abort_stream', { group }).catch(() => {});
+		try {
+			return await startEncoder(group, config);
+		} catch (error) {
+			broadcast.log = [
+				...broadcast.log.slice(-199),
+				`${group} encoder recovery failed: ${String(error)}`
+			];
+			throw error;
+		}
+	}, stillCurrent);
+	if (result && !stillCurrent()) {
+		await invoke('abort_stream', { group }).catch(() => {});
+		return null;
+	}
+	return result;
+}
+
+async function runHeldRecovery(active: Runtime, generation: number, epoch: number) {
+	const config = active.held;
+	if (!config || stopping || generation !== lifecycle || epoch !== heldRecoveryEpoch) return;
+	broadcast.heldLive = false;
+	const now = Date.now();
+	heldRecoveryTimes = heldRecoveryTimes.filter((at) => now - at < RECOVERY_WINDOW_MS);
+	if (heldRecoveryTimes.length >= MAX_RECOVERIES_PER_WINDOW) {
+		for (const target of broadcast.targets) {
+			if (target.group === 'held') target.state = 'failed';
+		}
+		broadcast.error = t('error.destinationRecoveryFailed');
+		return;
+	}
+	heldRecoveryTimes.push(now);
+	broadcast.recoveries++;
+	for (const target of broadcast.targets) {
+		if (target.group === 'held') {
+			target.state = 'reconnecting';
+			target.reason = null;
+		}
+	}
+	try {
+		const result = await restartEncoder(
+			'held',
+			config,
+			() =>
+				epoch === heldRecoveryEpoch &&
+				generation === lifecycle &&
+				!stopping &&
+				runtime === active &&
+				active.held === config
+		);
+		if (!result) return;
+		active.runIds.held = result.runId;
+		broadcast.heldLive = true;
+		for (const target of broadcast.targets) {
+			if (target.group === 'held') target.state = 'connecting';
+		}
+	} catch (error) {
+		broadcast.log = [
+			...broadcast.log.slice(-199),
+			`Held encoder recovery stopped: ${String(error)}`
+		];
+		for (const target of broadcast.targets) {
+			if (target.group === 'held') target.state = 'failed';
+		}
+		broadcast.error = t('error.destinationRecoveryFailed');
+	}
+}
+
+function recoverHeld(active: Runtime, generation: number): Promise<void> {
+	if (heldRecoveryTask) return heldRecoveryTask;
+	const epoch = heldRecoveryEpoch;
+	const task = runHeldRecovery(active, generation, epoch).finally(() => {
+		if (heldRecoveryTask === task) heldRecoveryTask = null;
+	});
+	heldRecoveryTask = task;
+	return task;
+}
+
+async function cancelHeldRecovery() {
+	heldRecoveryEpoch++;
+	await heldRecoveryTask?.catch(() => {});
+}
+
 async function recoverCapture() {
 	const active = runtime;
 	const generation = lifecycle;
 	if (!active || recovering || stopping || broadcast.phase === 'idle') return;
+	recovering = true;
+	await cancelHeldRecovery();
+	if (generation !== lifecycle || stopping || runtime !== active) {
+		recovering = false;
+		return;
+	}
 
 	const now = Date.now();
 	recoveryTimes = recoveryTimes.filter((at) => now - at < RECOVERY_WINDOW_MS);
@@ -265,7 +364,6 @@ async function recoverCapture() {
 		return;
 	}
 	recoveryTimes.push(now);
-	recovering = true;
 	broadcast.captureState = 'recovering';
 	broadcast.recoveries++;
 	broadcast.log = [...broadcast.log.slice(-199), 'Studio capture stalled; reconnecting encoder.'];
@@ -279,7 +377,12 @@ async function recoverCapture() {
 		await invoke('abort_stream', { group: null });
 		if (generation !== lifecycle || stopping) return;
 
-		const main = await startEncoder('main', active.main);
+		const main = await restartEncoder(
+			'main',
+			active.main,
+			() => generation === lifecycle && !stopping && runtime === active
+		);
+		if (!main) return;
 		if (generation !== lifecycle || stopping) {
 			await invoke('abort_stream', { group: null }).catch(() => {});
 			return;
@@ -288,21 +391,19 @@ async function recoverCapture() {
 		broadcast.command = main.command;
 		broadcast.localRecordingPath = main.localRecordingPath;
 		recording.localPath = main.localRecordingPath;
-		if (active.held) {
-			const held = await startEncoder('held', active.held);
-			if (generation !== lifecycle || stopping) {
-				await invoke('abort_stream', { group: null }).catch(() => {});
-				return;
-			}
-			active.runIds.held = held.runId;
-		}
 		broadcast.targets = [
 			...statuses(active.main, 'main'),
-			...(active.held ? statuses(active.held, 'held') : [])
+			...(active.held
+				? statuses(active.held, 'held').map((target) => ({
+						...target,
+						state: 'reconnecting' as const
+					}))
+				: [])
 		];
 		broadcast.stats = null;
 		broadcast.phase = 'connecting';
 		startRecorder(active);
+		if (active.held) void recoverHeld(active, generation);
 	} catch (error) {
 		broadcast.log = [...broadcast.log.slice(-199), `Capture recovery failed: ${String(error)}`];
 		await failCapture();
@@ -325,6 +426,9 @@ export async function startBroadcast(
 	broadcast.captureState = 'healthy';
 	broadcast.recoveries = 0;
 	recoveryTimes = [];
+	heldRecoveryEpoch++;
+	heldRecoveryTask = null;
+	heldRecoveryTimes = [];
 	chain = Promise.resolve();
 	try {
 		const enabled =
@@ -429,11 +533,8 @@ async function attachListeners() {
 				)
 					return;
 				if (event.payload.group === 'held') {
-					// Losing the held encoder must not take the main stream down.
-					broadcast.heldLive = false;
-					for (const target of broadcast.targets) {
-						if (target.group === 'held') target.state = 'failed';
-					}
+					// Losing a public destination must not take the main stream down.
+					void recoverHeld(runtime, lifecycle);
 					return;
 				}
 				// An unexpected encoder exit is recoverable. Do not end the public
@@ -454,6 +555,7 @@ export async function stopBroadcast() {
 	stopping = true;
 	stopWatchdog();
 	try {
+		await cancelHeldRecovery();
 		// Complete the public session and YouTube broadcast while the encoder still
 		// has a clean signal; both remote requests are started together.
 		await endSelectedSession();
@@ -475,6 +577,7 @@ export async function stopBroadcast() {
 		runtime = null;
 		hasAudio = false;
 		recoveryTimes = [];
+		heldRecoveryTimes = [];
 		clearRecording();
 		await detachListeners();
 		await stopCloudRecording();
@@ -527,6 +630,7 @@ export async function goLiveHeld(): Promise<void> {
 			record_local: false
 		};
 		const result = await startEncoder('held', config);
+		heldRecoveryTimes = [];
 		runtime.held = config;
 		runtime.runIds.held = result.runId;
 		broadcast.targets = [...broadcast.targets, ...statuses(config, 'held')];
@@ -570,6 +674,7 @@ export async function stopHeld(): Promise<void> {
 		delete runtime.held;
 		delete runtime.runIds.held;
 	}
+	await cancelHeldRecovery();
 	await invoke('stop_stream', { group: 'held' }).catch(() => {});
 	broadcast.heldLive = false;
 	broadcast.targets = broadcast.targets.filter((target) => target.group !== 'held');

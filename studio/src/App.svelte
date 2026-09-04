@@ -354,6 +354,9 @@
 			return { tone: 'warn', label: t('status.recoveringCapture') };
 		}
 		if (broadcast.phase === 'connecting') return { tone: 'idle', label: t('status.connecting') };
+		if (broadcast.targets.some((target) => target.state === 'reconnecting')) {
+			return { tone: 'warn', label: t('target.reconnecting') };
+		}
 		if (broadcast.targets.some((target) => target.state === 'failed')) {
 			return { tone: 'warn', label: t('target.failed') };
 		}

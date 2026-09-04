@@ -88,6 +88,7 @@
 	function label(state: string): string {
 		if (state === 'live') return t('target.live');
 		if (state === 'failed') return t('target.failed');
+		if (state === 'reconnecting') return t('target.reconnecting');
 		return t('target.connecting');
 	}
 
