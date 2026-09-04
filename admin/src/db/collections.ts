@@ -403,7 +403,10 @@ export async function updateAdminPassword(
 	const db = await getDb();
 	const result = await db
 		.collection('admin_users')
-		.updateOne({ email: email.toLowerCase() }, { $set: { password_hash: newPasswordHash } });
+		.updateOne(
+			{ email: email.toLowerCase() },
+			{ $set: { password_hash: newPasswordHash, must_change_password: false } }
+		);
 	return result.modifiedCount > 0;
 }
 
@@ -419,7 +422,10 @@ export async function createAdminUser(user: {
 		email: user.email.toLowerCase(),
 		created_at: new Date(),
 		last_login: null,
-		is_active: true
+		is_active: true,
+		must_change_password: true,
+		two_factor_enabled: false,
+		recovery_code_hashes: []
 	});
 	return result.insertedId.toString();
 }
@@ -442,8 +448,57 @@ export async function resetAdminPassword(email: string, newPasswordHash: string)
 	const db = await getDb();
 	const result = await db
 		.collection('admin_users')
-		.updateOne({ email: email.toLowerCase() }, { $set: { password_hash: newPasswordHash } });
+		.updateOne(
+			{ email: email.toLowerCase() },
+			{ $set: { password_hash: newPasswordHash, must_change_password: true } }
+		);
 	return result.modifiedCount > 0;
+}
+
+export async function beginTwoFactorSetup(
+	email: string,
+	encryptedSecret: string,
+	recoveryCodeHashes: string[]
+): Promise<void> {
+	const db = await getDb();
+	await db.collection('admin_users').updateOne(
+		{ email: email.toLowerCase() },
+		{
+			$set: {
+				two_factor_secret: encryptedSecret,
+				two_factor_enabled: false,
+				recovery_code_hashes: recoveryCodeHashes
+			}
+		}
+	);
+}
+
+export async function setTwoFactorEnabled(email: string, enabled: boolean): Promise<void> {
+	const db = await getDb();
+	if (enabled) {
+		await db
+			.collection('admin_users')
+			.updateOne({ email: email.toLowerCase() }, { $set: { two_factor_enabled: true } });
+		return;
+	}
+	await db.collection('admin_users').updateOne(
+		{ email: email.toLowerCase() },
+		{
+			$set: { two_factor_enabled: false, recovery_code_hashes: [] },
+			$unset: { two_factor_secret: '' }
+		}
+	);
+}
+
+export async function consumeRecoveryCode(email: string, codeHash: string): Promise<boolean> {
+	const db = await getDb();
+	const result = await db
+		.collection<{ email: string; recovery_code_hashes: string[] }>('admin_users')
+		.updateOne(
+			{ email: email.toLowerCase(), recovery_code_hashes: codeHash },
+			{ $pull: { recovery_code_hashes: { $eq: codeHash } } }
+		);
+	return result.modifiedCount === 1;
 }
 
 export async function updateAdminPermissions(
@@ -476,6 +531,7 @@ export async function createSessionRecord(session: {
 	expires_at: Date;
 	ip_address: string | null;
 	user_agent: string | null;
+	is_new_device: boolean;
 }): Promise<void> {
 	const db = await getDb();
 	await db.collection('admin_sessions').insertOne({
@@ -493,6 +549,120 @@ export async function findSession(token: string): Promise<AdminSession | null> {
 export async function deleteSession(token: string): Promise<void> {
 	const db = await getDb();
 	await db.collection('admin_sessions').deleteOne({ token });
+}
+
+export async function hasKnownSessionDevice(
+	userId: string,
+	userAgent: string | null
+): Promise<boolean> {
+	const db = await getDb();
+	return Boolean(
+		await db.collection('admin_sessions').findOne({
+			user_id: userId.toLowerCase(),
+			user_agent: userAgent,
+			expires_at: { $gt: new Date() }
+		})
+	);
+}
+
+export async function listSessionsForUser(userId: string): Promise<AdminSession[]> {
+	const db = await getDb();
+	const docs = await db
+		.collection('admin_sessions')
+		.find({ user_id: userId.toLowerCase(), expires_at: { $gt: new Date() } })
+		.sort({ created_at: -1 })
+		.toArray();
+	return docs.map((doc) => serializeDocument<AdminSession>(doc));
+}
+
+export async function deleteSessionForUser(
+	id: string,
+	userId: string,
+	currentToken: string
+): Promise<string | null> {
+	if (!ObjectId.isValid(id)) return null;
+	const db = await getDb();
+	const session = await db.collection('admin_sessions').findOneAndDelete({
+		_id: new ObjectId(id),
+		user_id: userId.toLowerCase(),
+		token: { $ne: currentToken }
+	});
+	return session?.token?.toString() ?? null;
+}
+
+export async function deleteOtherSessionsForUser(
+	userId: string,
+	currentToken: string
+): Promise<string[]> {
+	const db = await getDb();
+	const filter = { user_id: userId.toLowerCase(), token: { $ne: currentToken } };
+	const tokens = await db.collection('admin_sessions').find(filter).project({ token: 1 }).toArray();
+	await db.collection('admin_sessions').deleteMany(filter);
+	return tokens.map((session) => session.token.toString());
+}
+
+export async function deleteAllSessionsForUser(userId: string): Promise<string[]> {
+	const db = await getDb();
+	const filter = { user_id: userId.toLowerCase() };
+	const tokens = await db.collection('admin_sessions').find(filter).project({ token: 1 }).toArray();
+	await db.collection('admin_sessions').deleteMany(filter);
+	return tokens.map((session) => session.token.toString());
+}
+
+const LOGIN_CHALLENGES_COLLECTION = 'admin_login_challenges';
+const LOGIN_CHALLENGE_DURATION_MS = 10 * 60 * 1000;
+
+export type LoginChallenge = {
+	token: string;
+	user_id: string;
+	ip_address: string | null;
+	user_agent: string | null;
+	next: string;
+	attempts: number;
+	expires_at: Date;
+};
+
+export async function createLoginChallenge(
+	input: Omit<LoginChallenge, 'token' | 'attempts' | 'expires_at'>
+): Promise<LoginChallenge> {
+	const db = await getDb();
+	const collection = db.collection(LOGIN_CHALLENGES_COLLECTION);
+	await collection.createIndex({ expires_at: 1 }, { expireAfterSeconds: 0 });
+	const challenge: LoginChallenge = {
+		...input,
+		user_id: input.user_id.toLowerCase(),
+		token: randomBytes(32).toString('base64url'),
+		attempts: 0,
+		expires_at: new Date(Date.now() + LOGIN_CHALLENGE_DURATION_MS)
+	};
+	await collection.insertOne(challenge);
+	return challenge;
+}
+
+export async function findLoginChallenge(token: string): Promise<LoginChallenge | null> {
+	const db = await getDb();
+	const challenge = await db.collection(LOGIN_CHALLENGES_COLLECTION).findOne({
+		token,
+		expires_at: { $gt: new Date() }
+	});
+	return challenge ? (challenge as unknown as LoginChallenge) : null;
+}
+
+export async function recordLoginChallengeFailure(token: string): Promise<number> {
+	const db = await getDb();
+	const challenge = await db
+		.collection(LOGIN_CHALLENGES_COLLECTION)
+		.findOneAndUpdate(
+			{ token, expires_at: { $gt: new Date() } },
+			{ $inc: { attempts: 1 } },
+			{ returnDocument: 'after' }
+		);
+	return Number(challenge?.attempts ?? 0);
+}
+
+export async function deleteLoginChallenge(token: string): Promise<void> {
+	const db = await getDb();
+	await db.collection(LOGIN_CHALLENGES_COLLECTION).deleteOne({ token });
 }
 
 // ══════════════════════════════════════
@@ -549,6 +719,15 @@ export async function countRecentLoginFailures(email: string, ip: string | null)
 	return db.collection(LOGIN_ATTEMPTS_COLLECTION).countDocuments({
 		email: email.toLowerCase(),
 		ip_address: ip,
+		created_at: { $gte: new Date(Date.now() - LOGIN_ATTEMPT_WINDOW_MS) }
+	});
+}
+
+export async function countRecentLoginFailuresForEmail(email: string): Promise<number> {
+	await ensureLoginAttemptIndexes();
+	const db = await getDb();
+	return db.collection(LOGIN_ATTEMPTS_COLLECTION).countDocuments({
+		email: email.toLowerCase(),
 		created_at: { $gte: new Date(Date.now() - LOGIN_ATTEMPT_WINDOW_MS) }
 	});
 }

@@ -5,7 +5,10 @@ import {
 	createSessionRecord,
 	findSession,
 	deleteSession,
-	updateLastLogin
+	updateLastLogin,
+	hasKnownSessionDevice,
+	deleteOtherSessionsForUser,
+	deleteAllSessionsForUser
 } from '../../db/collections';
 import type { AdminUser } from '$lib/models/admin-user';
 
@@ -36,19 +39,21 @@ export async function createSession(
 	userId: string,
 	ip: string | null,
 	userAgent: string | null
-): Promise<{ token: string; expiresAt: Date }> {
+): Promise<{ token: string; expiresAt: Date; isNewDevice: boolean }> {
 	const token = randomUUID();
 	const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
+	const isNewDevice = !(await hasKnownSessionDevice(userId, userAgent));
 
 	await createSessionRecord({
 		user_id: userId,
 		token,
 		expires_at: expiresAt,
 		ip_address: ip,
-		user_agent: userAgent
+		user_agent: userAgent,
+		is_new_device: isNewDevice
 	});
 
-	return { token, expiresAt };
+	return { token, expiresAt, isNewDevice };
 }
 
 export async function validateSession(token: string): Promise<AdminUser | null> {
@@ -80,27 +85,51 @@ export async function validateSession(token: string): Promise<AdminUser | null> 
 	return user;
 }
 
+export async function authenticatePassword(
+	email: string,
+	password: string
+): Promise<AdminUser | null> {
+	const user = await findAdminByEmail(email);
+	if (!user || !user.is_active) return null;
+	return (await verifyPassword(password, user.password_hash)) ? user : null;
+}
+
+export async function completeLogin(
+	user: AdminUser,
+	ip: string | null,
+	userAgent: string | null
+): Promise<{ user: AdminUser; token: string; expiresAt: Date; isNewDevice: boolean }> {
+	const { token, expiresAt, isNewDevice } = await createSession(user.email, ip, userAgent);
+	if (user._id) await updateLastLogin(user._id);
+
+	return { user, token, expiresAt, isNewDevice };
+}
+
 export async function login(
 	email: string,
 	password: string,
 	ip: string | null,
 	userAgent: string | null
-): Promise<{ user: AdminUser; token: string; expiresAt: Date } | null> {
-	const user = await findAdminByEmail(email);
-	if (!user || !user.is_active) return null;
-
-	const valid = await verifyPassword(password, user.password_hash);
-	if (!valid) return null;
-
-	const { token, expiresAt } = await createSession(user.email, ip, userAgent);
-	if (user._id) await updateLastLogin(user._id);
-
-	return { user, token, expiresAt };
+): Promise<{ user: AdminUser; token: string; expiresAt: Date; isNewDevice: boolean } | null> {
+	const user = await authenticatePassword(email, password);
+	return user ? completeLogin(user, ip, userAgent) : null;
 }
 
 export async function logout(token: string): Promise<void> {
 	sessionCache.delete(token);
 	await deleteSession(token);
+}
+
+export async function revokeOtherSessions(userId: string, currentToken: string): Promise<number> {
+	const tokens = await deleteOtherSessionsForUser(userId, currentToken);
+	for (const token of tokens) sessionCache.delete(token);
+	return tokens.length;
+}
+
+export async function revokeAllSessions(userId: string): Promise<number> {
+	const tokens = await deleteAllSessionsForUser(userId);
+	for (const token of tokens) sessionCache.delete(token);
+	return tokens.length;
 }
 
 export const SESSION_COOKIE = 'admin_session';

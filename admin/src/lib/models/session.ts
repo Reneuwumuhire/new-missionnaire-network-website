@@ -7,7 +7,8 @@ export const AdminSessionSchema = z.object({
 	created_at: z.union([z.instanceof(Date), z.string()]).transform((val) => new Date(val)),
 	expires_at: z.union([z.instanceof(Date), z.string()]).transform((val) => new Date(val)),
 	ip_address: z.string().nullable(),
-	user_agent: z.string().nullable()
+	user_agent: z.string().nullable(),
+	is_new_device: z.boolean().default(false)
 });
 
 export type AdminSession = z.infer<typeof AdminSessionSchema>;

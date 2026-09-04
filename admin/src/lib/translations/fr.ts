@@ -96,6 +96,12 @@ export default {
 	'auth.login': 'Se connecter',
 	'auth.tooManyAttempts':
 		'Trop de tentatives de connexion. Veuillez réessayer dans une quinzaine de minutes.',
+	'auth.twoFactorTitle': 'Vérification en deux étapes',
+	'auth.twoFactorHint': 'Saisissez le code pour {email}.',
+	'auth.authenticationCode': 'Code d’authentification',
+	'auth.recoveryCodeHint': 'Vous pouvez aussi utiliser un de vos codes de récupération.',
+	'auth.verifying': 'Vérification...',
+	'auth.verify': 'Vérifier',
 
 	// ── Audio library (list) ────────────────────────────────────
 	'audio.pageTitle': 'Bibliothèque audio - Missionnaire Admin',
@@ -772,6 +778,49 @@ export default {
 	'settings.memberSince': 'Membre depuis',
 	'settings.lastLogin': 'Dernière connexion',
 	'settings.saveProfile': 'Enregistrer le profil',
+	'settings.passwordRequiredTitle': 'Changement de mot de passe requis',
+	'settings.passwordRequiredBody':
+		'Définissez un mot de passe privé avant d’utiliser le reste de l’administration.',
+	'settings.changePasswordNow': 'Changer le mot de passe maintenant',
+	'settings.failedAttemptsTitle': 'Tentatives de connexion échouées répétées',
+	'settings.failedAttemptsBody':
+		'{count} tentatives échouées ont été détectées pour votre compte au cours des 15 dernières minutes.',
+	'settings.securityCenter': 'Centre de sécurité',
+	'settings.securityCenterHint':
+		'Protégez votre compte et consultez les appareils connectés à l’administration.',
+	'settings.activeSessions': 'Sessions actives',
+	'settings.activeSessionsHint': 'Un appareil révoqué perd immédiatement l’accès.',
+	'settings.currentSession': 'Actuelle',
+	'settings.newDevice': 'Nouvel appareil',
+	'settings.unknownIp': 'IP inconnue',
+	'settings.signedInAt': 'Connecté le',
+	'settings.expiresAt': 'expire le',
+	'settings.revokeSession': 'Déconnecter',
+	'settings.revokeOthers': 'Déconnecter les autres',
+	'settings.revokeOthersConfirm': 'Déconnecter toutes les autres sessions administrateur ?',
+	'settings.sessionsRevoked': 'Les sessions sélectionnées ont été déconnectées.',
+	'settings.twoFactor': 'Authentification à deux facteurs',
+	'settings.twoFactorHint':
+		'Demandée après le mot de passe. Disponible pour les super administrateurs.',
+	'settings.enabled': 'Activée',
+	'settings.disabled': 'Désactivée',
+	'settings.twoFactorEnabled':
+		'L’authentification à deux facteurs est activée. Les autres sessions ont été déconnectées.',
+	'settings.twoFactorDisabled':
+		'L’authentification à deux facteurs est désactivée. Les autres sessions ont été déconnectées.',
+	'settings.recoveryRemaining': '{count} code(s) de récupération inutilisé(s).',
+	'settings.authenticationCode': 'Code authentificateur ou de récupération',
+	'settings.disableTwoFactor': 'Désactiver l’authentification à deux facteurs',
+	'settings.scanOrEnter':
+		'Ajoutez ce compte à votre application d’authentification, puis saisissez son code à six chiffres.',
+	'settings.openAuthenticator': 'Ouvrir dans l’application d’authentification',
+	'settings.manualSecret': 'Clé de configuration manuelle',
+	'settings.saveRecoveryCodes':
+		'Enregistrez ces codes de récupération maintenant. Chacun est utilisable une seule fois.',
+	'settings.enableTwoFactor': 'Activer la 2FA',
+	'settings.startSetup': 'Commencer',
+	'settings.twoFactorNotConfigured':
+		'Définissez ADMIN_2FA_ENCRYPTION_KEY sur le serveur pour activer la configuration à deux facteurs.',
 	'settings.connectedStudios': 'Studios connectés',
 	'settings.connectedStudiosHint':
 		'Consultez les installations Studio autorisées à diffuser avec votre compte.',
