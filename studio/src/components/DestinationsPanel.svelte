@@ -3,6 +3,7 @@
 	import Icon from './Icon.svelte';
 	import { t } from '../lib/i18n.svelte';
 	import { destinationUrl, id, type Destination } from '../lib/state.svelte';
+	import { destinationProblem } from '../lib/preflight';
 	import {
 		connectWithAdmin,
 		connectYouTube,
@@ -71,11 +72,16 @@
 	}
 
 	function problem(destination: Destination): string | null {
-		const url = destination.url.trim();
-		if (!url) return t('stream.missingUrl');
-		if (!/^rtmps?:\/\//.test(url)) return t('stream.badScheme');
-		if (/[|[\]'"\\\s]/.test(destinationUrl(destination))) return t('stream.badCharacter');
-		return null;
+		switch (destinationProblem(destinationUrl(destination))) {
+			case 'missing':
+				return t('stream.missingUrl');
+			case 'scheme':
+				return t('stream.badScheme');
+			case 'characters':
+				return t('stream.badCharacter');
+			default:
+				return null;
+		}
 	}
 </script>
 

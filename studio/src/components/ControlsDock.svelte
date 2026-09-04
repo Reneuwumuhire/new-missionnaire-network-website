@@ -107,7 +107,7 @@
 					: 'border border-red-500/50 text-red-400 hover:bg-red-600/15'
 				: 'bg-primary text-black hover:bg-missionnaire-400'} disabled:cursor-not-allowed disabled:opacity-40"
 			disabled={broadcast.starting ||
-				(!isStreaming() && (enabled.length === 0 || !liveSession.selectedId))}
+				(!isStreaming() && ((enabled.length === 0 && !recordsLocal()) || !liveSession.selectedId))}
 			onclick={onToggleLive}
 		>
 			{#if broadcast.starting}
@@ -256,7 +256,7 @@
 			{t('controls.settings')}
 			<!-- No enabled destination means Start Streaming is disabled; say so
 			     here rather than leaving a dead button with no explanation. -->
-			{#if enabled.length === 0}
+			{#if enabled.length === 0 && !recordsLocal()}
 				<span class="ml-1 font-mono text-[10px] text-amber-400">!</span>
 			{/if}
 		</button>

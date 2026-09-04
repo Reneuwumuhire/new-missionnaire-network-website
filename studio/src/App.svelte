@@ -13,6 +13,7 @@
 	import MixerDock from './components/MixerDock.svelte';
 	import Modal from './components/Modal.svelte';
 	import Preview from './components/Preview.svelte';
+	import PreflightPanel from './components/PreflightPanel.svelte';
 	import PropertiesPanel from './components/PropertiesPanel.svelte';
 	import ScenesDock from './components/ScenesDock.svelte';
 	import SettingsPanel from './components/SettingsPanel.svelte';
@@ -73,7 +74,14 @@
 		? new Promise<void>((resolve) => (releaseSetup = resolve))
 		: Promise.resolve();
 	let dialog = $state<
-		'properties' | 'settings' | 'help' | 'developer' | 'live-session' | 'new-session' | null
+		| 'properties'
+		| 'settings'
+		| 'help'
+		| 'developer'
+		| 'live-session'
+		| 'new-session'
+		| 'preflight'
+		| null
 	>(null);
 	let settingsPage = $state<'general' | 'output' | 'about'>('general');
 	let helpSection = $state<HelpSection>('getting-started');
@@ -317,6 +325,12 @@
 			return;
 		}
 		if (!programCanvas) return;
+		dialog = 'preflight';
+	}
+
+	async function startAfterPreflight() {
+		if (!programCanvas || isStreaming()) return;
+		dialog = null;
 		renderMissed = 0;
 		await mixer?.resume();
 		// Refresh the expiring managed destination immediately before ffmpeg
@@ -708,6 +722,16 @@
 {:else if dialog === 'new-session'}
 	<Modal title="New public session" onclose={() => (dialog = 'live-session')}>
 		<NewSessionDialog oncreated={() => (dialog = null)} />
+	</Modal>
+{:else if dialog === 'preflight'}
+	<Modal title={t('preflight.title')} onclose={() => (dialog = null)}>
+		<PreflightPanel
+			{mixer}
+			canvasReady={Boolean(programCanvas)}
+			{renderFps}
+			onclose={() => (dialog = null)}
+			onstart={() => void startAfterPreflight()}
+		/>
 	</Modal>
 {/if}
 

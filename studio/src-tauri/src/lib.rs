@@ -36,6 +36,59 @@ struct StartedStream {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+struct RecordingSpace {
+	path: String,
+	available_bytes: u64,
+}
+
+#[cfg(unix)]
+fn available_space(path: &std::path::Path) -> Result<u64, String> {
+	let output = Command::new("df")
+		.args(["-Pk"])
+		.arg(path)
+		.output()
+		.map_err(|error| format!("Espace disque illisible: {error}"))?;
+	if !output.status.success() {
+		return Err("Espace disque illisible".into());
+	}
+	let line = String::from_utf8_lossy(&output.stdout)
+		.lines()
+		.last()
+		.ok_or("Réponse disque vide")?
+		.to_string();
+	let available_kib = line
+		.split_whitespace()
+		.nth(3)
+		.ok_or("Espace disque absent")?
+		.parse::<u64>()
+		.map_err(|error| format!("Espace disque invalide: {error}"))?;
+	Ok(available_kib.saturating_mul(1024))
+}
+
+#[cfg(windows)]
+fn available_space(path: &std::path::Path) -> Result<u64, String> {
+	let drive = path
+		.to_string_lossy()
+		.chars()
+		.next()
+		.filter(|value| value.is_ascii_alphabetic())
+		.ok_or("Lecteur d’enregistrement introuvable")?;
+	let output = Command::new("powershell")
+		.args([
+			"-NoProfile",
+			"-Command",
+			&format!("(Get-PSDrive -Name {}).Free", drive),
+		])
+		.output()
+		.map_err(|error| format!("Espace disque illisible: {error}"))?;
+	String::from_utf8_lossy(&output.stdout)
+		.trim()
+		.parse::<u64>()
+		.map_err(|error| format!("Espace disque invalide: {error}"))
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct StudioDeviceInfo {
 	os: &'static str,
 	architecture: &'static str,
@@ -111,6 +164,20 @@ mod url_tests {
 #[tauri::command]
 fn check_ffmpeg() -> Result<FfmpegInfo, String> {
 	ffmpeg::probe_ffmpeg()
+}
+
+#[tauri::command]
+fn recording_space(app: AppHandle) -> Result<RecordingSpace, String> {
+	let path = app
+		.path()
+		.video_dir()
+		.map_err(|error| format!("Dossier Vidéos/Films introuvable: {error}"))?
+		.join("Missionnaire Studio");
+	let probe = path.parent().unwrap_or(&path);
+	Ok(RecordingSpace {
+		available_bytes: available_space(probe)?,
+		path: path.to_string_lossy().to_string(),
+	})
 }
 
 #[tauri::command]
@@ -599,6 +666,7 @@ pub fn run() {
 		})
 		.invoke_handler(tauri::generate_handler![
 			check_ffmpeg,
+			recording_space,
 			studio_device_info,
 			extract_reference_features,
 			start_stream,
