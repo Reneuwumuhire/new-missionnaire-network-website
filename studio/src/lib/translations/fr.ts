@@ -180,6 +180,7 @@ const fr: Record<keyof typeof en, string> = {
 	'health.renderSlow': 'Le compositeur est en retard — baissez la résolution ou les ips',
 	'health.good': 'Bonne',
 	'target.connecting': 'Connexion…',
+	'target.reconnecting': 'Reconnexion…',
 	'target.live': 'Connectée',
 	'target.failed': 'Échec',
 	'controls.reaching': 'Connexion aux serveurs…',
@@ -530,6 +531,8 @@ const fr: Record<keyof typeof en, string> = {
 	'error.ffmpegExited': 'ffmpeg s’est arrêté (code {code}) : {log}',
 	'error.captureFailed':
 		'La capture Studio s’est arrêtée plusieurs fois. Le direct public reste ouvert ; cliquez sur Démarrer le signal test pour vous reconnecter.',
+	'error.destinationRecoveryFailed':
+		'Une destination publique n’a pas pu se reconnecter après trois tentatives. Arrêtez et redémarrez le signal test.',
 
 	// ── Splitters ───────────────────────────────────────────────
 	'splitter.docks': 'Hauteur des panneaux',
