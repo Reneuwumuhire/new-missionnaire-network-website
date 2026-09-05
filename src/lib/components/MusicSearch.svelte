@@ -93,8 +93,28 @@
 	}}
 >
 	<div
-		class="flex h-10 items-stretch border border-stone-200 bg-white focus-within:border-missionnaire/60 md:h-11"
+		class="flex h-10 items-center rounded-full border border-stone-200/80 bg-white/90 transition-shadow focus-within:border-missionnaire/50 focus-within:ring-2 focus-within:ring-missionnaire/10 md:h-11 md:items-stretch md:rounded-none md:border-stone-200 md:bg-white md:focus-within:border-missionnaire/60 md:focus-within:ring-0"
 	>
+		<button
+			type="submit"
+			aria-label={$t('search.action')}
+			title={$t('search.action')}
+			class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-stone-400 transition-colors hover:text-missionnaire focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40 md:hidden"
+		>
+			<svg
+				width="16"
+				height="16"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.8"
+				stroke-linecap="round"
+				aria-hidden="true"
+			>
+				<circle cx="10.5" cy="10.5" r="6.5" />
+				<path d="m16 16 4.5 4.5" />
+			</svg>
+		</button>
 		<input
 			bind:this={input}
 			{id}
@@ -109,7 +129,7 @@
 			aria-label={$t('music.searchPlaceholder')}
 			placeholder={$t('music.searchPlaceholder')}
 			autocomplete="off"
-			class="min-w-0 flex-1 bg-transparent px-3 font-body text-sm text-stone-800 outline-none placeholder:text-stone-400"
+			class="h-full min-w-0 flex-1 bg-transparent pr-4 font-body text-sm text-stone-800 outline-none placeholder:text-stone-400 md:px-3"
 			bind:value={query}
 			oninput={() => {
 				active = -1;
@@ -123,31 +143,43 @@
 		{#if query}
 			<button
 				type="button"
-				class="px-2 text-stone-500 hover:text-stone-800"
+				class="mr-1 flex h-8 w-8 shrink-0 items-center justify-center self-center rounded-full text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40 md:mr-0 md:w-auto md:rounded-none md:px-2"
 				aria-label={$t('music.clearSearch')}
 				onclick={() => {
 					query = '';
 					active = -1;
 					input.focus();
 					if ($page.url.searchParams.has('search')) submit();
-				}}>✕</button
+				}}
 			>
+				<svg
+					width="14"
+					height="14"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.8"
+					stroke-linecap="round"
+					aria-hidden="true"><path d="m6 6 12 12M6 18 18 6" /></svg
+				>
+			</button>
 		{/if}
 		<button
 			type="submit"
-			class="bg-missionnaire px-3 font-body text-[10px] font-bold uppercase tracking-wider text-white hover:bg-missionnaire/90"
+			class="hidden bg-missionnaire px-3 font-body text-[10px] font-bold uppercase tracking-wider text-white hover:bg-missionnaire/90 md:block"
 			>{$t('search.action')}</button
 		>
 	</div>
 	{#if showDropdown}
 		<div
-			class="absolute left-0 right-0 top-full z-40 mt-1 border border-stone-200 bg-white shadow-xl"
+			class="absolute left-0 right-0 top-full z-40 mt-2 overflow-hidden rounded-xl border border-stone-200/80 bg-[#fdfcf9] shadow-lg shadow-stone-900/10 md:mt-1 md:rounded-none md:border-stone-200 md:bg-white md:shadow-xl"
 		>
 			<div
 				id={`${id}-results`}
 				role="listbox"
 				aria-label={$t('music.searchPlaceholder')}
 				aria-busy={loading}
+				class="divide-y divide-stone-100"
 			>
 				{#each matches as song, index}
 					<button
@@ -156,15 +188,18 @@
 						id={`${id}-result-${index}`}
 						aria-selected={active === index}
 						tabindex="-1"
-						class="block w-full px-4 py-3 text-left hover:bg-stone-100 {active === index
-							? 'bg-stone-100'
+						class="block w-full px-4 py-3 text-left transition-colors hover:bg-missionnaire/5 {active ===
+						index
+							? 'bg-missionnaire/5'
 							: ''}"
 						onclick={() => submit(song)}
 					>
-						<span class="block truncate text-sm font-medium text-stone-800"
+						<span class="block truncate font-body text-[13px] font-medium text-stone-800"
 							>{song.title || song.category}</span
 						>
-						{#if song.artist}<span class="block truncate text-xs text-stone-500">{song.artist}</span
+						{#if song.artist}<span
+								class="mt-0.5 block truncate font-body text-[11px] text-stone-400"
+								>{song.artist}</span
 							>{/if}
 					</button>
 				{/each}
@@ -176,7 +211,7 @@
 			{/if}
 			<button
 				type="submit"
-				class="w-full border-t border-stone-100 px-4 py-3 text-left text-sm font-medium text-missionnaire"
+				class="w-full border-t border-stone-200/60 px-4 py-3 text-left font-body text-xs font-medium text-missionnaire transition-colors hover:bg-missionnaire/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-missionnaire/40"
 				>{$t('search.seeAll')} →</button
 			>
 		</div>
