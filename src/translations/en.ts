@@ -217,6 +217,8 @@ const en: Record<keyof typeof fr, string> = {
 	'search.noResults': 'No results. Try another word.',
 	'search.minChars': 'Type at least 2 characters to search.',
 	'search.action': 'Search',
+	'music.searchLoading': 'Searching…',
+	'music.searchFailed': 'Suggestions could not load. Try again or submit your search.',
 	'search.clear': 'Clear search',
 	'search.clearShort': 'Clear',
 
