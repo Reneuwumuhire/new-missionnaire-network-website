@@ -231,10 +231,10 @@
 		{#if data.studioAuthorizations.length === 0}
 			<p class="mt-5 bg-cream/50 px-4 py-3 text-sm text-stone-500">{$t('settings.studioNone')}</p>
 		{:else}
-			<div class="mt-5 divide-y divide-stone-100 border border-stone-200/70">
+			<div class="studio-list mt-5 divide-y divide-stone-100 border border-stone-200/70">
 				{#each data.studioAuthorizations as authorization (authorization.id)}
-					<div class="flex items-start justify-between gap-4 p-4">
-						<div class="min-w-0">
+					<div class="studio-session flex flex-col items-stretch gap-4 p-4">
+						<div class="min-w-0 break-words">
 							<div class="flex flex-wrap items-center gap-2">
 								<p class="font-medium text-stone-700">
 									{authorization.device?.deviceName ?? 'Missionnaire Studio'}
@@ -266,17 +266,20 @@
 										· {$t('settings.studioApp')}: {authorization.device.appVersion}{/if}
 								</p>
 							{:else}
-								<p class="mt-1 text-xs text-stone-400">{$t('settings.studioLegacyDevice')}</p>
+								<p class="mt-2 text-xs leading-relaxed text-stone-400">
+									{$t('settings.studioLegacyDevice')}
+								</p>
 							{/if}
-							<p class="mt-1 text-xs text-stone-400">
+							<p class="mt-2 text-xs leading-relaxed text-stone-400">
 								{$t('settings.studioAuthorized')}: {formatDate(authorization.approvedAt)}
-								<span class="mx-1">·</span>
+								<span class="block"></span>
 								{$t('settings.studioLastSeen')}: {formatDate(authorization.lastSeenAt)}
-								<span class="mx-1">·</span>
+								<span class="block"></span>
 								{$t('settings.studioExpires')}: {formatDate(authorization.expiresAt)}
 							</p>
 						</div>
 						<form
+							class="shrink-0"
 							method="POST"
 							action={authorization.connected ? '?/revokeStudio' : '?/deleteStudio'}
 							onsubmit={(event) => {
@@ -297,7 +300,7 @@
 							<button
 								type="submit"
 								disabled={studioWorking === authorization.id}
-								class="admin-btn-secondary text-red-600 disabled:opacity-50"
+								class="admin-btn-secondary w-full justify-center sm:w-auto text-red-600 disabled:opacity-50"
 							>
 								{$t(authorization.connected ? 'settings.studioRevoke' : 'settings.studioDelete')}
 							</button>
@@ -546,3 +549,16 @@
 		</form>
 	</div>
 </div>
+
+<style>
+	.studio-list {
+		container-type: inline-size;
+	}
+	@container (min-width: 560px) {
+		.studio-session {
+			flex-direction: row;
+			align-items: flex-start;
+			justify-content: space-between;
+		}
+	}
+</style>

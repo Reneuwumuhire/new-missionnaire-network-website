@@ -96,6 +96,7 @@ export async function queryMusicAudio(options: {
 	search?: string;
 	artist?: string;
 	lyrics?: 'with' | 'without';
+	missingMetadata?: boolean;
 	limit?: number;
 	pageNumber?: number;
 	orderBy?: string;
@@ -112,6 +113,10 @@ export async function queryMusicAudio(options: {
 
 	const db = await getDb();
 	const conditions: Filter<Document>[] = [];
+	if (options.missingMetadata)
+		conditions.push({
+			$or: [{ title: { $in: [null, ''] } }, { artist: { $in: [null, ''] } }, { duration: null }]
+		});
 
 	if (category && category !== 'All') {
 		conditions.push({ category });

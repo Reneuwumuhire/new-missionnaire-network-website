@@ -98,6 +98,10 @@ export function canEditOrDeleteMusicAudio(user: AdminUser): boolean {
 export function canViewDashboard(user: AdminUser): boolean {
 	const permissions = getPermissions(user);
 	return (
-		user.role === 'superadmin' || permissions.can_manage_recordings || canManageMusicAudio(user)
+		user.role === 'superadmin' ||
+		permissions.can_manage_recordings ||
+		canManageMusicAudio(user) ||
+		permissions.can_view_questions ||
+		permissions.can_review_lyrics
 	);
 }

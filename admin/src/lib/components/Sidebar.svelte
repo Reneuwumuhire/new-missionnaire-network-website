@@ -26,12 +26,24 @@
 	} = $props();
 
 	const navItems: NavItem[] = $derived([
-		...(user.canViewDashboard ? [{ href: '/', labelKey: 'nav.dashboard' as const, icon: 'home' }] : []),
-		...(user.canViewQuestions ? [{ href: '/questions', labelKey: 'nav.questions' as const, icon: 'questions' }] : []),
-		...(user.canManageRecordings ? [{ href: '/recordings', labelKey: 'nav.recordings' as const, icon: 'recordings' }] : []),
-		...(user.canManageAudio ? [{ href: '/audio', labelKey: 'nav.audioLibrary' as const, icon: 'music' }] : []),
-		...(user.canReviewLyrics ? [{ href: '/lyrics-review', labelKey: 'nav.lyricsReview' as const, icon: 'lyrics' }] : []),
-		...(user.role === 'superadmin' ? [{ href: '/users', labelKey: 'nav.users' as const, icon: 'users' }] : []),
+		...(user.canViewDashboard
+			? [{ href: '/', labelKey: 'nav.dashboard' as const, icon: 'home' }]
+			: []),
+		...(user.canViewQuestions
+			? [{ href: '/questions', labelKey: 'nav.questions' as const, icon: 'questions' }]
+			: []),
+		...(user.canManageRecordings
+			? [{ href: '/recordings', labelKey: 'nav.recordings' as const, icon: 'recordings' }]
+			: []),
+		...(user.canManageAudio
+			? [{ href: '/audio', labelKey: 'nav.audioLibrary' as const, icon: 'music' }]
+			: []),
+		...(user.canReviewLyrics
+			? [{ href: '/lyrics-review', labelKey: 'nav.lyricsReview' as const, icon: 'lyrics' }]
+			: []),
+		...(user.role === 'superadmin'
+			? [{ href: '/users', labelKey: 'nav.users' as const, icon: 'users' }]
+			: []),
 		{ href: '/settings', labelKey: 'nav.settings' as const, icon: 'settings' }
 	]);
 	let mobileOpen = $state(false);
@@ -55,32 +67,47 @@
 	></button>
 {/if}
 
-<!-- Mobile hamburger (only visible when sidebar is closed) -->
-{#if !mobileOpen}
+<svelte:window
+	onkeydown={(event) => {
+		if (event.key === 'Escape') mobileOpen = false;
+	}}
+/>
+
+<!-- In-flow header reserves space above every admin page on mobile. -->
+<header
+	class="sticky top-0 z-20 flex min-h-16 items-center gap-3 border-b border-stone-200/80 bg-white/95 px-4 py-3 backdrop-blur-sm lg:hidden"
+>
 	<button
-		class="fixed left-4 top-4 z-40 flex h-10 w-10 items-center justify-center bg-white shadow-md lg:hidden"
-		onclick={() => (mobileOpen = true)}
+		type="button"
+		class="flex h-11 w-11 shrink-0 items-center justify-center border border-stone-200 bg-white text-stone-700 transition-colors hover:bg-stone-50"
+		onclick={() => (mobileOpen = !mobileOpen)}
 		aria-label={$t('nav.menu')}
+		aria-expanded={mobileOpen}
+		aria-controls="admin-sidebar"
 	>
-		<svg
-			class="h-[18px] w-[18px] text-stone-700"
-			fill="none"
-			viewBox="0 0 24 24"
-			stroke="currentColor"
-			stroke-width="2.5"
-		>
-			<path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h10M4 18h16" />
+		<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+			<path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
 		</svg>
 	</button>
-{/if}
+	<a href="/" class="flex min-w-0 items-center gap-2.5">
+		<img src="/icons/logo.webp" alt="" class="h-9 w-9 shrink-0 object-contain" />
+		<div class="min-w-0">
+			<p class="font-display text-lg font-semibold leading-tight text-stone-800">Missionnaire</p>
+			<p class="truncate text-[9px] font-semibold uppercase tracking-[0.16em] text-stone-500">
+				{$t('common.administration')}
+			</p>
+		</div>
+	</a>
+</header>
 
 <!-- Sidebar -->
 <aside
-	class="fixed inset-y-0 left-0 z-30 flex w-[272px] flex-col bg-white shadow-xl shadow-stone-200/40 transition-transform duration-300 ease-out lg:w-64 lg:border-r lg:border-stone-200/60 lg:shadow-none lg:translate-x-0
-	{mobileOpen ? 'translate-x-0' : '-translate-x-full'}"
+	id="admin-sidebar"
+	class="fixed inset-y-0 left-0 z-40 flex w-[min(320px,calc(100vw-48px))] overflow-y-auto overscroll-contain flex-col bg-white shadow-xl shadow-stone-200/40 transition-transform duration-300 ease-out lg:w-64 lg:border-r lg:border-stone-200/60 lg:shadow-none lg:translate-x-0
+	{mobileOpen ? 'visible translate-x-0' : 'invisible -translate-x-full lg:visible'}"
 >
 	<!-- Brand + close -->
-	<div class="flex items-center justify-between px-6 py-6">
+	<div class="flex items-center justify-between shrink-0 px-6 py-6">
 		<a href="/" class="flex items-center gap-3" onclick={() => (mobileOpen = false)}>
 			<img src="/icons/logo.webp" alt="Missionnaire" class="h-10 w-10 object-contain" />
 			<div>
@@ -93,7 +120,7 @@
 			</div>
 		</a>
 		<button
-			class="flex h-8 w-8 items-center justify-center rounded-full text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 lg:hidden"
+			class="flex h-11 w-11 shrink-0 items-center justify-center text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-600 lg:hidden"
 			onclick={() => (mobileOpen = false)}
 			aria-label={$t('nav.closeMenu')}
 		>
@@ -106,12 +133,13 @@
 	<div class="mx-5 h-px bg-gradient-to-r from-transparent via-stone-200 to-transparent"></div>
 
 	<!-- Navigation -->
-	<nav class="flex-1 px-4 py-5">
+	<nav class="flex-1 px-4 py-5" aria-label={$t('nav.menu')}>
 		<div class="space-y-0.5">
 			{#each navItems as item}
 				{@const active = isActive(item.href, $page.url.pathname)}
 				<a
 					href={item.href}
+					aria-current={active ? 'page' : undefined}
 					onclick={() => (mobileOpen = false)}
 					class="group flex items-center gap-3 px-3.5 py-2.5 text-[13px] font-medium transition-all
 					{active ? 'bg-primary/10 text-primary' : 'text-stone-500 hover:bg-stone-50 hover:text-stone-700'}"
@@ -165,8 +193,18 @@
 								/>
 							</svg>
 						{:else if item.icon === 'questions'}
-							<svg class="h-[15px] w-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M8 10h8M8 14h5m8-2a9 9 0 11-4.219-7.62L21 3v5h-5" />
+							<svg
+								class="h-[15px] w-[15px]"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+								stroke-width="2"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									d="M8 10h8M8 14h5m8-2a9 9 0 11-4.219-7.62L21 3v5h-5"
+								/>
 							</svg>
 						{:else if item.icon === 'recordings'}
 							<svg
