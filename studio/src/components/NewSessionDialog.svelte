@@ -4,6 +4,7 @@
 
 	let { oncreated }: { oncreated: () => void } = $props();
 	let title = $state('');
+	let serviceType = $state<'prepared' | 'live'>('prepared');
 	let scheduledAt = $state('');
 	let description = $state('');
 	let privacyStatus = $state<'private' | 'unlisted' | 'public'>('public');
@@ -34,6 +35,7 @@
 		formError = null;
 		if (
 			await createSession({
+				serviceType,
 				title,
 				scheduledAt,
 				description,
@@ -75,6 +77,39 @@
 			<h3 class="text-[12px] font-semibold text-fg/85">Service information</h3>
 			<p class="mt-0.5 text-[10px] text-fg/40">Used on YouTube and Missionnaire.</p>
 		</div>
+		<fieldset>
+			<legend class="studio-label">Service type *</legend>
+			<div class="grid grid-cols-2 gap-2">
+				<label
+					class="border p-3 {serviceType === 'prepared'
+						? 'border-primary/50 bg-primary/10'
+						: 'border-ink-700'}"
+				>
+					<input
+						class="mr-2 accent-primary"
+						type="radio"
+						name="serviceType"
+						value="prepared"
+						bind:group={serviceType}
+					/>
+					<span class="text-[12px] text-fg/80">Pre-recorded Kinyarwanda</span>
+				</label>
+				<label
+					class="border p-3 {serviceType === 'live'
+						? 'border-primary/50 bg-primary/10'
+						: 'border-ink-700'}"
+				>
+					<input
+						class="mr-2 accent-primary"
+						type="radio"
+						name="serviceType"
+						value="live"
+						bind:group={serviceType}
+					/>
+					<span class="text-[12px] text-fg/80">Live from Krefeld</span>
+				</label>
+			</div>
+		</fieldset>
 		<label class="block"
 			><span class="studio-label">Title *</span><input
 				class="studio-input w-full"

@@ -25,7 +25,8 @@ const ready = {
 	youtubeConnected: false,
 	localRecording: false,
 	availableRecordingBytes: null,
-	requiredRecordingBytes: requiredRecordingBytes(4500, 160)
+	requiredRecordingBytes: requiredRecordingBytes(4500, 160),
+	serviceMissing: []
 };
 
 describe('preflight', () => {

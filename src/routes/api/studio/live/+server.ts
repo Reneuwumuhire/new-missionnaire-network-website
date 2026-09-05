@@ -8,7 +8,8 @@ import {
 	listStudioScheduledLives,
 	setBroadcastAdminState,
 	setStudioScheduledLiveStatus,
-	updateStudioLiveSubtitles
+	updateStudioLiveSubtitles,
+	updateStudioLiveWorkflow
 } from '../../../../db/collections';
 import { presignUpload, s3Url } from '$lib/server/s3';
 
@@ -66,6 +67,11 @@ export async function POST({ request, url }) {
 		atEpochMs?: number;
 		paused?: boolean;
 		subtitleMode?: 'broadcast' | 'armed';
+		serviceType?: 'prepared' | 'live';
+		phase?: 'ready' | 'opening' | 'sermon' | 'closing' | 'complete';
+		sermonStartMs?: number | null;
+		sermonEndMs?: number | null;
+		subtitleTimingLanguage?: string;
 	};
 	if (body.action === 'logout') {
 		const code = request.headers.get('authorization')?.replace(/^Bearer\s+/, '') ?? '';
@@ -126,6 +132,7 @@ export async function POST({ request, url }) {
 			subtitleUrl: body.subtitleUrl ?? null,
 			subtitleKey: body.subtitleKey ?? null,
 			subtitleFilename: body.subtitleFilename ?? null,
+			serviceType: body.serviceType === 'live' ? 'live' : 'prepared',
 			announce: body.announce === true,
 			reminderEnabled: body.reminderEnabled === true,
 			notifyOnStart: body.notifyOnStart === true
@@ -156,6 +163,23 @@ export async function POST({ request, url }) {
 		});
 	}
 	if (!body.sessionId) throw error(400, 'sessionId required');
+	if (body.action === 'workflow') {
+		if (
+			!body.phase ||
+			!['ready', 'opening', 'sermon', 'closing', 'complete'].includes(body.phase)
+		) {
+			throw error(400, 'Invalid service phase');
+		}
+		await updateStudioLiveWorkflow(body.sessionId, {
+			active_phase: body.phase,
+			sermon_start_ms:
+				typeof body.sermonStartMs === 'number' ? Math.max(0, Math.round(body.sermonStartMs)) : null,
+			sermon_end_ms:
+				typeof body.sermonEndMs === 'number' ? Math.max(0, Math.round(body.sermonEndMs)) : null,
+			subtitle_timing_language: body.subtitleTimingLanguage?.slice(0, 80) || null
+		});
+		return json({ ok: true });
+	}
 	if (body.action === 'attach-subtitles') {
 		const current = await getBroadcastAdminState();
 		if (!current.is_live || current.scheduled_live_id !== body.sessionId) {
@@ -186,9 +210,18 @@ export async function POST({ request, url }) {
 			throw error(409, 'This session is not live');
 		}
 		await updateStudioLiveSubtitles(body.sessionId, { subtitle_anchor_epoch_ms: null });
+		const timeline = current.subtitle_timeline.slice(-199);
+		const active = timeline.at(-1);
+		const requestedEnd = Number(body.atEpochMs ?? Date.now());
+		const endedAt =
+			Number.isFinite(requestedEnd) && Math.abs(requestedEnd - Date.now()) <= 60_000
+				? requestedEnd
+				: Date.now();
+		if (active && active.toEpochMs === null) active.toEpochMs = endedAt;
 		await setBroadcastAdminState({
 			subtitle_anchor_epoch_ms: null,
-			subtitle_paused_position_ms: null
+			subtitle_paused_position_ms: null,
+			subtitle_timeline: timeline
 		});
 		return json({ ok: true });
 	}
@@ -219,6 +252,17 @@ export async function POST({ request, url }) {
 		const paused = body.paused === true;
 		const anchorEpochMs = Math.round(clickedAt - positionMs);
 		const pausedPositionMs = paused ? Math.max(0, Math.round(positionMs + offsetMs)) : null;
+		const timeline = current.subtitle_timeline.slice(-199);
+		const previous = timeline.at(-1);
+		if (previous && previous.toEpochMs === null) previous.toEpochMs = clickedAt;
+		timeline.push({
+			fromEpochMs: clickedAt,
+			toEpochMs: null,
+			url: attached ? body.subtitleUrl! : current.subtitle_srt_url!,
+			anchorEpochMs,
+			offsetMs: Math.round(offsetMs),
+			pausedPositionMs
+		});
 		await updateStudioLiveSubtitles(body.sessionId, {
 			...(attached
 				? {
@@ -240,7 +284,8 @@ export async function POST({ request, url }) {
 				: {}),
 			subtitle_anchor_epoch_ms: anchorEpochMs,
 			subtitle_offset_ms: Math.round(offsetMs),
-			subtitle_paused_position_ms: pausedPositionMs
+			subtitle_paused_position_ms: pausedPositionMs,
+			subtitle_timeline: timeline
 		});
 		return json({ ok: true, anchorEpochMs, offsetMs, pausedPositionMs });
 	}
@@ -289,7 +334,8 @@ export async function POST({ request, url }) {
 			subtitle_srt_s3_key: session.subtitle_srt_s3_key,
 			subtitle_anchor_epoch_ms: subtitleAnchorEpochMs,
 			subtitle_offset_ms: 0,
-			subtitle_paused_position_ms: null
+			subtitle_paused_position_ms: null,
+			subtitle_timeline: []
 		});
 		return json({ ok: true, startedAt, watchPath: `/live/${session.slug}` });
 	}

@@ -211,6 +211,7 @@ const en = {
 	'preflight.admin': 'Admin connection',
 	'preflight.missionnaire': 'Missionnaire broadcast',
 	'preflight.youtube': 'YouTube channel',
+	'preflight.service': 'Service workflow',
 	'preflight.storage': 'Recording space',
 	'preflight.ready': 'Ready',
 	'preflight.warning': 'Check',

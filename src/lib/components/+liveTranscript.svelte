@@ -166,7 +166,18 @@
 		anchorEpochMs: number | null;
 		offsetMs: number;
 		pausedPositionMs?: number | null;
+		timeline?: Array<{
+			fromEpochMs: number;
+			toEpochMs: number | null;
+			url: string;
+			anchorEpochMs: number;
+			offsetMs: number;
+			pausedPositionMs: number | null;
+		}>;
 	} | null;
+	type SubtitleTimeline = NonNullable<NonNullable<RadioSubtitles>['timeline']>;
+	let timeline = $state<SubtitleTimeline>([]);
+	let streamLive = $state(false);
 
 	async function pollLiveState() {
 		if (document.hidden) return;
@@ -184,6 +195,7 @@
 				clockSkewMs = data.serverNowMs - Date.now();
 			}
 			const subs = data.subtitles ?? null;
+			streamLive = data.isLive;
 			// The SRT may be attached before the sermon. A null anchor is the
 			// operator-controlled gate that keeps songs and introductions blank.
 			liveActive = Boolean(data.isLive && subs && subs.anchorEpochMs !== null);
@@ -193,6 +205,7 @@
 				anchorEpochMs = subs.anchorEpochMs;
 				offsetMs = subs.offsetMs ?? 0;
 				pausedPositionMs = subs.pausedPositionMs ?? null;
+				timeline = subs.timeline ?? [];
 			} else {
 				// Broadcast ended or subtitles cleared — freeze the transcript as-is
 				// (the watch page redirects to the replay shortly after).
@@ -205,15 +218,27 @@
 
 	function tick() {
 		if (mode === 'live') {
-			if (anchorEpochMs === null) {
-				srtSec = null;
-				return;
-			}
 			const { positionEpochMs, pdt } = $livePlayback;
 			if (positionEpochMs === null) {
 				// No stream connected yet — nothing is being heard, no highlight.
 				srtSec = null;
 				return;
+			}
+			const segment = timeline.find(
+				(item) =>
+					positionEpochMs >= item.fromEpochMs &&
+					(item.toEpochMs === null || positionEpochMs < item.toEpochMs)
+			);
+			const activeAnchor = timeline.length ? (segment?.anchorEpochMs ?? null) : anchorEpochMs;
+			if (activeAnchor === null) {
+				liveActive = false;
+				srtSec = null;
+				return;
+			}
+			liveActive = streamLive;
+			if (segment?.url && segment.url !== liveUrl) {
+				liveUrl = segment.url;
+				void loadSrt(segment.url);
 			}
 			// positionEpochMs is frozen while paused and shifts with DVR
 			// scrubbing, so the text always tracks the audio actually heard.
@@ -221,8 +246,10 @@
 			// from the listener's own clock); PDT positions are already server
 			// wall-clock — adding skew there would punish devices with a wrong
 			// clock in the exact mode that is otherwise exact.
-			const position = positionEpochMs + (pdt ? 0 : clockSkewMs) - anchorEpochMs + offsetMs;
-			srtSec = Math.min(position, pausedPositionMs ?? position) / 1000;
+			const activeOffset = segment?.offsetMs ?? offsetMs;
+			const activePaused = segment?.pausedPositionMs ?? pausedPositionMs;
+			const position = positionEpochMs + (pdt ? 0 : clockSkewMs) - activeAnchor + activeOffset;
+			srtSec = Math.min(position, activePaused ?? position) / 1000;
 		} else {
 			const { trackId: playingId, timeSec } = $replayPlayback;
 			if (!trackId || playingId !== trackId) {
