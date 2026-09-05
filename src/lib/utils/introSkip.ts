@@ -1,7 +1,7 @@
 /** Some tracks were ripped from YouTube videos whose first seconds are an
  *  on-screen title card — silent in the audio rip. Rather than playing the
- *  dead air, the player starts those tracks a few seconds in (with a short
- *  volume fade so the jump feels gentle).
+ *  dead air, the player starts those tracks a few seconds in. Volume is left
+ *  untouched so playback never depends on a background JavaScript timer.
  *
  *  A per-track `intro_skip_sec` field on the document always wins; the
  *  artist rules below are the fallback for known bulk imports.
