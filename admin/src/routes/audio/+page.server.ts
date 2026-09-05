@@ -10,8 +10,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const search = url.searchParams.get('search') ?? undefined;
 	const artist = url.searchParams.get('artist') ?? undefined;
 	const lyricsParam = url.searchParams.get('lyrics');
-	const lyrics =
-		lyricsParam === 'with' || lyricsParam === 'without' ? lyricsParam : undefined;
+	const lyrics = lyricsParam === 'with' || lyricsParam === 'without' ? lyricsParam : undefined;
 	const limit = Number.parseInt(url.searchParams.get('limit') || '25');
 	const pageNumber = Number.parseInt(url.searchParams.get('pageNumber') || '1');
 	const sort = url.searchParams.get('sort') || 'uploaded_at:desc';
@@ -20,6 +19,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	// render immediately with a skeleton table; await only the cheap distinct
 	// queries that the filter dropdowns need on first paint.
 	const listPromise = queryMusicAudio({
+		missingMetadata: url.searchParams.get('metadata') === 'missing',
 		category,
 		search,
 		artist,

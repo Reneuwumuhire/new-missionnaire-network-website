@@ -41,7 +41,8 @@
 		$page.url.searchParams.has('search') ||
 			$page.url.searchParams.has('category') ||
 			$page.url.searchParams.has('artist') ||
-			$page.url.searchParams.has('lyrics')
+			$page.url.searchParams.has('lyrics') ||
+			$page.url.searchParams.has('metadata')
 	);
 
 	const activeCategory = $derived($page.url.searchParams.get('category') ?? '');
@@ -51,6 +52,14 @@
 </script>
 
 <div class="border border-stone-200/60 bg-white/40 p-4">
+	{#if $page.url.searchParams.get('metadata') === 'missing'}
+		<button
+			class="mb-3 border border-primary/30 bg-orange-50 px-3 py-2 text-xs text-stone-700"
+			onclick={() => updateParam('metadata', '')}
+		>
+			{$t('dashboard.missingMetadata')} ×
+		</button>
+	{/if}
 	<!-- Top row: search + clear -->
 	<div class="relative">
 		<svg
@@ -60,18 +69,25 @@
 			stroke="currentColor"
 			stroke-width="2"
 		>
-			<path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+			<path
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+			/>
 		</svg>
 		<input
 			type="text"
 			placeholder={$t('audio.filters.searchPlaceholder')}
-			class="admin-input pl-10"
+			class="admin-input !pl-10 !pr-10"
 			bind:value={searchValue}
 			oninput={handleSearch}
 		/>
 		{#if searchValue}
 			<button
-				onclick={() => { searchValue = ''; updateParam('search', ''); }}
+				onclick={() => {
+					searchValue = '';
+					updateParam('search', '');
+				}}
 				class="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-stone-400 transition-colors hover:text-stone-600"
 				aria-label={$t('audio.filters.clearSearch')}
 			>
@@ -83,11 +99,15 @@
 	</div>
 
 	<!-- Bottom row: filters inline -->
-	<div class="mt-3 flex items-center gap-2">
-		<span class="mr-1 text-xs font-medium tracking-wide text-stone-400 uppercase">{$t('audio.filters.label')}</span>
+	<div class="mt-3 grid grid-cols-2 items-center gap-2 sm:flex sm:flex-wrap">
+		<span class="col-span-2 mr-1 text-xs font-medium tracking-wide text-stone-400 uppercase"
+			>{$t('audio.filters.label')}</span
+		>
 
 		<select
-			class="h-9 rounded-none border border-stone-200/60 bg-white/60 px-3 text-xs font-medium text-stone-600 transition-all hover:border-stone-300 focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none {activeCategory ? 'border-primary/40 bg-missionnaire-50 text-primary' : ''}"
+			class="h-11 min-w-0 w-full sm:h-9 sm:w-auto sm:max-w-full rounded-none border border-stone-200/60 bg-white/60 px-3 text-xs font-medium text-stone-600 transition-all hover:border-stone-300 focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none {activeCategory
+				? 'border-primary/40 bg-missionnaire-50 text-primary'
+				: ''}"
 			value={activeCategory}
 			onchange={(e) => updateParam('category', e.currentTarget.value)}
 		>
@@ -98,7 +118,9 @@
 		</select>
 
 		<select
-			class="h-9 rounded-none border border-stone-200/60 bg-white/60 px-3 text-xs font-medium text-stone-600 transition-all hover:border-stone-300 focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none {activeArtist ? 'border-primary/40 bg-missionnaire-50 text-primary' : ''}"
+			class="h-11 min-w-0 w-full sm:h-9 sm:w-auto sm:max-w-full rounded-none border border-stone-200/60 bg-white/60 px-3 text-xs font-medium text-stone-600 transition-all hover:border-stone-300 focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none {activeArtist
+				? 'border-primary/40 bg-missionnaire-50 text-primary'
+				: ''}"
 			value={activeArtist}
 			onchange={(e) => updateParam('artist', e.currentTarget.value)}
 		>
@@ -109,7 +131,9 @@
 		</select>
 
 		<select
-			class="h-9 rounded-none border border-stone-200/60 bg-white/60 px-3 text-xs font-medium text-stone-600 transition-all hover:border-stone-300 focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none {activeLyrics ? 'border-primary/40 bg-missionnaire-50 text-primary' : ''}"
+			class="h-11 min-w-0 w-full sm:h-9 sm:w-auto sm:max-w-full rounded-none border border-stone-200/60 bg-white/60 px-3 text-xs font-medium text-stone-600 transition-all hover:border-stone-300 focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none {activeLyrics
+				? 'border-primary/40 bg-missionnaire-50 text-primary'
+				: ''}"
 			value={activeLyrics}
 			onchange={(e) => updateParam('lyrics', e.currentTarget.value)}
 		>
@@ -118,10 +142,10 @@
 			<option value="without">{$t('audio.filters.withoutLyrics')}</option>
 		</select>
 
-		<div class="h-4 w-px bg-stone-200"></div>
+		<div class="hidden h-4 w-px bg-stone-200 sm:block"></div>
 
 		<select
-			class="h-9 rounded-none border border-stone-200/60 bg-white/60 px-3 text-xs font-medium text-stone-600 transition-all hover:border-stone-300 focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none"
+			class="h-11 min-w-0 w-full sm:h-9 sm:w-auto sm:max-w-full rounded-none border border-stone-200/60 bg-white/60 px-3 text-xs font-medium text-stone-600 transition-all hover:border-stone-300 focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none"
 			value={activeSort}
 			onchange={(e) => updateParam('sort', e.currentTarget.value)}
 		>
@@ -135,7 +159,7 @@
 		{#if hasFilters}
 			<button
 				onclick={clearFilters}
-				class="ml-auto flex h-9 items-center gap-1 rounded-none px-2.5 text-xs font-medium text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600"
+				class="col-span-2 ml-auto flex h-11 sm:h-9 items-center gap-1 rounded-none px-2.5 text-xs font-medium text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600"
 			>
 				<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />

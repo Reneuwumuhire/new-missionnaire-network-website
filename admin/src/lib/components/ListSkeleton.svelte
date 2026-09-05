@@ -14,12 +14,12 @@
 </script>
 
 {#if variant === 'stats'}
-	<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-hidden="true">
+	<div class="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4" aria-hidden="true">
 		{#each Array.from({ length: 4 }) as _}
-			<div class="animate-pulse border border-stone-200/60 bg-white/40 p-5">
-				<div class="mb-3 h-10 w-10 rounded-full bg-stone-200"></div>
+			<div class="animate-pulse border border-stone-200/60 bg-white/40 min-w-0 p-3.5 sm:p-5">
+				<div class="mb-2 h-8 w-8 sm:mb-3 sm:h-10 sm:w-10 rounded-full bg-stone-200"></div>
 				<div class="h-6 w-16 rounded-full bg-stone-200"></div>
-				<div class="mt-2 h-3 w-28 rounded-full bg-stone-100"></div>
+				<div class="mt-2 h-3 w-28 max-w-full rounded-full bg-stone-100"></div>
 			</div>
 		{/each}
 	</div>
