@@ -218,6 +218,8 @@ export default {
 	'search.noResults': 'Aucun résultat. Essayez un autre mot.',
 	'search.minChars': 'Tapez au moins 2 caractères pour rechercher.',
 	'search.action': 'Rechercher',
+	'music.searchLoading': 'Recherche…',
+	'music.searchFailed': 'Impossible de charger les suggestions. Réessayez ou lancez la recherche.',
 	'search.clear': 'Effacer la recherche',
 	'search.clearShort': 'Effacer',
 

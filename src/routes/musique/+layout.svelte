@@ -1,76 +1,18 @@
 <script lang="ts">
 	import AndroidBanner from '$lib/components/+androidBanner.svelte';
-	import { onDestroy, onMount, untrack } from 'svelte';
+	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
-	import { goto } from '$app/navigation';
 	import { t } from '../../i18n';
-	import LoadingRing from '$lib/components/LoadingRing.svelte';
+	import MusicSearch from '$lib/components/MusicSearch.svelte';
 
 	let { children } = $props();
-	// Seeded from the URL (not load data) so there's no initial-value capture;
-	// the sync $effect below keeps it aligned on every navigation.
-	let heroSearchValue = $state($page.url.searchParams.get('search') || '');
-	let debounceTimer: ReturnType<typeof setTimeout> | undefined = $state();
-	let isHeroSearchLoading = $state(false);
-	let lastSyncedSearch = $state('');
 
 	// Total song count for the header copy. Loaded async on mount so the page
 	// renders immediately without it — if the count endpoint is slow or
 	// unreachable, the count simply stays hidden instead of blocking.
 	let totalSongs: number | null = $state(null);
 	const formattedTotal = (n: number) => n.toLocaleString('fr-FR');
-
-	let currentSearch = $derived($page.url.searchParams.get('search') || '');
-	$effect(() => {
-		if (currentSearch !== lastSyncedSearch) {
-			heroSearchValue = currentSearch;
-			untrack(() => {
-				lastSyncedSearch = currentSearch;
-			});
-		}
-	});
-
-	async function handleHeroSearch() {
-		if (!browser) return;
-		const params = new URLSearchParams($page.url.searchParams);
-		if (heroSearchValue.trim()) {
-			params.set('search', heroSearchValue.trim());
-		} else {
-			params.delete('search');
-		}
-		params.set('page', '1');
-		isHeroSearchLoading = true;
-		try {
-			await goto(`?${params.toString()}`, { keepFocus: true, noScroll: true });
-		} finally {
-			isHeroSearchLoading = false;
-		}
-	}
-
-	$effect(() => {
-		if (browser) {
-			if (heroSearchValue !== undefined) {
-				// Timer bookkeeping is untracked: reading + reassigning
-				// `debounceTimer` inside the effect would re-trigger it forever.
-				untrack(() => {
-					clearTimeout(debounceTimer);
-					debounceTimer = setTimeout(() => {
-						if (heroSearchValue.trim() !== currentSearch) {
-							isHeroSearchLoading = true;
-							void handleHeroSearch();
-						} else {
-							isHeroSearchLoading = false;
-						}
-					}, 300);
-				});
-			}
-		}
-	});
-
-	onDestroy(() => {
-		clearTimeout(debounceTimer);
-	});
 
 	onMount(async () => {
 		if (!browser) return;
@@ -117,84 +59,9 @@
 			</div>
 
 			<div class="flex items-center justify-between gap-3 md:justify-end md:gap-4">
-				<!-- Desktop inline search — mobile uses the sticky toolbar below.
-				     White field (same refined feel as the prédications band),
-				     h-11 to match the segmented control next to it, orange
-				     focus ring, native autofill suppressed. -->
-				<form
-					class="hidden h-11 w-72 items-stretch overflow-hidden border border-stone-200/60 bg-white transition-shadow focus-within:border-missionnaire/40 focus-within:ring-2 focus-within:ring-missionnaire/30 md:flex lg:w-96"
-					role="search"
-					autocomplete="off"
-					onsubmit={(e) => {
-						e.preventDefault();
-						void handleHeroSearch();
-					}}
-				>
-					<svg
-						class="ml-3 shrink-0 self-center text-stone-400"
-						width="14"
-						height="14"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2.2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						aria-hidden="true"
-					>
-						<circle cx="11" cy="11" r="7" />
-						<line x1="21" y1="21" x2="16.65" y2="16.65" />
-					</svg>
-					<input
-						id="musique-band-search"
-						name="musique-band-search"
-						type="text"
-						class="min-w-0 flex-1 bg-transparent px-2.5 font-body text-sm text-stone-800 outline-none placeholder:text-stone-400"
-						placeholder={$t('music.searchPlaceholder')}
-						aria-label={$t('music.searchPlaceholder')}
-						autocomplete="off"
-						autocorrect="off"
-						autocapitalize="off"
-						spellcheck="false"
-						bind:value={heroSearchValue}
-					/>
-					{#if isHeroSearchLoading}
-						<LoadingRing
-							size={14}
-							className="mr-3 flex h-6 w-6 shrink-0 self-center items-center justify-center text-missionnaire"
-						/>
-					{:else if heroSearchValue}
-						<button
-							type="button"
-							aria-label={$t('music.clearSearch')}
-							title={$t('music.clearSearch')}
-							class="mr-1.5 flex h-7 w-7 shrink-0 self-center items-center justify-center text-stone-400 transition-colors duration-150 hover:text-stone-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/50"
-							onclick={() => {
-								heroSearchValue = '';
-							}}
-						>
-							<svg
-								width="13"
-								height="13"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2"
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								aria-hidden="true"
-							>
-								<path d="M6 6l12 12M6 18L18 6" />
-							</svg>
-						</button>
-					{/if}
-					<button
-						type="submit"
-						class="shrink-0 self-stretch bg-missionnaire px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-white font-body transition-colors duration-200 hover:bg-missionnaire/90 active:scale-[0.98]"
-					>
-						{$t('search.action')}
-					</button>
-				</form>
+				<div class="hidden w-72 md:block lg:w-96">
+					<MusicSearch id="musique-band-search" suggestions={isAudioActive} />
+				</div>
 
 				<!-- Audio / Vidéos segmented control — h-11 on md+ so it sits on
 				     the same baseline as the inline search field beside it. -->
