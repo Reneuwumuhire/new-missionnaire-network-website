@@ -1,5 +1,4 @@
 <script lang="ts">
-
 	import { browser } from '$app/environment';
 	import { getContext, onDestroy, onMount, tick } from 'svelte';
 	import { get } from 'svelte/store';
@@ -59,6 +58,8 @@
 	import { songSlug } from '$lib/utils/songSlug';
 	import { downloadAudioFile } from '../../utils/downloadAudio';
 	import { getIntroSkipSeconds } from '$lib/utils/introSkip';
+	import { createPlaybackStallDetector, reloadAudio } from '$lib/utils/audioRecovery';
+	import { getLiveTimeline } from '$lib/utils/liveTimeline';
 	// ── BEGIN: cache indicator imports (added) ────────────────────
 	import { isCached, prefetchAudio } from '$lib/audioCache';
 	import { isOnline } from '$lib/onlineStatus';
@@ -98,7 +99,6 @@
 	let isDragging = $state(false);
 	let initialClickX = 0;
 	let initialIndicatorPosition = 0;
-	let volume = 1; // Initial volume (1 = full volume, 0 = mute)
 	let isMuted = $state(false);
 	let audioSrc: string = '';
 	let isAudioReady = $state(false);
@@ -115,7 +115,6 @@
 	// deliberately seeking back to 0:00 isn't yanked forward again ('canplay'
 	// re-fires after seeks). Plain lets — never read in templates.
 	let introSkipAppliedForSrc = '';
-	let introFadeTimer: ReturnType<typeof setInterval> | null = null;
 	const SLEEP_TIMER_STORAGE_KEY = 'missionnaire:sleep-timer-ends-at';
 	const sleepTimerOptions = [15, 30, 45, 60, 90];
 	let isSleepTimerOpen = $state(false);
@@ -198,24 +197,42 @@
 	}
 	let liveSeekStart = $state(0);
 	let liveSeekEnd = $state(0);
+	let liveSyncPosition: number | null = $state(null);
+	let liveDvrRewound = $state(false);
 	let liveDvrSeeking = $state(false);
 	let liveDvrValue = $state(0);
 	let liveDvrWindowSec = $derived(liveSeekEnd - liveSeekStart);
-	let liveDvrDisplayValue = $derived(
-		liveDvrSeeking ? liveDvrValue : Math.min(currentTime, liveSeekEnd)
+	let liveTimeline = $derived(
+		getLiveTimeline({
+			start: liveSeekStart,
+			end: liveSeekEnd,
+			position: liveDvrSeeking ? liveDvrValue : currentTime,
+			syncPosition: liveSyncPosition,
+			playing: $isPlaying && !liveDvrSeeking,
+			rewound: liveDvrRewound
+		})
 	);
-	// Filled-track percentage (YouTube-style: red up to the playhead).
-	let liveDvrFillPct = $derived(
-		liveDvrWindowSec > 0
-			? Math.min(100, Math.max(0, ((liveDvrDisplayValue - liveSeekStart) / liveDvrWindowSec) * 100))
-			: 0
-	);
+	let liveDvrDisplayValue = $derived(liveTimeline.value);
+	let liveDvrFillPct = $derived(liveTimeline.fill);
 	// Only surface the scrubber once there's a meaningful window to seek in.
 	let hasLiveDvr = $derived(isLiveTrack && liveIsHls && liveDvrWindowSec > 45);
-	let liveBehindSec = $derived(Math.max(0, liveSeekEnd - currentTime));
-	// HLS players hold ~3 target durations behind the playlist end while "at
-	// the live edge" — anything under this is not a deliberate rewind.
-	let liveAtEdge = $derived(liveBehindSec < 25);
+	let liveBehindSec = $derived(liveTimeline.behind);
+	let liveAtEdge = $derived(liveTimeline.atEdge);
+
+	function refreshLiveWindow() {
+		if (!audio || !liveIsHls) return;
+		// MSE seekable can retain an old start after the server has deleted
+		// those segments. The current playlist is authoritative for DVR.
+		const details = hlsInstance?.latestLevelDetails;
+		if (details && details.fragments.length > 0) {
+			liveSeekStart = details.fragmentStart;
+			liveSeekEnd = details.edge;
+		} else if (audio.seekable.length > 0) {
+			liveSeekStart = audio.seekable.start(0);
+			liveSeekEnd = audio.seekable.end(audio.seekable.length - 1);
+		}
+		liveSyncPosition = hlsInstance?.liveSyncPosition ?? null;
+	}
 
 	function destroyHls() {
 		if (hlsInstance) {
@@ -353,6 +370,8 @@
 	/** Single live entry point: prefer the HLS DVR, fall back to Icecast. */
 	function connectLiveStream() {
 		if (!audio || !isLiveTrack) return;
+		liveDvrRewound = false;
+		liveSyncPosition = null;
 		const seq = ++liveConnectSeq;
 		clearLiveReconnectTimer();
 		liveStallNudged = false;
@@ -401,6 +420,8 @@
 
 	function seekToLiveEdge() {
 		if (!audio) return;
+		liveDvrRewound = false;
+		liveDvrSeeking = false;
 		// Jumping to live is an explicit "play from here" gesture.
 		setUserWantsToPlay(true);
 		// hls.js idles its loader while paused/behind — nudge it so the edge
@@ -410,17 +431,10 @@
 		} catch {
 			/* not attached */
 		}
-		let target: number | null = null;
-		const syncPos = hlsInstance?.liveSyncPosition;
-		if (typeof syncPos === 'number' && Number.isFinite(syncPos)) {
-			target = syncPos;
-		} else if (audio.seekable.length > 0) {
-			const end = audio.seekable.end(audio.seekable.length - 1);
-			target = Math.max(audio.seekable.start(0), end - 18);
-		}
-		if (target !== null) {
+		refreshLiveWindow();
+		if (liveSeekEnd > liveSeekStart) {
 			try {
-				audio.currentTime = target;
+				audio.currentTime = liveTimeline.edge;
 			} catch {
 				/* not seekable yet */
 			}
@@ -428,16 +442,12 @@
 			// position has buffered (seconds on a slow link), and a frozen
 			// behind-pill reads as "the click did nothing".
 			currentTime = audio.currentTime;
-			if (audio.seekable.length > 0) {
-				liveSeekStart = audio.seekable.start(0);
-				liveSeekEnd = audio.seekable.end(audio.seekable.length - 1);
-			}
 		}
 		void audio.play().catch(() => {});
 	}
 
 	// ── Behind-live indicator (both modes) ─────────────────────────
-	// HLS: distance to the DVR window's end. Icecast: wall-clock elapsed
+	// HLS: distance to the playable live edge. Icecast: wall-clock elapsed
 	// beyond the audio being heard (connection epoch + position) — grows
 	// while paused, resets on the fresh-connection reconnect. The 1s ticker
 	// keeps it counting while paused, when no timeupdate fires.
@@ -450,10 +460,7 @@
 			// While paused no timeupdate fires, but the live edge keeps moving —
 			// refresh the window bounds so the behind-counter ticks up and the
 			// jump-to-live target stays current.
-			if (liveIsHls && audio && audio.seekable.length > 0) {
-				liveSeekStart = audio.seekable.start(0);
-				liveSeekEnd = audio.seekable.end(audio.seekable.length - 1);
-			}
+			refreshLiveWindow();
 		}, 1000);
 	}
 	function stopLiveTicker() {
@@ -468,9 +475,9 @@
 			: 0
 	);
 	let liveBehindDisplaySec = $derived(liveIsHls ? liveBehindSec : liveIcecastBehindSec);
-	// Normal playback sits ~15-20s behind on HLS and ~5-15s on Icecast (burst
-	// buffer) — only call it "behind" past deliberate-pause territory.
-	let liveIsBehind = $derived(liveIsHls ? liveBehindSec >= 25 : liveIcecastBehindSec >= 45);
+	// HLS already excludes delivery latency. Icecast needs a burst-buffer
+	// allowance; an explicit pause is behind-live in either transport.
+	let liveIsBehind = $derived(liveIsHls ? !liveAtEdge : !$isPlaying || liveIcecastBehindSec >= 45);
 
 	/** The bottom-bar EN DIRECT button: snap back to the live edge. */
 	function goToLiveEdge() {
@@ -492,9 +499,15 @@
 	function onLiveDvrCommit(event: Event) {
 		if (!audio) return;
 		let value = Number((event.target as HTMLInputElement).value);
+		if (value >= liveTimeline.edge - 1) {
+			seekToLiveEdge();
+			return;
+		}
+		setUserWantsToPlay(true);
+		liveDvrRewound = true;
 		// Keep clear of both bounds: the window's tail is about to be deleted
 		// server-side, and the head stalls if we outrun the last segment.
-		value = Math.min(Math.max(value, liveSeekStart + 2), liveSeekEnd - 8);
+		value = Math.min(Math.max(value, liveSeekStart + 2), liveTimeline.edge);
 		try {
 			audio.currentTime = value;
 			currentTime = value;
@@ -576,7 +589,6 @@
 	let lyricsFetchToken = 0;
 	let lastLyricsAudioId = '';
 
-
 	function setPendingPlaybackIntent(intent: 'play' | 'pause' | null) {
 		pendingPlaybackIntent = intent;
 	}
@@ -605,6 +617,7 @@
 		// connect completes and starts audio the listener just refused.
 		setUserWantsToPlay(false);
 		shouldAutoplayOnLoad = false;
+		isPlaying.set(false);
 		if (audio.paused) {
 			setPendingPlaybackIntent(null);
 			isPlaying.set(false);
@@ -839,6 +852,10 @@
 
 	function setUserWantsToPlay(v: boolean) {
 		userWantsToPlay = v;
+		if (!v) {
+			cancelSessionReload();
+			if (isLiveTrack) liveDvrRewound = true;
+		}
 		// Mirror to the global store so the resume recorder can read intent
 		// when deciding whether to rehydrate the player on a cold reload.
 		// Without this, an OS-initiated pause (phone call, Siri) right
@@ -847,15 +864,6 @@
 		// listening when interrupted.
 		playbackIntent.set(v);
 	}
-
-	// True when the currently loaded track was paused by the OS (phone call,
-	// Siri, audio focus grab) at any point. We rebuild the audio session
-	// before auto-advancing to the next track in that case — without it,
-	// iOS's degraded session can leave the next track silent or stuttering
-	// (the symptom users describe as "the next song doesn't play immediately"
-	// or "the audio feels corrupted until I refresh"). Reset on every track
-	// switch.
-	let currentTrackInterrupted = false;
 
 	/** Timestamp when the audio last went into paused state (via user, OS,
 	 *  or lock-screen control). Used to decide whether to reload before
@@ -893,9 +901,6 @@
 	let lastSuccessfulPlayAt = 0;
 	let consecutiveFailedResumes = 0;
 
-	/** One-shot guard so the stuck-playback verifier escalates at most once
-	 *  per resume attempt. Re-armed on each user-initiated resume. */
-	let stuckVerifierArmed = false;
 	const RAPID_REPAUSE_THRESHOLD_MS = 2500;
 
 	/** Set true after the audio element has been torn down and rebuilt to
@@ -918,6 +923,12 @@
 	 *  (because the first load already reset currentTime), and the racing
 	 *  canplay handlers seek to different positions then each call play(). */
 	let isReloadingSession = false;
+	let cancelPendingReload: (() => void) | null = null;
+	function cancelSessionReload() {
+		cancelPendingReload?.();
+		cancelPendingReload = null;
+		isReloadingSession = false;
+	}
 
 	/** Set true when onDestroy has run. Every code path that could call
 	 *  audio.play() — the pause-event-driven watchdog, safePlay's deferred
@@ -995,7 +1006,6 @@
 		titleResizeObserver.observe(titleProbeEl);
 		measureTitleOverflow();
 	}
-
 
 	function getAudioFavId(item: any): string {
 		if (!item) return '';
@@ -1209,8 +1219,6 @@
 		}
 	}
 
-
-
 	// ── BEGIN: cache indicator state (added) ──────────────────────
 	// Tracks whether the currently playing track has been cached by
 	// the service worker. `null` while we don't know yet (initial
@@ -1228,9 +1236,6 @@
 		if (token !== cacheCheckToken) return;
 		isCurrentTrackCached = result;
 	}
-
-
-
 
 	// ── Adjacent-track prefetch (added) ──────────────────────────
 	// On 3G the audio element still has to wait for the first bytes
@@ -1256,7 +1261,6 @@
 		return !!item && typeof item === 'object' && 'mp3_url' in item && !('s3_url' in item);
 	}
 
-
 	onDestroy(() => {
 		if (prefetchTimer) clearTimeout(prefetchTimer);
 		if (downloadFeedbackTimeout) clearTimeout(downloadFeedbackTimeout);
@@ -1271,6 +1275,7 @@
 	}
 
 	function handleEnded() {
+		cancelSessionReload();
 		console.log('[Audio] ended event');
 		// A live stream only "ends" when the connection breaks (Icecast
 		// restart, network drop) — reconnect at the live edge instead of
@@ -1347,11 +1352,9 @@
 		// reactive-statement path relies on). Pausing or deferring play() breaks
 		// background playback when the screen is locked.
 		//
-		// Exception: if the previous track was interrupted by the OS (phone
-		// call, Siri), the audio session is in a degraded state. A bare
-		// play() can leave the next track silent or stuttering ("corrupted
-		// until refresh"). In that case we mirror safePlay('long') — call
-		// load() to rebuild the session, then play() once canplay fires.
+		// Setting src already starts a fresh media load. Do not defer play to
+		// a timer/canplay after an earlier interruption: background suspension
+		// can delay those callbacks until the listener unlocks the screen.
 		if (audio) {
 			const encodedUrl = encodeUrlPath(nextUrl);
 			audioSrc = nextUrl; // prevents the reactive $: block from re-loading
@@ -1362,44 +1365,18 @@
 			indicatorPosition = 0;
 			resetRememberedPlaybackPosition();
 
-			const wasInterrupted = currentTrackInterrupted;
-			currentTrackInterrupted = false;
 			consecutiveFailedResumes = 0;
 			lastSuccessfulPlayAt = 0;
 			audioElementRebuilt = false;
 
 			audio.src = encodedUrl;
 
-			if (wasInterrupted) {
-				let settled = false;
-				const playWhenReady = () => {
-					if (settled) return;
-					settled = true;
-					if (destroyed || !audio) return;
-					if (audio.src !== encodedUrl) return;
-					audio.play().catch((e) => {
-						console.warn('[AudioPlayer] Post-interruption next-track play failed:', e);
-						isPlaying.set(false);
-					});
-				};
-				audio.addEventListener('canplay', playWhenReady, { once: true });
-				// Safety net if `canplay` never fires (slow network, cached
-				// edge case). Mirrors the 2 s safety in safePlay().
-				setTimeout(playWhenReady, 2000);
-				try {
-					audio.load();
-				} catch (err) {
-					console.warn('[AudioPlayer] handleEnded load() failed:', err);
-					playWhenReady();
-				}
-			} else {
-				const playPromise = audio.play();
-				if (playPromise) {
-					playPromise.catch((e) => {
-						console.error('[AudioPlayer] Autoplay next failed:', e);
-						isPlaying.set(false);
-					});
-				}
+			const playPromise = audio.play();
+			if (playPromise) {
+				playPromise.catch((e) => {
+					console.error('[AudioPlayer] Autoplay next failed:', e);
+					isPlaying.set(false);
+				});
 			}
 
 			if ('mediaSession' in navigator) {
@@ -1513,6 +1490,7 @@
 	}
 
 	function handleAudioPlay() {
+		if (destroyed || !audio || audio.paused) return;
 		console.log('[Audio] play event', {
 			readyState: audio?.readyState,
 			currentTime: audio?.currentTime
@@ -1546,13 +1524,10 @@
 			currentTime: audio?.currentTime,
 			isChangingSource
 		});
-		if (isChangingSource) return;
+		if (destroyed || isChangingSource || isReloadingSession || !audio?.paused) return;
 		// End of media. WebKit fires `pause` just before `ended`; treating it
-		// as an OS interruption would set currentTrackInterrupted and start
-		// the resume watchdog, which then pushes handleEnded down its
-		// load()+canplay path — asynchronous, and therefore blocked while the
-		// screen is locked. Symptom: the PWA plays one track and only advances
-		// once the user unlocks and brings it to the foreground.
+		// as an OS interruption would start a competing resume watchdog just
+		// as handleEnded advances to the next track.
 		if (audio?.ended) return;
 		setPendingPlaybackIntent(null);
 		rememberPlaybackPosition();
@@ -1579,7 +1554,6 @@
 		// visibility-return path. The file-oriented resume watchdog would race
 		// those with competing play()/load() probes.
 		if (isLiveTrack) return;
-		currentTrackInterrupted = true;
 
 		// Two distinct kinds of OS-driven pause:
 		//   1. Genuine fresh interruption (audio was playing for a while
@@ -1592,8 +1566,7 @@
 		//      retrying play() on the same element can't fix. The only
 		//      reliable recovery is to throw away the <audio> element and
 		//      build a fresh one (mirrors what a page reload does).
-		const playedDurationMs =
-			lastSuccessfulPlayAt > 0 ? Date.now() - lastSuccessfulPlayAt : 0;
+		const playedDurationMs = lastSuccessfulPlayAt > 0 ? Date.now() - lastSuccessfulPlayAt : 0;
 		const isRapidRepause =
 			lastSuccessfulPlayAt > 0 && playedDurationMs < RAPID_REPAUSE_THRESHOLD_MS;
 
@@ -1633,10 +1606,8 @@
 		console.log('[AudioPlayer] Metadata loaded, duration:', duration);
 	}
 
-	/** Jump past a known-silent intro and ramp the volume up over ~600ms so
-	 *  the entry feels gentle. No-ops when the listener is resuming mid-track
-	 *  or the source was already handled. iOS ignores programmatic volume, so
-	 *  there the seek applies without the fade — still better than dead air. */
+	/** Skip known dead air without touching volume. A timer-driven fade can
+	 *  leave the player at zero volume when the page is suspended mid-fade. */
 	function applyIntroSkip() {
 		if (!audio) return;
 		const src = audio.currentSrc || audio.src;
@@ -1651,25 +1622,6 @@
 		} catch {
 			return;
 		}
-		if (isMuted) return;
-		const targetVolume = audio.volume;
-		if (introFadeTimer) clearInterval(introFadeTimer);
-		audio.volume = 0;
-		const startedAt = Date.now();
-		const FADE_MS = 600;
-		introFadeTimer = setInterval(() => {
-			if (!audio) {
-				if (introFadeTimer) clearInterval(introFadeTimer);
-				introFadeTimer = null;
-				return;
-			}
-			const progress = Math.min(1, (Date.now() - startedAt) / FADE_MS);
-			audio.volume = targetVolume * progress;
-			if (progress >= 1 && introFadeTimer) {
-				clearInterval(introFadeTimer);
-				introFadeTimer = null;
-			}
-		}, 40);
 	}
 
 	function handleAudioCanPlay() {
@@ -1678,7 +1630,11 @@
 			restorePlaybackPosition(pendingSessionResumeTime);
 		}
 		applyIntroSkip();
-		if (shouldAutoplayOnLoad || $isPlaying) {
+		if (
+			!isReloadingSession &&
+			pendingPlaybackIntent !== 'pause' &&
+			(shouldAutoplayOnLoad || $isPlaying)
+		) {
 			setPendingPlaybackIntent('play');
 			audio.play().catch((e) => {
 				setPendingPlaybackIntent(null);
@@ -1750,7 +1706,6 @@
 		el.removeEventListener('abort', logAbort);
 	}
 
-
 	/** Tear down the live <audio> element and build a fresh one preloaded
 	 *  to the same src and time. Used to escape a rapid-repause cycle
 	 *  caused by a degraded OS audio session — calling load()/play() on
@@ -1778,12 +1733,14 @@
 		const savedSrc = audio.src;
 		const savedTime = getReliablePlaybackTime();
 		const wantedToPlay = userWantsToPlay;
+		const savedTrack = audioSrc;
 
 		// Stop the polling watchdog and any in-flight reload before
 		// dropping references — otherwise a tick fires play() on the
 		// orphan element after we've moved on.
 		stopResumeWatchdog();
-		isReloadingSession = false;
+		cancelSessionReload();
+		detachAudioListeners(audio);
 
 		try {
 			audio.pause();
@@ -1799,12 +1756,12 @@
 		audioElementKey++;
 		await tick();
 
-		if (!audio || destroyed) return;
+		if (!audio || destroyed || audioSrc !== savedTrack || !$selectAudio) return;
 
 		if (savedTime > 0.25) {
 			pendingSessionResumeTime = savedTime;
 		}
-		shouldAutoplayOnLoad = wantedToPlay;
+		shouldAutoplayOnLoad = wantedToPlay && userWantsToPlay;
 		audioPausedAt = 0;
 		// Live: the saved src may be an MSE blob URL (hls.js) — meaningless on
 		// a fresh element. Reconnect through the live dispatcher instead.
@@ -1818,15 +1775,13 @@
 
 	function updateAudioSource(url: string) {
 		if (!url) return;
+		cancelSessionReload();
 
 		// Live streams get a per-connect cache-buster so every (re)connect is a
 		// fresh Icecast session at the live edge, never a stale cached response.
-		const encodedUrl = isLiveTrack
-			? withLiveCacheBuster(encodeUrlPath(url))
-			: encodeUrlPath(url);
+		const encodedUrl = isLiveTrack ? withLiveCacheBuster(encodeUrlPath(url)) : encodeUrlPath(url);
 		console.log('[AudioPlayer] Updating source to:', encodedUrl);
-		// New track — drop any "previous track was interrupted" carry-over.
-		currentTrackInterrupted = false;
+		// New track — reset the interruption recovery budget.
 		consecutiveFailedResumes = 0;
 		lastSuccessfulPlayAt = 0;
 		audioElementRebuilt = false;
@@ -1865,18 +1820,10 @@
 		audio.load();
 	}
 
-
-
 	const toggleMute = () => {
 		if (!audio) return;
-
-		if (isMuted) {
-			audio.volume = volume;
-		} else {
-			volume = audio.volume;
-			audio.volume = 0;
-		}
 		isMuted = !isMuted;
+		audio.muted = isMuted;
 	};
 
 	let progressBarElement: HTMLDivElement = $state(undefined as unknown as HTMLDivElement);
@@ -1966,20 +1913,20 @@
 	// Update the current time and duration as the audio plays
 	const updateAudioTime = () => {
 		if (audio) {
+			const advanced = audio.currentTime > currentTime + 0.05 && !audio.paused && !audio.seeking;
 			currentTime = audio.currentTime;
 			duration = audio.duration;
 			if (isLiveTrack) {
 				// Forward progress — feeds the stall watchdog and confirms the
 				// current connection is healthy (reset the reconnect backoff).
-				lastLiveProgressMs = Date.now();
-				liveReconnectAttempts = 0;
-				liveStallNudged = false;
+				if (advanced) {
+					lastLiveProgressMs = Date.now();
+					liveReconnectAttempts = 0;
+					liveStallNudged = false;
+				}
 				// DVR window bounds for the live scrubber (HLS only — Icecast
 				// exposes no meaningful seekable range).
-				if (liveIsHls && audio.seekable.length > 0) {
-					liveSeekStart = audio.seekable.start(0);
-					liveSeekEnd = audio.seekable.end(audio.seekable.length - 1);
-				}
+				refreshLiveWindow();
 			}
 			rememberPlaybackPosition(currentTime, duration);
 			progressBarWidth = (currentTime / duration) * 100;
@@ -2091,6 +2038,16 @@
 		//    at the live edge instead of a slow reload+restore.
 		if (isLiveTrack) {
 			if (hlsInstance || liveIsHls) {
+				refreshLiveWindow();
+				if (audioPausedAt > 0 && audio.currentTime < liveSeekStart) {
+					// A long pause can outlive the DVR retention window. Resume
+					// at the oldest available audio instead of requesting deleted segments.
+					try {
+						audio.currentTime = Math.min(liveSeekStart + 2, liveTimeline.edge);
+					} catch {
+						/* not ready */
+					}
+				}
 				audio.play().catch(() => {
 					/* hls.js error handling / gesture paths retry */
 				});
@@ -2147,24 +2104,9 @@
 			} else if (audio.currentTime <= 0.25 && lastKnownPlaybackTime > 0.25) {
 				restorePlaybackPosition(lastKnownPlaybackTime);
 			}
-			const t0 = audio.currentTime;
-			stuckVerifierArmed = true;
 			audio.play().catch((err) => {
 				console.warn('[AudioPlayer] play() failed:', err);
 			});
-			// Stuck-playback verifier: if the element claims to be playing
-			// but the clock hasn't advanced ~1.2s later, the session is in
-			// the degraded state the reload exists for — escalate once.
-			setTimeout(() => {
-				if (!stuckVerifierArmed) return;
-				stuckVerifierArmed = false;
-				if (destroyed || !audio || !userWantsToPlay) return;
-				if (audio.paused) return;
-				if (audio.currentTime - t0 < 0.05) {
-					console.warn('[AudioPlayer] Playback stuck after fast resume — reloading session');
-					safePlay('long');
-				}
-			}, 1200);
 			return;
 		}
 
@@ -2183,33 +2125,21 @@
 
 		const savedTime = hasOverrideSeek ? seekHint.time : getReliablePlaybackTime();
 		const savedSrc = audio.src;
+		const media = audio;
 		if (savedTime > 0.25) {
 			pendingSessionResumeTime = savedTime;
 		}
 		isReloadingSession = true;
-		let settled = false;
-		const finish = () => {
-			if (settled) return;
-			settled = true;
+		cancelPendingReload = reloadAudio(media, () => {
 			isReloadingSession = false;
-			// The 2s safety-net timeout below can fire after the component
-			// has been destroyed (HMR, navigation away). Don't resume.
-			if (destroyed) return;
-			if (!audio || audio.src !== savedSrc) return;
+			cancelPendingReload = null;
+			if (destroyed || audio !== media || media.src !== savedSrc || !userWantsToPlay) return;
 			restorePlaybackPosition(pendingSessionResumeTime ?? savedTime);
-			audio.play().catch((err) => {
+			setPendingPlaybackIntent('play');
+			media.play().catch((err) => {
 				console.warn('[AudioPlayer] Post-reload play() failed:', err);
 			});
-		};
-		audio.addEventListener('canplay', finish, { once: true });
-		// Safety net: don't stall forever if canplay never fires.
-		setTimeout(finish, 2000);
-		try {
-			audio.load();
-		} catch (err) {
-			console.warn('[AudioPlayer] audio.load() failed:', err);
-			finish();
-		}
+		});
 	}
 
 	/** Resume playback after an interruption only if the listener had asked
@@ -2284,6 +2214,31 @@
 
 	onMount(() => {
 		if (!browser) return;
+
+		const isStalled = createPlaybackStallDetector();
+		const stallWatch = setInterval(() => {
+			if (!audio || destroyed) return;
+			const recoverableError = audio.error?.code === 2 || audio.error?.code === 3;
+			if (
+				isStalled({
+					src: audio.src,
+					time: audio.currentTime,
+					now: Date.now(),
+					active:
+						!!$selectAudio &&
+						!isLiveTrack &&
+						userWantsToPlay &&
+						!isReloadingSession &&
+						!audio.seeking &&
+						!audio.ended &&
+						(!audio.paused || recoverableError) &&
+						navigator.onLine
+				})
+			) {
+				console.warn('[AudioPlayer] Media clock stalled — restoring the current track');
+				safePlay('long');
+			}
+		}, 3000);
 
 		const markPageLifecycleTeardown = () => {
 			isPageLifecycleTeardown = true;
@@ -2370,6 +2325,7 @@
 		window.addEventListener('beforeunload', markPageLifecycleTeardown);
 
 		return () => {
+			clearInterval(stallWatch);
 			document.removeEventListener('visibilitychange', onVisibility);
 			document.removeEventListener('freeze', onFreeze);
 			document.removeEventListener('resume', onResume);
@@ -2417,7 +2373,6 @@
 			console.warn('[AudioPlayer] MediaSession playlist handler sync failed:', err);
 		}
 	}
-
 
 	// Idempotent registration. iOS's mediaserverd can tear down the audio
 	// session after a long background pause; Control Center caches handler
@@ -2502,9 +2457,8 @@
 					boundInstanceId: audio?.dataset.instanceId ?? null,
 					currentSeq: audioInstanceSeq
 				});
-				setUserWantsToPlay(false);
-				if (audio) {
-					audio.pause();
+				pauseCurrentAudio();
+				if (audio && !isLiveTrack) {
 					audio.currentTime = 0;
 				}
 				resetRememberedPlaybackPosition();
@@ -2611,7 +2565,6 @@
 			]
 		});
 	}
-
 
 	/** Push the current playback position to the OS so the lock-screen /
 	 *  car head-unit seek bar can animate accurately. Called on every
@@ -2720,7 +2673,6 @@
 		};
 	});
 
-
 	onDestroy(() => {
 		// SvelteKit invokes onDestroy during SSR cleanup too. None of the
 		// teardown below is meaningful on the server — there's no audio
@@ -2738,10 +2690,10 @@
 		// so the resume recorder can rehydrate the player after a cold return.
 		// Only after that do we touch the audio element.
 		const preservePlaybackIntent =
-			userWantsToPlay &&
-			(isPageLifecycleTeardown || document.visibilityState === 'hidden');
+			userWantsToPlay && (isPageLifecycleTeardown || document.visibilityState === 'hidden');
 
 		destroyed = true;
+		cancelSessionReload();
 		if (!preservePlaybackIntent) {
 			setUserWantsToPlay(false);
 		}
@@ -2754,6 +2706,7 @@
 		clearLiveHlsUpgradeTimer();
 		destroyHls();
 		if (audio) {
+			detachAudioListeners(audio);
 			try {
 				audio.pause();
 				// Detach the source and force the media pipeline to release.
@@ -2778,10 +2731,12 @@
 		titleResizeObserver?.disconnect();
 		titleResizeObserver = null;
 	});
-	let sleepTimerRemainingLabel =
-		$derived(sleepTimerEndsAt !== null ? formatSleepTimerRemaining(sleepTimerRemainingMs) : '');
-	let sleepTimerEndLabel =
-		$derived(sleepTimerEndsAt !== null ? formatSleepTimerEndTime(sleepTimerEndsAt) : '');
+	let sleepTimerRemainingLabel = $derived(
+		sleepTimerEndsAt !== null ? formatSleepTimerRemaining(sleepTimerRemainingMs) : ''
+	);
+	let sleepTimerEndLabel = $derived(
+		sleepTimerEndsAt !== null ? formatSleepTimerEndTime(sleepTimerEndsAt) : ''
+	);
 	$effect(() => {
 		if (browser && isSleepTimerOpen && !customSleepTime) {
 			setDefaultSleepTimerClockTime();
@@ -2798,9 +2753,7 @@
 	$effect(() => {
 		if (browser) {
 			// Re-measure whenever the displayed title changes.
-			const _trackTitleRefresh = $selectAudio
-				? getDisplayTitle($selectAudio)
-				: '';
+			const _trackTitleRefresh = $selectAudio ? getDisplayTitle($selectAudio) : '';
 			void _trackTitleRefresh;
 			measureTitleOverflow();
 		}
@@ -2995,6 +2948,8 @@
 			clearLiveHlsUpgradeTimer();
 			liveSeekStart = 0;
 			liveSeekEnd = 0;
+			liveSyncPosition = null;
+			liveDvrRewound = false;
 			if (wasLiveTrack) {
 				wasLiveTrack = false;
 				livePlayback.set({ playing: false, positionEpochMs: null, pdt: false });
@@ -3068,13 +3023,13 @@
 	     with no crossorigin attribute. -->
 	<audio
 		bind:this={audio}
+		muted={isMuted}
 		crossorigin={isLiveTrack ? null : 'anonymous'}
 		playsinline
 		preload="auto"
 		hidden
 	></audio>
 {/key}
-
 
 {#if $selectAudio}
 	<div
@@ -3171,7 +3126,9 @@
 			class="player-main px-5 lg:px-10 max-w-7xl mx-auto flex flex-col lg:flex-row lg:items-center lg:gap-8"
 		>
 			<!-- Info Row -->
-			<div class="flex items-center justify-between gap-1 mb-3 lg:mb-0 lg:gap-0 lg:flex-1 lg:min-w-0">
+			<div
+				class="flex items-center justify-between gap-1 mb-3 lg:mb-0 lg:gap-0 lg:flex-1 lg:min-w-0"
+			>
 				<div class="flex-1 min-w-0 min-h-[2.75rem] lg:min-h-[3rem]">
 					<div
 						class="text-[10px] uppercase tracking-[0.2em] font-bold text-missionnaire mb-0.5 opacity-80 flex flex-wrap items-center gap-x-2 gap-y-0.5 whitespace-nowrap"
@@ -3296,7 +3253,9 @@
 											: 'bg-red-500'}"
 									></span>
 								</span>
-								{$t('live.atLive')}{#if liveIsBehind}&nbsp;· -{formatTime(liveBehindDisplaySec)}{/if}
+								{$t('live.atLive')}{#if liveIsBehind}&nbsp;· -{formatTime(
+										liveBehindDisplaySec
+									)}{/if}
 							</button>
 						</div>
 					{/if}
@@ -3323,9 +3282,7 @@
 				{#if hasLyrics}
 					<button
 						type="button"
-						class="player-action-pill flex-shrink-0 {lyricsPanelOpen
-							? 'is-active'
-							: ''}"
+						class="player-action-pill flex-shrink-0 {lyricsPanelOpen ? 'is-active' : ''}"
 						onclick={toggleLyricsPanel}
 						aria-expanded={lyricsPanelOpen}
 						aria-label={lyricsPanelOpen ? $t('player.closeLyrics') : $t('player.openLyrics')}
@@ -3342,7 +3299,10 @@
 						<button
 							type="button"
 							class="player-action-pill {isShareMenuOpen ? 'is-active' : ''}"
-							onclick={(e) => { e.stopPropagation(); toggleShareMenu(); }}
+							onclick={(e) => {
+								e.stopPropagation();
+								toggleShareMenu();
+							}}
 							aria-haspopup="menu"
 							aria-expanded={isShareMenuOpen}
 							aria-label={$t('player.shareSong')}
@@ -3399,13 +3359,12 @@
 						<button
 							type="button"
 							class="player-action-pill {isDownloading ? 'is-active' : ''}"
-							onclick={(e) => { e.stopPropagation(); downloadCurrentAudio(); }}
-							aria-label={isDownloading
-								? $t('player.cancelDownload')
-								: $t('player.downloadSong')}
-							title={isDownloading
-								? $t('player.downloadingClickCancel')
-								: $t('player.download')}
+							onclick={(e) => {
+								e.stopPropagation();
+								downloadCurrentAudio();
+							}}
+							aria-label={isDownloading ? $t('player.cancelDownload') : $t('player.downloadSong')}
+							title={isDownloading ? $t('player.downloadingClickCancel') : $t('player.download')}
 						>
 							<Icon src={AiOutlineDownload} size="17" />
 							{#if isDownloading}
@@ -3431,7 +3390,10 @@
 						class="player-action-pill player-action-pill--options {isSleepTimerOpen
 							? 'is-active'
 							: ''} {sleepTimerEndsAt !== null && !isSleepTimerOpen ? 'is-armed' : ''}"
-						onclick={(e) => { e.stopPropagation(); isSleepTimerOpen = !isSleepTimerOpen; }}
+						onclick={(e) => {
+							e.stopPropagation();
+							isSleepTimerOpen = !isSleepTimerOpen;
+						}}
 						aria-label={sleepTimerEndsAt !== null
 							? $t('player.optionsTimerActive', { remaining: sleepTimerRemainingLabel })
 							: $t('player.options')}
@@ -3467,10 +3429,7 @@
 							className="player-action-pill__caret {isSleepTimerOpen ? 'is-flipped' : ''}"
 						/>
 						{#if sleepTimerEndsAt !== null}
-							<span
-								class="player-action-pill__dot"
-								aria-hidden="true"
-							></span>
+							<span class="player-action-pill__dot" aria-hidden="true"></span>
 						{/if}
 					</button>
 
@@ -3510,28 +3469,30 @@
 							</div>
 
 							{#if !isLiveTrack}
-							<button
-								type="button"
-								class="mb-3 flex w-full items-center justify-between gap-3 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-left transition-colors hover:border-missionnaire hover:bg-missionnaire/5"
-								onclick={toggleRepeatOne}
-								aria-pressed={$repeatOne}
-							>
-								<span class="inline-flex min-w-0 items-center gap-2">
-									<Icon
-										src={RiMediaRepeatOneLine}
-										size="17"
-										color={$repeatOne ? '#FF880C' : '#a8a29e'}
-									/>
-									<span class="truncate text-xs font-bold text-stone-700">{$t('player.repeatOne')}</span>
-								</span>
-								<span
-									class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] {$repeatOne
-										? 'bg-missionnaire text-white'
-										: 'bg-white text-stone-400'}"
+								<button
+									type="button"
+									class="mb-3 flex w-full items-center justify-between gap-3 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-left transition-colors hover:border-missionnaire hover:bg-missionnaire/5"
+									onclick={toggleRepeatOne}
+									aria-pressed={$repeatOne}
 								>
-									{$repeatOne ? 'On' : 'Off'}
-								</span>
-							</button>
+									<span class="inline-flex min-w-0 items-center gap-2">
+										<Icon
+											src={RiMediaRepeatOneLine}
+											size="17"
+											color={$repeatOne ? '#FF880C' : '#a8a29e'}
+										/>
+										<span class="truncate text-xs font-bold text-stone-700"
+											>{$t('player.repeatOne')}</span
+										>
+									</span>
+									<span
+										class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] {$repeatOne
+											? 'bg-missionnaire text-white'
+											: 'bg-white text-stone-400'}"
+									>
+										{$repeatOne ? 'On' : 'Off'}
+									</span>
+								</button>
 							{/if}
 
 							<div class="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-400">
@@ -3730,7 +3691,9 @@
 											: 'bg-red-500'}"
 									></span>
 								</span>
-								{$t('live.atLive')}{#if liveIsBehind}&nbsp;· -{formatTime(liveBehindDisplaySec)}{/if}
+								{$t('live.atLive')}{#if liveIsBehind}&nbsp;· -{formatTime(
+										liveBehindDisplaySec
+									)}{/if}
 							</button>
 						{:else}
 							<span class="text-stone-500">{formatTime(currentTime)}</span>
@@ -3786,7 +3749,6 @@
 						     it sits flush against the viewport edge rather than
 						     inside the centered max-w-7xl content row. -->
 						<!-- /removed-from-here -->
-
 					</div>
 				</div>
 			</div>
@@ -3804,8 +3766,8 @@
 						class="live-dvr-scrubber flex-1 min-w-0"
 						style="--dvr-fill: {liveDvrFillPct}%"
 						min={liveSeekStart}
-						max={liveSeekEnd}
-						step="1"
+						max={liveTimeline.edge}
+						step="any"
 						value={liveDvrDisplayValue}
 						oninput={onLiveDvrInput}
 						onchange={onLiveDvrCommit}
@@ -3917,7 +3879,10 @@
 		justify-content: center;
 		padding: 0.5rem;
 		border-radius: 9999px;
-		transition: color 150ms ease, background-color 150ms ease, transform 150ms ease;
+		transition:
+			color 150ms ease,
+			background-color 150ms ease,
+			transform 150ms ease;
 	}
 	.player-action-icon:hover {
 		background-color: rgb(245 245 244 / 0.7);
@@ -3937,7 +3902,10 @@
 		line-height: 1;
 		background-color: rgb(245 245 244 / 0.85);
 		color: rgb(120 113 108);
-		transition: background-color 160ms ease, color 160ms ease, transform 160ms ease,
+		transition:
+			background-color 160ms ease,
+			color 160ms ease,
+			transform 160ms ease,
 			box-shadow 160ms ease;
 	}
 	@media (min-width: 640px) {
@@ -3978,7 +3946,9 @@
 	:global(.player-action-pill__caret) {
 		margin-left: 0.0625rem;
 		opacity: 0.7;
-		transition: transform 180ms ease, opacity 180ms ease;
+		transition:
+			transform 180ms ease,
+			opacity 180ms ease;
 	}
 	.player-action-pill--options:hover :global(.player-action-pill__caret) {
 		opacity: 1;
@@ -4003,7 +3973,9 @@
 		width: 10px;
 		border-radius: 9999px;
 		background-color: rgb(52 211 153);
-		box-shadow: 0 0 0 2px white, 0 0 0 3px rgb(255 255 255 / 0.6);
+		box-shadow:
+			0 0 0 2px white,
+			0 0 0 3px rgb(255 255 255 / 0.6);
 	}
 	.player-action-pill--options.is-armed .player-action-pill__dot {
 		box-shadow: 0 0 0 2px rgb(28 25 23);
@@ -4076,12 +4048,7 @@
 			black calc(100% - 1.75rem),
 			transparent 100%
 		);
-		mask-image: linear-gradient(
-			to right,
-			black 0,
-			black calc(100% - 1.75rem),
-			transparent 100%
-		);
+		mask-image: linear-gradient(to right, black 0, black calc(100% - 1.75rem), transparent 100%);
 	}
 
 	.track-title-track {
@@ -4146,12 +4113,7 @@
 				black calc(100% - 1.25rem),
 				transparent 100%
 			);
-			mask-image: linear-gradient(
-				to right,
-				black 0,
-				black calc(100% - 1.25rem),
-				transparent 100%
-			);
+			mask-image: linear-gradient(to right, black 0, black calc(100% - 1.25rem), transparent 100%);
 		}
 	}
 
