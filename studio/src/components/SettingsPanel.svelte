@@ -197,6 +197,7 @@
 									class="studio-chip flex-1 {draft.settings.recordingMode === mode
 										? 'bg-primary/20 text-primary'
 										: ''}"
+									disabled={studio.service.type === 'live' && mode === 'off'}
 									onclick={() =>
 										(draft.settings.recordingMode = mode as typeof draft.settings.recordingMode)}
 									>{t(`recording.${mode}` as never)}</button

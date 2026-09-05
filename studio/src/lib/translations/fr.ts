@@ -217,6 +217,7 @@ const fr: Record<keyof typeof en, string> = {
 	'preflight.admin': 'Connexion administration',
 	'preflight.missionnaire': 'Diffusion Missionnaire',
 	'preflight.youtube': 'Chaîne YouTube',
+	'preflight.service': 'Déroulement du service',
 	'preflight.storage': 'Espace d’enregistrement',
 	'preflight.ready': 'Prêt',
 	'preflight.warning': 'À vérifier',

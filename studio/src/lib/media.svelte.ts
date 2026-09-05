@@ -152,7 +152,13 @@ export async function openCamera(layer: Layer, width: number, height: number): P
 		set(layer.id, h);
 		return h;
 	} catch (err) {
-		const h: Handle = { kind: 'camera', el: null, stream: null, error: describe(err), objectUrl: null };
+		const h: Handle = {
+			kind: 'camera',
+			el: null,
+			stream: null,
+			error: describe(err),
+			objectUrl: null
+		};
 		set(layer.id, h);
 		return h;
 	}
@@ -190,13 +196,21 @@ export async function openMic(layerId: string, deviceId?: string): Promise<Handl
 		if (rate && rate !== MIX_RATE) {
 			// Nothing to be done from here, but a flat meter with no explanation
 			// is the worst possible half hour before a service.
-			report(`input device runs at ${rate} Hz, mixer at ${MIX_RATE} Hz — WebKit may deliver silence`);
+			report(
+				`input device runs at ${rate} Hz, mixer at ${MIX_RATE} Hz — WebKit may deliver silence`
+			);
 		}
 		const h: Handle = { kind: 'camera', el: null, stream, error: null, objectUrl: null };
 		set(layerId, h);
 		return h;
 	} catch (err) {
-		const h: Handle = { kind: 'camera', el: null, stream: null, error: describe(err), objectUrl: null };
+		const h: Handle = {
+			kind: 'camera',
+			el: null,
+			stream: null,
+			error: describe(err),
+			objectUrl: null
+		};
 		set(layerId, h);
 		return h;
 	}
@@ -222,7 +236,13 @@ export async function openScreen(layer: Layer): Promise<Handle> {
 		set(layer.id, h);
 		return h;
 	} catch (err) {
-		const h: Handle = { kind: 'screen', el: null, stream: null, error: describe(err), objectUrl: null };
+		const h: Handle = {
+			kind: 'screen',
+			el: null,
+			stream: null,
+			error: describe(err),
+			objectUrl: null
+		};
 		set(layer.id, h);
 		return h;
 	}
@@ -357,9 +377,39 @@ export interface DeviceOption {
 	label: string;
 }
 
+/** Some webviews miss Bluetooth devicechange events. Recheck on focus and
+ * while visible too; discovery never opens or switches an audio device. */
+export function watchDevices(refresh: () => Promise<void>): () => void {
+	let pending = false;
+	let disposed = false;
+	const update = async () => {
+		if (pending || disposed || document.hidden) return;
+		pending = true;
+		try {
+			await refresh();
+		} finally {
+			pending = false;
+		}
+	};
+	void update();
+	navigator.mediaDevices.addEventListener('devicechange', update);
+	window.addEventListener('focus', update);
+	document.addEventListener('visibilitychange', update);
+	const timer = setInterval(update, 3000);
+	return () => {
+		disposed = true;
+		clearInterval(timer);
+		navigator.mediaDevices.removeEventListener('devicechange', update);
+		window.removeEventListener('focus', update);
+		document.removeEventListener('visibilitychange', update);
+	};
+}
+
 /** Labels only appear once permission has been granted, so this is called
  *  again after the first successful capture. */
-export async function listDevices(kind: 'videoinput' | 'audioinput'): Promise<DeviceOption[]> {
+export async function listDevices(
+	kind: 'videoinput' | 'audioinput' | 'audiooutput'
+): Promise<DeviceOption[]> {
 	try {
 		const devices = await navigator.mediaDevices.enumerateDevices();
 		return devices

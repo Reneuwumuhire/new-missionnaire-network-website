@@ -12,6 +12,7 @@ export type PreflightCheckId =
 	| 'admin'
 	| 'missionnaire'
 	| 'youtube'
+	| 'service'
 	| 'storage';
 
 export interface PreflightCheck {
@@ -45,6 +46,7 @@ export interface PreflightInput {
 	localRecording: boolean;
 	availableRecordingBytes: number | null;
 	requiredRecordingBytes: number;
+	serviceMissing: string[];
 }
 
 export function destinationProblem(url: string): 'missing' | 'scheme' | 'characters' | null {
@@ -73,6 +75,11 @@ export function evaluatePreflight(input: PreflightInput): PreflightCheck[] {
 			detail: input.invalidDestinations.join(', ') || undefined
 		},
 		{ id: 'network', level: input.isOnline ? 'pass' : 'block' },
+		{
+			id: 'service',
+			level: input.serviceMissing.length ? 'block' : 'pass',
+			detail: input.serviceMissing.join(', ') || undefined
+		},
 		{
 			id: 'encoder',
 			level:

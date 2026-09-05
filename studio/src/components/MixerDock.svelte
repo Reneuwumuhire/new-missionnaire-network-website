@@ -4,6 +4,7 @@
 		askForMicrophone,
 		handleFor,
 		listDevices,
+		watchDevices,
 		mediaVersion,
 		openMic,
 		openPrivacySettings,
@@ -51,10 +52,7 @@
 	let devicesOpen = $state<string | null>(null);
 
 	onMount(() => {
-		void refreshDevices();
-		// A USB interface plugged in mid-service has to show up in the menu
-		// without restarting the studio.
-		navigator.mediaDevices.addEventListener('devicechange', refreshDevices);
+		const stopWatching = watchDevices(refreshDevices);
 		let last = performance.now();
 		// 30 Hz: enough for a meter to look alive without burning a core.
 		const timer = setInterval(() => {
@@ -78,7 +76,7 @@
 		}, 33);
 		return () => {
 			clearInterval(timer);
-			navigator.mediaDevices.removeEventListener('devicechange', refreshDevices);
+			stopWatching();
 		};
 	});
 
@@ -147,8 +145,18 @@
 	/** Global mics first, then the layers that carry sound: what the scene ON AIR
 	 *  contributes, plus any window capturing an application wherever it lives. */
 	const strips = $derived<Strip[]>([
-		...studio.audioSources.map((source) => ({ id: source.id, name: source.name, isMic: true, source })),
-		...audioLayers().map((layer) => ({ id: layer.id, name: layer.name, isMic: false, source: layer }))
+		...studio.audioSources.map((source) => ({
+			id: source.id,
+			name: source.name,
+			isMic: true,
+			source
+		})),
+		...audioLayers().map((layer) => ({
+			id: layer.id,
+			name: layer.name,
+			isMic: false,
+			source: layer
+		}))
 	]);
 
 	/** Strips whose sound comes from the native per-application capture: an
@@ -273,7 +281,9 @@
 				onclick={() => (adding = adding ? null : 'menu')}><Icon name="plus" /></button
 			>
 			{#if adding === 'menu'}
-				<div class="absolute right-0 top-7 z-30 w-56 border border-ink-600 bg-ink-850 py-1 shadow-2xl shadow-black/70">
+				<div
+					class="absolute right-0 top-7 z-30 w-56 border border-ink-600 bg-ink-850 py-1 shadow-2xl shadow-black/70"
+				>
 					<button class="block w-full px-3 py-2 text-left hover:bg-primary/15" onclick={addInput}>
 						<span class="block text-[13px] text-fg/90">{t('mixer.addMic')}</span>
 						<span class="block text-[11px] text-fg/40">{t('mixer.addMicHint')}</span>
@@ -414,7 +424,8 @@
 							class="studio-icon-btn"
 							title={t('common.remove')}
 							aria-label={t('common.remove')}
-							onclick={() => removeSource(source)}>
+							onclick={() => removeSource(source)}
+						>
 							<Icon name="trash" size={14} />
 						</button>
 					{/if}
@@ -469,14 +480,16 @@
 
 				<div class="mt-0.5 flex items-center gap-2">
 					<button
-						class="shrink-0 text-sm {strip.source.muted ? 'text-red-400' : 'text-fg/50 hover:text-fg'}"
+						class="shrink-0 text-sm {strip.source.muted
+							? 'text-red-400'
+							: 'text-fg/50 hover:text-fg'}"
 						title={strip.source.muted ? t('mixer.unmute') : t('mixer.mute')}
 						aria-label={strip.source.muted ? t('mixer.unmute') : t('mixer.mute')}
 						onclick={() => setLevel(strip, strip.source.gain, !strip.source.muted)}
 					>
 						<Icon name={strip.source.muted ? 'volumeOff' : 'volume'} size={16} />
 					</button>
-						<div class="relative min-w-0 flex-1">
+					<div class="relative min-w-0 flex-1">
 						<!-- Unity, marked on the track. Finding 0 dB by dragging until the
 						     number reads right is the kind of fiddling nobody has time for
 						     with a service running. -->

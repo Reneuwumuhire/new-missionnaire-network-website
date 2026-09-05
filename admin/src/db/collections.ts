@@ -1067,6 +1067,11 @@ export type ScheduledLive = {
 	subtitle_filename: string | null;
 	subtitle_anchor_epoch_ms: number | null;
 	subtitle_offset_ms: number;
+	service_type: 'prepared' | 'live';
+	active_phase: 'ready' | 'opening' | 'sermon' | 'closing' | 'complete';
+	sermon_start_ms: number | null;
+	sermon_end_ms: number | null;
+	subtitle_timing_language: string | null;
 	created_by: string | null;
 	created_at: string;
 	updated_at: string;
@@ -1116,6 +1121,7 @@ export async function createScheduledLive(input: {
 	subtitle_srt_url?: string | null;
 	subtitle_srt_s3_key?: string | null;
 	subtitle_filename?: string | null;
+	service_type?: 'prepared' | 'live';
 	created_by?: string | null;
 }): Promise<ScheduledLive> {
 	await ensureScheduledLiveIndexes();
@@ -1148,6 +1154,11 @@ export async function createScheduledLive(input: {
 			subtitle_filename: input.subtitle_filename ?? null,
 			subtitle_anchor_epoch_ms: null,
 			subtitle_offset_ms: 0,
+			service_type: input.service_type ?? 'prepared',
+			active_phase: 'ready',
+			sermon_start_ms: null,
+			sermon_end_ms: null,
+			subtitle_timing_language: null,
 			created_by: input.created_by ?? null,
 			created_at: now,
 			updated_at: now
