@@ -8,13 +8,7 @@
 	import { streamHealthIssue } from '../lib/stream-health';
 	import { destinationUrl, requiresYouTubeGoLive, studio } from '../lib/state.svelte';
 	import { connectYouTube, liveSession, sessionYouTubeChannelId } from '../lib/live-session.svelte';
-	import {
-		recording,
-		recordsCloud,
-		recordsLocal,
-		startCloudRecording,
-		stopCloudRecording
-	} from '../lib/recording.svelte';
+	import { recordsLocal } from '../lib/recording.svelte';
 
 	let {
 		onToggleLive,
@@ -41,16 +35,6 @@
 			(session) => session._id === (liveSession.activeId ?? liveSession.selectedId)
 		)
 	);
-	const recordingActive = $derived(Boolean(recording.localPath) || recording.cloud);
-	let now = $state(Date.now());
-	$effect(() => {
-		const timer = setInterval(() => (now = Date.now()), 1000);
-		return () => clearInterval(timer);
-	});
-	const recordingDuration = $derived(
-		recording.startedAt ? Math.floor((now - recording.startedAt) / 1000) : 0
-	);
-	const clock = (seconds: number) => new Date(seconds * 1000).toISOString().slice(11, 19);
 
 	// Keep public destinations held until the operator approves the preview.
 	const canGoLive = $derived(broadcast.phase === 'live' && !liveSession.activeId);
@@ -195,31 +179,6 @@
 				>{selectedSession?.title ?? 'Choose one'}</span
 			>
 		</button>
-		{#if isStreaming() && (recordsCloud() || recordsLocal())}
-			<button
-				class="flex h-8 w-full items-center justify-between border border-ink-700 px-2 text-[11px] {recordingActive
-					? 'text-red-300'
-					: 'text-fg/60'}"
-				disabled={(recordsLocal() && !recordsCloud()) || recording.cloudPending}
-				onclick={() => (recording.cloud ? void stopCloudRecording() : void startCloudRecording())}
-			>
-				<span
-					>{recording.cloudPending
-						? recording.cloud
-							? 'Stopping recording…'
-							: 'Starting recording…'
-						: recordsCloud()
-							? recording.cloud
-								? 'Stop recording'
-								: 'Start recording'
-							: recording.startedAt
-								? 'Recording local'
-								: 'Local recording armed'}</span
-				>
-				<span class="font-mono">{recordingActive ? clock(recordingDuration) : '00:00:00'}</span>
-			</button>
-		{/if}
-
 		<button
 			class="flex h-8 w-full items-center justify-between border border-ink-700 px-2 text-[11px] text-fg/60 transition-colors hover:border-ink-500 hover:text-fg"
 			onclick={onSettings}

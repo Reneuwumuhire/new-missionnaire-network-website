@@ -13,6 +13,7 @@
 		type PreflightLevel
 	} from '../lib/preflight';
 	import { recordsCloud, recordsLocal } from '../lib/recording.svelte';
+	import { liveReady, preparedReady } from '../lib/service-workflow.svelte';
 	import {
 		audioLayers,
 		destinationPlatform,
@@ -69,7 +70,10 @@
 		for (const layer of programScene().layers) {
 			if (!layer.visible || !['camera', 'screen', 'image', 'video'].includes(layer.kind)) continue;
 			const handle = handleForLayer(layer);
-			if (handle?.error) failed.push(layer.name);
+			const optionalPicture =
+				studio.service.type === 'prepared' && layer.id === studio.service.krefeldLayerId;
+			if (handle?.error && !optionalPicture) failed.push(layer.name);
+			else if (handle?.error) missing.push(layer.name);
 			else if (!handle) missing.push(layer.name);
 		}
 		return { failed, missing };
@@ -125,7 +129,8 @@
 			youtubeConnected,
 			localRecording: recordsLocal(),
 			availableRecordingBytes,
-			requiredRecordingBytes: requiredBytes
+			requiredRecordingBytes: requiredBytes,
+			serviceMissing: studio.service.type === 'prepared' ? preparedReady() : liveReady()
 		})
 	);
 	const blockers = $derived(checks.filter(({ level }) => level === 'block').length);
@@ -143,6 +148,7 @@
 		admin: 'preflight.admin',
 		missionnaire: 'preflight.missionnaire',
 		youtube: 'preflight.youtube',
+		service: 'preflight.service',
 		storage: 'preflight.storage'
 	};
 
@@ -171,6 +177,7 @@
 		}
 		if (id === 'rendering') return t('preflight.renderingDetail', { fps: fallback ?? '' });
 		if (id === 'sources' && fallback) return t('preflight.sourceDetail', { names: fallback });
+		if (id === 'service' && fallback) return fallback;
 		if (id === 'destination' && fallback)
 			return t('preflight.destinationDetail', { names: fallback });
 		return '';

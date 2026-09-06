@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
 	outputAlignedPositionMs,
+	outputEpochMs,
 	sampleOutputClock,
 	sampleServerClock,
 	serverEpochMs,
@@ -15,6 +16,7 @@ describe('stream clock', () => {
 		startStreamClock(10_000);
 		sampleOutputClock(3_500, 15_000);
 		expect(outputAlignedPositionMs(20_000, 15_100)).toBe(18_500);
+		expect(outputEpochMs(15_100)).toBe(13_600);
 	});
 
 	it('uses the local position until ffmpeg has a fresh timing sample', () => {

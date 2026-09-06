@@ -1037,6 +1037,14 @@ export type BroadcastAdminState = {
 	subtitle_anchor_epoch_ms: number | null;
 	subtitle_offset_ms: number;
 	subtitle_paused_position_ms: number | null;
+	subtitle_timeline: Array<{
+		fromEpochMs: number;
+		toEpochMs: number | null;
+		url: string;
+		anchorEpochMs: number;
+		offsetMs: number;
+		pausedPositionMs: number | null;
+	}>;
 	updated_at: string;
 };
 
@@ -1065,6 +1073,7 @@ const BROADCAST_DEFAULT: BroadcastAdminState = {
 	subtitle_anchor_epoch_ms: null,
 	subtitle_offset_ms: 0,
 	subtitle_paused_position_ms: null,
+	subtitle_timeline: [],
 	updated_at: new Date(0).toISOString()
 };
 
@@ -1104,6 +1113,9 @@ export async function getBroadcastAdminState(): Promise<BroadcastAdminState> {
 				typeof doc.subtitle_paused_position_ms === 'number'
 					? doc.subtitle_paused_position_ms
 					: null,
+			subtitle_timeline: Array.isArray(doc.subtitle_timeline)
+				? (doc.subtitle_timeline as BroadcastAdminState['subtitle_timeline'])
+				: [],
 			updated_at: (doc.updated_at as string) ?? new Date(0).toISOString()
 		};
 	} catch (e) {
@@ -1165,6 +1177,11 @@ export type ScheduledLive = {
 	subtitle_filename: string | null;
 	subtitle_anchor_epoch_ms: number | null;
 	subtitle_offset_ms: number;
+	service_type: 'prepared' | 'live';
+	active_phase: 'ready' | 'opening' | 'sermon' | 'closing' | 'complete';
+	sermon_start_ms: number | null;
+	sermon_end_ms: number | null;
+	subtitle_timing_language: string | null;
 	created_at: string;
 	updated_at: string;
 };
@@ -1259,6 +1276,7 @@ export async function createStudioScheduledLive(input: {
 	subtitleUrl?: string | null;
 	subtitleKey?: string | null;
 	subtitleFilename?: string | null;
+	serviceType?: 'prepared' | 'live';
 	announce?: boolean;
 	reminderEnabled?: boolean;
 	notifyOnStart?: boolean;
@@ -1293,6 +1311,11 @@ export async function createStudioScheduledLive(input: {
 			subtitle_filename: input.subtitleFilename ?? null,
 			subtitle_anchor_epoch_ms: null,
 			subtitle_offset_ms: 0,
+			service_type: input.serviceType ?? 'prepared',
+			active_phase: 'ready',
+			sermon_start_ms: null,
+			sermon_end_ms: null,
+			subtitle_timing_language: null,
 			created_by: input.createdBy,
 			created_at: now,
 			updated_at: now
@@ -1334,6 +1357,26 @@ export async function updateStudioLiveSubtitles(
 			| 'subtitle_filename'
 			| 'subtitle_anchor_epoch_ms'
 			| 'subtitle_offset_ms'
+		>
+	>
+): Promise<boolean> {
+	if (!ObjectId.isValid(id)) return false;
+	const db = await getDb();
+	const result = await db
+		.collection('scheduled_lives')
+		.updateOne(
+			{ _id: new ObjectId(id), status: 'live' },
+			{ $set: { ...updates, updated_at: new Date().toISOString() } }
+		);
+	return result.matchedCount > 0;
+}
+
+export async function updateStudioLiveWorkflow(
+	id: string,
+	updates: Partial<
+		Pick<
+			ScheduledLive,
+			'active_phase' | 'sermon_start_ms' | 'sermon_end_ms' | 'subtitle_timing_language'
 		>
 	>
 ): Promise<boolean> {

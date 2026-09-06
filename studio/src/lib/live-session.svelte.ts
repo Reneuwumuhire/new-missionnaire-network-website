@@ -2,7 +2,12 @@ import { invoke } from '@tauri-apps/api/core';
 import { followedMediaElement, lyrics } from './lyrics.svelte';
 import { t } from './i18n.svelte';
 import { id, persist, studio } from './state.svelte';
-import { outputAlignedPositionMs, sampleServerClock, serverEpochMs } from './stream-clock';
+import {
+	outputAlignedPositionMs,
+	outputEpochMs,
+	sampleServerClock,
+	serverEpochMs
+} from './stream-clock';
 
 export type LiveSession = {
 	_id: string;
@@ -14,6 +19,10 @@ export type LiveSession = {
 	youtube_channel_id?: string | null;
 	youtube_channel_title?: string | null;
 	is_test?: boolean;
+	service_type?: 'prepared' | 'live';
+	active_phase?: 'ready' | 'opening' | 'sermon' | 'closing' | 'complete';
+	sermon_start_ms?: number | null;
+	sermon_end_ms?: number | null;
 };
 export type YouTubeChannel = { id: string; title: string; updatedAt: string };
 
@@ -36,6 +45,7 @@ export function sessionYouTubeChannelId(
 }
 
 export type NewSession = {
+	serviceType: 'prepared' | 'live';
 	title: string;
 	scheduledAt: string;
 	description: string;
@@ -515,7 +525,30 @@ export async function syncLiveLyrics() {
 export async function hideLiveLyrics() {
 	if (!liveSession.activeId) return;
 	try {
-		await post({ action: 'hide-subtitles', sessionId: liveSession.activeId });
+		await post({
+			action: 'hide-subtitles',
+			sessionId: liveSession.activeId,
+			atEpochMs: serverEpochMs(outputEpochMs())
+		});
+	} catch (error) {
+		liveSession.error = error instanceof Error ? error.message : String(error);
+	}
+}
+
+export async function syncServiceWorkflow() {
+	if (!liveSession.activeId) return;
+	try {
+		await post({
+			action: 'workflow',
+			sessionId: liveSession.activeId,
+			phase: studio.service.phase,
+			sermonStartMs:
+				studio.service.sermonStartedAt === null
+					? null
+					: Math.max(0, studio.service.sermonStartedAt + studio.service.markerCorrectionMs),
+			sermonEndMs: studio.service.sermonEndedAt,
+			subtitleTimingLanguage: studio.service.subtitleTimingLanguage
+		});
 	} catch (error) {
 		liveSession.error = error instanceof Error ? error.message : String(error);
 	}
@@ -543,6 +576,7 @@ export async function createSession(draft: NewSession) {
 			reminderEnabled: draft.reminderEnabled,
 			notifyOnStart: draft.notifyOnStart,
 			channelId: channel.id,
+			serviceType: draft.serviceType,
 			thumbnailUrl: thumbnail?.url,
 			thumbnailKey: thumbnail?.key,
 			subtitleUrl: subtitle?.url,
@@ -554,6 +588,12 @@ export async function createSession(draft: NewSession) {
 			a.scheduled_at.localeCompare(b.scheduled_at)
 		);
 		liveSession.selectedId = result.session._id;
+		studio.service.type = draft.serviceType;
+		studio.service.phase = 'ready';
+		if (draft.serviceType === 'live' && studio.settings.recordingMode === 'off') {
+			studio.settings.recordingMode = 'both';
+		}
+		persist();
 		return result.session;
 	} catch (error) {
 		liveSession.error = error instanceof Error ? error.message : String(error);
@@ -567,6 +607,14 @@ export async function selectSession(sessionId: string) {
 	// credentials are being resolved.
 	disableManagedYouTube();
 	const session = liveSession.sessions.find((item) => item._id === sessionId);
+	if (session) {
+		studio.service.type = session.service_type === 'live' ? 'live' : 'prepared';
+		studio.service.phase = 'ready';
+		if (studio.service.type === 'live' && studio.settings.recordingMode === 'off') {
+			studio.settings.recordingMode = 'both';
+		}
+		persist();
+	}
 	if (!session?.youtube_url || session.is_test) {
 		return;
 	}
@@ -664,14 +712,9 @@ export async function startSelectedSession(): Promise<boolean> {
 		const result = await post<{ startedAt: string }>({
 			action: 'start',
 			sessionId: liveSession.selectedId,
-			// A captured external live can contain songs before the prerecorded
-			// sermon. Its SRT stays hidden until the matcher (or fallback button)
-			// locates the sermon; file-based services retain start-at-go-live.
-			subtitleMode: studio.scenes.some((scene) =>
-				scene.layers.some((layer) => layer.youtubeLiveUrl)
-			)
-				? 'armed'
-				: 'broadcast'
+			// Both guided workflows arm captions. The service controller opens the
+			// clock at the sermon boundary, never at public-session startup.
+			subtitleMode: 'armed'
 		});
 		liveSession.activeId = liveSession.selectedId;
 		liveSession.error = null;

@@ -173,6 +173,27 @@ Icecast → the app's radio player, plus the HLS DVR window. See
 Stream keys are stored in the app's local data in clear, the same as OBS stores
 its own. Don't screenshot the Stream page with a key revealed.
 
+## Guided broadcast workflow
+
+Studio offers exactly two service types in the service panel and when a public
+session is created:
+
+- **Pre-recorded Kinyarwanda** loads opening music, an existing Kinyarwanda
+  sermon, closing music and its SRT. **Start programme** runs that queue once;
+  subtitles follow only the sermon media clock. Krefeld can supply pictures,
+  but its audio route remains excluded. No recorder is started in this mode.
+- **Live from Krefeld** keeps one Krefeld source running. **Start sermon** opens
+  the interpreter microphone, lowers Krefeld publicly, starts the sermon
+  recording marker and subtitles; **End sermon** reverses the mix and saves the
+  segment while Krefeld continues into closing music. The subtitle timing
+  language must be identified, and small marker/caption corrections are
+  available during the sermon.
+
+Assignments and roles persist, but local media blobs do not. After a restart
+the workflow restores safely at Ready with the microphone closed; use the file
+inputs to locate local files again. Rehearse microphone and headphone hardware
+with a private destination before the service.
+
 ## Lyrics
 
 A **lyrics ribbon sits directly above the Program canvas**: the line on air is
@@ -324,8 +345,10 @@ is platform-independent.
   otherwise the room mic picks up the speakers.
 - Meters are dBFS, like a real desk: green to about −20, amber to −9, red above
   that, with a peak-hold marker. Aim for the top of the green.
-- No local recording button — the Fly recorder already captures every broadcast
-  server-side (`/recordings` in the admin panel).
+- Recording controls belong to the live sermon workflow. Live interpretation
+  uses cloud segment recording plus the configured local safety capture;
+  prepared Kinyarwanda reuses its existing sermon asset and cannot start either
+  recorder. Saved cloud recordings remain available in `/recordings` in admin.
 
 ## Checking it works
 

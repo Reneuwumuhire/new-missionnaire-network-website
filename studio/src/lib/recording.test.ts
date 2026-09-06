@@ -4,7 +4,7 @@ const controlCloudRecording = vi.hoisted(() => vi.fn());
 
 vi.mock('./live-session.svelte', () => ({ controlCloudRecording }));
 vi.mock('./state.svelte', () => ({
-	studio: { settings: { recordingMode: 'cloud' } }
+	studio: { settings: { recordingMode: 'cloud' }, service: { type: 'live' } }
 }));
 
 import { recording, stopCloudRecording } from './recording.svelte';
@@ -16,6 +16,7 @@ describe('cloud recording controls', () => {
 		recording.cloudPending = false;
 		recording.error = null;
 		recording.localPath = null;
+		recording.savedId = null;
 		recording.startedAt = 1;
 	});
 
@@ -34,5 +35,15 @@ describe('cloud recording controls', () => {
 		expect(recording.cloudPending).toBe(false);
 		expect(recording.startedAt).toBeNull();
 		expect(recording.error).toBeNull();
+	});
+
+	it('cannot record a prepared sermon again', async () => {
+		const { studio } = await import('./state.svelte');
+		studio.service.type = 'prepared';
+		recording.cloud = false;
+		const { startCloudRecording } = await import('./recording.svelte');
+		await startCloudRecording();
+		expect(controlCloudRecording).not.toHaveBeenCalled();
+		studio.service.type = 'live';
 	});
 });

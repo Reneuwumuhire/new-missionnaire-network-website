@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	audioLayers,
+	clearSceneSources,
 	destinationPlatform,
 	makeLayer,
 	migrateDestination,
@@ -11,6 +12,29 @@ import {
 	studio,
 	uniqueById
 } from './state.svelte';
+
+it('clears one scene and its service assignments while preserving other scenes and microphones', () => {
+	const source = makeLayer('video', 'Sermon', { locked: true });
+	const other = makeLayer('image', 'Other scene');
+	studio.scenes = [
+		{ id: 'clear', name: 'Clear', layers: [source] },
+		{ id: 'keep', name: 'Keep', layers: [other] }
+	];
+	studio.programSceneSnapshot = { id: 'clear', name: 'Clear', layers: [source] };
+	studio.selectedLayerId = source.id;
+	studio.service.sermonLayerId = source.id;
+	studio.service.krefeldLayerId = other.id;
+	const microphones = studio.audioSources;
+	expect(clearSceneSources('clear')).toEqual([source.id]);
+	expect(studio.scenes[0].layers).toEqual([]);
+	expect(studio.programSceneSnapshot.layers).toEqual([]);
+	expect(studio.scenes[1].layers[0].id).toBe(other.id);
+	expect(studio.audioSources).toBe(microphones);
+	expect(studio.selectedLayerId).toBeNull();
+	expect(studio.service.sermonLayerId).toBeNull();
+	expect(studio.service.krefeldLayerId).toBe(other.id);
+	expect(clearSceneSources('missing')).toEqual([]);
+});
 
 describe('which layers get a mixer strip', () => {
 	const window = makeLayer('screen', 'Arc', { appId: 'company.thebrowser.Browser' });

@@ -22,6 +22,12 @@
 	import AddFromUrl from './AddFromUrl.svelte';
 	import AddYouTubeLive from './AddYouTubeLive.svelte';
 	import Dock from './Dock.svelte';
+	import Modal from './Modal.svelte';
+	import { broadcast, isStreaming } from '../lib/broadcast.svelte';
+	import { recording } from '../lib/recording.svelte';
+	import { serviceRuntime } from '../lib/service-workflow.svelte';
+	import { lyrics } from '../lib/lyrics.svelte';
+	import { referenceMatcher } from '../lib/reference-match.svelte';
 	import Icon, { type IconName } from './Icon.svelte';
 	import { popoverFit } from '../lib/layout';
 	import { t } from '../lib/i18n.svelte';
@@ -30,6 +36,7 @@
 	import {
 		DEFAULT_TEXT_STYLE,
 		activeScene,
+		clearSceneSources,
 		makeLayer,
 		persist,
 		reconnectWith,
@@ -39,6 +46,28 @@
 	} from '../lib/state.svelte';
 
 	let { onproperties }: { onproperties: () => void } = $props();
+	let clearingSceneId = $state<string | null>(null);
+	const clearingScene = $derived(studio.scenes.find((scene) => scene.id === clearingSceneId));
+	const clearBlocked = $derived(
+		isStreaming() ||
+			broadcast.starting ||
+			recording.cloud ||
+			recording.cloudPending ||
+			Boolean(recording.localPath) ||
+			serviceRuntime.busy ||
+			!['ready', 'complete'].includes(studio.service.phase)
+	);
+	function confirmClear() {
+		// Recheck after confirmation: a broadcast may have started with the dialog open.
+		if (clearBlocked || !clearingSceneId) return;
+		const ids = clearSceneSources(clearingSceneId);
+		for (const id of ids) release(id);
+		if (lyrics.followLayerId && ids.includes(lyrics.followLayerId)) lyrics.followLayerId = null;
+		if (referenceMatcher.sourceId && ids.includes(referenceMatcher.sourceId))
+			useReferenceSource(null);
+		pendingFileLayer = null;
+		clearingSceneId = null;
+	}
 
 	/** false closed, 'menu' the source kinds, 'apps' the list of applications. */
 	let adding = $state<'menu' | 'apps' | false>(false);
@@ -411,6 +440,34 @@
 
 <input bind:this={fileInput} type="file" class="hidden" onchange={onFileChosen} />
 
+{#if clearingScene}
+	<Modal title="Clear sources?" onclose={() => (clearingSceneId = null)}>
+		<div class="space-y-4 p-5 text-xs text-fg/70">
+			<p>
+				Remove all {clearingScene.layers.length} sources from “{clearingScene.name}”, including
+				locked sources?
+			</p>
+			<p>
+				Other scenes and microphone settings will be kept. Files on your computer will not be
+				deleted. Removed sources must be added again.
+			</p>
+			{#if clearBlocked}<p class="text-amber-400">
+					Stop broadcasting, recording and programme playback before clearing sources.
+				</p>{/if}
+			<div class="flex justify-end gap-2">
+				<button class="studio-chip px-3 py-2" onclick={() => (clearingSceneId = null)}
+					>Cancel</button
+				>
+				<button
+					class="rounded bg-red-600 px-3 py-2 font-semibold text-white disabled:opacity-40"
+					disabled={clearBlocked || !clearingScene.layers.length}
+					onclick={confirmClear}>Clear {clearingScene.layers.length} sources</button
+				>
+			</div>
+		</div>
+	</Modal>
+{/if}
+
 {#if urlOpen}
 	<AddFromUrl onclose={() => (urlOpen = false)} onready={addFetched} />
 {/if}
@@ -420,6 +477,19 @@
 {/if}
 
 <Dock id="sources" title={t('dock.sources')}>
+	{#snippet actions()}
+		<button
+			class="px-1 text-[10px] text-fg/50 hover:text-red-400 disabled:opacity-35"
+			disabled={clearBlocked || !activeScene().layers.length}
+			title={clearBlocked
+				? 'Stop broadcasting, recording and programme playback first'
+				: 'Clear all sources in this scene'}
+			onclick={() => {
+				adding = false;
+				clearingSceneId = activeScene().id;
+			}}>Clear sources…</button
+		>
+	{/snippet}
 	<ul>
 		{#each activeScene().layers as layer (layer.id)}
 			{@const issue = problem(layer)}

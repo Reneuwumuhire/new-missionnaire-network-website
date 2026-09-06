@@ -81,6 +81,7 @@ export async function POST({ request, getClientAddress }) {
 		subtitleUrl?: unknown;
 		subtitleKey?: unknown;
 		subtitleFilename?: unknown;
+		serviceType?: unknown;
 		announce?: unknown;
 		reminderEnabled?: unknown;
 		notifyOnStart?: unknown;
@@ -202,6 +203,7 @@ export async function POST({ request, getClientAddress }) {
 				? body.privacyStatus
 				: 'unlisted';
 		const madeForKids = body.madeForKids === true;
+		const serviceType = body.serviceType === 'live' ? 'live' : 'prepared';
 		let thumbnail = parseThumbnailPair(body.thumbnailUrl, body.thumbnailKey);
 		const subtitle = parseSubtitleTriple(body.subtitleUrl, body.subtitleKey, body.subtitleFilename);
 		if (!thumbnail.thumbnail_url) {
@@ -249,6 +251,7 @@ export async function POST({ request, getClientAddress }) {
 				subtitle_srt_url: subtitle.subtitle_srt_url,
 				subtitle_srt_s3_key: subtitle.subtitle_srt_s3_key,
 				subtitle_filename: subtitle.subtitle_filename,
+				service_type: serviceType,
 				scheduled_at: scheduledAt,
 				announce: body.announce === true,
 				reminder_enabled: body.reminderEnabled === true,

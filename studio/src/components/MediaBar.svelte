@@ -8,10 +8,8 @@
 	import { t } from '../lib/i18n.svelte';
 	import { clampTime, handleFor, mediaVersion, shownDuration } from '../lib/media.svelte';
 	import { followMedia, lyrics } from '../lib/lyrics.svelte';
-	import { isStreaming } from '../lib/broadcast.svelte';
-	import { markProgrammeRecordingStarted, startCloudRecording } from '../lib/recording.svelte';
 	import { syncLiveLyrics } from '../lib/live-session.svelte';
-	import { programScene, selectedLayer, type Layer } from '../lib/state.svelte';
+	import { programScene, selectedLayer, studio, type Layer } from '../lib/state.svelte';
 
 	/** The recording this bar drives: whichever media source is selected, else
 	 *  the first one on air. ponytail: first wins — give it a picker if a
@@ -58,6 +56,7 @@
 		const source = element;
 		const sourceId = layer?.id;
 		if (!source || !sourceId || lyrics.mode !== 'timed' || lyrics.cues.length === 0) return;
+		if (studio.service.type === 'prepared' && sourceId !== studio.service.sermonLayerId) return;
 		const sync = () => {
 			followMedia(sourceId);
 			void syncLiveLyrics();
@@ -89,14 +88,9 @@
 		if (element.paused) {
 			if (lyrics.mode === 'timed' && lyrics.cues.length > 0) {
 				followMedia(layer!.id);
-				if (isStreaming()) {
-					markProgrammeRecordingStarted();
-					void startCloudRecording();
-				}
 			}
 			void element.play();
-		}
-		else element.pause();
+		} else element.pause();
 		playing = !element.paused;
 	}
 

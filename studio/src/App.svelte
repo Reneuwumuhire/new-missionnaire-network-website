@@ -16,6 +16,7 @@
 	import PreflightPanel from './components/PreflightPanel.svelte';
 	import PropertiesPanel from './components/PropertiesPanel.svelte';
 	import ScenesDock from './components/ScenesDock.svelte';
+	import ServicePanel from './components/ServicePanel.svelte';
 	import SettingsPanel from './components/SettingsPanel.svelte';
 	import SetupDialog from './components/SetupDialog.svelte';
 	import SourcesDock from './components/SourcesDock.svelte';
@@ -232,6 +233,7 @@
 				if (bus.has(source.id)) {
 					wanted.add(source.id);
 					bus.setLevel(source.id, source.gain, source.muted);
+					bus.setReference(source.id, source.serviceRole === 'krefeld');
 				}
 				continue;
 			}
@@ -240,6 +242,7 @@
 			if (bus.addStream(source.id, handle.stream)) {
 				wanted.add(source.id);
 				bus.setLevel(source.id, source.gain, source.muted);
+				bus.setReference(source.id, source.serviceRole === 'krefeld');
 				// A context still suspended renders nothing at all, so the meter
 				// sits flat however loud the room is.
 				void bus.resume();
@@ -258,7 +261,10 @@
 				bus.addElement(layer.id, handle.el);
 				wanted.add(layer.id);
 			}
-			if (wanted.has(layer.id)) bus.setLevel(layer.id, layer.gain, layer.muted);
+			if (wanted.has(layer.id)) {
+				bus.setLevel(layer.id, layer.gain, layer.muted);
+				bus.setReference(layer.id, layer.id === studio.service.krefeldLayerId);
+			}
 		}
 		// Only the scene's own layers come and go. A mic or an application strip
 		// is the show's, not the scene's, so cutting to a scene with no audio of
@@ -280,6 +286,7 @@
 	}
 
 	function onKeydown(event: KeyboardEvent) {
+		if (document.querySelector('dialog[open]')) return;
 		if (isTyping(event.target) || event.metaKey || event.ctrlKey) return;
 		// Advancing lyrics is the one thing an operator does constantly, so it
 		// gets the biggest key on the keyboard.
@@ -493,6 +500,7 @@
 	<div class="flex min-h-0 flex-1">
 		<div class="flex min-w-0 flex-1 flex-col">
 			<LyricsRibbon />
+			<ServicePanel {mixer} />
 			<div class="flex min-h-0 flex-1 gap-4 bg-ink-950 px-4 pt-1.5">
 				{#if studio.settings.studioMode}
 					<Preview

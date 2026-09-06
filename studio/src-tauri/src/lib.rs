@@ -2,6 +2,7 @@ mod appaudio;
 mod fetch;
 mod ffmpeg;
 mod reference;
+mod service_files;
 
 use ffmpeg::{Encoder, FfmpegInfo, StreamConfig};
 use serde::Serialize;
@@ -665,6 +666,7 @@ pub fn run() {
 			}
 		})
 		.invoke_handler(tauri::generate_handler![
+			service_files::pick_service_file,
 			check_ffmpeg,
 			recording_space,
 			studio_device_info,
