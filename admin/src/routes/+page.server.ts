@@ -1,14 +1,13 @@
 import { redirect } from '@sveltejs/kit';
 import { getDashboardStats, getRecentAuditLogs, listScheduledLives } from '../db/collections';
-import { canViewDashboard, getPermissions } from '$lib/models/admin-user';
+import { getAdminLandingPath, getPermissions } from '$lib/models/admin-user';
 import { listAdminQuestions } from '../db/questions';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
+	const landingPath = getAdminLandingPath(locals.user);
+	if (landingPath !== '/') throw redirect(303, landingPath);
 	const permissions = getPermissions(locals.user);
-	if (!canViewDashboard(locals.user)) {
-		throw redirect(303, '/settings');
-	}
 
 	// Streamed (not awaited): the page renders its header + skeleton instantly
 	// and fills in stats/activity/banners when this resolves. See the page's

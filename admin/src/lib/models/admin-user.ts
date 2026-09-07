@@ -105,3 +105,11 @@ export function canViewDashboard(user: AdminUser): boolean {
 		permissions.can_review_lyrics
 	);
 }
+
+/** Default destination; recording access takes precedence for multi-purpose editors. */
+export function getAdminLandingPath(user: AdminUser): string {
+	if (user.role === 'superadmin') return '/';
+	if (getPermissions(user).can_manage_recordings) return '/recordings';
+	if (canManageMusicAudio(user)) return '/audio';
+	return canViewDashboard(user) ? '/' : '/settings';
+}
