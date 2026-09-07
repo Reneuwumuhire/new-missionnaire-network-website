@@ -209,7 +209,10 @@
 					{#if draft.settings.recordingMode === 'local' || draft.settings.recordingMode === 'both'}
 						<label class="block">
 							<span class="studio-label">{t('settings.recordingFormat')}</span>
-							<select class="studio-input w-full" bind:value={draft.settings.recordingFormat}>
+							<select
+								class="studio-input studio-select w-full"
+								bind:value={draft.settings.recordingFormat}
+							>
 								<option value="audio">{t('settings.recordingAudio')}</option>
 								<option value="video">{t('settings.recordingVideo')}</option>
 								<option value="both">{t('settings.recordingBoth')}</option>
@@ -218,7 +221,7 @@
 						<label class="block">
 							<span class="studio-label">{t('settings.recordingAudioQuality')}</span>
 							<select
-								class="studio-input w-full"
+								class="studio-input studio-select w-full"
 								bind:value={draft.settings.recordingAudioBitrateKbps}
 							>
 								{#each [96, 128, 160, 192, 320] as kbps}
@@ -230,7 +233,7 @@
 							<label class="block">
 								<span class="studio-label">{t('settings.recordingVideoQuality')}</span>
 								<select
-									class="studio-input w-full"
+									class="studio-input studio-select w-full"
 									bind:value={draft.settings.recordingVideoBitrateKbps}
 								>
 									<option value={1500}>{t('settings.recordingCompact')} — 1.5 Mb/s</option>

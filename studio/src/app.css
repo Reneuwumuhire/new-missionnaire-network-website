@@ -42,18 +42,32 @@
 /* These take their colour from @apply inside the component layer, not from a
    utility in the DOM, so the remap below never reaches them. Kept above it so
    an active chip's `text-primary` still wins on a specificity tie. */
-:root.light .studio-chip { color: rgb(var(--fg) / 0.8); }
-:root.light .studio-label { color: rgb(var(--fg) / 0.62); }
-:root.light .studio-input { color: rgb(var(--fg) / 0.95); }
-:root.light .studio-input-flush { color: rgb(var(--fg) / 0.92); }
-:root.light .studio-icon-btn { color: rgb(var(--fg) / 0.62); }
+:root.light .studio-chip {
+	color: rgb(var(--fg) / 0.8);
+}
+:root.light .studio-label {
+	color: rgb(var(--fg) / 0.62);
+}
+:root.light .studio-input {
+	color: rgb(var(--fg) / 0.95);
+}
+:root.light .studio-input-flush {
+	color: rgb(var(--fg) / 0.92);
+}
+:root.light .studio-icon-btn {
+	color: rgb(var(--fg) / 0.62);
+}
 
 /* Disabled must read as inert, not as absent. Thirty percent of white on a
    dark panel is still legible; thirty percent of near-black on paper is not,
    so the quick-transition buttons vanished entirely rather than looking off. */
 :root.light .disabled\:opacity-20:disabled,
-:root.light .disabled\:opacity-30:disabled { opacity: 0.5; }
-:root.light .disabled\:opacity-40:disabled { opacity: 0.55; }
+:root.light .disabled\:opacity-30:disabled {
+	opacity: 0.5;
+}
+:root.light .disabled\:opacity-40:disabled {
+	opacity: 0.55;
+}
 
 /* The app mutes text by fading the foreground, which only works over a dark
    surface: white at 35% on near-black still reads, near-black at 35% on
@@ -62,34 +76,78 @@
    35% over white is 2.6:1 — so the steps themselves are remapped here, once,
    instead of in the fifteen components that use them. The hierarchy is kept;
    only the floor moves, and the smallest body text now clears 4.5:1. */
-:root.light .text-fg\/15 { color: rgb(var(--fg) / 0.38); }
-:root.light .text-fg\/25 { color: rgb(var(--fg) / 0.52); }
-:root.light .text-fg\/30 { color: rgb(var(--fg) / 0.56); }
-:root.light .text-fg\/35 { color: rgb(var(--fg) / 0.62); }
-:root.light .text-fg\/40 { color: rgb(var(--fg) / 0.66); }
-:root.light .text-fg\/45 { color: rgb(var(--fg) / 0.7); }
-:root.light .text-fg\/50 { color: rgb(var(--fg) / 0.74); }
-:root.light .text-fg\/55 { color: rgb(var(--fg) / 0.78); }
-:root.light .text-fg\/60 { color: rgb(var(--fg) / 0.8); }
-:root.light .text-fg\/65 { color: rgb(var(--fg) / 0.84); }
-:root.light .text-fg\/70 { color: rgb(var(--fg) / 0.86); }
-:root.light .text-fg\/75 { color: rgb(var(--fg) / 0.88); }
-:root.light .text-fg\/80 { color: rgb(var(--fg) / 0.9); }
-:root.light .text-fg\/85 { color: rgb(var(--fg) / 0.92); }
-:root.light .text-fg\/90 { color: rgb(var(--fg) / 0.95); }
+:root.light .text-fg\/15 {
+	color: rgb(var(--fg) / 0.38);
+}
+:root.light .text-fg\/25 {
+	color: rgb(var(--fg) / 0.52);
+}
+:root.light .text-fg\/30 {
+	color: rgb(var(--fg) / 0.56);
+}
+:root.light .text-fg\/35 {
+	color: rgb(var(--fg) / 0.62);
+}
+:root.light .text-fg\/40 {
+	color: rgb(var(--fg) / 0.66);
+}
+:root.light .text-fg\/45 {
+	color: rgb(var(--fg) / 0.7);
+}
+:root.light .text-fg\/50 {
+	color: rgb(var(--fg) / 0.74);
+}
+:root.light .text-fg\/55 {
+	color: rgb(var(--fg) / 0.78);
+}
+:root.light .text-fg\/60 {
+	color: rgb(var(--fg) / 0.8);
+}
+:root.light .text-fg\/65 {
+	color: rgb(var(--fg) / 0.84);
+}
+:root.light .text-fg\/70 {
+	color: rgb(var(--fg) / 0.86);
+}
+:root.light .text-fg\/75 {
+	color: rgb(var(--fg) / 0.88);
+}
+:root.light .text-fg\/80 {
+	color: rgb(var(--fg) / 0.9);
+}
+:root.light .text-fg\/85 {
+	color: rgb(var(--fg) / 0.92);
+}
+:root.light .text-fg\/90 {
+	color: rgb(var(--fg) / 0.95);
+}
 
 /* Status colours are chosen to glow on black — the 300/400 steps. On paper
    they are highlighter pens. Same hue, same meaning, darkened to carry. */
-:root.light .text-amber-400 { color: #b45309; }
-:root.light .text-amber-300 { color: #92400e; }
-:root.light .text-red-400 { color: #dc2626; }
-:root.light .text-red-300 { color: #b91c1c; }
-:root.light .text-emerald-400 { color: #047857; }
-:root.light .text-emerald-300 { color: #065f46; }
+:root.light .text-amber-400 {
+	color: #b45309;
+}
+:root.light .text-amber-300 {
+	color: #92400e;
+}
+:root.light .text-red-400 {
+	color: #dc2626;
+}
+:root.light .text-red-300 {
+	color: #b91c1c;
+}
+:root.light .text-emerald-400 {
+	color: #047857;
+}
+:root.light .text-emerald-300 {
+	color: #065f46;
+}
 /* The brand orange is a fill colour, not an ink: #FF880C on white is 2.5:1.
    Kept for anything it sits *behind* (buttons, badges), deepened where it has
    to be read as text. */
-:root.light .text-primary { color: #a3560a; }
+:root.light .text-primary {
+	color: #a3560a;
+}
 
 /* Blue-black rather than a darker grey: at these levels a neutral surface
    goes muddy, and the slight cool cast keeps the orange accent reading as
@@ -117,7 +175,11 @@ body,
 }
 
 body {
-	font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+	font-family:
+		'Outfit',
+		system-ui,
+		-apple-system,
+		sans-serif;
 	-webkit-font-smoothing: antialiased;
 	/* Nothing here is a document; text selection just gets in the way of
 	   dragging layers. Inputs opt back in below. */
@@ -159,6 +221,20 @@ textarea {
 	/* Sharp corners throughout, like the admin panel's editorial CTAs. */
 	.studio-input {
 		@apply border border-ink-600 bg-ink-800 px-2.5 py-2 text-sm text-fg/90 transition-colors placeholder:text-fg/25 focus:border-primary focus:outline-none;
+	}
+
+	.studio-select {
+		appearance: none;
+		-webkit-appearance: none;
+		color-scheme: dark;
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2385858f' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E");
+		background-position: right 12px center;
+		background-repeat: no-repeat;
+		@apply min-h-10 cursor-pointer rounded-lg py-2.5 pl-3.5 pr-10 shadow-sm hover:border-ink-500 focus:ring-2 focus:ring-primary/20;
+	}
+
+	:root.light .studio-select {
+		color-scheme: light;
 	}
 
 	/* Keep WebKit's accessible native date/time picker, but present it like a
