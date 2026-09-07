@@ -101,7 +101,11 @@
 		)
 	);
 	const requiredBytes = $derived(
-		requiredRecordingBytes(studio.settings.videoBitrateKbps, studio.settings.audioBitrateKbps)
+		requiredRecordingBytes(
+			studio.settings.recordingFormat === 'audio' ? 0 : studio.settings.recordingVideoBitrateKbps,
+			studio.settings.recordingAudioBitrateKbps *
+				(studio.settings.recordingFormat === 'both' ? 2 : 1)
+		)
 	);
 
 	const checks = $derived(

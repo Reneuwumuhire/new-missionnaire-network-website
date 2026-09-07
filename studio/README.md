@@ -349,6 +349,14 @@ is platform-independent.
   uses cloud segment recording plus the configured local safety capture;
   prepared Kinyarwanda reuses its existing sermon asset and cannot start either
   recorder. Saved cloud recordings remain available in `/recordings` in admin.
+- In **Settings → Output → Recording**, choose Local (or local and cloud), then
+  select **Audio only (MP3)**, **Video with audio (MP4)**, or **Both**. Both writes
+  two files with the same name in `Movies/Missionnaire Studio` on macOS or
+  `Videos/Missionnaire Studio` on Windows, ready to share once recording stops.
+  Recording audio quality ranges from 96 to 320 kb/s; video has Compact, Standard,
+  and High presets at the canvas resolution. These settings are saved separately
+  from streaming quality and apply to the next recording. Existing setups keep
+  MP4 as their default. Cloud recording is still controlled separately.
 
 ## Checking it works
 
