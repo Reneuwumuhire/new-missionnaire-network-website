@@ -123,7 +123,7 @@
 				class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] transition-colors {page ===
 				entry.id
 					? 'bg-primary text-black'
-					: 'text-fg/65 hover:bg-fg/5 hover:text-fg'}"
+					: 'text-muted hover:bg-fg/5 hover:text-fg'}"
 				onclick={() => (page = entry.id)}
 			>
 				<Icon name={entry.icon} size={14} />
@@ -160,7 +160,7 @@
 							{#each LOCALES as option (option.id)}
 								<button
 									class="studio-chip flex-1 {draft.locale === option.id
-										? 'bg-primary/20 text-primary'
+										? 'bg-primary/20 text-accent'
 										: ''}"
 									onclick={() => (draft.locale = option.id)}>{option.label}</button
 								>
@@ -177,14 +177,14 @@
 							{#each THEMES as option (option.id)}
 								<button
 									class="studio-chip flex-1 {theme.current === option.id
-										? 'bg-primary/20 text-primary'
+										? 'bg-primary/20 text-accent'
 										: ''}"
 									aria-pressed={theme.current === option.id}
 									onclick={() => applyTheme(option.id)}>{option.label()}</button
 								>
 							{/each}
 						</div>
-						<p class="mt-1.5 text-[11px] leading-relaxed text-fg/45">{t('settings.themeHint')}</p>
+						<p class="mt-1.5 text-[12px] leading-relaxed text-muted">{t('settings.themeHint')}</p>
 					</div>
 				{/if}
 
@@ -195,7 +195,7 @@
 							{#each ['off', 'local', 'cloud', 'both'] as mode}
 								<button
 									class="studio-chip flex-1 {draft.settings.recordingMode === mode
-										? 'bg-primary/20 text-primary'
+										? 'bg-primary/20 text-accent'
 										: ''}"
 									disabled={studio.service.type === 'live' && mode === 'off'}
 									onclick={() =>
@@ -204,7 +204,7 @@
 								>
 							{/each}
 						</div>
-						<p class="mt-1 text-[11px] text-fg/35">{t('settings.recordingHint')}</p>
+						<p class="mt-1 text-[12px] text-muted">{t('settings.recordingHint')}</p>
 					</div>
 					{#if draft.settings.recordingMode === 'local' || draft.settings.recordingMode === 'both'}
 						<label class="block">
@@ -242,11 +242,11 @@
 								</select>
 							</label>
 						{/if}
-						<p class="text-[11px] text-fg/45">{t('settings.recordingQualityHint')}</p>
+						<p class="text-[12px] text-muted">{t('settings.recordingQualityHint')}</p>
 					{/if}
 					{#if draft.settings.recordingMode === 'cloud' || draft.settings.recordingMode === 'both'}
 						<p
-							class="border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-[11px] leading-relaxed text-emerald-200/80"
+							class="border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-[12px] leading-relaxed text-success"
 						>
 							{t('settings.cloudRecordingManaged')}
 						</p>
@@ -254,7 +254,7 @@
 
 					{#if isStreaming()}
 						<p
-							class="border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-300"
+							class="border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[12px] text-warning"
 						>
 							{t('settings.liveWarning')}
 						</p>
@@ -277,7 +277,7 @@
 								);
 							}}
 						/>
-						<span class="text-[11px] text-fg/30">
+						<span class="text-[12px] text-muted">
 							{t('settings.uploadHint', { mbps: uploadMbps })}
 						</span>
 					</label>
@@ -288,7 +288,7 @@
 							{#each [96, 128, 160, 192] as kbps (kbps)}
 								<button
 									class="studio-chip flex-1 {draft.settings.audioBitrateKbps === kbps
-										? 'bg-primary/20 text-primary'
+										? 'bg-primary/20 text-accent'
 										: ''}"
 									onclick={() => {
 										draft.settings.audioBitrateKbps = kbps;
@@ -303,7 +303,7 @@
 						<div class="flex gap-1">
 							<button
 								class="studio-chip flex-1 {draft.settings.encoder === 'hardware'
-									? 'bg-primary/20 text-primary'
+									? 'bg-primary/20 text-accent'
 									: ''}"
 								disabled={ffmpeg ? !ffmpeg.hardware_h264 : false}
 								onclick={() => {
@@ -312,14 +312,14 @@
 							>
 							<button
 								class="studio-chip flex-1 {draft.settings.encoder === 'software'
-									? 'bg-primary/20 text-primary'
+									? 'bg-primary/20 text-accent'
 									: ''}"
 								onclick={() => {
 									draft.settings.encoder = 'software';
 								}}>{t('settings.software')}</button
 							>
 						</div>
-						<p class="mt-1 text-[11px] text-fg/30">{t('settings.encoderHint')}</p>
+						<p class="mt-1 text-[12px] text-muted">{t('settings.encoderHint')}</p>
 					</div>
 				{/if}
 
@@ -330,7 +330,7 @@
 							{#each RESOLUTIONS as [width, height, label] (label)}
 								<button
 									class="studio-chip flex-1 {draft.settings.width === width
-										? 'bg-primary/20 text-primary'
+										? 'bg-primary/20 text-accent'
 										: ''}"
 									onclick={() => setResolution(width, height, label)}>{label}</button
 								>
@@ -344,7 +344,7 @@
 							{#each [24, 25, 30, 60] as fps (fps)}
 								<button
 									class="studio-chip flex-1 {draft.settings.fps === fps
-										? 'bg-primary/20 text-primary'
+										? 'bg-primary/20 text-accent'
 										: ''}"
 									onclick={() => {
 										draft.settings.fps = fps;
@@ -367,7 +367,7 @@
 						/>
 						<span>
 							{t('settings.testPattern')}
-							<span class="mt-0.5 block text-[11px] leading-relaxed text-fg/35">
+							<span class="mt-0.5 block text-[12px] leading-relaxed text-muted">
 								{t('settings.testPatternHint')}
 							</span>
 						</span>
@@ -386,14 +386,14 @@
 								};
 							}}>{t('settings.resetLayout')}</button
 						>
-						<p class="mt-1 text-[11px] leading-relaxed text-fg/30">{t('settings.layoutHint')}</p>
+						<p class="mt-1 text-[12px] leading-relaxed text-muted">{t('settings.layoutHint')}</p>
 					</div>
 				{/if}
 
 				{#if page === 'advanced'}
 					<div>
 						<span class="studio-label">{t('settings.developerConfiguration')}</span>
-						<p class="mb-3 text-[11px] leading-relaxed text-fg/35">
+						<p class="mb-3 text-[12px] leading-relaxed text-muted">
 							{t('settings.developerConfigurationHint')}
 						</p>
 						<button class="studio-chip" onclick={onconfigure}>Import configuration (.env)</button>
@@ -405,37 +405,37 @@
 						<div class="flex items-start justify-between gap-4">
 							<div class="min-w-0">
 								<span class="studio-label">Missionnaire Studio</span>
-								<p class="font-mono text-[11px] text-fg/45">
+								<p class="font-mono text-[12px] text-muted">
 									{t('update.currentVersion', { version: appUpdate.currentVersion || '—' })}
 								</p>
 								{#if appUpdate.phase === 'checking'}
-									<p class="mt-1 text-[11px] text-fg/50">{t('update.checking')}</p>
+									<p class="mt-1 text-[12px] text-muted">{t('update.checking')}</p>
 								{:else if appUpdate.phase === 'current'}
-									<p class="mt-1 text-[11px] text-emerald-400">{t('update.current')}</p>
+									<p class="mt-1 text-[12px] text-success">{t('update.current')}</p>
 								{:else if appUpdate.phase === 'available'}
-									<p class="mt-1 text-[11px] text-primary">
+									<p class="mt-1 text-[12px] text-accent">
 										{t('update.available', { version: appUpdate.availableVersion ?? '' })}
 									</p>
 								{:else if appUpdate.phase === 'downloading'}
-									<p class="mt-1 text-[11px] text-primary">
+									<p class="mt-1 text-[12px] text-accent">
 										{t('update.downloading', { percent: downloadPercent() })}
 									</p>
 								{:else if appUpdate.phase === 'installing'}
-									<p class="mt-1 text-[11px] text-primary">{t('update.installing')}</p>
+									<p class="mt-1 text-[12px] text-accent">{t('update.installing')}</p>
 								{:else if appUpdate.phase === 'restarting'}
-									<p class="mt-1 text-[11px] text-primary">{t('update.restarting')}</p>
+									<p class="mt-1 text-[12px] text-accent">{t('update.restarting')}</p>
 								{:else if appUpdate.phase === 'error'}
-									<p class="mt-1 break-words text-[11px] text-red-400">
+									<p class="mt-1 break-words text-[12px] text-danger">
 										{t('update.error', { message: appUpdate.error ?? '' })}
 									</p>
 								{/if}
 								{#if updateBlocked && appUpdate.phase === 'available'}
-									<p class="mt-1 text-[11px] text-amber-300">{t('update.blocked')}</p>
+									<p class="mt-1 text-[12px] text-warning">{t('update.blocked')}</p>
 								{/if}
 							</div>
 							{#if appUpdate.phase === 'available'}
 								<button
-									class="studio-chip shrink-0 border-primary/50 bg-primary/20 text-primary"
+									class="studio-chip shrink-0 border-primary/50 bg-primary/20 text-accent"
 									disabled={updateBlocked}
 									onclick={() => void installUpdate()}>{t('update.installRestart')}</button
 								>
@@ -456,33 +456,33 @@
 						{/if}
 					</div>
 
-					<div class="space-y-1.5 font-mono text-[11px]">
+					<div class="space-y-1.5 font-mono text-[12px]">
 						<span class="studio-label font-body">{t('settings.system')}</span>
 						{#if ffmpegError}
-							<p class="text-red-400">{ffmpegError}</p>
+							<p class="text-danger">{ffmpegError}</p>
 						{:else if ffmpeg}
-							<p class="text-fg/45">{ffmpeg.version}</p>
-							<p class="text-fg/25">{ffmpeg.path}</p>
-							<p class="text-fg/45">
+							<p class="text-muted">{ffmpeg.version}</p>
+							<p class="text-muted">{ffmpeg.path}</p>
+							<p class="text-muted">
 								{t('settings.hardwareEncoding', {
 									state: ffmpeg.hardware_h264 ? t('settings.available') : t('settings.unavailable')
 								})}
 							</p>
 						{:else}
-							<p class="text-fg/30">{t('settings.checking')}</p>
+							<p class="text-muted">{t('settings.checking')}</p>
 						{/if}
-						<p class="text-fg/45">
+						<p class="text-muted">
 							{t('settings.capture', { mime: mime ?? t('settings.unavailable') })}
 						</p>
 					</div>
 
 					{#if broadcast.command.length > 0}
 						<details class="border-t border-ink-700 pt-4">
-							<summary class="cursor-pointer text-[11px] text-fg/40">
+							<summary class="cursor-pointer text-[12px] text-muted">
 								{t('settings.ffmpegCommand')}
 							</summary>
 							<pre
-								class="mt-2 overflow-x-auto whitespace-pre-wrap break-all bg-ink-950 p-2 font-mono text-[10px] text-fg/40">{broadcast.command.join(
+								class="mt-2 overflow-x-auto whitespace-pre-wrap break-all bg-ink-950 p-2 font-mono text-[12px] text-muted">{broadcast.command.join(
 									' '
 								)}</pre>
 						</details>
@@ -490,11 +490,11 @@
 
 					{#if broadcast.log.length > 0}
 						<details class="border-t border-ink-700 pt-4">
-							<summary class="cursor-pointer text-[11px] text-fg/40">
+							<summary class="cursor-pointer text-[12px] text-muted">
 								{t('settings.ffmpegLog', { count: broadcast.log.length })}
 							</summary>
 							<pre
-								class="mt-2 max-h-52 overflow-y-auto whitespace-pre-wrap break-all bg-ink-950 p-2 font-mono text-[10px] text-fg/40">{broadcast.log
+								class="mt-2 max-h-52 overflow-y-auto whitespace-pre-wrap break-all bg-ink-950 p-2 font-mono text-[12px] text-muted">{broadcast.log
 									.slice(-40)
 									.join('\n')}</pre>
 						</details>
@@ -512,13 +512,13 @@
 <footer
 	class="sticky bottom-0 z-10 flex shrink-0 items-center gap-2 border-t border-ink-700 bg-ink-850 px-4 py-3"
 >
-	<span class="min-w-0 flex-1 truncate text-[11px] {dirty ? 'text-amber-300/90' : 'text-fg/30'}">
+	<span class="min-w-0 flex-1 truncate text-[12px] {dirty ? 'text-warning' : 'text-muted'}">
 		{dirty ? t('settings.unsaved') : t('settings.saved')}
 	</span>
 	<button class="studio-chip px-3" onclick={onclose}>{t('common.cancel')}</button>
 	<button class="studio-chip px-3" disabled={!dirty} onclick={apply}>{t('settings.apply')}</button>
 	<button
-		class="studio-chip bg-primary/20 px-3 text-primary"
+		class="studio-chip bg-primary/20 px-3 text-accent"
 		onclick={() => {
 			apply();
 			onclose();

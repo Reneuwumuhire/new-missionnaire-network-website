@@ -252,11 +252,11 @@
 						? 'Pre-recorded Kinyarwanda'
 						: 'Live from Krefeld'}</span
 				>
-				<span class="rounded bg-ink-700 px-2 py-0.5 text-[10px] text-fg/60"
+				<span class="rounded bg-ink-700 px-2 py-0.5 text-[12px] text-muted"
 					>{phaseNames[studio.service.phase]}</span
 				>
 			</div>
-			<p class="mt-1 text-[11px] text-fg/45">
+			<p class="mt-1 text-[12px] text-muted">
 				{studio.service.type === 'prepared'
 					? 'Opening music → Kinyarwanda sermon → Closing music'
 					: 'Krefeld programme with live Kinyarwanda interpretation'}
@@ -273,15 +273,15 @@
 	{#if setupOpen}
 		<Modal title="Service setup" onclose={() => (setupOpen = false)}>
 			<div class="space-y-5 p-5">
-				<p class="text-xs leading-relaxed text-fg/50">
+				<p class="text-xs leading-relaxed text-muted">
 					Choose your service type, then prepare the sources below. Your selections are saved
 					automatically.
 				</p>
 				<div class="flex flex-wrap items-center gap-2">
-					<span class="text-[10px] font-semibold uppercase tracking-wider text-fg/40">Service</span>
+					<span class="text-[12px] font-semibold uppercase tracking-wider text-muted">Service</span>
 					<button
 						class="studio-chip {studio.service.type === 'prepared'
-							? 'border-primary/50 bg-primary/15 text-primary'
+							? 'border-primary/50 bg-primary/15 text-accent'
 							: ''}"
 						disabled={!editable}
 						aria-pressed={studio.service.type === 'prepared'}
@@ -289,20 +289,20 @@
 					>
 					<button
 						class="studio-chip {studio.service.type === 'live'
-							? 'border-primary/50 bg-primary/15 text-primary'
+							? 'border-primary/50 bg-primary/15 text-accent'
 							: ''}"
 						disabled={!editable}
 						aria-pressed={studio.service.type === 'live'}
 						onclick={() => selectServiceType('live')}>Live from Krefeld</button
 					>
-					<span class="ml-auto text-[11px] text-fg/55">{phaseNames[studio.service.phase]}</span>
+					<span class="ml-auto text-[12px] text-muted">{phaseNames[studio.service.phase]}</span>
 					{#if studio.service.type === 'prepared'}
-						<span class="text-[10px] text-fg/35">Existing sermon file · no recording</span>
+						<span class="text-[12px] text-muted">Existing sermon file · no recording</span>
 					{:else}
 						<span
-							class="text-[10px] {serviceRuntime.recordingStatus === 'failed'
-								? 'text-red-300'
-								: 'text-fg/35'}"
+							class="text-[12px] {serviceRuntime.recordingStatus === 'failed'
+								? 'text-danger'
+								: 'text-muted'}"
 						>
 							{serviceRuntime.recordingStatus === 'idle'
 								? 'Live recording ready'
@@ -325,7 +325,7 @@
 							<label class="min-w-0 rounded-lg border border-ink-700 bg-ink-850 p-3">
 								<span class="block text-xs font-medium text-fg/80">{item[0]}</span>
 								<span
-									class="mt-1 block truncate text-[11px] text-fg/45"
+									class="mt-1 block truncate text-[12px] text-muted"
 									title={fileName(item[1] as PreparedRole)}
 									>{fileName(item[1] as PreparedRole) || 'Choose an audio file'}</span
 								>
@@ -406,7 +406,7 @@
 							</select></label
 						>
 						<div class="flex items-center justify-between gap-3 sm:col-span-2">
-							<p class="text-[11px] text-fg/45">
+							<p class="text-[12px] text-muted">
 								Connect Bluetooth headphones in system settings. Devices refresh automatically.
 							</p>
 							<button
@@ -430,27 +430,27 @@
 							class="studio-chip mt-3 rounded px-3 py-2"
 							onclick={() => void chooseFile('subtitle')}>Choose subtitles (.srt)…</button
 						>
-						<span class="mt-2 block text-[11px] text-fg/40"
+						<span class="mt-2 block text-[12px] text-muted"
 							>SubRip (.srt) with timed sermon captions.</span
 						>
 					</label>
 				</fieldset>
-				{#if studio.service.type === 'prepared'}<p class="text-[11px] text-fg/45">
+				{#if studio.service.type === 'prepared'}<p class="text-[12px] text-muted">
 						Supported audio: MP3, WAV, M4A, AAC, AIFF and FLAC. Video is selected separately as an
 						image source.
 					</p>{/if}
 				{#if fileError}<p
 						role="alert"
-						class="rounded border border-red-400/30 bg-red-400/10 p-3 text-xs text-red-300"
+						class="rounded border border-red-400/30 bg-red-400/10 p-3 text-xs text-danger"
 					>
 						{fileError}
 					</p>{/if}
-				{#if validatingFile}<p role="status" class="text-xs text-fg/60">
+				{#if validatingFile}<p role="status" class="text-xs text-muted">
 						Checking audio file…
 					</p>{/if}
-				{#if headphoneError}<p role="alert" class="text-xs text-red-300">{headphoneError}</p>{/if}
+				{#if headphoneError}<p role="alert" class="text-xs text-danger">{headphoneError}</p>{/if}
 				<div class="flex items-center justify-between gap-4 border-t border-ink-700 pt-4">
-					<p class="text-[11px] {missing.length ? 'text-amber-300' : 'text-emerald-300'}">
+					<p class="text-[12px] {missing.length ? 'text-warning' : 'text-success'}">
 						{missing.length
 							? `Still needed: ${missing.join(', ')}`
 							: 'Everything is ready for this service.'}
@@ -467,7 +467,7 @@
 	<div class="mt-2 flex flex-wrap items-center justify-end gap-2">
 		{#if studio.service.type === 'prepared'}
 			<button
-				class="bg-primary px-3 py-2 text-[11px] font-semibold text-black disabled:opacity-35"
+				class="bg-primary px-3 py-2 text-[12px] font-semibold text-black disabled:opacity-35"
 				disabled={serviceRuntime.busy || studio.service.phase !== 'ready' || missing.length > 0}
 				onclick={() => void startPreparedProgramme()}>Start programme</button
 			>
@@ -479,18 +479,18 @@
 			>
 		{:else if studio.service.phase === 'opening'}
 			<button
-				class="bg-primary px-3 py-2 text-[11px] font-semibold text-black"
+				class="bg-primary px-3 py-2 text-[12px] font-semibold text-black"
 				disabled={serviceRuntime.busy}
 				onclick={() => void startLiveSermon(outputMs())}>Start sermon</button
 			>
 		{:else if studio.service.phase === 'sermon'}
 			<button
-				class="bg-red-500 px-3 py-2 text-[11px] font-semibold text-white"
+				class="bg-red-700 px-3 py-2 text-[12px] font-semibold text-white"
 				disabled={serviceRuntime.busy}
 				onclick={() => void endLiveSermon(outputMs())}>End sermon</button
 			>
 		{:else}
-			<span class="max-w-56 text-[10px] text-fg/50"
+			<span class="max-w-56 text-[12px] text-muted"
 				>Sermon ended — recording {serviceRuntime.recordingStatus}; Krefeld continues</span
 			>
 		{/if}
@@ -500,7 +500,7 @@
 	</div>
 
 	{#if studio.service.type === 'live' && studio.service.phase === 'sermon'}
-		<div class="mt-2 flex items-center gap-2 text-[10px] text-fg/45">
+		<div class="mt-2 flex items-center gap-2 text-[12px] text-muted">
 			<span
 				>Recording sermon · {Math.floor(sermonSeconds / 60)}:{String(sermonSeconds % 60).padStart(
 					2,
@@ -511,25 +511,23 @@
 			<button class="studio-chip" onclick={() => correctLiveTiming(250)}>+0.25s</button>
 		</div>
 	{/if}
-	{#if missing.length && studio.service.phase === 'ready'}<p
-			class="mt-1 text-[10px] text-amber-300"
-		>
+	{#if missing.length && studio.service.phase === 'ready'}<p class="mt-1 text-[12px] text-warning">
 			Required: {missing.join(', ')}
 		</p>{/if}
-	{#if serviceRuntime.error}<p class="mt-1 text-[10px] text-red-300">{serviceRuntime.error}</p>{/if}
+	{#if serviceRuntime.error}<p class="mt-1 text-[12px] text-danger">{serviceRuntime.error}</p>{/if}
 	{#if serviceRuntime.recordingStatus === 'failed' && studio.service.phase === 'sermon'}
 		<button
-			class="studio-chip mt-1 border-red-400/50 text-red-200"
+			class="studio-chip mt-1 border-red-400/50 text-danger"
 			onclick={() => void retryLiveRecording()}>Retry recording</button
 		>
 	{/if}
 	{#if serviceRuntime.recordingStatus === 'saved' && recording.savedId}
 		<a
-			class="ml-2 text-[10px] text-primary underline"
+			class="ml-2 text-[12px] text-accent underline"
 			href={`${studio.settings.adminSiteUrl}/recordings`}
 			target="_blank"
 			rel="noreferrer">Open saved recording</a
 		>
 	{/if}
-	{#if headphoneError}<p class="mt-1 text-[10px] text-red-300">{headphoneError}</p>{/if}
+	{#if headphoneError}<p class="mt-1 text-[12px] text-danger">{headphoneError}</p>{/if}
 </section>

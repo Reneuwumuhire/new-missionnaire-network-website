@@ -243,7 +243,7 @@
 <div class="space-y-4 p-5">
 	<div>
 		<p class="text-[13px] leading-relaxed text-fg/70">{t('preflight.intro')}</p>
-		<p class="mt-1 text-[11px] leading-relaxed text-fg/40">{t('preflight.previewHint')}</p>
+		<p class="mt-1 text-[12px] leading-relaxed text-muted">{t('preflight.previewHint')}</p>
 	</div>
 
 	<div class="grid gap-2 sm:grid-cols-2">
@@ -258,27 +258,27 @@
 			>
 				<div class="flex items-center gap-2">
 					<span
-						class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold {check.level ===
+						class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[12px] font-bold {check.level ===
 						'block'
-							? 'bg-red-500/20 text-red-300'
+							? 'bg-red-500/20 text-danger'
 							: check.level === 'warning'
-								? 'bg-amber-500/20 text-amber-300'
-								: 'bg-emerald-500/20 text-emerald-300'}"
+								? 'bg-amber-500/20 text-warning'
+								: 'bg-emerald-500/20 text-success'}"
 						>{check.level === 'pass' ? '✓' : check.level === 'warning' ? '!' : '×'}</span
 					>
 					<strong class="min-w-0 flex-1 truncate text-[12px] text-fg/85"
 						>{t(labels[check.id])}</strong
 					>
 					<span
-						class="text-[9px] font-semibold uppercase tracking-wider {check.level === 'block'
-							? 'text-red-300'
+						class="text-[12px] font-semibold uppercase tracking-wider {check.level === 'block'
+							? 'text-danger'
 							: check.level === 'warning'
-								? 'text-amber-300'
-								: 'text-emerald-300'}">{stateLabel(check.level)}</span
+								? 'text-warning'
+								: 'text-success'}">{stateLabel(check.level)}</span
 					>
 				</div>
 				{#if checkDetail}
-					<p class="mt-1.5 break-words pl-7 text-[10px] leading-relaxed text-fg/45">
+					<p class="mt-1.5 break-words pl-7 text-[12px] leading-relaxed text-muted">
 						{checkDetail}
 					</p>
 				{/if}
@@ -287,13 +287,13 @@
 	</div>
 
 	<div class="flex items-center justify-between gap-3 border-t border-ink-700 pt-4">
-		<div class="text-[11px]">
+		<div class="text-[12px]">
 			{#if blockers > 0}
-				<span class="text-red-300">{t('preflight.blockerCount', { count: blockers })}</span>
+				<span class="text-danger">{t('preflight.blockerCount', { count: blockers })}</span>
 			{:else if warnings > 0}
-				<span class="text-amber-300">{t('preflight.warningCount', { count: warnings })}</span>
+				<span class="text-warning">{t('preflight.warningCount', { count: warnings })}</span>
 			{:else}
-				<span class="text-emerald-300">{t('preflight.allReady')}</span>
+				<span class="text-success">{t('preflight.allReady')}</span>
 			{/if}
 		</div>
 		<div class="flex gap-2">

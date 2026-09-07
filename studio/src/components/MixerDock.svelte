@@ -242,7 +242,7 @@
      hiding the list behind a gear you cannot reach is a dead end. -->
 {#snippet deviceSelect(source: AudioSource)}
 	<select
-		class="studio-input h-7 min-w-0 flex-1 py-0 text-[11px]"
+		class="studio-input h-7 min-w-0 flex-1 py-0 text-[12px]"
 		aria-label={t('mixer.chooseInput')}
 		value={source.deviceId ?? ''}
 		onchange={(e) => {
@@ -260,7 +260,7 @@
 
 <Dock id="mixer" title={t('dock.audioMixer')}>
 	{#snippet actions()}
-		<label class="mr-1 flex cursor-pointer items-center gap-1.5 text-[10px] text-fg/45">
+		<label class="mr-1 flex cursor-pointer items-center gap-1.5 text-[12px] text-muted">
 			<input
 				type="checkbox"
 				class="accent-primary"
@@ -286,7 +286,7 @@
 				>
 					<button class="block w-full px-3 py-2 text-left hover:bg-primary/15" onclick={addInput}>
 						<span class="block text-[13px] text-fg/90">{t('mixer.addMic')}</span>
-						<span class="block text-[11px] text-fg/40">{t('mixer.addMicHint')}</span>
+						<span class="block text-[12px] text-muted">{t('mixer.addMicHint')}</span>
 					</button>
 					<button
 						class="block w-full px-3 py-2 text-left hover:bg-primary/15"
@@ -296,7 +296,7 @@
 						}}
 					>
 						<span class="block text-[13px] text-fg/90">{t('mixer.addApp')}</span>
-						<span class="block text-[11px] text-fg/40">{t('mixer.addAppHint')}</span>
+						<span class="block text-[12px] text-muted">{t('mixer.addAppHint')}</span>
 					</button>
 				</div>
 			{:else if adding === 'apps'}
@@ -312,7 +312,7 @@
 							onclick={() => addAppSource(app)}>{app.name}</button
 						>
 					{:else}
-						<p class="px-3 py-2 text-[11px] leading-snug text-fg/40">
+						<p class="px-3 py-2 text-[12px] leading-snug text-muted">
 							{appAudio.error ?? t('mixer.appAudioUnsupported')}
 						</p>
 					{/each}
@@ -325,15 +325,15 @@
 		<!-- A refusal cannot be undone from in here, so say what happened and
 		     point at the one place it can be changed. -->
 		<div class="flex items-center gap-2 border-b border-red-500/25 bg-red-500/10 px-3 py-1.5">
-			<p class="min-w-0 flex-1 text-[10px] leading-snug text-red-300/90">
+			<p class="min-w-0 flex-1 text-[12px] leading-snug text-danger">
 				{t('mixer.micDenied')}
 				{permissions.message}
 			</p>
-			<button class="studio-chip shrink-0 text-[10px]" onclick={() => askForMicrophone()}>
+			<button class="studio-chip shrink-0 text-[12px]" onclick={() => askForMicrophone()}>
 				{t('mixer.micRetry')}
 			</button>
 			<button
-				class="studio-chip shrink-0 text-[10px]"
+				class="studio-chip shrink-0 text-[12px]"
 				onclick={() => openPrivacySettings('microphone')}
 			>
 				{t('mixer.openPrivacy')}
@@ -342,7 +342,7 @@
 	{/if}
 
 	{#if studio.settings.monitorAudio}
-		<p class="border-b border-amber-500/20 bg-amber-500/10 px-3 py-1 text-[10px] text-amber-300/90">
+		<p class="border-b border-amber-500/20 bg-amber-500/10 px-3 py-1 text-[12px] text-warning">
 			{t('mixer.monitorWarning')}
 		</p>
 	{/if}
@@ -373,9 +373,9 @@
 				     below is the level; a number that jumps with the audio is
 				     unreadable and tells you nothing you can act on. -->
 				<span
-					class="shrink-0 font-mono text-[10px] {strip.source.muted
-						? 'text-red-400/70 line-through'
-						: 'text-fg/55'}"
+					class="shrink-0 font-mono text-[12px] {strip.source.muted
+						? 'text-danger line-through'
+						: 'text-muted'}"
 				>
 					{formatDb(faderDb(gainPosition(strip.source.gain)))}
 				</span>
@@ -386,7 +386,7 @@
 				<div class="mt-1 flex gap-1">
 					{#if isAppStrip(strip)}
 						<select
-							class="studio-input h-7 min-w-0 flex-1 py-0 text-[11px]"
+							class="studio-input h-7 min-w-0 flex-1 py-0 text-[12px]"
 							value={strip.source.appId ?? ''}
 							onchange={(e) => {
 								const picked = (e.currentTarget as HTMLSelectElement).value;
@@ -413,7 +413,7 @@
 						{@render deviceSelect(source)}
 					{/if}
 					<button
-						class="studio-chip px-2 text-[10px]"
+						class="studio-chip px-2 text-[12px]"
 						title={t('mixer.unity')}
 						onclick={() => setLevel(strip, 1, strip.source.muted)}>0 dB</button
 					>
@@ -468,7 +468,7 @@
 						     their mark: centred, half of -60 and half of 0 fell off the
 						     ends and the scale looked cropped. -->
 						<span
-							class="absolute top-0 font-mono text-[8px] text-fg/25 {i === 0
+							class="absolute top-0 font-mono text-[12px] text-muted {i === 0
 								? ''
 								: i === METER_TICKS.length - 1
 									? '-translate-x-full'
@@ -481,8 +481,8 @@
 				<div class="mt-0.5 flex items-center gap-2">
 					<button
 						class="shrink-0 text-sm {strip.source.muted
-							? 'text-red-400'
-							: 'text-fg/50 hover:text-fg'}"
+							? 'text-danger'
+							: 'text-muted hover:text-fg'}"
 						title={strip.source.muted ? t('mixer.unmute') : t('mixer.mute')}
 						aria-label={strip.source.muted ? t('mixer.unmute') : t('mixer.mute')}
 						onclick={() => setLevel(strip, strip.source.gain, !strip.source.muted)}
@@ -534,7 +534,7 @@
 				     next to it removes a strip that is no longer wanted. -->
 				<div class="mt-1.5 flex gap-1">
 					<button
-						class="studio-chip min-w-0 flex-1 truncate text-left text-[11px]"
+						class="studio-chip min-w-0 flex-1 truncate text-left text-[12px]"
 						onclick={async () => {
 							await refreshApps();
 							devicesOpen = strip.id;
@@ -559,7 +559,7 @@
 					{/if}
 				</div>
 				{#if !appAudio.supported && !strip.isMic}
-					<p class="mt-0.5 text-[10px] leading-snug text-fg/25">{t('mixer.noSurfaceAudioHint')}</p>
+					<p class="mt-0.5 text-[12px] leading-snug text-muted">{t('mixer.noSurfaceAudioHint')}</p>
 				{/if}
 			{:else if strip.isMic}
 				{@const source = strip.source as AudioSource}
@@ -582,19 +582,19 @@
 					</button>
 				</div>
 				{#if error}
-					<p class="mt-0.5 text-[10px] leading-snug text-amber-400/80">{error}</p>
+					<p class="mt-0.5 text-[12px] leading-snug text-warning">{error}</p>
 				{/if}
 			{:else}
 				{@const reason = silenceReason(strip)}
-				<p class="mt-1.5 text-[11px] leading-snug text-fg/35" title={reason.hint}>
+				<p class="mt-1.5 text-[12px] leading-snug text-muted" title={reason.hint}>
 					{reason.label}
 				</p>
 				{#if reason.hint}
-					<p class="mt-0.5 text-[10px] leading-snug text-fg/25">{reason.hint}</p>
+					<p class="mt-0.5 text-[12px] leading-snug text-muted">{reason.hint}</p>
 				{/if}
 			{/if}
 		</div>
 	{:else}
-		<p class="px-3 py-4 text-[11px] text-fg/30">{t('mixer.empty')}</p>
+		<p class="px-3 py-4 text-[12px] text-muted">{t('mixer.empty')}</p>
 	{/each}
 </Dock>

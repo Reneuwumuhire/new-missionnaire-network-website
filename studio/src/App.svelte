@@ -442,24 +442,22 @@
 		class="flex h-9 shrink-0 items-center gap-4 border-b border-ink-700 bg-ink-900 pl-[86px] pr-3"
 	>
 		<h1
-			class="pointer-events-none select-none text-[10px] font-semibold uppercase tracking-[0.28em] text-fg/45"
+			class="pointer-events-none select-none text-[12px] font-semibold uppercase tracking-[0.28em] text-muted"
 		>
-			Missionnaire <span class="text-primary">Studio</span>
+			Missionnaire <span class="text-accent">Studio</span>
 		</h1>
 		{#if liveSession.activeId}
 			<!-- pointer-events-none so the whole title bar drags, not just the gaps. -->
 			<span
-				class="pointer-events-none flex items-center gap-2 bg-red-600/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-red-400"
+				class="pointer-events-none flex items-center gap-2 bg-red-600/15 px-2.5 py-0.5 text-[12px] font-semibold uppercase tracking-[0.14em] text-danger"
 			>
 				<span class="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500"></span>
 				{t('status.live')}
-				<span class="font-mono tracking-normal text-red-300/80"
-					>{durationLabel(publicDuration)}</span
-				>
+				<span class="font-mono tracking-normal text-danger">{durationLabel(publicDuration)}</span>
 			</span>
 		{:else if broadcast.phase === 'live'}
 			<span
-				class="pointer-events-none flex items-center gap-2 bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-300"
+				class="pointer-events-none flex items-center gap-2 bg-amber-500/10 px-2.5 py-0.5 text-[12px] font-semibold uppercase tracking-[0.14em] text-warning"
 			>
 				<span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span>
 				{t('status.preview')} · {uptimeLabel(now)}
@@ -467,7 +465,7 @@
 		{/if}
 		{#if liveSession.operatorName}
 			<button
-				class="ml-auto text-[10px] text-fg/45 hover:text-fg"
+				class="ml-auto text-[12px] text-muted hover:text-fg"
 				onclick={() => void logoutStudio()}
 				title="Sign out of Studio"
 			>
@@ -477,17 +475,17 @@
 		<span
 			class="pointer-events-none {liveSession.operatorName
 				? ''
-				: 'ml-auto'} text-[10px] {health.tone === 'warn'
-				? 'text-amber-400'
+				: 'ml-auto'} text-[12px] {health.tone === 'warn'
+				? 'text-warning'
 				: health.tone === 'ok'
-					? 'text-emerald-400'
-					: 'text-fg/30'}">{health.label}</span
+					? 'text-success'
+					: 'text-muted'}">{health.label}</span
 		>
 	</header>
 
 	{#if broadcast.error}
 		<div class="flex shrink-0 items-start gap-3 border-b border-red-500/30 bg-red-950/40 px-4 py-2">
-			<p class="flex-1 text-[12px] leading-relaxed text-red-300">{broadcast.error}</p>
+			<p class="flex-1 text-[12px] leading-relaxed text-danger">{broadcast.error}</p>
 			<button
 				class="studio-icon-btn"
 				aria-label={t('common.close')}
@@ -513,7 +511,7 @@
 						<button
 							class="h-10 w-full text-[13px] font-medium leading-tight transition-colors {canTake
 								? 'bg-primary text-black hover:bg-missionnaire-400'
-								: 'border border-ink-600 text-fg/25'}"
+								: 'border border-ink-600 text-muted'}"
 							disabled={!canTake}
 							title={t('preview.transitionHint')}
 							onclick={() => takeToProgram(studio.activeSceneId)}
@@ -522,12 +520,12 @@
 						</button>
 						<!-- OBS's Quick Transitions: take with a specific transition
 						     without disturbing the configured default. -->
-						<span class="text-[9px] uppercase tracking-wider text-fg/30">
+						<span class="text-[12px] uppercase tracking-wider text-muted">
 							{t('transitions.quick')}
 						</span>
 						{#each QUICK as quick (quick.type)}
 							<button
-								class="studio-chip w-full justify-center text-[10px] disabled:opacity-30"
+								class="studio-chip w-full justify-center text-[12px] disabled:opacity-30"
 								disabled={!canTake}
 								onclick={() =>
 									takeToProgram(
@@ -565,12 +563,12 @@
 
 			<!-- Selected-source strip, where OBS puts its Properties/Filters bar. -->
 			<div class="flex h-9 shrink-0 items-center gap-3 border-t border-ink-700 bg-ink-950 px-5">
-				<span class="font-mono text-[10px] text-fg/30">
+				<span class="font-mono text-[12px] text-muted">
 					{t('preview.canvas', { width: studio.settings.width, height: studio.settings.height })}
 				</span>
 				<span class="h-3 w-px bg-ink-600"></span>
 				<span
-					class="min-w-0 flex-1 truncate text-[12px] {selectedLayer ? 'text-fg/70' : 'text-fg/25'}"
+					class="min-w-0 flex-1 truncate text-[12px] {selectedLayer ? 'text-fg/70' : 'text-muted'}"
 					>{selectedLayer ? selectedLayer.name : t('preview.noSource')}</span
 				>
 				<button
@@ -634,7 +632,7 @@
 
 	<!-- ── Status bar ─────────────────────────────────────── -->
 	<footer
-		class="flex h-6 shrink-0 items-center gap-4 border-t border-ink-700 bg-ink-850 px-3 font-mono text-[10px] text-fg/35"
+		class="flex h-6 shrink-0 items-center gap-4 border-t border-ink-700 bg-ink-850 px-3 font-mono text-[12px] text-muted"
 	>
 		<span class="flex items-center gap-1.5">
 			<span
@@ -648,13 +646,13 @@
 			     dot grey and the title bar saying Offline — the one word in this app
 			     that must not be on screen when it is not true. -->
 			{#if liveSession.activeId}
-				<span class="text-red-400">{t('status.live')}</span>
+				<span class="text-danger">{t('status.live')}</span>
 				{durationLabel(publicDuration)}
 				{#if selectedLiveSession}<span class="max-w-80 truncate font-body text-fg/70"
 						>{selectedLiveSession.title}</span
 					>{/if}
 			{:else if broadcast.phase === 'live'}
-				<span class="text-amber-300">{t('status.preview')}</span>
+				<span class="text-warning">{t('status.preview')}</span>
 				{uptimeLabel(now)}
 			{:else}
 				{t('status.offline')}
@@ -667,17 +665,17 @@
 				second: '2-digit'
 			})}</span
 		>
-		{#if recording.startedAt}<span class="text-red-300">REC {durationLabel(recordingDuration)}</span
+		{#if recording.startedAt}<span class="text-danger">REC {durationLabel(recordingDuration)}</span
 			>{/if}
-		<span class={renderFps > 0 && renderFps < studio.settings.fps - 5 ? 'text-amber-400' : ''}>
+		<span class={renderFps > 0 && renderFps < studio.settings.fps - 5 ? 'text-warning' : ''}>
 			{t('status.fps', { actual: renderFps, target: studio.settings.fps })}
 		</span>
 		{#if broadcast.stats}
 			<span>{t('status.bitrate', { kbps: Math.round(broadcast.stats.bitrate_kbps) })}</span>
-			<span class={broadcast.stats.dropped_frames > 0 ? 'text-amber-400' : ''}>
+			<span class={broadcast.stats.dropped_frames > 0 ? 'text-warning' : ''}>
 				{t('status.dropped', { count: broadcast.stats.dropped_frames })}
 			</span>
-			<span class={broadcast.stats.backpressure_events > 0 ? 'text-amber-400' : ''}>
+			<span class={broadcast.stats.backpressure_events > 0 ? 'text-warning' : ''}>
 				{t('status.backpressure', { count: broadcast.stats.backpressure_events })}
 			</span>
 		{/if}
@@ -686,11 +684,11 @@
 		</span>
 		{#if ['available', 'downloading', 'installing', 'restarting'].includes(appUpdate.phase)}
 			{#if updateBlocked}
-				<span class="font-body text-[9px] text-amber-300">{t('update.blockedShort')}</span>
+				<span class="font-body text-[12px] text-warning">{t('update.blockedShort')}</span>
 			{/if}
 			<button
 				type="button"
-				class="flex h-[18px] shrink-0 items-center rounded-full bg-blue-500 px-2.5 font-body text-[10px] font-semibold text-white transition-colors hover:bg-blue-400 disabled:cursor-not-allowed disabled:bg-blue-500/45 disabled:text-white/70"
+				class="flex h-[18px] shrink-0 items-center rounded-full bg-blue-700 px-2.5 font-body text-[12px] font-semibold text-white transition-colors hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-blue-700/45 disabled:text-white/70"
 				disabled={updateBlocked || appUpdate.phase !== 'available'}
 				aria-label={updateBlocked ? t('update.blocked') : updateStatusLabel}
 				title={updateBlocked ? t('update.blocked') : updateStatusLabel}

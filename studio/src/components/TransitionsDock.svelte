@@ -15,8 +15,8 @@
 			class="studio-input h-8 w-full py-0 text-[12px]"
 			value={studio.settings.transitionType}
 			onchange={(e) => {
-				studio.settings.transitionType = (e.currentTarget as HTMLSelectElement).value as
-					typeof studio.settings.transitionType;
+				studio.settings.transitionType = (e.currentTarget as HTMLSelectElement)
+					.value as typeof studio.settings.transitionType;
 				persist();
 			}}
 		>
@@ -27,13 +27,13 @@
 
 		<!-- Shown even for Cut, greyed rather than hidden: the chosen duration is
 		     remembered, and a control that vanishes reads as a bug. -->
-		<div class={studio.settings.transitionType === 'cut' ? 'opacity-40' : ''}>
-			<span class="mb-1 block text-[11px] text-fg/45">{t('transitions.duration')}</span>
+		<div>
+			<span class="mb-1 block text-[12px] text-muted">{t('transitions.duration')}</span>
 			<div class="flex flex-wrap gap-1">
 				{#each DURATIONS as ms (ms)}
 					<button
-						class="studio-chip flex-1 px-1 text-[10px] {studio.settings.transitionMs === ms
-							? 'bg-primary/20 text-primary'
+						class="studio-chip flex-1 px-1 text-[12px] {studio.settings.transitionMs === ms
+							? 'bg-primary/20 text-accent'
 							: ''}"
 						disabled={studio.settings.transitionType === 'cut'}
 						onclick={() => {
