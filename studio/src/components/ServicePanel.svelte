@@ -42,10 +42,10 @@
 		type ServicePhase
 	} from '../lib/state.svelte';
 
-	let { mixer }: { mixer: Mixer | null } = $props();
+	let { mixer, setupOpen = $bindable(false) }: { mixer: Mixer | null; setupOpen?: boolean } =
+		$props();
 	let outputs = $state<DeviceOption[]>([]);
 	let inputs = $state<DeviceOption[]>([]);
-	let setupOpen = $state(false);
 	let refreshing = $state(false);
 	let fileError = $state('');
 	let validatingFile = $state(false);
@@ -64,6 +64,9 @@
 		}
 	}
 	onMount(() => watchDevices(refreshDevices));
+	$effect(() => {
+		if (setupOpen) void refreshDevices();
+	});
 	const outputAvailable = $derived(
 		outputs.some((device) => device.deviceId === studio.settings.interpreterOutputDeviceId)
 	);
@@ -262,12 +265,8 @@
 					: 'Krefeld programme with live Kinyarwanda interpretation'}
 			</p>
 		</div>
-		<button
-			class="studio-chip rounded px-3 py-2"
-			onclick={() => {
-				setupOpen = true;
-				void refreshDevices();
-			}}>{editable ? 'Set up service' : 'View setup'}</button
+		<button class="studio-chip rounded px-3 py-2" onclick={() => (setupOpen = true)}
+			>{editable ? 'Set up service' : 'View setup'}</button
 		>
 	</div>
 	{#if setupOpen}

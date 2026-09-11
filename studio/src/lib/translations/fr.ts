@@ -464,7 +464,12 @@ const fr: Record<keyof typeof en, string> = {
 	'help.safety':
 		'Le programme est ce que les spectateurs reçoivent. Vérifiez toujours le programme — pas seulement l’aperçu — avant de démarrer ou modifier une diffusion.',
 	'help.shortcuts': 'Raccourcis clavier',
-	'help.shortcutsIntro': 'Les raccourcis sont ignorés pendant la saisie dans un champ.',
+	'help.toggleLyricsPanel': 'Afficher ou masquer le panneau des paroles',
+	'help.toggleBottomPanels': 'Afficher ou masquer les panneaux inférieurs',
+	'help.interfaceZoom': 'Agrandir, réduire ou revenir à la taille réelle',
+	'help.recordingsFolder': 'Ouvrir le dossier des enregistrements locaux',
+	'help.shortcutsIntro':
+		'Les raccourcis des scènes et paroles sont ignorés pendant la saisie. Ceux des menus restent disponibles.',
 	'help.nextSubtitle': 'Sous-titre manuel suivant',
 	'help.previousSubtitle': 'Sous-titre manuel précédent',
 	'help.selectScene': 'Choisir une scène selon sa position',

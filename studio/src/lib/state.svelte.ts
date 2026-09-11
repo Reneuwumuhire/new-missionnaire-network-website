@@ -639,3 +639,9 @@ export function destinationUrl(d: Destination): string {
 	const key = d.key.trim().replace(/^\/+/, '');
 	return key ? `${base}/${key}` : base;
 }
+
+/** Restore panel sizes and make hidden panels reachable again. */
+export function resetLayout() {
+	studio.settings.layout = { ...DEFAULT_LAYOUT, weights: { ...DEFAULT_LAYOUT.weights } };
+	persist();
+}

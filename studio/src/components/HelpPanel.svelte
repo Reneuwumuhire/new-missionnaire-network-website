@@ -67,7 +67,7 @@
 				<h3 class="text-base font-semibold text-fg/90">{t('help.shortcuts')}</h3>
 				<p class="mt-1 text-muted">{t('help.shortcutsIntro')}</p>
 			</div>
-			<dl class="grid grid-cols-[9rem_1fr] items-center gap-x-4 gap-y-3">
+			<dl class="grid grid-cols-[12rem_1fr] items-center gap-x-4 gap-y-3">
 				<dt><kbd>Space</kbd> / <kbd>→</kbd> / <kbd>↓</kbd></dt>
 				<dd>{t('help.nextSubtitle')}</dd>
 				<dt><kbd>←</kbd> / <kbd>↑</kbd></dt>
@@ -82,6 +82,16 @@
 				<dd>{t('help.openSettings')}</dd>
 				<dt><kbd>⌘/Ctrl</kbd> + <kbd>/</kbd></dt>
 				<dd>{t('help.openHelp')}</dd>
+				<dt><kbd>⌘/Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>L</kbd></dt>
+				<dd>{t('help.toggleLyricsPanel')}</dd>
+				<dt><kbd>⌘/Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>D</kbd></dt>
+				<dd>{t('help.toggleBottomPanels')}</dd>
+				<dt><kbd>⌘/Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>M</kbd></dt>
+				<dd>{t('controls.studioMode')}</dd>
+				<dt><kbd>⌘/Ctrl</kbd> + <kbd>+</kbd> / <kbd>−</kbd> / <kbd>0</kbd></dt>
+				<dd>{t('help.interfaceZoom')}</dd>
+				<dt><kbd>⌘/Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>R</kbd></dt>
+				<dd>{t('help.recordingsFolder')}</dd>
 			</dl>
 		{:else}
 			<div>

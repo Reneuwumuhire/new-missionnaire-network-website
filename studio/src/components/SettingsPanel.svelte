@@ -5,8 +5,13 @@
 	import DestinationsPanel from './DestinationsPanel.svelte';
 	import Icon, { type IconName } from './Icon.svelte';
 	import { LOCALES, THEMES, applyTheme, i18n, setLocale, t, theme } from '../lib/i18n.svelte';
-	import { DEFAULT_LAYOUT } from '../lib/layout';
-	import { persist, stageableSettings, studio, type Destination } from '../lib/state.svelte';
+	import {
+		persist,
+		resetLayout,
+		stageableSettings,
+		studio,
+		type Destination
+	} from '../lib/state.svelte';
 	import { recording } from '../lib/recording.svelte';
 	import { appUpdate, checkForUpdate, downloadPercent, installUpdate } from '../lib/updater.svelte';
 
@@ -377,15 +382,7 @@
 				{#if page === 'layout'}
 					<div>
 						<span class="studio-label">{t('settings.layout')}</span>
-						<button
-							class="studio-chip"
-							onclick={() => {
-								studio.settings.layout = {
-									...DEFAULT_LAYOUT,
-									weights: { ...DEFAULT_LAYOUT.weights }
-								};
-							}}>{t('settings.resetLayout')}</button
-						>
+						<button class="studio-chip" onclick={resetLayout}>{t('settings.resetLayout')}</button>
 						<p class="mt-1 text-[12px] leading-relaxed text-muted">{t('settings.layoutHint')}</p>
 					</div>
 				{/if}

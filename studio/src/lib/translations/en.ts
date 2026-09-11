@@ -454,7 +454,12 @@ const en = {
 	'help.safety':
 		'Program is what viewers receive. Always check Program—not only Preview—before starting or changing a broadcast.',
 	'help.shortcuts': 'Keyboard Shortcuts',
-	'help.shortcutsIntro': 'Shortcuts are ignored while you are typing in a field.',
+	'help.toggleLyricsPanel': 'Show or hide the lyrics panel',
+	'help.toggleBottomPanels': 'Show or hide the bottom panels',
+	'help.interfaceZoom': 'Zoom in, zoom out, or return to actual size',
+	'help.recordingsFolder': 'Open the local recordings folder',
+	'help.shortcutsIntro':
+		'Scene and lyric shortcuts are ignored while typing. Menu shortcuts remain available.',
 	'help.nextSubtitle': 'Next manual subtitle',
 	'help.previousSubtitle': 'Previous manual subtitle',
 	'help.selectScene': 'Select scene by position',

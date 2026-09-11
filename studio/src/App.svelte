@@ -30,7 +30,13 @@
 		stopBroadcast,
 		uptimeLabel
 	} from './lib/broadcast.svelte';
-	import { frameCount, selectScene, takeToProgram, type TransitionType } from './lib/compositor';
+	import {
+		frameCount,
+		selectScene,
+		setStudioMode,
+		takeToProgram,
+		type TransitionType
+	} from './lib/compositor';
 	import { lyrics, step } from './lib/lyrics.svelte';
 	import {
 		askForMicrophone,
@@ -51,7 +57,14 @@
 		selftestMixer,
 		selftestTarget
 	} from './lib/selftest';
-	import { activeScene, audioLayers, onAirSceneId, persist, studio } from './lib/state.svelte';
+	import {
+		activeScene,
+		audioLayers,
+		onAirSceneId,
+		persist,
+		resetLayout,
+		studio
+	} from './lib/state.svelte';
 	import {
 		heartbeatStudio,
 		liveSession,
@@ -61,7 +74,13 @@
 	} from './lib/live-session.svelte';
 	import { recording } from './lib/recording.svelte';
 	import { initReferenceMatcher } from './lib/reference-match.svelte';
-	import { appUpdate, downloadPercent, initUpdater, installUpdate } from './lib/updater.svelte';
+	import {
+		appUpdate,
+		checkForUpdate,
+		downloadPercent,
+		initUpdater,
+		installUpdate
+	} from './lib/updater.svelte';
 
 	let programCanvas = $state<HTMLCanvasElement | null>(null);
 	let mixer = $state<Mixer | null>(null);
@@ -86,6 +105,8 @@
 	>(null);
 	let settingsPage = $state<'general' | 'output' | 'about'>('general');
 	let helpSection = $state<HelpSection>('getting-started');
+	let serviceSetupOpen = $state(false);
+	let stopMenuErrorListener: (() => void) | null = null;
 	let stopMenuListener: (() => void) | null = null;
 	let stopCloseListener: (() => void) | null = null;
 	/** Frames actually painted per second — the readout OBS puts in its status
@@ -101,6 +122,9 @@
 		void initUpdater();
 		void listen<string>('studio://menu', (event) => openMenuItem(event.payload)).then(
 			(unlisten) => (stopMenuListener = unlisten)
+		);
+		void listen<string>('studio://menu-error', (event) => (broadcast.error = event.payload)).then(
+			(unlisten) => (stopMenuErrorListener = unlisten)
 		);
 		void listen(
 			'studio://close-blocked',
@@ -169,6 +193,7 @@
 		if (liveSession.pairingCode) void refreshSessions();
 		return () => {
 			stopMenuListener?.();
+			stopMenuErrorListener?.();
 			stopCloseListener?.();
 			clearInterval(clock);
 			clearInterval(heartbeat);
@@ -180,17 +205,48 @@
 	});
 
 	function openSettings(page: 'general' | 'output' | 'about' = 'general') {
+		serviceSetupOpen = false;
 		settingsPage = page;
 		dialog = 'settings';
 	}
 
 	function openHelp(section: HelpSection = 'getting-started') {
+		serviceSetupOpen = false;
 		helpSection = section;
 		dialog = 'help';
 	}
 
 	function openMenuItem(id: string) {
 		switch (id) {
+			case 'studio-service-setup':
+				dialog = null;
+				serviceSetupOpen = true;
+				break;
+			case 'studio-live-session':
+				serviceSetupOpen = false;
+				dialog = 'live-session';
+				break;
+			case 'studio-recording-settings':
+				openSettings('output');
+				break;
+			case 'studio-updates':
+				openSettings('about');
+				void checkForUpdate();
+				break;
+			case 'studio-toggle-lyrics':
+				studio.settings.layout.lyricsVisible = !studio.settings.layout.lyricsVisible;
+				persist();
+				break;
+			case 'studio-toggle-docks':
+				studio.settings.layout.docksVisible = !studio.settings.layout.docksVisible;
+				persist();
+				break;
+			case 'studio-toggle-mode':
+				setStudioMode(!studio.settings.studioMode);
+				break;
+			case 'studio-reset-layout':
+				resetLayout();
+				break;
 			case 'studio-settings':
 				openSettings();
 				break;
@@ -498,7 +554,7 @@
 	<div class="flex min-h-0 flex-1">
 		<div class="flex min-w-0 flex-1 flex-col">
 			<LyricsRibbon />
-			<ServicePanel {mixer} />
+			<ServicePanel {mixer} bind:setupOpen={serviceSetupOpen} />
 			<div class="flex min-h-0 flex-1 gap-4 bg-ink-950 px-4 pt-1.5">
 				{#if studio.settings.studioMode}
 					<Preview
@@ -581,9 +637,15 @@
 			</div>
 		</div>
 
-		<Splitter orientation="vertical" label={t('splitter.lyrics')} onmove={resizeLyrics} />
+		{#if layout.lyricsVisible}
+			<Splitter orientation="vertical" label={t('splitter.lyrics')} onmove={resizeLyrics} />
+		{/if}
 
-		<aside class="flex shrink-0 flex-col bg-ink-900" style="width: {layout.lyricsWidth}px">
+		<aside
+			class="flex shrink-0 flex-col bg-ink-900"
+			style="width: {layout.lyricsWidth}px"
+			style:display={layout.lyricsVisible ? undefined : 'none'}
+		>
 			<div class="flex h-8 shrink-0 items-center border-b border-ink-700 bg-ink-850 px-3">
 				<h2 class="text-[12px] font-semibold text-fg/80">{t('dock.lyrics')}</h2>
 			</div>
@@ -594,9 +656,16 @@
 	</div>
 
 	<!-- ── Dock row ───────────────────────────────────────── -->
-	<Splitter orientation="horizontal" label={t('splitter.docks')} onmove={resizeDockRow} />
+	{#if layout.docksVisible}
+		<Splitter orientation="horizontal" label={t('splitter.docks')} onmove={resizeDockRow} />
+	{/if}
 
-	<div bind:this={dockRow} class="flex shrink-0 bg-ink-900" style="height: {layout.dockHeight}px">
+	<div
+		bind:this={dockRow}
+		class="flex shrink-0 bg-ink-900"
+		style="height: {layout.dockHeight}px"
+		style:display={layout.docksVisible ? undefined : 'none'}
+	>
 		<ScenesDock />
 		<Splitter
 			orientation="vertical"
