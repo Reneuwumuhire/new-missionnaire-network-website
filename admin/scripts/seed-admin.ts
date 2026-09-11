@@ -24,7 +24,9 @@ async function main() {
 		process.exit(1);
 	}
 	if (!email || !password) {
-		console.error('Usage: MONGODB_URI="..." npx tsx scripts/seed-admin.ts --email <email> --password <password> [--name <name>]');
+		console.error(
+			'Usage: MONGODB_URI="..." npx tsx scripts/seed-admin.ts --email <email> --password <password> [--name <name>]'
+		);
 		process.exit(1);
 	}
 
@@ -37,24 +39,15 @@ async function main() {
 		const db = client.db('youtube_data');
 
 		// Create TTL index on sessions
-		await db.collection('admin_sessions').createIndex(
-			{ expires_at: 1 },
-			{ expireAfterSeconds: 0 }
-		);
+		await db.collection('admin_sessions').createIndex({ expires_at: 1 }, { expireAfterSeconds: 0 });
 		console.log('Created TTL index on admin_sessions.expires_at');
 
 		// Create unique index on admin users email
-		await db.collection('admin_users').createIndex(
-			{ email: 1 },
-			{ unique: true }
-		);
+		await db.collection('admin_users').createIndex({ email: 1 }, { unique: true });
 		console.log('Created unique index on admin_users.email');
 
 		// Create unique index on sessions token
-		await db.collection('admin_sessions').createIndex(
-			{ token: 1 },
-			{ unique: true }
-		);
+		await db.collection('admin_sessions').createIndex({ token: 1 }, { unique: true });
 		console.log('Created unique index on admin_sessions.token');
 
 		// Create audit log indexes
@@ -69,7 +62,14 @@ async function main() {
 			const hash = await bcrypt.hash(password, 12);
 			await db.collection('admin_users').updateOne(
 				{ email: email.toLowerCase() },
-				{ $set: { password_hash: hash, name, is_active: true } }
+				{
+					$set: {
+						password_hash: hash,
+						name,
+						is_active: true,
+						must_change_password: false
+					}
+				}
 			);
 			console.log('Password updated successfully.');
 		} else {
@@ -81,7 +81,10 @@ async function main() {
 				role: 'superadmin',
 				created_at: new Date(),
 				last_login: null,
-				is_active: true
+				is_active: true,
+				must_change_password: false,
+				two_factor_enabled: false,
+				recovery_code_hashes: []
 			});
 			console.log(`Created admin user: ${email} (superadmin)`);
 		}
