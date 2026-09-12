@@ -36,7 +36,7 @@ const language = (field: unknown) => ({
 
 // Read extracted text only while its URL still matches a current attachment.
 // Replacing/hiding a file immediately invalidates old text without waiting for re-indexing.
-function indexedParts(urls: unknown) {
+function indexedParts(urls: unknown, regex: string) {
 	return {
 		$reduce: {
 			input: {
@@ -48,11 +48,19 @@ function indexedParts(urls: unknown) {
 			},
 			initialValue: [],
 			in: {
-				$concatArrays: [
+				$cond: [
+					{ $gt: [{ $size: '$$value' }, 0] },
 					'$$value',
 					{
 						$map: {
-							input: fallback('$$this.parts', []),
+							input: {
+								$filter: {
+									input: fallback('$$this.parts', []),
+									as: 'part',
+									limit: 1,
+									cond: { $regexMatch: { input: fallback('$$part.text'), regex, options: 'i' } }
+								}
+							},
 							as: 'part',
 							in: { $mergeObjects: ['$$part', { url: '$$this.url' }] }
 						}
@@ -63,8 +71,25 @@ function indexedParts(urls: unknown) {
 	};
 }
 
-export function librarySourcePipeline(type: LibraryType, f: LibraryFilters): Document[] {
+// Whole-word candidate lookup only; the existing literal matcher still validates
+// phrases, punctuation and current attachment/language boundaries afterwards.
+export function libraryTextTerm(query: string) {
+	return (
+		(query.normalize('NFC').match(/[\p{L}\p{N}]+/gu) ?? []).sort(
+			(a, b) => b.length - a.length
+		)[0] ?? ''
+	);
+}
+
+export function librarySourcePipeline(
+	type: LibraryType,
+	f: LibraryFilters,
+	content = false
+): Document[] {
+	const regex = buildFuzzySearchPattern(f.q);
+	const textTerm = libraryTextTerm(f.q);
 	const stages: Document[] = [
+		...(content ? [{ $match: { $text: { $search: textTerm, $language: 'none' } } }] : []),
 		{
 			$match:
 				type === 'recordings'
@@ -120,13 +145,16 @@ export function librarySourcePipeline(type: LibraryType, f: LibraryFilters): Doc
 					}
 				]
 			},
-			parts: indexedParts(
-				f.language === 'fr'
-					? ['$pdf_url']
-					: f.language === 'en'
-						? ['$english_pdf_url']
-						: ['$pdf_url', '$english_pdf_url']
-			)
+			parts: content
+				? indexedParts(
+						f.language === 'fr'
+							? ['$pdf_url']
+							: f.language === 'en'
+								? ['$english_pdf_url']
+								: ['$pdf_url', '$english_pdf_url'],
+						regex
+					)
+				: []
 		});
 	} else if (type === 'songs') {
 		stages.push(
@@ -227,7 +255,7 @@ export function librarySourcePipeline(type: LibraryType, f: LibraryFilters): Doc
 			parts: {
 				$cond: [
 					{ $and: [{ $ne: ['$subtitles_hidden', true] }, { $isNumber: offset }] },
-					indexedParts([subtitleUrl]),
+					content ? indexedParts([subtitleUrl], regex) : [],
 					[]
 				]
 			}
@@ -265,18 +293,17 @@ export function librarySourcePipeline(type: LibraryType, f: LibraryFilters): Doc
 			title: fallback('$filename'),
 			date: '$publishedOn',
 			url: fallback('$url'),
-			parts: indexedParts(['$url'])
+			parts: content ? indexedParts(['$url'], regex) : []
 		});
 	} else {
 		Object.assign(fields, {
 			date: '$release_date',
 			category: fallback('$type'),
 			url: fallback('$pdf_url'),
-			parts: indexedParts(['$pdf_url'])
+			parts: content ? indexedParts(['$pdf_url'], regex) : []
 		});
 	}
 	stages.push({ $project: fields });
-	const regex = buildFuzzySearchPattern(f.q);
 	const matches: Document = {
 		$or: ['title', 'alternateTitle', 'author', 'category', 'description', 'code', 'parts.text'].map(
 			(field) => ({ [field]: { $regex: regex, $options: 'i' } })
@@ -304,6 +331,7 @@ export function librarySourcePipeline(type: LibraryType, f: LibraryFilters): Doc
 							$filter: {
 								input: '$parts',
 								as: 'part',
+								limit: 1,
 								cond: { $regexMatch: { input: fallback('$$part.text'), regex, options: 'i' } }
 							}
 						},
@@ -367,17 +395,34 @@ export async function searchLibrary(
 	if (filters.q.length < 2) return { results: [], total: 0, page: filters.page, pages: 0 };
 	const db = database ?? (await getDb());
 	const types = filters.type ? [filters.type] : [...libraryTypes];
-	const [first, ...rest] = types;
-	// ponytail: bounded Mongo aggregation over the existing catalogue. Move to
-	// Atlas Search when measured traffic/size outgrows the 5-second query budget.
+	const sources = types.flatMap((type) => [
+		{ type, content: false },
+		...(type !== 'songs' && libraryTextTerm(filters.q) ? [{ type, content: true }] : [])
+	]);
+	const [first, ...rest] = sources;
+	// Keep small metadata/lyric substring searches separate from indexed file
+	// searches. Never put $text in an $or with an unindexed regex predicate.
 	const [result] = await db
-		.collection(collections[first])
+		.collection(collections[first.type])
 		.aggregate(
 			[
-				...librarySourcePipeline(first, filters),
-				...rest.map((type) => ({
-					$unionWith: { coll: collections[type], pipeline: librarySourcePipeline(type, filters) }
+				...librarySourcePipeline(first.type, filters, first.content),
+				...rest.map(({ type, content }) => ({
+					$unionWith: {
+						coll: collections[type],
+						pipeline: librarySourcePipeline(type, filters, content)
+					}
 				})),
+				// A title and a PDF passage may both match. Return/count the source once,
+				// retaining the matching passage regardless of branch order.
+				{
+					$group: {
+						_id: { type: '$type', id: '$id' },
+						row: { $first: '$$ROOT' },
+						part: { $mergeObjects: '$part' }
+					}
+				},
+				{ $replaceWith: { $mergeObjects: ['$row', { part: '$part' }] } },
 				{
 					$facet: {
 						items: [

@@ -1,8 +1,27 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { MongoClient, ObjectId, type Db } from 'mongodb';
 vi.mock('../../db/mongo', () => ({ getDb: vi.fn() }));
-import { searchLibrary, toLibraryResult } from './librarySearch';
+import {
+	searchLibrary,
+	toLibraryResult,
+	librarySourcePipeline,
+	libraryTextTerm
+} from './librarySearch';
 import { parseLibraryFilters } from '../utils/librarySearch';
+import { ensureLibrarySearchIndexes } from './librarySearchIndexes';
+
+it('uses an indexed first stage for file text, not raw user search syntax', () => {
+	const filters = parseLibraryFilters(new URLSearchParams('q=amour'));
+	expect(librarySourcePipeline('sermons', filters, true)[0]).toEqual({
+		$match: { $text: { $search: 'amour', $language: 'none' } }
+	});
+	expect(JSON.stringify(librarySourcePipeline('sermons', filters))).not.toContain(
+		'$library_search'
+	);
+	expect(libraryTextTerm('-amour "foi"')).toBe('amour');
+	expect(libraryTextTerm('.*')).toBe('');
+	expect(libraryTextTerm('gra\u0302ce')).toBe('grâce');
+});
 
 it('maps timed snippets and safe document links', () => {
 	const row = {
@@ -41,6 +60,7 @@ describe.skipIf(!uri)('library search Mongo integration', () => {
 			throw new Error('Integration tests require explicit local Mongo URI');
 		client = await new MongoClient(uri).connect();
 		db = client.db(`library_search_test_${new ObjectId()}`);
+		await ensureLibrarySearchIndexes(db);
 		await db.collection('sermons').insertOne({
 			french_title: 'La grâce',
 			author: 'Prédicateur',
@@ -135,7 +155,7 @@ describe.skipIf(!uri)('library search Mongo integration', () => {
 			}
 		]);
 		await db.collection('literature').insertOne({
-			title: 'Une brochure',
+			title: 'Une brochure de grâce',
 			language: 'french',
 			type: 'Books',
 			pdf_url: 'https://assets.test/book.pdf',
@@ -172,6 +192,52 @@ describe.skipIf(!uri)('library search Mongo integration', () => {
 		for (const q of ['Private', 'secret-lyrics', 'stale-only', 'Not ready'])
 			expect((await run(`q=${encodeURIComponent(q)}`)).total).toBe(0);
 	});
+	it('uses the text index rather than examining unrelated PDF bodies', async () => {
+		const plan = await db
+			.collection('literature')
+			.find({
+				$text: { $search: 'grace', $language: 'none' }
+			})
+			.explain('executionStats');
+		expect(JSON.stringify(plan.queryPlanner.winningPlan)).toContain('library_file_text_v1');
+		expect(plan.executionStats.totalDocsExamined).toBe(1);
+		expect((await run('q=grace&type=documents')).total).toBe(1);
+	});
+	it('keeps phrase, accent and literal punctuation matching without duplicate source rows', async () => {
+		await db.collection('literature').insertOne({
+			title: 'Nouveau document',
+			language: 'rw',
+			pdf_url: 'https://assets.test/new.pdf',
+			library_search: [
+				{
+					url: 'https://assets.test/new.pdf',
+					parts: [{ page: 2, text: 'La gra\u0302ce nous suffit. [test] et C++.' }]
+				}
+			]
+		});
+		for (const query of ['grâce nous suffit', '[test]', 'C++']) {
+			const result = await run(`q=${encodeURIComponent(query)}&type=documents`);
+			expect(result.total).toBe(1);
+			expect(result.results[0].page).toBe(2);
+		}
+		expect((await run('q=Nouv&type=documents')).total).toBe(1);
+		expect((await run('q=grace&type=documents')).total).toBe(2);
+		await db.collection('literature').deleteOne({ title: 'Nouveau document' });
+	});
+	it('invalidates indexed text immediately after unpublishing or replacing its attachment', async () => {
+		const col = db.collection('literature');
+		await col.updateOne({ title: 'Une brochure de grâce' }, { $set: { published: false } });
+		expect((await run('q=écrite&type=documents')).total).toBe(0);
+		await col.updateOne(
+			{ title: 'Une brochure de grâce' },
+			{ $set: { published: true, pdf_url: 'https://assets.test/replaced.pdf' } }
+		);
+		expect((await run('q=écrite&type=documents')).total).toBe(0);
+		await col.updateOne(
+			{ title: 'Une brochure de grâce' },
+			{ $set: { pdf_url: 'https://assets.test/book.pdf' } }
+		);
+	});
 	it('hides subtitle text as soon as the recording hides it', async () => {
 		await db
 			.collection('recordings')
@@ -182,6 +248,23 @@ describe.skipIf(!uri)('library search Mongo integration', () => {
 		await db
 			.collection('recordings')
 			.updateOne({ _id: recId }, { $set: { subtitles_hidden: false } });
+	});
+	it('validates language-specific attachments after the index lookup', async () => {
+		const col = db.collection('sermons');
+		const { insertedId } = await col.insertOne({
+			french_title: 'Langues',
+			english_title: 'Languages',
+			pdf_url: 'https://assets.test/fr.pdf',
+			english_pdf_url: 'https://assets.test/en.pdf',
+			library_search: [
+				{ url: 'https://assets.test/fr.pdf', parts: [{ text: 'francophone', page: 7 }] },
+				{ url: 'https://assets.test/en.pdf', parts: [{ text: 'anglophone', page: 9 }] }
+			]
+		});
+		expect((await run('q=anglophone&type=sermons&language=fr')).total).toBe(0);
+		const english = await run('q=anglophone&type=sermons&language=en');
+		expect(english.results[0].pageHref).toBe('https://assets.test/en.pdf#page=9');
+		await col.deleteOne({ _id: insertedId });
 	});
 	it('paginates deterministically without duplicate or missing items', async () => {
 		await db.collection('literature').insertMany(
