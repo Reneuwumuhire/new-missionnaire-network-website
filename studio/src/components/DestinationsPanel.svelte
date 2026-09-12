@@ -88,14 +88,14 @@
 <section class="space-y-3 border-b border-ink-700 p-4">
 	<div>
 		<h3 class="text-[12px] font-semibold text-fg/80">{t('stream.youtubeChannels')}</h3>
-		<p class="mt-1 text-[11px] leading-relaxed text-fg/40">{t('stream.youtubeChannelsHint')}</p>
+		<p class="mt-1 text-[12px] leading-relaxed text-muted">{t('stream.youtubeChannelsHint')}</p>
 	</div>
 	{#if !liveSession.operatorName}
-		<p class="border border-amber-500/25 bg-amber-500/5 p-2 text-[11px] text-amber-300">
+		<p class="border border-amber-500/25 bg-amber-500/5 p-2 text-[12px] text-warning">
 			{t('stream.connectAdminFirst')}
 		</p>
 	{:else if liveSession.youtubeChannels.length === 0}
-		<p class="text-[11px] text-fg/35">{t('stream.noYouTubeChannels')}</p>
+		<p class="text-[12px] text-muted">{t('stream.noYouTubeChannels')}</p>
 	{:else}
 		<div class="space-y-1.5">
 			{#each liveSession.youtubeChannels as channel (channel.id)}
@@ -103,7 +103,7 @@
 					<span class="h-2 w-2 rounded-full bg-emerald-400"></span>
 					<span class="min-w-0 flex-1 truncate text-[12px] text-fg/75">{channel.title}</span>
 					<button
-						class="studio-chip text-red-300"
+						class="studio-chip text-danger"
 						disabled={isStreaming()}
 						onclick={() => void removeChannel(channel.id, channel.title)}
 						>{t('stream.disconnectChannel')}</button
@@ -124,19 +124,19 @@
 				: t('stream.connectAdmin')}
 	</button>
 	{#if liveSession.youtubeError}
-		<p class="text-[11px] text-red-400">{liveSession.youtubeError}</p>
+		<p class="text-[12px] text-danger">{liveSession.youtubeError}</p>
 	{/if}
 </section>
 
 <section class="space-y-3 border-b border-ink-700 p-4">
 	<div>
 		<h3 class="text-[12px] font-semibold text-fg/80">{t('stream.missionnaireManaged')}</h3>
-		<p class="mt-1 text-[11px] leading-relaxed text-fg/40">
+		<p class="mt-1 text-[12px] leading-relaxed text-muted">
 			{t('stream.missionnaireManagedHint')}
 		</p>
 	</div>
 	{#if !liveSession.operatorName}
-		<p class="border border-amber-500/25 bg-amber-500/5 p-2 text-[11px] text-amber-300">
+		<p class="border border-amber-500/25 bg-amber-500/5 p-2 text-[12px] text-warning">
 			{t('stream.connectAdminFirst')}
 		</p>
 	{:else if liveSession.missionnaireReady}
@@ -145,7 +145,7 @@
 			<span class="text-[12px] text-fg/75">{t('stream.missionnaireReady')}</span>
 		</div>
 	{:else}
-		<p class="border border-red-500/20 bg-red-500/5 p-2 text-[11px] text-red-300">
+		<p class="border border-red-500/20 bg-red-500/5 p-2 text-[12px] text-danger">
 			{liveSession.missionnaireError ?? t('stream.missionnaireUnavailable')}
 		</p>
 	{/if}
@@ -154,7 +154,7 @@
 <div class="space-y-3 p-4">
 	<div>
 		<h3 class="text-[12px] font-semibold text-fg/80">{t('stream.manualOutputs')}</h3>
-		<p class="mt-1 text-[11px] leading-relaxed text-fg/40">{t('stream.intro')}</p>
+		<p class="mt-1 text-[12px] leading-relaxed text-muted">{t('stream.intro')}</p>
 	</div>
 
 	{#each destinations.filter((destination) => !destination.managed) as destination (destination.id)}
@@ -191,7 +191,7 @@
 
 			<div class="mt-2 space-y-1.5">
 				<input
-					class="studio-input w-full font-mono text-[11px]"
+					class="studio-input w-full font-mono text-[12px]"
 					placeholder={t('stream.urlPlaceholder')}
 					value={destination.url}
 					onchange={(e) => {
@@ -200,7 +200,7 @@
 				/>
 				<div class="flex gap-1.5">
 					<input
-						class="studio-input min-w-0 flex-1 font-mono text-[11px]"
+						class="studio-input min-w-0 flex-1 font-mono text-[12px]"
 						type={revealed[destination.id] ? 'text' : 'password'}
 						placeholder={t('stream.keyPlaceholder')}
 						value={destination.key}
@@ -216,7 +216,7 @@
 				</div>
 			</div>
 
-			<label class="mt-2 flex items-start gap-2 text-[11px] text-fg/60">
+			<label class="mt-2 flex items-start gap-2 text-[12px] text-muted">
 				<input
 					type="checkbox"
 					class="mt-0.5 accent-primary"
@@ -228,16 +228,16 @@
 				/>
 				<span>
 					{t('stream.hold')}
-					<span class="mt-0.5 block text-[10px] leading-relaxed text-fg/35">
+					<span class="mt-0.5 block text-[12px] leading-relaxed text-muted">
 						{t('stream.holdHint')}
 					</span>
 				</span>
 			</label>
 
 			{#if issue}
-				<p class="mt-2 text-[11px] text-amber-400/90">{issue}</p>
+				<p class="mt-2 text-[12px] text-warning">{issue}</p>
 			{:else}
-				<p class="mt-2 truncate font-mono text-[10px] text-fg/25">{preview(destination)}</p>
+				<p class="mt-2 truncate font-mono text-[12px] text-muted">{preview(destination)}</p>
 			{/if}
 		</div>
 	{/each}
@@ -251,5 +251,5 @@
 		<button class="studio-chip" onclick={() => add()}>+ {t('stream.presetBlank')}</button>
 	</div>
 
-	<p class="text-[11px] leading-relaxed text-fg/30">{t('stream.keyWarning')}</p>
+	<p class="text-[12px] leading-relaxed text-muted">{t('stream.keyWarning')}</p>
 </div>

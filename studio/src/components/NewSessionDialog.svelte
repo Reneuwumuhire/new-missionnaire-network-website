@@ -66,7 +66,7 @@
 		<span class="mt-1 h-2 w-2 shrink-0 bg-primary"></span>
 		<div>
 			<p class="text-[12px] font-medium text-fg/80">One service, published in both places</p>
-			<p class="mt-0.5 text-[11px] leading-relaxed text-fg/45">
+			<p class="mt-0.5 text-[12px] leading-relaxed text-muted">
 				Creates the YouTube broadcast and a stable Missionnaire public link.
 			</p>
 		</div>
@@ -75,7 +75,7 @@
 	<section class="space-y-3 border border-ink-700 bg-ink-850/40 p-4">
 		<div>
 			<h3 class="text-[12px] font-semibold text-fg/85">Service information</h3>
-			<p class="mt-0.5 text-[10px] text-fg/40">Used on YouTube and Missionnaire.</p>
+			<p class="mt-0.5 text-[12px] text-muted">Used on YouTube and Missionnaire.</p>
 		</div>
 		<fieldset>
 			<legend class="studio-label">Service type *</legend>
@@ -139,7 +139,7 @@
 	<section class="space-y-3 border border-ink-700 bg-ink-850/40 p-4">
 		<div>
 			<h3 class="text-[12px] font-semibold text-fg/85">YouTube</h3>
-			<p class="mt-0.5 text-[10px] text-fg/40">Choose where and how the broadcast appears.</p>
+			<p class="mt-0.5 text-[12px] text-muted">Choose where and how the broadcast appears.</p>
 		</div>
 		<div class="grid gap-3 sm:grid-cols-2">
 			<label class="block">
@@ -155,14 +155,14 @@
 							{/each}
 						</select>
 						<span
-							class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-fg/40"
+							class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-muted"
 						>
 							<Icon name="down" size={14} />
 						</span>
 					</div>
 				{:else}
 					<button
-						class="studio-chip h-10 w-full justify-center border-primary/40 text-primary"
+						class="studio-chip h-10 w-full justify-center border-primary/40 text-accent"
 						type="button"
 						onclick={async () => {
 							youtubeChannelId = (await connectYouTube()) ?? youtubeChannelId;
@@ -178,7 +178,7 @@
 						<option value="unlisted">Unlisted</option>
 						<option value="private">Private</option>
 					</select>
-					<span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-fg/40">
+					<span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-muted">
 						<Icon name="down" size={14} />
 					</span>
 				</div>
@@ -201,7 +201,7 @@
 			</span>
 			<span>
 				<strong class="block text-[12px] font-medium text-fg/80">Made for kids</strong>
-				<span class="mt-0.5 block text-[10px] leading-relaxed text-fg/40"
+				<span class="mt-0.5 block text-[12px] leading-relaxed text-muted"
 					>Select only when children are the intended audience.</span
 				>
 			</span>
@@ -211,7 +211,7 @@
 	<section class="space-y-3 border border-ink-700 bg-ink-850/40 p-4">
 		<div>
 			<h3 class="text-[12px] font-semibold text-fg/85">Missionnaire</h3>
-			<p class="mt-0.5 text-[10px] text-fg/40">
+			<p class="mt-0.5 text-[12px] text-muted">
 				Public page, artwork, transcript, and notifications.
 			</p>
 		</div>
@@ -220,10 +220,10 @@
 				class="block border border-dashed border-ink-600 bg-ink-800/30 p-3 transition-colors hover:border-ink-500"
 			>
 				<span class="studio-label"
-					>Thumbnail <span class="normal-case tracking-normal text-fg/30">JPEG/PNG</span></span
+					>Thumbnail <span class="normal-case tracking-normal text-muted">JPEG/PNG</span></span
 				>
 				<input
-					class="block w-full text-[11px] text-fg/55 file:mr-2 file:border-0 file:bg-ink-700 file:px-2.5 file:py-1.5 file:text-[10px] file:text-fg/70"
+					class="block w-full text-[12px] text-muted file:mr-2 file:border-0 file:bg-ink-700 file:px-2.5 file:py-1.5 file:text-[12px] file:text-fg/70"
 					type="file"
 					accept="image/jpeg,image/png"
 					onchange={(event) =>
@@ -234,11 +234,11 @@
 				class="block border border-dashed border-ink-600 bg-ink-800/30 p-3 transition-colors hover:border-ink-500"
 			>
 				<span class="studio-label"
-					>Synchronized transcript <span class="normal-case tracking-normal text-fg/30">SRT</span
+					>Synchronized transcript <span class="normal-case tracking-normal text-muted">SRT</span
 					></span
 				>
 				<input
-					class="block w-full text-[11px] text-fg/55 file:mr-2 file:border-0 file:bg-ink-700 file:px-2.5 file:py-1.5 file:text-[10px] file:text-fg/70"
+					class="block w-full text-[12px] text-muted file:mr-2 file:border-0 file:bg-ink-700 file:px-2.5 file:py-1.5 file:text-[12px] file:text-fg/70"
 					type="file"
 					accept=".srt,text/plain"
 					onchange={(event) =>
@@ -264,7 +264,7 @@
 				</span>
 				<span>
 					<strong class="block text-[12px] font-medium text-fg/80">Announce when scheduled</strong>
-					<span class="mt-0.5 block text-[10px] leading-relaxed text-fg/40"
+					<span class="mt-0.5 block text-[12px] leading-relaxed text-muted"
 						>Send an “upcoming live” alert now.</span
 					>
 				</span>
@@ -286,7 +286,7 @@
 				</span>
 				<span>
 					<strong class="block text-[12px] font-medium text-fg/80">Notify when live starts</strong>
-					<span class="mt-0.5 block text-[10px] leading-relaxed text-fg/40"
+					<span class="mt-0.5 block text-[12px] leading-relaxed text-muted"
 						>Send an alert only when selected.</span
 					>
 				</span>
@@ -308,14 +308,14 @@
 				</span>
 				<span>
 					<strong class="block text-[12px] font-medium text-fg/80">Send a reminder</strong>
-					<span class="mt-0.5 block text-[10px] leading-relaxed text-fg/40"
+					<span class="mt-0.5 block text-[12px] leading-relaxed text-muted"
 						>Remind subscribers before the service.</span
 					>
 				</span>
 			</label>
 		</div>
 	</section>
-	{#if formError}<p class="text-[12px] text-red-400">{formError}</p>{/if}
+	{#if formError}<p class="text-[12px] text-danger">{formError}</p>{/if}
 	<button class="studio-btn-primary h-10 w-full" disabled={saving || !youtubeChannelId}
 		>{saving ? 'Creating YouTube + Missionnaire…' : 'Create YouTube + Missionnaire session'}</button
 	>

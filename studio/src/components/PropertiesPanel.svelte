@@ -78,7 +78,7 @@
 </script>
 
 {#if !layer}
-	<p class="p-6 text-center text-[11px] leading-relaxed text-fg/30">
+	<p class="p-6 text-center text-[12px] leading-relaxed text-muted">
 		{t('props.empty')}
 	</p>
 {:else}
@@ -114,12 +114,12 @@
 					{/each}
 				</select>
 				{#if handleFor(layer.id)?.error}
-					<p class="mt-1 text-[11px] text-amber-400/80">{handleFor(layer.id)?.error}</p>
+					<p class="mt-1 text-[12px] text-warning">{handleFor(layer.id)?.error}</p>
 				{/if}
 			</div>
 		{/if}
 
-			{#if layer.kind === 'screen'}
+		{#if layer.kind === 'screen'}
 			<div class="space-y-1">
 				<label class="flex items-center gap-2 text-sm text-fg/70">
 					<input
@@ -137,7 +137,7 @@
 					{t('props.hideCursor')}
 				</label>
 				{#if !canHideCursor()}
-					<p class="text-[11px] leading-snug text-fg/35">{t('props.hideCursorUnsupported')}</p>
+					<p class="text-[12px] leading-snug text-muted">{t('props.hideCursorUnsupported')}</p>
 				{/if}
 			</div>
 		{/if}
@@ -189,7 +189,7 @@
 		{#if layer.kind === 'video'}
 			<!-- The transport lives under the preview, not behind a dialog: this
 			     panel is for what a source *is*, not for driving it mid-service. -->
-			<p class="text-[11px] leading-relaxed text-fg/35">{t('props.transportMoved')}</p>
+			<p class="text-[12px] leading-relaxed text-muted">{t('props.transportMoved')}</p>
 		{/if}
 
 		<!-- ── Geometry ─────────────────────────────────────── -->
@@ -207,7 +207,7 @@
 			<div class="grid grid-cols-4 gap-1.5">
 				{#each [['x', 'X'], ['y', 'Y'], ['w', 'L'], ['h', 'H']] as [key, label] (key)}
 					<label class="block">
-						<span class="mb-0.5 block text-center text-[10px] text-fg/30">{label}</span>
+						<span class="mb-0.5 block text-center text-[12px] text-muted">{label}</span>
 						<input
 							type="number"
 							step="0.5"
@@ -232,7 +232,7 @@
 				<div class="flex gap-1">
 					{#each [['cover', t('props.cover')], ['contain', t('props.contain')], ['stretch', t('props.stretch')]] as [mode, label] (mode)}
 						<button
-							class="studio-chip flex-1 {layer.fit === mode ? 'bg-primary/20 text-primary' : ''}"
+							class="studio-chip flex-1 {layer.fit === mode ? 'bg-primary/20 text-accent' : ''}"
 							onclick={() => {
 								layer.fit = mode as typeof layer.fit;
 								commit();
@@ -244,7 +244,9 @@
 		{/if}
 
 		<label class="block">
-			<span class="studio-label">{t('props.opacity', { percent: Math.round(layer.opacity * 100) })}</span>
+			<span class="studio-label"
+				>{t('props.opacity', { percent: Math.round(layer.opacity * 100) })}</span
+			>
 			<input
 				type="range"
 				min="0"
@@ -266,7 +268,7 @@
 				<span class="studio-label">{t('props.textStyle')}</span>
 
 				<label class="block">
-					<span class="mb-1 block text-[11px] text-fg/40">
+					<span class="mb-1 block text-[12px] text-muted">
 						{t('props.size', { percent: Math.round(s.size * 100) })}
 					</span>
 					<input
@@ -285,7 +287,7 @@
 
 				<div class="grid grid-cols-2 gap-2">
 					<label class="block">
-						<span class="mb-1 block text-[11px] text-fg/40">{t('props.color')}</span>
+						<span class="mb-1 block text-[12px] text-muted">{t('props.color')}</span>
 						<input
 							type="color"
 							class="h-9 w-full cursor-pointer border border-ink-600 bg-ink-800"
@@ -297,7 +299,7 @@
 						/>
 					</label>
 					<label class="block">
-						<span class="mb-1 block text-[11px] text-fg/40">{t('props.font')}</span>
+						<span class="mb-1 block text-[12px] text-muted">{t('props.font')}</span>
 						<select
 							class="studio-input w-full"
 							value={s.font}
@@ -314,12 +316,12 @@
 
 				<div class="grid grid-cols-2 gap-2">
 					<div>
-						<span class="mb-1 block text-[11px] text-fg/40">{t('props.align')}</span>
+						<span class="mb-1 block text-[12px] text-muted">{t('props.align')}</span>
 						<div class="flex gap-1">
 							{#each [['left', 'alignLeft'], ['center', 'alignCenter'], ['right', 'alignRight']] as [value, icon] (value)}
 								<button
 									class="studio-chip flex flex-1 justify-center {s.align === value
-										? 'bg-primary/20 text-primary'
+										? 'bg-primary/20 text-accent'
 										: ''}"
 									aria-label={value}
 									onclick={() => {
@@ -331,14 +333,14 @@
 						</div>
 					</div>
 					<div>
-						<span class="mb-1 block text-[11px] text-fg/40">{t('props.valign')}</span>
+						<span class="mb-1 block text-[12px] text-muted">{t('props.valign')}</span>
 						<div class="flex gap-1">
 							<!-- Same glyphs turned a quarter: top/middle/bottom read as
 							     left/centre/right rotated, which is how they behave. -->
 							{#each [['top', 'alignLeft'], ['middle', 'alignCenter'], ['bottom', 'alignRight']] as [value, icon] (value)}
 								<button
 									class="studio-chip flex flex-1 justify-center {s.valign === value
-										? 'bg-primary/20 text-primary'
+										? 'bg-primary/20 text-accent'
 										: ''}"
 									aria-label={value}
 									onclick={() => {
@@ -352,11 +354,11 @@
 				</div>
 
 				<div>
-					<span class="mb-1 block text-[11px] text-fg/40">{t('props.background')}</span>
+					<span class="mb-1 block text-[12px] text-muted">{t('props.background')}</span>
 					<div class="flex flex-wrap gap-1">
 						{#each [['transparent', t('props.bgNone')], ['rgba(0,0,0,0.55)', t('props.bgDark')], ['rgba(0,0,0,0.85)', t('props.bgSolid')], ['rgba(255,136,12,0.85)', t('props.bgAccent')]] as [value, label] (value)}
 							<button
-								class="studio-chip {s.background === value ? 'bg-primary/20 text-primary' : ''}"
+								class="studio-chip {s.background === value ? 'bg-primary/20 text-accent' : ''}"
 								onclick={() => {
 									s.background = value;
 									commit();
@@ -367,7 +369,7 @@
 				</div>
 
 				<div class="flex flex-wrap gap-3">
-					<label class="flex items-center gap-2 text-[12px] text-fg/60">
+					<label class="flex items-center gap-2 text-[12px] text-muted">
 						<input
 							type="checkbox"
 							class="accent-primary"
@@ -379,7 +381,7 @@
 						/>
 						{t('props.shadow')}
 					</label>
-					<label class="flex items-center gap-2 text-[12px] text-fg/60">
+					<label class="flex items-center gap-2 text-[12px] text-muted">
 						<input
 							type="checkbox"
 							class="accent-primary"

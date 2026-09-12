@@ -451,7 +451,7 @@
 				Other scenes and microphone settings will be kept. Files on your computer will not be
 				deleted. Removed sources must be added again.
 			</p>
-			{#if clearBlocked}<p class="text-amber-400">
+			{#if clearBlocked}<p class="text-warning">
 					Stop broadcasting, recording and programme playback before clearing sources.
 				</p>{/if}
 			<div class="flex justify-end gap-2">
@@ -479,7 +479,7 @@
 <Dock id="sources" title={t('dock.sources')}>
 	{#snippet actions()}
 		<button
-			class="px-1 text-[10px] text-fg/50 hover:text-red-400 disabled:opacity-35"
+			class="px-1 text-[12px] text-muted hover:text-danger disabled:opacity-35"
 			disabled={clearBlocked || !activeScene().layers.length}
 			title={clearBlocked
 				? 'Stop broadcasting, recording and programme playback first'
@@ -506,19 +506,19 @@
 					<Icon
 						name={iconFor(layer.kind)}
 						size={13}
-						class={layer.id === studio.selectedLayerId ? 'text-black/60' : 'text-fg/45'}
+						class={layer.id === studio.selectedLayerId ? 'text-black/80' : 'text-muted'}
 					/>
 					<span
 						class="min-w-0 flex-1 truncate text-[13px] {layer.id === studio.selectedLayerId
 							? 'font-medium'
 							: layer.visible
 								? 'text-fg/85'
-								: 'text-fg/35'}">{layer.name}</span
+								: 'text-muted'}">{layer.name}</span
 					>
 				</button>
 				{#if issue}
 					<button
-						class="shrink-0 bg-amber-500/15 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-amber-400 hover:bg-amber-500/30"
+						class="shrink-0 bg-amber-500/15 px-1.5 py-px text-[12px] font-semibold uppercase tracking-wide text-warning hover:bg-amber-500/30"
 						title={issue}
 						disabled={relinking.has(layer.id)}
 						onclick={() => reconnect(layer)}
@@ -559,7 +559,7 @@
 				</button>
 			</li>
 		{:else}
-			<p class="px-3 py-6 text-center text-[11px] leading-relaxed text-fg/30">
+			<p class="px-3 py-6 text-center text-[12px] leading-relaxed text-muted">
 				{t('sources.empty')}
 			</p>
 		{/each}
@@ -597,7 +597,7 @@
 								}}>{app.name}</button
 							>
 						{:else}
-							<p class="px-3 py-2 text-[11px] leading-snug text-fg/40">
+							<p class="px-3 py-2 text-[12px] leading-snug text-muted">
 								{appAudio.error ?? t('mixer.appAudioUnsupported')}
 							</p>
 						{/each}
@@ -607,10 +607,10 @@
 								class="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-primary/15"
 								onclick={() => addSource(source.kind)}
 							>
-								<Icon name={source.icon} size={14} class="mt-0.5 text-fg/45" />
+								<Icon name={source.icon} size={14} class="mt-0.5 text-muted" />
 								<span class="min-w-0">
 									<span class="block text-[13px] text-fg/90">{source.label()}</span>
-									<span class="block text-[11px] text-fg/40">{source.hint()}</span>
+									<span class="block text-[12px] text-muted">{source.hint()}</span>
 								</span>
 							</button>
 						{/each}

@@ -14,6 +14,12 @@ export default {
 				// surface depth, not of luminance: ink-950 is the page, ink-900 a
 				// panel, ink-700 a border. That ordering holds in both themes.
 				fg: 'rgb(var(--fg) / <alpha-value>)',
+				muted: 'rgb(var(--text-muted) / <alpha-value>)',
+				success: 'rgb(var(--text-success) / <alpha-value>)',
+				warning: 'rgb(var(--text-warning) / <alpha-value>)',
+				danger: 'rgb(var(--text-danger) / <alpha-value>)',
+				accent: 'rgb(var(--text-accent) / <alpha-value>)',
+				control: 'rgb(var(--control-border) / <alpha-value>)',
 				primary: '#FF880C',
 				missionnaire: {
 					DEFAULT: '#FF880C',

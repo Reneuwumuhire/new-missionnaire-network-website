@@ -140,7 +140,7 @@
 <div class="flex min-h-0 min-w-0 flex-1 flex-col">
 	<div class="flex h-5 shrink-0 items-center justify-center gap-2">
 		<span
-			class="text-[9px] font-bold uppercase tracking-[0.2em] {live ? 'text-red-400' : 'text-fg/35'}"
+			class="text-[12px] font-bold uppercase tracking-[0.2em] {live ? 'text-danger' : 'text-muted'}"
 			>{label}</span
 		>
 		{#if live}

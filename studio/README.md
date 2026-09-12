@@ -349,6 +349,14 @@ is platform-independent.
   uses cloud segment recording plus the configured local safety capture;
   prepared Kinyarwanda reuses its existing sermon asset and cannot start either
   recorder. Saved cloud recordings remain available in `/recordings` in admin.
+- In **Settings → Output → Recording**, choose Local (or local and cloud), then
+  select **Audio only (MP3)**, **Video with audio (MP4)**, or **Both**. Both writes
+  two files with the same name in `Movies/Missionnaire Studio` on macOS or
+  `Videos/Missionnaire Studio` on Windows, ready to share once recording stops.
+  Recording audio quality ranges from 96 to 320 kb/s; video has Compact, Standard,
+  and High presets at the canvas resolution. These settings are saved separately
+  from streaming quality and apply to the next recording. Existing setups keep
+  MP4 as their default. Cloud recording is still controlled separately.
 
 ## Checking it works
 
@@ -373,3 +381,17 @@ STUDIO_SELFTEST=rtmp://127.0.0.1:11950/live/studio pnpm studio
 It prints a line a second (`frames`, `chunks`, encoded `f/kbps`) and finishes
 with `SELFTEST OK`. `ffprobe out.flv` should show H.264 at your configured
 resolution plus AAC 48 kHz stereo.
+
+## Native application menus
+
+File provides Service Setup (⌘/Ctrl+Shift+S), Choose Live Session (⌘/Ctrl+Shift+O),
+Recording Settings, and Open Recordings Folder (⌘/Ctrl+Shift+R).
+View provides Toggle Lyrics Panel (⌘/Ctrl+Shift+L), Toggle Bottom Panels
+(⌘/Ctrl+Shift+D), Toggle Studio Mode (⌘/Ctrl+Shift+M), Restore Default Layout,
+and interface Zoom In / Out / Actual Size (⌘/Ctrl with + / − / 0).
+Panel visibility persists; restoring the default layout brings both panels back.
+Hidden panels remain mounted so audio and in-progress edits are retained.
+Interface zoom is limited to 80–150% and does not change broadcast resolution.
+Window retains native minimize/zoom/close actions and adds Center Window and,
+on macOS, Bring All to Front. The application menu uses the product name and
+includes Check for Updates; Help retains the guide, shortcuts, and troubleshooting.

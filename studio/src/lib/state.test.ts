@@ -7,6 +7,7 @@ import {
 	migrateDestination,
 	persistableDestinations,
 	reconnectWith,
+	resetLayout,
 	requiresYouTubeGoLive,
 	stageableSettings,
 	studio,
@@ -153,4 +154,21 @@ describe('getting a lost source back', () => {
 		expect(reconnectWith(makeLayer('camera', 'cam'))).toBe('camera');
 		expect(reconnectWith(makeLayer('screen', 'win'))).toBe('screen');
 	});
+});
+
+it('restores hidden panels and default sizes without changing broadcast settings', () => {
+	const previous = studio.settings.layout;
+	const mode = studio.settings.studioMode;
+	studio.settings.layout = {
+		...previous,
+		lyricsVisible: false,
+		docksVisible: false,
+		lyricsWidth: 500
+	};
+	resetLayout();
+	expect(studio.settings.layout.lyricsVisible).toBe(true);
+	expect(studio.settings.layout.docksVisible).toBe(true);
+	expect(studio.settings.layout.lyricsWidth).toBe(368);
+	expect(studio.settings.studioMode).toBe(mode);
+	studio.settings.layout = previous;
 });

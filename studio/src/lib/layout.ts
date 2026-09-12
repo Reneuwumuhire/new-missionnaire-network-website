@@ -5,6 +5,8 @@
 export type DockId = 'scenes' | 'sources' | 'mixer' | 'transition' | 'controls';
 
 export interface Layout {
+	lyricsVisible: boolean;
+	docksVisible: boolean;
 	/** Height of the bottom dock row, px. */
 	dockHeight: number;
 	/** Width of the lyrics column, px. */
@@ -13,6 +15,8 @@ export interface Layout {
 }
 
 export const DEFAULT_LAYOUT: Layout = {
+	lyricsVisible: true,
+	docksVisible: true,
 	dockHeight: 240,
 	lyricsWidth: 368,
 	weights: { scenes: 1, sources: 1.3, mixer: 2.4, transition: 0.85, controls: 1.05 }

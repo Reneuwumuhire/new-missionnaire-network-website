@@ -372,6 +372,17 @@ const en = {
 	'settings.language': 'Language',
 	'settings.liveWarning': 'Encoder settings apply to the next broadcast.',
 	'settings.recording': 'Recording',
+	'settings.recordingFormat': 'Local recording format',
+	'settings.recordingAudio': 'Audio only (MP3)',
+	'settings.recordingVideo': 'Video with audio (MP4)',
+	'settings.recordingBoth': 'Both (MP3 + MP4)',
+	'settings.recordingAudioQuality': 'Recording audio quality',
+	'settings.recordingVideoQuality': 'Recording video quality',
+	'settings.recordingCompact': 'Compact',
+	'settings.recordingStandard': 'Standard',
+	'settings.recordingHigh': 'High',
+	'settings.recordingQualityHint':
+		'Higher quality creates larger files. 128 kb/s suits speech; 192–320 kb/s suits music. Both saves two files with the same name in the recording folder, ready to share after stopping. Video uses the canvas resolution. Changes apply to the next recording.',
 	'settings.recordingHint':
 		'Local files save in Videos/Missionnaire Studio on Windows or Movies/Missionnaire Studio on macOS.',
 	'settings.cloudRecordingManaged':
@@ -388,9 +399,9 @@ const en = {
 		'Show colour bars when a scene\u2019s camera, screen share or media file is not producing a picture. Black looks the same as a dead stream.',
 	'settings.resolution': 'Base resolution',
 	'settings.fps': 'Frames per second',
-	'settings.videoBitrate': 'Video bitrate — {kbps} kbps',
+	'settings.videoBitrate': 'Streaming video bitrate — {kbps} kbps',
 	'settings.uploadHint': 'Allow at least {mbps} Mbps of real upload.',
-	'settings.audioBitrate': 'Audio bitrate',
+	'settings.audioBitrate': 'Streaming audio bitrate',
 	'settings.encoder': 'Encoder',
 	'settings.hardware': 'Hardware',
 	'settings.software': 'Software (x264)',
@@ -443,7 +454,12 @@ const en = {
 	'help.safety':
 		'Program is what viewers receive. Always check Program—not only Preview—before starting or changing a broadcast.',
 	'help.shortcuts': 'Keyboard Shortcuts',
-	'help.shortcutsIntro': 'Shortcuts are ignored while you are typing in a field.',
+	'help.toggleLyricsPanel': 'Show or hide the lyrics panel',
+	'help.toggleBottomPanels': 'Show or hide the bottom panels',
+	'help.interfaceZoom': 'Zoom in, zoom out, or return to actual size',
+	'help.recordingsFolder': 'Open the local recordings folder',
+	'help.shortcutsIntro':
+		'Scene and lyric shortcuts are ignored while typing. Menu shortcuts remain available.',
 	'help.nextSubtitle': 'Next manual subtitle',
 	'help.previousSubtitle': 'Previous manual subtitle',
 	'help.selectScene': 'Select scene by position',

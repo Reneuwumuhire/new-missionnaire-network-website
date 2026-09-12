@@ -35,7 +35,7 @@
 <div class="space-y-4 p-5">
 	<div>
 		<h3 class="text-lg font-semibold text-fg/90">Developer configuration</h3>
-		<p class="mt-1 max-w-2xl text-[12px] leading-relaxed text-fg/50">
+		<p class="mt-1 max-w-2xl text-[12px] leading-relaxed text-muted">
 			Optional local-development import for site URLs and manual RTMP destinations. Installed apps
 			do not need this file. Database, AWS and recorder credentials are ignored.
 		</p>
@@ -45,24 +45,24 @@
 		Import .env file
 		<input class="sr-only" type="file" onchange={choose} />
 	</label>
-	{#if filename}<span class="ml-2 text-[11px] text-fg/45">{filename}</span>{/if}
+	{#if filename}<span class="ml-2 text-[12px] text-muted">{filename}</span>{/if}
 
 	<textarea
-		class="studio-input min-h-56 w-full resize-y font-mono text-[11px] leading-relaxed"
+		class="studio-input min-h-56 w-full resize-y font-mono text-[12px] leading-relaxed"
 		bind:value={contents}
 		placeholder={'MAIN_SITE_URL=http://localhost:8080\nADMIN_SITE_URL=http://localhost:5174\nMISSIONNAIRE_RTMP_URL=rtmp://localhost:1935/live\nMISSIONNAIRE_STREAM_KEY=obs\nYOUTUBE_STREAM_KEY=…'}
 	></textarea>
 
-	<p class="text-[11px] text-amber-300/80">
+	<p class="text-[12px] text-warning">
 		Manual stream keys are stored locally on this computer. Prefer managed YouTube channels for
 		production.
 	</p>
-	{#if error}<p class="text-[12px] text-red-400">{error}</p>{/if}
+	{#if error}<p class="text-[12px] text-danger">{error}</p>{/if}
 
 	<div class="flex justify-end gap-2 border-t border-ink-700 pt-4">
 		<button class="studio-chip px-3" onclick={oncomplete}>Cancel</button>
 		<button
-			class="studio-chip bg-primary/20 px-4 text-primary"
+			class="studio-chip bg-primary/20 px-4 text-accent"
 			disabled={!contents.trim()}
 			onclick={apply}>Import configuration</button
 		>

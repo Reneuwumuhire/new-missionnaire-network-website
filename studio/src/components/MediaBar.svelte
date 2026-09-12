@@ -114,7 +114,7 @@
 		class="flex h-12 shrink-0 items-center gap-3 border-t border-ink-700 bg-ink-900 px-5"
 		aria-label={t('media.transport')}
 	>
-		<Icon name={layer.audioOnly ? 'music' : 'film'} size={14} class="text-fg/35" />
+		<Icon name={layer.audioOnly ? 'music' : 'film'} size={14} class="text-muted" />
 		<span class="min-w-0 max-w-[14rem] shrink truncate text-[12px] text-fg/70">
 			{layer.fileName || layer.name}
 		</span>
@@ -122,22 +122,22 @@
 			<!-- Neither a blob nor a signed link survives a restart, so the source
 			     has to be fetched again. Dead controls with no reason given is the
 			     worst version of that — and the two need different actions. -->
-			<span class="shrink-0 text-[11px] text-amber-400/80">
+			<span class="shrink-0 text-[12px] text-warning">
 				{layer.url ? t('media.needsLink') : t('media.needsFile')}
 			</span>
 		{/if}
 
 		<button
-			class="studio-icon-btn h-8 w-8 text-fg/55"
+			class="studio-icon-btn h-8 w-8 text-muted"
 			title={t('media.back')}
 			aria-label={t('media.back')}
 			disabled={!element}
 			onclick={() => skip(-10)}
 		>
-			<span class="font-mono text-[10px] tracking-tight">−10</span>
+			<span class="font-mono text-[12px] tracking-tight">−10</span>
 		</button>
 		<button
-			class="flex h-8 w-8 shrink-0 items-center justify-center bg-primary text-black transition-colors hover:bg-missionnaire-400 disabled:cursor-not-allowed disabled:bg-ink-700 disabled:text-fg/25"
+			class="flex h-8 w-8 shrink-0 items-center justify-center bg-primary text-black transition-colors hover:bg-missionnaire-400 disabled:cursor-not-allowed disabled:bg-ink-700 disabled:text-muted"
 			title={playing ? t('props.pause') : t('props.play')}
 			aria-label={playing ? t('props.pause') : t('props.play')}
 			disabled={!element}
@@ -146,16 +146,16 @@
 			<Icon name={playing ? 'pause' : 'play'} size={15} strokeWidth={playing ? 2 : 1.5} />
 		</button>
 		<button
-			class="studio-icon-btn h-8 w-8 text-fg/55"
+			class="studio-icon-btn h-8 w-8 text-muted"
 			title={t('media.forward')}
 			aria-label={t('media.forward')}
 			disabled={!element}
 			onclick={() => skip(10)}
 		>
-			<span class="font-mono text-[10px] tracking-tight">+10</span>
+			<span class="font-mono text-[12px] tracking-tight">+10</span>
 		</button>
 
-		<span class="w-14 shrink-0 text-right font-mono text-[11px] tabular-nums text-fg/70">
+		<span class="w-14 shrink-0 text-right font-mono text-[12px] tabular-nums text-fg/70">
 			{clock(position)}
 		</span>
 		<input
@@ -172,12 +172,12 @@
 			onpointerup={() => (scrubbing = false)}
 			oninput={(e) => seek(Number((e.currentTarget as HTMLInputElement).value))}
 		/>
-		<span class="w-14 shrink-0 font-mono text-[11px] tabular-nums text-fg/35">
+		<span class="w-14 shrink-0 font-mono text-[12px] tabular-nums text-muted">
 			−{clock(remaining)}
 		</span>
 
 		<button
-			class="studio-chip {element?.loop ? 'border-primary/40 bg-primary/15 text-primary' : ''}"
+			class="studio-chip {element?.loop ? 'border-primary/40 bg-primary/15 text-accent' : ''}"
 			title={t('props.loop')}
 			aria-label={t('props.loop')}
 			aria-pressed={Boolean(element?.loop)}
@@ -189,7 +189,7 @@
 			<Icon name="repeat" size={13} />
 		</button>
 		<button
-			class="studio-chip {following ? 'border-primary/40 bg-primary/15 text-primary' : ''}"
+			class="studio-chip {following ? 'border-primary/40 bg-primary/15 text-accent' : ''}"
 			title={t('props.followLyricsHint')}
 			aria-pressed={following}
 			disabled={!layer}

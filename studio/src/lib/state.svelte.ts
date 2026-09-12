@@ -239,6 +239,9 @@ export interface Settings {
 	/** Panel sizes the operator has dragged to. */
 	layout: Layout;
 	recordingMode: 'off' | 'local' | 'cloud' | 'both';
+	recordingFormat: 'audio' | 'video' | 'both';
+	recordingVideoBitrateKbps: number;
+	recordingAudioBitrateKbps: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -257,7 +260,10 @@ export const DEFAULT_SETTINGS: Settings = {
 	monitorAudio: false,
 	interpreterOutputDeviceId: '',
 	layout: DEFAULT_LAYOUT,
-	recordingMode: 'off'
+	recordingMode: 'off',
+	recordingFormat: 'video',
+	recordingVideoBitrateKbps: 3500,
+	recordingAudioBitrateKbps: 160
 };
 
 export const id = () => Math.random().toString(36).slice(2, 10);
@@ -632,4 +638,10 @@ export function destinationUrl(d: Destination): string {
 	const base = d.url.trim().replace(/\/+$/, '');
 	const key = d.key.trim().replace(/^\/+/, '');
 	return key ? `${base}/${key}` : base;
+}
+
+/** Restore panel sizes and make hidden panels reachable again. */
+export function resetLayout() {
+	studio.settings.layout = { ...DEFAULT_LAYOUT, weights: { ...DEFAULT_LAYOUT.weights } };
+	persist();
 }
