@@ -276,8 +276,6 @@ sw.addEventListener('fetch', (event) => {
 	// Lane 2: Data / API — never cache, always hit the network.
 	// Crawler files also shouldn't be cached.
 	if (url.pathname.startsWith('/api/')) return;
-	// Search snippets follow current publication state, never a cached page.
-	if (url.pathname === '/recherche' || url.pathname.startsWith('/recherche/')) return;
 	if (url.pathname === '/robots.txt' || url.pathname === '/sitemap.xml') return;
 
 	// Lane 1: Audio — cache-first with Range support. Lives in its own

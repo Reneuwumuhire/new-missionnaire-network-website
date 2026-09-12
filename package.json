@@ -42,7 +42,6 @@
 		"lint-staged": "^17.3.0",
 		"minimist": "^1.2.8",
 		"node-fetch": "^3.3.2",
-		"pdfjs-dist": "^6.3.289",
 		"postcss": "^8.5.28",
 		"prettier": "^3.8.1",
 		"prettier-plugin-svelte": "^3.5.1",

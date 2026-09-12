@@ -7,7 +7,6 @@ import type { AudioAsset } from '$lib/models/media-assets';
 import type { MusicAudio } from '$lib/models/music-audio';
 import type { Sermon } from '$lib/models/sermon';
 import type { Literature } from '$lib/models/literature';
-import { buildFuzzySearchPattern } from '$lib/utils/searchText';
 
 const titleDateSortExpression = {
 	$switch: {
@@ -366,6 +365,52 @@ export async function queryAudios(options: {
 		console.error('[DB] Error in queryAudios:', error);
 		throw error;
 	}
+}
+
+// Map base characters to regex alternation that matches accented variants
+// Uses alternation (a|à|â) instead of character classes to avoid issues
+// with multi-byte characters in MongoDB's regex engine
+const ACCENT_MAP: Record<string, string[]> = {
+	a: ['a', 'à', 'â', 'ä', 'á', 'ã', 'å'],
+	e: ['e', 'è', 'é', 'ê', 'ë'],
+	i: ['i', 'ì', 'í', 'î', 'ï'],
+	o: ['o', 'ò', 'ó', 'ô', 'õ', 'ö'],
+	u: ['u', 'ù', 'ú', 'û', 'ü'],
+	c: ['c', 'ç'],
+	n: ['n', 'ñ'],
+	y: ['y', 'ý', 'ÿ']
+};
+
+// Optional combining accent mark — consumes any Unicode combining diacritical
+// that may follow a base letter in decomposed (NFD) storage
+const OPT_COMBINING = '[\u0300-\u036f]?';
+
+function buildFuzzySearchPattern(search: string): string {
+	// Normalize: strip accents to get base characters, then build a regex
+	// where each letter matches its accented variants (composed)
+	// AND tolerates decomposed storage (base + combining mark)
+	const normalized = search.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+	let pattern = '';
+	for (const char of normalized) {
+		const lower = char.toLowerCase();
+		if (lower in ACCENT_MAP) {
+			// Match composed accented char OR base letter + optional combining mark
+			pattern += '(?:' + ACCENT_MAP[lower].join('|') + ')' + OPT_COMBINING;
+		} else if (/[a-z]/i.test(char)) {
+			// Regular letter — still may have an unexpected combining mark after it
+			pattern += char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + OPT_COMBINING;
+		} else if (/[0-9]/.test(char)) {
+			pattern += char;
+		} else if (char === "'" || char === '\u2019' || char === '\u2018') {
+			pattern += "['ʼ\u2018\u2019]?";
+		} else if (char === ' ') {
+			pattern += '[\\s\\-]?';
+		} else {
+			pattern += char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+		}
+	}
+	return pattern;
 }
 
 function hashSeed(seed: string): number {
