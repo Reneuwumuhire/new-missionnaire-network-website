@@ -4,6 +4,7 @@ import { MongoClient } from 'mongodb';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseSrt } from '../src/lib/utils/srt.ts';
+import { ensureLibrarySearchIndexes } from '../src/lib/server/librarySearchIndexes.ts';
 
 const args = new Set(process.argv.slice(2));
 if (args.has('--help')) {
@@ -102,8 +103,7 @@ try {
 	await client.connect();
 	const db = client.db('youtube_data');
 	if (args.has('--write')) {
-		await db.collection('music_lyrics').createIndex({ audio_id: 1, lyrics_status: 1 });
-		await db.collection('scheduled_lives').createIndex({ recording_id: 1 });
+		await ensureLibrarySearchIndexes(db, console.log);
 	}
 	for (const collection of ['sermons', 'literature', 'pdfs', 'recordings']) {
 		const filter =

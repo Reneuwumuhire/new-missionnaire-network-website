@@ -232,7 +232,7 @@ const en: Record<keyof typeof fr, string> = {
 		'Check your filters: 2–100 characters, valid dates and an end date on or after the start date.',
 	'search.unavailable': 'Search is temporarily unavailable. Try again.',
 	'search.coverage':
-		'Search covers titles, metadata, published lyrics and indexed text. Scanned or not-yet-indexed documents match metadata only. Filters use recorded information; missing languages are not guessed.',
+		'Search covers titles, metadata, published lyrics and indexed text. Use complete words to search inside files; partial words still match titles and lyrics. Scanned or not-yet-indexed documents match metadata only. Filters use recorded information; missing languages are not guessed.',
 	'search.placeholder': 'Search for a sermon, a song...',
 	'search.close': 'Close search',
 	'search.sermons': 'Sermons',

@@ -7,6 +7,38 @@ and `to` dates, and `page`. Searches require 2–100 characters and use literal,
 accent-tolerant matching. Ordering is title match first, then newest, type and ID.
 Unknown language metadata is not guessed. No new search service is required.
 
+## Required database indexes (including already-extracted libraries)
+
+Before deploying the indexed search query, run with Node 24 and the intended
+`MONGODB_URI` in `.env.local`:
+
+```sh
+node --env-file=.env.local scripts/create-library-search-indexes.mjs
+node --env-file=.env.local scripts/create-library-search-indexes.mjs --write
+```
+
+The first command checks readiness without changes. The second creates/checks
+`library_file_text_v1` on `library_search.parts.text` in `sermons`, `literature`,
+`pdfs` and `recordings`, plus the two relationship lookup indexes below. It prints
+progress per collection, is safe to rerun, and does not download, re-extract or
+modify source records. Existing incompatible text indexes are not dropped or
+silently replaced; resolve any reported index conflict before deploying.
+
+Text indexes update automatically when extracted text is saved or changed.
+Default language is `none`: stop words are retained and no language stemming is
+applied. The language override field is separate from legacy content `language`
+values, so Kinyarwanda/unknown language metadata cannot break index creation.
+These are native MongoDB text indexes, not Google indexing or Atlas Search
+indexes, and do not require another service or subscription.
+
+Use complete words when searching **inside files**: an indexed whole-word
+candidate lookup (the longest query word) precedes literal phrase validation.
+Case/accent-insensitive partial matching remains available for metadata and
+published lyrics. Punctuation-only queries search metadata/lyrics, not PDF bodies.
+This deliberate distinction prevents every keystroke from scanning the entire
+extracted library. Consider Atlas Search autocomplete if infix matching throughout
+PDF text becomes a requirement.
+
 ## Extract existing PDF/SRT text
 
 Metadata and published lyrics are searchable immediately. File contents need the
@@ -28,8 +60,9 @@ again after adding files; use `--force` when replacing bytes at the same URL.
    node --env-file=.env scripts/index-library.mjs --write
    ```
 
-This writes derived `library_search` fields and creates lookup indexes on
-`music_lyrics` and `scheduled_lives`, not original files or publication state.
+This writes derived `library_search` fields, ensures the four full-text indexes,
+and creates lookup indexes on `music_lyrics` and `scheduled_lives`, not original
+files or publication state.
 It runs sequentially, skips unchanged URLs, refuses redirects/unapproved
 hosts, limits downloads to 30 MB, PDFs to 500 pages and extracted data to 2 MB per
 file. Failures are reported and cause a non-zero exit; failed files keep their
@@ -65,8 +98,28 @@ URLs are public HTTP(S) assets only. No database errors are exposed to users.
 - Disconnect the test database: show a retryable error, not a misleading zero
   results state. Invalid query length/date/type/page must be rejected.
 
-The server uses a five-second aggregation budget and bounded result pages, and
-does not cache publication-sensitive responses. If catalogue size/traffic makes
-that budget inadequate, move the same result contract to Atlas Search rather than
-increasing unlimited regex scans. File indexing is a deployment/content workflow
-step; without it, results truthfully describe metadata/lyrics-only coverage.
+The server retains its five-second aggregation budget and does not cache
+publication-sensitive responses. File-text branches start with indexed `$text`
+lookups, then validate current publication/attachment/language state and keep only
+the first matching passage. Metadata branches never construct PDF text arrays.
+Results are deduplicated before counting/pagination, so a title plus PDF match
+does not appear twice. Only the selected result page is turned into UI excerpts.
+There is no unindexed full-file fallback when a required index is missing.
+
+Regression suite with an explicitly local, disposable database:
+
+```sh
+LIBRARY_TEST_MONGODB_URI=mongodb://127.0.0.1:27028/ pnpm test --run
+```
+
+Optional **read-only** real-catalogue benchmark after index setup (no fixtures,
+index creation, database writes or cleanup against the configured database):
+
+```sh
+LIBRARY_BENCHMARK=1 node --env-file=.env.local node_modules/vitest/vitest.mjs run src/lib/server/librarySearch.performance.test.ts --disableConsoleIntercept
+```
+
+The benchmark includes `amour`, accents, common/short/no-match queries and combined
+filters, and asserts the five-second end-to-end budget. Integration tests inspect
+the query plan to verify use of `library_file_text_v1`, and cover deduplication,
+PDF pages, lyric/SRT timestamps, literal punctuation and immediate visibility changes.

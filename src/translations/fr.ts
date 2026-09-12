@@ -234,7 +234,7 @@ export default {
 		'Vérifiez les filtres : 2 à 100 caractères, dates valides et date de fin après la date de début.',
 	'search.unavailable': 'La recherche est momentanément indisponible. Réessayez.',
 	'search.coverage':
-		'Recherche dans les titres, métadonnées, paroles publiées et textes indexés. Les documents scannés ou pas encore indexés sont recherchés par leurs métadonnées uniquement. Les filtres utilisent les informations renseignées ; une langue manquante n’est pas déduite.',
+		'Recherche dans les titres, métadonnées, paroles publiées et textes indexés. Utilisez des mots complets pour rechercher dans les fichiers ; les mots partiels restent acceptés dans les titres et les paroles. Les documents scannés ou pas encore indexés sont recherchés par leurs métadonnées uniquement. Les filtres utilisent les informations renseignées ; une langue manquante n’est pas déduite.',
 	'search.placeholder': 'Rechercher une prédication, un chant...',
 	'search.close': 'Fermer la recherche',
 	'search.sermons': 'Prédications',
