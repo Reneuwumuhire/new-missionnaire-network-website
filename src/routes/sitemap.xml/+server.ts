@@ -125,6 +125,9 @@ export async function GET() {
 	const pages = [
 		'',
 		'/a-propos',
+		'/studio',
+		'/privacy',
+		'/terms',
 		'/eglise',
 		'/ewald-frank',
 		'/predications',
@@ -181,11 +184,7 @@ ${buildUrlEntry({
 			(r) => `
 ${buildUrlEntry({
 	loc: `${baseUrl}/live/rediffusions/${String(r._id)}`,
-	lastmod: pickLastmod(
-		r as SitemapDoc,
-		['updated_at', 'updatedAt', 'started_at'],
-		generatedAt
-	),
+	lastmod: pickLastmod(r as SitemapDoc, ['updated_at', 'updatedAt', 'started_at'], generatedAt),
 	changefreq: 'weekly',
 	priority: '0.6'
 })}`
