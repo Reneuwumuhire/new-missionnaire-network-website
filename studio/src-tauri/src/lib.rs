@@ -174,7 +174,19 @@ fn allowed_web_url(url: &str) -> bool {
 
 #[cfg(test)]
 mod url_tests {
-	use super::allowed_web_url;
+	use super::{allowed_web_url, open_url, studio_open_login, studio_open_youtube_login};
+
+	#[test]
+	fn browser_login_rejects_unsafe_input_before_opening() {
+		for url in ["file:///C:/Windows/System32/cmd.exe", "https://example.com/\0bad", "https://example.com/\n"] {
+			assert!(open_url(url.into()).is_err());
+			assert!(studio_open_login("a".repeat(20), url.into()).is_err());
+			assert!(studio_open_youtube_login("a".repeat(20), url.into()).is_err());
+		}
+		assert!(open_url(format!("https://example.com/{}", "a".repeat(2048))).is_err());
+		assert!(studio_open_login("bad&code".into(), "https://example.com".into()).is_err());
+		assert!(studio_open_youtube_login("bad&code".into(), "https://example.com".into()).is_err());
+	}
 
 	#[test]
 	fn only_https_or_real_loopback_is_allowed() {
@@ -233,7 +245,14 @@ fn studio_post(body: String, authorization: String, base_url: String, path: &str
 	if !allowed_web_url(&base_url) {
 		return Err("URL du site invalide".into());
 	}
-	let output = Command::new("curl")
+	let mut command = Command::new("curl");
+	#[cfg(target_os = "windows")]
+	{
+		use std::os::windows::process::CommandExt;
+		// Pairing polls run in the background without flashing a console.
+		command.creation_flags(windows_sys::Win32::System::Threading::CREATE_NO_WINDOW);
+	}
+	let output = command
 		.args([
 			"--fail-with-body",
 			"--silent",
@@ -386,17 +405,35 @@ fn open_url(url: String) -> Result<(), String> {
 	if !allowed_web_url(&url) || url.len() > 2048 {
 		return Err("URL non supportée".into());
 	}
-	#[cfg(target_os = "macos")]
-	let opener = "open";
-	#[cfg(target_os = "linux")]
-	let opener = "xdg-open";
 	#[cfg(target_os = "windows")]
-	let opener = "explorer";
-	std::process::Command::new(opener)
-		.arg(&url)
-		.spawn()
-		.map(|_| ())
-		.map_err(|e| e.to_string())
+	{
+		use windows_sys::Win32::UI::{Shell::ShellExecuteW, WindowsAndMessaging::SW_SHOWNORMAL};
+		let url: Vec<u16> = url.encode_utf16().chain(Some(0)).collect();
+		// Ask the registered browser directly, without Explorer or a command shell.
+		// SAFETY: the URL is NUL-terminated and stays alive for the call; optional
+		// parameters are null. URL validation above rejects embedded NULs.
+		let result = unsafe {
+			ShellExecuteW(std::ptr::null_mut(), windows_sys::w!("open"), url.as_ptr(),
+				std::ptr::null(), std::ptr::null(), SW_SHOWNORMAL)
+		} as isize;
+		if result > 32 {
+			Ok(())
+		} else {
+			Err(format!("Impossible d’ouvrir le navigateur (Windows {result}). Vérifiez votre navigateur par défaut."))
+		}
+	}
+	#[cfg(not(target_os = "windows"))]
+	{
+		#[cfg(target_os = "macos")]
+		let opener = "open";
+		#[cfg(target_os = "linux")]
+		let opener = "xdg-open";
+		Command::new(opener)
+			.arg(&url)
+			.spawn()
+			.map(|_| ())
+			.map_err(|e| e.to_string())
+	}
 }
 
 #[tauri::command]
