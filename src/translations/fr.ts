@@ -208,6 +208,33 @@ export default {
 
 	// ── Global search ───────────────────────────────────────────
 	'search.open': 'Rechercher sur le site',
+	'search.library': 'Rechercher dans la bibliothèque',
+	'search.libraryDescription':
+		'Retrouvez une prédication, un chant ou un passage dans les transcriptions et documents.',
+	'search.documents': 'Documents et littérature',
+	'search.contentType': 'Type de contenu',
+	'search.allTypes': 'Tous les contenus',
+	'search.language': 'Langue du contenu',
+	'search.allLanguages': 'Toutes les langues',
+	'search.unspecified': 'Non précisée',
+	'search.author': 'Prédicateur ou artiste',
+	'search.category': 'Catégorie',
+	'search.from': 'À partir du',
+	'search.to': 'Jusqu’au',
+	'search.applyFilters': 'Appliquer les filtres',
+	'search.resetFilters': 'Effacer les filtres',
+	'search.resultCount': '{count} résultats pour « {query} »',
+	'search.oneResult': '1 résultat pour « {query} »',
+	'search.listen': 'Écouter',
+	'search.listenAt': 'Écouter à {time}',
+	'search.pdfPage': 'Ouvrir la page {page}',
+	'search.selected': '{title} est chargé dans le lecteur. Appuyez sur lecture si nécessaire.',
+	'search.loading': 'Recherche en cours…',
+	'search.invalidFilters':
+		'Vérifiez les filtres : 2 à 100 caractères, dates valides et date de fin après la date de début.',
+	'search.unavailable': 'La recherche est momentanément indisponible. Réessayez.',
+	'search.coverage':
+		'Recherche dans les titres, métadonnées, paroles publiées et textes indexés. Les documents scannés ou pas encore indexés sont recherchés par leurs métadonnées uniquement. Les filtres utilisent les informations renseignées ; une langue manquante n’est pas déduite.',
 	'search.placeholder': 'Rechercher une prédication, un chant...',
 	'search.close': 'Fermer la recherche',
 	'search.sermons': 'Prédications',
