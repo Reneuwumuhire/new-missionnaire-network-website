@@ -5,7 +5,8 @@ import {
 	searchLibrary,
 	toLibraryResult,
 	librarySourcePipeline,
-	libraryTextTerm
+	libraryTextTerm,
+	libraryPhraseCandidate
 } from './librarySearch';
 import { parseLibraryFilters } from '../utils/librarySearch';
 import { ensureLibrarySearchIndexes } from './librarySearchIndexes';
@@ -21,6 +22,21 @@ it('uses an indexed first stage for file text, not raw user search syntax', () =
 	expect(libraryTextTerm('-amour "foi"')).toBe('amour');
 	expect(libraryTextTerm('.*')).toBe('');
 	expect(libraryTextTerm('gra\u0302ce')).toBe('grâce');
+});
+
+it('prunes phrase candidates without losing accented or cross-part quotations', () => {
+	const quote = 'Oui, monsieur.” Il m’a regardé de la tête aux pieds;';
+	const candidate = new RegExp(libraryPhraseCandidate(quote), 'iu');
+	const words = 'Oui monsieur Il m a regardé de la tête aux pieds'.split(' ');
+	for (let split = 1; split < words.length; split++) {
+		const parts = [words.slice(0, split).join(' '), words.slice(split).join(' ')];
+		expect(parts.some((part) => candidate.test(part))).toBe(true);
+	}
+	expect(words.some((word) => candidate.test(word))).toBe(true);
+	expect(candidate.test(quote)).toBe(true);
+	expect(candidate.test('un autre passage sur la foi')).toBe(false);
+	const filters = parseLibraryFilters(new URLSearchParams('q=la+foi'));
+	expect(librarySourcePipeline('sermons', filters, true)[1]).toHaveProperty('$match.published');
 });
 
 it('maps timed snippets and safe document links', () => {

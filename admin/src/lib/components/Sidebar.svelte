@@ -35,6 +35,9 @@
 		...(user.canManageRecordings
 			? [{ href: '/recordings', labelKey: 'nav.recordings' as const, icon: 'recordings' }]
 			: []),
+		...(user.canManageRecordings
+			? [{ href: '/library-index', labelKey: 'index.title' as const, icon: 'lyrics' }]
+			: []),
 		...(user.canManageAudio
 			? [{ href: '/audio', labelKey: 'nav.audioLibrary' as const, icon: 'music' }]
 			: []),

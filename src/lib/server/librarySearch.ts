@@ -2,7 +2,12 @@ import type { Db, Document } from 'mongodb';
 import { getDb } from '../../db/mongo';
 import { buildSermonSlug } from '../../utils/sermonSlug';
 import { buildFuzzySearchPattern } from '$lib/utils/searchText';
-import type { PassageMode } from '$lib/utils/passageSearch';
+import {
+	passagePattern,
+	passageWordPatterns,
+	phraseWords,
+	type PassageMode
+} from '$lib/utils/passageSearch';
 import { firstPassage } from './passageExpression';
 import {
 	libraryTypes,
@@ -95,6 +100,20 @@ export function libraryTextTerm(query: string) {
 	);
 }
 
+// A three-word anchor either fits in one part, or its first words reach that part's end.
+// This cheap native predicate discards non-candidates BEFORE the cross-page
+// reducer. Prefix alternatives retain quotations spanning any number of cues.
+export function libraryPhraseCandidate(query: string) {
+	const tokens = phraseWords(query);
+	const longest = tokens.findIndex((word) => word === libraryTextTerm(query));
+	const start = Math.min(longest, Math.max(0, tokens.length - 3));
+	const anchor = tokens.slice(start, start + 3).join(' ');
+	const words = passageWordPatterns(anchor);
+	let prefix = words.at(-1) ?? '';
+	for (let i = words.length - 2; i >= 0; i--) prefix = `${words[i]}(?:[^\\p{L}\\p{N}]+${prefix})?`;
+	return `(?:${passagePattern(anchor)})|(?:${prefix})[^\\p{L}\\p{N}]*$`;
+}
+
 export function librarySourcePipeline(
 	type: LibraryType,
 	f: LibraryFilters,
@@ -105,6 +124,15 @@ export function librarySourcePipeline(
 	const textTerm = libraryTextTerm(f.q);
 	const stages: Document[] = [
 		...(content ? [{ $match: { $text: { $search: textTerm, $language: 'none' } } }] : []),
+		...(content && f.match !== 'words' && passageWordPatterns(f.q).length >= 4
+			? [
+					{
+						$match: {
+							'library_search.parts.text': { $regex: libraryPhraseCandidate(f.q), $options: 'i' }
+						}
+					}
+				]
+			: []),
 		{
 			$match:
 				type === 'recordings'
@@ -463,7 +491,9 @@ export async function searchLibrary(
 					}
 				}
 			],
-			{ maxTimeMS: 5000, allowDiskUse: true }
+			// A complete cross-library count can exceed five seconds on a cold/shared
+			// cluster. Keep it bounded, but leave headroom after candidate pruning.
+			{ maxTimeMS: 10000, allowDiskUse: true }
 		)
 		.toArray();
 	const total = result?.count[0]?.total ?? 0;
