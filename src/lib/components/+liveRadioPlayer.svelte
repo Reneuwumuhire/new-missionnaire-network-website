@@ -16,6 +16,7 @@
 	} from '$lib/utils/liveTrack';
 	import LiveTranscript from './+liveTranscript.svelte';
 	import { focusTrap } from '$lib/actions/focusTrap';
+	import { portal } from '$lib/actions/portal';
 	import { t, type TranslationKey } from '../../i18n';
 	let { testToken = null }: { testToken?: string | null } = $props();
 
@@ -193,6 +194,19 @@
 	function closeThumbnail() {
 		thumbnailExpanded = false;
 	}
+
+	$effect(() => {
+		if (!browser || !thumbnailExpanded) return;
+		const y = window.scrollY;
+		document.body.style.cssText += `;position:fixed;top:-${y}px;width:100%;overflow:hidden`;
+		return () => {
+			document.body.style.position = '';
+			document.body.style.top = '';
+			document.body.style.width = '';
+			document.body.style.overflow = '';
+			window.scrollTo(0, y);
+		};
+	});
 
 	function handleLightboxKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') closeThumbnail();
@@ -745,7 +759,8 @@
 	<!-- Lightbox: click backdrop or press Escape to close. Image inside
 	     stops propagation so clicking the image itself doesn't dismiss. -->
 	<div
-		class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-lightbox-in"
+		use:portal
+		class="fixed inset-0 z-[130] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-lightbox-in"
 		onclick={handleBackdropClick}
 		onkeydown={handleLightboxKeydown}
 		use:focusTrap={{ onEscape: closeThumbnail }}
@@ -758,7 +773,7 @@
 			type="button"
 			onclick={closeThumbnail}
 			aria-label={$t('live.closeLightbox')}
-			class="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+			class="absolute right-4 top-[max(1rem,env(safe-area-inset-top))] flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
 		>
 			<svg
 				width="18"
@@ -780,7 +795,7 @@
 				broadcastThumbnailBroken = true;
 				closeThumbnail();
 			}}
-			class="max-h-[90vh] max-w-[90vw] object-contain shadow-2xl"
+			class="max-h-[calc(100dvh-2rem)] max-w-[calc(100vw-2rem)] object-contain shadow-2xl"
 		/>
 	</div>
 {/if}
