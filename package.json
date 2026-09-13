@@ -9,6 +9,7 @@
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
+		"start": "node scripts/start-server.mjs",
 		"preview": "vite preview",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
@@ -42,7 +43,6 @@
 		"lint-staged": "^17.3.0",
 		"minimist": "^1.2.8",
 		"node-fetch": "^3.3.2",
-		"pdfjs-dist": "^6.3.289",
 		"postcss": "^8.5.28",
 		"prettier": "^3.8.1",
 		"prettier-plugin-svelte": "^3.5.1",
@@ -72,6 +72,7 @@
 		"client-zip": "^2.5.0",
 		"hls.js": "^1.6.16",
 		"mongodb": "^6.8.0",
+		"pdfjs-dist": "^6.3.289",
 		"plyr": "^3.7.8",
 		"svelte-icons-pack": "^2.1.0",
 		"web-push": "^3.6.7",

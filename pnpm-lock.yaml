@@ -35,6 +35,9 @@ importers:
       mongodb:
         specifier: ^6.8.0
         version: 6.15.0(gcp-metadata@5.3.0)
+      pdfjs-dist:
+        specifier: ^6.3.289
+        version: 6.3.289
       plyr:
         specifier: ^3.7.8
         version: 3.7.8
@@ -108,9 +111,6 @@ importers:
       node-fetch:
         specifier: ^3.3.2
         version: 3.3.2
-      pdfjs-dist:
-        specifier: ^6.3.289
-        version: 6.3.289
       postcss:
         specifier: ^8.5.28
         version: 8.5.28

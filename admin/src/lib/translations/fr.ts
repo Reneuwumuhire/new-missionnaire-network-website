@@ -2,6 +2,28 @@
 // `TranslationKey` in admin/src/lib/i18n.ts derives from this file, and en.ts
 // is type-checked against it so a missing English key fails `pnpm run check`.
 export default {
+	'index.title': 'Indexation des fichiers',
+	'index.description':
+		'Les PDF et sous-titres publiés sont détectés automatiquement, puis traités en arrière-plan. Les paroles publiées sont déjà recherchables, sans extraction supplémentaire.',
+	'index.online': 'Traitement automatique actif · détection environ chaque minute',
+	'index.offline':
+		'Le traitement automatique ne répond pas. Vérifiez que le service du site est démarré avec son worker d’indexation.',
+	'index.refresh': 'Actualiser',
+	'index.status': 'État de l’indexation',
+	'index.pending': 'En attente',
+	'index.processing': 'En cours',
+	'index.ready': 'Recherchable',
+	'index.failed': 'Échec',
+	'index.no_text': 'Sans texte',
+	'index.noTextHelp':
+		'PDF scanné ou fichier vide : recherche par titre uniquement. Un PDF avec du texte sélectionnable est nécessaire.',
+	'index.retry': 'Réessayer',
+	'index.retryFailed': 'Ce fichier ne peut pas être relancé. Actualisez la liste.',
+	'index.retried': 'Le fichier a été remis en attente.',
+	'index.empty': 'Aucun fichier dans cet état.',
+	'index.pages': 'Pages de résultats',
+	'index.previous': 'Précédent',
+	'index.next': 'Suivant',
 	// ── Common ──────────────────────────────────────────────────
 	'common.administration': 'Administration',
 	'common.bulkImport': 'Importer en lot',

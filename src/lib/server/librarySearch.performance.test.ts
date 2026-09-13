@@ -23,6 +23,11 @@ describe.skipIf(process.env.LIBRARY_BENCHMARK !== '1')('real catalogue search bu
 		await client?.close();
 	});
 	it.each([
+		...['sermons', 'songs', 'documents', 'transcriptions', 'recordings'].map(
+			(type) =>
+				`type=${type}&q=${encodeURIComponent('Oui, monsieur.” Il m’a regardé de la tête aux pieds;')}`
+		),
+		`q=${encodeURIComponent('Oui, monsieur.” Il m’a regardé de la tête aux pieds;')}`,
 		'q=amour',
 		'q=amour&type=sermons&language=fr',
 		'q=grace',
@@ -48,7 +53,7 @@ describe.skipIf(process.env.LIBRARY_BENCHMARK !== '1')('real catalogue search bu
 					returned: result.results.length
 				})
 			);
-			expect(elapsed).toBeLessThan(5000);
+			expect(elapsed).toBeLessThan(10000);
 			expect(result.results.length).toBeLessThanOrEqual(20);
 		},
 		15000

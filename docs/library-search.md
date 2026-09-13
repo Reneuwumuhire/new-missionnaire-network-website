@@ -40,11 +40,58 @@ This deliberate distinction prevents every keystroke from scanning the entire
 extracted library. Consider Atlas Search autocomplete if infix matching throughout
 PDF text becomes a requirement.
 
-## Extract existing PDF/SRT text
+## Automatic PDF/SRT indexing
 
-Metadata and published lyrics are searchable immediately. File contents need the
-maintenance command below before they can appear in full-text results. Run it
-again after adding files; use `--force` when replacing bytes at the same URL.
+The Node/Docker website starts `scripts/start-server.mjs`, which runs the web
+server and a separate indexing worker. Deploy both this website change and the
+admin change. If Railway has a custom start command, set it to
+`node scripts/start-server.mjs` (or remove the override to use the Docker CMD).
+No per-upload command is needed after that deployment.
+
+- The worker checks published attachments about every minute, including admin,
+  Studio and imported records. A busy extraction can delay the next check by up
+  to 90 seconds. Upload requests do not wait for extraction.
+- Text stays in `youtube_data.<source collection>.library_search`, with its PDF
+  page/SRT timestamp. `library_index_jobs` stores only status, revision, retry and
+  lease metadata; `library_index_workers` stores the worker heartbeat/lease.
+  No original file or publication setting is changed. No duplicate text store.
+- Existing successful extractions are reused. New URLs and source revision/date
+  changes queue extraction; same-URL replacements must update the source record's
+  `updatedAt`/`updated_at`/`uploadDate` (the admin upload finalizer already does).
+  Changing bytes directly in S3 without updating the record is not detectable.
+- One leased worker processes one asset at a time across deployment replicas.
+  Failures retry up to three attempts with backoff, interrupted leases recover,
+  and stale/replaced/unpublished jobs are discarded. Publication gates remain
+  authoritative in search and the reader even before the next discovery pass.
+- Admin **File indexing / Indexation des fichiers** shows Pending, Processing,
+  Searchable, Failed and No text, plus Retry. Recording-management permission is
+  required. An offline warning means the worker must be started/fixed, not that
+  uploads should be repeated. Scanned PDFs still require a text layer; no OCR.
+- `LIBRARY_ASSET_HOSTS` defaults to the existing Missionnaire S3 host. Set an
+  explicit comma-separated HTTPS host allowlist for other buckets.
+  `LIBRARY_INDEXING_ENABLED=0` disables the bundled worker without disabling the
+  website. A worker failure does not stop the website; the supervisor restarts it.
+
+For local development or a separately hosted worker (Node 24, full checkout and
+dependencies required):
+
+```sh
+node --env-file=.env.local scripts/library-index-worker.mjs
+```
+
+**This command writes to the configured database. Use a local/staging database
+when testing.** Vite development and Vercel/serverless requests do not launch a
+persistent worker: run the standalone command as an always-on service using the
+same database. This change does not add a Vercel cron or activate production from
+a local test.
+
+## Optional manual extraction / backfill
+
+Metadata and published lyrics are searchable immediately. The worker handles
+file contents automatically. The older maintenance command remains available
+for deliberate dry runs/backfills; it is not needed after each upload. Stop the
+worker before a manual `--write` run so two writers cannot race. Use `--force`
+when replacing bytes directly at the same URL without a source-record update.
 
 1. Use Node 24 and `pnpm install` (PDF.js is also lazy-loaded by the passage reader).
 2. Configure `MONGODB_URI` and `LIBRARY_ASSET_HOSTS` (comma-separated exact HTTPS
@@ -69,8 +116,7 @@ hosts, limits downloads to 30 MB, PDFs to 500 pages and extracted data to 2 MB p
 file. Failures are reported and cause a non-zero exit; failed files keep their
 previous successful extraction. Scans without a text layer are reported and remain
 metadata-only (OCR is not included). No extraction or indexing runs in a user's
-search request. Run this command in your existing content-import/maintenance
-workflow; this PR does not schedule jobs or index production automatically.
+search request.
 
 The live source record is always authoritative: hidden/unpublished recordings and
 their linked PDFs are excluded, draft lyrics are excluded, and extracted text is
@@ -118,6 +164,31 @@ or unlimited-file ingestion. Search/reader responses remain `no-store` and `noin
 query permutations are not a replacement for indexable canonical content pages.
 
 ## How to test
+
+- With local Mongo running, run
+  `LIBRARY_TEST_MONGODB_URI=mongodb://127.0.0.1:27028/test node --test scripts/library-index-queue.test.mjs`.
+  This uses and drops only its own randomly named test database. It covers
+  publication, same-URL replacement, mid-extraction changes, retries, leases,
+  empty PDFs, legacy extraction reuse and blocked asset hosts.
+- Start the worker and both apps against a local/staging database. Upload and
+  publish a text PDF/SRT, without running the manual indexing command. Within the
+  discovery interval plus extraction time it should become Searchable in admin.
+  Search a sentence unique to that file and open the highlighted page/cue.
+- Replace that file, then unpublish its recording while extraction is running.
+  Old text must not be committed for a replaced source, and private content must
+  not appear in search. Test a scanned PDF and a bad asset URL; Retry should be
+  available only for Failed/No text. Stop the worker and check the offline warning
+  after three minutes; restart it and verify the queue resumes.
+- Verify an unauthenticated user cannot access the admin page/actions and an
+  editor without recording-management permission gets 403 (including direct POST).
+  Runnable check from `admin/` while the local admin is listening on port 8084:
+  `LIBRARY_ADMIN_TEST_URL=http://127.0.0.1:8084 LIBRARY_TEST_MONGODB_URI=mongodb://127.0.0.1:27028/test node --test scripts/library-index.test.mjs`.
+  It creates/removes only uniquely named local test users, sessions and one job.
+- Search `Oui, monsieur.” Il m’a regardé de la tête aux pieds;`. The old query
+  exceeded five seconds; a short phrase-anchor predicate now prunes candidates
+  before the cross-page reducer. A bounded ten-second server budget allows for
+  cold/shared-cluster load; there is no partial-result fallback or cached private
+  content. Repeat short phrases, accent variants and phrases crossing pages/cues.
 
 - `pnpm test --run`, `pnpm run check`, `pnpm run build`.
 - Search a phrase occurring only in published lyrics, then one only in an indexed
