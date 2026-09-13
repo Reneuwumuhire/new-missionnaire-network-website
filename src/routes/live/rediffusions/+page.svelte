@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import type { PublishedRecording, RecordingType } from '$lib/server/recordings';
+	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { navigating, page } from '$app/stores';
 	import { vercelImage, vercelImageSrcSet, vercelImagePlaceholder } from '$lib/utils/vercelImage';
@@ -151,6 +152,19 @@
 	function closeThumb() {
 		expandedThumb = null;
 	}
+
+	$effect(() => {
+		if (!browser || !expandedThumb) return;
+		const y = window.scrollY;
+		document.body.style.cssText += `;position:fixed;top:-${y}px;width:100%;overflow:hidden`;
+		return () => {
+			document.body.style.position = '';
+			document.body.style.top = '';
+			document.body.style.width = '';
+			document.body.style.overflow = '';
+			window.scrollTo(0, y);
+		};
+	});
 
 	function onLightboxKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') closeThumb();
@@ -585,7 +599,7 @@
 	     wherever the slot's box ends instead of being screen-centered. -->
 	<div
 		use:portal
-		class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-lightbox-in"
+		class="fixed inset-0 z-[130] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-lightbox-in"
 		onclick={onLightboxBackdropClick}
 		onkeydown={onLightboxKeydown}
 		role="dialog"
@@ -597,7 +611,7 @@
 			type="button"
 			onclick={closeThumb}
 			aria-label={$t('live.closeLightbox')}
-			class="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+			class="absolute right-4 top-[max(1rem,env(safe-area-inset-top))] flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
 		>
 			<svg
 				width="18"
@@ -619,7 +633,7 @@
 				markThumbFailed(expandedThumb!.id);
 				closeThumb();
 			}}
-			class="max-h-[90vh] max-w-[90vw] object-contain shadow-2xl"
+			class="max-h-[calc(100dvh-2rem)] max-w-[calc(100vw-2rem)] object-contain shadow-2xl"
 		/>
 	</div>
 {/if}
