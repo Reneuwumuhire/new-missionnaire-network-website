@@ -4,6 +4,7 @@
 	import { portal } from '$lib/actions/portal';
 	import { focusTrap } from '$lib/actions/focusTrap';
 	import { libraryHref, type LibraryResponse } from '$lib/utils/librarySearch';
+	import { MAX_PASSAGE_QUERY } from '$lib/utils/passageSearch';
 	import { t } from '../../i18n';
 	let open = $state(false),
 		query = $state(''),
@@ -110,7 +111,7 @@
 					bind:value={query}
 					oninput={onInput}
 					type="search"
-					maxlength="100"
+					maxlength={MAX_PASSAGE_QUERY}
 					placeholder={$t('search.placeholder')}
 					class="min-w-0 w-full bg-transparent py-4 text-base font-body focus:outline-none"
 					aria-label={$t('search.placeholder')}

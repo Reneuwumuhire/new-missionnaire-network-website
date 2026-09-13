@@ -231,7 +231,25 @@ export default {
 	'search.selected': '{title} est chargé dans le lecteur. Appuyez sur lecture si nécessaire.',
 	'search.loading': 'Recherche en cours…',
 	'search.invalidFilters':
-		'Vérifiez les filtres : 2 à 100 caractères, dates valides et date de fin après la date de début.',
+		'Vérifiez les filtres : recherche de 2 à 500 caractères, dates valides et date de fin après la date de début.',
+	'search.matchMode': 'Type de recherche',
+	'search.exactPhrase': 'Expression exacte',
+	'search.similarPassages': 'Passages similaires',
+	'search.phraseHint':
+		'Les expressions respectent l’ordre des mots, sans distinction de casse, d’accents ou de sauts de ligne. Les titres et métadonnées sont également recherchés.',
+	'search.similarHint':
+		'Ces passages contiennent les mots recherchés, dans un ordre différent : ils ne sont pas des citations exactes.',
+	'search.openPassage': 'Lire le passage surligné',
+	'reader.back': 'Retour aux résultats',
+	'reader.extracted': 'Texte extrait du PDF',
+	'reader.matches': 'Occurrences du texte',
+	'reader.position': 'Occurrence {current} sur {total}',
+	'reader.previous': 'Précédente',
+	'reader.next': 'Suivante',
+	'reader.original': 'Ouvrir le fichier original',
+	'reader.loading': 'Chargement de la page originale…',
+	'reader.pdfFallback':
+		'Le surlignage du PDF n’est pas disponible. Le passage extrait est surligné ci-dessus ; vous pouvez aussi ouvrir le fichier original.',
 	'search.unavailable': 'La recherche est momentanément indisponible. Réessayez.',
 	'search.coverage':
 		'Recherche dans les titres, métadonnées, paroles publiées et textes indexés. Utilisez des mots complets pour rechercher dans les fichiers ; les mots partiels restent acceptés dans les titres et les paroles. Les documents scannés ou pas encore indexés sont recherchés par leurs métadonnées uniquement. Les filtres utilisent les informations renseignées ; une langue manquante n’est pas déduite.',

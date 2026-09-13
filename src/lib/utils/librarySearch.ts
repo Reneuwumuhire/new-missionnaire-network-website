@@ -1,4 +1,5 @@
 import { buildFuzzySearchPattern } from './searchText';
+import { MAX_PASSAGE_QUERY, passagePattern, type PassageMode } from './passageSearch';
 
 export const libraryTypes = [
 	'sermons',
@@ -18,6 +19,7 @@ export type LibraryFilters = {
 	from: string;
 	to: string;
 	page: number;
+	match?: PassageMode;
 };
 export type LibraryResult = {
 	id: string;
@@ -28,6 +30,7 @@ export type LibraryResult = {
 	languages: string[];
 	date: string;
 	href: string;
+	sourceHref?: string;
 	audioUrl: string;
 	pageHref: string;
 	code: string;
@@ -50,6 +53,8 @@ export function parseLibraryFilters(params: URLSearchParams): LibraryFilters {
 	};
 	const type = bounded('type');
 	const language = bounded('language');
+	const match = bounded('match');
+	if (match && !['phrase', 'words'].includes(match)) throw new Error('invalid');
 	if (type && !libraryTypes.includes(type as LibraryType)) throw new Error('invalid');
 	if (language && !['fr', 'en', 'rw', 'sw', 'unknown'].includes(language))
 		throw new Error('invalid');
@@ -68,7 +73,8 @@ export function parseLibraryFilters(params: URLSearchParams): LibraryFilters {
 	const page = Number(params.get('page') || '1');
 	if (!Number.isInteger(page) || page < 1 || page > 1000) throw new Error('invalid');
 	return {
-		q: bounded('q'),
+		q: bounded('q', MAX_PASSAGE_QUERY),
+		...(match ? { match: match as PassageMode } : {}),
 		type: type as LibraryType | '',
 		language,
 		author: bounded('author'),
@@ -90,12 +96,15 @@ export function libraryHref(
 	return `/recherche?${params}`;
 }
 
-export function searchSnippet(text: string, query: string) {
+export function searchSnippet(text: string, query: string, mode: PassageMode = 'phrase') {
 	const clean = text
 		.replace(/<[^>]*>/g, ' ')
 		.replace(/\s+/g, ' ')
 		.trim();
-	const match = new RegExp(buildFuzzySearchPattern(query), 'i').exec(clean);
+	const match = new RegExp(
+		mode === 'words' ? buildFuzzySearchPattern(query.split(/\s+/)[0]) : passagePattern(query),
+		'iu'
+	).exec(clean);
 	if (!match)
 		return { before: clean.slice(0, 180), match: '', after: clean.length > 180 ? '…' : '' };
 	const start = Math.max(0, match.index - 70),

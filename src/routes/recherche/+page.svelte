@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { tick } from 'svelte';
+	import { MAX_PASSAGE_QUERY } from '$lib/utils/passageSearch';
+	import { playLibraryResult } from '$lib/utils/playLibraryResult';
 	import { page, navigating } from '$app/stores';
 	import { t } from '../../i18n';
 	import {
@@ -9,52 +10,11 @@
 	} from '$lib/utils/librarySearch';
 	import LibraryResult from '$lib/components/LibraryResult.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
-	import { selectAudio, playlist, basePlaylist, currentIndex, isPlaying } from '$lib/stores/global';
-	import { pendingPlaybackSeek } from '$lib/utils/audioResume';
-	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
-	import type { MusicAudio } from '$lib/models/music-audio';
 	let { data } = $props();
 	let playbackMessage = $state('');
 	function play(result: Result) {
-		const song: MusicAudio = {
-			_id: result.id,
-			title: result.title,
-			artist: result.author,
-			category: result.type === 'recordings' ? 'Direct' : result.category,
-			book: null,
-			number: null,
-			s3_key: '',
-			s3_url: result.audioUrl,
-			file_size: 0,
-			format: 'mp3',
-			uploaded_at: new Date()
-		};
-		pendingPlaybackSeek.set(
-			result.startSec !== null ? { url: song.s3_url, time: result.startSec } : null
-		);
-		const track =
-			result.type === 'sermons'
-				? {
-						_id: result.id,
-						author: result.author,
-						full_date_code: result.code,
-						date_code: result.code,
-						french_title: result.title,
-						mp3_url: result.audioUrl,
-						iso_date: result.date
-					}
-				: song;
-		playlist.set([track]);
-		basePlaylist.set([track]);
-		currentIndex.set(0);
-		selectAudio.set(track);
-		isPlaying.set(true);
+		playLibraryResult(result);
 		playbackMessage = $t('search.selected', { title: result.title });
-		void tick().then(() => {
-			if (result.startSec === 0)
-				window.dispatchEvent(new CustomEvent('missionnaire-audio-seek', { detail: { time: 0 } }));
-			dispatchAudioPlayerAction('play');
-		});
 	}
 </script>
 
@@ -78,7 +38,7 @@
 						type="search"
 						required
 						minlength="2"
-						maxlength="100"
+						maxlength={MAX_PASSAGE_QUERY}
 						value={data.filters.q}
 						placeholder={$t('search.placeholder')}
 						class="search-field min-w-0 flex-1 text-base"
@@ -88,6 +48,13 @@
 						type="submit">{$t('search.action')}</button
 					>
 				</div>
+				<label class="filter-label"
+					>{$t('search.matchMode')}
+					<select name="match" class="search-field" value={data.filters.match || 'phrase'}>
+						<option value="phrase">{$t('search.exactPhrase')}</option>
+						<option value="words">{$t('search.similarPassages')}</option>
+					</select>
+				</label>
 				<div class="grid grid-cols-2 md:grid-cols-3 gap-3">
 					<label class="filter-label"
 						>{$t('search.contentType')}<select
@@ -176,6 +143,9 @@
 		{:else if data.filters.q.length < 2}
 			<p class="py-8 text-stone-600">{$t('search.minChars')}</p>
 		{:else}
+			<p class="text-sm text-stone-600">
+				{$t(data.filters.match === 'words' ? 'search.similarHint' : 'search.phraseHint')}
+			</p>
 			<p class="pt-7 pb-2 text-sm text-stone-600" role="status">
 				{$t(data.result.total === 1 ? 'search.oneResult' : 'search.resultCount', {
 					count: data.result.total,

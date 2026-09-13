@@ -28,7 +28,12 @@ describe.skipIf(process.env.LIBRARY_BENCHMARK !== '1')('real catalogue search bu
 		'q=grace',
 		'q=foi',
 		'q=am',
-		'q=zznonexistent987654321'
+		'q=zznonexistent987654321',
+		'q=la+foi',
+		'q=foi+foi+foi+foi+foi',
+		'q=amour+foi&match=words',
+		'q=quand+je+monte+a+la+chaire',
+		`q=${encodeURIComponent('Et d’une façon ou d’une autre, quand je monte à la chaire, je sens que leurs prières seront exaucées. Et je sais qu’Il est ici.')}`
 	])(
 		'%s finishes within budget',
 		async (query) => {

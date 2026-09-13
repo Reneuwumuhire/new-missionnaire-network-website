@@ -54,7 +54,7 @@ async function extract(url, kind) {
 			startMs: cue.startMs
 		}));
 	} else {
-		// PDF.js is used only by this maintenance script, never shipped to the browser.
+		// Maintenance uses the Node build; the passage reader lazy-loads the browser build.
 		const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
 		const task = getDocument({
 			data: new Uint8Array(bytes),
