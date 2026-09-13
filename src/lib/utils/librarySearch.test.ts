@@ -23,7 +23,8 @@ describe('library search boundaries', () => {
 		'language=zz',
 		'from=2025-02-30',
 		'from=2026-01-01&to=2025-01-01',
-		`q=${'a'.repeat(101)}`
+		`q=${'a'.repeat(501)}`,
+		'match=invalid'
 	])('rejects invalid %s', (query) => {
 		expect(() => parseLibraryFilters(new URLSearchParams(query))).toThrow();
 	});

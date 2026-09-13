@@ -278,6 +278,7 @@ sw.addEventListener('fetch', (event) => {
 	if (url.pathname.startsWith('/api/')) return;
 	// Search snippets follow current publication state, never a cached page.
 	if (url.pathname === '/recherche' || url.pathname.startsWith('/recherche/')) return;
+	if (url.pathname.startsWith('/lecture/')) return;
 	if (url.pathname === '/robots.txt' || url.pathname === '/sitemap.xml') return;
 
 	// Lane 1: Audio — cache-first with Range support. Lives in its own

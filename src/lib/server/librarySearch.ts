@@ -2,6 +2,8 @@ import type { Db, Document } from 'mongodb';
 import { getDb } from '../../db/mongo';
 import { buildSermonSlug } from '../../utils/sermonSlug';
 import { buildFuzzySearchPattern } from '$lib/utils/searchText';
+import type { PassageMode } from '$lib/utils/passageSearch';
+import { firstPassage } from './passageExpression';
 import {
 	libraryTypes,
 	SEARCH_PAGE_SIZE,
@@ -13,7 +15,7 @@ import {
 	type LibraryType
 } from '$lib/utils/librarySearch';
 
-const collections: Record<LibraryType, string> = {
+export const libraryCollections: Record<LibraryType, string> = {
 	sermons: 'sermons',
 	songs: 'music_audio',
 	recordings: 'recordings',
@@ -36,33 +38,45 @@ const language = (field: unknown) => ({
 
 // Read extracted text only while its URL still matches a current attachment.
 // Replacing/hiding a file immediately invalidates old text without waiting for re-indexing.
-function indexedParts(urls: unknown, regex: string) {
+function indexedParts(urls: unknown, f: LibraryFilters, reader = false) {
+	const assets = {
+		$filter: {
+			input: fallback('$library_search', []),
+			as: 'asset',
+			cond: { $and: [{ $in: ['$$asset.url', urls] }, present('$$asset.url')] }
+		}
+	};
+	if (reader)
+		return {
+			$reduce: {
+				input: assets,
+				initialValue: [],
+				in: {
+					$concatArrays: [
+						'$$value',
+						{
+							$map: {
+								input: fallback('$$this.parts', []),
+								as: 'part',
+								in: { $mergeObjects: ['$$part', { url: '$$this.url' }] }
+							}
+						}
+					]
+				}
+			}
+		};
 	return {
 		$reduce: {
-			input: {
-				$filter: {
-					input: fallback('$library_search', []),
-					as: 'asset',
-					cond: { $and: [{ $in: ['$$asset.url', urls] }, present('$$asset.url')] }
-				}
-			},
+			input: assets,
 			initialValue: [],
 			in: {
 				$cond: [
 					{ $gt: [{ $size: '$$value' }, 0] },
 					'$$value',
 					{
-						$map: {
-							input: {
-								$filter: {
-									input: fallback('$$this.parts', []),
-									as: 'part',
-									limit: 1,
-									cond: { $regexMatch: { input: fallback('$$part.text'), regex, options: 'i' } }
-								}
-							},
-							as: 'part',
-							in: { $mergeObjects: ['$$part', { url: '$$this.url' }] }
+						$let: {
+							vars: { hit: firstPassage(fallback('$$this.parts', []), f.q, f.match) },
+							in: { $cond: ['$$hit', [{ $mergeObjects: ['$$hit', { url: '$$this.url' }] }], []] }
 						}
 					}
 				]
@@ -84,7 +98,8 @@ export function libraryTextTerm(query: string) {
 export function librarySourcePipeline(
 	type: LibraryType,
 	f: LibraryFilters,
-	content = false
+	content = false,
+	reader = false
 ): Document[] {
 	const regex = buildFuzzySearchPattern(f.q);
 	const textTerm = libraryTextTerm(f.q);
@@ -145,16 +160,18 @@ export function librarySourcePipeline(
 					}
 				]
 			},
-			parts: content
-				? indexedParts(
-						f.language === 'fr'
-							? ['$pdf_url']
-							: f.language === 'en'
-								? ['$english_pdf_url']
-								: ['$pdf_url', '$english_pdf_url'],
-						regex
-					)
-				: []
+			parts:
+				content || reader
+					? indexedParts(
+							f.language === 'fr'
+								? ['$pdf_url']
+								: f.language === 'en'
+									? ['$english_pdf_url']
+									: ['$pdf_url', '$english_pdf_url'],
+							f,
+							reader
+						)
+					: []
 		});
 	} else if (type === 'songs') {
 		stages.push(
@@ -255,7 +272,7 @@ export function librarySourcePipeline(
 			parts: {
 				$cond: [
 					{ $and: [{ $ne: ['$subtitles_hidden', true] }, { $isNumber: offset }] },
-					content ? indexedParts([subtitleUrl], regex) : [],
+					content || reader ? indexedParts([subtitleUrl], f, reader) : [],
 					[]
 				]
 			}
@@ -293,29 +310,39 @@ export function librarySourcePipeline(
 			title: fallback('$filename'),
 			date: '$publishedOn',
 			url: fallback('$url'),
-			parts: content ? indexedParts(['$url'], regex) : []
+			parts: content || reader ? indexedParts(['$url'], f, reader) : []
 		});
 	} else {
 		Object.assign(fields, {
 			date: '$release_date',
 			category: fallback('$type'),
 			url: fallback('$pdf_url'),
-			parts: content ? indexedParts(['$pdf_url'], regex) : []
+			parts: content || reader ? indexedParts(['$pdf_url'], f, reader) : []
 		});
 	}
 	stages.push({ $project: fields });
+	stages.push({
+		$set: { date: { $convert: { input: '$date', to: 'date', onError: null, onNull: null } } }
+	});
+	if (reader) return stages;
+	stages.push({
+		$set: {
+			part:
+				type === 'songs' ? firstPassage('$parts', f.q, f.match) : { $arrayElemAt: ['$parts', 0] }
+		}
+	});
 	const matches: Document = {
-		$or: ['title', 'alternateTitle', 'author', 'category', 'description', 'code', 'parts.text'].map(
-			(field) => ({ [field]: { $regex: regex, $options: 'i' } })
-		)
+		$or: [
+			...['title', 'alternateTitle', 'author', 'category', 'description', 'code'].map((field) => ({
+				[field]: { $regex: regex, $options: 'i' }
+			})),
+			{ 'part.text': { $exists: true, $ne: '' } }
+		]
 	};
 	if (f.author) matches.author = { $regex: buildFuzzySearchPattern(f.author), $options: 'i' };
 	if (f.category)
 		matches.category = { $regex: `^${buildFuzzySearchPattern(f.category)}$`, $options: 'i' };
 	if (f.language) matches.languages = f.language;
-	stages.push({
-		$set: { date: { $convert: { input: '$date', to: 'date', onError: null, onNull: null } } }
-	});
 	if (f.from || f.to)
 		matches.date = {
 			...(f.from ? { $gte: new Date(f.from) } : {}),
@@ -325,19 +352,6 @@ export function librarySourcePipeline(
 		{ $match: matches },
 		{
 			$set: {
-				part: {
-					$arrayElemAt: [
-						{
-							$filter: {
-								input: '$parts',
-								as: 'part',
-								limit: 1,
-								cond: { $regexMatch: { input: fallback('$$part.text'), regex, options: 'i' } }
-							}
-						},
-						0
-					]
-				},
 				score: { $cond: [{ $regexMatch: { input: '$title', regex, options: 'i' } }, 2, 1] }
 			}
 		},
@@ -346,7 +360,12 @@ export function librarySourcePipeline(
 	return stages;
 }
 
-export function toLibraryResult(row: Document, query: string): LibraryResult {
+export function toLibraryResult(
+	row: Document,
+	query: string,
+	mode: PassageMode = 'phrase',
+	language = ''
+): LibraryResult {
 	const type = row.type as LibraryType;
 	let href =
 		type === 'sermons'
@@ -367,6 +386,14 @@ export function toLibraryResult(row: Document, query: string): LibraryResult {
 	const pdfUrl = publicAssetUrl(row.part?.url || row.url);
 	const pageHref = pdfPage && pdfUrl ? `${pdfUrl.split('#')[0]}#page=${pdfPage}` : '';
 	if (pageHref && (type === 'documents' || type === 'transcriptions')) href = pageHref;
+	const sourceHref = href;
+	if (row.part?.text && /^[a-f\d]{24}$/i.test(row.id)) {
+		const params = new URLSearchParams({ q: query });
+		if (row.part.url) params.set('asset', row.part.url);
+		if (language) params.set('language', language);
+		if (mode === 'words') params.set('match', mode);
+		href = `/lecture/${type}/${row.id}?${params}`;
+	}
 	return {
 		id: row.id,
 		type,
@@ -376,6 +403,7 @@ export function toLibraryResult(row: Document, query: string): LibraryResult {
 		languages: row.languages,
 		date: row.date instanceof Date ? row.date.toISOString().slice(0, 10) : '',
 		href,
+		sourceHref,
 		pageHref,
 		code: row.date_code || row.code || '',
 		audioUrl: publicAssetUrl(row.audioUrl),
@@ -383,7 +411,8 @@ export function toLibraryResult(row: Document, query: string): LibraryResult {
 		page: pdfPage,
 		snippet: searchSnippet(
 			row.part?.text || row.description || row.alternateTitle || row.title,
-			query
+			query,
+			mode
 		)
 	};
 }
@@ -403,13 +432,13 @@ export async function searchLibrary(
 	// Keep small metadata/lyric substring searches separate from indexed file
 	// searches. Never put $text in an $or with an unindexed regex predicate.
 	const [result] = await db
-		.collection(collections[first.type])
+		.collection(libraryCollections[first.type])
 		.aggregate(
 			[
 				...librarySourcePipeline(first.type, filters, first.content),
 				...rest.map(({ type, content }) => ({
 					$unionWith: {
-						coll: collections[type],
+						coll: libraryCollections[type],
 						pipeline: librarySourcePipeline(type, filters, content)
 					}
 				})),
@@ -439,7 +468,9 @@ export async function searchLibrary(
 		.toArray();
 	const total = result?.count[0]?.total ?? 0;
 	return {
-		results: (result?.items ?? []).map((row: Document) => toLibraryResult(row, filters.q)),
+		results: (result?.items ?? []).map((row: Document) =>
+			toLibraryResult(row, filters.q, filters.match, filters.language)
+		),
 		total,
 		page: filters.page,
 		pages: Math.min(1000, Math.ceil(total / SEARCH_PAGE_SIZE))

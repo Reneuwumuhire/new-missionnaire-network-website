@@ -229,7 +229,25 @@ const en: Record<keyof typeof fr, string> = {
 	'search.selected': '{title} is loaded in the player. Press play if needed.',
 	'search.loading': 'Searching…',
 	'search.invalidFilters':
-		'Check your filters: 2–100 characters, valid dates and an end date on or after the start date.',
+		'Check your filters: search text of 2–500 characters, valid dates and an end date on or after the start date.',
+	'search.matchMode': 'Search mode',
+	'search.exactPhrase': 'Exact phrase',
+	'search.similarPassages': 'Similar passages',
+	'search.phraseHint':
+		'Phrases keep word order, ignoring case, accents and line breaks. Titles and metadata are also searched.',
+	'search.similarHint':
+		'These passages contain your search words in a different order; they are not exact quotations.',
+	'search.openPassage': 'Read highlighted passage',
+	'reader.back': 'Back to results',
+	'reader.extracted': 'Extracted PDF text',
+	'reader.matches': 'Text occurrences',
+	'reader.position': 'Match {current} of {total}',
+	'reader.previous': 'Previous',
+	'reader.next': 'Next',
+	'reader.original': 'Open original file',
+	'reader.loading': 'Loading original page…',
+	'reader.pdfFallback':
+		'PDF highlighting is unavailable. The extracted passage is highlighted above; you can also open the original file.',
 	'search.unavailable': 'Search is temporarily unavailable. Try again.',
 	'search.coverage':
 		'Search covers titles, metadata, published lyrics and indexed text. Use complete words to search inside files; partial words still match titles and lyrics. Scanned or not-yet-indexed documents match metadata only. Filters use recorded information; missing languages are not guessed.',

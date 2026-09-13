@@ -29,6 +29,10 @@
 		>{result.snippet.after}
 	</p>
 	<div class="mt-2 flex flex-wrap gap-4 items-center">
+		{#if result.href.startsWith('/lecture/')}<a
+				class="min-h-11 inline-flex items-center text-sm font-semibold underline underline-offset-4"
+				href={result.href}>{$t('search.openPassage')}</a
+			>{/if}
 		{#if onplay && result.audioUrl}
 			<button
 				type="button"
