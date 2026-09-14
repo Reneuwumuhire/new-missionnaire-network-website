@@ -1352,9 +1352,9 @@
 		// reactive-statement path relies on). Pausing or deferring play() breaks
 		// background playback when the screen is locked.
 		//
-		// Setting src already starts a fresh media load. Do not defer play to
-		// a timer/canplay after an earlier interruption: background suspension
-		// can delay those callbacks until the listener unlocks the screen.
+		// Start the new media load and play it synchronously. Do not defer play
+		// to a timer/canplay after an earlier interruption: background
+		// suspension can delay those callbacks until the listener unlocks.
 		if (audio) {
 			const encodedUrl = encodeUrlPath(nextUrl);
 			audioSrc = nextUrl; // prevents the reactive $: block from re-loading
@@ -1370,6 +1370,10 @@
 			audioElementRebuilt = false;
 
 			audio.src = encodedUrl;
+			// Installed iOS PWAs can leave the media element at the previous
+			// ended state when only `src` is replaced. Explicitly load the new
+			// resource before play() so the next track starts reliably.
+			audio.load();
 
 			const playPromise = audio.play();
 			if (playPromise) {
