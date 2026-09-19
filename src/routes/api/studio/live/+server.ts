@@ -34,12 +34,19 @@ function defaultTitle(template: string | null): string {
 }
 
 function validSubtitleUpload(key?: string, url?: string): boolean {
-	return (
-		typeof key === 'string' &&
-		typeof url === 'string' &&
-		key.startsWith('subtitles/') &&
-		url === s3Url(key)
-	);
+	if (typeof key !== 'string' || typeof url !== 'string' || !key.startsWith('subtitles/'))
+		return false;
+	try {
+		const parsed = new URL(url);
+		const encodedKey = key.split('/').map(encodeURIComponent).join('/');
+		return (
+			parsed.protocol === 'https:' &&
+			/^[a-z0-9.-]+\.s3(?:[.-][a-z0-9-]+)?\.amazonaws\.com$/i.test(parsed.hostname) &&
+			parsed.pathname === `/${encodedKey}`
+		);
+	} catch {
+		return false;
+	}
 }
 
 export async function POST({ request, url }) {

@@ -162,10 +162,13 @@ async function advancePrepared(from: ServicePhase) {
 			const sermon = element(studio.service.sermonLayerId)!;
 			sermon.currentTime = 0;
 			followMedia(studio.service.sermonLayerId);
-			lyrics.onAir = true;
+			// Captions must reach listeners before they appear on Studio's Program.
+			lyrics.onAir = await syncLiveLyrics();
+			if (!lyrics.onAir)
+				serviceRuntime.error =
+					'Subtitles were not attached to the live session; they stay off in Studio.';
 			element(studio.service.closingLayerId)!.preload = 'auto';
 			await sermon.play();
-			void syncLiveLyrics();
 		} else if (from === 'sermon') {
 			lyrics.onAir = false;
 			clearSync();
@@ -252,10 +255,13 @@ export async function startLiveSermon(outputMediaMs: number) {
 			serviceRuntime.recordingStatus = 'failed';
 			serviceRuntime.error = `Recording failed: ${recording.error}`;
 		}
-		lyrics.onAir = true;
+		lyrics.onAir = false;
 		clearSync();
 		lyrics.anchorEpochMs = Date.now();
-		void syncLiveLyrics();
+		lyrics.onAir = await syncLiveLyrics();
+		if (!lyrics.onAir)
+			serviceRuntime.error =
+				'Subtitles were not attached to the live session; they stay off in Studio.';
 	} finally {
 		serviceRuntime.busy = false;
 		persist();

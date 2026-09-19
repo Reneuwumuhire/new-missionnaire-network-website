@@ -14,7 +14,7 @@
 	} from '../lib/lyrics.svelte';
 	import { findCueIndex } from '../lib/srt';
 	import { t } from '../lib/i18n.svelte';
-	import { hideLiveLyrics, syncLiveLyrics } from '../lib/live-session.svelte';
+	import { hideLiveLyrics, prepareLiveSubtitles, syncLiveLyrics } from '../lib/live-session.svelte';
 	import { programScene } from '../lib/state.svelte';
 	import {
 		chooseReferenceAudio,
@@ -73,7 +73,7 @@
 		if (file.name.toLowerCase().endsWith('.srt')) {
 			const count = loadSrt(text, file.name);
 			notice = count ? t('lyrics.loadedCues', { count }) : t('lyrics.unreadableSrt');
-			if (count) void syncLiveLyrics();
+			if (count) void prepareLiveSubtitles().then((uploaded) => uploaded && syncLiveLyrics());
 		} else {
 			const count = loadLines(text, file.name);
 			notice = count ? t('lyrics.loadedLines', { count }) : t('lyrics.emptyFile');
