@@ -1080,15 +1080,26 @@ export async function getBroadcastAdminState(): Promise<BroadcastAdminState> {
 }
 
 export async function setBroadcastAdminState(updates: Partial<BroadcastAdminState>): Promise<void> {
+	// Single-anchor controls must not leave an older Studio timeline overriding
+	// their file/timing. Studio sync/hide supplies its own DVR timeline.
+	const resetTimeline =
+		updates.subtitle_timeline === undefined &&
+		Object.keys(updates).some(
+			(key) => key.startsWith('subtitle_') || key === 'is_live' || key === 'scheduled_live_id'
+		);
 	try {
 		const db = await getDb();
-		await db
-			.collection('broadcast_admin_state')
-			.updateOne(
-				{ _id: 'current' as unknown as ObjectId },
-				{ $set: { ...updates, updated_at: new Date().toISOString() } },
-				{ upsert: true }
-			);
+		await db.collection('broadcast_admin_state').updateOne(
+			{ _id: 'current' as unknown as ObjectId },
+			{
+				$set: {
+					...updates,
+					...(resetTimeline ? { subtitle_timeline: [] } : {}),
+					updated_at: new Date().toISOString()
+				}
+			},
+			{ upsert: true }
+		);
 	} catch (e) {
 		console.error('[BroadcastAdminState] set error:', e);
 	}
