@@ -33,6 +33,7 @@
 		startPreparedProgramme,
 		takeKrefeldLive
 	} from '../lib/service-workflow.svelte';
+	import { liveSession, prepareLiveSubtitles, syncLiveLyrics } from '../lib/live-session.svelte';
 	import {
 		activeScene,
 		addAudioInput,
@@ -162,6 +163,14 @@
 		lyrics.onAir = false;
 		serviceRuntime.error = null;
 		persist();
+		// Upload while service setup is still open, rather than leaving captions
+		// visible only in Studio if the public side cannot receive them.
+		if (!(await prepareLiveSubtitles())) {
+			fileError = liveSession.error || 'Could not upload these subtitles.';
+			return;
+		}
+		if (liveSession.activeId && !(await syncLiveLyrics()))
+			fileError = liveSession.error || 'Could not attach these subtitles to the live session.';
 	}
 
 	function setKrefeld(id: string) {
@@ -443,6 +452,22 @@
 						class="rounded border border-red-400/30 bg-red-400/10 p-3 text-xs text-danger"
 					>
 						{fileError}
+					</p>{/if}
+				{#if lyrics.srtText && liveSession.subtitleStatus !== 'idle'}<p
+						role="status"
+						class="text-xs {liveSession.subtitleStatus === 'error'
+							? 'text-danger'
+							: 'text-success'}"
+					>
+						{liveSession.subtitleStatus === 'uploading'
+							? 'Uploading subtitles…'
+							: liveSession.subtitleStatus === 'uploaded'
+								? 'Subtitles uploaded — they will attach when this live starts.'
+								: liveSession.subtitleStatus === 'attached'
+									? 'Subtitles attached to the live — waiting for the sermon.'
+									: liveSession.subtitleStatus === 'synced'
+										? 'Subtitles are synced for listeners.'
+										: 'Subtitle upload failed.'}
 					</p>{/if}
 				{#if validatingFile}<p role="status" class="text-xs text-muted">
 						Checking audio file…

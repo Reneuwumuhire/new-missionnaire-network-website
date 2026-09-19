@@ -19,6 +19,7 @@
 	);
 	let saving = $state(false);
 	let formError = $state<string | null>(null);
+	const MIN_YOUTUBE_SCHEDULE_LEAD_MS = 10 * 60 * 1000;
 
 	$effect(() => {
 		if (!liveSession.youtubeChannels.some((channel) => channel.id === youtubeChannelId)) {
@@ -29,6 +30,16 @@
 	async function save() {
 		if (!title.trim() || !scheduledAt) {
 			formError = 'Title and scheduled time are required.';
+			return;
+		}
+		const scheduledMs = Date.parse(scheduledAt);
+		if (!Number.isFinite(scheduledMs)) {
+			formError = 'Choose a valid date and time.';
+			return;
+		}
+		if (scheduledMs < Date.now() + MIN_YOUTUBE_SCHEDULE_LEAD_MS) {
+			formError =
+				'Schedule the YouTube live at least 10 minutes ahead. For an immediate check, use Quick private test.';
 			return;
 		}
 		saving = true;

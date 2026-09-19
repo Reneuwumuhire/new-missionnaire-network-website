@@ -70,7 +70,8 @@
 		liveSession,
 		logoutStudio,
 		refreshSessions,
-		refreshYouTubeStatus
+		refreshYouTubeStatus,
+		syncLiveLyrics
 	} from './lib/live-session.svelte';
 	import { recording } from './lib/recording.svelte';
 	import { initReferenceMatcher } from './lib/reference-match.svelte';
@@ -86,6 +87,7 @@
 	let mixer = $state<Mixer | null>(null);
 	let now = $state(Date.now());
 	let confirmStop = $state(false);
+	let subtitleAttachAttempt = '';
 	const SETUP_KEY = 'missionnaire-studio-configured-v1';
 	const needsSetup = localStorage.getItem(SETUP_KEY) !== '1';
 	let setupOpen = $state(needsSetup);
@@ -103,6 +105,22 @@
 		| 'preflight'
 		| null
 	>(null);
+
+	// A Studio restart or hot update must not strand an SRT that was already
+	// selected for the live currently on air. The key makes this one attempt per
+	// session/file; loading a different SRT creates a new attempt.
+	$effect(() => {
+		const sessionId = liveSession.activeId;
+		const text = lyrics.srtText;
+		if (!sessionId || lyrics.mode !== 'timed' || !text || lyrics.cues.length === 0) {
+			subtitleAttachAttempt = '';
+			return;
+		}
+		const attempt = `${sessionId}:${text}`;
+		if (subtitleAttachAttempt === attempt) return;
+		subtitleAttachAttempt = attempt;
+		void syncLiveLyrics();
+	});
 	let settingsPage = $state<'general' | 'output' | 'about'>('general');
 	let helpSection = $state<HelpSection>('getting-started');
 	let serviceSetupOpen = $state(false);

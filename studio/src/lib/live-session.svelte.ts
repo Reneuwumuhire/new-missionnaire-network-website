@@ -144,7 +144,10 @@ export const liveSession = $state({
 	youtubeConnecting: false,
 	youtubeError: null as string | null,
 	missionnaireReady: false,
-	missionnaireError: null as string | null
+	missionnaireError: null as string | null,
+	/** An SRT is prepared before the service starts, then attached as soon as
+	 * the selected public session is live. */
+	subtitleStatus: 'idle' as 'idle' | 'uploading' | 'uploaded' | 'attached' | 'synced' | 'error'
 });
 
 async function post<T>(body: object): Promise<T> {
@@ -451,16 +454,33 @@ async function ensureTimedSubtitle() {
 	return subtitleUpload;
 }
 
+/** Upload the selected SRT while the service is being prepared. It is attached
+ * to the selected broadcast as soon as that broadcast is live. */
+export async function prepareLiveSubtitles(): Promise<boolean> {
+	if (lyrics.mode !== 'timed' || !lyrics.srtText || lyrics.cues.length === 0) return false;
+	liveSession.subtitleStatus = 'uploading';
+	try {
+		await ensureTimedSubtitle();
+		liveSession.subtitleStatus = 'uploaded';
+		liveSession.error = null;
+		return true;
+	} catch (error) {
+		liveSession.subtitleStatus = 'error';
+		liveSession.error = error instanceof Error ? error.message : String(error);
+		return false;
+	}
+}
+
 /** Publish the same timed lyrics Studio is drawing into the video to the
  * audio-only website. The media clock is authoritative for play/pause/seek. */
-export async function syncLiveLyrics() {
+export async function syncLiveLyrics(): Promise<boolean> {
 	if (
 		!liveSession.activeId ||
 		lyrics.mode !== 'timed' ||
 		!lyrics.srtText ||
 		lyrics.cues.length === 0
 	)
-		return;
+		return false;
 	try {
 		const media = followedMediaElement(true);
 		const uploaded = await ensureTimedSubtitle();
@@ -483,9 +503,10 @@ export async function syncLiveLyrics() {
 			});
 			attachedSessionId = liveSession.activeId;
 			attachedSubtitleKey = uploaded.key;
-			return;
+			liveSession.subtitleStatus = 'attached';
+			return true;
 		}
-		if (!action) return;
+		if (!action) return true;
 		const sampledAtMs = Date.now();
 		const sourcePositionMs = media
 			? Math.round(media.currentTime * 1000)
@@ -515,8 +536,12 @@ export async function syncLiveLyrics() {
 		});
 		attachedSessionId = liveSession.activeId;
 		attachedSubtitleKey = uploaded.key;
+		liveSession.subtitleStatus = 'synced';
+		return true;
 	} catch (error) {
+		liveSession.subtitleStatus = 'error';
 		liveSession.error = error instanceof Error ? error.message : String(error);
+		return false;
 	}
 }
 
@@ -698,6 +723,7 @@ export async function logoutStudio(): Promise<boolean> {
 	disableManagedYouTube();
 	liveSession.missionnaireReady = false;
 	liveSession.missionnaireError = null;
+	liveSession.subtitleStatus = 'idle';
 	disableManagedMissionnaire();
 	attachedSessionId = null;
 	attachedSubtitleKey = null;
@@ -721,7 +747,7 @@ export async function startSelectedSession(): Promise<boolean> {
 		liveSession.activeStartedAt = new Date(result.startedAt).getTime();
 		attachedSessionId = null;
 		attachedSubtitleKey = null;
-		void syncLiveLyrics();
+		await syncLiveLyrics();
 		return true;
 	} catch (error) {
 		liveSession.error = error instanceof Error ? error.message : String(error);
