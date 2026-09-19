@@ -1013,14 +1013,23 @@ export async function getBroadcastAdminState(opts?: {
 }
 
 export async function setBroadcastAdminState(updates: Partial<BroadcastAdminState>): Promise<void> {
+	// Admin uses a single sync anchor. Clear any previous Studio timeline in
+	// the same write so the public player follows the admin's file/timing.
+	const resetTimeline = Object.keys(updates).some(
+		(key) => key.startsWith('subtitle_') || key === 'is_live' || key === 'scheduled_live_id'
+	);
 	const db = await getDb();
-	await db
-		.collection('broadcast_admin_state')
-		.updateOne(
-			{ _id: 'current' as unknown as ObjectId },
-			{ $set: { ...updates, updated_at: new Date().toISOString() } },
-			{ upsert: true }
-		);
+	await db.collection('broadcast_admin_state').updateOne(
+		{ _id: 'current' as unknown as ObjectId },
+		{
+			$set: {
+				...updates,
+				...(resetTimeline ? { subtitle_timeline: [] } : {}),
+				updated_at: new Date().toISOString()
+			}
+		},
+		{ upsert: true }
+	);
 	// Invalidate after the write so a concurrent in-flight read can't refill
 	// the cache with the pre-write value.
 	cachedBroadcast = null;
