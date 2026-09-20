@@ -1,5 +1,8 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
+	import { browserSupportsWebAuthn, startRegistration } from '@simplewebauthn/browser';
 	import { locale, t, type TranslationKey } from '$lib/i18n';
 	import type { ActionData, PageData } from './$types';
 
@@ -8,8 +11,53 @@
 	let profileLoading = $state(false);
 	let passwordLoading = $state(false);
 	let studioWorking = $state<string | null>(null);
+	let securityWorking = $state<string | null>(null);
 	let showCurrentPassword = $state(false);
 	let showNewPassword = $state(false);
+	let passkeySupported = $state(false);
+	let passkeyWorking = $state(false);
+	let passkeyPassword = $state('');
+	let passkeyError = $state<'password' | 'generic' | null>(null);
+	let passkeySuccess = $state(false);
+
+	onMount(() => {
+		passkeySupported = browserSupportsWebAuthn();
+	});
+
+	async function registerPasskey(): Promise<void> {
+		if (!passkeyPassword) {
+			passkeyError = 'password';
+			return;
+		}
+		passkeyWorking = true;
+		passkeyError = null;
+		passkeySuccess = false;
+		try {
+			const optionsResponse = await fetch('/api/passkeys/register', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ currentPassword: passkeyPassword })
+			});
+			if (!optionsResponse.ok) {
+				passkeyError = optionsResponse.status === 401 ? 'password' : 'generic';
+				return;
+			}
+			const response = await startRegistration({ optionsJSON: await optionsResponse.json() });
+			const verificationResponse = await fetch('/api/passkeys/register', {
+				method: 'PUT',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify(response)
+			});
+			if (!verificationResponse.ok) throw new Error('Passkey verification failed');
+			passkeyPassword = '';
+			passkeySuccess = true;
+			await invalidateAll();
+		} catch {
+			passkeyError = 'generic';
+		} finally {
+			passkeyWorking = false;
+		}
+	}
 
 	// Field-level action errors → translated inline messages (aria-invalid).
 	const profileFieldError = $derived(form?.profileFieldError ?? null);
@@ -52,6 +100,23 @@
 </div>
 
 <div class="mx-auto max-w-2xl space-y-6">
+	{#if data.passwordRequired && !form?.passwordSuccess}
+		<div class="border border-amber-300 bg-amber-50 px-5 py-4 text-sm text-amber-900" role="alert">
+			<p class="font-semibold">{$t('settings.passwordRequiredTitle')}</p>
+			<p class="mt-1">{$t('settings.passwordRequiredBody')}</p>
+			<a href="#change-password" class="mt-2 inline-block font-medium underline"
+				>{$t('settings.changePasswordNow')}</a
+			>
+		</div>
+	{/if}
+
+	{#if data.failedLoginAttempts >= 3}
+		<div class="border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-800" role="alert">
+			<p class="font-semibold">{$t('settings.failedAttemptsTitle')}</p>
+			<p class="mt-1">{$t('settings.failedAttemptsBody', { count: data.failedLoginAttempts })}</p>
+		</div>
+	{/if}
+
 	<!-- Profile card -->
 	<div class="overflow-hidden border border-stone-200/60 bg-white/40">
 		<!-- Header with avatar -->
@@ -191,6 +256,308 @@
 		</form>
 	</div>
 
+	<!-- Security center -->
+	<div class="border border-stone-200/60 bg-white/40 p-6">
+		<div class="flex flex-wrap items-start justify-between gap-3">
+			<div>
+				<h3
+					class="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-stone-500"
+				>
+					<svg
+						class="h-4 w-4"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+						stroke-width="2"
+						><path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+						/></svg
+					>
+					{$t('settings.securityCenter')}
+				</h3>
+				<p class="mt-2 text-sm text-stone-500">{$t('settings.securityCenterHint')}</p>
+			</div>
+		</div>
+
+		{#if form?.sessionRevoked || form?.otherSessionsRevoked !== undefined}
+			<div class="mt-4 border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+				{$t('settings.sessionsRevoked')}
+			</div>
+		{/if}
+		{#if form?.sessionError}
+			<div class="mt-4 border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+				{form.sessionError}
+			</div>
+		{/if}
+
+		<div class="mt-6">
+			<div class="flex items-center justify-between gap-3">
+				<div>
+					<h4 class="font-medium text-stone-700">{$t('settings.activeSessions')}</h4>
+					<p class="mt-1 text-xs text-stone-400">{$t('settings.activeSessionsHint')}</p>
+				</div>
+				{#if data.sessions.length > 1}
+					<form
+						method="POST"
+						action="?/revokeOtherSessions"
+						use:enhance={() => {
+							securityWorking = 'all';
+							return async ({ update }) => {
+								securityWorking = null;
+								await update();
+							};
+						}}
+						onsubmit={(event) => {
+							if (!confirm($t('settings.revokeOthersConfirm'))) event.preventDefault();
+						}}
+					>
+						<button
+							type="submit"
+							disabled={securityWorking === 'all'}
+							class="admin-btn-secondary text-red-600 disabled:opacity-50"
+							>{$t('settings.revokeOthers')}</button
+						>
+					</form>
+				{/if}
+			</div>
+			<div class="mt-4 divide-y divide-stone-100 border border-stone-200/70">
+				{#each data.sessions as session (session.id)}
+					<div class="flex items-start justify-between gap-4 p-4">
+						<div>
+							<div class="flex flex-wrap items-center gap-2">
+								<p class="text-sm font-medium text-stone-700">{session.device}</p>
+								{#if session.is_current}<span
+										class="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-green-700"
+										>{$t('settings.currentSession')}</span
+									>{/if}
+								{#if session.is_new_device}<span
+										class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-amber-700"
+										>{$t('settings.newDevice')}</span
+									>{/if}
+							</div>
+							<p class="mt-1 text-xs text-stone-400">
+								{session.ip_address ?? $t('settings.unknownIp')} · {$t('settings.signedInAt')}
+								{formatDate(session.created_at)} · {$t('settings.expiresAt')}
+								{formatDate(session.expires_at)}
+							</p>
+						</div>
+						{#if !session.is_current && session.id}
+							<form
+								method="POST"
+								action="?/revokeSession"
+								use:enhance={() => {
+									securityWorking = session.id ?? null;
+									return async ({ update }) => {
+										securityWorking = null;
+										await update();
+									};
+								}}
+							>
+								<input type="hidden" name="id" value={session.id} />
+								<button
+									type="submit"
+									disabled={securityWorking === session.id}
+									class="admin-btn-secondary text-red-600 disabled:opacity-50"
+									>{$t('settings.revokeSession')}</button
+								>
+							</form>
+						{/if}
+					</div>
+				{/each}
+			</div>
+		</div>
+
+		<div class="mt-7 border-t border-stone-100 pt-6">
+			<h4 class="font-medium text-stone-700">{$t('settings.passkeys')}</h4>
+			<p class="mt-1 text-xs text-stone-400">{$t('settings.passkeysHint')}</p>
+
+			{#if passkeySuccess}
+				<div class="mt-4 border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+					{$t('settings.passkeyAdded')}
+				</div>
+			{/if}
+			{#if passkeyError || form?.passkeyDeleteError}
+				<div
+					class="mt-4 border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+					role="alert"
+				>
+					{$t(
+						passkeyError === 'password' ? 'settings.passkeyPasswordError' : 'settings.passkeyError'
+					)}
+				</div>
+			{/if}
+			{#if form?.passkeyDeleted}
+				<div class="mt-4 border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+					{$t('settings.passkeyDeleted')}
+				</div>
+			{/if}
+
+			{#if data.passkeys.length}
+				<div class="mt-4 divide-y divide-stone-100 border border-stone-200/70">
+					{#each data.passkeys as passkey (passkey.id)}
+						<div class="flex items-center justify-between gap-4 p-4">
+							<div>
+								<p class="text-sm font-medium text-stone-700">{$t('settings.passkey')}</p>
+								<p class="mt-1 text-xs text-stone-400">
+									{$t('settings.passkeyAddedAt')}
+									{formatDate(passkey.created_at)}
+								</p>
+							</div>
+							<form method="POST" action="?/deletePasskey">
+								<input type="hidden" name="id" value={passkey.id} />
+								<button type="submit" class="admin-btn-secondary text-red-600"
+									>{$t('settings.deletePasskey')}</button
+								>
+							</form>
+						</div>
+					{/each}
+				</div>
+			{/if}
+
+			{#if passkeySupported}
+				<div class="mt-4 flex flex-col gap-3 sm:flex-row">
+					<label for="passkey-password" class="sr-only">{$t('settings.currentPassword')}</label>
+					<input
+						id="passkey-password"
+						type="password"
+						autocomplete="current-password"
+						bind:value={passkeyPassword}
+						class="admin-input"
+						placeholder={$t('settings.currentPassword')}
+					/>
+					<button
+						type="button"
+						disabled={passkeyWorking}
+						onclick={registerPasskey}
+						class="admin-btn-primary shrink-0 disabled:opacity-50"
+					>
+						{passkeyWorking ? $t('settings.passkeyWaiting') : $t('settings.addPasskey')}
+					</button>
+				</div>
+			{:else}
+				<p class="mt-4 text-sm text-stone-500">{$t('settings.passkeyUnsupported')}</p>
+			{/if}
+		</div>
+
+		{#if data.user.role === 'superadmin'}
+			<div class="mt-7 border-t border-stone-100 pt-6">
+				<div class="flex items-center justify-between gap-3">
+					<div>
+						<h4 class="font-medium text-stone-700">{$t('settings.twoFactor')}</h4>
+						<p class="mt-1 text-xs text-stone-400">{$t('settings.twoFactorHint')}</p>
+					</div>
+					<span
+						class="rounded-full px-2.5 py-1 text-xs font-medium {data.user.two_factor_enabled
+							? 'bg-green-100 text-green-700'
+							: 'bg-amber-100 text-amber-700'}"
+						>{$t(data.user.two_factor_enabled ? 'settings.enabled' : 'settings.disabled')}</span
+					>
+				</div>
+
+				{#if form?.twoFactorError}<div
+						class="mt-4 border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+					>
+						{form.twoFactorError}
+					</div>{/if}
+				{#if data.twoFactorStatus === 'enabled'}<div
+						class="mt-4 border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
+					>
+						{$t('settings.twoFactorEnabled')}
+					</div>{/if}
+				{#if data.twoFactorStatus === 'disabled'}<div
+						class="mt-4 border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
+					>
+						{$t('settings.twoFactorDisabled')}
+					</div>{/if}
+
+				{#if data.user.two_factor_enabled}
+					<p class="mt-4 text-sm text-stone-500">
+						{$t('settings.recoveryRemaining', { count: data.user.recovery_codes_remaining })}
+					</p>
+					<form method="POST" action="?/disableTwoFactor" class="mt-4 grid gap-3 sm:grid-cols-2">
+						<input
+							name="currentPassword"
+							type="password"
+							required
+							autocomplete="current-password"
+							class="admin-input"
+							placeholder={$t('settings.currentPassword')}
+						/>
+						<input
+							name="code"
+							required
+							autocomplete="one-time-code"
+							class="admin-input"
+							placeholder={$t('settings.authenticationCode')}
+						/>
+						<button type="submit" class="admin-btn-secondary text-red-600 sm:col-span-2"
+							>{$t('settings.disableTwoFactor')}</button
+						>
+					</form>
+				{:else if form?.twoFactorSetup}
+					<div class="mt-4 space-y-4 bg-cream/60 p-4">
+						<p class="text-sm font-medium text-stone-700">{$t('settings.scanOrEnter')}</p>
+						<img
+							src={form.twoFactorSetup.qrCodeDataUrl}
+							alt={$t('settings.twoFactorQrCode')}
+							class="size-[220px] bg-white p-2"
+						/>
+						<a
+							href={form.twoFactorSetup.otpAuthUri}
+							class="break-all text-xs text-primary underline">{$t('settings.openAuthenticator')}</a
+						>
+						<div>
+							<p class="text-xs text-stone-400">{$t('settings.manualSecret')}</p>
+							<code class="mt-1 block break-all bg-white px-3 py-2 text-sm"
+								>{form.twoFactorSetup.secret}</code
+							>
+						</div>
+						<div>
+							<p class="text-xs font-medium text-red-700">{$t('settings.saveRecoveryCodes')}</p>
+							<div class="mt-2 grid grid-cols-2 gap-2">
+								{#each form.twoFactorSetup.recoveryCodes as code}<code
+										class="bg-white px-2 py-1 text-center text-xs">{code}</code
+									>{/each}
+							</div>
+						</div>
+						<form method="POST" action="?/enableTwoFactor" class="flex gap-2">
+							<input
+								name="code"
+								required
+								autocomplete="one-time-code"
+								class="admin-input"
+								placeholder={$t('settings.authenticationCode')}
+							/>
+							<button type="submit" class="admin-btn-primary shrink-0"
+								>{$t('settings.enableTwoFactor')}</button
+							>
+						</form>
+					</div>
+				{:else if data.twoFactorConfigured}
+					<form method="POST" action="?/beginTwoFactor" class="mt-4 flex gap-2">
+						<input
+							name="currentPassword"
+							type="password"
+							required
+							autocomplete="current-password"
+							class="admin-input"
+							placeholder={$t('settings.currentPassword')}
+						/>
+						<button type="submit" class="admin-btn-primary shrink-0"
+							>{$t('settings.startSetup')}</button
+						>
+					</form>
+				{:else}
+					<p class="mt-4 border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+						{$t('settings.twoFactorNotConfigured')}
+					</p>
+				{/if}
+			</div>
+		{/if}
+	</div>
+
 	<!-- Connected Studio sessions -->
 	<div class="border border-stone-200/60 bg-white/40 p-6">
 		<h3
@@ -312,7 +679,7 @@
 	</div>
 
 	<!-- Password card -->
-	<div class="border border-stone-200/60 bg-white/40 p-6">
+	<div id="change-password" class="scroll-mt-6 border border-stone-200/60 bg-white/40 p-6">
 		<h3
 			class="mb-5 flex items-center gap-2 text-sm font-semibold tracking-wide text-stone-500 uppercase"
 		>

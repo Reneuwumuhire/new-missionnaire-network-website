@@ -47,7 +47,11 @@ export const AdminUserSchema = z.object({
 		.union([z.instanceof(Date), z.string()])
 		.transform((val) => new Date(val))
 		.nullable(),
-	is_active: z.boolean().default(true)
+	is_active: z.boolean().default(true),
+	must_change_password: z.boolean().default(false),
+	two_factor_enabled: z.boolean().default(false),
+	two_factor_secret: z.string().optional(),
+	recovery_code_hashes: z.array(z.string()).default([])
 });
 
 export type AdminUser = z.infer<typeof AdminUserSchema>;

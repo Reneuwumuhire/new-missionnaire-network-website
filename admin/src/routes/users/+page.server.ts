@@ -1,10 +1,11 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { randomBytes } from 'crypto';
-import { hashPassword } from '$lib/server/auth';
+import { hashPassword, revokeAllSessions } from '$lib/server/auth';
 import {
 	getAllAdminUsers,
 	findAdminByEmail,
 	createAdminUser,
+	deletePasskeysForUser,
 	toggleAdminUserActive,
 	resetAdminPassword,
 	updateAdminPermissions,
@@ -104,7 +105,10 @@ export const actions: Actions = {
 			return fail(400, { toggleError: 'Vous ne pouvez pas désactiver votre propre compte' });
 		}
 
-		if (action === 'deactivate') await revokeStudioAuthorizationsForUser(email);
+		if (action === 'deactivate') {
+			await revokeStudioAuthorizationsForUser(email);
+			await revokeAllSessions(email);
+		}
 		await toggleAdminUserActive(email, action === 'activate');
 
 		await logAudit({
@@ -137,6 +141,8 @@ export const actions: Actions = {
 		const generatedPassword = generatePassword();
 		const hash = await hashPassword(generatedPassword);
 		await revokeStudioAuthorizationsForUser(email);
+		await revokeAllSessions(email);
+		await deletePasskeysForUser(email);
 		await resetAdminPassword(email, hash);
 
 		await logAudit({

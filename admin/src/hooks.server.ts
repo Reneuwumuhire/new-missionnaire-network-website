@@ -27,5 +27,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 
 	event.locals.user = user;
+	if (user.must_change_password && pathname !== '/settings' && pathname !== '/logout') {
+		throw redirect(303, '/settings?password=required');
+	}
 	return resolve(event);
 };
