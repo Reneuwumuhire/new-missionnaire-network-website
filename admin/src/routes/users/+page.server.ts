@@ -5,6 +5,7 @@ import {
 	getAllAdminUsers,
 	findAdminByEmail,
 	createAdminUser,
+	deletePasskeysForUser,
 	toggleAdminUserActive,
 	resetAdminPassword,
 	updateAdminPermissions,
@@ -141,6 +142,7 @@ export const actions: Actions = {
 		const hash = await hashPassword(generatedPassword);
 		await revokeStudioAuthorizationsForUser(email);
 		await revokeAllSessions(email);
+		await deletePasskeysForUser(email);
 		await resetAdminPassword(email, hash);
 
 		await logAudit({

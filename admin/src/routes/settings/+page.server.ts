@@ -20,7 +20,9 @@ import {
 	beginTwoFactorSetup,
 	countRecentLoginFailuresForEmail,
 	deleteSessionForUser,
+	deletePasskeyForUser,
 	findAdminByEmail,
+	listPasskeysForUser,
 	listSessionsForUser,
 	setTwoFactorEnabled,
 	updateAdminProfile,
@@ -62,9 +64,10 @@ function deviceName(userAgent: string | null): string {
 
 export const load: PageServerLoad = async ({ locals, cookies, url }) => {
 	const currentToken = cookies.get(SESSION_COOKIE) ?? '';
-	const [studioAuthorizations, sessions, failedLoginAttempts] = await Promise.all([
+	const [studioAuthorizations, sessions, passkeys, failedLoginAttempts] = await Promise.all([
 		listStudioAuthorizations(locals.user.email),
 		listSessionsForUser(locals.user.email),
+		listPasskeysForUser(locals.user.email),
 		countRecentLoginFailuresForEmail(locals.user.email)
 	]);
 	return {
@@ -83,6 +86,12 @@ export const load: PageServerLoad = async ({ locals, cookies, url }) => {
 		twoFactorStatus: url.searchParams.get('twoFactor'),
 		twoFactorConfigured: Boolean(twoFactorKey()),
 		failedLoginAttempts,
+		passkeys: passkeys.map((passkey) => ({
+			id: passkey._id,
+			created_at: passkey.created_at,
+			last_used_at: passkey.last_used_at,
+			backed_up: passkey.backed_up
+		})),
 		sessions: sessions.map((session) => ({
 			id: session._id,
 			device: deviceName(session.user_agent),
@@ -317,6 +326,22 @@ export const actions: Actions = {
 			ip_address: getClientAddress()
 		});
 		return { otherSessionsRevoked: count };
+	},
+
+	deletePasskey: async ({ request, locals, getClientAddress }) => {
+		const id = (await request.formData()).get('id')?.toString() ?? '';
+		if (!(await deletePasskeyForUser(id, locals.user.email))) {
+			return fail(404, { passkeyDeleteError: true });
+		}
+		await logAudit({
+			user_id: locals.user._id ?? locals.user.email,
+			user_email: locals.user.email,
+			action: 'delete',
+			target_collection: 'admin_passkeys',
+			target_id: id,
+			ip_address: getClientAddress()
+		});
+		return { passkeyDeleted: true };
 	},
 
 	revokeStudio: async ({ request, locals, getClientAddress }) => {

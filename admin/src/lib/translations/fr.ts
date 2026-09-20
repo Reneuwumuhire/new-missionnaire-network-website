@@ -131,6 +131,13 @@ export default {
 	'auth.password': 'Mot de passe',
 	'auth.loggingIn': 'Connexion...',
 	'auth.login': 'Se connecter',
+	'auth.passkey': 'Se connecter avec la biométrie',
+	'auth.passkeyWaiting': 'Vérification…',
+	'auth.passkeyError':
+		'La connexion biométrique a échoué. Réessayez ou utilisez votre mot de passe.',
+	'auth.passkeyUnsupported':
+		'Ouvrez cette page dans Safari, Chrome ou Edge pour utiliser la connexion biométrique.',
+	'auth.orPassword': 'ou avec le mot de passe',
 	'auth.tooManyAttempts':
 		'Trop de tentatives de connexion. Veuillez réessayer dans une quinzaine de minutes.',
 	'auth.twoFactorTitle': 'Vérification en deux étapes',
@@ -836,6 +843,19 @@ export default {
 	'settings.revokeOthers': 'Déconnecter les autres',
 	'settings.revokeOthersConfirm': 'Déconnecter toutes les autres sessions administrateur ?',
 	'settings.sessionsRevoked': 'Les sessions sélectionnées ont été déconnectées.',
+	'settings.passkeys': 'Connexion biométrique',
+	'settings.passkeysHint':
+		'Utilisez Face ID, Touch ID, Windows Hello ou le code de votre appareil.',
+	'settings.passkey': 'Clé d’accès',
+	'settings.passkeyAddedAt': 'Ajoutée le',
+	'settings.addPasskey': 'Ajouter cet appareil',
+	'settings.passkeyWaiting': 'En attente de l’appareil…',
+	'settings.passkeyAdded': 'La connexion biométrique est prête sur cet appareil.',
+	'settings.passkeyDeleted': 'La clé d’accès a été supprimée.',
+	'settings.deletePasskey': 'Supprimer',
+	'settings.passkeyPasswordError': 'Le mot de passe actuel est incorrect.',
+	'settings.passkeyError': 'Impossible de configurer la connexion biométrique. Réessayez.',
+	'settings.passkeyUnsupported': 'Ce navigateur ne prend pas en charge les clés d’accès.',
 	'settings.twoFactor': 'Authentification à deux facteurs',
 	'settings.twoFactorHint':
 		'Demandée après le mot de passe. Disponible pour les super administrateurs.',

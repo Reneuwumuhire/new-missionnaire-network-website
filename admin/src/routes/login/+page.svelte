@@ -1,10 +1,42 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { enhance } from '$app/forms';
+	import { browserSupportsWebAuthn, startAuthentication } from '@simplewebauthn/browser';
 	import type { ActionData } from './$types';
 	import { t } from '$lib/i18n';
 
 	let { form, data }: { form: ActionData; data: { next: string } } = $props();
 	let loading = $state(false);
+	let passkeyChecked = $state(false);
+	let passkeySupported = $state(false);
+	let passkeyLoading = $state(false);
+	let passkeyError = $state(false);
+
+	onMount(() => {
+		passkeySupported = browserSupportsWebAuthn();
+		passkeyChecked = true;
+	});
+
+	async function signInWithPasskey(): Promise<void> {
+		passkeyLoading = true;
+		passkeyError = false;
+		try {
+			const optionsResponse = await fetch('/login/passkey');
+			if (!optionsResponse.ok) throw new Error('Could not start passkey sign-in');
+			const response = await startAuthentication({ optionsJSON: await optionsResponse.json() });
+			const verificationResponse = await fetch('/login/passkey', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ response, next: data.next })
+			});
+			const verification = await verificationResponse.json();
+			if (!verificationResponse.ok || !verification.verified) throw new Error('Passkey rejected');
+			window.location.assign(verification.redirect);
+		} catch {
+			passkeyError = true;
+			passkeyLoading = false;
+		}
+	}
 </script>
 
 <svelte:head>
@@ -33,6 +65,32 @@
 					{'errorIsKey' in form && form.errorIsKey ? $t('auth.tooManyAttempts') : form.error}
 				</div>
 			{/if}
+			{#if passkeyError}
+				<div
+					class="mb-6 border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+					role="alert"
+				>
+					{$t('auth.passkeyError')}
+				</div>
+			{/if}
+
+			{#if passkeySupported}
+				<button
+					type="button"
+					disabled={passkeyLoading}
+					onclick={signInWithPasskey}
+					class="admin-btn-primary w-full justify-center disabled:opacity-60"
+				>
+					{passkeyLoading ? $t('auth.passkeyWaiting') : $t('auth.passkey')}
+				</button>
+				<div class="my-6 flex items-center gap-3 text-xs text-stone-400">
+					<span class="h-px flex-1 bg-stone-200"></span>
+					{$t('auth.orPassword')}
+					<span class="h-px flex-1 bg-stone-200"></span>
+				</div>
+			{:else if passkeyChecked}
+				<p class="mb-6 text-center text-xs text-stone-400">{$t('auth.passkeyUnsupported')}</p>
+			{/if}
 
 			<form
 				method="POST"
@@ -51,7 +109,7 @@
 						id="email"
 						name="email"
 						type="email"
-						autocomplete="username"
+						autocomplete="username webauthn"
 						required
 						value={form?.email ?? ''}
 						class="admin-input"

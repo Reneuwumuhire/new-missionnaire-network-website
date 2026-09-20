@@ -1,5 +1,8 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
+	import { browserSupportsWebAuthn, startRegistration } from '@simplewebauthn/browser';
 	import { locale, t, type TranslationKey } from '$lib/i18n';
 	import type { ActionData, PageData } from './$types';
 
@@ -11,6 +14,50 @@
 	let securityWorking = $state<string | null>(null);
 	let showCurrentPassword = $state(false);
 	let showNewPassword = $state(false);
+	let passkeySupported = $state(false);
+	let passkeyWorking = $state(false);
+	let passkeyPassword = $state('');
+	let passkeyError = $state<'password' | 'generic' | null>(null);
+	let passkeySuccess = $state(false);
+
+	onMount(() => {
+		passkeySupported = browserSupportsWebAuthn();
+	});
+
+	async function registerPasskey(): Promise<void> {
+		if (!passkeyPassword) {
+			passkeyError = 'password';
+			return;
+		}
+		passkeyWorking = true;
+		passkeyError = null;
+		passkeySuccess = false;
+		try {
+			const optionsResponse = await fetch('/api/passkeys/register', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ currentPassword: passkeyPassword })
+			});
+			if (!optionsResponse.ok) {
+				passkeyError = optionsResponse.status === 401 ? 'password' : 'generic';
+				return;
+			}
+			const response = await startRegistration({ optionsJSON: await optionsResponse.json() });
+			const verificationResponse = await fetch('/api/passkeys/register', {
+				method: 'PUT',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify(response)
+			});
+			if (!verificationResponse.ok) throw new Error('Passkey verification failed');
+			passkeyPassword = '';
+			passkeySuccess = true;
+			await invalidateAll();
+		} catch {
+			passkeyError = 'generic';
+		} finally {
+			passkeyWorking = false;
+		}
+	}
 
 	// Field-level action errors → translated inline messages (aria-invalid).
 	const profileFieldError = $derived(form?.profileFieldError ?? null);
@@ -320,6 +367,78 @@
 					</div>
 				{/each}
 			</div>
+		</div>
+
+		<div class="mt-7 border-t border-stone-100 pt-6">
+			<h4 class="font-medium text-stone-700">{$t('settings.passkeys')}</h4>
+			<p class="mt-1 text-xs text-stone-400">{$t('settings.passkeysHint')}</p>
+
+			{#if passkeySuccess}
+				<div class="mt-4 border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+					{$t('settings.passkeyAdded')}
+				</div>
+			{/if}
+			{#if passkeyError || form?.passkeyDeleteError}
+				<div
+					class="mt-4 border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+					role="alert"
+				>
+					{$t(
+						passkeyError === 'password' ? 'settings.passkeyPasswordError' : 'settings.passkeyError'
+					)}
+				</div>
+			{/if}
+			{#if form?.passkeyDeleted}
+				<div class="mt-4 border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+					{$t('settings.passkeyDeleted')}
+				</div>
+			{/if}
+
+			{#if data.passkeys.length}
+				<div class="mt-4 divide-y divide-stone-100 border border-stone-200/70">
+					{#each data.passkeys as passkey (passkey.id)}
+						<div class="flex items-center justify-between gap-4 p-4">
+							<div>
+								<p class="text-sm font-medium text-stone-700">{$t('settings.passkey')}</p>
+								<p class="mt-1 text-xs text-stone-400">
+									{$t('settings.passkeyAddedAt')}
+									{formatDate(passkey.created_at)}
+								</p>
+							</div>
+							<form method="POST" action="?/deletePasskey">
+								<input type="hidden" name="id" value={passkey.id} />
+								<button type="submit" class="admin-btn-secondary text-red-600"
+									>{$t('settings.deletePasskey')}</button
+								>
+							</form>
+						</div>
+					{/each}
+				</div>
+			{/if}
+
+			{#if passkeySupported}
+				<div class="mt-4 flex flex-col gap-3 sm:flex-row">
+					<label for="passkey-password" class="sr-only">{$t('settings.currentPassword')}</label>
+					<input
+						id="passkey-password"
+						type="password"
+						autocomplete="current-password"
+						bind:value={passkeyPassword}
+						class="admin-input"
+						placeholder={$t('settings.currentPassword')}
+					/>
+					<button
+						type="button"
+						disabled={passkeyWorking}
+						onclick={registerPasskey}
+						class="admin-btn-primary shrink-0 disabled:opacity-50"
+					>
+						{passkeyWorking ? $t('settings.passkeyWaiting') : $t('settings.addPasskey')}
+					</button>
+				</div>
+			{:else}
+				<p class="mt-4 text-sm text-stone-500">{$t('settings.passkeyUnsupported')}</p>
+			{/if}
 		</div>
 
 		{#if data.user.role === 'superadmin'}

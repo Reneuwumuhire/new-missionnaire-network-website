@@ -614,6 +614,147 @@ export async function deleteAllSessionsForUser(userId: string): Promise<string[]
 	return tokens.map((session) => session.token.toString());
 }
 
+// ══════════════════════════════════════
+//  PASSKEYS
+// ══════════════════════════════════════
+
+const PASSKEYS_COLLECTION = 'admin_passkeys';
+
+export type AdminPasskey = {
+	_id?: string;
+	user_id: string;
+	credential_id: string;
+	public_key: string;
+	counter: number;
+	transports?: string[];
+	device_type: 'singleDevice' | 'multiDevice';
+	backed_up: boolean;
+	created_at: Date | string;
+	last_used_at: Date | string | null;
+};
+
+let passkeyIndexesEnsured: Promise<void> | null = null;
+async function ensurePasskeyIndexes(): Promise<void> {
+	if (passkeyIndexesEnsured) return passkeyIndexesEnsured;
+	passkeyIndexesEnsured = (async () => {
+		const db = await getDb();
+		const collection = db.collection(PASSKEYS_COLLECTION);
+		await collection.createIndex({ credential_id: 1 }, { unique: true });
+		await collection.createIndex({ user_id: 1 });
+	})().catch((error) => {
+		passkeyIndexesEnsured = null;
+		throw error;
+	});
+	return passkeyIndexesEnsured;
+}
+
+export async function listPasskeysForUser(userId: string): Promise<AdminPasskey[]> {
+	await ensurePasskeyIndexes();
+	const db = await getDb();
+	const docs = await db
+		.collection(PASSKEYS_COLLECTION)
+		.find({ user_id: userId.toLowerCase() })
+		.sort({ created_at: -1 })
+		.toArray();
+	return docs.map((doc) => serializeDocument<AdminPasskey>(doc));
+}
+
+export async function findPasskeyByCredentialId(
+	credentialId: string
+): Promise<AdminPasskey | null> {
+	await ensurePasskeyIndexes();
+	const db = await getDb();
+	const doc = await db.collection(PASSKEYS_COLLECTION).findOne({ credential_id: credentialId });
+	return doc ? serializeDocument<AdminPasskey>(doc) : null;
+}
+
+export async function createPasskey(
+	passkey: Omit<AdminPasskey, '_id' | 'created_at' | 'last_used_at'>
+): Promise<void> {
+	await ensurePasskeyIndexes();
+	const db = await getDb();
+	await db.collection(PASSKEYS_COLLECTION).insertOne({
+		...passkey,
+		user_id: passkey.user_id.toLowerCase(),
+		created_at: new Date(),
+		last_used_at: null
+	});
+}
+
+export async function updatePasskeyCounter(
+	credentialId: string,
+	previousCounter: number,
+	counter: number
+): Promise<boolean> {
+	const db = await getDb();
+	const result = await db
+		.collection(PASSKEYS_COLLECTION)
+		.updateOne(
+			{ credential_id: credentialId, counter: previousCounter },
+			{ $set: { counter, last_used_at: new Date() } }
+		);
+	return result.matchedCount === 1;
+}
+
+export async function deletePasskeyForUser(id: string, userId: string): Promise<boolean> {
+	if (!ObjectId.isValid(id)) return false;
+	const db = await getDb();
+	const result = await db.collection(PASSKEYS_COLLECTION).deleteOne({
+		_id: new ObjectId(id),
+		user_id: userId.toLowerCase()
+	});
+	return result.deletedCount === 1;
+}
+
+export async function deletePasskeysForUser(userId: string): Promise<void> {
+	const db = await getDb();
+	await db.collection(PASSKEYS_COLLECTION).deleteMany({ user_id: userId.toLowerCase() });
+}
+
+const PASSKEY_CHALLENGES_COLLECTION = 'admin_passkey_challenges';
+
+export type PasskeyChallenge = {
+	token: string;
+	challenge: string;
+	purpose: 'registration' | 'authentication';
+	user_id?: string;
+	expires_at: Date;
+};
+
+export async function createPasskeyChallenge(
+	challenge: string,
+	purpose: PasskeyChallenge['purpose'],
+	userId?: string
+): Promise<PasskeyChallenge> {
+	const db = await getDb();
+	const collection = db.collection(PASSKEY_CHALLENGES_COLLECTION);
+	await collection.createIndex({ expires_at: 1 }, { expireAfterSeconds: 0 });
+	const record: PasskeyChallenge = {
+		token: randomBytes(32).toString('base64url'),
+		challenge,
+		purpose,
+		...(userId ? { user_id: userId.toLowerCase() } : {}),
+		expires_at: new Date(Date.now() + 5 * 60 * 1000)
+	};
+	await collection.insertOne(record);
+	return record;
+}
+
+export async function consumePasskeyChallenge(
+	token: string,
+	purpose: PasskeyChallenge['purpose'],
+	userId?: string
+): Promise<PasskeyChallenge | null> {
+	const db = await getDb();
+	const challenge = await db.collection(PASSKEY_CHALLENGES_COLLECTION).findOneAndDelete({
+		token,
+		purpose,
+		...(userId ? { user_id: userId.toLowerCase() } : {}),
+		expires_at: { $gt: new Date() }
+	});
+	return challenge ? (challenge as unknown as PasskeyChallenge) : null;
+}
+
 const LOGIN_CHALLENGES_COLLECTION = 'admin_login_challenges';
 const LOGIN_CHALLENGE_DURATION_MS = 10 * 60 * 1000;
 
