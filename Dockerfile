@@ -11,4 +11,4 @@ RUN pnpm build
 
 ENV NODE_ENV=production
 EXPOSE 3000
-CMD [ "node", "build/index.js" ]
+CMD [ "node", "scripts/start-server.mjs" ]

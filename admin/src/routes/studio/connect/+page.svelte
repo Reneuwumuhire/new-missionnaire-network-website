@@ -151,6 +151,21 @@
 
 					<form method="POST" class="mt-6">
 						<input type="hidden" name="code" value={data.code} />
+						<p class="mb-4 text-sm leading-6 text-stone-600">
+							By approving this connection, you agree to the <a
+								class="underline"
+								href="https://missionnaire.net/terms"
+								target="_blank"
+								rel="noreferrer">Terms of service</a
+							>
+							and
+							<a
+								class="underline"
+								href="https://missionnaire.net/privacy"
+								target="_blank"
+								rel="noreferrer">Privacy policy</a
+							> for Missionnaire Studio, including its YouTube features.
+						</p>
 						<button class="admin-btn-primary w-full justify-center">Approve connection</button>
 					</form>
 

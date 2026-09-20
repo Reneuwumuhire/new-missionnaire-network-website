@@ -121,7 +121,40 @@ export interface AudioSource {
 	appId?: string;
 	gain: number;
 	muted: boolean;
+	/** Guided-service routing role. Unlike a display name, this survives renaming. */
+	serviceRole?: 'interpreter' | 'krefeld';
 }
+
+export type ServiceType = 'prepared' | 'live';
+export type ServicePhase = 'ready' | 'opening' | 'sermon' | 'closing' | 'complete';
+
+export interface ServiceWorkflow {
+	type: ServiceType;
+	phase: ServicePhase;
+	openingLayerId: string | null;
+	sermonLayerId: string | null;
+	closingLayerId: string | null;
+	krefeldLayerId: string | null;
+	subtitleFileName: string;
+	subtitleTimingLanguage: string;
+	sermonStartedAt: number | null;
+	sermonEndedAt: number | null;
+	markerCorrectionMs: number;
+}
+
+export const DEFAULT_SERVICE: ServiceWorkflow = {
+	type: 'prepared',
+	phase: 'ready',
+	openingLayerId: null,
+	sermonLayerId: null,
+	closingLayerId: null,
+	krefeldLayerId: null,
+	subtitleFileName: '',
+	subtitleTimingLanguage: '',
+	sermonStartedAt: null,
+	sermonEndedAt: null,
+	markerCorrectionMs: 0
+};
 
 export interface Destination {
 	id: string;
@@ -201,9 +234,14 @@ export interface Settings {
 	 *  on air on the right, then cut to it deliberately. */
 	studioMode: boolean;
 	monitorAudio: boolean;
+	/** Physical output used only for the interpreter's pre-fader French feed. */
+	interpreterOutputDeviceId: string;
 	/** Panel sizes the operator has dragged to. */
 	layout: Layout;
 	recordingMode: 'off' | 'local' | 'cloud' | 'both';
+	recordingFormat: 'audio' | 'video' | 'both';
+	recordingVideoBitrateKbps: number;
+	recordingAudioBitrateKbps: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -220,8 +258,12 @@ export const DEFAULT_SETTINGS: Settings = {
 	barsWhenNoSource: true,
 	studioMode: false,
 	monitorAudio: false,
+	interpreterOutputDeviceId: '',
 	layout: DEFAULT_LAYOUT,
-	recordingMode: 'off'
+	recordingMode: 'off',
+	recordingFormat: 'video',
+	recordingVideoBitrateKbps: 3500,
+	recordingAudioBitrateKbps: 160
 };
 
 export const id = () => Math.random().toString(36).slice(2, 10);
@@ -306,6 +348,7 @@ interface Persisted {
 	audioSources: AudioSource[];
 	destinations: Destination[];
 	settings: Settings;
+	service: ServiceWorkflow;
 }
 
 /** Ids have to be unique or the docks take the whole app down with them: a
@@ -356,7 +399,8 @@ function load(): Persisted {
 		settings: {
 			...DEFAULT_SETTINGS,
 			layout: { ...DEFAULT_LAYOUT, weights: { ...DEFAULT_LAYOUT.weights } }
-		}
+		},
+		service: { ...DEFAULT_SERVICE }
 	};
 	try {
 		const raw = localStorage.getItem(STORE_KEY);
@@ -427,6 +471,15 @@ function load(): Persisted {
 					...saved.layout,
 					weights: { ...DEFAULT_LAYOUT.weights, ...saved.layout?.weights }
 				}
+			},
+			// A restarted show is deliberately paused and safe: no mic is opened and
+			// no programme resumes merely because it was running when Studio quit.
+			service: {
+				...DEFAULT_SERVICE,
+				...parsed.service,
+				phase: 'ready',
+				sermonStartedAt: null,
+				sermonEndedAt: null
 			}
 		};
 	} catch {
@@ -452,7 +505,8 @@ export const studio = $state({
 	selectedLayerId: null as string | null,
 	audioSources: initial.audioSources,
 	destinations: initial.destinations,
-	settings: initial.settings
+	settings: initial.settings,
+	service: initial.service
 });
 
 export function persistableDestinations(destinations: Destination[]): Destination[] {
@@ -471,7 +525,8 @@ export function persist() {
 				programSceneId: studio.programSceneId,
 				audioSources: studio.audioSources,
 				destinations: persistableDestinations(studio.destinations),
-				settings: studio.settings
+				settings: studio.settings,
+				service: studio.service
 			})
 		);
 	} catch {
@@ -534,6 +589,26 @@ export function selectedLayer(): Layer | null {
 	return activeScene().layers.find((l) => l.id === studio.selectedLayerId) ?? null;
 }
 
+/** Remove only this scene's sources; global audio inputs and other scenes stay intact. */
+export function clearSceneSources(sceneId: string): string[] {
+	const scene = studio.scenes.find((item) => item.id === sceneId);
+	if (!scene) return [];
+	const ids = scene.layers.map((layer) => layer.id);
+	scene.layers = [];
+	if (studio.selectedLayerId && ids.includes(studio.selectedLayerId)) studio.selectedLayerId = null;
+	if (studio.programSceneSnapshot?.id === sceneId) studio.programSceneSnapshot.layers = [];
+	for (const role of [
+		'openingLayerId',
+		'sermonLayerId',
+		'closingLayerId',
+		'krefeldLayerId'
+	] as const) {
+		if (studio.service[role] && ids.includes(studio.service[role]!)) studio.service[role] = null;
+	}
+	persist();
+	return ids;
+}
+
 /** The layers that get a mixer strip.
  *
  *  Audio-bearing layers of the scene currently ON AIR — the program scene, not
@@ -563,4 +638,10 @@ export function destinationUrl(d: Destination): string {
 	const base = d.url.trim().replace(/\/+$/, '');
 	const key = d.key.trim().replace(/^\/+/, '');
 	return key ? `${base}/${key}` : base;
+}
+
+/** Restore panel sizes and make hidden panels reachable again. */
+export function resetLayout() {
+	studio.settings.layout = { ...DEFAULT_LAYOUT, weights: { ...DEFAULT_LAYOUT.weights } };
+	persist();
 }

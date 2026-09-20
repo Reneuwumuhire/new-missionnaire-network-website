@@ -9,6 +9,7 @@
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
+		"start": "node scripts/start-server.mjs",
 		"preview": "vite preview",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
@@ -25,7 +26,7 @@
 		"@sveltejs/adapter-auto": "^3.3.1",
 		"@sveltejs/adapter-node": "^5.5.4",
 		"@sveltejs/adapter-vercel": "^6.3.2",
-		"@sveltejs/kit": "^2.60.1",
+		"@sveltejs/kit": "^2.70.3",
 		"@sveltejs/vite-plugin-svelte": "^5.1.1",
 		"@types/node": "^25.0.3",
 		"@types/web-push": "^3.6.4",
@@ -42,7 +43,7 @@
 		"lint-staged": "^17.3.0",
 		"minimist": "^1.2.8",
 		"node-fetch": "^3.3.2",
-		"postcss": "^8.5.10",
+		"postcss": "^8.5.28",
 		"prettier": "^3.8.1",
 		"prettier-plugin-svelte": "^3.5.1",
 		"svelte": "^5.55.7",
@@ -51,7 +52,7 @@
 		"tslib": "^2.6.2",
 		"typescript": "^5.5",
 		"vite": "^6.4.3",
-		"vitest": "^3.2.6"
+		"vitest": "^5.0.0"
 	},
 	"type": "module",
 	"lint-staged": {
@@ -71,6 +72,7 @@
 		"client-zip": "^2.5.0",
 		"hls.js": "^1.6.16",
 		"mongodb": "^6.8.0",
+		"pdfjs-dist": "^6.3.289",
 		"plyr": "^3.7.8",
 		"svelte-icons-pack": "^2.1.0",
 		"web-push": "^3.6.7",

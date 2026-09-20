@@ -40,6 +40,19 @@ export function outputAlignedPositionMs(sourcePositionMs: number, atEpochMs = Da
 	return Math.max(0, Math.round(sourcePositionMs - pipelineDelayMs));
 }
 
+/** Wall-clock moment currently leaving ffmpeg, used for durable phase markers. */
+export function outputEpochMs(atEpochMs = Date.now()): number {
+	if (
+		inputEpochMs === null ||
+		outputSampleEpochMs === 0 ||
+		atEpochMs - outputSampleEpochMs > 2500
+	) {
+		return atEpochMs;
+	}
+	const pipelineDelayMs = Math.max(0, outputSampleEpochMs - inputEpochMs - outputMediaMs);
+	return Math.round(atEpochMs - pipelineDelayMs);
+}
+
 /** NTP clock estimate that removes the server's database-processing time. */
 export function sampleServerClock(
 	serverReceivedAtMs: number,

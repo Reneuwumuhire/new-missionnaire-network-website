@@ -102,6 +102,18 @@ export function canEditOrDeleteMusicAudio(user: AdminUser): boolean {
 export function canViewDashboard(user: AdminUser): boolean {
 	const permissions = getPermissions(user);
 	return (
-		user.role === 'superadmin' || permissions.can_manage_recordings || canManageMusicAudio(user)
+		user.role === 'superadmin' ||
+		permissions.can_manage_recordings ||
+		canManageMusicAudio(user) ||
+		permissions.can_view_questions ||
+		permissions.can_review_lyrics
 	);
+}
+
+/** Default destination; recording access takes precedence for multi-purpose editors. */
+export function getAdminLandingPath(user: AdminUser): string {
+	if (user.role === 'superadmin') return '/';
+	if (getPermissions(user).can_manage_recordings) return '/recordings';
+	if (canManageMusicAudio(user)) return '/audio';
+	return canViewDashboard(user) ? '/' : '/settings';
 }

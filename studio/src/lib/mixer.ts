@@ -10,6 +10,7 @@ export const MIX_RATE = 48000;
 export interface Strip {
 	id: string;
 	gain: GainNode;
+	referenceGain: GainNode;
 	/** One analyser per channel: a desk feed with a dead right leg looks
 	 *  perfectly healthy on a summed meter, which is exactly the fault you want
 	 *  a meter to show you. */
@@ -36,6 +37,8 @@ export class Mixer {
 	readonly master: GainNode;
 	readonly destination: MediaStreamAudioDestinationNode;
 	private readonly monitor: GainNode;
+	private readonly referenceDestination: MediaStreamAudioDestinationNode;
+	private readonly referencePlayer: HTMLAudioElement;
 	private readonly silence: ConstantSourceNode;
 	private readonly strips = new Map<string, Strip>();
 	/** createMediaElementSource throws if called twice on one element. */
@@ -55,6 +58,10 @@ export class Mixer {
 		this.master = this.ctx.createGain();
 		this.destination = this.ctx.createMediaStreamDestination();
 		this.monitor = this.ctx.createGain();
+		this.referenceDestination = this.ctx.createMediaStreamDestination();
+		this.referencePlayer = new Audio();
+		this.referencePlayer.autoplay = true;
+		this.referencePlayer.srcObject = this.referenceDestination.stream;
 		// WebKit does not advance an otherwise empty audio graph. Keep a zero
 		// source running so preview starts immediately and real inputs can join it.
 		this.silence = this.ctx.createConstantSource();
@@ -65,6 +72,7 @@ export class Mixer {
 		this.master.connect(this.destination);
 		this.master.connect(this.monitor);
 		this.monitor.connect(this.ctx.destination);
+		void this.referencePlayer.play().catch(() => {});
 	}
 
 	/** The bus always carries a track, even with nothing plugged in — a silent
@@ -76,6 +84,20 @@ export class Mixer {
 
 	setMonitor(on: boolean) {
 		this.monitor.gain.setTargetAtTime(on ? 1 : 0, this.ctx.currentTime, 0.02);
+	}
+
+	async setReferenceOutput(deviceId: string): Promise<boolean> {
+		const player = this.referencePlayer as HTMLAudioElement & {
+			setSinkId?: (id: string) => Promise<void>;
+		};
+		if (!player.setSinkId) return false;
+		try {
+			await player.setSinkId(deviceId);
+			await player.play();
+			return true;
+		} catch {
+			return false;
+		}
 	}
 
 	resume(): Promise<void> {
@@ -90,6 +112,9 @@ export class Mixer {
 		stream: MediaStream | null = null
 	): Strip {
 		const gain = this.ctx.createGain();
+		const referenceGain = this.ctx.createGain();
+		referenceGain.gain.value = 0;
+		referenceGain.connect(this.referenceDestination);
 		// Force two channels so a mono source is upmixed to both legs rather
 		// than metering as a dead right channel.
 		gain.channelCount = 2;
@@ -119,15 +144,17 @@ export class Mixer {
 			split.connect(merger, 0, 0);
 			split.connect(merger, 0, 1);
 			merger.connect(gain);
+			merger.connect(referenceGain);
 		} else {
 			node.connect(gain);
+			node.connect(referenceGain);
 		}
 		// The meters tap the signal; the master takes it from the gain node
 		// directly, so an analyser can never sit in the audio path.
 		gain.connect(splitter);
 		gain.connect(this.master);
 
-		const strip: Strip = { id, gain, analysers, node, stream, element };
+		const strip: Strip = { id, gain, referenceGain, analysers, node, stream, element };
 		this.strips.set(id, strip);
 		return strip;
 	}
@@ -198,6 +225,7 @@ export class Mixer {
 		try {
 			strip.node.disconnect();
 			strip.gain.disconnect();
+			strip.referenceGain.disconnect();
 			strip.analysers.forEach((analyser) => analyser.disconnect());
 		} catch {
 			// Already torn down by a stopped track — nothing to do.
@@ -229,6 +257,13 @@ export class Mixer {
 		param.linearRampToValueAtTime(target, now + 0.015);
 	}
 
+	/** Pre-fader reference: public mute/gain never changes this headphone feed. */
+	setReference(id: string, on: boolean) {
+		const strip = this.strips.get(id);
+		if (!strip) return;
+		strip.referenceGain.gain.setTargetAtTime(on ? 1 : 0, this.ctx.currentTime, 0.02);
+	}
+
 	/** Peak level 0..1 per channel. Reads the time-domain buffer rather than the
 	 *  FFT so it reflects what a VU meter would show. */
 	peaks(id: string): [number, number] {
@@ -248,6 +283,8 @@ export class Mixer {
 	}
 
 	close() {
+		this.referencePlayer.pause();
+		this.referencePlayer.srcObject = null;
 		this.silence.stop();
 		for (const id of this.ids()) this.remove(id);
 		void this.ctx.close();

@@ -3,6 +3,28 @@ import type fr from './fr';
 // Typed against the French dictionary: adding a key to fr.ts without a
 // matching English entry fails `pnpm run check`.
 const en: Record<keyof typeof fr, string> = {
+	'index.title': 'File indexing',
+	'index.description':
+		'Published PDFs and subtitles are detected automatically and processed in the background. Published lyrics are already searchable, with no additional extraction.',
+	'index.online': 'Automatic processing active · checks about every minute',
+	'index.offline':
+		'Automatic processing is not responding. Check that the website service is running with its indexing worker.',
+	'index.refresh': 'Refresh',
+	'index.status': 'Indexing status',
+	'index.pending': 'Pending',
+	'index.processing': 'Processing',
+	'index.ready': 'Searchable',
+	'index.failed': 'Failed',
+	'index.no_text': 'No text',
+	'index.noTextHelp':
+		'Scanned PDF or empty file: title search only. A PDF with selectable text is required.',
+	'index.retry': 'Retry',
+	'index.retryFailed': 'This file cannot be retried. Refresh the list.',
+	'index.retried': 'The file has been queued again.',
+	'index.empty': 'No files in this state.',
+	'index.pages': 'Result pages',
+	'index.previous': 'Previous',
+	'index.next': 'Next',
 	// ── Common ──────────────────────────────────────────────────
 	'common.administration': 'Administration',
 	'common.bulkImport': 'Bulk import',
@@ -31,8 +53,23 @@ const en: Record<keyof typeof fr, string> = {
 
 	// ── Dashboard ───────────────────────────────────────────────
 	'dashboard.pageTitle': 'Dashboard - Missionnaire Admin',
+	'dashboard.quickActions': 'Quick access',
+	'dashboard.liveControls': 'Open live controls',
+	'dashboard.addContent': 'Add to the library',
+	'dashboard.browse': 'Search and edit',
+	'dashboard.answer': 'Answer and moderate',
+	'dashboard.review': 'Check matches',
+	'dashboard.onAir': 'Broadcast is live',
+	'dashboard.offAir': 'No active broadcast',
+	'dashboard.attention': 'Needs attention',
+	'dashboard.pendingQuestions': 'Pending questions',
+	'dashboard.reports': 'Open reports',
+	'dashboard.nextLive': 'Next live',
+	'dashboard.noUpcoming': 'No upcoming live scheduled.',
+	'dashboard.manageSchedule': 'Manage schedule',
+	'dashboard.overview': 'Library overview',
 	'dashboard.title': 'Dashboard',
-	'dashboard.subtitle': 'Overview of your audio library',
+	'dashboard.subtitle': 'Your activity and what needs attention',
 	'dashboard.importOne': 'Import an audio',
 	'dashboard.totalTracks': 'Audio tracks',
 	'dashboard.totalStorage': 'Total storage',

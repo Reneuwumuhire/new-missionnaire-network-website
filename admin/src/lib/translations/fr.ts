@@ -2,6 +2,28 @@
 // `TranslationKey` in admin/src/lib/i18n.ts derives from this file, and en.ts
 // is type-checked against it so a missing English key fails `pnpm run check`.
 export default {
+	'index.title': 'Indexation des fichiers',
+	'index.description':
+		'Les PDF et sous-titres publiés sont détectés automatiquement, puis traités en arrière-plan. Les paroles publiées sont déjà recherchables, sans extraction supplémentaire.',
+	'index.online': 'Traitement automatique actif · détection environ chaque minute',
+	'index.offline':
+		'Le traitement automatique ne répond pas. Vérifiez que le service du site est démarré avec son worker d’indexation.',
+	'index.refresh': 'Actualiser',
+	'index.status': 'État de l’indexation',
+	'index.pending': 'En attente',
+	'index.processing': 'En cours',
+	'index.ready': 'Recherchable',
+	'index.failed': 'Échec',
+	'index.no_text': 'Sans texte',
+	'index.noTextHelp':
+		'PDF scanné ou fichier vide : recherche par titre uniquement. Un PDF avec du texte sélectionnable est nécessaire.',
+	'index.retry': 'Réessayer',
+	'index.retryFailed': 'Ce fichier ne peut pas être relancé. Actualisez la liste.',
+	'index.retried': 'Le fichier a été remis en attente.',
+	'index.empty': 'Aucun fichier dans cet état.',
+	'index.pages': 'Pages de résultats',
+	'index.previous': 'Précédent',
+	'index.next': 'Suivant',
 	// ── Common ──────────────────────────────────────────────────
 	'common.administration': 'Administration',
 	'common.bulkImport': 'Importer en lot',
@@ -30,8 +52,23 @@ export default {
 
 	// ── Dashboard ───────────────────────────────────────────────
 	'dashboard.pageTitle': 'Tableau de bord - Missionnaire Admin',
+	'dashboard.quickActions': 'Accès rapide',
+	'dashboard.liveControls': 'Ouvrir les commandes du direct',
+	'dashboard.addContent': 'Ajouter à la bibliothèque',
+	'dashboard.browse': 'Rechercher et modifier',
+	'dashboard.answer': 'Répondre et modérer',
+	'dashboard.review': 'Vérifier les correspondances',
+	'dashboard.onAir': 'Diffusion en direct',
+	'dashboard.offAir': 'Aucune diffusion en direct',
+	'dashboard.attention': 'À traiter',
+	'dashboard.pendingQuestions': 'Questions en attente',
+	'dashboard.reports': 'Signalements ouverts',
+	'dashboard.nextLive': 'Prochain direct',
+	'dashboard.noUpcoming': 'Aucun direct programmé.',
+	'dashboard.manageSchedule': 'Gérer le programme',
+	'dashboard.overview': 'La bibliothèque en chiffres',
 	'dashboard.title': 'Tableau de bord',
-	'dashboard.subtitle': "Vue d'ensemble de votre bibliothèque audio",
+	'dashboard.subtitle': 'Vos activités et les éléments à traiter',
 	'dashboard.importOne': 'Importer un audio',
 	'dashboard.totalTracks': 'Pistes audio',
 	'dashboard.totalStorage': 'Stockage total',

@@ -2,12 +2,14 @@ mod appaudio;
 mod fetch;
 mod ffmpeg;
 mod reference;
+mod service_files;
 
 use ffmpeg::{Encoder, FfmpegInfo, StreamConfig};
 use serde::Serialize;
 use std::process::Command;
+use std::sync::Mutex;
 use tauri::{
-	menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, HELP_SUBMENU_ID},
+	menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu, HELP_SUBMENU_ID, WINDOW_SUBMENU_ID},
 	AppHandle, Emitter, Manager, State,
 };
 
@@ -17,6 +19,29 @@ const MENU_GETTING_STARTED: &str = "studio-getting-started";
 const MENU_SHORTCUTS: &str = "studio-keyboard-shortcuts";
 const MENU_TROUBLESHOOTING: &str = "studio-troubleshooting";
 const MENU_SYSTEM_INFO: &str = "studio-system-information";
+
+#[derive(Default)]
+struct InterfaceZoom(Mutex<Option<u32>>);
+
+fn next_zoom(current: u32, action: &str) -> u32 {
+	match action {
+		"studio-zoom-in" => (current + 10).min(150),
+		"studio-zoom-out" => current.saturating_sub(10).max(80),
+		_ => 100,
+	}
+}
+
+fn open_recordings_folder(app: &AppHandle) -> Result<(), String> {
+	let folder = app.path().video_dir().map_err(|e| e.to_string())?.join("Missionnaire Studio");
+	std::fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
+	#[cfg(target_os = "macos")]
+	let opener = "open";
+	#[cfg(target_os = "linux")]
+	let opener = "xdg-open";
+	#[cfg(target_os = "windows")]
+	let opener = "explorer";
+	Command::new(opener).arg(folder).spawn().map(|_| ()).map_err(|e| e.to_string())
+}
 
 fn notify_close_blocked(app: &AppHandle) {
 	if let Some(window) = app.get_webview_window("main") {
@@ -149,7 +174,19 @@ fn allowed_web_url(url: &str) -> bool {
 
 #[cfg(test)]
 mod url_tests {
-	use super::allowed_web_url;
+	use super::{allowed_web_url, open_url, studio_open_login, studio_open_youtube_login};
+
+	#[test]
+	fn browser_login_rejects_unsafe_input_before_opening() {
+		for url in ["file:///C:/Windows/System32/cmd.exe", "https://example.com/\0bad", "https://example.com/\n"] {
+			assert!(open_url(url.into()).is_err());
+			assert!(studio_open_login("a".repeat(20), url.into()).is_err());
+			assert!(studio_open_youtube_login("a".repeat(20), url.into()).is_err());
+		}
+		assert!(open_url(format!("https://example.com/{}", "a".repeat(2048))).is_err());
+		assert!(studio_open_login("bad&code".into(), "https://example.com".into()).is_err());
+		assert!(studio_open_youtube_login("bad&code".into(), "https://example.com".into()).is_err());
+	}
 
 	#[test]
 	fn only_https_or_real_loopback_is_allowed() {
@@ -208,7 +245,14 @@ fn studio_post(body: String, authorization: String, base_url: String, path: &str
 	if !allowed_web_url(&base_url) {
 		return Err("URL du site invalide".into());
 	}
-	let output = Command::new("curl")
+	let mut command = Command::new("curl");
+	#[cfg(target_os = "windows")]
+	{
+		use std::os::windows::process::CommandExt;
+		// Pairing polls run in the background without flashing a console.
+		command.creation_flags(windows_sys::Win32::System::Threading::CREATE_NO_WINDOW);
+	}
+	let output = command
 		.args([
 			"--fail-with-body",
 			"--silent",
@@ -361,17 +405,35 @@ fn open_url(url: String) -> Result<(), String> {
 	if !allowed_web_url(&url) || url.len() > 2048 {
 		return Err("URL non supportée".into());
 	}
-	#[cfg(target_os = "macos")]
-	let opener = "open";
-	#[cfg(target_os = "linux")]
-	let opener = "xdg-open";
 	#[cfg(target_os = "windows")]
-	let opener = "explorer";
-	std::process::Command::new(opener)
-		.arg(&url)
-		.spawn()
-		.map(|_| ())
-		.map_err(|e| e.to_string())
+	{
+		use windows_sys::Win32::UI::{Shell::ShellExecuteW, WindowsAndMessaging::SW_SHOWNORMAL};
+		let url: Vec<u16> = url.encode_utf16().chain(Some(0)).collect();
+		// Ask the registered browser directly, without Explorer or a command shell.
+		// SAFETY: the URL is NUL-terminated and stays alive for the call; optional
+		// parameters are null. URL validation above rejects embedded NULs.
+		let result = unsafe {
+			ShellExecuteW(std::ptr::null_mut(), windows_sys::w!("open"), url.as_ptr(),
+				std::ptr::null(), std::ptr::null(), SW_SHOWNORMAL)
+		} as isize;
+		if result > 32 {
+			Ok(())
+		} else {
+			Err(format!("Impossible d’ouvrir le navigateur (Windows {result}). Vérifiez votre navigateur par défaut."))
+		}
+	}
+	#[cfg(not(target_os = "windows"))]
+	{
+		#[cfg(target_os = "macos")]
+		let opener = "open";
+		#[cfg(target_os = "linux")]
+		let opener = "xdg-open";
+		Command::new(opener)
+			.arg(&url)
+			.spawn()
+			.map(|_| ())
+			.map_err(|e| e.to_string())
+	}
 }
 
 #[tauri::command]
@@ -481,7 +543,7 @@ pub fn run() {
 			let (version, short_version) = (Some(app_version), None);
 			let about = PredefinedMenuItem::about(
 				app,
-				None,
+				Some("About Missionnaire Studio"),
 				Some(AboutMetadata {
 					name: Some("Missionnaire Studio".into()),
 					version,
@@ -517,9 +579,20 @@ pub fn run() {
 				// Replace Tauri's sparse About item, then put Settings in the native
 				// application-menu position immediately below it.
 				if let Some(submenu) = top_level.first().and_then(|item| item.as_submenu()) {
+					submenu.set_text("Missionnaire Studio")?;
+					for entry in submenu.items()? {
+						if let Some(item) = entry.as_predefined_menuitem() {
+							let text = item.text()?;
+							if text.contains("missionnaire-studio") {
+								item.set_text(text.replace("missionnaire-studio", "Missionnaire Studio"))?;
+							}
+						}
+					}
 					submenu.remove_at(0)?;
 					submenu.insert(&about, 0)?;
 					submenu.insert_items(&[&settings, &separator], 2)?;
+					submenu.insert(&MenuItem::with_id(app, "studio-updates", "Check for Updates…", true, None::<&str>)?, 3)?;
+					submenu.insert(&PredefinedMenuItem::show_all(app, Some("Show All"))?, 9)?;
 				}
 			}
 			#[cfg(target_os = "windows")]
@@ -532,6 +605,46 @@ pub fn run() {
 					Some("CmdOrCtrl+,"),
 				)?;
 				file.insert_items(&[&settings, &PredefinedMenuItem::separator(app)?], 0)?;
+			}
+
+			let item = |id, text, shortcut| MenuItem::with_id(app, id, text, true, shortcut);
+			let find_submenu = |name: &str| -> Option<Submenu<_>> {
+				menu.items().ok()?.into_iter().filter_map(|entry| entry.as_submenu().cloned())
+					.find(|submenu| submenu.text().ok().as_deref() == Some(name))
+			};
+			if let Some(file) = find_submenu("File") {
+				file.prepend_items(&[
+					&item("studio-service-setup", "Service Setup…", Some("CmdOrCtrl+Shift+S"))?,
+					&item("studio-live-session", "Choose Live Session…", Some("CmdOrCtrl+Shift+O"))?,
+					&PredefinedMenuItem::separator(app)?,
+					&item("studio-recording-settings", "Recording Settings…", None)?,
+					&item("studio-recordings-folder", "Open Recordings Folder", Some("CmdOrCtrl+Shift+R"))?,
+					&PredefinedMenuItem::separator(app)?,
+				])?;
+			}
+			let view = if let Some(view) = find_submenu("View") { view } else {
+				let view = Submenu::new(app, "View", true)?;
+				menu.insert(&view, menu.items()?.len().saturating_sub(2))?;
+				view
+			};
+			view.prepend_items(&[
+				&item("studio-toggle-lyrics", "Toggle Lyrics Panel", Some("CmdOrCtrl+Shift+L"))?,
+				&item("studio-toggle-docks", "Toggle Bottom Panels", Some("CmdOrCtrl+Shift+D"))?,
+				&item("studio-toggle-mode", "Toggle Studio Mode", Some("CmdOrCtrl+Shift+M"))?,
+				&item("studio-reset-layout", "Restore Default Layout", None)?,
+				&PredefinedMenuItem::separator(app)?,
+				&item("studio-zoom-in", "Zoom In", Some("CmdOrCtrl+="))?,
+				&item("studio-zoom-out", "Zoom Out", Some("CmdOrCtrl+-"))?,
+				&item("studio-zoom-reset", "Actual Size", Some("CmdOrCtrl+0"))?,
+				&PredefinedMenuItem::separator(app)?,
+			])?;
+			if let Some(window) = menu.get(WINDOW_SUBMENU_ID).and_then(|entry| entry.as_submenu().cloned()) {
+				window.append(&item("studio-center-window", "Center Window", None)?)?;
+				#[cfg(target_os = "macos")]
+				window.append_items(&[
+					&PredefinedMenuItem::separator(app)?,
+					&PredefinedMenuItem::bring_all_to_front(app, None)?,
+				])?;
 			}
 
 			if let Some(help) = menu
@@ -568,6 +681,7 @@ pub fn run() {
 			}
 			Ok(menu)
 		})
+		.manage(InterfaceZoom::default())
 		.manage(Encoder::default())
 		.manage(appaudio::Capture::default())
 		.manage(fetch::Streams::default())
@@ -648,23 +762,33 @@ pub fn run() {
 		.plugin(tauri_plugin_process::init())
 		.on_menu_event(|app, event| {
 			let id = event.id().as_ref();
-			if matches!(
-				id,
-				MENU_SETTINGS
-					| MENU_HELP
-					| MENU_GETTING_STARTED
-					| MENU_SHORTCUTS
-					| MENU_TROUBLESHOOTING
-					| MENU_SYSTEM_INFO
-			) {
-				if let Some(window) = app.get_webview_window("main") {
-					let _ = window.show();
-					let _ = window.set_focus();
+			if !id.starts_with("studio-") { return; }
+			if let Some(window) = app.get_webview_window("main") {
+				let _ = window.show();
+				let _ = window.set_focus();
+				let result = match id {
+					"studio-center-window" => window.center().map_err(|e| e.to_string()),
+					"studio-recordings-folder" => open_recordings_folder(app),
+					"studio-zoom-in" | "studio-zoom-out" | "studio-zoom-reset" => {
+						let state = app.state::<InterfaceZoom>();
+						let result = if let Ok(mut zoom) = state.0.lock() {
+							let next = next_zoom(zoom.unwrap_or(100), id);
+							match window.set_zoom(next as f64 / 100.0) {
+								Ok(()) => { *zoom = Some(next); Ok(()) },
+								Err(error) => Err(error.to_string()),
+							}
+						} else { Err("Interface zoom unavailable".into()) };
+						result
+					},
+					_ => app.emit_to("main", "studio://menu", id).map_err(|e| e.to_string()),
+				};
+				if let Err(error) = result {
+					let _ = app.emit_to("main", "studio://menu-error", error);
 				}
-				let _ = app.emit_to("main", "studio://menu", id);
 			}
 		})
 		.invoke_handler(tauri::generate_handler![
+			service_files::pick_service_file,
 			check_ffmpeg,
 			recording_space,
 			studio_device_info,
@@ -729,4 +853,18 @@ pub fn run() {
 				}
 			}
 		});
+}
+
+#[cfg(test)]
+mod menu_tests {
+	use super::next_zoom;
+
+	#[test]
+	fn zoom_is_bounded_and_resettable() {
+		assert_eq!(next_zoom(100, "studio-zoom-in"), 110);
+		assert_eq!(next_zoom(100, "studio-zoom-out"), 90);
+		assert_eq!(next_zoom(150, "studio-zoom-in"), 150);
+		assert_eq!(next_zoom(80, "studio-zoom-out"), 80);
+		assert_eq!(next_zoom(140, "studio-zoom-reset"), 100);
+	}
 }

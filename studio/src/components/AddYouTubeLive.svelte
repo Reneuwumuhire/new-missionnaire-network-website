@@ -37,7 +37,7 @@
 <Modal title={t('youtubeLive.title')} {onclose}>
 	<div class="flex flex-col gap-4 p-5">
 		<label class="flex flex-col gap-2">
-			<span class="text-[11px] uppercase tracking-[0.14em] text-fg/45">{t('youtubeLive.url')}</span>
+			<span class="text-[12px] uppercase tracking-[0.14em] text-muted">{t('youtubeLive.url')}</span>
 			<!-- svelte-ignore a11y_autofocus -- this modal exists to accept this one URL -->
 			<input
 				class="studio-input"
@@ -53,13 +53,13 @@
 			/>
 		</label>
 
-		<p class="text-[12px] leading-relaxed text-fg/50">{t('youtubeLive.hint')}</p>
+		<p class="text-[12px] leading-relaxed text-muted">{t('youtubeLive.hint')}</p>
 		{#if value.trim() && !videoId}
-			<p class="border border-red-500/30 bg-red-950/40 px-3 py-2 text-[12px] text-red-300">
+			<p class="border border-red-500/30 bg-red-950/40 px-3 py-2 text-[12px] text-danger">
 				{t('youtubeLive.invalid')}
 			</p>
 		{:else if error}
-			<p class="border border-red-500/30 bg-red-950/40 px-3 py-2 text-[12px] text-red-300">
+			<p class="border border-red-500/30 bg-red-950/40 px-3 py-2 text-[12px] text-danger">
 				{error}
 			</p>
 		{/if}

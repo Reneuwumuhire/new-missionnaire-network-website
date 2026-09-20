@@ -17,6 +17,7 @@
 		isPlaying
 	} from '$lib/stores/global';
 	import Pagination from '$lib/components/Pagination.svelte';
+	import MusicSearch from '$lib/components/MusicSearch.svelte';
 	import ListSkeleton from '$lib/components/ListSkeleton.svelte';
 	import ErrorCard from '$lib/components/ErrorCard.svelte';
 	import ResultsSummary from '$lib/components/ResultsSummary.svelte';
@@ -89,7 +90,6 @@
 	let musicListAbortController: AbortController | null = null;
 	let currentListRequestToken = 0;
 	let lastHandledMusicRequestKey = $state('');
-
 
 	let artistSearch = $state('');
 	// "Filtres" sheet — bottom sheet on mobile, centered dialog on sm+.
@@ -298,8 +298,7 @@
 			if ((error as Error).name === 'AbortError') return;
 			if (requestToken !== currentListRequestToken || requestKey !== musicRequestKey) return;
 
-			listLoadError =
-				error instanceof Error ? error.message : $t('music.loadFailed');
+			listLoadError = error instanceof Error ? error.message : $t('music.loadFailed');
 
 			if (!hasResolvedMusicList) {
 				musicList = [];
@@ -315,7 +314,6 @@
 			}
 		}
 	}
-
 
 	let recueilsScrollEl: HTMLDivElement | undefined = $state();
 	let recueilsCanLeft = $state(false);
@@ -396,10 +394,8 @@
 		void tick().then(() => dispatchAudioPlayerAction('play'));
 	}
 
-
 	onDestroy(() => {
 		if (cacheRefreshTimer) clearTimeout(cacheRefreshTimer);
-		if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
 		abortMusicListRequest();
 	});
 
@@ -407,7 +403,6 @@
 	// SW a moment to write the response, then surfaces the new entry in
 	// the "En cache" panel without a manual refresh.
 	let cacheRefreshTimer: ReturnType<typeof setTimeout> | null = $state(null);
-
 
 	// ── END: cached filter state ──────────────────────────────────
 
@@ -447,29 +442,6 @@
 		addToRecentlyPlayed(songs[0] as any);
 	}
 
-
-	let searchInput = $state((data as any).search);
-
-	// Debounced list search for the row-2 utility bar (mobile; desktop
-	// keeps the header band's inline search). Same 300ms debounce as the
-	// layout's hero search, applied through the existing handleSearch()
-	// URL mechanism so both inputs stay in sync via the URL.
-	let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-	let lastSyncedListSearch = $state(((data as any).search || '') as string);
-
-	function onSearchInput() {
-		if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
-		searchDebounceTimer = setTimeout(() => {
-			if ((searchInput || '').trim() !== (currentSearch || '')) handleSearch();
-		}, 300);
-	}
-
-	function clearListSearch() {
-		if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
-		searchInput = '';
-		if (currentSearch) handleSearch();
-	}
-
 	const categories = [
 		'All',
 		'Sur les Ailes de la Foi',
@@ -490,7 +462,6 @@
 	];
 	const desktopMusicGrid =
 		'md:grid-cols-[28px_minmax(0,2fr)_minmax(0,0.95fr)_minmax(0,0.85fr)_58px_28px_36px_36px] lg:grid-cols-[30px_minmax(0,2.2fr)_minmax(0,1.05fr)_minmax(0,0.95fr)_68px_32px_40px_40px] xl:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.2fr)_minmax(0,1fr)_80px_32px_40px_40px]';
-
 
 	function createPlaylistSeed() {
 		return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -526,20 +497,6 @@
 		}
 
 		params.delete('seed');
-	}
-
-	function handleSearch() {
-		const params = new URLSearchParams($page.url.searchParams);
-		if (searchInput) {
-			params.set('search', searchInput);
-		} else {
-			params.delete('search');
-		}
-		params.delete('alpha'); // Search clears alphabetical filter
-		params.delete('artist'); // Search clears artist filter
-		params.set('page', '1');
-		syncSeedParam(params);
-		goto(`?${params.toString()}`);
 	}
 
 	function handleArtistChange(artist: string) {
@@ -725,7 +682,9 @@
 		return activeUrl === songUrl;
 	}
 	let initialMusicList = $derived(((data as any).musicAudio || []) as MusicAudio[]);
-	let initialPlaylist = $derived(((data as any).playlistAudio || initialMusicList || []) as MusicAudio[]);
+	let initialPlaylist = $derived(
+		((data as any).playlistAudio || initialMusicList || []) as MusicAudio[]
+	);
 	let initialArtists = $derived(((data as any).artists || []) as string[]);
 	let initialTotalSongs = $derived(((data as any).total || 0) as number);
 	let currentCategory = $derived((data as any).category);
@@ -745,27 +704,33 @@
 	let sharedSongTitle = $derived(sharedSong?.title?.trim() || '');
 	let sharedSongArtist = $derived(sharedSong?.artist?.trim() || '');
 	let sharedSongCategory = $derived(sharedSong?.category?.trim() || '');
-	let sharedSongPreviewTitle = $derived(sharedSongTitle ? `${sharedSongTitle} — Missionnaire Network` : '');
-	let sharedSongPreviewDescription = $derived(sharedSongTitle
-		? sharedSongArtist
-			? `Écoutez « ${sharedSongTitle} » par ${sharedSongArtist} sur Missionnaire Network.`
-			: sharedSongCategory
-				? `Écoutez « ${sharedSongTitle} » (${sharedSongCategory}) sur Missionnaire Network.`
-				: `Écoutez « ${sharedSongTitle} » sur Missionnaire Network.`
-		: '');
-	let sharedSongCanonical = $derived(sharedSongId
-		? `https://missionnaire.net/musique?play=${encodeURIComponent(sharedSongId)}`
-		: '');
-	let musicRequestKey = $derived(JSON.stringify({
-		category: currentCategory || 'All',
-		search: currentSearch || '',
-		alpha: currentAlpha || '',
-		artist: currentArtist || '',
-		pageNumber: currentPage || 1,
-		limit: limit || 100,
-		sort: currentSort || 'uploaded_at:desc',
-		seed: currentSeed || ''
-	}));
+	let sharedSongPreviewTitle = $derived(
+		sharedSongTitle ? `${sharedSongTitle} — Missionnaire Network` : ''
+	);
+	let sharedSongPreviewDescription = $derived(
+		sharedSongTitle
+			? sharedSongArtist
+				? `Écoutez « ${sharedSongTitle} » par ${sharedSongArtist} sur Missionnaire Network.`
+				: sharedSongCategory
+					? `Écoutez « ${sharedSongTitle} » (${sharedSongCategory}) sur Missionnaire Network.`
+					: `Écoutez « ${sharedSongTitle} » sur Missionnaire Network.`
+			: ''
+	);
+	let sharedSongCanonical = $derived(
+		sharedSongId ? `https://missionnaire.net/musique?play=${encodeURIComponent(sharedSongId)}` : ''
+	);
+	let musicRequestKey = $derived(
+		JSON.stringify({
+			category: currentCategory || 'All',
+			search: currentSearch || '',
+			alpha: currentAlpha || '',
+			artist: currentArtist || '',
+			pageNumber: currentPage || 1,
+			limit: limit || 100,
+			sort: currentSort || 'uploaded_at:desc',
+			seed: currentSeed || ''
+		})
+	);
 	$effect(() => {
 		if (musicRequestKey && musicRequestKey !== lastHandledMusicRequestKey) {
 			untrack(() => {
@@ -813,25 +778,15 @@
 	let summaryFrom = $derived(totalSongs === 0 ? 0 : (currentPage - 1) * limit + 1);
 	let summaryTo = $derived(Math.min(currentPage * limit, totalSongs));
 	let downloadEstimateMb = $derived(Math.round((totalSongs * 4.5) / 1) || 0);
-	let downloadFilterLabel = $derived((() => {
-		if (currentSearch) return `« ${currentSearch} »`;
-		if (currentArtist) return currentArtist;
-		if (currentAlpha) return $t('music.letterLabel', { letter: currentAlpha });
-		if (currentCategory && currentCategory !== 'All') return currentCategory;
-		return $t('music.allSongs');
-	})());
-	// Keep the row-2 search input in step with the URL (e.g. when the
-	// desktop header search or a back/forward navigation changes it),
-	// without stomping on in-progress typing.
-	$effect(() => {
-		const urlSearch = currentSearch || '';
-		if (urlSearch !== lastSyncedListSearch) {
-			searchInput = urlSearch;
-			untrack(() => {
-				lastSyncedListSearch = urlSearch;
-			});
-		}
-	});
+	let downloadFilterLabel = $derived(
+		(() => {
+			if (currentSearch) return `« ${currentSearch} »`;
+			if (currentArtist) return currentArtist;
+			if (currentAlpha) return $t('music.letterLabel', { letter: currentAlpha });
+			if (currentCategory && currentCategory !== 'All') return currentCategory;
+			return $t('music.allSongs');
+		})()
+	);
 	// Badge on the "Filtres" button: how many sheet-managed filters are
 	// currently narrowing the list (collection has its own pill row).
 	let activeFilterCount = $derived((currentArtist ? 1 : 0) + (currentAlpha ? 1 : 0));
@@ -860,85 +815,93 @@
 	// missing from all three sources won't appear — but in practice a
 	// song must be played to be cached, so it's almost always either
 	// in recently-played (last 20) or favorites.
-	let cachedSongs = $derived((() => {
-		const set = $cachedUrls;
-		if (set.size === 0)
-			return [] as Array<{
+	let cachedSongs = $derived(
+		(() => {
+			const set = $cachedUrls;
+			if (set.size === 0)
+				return [] as Array<{
+					id: string;
+					title: string;
+					artist?: string;
+					category?: string;
+					s3_url?: string;
+					song?: MusicAudio;
+				}>;
+
+			const seen = new Set<string>();
+			const out: Array<{
 				id: string;
 				title: string;
 				artist?: string;
 				category?: string;
 				s3_url?: string;
 				song?: MusicAudio;
-			}>;
+			}> = [];
 
-		const seen = new Set<string>();
-		const out: Array<{
-			id: string;
-			title: string;
-			artist?: string;
-			category?: string;
-			s3_url?: string;
-			song?: MusicAudio;
-		}> = [];
+			const pushIfCached = (
+				id: string,
+				title: string,
+				s3_url: string | null | undefined,
+				artist: string | null | undefined,
+				category: string | null | undefined,
+				song?: MusicAudio
+			) => {
+				if (!id || seen.has(id)) return;
+				if (!s3_url || !isUrlCached(s3_url, set)) return;
+				seen.add(id);
+				out.push({
+					id,
+					title,
+					artist: artist ?? undefined,
+					category: category ?? undefined,
+					s3_url,
+					song
+				});
+			};
 
-		const pushIfCached = (
-			id: string,
-			title: string,
-			s3_url: string | null | undefined,
-			artist: string | null | undefined,
-			category: string | null | undefined,
-			song?: MusicAudio
-		) => {
-			if (!id || seen.has(id)) return;
-			if (!s3_url || !isUrlCached(s3_url, set)) return;
-			seen.add(id);
-			out.push({
-				id,
-				title,
-				artist: artist ?? undefined,
-				category: category ?? undefined,
-				s3_url,
-				song
-			});
-		};
+			// Favorites first (most intentionally retained), then recents,
+			// then current page — preserves a sensible default ordering.
+			for (const fav of $favorites) {
+				pushIfCached(fav.id, fav.title, fav.s3_url, fav.artist, fav.category);
+			}
+			for (const rec of $recentlyPlayed) {
+				pushIfCached(rec.id, rec.title, rec.s3_url, rec.artist, rec.category);
+			}
+			for (const song of (musicPlaylist || []) as MusicAudio[]) {
+				const id = song._id || song.s3_url || '';
+				pushIfCached(id, song.title || 'Sans titre', song.s3_url, song.artist, song.category, song);
+			}
 
-		// Favorites first (most intentionally retained), then recents,
-		// then current page — preserves a sensible default ordering.
-		for (const fav of $favorites) {
-			pushIfCached(fav.id, fav.title, fav.s3_url, fav.artist, fav.category);
-		}
-		for (const rec of $recentlyPlayed) {
-			pushIfCached(rec.id, rec.title, rec.s3_url, rec.artist, rec.category);
-		}
-		for (const song of (musicPlaylist || []) as MusicAudio[]) {
-			const id = song._id || song.s3_url || '';
-			pushIfCached(id, song.title || 'Sans titre', song.s3_url, song.artist, song.category, song);
-		}
-
-		return out;
-	})());
+			return out;
+		})()
+	);
 	let cachedCount = $derived(cachedSongs.length);
-	let cachedPlayableCount = $derived(cachedSongs.reduce(
-		(n, item) => n + ((item.song ?? findSongById(musicPlaylist, item.id)) ? 1 : 0),
-		0
-	));
+	let cachedPlayableCount = $derived(
+		cachedSongs.reduce(
+			(n, item) => n + ((item.song ?? findSongById(musicPlaylist, item.id)) ? 1 : 0),
+			0
+		)
+	);
 	// ── END: play all cached ──────────────────────────────────────
-	let filteredArtists = $derived(artists.filter((a: string) =>
-		a.toLowerCase().includes(artistSearch.toLowerCase())
-	));
-	let playlistIndexByUrl = $derived(new Map<string, number>(
-		(musicPlaylist || []).map((song: MusicAudio, index: number) => [song.s3_url, index])
-	));
+	let filteredArtists = $derived(
+		artists.filter((a: string) => a.toLowerCase().includes(artistSearch.toLowerCase()))
+	);
+	let playlistIndexByUrl = $derived(
+		new Map<string, number>(
+			(musicPlaylist || []).map((song: MusicAudio, index: number) => [song.s3_url, index])
+		)
+	);
 	let activeMusicSong = $derived(isMusicAudio($selectAudio) ? $selectAudio : null);
-	let activeMusicSongIndex = $derived(activeMusicSong
-		? (playlistIndexByUrl.get(activeMusicSong.s3_url) ?? -1)
-		: -1);
-	let isActiveMusicSongVisible =
-		$derived(!!activeMusicSong &&
-		(musicList || []).some((song: MusicAudio) => song.s3_url === activeMusicSong.s3_url));
-	let activeMusicSongPage =
-		$derived(activeMusicSongIndex >= 0 ? Math.floor(activeMusicSongIndex / limit) + 1 : null);
+	let activeMusicSongIndex = $derived(
+		activeMusicSong ? (playlistIndexByUrl.get(activeMusicSong.s3_url) ?? -1) : -1
+	);
+	let isActiveMusicSongVisible = $derived(
+		!!activeMusicSong &&
+			(musicList || []).some((song: MusicAudio) => song.s3_url === activeMusicSong.s3_url)
+	);
+	let activeMusicSongPage = $derived(
+		activeMusicSongIndex >= 0 ? Math.floor(activeMusicSongIndex / limit) + 1 : null
+	);
 	let isRandomListOrder = $derived(currentSort.split(/[: ,]/)[0] === 'random');
 	// Sync playlist when songs are loaded
 	$effect(() => {
@@ -1003,44 +966,8 @@
 	     opens the sheet (artist, alphabet, sort, Rafraîchir, Tout
 	     télécharger). -->
 	<div class="mt-3 mb-3 md:mb-4 flex items-center gap-2 md:justify-end">
-		<div class="relative min-w-0 flex-1 md:hidden">
-			<svg
-				class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
-				width="14"
-				height="14"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2.2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				aria-hidden="true"
-			>
-				<circle cx="11" cy="11" r="7" />
-				<line x1="21" y1="21" x2="16.65" y2="16.65" />
-			</svg>
-			<input
-				type="text"
-				inputmode="search"
-				enterkeyhint="search"
-				class="h-10 w-full border border-stone-200 bg-white/70 pl-9 {searchInput
-					? 'pr-9'
-					: 'pr-3'} font-body text-sm text-stone-800 outline-none transition-colors duration-150 placeholder:text-stone-400 focus:border-missionnaire/60 focus:bg-white"
-				placeholder={$t('music.searchPlaceholder')}
-				aria-label={$t('music.searchPlaceholder')}
-				bind:value={searchInput}
-				oninput={onSearchInput}
-			/>
-			{#if searchInput}
-				<button
-					type="button"
-					class="absolute right-0 top-0 flex h-10 w-9 items-center justify-center text-stone-400 transition-colors duration-150 hover:text-stone-700"
-					aria-label={$t('music.clearSearch')}
-					onclick={clearListSearch}
-				>
-					<Icon src={BsX} size="16" />
-				</button>
-			{/if}
+		<div class="min-w-0 flex-1 md:hidden">
+			<MusicSearch id="musique-list-search" />
 		</div>
 		{#if isRandomListOrder}
 			<button
@@ -1221,166 +1148,166 @@
 		{/if}
 	</div>
 
-		{#if showFavorites && $favorites.length > 0}
-			<div class="bg-white/40 border border-stone-200/60 mb-6 overflow-hidden">
-				<div
-					class="flex items-center justify-between px-4 py-3 border-b border-stone-200 bg-stone-50/50"
+	{#if showFavorites && $favorites.length > 0}
+		<div class="bg-white/40 border border-stone-200/60 mb-6 overflow-hidden">
+			<div
+				class="flex items-center justify-between px-4 py-3 border-b border-stone-200 bg-stone-50/50"
+			>
+				<span class="text-[10px] font-bold uppercase tracking-widest text-stone-400">
+					{$t('music.favorites')} — {$favorites.length}
+					{$favorites.length > 1 ? $t('music.songs') : $t('music.song')}
+				</span>
+				<button
+					class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-900 hover:bg-stone-800 text-white text-[10px] font-bold uppercase tracking-wider transition-colors"
+					onclick={() => playAllFavorites()}
 				>
-					<span class="text-[10px] font-bold uppercase tracking-widest text-stone-400">
-						{$t('music.favorites')} — {$favorites.length}
-						{$favorites.length > 1 ? $t('music.songs') : $t('music.song')}
-					</span>
-					<button
-						class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-900 hover:bg-stone-800 text-white text-[10px] font-bold uppercase tracking-wider transition-colors"
-						onclick={() => playAllFavorites()}
+					<Icon src={BsPlayFill} size="10" />
+					{$t('music.playAll')}
+				</button>
+			</div>
+			<div class="divide-y divide-stone-50 max-h-[300px] overflow-y-auto">
+				{#each $favorites as fav, i}
+					{@const favSong = findSongById(musicPlaylist, fav.id)}
+					<div
+						class="flex items-center gap-3 px-4 py-2.5 hover:bg-stone-100/50 transition-colors group"
 					>
-						<Icon src={BsPlayFill} size="10" />
-						{$t('music.playAll')}
-					</button>
-				</div>
-				<div class="divide-y divide-stone-50 max-h-[300px] overflow-y-auto">
-					{#each $favorites as fav, i}
-						{@const favSong = findSongById(musicPlaylist, fav.id)}
-						<div
-							class="flex items-center gap-3 px-4 py-2.5 hover:bg-stone-100/50 transition-colors group"
+						<span class="text-[10px] font-bold text-stone-300 w-5 text-center">{i + 1}</span>
+						<button
+							class="flex-1 min-w-0 text-left"
+							onclick={() => {
+								if (favSong) playSong(favSong);
+							}}
 						>
-							<span class="text-[10px] font-bold text-stone-300 w-5 text-center">{i + 1}</span>
-							<button
-								class="flex-1 min-w-0 text-left"
-								onclick={() => {
-									if (favSong) playSong(favSong);
-								}}
-							>
-								<div
-									class="text-sm font-bold text-stone-800 group-hover:text-missionnaire transition-colors truncate"
-								>
-									{fav.title}
-								</div>
-								<div class="flex items-center gap-2">
-									{#if fav.artist}
-										<span class="text-[10px] text-stone-400">{fav.artist}</span>
-									{/if}
-									{#if fav.category}
-										<span class="text-[10px] text-stone-300">{fav.category}</span>
-									{/if}
-								</div>
-							</button>
-							<!-- svelte-ignore a11y_click_events_have_key_events -->
-							<!-- svelte-ignore a11y_no_static_element_interactions -->
 							<div
-								class="text-red-300 hover:text-red-500 p-1 cursor-pointer transition-colors"
-								onclick={(e) => {
-									e.stopPropagation();
-									toggleFavorite({
-										_id: fav.id,
-										title: fav.title,
-										artist: fav.artist,
-										s3_url: fav.s3_url
-									});
-								}}
-								title={$t('player.unfavorite')}
+								class="text-sm font-bold text-stone-800 group-hover:text-missionnaire transition-colors truncate"
 							>
-								<Icon src={BsX} size="14" />
+								{fav.title}
 							</div>
-						</div>
-					{/each}
-				</div>
-			</div>
-		{/if}
-
-		{#if showRecent && $recentlyPlayed.length > 0}
-			<div class="bg-white/40 border border-stone-200/60 mb-6 overflow-hidden">
-				<div class="px-4 py-3 border-b border-stone-200 bg-stone-50/50">
-					<span class="text-[10px] font-bold uppercase tracking-widest text-stone-400">
-						{$t('music.recentlyPlayed')}
-					</span>
-				</div>
-				<div class="divide-y divide-stone-50 max-h-[300px] overflow-y-auto">
-					{#each $recentlyPlayed as recent, i}
-						{@const recentSong = findSongById(musicPlaylist, recent.id)}
-						<div
-							class="flex items-center gap-3 px-4 py-2.5 hover:bg-stone-100/50 transition-colors group"
-						>
-							<span class="text-[10px] font-bold text-stone-300 w-5 text-center">{i + 1}</span>
-							<button
-								class="flex-1 min-w-0 text-left"
-								onclick={() => {
-									if (recentSong) playSong(recentSong);
-								}}
-							>
-								<div
-									class="text-sm font-bold text-stone-800 group-hover:text-missionnaire transition-colors truncate"
-								>
-									{recent.title}
-								</div>
-								{#if recent.artist}
-									<span class="text-[10px] text-stone-400">{recent.artist}</span>
+							<div class="flex items-center gap-2">
+								{#if fav.artist}
+									<span class="text-[10px] text-stone-400">{fav.artist}</span>
 								{/if}
-							</button>
-						</div>
-					{/each}
-				</div>
-			</div>
-		{/if}
-
-		<!-- ── BEGIN: cached panel (added) ────────────────────────── -->
-		{#if showCached && cachedCount > 0}
-			<div class="bg-white/40 border border-stone-200/60 mb-6 overflow-hidden">
-				<div
-					class="flex items-center justify-between px-4 py-3 border-b border-stone-200 bg-stone-50/50"
-				>
-					<span
-						class="text-[10px] font-bold uppercase tracking-widest text-stone-400 flex items-center gap-2"
-					>
-						<span class="text-emerald-600"><Icon src={IoCloudDoneOutline} size="12" /></span>
-						{$t('player.cached')} — {cachedCount}
-						{cachedCount > 1 ? $t('music.cachedManySuffix') : $t('music.cachedOneSuffix')}
-					</span>
-					<button
-						class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-900 hover:bg-stone-800 text-white text-[10px] font-bold uppercase tracking-wider transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-stone-900"
-						onclick={() => playAllCached()}
-						disabled={cachedPlayableCount === 0}
-						title={cachedPlayableCount === 0 ? $t('music.noPlayableCached') : ''}
-					>
-						<Icon src={BsPlayFill} size="10" />
-						{$t('music.playAll')}
-					</button>
-				</div>
-				<div class="divide-y divide-stone-50 max-h-[300px] overflow-y-auto">
-					{#each cachedSongs as item, i}
-						{@const cachedSong = item.song ?? findSongById(musicPlaylist, item.id)}
+								{#if fav.category}
+									<span class="text-[10px] text-stone-300">{fav.category}</span>
+								{/if}
+							</div>
+						</button>
+						<!-- svelte-ignore a11y_click_events_have_key_events -->
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
 						<div
-							class="flex items-center gap-3 px-4 py-2.5 hover:bg-stone-100/50 transition-colors group"
+							class="text-red-300 hover:text-red-500 p-1 cursor-pointer transition-colors"
+							onclick={(e) => {
+								e.stopPropagation();
+								toggleFavorite({
+									_id: fav.id,
+									title: fav.title,
+									artist: fav.artist,
+									s3_url: fav.s3_url
+								});
+							}}
+							title={$t('player.unfavorite')}
 						>
-							<span class="text-[10px] font-bold text-stone-300 w-5 text-center">{i + 1}</span>
-							<button
-								class="flex-1 min-w-0 text-left"
-								onclick={() => {
-									if (cachedSong) playSong(cachedSong);
-								}}
-								disabled={!cachedSong}
-								title={cachedSong ? '' : $t('music.reloadToReplay')}
-							>
-								<div
-									class="text-sm font-bold text-stone-800 group-hover:text-missionnaire transition-colors truncate"
-								>
-									{item.title}
-								</div>
-								<div class="flex items-center gap-2">
-									{#if item.artist}
-										<span class="text-[10px] text-stone-400">{item.artist}</span>
-									{/if}
-									{#if item.category}
-										<span class="text-[10px] text-stone-300">{item.category}</span>
-									{/if}
-								</div>
-							</button>
+							<Icon src={BsX} size="14" />
 						</div>
-					{/each}
-				</div>
+					</div>
+				{/each}
 			</div>
-		{/if}
-		<!-- ── END: cached panel ──────────────────────────────────── -->
+		</div>
+	{/if}
+
+	{#if showRecent && $recentlyPlayed.length > 0}
+		<div class="bg-white/40 border border-stone-200/60 mb-6 overflow-hidden">
+			<div class="px-4 py-3 border-b border-stone-200 bg-stone-50/50">
+				<span class="text-[10px] font-bold uppercase tracking-widest text-stone-400">
+					{$t('music.recentlyPlayed')}
+				</span>
+			</div>
+			<div class="divide-y divide-stone-50 max-h-[300px] overflow-y-auto">
+				{#each $recentlyPlayed as recent, i}
+					{@const recentSong = findSongById(musicPlaylist, recent.id)}
+					<div
+						class="flex items-center gap-3 px-4 py-2.5 hover:bg-stone-100/50 transition-colors group"
+					>
+						<span class="text-[10px] font-bold text-stone-300 w-5 text-center">{i + 1}</span>
+						<button
+							class="flex-1 min-w-0 text-left"
+							onclick={() => {
+								if (recentSong) playSong(recentSong);
+							}}
+						>
+							<div
+								class="text-sm font-bold text-stone-800 group-hover:text-missionnaire transition-colors truncate"
+							>
+								{recent.title}
+							</div>
+							{#if recent.artist}
+								<span class="text-[10px] text-stone-400">{recent.artist}</span>
+							{/if}
+						</button>
+					</div>
+				{/each}
+			</div>
+		</div>
+	{/if}
+
+	<!-- ── BEGIN: cached panel (added) ────────────────────────── -->
+	{#if showCached && cachedCount > 0}
+		<div class="bg-white/40 border border-stone-200/60 mb-6 overflow-hidden">
+			<div
+				class="flex items-center justify-between px-4 py-3 border-b border-stone-200 bg-stone-50/50"
+			>
+				<span
+					class="text-[10px] font-bold uppercase tracking-widest text-stone-400 flex items-center gap-2"
+				>
+					<span class="text-emerald-600"><Icon src={IoCloudDoneOutline} size="12" /></span>
+					{$t('player.cached')} — {cachedCount}
+					{cachedCount > 1 ? $t('music.cachedManySuffix') : $t('music.cachedOneSuffix')}
+				</span>
+				<button
+					class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-900 hover:bg-stone-800 text-white text-[10px] font-bold uppercase tracking-wider transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-stone-900"
+					onclick={() => playAllCached()}
+					disabled={cachedPlayableCount === 0}
+					title={cachedPlayableCount === 0 ? $t('music.noPlayableCached') : ''}
+				>
+					<Icon src={BsPlayFill} size="10" />
+					{$t('music.playAll')}
+				</button>
+			</div>
+			<div class="divide-y divide-stone-50 max-h-[300px] overflow-y-auto">
+				{#each cachedSongs as item, i}
+					{@const cachedSong = item.song ?? findSongById(musicPlaylist, item.id)}
+					<div
+						class="flex items-center gap-3 px-4 py-2.5 hover:bg-stone-100/50 transition-colors group"
+					>
+						<span class="text-[10px] font-bold text-stone-300 w-5 text-center">{i + 1}</span>
+						<button
+							class="flex-1 min-w-0 text-left"
+							onclick={() => {
+								if (cachedSong) playSong(cachedSong);
+							}}
+							disabled={!cachedSong}
+							title={cachedSong ? '' : $t('music.reloadToReplay')}
+						>
+							<div
+								class="text-sm font-bold text-stone-800 group-hover:text-missionnaire transition-colors truncate"
+							>
+								{item.title}
+							</div>
+							<div class="flex items-center gap-2">
+								{#if item.artist}
+									<span class="text-[10px] text-stone-400">{item.artist}</span>
+								{/if}
+								{#if item.category}
+									<span class="text-[10px] text-stone-300">{item.category}</span>
+								{/if}
+							</div>
+						</button>
+					</div>
+				{/each}
+			</div>
+		</div>
+	{/if}
+	<!-- ── END: cached panel ──────────────────────────────────── -->
 
 	<!-- Songs List -->
 	<div class="bg-white/40 border border-stone-200/60 min-h-[500px] flex flex-col overflow-hidden">

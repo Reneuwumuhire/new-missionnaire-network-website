@@ -68,6 +68,7 @@
 	let previousActiveLineIndex = $state(-1);
 	let prefersReducedMotion = $state(false);
 	let userScrolled = $state(false);
+	let scrollAnimationFrame: number | null = null;
 	// Which way the "back to current line" pill arrow points: down when the
 	// live passage is below the reader's viewport (they scrolled up to read
 	// earlier text), up when it's above (they scrolled ahead).
@@ -87,6 +88,10 @@
 
 	function onUserScroll() {
 		if (!pauseOnUserScroll) return;
+		if (scrollAnimationFrame !== null) {
+			cancelAnimationFrame(scrollAnimationFrame);
+			scrollAnimationFrame = null;
+		}
 		userScrolled = true;
 		updateScrollDirection();
 	}
@@ -102,10 +107,28 @@
 		const panelRect = panelElement.getBoundingClientRect();
 		const elRect = el.getBoundingClientRect();
 		const delta = elRect.top + elRect.height / 2 - (panelRect.top + panelRect.height / 2);
-		panelElement.scrollTo({
-			top: panelElement.scrollTop + delta,
-			behavior: smooth ? 'smooth' : 'auto'
-		});
+		const target = Math.max(
+			0,
+			Math.min(panelElement.scrollTop + delta, panelElement.scrollHeight - panelElement.clientHeight)
+		);
+
+		if (scrollAnimationFrame !== null) cancelAnimationFrame(scrollAnimationFrame);
+		if (!smooth) {
+			panelElement.scrollTop = target;
+			return;
+		}
+
+		const start = panelElement.scrollTop;
+		const distance = target - start;
+		const startedAt = performance.now();
+		const animate = (now: number) => {
+			const progress = Math.min((now - startedAt) / 420, 1);
+			panelElement!.scrollTop = start + distance * (1 - (1 - progress) ** 3);
+			if (progress < 1) scrollAnimationFrame = requestAnimationFrame(animate);
+			else scrollAnimationFrame = null;
+		};
+
+		scrollAnimationFrame = requestAnimationFrame(animate);
 	}
 
 	function resumeAutoScroll() {
@@ -264,6 +287,7 @@
 		mediaQuery.addEventListener('change', updateReducedMotion);
 
 		return () => {
+			if (scrollAnimationFrame !== null) cancelAnimationFrame(scrollAnimationFrame);
 			mediaQuery.removeEventListener('change', updateReducedMotion);
 		};
 	});
@@ -529,10 +553,9 @@
 	}
 
 	/* ─── The current line gets the spotlight ──────────────
-	   Scale + weight + warm orange glow. Karaoke moment. */
+	   Keep its size and weight fixed so wrapping never shifts the lines below. */
 	.lyric-line.active {
 		color: var(--lyric-color-active);
-		transform: scale(1.025);
 		text-shadow:
 			0 0 22px var(--lyric-glow-active),
 			0 0 1px rgba(255, 136, 12, 0.18);
@@ -540,7 +563,6 @@
 
 	.lyric-line.active .lyric-text {
 		opacity: 1;
-		font-weight: 600;
 	}
 
 	.lyric-line.active.chorus {
@@ -680,8 +702,7 @@
 		max-height: none;
 		min-height: 0;
 		flex: 1 1 auto;
-		/* Extra bottom padding so the last lines clear the floating close bar. */
-		padding: 1rem 1rem calc(6.5rem + env(safe-area-inset-bottom, 0px));
+		padding: 1rem 1rem calc(2rem + env(safe-area-inset-bottom, 0px));
 		scroll-padding-block: 42%;
 	}
 
@@ -707,9 +728,32 @@
 		opacity: 0.55;
 	}
 
-	.lyrics-panel.fullscreen-large .resume-follow {
-		/* Sit above the overlay's floating close bar. */
-		bottom: calc(4.4rem + env(safe-area-inset-bottom, 0px));
+	/* Keep the highlight layer mounted so it crossfades without changing
+	   text layout. Isolate it behind the text to preserve reading contrast. */
+	.lyrics-panel.fullscreen-large .lyric-line {
+		position: relative;
+		isolation: isolate;
+	}
+
+	.lyrics-panel.fullscreen-large .lyric-line::before {
+		position: absolute;
+		z-index: -1;
+		inset: 0 -1rem;
+		background: linear-gradient(
+			to bottom,
+			transparent,
+			var(--subtitle-active-bg) 25%,
+			var(--subtitle-active-bg) 75%,
+			transparent
+		);
+		content: '';
+		pointer-events: none;
+		opacity: 0;
+		transition: opacity 420ms ease-in-out;
+	}
+
+	.lyrics-panel.fullscreen-large .lyric-line.active::before {
+		opacity: 1;
 	}
 
 	/* Floating "back to current line" pill — sticky inside the scroll
@@ -830,15 +874,15 @@
 			.subtitle-theme-sepia,
 			.subtitle-theme-dark,
 			.subtitle-theme-contrast
-		) .lyric-line.active {
+	) .lyric-line.active {
 		background: var(--subtitle-active-bg);
 		border-radius: 0.6rem;
 		text-shadow: none;
-		transform: scale(1.012);
 	}
 
-	.lyrics-panel.subtitle-theme-contrast .lyric-line.active .lyric-text {
-		font-weight: 700;
+	.lyrics-panel.fullscreen-large .lyric-line.active {
+		background: transparent;
+		border-radius: 0;
 	}
 
 	/* In the fullscreen overlay the surface comes from the overlay itself, so
@@ -878,6 +922,10 @@
 	}
 
 	@media (prefers-reduced-motion: reduce) {
+		.lyrics-panel.fullscreen-large .lyric-line::before {
+			transition: none;
+		}
+
 		.lyric-line,
 		.lyric-section {
 			transition:

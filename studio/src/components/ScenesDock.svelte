@@ -72,13 +72,17 @@
 						onclick={() => selectScene(scene.id)}
 						ondblclick={() => (renamingId = scene.id)}
 					>
-						<span class="w-3 shrink-0 font-mono text-[10px] text-fg/25">{index + 1}</span>
+						<span
+							class="w-3 shrink-0 font-mono text-[12px] {scene.id === studio.activeSceneId
+								? 'text-black/80'
+								: 'text-muted'}">{index + 1}</span
+						>
 						<span class="min-w-0 flex-1 truncate">{scene.name}</span>
 						{#if scene.id === onAirSceneId()}
 							<!-- Which scene is actually on air. Only ambiguous in Studio Mode,
 							     but that is exactly when getting it wrong matters. -->
 							<span
-								class="shrink-0 bg-red-600 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-fg"
+								class="shrink-0 bg-red-600 px-1.5 py-px text-[12px] font-bold uppercase tracking-wider text-white"
 							>
 								{t('preview.onAir')}
 							</span>
@@ -90,7 +94,12 @@
 	</ul>
 
 	{#snippet footer()}
-		<button class="studio-icon-btn" title={t('scenes.addScene')} aria-label={t('scenes.addScene')} onclick={addScene}><Icon name="plus" /></button>
+		<button
+			class="studio-icon-btn"
+			title={t('scenes.addScene')}
+			aria-label={t('scenes.addScene')}
+			onclick={addScene}><Icon name="plus" /></button
+		>
 		<button
 			class="studio-icon-btn"
 			title={t('scenes.removeScene')}

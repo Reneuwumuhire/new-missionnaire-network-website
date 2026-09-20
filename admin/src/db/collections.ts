@@ -96,6 +96,7 @@ export async function queryMusicAudio(options: {
 	search?: string;
 	artist?: string;
 	lyrics?: 'with' | 'without';
+	missingMetadata?: boolean;
 	limit?: number;
 	pageNumber?: number;
 	orderBy?: string;
@@ -112,6 +113,10 @@ export async function queryMusicAudio(options: {
 
 	const db = await getDb();
 	const conditions: Filter<Document>[] = [];
+	if (options.missingMetadata)
+		conditions.push({
+			$or: [{ title: { $in: [null, ''] } }, { artist: { $in: [null, ''] } }, { duration: null }]
+		});
 
 	if (category && category !== 'All') {
 		conditions.push({ category });
@@ -1187,14 +1192,23 @@ export async function getBroadcastAdminState(opts?: {
 }
 
 export async function setBroadcastAdminState(updates: Partial<BroadcastAdminState>): Promise<void> {
+	// Admin uses a single sync anchor. Clear any previous Studio timeline in
+	// the same write so the public player follows the admin's file/timing.
+	const resetTimeline = Object.keys(updates).some(
+		(key) => key.startsWith('subtitle_') || key === 'is_live' || key === 'scheduled_live_id'
+	);
 	const db = await getDb();
-	await db
-		.collection('broadcast_admin_state')
-		.updateOne(
-			{ _id: 'current' as unknown as ObjectId },
-			{ $set: { ...updates, updated_at: new Date().toISOString() } },
-			{ upsert: true }
-		);
+	await db.collection('broadcast_admin_state').updateOne(
+		{ _id: 'current' as unknown as ObjectId },
+		{
+			$set: {
+				...updates,
+				...(resetTimeline ? { subtitle_timeline: [] } : {}),
+				updated_at: new Date().toISOString()
+			}
+		},
+		{ upsert: true }
+	);
 	// Invalidate after the write so a concurrent in-flight read can't refill
 	// the cache with the pre-write value.
 	cachedBroadcast = null;
@@ -1246,6 +1260,11 @@ export type ScheduledLive = {
 	subtitle_filename: string | null;
 	subtitle_anchor_epoch_ms: number | null;
 	subtitle_offset_ms: number;
+	service_type: 'prepared' | 'live';
+	active_phase: 'ready' | 'opening' | 'sermon' | 'closing' | 'complete';
+	sermon_start_ms: number | null;
+	sermon_end_ms: number | null;
+	subtitle_timing_language: string | null;
 	created_by: string | null;
 	created_at: string;
 	updated_at: string;
@@ -1295,6 +1314,7 @@ export async function createScheduledLive(input: {
 	subtitle_srt_url?: string | null;
 	subtitle_srt_s3_key?: string | null;
 	subtitle_filename?: string | null;
+	service_type?: 'prepared' | 'live';
 	created_by?: string | null;
 }): Promise<ScheduledLive> {
 	await ensureScheduledLiveIndexes();
@@ -1327,6 +1347,11 @@ export async function createScheduledLive(input: {
 			subtitle_filename: input.subtitle_filename ?? null,
 			subtitle_anchor_epoch_ms: null,
 			subtitle_offset_ms: 0,
+			service_type: input.service_type ?? 'prepared',
+			active_phase: 'ready',
+			sermon_start_ms: null,
+			sermon_end_ms: null,
+			subtitle_timing_language: null,
 			created_by: input.created_by ?? null,
 			created_at: now,
 			updated_at: now

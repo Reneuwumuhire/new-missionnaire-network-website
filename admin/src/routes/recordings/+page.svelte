@@ -445,7 +445,7 @@
 	// Lets an admin add a recording for a date we didn't capture live but have
 	// elsewhere (e.g. the YouTube re-broadcast). Picks the MP3, a backdated
 	// date, and metadata; the doc is created then audio is uploaded + finalized
-	// via the same S3 flow the edit modal uses.
+	// via the same S3 flow the edit  modal uses.
 	const canManageRecordings = $derived(Boolean(data.user?.permissions.can_manage_recordings));
 	let uploadModalOpen = $state(false);
 	let uploadTitle = $state('');

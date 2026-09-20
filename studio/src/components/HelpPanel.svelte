@@ -26,7 +26,7 @@
 			<button
 				class="w-full px-3 py-2 text-left text-[13px] transition-colors {section === entry.id
 					? 'bg-primary text-black'
-					: 'text-fg/65 hover:bg-fg/5 hover:text-fg'}"
+					: 'text-muted hover:bg-fg/5 hover:text-fg'}"
 				onclick={() => onsection(entry.id)}>{entry.label()}</button
 			>
 		{/each}
@@ -36,7 +36,7 @@
 		{#if section === 'getting-started'}
 			<div>
 				<h3 class="text-base font-semibold text-fg/90">{t('help.gettingStarted')}</h3>
-				<p class="mt-1 text-fg/45">{t('help.gettingStartedIntro')}</p>
+				<p class="mt-1 text-muted">{t('help.gettingStartedIntro')}</p>
 			</div>
 			<ol class="space-y-3">
 				<li>
@@ -59,15 +59,15 @@
 					<strong class="text-fg/85">5. {t('help.goLiveTitle')}</strong><br />{t('help.goLive')}
 				</li>
 			</ol>
-			<div class="border border-amber-500/25 bg-amber-500/10 p-3 text-amber-200/90">
+			<div class="border border-amber-500/25 bg-amber-500/10 p-3 text-warning">
 				{t('help.safety')}
 			</div>
 		{:else if section === 'shortcuts'}
 			<div>
 				<h3 class="text-base font-semibold text-fg/90">{t('help.shortcuts')}</h3>
-				<p class="mt-1 text-fg/45">{t('help.shortcutsIntro')}</p>
+				<p class="mt-1 text-muted">{t('help.shortcutsIntro')}</p>
 			</div>
-			<dl class="grid grid-cols-[9rem_1fr] items-center gap-x-4 gap-y-3">
+			<dl class="grid grid-cols-[12rem_1fr] items-center gap-x-4 gap-y-3">
 				<dt><kbd>Space</kbd> / <kbd>→</kbd> / <kbd>↓</kbd></dt>
 				<dd>{t('help.nextSubtitle')}</dd>
 				<dt><kbd>←</kbd> / <kbd>↑</kbd></dt>
@@ -82,11 +82,21 @@
 				<dd>{t('help.openSettings')}</dd>
 				<dt><kbd>⌘/Ctrl</kbd> + <kbd>/</kbd></dt>
 				<dd>{t('help.openHelp')}</dd>
+				<dt><kbd>⌘/Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>L</kbd></dt>
+				<dd>{t('help.toggleLyricsPanel')}</dd>
+				<dt><kbd>⌘/Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>D</kbd></dt>
+				<dd>{t('help.toggleBottomPanels')}</dd>
+				<dt><kbd>⌘/Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>M</kbd></dt>
+				<dd>{t('controls.studioMode')}</dd>
+				<dt><kbd>⌘/Ctrl</kbd> + <kbd>+</kbd> / <kbd>−</kbd> / <kbd>0</kbd></dt>
+				<dd>{t('help.interfaceZoom')}</dd>
+				<dt><kbd>⌘/Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>R</kbd></dt>
+				<dd>{t('help.recordingsFolder')}</dd>
 			</dl>
 		{:else}
 			<div>
 				<h3 class="text-base font-semibold text-fg/90">{t('help.troubleshooting')}</h3>
-				<p class="mt-1 text-fg/45">{t('help.troubleshootingIntro')}</p>
+				<p class="mt-1 text-muted">{t('help.troubleshootingIntro')}</p>
 			</div>
 			<div class="space-y-3">
 				<details open class="border border-ink-700 bg-ink-850 p-3">

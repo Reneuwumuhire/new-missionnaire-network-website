@@ -12,6 +12,7 @@
 	import { vercelImage, vercelImagePlaceholder } from '$lib/utils/vercelImage';
 	import BlurUpImage from '$lib/components/BlurUpImage.svelte';
 	import LiveTranscript from '$lib/components/+liveTranscript.svelte';
+	import { portal } from '$lib/actions/portal';
 
 	interface Props {
 		data: PageData;
@@ -345,6 +346,20 @@
 	function closeThumbnail() {
 		thumbnailExpanded = false;
 	}
+
+	$effect(() => {
+		if (!browser || !thumbnailExpanded) return;
+		const y = window.scrollY;
+		document.body.style.cssText += `;position:fixed;top:-${y}px;width:100%;overflow:hidden`;
+		return () => {
+			document.body.style.position = '';
+			document.body.style.top = '';
+			document.body.style.width = '';
+			document.body.style.overflow = '';
+			window.scrollTo(0, y);
+		};
+	});
+
 	function onLightboxKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') {
 			closeThumbnail();
@@ -897,7 +912,8 @@
 
 {#if thumbnailExpanded && rec.thumbnail_url && !thumbnailBroken}
 	<div
-		class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-lightbox-in"
+		use:portal
+		class="fixed inset-0 z-[130] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-lightbox-in"
 		onclick={onBackdropClick}
 		onkeydown={onLightboxKeydown}
 		role="dialog"
@@ -909,7 +925,7 @@
 			type="button"
 			onclick={closeThumbnail}
 			aria-label={$t('rediffDetail.close')}
-			class="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors motion-reduce:transition-none hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+			class="absolute right-4 top-[max(1rem,env(safe-area-inset-top))] flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors motion-reduce:transition-none hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
 		>
 			<svg
 				width="18"
@@ -931,7 +947,7 @@
 				thumbnailBroken = true;
 				closeThumbnail();
 			}}
-			class="max-h-[90vh] max-w-[90vw] object-contain shadow-2xl"
+			class="max-h-[calc(100dvh-2rem)] max-w-[calc(100vw-2rem)] object-contain shadow-2xl"
 		/>
 	</div>
 {/if}

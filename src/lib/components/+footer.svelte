@@ -35,6 +35,9 @@
 			title: 'footer.info',
 			links: [
 				{ label: 'nav.aPropos', href: '/a-propos' },
+				{ label: 'Missionnaire Studio', href: '/studio', literal: true },
+				{ label: 'Privacy policy', href: '/privacy', literal: true },
+				{ label: 'Terms of service', href: '/terms', literal: true },
 				{
 					label: 'YouTube',
 					href: 'https://www.youtube.com/channel/UCS3zqpqnCvT0SFa_jI662Kg',

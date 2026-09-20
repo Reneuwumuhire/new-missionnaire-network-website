@@ -8,13 +8,7 @@
 	import { streamHealthIssue } from '../lib/stream-health';
 	import { destinationUrl, requiresYouTubeGoLive, studio } from '../lib/state.svelte';
 	import { connectYouTube, liveSession, sessionYouTubeChannelId } from '../lib/live-session.svelte';
-	import {
-		recording,
-		recordsCloud,
-		recordsLocal,
-		startCloudRecording,
-		stopCloudRecording
-	} from '../lib/recording.svelte';
+	import { recordsLocal } from '../lib/recording.svelte';
 
 	let {
 		onToggleLive,
@@ -41,16 +35,6 @@
 			(session) => session._id === (liveSession.activeId ?? liveSession.selectedId)
 		)
 	);
-	const recordingActive = $derived(Boolean(recording.localPath) || recording.cloud);
-	let now = $state(Date.now());
-	$effect(() => {
-		const timer = setInterval(() => (now = Date.now()), 1000);
-		return () => clearInterval(timer);
-	});
-	const recordingDuration = $derived(
-		recording.startedAt ? Math.floor((now - recording.startedAt) / 1000) : 0
-	);
-	const clock = (seconds: number) => new Date(seconds * 1000).toISOString().slice(11, 19);
 
 	// Keep public destinations held until the operator approves the preview.
 	const canGoLive = $derived(broadcast.phase === 'live' && !liveSession.activeId);
@@ -104,8 +88,8 @@
 		<button
 			class="h-10 w-full text-[13px] font-medium transition-colors {isStreaming()
 				? confirmStop
-					? 'bg-red-600 text-fg'
-					: 'border border-red-500/50 text-red-400 hover:bg-red-600/15'
+					? 'bg-red-600 text-white'
+					: 'border border-red-500/50 text-danger hover:bg-red-600/15'
 				: 'bg-primary text-black hover:bg-missionnaire-400'} disabled:cursor-not-allowed disabled:opacity-40"
 			disabled={broadcast.starting ||
 				(!isStreaming() && ((enabled.length === 0 && !recordsLocal()) || !liveSession.selectedId))}
@@ -123,7 +107,7 @@
 		</button>
 		{#if canGoLive}
 			<button
-				class="flex h-10 w-full items-center justify-center gap-2 bg-red-600 text-[13px] font-semibold text-white transition-colors hover:bg-red-500 disabled:cursor-wait disabled:opacity-50"
+				class="flex h-10 w-full items-center justify-center gap-2 bg-red-600 text-[13px] font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-wait disabled:opacity-50"
 				disabled={broadcast.publishing ||
 					liveSession.starting ||
 					(youtubeRequired && !youtubeSessionConnected)}
@@ -141,16 +125,16 @@
 			</button>
 		{:else if liveSession.activeId}
 			<div
-				class="flex h-8 items-center justify-center border border-red-500/40 bg-red-600/10 text-[11px] font-medium text-red-300"
+				class="flex h-8 items-center justify-center border border-red-500/40 bg-red-600/10 text-[12px] font-medium text-danger"
 			>
 				{t('controls.publicLive')}
 			</div>
 		{/if}
 		{#if liveSession.operatorName && youtubeRequired}
 			<button
-				class="flex h-8 w-full items-center justify-between border border-ink-700 px-2 text-[11px] transition-colors {youtubeSessionConnected
-					? 'text-emerald-300'
-					: 'text-fg/60 hover:border-red-500/50 hover:text-red-300'}"
+				class="flex h-8 w-full items-center justify-between border border-ink-700 px-2 text-[12px] transition-colors {youtubeSessionConnected
+					? 'text-success'
+					: 'text-muted hover:border-red-500/50 hover:text-danger'}"
 				disabled={liveSession.youtubeConnecting}
 				onclick={() => void connectYouTube()}
 			>
@@ -166,24 +150,24 @@
 				>
 			</button>
 			{#if liveSession.youtubeError && !youtubeSessionConnected}
-				<p class="text-[10px] leading-snug text-red-400">{liveSession.youtubeError}</p>
+				<p class="text-[12px] leading-snug text-danger">{liveSession.youtubeError}</p>
 			{/if}
 		{/if}
 		{#if selectedSession?.is_test && liveSession.testUrl}
 			<div class="grid grid-cols-[1fr_auto] gap-1" title={liveSession.testUrl}>
 				<button
-					class="h-8 border border-primary/40 text-[11px] text-primary hover:bg-primary/10"
+					class="h-8 border border-primary/40 text-[12px] text-accent hover:bg-primary/10"
 					onclick={() => void invoke('open_url', { url: liveSession.testUrl! })}
 					>Open private test link</button
 				>
 				<button
-					class="h-8 border border-ink-600 px-2 text-[10px] text-fg/65 hover:text-fg"
+					class="h-8 border border-ink-600 px-2 text-[12px] text-muted hover:text-fg"
 					onclick={() => void copyTestLink()}>{copiedTestLink ? 'Copied' : 'Copy'}</button
 				>
 			</div>
 		{/if}
 		<button
-			class="flex h-8 w-full items-center justify-between border border-ink-700 px-2 text-[11px] text-fg/60 transition-colors hover:border-ink-500 hover:text-fg"
+			class="flex h-8 w-full items-center justify-between border border-ink-700 px-2 text-[12px] text-muted transition-colors hover:border-ink-500 hover:text-fg"
 			disabled={isStreaming()}
 			onclick={onSelectSession}
 			title={isStreaming()
@@ -191,49 +175,22 @@
 				: 'Choose or create the public live session'}
 		>
 			<span>Live session</span>
-			<span class={selectedSession ? 'max-w-36 truncate text-emerald-300' : 'text-amber-300'}
+			<span class={selectedSession ? 'max-w-36 truncate text-success' : 'text-warning'}
 				>{selectedSession?.title ?? 'Choose one'}</span
 			>
 		</button>
-		{#if isStreaming() && (recordsCloud() || recordsLocal())}
-			<button
-				class="flex h-8 w-full items-center justify-between border border-ink-700 px-2 text-[11px] {recordingActive
-					? 'text-red-300'
-					: 'text-fg/60'}"
-				disabled={(recordsLocal() && !recordsCloud()) || recording.cloudPending}
-				onclick={() => (recording.cloud ? void stopCloudRecording() : void startCloudRecording())}
-			>
-				<span
-					>{recording.cloudPending
-						? recording.cloud
-							? 'Stopping recording…'
-							: 'Starting recording…'
-						: recordsCloud()
-							? recording.cloud
-								? 'Stop recording'
-								: 'Start recording'
-							: recording.startedAt
-								? 'Recording local'
-								: 'Local recording armed'}</span
-				>
-				<span class="font-mono">{recordingActive ? clock(recordingDuration) : '00:00:00'}</span>
-			</button>
-		{/if}
-
 		<button
-			class="flex h-8 w-full items-center justify-between border border-ink-700 px-2 text-[11px] text-fg/60 transition-colors hover:border-ink-500 hover:text-fg"
+			class="flex h-8 w-full items-center justify-between border border-ink-700 px-2 text-[12px] text-muted transition-colors hover:border-ink-500 hover:text-fg"
 			onclick={onSettings}
 			title={t('controls.recordingHint')}
 		>
 			<span>{t('controls.recording')}</span>
-			<span class={recordingMode === 'off' ? 'text-fg/35' : 'text-emerald-300'}
-				>{recordingLabel}</span
-			>
+			<span class={recordingMode === 'off' ? 'text-muted' : 'text-success'}>{recordingLabel}</span>
 		</button>
 
 		{#if youtubeReady}
 			<button
-				class="h-9 w-full bg-red-600 text-[13px] font-medium text-fg transition-colors hover:bg-red-500"
+				class="h-9 w-full bg-red-600 text-[13px] font-medium text-white transition-colors hover:bg-red-700"
 				title={t('controls.openYouTubeHint')}
 				onclick={() => invoke('open_url', { url: 'https://studio.youtube.com/' })}
 			>
@@ -243,8 +200,8 @@
 
 		<button
 			class="h-9 w-full border text-[13px] transition-colors {studio.settings.studioMode
-				? 'border-primary/60 bg-primary/15 text-primary'
-				: 'border-ink-600 text-fg/60 hover:border-ink-500 hover:text-fg'}"
+				? 'border-primary/60 bg-primary/15 text-accent'
+				: 'border-ink-600 text-muted hover:border-ink-500 hover:text-fg'}"
 			onclick={() => {
 				setStudioMode(!studio.settings.studioMode);
 			}}>{t('controls.studioMode')}</button
@@ -258,7 +215,7 @@
 			<!-- No enabled destination means Start Streaming is disabled; say so
 			     here rather than leaving a dead button with no explanation. -->
 			{#if enabled.length === 0 && !recordsLocal()}
-				<span class="ml-1 font-mono text-[10px] text-amber-400">!</span>
+				<span class="ml-1 font-mono text-[12px] text-warning">!</span>
 			{/if}
 		</button>
 	</div>
@@ -271,14 +228,14 @@
 					<span class="h-1.5 w-1.5 shrink-0 rounded-full {dot(target.state)}"></span>
 					<span class="min-w-0 flex-1 truncate text-[12px] text-fg/75">{target.name}</span>
 					<span
-						class="shrink-0 text-[10px] {target.state === 'failed'
-							? 'text-red-400'
+						class="shrink-0 text-[12px] {target.state === 'failed'
+							? 'text-danger'
 							: target.state === 'live'
-								? 'text-emerald-400'
-								: 'text-amber-400'}">{label(target.state)}</span
+								? 'text-success'
+								: 'text-warning'}">{label(target.state)}</span
 					>
 				</div>
-				<p class="mb-1 truncate pl-3.5 font-mono text-[9px] text-fg/25">{target.host}</p>
+				<p class="mb-1 truncate pl-3.5 font-mono text-[12px] text-muted">{target.host}</p>
 			{/each}
 		</div>
 	{/if}
@@ -287,60 +244,60 @@
 	{#if stats}
 		<div class="border-t border-ink-700 px-2 py-2">
 			<div class="mb-1 flex items-center justify-between">
-				<span class="text-[10px] font-semibold uppercase tracking-wider text-fg/35">
+				<span class="text-[12px] font-semibold uppercase tracking-wider text-muted">
 					{t('health.title')}
 				</span>
-				<span class="text-[10px] {healthIssue ? 'text-amber-400' : 'text-emerald-400'}">
+				<span class="text-[12px] {healthIssue ? 'text-warning' : 'text-success'}">
 					{healthIssue ? '⚠' : t('health.good')}
 				</span>
 			</div>
 
-			<dl class="space-y-0.5 font-mono text-[10px]">
+			<dl class="space-y-0.5 font-mono text-[12px]">
 				<div class="flex justify-between gap-2">
-					<dt class="truncate text-fg/40">{t('health.bitrate')}</dt>
+					<dt class="truncate text-muted">{t('health.bitrate')}</dt>
 					<dd class="shrink-0 text-fg/70">
 						{Math.round(stats.bitrate_kbps)} / {studio.settings.videoBitrateKbps +
 							studio.settings.audioBitrateKbps}
 					</dd>
 				</div>
 				<div class="flex justify-between gap-2">
-					<dt class="truncate text-fg/40">{t('health.dataOut')}</dt>
+					<dt class="truncate text-muted">{t('health.dataOut')}</dt>
 					<dd class="shrink-0 text-fg/70">{formatBytes(stats.total_bytes)}</dd>
 				</div>
 				<div class="flex justify-between gap-2">
-					<dt class="truncate text-fg/40">{t('health.droppedNetwork')}</dt>
-					<dd class="shrink-0 {stats.dropped_frames > 0 ? 'text-amber-400' : 'text-fg/70'}">
+					<dt class="truncate text-muted">{t('health.droppedNetwork')}</dt>
+					<dd class="shrink-0 {stats.dropped_frames > 0 ? 'text-warning' : 'text-fg/70'}">
 						{stats.dropped_frames}
 					</dd>
 				</div>
 				<div class="flex justify-between gap-2">
-					<dt class="truncate text-fg/40">{t('health.encodingLag')}</dt>
-					<dd class="shrink-0 {stats.backpressure_events > 0 ? 'text-amber-400' : 'text-fg/70'}">
+					<dt class="truncate text-muted">{t('health.encodingLag')}</dt>
+					<dd class="shrink-0 {stats.backpressure_events > 0 ? 'text-warning' : 'text-fg/70'}">
 						{stats.backpressure_events}
 					</dd>
 				</div>
 				<div class="flex justify-between gap-2">
-					<dt class="truncate text-fg/40">{t('health.renderingLag')}</dt>
-					<dd class="shrink-0 {renderMissed > 0 ? 'text-amber-400' : 'text-fg/70'}">
+					<dt class="truncate text-muted">{t('health.renderingLag')}</dt>
+					<dd class="shrink-0 {renderMissed > 0 ? 'text-warning' : 'text-fg/70'}">
 						{renderMissed}
 					</dd>
 				</div>
 				<div class="flex justify-between gap-2">
-					<dt class="truncate text-fg/40">{t('health.speed')}</dt>
-					<dd class="shrink-0 {stats.speed < 0.95 ? 'text-amber-400' : 'text-fg/70'}">
+					<dt class="truncate text-muted">{t('health.speed')}</dt>
+					<dd class="shrink-0 {stats.speed < 0.95 ? 'text-warning' : 'text-fg/70'}">
 						{stats.speed.toFixed(2)}×
 					</dd>
 				</div>
 				{#if broadcast.recoveries > 0}
 					<div class="flex justify-between gap-2">
-						<dt class="truncate text-fg/40">{t('health.recoveries')}</dt>
+						<dt class="truncate text-muted">{t('health.recoveries')}</dt>
 						<dd class="shrink-0 text-fg/70">{broadcast.recoveries}</dd>
 					</div>
 				{/if}
 			</dl>
 
 			{#if healthIssue}
-				<p class="mt-1.5 flex items-start gap-1 text-[10px] leading-snug text-amber-400/90">
+				<p class="mt-1.5 flex items-start gap-1 text-[12px] leading-snug text-warning">
 					<Icon name="more" size={10} class="mt-px" />
 					{healthMessage}
 				</p>

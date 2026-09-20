@@ -32,7 +32,7 @@
 </script>
 
 <div class="space-y-3 p-4">
-	<p class="text-[12px] text-fg/60">
+	<p class="text-[12px] text-muted">
 		Choose an upcoming public link, or create a new service. Past sessions are managed in admin.
 	</p>
 	{#if !liveSession.operatorName}
@@ -48,20 +48,20 @@
 		<div class="grid grid-cols-2 gap-2">
 			<button class="studio-chip" onclick={onnew}>New public session</button>
 			<button
-				class="studio-chip border-primary/50 text-primary"
+				class="studio-chip border-primary/50 text-accent"
 				disabled={quickTestLoading}
 				onclick={openQuickTest}
 			>
 				{#if quickTestLoading}
-					<span class="h-3 w-3 animate-spin rounded-full border border-primary/30 border-t-primary"></span>
+					<span class="h-3 w-3 animate-spin rounded-full border border-primary/30 border-t-primary"
+					></span>
 					Creating test…
 				{:else}
 					Quick private test
 				{/if}
-			</button
-			>
+			</button>
 		</div>
-		<p class="text-[10px] leading-relaxed text-fg/35">
+		<p class="text-[12px] leading-relaxed text-muted">
 			Uses the admin default information. The unlisted link is only opened here and never notifies
 			subscribers.
 		</p>
@@ -81,15 +81,15 @@
 				>
 					<span class="min-w-0"
 						><strong class="block truncate text-fg/90">{session.title}</strong><span
-							class="text-[10px] text-fg/45">{new Date(session.scheduled_at).toLocaleString()}</span
+							class="text-[12px] text-muted">{new Date(session.scheduled_at).toLocaleString()}</span
 						></span
 					>
-					<span class="ml-3 shrink-0 font-mono text-[10px] text-primary">/live/{session.slug}</span>
+					<span class="ml-3 shrink-0 font-mono text-[12px] text-accent">/live/{session.slug}</span>
 				</button>
 			{/each}
 		</div>
 	{:else if !liveSession.error}
-		<p class="py-6 text-center text-[12px] text-fg/40">No upcoming live session found.</p>
+		<p class="py-6 text-center text-[12px] text-muted">No upcoming live session found.</p>
 	{/if}
-	{#if liveSession.error}<p class="text-[12px] text-red-400">{liveSession.error}</p>{/if}
+	{#if liveSession.error}<p class="text-[12px] text-danger">{liveSession.error}</p>{/if}
 </div>

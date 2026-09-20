@@ -7,6 +7,7 @@ import type { AudioAsset } from '$lib/models/media-assets';
 import type { MusicAudio } from '$lib/models/music-audio';
 import type { Sermon } from '$lib/models/sermon';
 import type { Literature } from '$lib/models/literature';
+import { buildFuzzySearchPattern } from '$lib/utils/searchText';
 
 const titleDateSortExpression = {
 	$switch: {
@@ -365,52 +366,6 @@ export async function queryAudios(options: {
 		console.error('[DB] Error in queryAudios:', error);
 		throw error;
 	}
-}
-
-// Map base characters to regex alternation that matches accented variants
-// Uses alternation (a|à|â) instead of character classes to avoid issues
-// with multi-byte characters in MongoDB's regex engine
-const ACCENT_MAP: Record<string, string[]> = {
-	a: ['a', 'à', 'â', 'ä', 'á', 'ã', 'å'],
-	e: ['e', 'è', 'é', 'ê', 'ë'],
-	i: ['i', 'ì', 'í', 'î', 'ï'],
-	o: ['o', 'ò', 'ó', 'ô', 'õ', 'ö'],
-	u: ['u', 'ù', 'ú', 'û', 'ü'],
-	c: ['c', 'ç'],
-	n: ['n', 'ñ'],
-	y: ['y', 'ý', 'ÿ']
-};
-
-// Optional combining accent mark — consumes any Unicode combining diacritical
-// that may follow a base letter in decomposed (NFD) storage
-const OPT_COMBINING = '[\u0300-\u036f]?';
-
-function buildFuzzySearchPattern(search: string): string {
-	// Normalize: strip accents to get base characters, then build a regex
-	// where each letter matches its accented variants (composed)
-	// AND tolerates decomposed storage (base + combining mark)
-	const normalized = search.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
-	let pattern = '';
-	for (const char of normalized) {
-		const lower = char.toLowerCase();
-		if (lower in ACCENT_MAP) {
-			// Match composed accented char OR base letter + optional combining mark
-			pattern += '(?:' + ACCENT_MAP[lower].join('|') + ')' + OPT_COMBINING;
-		} else if (/[a-z]/i.test(char)) {
-			// Regular letter — still may have an unexpected combining mark after it
-			pattern += char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + OPT_COMBINING;
-		} else if (/[0-9]/.test(char)) {
-			pattern += char;
-		} else if (char === "'" || char === '\u2019' || char === '\u2018') {
-			pattern += "['ʼ\u2018\u2019]?";
-		} else if (char === ' ') {
-			pattern += '[\\s\\-]?';
-		} else {
-			pattern += char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-		}
-	}
-	return pattern;
 }
 
 function hashSeed(seed: string): number {
@@ -1037,6 +992,14 @@ export type BroadcastAdminState = {
 	subtitle_anchor_epoch_ms: number | null;
 	subtitle_offset_ms: number;
 	subtitle_paused_position_ms: number | null;
+	subtitle_timeline: Array<{
+		fromEpochMs: number;
+		toEpochMs: number | null;
+		url: string;
+		anchorEpochMs: number;
+		offsetMs: number;
+		pausedPositionMs: number | null;
+	}>;
 	updated_at: string;
 };
 
@@ -1065,6 +1028,7 @@ const BROADCAST_DEFAULT: BroadcastAdminState = {
 	subtitle_anchor_epoch_ms: null,
 	subtitle_offset_ms: 0,
 	subtitle_paused_position_ms: null,
+	subtitle_timeline: [],
 	updated_at: new Date(0).toISOString()
 };
 
@@ -1104,6 +1068,9 @@ export async function getBroadcastAdminState(): Promise<BroadcastAdminState> {
 				typeof doc.subtitle_paused_position_ms === 'number'
 					? doc.subtitle_paused_position_ms
 					: null,
+			subtitle_timeline: Array.isArray(doc.subtitle_timeline)
+				? (doc.subtitle_timeline as BroadcastAdminState['subtitle_timeline'])
+				: [],
 			updated_at: (doc.updated_at as string) ?? new Date(0).toISOString()
 		};
 	} catch (e) {
@@ -1113,15 +1080,26 @@ export async function getBroadcastAdminState(): Promise<BroadcastAdminState> {
 }
 
 export async function setBroadcastAdminState(updates: Partial<BroadcastAdminState>): Promise<void> {
+	// Single-anchor controls must not leave an older Studio timeline overriding
+	// their file/timing. Studio sync/hide supplies its own DVR timeline.
+	const resetTimeline =
+		updates.subtitle_timeline === undefined &&
+		Object.keys(updates).some(
+			(key) => key.startsWith('subtitle_') || key === 'is_live' || key === 'scheduled_live_id'
+		);
 	try {
 		const db = await getDb();
-		await db
-			.collection('broadcast_admin_state')
-			.updateOne(
-				{ _id: 'current' as unknown as ObjectId },
-				{ $set: { ...updates, updated_at: new Date().toISOString() } },
-				{ upsert: true }
-			);
+		await db.collection('broadcast_admin_state').updateOne(
+			{ _id: 'current' as unknown as ObjectId },
+			{
+				$set: {
+					...updates,
+					...(resetTimeline ? { subtitle_timeline: [] } : {}),
+					updated_at: new Date().toISOString()
+				}
+			},
+			{ upsert: true }
+		);
 	} catch (e) {
 		console.error('[BroadcastAdminState] set error:', e);
 	}
@@ -1165,6 +1143,11 @@ export type ScheduledLive = {
 	subtitle_filename: string | null;
 	subtitle_anchor_epoch_ms: number | null;
 	subtitle_offset_ms: number;
+	service_type: 'prepared' | 'live';
+	active_phase: 'ready' | 'opening' | 'sermon' | 'closing' | 'complete';
+	sermon_start_ms: number | null;
+	sermon_end_ms: number | null;
+	subtitle_timing_language: string | null;
 	created_at: string;
 	updated_at: string;
 };
@@ -1259,6 +1242,7 @@ export async function createStudioScheduledLive(input: {
 	subtitleUrl?: string | null;
 	subtitleKey?: string | null;
 	subtitleFilename?: string | null;
+	serviceType?: 'prepared' | 'live';
 	announce?: boolean;
 	reminderEnabled?: boolean;
 	notifyOnStart?: boolean;
@@ -1293,6 +1277,11 @@ export async function createStudioScheduledLive(input: {
 			subtitle_filename: input.subtitleFilename ?? null,
 			subtitle_anchor_epoch_ms: null,
 			subtitle_offset_ms: 0,
+			service_type: input.serviceType ?? 'prepared',
+			active_phase: 'ready',
+			sermon_start_ms: null,
+			sermon_end_ms: null,
+			subtitle_timing_language: null,
 			created_by: input.createdBy,
 			created_at: now,
 			updated_at: now
@@ -1334,6 +1323,26 @@ export async function updateStudioLiveSubtitles(
 			| 'subtitle_filename'
 			| 'subtitle_anchor_epoch_ms'
 			| 'subtitle_offset_ms'
+		>
+	>
+): Promise<boolean> {
+	if (!ObjectId.isValid(id)) return false;
+	const db = await getDb();
+	const result = await db
+		.collection('scheduled_lives')
+		.updateOne(
+			{ _id: new ObjectId(id), status: 'live' },
+			{ $set: { ...updates, updated_at: new Date().toISOString() } }
+		);
+	return result.matchedCount > 0;
+}
+
+export async function updateStudioLiveWorkflow(
+	id: string,
+	updates: Partial<
+		Pick<
+			ScheduledLive,
+			'active_phase' | 'sermon_start_ms' | 'sermon_end_ms' | 'subtitle_timing_language'
 		>
 	>
 ): Promise<boolean> {

@@ -48,6 +48,22 @@ pub struct StreamConfig {
 	pub encoder: String,
 	pub has_audio: bool,
 	pub record_local: bool,
+	#[serde(default = "default_recording_format")]
+	pub recording_format: String,
+	#[serde(default = "default_recording_video_bitrate")]
+	pub recording_video_bitrate_kbps: u32,
+	#[serde(default = "default_recording_audio_bitrate")]
+	pub recording_audio_bitrate_kbps: u32,
+}
+
+fn default_recording_format() -> String {
+	"video".into()
+}
+fn default_recording_video_bitrate() -> u32 {
+	3500
+}
+fn default_recording_audio_bitrate() -> u32 {
+	160
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -213,32 +229,15 @@ fn build_args(cfg: &StreamConfig) -> Result<Vec<String>, String> {
 	build_args_with_path(cfg, None)
 }
 
-fn build_args_with_path(cfg: &StreamConfig, local_path: Option<&str>) -> Result<Vec<String>, String> {
-	if cfg.targets.is_empty() && local_path.is_none() {
-		return Err("Aucune destination activée".into());
-	}
-	for t in &cfg.targets {
-		validate_url(&t.url).map_err(|e| format!("{} — {e}", t.name))?;
-	}
-	let container = match cfg.container.as_str() {
-		"webm" => "webm",
-		"mp4" => "mp4",
-		other => return Err(format!("Conteneur inconnu: {other}")),
-	};
+fn video_args(cfg: &StreamConfig) -> Vec<String> {
 	let fps = cfg.fps.clamp(10, 60);
 	let vk = cfg.video_bitrate_kbps.clamp(300, 20_000);
 	let ak = cfg.audio_bitrate_kbps.clamp(48, 320);
 
-	let mut a: Vec<String> = Vec::new();
+	let mut a = Vec::new();
 	macro_rules! push {
 		($($v:expr),+ $(,)?) => { $( a.push($v.to_string()); )+ };
 	}
-
-	push!("-hide_banner", "-loglevel", "warning", "-nostdin");
-	// MediaRecorder timestamps restart oddly across pauses; let ffmpeg rebuild
-	// a monotonic timeline instead of dropping frames on the way in.
-	push!("-fflags", "+genpts", "-thread_queue_size", "512");
-	push!("-f", container, "-i", "pipe:0");
 	// `0:a:0?` — optional: a scene with no audio source must still stream.
 	push!("-map", "0:v:0", "-map", "0:a:0?");
 
@@ -274,6 +273,33 @@ fn build_args_with_path(cfg: &StreamConfig, local_path: Option<&str>) -> Result<
 		push!("-af", "aresample=async=1000:first_pts=0");
 	}
 	push!("-c:a", "aac", "-b:a", format!("{ak}k"), "-ar", "48000", "-ac", "2");
+	a
+}
+
+fn build_args_with_path(cfg: &StreamConfig, local_path: Option<&str>) -> Result<Vec<String>, String> {
+	if cfg.targets.is_empty() && local_path.is_none() {
+		return Err("Aucune destination activée".into());
+	}
+	for t in &cfg.targets {
+		validate_url(&t.url).map_err(|e| format!("{} — {e}", t.name))?;
+	}
+	let container = match cfg.container.as_str() {
+		"webm" => "webm",
+		"mp4" => "mp4",
+		other => return Err(format!("Conteneur inconnu: {other}")),
+	};
+
+	let mut a: Vec<String> = Vec::new();
+	macro_rules! push {
+		($($v:expr),+ $(,)?) => { $( a.push($v.to_string()); )+ };
+	}
+
+	push!("-hide_banner", "-loglevel", "warning", "-nostdin");
+	// MediaRecorder timestamps restart oddly across pauses; let ffmpeg rebuild
+	// a monotonic timeline instead of dropping frames on the way in.
+	push!("-fflags", "+genpts", "-thread_queue_size", "512");
+	push!("-f", container, "-i", "pipe:0");
+
 	push!("-nostats", "-progress", "pipe:1");
 
 	// Each RTMP destination gets an independent packet queue and reconnect loop.
@@ -284,7 +310,7 @@ fn build_args_with_path(cfg: &StreamConfig, local_path: Option<&str>) -> Result<
 		r"attempt_recovery\\=1\\:recover_any_error\\=1\\:recovery_wait_time\\=1",
 		r"\\:restart_with_keyframe\\=1\\:queue_size\\=600\\:drop_pkts_on_overflow\\=1"
 	);
-	let mut outputs = cfg
+	let outputs = cfg
 		.targets
 		.iter()
 		.map(|t| {
@@ -294,17 +320,31 @@ fn build_args_with_path(cfg: &StreamConfig, local_path: Option<&str>) -> Result<
 			)
 		})
 		.collect::<Vec<_>>();
-	if let Some(path) = local_path {
-		outputs.push(format!("[f=mp4:movflags=+frag_keyframe+empty_moov]{}", path));
+	if !cfg.targets.is_empty() {
+		a.extend(video_args(cfg));
+		push!("-flags", "+global_header", "-f", "tee", outputs.join("|"));
 	}
-	if cfg.targets.is_empty() {
-		push!("-movflags", "+frag_keyframe+empty_moov", "-f", "mp4", local_path.unwrap());
-	} else {
-		// tee fans one encode out to every destination. `onfail=ignore` is the
-		// point: YouTube rejecting the key must not take the church's own
-		// stream down with it.
-		push!("-flags", "+global_header", "-f", "tee");
-		push!(outputs.join("|"));
+	if let Some(path) = local_path {
+		if !matches!(cfg.recording_format.as_str(), "audio" | "video" | "both") {
+			return Err("Format d’enregistrement inconnu".into());
+		}
+		if cfg.recording_format != "video" && !cfg.has_audio {
+			return Err("Une source audio est nécessaire pour enregistrer en MP3".into());
+		}
+		if cfg.recording_format != "audio" {
+			let mut local = cfg.clone();
+			local.video_bitrate_kbps = cfg.recording_video_bitrate_kbps;
+			local.audio_bitrate_kbps = cfg.recording_audio_bitrate_kbps;
+			a.extend(video_args(&local));
+			push!("-movflags", "+frag_keyframe+empty_moov", "-f", "mp4", path);
+		}
+		if cfg.recording_format != "video" {
+			let audio_path = PathBuf::from(path).with_extension("mp3");
+			push!("-map", "0:a:0", "-vn", "-c:a", "libmp3lame",
+				"-b:a", format!("{}k", cfg.recording_audio_bitrate_kbps.clamp(48, 320)),
+				"-ar", "48000", "-ac", "2", "-af", "aresample=async=1000:first_pts=0",
+				"-f", "mp3", audio_path.to_string_lossy());
+		}
 	}
 	Ok(a)
 }
@@ -362,7 +402,11 @@ impl Encoder {
 				.join("Missionnaire Studio");
 			fs::create_dir_all(&dir).map_err(|e| format!("Dossier d’enregistrement impossible: {e}"))?;
 			Some(
-				dir.join(format!("Missionnaire Studio {}.mp4", chrono_stamp()))
+				dir.join(format!(
+					"Missionnaire Studio {}.{}",
+					chrono_stamp(),
+					if cfg.recording_format == "audio" { "mp3" } else { "mp4" }
+				))
 					.to_string_lossy()
 					.to_string(),
 			)
@@ -620,7 +664,91 @@ mod tests {
 			encoder: "hardware".into(),
 			has_audio: true,
 			record_local: false,
+			recording_format: default_recording_format(),
+			recording_video_bitrate_kbps: default_recording_video_bitrate(),
+			recording_audio_bitrate_kbps: default_recording_audio_bitrate(),
 		}
+	}
+
+	#[test]
+	fn local_formats_keep_recording_quality_separate_from_stream() {
+		for format in ["audio", "video", "both"] {
+			for targets in [vec![], vec!["rtmp://localhost:1935/live/test"]] {
+				let mut c = cfg(&targets);
+				c.recording_format = format.into();
+				c.recording_video_bitrate_kbps = 6000;
+				c.recording_audio_bitrate_kbps = 192;
+				let args = build_args_with_path(&c, Some("/tmp/recording.mp4")).unwrap();
+				assert_eq!(args.contains(&"libmp3lame".into()), format != "video");
+				assert_eq!(args.contains(&"/tmp/recording.mp4".into()), format != "audio");
+				assert_eq!(args.contains(&"/tmp/recording.mp3".into()), format != "video");
+				assert_eq!(args.contains(&"6000k".into()), format != "audio");
+				assert_eq!(args.contains(&"4500k".into()), !targets.is_empty());
+				assert!(args.contains(&"192k".into()));
+			}
+		}
+		let mut c = cfg(&[]);
+		c.recording_format = "audio".into();
+		c.has_audio = false;
+		assert!(build_args_with_path(&c, Some("/tmp/recording.mp3")).is_err());
+		c.recording_format = "unknown".into();
+		assert!(build_args_with_path(&c, Some("/tmp/recording.mp3")).is_err());
+	}
+
+	/// Run explicitly on machines with ffmpeg and ffprobe installed.
+	#[test]
+	#[ignore = "requires ffmpeg and ffprobe"]
+	fn local_files_have_the_requested_codecs_and_audio_quality() {
+		let ffmpeg = resolve_ffmpeg().unwrap();
+		let ffprobe = ffmpeg.with_file_name("ffprobe");
+		let dir = std::env::temp_dir().join(format!("studio-recording-test-{}", chrono_stamp()));
+		fs::create_dir_all(&dir).unwrap();
+		let source = dir.join("source.webm");
+		let generated = Command::new(&ffmpeg).args([
+			"-v", "error", "-f", "lavfi", "-i", "color=size=320x180:rate=30",
+			"-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000",
+			"-t", "1", "-c:v", "libvpx", "-c:a", "libopus",
+		]).arg(&source).output().unwrap();
+		assert!(generated.status.success(), "{}", String::from_utf8_lossy(&generated.stderr));
+		for streaming in [false, true] {
+			for format in ["audio", "video", "both"] {
+				let mut c = cfg(if streaming { &["rtmp://localhost/live/test"] } else { &[] });
+				c.encoder = "software".into();
+				c.recording_format = format.into();
+				c.recording_audio_bitrate_kbps = 192;
+				let path = dir.join(format!("{format}-{streaming}.mp4"));
+				let mut args = build_args_with_path(&c, path.to_str()).unwrap();
+				if streaming {
+					let spec = args.iter().position(|arg| arg == "tee").unwrap() + 1;
+					args[spec] = format!("[f=flv]{}", path.with_extension("flv").display());
+				}
+				let out = Command::new(&ffmpeg).args(args)
+					.stdin(fs::File::open(&source).unwrap()).output().unwrap();
+				assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+				for extension in ["mp3", "mp4"] {
+					let file = path.with_extension(extension);
+					let expected = if extension == "mp3" { format != "video" } else { format != "audio" };
+					assert_eq!(file.exists(), expected);
+					if !expected { continue; }
+					let probe = Command::new(&ffprobe).args([
+						"-v", "error", "-show_entries", "stream=codec_name,bit_rate", "-of", "json",
+					]).arg(file).output().unwrap();
+					assert!(probe.status.success());
+					let data: serde_json::Value = serde_json::from_slice(&probe.stdout).unwrap();
+					let streams = data["streams"].as_array().unwrap();
+					if extension == "mp3" {
+						assert_eq!(streams.len(), 1);
+						assert_eq!(streams[0]["codec_name"], "mp3");
+						assert_eq!(streams[0]["bit_rate"], "192000");
+					} else {
+						assert_eq!(streams.len(), 2);
+						assert_eq!(streams[0]["codec_name"], "h264");
+						assert_eq!(streams[1]["codec_name"], "aac");
+					}
+				}
+			}
+		}
+		fs::remove_dir_all(dir).unwrap();
 	}
 
 	#[test]

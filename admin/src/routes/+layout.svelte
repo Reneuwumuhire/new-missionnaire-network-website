@@ -42,6 +42,8 @@
 				canViewDashboard:
 					data.user.role === 'superadmin' ||
 					data.user.permissions.can_manage_recordings ||
+					data.user.permissions.can_view_questions ||
+					data.user.permissions.can_review_lyrics ||
 					data.user.permissions.can_add ||
 					data.user.permissions.can_edit ||
 					data.user.permissions.can_delete,

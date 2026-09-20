@@ -17,7 +17,10 @@
 		reduced: boolean;
 	}
 
-	let { onclose, onready }: {
+	let {
+		onclose,
+		onready
+	}: {
 		onclose: () => void;
 		onready: (found: Resolved, url: string, audioOnly: boolean) => void;
 	} = $props();
@@ -50,7 +53,7 @@
 <Modal title={t('web.title')} {onclose}>
 	<div class="flex flex-col gap-5 p-5">
 		<label class="flex flex-col gap-2">
-			<span class="text-[11px] uppercase tracking-[0.14em] text-fg/45">{t('web.url')}</span>
+			<span class="text-[12px] uppercase tracking-[0.14em] text-muted">{t('web.url')}</span>
 			<!-- svelte-ignore a11y_autofocus -- the dialog exists to take this one value -->
 			<input
 				class="studio-input"
@@ -66,7 +69,7 @@
 
 		<div class="flex gap-2">
 			<button
-				class="studio-chip {audioOnly ? 'border-primary/40 bg-primary/15 text-primary' : ''}"
+				class="studio-chip {audioOnly ? 'border-primary/40 bg-primary/15 text-accent' : ''}"
 				aria-pressed={audioOnly}
 				disabled={busy}
 				onclick={() => (audioOnly = true)}
@@ -75,7 +78,7 @@
 				{t('web.audioOnly')}
 			</button>
 			<button
-				class="studio-chip {audioOnly ? '' : 'border-primary/40 bg-primary/15 text-primary'}"
+				class="studio-chip {audioOnly ? '' : 'border-primary/40 bg-primary/15 text-accent'}"
 				aria-pressed={!audioOnly}
 				disabled={busy}
 				onclick={() => (audioOnly = false)}
@@ -88,11 +91,13 @@
 		{#if error}
 			<!-- Same treatment as the title bar's error strip, so a failure here reads
 			     as the same kind of event it does everywhere else in the app. -->
-			<p class="border border-red-500/30 bg-red-950/40 px-3 py-2 text-[12px] leading-relaxed text-red-300">
+			<p
+				class="border border-red-500/30 bg-red-950/40 px-3 py-2 text-[12px] leading-relaxed text-danger"
+			>
 				{error}
 			</p>
 		{:else}
-			<p class="text-[12px] leading-relaxed text-fg/45">
+			<p class="text-[12px] leading-relaxed text-muted">
 				{audioOnly ? t('web.hintAudio') : t('web.hintVideo')}
 			</p>
 		{/if}

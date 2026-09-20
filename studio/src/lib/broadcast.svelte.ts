@@ -126,6 +126,9 @@ interface StreamConfig {
 	encoder: string;
 	has_audio: boolean;
 	record_local: boolean;
+	recording_format?: 'audio' | 'video' | 'both';
+	recording_video_bitrate_kbps?: number;
+	recording_audio_bitrate_kbps?: number;
 }
 
 interface StartedStream {
@@ -182,8 +185,18 @@ function startRecorder(active: Runtime) {
 
 	const current = new MediaRecorder(stream, {
 		mimeType: active.mime,
-		videoBitsPerSecond: active.main.video_bitrate_kbps * 1000,
-		audioBitsPerSecond: active.main.audio_bitrate_kbps * 1000
+		videoBitsPerSecond:
+			Math.max(
+				active.main.video_bitrate_kbps,
+				active.main.record_local && active.main.recording_format !== 'audio'
+					? (active.main.recording_video_bitrate_kbps ?? 0)
+					: 0
+			) * 1000,
+		audioBitsPerSecond:
+			Math.max(
+				active.main.audio_bitrate_kbps,
+				active.main.record_local ? (active.main.recording_audio_bitrate_kbps ?? 0) : 0
+			) * 1000
 	});
 	recorder = current;
 	lastChunkAt = Date.now();
@@ -450,7 +463,10 @@ export async function startBroadcast(
 			audio_bitrate_kbps: settings.audioBitrateKbps,
 			encoder: settings.encoder,
 			has_audio: Boolean(audioTrack),
-			record_local: recordsLocal()
+			record_local: recordsLocal(),
+			recording_format: settings.recordingFormat,
+			recording_video_bitrate_kbps: settings.recordingVideoBitrateKbps,
+			recording_audio_bitrate_kbps: settings.recordingAudioBitrateKbps
 		};
 		runtime = { canvas, audioTrack, mime, main: config, runIds: {} };
 		await attachListeners();
@@ -492,7 +508,11 @@ async function attachListeners() {
 			sampleOutputClock(event.payload.stats.out_time_ms);
 			// Output is flowing — every target that has not reported a failure is
 			// connected, and this is the instant we count as on air.
-			if (broadcast.phase === 'connecting' && event.payload.stats.frames > 0) {
+			// Audio-only recordings advance time without producing video frames.
+			if (
+				broadcast.phase === 'connecting' &&
+				(event.payload.stats.frames > 0 || event.payload.stats.out_time_ms > 0)
+			) {
 				broadcast.phase = 'live';
 				broadcast.startedAt ??= Date.now();
 			}
