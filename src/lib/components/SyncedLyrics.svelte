@@ -728,6 +728,22 @@
 		opacity: 0.55;
 	}
 
+	/* Let the active highlight meet the reader's edges without changing the
+	   line's text width (which would make it rewrap mid-scroll). */
+	.lyrics-panel.fullscreen-large .lyric-line.active {
+		position: relative;
+		background: transparent;
+		border-radius: 0;
+	}
+
+	.lyrics-panel.fullscreen-large .lyric-line.active::before {
+		position: absolute;
+		inset: 0 -1rem;
+		background: var(--subtitle-active-bg);
+		content: '';
+		pointer-events: none;
+	}
+
 	/* Floating "back to current line" pill — sticky inside the scroll
 	   container so it stays visible while the reader browses history. */
 	.resume-follow {
