@@ -529,10 +529,9 @@
 	}
 
 	/* ─── The current line gets the spotlight ──────────────
-	   Scale + weight + warm orange glow. Karaoke moment. */
+	   Keep its size and weight fixed so wrapping never shifts the lines below. */
 	.lyric-line.active {
 		color: var(--lyric-color-active);
-		transform: scale(1.025);
 		text-shadow:
 			0 0 22px var(--lyric-glow-active),
 			0 0 1px rgba(255, 136, 12, 0.18);
@@ -540,7 +539,6 @@
 
 	.lyric-line.active .lyric-text {
 		opacity: 1;
-		font-weight: 600;
 	}
 
 	.lyric-line.active.chorus {
@@ -680,8 +678,7 @@
 		max-height: none;
 		min-height: 0;
 		flex: 1 1 auto;
-		/* Extra bottom padding so the last lines clear the floating close bar. */
-		padding: 1rem 1rem calc(6.5rem + env(safe-area-inset-bottom, 0px));
+		padding: 1rem 1rem calc(2rem + env(safe-area-inset-bottom, 0px));
 		scroll-padding-block: 42%;
 	}
 
@@ -705,11 +702,6 @@
 
 	.lyrics-panel.fullscreen-large .lyric-line.future .lyric-text {
 		opacity: 0.55;
-	}
-
-	.lyrics-panel.fullscreen-large .resume-follow {
-		/* Sit above the overlay's floating close bar. */
-		bottom: calc(4.4rem + env(safe-area-inset-bottom, 0px));
 	}
 
 	/* Floating "back to current line" pill — sticky inside the scroll
@@ -834,11 +826,6 @@
 		background: var(--subtitle-active-bg);
 		border-radius: 0.6rem;
 		text-shadow: none;
-		transform: scale(1.012);
-	}
-
-	.lyrics-panel.subtitle-theme-contrast .lyric-line.active .lyric-text {
-		font-weight: 700;
 	}
 
 	/* In the fullscreen overlay the surface comes from the overlay itself, so
