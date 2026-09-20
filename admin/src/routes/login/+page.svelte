@@ -29,9 +29,7 @@
 		<!-- Login Card -->
 		<div class="border border-stone-200/60 bg-white/40 p-8 shadow-4xl">
 			{#if form?.error}
-				<div
-					class="mb-6 border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-				>
+				<div class="mb-6 border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
 					{'errorIsKey' in form && form.errorIsKey ? $t('auth.tooManyAttempts') : form.error}
 				</div>
 			{/if}
@@ -53,7 +51,7 @@
 						id="email"
 						name="email"
 						type="email"
-						autocomplete="email"
+						autocomplete="username"
 						required
 						value={form?.email ?? ''}
 						class="admin-input"

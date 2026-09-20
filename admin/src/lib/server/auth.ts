@@ -13,7 +13,7 @@ import {
 import type { AdminUser } from '$lib/models/admin-user';
 
 const SALT_ROUNDS = 12;
-const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 // Per-process cache of validated sessions. The hooks.server.ts handler runs on
 // every page navigation, asset request and API call — without this each one
