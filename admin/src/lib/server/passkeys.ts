@@ -31,6 +31,7 @@ export function createPasskeyRegistrationOptions(
 		attestationType: 'none',
 		excludeCredentials: existingCredentialIds.map((id) => ({ id: id as Base64URLString })),
 		authenticatorSelection: {
+			authenticatorAttachment: 'platform',
 			residentKey: 'required',
 			userVerification: 'required'
 		},

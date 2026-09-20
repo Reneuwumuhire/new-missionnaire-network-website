@@ -25,6 +25,7 @@ test('passkey options require discoverable user verification for the current hos
 	const authentication = await createPasskeyAuthenticationOptions(url);
 
 	assert.equal(registration.rp.id, 'localhost');
+	assert.equal(registration.authenticatorSelection?.authenticatorAttachment, 'platform');
 	assert.equal(registration.authenticatorSelection?.residentKey, 'required');
 	assert.equal(registration.authenticatorSelection?.userVerification, 'required');
 	assert.equal(authentication.rpId, 'localhost');
