@@ -3234,7 +3234,7 @@
 							<div class="w-1 h-1 rounded-full bg-stone-200"></div>
 							<span class="text-[10px] font-medium text-stone-400">{formatTime(duration)}</span>
 						</div>
-					{:else}
+					{:else if liveIsBehind}
 						<!-- Mobile: behind-live counter + tap to jump back to live -->
 						<div class="mt-0.5 lg:hidden">
 							<button
@@ -3246,20 +3246,9 @@
 									: 'border-transparent text-red-600 -ml-2'}"
 							>
 								<span class="relative inline-flex h-1.5 w-1.5">
-									{#if !liveIsBehind}
-										<span
-											class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"
-										></span>
-									{/if}
-									<span
-										class="relative inline-flex h-1.5 w-1.5 rounded-full {liveIsBehind
-											? 'bg-white'
-											: 'bg-red-500'}"
-									></span>
+									<span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-white"></span>
 								</span>
-								{$t('live.atLive')}{#if liveIsBehind}&nbsp;· -{formatTime(
-										liveBehindDisplaySec
-									)}{/if}
+								{$t('live.backToLive')} · -{formatTime(liveBehindDisplaySec)}
 							</button>
 						</div>
 					{/if}
