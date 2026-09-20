@@ -68,6 +68,7 @@
 	let previousActiveLineIndex = $state(-1);
 	let prefersReducedMotion = $state(false);
 	let userScrolled = $state(false);
+	let scrollAnimationFrame: number | null = null;
 	// Which way the "back to current line" pill arrow points: down when the
 	// live passage is below the reader's viewport (they scrolled up to read
 	// earlier text), up when it's above (they scrolled ahead).
@@ -87,6 +88,10 @@
 
 	function onUserScroll() {
 		if (!pauseOnUserScroll) return;
+		if (scrollAnimationFrame !== null) {
+			cancelAnimationFrame(scrollAnimationFrame);
+			scrollAnimationFrame = null;
+		}
 		userScrolled = true;
 		updateScrollDirection();
 	}
@@ -102,10 +107,28 @@
 		const panelRect = panelElement.getBoundingClientRect();
 		const elRect = el.getBoundingClientRect();
 		const delta = elRect.top + elRect.height / 2 - (panelRect.top + panelRect.height / 2);
-		panelElement.scrollTo({
-			top: panelElement.scrollTop + delta,
-			behavior: smooth ? 'smooth' : 'auto'
-		});
+		const target = Math.max(
+			0,
+			Math.min(panelElement.scrollTop + delta, panelElement.scrollHeight - panelElement.clientHeight)
+		);
+
+		if (scrollAnimationFrame !== null) cancelAnimationFrame(scrollAnimationFrame);
+		if (!smooth) {
+			panelElement.scrollTop = target;
+			return;
+		}
+
+		const start = panelElement.scrollTop;
+		const distance = target - start;
+		const startedAt = performance.now();
+		const animate = (now: number) => {
+			const progress = Math.min((now - startedAt) / 420, 1);
+			panelElement!.scrollTop = start + distance * (1 - (1 - progress) ** 3);
+			if (progress < 1) scrollAnimationFrame = requestAnimationFrame(animate);
+			else scrollAnimationFrame = null;
+		};
+
+		scrollAnimationFrame = requestAnimationFrame(animate);
 	}
 
 	function resumeAutoScroll() {
@@ -264,6 +287,7 @@
 		mediaQuery.addEventListener('change', updateReducedMotion);
 
 		return () => {
+			if (scrollAnimationFrame !== null) cancelAnimationFrame(scrollAnimationFrame);
 			mediaQuery.removeEventListener('change', updateReducedMotion);
 		};
 	});
