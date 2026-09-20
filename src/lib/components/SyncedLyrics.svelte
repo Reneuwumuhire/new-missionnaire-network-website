@@ -732,8 +732,6 @@
 	   line's text width (which would make it rewrap mid-scroll). */
 	.lyrics-panel.fullscreen-large .lyric-line.active {
 		position: relative;
-		background: transparent;
-		border-radius: 0;
 	}
 
 	.lyrics-panel.fullscreen-large .lyric-line.active::before {
@@ -862,10 +860,15 @@
 			.subtitle-theme-sepia,
 			.subtitle-theme-dark,
 			.subtitle-theme-contrast
-		) .lyric-line.active {
+	) .lyric-line.active {
 		background: var(--subtitle-active-bg);
 		border-radius: 0.6rem;
 		text-shadow: none;
+	}
+
+	.lyrics-panel.fullscreen-large .lyric-line.active {
+		background: transparent;
+		border-radius: 0;
 	}
 
 	/* In the fullscreen overlay the surface comes from the overlay itself, so
