@@ -529,30 +529,6 @@
 			sizeKey={$subtitlePrefs.size}
 			onseek={handleSeek}
 		/>
-		<!-- Thumb-zone close bar: always visible at the bottom so closing never
-		     requires reaching the top corner (the main complaint on mobile). -->
-		<div class="transcript-fullscreen-footer pointer-events-none flex justify-center px-4">
-			<button
-				type="button"
-				onclick={closeFullscreen}
-				class="pointer-events-auto inline-flex min-h-11 items-center gap-2 rounded-full border border-stone-200 bg-white/95 px-6 py-2.5 text-[12px] font-bold uppercase tracking-[0.18em] font-body text-stone-700 shadow-lg backdrop-blur transition-colors hover:bg-stone-50 active:bg-stone-100"
-			>
-				<svg
-					width="14"
-					height="14"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					aria-hidden="true"
-				>
-					<path d="M6 6l12 12M6 18L18 6" />
-				</svg>
-				{$t('misc.close')}
-			</button>
-		</div>
 	</div>
 {/if}
 
@@ -582,14 +558,5 @@
 	/* Keep the header clear of notches/status bars on phones. */
 	.transcript-fullscreen-header {
 		padding-top: calc(0.75rem + env(safe-area-inset-top, 0px));
-	}
-
-	/* Floating over the text (not a layout row) so the transcript keeps the
-	   full height; safe-area keeps it above iOS home-indicator. */
-	.transcript-fullscreen-footer {
-		position: absolute;
-		left: 0;
-		right: 0;
-		bottom: calc(0.9rem + env(safe-area-inset-bottom, 0px));
 	}
 </style>
