@@ -737,7 +737,13 @@
 	.lyrics-panel.fullscreen-large .lyric-line.active::before {
 		position: absolute;
 		inset: 0 -1rem;
-		background: var(--subtitle-active-bg);
+		background: linear-gradient(
+			to bottom,
+			transparent,
+			var(--subtitle-active-bg) 1rem,
+			var(--subtitle-active-bg) calc(100% - 1rem),
+			transparent
+		);
 		content: '';
 		pointer-events: none;
 	}
