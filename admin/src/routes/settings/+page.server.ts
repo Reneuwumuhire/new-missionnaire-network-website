@@ -1,4 +1,5 @@
 import { fail, redirect } from '@sveltejs/kit';
+import { renderSVG } from 'uqr';
 import {
 	verifyPassword,
 	hashPassword,
@@ -216,6 +217,7 @@ export const actions: Actions = {
 		}
 		const secret = generateTwoFactorSecret();
 		const recoveryCodes = generateRecoveryCodes();
+		const otpAuthUri = buildOtpAuthUri(secret, user.email);
 		await beginTwoFactorSetup(
 			user.email,
 			encryptTwoFactorSecret(secret, key),
@@ -234,7 +236,8 @@ export const actions: Actions = {
 			twoFactorSetup: {
 				secret,
 				recoveryCodes,
-				otpAuthUri: buildOtpAuthUri(secret, user.email)
+				otpAuthUri,
+				qrCodeDataUrl: `data:image/svg+xml,${encodeURIComponent(renderSVG(otpAuthUri))}`
 			}
 		};
 	},

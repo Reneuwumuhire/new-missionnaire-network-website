@@ -29,6 +29,9 @@ importers:
       mongodb:
         specifier: ^6.8.0
         version: 6.21.0
+      uqr:
+        specifier: ^0.1.3
+        version: 0.1.3
       wavesurfer.js:
         specifier: ^7.12.6
         version: 7.12.6
@@ -1718,6 +1721,9 @@ packages:
     peerDependencies:
       browserslist: '>= 4.21.0'
 
+  uqr@0.1.3:
+    resolution: {integrity: sha512-0rjE8iEJe4YmT9TOhwsZtqCMRLc5DXZUI2UEYUUg63ikBkqqE5EYWaI0etFe/5KUcmcYwLih2RND1kq+hrUJXA==}
+
   util-deprecate@1.0.2:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
 
@@ -3382,6 +3388,8 @@ snapshots:
       browserslist: 4.28.2
       escalade: 3.2.0
       picocolors: 1.1.1
+
+  uqr@0.1.3: {}
 
   util-deprecate@1.0.2: {}
 

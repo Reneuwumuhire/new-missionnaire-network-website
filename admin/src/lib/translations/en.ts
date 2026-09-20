@@ -860,6 +860,7 @@ const en: Record<keyof typeof fr, string> = {
 	'settings.disableTwoFactor': 'Disable two-factor authentication',
 	'settings.scanOrEnter':
 		'Add this account to your authenticator app, then enter its six-digit code.',
+	'settings.twoFactorQrCode': 'QR code for authenticator setup',
 	'settings.openAuthenticator': 'Open in authenticator app',
 	'settings.manualSecret': 'Manual setup key',
 	'settings.saveRecoveryCodes': 'Save these recovery codes now. Each can be used once.',

@@ -870,6 +870,7 @@ export default {
 	'settings.disableTwoFactor': 'Désactiver l’authentification à deux facteurs',
 	'settings.scanOrEnter':
 		'Ajoutez ce compte à votre application d’authentification, puis saisissez son code à six chiffres.',
+	'settings.twoFactorQrCode': 'Code QR pour configurer l’application d’authentification',
 	'settings.openAuthenticator': 'Ouvrir dans l’application d’authentification',
 	'settings.manualSecret': 'Clé de configuration manuelle',
 	'settings.saveRecoveryCodes':

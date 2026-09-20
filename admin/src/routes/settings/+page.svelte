@@ -499,6 +499,11 @@
 				{:else if form?.twoFactorSetup}
 					<div class="mt-4 space-y-4 bg-cream/60 p-4">
 						<p class="text-sm font-medium text-stone-700">{$t('settings.scanOrEnter')}</p>
+						<img
+							src={form.twoFactorSetup.qrCodeDataUrl}
+							alt={$t('settings.twoFactorQrCode')}
+							class="size-[220px] bg-white p-2"
+						/>
 						<a
 							href={form.twoFactorSetup.otpAuthUri}
 							class="break-all text-xs text-primary underline">{$t('settings.openAuthenticator')}</a
