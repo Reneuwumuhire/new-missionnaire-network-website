@@ -728,24 +728,32 @@
 		opacity: 0.55;
 	}
 
-	/* Let the active highlight meet the reader's edges without changing the
-	   line's text width (which would make it rewrap mid-scroll). */
-	.lyrics-panel.fullscreen-large .lyric-line.active {
+	/* Keep the highlight layer mounted so it crossfades without changing
+	   text layout. Isolate it behind the text to preserve reading contrast. */
+	.lyrics-panel.fullscreen-large .lyric-line {
 		position: relative;
+		isolation: isolate;
 	}
 
-	.lyrics-panel.fullscreen-large .lyric-line.active::before {
+	.lyrics-panel.fullscreen-large .lyric-line::before {
 		position: absolute;
+		z-index: -1;
 		inset: 0 -1rem;
 		background: linear-gradient(
 			to bottom,
 			transparent,
-			var(--subtitle-active-bg) 1rem,
-			var(--subtitle-active-bg) calc(100% - 1rem),
+			var(--subtitle-active-bg) 25%,
+			var(--subtitle-active-bg) 75%,
 			transparent
 		);
 		content: '';
 		pointer-events: none;
+		opacity: 0;
+		transition: opacity 420ms ease-in-out;
+	}
+
+	.lyrics-panel.fullscreen-large .lyric-line.active::before {
+		opacity: 1;
 	}
 
 	/* Floating "back to current line" pill — sticky inside the scroll
@@ -914,6 +922,10 @@
 	}
 
 	@media (prefers-reduced-motion: reduce) {
+		.lyrics-panel.fullscreen-large .lyric-line::before {
+			transition: none;
+		}
+
 		.lyric-line,
 		.lyric-section {
 			transition:
