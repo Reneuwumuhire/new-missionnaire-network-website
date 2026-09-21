@@ -1,6 +1,13 @@
 import { getDb } from './mongo';
 import { availableTypesTag } from '../utils/data';
-import { ObjectId, MongoServerError, type Document, type Filter, type Sort } from 'mongodb';
+import {
+	ObjectId,
+	MongoServerError,
+	type Db,
+	type Document,
+	type Filter,
+	type Sort
+} from 'mongodb';
 import { randomBytes } from 'node:crypto';
 import type { YoutubeVideo } from '$lib/models/youtube';
 import type { AudioAsset } from '$lib/models/media-assets';
@@ -1625,6 +1632,25 @@ export async function getSongsCount(search?: string): Promise<number> {
 	}
 }
 
+const sermonSortFields = new Set(['french_title', 'author', 'iso_date', 'duration']);
+let sermonIndexesEnsured: Promise<string[]> | null = null;
+
+function ensureSermonIndexes(db: Db) {
+	sermonIndexesEnsured ??= db
+		.collection('sermons')
+		.createIndexes([
+			{ key: { french_title: 1 } },
+			{ key: { author: 1 } },
+			{ key: { iso_date: 1 } },
+			{ key: { duration: 1 } }
+		])
+		.catch((error) => {
+			sermonIndexesEnsured = null;
+			throw error;
+		});
+	return sermonIndexesEnsured;
+}
+
 export async function querySermons(options: {
 	author?: string;
 	search?: string;
@@ -1650,6 +1676,7 @@ export async function querySermons(options: {
 
 	try {
 		const db = await getDb();
+		await ensureSermonIndexes(db);
 		const query: Filter<Document> = {};
 		const conditions: Filter<Document>[] = [];
 
@@ -1707,13 +1734,15 @@ export async function querySermons(options: {
 		const skip = (pageNumber - 1) * limit;
 		const total = await db.collection('sermons').countDocuments(query);
 
-		const [property, order] = orderBy.split(/[: ,]/);
+		const [requestedProperty, order] = orderBy.split(/[: ,]/);
+		const property = sermonSortFields.has(requestedProperty) ? requestedProperty : 'iso_date';
 		const sort: Sort = {};
-		sort[property] = order === 'asc' ? 1 : -1;
+		sort[property] = property === requestedProperty && order === 'asc' ? 1 : -1;
 
 		const data = await db
 			.collection('sermons')
 			.find(query)
+			.project({ library_search: 0 })
 			.sort(sort)
 			.skip(skip)
 			.limit(limit)
