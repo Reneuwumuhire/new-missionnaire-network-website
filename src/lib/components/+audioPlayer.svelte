@@ -1649,6 +1649,15 @@
 		shouldAutoplayOnLoad = false;
 	}
 
+	function handleAudioPlaying() {
+		isAudioReady = true;
+	}
+
+	function handleAudioWaiting() {
+		isAudioReady = false;
+		console.log('[Audio] waiting');
+	}
+
 	function handleAudioError(e: Event) {
 		setPendingPlaybackIntent(null);
 		console.error('[AudioPlayer] Audio error:', e);
@@ -1668,10 +1677,9 @@
 		}
 	}
 
-	// Diagnostic-only listeners. Help debug iOS lock-screen / Bluetooth /
+	// Remaining diagnostic-only listeners. Help debug iOS lock-screen / Bluetooth /
 	// AVAudioSession issues. They do not mutate state.
 	const logSuspend = () => console.log('[Audio] suspend');
-	const logWaiting = () => console.log('[Audio] waiting');
 	const logStalled = () => console.log('[Audio] stalled');
 	const logEmptied = () => console.log('[Audio] emptied');
 	const logAbort = () => console.log('[Audio] abort');
@@ -1685,9 +1693,10 @@
 		el.addEventListener('pause', handleAudioPause);
 		el.addEventListener('loadedmetadata', handleAudioLoadedMetadata);
 		el.addEventListener('canplay', handleAudioCanPlay);
+		el.addEventListener('playing', handleAudioPlaying);
 		el.addEventListener('error', handleAudioError);
 		el.addEventListener('suspend', logSuspend);
-		el.addEventListener('waiting', logWaiting);
+		el.addEventListener('waiting', handleAudioWaiting);
 		el.addEventListener('stalled', logStalled);
 		el.addEventListener('emptied', logEmptied);
 		el.addEventListener('abort', logAbort);
@@ -1702,9 +1711,10 @@
 		el.removeEventListener('pause', handleAudioPause);
 		el.removeEventListener('loadedmetadata', handleAudioLoadedMetadata);
 		el.removeEventListener('canplay', handleAudioCanPlay);
+		el.removeEventListener('playing', handleAudioPlaying);
 		el.removeEventListener('error', handleAudioError);
 		el.removeEventListener('suspend', logSuspend);
-		el.removeEventListener('waiting', logWaiting);
+		el.removeEventListener('waiting', handleAudioWaiting);
 		el.removeEventListener('stalled', logStalled);
 		el.removeEventListener('emptied', logEmptied);
 		el.removeEventListener('abort', logAbort);
@@ -1918,6 +1928,7 @@
 	const updateAudioTime = () => {
 		if (audio) {
 			const advanced = audio.currentTime > currentTime + 0.05 && !audio.paused && !audio.seeking;
+			if (advanced) isAudioReady = true;
 			currentTime = audio.currentTime;
 			duration = audio.duration;
 			if (isLiveTrack) {
