@@ -2,13 +2,14 @@ import { expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => {
 	const cursor = {
+		hint: vi.fn(),
 		project: vi.fn(),
 		sort: vi.fn(),
 		skip: vi.fn(),
 		limit: vi.fn(),
 		toArray: vi.fn(async () => [])
 	};
-	for (const method of ['project', 'sort', 'skip', 'limit'] as const) {
+	for (const method of ['hint', 'project', 'sort', 'skip', 'limit'] as const) {
 		cursor[method].mockReturnValue(cursor);
 	}
 	return {
@@ -31,20 +32,70 @@ vi.mock('../../db/mongo', () => ({
 
 import { listRetransmissions } from './recordings';
 
-it('indexes recording list sorts and excludes full-text data', async () => {
+it('uses a covered recording list index and a safe sort', async () => {
 	await listRetransmissions({ sortField: 'library_search' });
 
 	expect(mocks.createIndexes).toHaveBeenCalledWith([
 		{
-			key: { published: 1, status: 1, started_at: -1 },
-			name: 'pub_status_startedAt_desc'
+			key: {
+				published: 1,
+				status: 1,
+				started_at: -1,
+				title: 1,
+				duration_sec: 1,
+				s3_url: 1,
+				size_bytes: 1,
+				thumbnail_url: 1,
+				_id: 1
+			},
+			name: 'published_recording_list_by_date_v2'
 		},
-		{ key: { published: 1, status: 1, title: 1 }, name: 'pub_status_title_asc' },
 		{
-			key: { published: 1, status: 1, duration_sec: 1 },
-			name: 'pub_status_duration_asc'
+			key: {
+				published: 1,
+				status: 1,
+				title: 1,
+				started_at: 1,
+				duration_sec: 1,
+				s3_url: 1,
+				size_bytes: 1,
+				thumbnail_url: 1,
+				_id: 1
+			},
+			name: 'published_recording_list_by_title_v2'
+		},
+		{
+			key: {
+				published: 1,
+				status: 1,
+				duration_sec: 1,
+				title: 1,
+				started_at: 1,
+				s3_url: 1,
+				size_bytes: 1,
+				thumbnail_url: 1,
+				_id: 1
+			},
+			name: 'published_recording_list_by_duration_v2'
 		}
 	]);
-	expect(mocks.cursor.project).toHaveBeenCalledWith({ library_search: 0 });
+	expect(mocks.cursor.project).toHaveBeenCalledWith({
+		_id: 1,
+		title: 1,
+		started_at: 1,
+		duration_sec: 1,
+		s3_url: 1,
+		size_bytes: 1,
+		thumbnail_url: 1
+	});
+	expect(mocks.cursor.hint).toHaveBeenCalledWith('published_recording_list_by_date_v2');
 	expect(mocks.cursor.sort).toHaveBeenCalledWith({ started_at: -1 });
+});
+
+it('surfaces database failures instead of reporting an empty library', async () => {
+	mocks.find.mockImplementationOnce(() => {
+		throw new Error('database timeout');
+	});
+
+	await expect(listRetransmissions()).rejects.toThrow('database timeout');
 });
