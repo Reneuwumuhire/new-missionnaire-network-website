@@ -11,12 +11,17 @@ async function ensureIndexes(): Promise<void> {
 	indexesEnsured = (async () => {
 		try {
 			const db = await getDb();
-			await db
-				.collection('recordings')
-				.createIndex(
-					{ published: 1, status: 1, started_at: -1 },
-					{ name: 'pub_status_startedAt_desc' }
-				);
+			await db.collection('recordings').createIndexes([
+				{
+					key: { published: 1, status: 1, started_at: -1 },
+					name: 'pub_status_startedAt_desc'
+				},
+				{ key: { published: 1, status: 1, title: 1 }, name: 'pub_status_title_asc' },
+				{
+					key: { published: 1, status: 1, duration_sec: 1 },
+					name: 'pub_status_duration_asc'
+				}
+			]);
 		} catch (err) {
 			// Retry next call: reset the latch so a transient failure doesn't
 			// permanently disable indexes (e.g. if the DB is briefly unavailable
@@ -92,6 +97,8 @@ interface RecordingRow {
 	original_audio_language?: string | null;
 }
 
+const RECORDING_LIST_PROJECTION = { library_search: 0 } as const;
+
 function toPublic(doc: RecordingRow): PublishedRecording {
 	return {
 		id: doc._id.toString(),
@@ -136,6 +143,7 @@ export async function getRecentPublished(limit = 5): Promise<PublishedRecording[
 		const rows = (await db
 			.collection('recordings')
 			.find({ published: true, status: 'ready' })
+			.project(RECORDING_LIST_PROJECTION)
 			.sort({ started_at: -1 })
 			.limit(limit)
 			.toArray()) as unknown as RecordingRow[];
@@ -176,6 +184,7 @@ export async function getPublishedNearSession(
 		const rows = (await db
 			.collection('recordings')
 			.find({ published: true, status: 'ready', started_at: { $gte: from, $lte: to } })
+			.project(RECORDING_LIST_PROJECTION)
 			.sort({ started_at: 1 })
 			.limit(20)
 			.toArray()) as unknown as RecordingRow[];
@@ -263,6 +272,7 @@ export async function listPublished(
 			db
 				.collection('recordings')
 				.find(query)
+				.project(RECORDING_LIST_PROJECTION)
 				.sort({ started_at: -1 })
 				.skip(skip)
 				.limit(limit)
@@ -385,7 +395,14 @@ export async function listRetransmissions(
 
 		const skip = (pageNumber - 1) * limit;
 		const [rows, total] = await Promise.all([
-			db.collection('recordings').find(query).sort(sort).skip(skip).limit(limit).toArray(),
+			db
+				.collection('recordings')
+				.find(query)
+				.project(RECORDING_LIST_PROJECTION)
+				.sort(sort)
+				.skip(skip)
+				.limit(limit)
+				.toArray(),
 			db.collection('recordings').countDocuments(query)
 		]);
 		return { data: (rows as unknown as RecordingRow[]).map(toPublic), total };
@@ -400,11 +417,14 @@ export async function getPublishedById(id: string): Promise<PublishedRecording |
 		const { ObjectId } = await import('mongodb');
 		if (!ObjectId.isValid(id)) return null;
 		const db = await getDb();
-		const row = (await db.collection('recordings').findOne({
-			_id: new ObjectId(id),
-			published: true,
-			status: 'ready'
-		})) as unknown as RecordingRow | null;
+		const row = (await db.collection('recordings').findOne(
+			{
+				_id: new ObjectId(id),
+				published: true,
+				status: 'ready'
+			},
+			{ projection: RECORDING_LIST_PROJECTION }
+		)) as unknown as RecordingRow | null;
 		return row ? toPublic(row) : null;
 	} catch (err) {
 		console.error('[recordings] getPublishedById failed', err);

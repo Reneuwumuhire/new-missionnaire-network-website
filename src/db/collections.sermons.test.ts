@@ -29,7 +29,7 @@ vi.mock('./mongo', () => ({
 	})
 }));
 
-import { querySermons } from './collections';
+import { queryLiterature, querySermons } from './collections';
 
 it('indexes supported sermon sorts and omits search text from list results', async () => {
 	await querySermons({ orderBy: 'library_search:asc' });
@@ -42,4 +42,16 @@ it('indexes supported sermon sorts and omits search text from list results', asy
 	]);
 	expect(mocks.cursor.project).toHaveBeenCalledWith({ library_search: 0 });
 	expect(mocks.cursor.sort).toHaveBeenCalledWith({ iso_date: -1 });
+});
+
+it('indexes literature sorts and omits search text from list results', async () => {
+	await queryLiterature({ orderBy: 'library_search:asc' });
+
+	expect(mocks.createIndexes).toHaveBeenCalledWith([
+		{ key: { release_date: 1 } },
+		{ key: { title: 1 } },
+		{ key: { author: 1 } }
+	]);
+	expect(mocks.cursor.project).toHaveBeenCalledWith({ library_search: 0 });
+	expect(mocks.cursor.sort).toHaveBeenCalledWith({ release_date: -1 });
 });

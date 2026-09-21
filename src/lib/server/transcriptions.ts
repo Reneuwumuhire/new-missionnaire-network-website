@@ -1,4 +1,4 @@
-import { ObjectId, type Filter } from 'mongodb';
+import { ObjectId, type Db, type Filter } from 'mongodb';
 import { getDb } from '../../db/mongo';
 import type { PDF } from '../../core/model/pdf';
 
@@ -10,6 +10,24 @@ export type SerializedTranscription = Omit<PDF, '_id' | 'videoId'> & {
 
 const YEARS_TTL_MS = 5 * 60_000;
 let yearsCache: { value: number[]; expires: number } | null = null;
+let listIndexEnsured: Promise<string> | null = null;
+
+function ensureListIndex(db: Db) {
+	listIndexEnsured ??= db
+		.collection('pdfs')
+		.createIndex(
+			{ publishedOn: -1, filename: -1, _id: -1 },
+			{
+				name: 'transcriptions_list_desc',
+				collation: { locale: 'fr', numericOrdering: true }
+			}
+		)
+		.catch((error) => {
+			listIndexEnsured = null;
+			throw error;
+		});
+	return listIndexEnsured;
+}
 
 export async function getTranscriptionYears(): Promise<number[]> {
 	if (yearsCache && yearsCache.expires > Date.now()) return yearsCache.value;
@@ -40,6 +58,7 @@ export async function queryTranscriptions(options: {
 	const { page = 1, limit = 12, sort = 'desc', year = null, search = null } = options;
 
 	const db = await getDb();
+	await ensureListIndex(db);
 	const collection = db.collection<PDF>('pdfs');
 
 	const query: Filter<PDF> = {};
@@ -54,20 +73,23 @@ export async function queryTranscriptions(options: {
 		};
 	}
 
-	const total = await collection.countDocuments(query);
 	const skip = (page - 1) * limit;
 
-	const documents = await collection
-		.find(query)
-		.sort({
-			publishedOn: sort === 'desc' ? -1 : 1,
-			filename: sort === 'desc' ? -1 : 1,
-			_id: sort === 'desc' ? -1 : 1
-		})
-		.collation({ locale: 'fr', numericOrdering: true })
-		.skip(skip)
-		.limit(limit)
-		.toArray();
+	const [total, documents] = await Promise.all([
+		collection.countDocuments(query),
+		collection
+			.find(query)
+			.project({ library_search: 0 })
+			.sort({
+				publishedOn: sort === 'desc' ? -1 : 1,
+				filename: sort === 'desc' ? -1 : 1,
+				_id: sort === 'desc' ? -1 : 1
+			})
+			.collation({ locale: 'fr', numericOrdering: true })
+			.skip(skip)
+			.limit(limit)
+			.toArray()
+	]);
 
 	const videoIds = documents
 		.map((d) => d.videoId)
