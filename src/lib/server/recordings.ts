@@ -1,6 +1,24 @@
 import { ObjectId } from 'mongodb';
 import { getDb } from '../../db/mongo';
 
+// Keep list reads covered by the indexes below. Recording documents can carry
+// large extracted transcript text, so fetching the document just to exclude
+// that field still makes list pages wait on all of that data.
+const RECORDING_LIST_PROJECTION = {
+	_id: 1,
+	title: 1,
+	started_at: 1,
+	duration_sec: 1,
+	s3_url: 1,
+	size_bytes: 1,
+	thumbnail_url: 1
+} as const;
+const RECORDING_LIST_INDEX = {
+	started_at: 'published_recording_list_by_date_v2',
+	title: 'published_recording_list_by_title_v2',
+	duration_sec: 'published_recording_list_by_duration_v2'
+} as const;
+
 // Indexes we want on the `recordings` collection. Created lazily on first
 // query so we never ship a migration step; Mongo's createIndex is a no-op
 // when the index already exists, so the cost is a single metadata round-trip
@@ -13,13 +31,46 @@ async function ensureIndexes(): Promise<void> {
 			const db = await getDb();
 			await db.collection('recordings').createIndexes([
 				{
-					key: { published: 1, status: 1, started_at: -1 },
-					name: 'pub_status_startedAt_desc'
+					key: {
+						published: 1,
+						status: 1,
+						started_at: -1,
+						title: 1,
+						duration_sec: 1,
+						s3_url: 1,
+						size_bytes: 1,
+						thumbnail_url: 1,
+						_id: 1
+					},
+					name: 'published_recording_list_by_date_v2'
 				},
-				{ key: { published: 1, status: 1, title: 1 }, name: 'pub_status_title_asc' },
 				{
-					key: { published: 1, status: 1, duration_sec: 1 },
-					name: 'pub_status_duration_asc'
+					key: {
+						published: 1,
+						status: 1,
+						title: 1,
+						started_at: 1,
+						duration_sec: 1,
+						s3_url: 1,
+						size_bytes: 1,
+						thumbnail_url: 1,
+						_id: 1
+					},
+					name: 'published_recording_list_by_title_v2'
+				},
+				{
+					key: {
+						published: 1,
+						status: 1,
+						duration_sec: 1,
+						title: 1,
+						started_at: 1,
+						s3_url: 1,
+						size_bytes: 1,
+						thumbnail_url: 1,
+						_id: 1
+					},
+					name: 'published_recording_list_by_duration_v2'
 				}
 			]);
 		} catch (err) {
@@ -28,6 +79,7 @@ async function ensureIndexes(): Promise<void> {
 			// during the first request).
 			indexesEnsured = null;
 			console.error('[recordings] ensureIndexes failed', err);
+			throw err;
 		}
 	})();
 	return indexesEnsured;
@@ -97,8 +149,6 @@ interface RecordingRow {
 	original_audio_language?: string | null;
 }
 
-const RECORDING_LIST_PROJECTION = { library_search: 0 } as const;
-
 function toPublic(doc: RecordingRow): PublishedRecording {
 	return {
 		id: doc._id.toString(),
@@ -143,6 +193,7 @@ export async function getRecentPublished(limit = 5): Promise<PublishedRecording[
 		const rows = (await db
 			.collection('recordings')
 			.find({ published: true, status: 'ready' })
+			.hint(RECORDING_LIST_INDEX.started_at)
 			.project(RECORDING_LIST_PROJECTION)
 			.sort({ started_at: -1 })
 			.limit(limit)
@@ -184,6 +235,7 @@ export async function getPublishedNearSession(
 		const rows = (await db
 			.collection('recordings')
 			.find({ published: true, status: 'ready', started_at: { $gte: from, $lte: to } })
+			.hint(RECORDING_LIST_INDEX.started_at)
 			.project(RECORDING_LIST_PROJECTION)
 			.sort({ started_at: 1 })
 			.limit(20)
@@ -272,6 +324,7 @@ export async function listPublished(
 			db
 				.collection('recordings')
 				.find(query)
+				.hint(RECORDING_LIST_INDEX.started_at)
 				.project(RECORDING_LIST_PROJECTION)
 				.sort({ started_at: -1 })
 				.skip(skip)
@@ -282,7 +335,7 @@ export async function listPublished(
 		return { data: (rows as unknown as RecordingRow[]).map(toPublic), total };
 	} catch (err) {
 		console.error('[recordings] listPublished failed', err);
-		return { data: [], total: 0 };
+		throw err;
 	}
 }
 
@@ -342,8 +395,8 @@ export async function getAvailableYears(): Promise<number[]> {
  *  ("Retransmission", "Frank", or "Ewald", case-insensitive). Used by the
  *  Prédications page to surface live-broadcast archives alongside curated
  *  sermons when the Ewald Frank / "Tous" author filter is active. Shares
- *  the `(published, status, started_at)` compound index created in
- *  ensureIndexes() — the regex only filters the already-indexed result set. */
+ *  a covering list index created in ensureIndexes(), so MongoDB never has to
+ *  load the large extracted transcript field to evaluate or return a row. */
 export async function listRetransmissions(
 	options: {
 		limit?: number;
@@ -392,12 +445,14 @@ export async function listRetransmissions(
 		const allowedSorts = new Set(['title', 'started_at', 'duration_sec']);
 		const safeSortField = allowedSorts.has(sortField) ? sortField : 'started_at';
 		const sort: Record<string, 1 | -1> = { [safeSortField]: sortOrder === 'asc' ? 1 : -1 };
+		const index = RECORDING_LIST_INDEX[safeSortField as keyof typeof RECORDING_LIST_INDEX];
 
 		const skip = (pageNumber - 1) * limit;
 		const [rows, total] = await Promise.all([
 			db
 				.collection('recordings')
 				.find(query)
+				.hint(index)
 				.project(RECORDING_LIST_PROJECTION)
 				.sort(sort)
 				.skip(skip)
@@ -408,7 +463,7 @@ export async function listRetransmissions(
 		return { data: (rows as unknown as RecordingRow[]).map(toPublic), total };
 	} catch (err) {
 		console.error('[recordings] listRetransmissions failed', err);
-		return { data: [], total: 0 };
+		throw err;
 	}
 }
 
