@@ -302,8 +302,7 @@ export async function queryVideos(options: {
 		}
 
 		const [property, order] = orderBy.split(/[: ,]/);
-		const sort: Sort = {};
-		sort[property] = order === 'asc' ? 1 : -1;
+		const sort: Sort = { [property]: order === 'asc' ? 1 : -1 };
 
 		const skip = (pageNumber - 1) * limit;
 
@@ -355,8 +354,7 @@ export async function queryAudios(options: {
 		}
 
 		const [property, order] = orderBy.split(/[: ,]/);
-		const sort: Sort = {};
-		sort[property] = order === 'asc' ? 1 : -1;
+		const sort: Sort = { [property]: order === 'asc' ? 1 : -1 };
 
 		const skip = (pageNumber - 1) * limit;
 
@@ -602,8 +600,7 @@ export async function queryMusicAudio(options: {
 		} else {
 			// Standard sort: count + find in parallel, eliminating the
 			// "wait for count, then issue find" round-trip stall.
-			const sort: Sort = {};
-			sort[property] = order === 'asc' ? 1 : -1;
+			const sort: Sort = { [property]: order === 'asc' ? 1 : -1 };
 			const [totalResult, docs] = await Promise.all([
 				collection.countDocuments(query, { collation: { locale: 'fr', strength: 1 } }),
 				collection
@@ -1736,8 +1733,9 @@ export async function querySermons(options: {
 
 		const [requestedProperty, order] = orderBy.split(/[: ,]/);
 		const property = sermonSortFields.has(requestedProperty) ? requestedProperty : 'iso_date';
-		const sort: Sort = {};
-		sort[property] = property === requestedProperty && order === 'asc' ? 1 : -1;
+		const sort: Sort = {
+			[property]: property === requestedProperty && order === 'asc' ? 1 : -1
+		};
 
 		const data = await db
 			.collection('sermons')
@@ -1874,8 +1872,9 @@ export async function queryLiterature(options: {
 		const property = literatureSortFields.has(requestedProperty)
 			? requestedProperty
 			: 'release_date';
-		const sort: Sort = {};
-		sort[property] = property === requestedProperty && order === 'asc' ? 1 : -1;
+		const sort: Sort = {
+			[property]: property === requestedProperty && order === 'asc' ? 1 : -1
+		};
 
 		const skip = (pageNumber - 1) * limit;
 		const [total, data] = await Promise.all([
