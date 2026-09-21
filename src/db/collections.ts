@@ -1797,6 +1797,20 @@ export async function getSermonYears(): Promise<string[]> {
 	}
 }
 
+const literatureSortFields = new Set(['release_date', 'title', 'author']);
+let literatureIndexesEnsured: Promise<string[]> | null = null;
+
+function ensureLiteratureIndexes(db: Db) {
+	literatureIndexesEnsured ??= db
+		.collection('literature')
+		.createIndexes([{ key: { release_date: 1 } }, { key: { title: 1 } }, { key: { author: 1 } }])
+		.catch((error) => {
+			literatureIndexesEnsured = null;
+			throw error;
+		});
+	return literatureIndexesEnsured;
+}
+
 export async function queryLiterature(options: {
 	author?: string;
 	search?: string;
@@ -1820,6 +1834,7 @@ export async function queryLiterature(options: {
 
 	try {
 		const db = await getDb();
+		await ensureLiteratureIndexes(db);
 		const query: Filter<Document> = {};
 		const conditions: Filter<Document>[] = [];
 
@@ -1855,20 +1870,25 @@ export async function queryLiterature(options: {
 			query.$and = conditions;
 		}
 
-		const skip = (pageNumber - 1) * limit;
-		const total = await db.collection('literature').countDocuments(query);
-
-		const [property, order] = orderBy.split(/[: ,]/);
+		const [requestedProperty, order] = orderBy.split(/[: ,]/);
+		const property = literatureSortFields.has(requestedProperty)
+			? requestedProperty
+			: 'release_date';
 		const sort: Sort = {};
-		sort[property] = order === 'asc' ? 1 : -1;
+		sort[property] = property === requestedProperty && order === 'asc' ? 1 : -1;
 
-		const data = await db
-			.collection('literature')
-			.find(query)
-			.sort(sort)
-			.skip(skip)
-			.limit(limit)
-			.toArray();
+		const skip = (pageNumber - 1) * limit;
+		const [total, data] = await Promise.all([
+			db.collection('literature').countDocuments(query),
+			db
+				.collection('literature')
+				.find(query)
+				.project({ library_search: 0 })
+				.sort(sort)
+				.skip(skip)
+				.limit(limit)
+				.toArray()
+		]);
 
 		return {
 			data: data.map((doc) => serializeDocument<Literature>(doc)),
