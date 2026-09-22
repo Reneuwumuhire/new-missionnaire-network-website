@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	isLatestStatusRequest,
+	reusableSessionDraft,
 	restoreStudioAuthorization,
 	sessionYouTubeChannelId,
 	subtitleNeedsAttach,
@@ -8,6 +9,41 @@ import {
 	type YouTubeChannel,
 	youtubeChannelsFromStatus
 } from './live-session.svelte';
+
+it('reuses stream settings without reusing its schedule or transcript', () => {
+	const draft = reusableSessionDraft({
+		_id: 'previous',
+		slug: 'previous-live',
+		title: 'Sunday service',
+		scheduled_at: '2026-09-20T08:00:00.000Z',
+		status: 'ended',
+		description: 'Service description',
+		thumbnail_url: 'https://example.com/thumbnail.jpg',
+		thumbnail_s3_key: 'broadcast-thumbnails/thumbnail.jpg',
+		privacy_status: 'unlisted',
+		made_for_kids: true,
+		reminder_enabled: true,
+		notify_on_start: true,
+		youtube_channel_id: 'channel-1',
+		service_type: 'live'
+	});
+
+	expect(draft).toMatchObject({
+		title: 'Sunday service',
+		scheduledAt: '',
+		description: 'Service description',
+		privacyStatus: 'unlisted',
+		madeForKids: true,
+		thumbnailUrl: 'https://example.com/thumbnail.jpg',
+		thumbnailKey: 'broadcast-thumbnails/thumbnail.jpg',
+		reminderEnabled: true,
+		notifyOnStart: true,
+		youtubeChannelId: 'channel-1',
+		serviceType: 'live'
+	});
+	expect(draft.subtitle).toBeNull();
+	expect(draft.announce).toBe(false);
+});
 
 it('ignores an older status response after a newer refresh starts', () => {
 	expect(isLatestStatusRequest(4, 5)).toBe(false);

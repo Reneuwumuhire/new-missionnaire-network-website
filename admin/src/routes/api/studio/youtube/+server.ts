@@ -248,6 +248,8 @@ export async function POST({ request, getClientAddress }) {
 				youtube_url: youtube.youtubeUrl,
 				youtube_channel_id: youtube.channelId,
 				youtube_channel_title: youtube.channelTitle,
+				privacy_status: privacyStatus,
+				made_for_kids: madeForKids,
 				subtitle_srt_url: subtitle.subtitle_srt_url,
 				subtitle_srt_s3_key: subtitle.subtitle_srt_s3_key,
 				subtitle_filename: subtitle.subtitle_filename,

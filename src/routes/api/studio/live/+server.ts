@@ -5,6 +5,7 @@ import {
 	createStudioScheduledLive,
 	getBroadcastAdminState,
 	getScheduledLiveById,
+	listStudioPreviousLives,
 	listStudioScheduledLives,
 	setBroadcastAdminState,
 	setStudioScheduledLiveStatus,
@@ -87,9 +88,14 @@ export async function POST({ request, url }) {
 	}
 	const operator = await authorized(request);
 	if (body.action === 'list') {
+		const [sessions, previousSessions] = await Promise.all([
+			listStudioScheduledLives(),
+			listStudioPreviousLives()
+		]);
 		return json({
 			operator,
-			sessions: await listStudioScheduledLives(),
+			sessions,
+			previousSessions,
 			serverReceivedAtMs,
 			serverSentAtMs: Date.now()
 		});
