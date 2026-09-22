@@ -1127,6 +1127,8 @@ export type ScheduledLive = {
 	youtube_url: string | null;
 	youtube_channel_id: string | null;
 	youtube_channel_title: string | null;
+	privacy_status?: 'private' | 'unlisted' | 'public';
+	made_for_kids?: boolean;
 	scheduled_at: string; // ISO
 	status: ScheduledLiveStatus;
 	live_started_at: string | null;
@@ -1229,6 +1231,18 @@ export async function listStudioScheduledLives(): Promise<ScheduledLive[]> {
 		.find({ status: 'scheduled', is_test: { $ne: true } })
 		.sort({ scheduled_at: 1 })
 		.limit(50)
+		.toArray();
+	return docs.map((doc) => serializeDocument<ScheduledLive>(doc));
+}
+
+export async function listStudioPreviousLives(): Promise<ScheduledLive[]> {
+	const db = await getDb();
+	// ponytail: recent history stays a short picker; paginate if operators need an archive browser.
+	const docs = await db
+		.collection('scheduled_lives')
+		.find({ status: 'ended', is_test: { $ne: true } })
+		.sort({ live_ended_at: -1, scheduled_at: -1 })
+		.limit(8)
 		.toArray();
 	return docs.map((doc) => serializeDocument<ScheduledLive>(doc));
 }

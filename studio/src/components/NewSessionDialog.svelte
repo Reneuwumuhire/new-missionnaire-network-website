@@ -1,21 +1,34 @@
 <script lang="ts">
-	import { connectYouTube, createSession, liveSession } from '../lib/live-session.svelte';
+	import { untrack } from 'svelte';
+	import {
+		connectYouTube,
+		createSession,
+		liveSession,
+		reusableSessionDraft,
+		type LiveSession
+	} from '../lib/live-session.svelte';
 	import Icon from './Icon.svelte';
 
-	let { oncreated }: { oncreated: () => void } = $props();
-	let title = $state('');
-	let serviceType = $state<'prepared' | 'live'>('prepared');
+	let { oncreated, template = null }: { oncreated: () => void; template?: LiveSession | null } =
+		$props();
+	const templateAtOpen = untrack(() => template);
+	const reused = templateAtOpen ? reusableSessionDraft(templateAtOpen) : null;
+	let title = $state(reused?.title ?? '');
+	let serviceType = $state<'prepared' | 'live'>(reused?.serviceType ?? 'prepared');
 	let scheduledAt = $state('');
-	let description = $state('');
-	let privacyStatus = $state<'private' | 'unlisted' | 'public'>('public');
-	let madeForKids = $state(false);
+	let description = $state(reused?.description ?? '');
+	let privacyStatus = $state<'private' | 'unlisted' | 'public'>(reused?.privacyStatus ?? 'public');
+	let madeForKids = $state(reused?.madeForKids ?? false);
 	let thumbnail = $state<File | null>(null);
 	let subtitle = $state<File | null>(null);
 	let announce = $state(false);
-	let reminderEnabled = $state(false);
-	let notifyOnStart = $state(false);
+	let reminderEnabled = $state(reused?.reminderEnabled ?? false);
+	let notifyOnStart = $state(reused?.notifyOnStart ?? false);
 	let youtubeChannelId = $state(
-		liveSession.youtubeChannelId ?? liveSession.youtubeChannels[0]?.id ?? ''
+		reused?.youtubeChannelId ||
+			liveSession.youtubeChannelId ||
+			liveSession.youtubeChannels[0]?.id ||
+			''
 	);
 	let saving = $state(false);
 	let formError = $state<string | null>(null);
@@ -53,6 +66,8 @@
 				privacyStatus,
 				madeForKids,
 				thumbnail,
+				thumbnailUrl: reused?.thumbnailUrl ?? null,
+				thumbnailKey: reused?.thumbnailKey ?? null,
 				subtitle,
 				announce,
 				reminderEnabled,
@@ -82,6 +97,12 @@
 			</p>
 		</div>
 	</div>
+	{#if template}
+		<p class="border-l-2 border-primary pl-3 text-[12px] text-muted">
+			Reusing settings from <strong class="text-fg/85">{template.title}</strong>. Choose a new date
+			and review the details before creating the session.
+		</p>
+	{/if}
 
 	<section class="space-y-3 border border-ink-700 bg-ink-850/40 p-4">
 		<div>
@@ -240,6 +261,12 @@
 					onchange={(event) =>
 						(thumbnail = (event.currentTarget as HTMLInputElement).files?.[0] ?? null)}
 				/>
+				{#if reused?.thumbnailUrl && !thumbnail}
+					<span class="mt-2 flex items-center gap-2 text-[12px] text-muted">
+						<img class="h-9 w-16 object-cover" src={reused.thumbnailUrl} alt="" />
+						Previous thumbnail will be reused.
+					</span>
+				{/if}
 			</label>
 			<label
 				class="block border border-dashed border-ink-600 bg-ink-800/30 p-3 transition-colors hover:border-ink-500"

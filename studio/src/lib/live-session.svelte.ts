@@ -18,6 +18,14 @@ export type LiveSession = {
 	youtube_url?: string | null;
 	youtube_channel_id?: string | null;
 	youtube_channel_title?: string | null;
+	description?: string | null;
+	thumbnail_url?: string | null;
+	thumbnail_s3_key?: string | null;
+	privacy_status?: 'private' | 'unlisted' | 'public';
+	made_for_kids?: boolean;
+	reminder_enabled?: boolean;
+	notify_on_start?: boolean;
+	live_ended_at?: string | null;
 	is_test?: boolean;
 	service_type?: 'prepared' | 'live';
 	active_phase?: 'ready' | 'opening' | 'sermon' | 'closing' | 'complete';
@@ -52,12 +60,33 @@ export type NewSession = {
 	privacyStatus: 'private' | 'unlisted' | 'public';
 	madeForKids: boolean;
 	thumbnail: File | null;
+	thumbnailUrl: string | null;
+	thumbnailKey: string | null;
 	subtitle: File | null;
 	announce: boolean;
 	reminderEnabled: boolean;
 	notifyOnStart: boolean;
 	youtubeChannelId: string;
 };
+
+export function reusableSessionDraft(session: LiveSession): NewSession {
+	return {
+		serviceType: session.service_type === 'live' ? 'live' : 'prepared',
+		title: session.title,
+		scheduledAt: '',
+		description: session.description ?? '',
+		privacyStatus: session.privacy_status ?? 'public',
+		madeForKids: session.made_for_kids === true,
+		thumbnail: null,
+		thumbnailUrl: session.thumbnail_url ?? null,
+		thumbnailKey: session.thumbnail_s3_key ?? null,
+		subtitle: null,
+		announce: false,
+		reminderEnabled: session.reminder_enabled === true,
+		notifyOnStart: session.notify_on_start === true,
+		youtubeChannelId: session.youtube_channel_id ?? ''
+	};
+}
 
 type YouTubeIngest = { url: string; key: string };
 type MissionnaireIngest = YouTubeIngest & { expiresAt: string };
@@ -128,6 +157,7 @@ function studioDeviceInfo() {
 
 export const liveSession = $state({
 	sessions: [] as LiveSession[],
+	previousSessions: [] as LiveSession[],
 	selectedId: null as string | null,
 	activeId: null as string | null,
 	activeStartedAt: null as number | null,
@@ -584,7 +614,9 @@ export async function createSession(draft: NewSession) {
 	try {
 		const channel = liveSession.youtubeChannels.find((item) => item.id === draft.youtubeChannelId);
 		if (!channel) throw new Error('Choose a connected YouTube channel.');
-		const thumbnail = draft.thumbnail ? await upload(draft.thumbnail, 'presign-thumbnail') : null;
+		const thumbnail = draft.thumbnail
+			? await upload(draft.thumbnail, 'presign-thumbnail')
+			: { url: draft.thumbnailUrl, key: draft.thumbnailKey };
 		const subtitle = draft.subtitle ? await upload(draft.subtitle, 'presign-subtitle') : null;
 		const result = await adminPost<{
 			session: LiveSession;
@@ -682,6 +714,7 @@ export async function refreshSessions() {
 		const result = await post<{
 			operator: { name: string };
 			sessions: LiveSession[];
+			previousSessions: LiveSession[];
 			serverReceivedAtMs: number;
 			serverSentAtMs: number;
 		}>({
@@ -689,6 +722,7 @@ export async function refreshSessions() {
 		});
 		sampleServerClock(result.serverReceivedAtMs, result.serverSentAtMs, sentAtMs, Date.now());
 		liveSession.sessions = result.sessions;
+		liveSession.previousSessions = result.previousSessions ?? [];
 		liveSession.operatorName = result.operator.name;
 		void refreshYouTubeStatus();
 	} catch (error) {
@@ -714,6 +748,7 @@ export async function logoutStudio(): Promise<boolean> {
 	liveSession.activeId = null;
 	liveSession.activeStartedAt = null;
 	liveSession.sessions = [];
+	liveSession.previousSessions = [];
 	liveSession.testUrl = null;
 	liveSession.error = null;
 	liveSession.youtubeConnected = false;

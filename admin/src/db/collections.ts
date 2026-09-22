@@ -1381,6 +1381,8 @@ export type ScheduledLive = {
 	youtube_url: string | null;
 	youtube_channel_id: string | null;
 	youtube_channel_title: string | null;
+	privacy_status?: 'private' | 'unlisted' | 'public';
+	made_for_kids?: boolean;
 	scheduled_at: string; // ISO (stored as BSON Date, serialized on read)
 	status: ScheduledLiveStatus;
 	live_started_at: string | null;
@@ -1446,6 +1448,8 @@ export async function createScheduledLive(input: {
 	youtube_url?: string | null;
 	youtube_channel_id?: string | null;
 	youtube_channel_title?: string | null;
+	privacy_status?: 'private' | 'unlisted' | 'public';
+	made_for_kids?: boolean;
 	scheduled_at: Date;
 	status?: 'scheduled' | 'live';
 	live_started_at?: string | null;
@@ -1473,6 +1477,8 @@ export async function createScheduledLive(input: {
 			youtube_url: input.youtube_url ?? null,
 			youtube_channel_id: input.youtube_channel_id ?? null,
 			youtube_channel_title: input.youtube_channel_title ?? null,
+			privacy_status: input.privacy_status ?? 'public',
+			made_for_kids: input.made_for_kids === true,
 			scheduled_at: input.scheduled_at,
 			status: input.status ?? 'scheduled',
 			live_started_at: input.live_started_at ?? null,

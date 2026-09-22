@@ -14,6 +14,7 @@
 	import Modal from './components/Modal.svelte';
 	import Preview from './components/Preview.svelte';
 	import PreflightPanel from './components/PreflightPanel.svelte';
+	import PreviousSessionDialog from './components/PreviousSessionDialog.svelte';
 	import PropertiesPanel from './components/PropertiesPanel.svelte';
 	import ScenesDock from './components/ScenesDock.svelte';
 	import ServicePanel from './components/ServicePanel.svelte';
@@ -71,7 +72,8 @@
 		logoutStudio,
 		refreshSessions,
 		refreshYouTubeStatus,
-		syncLiveLyrics
+		syncLiveLyrics,
+		type LiveSession
 	} from './lib/live-session.svelte';
 	import { recording } from './lib/recording.svelte';
 	import { initReferenceMatcher } from './lib/reference-match.svelte';
@@ -101,10 +103,17 @@
 		| 'help'
 		| 'developer'
 		| 'live-session'
+		| 'previous-session'
 		| 'new-session'
 		| 'preflight'
 		| null
 	>(null);
+	let sessionTemplate = $state<LiveSession | null>(null);
+
+	function openNewSession(template: LiveSession | null = null) {
+		sessionTemplate = template;
+		dialog = 'new-session';
+	}
 
 	// A Studio restart or hot update must not strand an SRT that was already
 	// selected for the live currently on air. The key makes this one attempt per
@@ -813,11 +822,24 @@
 	</Modal>
 {:else if dialog === 'live-session'}
 	<Modal title="Choose live session" onclose={() => (dialog = null)}>
-		<LiveSessionDialog onchoose={() => (dialog = null)} onnew={() => (dialog = 'new-session')} />
+		<LiveSessionDialog
+			onchoose={() => (dialog = null)}
+			onnew={() => (dialog = 'previous-session')}
+		/>
+	</Modal>
+{:else if dialog === 'previous-session'}
+	<Modal title="Schedule with previous settings" onclose={() => (dialog = 'live-session')}>
+		<PreviousSessionDialog onnew={() => openNewSession()} onreuse={openNewSession} />
 	</Modal>
 {:else if dialog === 'new-session'}
-	<Modal title="New public session" onclose={() => (dialog = 'live-session')}>
-		<NewSessionDialog oncreated={() => (dialog = null)} />
+	<Modal title="New public session" onclose={() => (dialog = 'previous-session')}>
+		<NewSessionDialog
+			template={sessionTemplate}
+			oncreated={() => {
+				sessionTemplate = null;
+				dialog = null;
+			}}
+		/>
 	</Modal>
 {:else if dialog === 'preflight'}
 	<Modal title={t('preflight.title')} onclose={() => (dialog = null)}>
