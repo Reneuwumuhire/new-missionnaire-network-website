@@ -30,7 +30,7 @@
 	// auto-follow so long texts can be read back; a sticky pill jumps back to
 	// the current line and resumes following. Music lyrics keep the always-
 	// follow behavior. Only wheel/touchmove count as "user scroll" — they
-	
+
 	// Fill-parent sizing + large type at ALL viewport widths — for the
 	// transcript's fullscreen reading overlay. Keeps the default light palette
 	// (dark text) so no dark theme is forced on the reader. (fullscreenMobile
@@ -402,6 +402,7 @@
 		--lyric-rule-chorus: rgba(194, 100, 12, 0.65);
 
 		max-height: 42vh;
+		overflow-x: hidden;
 		overflow-y: auto;
 		overscroll-behavior: contain;
 		display: flex;
@@ -700,6 +701,7 @@
 	   changes to a fill-screen, large-type layout for reading/projection. */
 	.lyrics-panel.fullscreen-large {
 		max-height: none;
+		min-width: 0;
 		min-height: 0;
 		flex: 1 1 auto;
 		padding: 1rem 1rem calc(2rem + env(safe-area-inset-bottom, 0px));
@@ -738,14 +740,10 @@
 	.lyrics-panel.fullscreen-large .lyric-line::before {
 		position: absolute;
 		z-index: -1;
-		inset: 0 -1rem;
-		background: linear-gradient(
-			to bottom,
-			transparent,
-			var(--subtitle-active-bg) 25%,
-			var(--subtitle-active-bg) 75%,
-			transparent
-		);
+		inset: 0;
+		border-inline-start: 4px solid var(--lyric-color-accent);
+		border-radius: 0.5rem;
+		background: var(--subtitle-active-bg);
 		content: '';
 		pointer-events: none;
 		opacity: 0;
@@ -791,9 +789,9 @@
 		--lyric-color-default: #6e655d;
 		--lyric-color-accent: #b9610f;
 		--subtitle-surface: #fbf8f3;
-		--subtitle-active-bg: rgba(255, 136, 12, 0.1);
-		--subtitle-past: 0.58;
-		--subtitle-future: 0.72;
+		--subtitle-active-bg: rgba(255, 136, 12, 0.18);
+		--subtitle-past: 0.72;
+		--subtitle-future: 0.82;
 		--subtitle-scrollbar: rgba(120, 110, 100, 0.35);
 	}
 	.subtitle-theme-sepia {
@@ -801,9 +799,9 @@
 		--lyric-color-default: #7a6a4d;
 		--lyric-color-accent: #9a6312;
 		--subtitle-surface: #f4ecd9;
-		--subtitle-active-bg: rgba(154, 99, 18, 0.12);
-		--subtitle-past: 0.62;
-		--subtitle-future: 0.76;
+		--subtitle-active-bg: rgba(154, 99, 18, 0.2);
+		--subtitle-past: 0.74;
+		--subtitle-future: 0.84;
 		--subtitle-scrollbar: rgba(120, 96, 56, 0.4);
 	}
 	.subtitle-theme-dark {
@@ -811,9 +809,9 @@
 		--lyric-color-default: #a89e92;
 		--lyric-color-accent: #eda35a;
 		--subtitle-surface: #1c1a17;
-		--subtitle-active-bg: rgba(255, 176, 80, 0.13);
-		--subtitle-past: 0.5;
-		--subtitle-future: 0.68;
+		--subtitle-active-bg: rgba(255, 176, 80, 0.22);
+		--subtitle-past: 0.72;
+		--subtitle-future: 0.82;
 		--subtitle-scrollbar: rgba(200, 190, 175, 0.3);
 	}
 	.subtitle-theme-contrast {
@@ -821,9 +819,9 @@
 		--lyric-color-default: #3d3d3d;
 		--lyric-color-accent: #8a4500;
 		--subtitle-surface: #ffffff;
-		--subtitle-active-bg: rgba(0, 0, 0, 0.06);
-		--subtitle-past: 0.82;
-		--subtitle-future: 0.9;
+		--subtitle-active-bg: rgba(0, 0, 0, 0.12);
+		--subtitle-past: 0.88;
+		--subtitle-future: 0.94;
 		--subtitle-scrollbar: rgba(60, 60, 60, 0.45);
 	}
 
