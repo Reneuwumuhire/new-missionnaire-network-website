@@ -8,7 +8,7 @@ const isNodeDeployment = process.env.DEPLOY_TARGET === 'node';
 const config = {
 	kit: {
 		adapter: isNodeDeployment ? nodeAdapter() : vercelAdapter({
-			runtime: 'nodejs22.x',
+			runtime: 'nodejs24.x',
 			// Vercel Image Optimization config must live on the adapter — at build
 			// time, adapter-vercel writes `.vercel/output/config.json` and that
 			// supersedes the `images` block in `vercel.json`. Without this, the

@@ -8,7 +8,7 @@ const isNodeDeployment = process.env.DEPLOY_TARGET === 'node';
 const config = {
 	kit: {
 		adapter: isNodeDeployment ? nodeAdapter() : adapter({
-			runtime: 'nodejs22.x',
+			runtime: 'nodejs24.x',
 			// Vercel image optimization: exposes `/_vercel/image` for resized,
 			// AVIF/WebP-negotiated, edge-cached thumbnails. Mirrors the public
 			// site's config so admin can use the same BlurUpImage component.
