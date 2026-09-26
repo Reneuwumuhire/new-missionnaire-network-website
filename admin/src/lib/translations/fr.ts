@@ -43,12 +43,44 @@ export default {
 	'nav.audioLibrary': 'Bibliothèque audio',
 	'nav.lyricsReview': 'Révision paroles',
 	'nav.users': 'Utilisateurs',
+	'nav.studioHelp': 'Aide Studio',
 	'nav.settings': 'Paramètres',
 	'nav.logout': 'Déconnexion',
 	'nav.menu': 'Menu',
 	'nav.closeMenu': 'Fermer le menu',
 	'nav.liveAudience': 'Audience en direct',
 	'nav.language': 'Langue',
+
+	// ── Aide Studio ─────────────────────────────────────────────
+	'studioHelp.pageTitle': 'Aide Studio - Missionnaire Admin',
+	'studioHelp.title': 'Aide Missionnaire Studio',
+	'studioHelp.subtitle':
+		'Regardez les guides dans l’ordre avant de conduire un direct. Chaque vidéo reprend les commandes et le déroulement affichés dans Studio.',
+	'studioHelp.beforeTitle': 'Complétez d’abord les informations dans Admin',
+	'studioHelp.beforeBody':
+		'Le test privé rapide réutilise le titre, la description et les réglages par défaut du direct dans Admin. Vérifiez-les avant d’ouvrir Studio.',
+	'studioHelp.openLives': 'Ouvrir les réglages du direct',
+	'studioHelp.guideList': 'Guides vidéo de Studio',
+	'studioHelp.englishCaptions': 'Sous-titres anglais',
+	'studioHelp.videoUnsupported': 'Votre navigateur ne prend pas en charge la vidéo intégrée.',
+	'studioHelp.guide1Title': 'Vue d’ensemble de Studio',
+	'studioHelp.guide1Description':
+		'Découvrez où se trouvent Preview, Program, les scènes, les sources, l’audio, les paroles et les commandes.',
+	'studioHelp.guide2Title': 'Scènes et sources',
+	'studioHelp.guide2Description':
+		'Construisez une scène, ajoutez uniquement les sources nécessaires et préparez-la dans Preview.',
+	'studioHelp.guide3Title': 'Audio et paroles',
+	'studioHelp.guide3Description':
+		'Réglez les niveaux, le son coupé, le contrôle audio et la synchronisation des paroles.',
+	'studioHelp.guide4Title': 'Préparation du service',
+	'studioHelp.guide4Description':
+		'Préparez la musique d’ouverture, la prédication, la musique de fin, l’image et les sous-titres.',
+	'studioHelp.guide5Title': 'Démarrer un direct en sécurité',
+	'studioHelp.guide5Description':
+		'Choisissez la session, la destination d’enregistrement et les réglages de sortie avant le direct.',
+	'studioHelp.guide6Title': 'Service préenregistré et Preview',
+	'studioHelp.guide6Description':
+		'Complétez les réglages Admin, préparez tous les fichiers, créez un test privé et vérifiez Preview.',
 
 	// ── Dashboard ───────────────────────────────────────────────
 	'dashboard.pageTitle': 'Tableau de bord - Missionnaire Admin',

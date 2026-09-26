@@ -1,0 +1,19 @@
+WEBVTT
+
+00:00.500 --> 00:06.500
+This final beginner guide covers the checks before you start a preview signal, recording, or live programme.
+
+00:07.500 --> 00:17.500
+Open Live session and select an upcoming public service. If no session exists, create one only after its public details and timing are confirmed.
+
+00:18.500 --> 00:27.500
+Use Quick private test for rehearsal. It creates an unlisted link, uses the admin defaults, and does not notify subscribers.
+
+00:28.500 --> 00:40.500
+In Settings, Output, choose whether recording is Off, Local, Cloud, or Both. Local recordings are saved in the Missionnaire Studio folder on the computer.
+
+00:41.500 --> 00:49.500
+Keep the recommended bitrate unless the connection requires a change. Hardware encoding reduces CPU use; use software only when needed.
+
+00:50.500 --> 00:56.500
+Choose the session, confirm recording, start the preview signal, check it, and only then start the programme.

@@ -1,0 +1,16 @@
+WEBVTT
+
+00:00.500 --> 00:06.500
+This guide shows how scenes and sources work together in Missionnaire Studio.
+
+00:07.500 --> 00:16.500
+A scene is a complete layout. Keep simple scenes for the live camera, a shared screen, and a break image. Select the scene you want to prepare.
+
+00:17.500 --> 00:29.500
+Choose Add source, then select exactly what the scene needs: a camera, display, image, media file, text, lyrics, or an audio capture.
+
+00:30.500 --> 00:41.500
+Sources belong to the selected scene. Use the eye to show or hide one, lock finished items, open Properties to adjust them, and reorder them when they overlap.
+
+00:42.500 --> 00:49.500
+Build the scene, check every source in Preview, then send it to Program only when it is ready.
