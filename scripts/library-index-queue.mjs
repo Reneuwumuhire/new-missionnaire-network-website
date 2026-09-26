@@ -5,6 +5,7 @@ export const collections = ['sermons', 'literature', 'pdfs', 'recordings'];
 const revisionFields = [
 	'pdf_url',
 	'english_pdf_url',
+	'parts',
 	'url',
 	'subtitle_srt_url',
 	'subtitle_srt_s3_key',
@@ -41,7 +42,7 @@ const publicRow = (row) =>
 	!['draft', 'scheduled', 'archived', 'private'].includes(row.status);
 const publicRecording = (row) => row?.published === true && row.status === 'ready';
 
-function assetsFor(collection, row, owner, scheduled) {
+export function assetsFor(collection, row, owner, scheduled) {
 	if (!publicRow(row)) return [];
 	if (collection === 'pdfs' && row.recordingId && !publicRecording(owner)) return [];
 	if (collection === 'recordings' && (!publicRecording(row) || row.subtitles_hidden === true))
@@ -51,11 +52,19 @@ function assetsFor(collection, row, owner, scheduled) {
 		collection === 'sermons'
 			? [row.pdf_url, row.english_pdf_url]
 			: collection === 'literature'
-				? [row.pdf_url]
+				? row.parts?.length
+					? row.parts.map((part) => part.url)
+					: /\.pdf(?:$|[?#])/i.test(row.pdf_url ?? '')
+						? [row.pdf_url]
+						: []
 				: collection === 'recordings'
 					? [direct ? row.subtitle_srt_url : scheduled?.subtitle_srt_url]
 					: [row.url];
-	const snapshot = Object.fromEntries(revisionFields.map((key) => [key, row[key] ?? null]));
+	const snapshot = Object.fromEntries(
+		revisionFields
+			.filter((key) => key !== 'parts' || row.parts?.length)
+			.map((key) => [key, row[key] ?? null])
+	);
 	// ponytail: source timestamps conservatively re-index after metadata edits too;
 	// use dedicated asset revisions if that extra work becomes significant.
 	return [...new Set(urls.filter((url) => typeof url === 'string' && url))].map((url) => ({
@@ -63,7 +72,10 @@ function assetsFor(collection, row, owner, scheduled) {
 		collection,
 		sourceId: row._id,
 		url,
-		title: row.french_title || row.title || row.filename || String(row._id),
+		title:
+			collection === 'literature' && row.parts?.find((part) => part.url === url)?.title
+				? `${row.title} — ${row.parts.find((part) => part.url === url).title}`
+				: row.french_title || row.title || row.filename || String(row._id),
 		kind: collection === 'recordings' ? 'srt' : 'pdf',
 		revision: hash([
 			snapshot,

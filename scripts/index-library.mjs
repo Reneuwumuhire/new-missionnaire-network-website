@@ -44,6 +44,7 @@ try {
 			library_search: 1,
 			pdf_url: 1,
 			english_pdf_url: 1,
+			parts: 1,
 			url: 1,
 			subtitle_srt_url: 1,
 			subtitle_srt_s3_key: 1,
@@ -68,7 +69,11 @@ try {
 				collection === 'sermons'
 					? [row.pdf_url, row.english_pdf_url]
 					: collection === 'literature'
-						? [row.pdf_url]
+						? row.parts?.length
+							? row.parts.map((part) => part.url)
+							: /\.pdf(?:$|[?#])/i.test(row.pdf_url ?? '')
+								? [row.pdf_url]
+								: []
 						: [row.url];
 			if (collection === 'recordings') {
 				const direct =

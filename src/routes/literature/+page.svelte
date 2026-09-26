@@ -11,6 +11,7 @@
 	import BsArrowDown from 'svelte-icons-pack/bs/BsArrowDown';
 	import IoReload from 'svelte-icons-pack/io/IoReload';
 	import AiOutlineDownload from 'svelte-icons-pack/ai/AiOutlineDownload';
+	import BsChevronDown from 'svelte-icons-pack/bs/BsChevronDown';
 	import IoBookOutline from 'svelte-icons-pack/io/IoBookOutline';
 	import IoCreate from 'svelte-icons-pack/io/IoCreate';
 
@@ -326,23 +327,6 @@
 									>
 								</div>
 							{/if}
-
-							<!-- Hover Overlay with Download Action -->
-							<div
-								class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]"
-							>
-								{#if item.pdf_url}
-									<a
-										href={item.pdf_url}
-										target="_blank"
-										rel="noopener noreferrer"
-										class="flex items-center gap-2 px-6 py-3 bg-white text-orange-600 rounded-full font-bold shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-all"
-									>
-										<Icon src={AiOutlineDownload} size="20" />
-										Télécharger
-									</a>
-								{/if}
-							</div>
 						</div>
 
 						<!-- Content -->
@@ -359,6 +343,57 @@
 								</p>
 							{:else}
 								<div class="flex-grow"></div>
+							{/if}
+
+							{#if item.parts.length}
+								<details class="book-parts mb-4 border-y border-stone-200 py-1">
+									<summary
+										class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-bold text-stone-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500"
+									>
+										<span>{item.parts.length} prédication{item.parts.length > 1 ? 's' : ''}</span>
+										<span class="book-parts-chevron text-orange-600" aria-hidden="true">
+											<Icon src={BsChevronDown} size="16" />
+										</span>
+									</summary>
+									<ol class="max-h-72 space-y-1 overflow-y-auto pb-3 pt-1">
+										{#each item.parts as part}
+											<li
+												class="grid grid-cols-[1.5rem_1fr_auto] items-start gap-2 rounded-lg px-2 py-2 hover:bg-orange-50"
+											>
+												<span class="pt-0.5 text-xs tabular-nums text-stone-400"
+													>{part.position}</span
+												>
+												<span class="min-w-0">
+													<span class="block text-sm font-semibold leading-snug text-stone-700"
+														>{part.title}</span
+													>
+													{#if part.code}<span class="mt-0.5 block text-[11px] text-stone-400"
+															>{part.code}</span
+														>{/if}
+												</span>
+												<a
+													href={part.url}
+													target="_blank"
+													rel="noopener noreferrer"
+													class="inline-flex min-h-11 items-center px-2 text-xs font-bold text-orange-700 underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500"
+													>Lire</a
+												>
+											</li>
+										{/each}
+									</ol>
+								</details>
+							{/if}
+
+							{#if item.pdf_url}
+								<a
+									href={item.pdf_url}
+									target="_blank"
+									rel="noopener noreferrer"
+									class="mb-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-bold text-white hover:bg-orange-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500"
+								>
+									<Icon src={AiOutlineDownload} size="17" />
+									{item.parts.length ? 'Télécharger le livre (.zip)' : 'Télécharger le PDF'}
+								</a>
 							{/if}
 
 							<div
@@ -530,4 +565,17 @@
 </div>
 
 <style>
+	.book-parts[open] .book-parts-chevron {
+		transform: rotate(180deg);
+	}
+
+	.book-parts-chevron {
+		transition: transform 150ms ease;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.book-parts-chevron {
+			transition: none;
+		}
+	}
 </style>
