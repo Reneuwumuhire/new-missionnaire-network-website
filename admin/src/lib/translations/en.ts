@@ -44,12 +44,44 @@ const en: Record<keyof typeof fr, string> = {
 	'nav.audioLibrary': 'Audio library',
 	'nav.lyricsReview': 'Lyrics review',
 	'nav.users': 'Users',
+	'nav.studioHelp': 'Studio help',
 	'nav.settings': 'Settings',
 	'nav.logout': 'Log out',
 	'nav.menu': 'Menu',
 	'nav.closeMenu': 'Close menu',
 	'nav.liveAudience': 'Live audience',
 	'nav.language': 'Language',
+
+	// ── Studio help ─────────────────────────────────────────────
+	'studioHelp.pageTitle': 'Studio help - Missionnaire Admin',
+	'studioHelp.title': 'Missionnaire Studio help',
+	'studioHelp.subtitle':
+		'Watch the guides in order before operating a live service. Each video uses the same controls and workflow you will see in Studio.',
+	'studioHelp.beforeTitle': 'Complete the Admin information first',
+	'studioHelp.beforeBody':
+		'The quick private test reuses the default live title, description and settings from Admin. Check them before opening Studio.',
+	'studioHelp.openLives': 'Open live settings',
+	'studioHelp.guideList': 'Studio video guides',
+	'studioHelp.englishCaptions': 'English captions',
+	'studioHelp.videoUnsupported': 'Your browser does not support embedded video.',
+	'studioHelp.guide1Title': 'Studio at a glance',
+	'studioHelp.guide1Description':
+		'Learn where Preview, Program, scenes, sources, audio, lyrics and controls live.',
+	'studioHelp.guide2Title': 'Scenes and sources',
+	'studioHelp.guide2Description':
+		'Build a scene, add only the sources it needs, and prepare it safely in Preview.',
+	'studioHelp.guide3Title': 'Audio and lyrics',
+	'studioHelp.guide3Description':
+		'Set sound levels, control mute and monitoring, and keep lyrics in time.',
+	'studioHelp.guide4Title': 'Service setup',
+	'studioHelp.guide4Description':
+		'Prepare the opening music, sermon, closing music, visuals and subtitles.',
+	'studioHelp.guide5Title': 'Going live safely',
+	'studioHelp.guide5Description':
+		'Choose the live session, recording destination and output settings before broadcast.',
+	'studioHelp.guide6Title': 'Pre-recorded service and Preview',
+	'studioHelp.guide6Description':
+		'Complete the Admin defaults, prepare every file, create a private test and verify Preview safely.',
 
 	// ── Dashboard ───────────────────────────────────────────────
 	'dashboard.pageTitle': 'Dashboard - Missionnaire Admin',

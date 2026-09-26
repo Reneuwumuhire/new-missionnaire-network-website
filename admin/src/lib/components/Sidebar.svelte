@@ -38,6 +38,9 @@
 		...(user.canManageRecordings
 			? [{ href: '/library-index', labelKey: 'index.title' as const, icon: 'lyrics' }]
 			: []),
+		...(user.canManageRecordings
+			? [{ href: '/studio/help', labelKey: 'nav.studioHelp' as const, icon: 'help' }]
+			: []),
 		...(user.canManageAudio
 			? [{ href: '/audio', labelKey: 'nav.audioLibrary' as const, icon: 'music' }]
 			: []),
@@ -236,6 +239,20 @@
 									stroke-linecap="round"
 									stroke-linejoin="round"
 									d="M8 6h10M8 10h10M8 14h6M5 6h.01M5 10h.01M5 14h.01M4 20h16"
+								/>
+							</svg>
+						{:else if item.icon === 'help'}
+							<svg
+								class="h-[15px] w-[15px]"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+								stroke-width="2"
+							>
+								<circle cx="12" cy="12" r="9" />
+								<path
+									stroke-linecap="round"
+									d="M9.8 9a2.4 2.4 0 114.1 1.7c-1.1 1-1.9 1.4-1.9 2.8M12 17h.01"
 								/>
 							</svg>
 						{:else if item.icon === 'settings'}

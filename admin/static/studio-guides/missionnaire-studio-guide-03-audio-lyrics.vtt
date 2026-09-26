@@ -1,0 +1,16 @@
+WEBVTT
+
+00:00.500 --> 00:06.500
+This guide covers the two things viewers notice immediately: clear audio and correctly timed lyrics.
+
+00:07.500 --> 00:18.500
+In the Audio Mixer, watch each level meter while the source is playing. Set a healthy level, unmute only what should be heard, and use Monitor to check sound locally.
+
+00:19.500 --> 00:31.500
+In Lyrics, open a timed SRT file for automatic captions, or paste plain text when an operator will advance each line manually. Shown controls whether lyrics are visible.
+
+00:32.500 --> 00:41.500
+For recorded sermons, the Lyrics switch follows the media position. Pausing or moving backward keeps the subtitle timing attached to the recording.
+
+00:42.500 --> 00:49.500
+Before going live, listen once, watch the meters, confirm the first lyric, and keep silent sources muted.

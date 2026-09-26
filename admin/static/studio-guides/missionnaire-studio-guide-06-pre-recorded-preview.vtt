@@ -1,0 +1,19 @@
+WEBVTT
+
+00:00.000 --> 00:07.000
+This guide shows the complete pre-recorded workflow, from Admin preparation to a private Preview signal.
+
+00:07.000 --> 00:16.000
+Before opening Studio, complete the default live information in Missionnaire Admin. The quick private test reuses those details.
+
+00:16.000 --> 00:30.000
+In Service setup, choose Pre-recorded Kinyarwanda, then connect the opening music, sermon recording, closing music, visual, and timed subtitle file. Continue only when everything is ready.
+
+00:30.000 --> 00:40.000
+Open Live session and choose Quick private test. Studio creates an unlisted link using the Admin defaults and does not notify subscribers.
+
+00:40.000 --> 00:53.000
+Select Start Preview Signal and review preflight. Fix every blocked check. Review warnings, then wait for FPS, destinations, and stream health to become stable.
+
+00:53.000 --> 01:03.000
+Preview is not public. Check the private link, never choose Go Live during rehearsal, then stop streaming when the test is complete.
