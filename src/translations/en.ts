@@ -59,6 +59,8 @@ const en: Record<keyof typeof fr, string> = {
 
 	// ── Language picker ─────────────────────────────────────────
 	'lang.label': 'Language',
+	'lang.all': 'All',
+	'lang.available': '{count} languages available',
 	'lang.french': 'Français',
 	'lang.english': 'English',
 	'lang.kinyarwanda': 'Kinyarwanda',

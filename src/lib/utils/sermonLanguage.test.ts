@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { availableSermonVersions, getSermonVersion, parseSermonLanguage } from './sermonLanguage';
+import {
+	availableSermonVersions,
+	getSermonVersion,
+	parseSermonLanguage,
+	parseSermonLanguageFilter
+} from './sermonLanguage';
 import type { Sermon } from '$lib/models/sermon';
 
 const sermon: Sermon = {
@@ -31,5 +36,6 @@ describe('sermon language versions', () => {
 		expect(parseSermonLanguage('RW')).toBe('kinyarwanda');
 		expect(parseSermonLanguage('Swahili')).toBe('swahili');
 		expect(parseSermonLanguage('unknown')).toBe('french');
+		expect(parseSermonLanguageFilter('ALL')).toBe('all');
 	});
 });

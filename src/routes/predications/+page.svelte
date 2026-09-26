@@ -22,9 +22,10 @@
 	import ErrorCard from '$lib/components/ErrorCard.svelte';
 	import ResultsSummary from '$lib/components/ResultsSummary.svelte';
 	import {
-		parseSermonLanguage,
-		sermonLanguages,
-		type SermonLanguage
+		availableSermonVersions,
+		parseSermonLanguageFilter,
+		sermonLanguageFilters,
+		type SermonLanguageFilter
 	} from '$lib/utils/sermonLanguage';
 	import { onDestroy, onMount, tick, untrack } from 'svelte';
 	import {
@@ -75,11 +76,12 @@
 	let currentSort = $derived((data as any).sort || 'iso_date:desc');
 	let currentPage = $derived((data as any).page);
 	let limit = $derived((data as any).limit);
-	let currentLanguage = $derived(parseSermonLanguage((data as any).language));
+	let currentLanguage = $derived(parseSermonLanguageFilter((data as any).language));
 	const languageLabelKeys: Record<
-		SermonLanguage,
-		'lang.french' | 'lang.english' | 'lang.kinyarwanda' | 'lang.swahili'
+		SermonLanguageFilter,
+		'lang.all' | 'lang.french' | 'lang.english' | 'lang.kinyarwanda' | 'lang.swahili'
 	> = {
+		all: 'lang.all',
 		french: 'lang.french',
 		english: 'lang.english',
 		kinyarwanda: 'lang.kinyarwanda',
@@ -110,7 +112,15 @@
 	);
 	let playlistSermons = $derived(
 		filterType === 'sermon'
-			? sermons.map((sermon: Sermon) => createPlayableSermon(sermon, currentLanguage))
+			? sermons.map((sermon: Sermon) =>
+					createPlayableSermon(
+						sermon,
+						currentLanguage === 'all'
+							? availableSermonVersions(sermon).find((version) => version.audioUrl)?.language ||
+									'french'
+							: currentLanguage
+					)
+				)
 			: []
 	);
 
@@ -460,7 +470,7 @@
 		goto(`?${params.toString()}`);
 	}
 
-	function handleLanguageChange(lang: SermonLanguage) {
+	function handleLanguageChange(lang: SermonLanguageFilter) {
 		if (currentLanguage === lang) return;
 		const params = new URLSearchParams($page.url.searchParams);
 		params.set('language', lang);
@@ -997,7 +1007,7 @@
 							{$t('lang.label')}
 						</h3>
 						<div class="flex flex-wrap gap-2">
-							{#each sermonLanguages as language}
+							{#each sermonLanguageFilters as language}
 								<button
 									class="inline-flex h-9 items-center rounded-full border px-3.5 text-[11px] font-bold uppercase tracking-[0.08em] transition-colors duration-150 {currentLanguage ===
 									language

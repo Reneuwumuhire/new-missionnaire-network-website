@@ -2,6 +2,8 @@ import type { Sermon } from '$lib/models/sermon';
 
 export const sermonLanguages = ['french', 'english', 'kinyarwanda', 'swahili'] as const;
 export type SermonLanguage = (typeof sermonLanguages)[number];
+export const sermonLanguageFilters = ['all', ...sermonLanguages] as const;
+export type SermonLanguageFilter = (typeof sermonLanguageFilters)[number];
 
 export const sermonLanguageCodes: Record<SermonLanguage, 'fr' | 'en' | 'rw' | 'sw'> = {
 	french: 'fr',
@@ -34,6 +36,12 @@ export function parseSermonLanguage(value: unknown): SermonLanguage {
 			? (normalized as SermonLanguage)
 			: 'french')
 	);
+}
+
+export function parseSermonLanguageFilter(value: unknown): SermonLanguageFilter {
+	return typeof value === 'string' && value.toLowerCase() === 'all'
+		? 'all'
+		: parseSermonLanguage(value);
 }
 
 export function getSermonVersion(

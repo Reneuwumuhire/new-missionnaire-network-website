@@ -15,13 +15,18 @@
 	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
 	import { downloadAudioFile } from '../../utils/downloadAudio';
 	import { t } from '../../i18n';
-	import { getSermonVersion, type SermonLanguage } from '$lib/utils/sermonLanguage';
+	import {
+		availableSermonVersions,
+		getSermonVersion,
+		type SermonLanguage,
+		type SermonLanguageFilter
+	} from '$lib/utils/sermonLanguage';
 
 	interface Props {
 		sermon: Sermon;
 		index: number;
 		absoluteIndex: number;
-		language?: SermonLanguage;
+		language?: SermonLanguageFilter;
 	}
 
 	let { sermon, index, absoluteIndex, language = 'french' }: Props = $props();
@@ -37,36 +42,35 @@
 	let downloadController: AbortController | null = null;
 	const desktopSermonGrid = 'md:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.35fr)_110px_80px_120px]';
 
-	function isSermonActive(
-		s: Sermon,
-		current: Sermon | AudioAsset | MusicAudio | LiveStreamTrack | null
-	) {
-		// Check for specific english audio URL match
-		const audioUrl = getSermonVersion(s, language).audioUrl;
-		if (!current || !audioUrl) return false;
-		const currentUrl =
-			'mp3_url' in current
-				? current.mp3_url
-				: 's3_url' in current
-					? current.s3_url
-					: (current as any).url;
-		return currentUrl === audioUrl;
+	function currentAudioUrl(current: Sermon | AudioAsset | MusicAudio | LiveStreamTrack | null) {
+		if (!current) return null;
+		return 'mp3_url' in current
+			? current.mp3_url
+			: 's3_url' in current
+				? current.s3_url
+				: (current as any).url;
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
+		if (e.target instanceof Element && e.target.closest('details')) return;
 		if (e.key === 'Enter' || e.key === ' ') {
 			e.preventDefault();
 			togglePlay();
 		}
 	}
 
-	function togglePlay() {
-		const playbackSermon = createPlayableSermon(sermon, language);
+	function handleRowClick(event: MouseEvent) {
+		if (event.target instanceof Element && event.target.closest('details')) return;
+		togglePlay();
+	}
+
+	function togglePlay(selectedLanguage: SermonLanguage = primaryLanguage) {
+		const playbackSermon = createPlayableSermon(sermon, selectedLanguage);
 		const audioUrl = playbackSermon.mp3_url;
 
 		if (!audioUrl) return;
 
-		if (isActive) {
+		if (currentAudioUrl($selectAudio) === audioUrl) {
 			dispatchAudioPlayerAction('toggle');
 		} else {
 			currentIndex.set(index);
@@ -124,10 +128,23 @@
 		return isDurationLoading ? '...' : '--:--';
 	}
 
-	let isActive = $derived(isSermonActive(sermon, $selectAudio));
-	let version = $derived(getSermonVersion(sermon, language));
+	let versions = $derived(availableSermonVersions(sermon));
+	let primaryLanguage = $derived(
+		language === 'all'
+			? versions.find((candidate) => candidate.language === 'french')?.language ||
+					versions[0]?.language ||
+					'french'
+			: language
+	);
+	let version = $derived(getSermonVersion(sermon, primaryLanguage));
+	let selectedAudioUrl = $derived(currentAudioUrl($selectAudio));
+	let isActive = $derived(
+		language === 'all'
+			? versions.some((candidate) => candidate.audioUrl === selectedAudioUrl)
+			: version.audioUrl === selectedAudioUrl
+	);
 	let sermonHref = $derived(
-		`/predications/${buildSermonSlug(sermon)}${language === 'french' ? '' : `?language=${language}`}`
+		`/predications/${buildSermonSlug(sermon)}${primaryLanguage === 'french' ? '' : `?language=${primaryLanguage}`}`
 	);
 	let durationAudioUrl = $derived(version.audioUrl);
 	let hasDurationAudio = $derived(Boolean(durationAudioUrl));
@@ -147,7 +164,7 @@
 	class="grid grid-cols-[30px_1fr_auto_auto] {desktopSermonGrid} gap-2 md:gap-4 px-4 py-3 md:py-4 items-center transition-all group cursor-pointer {isActive
 		? 'bg-orange-50/80 border-l-4 border-l-orange-500'
 		: 'hover:bg-gray-50'}"
-	onclick={togglePlay}
+	onclick={handleRowClick}
 	onkeydown={handleKeydown}
 	role="button"
 	tabindex="0"
@@ -358,4 +375,58 @@
 			</button>
 		{/if}
 	</div>
+
+	{#if language === 'all' && versions.length > 0}
+		<details class="col-span-full ml-10 border-t border-stone-200/70 pt-2">
+			<summary
+				class="min-h-11 cursor-pointer select-none py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-stone-500 hover:text-missionnaire"
+			>
+				{$t('lang.available', { count: versions.length })}
+			</summary>
+			<div class="divide-y divide-stone-100 border-t border-stone-100">
+				{#each versions as languageVersion}
+					<div class="flex min-h-12 items-center gap-3 py-2">
+						<span
+							class="w-8 shrink-0 rounded bg-stone-100 px-1.5 py-1 text-center text-[10px] font-bold uppercase text-stone-500"
+						>
+							{languageVersion.code}
+						</span>
+						<a
+							href={`/predications/${buildSermonSlug(sermon)}?language=${languageVersion.language}`}
+							class="min-w-0 flex-1 truncate text-xs font-semibold text-stone-700 hover:text-missionnaire hover:underline"
+						>
+							{languageVersion.title}
+						</a>
+						{#if languageVersion.pdfUrl}
+							<a
+								href={languageVersion.pdfUrl}
+								target="_blank"
+								rel="noopener noreferrer"
+								class="inline-flex min-h-11 min-w-11 items-center justify-center text-stone-400 hover:text-red-500"
+								aria-label={$t('player.downloadPdfLabel', { title: languageVersion.title })}
+							>
+								<Icon src={BsFileEarmarkPdfFill} size="16" />
+							</a>
+						{/if}
+						{#if languageVersion.audioUrl}
+							<button
+								class="inline-flex min-h-11 min-w-11 items-center justify-center text-orange-600 hover:scale-110"
+								onclick={() => togglePlay(languageVersion.language)}
+								aria-label={selectedAudioUrl === languageVersion.audioUrl && $isPlaying
+									? $t('player.pause')
+									: $t('player.playAction')}
+							>
+								<Icon
+									src={selectedAudioUrl === languageVersion.audioUrl && $isPlaying
+										? IoPauseCircle
+										: IoPlayCircle}
+									size="22"
+								/>
+							</button>
+						{/if}
+					</div>
+				{/each}
+			</div>
+		</details>
+	{/if}
 </div>

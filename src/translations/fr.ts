@@ -59,6 +59,8 @@ export default {
 
 	// ── Language picker ─────────────────────────────────────────
 	'lang.label': 'Langue',
+	'lang.all': 'Toutes',
+	'lang.available': '{count} langues disponibles',
 	'lang.french': 'Français',
 	'lang.english': 'English',
 	'lang.kinyarwanda': 'Kinyarwanda',

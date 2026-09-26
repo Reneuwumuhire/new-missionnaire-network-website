@@ -1710,6 +1710,7 @@ export async function querySermons(options: {
 	const languageFields =
 		sermonLanguageFields[language as keyof typeof sermonLanguageFields] ??
 		sermonLanguageFields.french;
+	const allLanguageAudioFields = Object.values(sermonLanguageFields).map(({ audio }) => audio);
 
 	try {
 		const db = await getDb();
@@ -1746,11 +1747,15 @@ export async function querySermons(options: {
 		}
 
 		if (hasAudio) {
-			conditions.push({ [languageFields.audio]: { $regex: '.+' } });
+			conditions.push(
+				language === 'all'
+					? { $or: allLanguageAudioFields.map((field) => ({ [field]: { $regex: '.+' } })) }
+					: { [languageFields.audio]: { $regex: '.+' } }
+			);
 		}
 
 		// Language filtering logic
-		if (language !== 'french') {
+		if (language !== 'french' && language !== 'all') {
 			conditions.push({
 				$or: [
 					{ [languageFields.pdf]: { $regex: '.+' } },
