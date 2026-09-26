@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MongoClient, ObjectId } from 'mongodb';
-import { discover, processOne } from './library-index-queue.mjs';
+import { assetsFor, discover, processOne } from './library-index-queue.mjs';
 import { extract } from './library-extract.mjs';
 
 test('extractor refuses untrusted hosts, credentials, and non-HTTPS URLs before fetching', async () => {
@@ -11,6 +11,29 @@ test('extractor refuses untrusted hosts, credentials, and non-HTTPS URLs before 
 		'https://user:pass@assets.test/a.pdf'
 	])
 		await assert.rejects(extract(url, 'pdf', new Set(['assets.test'])), /not allowed/);
+});
+
+test('literature indexes PDFs, never the ZIP download container', () => {
+	assert.equal(
+		assetsFor('literature', { _id: 'book', pdf_url: 'https://assets.test/book.zip' }).length,
+		0
+	);
+	assert.deepEqual(
+		assetsFor('literature', {
+			_id: 'book',
+			pdf_url: 'https://assets.test/book.zip',
+			parts: [{ title: 'Part 1', url: 'https://assets.test/part-1.pdf' }]
+		}).map(({ url }) => url),
+		['https://assets.test/part-1.pdf']
+	);
+	assert.equal(
+		assetsFor('sermons', { _id: 'sermon', pdf_url: 'https://assets.test/sermon.pdf' })[0].revision,
+		assetsFor('sermons', {
+			_id: 'sermon',
+			pdf_url: 'https://assets.test/sermon.pdf',
+			parts: []
+		})[0].revision
+	);
 });
 
 test(

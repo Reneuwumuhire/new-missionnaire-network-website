@@ -1810,18 +1810,6 @@ export async function getSermonYears(): Promise<string[]> {
 }
 
 const literatureSortFields = new Set(['release_date', 'title', 'author']);
-let literatureIndexesEnsured: Promise<string[]> | null = null;
-
-function ensureLiteratureIndexes(db: Db) {
-	literatureIndexesEnsured ??= db
-		.collection('literature')
-		.createIndexes([{ key: { release_date: 1 } }, { key: { title: 1 } }, { key: { author: 1 } }])
-		.catch((error) => {
-			literatureIndexesEnsured = null;
-			throw error;
-		});
-	return literatureIndexesEnsured;
-}
 
 export async function queryLiterature(options: {
 	author?: string;
@@ -1846,7 +1834,6 @@ export async function queryLiterature(options: {
 
 	try {
 		const db = await getDb();
-		await ensureLiteratureIndexes(db);
 		const query: Filter<Document> = {};
 		const conditions: Filter<Document>[] = [];
 
@@ -1859,8 +1846,14 @@ export async function queryLiterature(options: {
 		}
 
 		if (search && search.trim()) {
+			const escaped = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 			conditions.push({
-				$or: [{ title: { $regex: search, $options: 'i' } }]
+				$or: [
+					{ title: { $regex: escaped, $options: 'i' } },
+					{ description: { $regex: escaped, $options: 'i' } },
+					{ 'parts.title': { $regex: escaped, $options: 'i' } },
+					{ 'parts.code': { $regex: escaped, $options: 'i' } }
+				]
 			});
 		}
 
@@ -1904,7 +1897,10 @@ export async function queryLiterature(options: {
 		]);
 
 		return {
-			data: data.map((doc) => serializeDocument<Literature>(doc)),
+			data: data.map((doc) => ({
+				...serializeDocument<Literature>(doc),
+				parts: doc.parts ?? []
+			})),
 			total
 		};
 	} catch (error) {

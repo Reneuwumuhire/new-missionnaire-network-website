@@ -19,6 +19,7 @@ it('uses an indexed first stage for file text, not raw user search syntax', () =
 	expect(JSON.stringify(librarySourcePipeline('sermons', filters))).not.toContain(
 		'$library_search'
 	);
+	expect(JSON.stringify(librarySourcePipeline('documents', filters, true))).toContain('$parts.url');
 	expect(libraryTextTerm('-amour "foi"')).toBe('amour');
 	expect(libraryTextTerm('.*')).toBe('');
 	expect(libraryTextTerm('gra\u0302ce')).toBe('grâce');
@@ -174,7 +175,15 @@ describe.skipIf(!uri)('library search Mongo integration', () => {
 			title: 'Une brochure de grâce',
 			language: 'french',
 			type: 'Books',
-			pdf_url: 'https://assets.test/book.pdf',
+			pdf_url: 'https://assets.test/book.zip',
+			parts: [
+				{
+					title: 'Première partie',
+					code: 'FRN60-0101',
+					url: 'https://assets.test/book.pdf',
+					position: 1
+				}
+			],
 			library_search: [
 				{ url: 'https://assets.test/book.pdf', parts: [{ text: 'La grâce écrite', page: 2 }] }
 			]
@@ -249,12 +258,12 @@ describe.skipIf(!uri)('library search Mongo integration', () => {
 		expect((await run('q=écrite&type=documents')).total).toBe(0);
 		await col.updateOne(
 			{ title: 'Une brochure de grâce' },
-			{ $set: { published: true, pdf_url: 'https://assets.test/replaced.pdf' } }
+			{ $set: { published: true, 'parts.0.url': 'https://assets.test/replaced.pdf' } }
 		);
 		expect((await run('q=écrite&type=documents')).total).toBe(0);
 		await col.updateOne(
 			{ title: 'Une brochure de grâce' },
-			{ $set: { pdf_url: 'https://assets.test/book.pdf' } }
+			{ $set: { 'parts.0.url': 'https://assets.test/book.pdf' } }
 		);
 	});
 	it('hides subtitle text as soon as the recording hides it', async () => {

@@ -341,11 +341,18 @@ export function librarySourcePipeline(
 			parts: content || reader ? indexedParts(['$url'], f, reader) : []
 		});
 	} else {
+		const documentUrls = {
+			$cond: [
+				{ $gt: [{ $size: fallback('$parts', []) }, 0] },
+				fallback('$parts.url', []),
+				{ $cond: [present('$pdf_url'), ['$pdf_url'], []] }
+			]
+		};
 		Object.assign(fields, {
 			date: '$release_date',
 			category: fallback('$type'),
-			url: fallback('$pdf_url'),
-			parts: content || reader ? indexedParts(['$pdf_url'], f, reader) : []
+			url: fallback({ $arrayElemAt: [fallback('$parts.url', []), 0] }, fallback('$pdf_url')),
+			parts: content || reader ? indexedParts(documentUrls, f, reader) : []
 		});
 	}
 	stages.push({ $project: fields });
