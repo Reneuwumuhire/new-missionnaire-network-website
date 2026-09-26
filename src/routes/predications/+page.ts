@@ -98,13 +98,11 @@ export const load = async ({ fetch, url }) => {
 	const wantsRetransmissions = isRetransmissions || isBlendedSearch;
 
 	const [sermonRes, retransmissionRes, yearsRes, authorsRes] = await Promise.all([
-		wantsSermons
-			? fetch(`/api/sermons?${sermonParams.toString()}`)
-			: Promise.resolve(null),
+		wantsSermons ? fetch(`/api/sermons?${sermonParams.toString()}`) : Promise.resolve(null),
 		wantsRetransmissions
 			? fetch(`/api/retransmissions?${retransmissionParams.toString()}`)
 			: Promise.resolve(null),
-		fetch('/api/sermon-years'),
+		wantsSermons ? fetch('/api/sermon-years') : Promise.resolve(null),
 		fetch('/api/sermon-authors')
 	]);
 
@@ -118,14 +116,16 @@ export const load = async ({ fetch, url }) => {
 
 	let recordings: PublishedRecording[] = [];
 	let recordingsTotal = 0;
+	let retransmissionYears: string[] = [];
 	if (retransmissionRes && retransmissionRes.ok) {
 		const r = await retransmissionRes.json();
 		recordings = (r.data || []) as PublishedRecording[];
 		recordingsTotal = (r.total || 0) as number;
+		retransmissionYears = (r.years || []).map(String);
 	}
 
-	let years: string[] = [];
-	if (yearsRes.ok) {
+	let years: string[] = isRetransmissions ? retransmissionYears : [];
+	if (yearsRes?.ok) {
 		const r = await yearsRes.json();
 		years = (r.data || []) as string[];
 	}

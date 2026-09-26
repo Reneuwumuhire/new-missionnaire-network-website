@@ -5,8 +5,10 @@ import { buildSermonSlug } from '../../../utils/sermonSlug';
 import { getDb } from '../../../db/mongo';
 import { ObjectId } from 'mongodb';
 import { pageMeta } from '$lib/seo';
+import { getSermonVersion, parseSermonLanguage } from '$lib/utils/sermonLanguage';
+import type { Sermon } from '$lib/models/sermon';
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params, url }) => {
 	const identifier = params.slug;
 	const sermon = await findSermonByIdentifier(identifier);
 
@@ -20,7 +22,7 @@ export const load: PageServerLoad = async ({ params }) => {
 	}
 
 	if (identifier.toLowerCase() !== canonicalSlug.toLowerCase()) {
-		redirect(301, `/predications/${canonicalSlug}`);
+		redirect(301, `/predications/${canonicalSlug}${url.search}`);
 	}
 
 	// Fetch related sermons (same author, excluding current)
@@ -46,13 +48,17 @@ export const load: PageServerLoad = async ({ params }) => {
 	}
 
 	const normalized = normalizeSermon(sermon);
+	const language = parseSermonLanguage(url.searchParams.get('language'));
+	const version = getSermonVersion(normalized as unknown as Sermon, language);
 
 	// Share preview (og:*/twitter:*) — rendered by the root layout as the
 	// single canonical tag set, mirroring the page's JSON-LD values.
-	const sermonTitle =
-		(normalized as any).french_title || (normalized as any).english_title || 'Prédication';
+	const sermonTitle = version.title;
 	const sermonDate =
-		(normalized as any).full_date_code || (normalized as any).date_code || (normalized as any).iso_date || '';
+		(normalized as any).full_date_code ||
+		(normalized as any).date_code ||
+		(normalized as any).iso_date ||
+		'';
 	const meta = pageMeta(`/predications/${canonicalSlug}`, {
 		title: `${sermonTitle} | Prédications - Missionnaire Network`,
 		description: `Écoutez la prédication "${sermonTitle}"${
@@ -64,6 +70,7 @@ export const load: PageServerLoad = async ({ params }) => {
 	return {
 		sermon: normalized,
 		canonicalSlug,
+		language,
 		relatedSermons,
 		meta
 	};

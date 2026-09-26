@@ -36,6 +36,8 @@ it('indexes supported sermon sorts and omits search text from list results', asy
 
 	expect(mocks.createIndexes).toHaveBeenCalledWith([
 		{ key: { french_title: 1 } },
+		{ key: { 'localizations.rw.title': 1 } },
+		{ key: { 'localizations.sw.title': 1 } },
 		{ key: { author: 1 } },
 		{ key: { iso_date: 1 } },
 		{ key: { duration: 1 } }

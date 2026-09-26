@@ -59,13 +59,18 @@ export default {
 
 	// ── Language picker ─────────────────────────────────────────
 	'lang.label': 'Langue',
+	'lang.all': 'Toutes',
+	'lang.available': '{count} langues disponibles',
 	'lang.french': 'Français',
 	'lang.english': 'English',
+	'lang.kinyarwanda': 'Kinyarwanda',
+	'lang.swahili': 'Kiswahili',
 
 	// ── Audio language names (replay version switch) ────────────
 	'lang.name.rw': 'Kinyarwanda',
 	'lang.name.fr': 'Français',
 	'lang.name.en': 'Anglais',
+	'lang.name.sw': 'Kiswahili',
 
 	// ── Lists, search & filters ─────────────────────────────────
 	'list.loading': 'Chargement...',

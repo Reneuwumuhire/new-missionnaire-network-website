@@ -22,7 +22,9 @@
 		"stream:logs": "docker compose -f ops/streaming/docker-compose.yml logs -f --tail=100",
 		"lyrics:match": "node scripts/create-lyrics-match-list.mjs",
 		"literature:migrate-zips": "node --env-file=admin/.env.local scripts/migrate-literature-zips.mjs",
-		"library:repair-urls": "node --env-file=admin/.env.local scripts/repair-library-asset-urls.mjs"
+		"library:repair-urls": "node --env-file=admin/.env.local scripts/repair-library-asset-urls.mjs",
+		"sermons:sync": "node --env-file-if-exists=.env.local scripts/sync-branham-sermons.mjs",
+		"sermons:migrate-assets": "node --env-file=admin/.env.local scripts/migrate-sermon-assets.mjs"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^3.3.1",

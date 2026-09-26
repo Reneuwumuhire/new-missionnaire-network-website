@@ -15,20 +15,21 @@
 	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
 	import { downloadAudioFile } from '../../utils/downloadAudio';
 	import { t } from '../../i18n';
+	import {
+		availableSermonVersions,
+		getSermonVersion,
+		type SermonLanguage,
+		type SermonLanguageFilter
+	} from '$lib/utils/sermonLanguage';
 
 	interface Props {
 		sermon: Sermon;
 		index: number;
 		absoluteIndex: number;
-		language?: string;
+		language?: SermonLanguageFilter;
 	}
 
-	let {
-		sermon,
-		index,
-		absoluteIndex,
-		language = 'french'
-	}: Props = $props();
+	let { sermon, index, absoluteIndex, language = 'french' }: Props = $props();
 	let isDurationLoading = false;
 
 	// Background-download state: when the listener clicks the cloud icon we
@@ -41,52 +42,35 @@
 	let downloadController: AbortController | null = null;
 	const desktopSermonGrid = 'md:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.35fr)_110px_80px_120px]';
 
-
-	function isSermonActive(
-		s: Sermon,
-		current: Sermon | AudioAsset | MusicAudio | LiveStreamTrack | null
-	) {
-		// Check for specific english audio URL match
-		if (language === 'english') {
-			if (!s.english_audio_url) return false;
-			// Check if current is null before using 'in' operator
-			if (!current) return false;
-			const currentUrl =
-				'mp3_url' in current
-					? current.mp3_url
-					: 's3_url' in current
-					? current.s3_url
-					: (current as any).url;
-			return currentUrl === s.english_audio_url;
-		}
-
-		if (!current || !s.mp3_url) return false;
-		const currentUrl =
-			'mp3_url' in current
-				? current.mp3_url
-				: 's3_url' in current
+	function currentAudioUrl(current: Sermon | AudioAsset | MusicAudio | LiveStreamTrack | null) {
+		if (!current) return null;
+		return 'mp3_url' in current
+			? current.mp3_url
+			: 's3_url' in current
 				? current.s3_url
 				: (current as any).url;
-		return currentUrl === s.mp3_url;
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
+		if (e.target instanceof Element && e.target.closest('details')) return;
 		if (e.key === 'Enter' || e.key === ' ') {
 			e.preventDefault();
 			togglePlay();
 		}
 	}
 
-	function togglePlay() {
-		const playbackSermon = createPlayableSermon(
-			sermon,
-			language === 'english' ? 'english' : 'french'
-		);
+	function handleRowClick(event: MouseEvent) {
+		if (event.target instanceof Element && event.target.closest('details')) return;
+		togglePlay();
+	}
+
+	function togglePlay(selectedLanguage: SermonLanguage = primaryLanguage) {
+		const playbackSermon = createPlayableSermon(sermon, selectedLanguage);
 		const audioUrl = playbackSermon.mp3_url;
 
 		if (!audioUrl) return;
 
-		if (isActive) {
+		if (currentAudioUrl($selectAudio) === audioUrl) {
 			dispatchAudioPlayerAction('toggle');
 		} else {
 			currentIndex.set(index);
@@ -101,11 +85,9 @@
 			downloadController.abort();
 			return;
 		}
-		const url = language === 'english' ? sermon.english_audio_url : sermon.mp3_url;
+		const url = version.audioUrl;
 		if (!url) return;
-		const title = language === 'english'
-			? sermon.english_title || 'sermon'
-			: sermon.french_title || sermon.english_title || 'sermon';
+		const title = version.title || 'sermon';
 		const controller = new AbortController();
 		downloadController = controller;
 		isDownloading = true;
@@ -128,7 +110,7 @@
 	}
 
 	function downloadPdf() {
-		const url = language === 'english' ? sermon.english_pdf_url : sermon.pdf_url;
+		const url = version.pdfUrl;
 		if (url) {
 			window.open(url, '_blank');
 		}
@@ -146,9 +128,25 @@
 		return isDurationLoading ? '...' : '--:--';
 	}
 
-	let isActive = $derived(isSermonActive(sermon, $selectAudio));
-	let sermonHref = $derived(`/predications/${buildSermonSlug(sermon)}`);
-	let durationAudioUrl = $derived(language === 'english' ? sermon.english_audio_url : sermon.mp3_url);
+	let versions = $derived(availableSermonVersions(sermon));
+	let primaryLanguage = $derived(
+		language === 'all'
+			? versions.find((candidate) => candidate.language === 'french')?.language ||
+					versions[0]?.language ||
+					'french'
+			: language
+	);
+	let version = $derived(getSermonVersion(sermon, primaryLanguage));
+	let selectedAudioUrl = $derived(currentAudioUrl($selectAudio));
+	let isActive = $derived(
+		language === 'all'
+			? versions.some((candidate) => candidate.audioUrl === selectedAudioUrl)
+			: version.audioUrl === selectedAudioUrl
+	);
+	let sermonHref = $derived(
+		`/predications/${buildSermonSlug(sermon)}${primaryLanguage === 'french' ? '' : `?language=${primaryLanguage}`}`
+	);
+	let durationAudioUrl = $derived(version.audioUrl);
 	let hasDurationAudio = $derived(Boolean(durationAudioUrl));
 	// Only show the stored duration. We used to probe every row's audio via
 	// `<audio preload="metadata" src=url>` to extract its duration, but that
@@ -158,9 +156,7 @@
 	// Rows without a stored duration now render "--:--"; backfill them with
 	// admin/scripts/backfill-sermon-durations.ts. Each language has its own
 	// stored duration because translations usually run a different length.
-	let resolvedDuration = $derived(
-		(language === 'english' ? sermon.english_duration : sermon.duration) ?? null
-	);
+	let resolvedDuration = $derived(version.duration);
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -168,12 +164,12 @@
 	class="grid grid-cols-[30px_1fr_auto_auto] {desktopSermonGrid} gap-2 md:gap-4 px-4 py-3 md:py-4 items-center transition-all group cursor-pointer {isActive
 		? 'bg-orange-50/80 border-l-4 border-l-orange-500'
 		: 'hover:bg-gray-50'}"
-	onclick={togglePlay}
+	onclick={handleRowClick}
 	onkeydown={handleKeydown}
 	role="button"
 	tabindex="0"
 	aria-label={$t('player.playSermon', {
-		title: sermon.french_title || sermon.english_title || ''
+		title: version.title
 	})}
 >
 	<!-- Index -->
@@ -194,11 +190,7 @@
 				: 'text-gray-800 group-hover:text-orange-600'} hover:underline underline-offset-2"
 			onclick={(e) => e.stopPropagation()}
 		>
-			{#if language === 'english'}
-				{sermon.english_title || 'Untitled'}
-			{:else}
-				{sermon.french_title || sermon.english_title || 'Sans titre'}
-			{/if}
+			{version.title}
 		</a>
 		<div
 			class="flex flex-row items-center gap-2 md:hidden overflow-hidden text-ellipsis whitespace-nowrap"
@@ -237,7 +229,11 @@
 		{sermon.full_date_code}
 	</div>
 
-	<div class="hidden md:block text-center text-xs font-mono {isActive ? 'text-orange-600' : 'text-gray-400'}">
+	<div
+		class="hidden md:block text-center text-xs font-mono {isActive
+			? 'text-orange-600'
+			: 'text-gray-400'}"
+	>
 		{formatDuration(resolvedDuration)}
 	</div>
 
@@ -246,27 +242,31 @@
 	     reveals the PDF / download / play controls. Desktop always shows
 	     them (it has dedicated columns). -->
 	<div
-		class="w-full items-center justify-center gap-1 md:gap-2 {isActive
-			? 'flex'
-			: 'hidden md:flex'}"
+		class="w-full items-center justify-center gap-1 md:gap-2 {isActive ? 'flex' : 'hidden md:flex'}"
 	>
-		{#if (language === 'english' && sermon.english_pdf_url) || (language !== 'english' && sermon.pdf_url)}
+		{#if version.pdfUrl}
 			<button
 				class="inline-flex items-center justify-center min-w-11 min-h-11 text-gray-400 hover:text-red-500 transition-colors"
-				onclick={(e) => { e.stopPropagation(); downloadPdf(); }}
+				onclick={(e) => {
+					e.stopPropagation();
+					downloadPdf();
+				}}
 				title={$t('player.downloadPdf')}
 				aria-label={$t('player.downloadPdfLabel', {
-					title: sermon.french_title || sermon.english_title || ''
+					title: version.title
 				})}
 			>
 				<Icon src={BsFileEarmarkPdfFill} size="18" />
 			</button>
 		{/if}
 
-		{#if (language === 'english' && sermon.english_audio_url) || (language !== 'english' && sermon.mp3_url)}
+		{#if version.audioUrl}
 			<button
 				class="group relative inline-flex items-center justify-center min-w-11 min-h-11 text-gray-400 hover:text-orange-600 transition-colors"
-				onclick={(e) => { e.stopPropagation(); downloadMp3(); }}
+				onclick={(e) => {
+					e.stopPropagation();
+					downloadMp3();
+				}}
 				title={isDownloading
 					? downloadPercent !== null
 						? $t('player.cancelPercent', { percent: downloadPercent })
@@ -281,8 +281,20 @@
 				{#if isDownloading}
 					<span class="relative flex h-5 w-5 items-center justify-center">
 						{#if downloadPercent !== null}
-							<svg class="absolute inset-0 h-5 w-5 -rotate-90" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-								<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="text-gray-200" />
+							<svg
+								class="absolute inset-0 h-5 w-5 -rotate-90"
+								viewBox="0 0 24 24"
+								fill="none"
+								aria-hidden="true"
+							>
+								<circle
+									cx="12"
+									cy="12"
+									r="10"
+									stroke="currentColor"
+									stroke-width="3"
+									class="text-gray-200"
+								/>
 								<circle
 									cx="12"
 									cy="12"
@@ -295,16 +307,48 @@
 									class="text-orange-500 transition-[stroke-dashoffset] duration-200"
 								/>
 							</svg>
-							<span class="text-[7px] font-bold text-orange-600 tabular-nums">{downloadPercent}</span>
+							<span class="text-[7px] font-bold text-orange-600 tabular-nums"
+								>{downloadPercent}</span
+							>
 						{:else}
-							<svg class="h-5 w-5 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-								<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25" />
-								<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="42 62" />
+							<svg
+								class="h-5 w-5 animate-spin text-orange-500"
+								viewBox="0 0 24 24"
+								fill="none"
+								aria-hidden="true"
+							>
+								<circle
+									cx="12"
+									cy="12"
+									r="10"
+									stroke="currentColor"
+									stroke-width="3"
+									class="opacity-25"
+								/>
+								<circle
+									cx="12"
+									cy="12"
+									r="10"
+									stroke="currentColor"
+									stroke-width="3"
+									stroke-linecap="round"
+									stroke-dasharray="42 62"
+								/>
 							</svg>
 						{/if}
 						<!-- Hover hint: swap ring for X so cancel is obvious on pointer devices. -->
-						<span class="absolute inset-0 hidden items-center justify-center rounded-full bg-orange-600 group-hover:flex">
-							<svg class="h-3 w-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+						<span
+							class="absolute inset-0 hidden items-center justify-center rounded-full bg-orange-600 group-hover:flex"
+						>
+							<svg
+								class="h-3 w-3 text-white"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2.5"
+								stroke-linecap="round"
+								aria-hidden="true"
+							>
 								<path d="M6 6l12 12M6 18L18 6" />
 							</svg>
 						</span>
@@ -315,12 +359,15 @@
 			</button>
 		{/if}
 
-		{#if (language === 'english' && sermon.english_audio_url) || (language !== 'english' && sermon.mp3_url)}
+		{#if version.audioUrl}
 			<button
 				class="hover:scale-110 active:scale-95 transition-all inline-flex items-center justify-center min-w-11 min-h-11 {isActive
 					? 'text-orange-600'
 					: 'text-orange-600'}"
-				onclick={(e) => { e.stopPropagation(); togglePlay(); }}
+				onclick={(e) => {
+					e.stopPropagation();
+					togglePlay();
+				}}
 				title={isActive && $isPlaying ? $t('player.pause') : $t('player.playAction')}
 				aria-label={isActive && $isPlaying ? $t('player.pause') : $t('player.playAction')}
 			>
@@ -328,4 +375,58 @@
 			</button>
 		{/if}
 	</div>
+
+	{#if language === 'all' && versions.length > 0}
+		<details class="col-span-full ml-10 border-t border-stone-200/70 pt-2">
+			<summary
+				class="min-h-11 cursor-pointer select-none py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-stone-500 hover:text-missionnaire"
+			>
+				{$t('lang.available', { count: versions.length })}
+			</summary>
+			<div class="divide-y divide-stone-100 border-t border-stone-100">
+				{#each versions as languageVersion}
+					<div class="flex min-h-12 items-center gap-3 py-2">
+						<span
+							class="w-8 shrink-0 rounded bg-stone-100 px-1.5 py-1 text-center text-[10px] font-bold uppercase text-stone-500"
+						>
+							{languageVersion.code}
+						</span>
+						<a
+							href={`/predications/${buildSermonSlug(sermon)}?language=${languageVersion.language}`}
+							class="min-w-0 flex-1 truncate text-xs font-semibold text-stone-700 hover:text-missionnaire hover:underline"
+						>
+							{languageVersion.title}
+						</a>
+						{#if languageVersion.pdfUrl}
+							<a
+								href={languageVersion.pdfUrl}
+								target="_blank"
+								rel="noopener noreferrer"
+								class="inline-flex min-h-11 min-w-11 items-center justify-center text-stone-400 hover:text-red-500"
+								aria-label={$t('player.downloadPdfLabel', { title: languageVersion.title })}
+							>
+								<Icon src={BsFileEarmarkPdfFill} size="16" />
+							</a>
+						{/if}
+						{#if languageVersion.audioUrl}
+							<button
+								class="inline-flex min-h-11 min-w-11 items-center justify-center text-orange-600 hover:scale-110"
+								onclick={() => togglePlay(languageVersion.language)}
+								aria-label={selectedAudioUrl === languageVersion.audioUrl && $isPlaying
+									? $t('player.pause')
+									: $t('player.playAction')}
+							>
+								<Icon
+									src={selectedAudioUrl === languageVersion.audioUrl && $isPlaying
+										? IoPauseCircle
+										: IoPlayCircle}
+									size="22"
+								/>
+							</button>
+						{/if}
+					</div>
+				{/each}
+			</div>
+		</details>
+	{/if}
 </div>
