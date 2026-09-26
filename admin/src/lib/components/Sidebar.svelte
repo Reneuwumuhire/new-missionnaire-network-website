@@ -38,9 +38,6 @@
 		...(user.canManageRecordings
 			? [{ href: '/library-index', labelKey: 'index.title' as const, icon: 'lyrics' }]
 			: []),
-		...(user.canManageRecordings
-			? [{ href: '/studio/help', labelKey: 'nav.studioHelp' as const, icon: 'help' }]
-			: []),
 		...(user.canManageAudio
 			? [{ href: '/audio', labelKey: 'nav.audioLibrary' as const, icon: 'music' }]
 			: []),
@@ -241,20 +238,6 @@
 									d="M8 6h10M8 10h10M8 14h6M5 6h.01M5 10h.01M5 14h.01M4 20h16"
 								/>
 							</svg>
-						{:else if item.icon === 'help'}
-							<svg
-								class="h-[15px] w-[15px]"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
-								stroke-width="2"
-							>
-								<circle cx="12" cy="12" r="9" />
-								<path
-									stroke-linecap="round"
-									d="M9.8 9a2.4 2.4 0 114.1 1.7c-1.1 1-1.9 1.4-1.9 2.8M12 17h.01"
-								/>
-							</svg>
 						{:else if item.icon === 'settings'}
 							<svg
 								class="h-[15px] w-[15px]"
@@ -314,6 +297,27 @@
 				<p class="truncate text-[11px] text-stone-400">{user.email}</p>
 			</div>
 		</a>
+		{#if user.canManageRecordings}
+			<a
+				href="/studio/help"
+				aria-current={$page.url.pathname.startsWith('/studio/help') ? 'page' : undefined}
+				onclick={() => (mobileOpen = false)}
+				class="mt-2 flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] font-medium transition-colors {$page.url.pathname.startsWith(
+					'/studio/help'
+				)
+					? 'bg-primary/10 text-primary'
+					: 'text-stone-400 hover:bg-stone-50 hover:text-stone-700'}"
+			>
+				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+					<circle cx="12" cy="12" r="9" />
+					<path
+						stroke-linecap="round"
+						d="M9.8 9a2.4 2.4 0 114.1 1.7c-1.1 1-1.9 1.4-1.9 2.8M12 17h.01"
+					/>
+				</svg>
+				{$t('nav.studioHelp')}
+			</a>
+		{/if}
 		<form action="/logout" method="POST" class="mt-2">
 			<button
 				type="submit"
