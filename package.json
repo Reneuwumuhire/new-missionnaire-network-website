@@ -25,7 +25,9 @@
 		"library:repair-urls": "node --env-file=admin/.env.local scripts/repair-library-asset-urls.mjs",
 		"sermons:sync": "node --env-file-if-exists=.env.local scripts/sync-branham-sermons.mjs",
 		"sermons:migrate-assets": "node --env-file-if-exists=admin/.env.local scripts/migrate-sermon-assets.mjs",
-		"sermons:backfill-durations": "node --env-file-if-exists=admin/.env.local scripts/backfill-sermon-durations.mjs"
+		"sermons:backfill-durations": "node --env-file-if-exists=admin/.env.local scripts/backfill-sermon-durations.mjs",
+		"channel:import": "node scripts/import-whatsapp-channel.mjs",
+		"channel:test": "node scripts/import-whatsapp-channel.mjs --test"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^3.3.1",
