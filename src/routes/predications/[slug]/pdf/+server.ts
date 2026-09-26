@@ -2,25 +2,13 @@ import { error, redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { findSermonByIdentifier } from '$lib/server/sermonByIdentifier';
 import { buildSermonSlug } from '../../../../utils/sermonSlug';
+import { getSermonVersion, parseSermonLanguage } from '$lib/utils/sermonLanguage';
+import type { Sermon } from '$lib/models/sermon';
 
 function normalizePdfUrl(value: unknown): string | null {
 	if (typeof value !== 'string') return null;
 	const trimmed = value.trim();
 	return trimmed.length > 0 ? trimmed : null;
-}
-
-function selectPdfUrl(
-	frenchPdfUrl: string | null,
-	englishPdfUrl: string | null,
-	langParam: string | null
-): string | null {
-	const lang = (langParam || '').toLowerCase();
-
-	if (lang.startsWith('en')) {
-		return englishPdfUrl || frenchPdfUrl;
-	}
-
-	return frenchPdfUrl || englishPdfUrl;
 }
 
 function toInlineFilename(slug: string): string {
@@ -45,9 +33,12 @@ export const GET: RequestHandler = async ({ params, url, fetch }) => {
 		redirect(301, `/predications/${canonicalSlug}/pdf${url.search}`);
 	}
 
-	const frenchPdfUrl = normalizePdfUrl(sermon.pdf_url);
-	const englishPdfUrl = normalizePdfUrl(sermon.english_pdf_url);
-	const pdfUrl = selectPdfUrl(frenchPdfUrl, englishPdfUrl, url.searchParams.get('lang'));
+	const language = parseSermonLanguage(url.searchParams.get('lang'));
+	const requestedPdfUrl = normalizePdfUrl(
+		getSermonVersion(sermon as unknown as Sermon, language).pdfUrl
+	);
+	const pdfUrl =
+		requestedPdfUrl || normalizePdfUrl(sermon.pdf_url) || normalizePdfUrl(sermon.english_pdf_url);
 
 	if (!pdfUrl) {
 		error(404, 'PDF introuvable');
@@ -70,7 +61,10 @@ export const GET: RequestHandler = async ({ params, url, fetch }) => {
 
 	const headers = new Headers();
 	const upstreamType = upstreamResponse.headers.get('content-type') || '';
-	headers.set('content-type', upstreamType.toLowerCase().includes('pdf') ? upstreamType : 'application/pdf');
+	headers.set(
+		'content-type',
+		upstreamType.toLowerCase().includes('pdf') ? upstreamType : 'application/pdf'
+	);
 	headers.set('content-disposition', `inline; filename="${toInlineFilename(canonicalSlug)}"`);
 	headers.set('cache-control', 'public, max-age=3600, stale-while-revalidate=86400');
 	// Search Console was reporting these PDF URLs as "Duplicate without
@@ -81,10 +75,7 @@ export const GET: RequestHandler = async ({ params, url, fetch }) => {
 	// Also surface the canonical HTML URL so any link-graph signal
 	// flows back to it.
 	headers.set('x-robots-tag', 'noindex, nofollow');
-	headers.set(
-		'link',
-		`<https://missionnaire.net/predications/${canonicalSlug}>; rel="canonical"`
-	);
+	headers.set('link', `<https://missionnaire.net/predications/${canonicalSlug}>; rel="canonical"`);
 
 	const contentLength = upstreamResponse.headers.get('content-length');
 	if (contentLength) {

@@ -2,9 +2,9 @@ import type { AudioAsset } from '$lib/models/media-assets';
 import type { MusicAudio } from '$lib/models/music-audio';
 import type { Sermon } from '$lib/models/sermon';
 import type { LiveStreamTrack } from '$lib/utils/liveTrack';
+import { getSermonVersion, type SermonLanguage } from '$lib/utils/sermonLanguage';
 
 export type PlayableAudio = AudioAsset | MusicAudio | Sermon | LiveStreamTrack;
-export type SermonPlaybackLanguage = 'french' | 'english';
 
 // Some s3_url values stored in MongoDB contain literal spaces or `+`
 // characters in the key. Browsers usually tolerate this, but S3 rejects
@@ -44,18 +44,14 @@ export function getPlayableAudioUrl(item: PlayableAudio | null | undefined): str
 	return '';
 }
 
-export function createPlayableSermon(
-	sermon: Sermon,
-	language: SermonPlaybackLanguage = 'french'
-): Sermon {
-	if (language !== 'english') {
-		return sermon;
-	}
+export function createPlayableSermon(sermon: Sermon, language: SermonLanguage = 'french'): Sermon {
+	const version = getSermonVersion(sermon, language);
 
 	return {
 		...sermon,
-		mp3_url: sermon.english_audio_url ?? null,
-		french_title: sermon.english_title || sermon.french_title
+		mp3_url: version.audioUrl,
+		french_title: version.title,
+		duration: version.duration
 	};
 }
 

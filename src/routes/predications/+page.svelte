@@ -21,6 +21,11 @@
 	import ListSkeleton from '$lib/components/ListSkeleton.svelte';
 	import ErrorCard from '$lib/components/ErrorCard.svelte';
 	import ResultsSummary from '$lib/components/ResultsSummary.svelte';
+	import {
+		parseSermonLanguage,
+		sermonLanguages,
+		type SermonLanguage
+	} from '$lib/utils/sermonLanguage';
 	import { onDestroy, onMount, tick, untrack } from 'svelte';
 	import {
 		areAuthorsFresh,
@@ -59,7 +64,9 @@
 	let initialTotal = $derived(((data as any).total || 0) as number);
 	let initialYears = $derived(((data as any).years || []) as string[]);
 	let initialAuthors = $derived(((data as any).availableAuthors || []) as string[]);
-	let initialFilterType = $derived(((data as any).filterType || 'sermon') as 'sermon' | 'retransmission');
+	let initialFilterType = $derived(
+		((data as any).filterType || 'sermon') as 'sermon' | 'retransmission'
+	);
 	let currentAuthor = $derived((data as any).author);
 	let currentSearch = $derived((data as any).search);
 	let currentAlpha = $derived((data as any).alpha);
@@ -68,33 +75,44 @@
 	let currentSort = $derived((data as any).sort || 'iso_date:desc');
 	let currentPage = $derived((data as any).page);
 	let limit = $derived((data as any).limit);
-	let currentLanguage = $derived((data as any).language || 'french');
+	let currentLanguage = $derived(parseSermonLanguage((data as any).language));
+	const languageLabelKeys: Record<
+		SermonLanguage,
+		'lang.french' | 'lang.english' | 'lang.kinyarwanda' | 'lang.swahili'
+	> = {
+		french: 'lang.french',
+		english: 'lang.english',
+		kinyarwanda: 'lang.kinyarwanda',
+		swahili: 'lang.swahili'
+	};
 	let isDeferredData = $derived(Boolean((data as any).deferred));
-	let requestKey = $derived(JSON.stringify({
-		author: currentAuthor || 'Tous',
-		search: currentSearch || '',
-		alpha: currentAlpha || '',
-		year: currentYear || '',
-		hasAudio: !!currentHasAudio,
-		sort: currentSort || 'iso_date:desc',
-		language: currentLanguage || 'french',
-		page: currentPage || 1,
-		limit: limit || 100
-	}));
+	let requestKey = $derived(
+		JSON.stringify({
+			author: currentAuthor || 'Tous',
+			search: currentSearch || '',
+			alpha: currentAlpha || '',
+			year: currentYear || '',
+			hasAudio: !!currentHasAudio,
+			sort: currentSort || 'iso_date:desc',
+			language: currentLanguage || 'french',
+			page: currentPage || 1,
+			limit: limit || 100
+		})
+	);
 	let totalPages = $derived(Math.ceil(totalSermons / limit));
 	let summaryFrom = $derived(totalSermons === 0 ? 0 : (currentPage - 1) * limit + 1);
 	let summaryTo = $derived(Math.min(currentPage * limit, totalSermons));
-	let blendedOnly =
-		$derived(filterType === 'sermon' &&
-		sermons.length === 0 &&
-		showBlendedRetransmissions &&
-		recordings.length > 0);
-	let playlistSermons =
-		$derived(filterType === 'sermon'
-			? sermons.map((sermon: Sermon) =>
-					createPlayableSermon(sermon, currentLanguage === 'english' ? 'english' : 'french')
-				)
-			: []);
+	let blendedOnly = $derived(
+		filterType === 'sermon' &&
+			sermons.length === 0 &&
+			showBlendedRetransmissions &&
+			recordings.length > 0
+	);
+	let playlistSermons = $derived(
+		filterType === 'sermon'
+			? sermons.map((sermon: Sermon) => createPlayableSermon(sermon, currentLanguage))
+			: []
+	);
 
 	const desktopSermonGrid = 'md:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.35fr)_110px_80px_120px]';
 	let authors = $derived(['Tous', ...(availableAuthors ?? [])]);
@@ -118,7 +136,7 @@
 	let activeFilterCount = $derived(
 		(currentAlpha ? 1 : 0) +
 			(currentYear ? 1 : 0) +
-			(currentLanguage === 'english' ? 1 : 0) +
+			(currentLanguage !== 'french' ? 1 : 0) +
 			(currentHasAudio ? 1 : 0)
 	);
 
@@ -333,8 +351,7 @@
 		} catch (error) {
 			if ((error as Error).name === 'AbortError') return;
 			if (token !== currentRequestToken || key !== requestKey) return;
-			listLoadError =
-				error instanceof Error ? error.message : $t('predications.loadFailed');
+			listLoadError = error instanceof Error ? error.message : $t('predications.loadFailed');
 			if (!hasResolvedList) {
 				sermons = [];
 				recordings = [];
@@ -443,7 +460,7 @@
 		goto(`?${params.toString()}`);
 	}
 
-	function handleLanguageChange(lang: string) {
+	function handleLanguageChange(lang: SermonLanguage) {
 		if (currentLanguage === lang) return;
 		const params = new URLSearchParams($page.url.searchParams);
 		params.set('language', lang);
@@ -481,7 +498,8 @@
 			<button
 				role="tab"
 				aria-selected={currentAuthor !== 'Retransmissions'}
-				class="px-4 md:px-6 py-3 min-h-11 text-[12px] md:text-[13px] font-bold uppercase tracking-[0.15em] font-body border-b-2 -mb-px transition-colors {currentAuthor !== 'Retransmissions'
+				class="px-4 md:px-6 py-3 min-h-11 text-[12px] md:text-[13px] font-bold uppercase tracking-[0.15em] font-body border-b-2 -mb-px transition-colors {currentAuthor !==
+				'Retransmissions'
 					? 'border-missionnaire text-missionnaire'
 					: 'border-transparent text-stone-400 hover:text-stone-600'}"
 				onclick={() => handleAuthorChange('Tous')}
@@ -491,7 +509,8 @@
 			<button
 				role="tab"
 				aria-selected={currentAuthor === 'Retransmissions'}
-				class="px-4 md:px-6 py-3 min-h-11 text-[12px] md:text-[13px] font-bold uppercase tracking-[0.15em] font-body border-b-2 -mb-px transition-colors {currentAuthor === 'Retransmissions'
+				class="px-4 md:px-6 py-3 min-h-11 text-[12px] md:text-[13px] font-bold uppercase tracking-[0.15em] font-body border-b-2 -mb-px transition-colors {currentAuthor ===
+				'Retransmissions'
 					? 'border-missionnaire text-missionnaire'
 					: 'border-transparent text-stone-400 hover:text-stone-600'}"
 				onclick={() => handleAuthorChange('Retransmissions')}
@@ -544,8 +563,7 @@
 			aria-label={$t('predications.preachers')}
 		>
 			{#each authors as author}
-				{@const isActivePill =
-					(author === 'Tous' && !currentAuthor) || currentAuthor === author}
+				{@const isActivePill = (author === 'Tous' && !currentAuthor) || currentAuthor === author}
 				<button
 					class="flex-shrink-0 inline-flex items-center h-10 md:h-11 px-4 md:px-5 rounded-full border text-[11px] md:text-xs font-bold uppercase tracking-[0.1em] md:tracking-wider transition-colors duration-150 {isActivePill
 						? 'bg-missionnaire border-missionnaire text-white shadow-sm'
@@ -640,7 +658,7 @@
 
 	<!-- Active sheet-filters as dismissible chips (the preacher state is
 	     already visible in the pill row above). -->
-	{#if currentAlpha || currentYear || currentLanguage === 'english' || currentHasAudio}
+	{#if currentAlpha || currentYear || currentLanguage !== 'french' || currentHasAudio}
 		<div class="mb-3 flex flex-wrap gap-2">
 			{#if currentAlpha}
 				<button
@@ -660,13 +678,13 @@
 					<Icon src={BsX} size="14" />
 				</button>
 			{/if}
-			{#if currentLanguage === 'english'}
+			{#if currentLanguage !== 'french'}
 				<button
 					class="flex items-center gap-1.5 rounded-full border border-missionnaire/40 bg-missionnaire/10 px-3 py-1.5 text-xs font-semibold text-missionnaire"
 					onclick={() => handleLanguageChange('french')}
 					title={$t('lang.french')}
 				>
-					<span>{$t('lang.english')}</span>
+					<span>{$t(languageLabelKeys[currentLanguage])}</span>
 					<Icon src={BsX} size="14" />
 				</button>
 			{/if}
@@ -685,220 +703,220 @@
 	<!-- The years sidebar moved into the Filtres sheet — the list now
 	     takes the full width, like /musique. -->
 	<div class="relative">
-			{#if currentSearch || currentAlpha || currentYear || currentHasAudio || (currentAuthor && currentAuthor !== 'Tous')}
-				<div class="mb-3 flex justify-end">
-					<button
-						class="inline-flex items-center gap-1.5 border border-stone-200 bg-white/60 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-stone-500 hover:border-missionnaire hover:text-missionnaire transition-colors duration-200 active:scale-[0.98]"
-						onclick={() => goto('?')}
-						title={$t('list.resetFilters')}
-					>
-						<Icon src={BsX} size="14" />
-						{$t('list.reset')}
-					</button>
-				</div>
-			{/if}
-			{#if !blendedOnly}
-				{#if hasResolvedList}
-					<div class="mb-2">
-						<ResultsSummary
-							from={summaryFrom}
-							to={summaryTo}
-							total={totalSermons}
-							query={currentSearch}
-						/>
-					</div>
-				{/if}
-				<div class="bg-white/40 border border-stone-200/60 min-h-[500px] flex flex-col">
-					<div
-						class="relative grid grid-cols-[30px_1fr_auto_auto] {desktopSermonGrid} gap-2 md:gap-4 px-4 py-3 border-b border-stone-200/60 text-[10px] md:text-[11px] font-bold text-stone-400 uppercase tracking-widest bg-white/40 items-center"
-					>
-						<div class="text-center">#</div>
-						<button
-							class="text-left flex items-center gap-1.5 hover:text-missionnaire transition-colors"
-							onclick={() => handleSortChange('french_title')}
-						>
-							{#if currentSort.startsWith('french_title')}
-								<span class="text-missionnaire">
-									<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
-								</span>
-							{/if}
-							{$t('list.title')}
-						</button>
-						<button
-							class="hidden md:flex text-left items-center gap-1.5 hover:text-missionnaire transition-colors"
-							onclick={() => handleSortChange('author')}
-						>
-							{#if currentSort.startsWith('author')}
-								<span class="text-missionnaire">
-									<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
-								</span>
-							{/if}
-							{$t('predications.preacher')}
-						</button>
-						<button
-							class="hidden md:flex text-left items-center gap-1.5 hover:text-missionnaire transition-colors"
-							onclick={() => handleSortChange('iso_date')}
-						>
-							{#if currentSort.startsWith('iso_date')}
-								<span class="text-missionnaire">
-									<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
-								</span>
-							{/if}
-							{$t('list.date')}
-						</button>
-						<button
-							class="hidden md:flex text-center items-center justify-center gap-1.5 hover:text-missionnaire transition-colors"
-							onclick={() => handleSortChange('duration')}
-						>
-							{#if currentSort.startsWith('duration')}
-								<span class="text-missionnaire">
-									<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
-								</span>
-							{/if}
-							{$t('list.duration')}
-						</button>
-						<div class="flex items-center justify-center text-center">
-							<span class="hidden md:inline">{$t('list.actions')}</span>
-						</div>
-					</div>
-
-					<div class="divide-y divide-stone-100 [&>*]:hover:bg-white/60">
-						{#if isListLoading && !hasResolvedList}
-							<ListSkeleton rows={8} />
-						{:else if listLoadError && !hasResolvedList}
-							<ErrorCard
-								message={listLoadError}
-								onRetry={() => void loadInBackground({ showLoading: true })}
-							/>
-						{:else}
-							{#if isListLoading}
-								<div
-									class="border-b border-stone-200/60 bg-stone-50/70 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400"
-								>
-									{$t('list.updating')}
-								</div>
-							{/if}
-							{#if filterType === 'retransmission'}
-								{#each recordings as recording, i (recording.id)}
-									<RetransmissionTableItem
-										{recording}
-										absoluteIndex={i + 1 + (currentPage - 1) * limit}
-									/>
-								{:else}
-									<div class="py-24 text-center">
-										<div
-											class="bg-stone-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-stone-200"
-										>
-											<Icon src={BsSearch} size="32" />
-										</div>
-										<h3 class="text-xl font-bold text-stone-800 mb-2">
-											{$t('predications.noRetransmissions')}
-										</h3>
-										<p class="text-stone-400 text-sm">
-											{$t('list.tryAdjustFilters')}
-										</p>
-									</div>
-								{/each}
-							{:else}
-								{#each sermons as sermon, i (sermon._id)}
-									<SermonTableItem
-										{sermon}
-										index={i}
-										absoluteIndex={i + 1 + (currentPage - 1) * limit}
-										language={currentLanguage}
-									/>
-								{:else}
-									<div class="py-24 text-center">
-										<div
-											class="bg-stone-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-stone-200"
-										>
-											<Icon src={BsSearch} size="32" />
-										</div>
-										<h3 class="text-xl font-bold text-stone-800 mb-2">
-											{$t('predications.noSermons')}
-										</h3>
-										<p class="text-stone-400 text-sm">
-											{$t('list.tryAdjustFilters')}
-										</p>
-									</div>
-								{/each}
-							{/if}
-						{/if}
-					</div>
-				</div>
-			{/if}
-
-			{#if hasResolvedList && totalPages > 1}
-				<div class="mt-12 py-6 border-t border-stone-200/60 flex flex-col gap-6">
-					<div
-						class="flex flex-col sm:flex-row items-center sm:justify-between gap-4 text-[10px] md:text-xs font-bold text-stone-400 tracking-widest uppercase tabular-nums"
-					>
-						<div class="hidden md:block">
-							{$t('predications.showingOf', { shown: sermons.length, total: totalSermons })}
-						</div>
-						<div class="flex items-center gap-3">
-							<span class="opacity-60">{$t('list.rows')}</span>
-							<select
-								class="border border-stone-200 bg-white px-3 py-1.5 outline-none text-stone-800 tabular-nums focus:ring-2 focus:ring-missionnaire/20 transition-all cursor-pointer"
-								value={limit}
-								onchange={(e) => {
-									const params = new URLSearchParams($page.url.searchParams);
-									params.set('limit', e.currentTarget.value);
-									params.set('page', '1');
-									goto(`?${params.toString()}`);
-								}}
-							>
-								<option value="10">10</option>
-								<option value="20">20</option>
-								<option value="50">50</option>
-								<option value="100">100</option>
-							</select>
-						</div>
-					</div>
-					<Pagination
-						current={currentPage}
-						total={totalPages}
-						getHref={(p) => {
-							const params = new URLSearchParams($page.url.searchParams);
-							params.set('page', String(p));
-							return `?${params.toString()}`;
-						}}
+		{#if currentSearch || currentAlpha || currentYear || currentLanguage !== 'french' || currentHasAudio || (currentAuthor && currentAuthor !== 'Tous')}
+			<div class="mb-3 flex justify-end">
+				<button
+					class="inline-flex items-center gap-1.5 border border-stone-200 bg-white/60 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-stone-500 hover:border-missionnaire hover:text-missionnaire transition-colors duration-200 active:scale-[0.98]"
+					onclick={() => goto('?')}
+					title={$t('list.resetFilters')}
+				>
+					<Icon src={BsX} size="14" />
+					{$t('list.reset')}
+				</button>
+			</div>
+		{/if}
+		{#if !blendedOnly}
+			{#if hasResolvedList}
+				<div class="mb-2">
+					<ResultsSummary
+						from={summaryFrom}
+						to={summaryTo}
+						total={totalSermons}
+						query={currentSearch}
 					/>
 				</div>
 			{/if}
-
-			{#if showBlendedRetransmissions && recordings.length > 0}
-				<section class="mt-12">
-					<div class="mb-4 flex items-baseline justify-between gap-4">
-						<h2
-							class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.3em] font-body"
-						>
-							{$t('predications.retransmissionsMatching', { query: currentSearch })}
-							<span class="ml-2 normal-case tracking-normal text-stone-400 font-normal"
-								>{recordingsTotal ?? recordings.length}</span
-							>
-						</h2>
-						{#if (recordingsTotal ?? 0) > recordings.length}
-							<a
-								href={(() => {
-									const p = new URLSearchParams($page.url.searchParams);
-									p.set('author', 'Retransmissions');
-									p.set('page', '1');
-									return `?${p.toString()}`;
-								})()}
-								class="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.15em] text-missionnaire hover:underline"
-							>
-								{$t('misc.viewAll')} →
-							</a>
+			<div class="bg-white/40 border border-stone-200/60 min-h-[500px] flex flex-col">
+				<div
+					class="relative grid grid-cols-[30px_1fr_auto_auto] {desktopSermonGrid} gap-2 md:gap-4 px-4 py-3 border-b border-stone-200/60 text-[10px] md:text-[11px] font-bold text-stone-400 uppercase tracking-widest bg-white/40 items-center"
+				>
+					<div class="text-center">#</div>
+					<button
+						class="text-left flex items-center gap-1.5 hover:text-missionnaire transition-colors"
+						onclick={() => handleSortChange('french_title')}
+					>
+						{#if currentSort.startsWith('french_title')}
+							<span class="text-missionnaire">
+								<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
+							</span>
 						{/if}
+						{$t('list.title')}
+					</button>
+					<button
+						class="hidden md:flex text-left items-center gap-1.5 hover:text-missionnaire transition-colors"
+						onclick={() => handleSortChange('author')}
+					>
+						{#if currentSort.startsWith('author')}
+							<span class="text-missionnaire">
+								<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
+							</span>
+						{/if}
+						{$t('predications.preacher')}
+					</button>
+					<button
+						class="hidden md:flex text-left items-center gap-1.5 hover:text-missionnaire transition-colors"
+						onclick={() => handleSortChange('iso_date')}
+					>
+						{#if currentSort.startsWith('iso_date')}
+							<span class="text-missionnaire">
+								<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
+							</span>
+						{/if}
+						{$t('list.date')}
+					</button>
+					<button
+						class="hidden md:flex text-center items-center justify-center gap-1.5 hover:text-missionnaire transition-colors"
+						onclick={() => handleSortChange('duration')}
+					>
+						{#if currentSort.startsWith('duration')}
+							<span class="text-missionnaire">
+								<Icon src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp} size="12" />
+							</span>
+						{/if}
+						{$t('list.duration')}
+					</button>
+					<div class="flex items-center justify-center text-center">
+						<span class="hidden md:inline">{$t('list.actions')}</span>
 					</div>
-					<div class="divide-y divide-stone-100 border border-stone-200/60 bg-white/40">
-						{#each recordings as recording, i (recording.id)}
-							<RetransmissionTableItem {recording} absoluteIndex={i + 1} showBadge />
-						{/each}
+				</div>
+
+				<div class="divide-y divide-stone-100 [&>*]:hover:bg-white/60">
+					{#if isListLoading && !hasResolvedList}
+						<ListSkeleton rows={8} />
+					{:else if listLoadError && !hasResolvedList}
+						<ErrorCard
+							message={listLoadError}
+							onRetry={() => void loadInBackground({ showLoading: true })}
+						/>
+					{:else}
+						{#if isListLoading}
+							<div
+								class="border-b border-stone-200/60 bg-stone-50/70 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400"
+							>
+								{$t('list.updating')}
+							</div>
+						{/if}
+						{#if filterType === 'retransmission'}
+							{#each recordings as recording, i (recording.id)}
+								<RetransmissionTableItem
+									{recording}
+									absoluteIndex={i + 1 + (currentPage - 1) * limit}
+								/>
+							{:else}
+								<div class="py-24 text-center">
+									<div
+										class="bg-stone-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-stone-200"
+									>
+										<Icon src={BsSearch} size="32" />
+									</div>
+									<h3 class="text-xl font-bold text-stone-800 mb-2">
+										{$t('predications.noRetransmissions')}
+									</h3>
+									<p class="text-stone-400 text-sm">
+										{$t('list.tryAdjustFilters')}
+									</p>
+								</div>
+							{/each}
+						{:else}
+							{#each sermons as sermon, i (sermon._id)}
+								<SermonTableItem
+									{sermon}
+									index={i}
+									absoluteIndex={i + 1 + (currentPage - 1) * limit}
+									language={currentLanguage}
+								/>
+							{:else}
+								<div class="py-24 text-center">
+									<div
+										class="bg-stone-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-stone-200"
+									>
+										<Icon src={BsSearch} size="32" />
+									</div>
+									<h3 class="text-xl font-bold text-stone-800 mb-2">
+										{$t('predications.noSermons')}
+									</h3>
+									<p class="text-stone-400 text-sm">
+										{$t('list.tryAdjustFilters')}
+									</p>
+								</div>
+							{/each}
+						{/if}
+					{/if}
+				</div>
+			</div>
+		{/if}
+
+		{#if hasResolvedList && totalPages > 1}
+			<div class="mt-12 py-6 border-t border-stone-200/60 flex flex-col gap-6">
+				<div
+					class="flex flex-col sm:flex-row items-center sm:justify-between gap-4 text-[10px] md:text-xs font-bold text-stone-400 tracking-widest uppercase tabular-nums"
+				>
+					<div class="hidden md:block">
+						{$t('predications.showingOf', { shown: sermons.length, total: totalSermons })}
 					</div>
-				</section>
-			{/if}
+					<div class="flex items-center gap-3">
+						<span class="opacity-60">{$t('list.rows')}</span>
+						<select
+							class="border border-stone-200 bg-white px-3 py-1.5 outline-none text-stone-800 tabular-nums focus:ring-2 focus:ring-missionnaire/20 transition-all cursor-pointer"
+							value={limit}
+							onchange={(e) => {
+								const params = new URLSearchParams($page.url.searchParams);
+								params.set('limit', e.currentTarget.value);
+								params.set('page', '1');
+								goto(`?${params.toString()}`);
+							}}
+						>
+							<option value="10">10</option>
+							<option value="20">20</option>
+							<option value="50">50</option>
+							<option value="100">100</option>
+						</select>
+					</div>
+				</div>
+				<Pagination
+					current={currentPage}
+					total={totalPages}
+					getHref={(p) => {
+						const params = new URLSearchParams($page.url.searchParams);
+						params.set('page', String(p));
+						return `?${params.toString()}`;
+					}}
+				/>
+			</div>
+		{/if}
+
+		{#if showBlendedRetransmissions && recordings.length > 0}
+			<section class="mt-12">
+				<div class="mb-4 flex items-baseline justify-between gap-4">
+					<h2
+						class="text-[10px] md:text-xs font-bold text-missionnaire uppercase tracking-[0.3em] font-body"
+					>
+						{$t('predications.retransmissionsMatching', { query: currentSearch })}
+						<span class="ml-2 normal-case tracking-normal text-stone-400 font-normal"
+							>{recordingsTotal ?? recordings.length}</span
+						>
+					</h2>
+					{#if (recordingsTotal ?? 0) > recordings.length}
+						<a
+							href={(() => {
+								const p = new URLSearchParams($page.url.searchParams);
+								p.set('author', 'Retransmissions');
+								p.set('page', '1');
+								return `?${p.toString()}`;
+							})()}
+							class="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.15em] text-missionnaire hover:underline"
+						>
+							{$t('misc.viewAll')} →
+						</a>
+					{/if}
+				</div>
+				<div class="divide-y divide-stone-100 border border-stone-200/60 bg-white/40">
+					{#each recordings as recording, i (recording.id)}
+						<RetransmissionTableItem {recording} absoluteIndex={i + 1} showBadge />
+					{/each}
+				</div>
+			</section>
+		{/if}
 	</div>
 </div>
 
@@ -979,26 +997,18 @@
 							{$t('lang.label')}
 						</h3>
 						<div class="flex flex-wrap gap-2">
-							<button
-								class="inline-flex h-9 items-center rounded-full border px-3.5 text-[11px] font-bold uppercase tracking-[0.08em] transition-colors duration-150 {currentLanguage ===
-								'french'
-									? 'bg-missionnaire border-missionnaire text-white'
-									: 'border-stone-200 bg-white text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
-								aria-pressed={currentLanguage === 'french'}
-								onclick={() => handleLanguageChange('french')}
-							>
-								{$t('lang.french')}
-							</button>
-							<button
-								class="inline-flex h-9 items-center rounded-full border px-3.5 text-[11px] font-bold uppercase tracking-[0.08em] transition-colors duration-150 {currentLanguage ===
-								'english'
-									? 'bg-missionnaire border-missionnaire text-white'
-									: 'border-stone-200 bg-white text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
-								aria-pressed={currentLanguage === 'english'}
-								onclick={() => handleLanguageChange('english')}
-							>
-								{$t('lang.english')}
-							</button>
+							{#each sermonLanguages as language}
+								<button
+									class="inline-flex h-9 items-center rounded-full border px-3.5 text-[11px] font-bold uppercase tracking-[0.08em] transition-colors duration-150 {currentLanguage ===
+									language
+										? 'bg-missionnaire border-missionnaire text-white'
+										: 'border-stone-200 bg-white text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
+									aria-pressed={currentLanguage === language}
+									onclick={() => handleLanguageChange(language)}
+								>
+									{$t(languageLabelKeys[language])}
+								</button>
+							{/each}
 						</div>
 					</section>
 

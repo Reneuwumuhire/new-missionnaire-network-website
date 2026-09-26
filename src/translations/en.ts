@@ -61,11 +61,14 @@ const en: Record<keyof typeof fr, string> = {
 	'lang.label': 'Language',
 	'lang.french': 'Français',
 	'lang.english': 'English',
+	'lang.kinyarwanda': 'Kinyarwanda',
+	'lang.swahili': 'Kiswahili',
 
 	// ── Audio language names (replay version switch) ────────────
 	'lang.name.rw': 'Kinyarwanda',
 	'lang.name.fr': 'French',
 	'lang.name.en': 'English',
+	'lang.name.sw': 'Kiswahili',
 
 	// ── Lists, search & filters ─────────────────────────────────
 	'list.loading': 'Loading...',

@@ -1644,6 +1644,27 @@ export async function getSongsCount(search?: string): Promise<number> {
 }
 
 const sermonSortFields = new Set(['french_title', 'author', 'iso_date', 'duration']);
+const sermonLanguageFields = {
+	french: { title: 'french_title', audio: 'mp3_url', pdf: 'pdf_url', duration: 'duration' },
+	english: {
+		title: 'english_title',
+		audio: 'english_audio_url',
+		pdf: 'english_pdf_url',
+		duration: 'english_duration'
+	},
+	kinyarwanda: {
+		title: 'localizations.rw.title',
+		audio: 'localizations.rw.audio_url',
+		pdf: 'localizations.rw.pdf_url',
+		duration: 'localizations.rw.duration'
+	},
+	swahili: {
+		title: 'localizations.sw.title',
+		audio: 'localizations.sw.audio_url',
+		pdf: 'localizations.sw.pdf_url',
+		duration: 'localizations.sw.duration'
+	}
+} as const;
 let sermonIndexesEnsured: Promise<string[]> | null = null;
 
 function ensureSermonIndexes(db: Db) {
@@ -1651,6 +1672,8 @@ function ensureSermonIndexes(db: Db) {
 		.collection('sermons')
 		.createIndexes([
 			{ key: { french_title: 1 } },
+			{ key: { 'localizations.rw.title': 1 } },
+			{ key: { 'localizations.sw.title': 1 } },
 			{ key: { author: 1 } },
 			{ key: { iso_date: 1 } },
 			{ key: { duration: 1 } }
@@ -1684,6 +1707,9 @@ export async function querySermons(options: {
 		orderBy = 'iso_date:desc',
 		language = 'french'
 	} = options;
+	const languageFields =
+		sermonLanguageFields[language as keyof typeof sermonLanguageFields] ??
+		sermonLanguageFields.french;
 
 	try {
 		const db = await getDb();
@@ -1700,6 +1726,8 @@ export async function querySermons(options: {
 				$or: [
 					{ english_title: { $regex: search, $options: 'i' } },
 					{ french_title: { $regex: search, $options: 'i' } },
+					{ 'localizations.rw.title': { $regex: search, $options: 'i' } },
+					{ 'localizations.sw.title': { $regex: search, $options: 'i' } },
 					{ full_date_code: { $regex: search, $options: 'i' } },
 					// Also match the preacher's name so a search like "Frank" or
 					// "Branham" returns their sermons (the title holds the subject,
@@ -1710,7 +1738,7 @@ export async function querySermons(options: {
 		}
 
 		if (alpha && alpha.length === 1) {
-			conditions.push({ french_title: { $regex: `^${alpha}`, $options: 'i' } });
+			conditions.push({ [languageFields.title]: { $regex: `^${alpha}`, $options: 'i' } });
 		}
 
 		if (year) {
@@ -1718,19 +1746,16 @@ export async function querySermons(options: {
 		}
 
 		if (hasAudio) {
-			if (language === 'english') {
-				conditions.push({ english_audio_url: { $regex: '.+' } });
-			} else {
-				conditions.push({ mp3_url: { $regex: '.+' } });
-			}
+			conditions.push({ [languageFields.audio]: { $regex: '.+' } });
 		}
 
 		// Language filtering logic
-		if (language === 'english') {
-			// For English, we specifically want items with english_audio_url OR english_pdf_url
-			// (User requested to hide entry if no audio/pdf is available)
+		if (language !== 'french') {
 			conditions.push({
-				$or: [{ english_pdf_url: { $regex: '.+' } }, { english_audio_url: { $regex: '.+' } }]
+				$or: [
+					{ [languageFields.pdf]: { $regex: '.+' } },
+					{ [languageFields.audio]: { $regex: '.+' } }
+				]
 			});
 		}
 		// For French (default), we show everything unless specifically filtered out,
@@ -1746,9 +1771,12 @@ export async function querySermons(options: {
 		const total = await db.collection('sermons').countDocuments(query);
 
 		const [requestedProperty, order] = orderBy.split(/[: ,]/);
-		const property = sermonSortFields.has(requestedProperty) ? requestedProperty : 'iso_date';
+		const requestedPropertyAllowed = sermonSortFields.has(requestedProperty);
+		let property = requestedPropertyAllowed ? requestedProperty : 'iso_date';
+		if (property === 'french_title') property = languageFields.title;
+		if (property === 'duration') property = languageFields.duration;
 		const sort: Sort = {
-			[property]: property === requestedProperty && order === 'asc' ? 1 : -1
+			[property]: requestedPropertyAllowed && order === 'asc' ? 1 : -1
 		};
 
 		const data = await db

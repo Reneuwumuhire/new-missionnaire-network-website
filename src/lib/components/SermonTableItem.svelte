@@ -15,20 +15,16 @@
 	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
 	import { downloadAudioFile } from '../../utils/downloadAudio';
 	import { t } from '../../i18n';
+	import { getSermonVersion, type SermonLanguage } from '$lib/utils/sermonLanguage';
 
 	interface Props {
 		sermon: Sermon;
 		index: number;
 		absoluteIndex: number;
-		language?: string;
+		language?: SermonLanguage;
 	}
 
-	let {
-		sermon,
-		index,
-		absoluteIndex,
-		language = 'french'
-	}: Props = $props();
+	let { sermon, index, absoluteIndex, language = 'french' }: Props = $props();
 	let isDurationLoading = false;
 
 	// Background-download state: when the listener clicks the cloud icon we
@@ -41,33 +37,20 @@
 	let downloadController: AbortController | null = null;
 	const desktopSermonGrid = 'md:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.35fr)_110px_80px_120px]';
 
-
 	function isSermonActive(
 		s: Sermon,
 		current: Sermon | AudioAsset | MusicAudio | LiveStreamTrack | null
 	) {
 		// Check for specific english audio URL match
-		if (language === 'english') {
-			if (!s.english_audio_url) return false;
-			// Check if current is null before using 'in' operator
-			if (!current) return false;
-			const currentUrl =
-				'mp3_url' in current
-					? current.mp3_url
-					: 's3_url' in current
-					? current.s3_url
-					: (current as any).url;
-			return currentUrl === s.english_audio_url;
-		}
-
-		if (!current || !s.mp3_url) return false;
+		const audioUrl = getSermonVersion(s, language).audioUrl;
+		if (!current || !audioUrl) return false;
 		const currentUrl =
 			'mp3_url' in current
 				? current.mp3_url
 				: 's3_url' in current
-				? current.s3_url
-				: (current as any).url;
-		return currentUrl === s.mp3_url;
+					? current.s3_url
+					: (current as any).url;
+		return currentUrl === audioUrl;
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -78,10 +61,7 @@
 	}
 
 	function togglePlay() {
-		const playbackSermon = createPlayableSermon(
-			sermon,
-			language === 'english' ? 'english' : 'french'
-		);
+		const playbackSermon = createPlayableSermon(sermon, language);
 		const audioUrl = playbackSermon.mp3_url;
 
 		if (!audioUrl) return;
@@ -101,11 +81,9 @@
 			downloadController.abort();
 			return;
 		}
-		const url = language === 'english' ? sermon.english_audio_url : sermon.mp3_url;
+		const url = version.audioUrl;
 		if (!url) return;
-		const title = language === 'english'
-			? sermon.english_title || 'sermon'
-			: sermon.french_title || sermon.english_title || 'sermon';
+		const title = version.title || 'sermon';
 		const controller = new AbortController();
 		downloadController = controller;
 		isDownloading = true;
@@ -128,7 +106,7 @@
 	}
 
 	function downloadPdf() {
-		const url = language === 'english' ? sermon.english_pdf_url : sermon.pdf_url;
+		const url = version.pdfUrl;
 		if (url) {
 			window.open(url, '_blank');
 		}
@@ -147,8 +125,11 @@
 	}
 
 	let isActive = $derived(isSermonActive(sermon, $selectAudio));
-	let sermonHref = $derived(`/predications/${buildSermonSlug(sermon)}`);
-	let durationAudioUrl = $derived(language === 'english' ? sermon.english_audio_url : sermon.mp3_url);
+	let version = $derived(getSermonVersion(sermon, language));
+	let sermonHref = $derived(
+		`/predications/${buildSermonSlug(sermon)}${language === 'french' ? '' : `?language=${language}`}`
+	);
+	let durationAudioUrl = $derived(version.audioUrl);
 	let hasDurationAudio = $derived(Boolean(durationAudioUrl));
 	// Only show the stored duration. We used to probe every row's audio via
 	// `<audio preload="metadata" src=url>` to extract its duration, but that
@@ -158,9 +139,7 @@
 	// Rows without a stored duration now render "--:--"; backfill them with
 	// admin/scripts/backfill-sermon-durations.ts. Each language has its own
 	// stored duration because translations usually run a different length.
-	let resolvedDuration = $derived(
-		(language === 'english' ? sermon.english_duration : sermon.duration) ?? null
-	);
+	let resolvedDuration = $derived(version.duration);
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -173,7 +152,7 @@
 	role="button"
 	tabindex="0"
 	aria-label={$t('player.playSermon', {
-		title: sermon.french_title || sermon.english_title || ''
+		title: version.title
 	})}
 >
 	<!-- Index -->
@@ -194,11 +173,7 @@
 				: 'text-gray-800 group-hover:text-orange-600'} hover:underline underline-offset-2"
 			onclick={(e) => e.stopPropagation()}
 		>
-			{#if language === 'english'}
-				{sermon.english_title || 'Untitled'}
-			{:else}
-				{sermon.french_title || sermon.english_title || 'Sans titre'}
-			{/if}
+			{version.title}
 		</a>
 		<div
 			class="flex flex-row items-center gap-2 md:hidden overflow-hidden text-ellipsis whitespace-nowrap"
@@ -237,7 +212,11 @@
 		{sermon.full_date_code}
 	</div>
 
-	<div class="hidden md:block text-center text-xs font-mono {isActive ? 'text-orange-600' : 'text-gray-400'}">
+	<div
+		class="hidden md:block text-center text-xs font-mono {isActive
+			? 'text-orange-600'
+			: 'text-gray-400'}"
+	>
 		{formatDuration(resolvedDuration)}
 	</div>
 
@@ -246,27 +225,31 @@
 	     reveals the PDF / download / play controls. Desktop always shows
 	     them (it has dedicated columns). -->
 	<div
-		class="w-full items-center justify-center gap-1 md:gap-2 {isActive
-			? 'flex'
-			: 'hidden md:flex'}"
+		class="w-full items-center justify-center gap-1 md:gap-2 {isActive ? 'flex' : 'hidden md:flex'}"
 	>
-		{#if (language === 'english' && sermon.english_pdf_url) || (language !== 'english' && sermon.pdf_url)}
+		{#if version.pdfUrl}
 			<button
 				class="inline-flex items-center justify-center min-w-11 min-h-11 text-gray-400 hover:text-red-500 transition-colors"
-				onclick={(e) => { e.stopPropagation(); downloadPdf(); }}
+				onclick={(e) => {
+					e.stopPropagation();
+					downloadPdf();
+				}}
 				title={$t('player.downloadPdf')}
 				aria-label={$t('player.downloadPdfLabel', {
-					title: sermon.french_title || sermon.english_title || ''
+					title: version.title
 				})}
 			>
 				<Icon src={BsFileEarmarkPdfFill} size="18" />
 			</button>
 		{/if}
 
-		{#if (language === 'english' && sermon.english_audio_url) || (language !== 'english' && sermon.mp3_url)}
+		{#if version.audioUrl}
 			<button
 				class="group relative inline-flex items-center justify-center min-w-11 min-h-11 text-gray-400 hover:text-orange-600 transition-colors"
-				onclick={(e) => { e.stopPropagation(); downloadMp3(); }}
+				onclick={(e) => {
+					e.stopPropagation();
+					downloadMp3();
+				}}
 				title={isDownloading
 					? downloadPercent !== null
 						? $t('player.cancelPercent', { percent: downloadPercent })
@@ -281,8 +264,20 @@
 				{#if isDownloading}
 					<span class="relative flex h-5 w-5 items-center justify-center">
 						{#if downloadPercent !== null}
-							<svg class="absolute inset-0 h-5 w-5 -rotate-90" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-								<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="text-gray-200" />
+							<svg
+								class="absolute inset-0 h-5 w-5 -rotate-90"
+								viewBox="0 0 24 24"
+								fill="none"
+								aria-hidden="true"
+							>
+								<circle
+									cx="12"
+									cy="12"
+									r="10"
+									stroke="currentColor"
+									stroke-width="3"
+									class="text-gray-200"
+								/>
 								<circle
 									cx="12"
 									cy="12"
@@ -295,16 +290,48 @@
 									class="text-orange-500 transition-[stroke-dashoffset] duration-200"
 								/>
 							</svg>
-							<span class="text-[7px] font-bold text-orange-600 tabular-nums">{downloadPercent}</span>
+							<span class="text-[7px] font-bold text-orange-600 tabular-nums"
+								>{downloadPercent}</span
+							>
 						{:else}
-							<svg class="h-5 w-5 animate-spin text-orange-500" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-								<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25" />
-								<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="42 62" />
+							<svg
+								class="h-5 w-5 animate-spin text-orange-500"
+								viewBox="0 0 24 24"
+								fill="none"
+								aria-hidden="true"
+							>
+								<circle
+									cx="12"
+									cy="12"
+									r="10"
+									stroke="currentColor"
+									stroke-width="3"
+									class="opacity-25"
+								/>
+								<circle
+									cx="12"
+									cy="12"
+									r="10"
+									stroke="currentColor"
+									stroke-width="3"
+									stroke-linecap="round"
+									stroke-dasharray="42 62"
+								/>
 							</svg>
 						{/if}
 						<!-- Hover hint: swap ring for X so cancel is obvious on pointer devices. -->
-						<span class="absolute inset-0 hidden items-center justify-center rounded-full bg-orange-600 group-hover:flex">
-							<svg class="h-3 w-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+						<span
+							class="absolute inset-0 hidden items-center justify-center rounded-full bg-orange-600 group-hover:flex"
+						>
+							<svg
+								class="h-3 w-3 text-white"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2.5"
+								stroke-linecap="round"
+								aria-hidden="true"
+							>
 								<path d="M6 6l12 12M6 18L18 6" />
 							</svg>
 						</span>
@@ -315,12 +342,15 @@
 			</button>
 		{/if}
 
-		{#if (language === 'english' && sermon.english_audio_url) || (language !== 'english' && sermon.mp3_url)}
+		{#if version.audioUrl}
 			<button
 				class="hover:scale-110 active:scale-95 transition-all inline-flex items-center justify-center min-w-11 min-h-11 {isActive
 					? 'text-orange-600'
 					: 'text-orange-600'}"
-				onclick={(e) => { e.stopPropagation(); togglePlay(); }}
+				onclick={(e) => {
+					e.stopPropagation();
+					togglePlay();
+				}}
 				title={isActive && $isPlaying ? $t('player.pause') : $t('player.playAction')}
 				aria-label={isActive && $isPlaying ? $t('player.pause') : $t('player.playAction')}
 			>

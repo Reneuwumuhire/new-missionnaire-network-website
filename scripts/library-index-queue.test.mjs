@@ -34,6 +34,16 @@ test('literature indexes PDFs, never the ZIP download container', () => {
 			parts: []
 		})[0].revision
 	);
+	assert.deepEqual(
+		assetsFor('sermons', {
+			_id: 'localized-sermon',
+			localizations: {
+				rw: { pdf_url: 'https://assets.test/rw.pdf' },
+				sw: { pdf_url: 'https://assets.test/sw.pdf' }
+			}
+		}).map(({ url }) => url),
+		['https://assets.test/rw.pdf', 'https://assets.test/sw.pdf']
+	);
 });
 
 test(
