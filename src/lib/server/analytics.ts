@@ -27,35 +27,41 @@ export async function getAnalyticsStats(): Promise<AnalyticsStats> {
 	const [result = {}] = (await analytics
 		.aggregate(
 			[
-				// One-request addresses are overwhelmingly rotating crawlers in this dataset.
-				// Requiring a second page view that day is a country-neutral quality floor.
-				{ $match: { device: { $ne: 'Bot' }, pageViews: { $gt: 1 } } },
+				// New records are browser-confirmed. Legacy records need a second page view
+				// because one-request addresses are overwhelmingly rotating crawlers.
+				{
+					$match: {
+						device: { $ne: 'Bot' },
+						$or: [{ verifiedHuman: true }, { pageViews: { $gt: 1 } }]
+					}
+				},
+				{ $set: { visitorKey: { $ifNull: ['$visitorId', '$ip'] } } },
 				{
 					$facet: {
-						totalVisitors: [{ $group: { _id: '$ip' } }, { $count: 'value' }],
+						totalVisitors: [{ $group: { _id: '$visitorKey' } }, { $count: 'value' }],
 						todayVisitors: [
 							{ $match: { date: today } },
-							{ $group: { _id: '$ip' } },
+							{ $group: { _id: '$visitorKey' } },
 							{ $count: 'value' }
 						],
 						dailyAverage: [
 							{ $match: { date: { $ne: today } } },
-							{ $group: { _id: { date: '$date', ip: '$ip' } } },
+							{ $group: { _id: { date: '$date', visitor: '$visitorKey' } } },
 							{ $group: { _id: '$_id.date', visitors: { $sum: 1 } } },
 							{ $group: { _id: null, value: { $avg: '$visitors' } } }
 						],
 						monthlyAverage: [
 							{ $match: { date: { $not: new RegExp(`^${currentMonth}`) } } },
-							{ $project: { month: { $substrBytes: ['$date', 0, 7] }, ip: 1 } },
-							{ $group: { _id: { month: '$month', ip: '$ip' } } },
+							{ $project: { month: { $substrBytes: ['$date', 0, 7] }, visitorKey: 1 } },
+							{ $group: { _id: { month: '$month', visitor: '$visitorKey' } } },
 							{ $group: { _id: '$_id.month', visitors: { $sum: 1 } } },
 							{ $group: { _id: null, value: { $avg: '$visitors' } } }
 						],
 						distributions: [
-							{ $sort: { ip: 1, lastSeen: -1 } },
+							{ $sort: { visitorKey: 1, lastSeen: -1 } },
 							{
 								$group: {
-									_id: '$ip',
+									_id: '$visitorKey',
 									device: { $first: { $ifNull: ['$device', 'Unknown'] } },
 									country: {
 										$first: {

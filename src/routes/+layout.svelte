@@ -39,6 +39,45 @@
 	let headerRef: HTMLDivElement | null = $state(null);
 	let headerHeight = $state(120);
 	let resizeObserver: ResizeObserver | null = null;
+	let stopPendingAnalytics = () => {};
+
+	function trackVisibleVisit(url: URL) {
+		stopPendingAnalytics();
+		if (
+			!browser ||
+			dev ||
+			navigator.webdriver ||
+			navigator.doNotTrack === '1' ||
+			url.pathname.startsWith('/__')
+		)
+			return;
+
+		let sent = false;
+		const send = () => {
+			if (sent || document.visibilityState !== 'visible') return;
+			sent = true;
+			cleanup();
+			void fetch('/api/analytics', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ path: url.pathname, referrer: document.referrer }),
+				keepalive: true
+			}).catch(() => {
+				/* Analytics must never affect the page. */
+			});
+		};
+		const timer = window.setTimeout(send, 8000);
+		const cleanup = () => {
+			window.clearTimeout(timer);
+			for (const event of ['pointerdown', 'keydown', 'scroll']) {
+				window.removeEventListener(event, send);
+			}
+		};
+		for (const event of ['pointerdown', 'keydown', 'scroll']) {
+			window.addEventListener(event, send, { once: true, passive: true });
+		}
+		stopPendingAnalytics = cleanup;
+	}
 
 	function rememberMusicPath(url: URL) {
 		if (!browser || url.pathname !== '/musique') return;
@@ -126,6 +165,7 @@
 		return () => {
 			cancelAnimationFrame(rafId);
 			resizeObserver?.disconnect();
+			stopPendingAnalytics();
 		};
 	});
 
@@ -148,11 +188,13 @@
 	// the wrong 1200×630 makes Facebook/WhatsApp mis-render or reject it, so we
 	// omit the hints and let the crawler read the real size unless the page
 	// passes explicit dimensions.
-	let ogImageDims = $derived(pageMeta.image
-		? pageMeta.imageWidth && pageMeta.imageHeight
-			? { w: pageMeta.imageWidth, h: pageMeta.imageHeight }
-			: null
-		: { w: 1200, h: 630 });
+	let ogImageDims = $derived(
+		pageMeta.image
+			? pageMeta.imageWidth && pageMeta.imageHeight
+				? { w: pageMeta.imageWidth, h: pageMeta.imageHeight }
+				: null
+			: { w: 1200, h: 630 }
+	);
 
 	const ytPages = ['/videos', '/musique', '/predications'];
 	let needsYouTube = $derived(ytPages.some((p) => $page.url.pathname.startsWith(p)));
@@ -295,6 +337,7 @@
 
 	afterNavigate(({ to }) => {
 		if (!browser || !to) return;
+		trackVisibleVisit(to.url);
 		try {
 			// Drop the random-shuffle `seed` before persisting. Seeds are
 			// per-session state — keeping one in the saved last-path means

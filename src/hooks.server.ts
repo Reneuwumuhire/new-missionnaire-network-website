@@ -2,9 +2,7 @@ import { connect, getDb } from './db/mongo';
 import { checkAndIngestLiveStream } from './lib/server/youtube-poller';
 import { ensureWebSubSubscription } from '$lib/server/youtube-websub';
 import { redirect, type Handle } from '@sveltejs/kit';
-import { getFullCountryName } from './utils/countries';
-import { classifyDevice } from './utils/botDetection';
-import { getTodayInKigali } from './utils/time';
+import { isBotUserAgent } from './utils/botDetection';
 import { startRadioProbeScheduler } from '$lib/server/radio-probe-scheduler';
 
 if (process.env.RAILWAY_PRIVATE_DOMAIN) startRadioProbeScheduler();
@@ -21,59 +19,6 @@ connect()
 	.catch((e) => {
 		console.error('[MongoDB] Initialization failed:', e);
 	});
-
-async function trackAnalytics(event: any, isPageRequest: boolean) {
-	if (!isPageRequest) return;
-
-	try {
-		const db = await getDb();
-		if (!db) return;
-
-		const analytics = db.collection('analytics');
-		const { pathname } = event.url;
-		const userAgent = event.request.headers.get('user-agent') || 'unknown';
-		const referrer = event.request.headers.get('referer') || 'direct';
-
-		let ip = 'unknown';
-		try {
-			ip = event.getClientAddress();
-		} catch (e) {
-			console.warn('[Tracking] Could not determine client IP:', e);
-		}
-		const today = getTodayInKigali();
-
-		const countryCode =
-			event.request.headers.get('cf-ipcountry') ||
-			event.request.headers.get('x-vercel-ip-country') ||
-			'Unknown';
-		const countryFull = getFullCountryName(countryCode);
-		const city = event.request.headers.get('x-vercel-ip-city') || 'Unknown';
-
-		const device = classifyDevice(userAgent);
-
-		const now = Date.now();
-		await analytics.updateOne(
-			{ date: today, ip: ip, userAgent: userAgent },
-			{
-				$setOnInsert: {
-					userAgent,
-					countryShort: countryCode,
-					countryFull,
-					city,
-					device,
-					referrer,
-					firstSeen: now
-				},
-				$set: { lastSeen: now },
-				$inc: { pageViews: 1 },
-				$addToSet: { viewedPaths: pathname }
-			},
-			{ upsert: true }
-		);
-	} catch (error) {
-		console.error('[Tracking Error]:', error);
-	}
-}
 
 async function trackMissedRoute(event: any, response: Response, isPageRequest: boolean) {
 	if (response.status !== 404 || !isPageRequest) return;
@@ -109,20 +54,16 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 
 	const userAgent = event.request.headers.get('user-agent') || 'unknown';
-	const isVercelBot =
-		userAgent.includes('vercel-screenshot') || userAgent.includes('vercel-favicon/1.0');
-
 	const isPageRequest =
 		!pathname.includes('.') &&
 		!pathname.startsWith('/api/') &&
 		!pathname.startsWith('/_') &&
-		!isVercelBot;
-
-	// Fire and forget analytics tracking
-	trackAnalytics(event, isPageRequest);
+		!isBotUserAgent(userAgent);
 
 	// Fire and forget livestream check (self-throttled via DB lock)
-	checkAndIngestLiveStream().catch((e) => console.error('[Hooks] Poller error:', e));
+	if (isPageRequest) {
+		checkAndIngestLiveStream().catch((e) => console.error('[Hooks] Poller error:', e));
+	}
 
 	const response = await resolve(event);
 

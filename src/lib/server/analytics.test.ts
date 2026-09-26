@@ -36,6 +36,6 @@ it('loads all public analytics in one aggregation and merges country aliases', a
 	expect(mocks.aggregate).toHaveBeenCalledOnce();
 	expect(mocks.aggregate).toHaveBeenCalledWith(expect.any(Array), { allowDiskUse: true });
 	expect(mocks.aggregate.mock.calls[0][0]).toContainEqual({
-		$match: { device: { $ne: 'Bot' }, pageViews: { $gt: 1 } }
+		$set: { visitorKey: { $ifNull: ['$visitorId', '$ip'] } }
 	});
 });
