@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { listRetransmissions } from '$lib/server/recordings';
+import { getRetransmissionYears, listRetransmissions } from '$lib/server/recordings';
 import type { RequestEvent } from './$types';
 
 export async function GET({ url }: RequestEvent) {
@@ -12,18 +12,22 @@ export async function GET({ url }: RequestEvent) {
 		const sortField = url.searchParams.get('sortField') || 'started_at';
 		const sortOrder = url.searchParams.get('sortOrder') === 'asc' ? 'asc' : 'desc';
 
-		const result = await listRetransmissions({
-			limit,
-			pageNumber,
-			q,
-			year,
-			sortField,
-			sortOrder
-		});
+		const [result, years] = await Promise.all([
+			listRetransmissions({
+				limit,
+				pageNumber,
+				q,
+				year,
+				sortField,
+				sortOrder
+			}),
+			getRetransmissionYears()
+		]);
 
 		return json({
 			data: result.data,
 			total: result.total,
+			years,
 			error: null
 		});
 	} catch (error) {

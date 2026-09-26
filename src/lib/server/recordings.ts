@@ -344,6 +344,7 @@ export async function listPublished(
 // between requests on the same server instance.
 const YEARS_TTL_MS = 10 * 60 * 1000;
 let yearsCache: { value: number[]; expires: number } | null = null;
+let retransmissionYearsCache: { value: number[]; expires: number } | null = null;
 
 // Total count of published+ready recordings. Used for the page header, so
 // stale-within-minutes is fine — new recordings appear on the next refresh.
@@ -388,6 +389,36 @@ export async function getAvailableYears(): Promise<number[]> {
 	} catch (err) {
 		console.error('[recordings] getAvailableYears failed', err);
 		return yearsCache?.value ?? [];
+	}
+}
+
+export async function getRetransmissionYears(): Promise<number[]> {
+	if (retransmissionYearsCache && retransmissionYearsCache.expires > Date.now())
+		return retransmissionYearsCache.value;
+	try {
+		const db = await getDb();
+		const rows = (await db
+			.collection('recordings')
+			.find(
+				{
+					published: true,
+					status: 'ready',
+					title: { $regex: RETRANSMISSION_TITLE_REGEX, $options: 'i' }
+				},
+				{ projection: { started_at: 1 } }
+			)
+			.toArray()) as unknown as Array<{ started_at: Date | string }>;
+		const years = new Set<number>();
+		for (const row of rows) {
+			const date = row.started_at instanceof Date ? row.started_at : new Date(row.started_at);
+			if (!Number.isNaN(date.getTime())) years.add(date.getUTCFullYear());
+		}
+		const sorted = [...years].sort((a, b) => b - a);
+		retransmissionYearsCache = { value: sorted, expires: Date.now() + YEARS_TTL_MS };
+		return sorted;
+	} catch (error) {
+		console.error('[recordings] getRetransmissionYears failed', error);
+		return retransmissionYearsCache?.value ?? [];
 	}
 }
 

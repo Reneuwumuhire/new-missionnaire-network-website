@@ -282,7 +282,7 @@
 		if (currentYear) retransmissionParams.set('year', currentYear);
 
 		const fetchAuthors = !areAuthorsFresh() || availableAuthors.length === 0;
-		const fetchYears = !areYearsFresh() || years.length === 0;
+		const fetchYears = !isRetransmissions && (!areYearsFresh() || years.length === 0);
 		const wantsSermons = !isRetransmissions;
 		const wantsRetransmissions = isRetransmissions || isBlendedSearch;
 
@@ -322,14 +322,16 @@
 
 			let nextRecordings: PublishedRecording[] = [];
 			let nextRecordingsTotal = 0;
+			let nextRetransmissionYears: string[] = [];
 			if (retransmissionRes) {
 				if (!retransmissionRes.ok) throw new Error($t('predications.loadRetransmissionsFailed'));
 				const r = await retransmissionRes.json();
 				nextRecordings = (r.data || []) as PublishedRecording[];
 				nextRecordingsTotal = (r.total || 0) as number;
+				nextRetransmissionYears = (r.years || []).map(String);
 			}
 
-			let nextYears = getCachedYears() || years;
+			let nextYears = isRetransmissions ? nextRetransmissionYears : getCachedYears() || years;
 			if (yearsRes) {
 				if (yearsRes.ok) {
 					const r = await yearsRes.json();
@@ -407,7 +409,12 @@
 					...cachedEntry,
 					availableAuthors:
 						cachedEntry.availableAuthors.length > 0 ? cachedEntry.availableAuthors : cachedAuthors,
-					years: cachedEntry.years.length > 0 ? cachedEntry.years : cachedYears
+					years:
+						cachedEntry.years.length > 0
+							? cachedEntry.years
+							: currentAuthor === 'Retransmissions'
+								? []
+								: cachedYears
 				});
 				void loadInBackground({ showLoading: !isPredicationsPageCacheFresh(cachedEntry) });
 			} else {
@@ -417,7 +424,7 @@
 				recordingsTotal = 0;
 				totalSermons = 0;
 				availableAuthors = cachedAuthors;
-				years = cachedYears;
+				years = currentAuthor === 'Retransmissions' ? [] : cachedYears;
 				hasResolvedList = false;
 				void loadInBackground({ showLoading: true });
 			}
@@ -440,6 +447,8 @@
 		const params = new URLSearchParams($page.url.searchParams);
 		if (author === 'Tous') params.delete('author');
 		else params.set('author', author);
+		if ((author === 'Retransmissions') !== (currentAuthor === 'Retransmissions'))
+			params.delete('year');
 		params.set('page', '1');
 		goto(`?${params.toString()}`);
 	}
