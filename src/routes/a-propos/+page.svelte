@@ -101,7 +101,8 @@
 			{:else if stats}
 				<h2 class="font-display text-2xl md:text-3xl font-semibold text-stone-900">Statistiques</h2>
 				<p class="-mt-5 text-sm text-stone-500">
-					Visiteurs uniques estimés à partir des adresses réseau.
+					Visiteurs actifs estimés. Les robots reconnus et les requêtes sans interaction sont
+					exclus.
 				</p>
 				<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 w-full">
 					<div class="border border-stone-200/60 bg-white/40 p-5 card-lift space-y-2">

@@ -27,7 +27,9 @@ export async function getAnalyticsStats(): Promise<AnalyticsStats> {
 	const [result = {}] = (await analytics
 		.aggregate(
 			[
-				{ $match: { device: { $ne: 'Bot' } } },
+				// One-request addresses are overwhelmingly rotating crawlers in this dataset.
+				// Requiring a second page view that day is a country-neutral quality floor.
+				{ $match: { device: { $ne: 'Bot' }, pageViews: { $gt: 1 } } },
 				{
 					$facet: {
 						totalVisitors: [{ $group: { _id: '$ip' } }, { $count: 'value' }],
