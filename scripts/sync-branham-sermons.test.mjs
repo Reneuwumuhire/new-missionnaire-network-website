@@ -53,6 +53,27 @@ test('matches by code or same title and date, never by title alone', () => {
 	assert.equal(result.unmatched[0].code, '58-0000');
 });
 
+test('maps known catalog aliases to existing sermon rows', () => {
+	const existing = {
+		_id: new ObjectId(),
+		full_date_code: '60-0210',
+		english_title: 'Testimony'
+	};
+	const result = resolveCatalog(
+		[
+			{
+				catalog: 'ENG',
+				code: '60-0210M',
+				title: 'The Revelation That Was Given To Me',
+				isSermon: true
+			}
+		],
+		[existing]
+	);
+	assert.equal(result.matched[0].document, existing);
+	assert.equal(result.matched[0].reason, 'known-code-alias');
+});
+
 test('fills only missing localized fields and reports conflicts', () => {
 	const document = {
 		localizations: { rw: { title: 'Existing title', pdf_url: 'https://assets.test/existing.pdf' } }

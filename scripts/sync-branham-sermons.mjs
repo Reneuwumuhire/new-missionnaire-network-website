@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /** Sync official sermon resources into existing MongoDB sermon documents.
- * Dry-run by default. --write only fills empty fields; it never inserts,
- * overwrites, deletes, or guesses an ambiguous match. */
+ * Dry-run by default. --write only fills empty fields; --insert-codes adds
+ * explicitly reviewed omissions. It never overwrites, deletes, or guesses. */
 import fs from 'node:fs/promises';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import fetch from 'node-fetch';
-import { MongoClient } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 
 export const CATALOGS = {
 	ENG: {
@@ -35,6 +35,13 @@ export const CATALOGS = {
 const BASE_URL = 'https://branham.org';
 const MESSAGE_MARKER = '<div class="large-24 medium-24 small-24 columns end message">';
 const SERMON_CODE = /^\d{2}-\d{4}[A-Z]?$/;
+const CODE_ALIASES = new Map([
+	['53-0614E', '53-0614'],
+	['53-1115A', '53-1115M'],
+	['56-0218B', '56-0218M'],
+	['60-0210M', '60-0210'],
+	['62-0318', '62-0318E']
+]);
 
 function decodeHtml(value = '') {
 	const named = { amp: '&', quot: '"', apos: "'", lt: '<', gt: '>', nbsp: ' ' };
@@ -126,6 +133,10 @@ export function resolveCatalog(entries, documents, canonicalMatches = new Map())
 		}
 		let candidates = exact.get(entry.code) || [];
 		let reason = 'code';
+		if (candidates.length === 0 && CODE_ALIASES.has(entry.code)) {
+			candidates = exact.get(CODE_ALIASES.get(entry.code)) || [];
+			reason = 'known-code-alias';
+		}
 		if (candidates.length === 0 && canonicalMatches.has(entry.code)) {
 			candidates = [canonicalMatches.get(entry.code)];
 			reason = 'english-alias';
@@ -194,11 +205,17 @@ async function fetchCatalog(code) {
 }
 
 function parseArgs(argv) {
-	const options = { write: false, report: '', catalogs: Object.keys(CATALOGS) };
+	const options = { write: false, report: '', catalogs: Object.keys(CATALOGS), insertCodes: [] };
 	for (const arg of argv) {
 		if (arg === '--') continue;
 		if (arg === '--write') options.write = true;
 		else if (arg.startsWith('--report=')) options.report = arg.slice('--report='.length);
+		else if (arg.startsWith('--insert-codes='))
+			options.insertCodes = arg
+				.slice('--insert-codes='.length)
+				.split(',')
+				.map((value) => value.trim().toUpperCase())
+				.filter(Boolean);
 		else if (arg.startsWith('--catalogs=')) {
 			options.catalogs = arg
 				.slice('--catalogs='.length)
@@ -207,17 +224,41 @@ function parseArgs(argv) {
 				.filter(Boolean);
 		} else if (arg === '--help') {
 			console.log(
-				'node --env-file=.env.local scripts/sync-branham-sermons.mjs [--catalogs=ENG,FRN,KIN,SWA] [--report=path.json] [--write]'
+				'node --env-file=.env.local scripts/sync-branham-sermons.mjs [--catalogs=ENG,FRN,KIN,SWA] [--insert-codes=56-1003,61-0120] [--report=path.json] [--write]'
 			);
 			process.exit(0);
 		} else throw new Error(`Unknown argument: ${arg}`);
 	}
 	for (const code of options.catalogs)
 		if (!CATALOGS[code]) throw new Error(`Unknown catalog: ${code}`);
+	if (options.insertCodes.length && !options.write)
+		throw new Error('--insert-codes requires --write');
 	return options;
 }
 
-export async function syncSermons({ uri, database = 'youtube_data', catalogs, write = false }) {
+function documentForEntry(entry) {
+	const [, year, month, day] = entry.code.match(/^(\d{2})-(\d{2})(\d{2})/) || [];
+	if (!year) throw new Error(`Cannot derive date from ${entry.code}`);
+	return {
+		_id: new ObjectId(),
+		full_date_code: entry.code,
+		date_code: entry.code,
+		author: 'William Marrion Branham',
+		english_title: entry.title,
+		english_audio_url: entry.audioUrl,
+		english_pdf_url: entry.pdfUrl,
+		iso_date: `19${year}-${month}-${day}`,
+		updated_at: new Date()
+	};
+}
+
+export async function syncSermons({
+	uri,
+	database = 'youtube_data',
+	catalogs,
+	write = false,
+	insertCodes = []
+}) {
 	const requested = [...new Set(['ENG', ...catalogs])];
 	const fetched = Object.fromEntries(
 		await Promise.all(requested.map(async (code) => [code, await fetchCatalog(code)]))
@@ -227,7 +268,16 @@ export async function syncSermons({ uri, database = 'youtube_data', catalogs, wr
 		await client.connect();
 		const collection = client.db(database).collection('sermons');
 		const documents = await collection.find({}).project({ library_search: 0 }).toArray();
-		const english = resolveCatalog(fetched.ENG, documents);
+		let english = resolveCatalog(fetched.ENG, documents);
+		const requestedInserts = new Set(insertCodes);
+		for (const code of requestedInserts)
+			if (!fetched.ENG.some((entry) => entry.isSermon && entry.code === code))
+				throw new Error(`Cannot insert unknown English sermon: ${code}`);
+		const inserts = english.unmatched
+			.filter((entry) => requestedInserts.has(entry.code))
+			.map(documentForEntry);
+		documents.push(...inserts);
+		if (inserts.length) english = resolveCatalog(fetched.ENG, documents);
 		const canonicalMatches = new Map(
 			english.matched.map(({ entry, document }) => [entry.code, document])
 		);
@@ -279,8 +329,11 @@ export async function syncSermons({ uri, database = 'youtube_data', catalogs, wr
 				nonSermons: resolved.nonSermons
 			};
 		}
+		if (write && inserts.length) await collection.insertMany(inserts);
 		if (write && operations.length) await collection.bulkWrite(operations, { ordered: false });
+		report.insertedDocuments = write ? inserts.length : 0;
 		report.updatedDocuments = write ? operations.length : 0;
+		report.pendingInserts = inserts.length;
 		report.pendingUpdates = operations.length;
 		return report;
 	} finally {
@@ -295,7 +348,8 @@ async function main() {
 		uri: process.env.MONGODB_URI,
 		database: process.env.MONGODB_DB || 'youtube_data',
 		catalogs: options.catalogs,
-		write: options.write
+		write: options.write,
+		insertCodes: options.insertCodes
 	});
 	if (options.report) await fs.writeFile(options.report, `${JSON.stringify(report, null, 2)}\n`);
 	for (const [code, result] of Object.entries(report.catalogs)) {
@@ -308,7 +362,7 @@ async function main() {
 			);
 	}
 	console.log(
-		`${options.write ? 'Updated' : 'Would update'} ${report.pendingUpdates} matched language versions.`
+		`${options.write ? 'Inserted' : 'Would insert'} ${report.pendingInserts} sermons; ${options.write ? 'updated' : 'would update'} ${report.pendingUpdates} matched language versions.`
 	);
 }
 
