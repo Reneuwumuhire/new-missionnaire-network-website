@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Sync official sermon resources into existing MongoDB sermon documents.
- * Dry-run by default. --write only fills empty fields; --insert-codes adds
- * explicitly reviewed omissions. It never overwrites, deletes, or guesses. */
+ * Dry-run by default. --write only fills empty fields; --insert-new adds
+ * unmatched official English sermons. It never overwrites or deletes. */
 import fs from 'node:fs/promises';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
@@ -205,10 +205,17 @@ async function fetchCatalog(code) {
 }
 
 function parseArgs(argv) {
-	const options = { write: false, report: '', catalogs: Object.keys(CATALOGS), insertCodes: [] };
+	const options = {
+		write: false,
+		insertNew: false,
+		report: '',
+		catalogs: Object.keys(CATALOGS),
+		insertCodes: []
+	};
 	for (const arg of argv) {
 		if (arg === '--') continue;
 		if (arg === '--write') options.write = true;
+		else if (arg === '--insert-new') options.insertNew = true;
 		else if (arg.startsWith('--report=')) options.report = arg.slice('--report='.length);
 		else if (arg.startsWith('--insert-codes='))
 			options.insertCodes = arg
@@ -224,15 +231,15 @@ function parseArgs(argv) {
 				.filter(Boolean);
 		} else if (arg === '--help') {
 			console.log(
-				'node --env-file=.env.local scripts/sync-branham-sermons.mjs [--catalogs=ENG,FRN,KIN,SWA] [--insert-codes=56-1003,61-0120] [--report=path.json] [--write]'
+				'node --env-file=.env.local scripts/sync-branham-sermons.mjs [--catalogs=ENG,FRN,KIN,SWA] [--insert-new | --insert-codes=56-1003,61-0120] [--report=path.json] [--write]'
 			);
 			process.exit(0);
 		} else throw new Error(`Unknown argument: ${arg}`);
 	}
 	for (const code of options.catalogs)
 		if (!CATALOGS[code]) throw new Error(`Unknown catalog: ${code}`);
-	if (options.insertCodes.length && !options.write)
-		throw new Error('--insert-codes requires --write');
+	if ((options.insertNew || options.insertCodes.length) && !options.write)
+		throw new Error('--insert-new and --insert-codes require --write');
 	return options;
 }
 
@@ -257,6 +264,7 @@ export async function syncSermons({
 	database = 'youtube_data',
 	catalogs,
 	write = false,
+	insertNew = false,
 	insertCodes = []
 }) {
 	const requested = [...new Set(['ENG', ...catalogs])];
@@ -274,7 +282,7 @@ export async function syncSermons({
 			if (!fetched.ENG.some((entry) => entry.isSermon && entry.code === code))
 				throw new Error(`Cannot insert unknown English sermon: ${code}`);
 		const inserts = english.unmatched
-			.filter((entry) => requestedInserts.has(entry.code))
+			.filter((entry) => insertNew || requestedInserts.has(entry.code))
 			.map(documentForEntry);
 		documents.push(...inserts);
 		if (inserts.length) english = resolveCatalog(fetched.ENG, documents);
@@ -349,6 +357,7 @@ async function main() {
 		database: process.env.MONGODB_DB || 'youtube_data',
 		catalogs: options.catalogs,
 		write: options.write,
+		insertNew: options.insertNew,
 		insertCodes: options.insertCodes
 	});
 	if (options.report) await fs.writeFile(options.report, `${JSON.stringify(report, null, 2)}\n`);
