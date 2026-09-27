@@ -44,6 +44,7 @@ try {
 			library_search: 1,
 			pdf_url: 1,
 			english_pdf_url: 1,
+			localizations: 1,
 			parts: 1,
 			url: 1,
 			subtitle_srt_url: 1,
@@ -67,7 +68,12 @@ try {
 			}
 			let urls =
 				collection === 'sermons'
-					? [row.pdf_url, row.english_pdf_url]
+					? [
+							row.pdf_url,
+							row.english_pdf_url,
+							row.localizations?.rw?.pdf_url,
+							row.localizations?.sw?.pdf_url
+						]
 					: collection === 'literature'
 						? row.parts?.length
 							? row.parts.map((part) => part.url)

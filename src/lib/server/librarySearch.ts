@@ -161,12 +161,37 @@ export function librarySourcePipeline(
 		offsetMs: { $literal: 0 }
 	};
 	if (type === 'sermons') {
+		const localized =
+			f.language === 'en'
+				? {
+						title: '$english_title',
+						alternateTitle: '$french_title',
+						audio: '$english_audio_url',
+						pdf: '$english_pdf_url'
+					}
+				: f.language === 'rw'
+					? {
+							title: '$localizations.rw.title',
+							alternateTitle: '$english_title',
+							audio: '$localizations.rw.audio_url',
+							pdf: '$localizations.rw.pdf_url'
+						}
+					: f.language === 'sw'
+						? {
+								title: '$localizations.sw.title',
+								alternateTitle: '$english_title',
+								audio: '$localizations.sw.audio_url',
+								pdf: '$localizations.sw.pdf_url'
+							}
+						: {
+								title: '$french_title',
+								alternateTitle: '$english_title',
+								audio: '$mp3_url',
+								pdf: '$pdf_url'
+							};
 		Object.assign(fields, {
-			title: fallback(
-				f.language === 'en' ? '$english_title' : '$french_title',
-				fallback('$english_title')
-			),
-			alternateTitle: fallback(f.language === 'en' ? '$french_title' : '$english_title'),
+			title: fallback(localized.title, fallback('$english_title')),
+			alternateTitle: fallback(localized.alternateTitle),
 			french_title: 1,
 			english_title: 1,
 			date_code: 1,
@@ -174,8 +199,8 @@ export function librarySourcePipeline(
 			iso_date: 1,
 			code: fallback('$full_date_code'),
 			date: fallback('$iso_date'),
-			audioUrl: fallback(f.language === 'en' ? '$english_audio_url' : '$mp3_url'),
-			url: fallback(f.language === 'en' ? '$english_pdf_url' : '$pdf_url'),
+			audioUrl: fallback(localized.audio),
+			url: fallback(localized.pdf),
 			languages: {
 				$concatArrays: [
 					{ $cond: [{ $or: [present('$mp3_url'), present('$pdf_url')] }, ['fr'], []] },
@@ -185,17 +210,38 @@ export function librarySourcePipeline(
 							['en'],
 							[]
 						]
+					},
+					{
+						$cond: [
+							{
+								$or: [present('$localizations.rw.audio_url'), present('$localizations.rw.pdf_url')]
+							},
+							['rw'],
+							[]
+						]
+					},
+					{
+						$cond: [
+							{
+								$or: [present('$localizations.sw.audio_url'), present('$localizations.sw.pdf_url')]
+							},
+							['sw'],
+							[]
+						]
 					}
 				]
 			},
 			parts:
 				content || reader
 					? indexedParts(
-							f.language === 'fr'
-								? ['$pdf_url']
-								: f.language === 'en'
-									? ['$english_pdf_url']
-									: ['$pdf_url', '$english_pdf_url'],
+							f.language
+								? [localized.pdf]
+								: [
+										'$pdf_url',
+										'$english_pdf_url',
+										'$localizations.rw.pdf_url',
+										'$localizations.sw.pdf_url'
+									],
 							f,
 							reader
 						)

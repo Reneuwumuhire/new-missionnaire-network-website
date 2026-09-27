@@ -9,7 +9,7 @@
  * a bot — real browsers always send one.
  */
 const BOT_UA_PATTERN =
-	/bot|spider|crawl|slurp|facebookexternalhit|whatsapp|embedly|pinterest|telegram|discord|slack|curl|wget|python-requests|python-urllib|go-http-client|okhttp|node-fetch|axios|headlesschrome|phantomjs|puppeteer|playwright|scraper|archiver|fetcher|preview|linkchecker|httpclient|libwww|lighthouse|ahrefs|semrush|yandex|baidu|duckduck/i;
+	/bot|spider|crawl|slurp|facebookexternalhit|whatsapp|embedly|pinterest|telegram|discord|slack|curl|wget|python-requests|python-urllib|go-http-client|okhttp|node-fetch|axios|headlesschrome|phantomjs|puppeteer|playwright|scraper|archiver|fetcher|preview|linkchecker|httpclient|libwww|lighthouse|ahrefs|semrush|yandex|baidu|duckduck|msh-pdfmin/i;
 
 export function isBotUserAgent(userAgent: string | null | undefined): boolean {
 	if (!userAgent || userAgent === 'unknown') return true;

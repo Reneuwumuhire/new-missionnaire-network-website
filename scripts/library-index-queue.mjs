@@ -5,6 +5,7 @@ export const collections = ['sermons', 'literature', 'pdfs', 'recordings'];
 const revisionFields = [
 	'pdf_url',
 	'english_pdf_url',
+	'localizations',
 	'parts',
 	'url',
 	'subtitle_srt_url',
@@ -50,7 +51,12 @@ export function assetsFor(collection, row, owner, scheduled) {
 	const direct = row.subtitle_srt_s3_key && Number.isFinite(row.subtitle_offset_into_recording_ms);
 	const urls =
 		collection === 'sermons'
-			? [row.pdf_url, row.english_pdf_url]
+			? [
+					row.pdf_url,
+					row.english_pdf_url,
+					row.localizations?.rw?.pdf_url,
+					row.localizations?.sw?.pdf_url
+				]
 			: collection === 'literature'
 				? row.parts?.length
 					? row.parts.map((part) => part.url)

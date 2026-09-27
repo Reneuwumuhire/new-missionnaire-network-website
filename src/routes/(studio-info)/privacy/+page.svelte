@@ -1,5 +1,5 @@
 <h1>Privacy policy</h1>
-<p>Missionnaire Studio and Missionnaire Admin · Last updated: September 12, 2026</p>
+<p>Missionnaire Studio and Missionnaire Admin · Last updated: September 27, 2026</p>
 <p>
 	This policy describes how Missionnaire Network handles information when you use Missionnaire
 	Studio, its Admin connection, and its Google/YouTube integration. Contact: <a
@@ -30,10 +30,12 @@
 		features store the recordings you create.
 	</li>
 	<li>
-		<strong>Technical information:</strong> our website processes request information such as IP address,
-		browser/device information, visited pages, referrer and approximate country and city for operation
-		and visitor statistics. Session cookies and local storage support authentication, preferences and
-		cached media. Embedded third-party content may use its own cookies or similar technologies.
+		<strong>Technical information:</strong> our servers necessarily process request information such as
+		an IP address to deliver and protect the website. Visitor statistics use an anonymous first-party
+		browser identifier, device type, visited pages, referrer and approximate country only after a visible
+		visit or interaction; the new statistics do not store the visitor's IP address or exact location.
+		The identifier expires after 180 days. Cookies and local storage also support authentication, preferences
+		and cached media. Embedded third-party content may use its own cookies or similar technologies.
 	</li>
 </ul>
 <h2>How we use your information</h2>

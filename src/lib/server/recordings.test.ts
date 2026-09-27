@@ -30,7 +30,7 @@ vi.mock('../../db/mongo', () => ({
 	})
 }));
 
-import { listRetransmissions } from './recordings';
+import { getRetransmissionYears, listRetransmissions } from './recordings';
 
 it('uses a covered recording list index and a safe sort', async () => {
 	await listRetransmissions({ sortField: 'library_search' });
@@ -90,6 +90,24 @@ it('uses a covered recording list index and a safe sort', async () => {
 	});
 	expect(mocks.cursor.hint).toHaveBeenCalledWith('published_recording_list_by_date_v2');
 	expect(mocks.cursor.sort).toHaveBeenCalledWith({ started_at: -1 });
+});
+
+it('offers only years containing retransmissions', async () => {
+	mocks.cursor.toArray.mockResolvedValueOnce([
+		{ started_at: new Date('2025-01-01T00:00:00Z') },
+		{ started_at: new Date('2026-01-01T00:00:00Z') },
+		{ started_at: new Date('2025-06-01T00:00:00Z') }
+	] as never[]);
+
+	await expect(getRetransmissionYears()).resolves.toEqual([2026, 2025]);
+	expect(mocks.find).toHaveBeenLastCalledWith(
+		{
+			published: true,
+			status: 'ready',
+			title: { $regex: 'retransmission|frank|ewald', $options: 'i' }
+		},
+		{ projection: { started_at: 1 } }
+	);
 });
 
 it('surfaces database failures instead of reporting an empty library', async () => {

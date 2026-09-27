@@ -59,13 +59,18 @@ const en: Record<keyof typeof fr, string> = {
 
 	// ── Language picker ─────────────────────────────────────────
 	'lang.label': 'Language',
+	'lang.all': 'All',
+	'lang.available': '{count} languages available',
 	'lang.french': 'Français',
 	'lang.english': 'English',
+	'lang.kinyarwanda': 'Kinyarwanda',
+	'lang.swahili': 'Kiswahili',
 
 	// ── Audio language names (replay version switch) ────────────
 	'lang.name.rw': 'Kinyarwanda',
 	'lang.name.fr': 'French',
 	'lang.name.en': 'English',
+	'lang.name.sw': 'Kiswahili',
 
 	// ── Lists, search & filters ─────────────────────────────────
 	'list.loading': 'Loading...',
