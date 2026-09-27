@@ -154,7 +154,7 @@
 	// moov atom which for m4a often requires the whole file). With ~100
 	// sermons per page that was ~40MB+ of wasted bandwidth on page load.
 	// Rows without a stored duration now render "--:--"; backfill them with
-	// admin/scripts/backfill-sermon-durations.ts. Each language has its own
+	// scripts/backfill-sermon-durations.mjs. Each language has its own
 	// stored duration because translations usually run a different length.
 	let resolvedDuration = $derived(version.duration);
 </script>
