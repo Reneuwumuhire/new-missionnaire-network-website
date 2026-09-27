@@ -24,7 +24,8 @@
 		"literature:migrate-zips": "node --env-file=admin/.env.local scripts/migrate-literature-zips.mjs",
 		"library:repair-urls": "node --env-file=admin/.env.local scripts/repair-library-asset-urls.mjs",
 		"sermons:sync": "node --env-file-if-exists=.env.local scripts/sync-branham-sermons.mjs",
-		"sermons:migrate-assets": "node --env-file=admin/.env.local scripts/migrate-sermon-assets.mjs"
+		"sermons:migrate-assets": "node --env-file=admin/.env.local scripts/migrate-sermon-assets.mjs",
+		"sermons:backfill-durations": "node --env-file=admin/.env.local scripts/backfill-sermon-durations.mjs"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^3.3.1",
