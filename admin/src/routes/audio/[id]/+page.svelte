@@ -254,7 +254,7 @@
 
 		try {
 			const parsed = new URL(url);
-			if (parsed.hostname !== 'indirimbo-zikundwa.bi') {
+			if (parsed.hostname !== 'indirimbo-zikundwa.github.io') {
 				toast.error($t('audio.lyrics.unsupportedUrl'));
 				return;
 			}
@@ -347,7 +347,9 @@
 	<!-- Main form (2 cols) -->
 	<div class="lg:col-span-2">
 		<div class="border border-stone-200/60 bg-white/40 p-6">
-			<h2 class="mb-5 font-display text-lg font-semibold text-stone-700">{$t('audio.edit.metadata')}</h2>
+			<h2 class="mb-5 font-display text-lg font-semibold text-stone-700">
+				{$t('audio.edit.metadata')}
+			</h2>
 
 			<div class="grid gap-5 sm:grid-cols-2">
 				<div class="sm:col-span-2">
@@ -355,7 +357,9 @@
 					<input
 						id="title"
 						type="text"
-						class="admin-input {fieldErrors.title ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : ''}"
+						class="admin-input {fieldErrors.title
+							? 'border-red-400 focus:border-red-500 focus:ring-red-200'
+							: ''}"
 						bind:value={title}
 						disabled={!data.canEdit}
 						aria-invalid={fieldErrors.title ? 'true' : undefined}
@@ -419,7 +423,9 @@
 					<input
 						id="number"
 						type="number"
-						class="admin-input {fieldErrors.number ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : ''}"
+						class="admin-input {fieldErrors.number
+							? 'border-red-400 focus:border-red-500 focus:ring-red-200'
+							: ''}"
 						value={number ?? ''}
 						disabled={!data.canEdit}
 						aria-invalid={fieldErrors.number ? 'true' : undefined}
@@ -469,13 +475,17 @@
 		<div class="mt-6 border border-stone-200/60 bg-white/40 p-6">
 			<div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 				<div>
-					<p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">{$t('audio.lyrics.eyebrow')}</p>
+					<p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
+						{$t('audio.lyrics.eyebrow')}
+					</p>
 					<h2 class="mt-1 font-display text-lg font-semibold text-stone-700">
 						{$t('audio.lyrics.publishHeading')}
 					</h2>
 					{#if lyrics}
 						<p class="mt-1 text-sm text-stone-500">
-							{$t('audio.lyrics.linesPublished', { count: lyricLineCount(lyrics.lines) })}{lyrics.synced_at
+							{$t('audio.lyrics.linesPublished', {
+								count: lyricLineCount(lyrics.lines)
+							})}{lyrics.synced_at
 								? $t('audio.lyrics.onDate', { date: formatDate(lyrics.synced_at) })
 								: ''}{lyrics.synced_by ? $t('audio.lyrics.byUser', { user: lyrics.synced_by }) : ''}
 						</p>
@@ -505,7 +515,7 @@
 							type="url"
 							class="admin-input flex-1"
 							bind:value={lyricsSourceUrl}
-							placeholder="https://indirimbo-zikundwa.bi/..."
+							placeholder="https://indirimbo-zikundwa.github.io/songs/..."
 							disabled={lyricsUrlLoading}
 						/>
 						<button
@@ -529,7 +539,9 @@
 				class="admin-input min-h-72 resize-y leading-7"
 				bind:value={lyricsText}
 				disabled={!data.canPublishLyrics}
-				placeholder={$t('audio.lyrics.pastePlaceholder', { title: title || $t('audio.lyrics.thisAudio') })}
+				placeholder={$t('audio.lyrics.pastePlaceholder', {
+					title: title || $t('audio.lyrics.thisAudio')
+				})}
 			></textarea>
 			<p class="mt-2 text-xs text-stone-500">
 				{$t('audio.lyrics.formatHelp')}
@@ -567,7 +579,9 @@
 	<div class="space-y-6">
 		<!-- Audio preview -->
 		<div class="border border-stone-200/60 bg-white/40 p-6">
-			<h3 class="mb-4 text-sm font-medium text-stone-500 uppercase tracking-wider">{$t('audio.edit.preview')}</h3>
+			<h3 class="mb-4 text-sm font-medium text-stone-500 uppercase tracking-wider">
+				{$t('audio.edit.preview')}
+			</h3>
 			<div class="mb-4">
 				<AudioPreviewPlayer src={data.audio.s3_url} />
 			</div>
@@ -621,7 +635,11 @@
 				</p>
 				{#if confirmDelete}
 					<div class="flex items-center gap-2">
-						<button onclick={deleteAudio} disabled={deleting} class="admin-btn-danger admin-btn-compact">
+						<button
+							onclick={deleteAudio}
+							disabled={deleting}
+							class="admin-btn-danger admin-btn-compact"
+						>
 							{deleting ? $t('audio.edit.deleting') : $t('audio.edit.confirmDelete')}
 						</button>
 						<button

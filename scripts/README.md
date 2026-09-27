@@ -7,7 +7,8 @@ pnpm lyrics:match -- --limit 50
 ```
 
 The script reads `MONGODB_URI` from your shell, `.env.local`, or `.env`, then matches
-`youtube_data.music_audio` rows against the public song index at `https://indirimbo-zikundwa.bi/`.
+`youtube_data.music_audio` rows against the public song index at
+`https://indirimbo-zikundwa.github.io/app/`.
 By default it writes `admin/lyrics-matches.csv` so the admin app can load it locally and in
 deployment.
 

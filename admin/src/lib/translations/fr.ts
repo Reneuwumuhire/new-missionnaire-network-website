@@ -388,13 +388,13 @@ export default {
 
 	// ── Audio: lyrics import/publish ────────────────────────────
 	'audio.lyrics.pasteUrlFirst': 'Collez une URL avant de charger',
-	'audio.lyrics.unsupportedUrl': 'URL non supportée — utilisez indirimbo-zikundwa.bi',
+	'audio.lyrics.unsupportedUrl': 'URL non supportée — utilisez un lien de chant Indirimbo Zikundwa',
 	'audio.lyrics.invalidUrl': 'URL invalide',
 	'audio.lyrics.loadFailed': 'Impossible de charger les paroles',
 	'audio.lyrics.noneFound': 'Aucune parole trouvée à cette URL',
 	'audio.lyrics.loadedFromUrl': 'Paroles chargées depuis l’URL',
 	'audio.lyrics.loadError': 'Erreur lors du chargement des paroles',
-	'audio.lyrics.importFromSite': 'Importer depuis indirimbo-zikundwa.bi',
+	'audio.lyrics.importFromSite': 'Importer depuis Indirimbo Zikundwa',
 	'audio.lyrics.loading': 'Chargement...',
 	'audio.lyrics.loadFromUrl': 'Charger depuis l’URL',
 	'audio.lyrics.urlHelp':

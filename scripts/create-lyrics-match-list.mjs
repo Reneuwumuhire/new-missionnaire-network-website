@@ -5,12 +5,13 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { gunzipSync } from 'node:zlib';
 import { MongoClient } from 'mongodb';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(SCRIPT_DIR, '..');
 
-const DEFAULT_SOURCE_URL = 'https://indirimbo-zikundwa.bi/';
+const DEFAULT_SOURCE_URL = 'https://indirimbo-zikundwa.github.io/app/';
 const DEFAULT_DB_NAME = 'youtube_data';
 const DEFAULT_COLLECTION = 'music_audio';
 const DEFAULT_OUT = path.join(ROOT_DIR, 'admin', 'lyrics-matches.csv');
@@ -60,7 +61,7 @@ const SOURCE_BOOK_DEFINITIONS = new Map(
 		'chants de victoire': { book: 'Chants de Victoire', linkPrefix: 'C-Victoire' },
 		chorus: { book: 'Chorus', linkPrefix: 'Chorus' },
 		'coll des cantiques': { book: 'Coll. des Cantiques', linkPrefix: 'C-Cantiques' },
-		'crois seulement': { book: 'Crois Seulement', linkPrefix: 'Crois-Seulement' },
+		'crois seulement': { book: 'Crois Seulement', linkPrefix: 'C-Seulement' },
 		gushimisha: { book: 'Gushimisha', linkPrefix: 'Gushimisha' },
 		ikirundi: { book: 'Ikirundi', linkPrefix: 'Ikirundi' },
 		impimbano: { book: 'Impimbano', linkPrefix: 'Impimbano' },
@@ -95,7 +96,7 @@ Options:
   --min-confidence <number>    Confidence threshold for "candidate" status. Default: 0.72
   --db-name <name>             MongoDB database name. Default: youtube_data
   --collection <name>          MongoDB collection name. Default: music_audio
-  --source-url <url>           Lyric source home URL. Default: https://indirimbo-zikundwa.bi/
+  --source-url <url>           Lyric source app URL. Default: https://indirimbo-zikundwa.github.io/app/
   --source-cache <path>        Source index cache path. Default: .lyrics-cache/indirimbo-zikundwa-index.json
   --refresh-source             Ignore cached source index and fetch again.
   --source-only                Fetch/parse the lyric source index, then exit without MongoDB.
@@ -224,7 +225,11 @@ async function loadSourceIndex(options) {
 	if (!options.refreshSource) {
 		try {
 			const cached = JSON.parse(await fs.readFile(options.sourceCache, 'utf8'));
-			if (Array.isArray(cached.songs) && cached.songs.length > 0) {
+			if (
+				cached.sourceUrl === options.sourceUrl &&
+				Array.isArray(cached.songs) &&
+				cached.songs.length > 0
+			) {
 				console.log(
 					`Loaded ${cached.songs.length} lyric source songs from cache: ${relativePath(
 						options.sourceCache
@@ -239,10 +244,11 @@ async function loadSourceIndex(options) {
 		}
 	}
 
-	console.log(`Fetching lyric source index: ${options.sourceUrl}`);
-	const response = await globalThis.fetch(options.sourceUrl, {
+	const dataUrl = new URL('/data/hymns.json.gz', options.sourceUrl).href;
+	console.log(`Fetching lyric source index: ${dataUrl}`);
+	const response = await globalThis.fetch(dataUrl, {
 		headers: {
-			accept: 'text/html,application/xhtml+xml',
+			accept: 'application/gzip,application/octet-stream',
 			'user-agent': 'MissionnaireNetworkLyricsMatcher/0.1 (+https://missionnaire.net)'
 		}
 	});
@@ -253,8 +259,10 @@ async function loadSourceIndex(options) {
 		);
 	}
 
-	const html = await response.text();
-	const songs = parseIndirimboZikundwaIndex(html, options.sourceUrl);
+	const songs = parseIndirimboZikundwaIndex(
+		gunzipSync(Buffer.from(await response.arrayBuffer())).toString('utf8'),
+		options.sourceUrl
+	);
 
 	await fs.mkdir(path.dirname(options.sourceCache), { recursive: true });
 	await fs.writeFile(
@@ -276,61 +284,33 @@ async function loadSourceIndex(options) {
 	return songs.map(prepareSourceSong);
 }
 
-function parseIndirimboZikundwaIndex(html, sourceUrl) {
-	const marker = 'const books = {';
-	const start = html.indexOf(marker);
-	if (start === -1) {
-		throw new Error('Could not find "const books" in lyric source HTML');
+function parseIndirimboZikundwaIndex(json, sourceUrl) {
+	const data = JSON.parse(json);
+	if (!Array.isArray(data.collections) || !Array.isArray(data.songs)) {
+		throw new Error('The lyric source catalog is invalid');
 	}
 
-	const bodyStart = html.indexOf('{', start);
-	const bodyEnd = html.indexOf('\n};', bodyStart);
-	if (bodyStart === -1 || bodyEnd === -1) {
-		throw new Error('Could not isolate the lyric source books object');
-	}
-
-	const objectBody = html.slice(bodyStart + 1, bodyEnd);
-	const songs = [];
-	const bookRegex = /"([^"]+)"\s*:\s*\[([\s\S]*?)\]\s*,?/g;
-	const songRegex =
-		/\{\s*number:\s*(\d+)\s*,\s*title:\s*"((?:\\.|[^"\\])*)"\s*,\s*link:\s*"([^"]+)"\s*\}/g;
-
-	let bookMatch;
-	while ((bookMatch = bookRegex.exec(objectBody)) !== null) {
-		const [, book, block] = bookMatch;
-		let songMatch;
-
-		while ((songMatch = songRegex.exec(block)) !== null) {
-			const [, rawNumber, rawTitle, link] = songMatch;
-			const number = Number.parseInt(rawNumber, 10);
-			const title = parseJsString(rawTitle);
-			const sourceLink = new URL(link, sourceUrl).href;
-			const lyricsTextId = makeLyricsTextId(book, number, title);
-
-			songs.push({
+	const collectionNames = new Map(data.collections.map(({ id, name }) => [id, name]));
+	const songs = data.songs
+		.filter(({ id, number, title }) => id && Number.isFinite(number) && title)
+		.map(({ id, number, series, title }) => {
+			const book = collectionNames.get(series) ?? series;
+			return {
 				book,
-				lyricsTextId,
+				lyricsTextId: makeLyricsTextId(book, number, title),
 				number,
 				source: SOURCE_ID,
 				title,
-				url: sourceLink
-			});
-		}
-	}
+				url: makeSourceSongUrl(sourceUrl, id)
+			};
+		});
 
-	if (songs.length === 0) {
-		throw new Error('Found the lyric source books object, but parsed zero songs');
-	}
-
+	if (songs.length === 0) throw new Error('The lyric source catalog contains no songs');
 	return songs;
 }
 
-function parseJsString(value) {
-	try {
-		return JSON.parse(`"${value}"`);
-	} catch {
-		return value.replace(/\\"/g, '"').replace(/\\\\/g, '\\');
-	}
+function makeSourceSongUrl(sourceUrl, songId) {
+	return new URL(`/songs/${songId}.html`, sourceUrl).href;
 }
 
 function prepareSourceSong(song) {
@@ -429,7 +409,7 @@ function addDirectSourceCandidates(sourceSongs, audioRows, sourceUrl) {
 
 			const title = getSyntheticSourceTitle(metadata, definition);
 			const numberPath = String(metadata.number).padStart(3, '0');
-			const url = new URL(`Indirimbo/${definition.linkPrefix}-${numberPath}.html`, sourceUrl).href;
+			const url = makeSourceSongUrl(sourceUrl, `${definition.linkPrefix}-${numberPath}`);
 			const sourceSong = prepareSourceSong({
 				book: definition.book,
 				lyricsTextId: makeLyricsTextId(definition.book, metadata.number, title),

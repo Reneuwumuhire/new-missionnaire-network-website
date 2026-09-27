@@ -10,7 +10,7 @@ export type ExtractedSection = {
 	title?: string;
 };
 
-// indirimbo-zikundwa.bi marks a repeated passage with ":/: … :/:". The colons
+// Indirimbo Zikundwa marks a repeated passage with ":/: … :/:". The colons
 // are not sentence punctuation and must never trigger a line break.
 const REPEAT_MARK = ':/:';
 // A control character the lyrics can never contain, and — unlike a space — one

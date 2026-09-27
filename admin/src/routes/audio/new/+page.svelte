@@ -51,7 +51,7 @@
 
 		try {
 			const parsed = new URL(url);
-			if (parsed.hostname !== 'indirimbo-zikundwa.bi') {
+			if (parsed.hostname !== 'indirimbo-zikundwa.github.io') {
 				toast.error($t('audio.lyrics.unsupportedUrl'));
 				return;
 			}
@@ -325,7 +325,13 @@
 
 			<div>
 				<label for="book" class="admin-label">{$t('audio.fields.book')}</label>
-				<input id="book" type="text" class="admin-input" bind:value={book} placeholder={$t('audio.fields.bookPlaceholder')} />
+				<input
+					id="book"
+					type="text"
+					class="admin-input"
+					bind:value={book}
+					placeholder={$t('audio.fields.bookPlaceholder')}
+				/>
 			</div>
 
 			<div>
@@ -359,7 +365,8 @@
 	<!-- Step 3: Optional lyrics -->
 	<div class="mb-8 border border-stone-200/60 bg-white/40 p-6">
 		<h2 class="mb-3 font-display text-lg font-semibold text-stone-700">
-			{$t('audio.new.step3')} <span class="text-sm font-normal text-stone-400">{$t('audio.new.optional')}</span>
+			{$t('audio.new.step3')}
+			<span class="text-sm font-normal text-stone-400">{$t('audio.new.optional')}</span>
 		</h2>
 
 		<div class="mb-5 rounded border border-stone-200/70 bg-stone-50/60 p-4">
@@ -372,7 +379,7 @@
 					type="url"
 					class="admin-input flex-1"
 					bind:value={lyricsSourceUrl}
-					placeholder="https://indirimbo-zikundwa.bi/..."
+					placeholder="https://indirimbo-zikundwa.github.io/songs/..."
 					disabled={lyricsUrlLoading}
 					onpaste={(e) => {
 						const pasted = e.clipboardData?.getData('text')?.trim();

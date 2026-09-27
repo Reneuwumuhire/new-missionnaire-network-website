@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { env } from '$env/dynamic/private';
 import { getDb } from '../../db/mongo';
+import { loadIndirimboSongs } from './indirimboSource';
 // Build-time CSV fallback. Vercel serverless functions can't read arbitrary
 // repo files at runtime (process.cwd() is the read-only Lambda bundle), so we
 // inline the CSV as a string. In dev, fs.readFile takes precedence so script
@@ -213,42 +214,30 @@ export async function extractLyricsFromUrl(
 	sourceUrl: string,
 	options: { audioTitle?: string; versionLabel?: string } = {}
 ) {
-	const url = new URL(sourceUrl);
-	if (url.hostname !== 'indirimbo-zikundwa.bi') {
-		throw new Error('Unsupported lyrics source');
-	}
-
-	const response = await fetch(url, {
-		headers: {
-			accept: 'text/html,application/xhtml+xml',
-			'user-agent': 'MissionnaireNetworkLyricsReview/0.1 (+https://missionnaire.net)'
-		}
+	const songs = await loadIndirimboSongs(sourceUrl, options);
+	const sections: LyricSection[] = songs.map((song) => {
+		let verseNumber = 0;
+		return {
+			label: song.label,
+			title: song.title,
+			lines: song.stanzas
+				.filter((stanza) => stanza.text?.trim())
+				.map((stanza) => ({
+					role: stanza.type === 'chorus' ? 'refrain' : 'verse',
+					text: stanza.text.trim(),
+					verse_number: stanza.type === 'verse' ? ++verseNumber : null
+				}))
+		};
 	});
-
-	if (!response.ok) {
-		throw new Error(`Could not fetch lyrics page (${response.status})`);
-	}
-
-	const html = await response.text();
-	const sections = extractLyricSections(html);
-	const selectedSections = selectLyricSections(sections, options);
-	const visibleSections = selectedSections.length > 0 ? selectedSections : sections;
-	const title =
-		visibleSections.length > 0
-			? visibleSections
-					.map((section) => section.title)
-					.filter(Boolean)
-					.join(' / ')
-			: extractFirstText(html, /<div class="s">\s*<div[^>]*>([\s\S]*?)<\/div>\s*<\/div>/i);
-	const lines = visibleSections.flatMap((section) => [
+	const lines = sections.flatMap((section) => [
 		formatSectionHeading(section),
 		...section.lines.map((line) => getLyricSourceLineText(line))
 	]);
 
 	return {
 		lines,
-		sections: visibleSections,
-		title,
+		sections,
+		title: songs.map((song) => song.title).join(' / '),
 		url: sourceUrl
 	};
 }
@@ -580,220 +569,10 @@ export type LyricSourceLine = {
 	verse_number?: number | null;
 };
 
-function extractLyricSections(html: string) {
-	const sections: LyricSection[] = [];
-	const tokenRegex =
-		/<div\b[^>]*class="(pc|s)"[^>]*>([\s\S]*?)<\/div>|<ol\b([^>]*)>[\s\S]*?<li\b[^>]*class="z?oli1"[^>]*>([\s\S]*?)<\/li>[\s\S]*?<\/ol>|<li\b[^>]*class="z?oli1"[^>]*>([\s\S]*?)<\/li>/gi;
-	let currentSection: LyricSection | null = null;
-	let match;
-
-	while ((match = tokenRegex.exec(html)) !== null) {
-		const blockClass = match[1];
-		const blockHtml = match[2] ?? match[4] ?? match[5] ?? '';
-		const text = htmlToText(blockHtml);
-		if (!text || /^\*+$/.test(text)) continue;
-
-		if (blockClass === 'pc') {
-			const label = normalizeSectionLabel(text);
-			if (label) {
-				currentSection = { label, lines: [], title: '' };
-				sections.push(currentSection);
-				continue;
-			}
-			if (!currentSection) {
-				currentSection = { label: '', lines: [], title: '' };
-				sections.push(currentSection);
-			}
-			pushBlockLines(currentSection, text, {
-				role: isRefrainBlock(blockHtml, text) ? 'refrain' : 'line'
-			});
-			continue;
-		}
-
-		if (blockClass === 's') {
-			if (!currentSection) {
-				currentSection = { label: '', lines: [], title: '' };
-				sections.push(currentSection);
-			}
-			currentSection.title = collapseWhitespace(text);
-			continue;
-		}
-
-		if (!currentSection) {
-			currentSection = { label: '', lines: [], title: '' };
-			sections.push(currentSection);
-		}
-		pushBlockLines(currentSection, text, {
-			role: isRefrainBlock(blockHtml, text) ? 'refrain' : 'verse',
-			verseNumber: parseOlStart(match[3])
-		});
-	}
-
-	return sections.filter((section) => section.title || section.lines.length > 0);
-}
-
-// A `<br>` inside a block is a real line break, so each of its lines becomes
-// its own lyric line. Only the first carries the stanza's verse number.
-function pushBlockLines(
-	section: LyricSection,
-	text: string,
-	options: { role?: LyricSourceLine['role']; verseNumber?: number | null }
-) {
-	text
-		.split('\n')
-		.map((line) => line.trim())
-		.filter(Boolean)
-		.forEach((line, index) => {
-			section.lines.push(
-				createLyricSourceLine(line, {
-					role: options.role,
-					verseNumber: index === 0 ? options.verseNumber : null
-				})
-			);
-		});
-}
-
-function createLyricSourceLine(
-	text: string,
-	options: { role?: LyricSourceLine['role']; verseNumber?: number | null } = {}
-): LyricSourceLine {
-	const parsed = parseVersePrefix(text);
-	return {
-		role: options.role ?? (parsed.verseNumber !== null ? 'verse' : 'line'),
-		text: parsed.text,
-		verse_number: options.verseNumber ?? parsed.verseNumber
-	};
-}
-
 function getLyricSourceLineText(line: LyricSourceLine | string) {
 	return typeof line === 'string' ? line : line.text;
 }
 
-function parseOlStart(attributes?: string) {
-	const match = String(attributes ?? '').match(/\bstart\s*=\s*["']?(\d{1,3})/i);
-	if (!match) return null;
-	const value = Number(match[1]);
-	return Number.isFinite(value) ? value : null;
-}
-
-function parseVersePrefix(text: string) {
-	const match = text.match(/^\s*(\d{1,3})\s*[.)]\s+(.+)$/);
-	if (!match) return { text, verseNumber: null };
-	return {
-		text: match[2].trim(),
-		verseNumber: Number(match[1])
-	};
-}
-
-function isRefrainBlock(html: string, text: string) {
-	return (
-		/\bclass=["'][^"']*\bbdit\b/i.test(html) ||
-		/<(?:i|em)\b/i.test(html) ||
-		/\b(refrain|chorus|choeur|chœur|coro|korasi)\b/i.test(text)
-	);
-}
-
-function selectLyricSections(
-	sections: LyricSection[],
-	options: { audioTitle?: string; versionLabel?: string }
-) {
-	const versionLetters = parseVersionLetters(options.versionLabel);
-	if (versionLetters.length > 0) {
-		const matches = sections.filter((section) => {
-			const sectionVersion = parseSectionVersion(section.label);
-			return sectionVersion && versionLetters.includes(sectionVersion);
-		});
-		if (matches.length > 0) return matches;
-	}
-
-	const audioTitle = normalizeText(options.audioTitle);
-	if (!audioTitle) return [];
-
-	const titleMatches = sections.filter((section) => {
-		const sectionTitle = normalizeText(section.title);
-		return sectionTitle.length >= 5 && audioTitle.includes(sectionTitle);
-	});
-
-	return titleMatches;
-}
-
-function normalizeSectionLabel(text: string) {
-	const label = text.replace(/\s+/g, '').trim();
-	return /^\d{1,4}[A-Za-z]?$/.test(label) ? label.toUpperCase() : '';
-}
-
-function parseVersionLetters(value?: string) {
-	return [
-		...new Set(
-			String(value ?? '')
-				.toUpperCase()
-				.match(/[A-Z]/g) ?? []
-		)
-	];
-}
-
-function parseSectionVersion(label: string) {
-	return label.match(/[A-Z]$/)?.[0] ?? '';
-}
-
 function formatSectionHeading(section: LyricSection) {
 	return [section.label, section.title].filter(Boolean).join(' - ');
-}
-
-function normalizeText(value?: string) {
-	return String(value ?? '')
-		.normalize('NFKD')
-		.replace(/[\u0300-\u036f]/g, '')
-		.replace(/[‘’‚‛`´]/g, "'")
-		.toLowerCase()
-		.replace(/[^a-z0-9' ]+/g, ' ')
-		.replace(/'/g, '')
-		.replace(/\s+/g, ' ')
-		.trim();
-}
-
-function extractFirstText(html: string, regex: RegExp) {
-	const match = regex.exec(html);
-	return match ? collapseWhitespace(htmlToText(match[1])) : '';
-}
-
-// Keeps the line breaks a `<br>` stands for. Callers that need a single line
-// (titles, section labels) run the result through collapseWhitespace.
-function htmlToText(html: string) {
-	return decodeHtmlEntities(
-		html
-			.replace(/<br\s*\/?>/gi, '\n')
-			.replace(/<[^>]+>/g, '')
-			.replace(/[^\S\n]+/g, ' ')
-			.replace(/[ \t]+\n/g, '\n')
-			.replace(/\n[ \t]+/g, '\n')
-			.replace(/\n{2,}/g, '\n')
-			.trim()
-	);
-}
-
-function collapseWhitespace(text: string) {
-	return text.replace(/\s+/g, ' ').trim();
-}
-
-function decodeHtmlEntities(text: string) {
-	const named: Record<string, string> = {
-		amp: '&',
-		apos: "'",
-		gt: '>',
-		lt: '<',
-		nbsp: ' ',
-		quot: '"'
-	};
-
-	return text.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (_, entity: string) => {
-		const lower = entity.toLowerCase();
-		if (lower.startsWith('#x')) {
-			return String.fromCodePoint(Number.parseInt(lower.slice(2), 16));
-		}
-		if (lower.startsWith('#')) {
-			return String.fromCodePoint(Number.parseInt(lower.slice(1), 10));
-		}
-		return named[lower] ?? `&${entity};`;
-	});
 }
