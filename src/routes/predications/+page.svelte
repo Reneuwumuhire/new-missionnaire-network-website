@@ -496,9 +496,11 @@
 				'Retransmissions'
 					? 'border-missionnaire text-missionnaire'
 					: 'border-transparent text-stone-400 hover:text-stone-600'}"
+				aria-label={BRANHAM_AUTHOR}
 				onclick={() => handleAuthorChange(BRANHAM_AUTHOR)}
 			>
-				{BRANHAM_AUTHOR}
+				<span class="md:hidden">W.M Branham</span>
+				<span class="hidden md:inline">{BRANHAM_AUTHOR}</span>
 			</button>
 			<button
 				role="tab"
