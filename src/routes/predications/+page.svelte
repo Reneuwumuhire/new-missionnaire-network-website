@@ -541,34 +541,32 @@
 		</a>
 	</div>
 
-	<!-- Slim utility bar: compact search (mobile only; desktop
-	     keeps the header band's inline search) + one "Filtres" button that
-	     opens the sheet (alphabet, years, language, audio-only). -->
-	<div class="mt-3 mb-3 md:mb-4 flex items-center gap-2 md:justify-end">
-		<div class="relative min-w-0 flex-1 md:hidden">
-			<svg
-				class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
-				width="14"
-				height="14"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2.2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				aria-hidden="true"
-			>
-				<circle cx="11" cy="11" r="7" />
-				<line x1="21" y1="21" x2="16.65" y2="16.65" />
-			</svg>
+	<!-- One compact control row: mobile search, active filters, and actions. -->
+	<div class="mt-3 mb-3 flex flex-wrap items-center gap-2 md:mb-4">
+		<div
+			class="order-1 flex h-10 min-w-0 flex-1 items-center rounded-full border border-stone-200/80 bg-white/90 transition-shadow focus-within:border-missionnaire/50 focus-within:ring-2 focus-within:ring-missionnaire/10 md:hidden"
+		>
+			<span class="flex h-10 w-10 shrink-0 items-center justify-center text-stone-400">
+				<svg
+					width="16"
+					height="16"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.8"
+					stroke-linecap="round"
+					aria-hidden="true"
+				>
+					<circle cx="10.5" cy="10.5" r="6.5" />
+					<path d="m16 16 4.5 4.5" />
+				</svg>
+			</span>
 			<input
 				type="text"
 				inputmode="search"
 				enterkeyhint="search"
 				autocomplete="off"
-				class="h-10 w-full border border-stone-200 bg-white/70 pl-9 {searchInput
-					? 'pr-9'
-					: 'pr-3'} font-body text-sm text-stone-800 outline-none transition-colors duration-150 placeholder:text-stone-400 focus:border-missionnaire/60 focus:bg-white"
+				class="h-full min-w-0 flex-1 bg-transparent pr-4 font-body text-sm text-stone-800 outline-none placeholder:text-stone-400"
 				placeholder={$t('predications.searchPlaceholder')}
 				aria-label={$t('predications.searchPlaceholder')}
 				bind:value={searchInput}
@@ -577,7 +575,7 @@
 			{#if searchInput}
 				<button
 					type="button"
-					class="absolute right-0 top-0 flex h-10 w-9 items-center justify-center text-stone-400 transition-colors duration-150 hover:text-stone-700"
+					class="mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-missionnaire/40"
 					aria-label={$t('predications.clearSearch')}
 					onclick={clearListSearch}
 				>
@@ -585,100 +583,99 @@
 				</button>
 			{/if}
 		</div>
-		<button
-			class="inline-flex h-10 shrink-0 items-center gap-2 border px-4 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors duration-150 {filtersOpen ||
-			activeFilterCount > 0
-				? 'border-missionnaire/60 bg-missionnaire/5 text-missionnaire'
-				: 'border-stone-200 bg-white/70 text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
-			aria-haspopup="dialog"
-			aria-expanded={filtersOpen}
-			onclick={openFilters}
-		>
-			<svg
-				viewBox="0 0 24 24"
-				width="13"
-				height="13"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2.2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				aria-hidden="true"
+		{#if currentAlpha || currentYear || currentLanguage !== 'french' || currentHasAudio}
+			<div class="order-2 flex basis-full flex-wrap gap-2 md:order-1 md:basis-auto">
+				{#if currentAlpha}
+					<button
+						class="flex items-center gap-1.5 rounded-full border border-missionnaire/40 bg-missionnaire/10 px-3 py-1.5 text-xs font-semibold text-missionnaire"
+						onclick={() => handleAlphaChange(currentAlpha)}
+					>
+						<span>{$t('predications.letterLabel', { letter: currentAlpha })}</span>
+						<Icon src={BsX} size="14" />
+					</button>
+				{/if}
+				{#if currentYear}
+					<button
+						class="flex items-center gap-1.5 rounded-full border border-missionnaire/40 bg-missionnaire/10 px-3 py-1.5 text-xs font-semibold text-missionnaire"
+						onclick={() => handleYearChange(currentYear)}
+					>
+						<span>{$t('predications.yearLabel', { year: currentYear })}</span>
+						<Icon src={BsX} size="14" />
+					</button>
+				{/if}
+				{#if currentLanguage !== 'french'}
+					<button
+						class="flex items-center gap-1.5 rounded-full border border-missionnaire/40 bg-missionnaire/10 px-3 py-1.5 text-xs font-semibold text-missionnaire"
+						onclick={() => handleLanguageChange('french')}
+						title={$t('lang.french')}
+					>
+						<span>{$t(languageLabelKeys[currentLanguage])}</span>
+						<Icon src={BsX} size="14" />
+					</button>
+				{/if}
+				{#if currentHasAudio}
+					<button
+						class="flex items-center gap-1.5 rounded-full border border-missionnaire/40 bg-missionnaire/10 px-3 py-1.5 text-xs font-semibold text-missionnaire"
+						onclick={() => handleAudioFilterToggle()}
+					>
+						<span>{$t('predications.audioOnly')}</span>
+						<Icon src={BsX} size="14" />
+					</button>
+				{/if}
+			</div>
+		{/if}
+
+		<div class="order-1 ml-auto flex shrink-0 items-center gap-2 md:order-2">
+			<button
+				class="inline-flex h-10 shrink-0 items-center gap-2 border px-4 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors duration-150 {filtersOpen ||
+				activeFilterCount > 0
+					? 'border-missionnaire/60 bg-missionnaire/5 text-missionnaire'
+					: 'border-stone-200 bg-white/70 text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
+				aria-haspopup="dialog"
+				aria-expanded={filtersOpen}
+				onclick={openFilters}
 			>
-				<line x1="4" y1="6" x2="20" y2="6" />
-				<line x1="7" y1="12" x2="17" y2="12" />
-				<line x1="10" y1="18" x2="14" y2="18" />
-			</svg>
-			{$t('predications.filters')}
-			{#if activeFilterCount > 0}
-				<span
-					class="flex h-4 min-w-4 items-center justify-center rounded-full bg-missionnaire px-1 text-[9px] font-bold text-white"
+				<svg
+					viewBox="0 0 24 24"
+					width="13"
+					height="13"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2.2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					aria-hidden="true"
 				>
-					{activeFilterCount}
-				</span>
-			{/if}
-		</button>
-	</div>
-
-	<!-- Active sheet-filters as dismissible chips (the preacher state is
-	     already visible in the pill row above). -->
-	{#if currentAlpha || currentYear || currentLanguage !== 'french' || currentHasAudio}
-		<div class="mb-3 flex flex-wrap gap-2">
-			{#if currentAlpha}
+					<line x1="4" y1="6" x2="20" y2="6" />
+					<line x1="7" y1="12" x2="17" y2="12" />
+					<line x1="10" y1="18" x2="14" y2="18" />
+				</svg>
+				{$t('predications.filters')}
+				{#if activeFilterCount > 0}
+					<span
+						class="flex h-4 min-w-4 items-center justify-center rounded-full bg-missionnaire px-1 text-[9px] font-bold text-white"
+					>
+						{activeFilterCount}
+					</span>
+				{/if}
+			</button>
+			{#if currentSearch || currentAlpha || currentYear || currentLanguage !== 'french' || currentHasAudio || currentAuthor === 'Retransmissions'}
 				<button
-					class="flex items-center gap-1.5 rounded-full border border-missionnaire/40 bg-missionnaire/10 px-3 py-1.5 text-xs font-semibold text-missionnaire"
-					onclick={() => handleAlphaChange(currentAlpha)}
-				>
-					<span>{$t('predications.letterLabel', { letter: currentAlpha })}</span>
-					<Icon src={BsX} size="14" />
-				</button>
-			{/if}
-			{#if currentYear}
-				<button
-					class="flex items-center gap-1.5 rounded-full border border-missionnaire/40 bg-missionnaire/10 px-3 py-1.5 text-xs font-semibold text-missionnaire"
-					onclick={() => handleYearChange(currentYear)}
-				>
-					<span>{$t('predications.yearLabel', { year: currentYear })}</span>
-					<Icon src={BsX} size="14" />
-				</button>
-			{/if}
-			{#if currentLanguage !== 'french'}
-				<button
-					class="flex items-center gap-1.5 rounded-full border border-missionnaire/40 bg-missionnaire/10 px-3 py-1.5 text-xs font-semibold text-missionnaire"
-					onclick={() => handleLanguageChange('french')}
-					title={$t('lang.french')}
-				>
-					<span>{$t(languageLabelKeys[currentLanguage])}</span>
-					<Icon src={BsX} size="14" />
-				</button>
-			{/if}
-			{#if currentHasAudio}
-				<button
-					class="flex items-center gap-1.5 rounded-full border border-missionnaire/40 bg-missionnaire/10 px-3 py-1.5 text-xs font-semibold text-missionnaire"
-					onclick={() => handleAudioFilterToggle()}
-				>
-					<span>{$t('predications.audioOnly')}</span>
-					<Icon src={BsX} size="14" />
-				</button>
-			{/if}
-		</div>
-	{/if}
-
-	<!-- The years sidebar moved into the Filtres sheet — the list now
-	     takes the full width, like /musique. -->
-	<div class="relative">
-		{#if currentSearch || currentAlpha || currentYear || currentLanguage !== 'french' || currentHasAudio || currentAuthor === 'Retransmissions'}
-			<div class="mb-3 flex justify-end">
-				<button
-					class="inline-flex items-center gap-1.5 border border-stone-200 bg-white/60 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-stone-500 hover:border-missionnaire hover:text-missionnaire transition-colors duration-200 active:scale-[0.98]"
+					class="hidden h-10 items-center justify-center gap-1.5 px-2 text-[10px] font-bold uppercase tracking-[0.15em] text-stone-500 transition-colors duration-150 hover:text-missionnaire sm:inline-flex"
 					onclick={() => goto('?')}
 					title={$t('list.resetFilters')}
+					aria-label={$t('list.resetFilters')}
 				>
 					<Icon src={BsX} size="14" />
 					{$t('list.reset')}
 				</button>
-			</div>
-		{/if}
+			{/if}
+		</div>
+	</div>
+
+	<!-- The years sidebar moved into the Filtres sheet — the list now
+	     takes the full width, like /musique. -->
+	<div class="relative">
 		{#if !blendedOnly}
 			{#if hasResolvedList}
 				<div class="mb-2">
