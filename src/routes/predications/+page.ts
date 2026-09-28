@@ -4,6 +4,7 @@ import type { PublishedRecording } from '$lib/server/recordings';
 import { pageMeta } from '$lib/seo';
 
 const RETRANSMISSIONS_FILTER = 'Retransmissions';
+const BRANHAM_AUTHOR = 'William Marrion Branham';
 
 function sermonSortToRecordingSort(sort: string): { field: string; order: 'asc' | 'desc' } {
 	const [property, order] = sort.split(':');
@@ -21,7 +22,10 @@ function sermonSortToRecordingSort(sort: string): { field: string; order: 'asc' 
 }
 
 export const load = async ({ fetch, url }) => {
-	const author = url.searchParams.get('author') || 'Tous';
+	const author =
+		url.searchParams.get('author') === RETRANSMISSIONS_FILTER
+			? RETRANSMISSIONS_FILTER
+			: BRANHAM_AUTHOR;
 	const search = url.searchParams.get('search') || '';
 	const alpha = url.searchParams.get('alpha') || '';
 	const year = url.searchParams.get('year') || '';
@@ -68,7 +72,6 @@ export const load = async ({ fetch, url }) => {
 	}
 
 	const isRetransmissions = author === RETRANSMISSIONS_FILTER;
-	const isBlendedSearch = author === 'Tous' && search.trim().length > 0;
 
 	const sermonParams = new URLSearchParams({
 		author,
@@ -95,7 +98,7 @@ export const load = async ({ fetch, url }) => {
 	if (year) retransmissionParams.set('year', year);
 
 	const wantsSermons = !isRetransmissions;
-	const wantsRetransmissions = isRetransmissions || isBlendedSearch;
+	const wantsRetransmissions = isRetransmissions;
 
 	const [sermonRes, retransmissionRes, yearsRes, authorsRes] = await Promise.all([
 		wantsSermons ? fetch(`/api/sermons?${sermonParams.toString()}`) : Promise.resolve(null),
@@ -142,7 +145,7 @@ export const load = async ({ fetch, url }) => {
 		sermons,
 		recordings,
 		recordingsTotal,
-		showBlendedRetransmissions: isBlendedSearch,
+		showBlendedRetransmissions: false,
 		total: isRetransmissions ? recordingsTotal : sermonTotal,
 		years,
 		availableAuthors,

@@ -27,7 +27,7 @@
 		sermonLanguageFilters,
 		type SermonLanguageFilter
 	} from '$lib/utils/sermonLanguage';
-	import { onDestroy, onMount, tick, untrack } from 'svelte';
+	import { onDestroy, untrack } from 'svelte';
 	import {
 		areAuthorsFresh,
 		areYearsFresh,
@@ -40,6 +40,8 @@
 		setPredicationsPageCache,
 		type PredicationsPageCacheEntry
 	} from './listCache';
+
+	const BRANHAM_AUTHOR = 'William Marrion Branham';
 
 	let { data } = $props();
 
@@ -90,7 +92,7 @@
 	let isDeferredData = $derived(Boolean((data as any).deferred));
 	let requestKey = $derived(
 		JSON.stringify({
-			author: currentAuthor || 'Tous',
+			author: currentAuthor || BRANHAM_AUTHOR,
 			search: currentSearch || '',
 			alpha: currentAlpha || '',
 			year: currentYear || '',
@@ -125,8 +127,6 @@
 	);
 
 	const desktopSermonGrid = 'md:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.35fr)_110px_80px_120px]';
-	let authors = $derived(['Tous', ...(availableAuthors ?? [])]);
-
 	// "Filtres" sheet — bottom sheet on mobile, centered dialog on sm+
 	// (same pattern as /musique). Hosts the alphabet, years, language and
 	// audio-only filters; every choice routes through the existing
@@ -149,30 +149,6 @@
 			(currentLanguage !== 'french' ? 1 : 0) +
 			(currentHasAudio ? 1 : 0)
 	);
-
-	// Preacher pill row scroll affordance (edge fade), mirroring the
-	// Recueils row on /musique.
-	let pillsScrollEl: HTMLDivElement | undefined = $state();
-	let pillsCanLeft = $state(false);
-	let pillsCanRight = $state(true);
-
-	function updatePillsScrollState() {
-		if (!pillsScrollEl) return;
-		const { scrollLeft, clientWidth, scrollWidth } = pillsScrollEl;
-		pillsCanLeft = scrollLeft > 4;
-		pillsCanRight = scrollLeft + clientWidth < scrollWidth - 4;
-	}
-
-	onMount(() => {
-		updatePillsScrollState();
-	});
-
-	// Authors arrive async on cold loads — recompute the edge fade once
-	// the pill row has re-rendered with the full list.
-	$effect(() => {
-		void authors.length;
-		void tick().then(updatePillsScrollState);
-	});
 
 	// Debounced list search for the utility bar (mobile only; desktop keeps
 	// the header band's inline search). Same 300ms debounce and URL params
@@ -255,10 +231,9 @@
 		const key = requestKey;
 		const token = ++currentRequestToken;
 		const isRetransmissions = currentAuthor === 'Retransmissions';
-		const isBlendedSearch = currentAuthor === 'Tous' && (currentSearch || '').trim().length > 0;
 
 		const sermonParams = new URLSearchParams({
-			author: currentAuthor || 'Tous',
+			author: currentAuthor || BRANHAM_AUTHOR,
 			search: currentSearch || '',
 			alpha: currentAlpha || '',
 			year: currentYear || '',
@@ -284,7 +259,7 @@
 		const fetchAuthors = !areAuthorsFresh() || availableAuthors.length === 0;
 		const fetchYears = !isRetransmissions && (!areYearsFresh() || years.length === 0);
 		const wantsSermons = !isRetransmissions;
-		const wantsRetransmissions = isRetransmissions || isBlendedSearch;
+		const wantsRetransmissions = isRetransmissions;
 
 		const controller = new AbortController();
 		abortRequest();
@@ -352,7 +327,7 @@
 				sermons: nextSermons,
 				recordings: nextRecordings,
 				recordingsTotal: nextRecordingsTotal,
-				showBlendedRetransmissions: isBlendedSearch,
+				showBlendedRetransmissions: false,
 				total: isRetransmissions ? nextRecordingsTotal : nextSermonTotal,
 				availableAuthors: nextAuthors,
 				years: nextYears
@@ -445,7 +420,7 @@
 
 	function handleAuthorChange(author: string) {
 		const params = new URLSearchParams($page.url.searchParams);
-		if (author === 'Tous') params.delete('author');
+		if (author === BRANHAM_AUTHOR) params.delete('author');
 		else params.set('author', author);
 		if ((author === 'Retransmissions') !== (currentAuthor === 'Retransmissions'))
 			params.delete('year');
@@ -509,7 +484,7 @@
      load — the root layout renders the single canonical tag set ($lib/seo). -->
 
 <div class="w-full max-w-6xl mx-auto px-4 pt-0 pb-8 md:px-6">
-	<!-- Content-type tabs: classic sermons vs recorded live broadcasts.
+	<!-- Content-type tabs: Branham sermons vs recorded live broadcasts.
 	     Page identity now lives in the layout's compact band; the video
 	     cross-link sits beside the tabs instead of a second header. -->
 	<div class="mb-4 md:mb-5 flex items-center justify-between gap-3 border-b border-stone-200/60">
@@ -521,9 +496,11 @@
 				'Retransmissions'
 					? 'border-missionnaire text-missionnaire'
 					: 'border-transparent text-stone-400 hover:text-stone-600'}"
-				onclick={() => handleAuthorChange('Tous')}
+				aria-label={BRANHAM_AUTHOR}
+				onclick={() => handleAuthorChange(BRANHAM_AUTHOR)}
 			>
-				{$t('misc.sermonBadge')}s
+				<span class="md:hidden">W.M Branham</span>
+				<span class="hidden md:inline">{BRANHAM_AUTHOR}</span>
 			</button>
 			<button
 				role="tab"
@@ -564,39 +541,7 @@
 		</a>
 	</div>
 
-	<!-- ROW 1 — Preachers: THE primary filter, music-app style pill row
-	     directly under the tabs (mirrors the Recueils row on /musique).
-	     The active pill is solid missionnaire orange; edge fade hints at
-	     horizontal scrollability. -->
-	<div
-		class="preachers-scroll relative -mx-4 md:mx-0"
-		class:can-scroll-left={pillsCanLeft}
-		class:can-scroll-right={pillsCanRight}
-	>
-		<div
-			bind:this={pillsScrollEl}
-			onscroll={updatePillsScrollState}
-			class="preachers-track flex overflow-x-auto overscroll-x-contain gap-2 md:gap-2.5 no-scrollbar px-4 md:px-0 py-1"
-			style="scrollbar-width: none; -ms-overflow-style: none;"
-			role="group"
-			aria-label={$t('predications.preachers')}
-		>
-			{#each authors as author}
-				{@const isActivePill = (author === 'Tous' && !currentAuthor) || currentAuthor === author}
-				<button
-					class="flex-shrink-0 inline-flex items-center h-10 md:h-11 px-4 md:px-5 rounded-full border text-[11px] md:text-xs font-bold uppercase tracking-[0.1em] md:tracking-wider transition-colors duration-150 {isActivePill
-						? 'bg-missionnaire border-missionnaire text-white shadow-sm'
-						: 'bg-white/60 text-stone-600 border-stone-200 hover:border-missionnaire hover:text-missionnaire'}"
-					aria-pressed={isActivePill}
-					onclick={() => handleAuthorChange(author)}
-				>
-					{author === 'Tous' ? $t('misc.seeAllCap') : author}
-				</button>
-			{/each}
-		</div>
-	</div>
-
-	<!-- ROW 2 — slim utility bar: compact search (mobile only; desktop
+	<!-- Slim utility bar: compact search (mobile only; desktop
 	     keeps the header band's inline search) + one "Filtres" button that
 	     opens the sheet (alphabet, years, language, audio-only). -->
 	<div class="mt-3 mb-3 md:mb-4 flex items-center gap-2 md:justify-end">
@@ -722,7 +667,7 @@
 	<!-- The years sidebar moved into the Filtres sheet — the list now
 	     takes the full width, like /musique. -->
 	<div class="relative">
-		{#if currentSearch || currentAlpha || currentYear || currentLanguage !== 'french' || currentHasAudio || (currentAuthor && currentAuthor !== 'Tous')}
+		{#if currentSearch || currentAlpha || currentYear || currentLanguage !== 'french' || currentHasAudio || currentAuthor === 'Retransmissions'}
 			<div class="mb-3 flex justify-end">
 				<button
 					class="inline-flex items-center gap-1.5 border border-stone-200 bg-white/60 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-stone-500 hover:border-missionnaire hover:text-missionnaire transition-colors duration-200 active:scale-[0.98]"
@@ -1084,42 +1029,5 @@
 		.filters-sheet {
 			animation: none;
 		}
-	}
-
-	/* Edge-fade affordance for the horizontally scrollable Prédicateurs
-	   row — same treatment as the Recueils row on /musique. */
-	.preachers-scroll .preachers-track {
-		--fade: 28px;
-		-webkit-mask-image: linear-gradient(to right, #000 0, #000 100%);
-		mask-image: linear-gradient(to right, #000 0, #000 100%);
-	}
-	.preachers-scroll.can-scroll-right .preachers-track {
-		-webkit-mask-image: linear-gradient(
-			to right,
-			#000 0,
-			#000 calc(100% - var(--fade)),
-			transparent 100%
-		);
-		mask-image: linear-gradient(to right, #000 0, #000 calc(100% - var(--fade)), transparent 100%);
-	}
-	.preachers-scroll.can-scroll-left .preachers-track {
-		-webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fade), #000 100%);
-		mask-image: linear-gradient(to right, transparent 0, #000 var(--fade), #000 100%);
-	}
-	.preachers-scroll.can-scroll-left.can-scroll-right .preachers-track {
-		-webkit-mask-image: linear-gradient(
-			to right,
-			transparent 0,
-			#000 var(--fade),
-			#000 calc(100% - var(--fade)),
-			transparent 100%
-		);
-		mask-image: linear-gradient(
-			to right,
-			transparent 0,
-			#000 var(--fade),
-			#000 calc(100% - var(--fade)),
-			transparent 100%
-		);
 	}
 </style>
