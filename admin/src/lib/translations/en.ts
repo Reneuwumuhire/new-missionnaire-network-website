@@ -382,13 +382,13 @@ const en: Record<keyof typeof fr, string> = {
 
 	// ── Audio: lyrics import/publish ────────────────────────────
 	'audio.lyrics.pasteUrlFirst': 'Paste a URL before loading',
-	'audio.lyrics.unsupportedUrl': 'Unsupported URL — use indirimbo-zikundwa.bi',
+	'audio.lyrics.unsupportedUrl': 'Unsupported URL — use an Indirimbo Zikundwa song link',
 	'audio.lyrics.invalidUrl': 'Invalid URL',
 	'audio.lyrics.loadFailed': 'Unable to load the lyrics',
 	'audio.lyrics.noneFound': 'No lyrics found at this URL',
 	'audio.lyrics.loadedFromUrl': 'Lyrics loaded from the URL',
 	'audio.lyrics.loadError': 'Error while loading the lyrics',
-	'audio.lyrics.importFromSite': 'Import from indirimbo-zikundwa.bi',
+	'audio.lyrics.importFromSite': 'Import from Indirimbo Zikundwa',
 	'audio.lyrics.loading': 'Loading...',
 	'audio.lyrics.loadFromUrl': 'Load from URL',
 	'audio.lyrics.urlHelp':
