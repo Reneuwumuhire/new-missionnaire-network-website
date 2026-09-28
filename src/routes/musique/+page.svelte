@@ -961,84 +961,82 @@
 		</div>
 	</div>
 
-	<!-- ROW 2 — slim utility bar: compact search (mobile only; desktop
-	     keeps the header band's inline search) + one "Filtres" button that
-	     opens the sheet (artist, alphabet, sort, Rafraîchir, Tout
-	     télécharger). -->
-	<div class="mt-3 mb-3 md:mb-4 flex items-center gap-2 md:justify-end">
-		<div class="min-w-0 flex-1 md:hidden">
+	<!-- One compact control row: mobile search, active filters, and actions. -->
+	<div class="mt-3 mb-3 flex flex-wrap items-center gap-2 md:mb-4">
+		<div class="order-1 min-w-0 flex-1 md:hidden">
 			<MusicSearch id="musique-list-search" />
 		</div>
-		{#if isRandomListOrder}
-			<button
-				class="hidden md:inline-flex h-10 items-center gap-1.5 border border-stone-200 bg-white/70 px-4 text-[10px] font-bold uppercase tracking-[0.16em] text-stone-500 transition-colors duration-150 hover:border-missionnaire hover:text-missionnaire"
-				onclick={refreshRandomList}
-				title={$t('music.refreshRandom')}
-			>
-				<Icon src={BsShuffle} size="11" />
-				{$t('music.refresh')}
-			</button>
-		{/if}
-		<button
-			class="inline-flex h-10 shrink-0 items-center gap-2 border px-4 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors duration-150 {filtersOpen ||
-			activeFilterCount > 0
-				? 'border-missionnaire/60 bg-missionnaire/5 text-missionnaire'
-				: 'border-stone-200 bg-white/70 text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
-			aria-haspopup="dialog"
-			aria-expanded={filtersOpen}
-			onclick={openFilters}
-		>
-			<svg
-				viewBox="0 0 24 24"
-				width="13"
-				height="13"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2.2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				aria-hidden="true"
-			>
-				<line x1="4" y1="6" x2="20" y2="6" />
-				<line x1="7" y1="12" x2="17" y2="12" />
-				<line x1="10" y1="18" x2="14" y2="18" />
-			</svg>
-			{$t('music.filters')}
-			{#if activeFilterCount > 0}
-				<span
-					class="flex h-4 min-w-4 items-center justify-center rounded-full bg-missionnaire px-1 text-[9px] font-bold text-white"
-				>
-					{activeFilterCount}
-				</span>
-			{/if}
-		</button>
-	</div>
 
-	<!-- Active sheet-filters as dismissible chips (collection state is
-	     already visible in the pill row above). -->
-	{#if currentArtist || currentAlpha}
-		<div class="mb-3 flex flex-wrap gap-2">
-			{#if currentArtist}
+		{#if currentArtist || currentAlpha}
+			<div class="order-2 flex basis-full flex-wrap gap-2 md:order-1 md:basis-auto">
+				{#if currentArtist}
+					<button
+						class="flex items-center gap-1.5 rounded-full border border-missionnaire/40 bg-missionnaire/10 px-3 py-1.5 text-xs font-semibold text-missionnaire"
+						onclick={() => handleArtistChange('')}
+						title={$t('music.allArtists')}
+					>
+						<span class="max-w-[150px] truncate">{currentArtist}</span>
+						<Icon src={BsX} size="14" />
+					</button>
+				{/if}
+				{#if currentAlpha}
+					<button
+						class="flex items-center gap-1.5 rounded-full border border-missionnaire/40 bg-missionnaire/10 px-3 py-1.5 text-xs font-semibold text-missionnaire"
+						onclick={() => handleAlphaChange(currentAlpha)}
+					>
+						<span>{$t('music.letterLabel', { letter: currentAlpha })}</span>
+						<Icon src={BsX} size="14" />
+					</button>
+				{/if}
+			</div>
+		{/if}
+
+		<div class="order-1 ml-auto flex shrink-0 items-center gap-2 md:order-2">
+			{#if isRandomListOrder}
 				<button
-					class="flex items-center gap-1.5 rounded-full border border-missionnaire/40 bg-missionnaire/10 px-3 py-1.5 text-xs font-semibold text-missionnaire"
-					onclick={() => handleArtistChange('')}
-					title={$t('music.allArtists')}
+					class="hidden md:inline-flex h-10 items-center gap-1.5 border border-stone-200 bg-white/70 px-4 text-[10px] font-bold uppercase tracking-[0.16em] text-stone-500 transition-colors duration-150 hover:border-missionnaire hover:text-missionnaire"
+					onclick={refreshRandomList}
+					title={$t('music.refreshRandom')}
 				>
-					<span class="max-w-[150px] truncate">{currentArtist}</span>
-					<Icon src={BsX} size="14" />
+					<Icon src={BsShuffle} size="11" />
+					{$t('music.refresh')}
 				</button>
 			{/if}
-			{#if currentAlpha}
-				<button
-					class="flex items-center gap-1.5 rounded-full border border-missionnaire/40 bg-missionnaire/10 px-3 py-1.5 text-xs font-semibold text-missionnaire"
-					onclick={() => handleAlphaChange(currentAlpha)}
+			<button
+				class="inline-flex h-10 shrink-0 items-center gap-2 border px-4 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors duration-150 {filtersOpen ||
+				activeFilterCount > 0
+					? 'border-missionnaire/60 bg-missionnaire/5 text-missionnaire'
+					: 'border-stone-200 bg-white/70 text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
+				aria-haspopup="dialog"
+				aria-expanded={filtersOpen}
+				onclick={openFilters}
+			>
+				<svg
+					viewBox="0 0 24 24"
+					width="13"
+					height="13"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2.2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					aria-hidden="true"
 				>
-					<span>{$t('music.letterLabel', { letter: currentAlpha })}</span>
-					<Icon src={BsX} size="14" />
-				</button>
-			{/if}
+					<line x1="4" y1="6" x2="20" y2="6" />
+					<line x1="7" y1="12" x2="17" y2="12" />
+					<line x1="10" y1="18" x2="14" y2="18" />
+				</svg>
+				{$t('music.filters')}
+				{#if activeFilterCount > 0}
+					<span
+						class="flex h-4 min-w-4 items-center justify-center rounded-full bg-missionnaire px-1 text-[9px] font-bold text-white"
+					>
+						{activeFilterCount}
+					</span>
+				{/if}
+			</button>
 		</div>
-	{/if}
+	</div>
 
 	{#if activeMusicSong && !isActiveMusicSongVisible}
 		<div class="mb-4 border border-stone-300 bg-stone-100/80 px-4 py-3">
