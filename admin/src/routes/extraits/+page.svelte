@@ -67,6 +67,18 @@
 			{ label: 'Lire la transcription', href: transcriptionUrl }
 		].filter((link) => link.href)
 	);
+	let sourceGroups = $derived([
+		{
+			kind: 'sermon',
+			label: 'Prédications',
+			items: sourceSuggestions.filter((source) => source.kind === 'sermon')
+		},
+		{
+			kind: 'recording',
+			label: 'Retransmissions',
+			items: sourceSuggestions.filter((source) => source.kind === 'recording')
+		}
+	]);
 	let previewTime = $derived.by(() => {
 		const date = new Date(`${publishedAt}:00+02:00`);
 		return Number.isNaN(date.getTime())
@@ -333,7 +345,7 @@
 									id="sourceSearch"
 									class="admin-input !h-12 !pl-11 !pr-10"
 									value={sourceSearch}
-									placeholder="Titre, date, lieu ou prédicateur…"
+									placeholder="Titre de la prédication ou retransmission…"
 									autocomplete="off"
 									role="combobox"
 									aria-autocomplete="list"
@@ -367,28 +379,39 @@
 											Aucune source trouvée. Essayez un autre mot.
 										</p>
 									{:else}
-										{#each sourceSuggestions as source, index}
-											<button
-												id={`source-option-${index}`}
-												type="button"
-												role="option"
-												aria-selected={activeSuggestion === index}
-												class:active={activeSuggestion === index}
-												onmouseenter={() => (activeSuggestion = index)}
-												onmousedown={(event) => event.preventDefault()}
-												onclick={() => selectSource(source)}
-											>
-												<span class="source-kind"
-													>{source.kind === 'recording' ? 'Retransmission' : 'Prédication'}</span
+										{#each sourceGroups as group}
+											{#if group.items.length}
+												<section
+													class="source-group"
+													role="group"
+													aria-labelledby={`source-group-${group.kind}`}
 												>
-												<strong>{source.title}</strong>
-												<small>{source.subtitle}</small>
-												<span class="mt-2 flex flex-wrap gap-1.5">
-													{#each source.links as link}<span class="resource-chip"
-															>{resourceName(link.kind)}</span
-														>{/each}
-												</span>
-											</button>
+													<p id={`source-group-${group.kind}`} class="source-group-title">
+														{group.label}<span>{group.items.length}</span>
+													</p>
+													{#each group.items as source (`${source.kind}:${source.id}`)}
+														{@const index = sourceSuggestions.indexOf(source)}
+														<button
+															id={`source-option-${index}`}
+															type="button"
+															role="option"
+															aria-selected={activeSuggestion === index}
+															class:active={activeSuggestion === index}
+															onmouseenter={() => (activeSuggestion = index)}
+															onmousedown={(event) => event.preventDefault()}
+															onclick={() => selectSource(source)}
+														>
+															<strong>{source.title}</strong>
+															<small>{source.subtitle}</small>
+															<span class="mt-2 flex flex-wrap gap-1.5">
+																{#each source.links as link}<span class="resource-chip"
+																		>{resourceName(link.kind)}</span
+																	>{/each}
+															</span>
+														</button>
+													{/each}
+												</section>
+											{/if}
 										{/each}
 									{/if}
 								</div>
@@ -704,7 +727,26 @@
 		background: #fff;
 		box-shadow: 0 14px 32px rgb(41 37 36 / 14%);
 	}
-	.source-results > button {
+	.source-group + .source-group {
+		border-top: 1px solid #d6d3d1;
+	}
+	.source-group-title {
+		position: sticky;
+		top: 0;
+		z-index: 1;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0.55rem 1rem;
+		font-size: 0.68rem;
+		font-weight: 700;
+		color: #78716c;
+		background: #faf8f3;
+	}
+	.source-group-title span {
+		color: #a8a29e;
+	}
+	.source-group button {
 		display: block;
 		width: 100%;
 		min-height: 4.75rem;
@@ -713,11 +755,11 @@
 		text-align: left;
 		background: #fff;
 	}
-	.source-results > button:last-child {
+	.source-group button:last-child {
 		border-bottom: 0;
 	}
-	.source-results > button:hover,
-	.source-results > button.active {
+	.source-group button:hover,
+	.source-group button.active {
 		background: #fff7ed;
 	}
 	.source-results strong,
@@ -736,11 +778,6 @@
 		font-size: 0.72rem;
 		line-height: 1.35;
 		color: #78716c;
-	}
-	.source-kind {
-		font-size: 0.64rem;
-		font-weight: 700;
-		color: #9a4d00;
 	}
 	.resource-chip {
 		display: inline-flex;

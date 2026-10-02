@@ -36,7 +36,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 				{
 					published: true,
 					status: 'ready',
-					$or: [{ title: regex }, { description: regex }]
+					title: regex
 				},
 				{
 					projection: {
@@ -56,13 +56,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 				{
 					published: { $ne: false },
 					status: { $nin: ['draft', 'scheduled', 'archived', 'private'] },
-					$or: [
-						{ french_title: regex },
-						{ english_title: regex },
-						{ full_date_code: regex },
-						{ date_code: regex },
-						{ author: regex }
-					]
+					$or: [{ french_title: regex }, { english_title: regex }]
 				},
 				{
 					projection: {
@@ -138,5 +132,5 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 		};
 	});
 
-	return json({ suggestions: [...recordingSuggestions, ...sermonSuggestions] });
+	return json({ suggestions: [...sermonSuggestions, ...recordingSuggestions] });
 };

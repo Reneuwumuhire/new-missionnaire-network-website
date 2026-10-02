@@ -21,7 +21,11 @@
 import IoMusicalNotes from 'svelte-icons-pack/io/IoMusicalNotes';
 import IoVideocam from 'svelte-icons-pack/io/IoVideocam';
 import IoBookOutline from 'svelte-icons-pack/io/IoBookOutline';
+import IoChatboxEllipsesOutline from 'svelte-icons-pack/io/IoChatboxEllipsesOutline';
+import IoHomeOutline from 'svelte-icons-pack/io/IoHomeOutline';
 import IoInformationCircleOutline from 'svelte-icons-pack/io/IoInformationCircleOutline';
+import IoPeopleOutline from 'svelte-icons-pack/io/IoPeopleOutline';
+import IoReaderOutline from 'svelte-icons-pack/io/IoReaderOutline';
 import type { TranslationKey } from '../i18n';
 
 // `menuName`, `subName` and `subText` are translation KEYS — the nav
@@ -44,67 +48,60 @@ export const NavigationLinkList: NavigationLink[] = [
 	{
 		id: 1,
 		menuName: 'nav.predications',
-		link: '/predications',
+		link: '/predications'
+	},
+	{
+		id: 2,
+		menuName: 'nav.resources',
+		link: '/transcriptions',
 		subMenu: [
 			{
-				subName: 'nav.sub.sermonsAudio',
-				subText: 'nav.sub.sermonsAudioText',
-				link: '/predications',
-				icon: IoMusicalNotes
+				subName: 'nav.transcriptions',
+				subText: 'nav.sub.transcriptionsText',
+				link: '/transcriptions',
+				icon: IoReaderOutline
+			},
+			{
+				subName: 'nav.extraits',
+				subText: 'nav.sub.extraitsText',
+				link: '/extraits',
+				icon: IoChatboxEllipsesOutline
 			},
 			{
 				subName: 'nav.sub.videos',
 				subText: 'nav.sub.videosText',
 				link: '/videos',
 				icon: IoVideocam
+			},
+			{
+				subName: 'nav.literature',
+				subText: 'nav.sub.literatureText',
+				link: '/literature',
+				icon: IoBookOutline
 			}
 		]
 	},
 	{
-		id: 2,
-		menuName: 'nav.transcriptions',
-		link: '/transcriptions'
-	},
-	{
 		id: 3,
-		menuName: 'nav.williamBranham',
+		menuName: 'nav.ministries',
 		link: '/william-branham/biographie',
 		subMenu: [
 			{
-				subName: 'nav.sub.branhamBio',
+				subName: 'nav.williamBranham',
 				subText: 'nav.sub.branhamBioText',
 				link: '/william-branham/biographie',
 				image: '/img/branham_icon.png'
 			},
 			{
-				subName: 'nav.sub.branhamBrochures',
-				subText: 'nav.sub.branhamBrochuresText',
-				link: '/literature?author=William Marrion Branham&category=book',
-				icon: IoBookOutline
+				subName: 'nav.ewaldFrank',
+				subText: 'nav.sub.frankAboutText',
+				link: '/ewald-frank',
+				icon: IoPeopleOutline
 			}
 		]
 	},
 	{
 		id: 4,
-		menuName: 'nav.ewaldFrank',
-		link: '/ewald-frank',
-		subMenu: [
-			{
-				subName: 'nav.sub.frankAbout',
-				subText: 'nav.sub.frankAboutText',
-				link: '/ewald-frank',
-				icon: IoInformationCircleOutline
-			},
-			{
-				subName: 'nav.sub.frankBooks',
-				subText: 'nav.sub.frankBooksText',
-				link: '/literature?author=Ewald Frank&category=book',
-				icon: IoBookOutline
-			}
-		]
-	},
-	{
-		id: 5,
 		menuName: 'nav.musique',
 		link: '/musique',
 		subMenu: [
@@ -123,23 +120,32 @@ export const NavigationLinkList: NavigationLink[] = [
 		]
 	},
 	{
-		id: 6,
+		id: 5,
 		menuName: 'nav.questions',
 		link: '/questions'
 	},
 	{
-		id: 7,
+		id: 6,
 		menuName: 'nav.direct',
 		link: '/live'
 	},
 	{
-		id: 8,
-		menuName: 'nav.eglise',
-		link: '/eglise'
-	},
-	{
-		id: 9,
+		id: 7,
 		menuName: 'nav.aPropos',
-		link: '/a-propos'
+		link: '/a-propos',
+		subMenu: [
+			{
+				subName: 'nav.eglise',
+				subText: 'nav.sub.churchText',
+				link: '/eglise',
+				icon: IoHomeOutline
+			},
+			{
+				subName: 'nav.aPropos',
+				subText: 'nav.sub.aboutText',
+				link: '/a-propos',
+				icon: IoInformationCircleOutline
+			}
+		]
 	}
 ];
