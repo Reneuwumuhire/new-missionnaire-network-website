@@ -18,6 +18,7 @@
 			role?: string;
 			canViewDashboard?: boolean;
 			canManageAudio?: boolean;
+			canManageExtraits?: boolean;
 			canManageRecordings?: boolean;
 			canReviewLyrics?: boolean;
 			canViewQuestions?: boolean;
@@ -40,6 +41,9 @@
 			: []),
 		...(user.canManageAudio
 			? [{ href: '/audio', labelKey: 'nav.audioLibrary' as const, icon: 'music' }]
+			: []),
+		...(user.canManageExtraits
+			? [{ href: '/extraits', labelKey: 'nav.extraits' as const, icon: 'extraits' }]
 			: []),
 		...(user.canReviewLyrics
 			? [{ href: '/lyrics-review', labelKey: 'nav.lyricsReview' as const, icon: 'lyrics' }]
@@ -223,6 +227,17 @@
 									stroke-linejoin="round"
 									d="M12 3a9 9 0 109 9M12 3v4m0 0a5 5 0 015 5"
 								/>
+							</svg>
+						{:else if item.icon === 'extraits'}
+							<svg
+								class="h-[15px] w-[15px]"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+								stroke-width="2"
+							>
+								<rect x="3" y="4" width="18" height="16" rx="2" />
+								<path stroke-linecap="round" d="m7 15 3-3 2 2 3-4 2 3M7 8h4" />
 							</svg>
 						{:else if item.icon === 'lyrics'}
 							<svg

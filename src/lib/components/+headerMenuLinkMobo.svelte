@@ -5,7 +5,6 @@
 	import type { NavigationLinkSubmenu } from '../../helpers/NavigationLinkList';
 	import { t, type TranslationKey } from '../../i18n';
 
-
 	interface Props {
 		subMenu: NavigationLinkSubmenu[];
 		menuName: TranslationKey;
@@ -28,7 +27,13 @@
 		ontoggle
 	}: Props = $props();
 
-	let isActive = $derived($page.url.pathname === link || $page.url.pathname.startsWith(link + '/'));
+	let isActive = $derived(
+		$page.url.pathname === link ||
+			$page.url.pathname.startsWith(link + '/') ||
+			subMenu.some(
+				(item) => $page.url.pathname === item.link || $page.url.pathname.startsWith(item.link + '/')
+			)
+	);
 </script>
 
 <div class="flex flex-col w-full border-b border-stone-100 last:border-b-0">
@@ -38,13 +43,19 @@
 			class="flex items-center justify-between w-full py-3.5 transition-colors duration-200 cursor-pointer"
 			onclick={() => ontoggle?.()}
 		>
-			<span class="text-[15px] font-medium whitespace-nowrap {isActive ? 'text-missionnaire' : 'text-stone-700'}">
+			<span
+				class="text-[15px] font-medium whitespace-nowrap {isActive
+					? 'text-missionnaire'
+					: 'text-stone-700'}"
+			>
 				{$t(menuName)}
 			</span>
 			<span class="{active ? activeClass : inactiveClass} transition-colors">
 				<Icon
 					src={BsChevronDown}
-					className="w-3.5 h-3.5 transition duration-300 ease-out {active ? 'transform rotate-180' : ''}"
+					className="w-3.5 h-3.5 transition duration-300 ease-out {active
+						? 'transform rotate-180'
+						: ''}"
 				/>
 			</span>
 		</button>
@@ -52,7 +63,9 @@
 		<!-- No sub-menu — the whole row is a link -->
 		<a
 			href={link}
-			class="flex items-center py-3.5 text-[15px] font-medium whitespace-nowrap w-full transition-colors duration-200 {isActive ? 'text-missionnaire' : 'text-stone-700 hover:text-missionnaire'}"
+			class="flex items-center py-3.5 text-[15px] font-medium whitespace-nowrap w-full transition-colors duration-200 {isActive
+				? 'text-missionnaire'
+				: 'text-stone-700 hover:text-missionnaire'}"
 			onclick={() => closeMenuFrom()}
 		>
 			{$t(menuName)}
@@ -64,8 +77,9 @@
 
 	{#if active && subMenu && subMenu.length > 0}
 		<div class="mobo-submenu flex flex-col ml-4 mb-3 border-l border-stone-200 pl-4">
-			{#each subMenu as { subName, link: subLink, subText, icon }, i (subName)}
-				{@const isSubActive = $page.url.pathname === subLink || $page.url.pathname.startsWith(subLink + '/')}
+			{#each subMenu as { subName, link: subLink, subText, image, icon }, i (subName)}
+				{@const isSubActive =
+					$page.url.pathname === subLink || $page.url.pathname.startsWith(subLink + '/')}
 				<a
 					href={subLink}
 					class="group flex items-start gap-3 py-2.5 transition-colors duration-200"
@@ -73,13 +87,27 @@
 						closeMenuFrom();
 					}}
 				>
-					{#if icon}
-						<span class="mt-0.5 transition-colors duration-200 {isSubActive ? 'text-missionnaire' : 'text-stone-400 group-hover:text-missionnaire'}">
-							<Icon src={icon} size="14" />
+					{#if image}
+						<img
+							src={image}
+							class="mt-0.5 h-8 w-8 shrink-0 border border-stone-200 object-cover grayscale opacity-80"
+							alt=""
+						/>
+					{:else if icon}
+						<span
+							class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center border transition-colors duration-200 {isSubActive
+								? 'border-orange-200 bg-orange-50 text-missionnaire'
+								: 'border-stone-200 bg-white text-stone-500 group-hover:border-orange-200 group-hover:text-missionnaire'}"
+						>
+							<Icon src={icon} size="17" color="currentColor" />
 						</span>
 					{/if}
 					<span class="flex flex-col min-w-0">
-						<span class="font-body text-sm font-semibold leading-tight transition-colors duration-200 {isSubActive ? 'text-missionnaire' : 'text-stone-900 group-hover:text-missionnaire'}">
+						<span
+							class="font-body text-sm font-semibold leading-tight transition-colors duration-200 {isSubActive
+								? 'text-missionnaire'
+								: 'text-stone-900 group-hover:text-missionnaire'}"
+						>
 							{$t(subName)}
 						</span>
 						{#if subText}

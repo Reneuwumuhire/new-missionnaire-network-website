@@ -1,5 +1,4 @@
 <script lang="ts">
-	import Breadcrumbs from '$lib/components/+breadcrumbs.svelte';
 	import { goto } from '$app/navigation';
 	import { page, navigating } from '$app/stores';
 	import type { Literature } from '$lib/models/literature';
@@ -14,6 +13,7 @@
 	import BsChevronDown from 'svelte-icons-pack/bs/BsChevronDown';
 	import IoBookOutline from 'svelte-icons-pack/io/IoBookOutline';
 	import IoCreate from 'svelte-icons-pack/io/IoCreate';
+	import Pagination from '$lib/components/Pagination.svelte';
 
 	let { data } = $props();
 
@@ -27,17 +27,27 @@
 	let limit = $derived(data.limit);
 	let currentLanguage = $derived(data.language);
 	let currentSource = $derived(data.source || 'All');
+	let totalPages = $derived(Math.ceil(totalItems / limit));
+	let summaryFrom = $derived(totalItems === 0 ? 0 : (currentPage - 1) * limit + 1);
+	let summaryTo = $derived(Math.min(currentPage * limit, totalItems));
+	let activeFilterCount = $derived(
+		(currentType && currentType !== 'All' ? 1 : 0) +
+			(currentLanguage !== 'french' ? 1 : 0) +
+			(currentSource && currentSource !== 'All' ? 1 : 0)
+	);
 
 	let expandedItems = $state(new Set<string>());
 
 	function toggleDescription(id: string | undefined) {
 		if (!id) return;
-		if (expandedItems.has(id)) {
-			expandedItems.delete(id);
-		} else {
-			expandedItems.add(id);
-		}
-		expandedItems = expandedItems; // trigger reactivity
+		const next = new Set(expandedItems);
+		if (next.has(id)) next.delete(id);
+		else next.add(id);
+		expandedItems = next;
+	}
+
+	function readingUrl(item: Literature) {
+		return item.parts[0]?.url || item.pdf_url;
 	}
 
 	const authors = ['Tous', 'William Marrion Branham', 'Ewald Frank'];
@@ -125,220 +135,248 @@
 <!-- Title/description/og:*/canonical come from `meta` in this route's
      load — the root layout renders the single canonical tag set ($lib/seo). -->
 
-<div class="container mx-auto px-4 pt-4 pb-10 md:px-8 md:pt-6 max-w-7xl">
-	<Breadcrumbs items={[{ label: 'Littérature' }]} />
-	<!-- Hero Section -->
-	<div class="mb-12 text-left">
-		<h1 class="text-4xl md:text-5xl font-black text-gray-900 mb-4">Littérature</h1>
-		<p class="text-gray-500 max-w-2xl">
-			Découvrez les livres, brochures et lettres circulaires des serviteurs de Dieu pour
-			l'édification du Corps de Christ.
-		</p>
-	</div>
-
-	<!-- Filters Section -->
-	<div
-		class="flex flex-col gap-10 mb-12 bg-gray-50/30 p-4 md:p-6 rounded-2xl border border-gray-100/50"
-	>
-		<!-- Authors Filter -->
-		<div>
-			<h2
-				class="text-[10px] md:text-xs font-black text-orange-600 uppercase tracking-[0.2em] mb-4 text-left"
-			>
-				Auteurs
-			</h2>
-			<div class="flex flex-wrap gap-3 justify-start">
-				{#each authors as author}
-					<button
-						class="px-5 py-2.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all border {(author ===
-							'Tous' &&
-							!currentAuthor) ||
-						currentAuthor === author
-							? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20'
-							: 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-600'}"
-						onclick={() => handleAuthorChange(author)}
-					>
-						{author === 'Tous' ? 'Tout le monde' : author}
-					</button>
-				{/each}
-			</div>
-		</div>
-
-		<!-- Types Filter -->
-		{#if currentAuthor !== 'William Marrion Branham'}
-			<div>
-				<h2
-					class="text-[10px] md:text-xs font-black text-orange-600 uppercase tracking-[0.2em] mb-4 text-left"
+<header class="literature-band relative border-b border-stone-200/80">
+	<div class="literature-band-overlay">
+		<div
+			class="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between md:gap-8 md:px-6 md:py-8"
+		>
+			<div class="min-w-0">
+				<p
+					class="font-body text-[9px] font-bold uppercase tracking-[0.35em] text-missionnaire md:text-[10px]"
 				>
-					Types
-				</h2>
-				<div class="flex flex-wrap gap-3 justify-start">
-					{#each categories as cat}
-						<button
-							class="px-5 py-2.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all border {(cat ===
-								'All' &&
-								!currentType) ||
-							currentType === cat
-								? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20'
-								: 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-600'}"
-							onclick={() => handleTypeChange(cat)}
-						>
-							{#if cat === 'All'}
-								Tout
-							{:else if cat === 'book'}
-								Livres & Brochures
-							{:else if cat === 'circular_letter'}
-								Lettres Circulaires
-							{:else}
-								{cat}
-							{/if}
-						</button>
-					{/each}
+					Bibliothèque du Message
+				</p>
+				<div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+					<h1 class="font-display text-[26px] font-semibold leading-none text-white md:text-4xl">
+						Littérature
+					</h1>
+					<span class="font-body text-[11px] text-white/50 md:text-xs">
+						Livres, brochures et lettres circulaires
+					</span>
 				</div>
 			</div>
-		{/if}
 
-		<!-- Source Filter -->
-		{#if currentAuthor === 'Ewald Frank' && currentType === 'circular_letter'}
-			<div>
-				<h2
-					class="text-[10px] md:text-xs font-black text-orange-600 uppercase tracking-[0.2em] mb-4 text-left"
-				>
-					Sources
-				</h2>
-				<div class="flex flex-wrap gap-3 justify-start">
-					{#each sources as src}
-						<button
-							class="px-5 py-2.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all border {(src ===
-								'All' &&
-								currentSource === 'All') ||
-							currentSource === src
-								? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20'
-								: 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-600'}"
-							onclick={() => handleSourceChange(src)}
-						>
-							{#if src === 'All'}
-								Toutes
-							{:else if src === 'freie-volksmission'}
-								Freie Volksmission
-							{:else if src === 'cmpp'}
-								CMPP
-							{:else}
-								{src}
-							{/if}
-						</button>
-					{/each}
-				</div>
-			</div>
-		{/if}
-
-		<!-- Language Filter -->
-		<div>
-			<h2
-				class="text-[10px] md:text-xs font-black text-orange-600 uppercase tracking-[0.2em] mb-4 text-left"
+			<label
+				class="hidden h-11 w-72 shrink-0 items-center border border-stone-200/60 bg-white md:flex lg:w-96"
 			>
-				Langues
-			</h2>
-			<div class="flex flex-wrap gap-3 justify-start">
-				{#each languages as lang}
-					<button
-						class="px-5 py-2.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all border {currentLanguage ===
-						lang.id
-							? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20'
-							: 'bg-white text-gray-500 border-gray-100 hover:border-orange-200 hover:text-orange-600'}"
-						onclick={() => handleLanguageChange(lang.id)}
-					>
-						{lang.name}
-					</button>
-				{/each}
-			</div>
-		</div>
-
-		<!-- Search & Sort Row -->
-		<div class="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-			<div class="w-full md:w-96 relative">
-				<div class="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-					<Icon src={BsSearch} size="14" color="#9ca3af" />
-				</div>
+				<span class="sr-only">Rechercher dans la littérature</span>
+				<span class="ml-3 shrink-0 text-stone-400"><Icon src={BsSearch} size="14" /></span>
 				<input
-					type="text"
-					placeholder="Rechercher un livre..."
-					class="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-xl shadow-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all text-sm"
+					type="search"
+					class="min-w-0 flex-1 bg-transparent px-2.5 font-body text-sm text-stone-800 outline-none placeholder:text-stone-400"
+					placeholder="Rechercher par titre ou mot-clé"
 					value={currentSearch}
 					oninput={handleSearch}
 				/>
-			</div>
-
-			{#if currentSearch || (currentAuthor && currentAuthor !== 'Tous') || (currentType && currentType !== 'All') || (currentSource && currentSource !== 'All')}
-				<button
-					class="flex items-center gap-2 text-orange-600 font-bold text-xs uppercase tracking-widest hover:text-orange-600 transition-colors"
-					onclick={() => goto('?')}
-				>
-					<Icon src={BsX} size="18" />
-					Réinitialiser les filtres
-				</button>
-			{/if}
+			</label>
 		</div>
 	</div>
+</header>
+
+<div class="mx-auto w-full max-w-6xl px-4 pb-10 pt-4 md:px-6 md:pt-8">
+	<div
+		class="mb-4 flex items-center overflow-x-auto border-b border-stone-200/60"
+		role="tablist"
+		aria-label="Auteur"
+	>
+		{#each authors as author}
+			<button
+				role="tab"
+				aria-selected={currentAuthor === author}
+				class="-mb-px min-h-11 shrink-0 border-b-2 px-4 py-3 font-body text-[11px] font-bold uppercase tracking-[0.12em] transition-colors md:px-6 md:text-[12px] {currentAuthor ===
+				author
+					? 'border-missionnaire text-missionnaire'
+					: 'border-transparent text-stone-400 hover:text-stone-600'}"
+				onclick={() => handleAuthorChange(author)}
+			>
+				{author === 'Tous'
+					? 'Tous'
+					: author === 'William Marrion Branham'
+						? 'W. M. Branham'
+						: author}
+			</button>
+		{/each}
+	</div>
+
+	<div class="mb-3 flex flex-wrap items-start justify-end gap-2">
+		<label class="relative min-w-0 flex-1 md:hidden">
+			<span class="sr-only">Rechercher dans la littérature</span>
+			<span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-stone-400">
+				<Icon src={BsSearch} size="14" />
+			</span>
+			<input
+				type="search"
+				class="h-11 w-full border border-stone-200 bg-white/70 pl-9 pr-3 text-base text-stone-800 outline-none placeholder:text-stone-400 focus:border-missionnaire"
+				placeholder="Rechercher un document"
+				value={currentSearch}
+				oninput={handleSearch}
+			/>
+		</label>
+
+		<details class="literature-filters w-full md:w-auto">
+			<summary
+				class="ml-auto inline-flex h-11 cursor-pointer list-none items-center gap-2 border border-stone-200 bg-white/70 px-4 text-[10px] font-bold uppercase tracking-[0.16em] text-stone-500 hover:border-missionnaire hover:text-missionnaire"
+			>
+				<svg
+					viewBox="0 0 24 24"
+					width="13"
+					height="13"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2.2"
+					stroke-linecap="round"
+					aria-hidden="true"
+				>
+					<line x1="4" y1="6" x2="20" y2="6" />
+					<line x1="7" y1="12" x2="17" y2="12" />
+					<line x1="10" y1="18" x2="14" y2="18" />
+				</svg>
+				Filtres
+				{#if activeFilterCount > 0}
+					<span
+						class="flex h-4 min-w-4 items-center justify-center rounded-full bg-missionnaire px-1 text-[9px] text-white"
+					>
+						{activeFilterCount}
+					</span>
+				{/if}
+			</summary>
+			<div class="mt-3 grid gap-5 border border-stone-200 bg-white p-4 md:w-[42rem] md:grid-cols-2">
+				{#if currentAuthor !== 'William Marrion Branham'}
+					<fieldset>
+						<legend class="mb-2 text-xs font-bold uppercase tracking-widest text-stone-400"
+							>Format</legend
+						>
+						<div class="flex flex-wrap gap-2">
+							{#each categories as cat}
+								<button
+									class="min-h-11 border px-3 text-xs font-semibold {currentType === cat
+										? 'border-missionnaire bg-missionnaire text-white'
+										: 'border-stone-200 text-stone-600 hover:border-missionnaire'}"
+									onclick={() => handleTypeChange(cat)}
+								>
+									{cat === 'All'
+										? 'Tous'
+										: cat === 'book'
+											? 'Livres et brochures'
+											: 'Lettres circulaires'}
+								</button>
+							{/each}
+						</div>
+					</fieldset>
+				{/if}
+
+				<fieldset>
+					<legend class="mb-2 text-xs font-bold uppercase tracking-widest text-stone-400"
+						>Langue</legend
+					>
+					<div class="flex flex-wrap gap-2">
+						{#each languages as lang}
+							<button
+								class="min-h-11 border px-3 text-xs font-semibold {currentLanguage === lang.id
+									? 'border-missionnaire bg-missionnaire text-white'
+									: 'border-stone-200 text-stone-600 hover:border-missionnaire'}"
+								onclick={() => handleLanguageChange(lang.id)}
+							>
+								{lang.name}
+							</button>
+						{/each}
+					</div>
+				</fieldset>
+
+				{#if currentAuthor === 'Ewald Frank' && currentType === 'circular_letter'}
+					<fieldset class="md:col-span-2">
+						<legend class="mb-2 text-xs font-bold uppercase tracking-widest text-stone-400"
+							>Source</legend
+						>
+						<div class="flex flex-wrap gap-2">
+							{#each sources as src}
+								<button
+									class="min-h-11 border px-3 text-xs font-semibold {currentSource === src
+										? 'border-missionnaire bg-missionnaire text-white'
+										: 'border-stone-200 text-stone-600 hover:border-missionnaire'}"
+									onclick={() => handleSourceChange(src)}
+								>
+									{src === 'All'
+										? 'Toutes'
+										: src === 'freie-volksmission'
+											? 'Freie Volksmission'
+											: src.toUpperCase()}
+								</button>
+							{/each}
+						</div>
+					</fieldset>
+				{/if}
+			</div>
+		</details>
+	</div>
+
+	{#if currentSearch || currentAuthor !== 'Tous' || activeFilterCount > 0}
+		<div class="mb-3 flex justify-end">
+			<button
+				class="inline-flex items-center gap-1.5 border border-stone-200 bg-white/60 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-stone-500 hover:border-missionnaire hover:text-missionnaire"
+				onclick={() => goto('?')}
+			>
+				<Icon src={BsX} size="14" />
+				Réinitialiser
+			</button>
+		</div>
+	{/if}
+
+	<p class="mb-2 text-xs text-stone-500">
+		Affichage de {summaryFrom}–{summaryTo} sur {totalItems}
+	</p>
 
 	<!-- Main List -->
 	<div class="relative min-h-[400px]">
 		{#if $navigating}
 			<div
-				class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-20 flex items-center justify-center rounded-xl transition-all duration-300"
+				class="absolute inset-0 z-20 flex items-center justify-center bg-white/70 backdrop-blur-[1px]"
 			>
-				<div class="flex flex-col items-center gap-4">
+				<div
+					class="flex items-center gap-3 rounded-lg border border-stone-200 bg-white px-4 py-3 shadow-sm"
+				>
 					<div class="text-orange-600 animate-spin">
-						<Icon src={IoReload} size="32" />
+						<Icon src={IoReload} size="20" />
 					</div>
-					<span
-						class="text-[10px] font-black uppercase tracking-[0.2em] text-orange-600 animate-pulse"
-						>Chargement...</span
-					>
+					<span class="text-sm font-semibold text-stone-700">Chargement…</span>
 				</div>
 			</div>
 		{/if}
 
 		{#if currentAuthor === 'William Marrion Branham'}
-			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+			<div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
 				{#each literature as item}
 					<div
-						class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all group flex flex-col h-full"
+						class="group flex h-full flex-col overflow-hidden rounded-lg border border-stone-200 bg-white transition-colors hover:border-orange-300"
 					>
 						<!-- Cover Image Area -->
 						<div
-							class="aspect-[2/3] bg-gray-50 relative overflow-hidden flex items-center justify-center"
+							class="relative flex aspect-[2/3] items-center justify-center overflow-hidden bg-stone-100"
 						>
 							{#if item.cover_url}
-								<img
-									src={item.cover_url}
-									alt={item.title}
-									class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-								/>
+								<img src={item.cover_url} alt={item.title} class="h-full w-full object-cover" />
 							{:else}
 								<div class="text-center p-6">
 									<div
-										class="w-16 h-16 mx-auto bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mb-4"
+										class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-orange-100 text-orange-600"
 									>
 										<Icon src={IoBookOutline} size="32" />
 									</div>
-									<span class="text-xs font-black text-gray-300 uppercase tracking-widest"
-										>Pas de couverture</span
-									>
+									<span class="text-sm font-medium text-stone-400">Pas de couverture</span>
 								</div>
 							{/if}
 						</div>
 
 						<!-- Content -->
-						<div class="p-6 flex flex-col flex-grow">
+						<div class="flex flex-grow flex-col p-5">
 							<h3
-								class="text-lg font-black text-gray-900 mb-2 leading-tight group-hover:text-orange-600 transition-colors"
+								class="mb-2 font-display text-2xl font-semibold leading-tight text-stone-900 transition-colors group-hover:text-orange-700"
 							>
 								{item.title}
 							</h3>
 
 							{#if item.description}
-								<p class="text-sm text-gray-500 leading-relaxed line-clamp-3 mb-4 flex-grow">
+								<p class="mb-4 line-clamp-3 flex-grow text-sm leading-relaxed text-stone-600">
 									{item.description}
 								</p>
 							{:else}
@@ -397,7 +435,7 @@
 							{/if}
 
 							<div
-								class="pt-4 border-t border-gray-50 flex items-center justify-between text-xs font-medium text-gray-400 uppercase tracking-wider"
+								class="flex items-center justify-between border-t border-stone-100 pt-4 text-xs font-medium text-stone-500"
 							>
 								<span>{item.language === 'english' ? 'English' : 'Français'}</span>
 								{#if item.release_date}
@@ -411,32 +449,30 @@
 
 			<!-- Empty State for Grid -->
 			{#if literature.length === 0}
-				<div class="py-24 text-center bg-white rounded-2xl border border-gray-100">
+				<div class="rounded-xl border border-stone-200 bg-white py-20 text-center">
 					<div
-						class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gray-50 text-gray-200 mb-6"
+						class="mb-5 inline-flex h-16 w-16 items-center justify-center rounded-full bg-stone-100 text-stone-400"
 					>
-						<Icon src={BsSearch} size="32" />
+						<Icon src={BsSearch} size="26" />
 					</div>
-					<h3 class="text-xl font-bold text-gray-800 mb-2">Aucun livre trouvé</h3>
-					<p class="text-gray-400 text-sm">
+					<h3 class="font-display text-2xl font-semibold text-stone-800">Aucun livre trouvé</h3>
+					<p class="mt-1 text-sm text-stone-500">
 						Nous n'avons trouvé aucun livre correspondant à votre recherche.
 					</p>
 				</div>
 			{/if}
 		{:else}
 			<!-- Standard List View -->
-			<div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+			<div class="flex min-h-[500px] flex-col border border-stone-200/60 bg-white/40">
 				<div
-					class="grid grid-cols-[50px_1fr_auto] md:grid-cols-[60px_2fr_1fr_1fr_120px] gap-4 px-4 py-4 bg-gray-50/50 border-b border-gray-100 items-center"
+					class="grid grid-cols-[30px_1fr_auto] items-center gap-2 border-b border-stone-200/60 bg-white/40 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-stone-400 md:grid-cols-[30px_minmax(0,2fr)_minmax(8rem,0.8fr)_8rem_10rem] md:gap-4 md:text-[11px]"
 				>
-					<div class="text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">
-						#
-					</div>
+					<div class="text-center">#</div>
 					<button
-						class="text-left flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-orange-600 transition-colors"
+						class="flex items-center gap-1.5 text-left transition-colors hover:text-missionnaire"
 						onclick={() => handleSortChange('title')}
 					>
-						TITRE
+						Titre
 						{#if currentSort.startsWith('title')}
 							<Icon
 								src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp}
@@ -446,10 +482,10 @@
 						{/if}
 					</button>
 					<button
-						class="hidden md:flex text-left items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-orange-600 transition-colors"
+						class="hidden items-center gap-1.5 text-left transition-colors hover:text-missionnaire md:flex"
 						onclick={() => handleSortChange('author')}
 					>
-						AUTEUR
+						Auteur
 						{#if currentSort.startsWith('author')}
 							<Icon
 								src={currentSort.endsWith('desc') ? BsArrowDown : BsArrowUp}
@@ -458,34 +494,41 @@
 							/>
 						{/if}
 					</button>
-					<div
-						class="hidden md:block text-left text-[10px] font-black text-gray-400 uppercase tracking-widest"
-					>
-						CATÉGORIE
-					</div>
-					<div class="text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">
-						ACTIONS
-					</div>
+					<div class="hidden text-left md:block">Format</div>
+					<div class="text-center"><span class="hidden md:inline">Document</span></div>
 				</div>
 
-				<div class="divide-y divide-gray-50">
+				<div class="divide-y divide-stone-100 [&>*]:hover:bg-white/60">
 					{#each literature as item, i}
 						<div
-							class="grid grid-cols-[50px_1fr_auto] md:grid-cols-[60px_2fr_1fr_1fr_120px] gap-4 px-4 py-5 items-center hover:bg-orange-50/30 transition-colors group"
+							class="group relative grid grid-cols-[30px_minmax(0,1fr)_auto] items-center gap-2 px-4 py-4 transition-colors md:grid-cols-[30px_minmax(0,2fr)_minmax(8rem,0.8fr)_8rem_10rem] md:gap-4 {readingUrl(
+								item
+							)
+								? 'cursor-pointer'
+								: ''}"
 						>
-							<div class="text-center text-xs font-bold text-gray-300 group-hover:text-orange-300">
+							<div class="text-center text-xs font-semibold text-stone-300">
 								{i + 1 + (currentPage - 1) * limit}
 							</div>
 							<div class="flex flex-col min-w-0">
-								<span
-									class="text-sm font-bold text-gray-800 group-hover:text-orange-600 transition-colors line-clamp-2 leading-snug"
-								>
-									{item.title || 'Sans titre'}
-								</span>
+								{#if readingUrl(item)}
+									<a
+										href={readingUrl(item)}
+										target="_blank"
+										rel="noopener noreferrer"
+										class="row-read-link line-clamp-2 text-sm font-semibold leading-snug text-stone-800 transition-colors group-hover:text-missionnaire focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500"
+									>
+										{item.title || 'Sans titre'}
+									</a>
+								{:else}
+									<span class="line-clamp-2 text-sm font-semibold leading-snug text-stone-800">
+										{item.title || 'Sans titre'}
+									</span>
+								{/if}
 								{#if item.description}
 									<div class="mt-1">
 										<p
-											class="text-xs text-gray-500 leading-relaxed {expandedItems.has(
+											class="text-sm leading-relaxed text-stone-500 {expandedItems.has(
 												item._id || ''
 											)
 												? ''
@@ -495,7 +538,7 @@
 										</p>
 										{#if item.description.length > 100}
 											<button
-												class="text-[10px] font-bold text-orange-600 hover:text-orange-600 mt-1 uppercase tracking-wider"
+												class="relative z-10 mt-1 text-xs font-semibold text-orange-700 underline-offset-4 hover:underline"
 												onclick={() => toggleDescription(item._id)}
 											>
 												{expandedItems.has(item._id || '') ? 'Voir moins' : 'Voir plus'}
@@ -503,57 +546,61 @@
 										{/if}
 									</div>
 								{/if}
-								<div class="flex items-center gap-2 mt-1 md:hidden">
-									<span class="text-[10px] font-medium text-gray-400">{item.author}</span>
-									<span class="text-gray-200">•</span>
-									<span class="text-[10px] font-medium text-orange-400">{item.type}</span>
+								<div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 md:hidden">
+									<span class="text-xs font-medium text-stone-500">{item.author}</span>
+									<span class="text-stone-300">•</span>
+									<span class="text-xs font-medium text-orange-700"
+										>{item.type === 'book' ? 'Livre' : 'Lettre'}</span
+									>
 									{#if item.source}
-										<span class="text-gray-200">•</span>
-										<span class="text-[10px] font-medium text-blue-400">{item.source}</span>
+										<span class="text-stone-300">•</span>
+										<span class="text-xs text-stone-500">{item.source}</span>
 									{/if}
 								</div>
 							</div>
-							<div class="hidden md:block text-xs font-semibold text-gray-500">
+							<div class="hidden text-xs font-medium text-stone-500 md:block">
 								{item.author}
 							</div>
 							<div class="hidden md:block">
 								<span
-									class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider {item.type ===
+									class="inline-flex items-center gap-1.5 px-2 py-1 text-[10px] font-bold uppercase tracking-wider {item.type ===
 									'book'
-										? 'bg-blue-50 text-blue-600'
-										: 'bg-green-50 text-green-600'}"
+										? 'bg-blue-50 text-blue-700'
+										: 'bg-emerald-50 text-emerald-700'}"
 								>
 									<Icon src={item.type === 'book' ? IoBookOutline : IoCreate} size="12" />
 									{item.type === 'book' ? 'Livre' : 'Lettre'}
 								</span>
 							</div>
-							<div class="flex justify-end pr-2">
+							<div class="flex justify-end">
 								{#if item.pdf_url}
 									<a
 										href={item.pdf_url}
 										target="_blank"
 										rel="noopener noreferrer"
-										class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-100 rounded-lg text-xs font-bold text-gray-600 hover:bg-orange-500 hover:text-white hover:border-orange-500 shadow-sm transition-all active:scale-95"
+										class="relative z-10 inline-flex min-h-10 items-center gap-2 border border-stone-200 bg-white px-3 py-2 text-xs font-bold text-stone-600 transition-colors hover:border-missionnaire hover:text-missionnaire focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500"
 									>
 										<Icon src={AiOutlineDownload} size="16" />
-										<span class="hidden lg:inline">Télécharger</span>
+										<span class="hidden lg:inline">Télécharger</span><span class="lg:hidden"
+											>PDF</span
+										>
 									</a>
 								{:else}
-									<span class="text-[10px] font-bold text-gray-300 uppercase tracking-widest italic"
-										>Indisponible</span
-									>
+									<span class="text-xs text-stone-400">Indisponible</span>
 								{/if}
 							</div>
 						</div>
 					{:else}
-						<div class="py-24 text-center">
+						<div class="py-20 text-center">
 							<div
-								class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gray-50 text-gray-200 mb-6"
+								class="mb-5 inline-flex h-16 w-16 items-center justify-center rounded-full bg-stone-100 text-stone-400"
 							>
-								<Icon src={BsSearch} size="32" />
+								<Icon src={BsSearch} size="26" />
 							</div>
-							<h3 class="text-xl font-bold text-gray-800 mb-2">Aucun document trouvé</h3>
-							<p class="text-gray-400 text-sm">
+							<h3 class="font-display text-2xl font-semibold text-stone-800">
+								Aucun document trouvé
+							</h3>
+							<p class="mt-1 text-sm text-stone-500">
 								Réessayez avec d'autres filtres ou vérifiez l'orthographe.
 							</p>
 						</div>
@@ -562,9 +609,45 @@
 			</div>
 		{/if}
 	</div>
+
+	{#if totalPages > 1}
+		<div class="mt-12 border-t border-stone-200/60 py-6">
+			<Pagination
+				current={currentPage}
+				total={totalPages}
+				getHref={(pageNumber) => {
+					const params = new URLSearchParams($page.url.searchParams);
+					params.set('page', String(pageNumber));
+					return `?${params.toString()}`;
+				}}
+			/>
+		</div>
+	{/if}
 </div>
 
 <style>
+	.literature-band {
+		background-image: url('/img/predications_header.jpg');
+		background-color: #1c1917;
+		background-position: center 30%;
+		background-repeat: no-repeat;
+		background-size: cover;
+	}
+
+	.literature-band-overlay {
+		background-color: rgba(16, 14, 12, 0.84);
+	}
+
+	.literature-filters > summary::-webkit-details-marker {
+		display: none;
+	}
+
+	.row-read-link::after {
+		position: absolute;
+		inset: 0;
+		content: '';
+	}
+
 	.book-parts[open] .book-parts-chevron {
 		transform: rotate(180deg);
 	}

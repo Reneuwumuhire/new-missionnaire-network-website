@@ -18,10 +18,14 @@
 // <HeaderMenuLink menuName="Chants" link="/" />
 // <HeaderMenuLink menuName="Galerie" link="/" />
 
-import IoMusicalNotes from 'svelte-icons-pack/io/IoMusicalNotes';
-import IoVideocam from 'svelte-icons-pack/io/IoVideocam';
-import IoBookOutline from 'svelte-icons-pack/io/IoBookOutline';
-import IoInformationCircleOutline from 'svelte-icons-pack/io/IoInformationCircleOutline';
+import FiBookOpen from 'svelte-icons-pack/fi/FiBookOpen';
+import FiFileText from 'svelte-icons-pack/fi/FiFileText';
+import FiHome from 'svelte-icons-pack/fi/FiHome';
+import FiInfo from 'svelte-icons-pack/fi/FiInfo';
+import FiMessageSquare from 'svelte-icons-pack/fi/FiMessageSquare';
+import FiMusic from 'svelte-icons-pack/fi/FiMusic';
+import FiPlayCircle from 'svelte-icons-pack/fi/FiPlayCircle';
+import FiVideo from 'svelte-icons-pack/fi/FiVideo';
 import type { TranslationKey } from '../i18n';
 
 // `menuName`, `subName` and `subText` are translation KEYS — the nav
@@ -44,67 +48,60 @@ export const NavigationLinkList: NavigationLink[] = [
 	{
 		id: 1,
 		menuName: 'nav.predications',
-		link: '/predications',
+		link: '/predications'
+	},
+	{
+		id: 2,
+		menuName: 'nav.resources',
+		link: '/transcriptions',
 		subMenu: [
 			{
-				subName: 'nav.sub.sermonsAudio',
-				subText: 'nav.sub.sermonsAudioText',
-				link: '/predications',
-				icon: IoMusicalNotes
+				subName: 'nav.transcriptions',
+				subText: 'nav.sub.transcriptionsText',
+				link: '/transcriptions',
+				icon: FiFileText
+			},
+			{
+				subName: 'nav.extraits',
+				subText: 'nav.sub.extraitsText',
+				link: '/extraits',
+				icon: FiMessageSquare
 			},
 			{
 				subName: 'nav.sub.videos',
 				subText: 'nav.sub.videosText',
 				link: '/videos',
-				icon: IoVideocam
+				icon: FiVideo
+			},
+			{
+				subName: 'nav.literature',
+				subText: 'nav.sub.literatureText',
+				link: '/literature',
+				icon: FiBookOpen
 			}
 		]
 	},
 	{
-		id: 2,
-		menuName: 'nav.transcriptions',
-		link: '/transcriptions'
-	},
-	{
 		id: 3,
-		menuName: 'nav.williamBranham',
+		menuName: 'nav.ministries',
 		link: '/william-branham/biographie',
 		subMenu: [
 			{
-				subName: 'nav.sub.branhamBio',
+				subName: 'nav.williamBranham',
 				subText: 'nav.sub.branhamBioText',
 				link: '/william-branham/biographie',
-				image: '/img/branham_icon.png'
+				image: '/img/branham_icon.webp'
 			},
 			{
-				subName: 'nav.sub.branhamBrochures',
-				subText: 'nav.sub.branhamBrochuresText',
-				link: '/literature?author=William Marrion Branham&category=book',
-				icon: IoBookOutline
+				subName: 'nav.ewaldFrank',
+				subText: 'nav.sub.frankAboutText',
+				link: '/ewald-frank',
+				image: '/img/ewald_frank_menu.png'
 			}
 		]
 	},
 	{
 		id: 4,
-		menuName: 'nav.ewaldFrank',
-		link: '/ewald-frank',
-		subMenu: [
-			{
-				subName: 'nav.sub.frankAbout',
-				subText: 'nav.sub.frankAboutText',
-				link: '/ewald-frank',
-				icon: IoInformationCircleOutline
-			},
-			{
-				subName: 'nav.sub.frankBooks',
-				subText: 'nav.sub.frankBooksText',
-				link: '/literature?author=Ewald Frank&category=book',
-				icon: IoBookOutline
-			}
-		]
-	},
-	{
-		id: 5,
 		menuName: 'nav.musique',
 		link: '/musique',
 		subMenu: [
@@ -112,34 +109,43 @@ export const NavigationLinkList: NavigationLink[] = [
 				subName: 'nav.sub.songsAudio',
 				subText: 'nav.sub.songsAudioText',
 				link: '/musique',
-				icon: IoMusicalNotes
+				icon: FiMusic
 			},
 			{
 				subName: 'nav.sub.songsVideo',
 				subText: 'nav.sub.songsVideoText',
 				link: '/musique/videos',
-				icon: IoVideocam
+				icon: FiPlayCircle
 			}
 		]
 	},
 	{
-		id: 6,
+		id: 5,
 		menuName: 'nav.questions',
 		link: '/questions'
 	},
 	{
-		id: 7,
+		id: 6,
 		menuName: 'nav.direct',
 		link: '/live'
 	},
 	{
-		id: 8,
-		menuName: 'nav.eglise',
-		link: '/eglise'
-	},
-	{
-		id: 9,
+		id: 7,
 		menuName: 'nav.aPropos',
-		link: '/a-propos'
+		link: '/a-propos',
+		subMenu: [
+			{
+				subName: 'nav.eglise',
+				subText: 'nav.sub.churchText',
+				link: '/eglise',
+				icon: FiHome
+			},
+			{
+				subName: 'nav.aPropos',
+				subText: 'nav.sub.aboutText',
+				link: '/a-propos',
+				icon: FiInfo
+			}
+		]
 	}
 ];

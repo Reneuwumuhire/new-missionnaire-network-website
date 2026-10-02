@@ -114,12 +114,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
 				? `Réécoutez le direct audio du ${dateFr} sur Missionnaire Network.`
 				: 'Réécoutez ce direct audio sur Missionnaire Network.'),
 		...(ogImage ? { image: ogImage } : {}),
-		type: 'article',
-		// Search Console reported these archive pages under "Crawled —
-		// currently not indexed" — keep them noindex (the /live/rediffusions
-		// index is the indexable entry point). OG scrapers ignore robots meta,
-		// so share previews still work.
-		noindex: true
+		type: 'article'
 	});
 
 	return { recording, backHref, transcript, subtitles, meta };

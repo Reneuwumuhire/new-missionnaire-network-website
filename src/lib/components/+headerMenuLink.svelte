@@ -4,7 +4,6 @@
 	import type { NavigationLinkSubmenu } from '../../helpers/NavigationLinkList';
 	import { t, type TranslationKey } from '../../i18n';
 
-
 	interface Props {
 		subMenu: NavigationLinkSubmenu[];
 		menuName: TranslationKey;
@@ -60,7 +59,10 @@
 			/>
 		</button>
 	{:else}
-		<a href={link} class="flex items-center px-3 py-2 whitespace-nowrap text-stone-600 hover:text-missionnaire transition-colors duration-200">
+		<a
+			href={link}
+			class="flex items-center px-3 py-2 whitespace-nowrap text-stone-600 hover:text-missionnaire transition-colors duration-200"
+		>
 			{$t(menuName)}
 		</a>
 	{/if}
@@ -91,16 +93,20 @@
 						{#if image}
 							<img
 								src={image}
-								class="flex-shrink-0 w-8 h-8 object-cover border border-stone-200 grayscale opacity-80 transition-all duration-200 group-hover:grayscale-0 group-hover:opacity-100"
-								alt={$t(subName)}
+								class="h-9 w-9 flex-shrink-0 border border-stone-200 object-cover grayscale opacity-80 transition-all duration-200 group-hover:opacity-100 group-hover:grayscale-0"
+								alt=""
 							/>
 						{:else if icon}
-							<span class="flex-shrink-0 text-stone-400 transition-colors duration-200 group-hover:text-missionnaire">
-								<Icon src={icon} size="16" />
+							<span
+								class="flex h-9 w-9 flex-shrink-0 items-center justify-center border border-stone-200/80 bg-white text-stone-500 transition-colors duration-200 group-hover:border-orange-200 group-hover:text-missionnaire"
+							>
+								<Icon src={icon} size="18" color="currentColor" />
 							</span>
 						{/if}
 						<span class="flex flex-col min-w-0">
-							<span class="font-body text-sm font-semibold text-stone-900 leading-tight transition-colors duration-200 group-hover:text-missionnaire">
+							<span
+								class="font-body text-sm font-semibold text-stone-900 leading-tight transition-colors duration-200 group-hover:text-missionnaire"
+							>
 								{$t(subName)}
 							</span>
 							{#if subText}

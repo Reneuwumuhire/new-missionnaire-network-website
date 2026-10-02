@@ -513,6 +513,7 @@ export async function updateAdminPermissions(
 		can_edit: boolean;
 		can_delete: boolean;
 		can_manage_recordings: boolean;
+		can_manage_extraits: boolean;
 		can_review_lyrics: boolean;
 		can_view_questions: boolean;
 		can_answer_questions: boolean;
