@@ -364,6 +364,13 @@
 										{$t('users.perm.recordings')}
 									</span>
 									<span
+										class="inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {ep.can_manage_extraits
+											? 'bg-orange-100 text-orange-700'
+											: 'bg-stone-100 text-stone-400'}"
+									>
+										{$t('users.perm.extraits')}
+									</span>
+									<span
 										class="inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {ep.can_review_lyrics
 											? 'bg-sky-100 text-sky-700'
 											: 'bg-stone-100 text-stone-400'}"
@@ -661,6 +668,23 @@
 											<p class="text-[10px] text-stone-400">
 												{$t('users.permRecordings.desc')}
 											</p>
+										</div>
+									</label>
+
+									<label
+										class="flex cursor-pointer items-center gap-2 border border-stone-200 bg-white px-3 py-2 transition-colors has-[:checked]:border-orange-300 has-[:checked]:bg-orange-50"
+									>
+										<input
+											type="checkbox"
+											name="can_manage_extraits"
+											checked={ep.can_manage_extraits}
+											class="h-4 w-4 rounded border-stone-300 text-orange-600 focus:ring-orange-500/30"
+										/>
+										<div>
+											<span class="text-sm font-medium text-stone-700"
+												>{$t('users.permExtraits.label')}</span
+											>
+											<p class="text-[10px] text-stone-400">{$t('users.permExtraits.desc')}</p>
 										</div>
 									</label>
 

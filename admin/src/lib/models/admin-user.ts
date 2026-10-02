@@ -5,6 +5,7 @@ export const PermissionsSchema = z.object({
 	can_edit: z.boolean().default(true),
 	can_delete: z.boolean().default(false),
 	can_manage_recordings: z.boolean().default(false),
+	can_manage_extraits: z.boolean().default(false),
 	can_review_lyrics: z.boolean().default(false),
 	can_view_questions: z.boolean().default(false),
 	can_answer_questions: z.boolean().default(false),
@@ -18,6 +19,7 @@ export const DEFAULT_PERMISSIONS: Permissions = {
 	can_edit: true,
 	can_delete: false,
 	can_manage_recordings: false,
+	can_manage_extraits: false,
 	can_review_lyrics: false,
 	can_view_questions: false,
 	can_answer_questions: false,
@@ -29,6 +31,7 @@ export const SUPERADMIN_PERMISSIONS: Permissions = {
 	can_edit: true,
 	can_delete: true,
 	can_manage_recordings: true,
+	can_manage_extraits: true,
 	can_review_lyrics: true,
 	can_view_questions: true,
 	can_answer_questions: true,
@@ -115,5 +118,6 @@ export function getAdminLandingPath(user: AdminUser): string {
 	if (user.role === 'superadmin') return '/';
 	if (getPermissions(user).can_manage_recordings) return '/recordings';
 	if (canManageMusicAudio(user)) return '/audio';
+	if (getPermissions(user).can_manage_extraits) return '/extraits';
 	return canViewDashboard(user) ? '/' : '/settings';
 }

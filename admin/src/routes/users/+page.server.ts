@@ -169,6 +169,7 @@ export const actions: Actions = {
 		const canEdit = formData.get('can_edit') === 'on';
 		const canDelete = formData.get('can_delete') === 'on';
 		const canManageRecordings = formData.get('can_manage_recordings') === 'on';
+		const canManageExtraits = formData.get('can_manage_extraits') === 'on';
 		const canReviewLyrics = formData.get('can_review_lyrics') === 'on';
 		const canViewQuestions = formData.get('can_view_questions') === 'on';
 		const canAnswerQuestions = formData.get('can_answer_questions') === 'on';
@@ -183,6 +184,7 @@ export const actions: Actions = {
 			can_edit: canEdit,
 			can_delete: canDelete,
 			can_manage_recordings: canManageRecordings,
+			can_manage_extraits: canManageExtraits,
 			can_review_lyrics: canReviewLyrics,
 			can_view_questions: canViewQuestions,
 			can_answer_questions: canAnswerQuestions,

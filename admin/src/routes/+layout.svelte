@@ -52,7 +52,7 @@
 					data.user.permissions.can_add ||
 					data.user.permissions.can_edit ||
 					data.user.permissions.can_delete,
-				canManageExtraits: data.user.permissions.can_add || data.user.permissions.can_edit,
+				canManageExtraits: data.user.permissions.can_manage_extraits,
 				canManageRecordings: data.user.permissions.can_manage_recordings,
 				canViewQuestions: data.user.permissions.can_view_questions
 			}}

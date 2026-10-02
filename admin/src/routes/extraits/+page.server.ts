@@ -67,7 +67,7 @@ function serialize(post: Record<string, any>) {
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const permissions = getPermissions(locals.user);
-	if (!permissions.can_add && !permissions.can_edit) throw error(403, 'Accès refusé');
+	if (!permissions.can_manage_extraits) throw error(403, 'Accès refusé');
 
 	const db = await getDb();
 	const requestedId = url.searchParams.get('edit');
@@ -93,7 +93,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 export const actions: Actions = {
 	default: async ({ request, locals }) => {
 		const permissions = getPermissions(locals.user);
-		if (!permissions.can_add && !permissions.can_edit) throw error(403, 'Accès refusé');
+		if (!permissions.can_manage_extraits) throw error(403, 'Accès refusé');
 
 		const formData = await request.formData();
 		const values = formValues(formData);
@@ -160,13 +160,12 @@ export const actions: Actions = {
 		const db = await getDb();
 		let id = values.postId;
 		if (id) {
-			if (!ObjectId.isValid(id) || !permissions.can_edit) throw error(403, 'Accès refusé');
+			if (!ObjectId.isValid(id)) throw error(400, 'Extrait invalide');
 			const result = await db
 				.collection('extrait_posts')
 				.updateOne({ _id: new ObjectId(id) }, { $set: document });
 			if (!result.matchedCount) throw error(404, 'Extrait introuvable');
 		} else {
-			if (!permissions.can_add) throw error(403, 'Accès refusé');
 			const result = await db.collection('extrait_posts').insertOne({
 				...document,
 				createdAt: now,

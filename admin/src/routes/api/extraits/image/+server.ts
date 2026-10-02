@@ -10,7 +10,7 @@ const types: Record<string, string> = {
 };
 
 export const POST: RequestHandler = async ({ locals, request }) => {
-	if (!getPermissions(locals.user).can_add) throw error(403, 'Accès refusé');
+	if (!getPermissions(locals.user).can_manage_extraits) throw error(403, 'Accès refusé');
 
 	const body = (await request.json().catch(() => ({}))) as {
 		contentType?: unknown;

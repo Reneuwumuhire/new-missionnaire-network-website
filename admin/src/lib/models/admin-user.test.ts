@@ -51,4 +51,11 @@ test('default landing follows effective permissions and preserves specialist fal
 			'/'
 		);
 	}
+	assert.equal(
+		getAdminLandingPath({
+			...user,
+			permissions: { ...permissions, can_manage_extraits: true }
+		}),
+		'/extraits'
+	);
 });

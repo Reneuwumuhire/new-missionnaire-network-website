@@ -21,7 +21,7 @@ function dateLabel(value: unknown): string {
 
 export const GET: RequestHandler = async ({ locals, url }) => {
 	const permissions = getPermissions(locals.user);
-	if (!permissions.can_add && !permissions.can_edit) throw error(403, 'Accès refusé');
+	if (!permissions.can_manage_extraits) throw error(403, 'Accès refusé');
 
 	const query = url.searchParams.get('q')?.trim() ?? '';
 	if (query.length < 2) return json({ suggestions: [] });
