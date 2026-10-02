@@ -3,6 +3,7 @@
 	import { tick, untrack } from 'svelte';
 	import type { ActionData, PageData } from './$types';
 	import { whatsappToHtml } from '$lib/whatsapp-format';
+	import { selectedSourceValues, type ExtraitSourceSuggestion } from '$lib/extrait-source';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 	const initial = untrack(() => ({
@@ -12,6 +13,11 @@
 	}));
 	const edit = initial.edit;
 	const savedValues = initial.savedValues;
+	const initialSource = {
+		kind: savedValues?.sourceKind ?? edit?.sourceKind ?? '',
+		id: savedValues?.sourceId ?? edit?.sourceId ?? '',
+		title: savedValues?.sourceTitle ?? edit?.sourceTitle ?? ''
+	};
 
 	function existingLink(kind: string): string {
 		return edit?.links?.find((link: { kind: string }) => link.kind === kind)?.href ?? '';
@@ -35,6 +41,16 @@
 	let transcriptionUrl: string = $state(
 		savedValues?.transcriptionUrl ?? existingLink('transcription')
 	);
+	let sourceKind: string = $state(initialSource.kind);
+	let sourceId: string = $state(initialSource.id);
+	let sourceSearch = $state(initialSource.kind && initialSource.id ? initialSource.title : '');
+	let sourceSuggestions = $state<ExtraitSourceSuggestion[]>([]);
+	let sourceSearchOpen = $state(false);
+	let sourceSearching = $state(false);
+	let sourceSearchError = $state('');
+	let activeSuggestion = $state(-1);
+	let sourceSearchTimer: ReturnType<typeof setTimeout> | undefined;
+	let sourceAbort: AbortController | null = null;
 	let bodyField: HTMLTextAreaElement;
 	let uploading = $state(false);
 	let submitting = $state(false);
@@ -57,6 +73,104 @@
 			? '--:--'
 			: new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(date);
 	});
+
+	function resourceName(kind: string): string {
+		return (
+			(
+				{
+					sermon: 'Prédication',
+					live: 'Retransmission',
+					video: 'Vidéo',
+					pdf: 'PDF',
+					audio: 'Audio',
+					transcription: 'Transcription'
+				} as Record<string, string>
+			)[kind] ?? kind
+		);
+	}
+
+	async function searchSources(query: string) {
+		sourceAbort?.abort();
+		const controller = new AbortController();
+		sourceAbort = controller;
+		sourceSearching = true;
+		sourceSearchError = '';
+		try {
+			const response = await fetch(`/api/extraits/sources?q=${encodeURIComponent(query)}`, {
+				signal: controller.signal
+			});
+			if (!response.ok) throw new Error('La recherche est momentanément indisponible.');
+			const result = (await response.json()) as { suggestions: ExtraitSourceSuggestion[] };
+			if (query !== sourceSearch.trim()) return;
+			sourceSuggestions = result.suggestions;
+			activeSuggestion = result.suggestions.length ? 0 : -1;
+			sourceSearchOpen = true;
+		} catch (cause) {
+			if (cause instanceof DOMException && cause.name === 'AbortError') return;
+			sourceSuggestions = [];
+			sourceSearchError = cause instanceof Error ? cause.message : 'La recherche a échoué.';
+			sourceSearchOpen = true;
+		} finally {
+			if (sourceAbort === controller) sourceSearching = false;
+		}
+	}
+
+	function queueSourceSearch(event: Event) {
+		sourceSearch = (event.currentTarget as HTMLInputElement).value;
+		clearTimeout(sourceSearchTimer);
+		sourceAbort?.abort();
+		sourceSearchError = '';
+		activeSuggestion = -1;
+		if (sourceSearch.trim().length < 2) {
+			sourceSuggestions = [];
+			sourceSearchOpen = false;
+			sourceSearching = false;
+			return;
+		}
+		sourceSearching = true;
+		sourceSearchTimer = setTimeout(() => void searchSources(sourceSearch.trim()), 250);
+	}
+
+	function selectSource(source: ExtraitSourceSuggestion) {
+		const selected = selectedSourceValues(source);
+		sourceKind = selected.sourceKind;
+		sourceId = selected.sourceId;
+		sourceTitle = selected.sourceTitle;
+		sourceSearch = source.title;
+		sermonUrl = selected.sermonUrl;
+		liveUrl = selected.liveUrl;
+		videoUrl = selected.videoUrl;
+		pdfUrl = selected.pdfUrl;
+		audioUrl = selected.audioUrl;
+		transcriptionUrl = selected.transcriptionUrl;
+		sourceSuggestions = [];
+		sourceSearchOpen = false;
+		activeSuggestion = -1;
+	}
+
+	function changeSource() {
+		sourceKind = '';
+		sourceId = '';
+		sourceSearch = '';
+		sourceSuggestions = [];
+		sourceSearchOpen = false;
+	}
+
+	function sourceSearchKeydown(event: KeyboardEvent) {
+		if (!sourceSearchOpen || !sourceSuggestions.length) return;
+		if (event.key === 'ArrowDown') {
+			event.preventDefault();
+			activeSuggestion = Math.min(activeSuggestion + 1, sourceSuggestions.length - 1);
+		} else if (event.key === 'ArrowUp') {
+			event.preventDefault();
+			activeSuggestion = Math.max(activeSuggestion - 1, 0);
+		} else if (event.key === 'Enter' && activeSuggestion >= 0) {
+			event.preventDefault();
+			selectSource(sourceSuggestions[activeSuggestion]);
+		} else if (event.key === 'Escape') {
+			sourceSearchOpen = false;
+		}
+	}
 
 	async function wrap(startMarker: string, endMarker = startMarker) {
 		const start = bodyField.selectionStart;
@@ -185,14 +299,109 @@
 	<input type="hidden" name="imageKey" value={imageKey} />
 	<input type="hidden" name="imageWidth" value={imageWidth} />
 	<input type="hidden" name="imageHeight" value={imageHeight} />
+	<input type="hidden" name="sourceKind" value={sourceKind} />
+	<input type="hidden" name="sourceId" value={sourceId} />
 
 	<div class="grid gap-4 sm:gap-5">
 		<section class="border border-stone-200/70 bg-white/65 p-4 sm:p-6">
 			<div class="grid gap-5">
 				<div>
-					<label for="sourceTitle" class="admin-label"
-						>Titre de la prédication ou de la source</label
-					>
+					<label for="sourceSearch" class="admin-label">Trouver la source</label>
+					{#if sourceKind && sourceId}
+						<div class="selected-source">
+							<div class="min-w-0 flex-1">
+								<p class="text-xs font-semibold text-primary">Source liée</p>
+								<p class="mt-1 line-clamp-2 text-sm font-medium leading-5 text-stone-800">
+									{sourceTitle}
+								</p>
+								<div class="mt-2 flex flex-wrap gap-1.5">
+									{#each previewLinks as link}
+										<span class="resource-chip">{link.label}</span>
+									{/each}
+								</div>
+							</div>
+							<button type="button" class="source-change" onclick={changeSource}>Changer</button>
+						</div>
+					{:else}
+						<div class="source-search-wrap">
+							<div class="relative">
+								<svg class="source-search-icon" aria-hidden="true" viewBox="0 0 24 24">
+									<circle cx="11" cy="11" r="6" />
+									<path d="m16 16 4 4" />
+								</svg>
+								<input
+									id="sourceSearch"
+									class="admin-input !h-12 !pl-11 !pr-10"
+									value={sourceSearch}
+									placeholder="Titre, date, lieu ou prédicateur…"
+									autocomplete="off"
+									role="combobox"
+									aria-autocomplete="list"
+									aria-expanded={sourceSearchOpen}
+									aria-controls="source-suggestions"
+									aria-activedescendant={activeSuggestion >= 0
+										? `source-option-${activeSuggestion}`
+										: undefined}
+									oninput={queueSourceSearch}
+									onkeydown={sourceSearchKeydown}
+									onfocus={() => {
+										if (sourceSuggestions.length) sourceSearchOpen = true;
+									}}
+									onblur={() => setTimeout(() => (sourceSearchOpen = false), 150)}
+								/>
+								{#if sourceSearching}<span class="source-spinner" aria-label="Recherche en cours"
+									></span>{/if}
+							</div>
+
+							{#if sourceSearchOpen}
+								<div
+									id="source-suggestions"
+									class="source-results"
+									role="listbox"
+									aria-label="Sources trouvées"
+								>
+									{#if sourceSearchError}
+										<p role="alert" class="p-4 text-sm text-red-700">{sourceSearchError}</p>
+									{:else if !sourceSearching && !sourceSuggestions.length}
+										<p class="p-4 text-sm text-stone-500">
+											Aucune source trouvée. Essayez un autre mot.
+										</p>
+									{:else}
+										{#each sourceSuggestions as source, index}
+											<button
+												id={`source-option-${index}`}
+												type="button"
+												role="option"
+												aria-selected={activeSuggestion === index}
+												class:active={activeSuggestion === index}
+												onmouseenter={() => (activeSuggestion = index)}
+												onmousedown={(event) => event.preventDefault()}
+												onclick={() => selectSource(source)}
+											>
+												<span class="source-kind"
+													>{source.kind === 'recording' ? 'Retransmission' : 'Prédication'}</span
+												>
+												<strong>{source.title}</strong>
+												<small>{source.subtitle}</small>
+												<span class="mt-2 flex flex-wrap gap-1.5">
+													{#each source.links as link}<span class="resource-chip"
+															>{resourceName(link.kind)}</span
+														>{/each}
+												</span>
+											</button>
+										{/each}
+									{/if}
+								</div>
+							{/if}
+						</div>
+						<p class="mt-2 text-xs leading-5 text-stone-500">
+							Choisissez une source pour remplir automatiquement ses liens.
+						</p>
+					{/if}
+				</div>
+
+				<div>
+					<label for="sourceTitle" class="admin-label">Titre affiché</label>
 					<input
 						id="sourceTitle"
 						name="sourceTitle"
@@ -300,16 +509,17 @@
 			</div>
 		</section>
 
-		<details
-			class="links-section border border-stone-200/70 bg-white/65"
-			open={Boolean(edit?.links?.length)}
-		>
+		<details class="links-section border border-stone-200/70 bg-white/65">
 			<summary
 				class="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 p-4 sm:px-6"
 			>
 				<div>
-					<h2 class="font-display text-2xl font-semibold text-stone-800">Liens associés</h2>
-					<p class="mt-0.5 text-sm text-stone-500">Prédication, direct, PDF ou transcription</p>
+					<h2 class="font-display text-2xl font-semibold text-stone-800">Ajuster les liens</h2>
+					<p class="mt-0.5 text-sm text-stone-500">
+						{previewLinks.length
+							? `${previewLinks.length} ressource${previewLinks.length > 1 ? 's' : ''} liée${previewLinks.length > 1 ? 's' : ''}`
+							: 'Correction manuelle si nécessaire'}
+					</p>
 				</div>
 				<span
 					class="links-chevron flex h-11 w-11 shrink-0 items-center justify-center border border-stone-200 bg-white text-lg text-stone-500"
@@ -454,6 +664,120 @@
 </form>
 
 <style>
+	.source-search-wrap {
+		position: relative;
+	}
+	.source-search-icon {
+		position: absolute;
+		top: 50%;
+		left: 0.95rem;
+		z-index: 1;
+		width: 1.15rem;
+		height: 1.15rem;
+		transform: translateY(-50%);
+		fill: none;
+		stroke: #78716c;
+		stroke-linecap: round;
+		stroke-width: 1.8;
+	}
+	.source-spinner {
+		position: absolute;
+		top: 50%;
+		right: 0.9rem;
+		width: 1rem;
+		height: 1rem;
+		transform: translateY(-50%);
+		border: 2px solid #fed7aa;
+		border-right-color: #ff880c;
+		border-radius: 999px;
+		animation: source-spin 0.7s linear infinite;
+	}
+	.source-results {
+		position: absolute;
+		z-index: 40;
+		top: calc(100% + 0.35rem);
+		left: 0;
+		right: 0;
+		max-height: min(25rem, 60vh);
+		overflow-y: auto;
+		border: 1px solid #d6d3d1;
+		background: #fff;
+		box-shadow: 0 14px 32px rgb(41 37 36 / 14%);
+	}
+	.source-results > button {
+		display: block;
+		width: 100%;
+		min-height: 4.75rem;
+		padding: 0.8rem 1rem;
+		border-bottom: 1px solid #f0ece6;
+		text-align: left;
+		background: #fff;
+	}
+	.source-results > button:last-child {
+		border-bottom: 0;
+	}
+	.source-results > button:hover,
+	.source-results > button.active {
+		background: #fff7ed;
+	}
+	.source-results strong,
+	.source-results small {
+		display: block;
+	}
+	.source-results strong {
+		margin-top: 0.18rem;
+		font-size: 0.88rem;
+		font-weight: 600;
+		line-height: 1.35;
+		color: #292524;
+	}
+	.source-results small {
+		margin-top: 0.2rem;
+		font-size: 0.72rem;
+		line-height: 1.35;
+		color: #78716c;
+	}
+	.source-kind {
+		font-size: 0.64rem;
+		font-weight: 700;
+		color: #9a4d00;
+	}
+	.resource-chip {
+		display: inline-flex;
+		align-items: center;
+		min-height: 1.45rem;
+		padding: 0.18rem 0.45rem;
+		border: 1px solid #fed7aa;
+		border-radius: 999px;
+		font-size: 0.62rem;
+		font-weight: 650;
+		line-height: 1;
+		color: #9a4d00;
+		background: #fff7ed;
+	}
+	.selected-source {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.75rem;
+		padding: 0.9rem;
+		border: 1px solid #fed7aa;
+		background: #fffaf3;
+	}
+	.source-change {
+		min-width: 4.5rem;
+		min-height: 2.75rem;
+		padding-inline: 0.65rem;
+		border: 1px solid #fed7aa;
+		font-size: 0.72rem;
+		font-weight: 650;
+		color: #9a4d00;
+		background: #fff;
+	}
+	@keyframes source-spin {
+		to {
+			transform: translateY(-50%) rotate(360deg);
+		}
+	}
 	.format-button {
 		display: inline-flex;
 		width: 2.75rem;
@@ -585,8 +909,10 @@
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {
-		.links-chevron {
+		.links-chevron,
+		.source-spinner {
 			transition: none;
+			animation: none;
 		}
 	}
 </style>

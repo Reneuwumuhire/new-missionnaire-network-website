@@ -30,6 +30,8 @@ function formValues(formData: FormData) {
 			'imageWidth',
 			'imageHeight',
 			'postId',
+			'sourceKind',
+			'sourceId',
 			...linkFields.map(([field]) => field)
 		].map((field) => [field, formData.get(field)?.toString().trim() ?? ''])
 	);
@@ -57,6 +59,8 @@ function serialize(post: Record<string, any>) {
 		imageWidth: post.imageWidth,
 		imageHeight: post.imageHeight,
 		links: post.links,
+		sourceKind: post.source?.kind ?? '',
+		sourceId: post.source?.id ?? '',
 		updatedAt: new Date(post.updatedAt).toISOString()
 	};
 }
@@ -130,6 +134,11 @@ export const actions: Actions = {
 
 		const width = Number.parseInt(values.imageWidth, 10);
 		const height = Number.parseInt(values.imageHeight, 10);
+		const validSource =
+			['recording', 'sermon'].includes(values.sourceKind) && /^[a-f\d]{24}$/i.test(values.sourceId);
+		if ((values.sourceKind || values.sourceId) && !validSource) {
+			return fail(400, { error: 'La source sélectionnée est invalide.', values });
+		}
 		const now = new Date();
 		const document = {
 			status: intent,
@@ -142,6 +151,7 @@ export const actions: Actions = {
 			imageWidth: Number.isFinite(width) && width > 0 ? width : 1200,
 			imageHeight: Number.isFinite(height) && height > 0 ? height : 675,
 			sourceTitle,
+			source: validSource ? { kind: values.sourceKind, id: values.sourceId } : null,
 			links,
 			updatedAt: now,
 			updatedBy: locals.user.email
