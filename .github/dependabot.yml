@@ -1,0 +1,12 @@
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /studio/src-tauri
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    ignore:
+      # Studio ships on macOS and Windows; Tauri's lockfile still includes this
+      # Linux-only crate and does not yet support its 0.20 API.
+      - dependency-name: glib
+        versions: ['>=0.20.0']
