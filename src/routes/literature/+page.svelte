@@ -46,6 +46,10 @@
 		expandedItems = next;
 	}
 
+	function readingUrl(item: Literature) {
+		return item.parts[0]?.url || item.pdf_url;
+	}
+
 	const authors = ['Tous', 'William Marrion Branham', 'Ewald Frank'];
 	const categories = ['All', 'book', 'circular_letter'];
 	const sources = ['All', 'freie-volksmission', 'cmpp'];
@@ -497,17 +501,30 @@
 				<div class="divide-y divide-stone-100 [&>*]:hover:bg-white/60">
 					{#each literature as item, i}
 						<div
-							class="group grid grid-cols-[30px_minmax(0,1fr)_auto] items-center gap-2 px-4 py-4 transition-colors md:grid-cols-[30px_minmax(0,2fr)_minmax(8rem,0.8fr)_8rem_10rem] md:gap-4"
+							class="group relative grid grid-cols-[30px_minmax(0,1fr)_auto] items-center gap-2 px-4 py-4 transition-colors md:grid-cols-[30px_minmax(0,2fr)_minmax(8rem,0.8fr)_8rem_10rem] md:gap-4 {readingUrl(
+								item
+							)
+								? 'cursor-pointer'
+								: ''}"
 						>
 							<div class="text-center text-xs font-semibold text-stone-300">
 								{i + 1 + (currentPage - 1) * limit}
 							</div>
 							<div class="flex flex-col min-w-0">
-								<span
-									class="line-clamp-2 text-sm font-semibold leading-snug text-stone-800 transition-colors group-hover:text-missionnaire"
-								>
-									{item.title || 'Sans titre'}
-								</span>
+								{#if readingUrl(item)}
+									<a
+										href={readingUrl(item)}
+										target="_blank"
+										rel="noopener noreferrer"
+										class="row-read-link line-clamp-2 text-sm font-semibold leading-snug text-stone-800 transition-colors group-hover:text-missionnaire focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500"
+									>
+										{item.title || 'Sans titre'}
+									</a>
+								{:else}
+									<span class="line-clamp-2 text-sm font-semibold leading-snug text-stone-800">
+										{item.title || 'Sans titre'}
+									</span>
+								{/if}
 								{#if item.description}
 									<div class="mt-1">
 										<p
@@ -521,7 +538,7 @@
 										</p>
 										{#if item.description.length > 100}
 											<button
-												class="mt-1 text-xs font-semibold text-orange-700 underline-offset-4 hover:underline"
+												class="relative z-10 mt-1 text-xs font-semibold text-orange-700 underline-offset-4 hover:underline"
 												onclick={() => toggleDescription(item._id)}
 											>
 												{expandedItems.has(item._id || '') ? 'Voir moins' : 'Voir plus'}
@@ -561,7 +578,7 @@
 										href={item.pdf_url}
 										target="_blank"
 										rel="noopener noreferrer"
-										class="inline-flex min-h-10 items-center gap-2 border border-stone-200 bg-white px-3 py-2 text-xs font-bold text-stone-600 transition-colors hover:border-missionnaire hover:text-missionnaire focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500"
+										class="relative z-10 inline-flex min-h-10 items-center gap-2 border border-stone-200 bg-white px-3 py-2 text-xs font-bold text-stone-600 transition-colors hover:border-missionnaire hover:text-missionnaire focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500"
 									>
 										<Icon src={AiOutlineDownload} size="16" />
 										<span class="hidden lg:inline">Télécharger</span><span class="lg:hidden"
@@ -623,6 +640,12 @@
 
 	.literature-filters > summary::-webkit-details-marker {
 		display: none;
+	}
+
+	.row-read-link::after {
+		position: absolute;
+		inset: 0;
+		content: '';
 	}
 
 	.book-parts[open] .book-parts-chevron {
