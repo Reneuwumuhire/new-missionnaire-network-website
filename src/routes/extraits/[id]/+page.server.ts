@@ -1,12 +1,16 @@
 import { error } from '@sveltejs/kit';
 import { getExtraitFeed } from '$lib/server/extraitPosts';
-import { pageMeta, shareDescription, shareTitle, SITE_URL } from '$lib/seo';
+import { pageMeta, shareDescription, shareTitle } from '$lib/seo';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params, url }) => {
 	const feed = await getExtraitFeed();
 	const post = feed.posts.find((candidate) => candidate.id === params.id);
 	if (!post) error(404, 'Extrait introuvable');
+	const image = new URL(post.image, url.origin);
+	const shareImage = image.hostname.endsWith('.amazonaws.com')
+		? `${url.origin}/_vercel/image?url=${encodeURIComponent(image.toString())}&w=1080&q=50`
+		: image.toString();
 
 	return {
 		...feed,
@@ -14,9 +18,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		meta: pageMeta(`/extraits/${encodeURIComponent(post.id)}`, {
 			title: shareTitle(post.sourceTitle, ' · Extrait'),
 			description: shareDescription(post.excerpt || post.text),
-			image: new URL(post.image, SITE_URL).toString(),
-			imageWidth: post.imageWidth,
-			imageHeight: post.imageHeight,
+			image: shareImage,
 			type: 'article'
 		})
 	};
