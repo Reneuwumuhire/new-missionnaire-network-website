@@ -18,14 +18,16 @@
 // <HeaderMenuLink menuName="Chants" link="/" />
 // <HeaderMenuLink menuName="Galerie" link="/" />
 
-import IoMusicalNotes from 'svelte-icons-pack/io/IoMusicalNotes';
-import IoVideocam from 'svelte-icons-pack/io/IoVideocam';
-import IoBookOutline from 'svelte-icons-pack/io/IoBookOutline';
-import IoChatboxEllipsesOutline from 'svelte-icons-pack/io/IoChatboxEllipsesOutline';
-import IoHomeOutline from 'svelte-icons-pack/io/IoHomeOutline';
-import IoInformationCircleOutline from 'svelte-icons-pack/io/IoInformationCircleOutline';
-import IoPeopleOutline from 'svelte-icons-pack/io/IoPeopleOutline';
-import IoReaderOutline from 'svelte-icons-pack/io/IoReaderOutline';
+import FiBookOpen from 'svelte-icons-pack/fi/FiBookOpen';
+import FiFileText from 'svelte-icons-pack/fi/FiFileText';
+import FiHome from 'svelte-icons-pack/fi/FiHome';
+import FiInfo from 'svelte-icons-pack/fi/FiInfo';
+import FiMessageSquare from 'svelte-icons-pack/fi/FiMessageSquare';
+import FiMusic from 'svelte-icons-pack/fi/FiMusic';
+import FiPlayCircle from 'svelte-icons-pack/fi/FiPlayCircle';
+import FiUser from 'svelte-icons-pack/fi/FiUser';
+import FiUsers from 'svelte-icons-pack/fi/FiUsers';
+import FiVideo from 'svelte-icons-pack/fi/FiVideo';
 import type { TranslationKey } from '../i18n';
 
 // `menuName`, `subName` and `subText` are translation KEYS — the nav
@@ -59,25 +61,25 @@ export const NavigationLinkList: NavigationLink[] = [
 				subName: 'nav.transcriptions',
 				subText: 'nav.sub.transcriptionsText',
 				link: '/transcriptions',
-				icon: IoReaderOutline
+				icon: FiFileText
 			},
 			{
 				subName: 'nav.extraits',
 				subText: 'nav.sub.extraitsText',
 				link: '/extraits',
-				icon: IoChatboxEllipsesOutline
+				icon: FiMessageSquare
 			},
 			{
 				subName: 'nav.sub.videos',
 				subText: 'nav.sub.videosText',
 				link: '/videos',
-				icon: IoVideocam
+				icon: FiVideo
 			},
 			{
 				subName: 'nav.literature',
 				subText: 'nav.sub.literatureText',
 				link: '/literature',
-				icon: IoBookOutline
+				icon: FiBookOpen
 			}
 		]
 	},
@@ -90,13 +92,13 @@ export const NavigationLinkList: NavigationLink[] = [
 				subName: 'nav.williamBranham',
 				subText: 'nav.sub.branhamBioText',
 				link: '/william-branham/biographie',
-				image: '/img/branham_icon.png'
+				icon: FiUser
 			},
 			{
 				subName: 'nav.ewaldFrank',
 				subText: 'nav.sub.frankAboutText',
 				link: '/ewald-frank',
-				icon: IoPeopleOutline
+				icon: FiUsers
 			}
 		]
 	},
@@ -109,13 +111,13 @@ export const NavigationLinkList: NavigationLink[] = [
 				subName: 'nav.sub.songsAudio',
 				subText: 'nav.sub.songsAudioText',
 				link: '/musique',
-				icon: IoMusicalNotes
+				icon: FiMusic
 			},
 			{
 				subName: 'nav.sub.songsVideo',
 				subText: 'nav.sub.songsVideoText',
 				link: '/musique/videos',
-				icon: IoVideocam
+				icon: FiPlayCircle
 			}
 		]
 	},
@@ -138,13 +140,13 @@ export const NavigationLinkList: NavigationLink[] = [
 				subName: 'nav.eglise',
 				subText: 'nav.sub.churchText',
 				link: '/eglise',
-				icon: IoHomeOutline
+				icon: FiHome
 			},
 			{
 				subName: 'nav.aPropos',
 				subText: 'nav.sub.aboutText',
 				link: '/a-propos',
-				icon: IoInformationCircleOutline
+				icon: FiInfo
 			}
 		]
 	}

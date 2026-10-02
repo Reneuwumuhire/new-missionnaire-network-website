@@ -89,11 +89,11 @@
 				>
 					{#if icon}
 						<span
-							class="mt-0.5 transition-colors duration-200 {isSubActive
-								? 'text-missionnaire'
-								: 'text-stone-400 group-hover:text-missionnaire'}"
+							class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center border transition-colors duration-200 {isSubActive
+								? 'border-orange-200 bg-orange-50 text-missionnaire'
+								: 'border-stone-200 bg-white text-stone-500 group-hover:border-orange-200 group-hover:text-missionnaire'}"
 						>
-							<Icon src={icon} size="14" />
+							<Icon src={icon} size="17" color="currentColor" />
 						</span>
 					{/if}
 					<span class="flex flex-col min-w-0">

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount, tick } from 'svelte';
 	import type { PageData } from './$types';
 
 	interface Props {
@@ -6,8 +7,12 @@
 	}
 
 	let { data }: Props = $props();
+	const PAGE_SIZE = 6;
 	let copiedPostId = $state<string | null>(null);
 	let copyResetTimer: ReturnType<typeof setTimeout> | undefined;
+	let visibleCount = $state(PAGE_SIZE);
+	let visiblePosts = $derived(data.posts.slice(0, visibleCount));
+	let hasMore = $derived(visibleCount < data.posts.length);
 
 	const dateFormatter = new Intl.DateTimeFormat('fr-FR', {
 		day: 'numeric',
@@ -28,6 +33,30 @@
 	function timeLabel(iso: string) {
 		return timeFormatter.format(new Date(iso));
 	}
+
+	function revealMore() {
+		visibleCount = Math.min(visibleCount + PAGE_SIZE, data.posts.length);
+	}
+
+	function infiniteScroll(node: HTMLElement) {
+		if (!('IntersectionObserver' in window)) return;
+		const observer = new IntersectionObserver(
+			([entry]) => {
+				if (entry.isIntersecting && hasMore) revealMore();
+			},
+			{ rootMargin: '600px 0px', threshold: 0 }
+		);
+		observer.observe(node);
+		return { destroy: () => observer.disconnect() };
+	}
+
+	onMount(() => {
+		const id = window.location.hash.slice(1);
+		const targetIndex = data.posts.findIndex((post) => post.id === id);
+		if (targetIndex < visibleCount) return;
+		visibleCount = targetIndex + 1;
+		void tick().then(() => document.getElementById(id)?.scrollIntoView());
+	});
 
 	async function sharePost(id: string, title: string, excerpt: string) {
 		const url = `${window.location.origin}${window.location.pathname}#${id}`;
@@ -67,8 +96,8 @@
 	</header>
 
 	<section class="feed" aria-label="Extraits publiés">
-		{#each data.posts as post, index (post.id)}
-			{#if index === 0 || dateLabel(post.publishedAt) !== dateLabel(data.posts[index - 1].publishedAt)}
+		{#each visiblePosts as post, index (post.id)}
+			{#if index === 0 || dateLabel(post.publishedAt) !== dateLabel(visiblePosts[index - 1].publishedAt)}
 				<div class="date-divider"><span>{dateLabel(post.publishedAt)}</span></div>
 			{/if}
 
@@ -124,6 +153,14 @@
 				</div>
 			</article>
 		{/each}
+
+		{#if hasMore}
+			<div class="feed-loader" use:infiniteScroll aria-live="polite">
+				<button type="button" onclick={revealMore}>Afficher plus d’extraits</button>
+			</div>
+		{:else if data.posts.length > PAGE_SIZE}
+			<p class="feed-end">Tous les extraits sont affichés</p>
+		{/if}
 	</section>
 </main>
 
@@ -363,6 +400,39 @@
 		color: #fff;
 		background: var(--color-missionnaire);
 		outline: none;
+	}
+
+	.feed-loader {
+		display: grid;
+		min-height: 5rem;
+		place-items: center;
+	}
+
+	.feed-loader button {
+		min-height: 44px;
+		padding: 0.65rem 1rem;
+		border: 1px solid #d6d3d1;
+		border-radius: 999px;
+		font: inherit;
+		font-size: 0.75rem;
+		font-weight: 650;
+		color: #57534e;
+		background: #fff;
+		cursor: pointer;
+	}
+
+	.feed-loader button:hover,
+	.feed-loader button:focus-visible {
+		border-color: var(--color-missionnaire);
+		color: #9a4d00;
+		outline: none;
+	}
+
+	.feed-end {
+		margin: 2rem 0 0;
+		text-align: center;
+		font-size: 0.72rem;
+		color: #a8a29e;
 	}
 
 	@media (max-width: 640px) {
