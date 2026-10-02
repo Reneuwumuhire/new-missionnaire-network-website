@@ -3,7 +3,7 @@ import { ObjectId } from 'mongodb';
 import type { PageServerLoad } from './$types';
 import { getDb } from '../../db/mongo';
 import { getPermissions } from '$lib/models/admin-user';
-import { getS3Url } from '$lib/server/s3';
+import { deleteObject, getS3Url } from '$lib/server/s3';
 import { whatsappExcerpt, whatsappToHtml } from '$lib/whatsapp-format';
 
 const linkFields = [
@@ -86,12 +86,13 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		edit: edit ? serialize(edit) : null,
 		recent: recent.map(serialize),
 		defaultPublishedAt: localDateTime(),
-		saved: url.searchParams.get('saved')
+		saved: url.searchParams.get('saved'),
+		managed: url.searchParams.get('managed')
 	};
 };
 
 export const actions: Actions = {
-	default: async ({ request, locals }) => {
+	save: async ({ request, locals }) => {
 		const permissions = getPermissions(locals.user);
 		if (!permissions.can_manage_extraits) throw error(403, 'Accès refusé');
 
@@ -175,5 +176,53 @@ export const actions: Actions = {
 		}
 
 		throw redirect(303, `/extraits?edit=${id}&saved=${intent}`);
+	},
+	toggle: async ({ request, locals }) => {
+		const permissions = getPermissions(locals.user);
+		if (!permissions.can_manage_extraits) throw error(403, 'Accès refusé');
+
+		const id = (await request.formData()).get('targetId')?.toString() ?? '';
+		if (!ObjectId.isValid(id)) throw error(400, 'Extrait invalide');
+
+		const db = await getDb();
+		const post = await db.collection('extrait_posts').findOne({ _id: new ObjectId(id) });
+		if (!post) throw error(404, 'Extrait introuvable');
+
+		const status = post.status === 'published' ? 'draft' : 'published';
+		if (
+			status === 'published' &&
+			(!post.imageKey?.startsWith('broadcast-thumbnails/extraits/') ||
+				post.image !== getS3Url(post.imageKey))
+		) {
+			return fail(400, { error: 'Ajoutez une image avant de publier cet extrait.' });
+		}
+
+		await db
+			.collection('extrait_posts')
+			.updateOne(
+				{ _id: post._id },
+				{ $set: { status, updatedAt: new Date(), updatedBy: locals.user.email } }
+			);
+		throw redirect(303, `/extraits?managed=${status === 'published' ? 'published' : 'hidden'}`);
+	},
+	delete: async ({ request, locals }) => {
+		const permissions = getPermissions(locals.user);
+		if (!permissions.can_manage_extraits) throw error(403, 'Accès refusé');
+
+		const id = (await request.formData()).get('targetId')?.toString() ?? '';
+		if (!ObjectId.isValid(id)) throw error(400, 'Extrait invalide');
+
+		const db = await getDb();
+		const post = await db.collection('extrait_posts').findOneAndDelete({ _id: new ObjectId(id) });
+		if (!post) throw error(404, 'Extrait introuvable');
+		if (post.imageKey?.startsWith('broadcast-thumbnails/extraits/')) {
+			try {
+				await deleteObject(post.imageKey);
+			} catch (cause) {
+				console.error('[Extraits] Image cleanup failed:', cause);
+			}
+		}
+
+		throw redirect(303, '/extraits?managed=deleted');
 	}
 };

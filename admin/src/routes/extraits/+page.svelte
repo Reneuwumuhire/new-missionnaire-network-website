@@ -289,6 +289,19 @@
 	</div>
 {/if}
 
+{#if data.managed}
+	<div
+		role="status"
+		class="mb-6 border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"
+	>
+		{data.managed === 'deleted'
+			? 'L’extrait a été supprimé.'
+			: data.managed === 'hidden'
+				? 'L’extrait est maintenant masqué.'
+				: 'L’extrait est de nouveau publié.'}
+	</div>
+{/if}
+
 {#if form?.error}
 	<div role="alert" class="mb-6 border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
 		{form.error}
@@ -297,6 +310,7 @@
 
 <form
 	method="POST"
+	action="?/save"
 	class="editor-form grid items-start gap-5 md:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_minmax(360px,520px)] xl:gap-7"
 	use:enhance={() => {
 		submitting = true;
@@ -664,21 +678,58 @@
 				</h2>
 				<div class="mt-3 grid gap-2">
 					{#each data.recent as post}
-						<a
-							href={`/extraits?edit=${post.id}`}
-							data-sveltekit-reload
-							class="flex items-center justify-between gap-3 border border-stone-200/70 bg-white/60 px-3 py-3 text-sm transition hover:border-primary hover:bg-white"
-						>
-							<span class="truncate text-stone-700">{post.sourceTitle}</span>
-							<span
-								class="shrink-0 text-[10px] font-bold uppercase tracking-wider {post.status ===
-								'published'
-									? 'text-green-700'
-									: 'text-amber-700'}"
-							>
-								{post.status === 'published' ? 'Publié' : 'Brouillon'}
-							</span>
-						</a>
+						<article class="border border-stone-200/70 bg-white/60 p-3 text-sm">
+							<div class="flex items-start justify-between gap-3">
+								<p class="line-clamp-2 min-w-0 text-stone-700">{post.sourceTitle}</p>
+								<span
+									class="shrink-0 text-[10px] font-bold uppercase tracking-wider {post.status ===
+									'published'
+										? 'text-green-700'
+										: 'text-amber-700'}"
+								>
+									{post.status === 'published' ? 'Publié' : 'Brouillon'}
+								</span>
+							</div>
+							<div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs font-semibold">
+								<a
+									href={`/extraits?edit=${post.id}`}
+									data-sveltekit-reload
+									class="text-stone-600 hover:text-primary">Modifier</a
+								>
+								{#if post.status === 'published'}
+									<a
+										href={`https://missionnaire.net/extraits/${post.id}`}
+										target="_blank"
+										rel="noreferrer"
+										class="text-stone-600 hover:text-primary">Voir</a
+									>
+								{/if}
+								<button
+									type="submit"
+									name="targetId"
+									value={post.id}
+									formaction="?/toggle"
+									formnovalidate
+									class="text-stone-600 hover:text-primary"
+								>
+									{post.status === 'published' ? 'Masquer' : 'Publier'}
+								</button>
+								<button
+									type="submit"
+									name="targetId"
+									value={post.id}
+									formaction="?/delete"
+									formnovalidate
+									class="ml-auto text-red-700 hover:text-red-900"
+									onclick={(event) => {
+										if (!confirm(`Supprimer définitivement « ${post.sourceTitle} » ?`))
+											event.preventDefault();
+									}}
+								>
+									Supprimer
+								</button>
+							</div>
+						</article>
 					{/each}
 				</div>
 			</section>
