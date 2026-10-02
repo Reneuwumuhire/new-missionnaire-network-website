@@ -40,12 +40,10 @@
 
 	function toggleDescription(id: string | undefined) {
 		if (!id) return;
-		if (expandedItems.has(id)) {
-			expandedItems.delete(id);
-		} else {
-			expandedItems.add(id);
-		}
-		expandedItems = expandedItems; // trigger reactivity
+		const next = new Set(expandedItems);
+		if (next.has(id)) next.delete(id);
+		else next.add(id);
+		expandedItems = next;
 	}
 
 	const authors = ['Tous', 'William Marrion Branham', 'Ewald Frank'];
