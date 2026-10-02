@@ -42,6 +42,7 @@ const en: Record<keyof typeof fr, string> = {
 	'nav.questions': 'Questions',
 	'nav.recordings': 'Recordings',
 	'nav.audioLibrary': 'Audio library',
+	'nav.extraits': 'Excerpts',
 	'nav.lyricsReview': 'Lyrics review',
 	'nav.users': 'Users',
 	'nav.studioHelp': 'Studio help',

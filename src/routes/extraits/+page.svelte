@@ -270,6 +270,13 @@
 		background: #fff7ed;
 	}
 
+	.post-copy :global(blockquote) {
+		margin: 0.35rem 0;
+		padding-left: 0.65rem;
+		border-left: 3px solid #f59e0b;
+		color: #57534e;
+	}
+
 	.source-links {
 		display: flex;
 		flex-wrap: wrap;

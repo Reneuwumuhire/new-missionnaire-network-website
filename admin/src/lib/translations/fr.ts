@@ -41,6 +41,7 @@ export default {
 	'nav.questions': 'Questions',
 	'nav.recordings': 'Enregistrements',
 	'nav.audioLibrary': 'Bibliothèque audio',
+	'nav.extraits': 'Extraits',
 	'nav.lyricsReview': 'Révision paroles',
 	'nav.users': 'Utilisateurs',
 	'nav.studioHelp': 'Aide Studio',
