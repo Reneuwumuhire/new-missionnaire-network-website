@@ -59,7 +59,7 @@
 	});
 
 	async function sharePost(id: string, title: string, excerpt: string) {
-		const url = `${window.location.origin}${window.location.pathname}#${id}`;
+		const url = `${window.location.origin}/extraits/${encodeURIComponent(id)}`;
 
 		if (navigator.share) {
 			try {
