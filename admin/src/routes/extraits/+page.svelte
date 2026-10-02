@@ -132,12 +132,12 @@
 	<title>{edit ? 'Modifier' : 'Nouvel'} extrait — Administration</title>
 </svelte:head>
 
-<header class="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+<header class="mb-6 flex flex-col gap-4 sm:mb-7 sm:flex-row sm:items-end sm:justify-between">
 	<div>
 		<p class="mb-2 text-[10px] font-bold uppercase tracking-[0.22em] text-primary">
 			Canal WhatsApp
 		</p>
-		<h1 class="font-display text-4xl font-semibold leading-none text-stone-800">
+		<h1 class="font-display text-3xl font-semibold leading-none text-stone-800 sm:text-4xl">
 			{edit ? 'Modifier l’extrait' : 'Nouvel extrait'}
 		</h1>
 		<p class="mt-2 text-sm text-stone-500">
@@ -148,7 +148,7 @@
 		href="https://missionnaire.net/extraits"
 		target="_blank"
 		rel="noreferrer"
-		class="admin-btn-secondary admin-btn-compact"
+		class="admin-btn-secondary h-11 justify-center sm:h-9"
 	>
 		Voir la page publique
 	</a>
@@ -171,7 +171,7 @@
 
 <form
 	method="POST"
-	class="grid items-start gap-7 xl:grid-cols-[minmax(0,1fr)_minmax(360px,520px)]"
+	class="editor-form grid items-start gap-5 md:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_minmax(360px,520px)] xl:gap-7"
 	use:enhance={() => {
 		submitting = true;
 		return async ({ update }) => {
@@ -186,8 +186,8 @@
 	<input type="hidden" name="imageWidth" value={imageWidth} />
 	<input type="hidden" name="imageHeight" value={imageHeight} />
 
-	<div class="grid gap-5">
-		<section class="border border-stone-200/70 bg-white/65 p-5 sm:p-6">
+	<div class="grid gap-4 sm:gap-5">
+		<section class="border border-stone-200/70 bg-white/65 p-4 sm:p-6">
 			<div class="grid gap-5">
 				<div>
 					<label for="sourceTitle" class="admin-label"
@@ -240,42 +240,52 @@
 				</div>
 
 				<div>
-					<div class="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+					<div
+						class="mb-2 flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
+					>
 						<label for="body" class="admin-label !mb-0">Texte de l’extrait</label>
 						<div class="flex gap-1" aria-label="Mise en forme">
 							<button
 								type="button"
 								class="format-button font-bold"
 								onclick={() => wrap('*')}
+								aria-label="Mettre en gras"
 								title="Gras">B</button
 							>
 							<button
 								type="button"
 								class="format-button italic"
 								onclick={() => wrap('_')}
+								aria-label="Mettre en italique"
 								title="Italique">I</button
 							>
 							<button
 								type="button"
 								class="format-button line-through"
 								onclick={() => wrap('~')}
+								aria-label="Barrer le texte"
 								title="Barré">S</button
 							>
 							<button
 								type="button"
 								class="format-button font-mono"
 								onclick={() => wrap('`')}
+								aria-label="Mettre en monospace"
 								title="Monospace">&lt;/&gt;</button
 							>
-							<button type="button" class="format-button" onclick={quoteSelection} title="Citation"
-								>❯</button
+							<button
+								type="button"
+								class="format-button"
+								onclick={quoteSelection}
+								aria-label="Mettre en citation"
+								title="Citation">❯</button
 							>
 						</div>
 					</div>
 					<textarea
 						id="body"
 						name="body"
-						class="admin-input min-h-64 resize-y"
+						class="admin-input min-h-56 resize-y sm:min-h-64"
 						required
 						maxlength="50000"
 						bind:this={bodyField}
@@ -290,10 +300,23 @@
 			</div>
 		</section>
 
-		<section class="border border-stone-200/70 bg-white/65 p-5 sm:p-6">
-			<h2 class="font-display text-2xl font-semibold text-stone-800">Liens associés</h2>
-			<p class="mb-5 mt-1 text-sm text-stone-500">Laissez vide ce qui n’existe pas encore.</p>
-			<div class="grid gap-4 sm:grid-cols-2">
+		<details
+			class="links-section border border-stone-200/70 bg-white/65"
+			open={Boolean(edit?.links?.length)}
+		>
+			<summary
+				class="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 p-4 sm:px-6"
+			>
+				<div>
+					<h2 class="font-display text-2xl font-semibold text-stone-800">Liens associés</h2>
+					<p class="mt-0.5 text-sm text-stone-500">Prédication, direct, PDF ou transcription</p>
+				</div>
+				<span
+					class="links-chevron flex h-11 w-11 shrink-0 items-center justify-center border border-stone-200 bg-white text-lg text-stone-500"
+					aria-hidden="true">⌄</span
+				>
+			</summary>
+			<div class="grid gap-4 border-t border-stone-100 px-4 pb-5 pt-4 sm:grid-cols-2 sm:px-6">
 				<label class="admin-label"
 					>Prédication<input
 						name="sermonUrl"
@@ -343,31 +366,10 @@
 					/></label
 				>
 			</div>
-		</section>
-
-		<div class="flex flex-wrap justify-end gap-3 border-t border-stone-200 pt-5">
-			<button
-				type="submit"
-				name="intent"
-				value="draft"
-				class="admin-btn-secondary"
-				disabled={uploading || submitting}
-			>
-				{submitting ? 'Enregistrement…' : 'Enregistrer le brouillon'}
-			</button>
-			<button
-				type="submit"
-				name="intent"
-				value="publish"
-				class="admin-btn-primary"
-				disabled={uploading || submitting}
-			>
-				Publier
-			</button>
-		</div>
+		</details>
 	</div>
 
-	<aside class="xl:sticky xl:top-8">
+	<aside class="md:sticky md:top-6 xl:top-8">
 		<div class="mb-3 flex items-center justify-between px-1">
 			<p class="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500">
 				Aperçu en direct
@@ -393,6 +395,34 @@
 				</footer>
 			</div>
 		</article>
+
+		<div
+			class="action-bar sticky bottom-0 z-20 mt-4 grid grid-cols-2 gap-2 border border-stone-200 bg-[#faf8f3]/95 p-2 shadow-[0_-8px_24px_rgba(41,37,36,0.08)] backdrop-blur-sm xl:static xl:border-0 xl:bg-transparent xl:p-0 xl:shadow-none"
+		>
+			<button
+				type="submit"
+				name="intent"
+				value="draft"
+				class="admin-btn-secondary w-full justify-center px-3"
+				disabled={uploading || submitting}
+			>
+				{#if submitting}
+					Enregistrement…
+				{:else}
+					<span class="xl:hidden">Enregistrer</span>
+					<span class="hidden xl:inline">Enregistrer le brouillon</span>
+				{/if}
+			</button>
+			<button
+				type="submit"
+				name="intent"
+				value="publish"
+				class="admin-btn-primary w-full justify-center px-3"
+				disabled={uploading || submitting}
+			>
+				Publier
+			</button>
+		</div>
 
 		{#if data.recent.length}
 			<section class="mt-7 border-t border-stone-200 pt-5">
@@ -426,8 +456,8 @@
 <style>
 	.format-button {
 		display: inline-flex;
-		width: 2rem;
-		height: 2rem;
+		width: 2.75rem;
+		height: 2.75rem;
 		align-items: center;
 		justify-content: center;
 		border: 1px solid #e7e5e4;
@@ -439,6 +469,15 @@
 	.format-button:focus-visible {
 		border-color: #ff880c;
 		color: #9a4d00;
+	}
+	.links-section summary::-webkit-details-marker {
+		display: none;
+	}
+	.links-section[open] .links-chevron {
+		transform: rotate(180deg);
+	}
+	.links-chevron {
+		transition: transform 160ms ease;
 	}
 	.preview-card {
 		overflow: hidden;
@@ -459,7 +498,7 @@
 	}
 	.preview-empty {
 		display: grid;
-		min-height: 14rem;
+		min-height: 10rem;
 		place-items: center;
 		background: #eeeae2;
 		color: #a8a29e;
@@ -539,5 +578,15 @@
 		font-weight: 700;
 		color: #9a4d00;
 		background: #fff7ed;
+	}
+	@media (min-width: 640px) {
+		.preview-empty {
+			min-height: 14rem;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.links-chevron {
+			transition: none;
+		}
 	}
 </style>
