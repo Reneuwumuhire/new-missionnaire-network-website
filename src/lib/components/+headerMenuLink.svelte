@@ -93,8 +93,8 @@
 						{#if image}
 							<img
 								src={image}
-								class="flex-shrink-0 w-8 h-8 object-cover border border-stone-200 grayscale opacity-80 transition-all duration-200 group-hover:grayscale-0 group-hover:opacity-100"
-								alt={$t(subName)}
+								class="h-9 w-9 flex-shrink-0 border border-stone-200 object-cover grayscale opacity-80 transition-all duration-200 group-hover:opacity-100 group-hover:grayscale-0"
+								alt=""
 							/>
 						{:else if icon}
 							<span

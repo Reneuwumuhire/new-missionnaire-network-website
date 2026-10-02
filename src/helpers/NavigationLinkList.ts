@@ -25,8 +25,6 @@ import FiInfo from 'svelte-icons-pack/fi/FiInfo';
 import FiMessageSquare from 'svelte-icons-pack/fi/FiMessageSquare';
 import FiMusic from 'svelte-icons-pack/fi/FiMusic';
 import FiPlayCircle from 'svelte-icons-pack/fi/FiPlayCircle';
-import FiUser from 'svelte-icons-pack/fi/FiUser';
-import FiUsers from 'svelte-icons-pack/fi/FiUsers';
 import FiVideo from 'svelte-icons-pack/fi/FiVideo';
 import type { TranslationKey } from '../i18n';
 
@@ -92,13 +90,13 @@ export const NavigationLinkList: NavigationLink[] = [
 				subName: 'nav.williamBranham',
 				subText: 'nav.sub.branhamBioText',
 				link: '/william-branham/biographie',
-				icon: FiUser
+				image: '/img/branham_icon.webp'
 			},
 			{
 				subName: 'nav.ewaldFrank',
 				subText: 'nav.sub.frankAboutText',
 				link: '/ewald-frank',
-				icon: FiUsers
+				image: '/img/ewald_frank_menu.png'
 			}
 		]
 	},

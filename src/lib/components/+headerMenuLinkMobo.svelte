@@ -77,7 +77,7 @@
 
 	{#if active && subMenu && subMenu.length > 0}
 		<div class="mobo-submenu flex flex-col ml-4 mb-3 border-l border-stone-200 pl-4">
-			{#each subMenu as { subName, link: subLink, subText, icon }, i (subName)}
+			{#each subMenu as { subName, link: subLink, subText, image, icon }, i (subName)}
 				{@const isSubActive =
 					$page.url.pathname === subLink || $page.url.pathname.startsWith(subLink + '/')}
 				<a
@@ -87,7 +87,13 @@
 						closeMenuFrom();
 					}}
 				>
-					{#if icon}
+					{#if image}
+						<img
+							src={image}
+							class="mt-0.5 h-8 w-8 shrink-0 border border-stone-200 object-cover grayscale opacity-80"
+							alt=""
+						/>
+					{:else if icon}
 						<span
 							class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center border transition-colors duration-200 {isSubActive
 								? 'border-orange-200 bg-orange-50 text-missionnaire'
