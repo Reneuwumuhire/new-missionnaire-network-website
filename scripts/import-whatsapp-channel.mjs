@@ -17,8 +17,22 @@ const sources = {
 	d89a4a123b14: krefeld1991(),
 	'8f9133bd1b0a': krefeld1991(),
 	f56804bc6516: krefeld1991(),
-	e94395921a66: zurich2023()
+	e94395921a66: zurich2023(),
+	eb06794ee58a: zurichAugust1991()
 };
+
+function zurichAugust1991() {
+	return {
+		title: 'La prophétie biblique de la fin des temps — Zurich, 25 août 1991',
+		links: [
+			{
+				label: 'Écouter la retransmission',
+				href: '/live/rediffusions/6abd477a1473609269a4fcb7',
+				kind: 'live'
+			}
+		]
+	};
+}
 
 function zurich1991() {
 	return {
