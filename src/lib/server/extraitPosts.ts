@@ -31,6 +31,43 @@ export function addMissingPdfLink(links: PublicationLink[], value: unknown): Pub
 	return href ? [...links, { label: 'Lire le PDF', href, kind: 'pdf' }] : links;
 }
 
+export function recordingSourceFromLinks(
+	links: PublicationLink[]
+): PublicationPost['source'] | null {
+	const href = links.find(({ kind }) => kind === 'live')?.href;
+	if (!href) return null;
+	try {
+		const match = new URL(href, 'https://missionnaire.net').pathname.match(
+			/^\/live\/rediffusions\/([a-f\d]{24})$/i
+		);
+		return match ? { kind: 'recording', id: match[1] } : null;
+	} catch {
+		return null;
+	}
+}
+
+export function addMissingRecordingLinks(
+	links: PublicationLink[],
+	videoId: unknown,
+	pdfUrl: unknown
+): PublicationLink[] {
+	let updated = links;
+	if (typeof videoId === 'string' && videoId && !links.some(({ kind }) => kind === 'video')) {
+		updated = [
+			...updated,
+			{ label: 'Voir la vidéo', href: `/videos?v=${encodeURIComponent(videoId)}`, kind: 'video' }
+		];
+	}
+	updated = addMissingPdfLink(updated, pdfUrl);
+	return updated.some(({ kind }) => kind === 'pdf')
+		? updated.map((link) =>
+				link.kind === 'live' && link.label === 'Écouter la retransmission'
+					? { ...link, label: 'Écouter et lire la transcription' }
+					: link
+			)
+		: updated;
+}
+
 function decodeHtmlEntities(value: string): string {
 	return value.replace(/&(?:#(\d+)|#x([\da-f]+)|amp|lt|gt|quot|apos);/gi, (entity, dec, hex) => {
 		if (dec) return String.fromCodePoint(Number(dec));
@@ -72,6 +109,10 @@ export function whatsappTextFromHtml(value: string): string {
 
 export async function getExtraitFeed() {
 	let managedPosts: PublicationPost[] = [];
+	let archivedPosts: PublicationPost[] = (archive.posts as PublicationPost[]).map((post) => ({
+		...post,
+		source: post.source ?? recordingSourceFromLinks(post.links)
+	}));
 	try {
 		const db = await getDb();
 		const rows = await db
@@ -94,18 +135,21 @@ export async function getExtraitFeed() {
 			source: post.source
 		}));
 
-		const missingPdfSources = managedPosts.filter(
+		const linkedPosts = [...managedPosts, ...archivedPosts].filter(
 			(post) =>
 				post.source &&
 				ObjectId.isValid(post.source.id) &&
-				!post.links.some(({ kind }) => kind === 'pdf')
+				(!post.links.some(({ kind }) => kind === 'pdf') ||
+					(post.source.kind === 'recording' && !post.links.some(({ kind }) => kind === 'video')))
 		);
-		const sermonIds = missingPdfSources
-			.filter(({ source }) => source?.kind === 'sermon')
-			.map(({ source }) => new ObjectId(source!.id));
-		const recordingIds = missingPdfSources
-			.filter(({ source }) => source?.kind === 'recording')
-			.map(({ source }) => new ObjectId(source!.id));
+		const sourceIds = (kind: 'sermon' | 'recording') =>
+			[
+				...new Set(
+					linkedPosts.filter(({ source }) => source?.kind === kind).map(({ source }) => source!.id)
+				)
+			].map((id) => new ObjectId(id));
+		const sermonIds = sourceIds('sermon');
+		const recordingIds = sourceIds('recording');
 		const [sermons, recordings] = await Promise.all([
 			sermonIds.length
 				? db
@@ -123,7 +167,9 @@ export async function getExtraitFeed() {
 						.toArray()
 				: []
 		]);
-		const pdfBySource = new Map(sermons.map((sermon) => [sermon._id.toString(), sermon.pdf_url]));
+		const resourcesBySource = new Map<string, { pdf?: unknown; videoId?: unknown }>(
+			sermons.map((sermon) => [sermon._id.toString(), { pdf: sermon.pdf_url }])
+		);
 		await Promise.all(
 			recordings.map(async (recording) => {
 				const transcript = await getTranscriptForRecording({
@@ -131,18 +177,29 @@ export async function getExtraitFeed() {
 					source_video_id: recording.source_video_id ?? null,
 					started_at: recording.started_at?.toISOString?.() ?? recording.started_at ?? null
 				});
-				if (transcript) pdfBySource.set(recording._id.toString(), transcript.url);
+				resourcesBySource.set(recording._id.toString(), {
+					pdf: transcript?.url,
+					videoId: recording.source_video_id
+				});
 			})
 		);
-		managedPosts = managedPosts.map((post) => ({
-			...post,
-			links: addMissingPdfLink(post.links, post.source && pdfBySource.get(post.source.id))
-		}));
+		const enrich = (post: PublicationPost): PublicationPost => {
+			const resources = post.source && resourcesBySource.get(post.source.id);
+			return {
+				...post,
+				links:
+					post.source?.kind === 'recording'
+						? addMissingRecordingLinks(post.links, resources?.videoId, resources?.pdf)
+						: addMissingPdfLink(post.links, resources?.pdf)
+			};
+		};
+		managedPosts = managedPosts.map(enrich);
+		archivedPosts = archivedPosts.map(enrich);
 	} catch (cause) {
 		console.error('[Extraits] Managed posts unavailable:', cause);
 	}
 
-	const allPosts = [...managedPosts, ...(archive.posts as PublicationPost[])];
+	const allPosts = [...managedPosts, ...archivedPosts];
 	let engagementByPost = new Map<string, PublicationEngagement>();
 	try {
 		engagementByPost = await getPublicationEngagement([...new Set(allPosts.map(({ id }) => id))]);
