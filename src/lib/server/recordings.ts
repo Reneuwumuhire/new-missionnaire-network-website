@@ -13,6 +13,22 @@ const RECORDING_LIST_PROJECTION = {
 	size_bytes: 1,
 	thumbnail_url: 1
 } as const;
+const RECORDING_DETAIL_PROJECTION = {
+	...RECORDING_LIST_PROJECTION,
+	description: 1,
+	source_video_id: 1,
+	transcript_pdf_id: 1,
+	view_count: 1,
+	subtitle_srt_url: 1,
+	subtitle_srt_s3_key: 1,
+	subtitle_filename: 1,
+	subtitle_offset_into_recording_ms: 1,
+	subtitles_hidden: 1,
+	french_audio_s3_url: 1,
+	french_audio_size_bytes: 1,
+	french_audio_duration_sec: 1,
+	original_audio_language: 1
+} as const;
 const RECORDING_LIST_INDEX = {
 	started_at: 'published_recording_list_by_date_v2',
 	title: 'published_recording_list_by_title_v2',
@@ -509,7 +525,7 @@ export async function getPublishedById(id: string): Promise<PublishedRecording |
 				published: true,
 				status: 'ready'
 			},
-			{ projection: RECORDING_LIST_PROJECTION }
+			{ projection: RECORDING_DETAIL_PROJECTION }
 		)) as unknown as RecordingRow | null;
 		return row ? toPublic(row) : null;
 	} catch (err) {
