@@ -39,10 +39,11 @@ const en: Record<keyof typeof fr, string> = {
 	'nav.sub.extraitsText': 'Read the complete posts from our channel.',
 
 	// ── Channel posts ──────────────────────────────────────────
-	'publications.eyebrow': 'The channel on our website',
-	'publications.title': 'Shared passages',
+	'publications.eyebrow': 'WhatsApp channel',
+	'publications.title': 'SERMON TRANSCRIPTIONS',
 	'publications.introduction':
-		'Selected passages from sermons and broadcasts, accompanied by their source for reading, listening, and sharing.',
+		'This channel mainly shares excerpts from sermon transcripts by Brother William Marrion Branham, as well as sermon excerpts from Brother Ewald Frank, in French.',
+	'publications.blessing': 'MAY GOD BLESS YOU!',
 	'publications.countOne': '{count} post',
 	'publications.countMany': '{count} posts',
 	'publications.openWhatsapp': 'Open in WhatsApp',

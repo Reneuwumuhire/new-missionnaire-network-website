@@ -259,6 +259,7 @@
 		<p class="introduction">
 			{$t('publications.introduction')}
 		</p>
+		<p class="channel-blessing">{$t('publications.blessing')}</p>
 		<div class="hero-meta">
 			<span
 				>{$t(data.posts.length === 1 ? 'publications.countOne' : 'publications.countMany', {
@@ -519,6 +520,13 @@
 		font-size: 0.94rem;
 		line-height: 1.55;
 		color: #57534e;
+	}
+
+	.channel-blessing {
+		margin: 0.6rem 0 0;
+		font-size: 0.88rem;
+		font-weight: 700;
+		color: #292524;
 	}
 
 	.hero-meta {
