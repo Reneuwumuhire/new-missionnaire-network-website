@@ -38,10 +38,11 @@ export default {
 	'nav.sub.extraitsText': 'Retrouvez les publications complètes de notre canal.',
 
 	// ── Publications du canal ──────────────────────────────────
-	'publications.eyebrow': 'Le canal sur le site',
-	'publications.title': 'Paroles partagées',
+	'publications.eyebrow': 'Canal WhatsApp',
+	'publications.title': 'TRANSCRIPTION DES PRÉDICATIONS',
 	'publications.introduction':
-		'Des passages choisis de prédications et de retransmissions, accompagnés de leur source pour les lire, les écouter et les partager.',
+		'Cette chaîne publiera principalement les extraits des transcriptions des prédications de Frère William Marrion BRANHAM et les extraits des prédications de Frère Ewald Frank en français.',
+	'publications.blessing': 'QUE DIEU VOUS BÉNISSE !',
 	'publications.countOne': '{count} publication',
 	'publications.countMany': '{count} publications',
 	'publications.openWhatsapp': 'Ouvrir dans WhatsApp',
