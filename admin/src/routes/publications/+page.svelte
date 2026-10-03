@@ -272,7 +272,7 @@
 		</p>
 	</div>
 	<a
-		href="https://missionnaire.net/extraits"
+		href="https://missionnaire.net/publications"
 		target="_blank"
 		rel="noreferrer"
 		class="admin-btn-secondary h-11 justify-center sm:h-9"
@@ -705,13 +705,13 @@
 							</div>
 							<div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs font-semibold">
 								<a
-									href={`/extraits?edit=${post.id}`}
+									href={`/publications?edit=${post.id}`}
 									data-sveltekit-reload
 									class="text-stone-600 hover:text-primary">{$t('extraits.edit')}</a
 								>
 								{#if post.status === 'published'}
 									<a
-										href={`https://missionnaire.net/extraits/${post.id}`}
+										href={`https://missionnaire.net/publications/${post.id}`}
 										target="_blank"
 										rel="noreferrer"
 										class="text-stone-600 hover:text-primary">{$t('extraits.view')}</a

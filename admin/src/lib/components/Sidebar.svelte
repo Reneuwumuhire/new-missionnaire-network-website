@@ -43,7 +43,7 @@
 			? [{ href: '/audio', labelKey: 'nav.audioLibrary' as const, icon: 'music' }]
 			: []),
 		...(user.canManageExtraits
-			? [{ href: '/extraits', labelKey: 'nav.extraits' as const, icon: 'extraits' }]
+			? [{ href: '/publications', labelKey: 'nav.extraits' as const, icon: 'extraits' }]
 			: []),
 		...(user.canReviewLyrics
 			? [{ href: '/lyrics-review', labelKey: 'nav.lyricsReview' as const, icon: 'lyrics' }]

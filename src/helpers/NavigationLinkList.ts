@@ -64,7 +64,7 @@ export const NavigationLinkList: NavigationLink[] = [
 			{
 				subName: 'nav.extraits',
 				subText: 'nav.sub.extraitsText',
-				link: '/extraits',
+				link: '/publications',
 				icon: FiMessageSquare
 			},
 			{

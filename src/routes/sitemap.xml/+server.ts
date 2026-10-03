@@ -133,7 +133,7 @@ export async function GET() {
 		'/predications',
 		'/musique',
 		'/transcriptions',
-		'/extraits',
+		'/publications',
 		'/william-branham/biographie',
 		'/videos',
 		'/live',

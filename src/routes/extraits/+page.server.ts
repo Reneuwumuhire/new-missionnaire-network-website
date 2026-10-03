@@ -1,16 +1,6 @@
-import { pageMeta } from '$lib/seo';
-import { getExtraitFeed } from '$lib/server/extraitPosts';
+import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async () => {
-	const feed = await getExtraitFeed();
-
-	return {
-		...feed,
-		meta: pageMeta('/extraits', {
-			title: 'Extraits des prédications | Missionnaire Network',
-			description:
-				'Retrouvez les extraits publiés sur notre canal, avec leurs images et les liens vers les prédications, retransmissions, vidéos et PDF.'
-		})
-	};
+export const load: PageServerLoad = ({ url }) => {
+	redirect(308, `/publications${url.search}`);
 };
