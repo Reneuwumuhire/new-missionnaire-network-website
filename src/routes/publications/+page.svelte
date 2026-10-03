@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
 	import { focusTrap } from '$lib/actions/focusTrap';
-	import { locale, t } from '../../i18n';
+	import { locale, t, type TranslationKey } from '../../i18n';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
-	import BsLink45deg from 'svelte-icons-pack/bs/BsLink45deg';
+	import RiSystemEyeLine from 'svelte-icons-pack/ri/RiSystemEyeLine';
 	import RiSystemShareForwardLine from 'svelte-icons-pack/ri/RiSystemShareForwardLine';
 	import type { PageData } from './$types';
 
@@ -21,6 +21,32 @@
 	let visibleCount = $state(PAGE_SIZE);
 	let visiblePosts = $derived(data.posts.slice(0, visibleCount));
 	let hasMore = $derived(visibleCount < data.posts.length);
+	type Reaction = 'like' | 'heart' | 'laugh' | 'wow' | 'sad' | 'pray';
+	const reactionOptions: { id: Reaction; emoji: string; label: TranslationKey }[] = [
+		{ id: 'like', emoji: '👍', label: 'publications.reactLike' },
+		{ id: 'heart', emoji: '❤️', label: 'publications.reactHeart' },
+		{ id: 'laugh', emoji: '😂', label: 'publications.reactLaugh' },
+		{ id: 'wow', emoji: '😮', label: 'publications.reactWow' },
+		{ id: 'sad', emoji: '😢', label: 'publications.reactSad' },
+		{ id: 'pray', emoji: '🙏', label: 'publications.reactPray' }
+	];
+	let openReactionPostId = $state<string | null>(null);
+	let openReactionSummaryPostId = $state<string | null>(null);
+	function initialEngagement() {
+		return Object.fromEntries(
+			data.posts.map((post) => [
+				post.id,
+				{
+					views: post.engagement.views,
+					shares: post.engagement.shares,
+					reactions: { ...post.engagement.reactions }
+				}
+			])
+		);
+	}
+	let engagement = $state(initialEngagement());
+	let selectedReactions = $state<Record<string, Reaction | undefined>>({});
+	let pendingReactions = $state<Record<string, boolean>>({});
 
 	let dateFormatter = $derived(
 		new Intl.DateTimeFormat($locale === 'fr' ? 'fr-FR' : 'en-GB', {
@@ -64,6 +90,16 @@
 
 	onMount(() => {
 		hasNativeShare = typeof navigator.share === 'function';
+		for (const post of data.posts) {
+			try {
+				const reaction = localStorage.getItem(`publication-reaction:${post.id}`);
+				if (reactionOptions.some(({ id }) => id === reaction)) {
+					selectedReactions[post.id] = reaction as Reaction;
+				}
+			} catch {
+				/* Storage can be blocked in private mode. */
+			}
+		}
 		const id = window.location.hash.slice(1);
 		const targetIndex = data.posts.findIndex((post) => post.id === id);
 		if (targetIndex < visibleCount) return;
@@ -75,12 +111,113 @@
 		return `${window.location.origin}/publications/${encodeURIComponent(id)}`;
 	}
 
+	async function syncEngagement(postId: string, body: Record<string, unknown>) {
+		try {
+			const response = await fetch(`/api/publications/${encodeURIComponent(postId)}/engagement`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify(body),
+				keepalive: true
+			});
+			if (response.ok) engagement[postId] = await response.json();
+		} catch {
+			/* Engagement is best-effort and never interrupts reading. */
+		}
+	}
+
+	function trackPostView(node: HTMLElement, postId: string) {
+		const countView = () => {
+			const key = `publication-viewed:${postId}`;
+			try {
+				if (localStorage.getItem(key) === '1') return;
+				localStorage.setItem(key, '1');
+			} catch {
+				/* Count once for this mount when local storage is unavailable. */
+			}
+			engagement[postId].views += 1;
+			void syncEngagement(postId, { action: 'view' });
+		};
+		if (!('IntersectionObserver' in window)) {
+			countView();
+			return;
+		}
+		const observer = new IntersectionObserver(
+			([entry]) => {
+				if (!entry.isIntersecting) return;
+				observer.disconnect();
+				countView();
+			},
+			{ threshold: 0.5 }
+		);
+		observer.observe(node);
+		return { destroy: () => observer.disconnect() };
+	}
+
+	function recordShare(postId: string) {
+		engagement[postId].shares += 1;
+		void syncEngagement(postId, { action: 'share' });
+	}
+
+	async function toggleReaction(postId: string, reaction: Reaction) {
+		if (pendingReactions[postId]) return;
+		pendingReactions[postId] = true;
+		const previous = selectedReactions[postId];
+		const next = previous === reaction ? undefined : reaction;
+		if (previous) {
+			engagement[postId].reactions[previous] = Math.max(
+				0,
+				engagement[postId].reactions[previous] - 1
+			);
+		}
+		if (next) engagement[postId].reactions[next] += 1;
+		selectedReactions[postId] = next;
+		try {
+			if (next) localStorage.setItem(`publication-reaction:${postId}`, next);
+			else localStorage.removeItem(`publication-reaction:${postId}`);
+		} catch {
+			/* The reaction still works for this page view. */
+		}
+		await syncEngagement(postId, { action: 'reaction', reaction: next, previous });
+		pendingReactions[postId] = false;
+	}
+
+	function formatCount(value: number) {
+		return value.toLocaleString($locale === 'fr' ? 'fr-FR' : 'en-GB');
+	}
+
+	function totalReactions(postId: string) {
+		return reactionOptions.reduce((total, { id }) => total + engagement[postId].reactions[id], 0);
+	}
+
+	function shownReactions(postId: string) {
+		return reactionOptions.filter(({ id }) => engagement[postId].reactions[id] > 0);
+	}
+
+	function toggleReactionSummary(postId: string) {
+		if (totalReactions(postId) === 0) {
+			openReactionSummaryPostId = null;
+			openReactionPostId = openReactionPostId === postId ? null : postId;
+			return;
+		}
+		openReactionPostId = null;
+		openReactionSummaryPostId = openReactionSummaryPostId === postId ? null : postId;
+	}
+
+	function openCardReactions(event: MouseEvent, postId: string) {
+		if (event.target instanceof Element && event.target.closest('a, button')) return;
+		event.stopPropagation();
+		openReactionSummaryPostId = null;
+		openReactionPostId = openReactionPostId === postId ? null : postId;
+	}
+
 	function toggleShareMenu(id: string) {
 		openSharePostId = openSharePostId === id ? null : id;
 	}
 
-	function closeShareMenu() {
+	function closeMenus() {
 		openSharePostId = null;
+		openReactionPostId = null;
+		openReactionSummaryPostId = null;
 	}
 
 	function flashShareFeedback(postId: string, state: 'copied' | 'error') {
@@ -89,18 +226,8 @@
 		copyResetTimer = setTimeout(() => (shareFeedback = null), 2000);
 	}
 
-	async function copyShareLink(post: (typeof data.posts)[number]) {
-		closeShareMenu();
-		try {
-			await navigator.clipboard.writeText(postUrl(post.id));
-			flashShareFeedback(post.id, 'copied');
-		} catch {
-			flashShareFeedback(post.id, 'error');
-		}
-	}
-
 	async function nativeShare(post: (typeof data.posts)[number]) {
-		closeShareMenu();
+		closeMenus();
 		const url = postUrl(post.id);
 		try {
 			await navigator.share({
@@ -108,6 +235,7 @@
 				text: post.shareText || post.text,
 				url
 			});
+			recordShare(post.id);
 			return;
 		} catch (error) {
 			if (error instanceof DOMException && error.name === 'AbortError') return;
@@ -115,6 +243,7 @@
 
 		try {
 			await navigator.clipboard.writeText(`${post.shareText || post.text}\n\n${url}`);
+			recordShare(post.id);
 			flashShareFeedback(post.id, 'copied');
 		} catch {
 			flashShareFeedback(post.id, 'error');
@@ -123,9 +252,9 @@
 </script>
 
 <svelte:window
-	onclick={closeShareMenu}
+	onclick={closeMenus}
 	onkeydown={(event) => {
-		if (event.key === 'Escape') closeShareMenu();
+		if (event.key === 'Escape') closeMenus();
 	}}
 />
 
@@ -155,7 +284,15 @@
 				<div class="date-divider"><span>{dateLabel(post.publishedAt)}</span></div>
 			{/if}
 
-			<article id={post.id} class="post">
+			<!-- The card click is a pointer shortcut; the reaction summary remains keyboard accessible. -->
+			<!-- svelte-ignore a11y_click_events_have_key_events -->
+			<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+			<article
+				id={post.id}
+				class="post"
+				use:trackPostView={post.id}
+				onclick={(event) => openCardReactions(event, post.id)}
+			>
 				<figure>
 					<img
 						src={post.image}
@@ -186,6 +323,94 @@
 						</nav>
 					{/if}
 
+					<div class="engagement-bar" aria-label={$t('publications.engagement')}>
+						<div class="reaction-zone">
+							<button
+								type="button"
+								class="reaction-summary"
+								onclick={(event) => {
+									event.stopPropagation();
+									toggleReactionSummary(post.id);
+								}}
+								aria-expanded={openReactionSummaryPostId === post.id ||
+									openReactionPostId === post.id}
+								aria-label={$t('publications.reactionCount', { count: totalReactions(post.id) })}
+							>
+								{#if totalReactions(post.id)}
+									<span class="reaction-stack" aria-hidden="true">
+										{#each shownReactions(post.id).slice(0, 3) as reaction}
+											<span>{reaction.emoji}</span>
+										{/each}
+									</span>
+									<strong>{formatCount(totalReactions(post.id))}</strong>
+								{:else}
+									<span class="add-reaction" aria-hidden="true">☺</span>
+								{/if}
+							</button>
+
+							{#if openReactionSummaryPostId === post.id}
+								<div class="reaction-breakdown">
+									<strong
+										>{$t('publications.reactionCount', { count: totalReactions(post.id) })}</strong
+									>
+									<div>
+										{#each shownReactions(post.id) as reaction}
+											<button
+												type="button"
+												class:reaction-selected={selectedReactions[post.id] === reaction.id}
+												disabled={pendingReactions[post.id]}
+												onclick={() => toggleReaction(post.id, reaction.id)}
+												aria-label={$t(reaction.label)}
+											>
+												<span aria-hidden="true">{reaction.emoji}</span>
+												{formatCount(engagement[post.id].reactions[reaction.id])}
+											</button>
+										{/each}
+									</div>
+								</div>
+							{:else}
+								<div class="reaction-picker" class:picker-open={openReactionPostId === post.id}>
+									{#each reactionOptions as reaction}
+										<button
+											type="button"
+											class:reaction-selected={selectedReactions[post.id] === reaction.id}
+											disabled={pendingReactions[post.id]}
+											onclick={() => {
+												void toggleReaction(post.id, reaction.id);
+												openReactionPostId = null;
+											}}
+											aria-pressed={selectedReactions[post.id] === reaction.id}
+											aria-label={$t(reaction.label)}
+											title={$t(reaction.label)}
+										>
+											<span aria-hidden="true">{reaction.emoji}</span>
+										</button>
+									{/each}
+								</div>
+							{/if}
+						</div>
+						<div class="engagement-counts">
+							<span
+								title={$t('publications.views')}
+								aria-label={$t('publications.viewCount', {
+									count: engagement[post.id].views
+								})}
+							>
+								{formatCount(engagement[post.id].views)}
+								<Icon src={RiSystemEyeLine} size="15" />
+							</span>
+							<span
+								title={$t('publications.reshares')}
+								aria-label={$t('publications.reshareCount', {
+									count: engagement[post.id].shares
+								})}
+							>
+								{formatCount(engagement[post.id].shares)}
+								<Icon src={RiSystemShareForwardLine} size="15" />
+							</span>
+						</div>
+					</div>
+
 					<footer class="post-meta">
 						<span class="source-title">{post.sourceTitle}</span>
 						<div class="post-actions">
@@ -197,10 +422,11 @@
 									class="share-button"
 									onclick={(event) => {
 										event.stopPropagation();
-										toggleShareMenu(post.id);
+										if (hasNativeShare) toggleShareMenu(post.id);
+										else void nativeShare(post);
 									}}
-									aria-haspopup="menu"
-									aria-expanded={openSharePostId === post.id}
+									aria-haspopup={hasNativeShare ? 'menu' : undefined}
+									aria-expanded={hasNativeShare && openSharePostId === post.id}
 									aria-label={$t('publications.shareFor', { date: dateLabel(post.publishedAt) })}
 									title={$t('publications.share')}
 								>
@@ -208,25 +434,19 @@
 									<span>{$t('publications.share')}</span>
 								</button>
 
-								{#if openSharePostId === post.id}
+								{#if hasNativeShare && openSharePostId === post.id}
 									<!-- svelte-ignore a11y_click_events_have_key_events -->
 									<!-- svelte-ignore a11y_no_static_element_interactions -->
 									<div
 										class="share-menu"
 										role="menu"
 										tabindex="-1"
-										use:focusTrap={{ onEscape: closeShareMenu }}
+										use:focusTrap={{ onEscape: closeMenus }}
 										onclick={(event) => event.stopPropagation()}
 									>
-										{#if hasNativeShare}
-											<button type="button" role="menuitem" onclick={() => nativeShare(post)}>
-												<Icon src={RiSystemShareForwardLine} size="17" />
-												<span>{$t('publications.shareNative')}</span>
-											</button>
-										{/if}
-										<button type="button" role="menuitem" onclick={() => copyShareLink(post)}>
-											<Icon src={BsLink45deg} size="18" />
-											<span>{$t('publications.copyLink')}</span>
+										<button type="button" role="menuitem" onclick={() => nativeShare(post)}>
+											<Icon src={RiSystemShareForwardLine} size="17" />
+											<span>{$t('publications.shareNative')}</span>
 										</button>
 									</div>
 								{/if}
@@ -435,12 +655,208 @@
 		color: #7c2d12;
 	}
 
+	.engagement-bar {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.65rem;
+		margin-top: 0.65rem;
+		padding-top: 0.55rem;
+		border-top: 1px solid #eeeae3;
+	}
+
+	.reaction-zone,
+	.engagement-counts {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+	}
+
+	.reaction-zone {
+		position: relative;
+	}
+
+	.reaction-summary {
+		display: inline-flex;
+		min-width: 32px;
+		min-height: 32px;
+		align-items: center;
+		justify-content: center;
+		gap: 0.38rem;
+		padding: 0.25rem 0.48rem;
+		border: 1px solid #e7e5e4;
+		border-radius: 999px;
+		font: inherit;
+		font-size: 0.72rem;
+		font-weight: 700;
+		color: #57534e;
+		background: #fafaf9;
+		cursor: pointer;
+	}
+
+	.reaction-summary:hover,
+	.reaction-summary:focus-visible {
+		border-color: #a8a29e;
+		color: #292524;
+		background: #e7e5e4;
+		outline: none;
+	}
+
+	.reaction-summary:focus-visible,
+	.reaction-picker button:focus-visible,
+	.reaction-breakdown button:focus-visible {
+		box-shadow:
+			0 0 0 2px #fff,
+			0 0 0 4px rgb(255 136 12 / 55%);
+		outline: none;
+	}
+
+	.add-reaction {
+		font-size: 1rem;
+		line-height: 1;
+	}
+
+	.reaction-stack {
+		display: inline-flex;
+	}
+
+	.reaction-stack span {
+		width: 1.15rem;
+		height: 1.15rem;
+		margin-left: -0.2rem;
+		border: 1px solid #fff;
+		border-radius: 999px;
+		font-size: 0.76rem;
+		line-height: 1rem;
+		background: #fff;
+	}
+
+	.reaction-stack span:first-child {
+		margin-left: 0;
+	}
+
+	.reaction-picker,
+	.reaction-breakdown {
+		position: absolute;
+		bottom: calc(100% + 0.5rem);
+		left: 0;
+		z-index: 20;
+		border: 1px solid #292524;
+		border-radius: 1.25rem;
+		color: #fff;
+		background: #1c1917;
+		box-shadow: 0 12px 28px rgb(28 25 23 / 28%);
+	}
+
+	.reaction-picker {
+		display: flex;
+		gap: 0.08rem;
+		padding: 0.3rem;
+		opacity: 0;
+		pointer-events: none;
+		transform: translateY(0.25rem) scale(0.96);
+		transform-origin: bottom left;
+		transition:
+			opacity 120ms ease,
+			transform 120ms ease;
+	}
+
+	.post:hover .reaction-picker,
+	.post:focus-within .reaction-picker,
+	.reaction-picker.picker-open {
+		opacity: 1;
+		pointer-events: auto;
+		transform: none;
+	}
+
+	.reaction-picker button {
+		display: grid;
+		width: 38px;
+		height: 38px;
+		padding: 0;
+		border: 0;
+		border-radius: 999px;
+		place-items: center;
+		font: inherit;
+		font-size: 1.35rem;
+		background: transparent;
+		cursor: pointer;
+		transition:
+			transform 100ms ease,
+			background-color 100ms ease;
+	}
+
+	.reaction-picker button:hover,
+	.reaction-picker button.reaction-selected {
+		background: #44403c;
+		transform: translateY(-0.18rem) scale(1.12);
+	}
+
+	.reaction-breakdown {
+		width: 14rem;
+		padding: 0.75rem;
+		border-radius: 0.65rem;
+	}
+
+	.reaction-breakdown > strong {
+		display: block;
+		margin-bottom: 0.55rem;
+		font-size: 0.78rem;
+	}
+
+	.reaction-breakdown > div {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem;
+	}
+
+	.reaction-breakdown button {
+		display: inline-flex;
+		min-height: 34px;
+		align-items: center;
+		gap: 0.32rem;
+		padding: 0.25rem 0.52rem;
+		border: 1px solid #57534e;
+		border-radius: 999px;
+		font: inherit;
+		font-size: 0.72rem;
+		font-weight: 700;
+		color: #f5f5f4;
+		background: #292524;
+		cursor: pointer;
+	}
+
+	.reaction-breakdown button:hover,
+	.reaction-breakdown button.reaction-selected {
+		border-color: #f59e0b;
+		background: #44403c;
+	}
+
+	.reaction-picker button:disabled,
+	.reaction-breakdown button:disabled {
+		cursor: wait;
+		opacity: 0.65;
+	}
+
+	.engagement-counts {
+		gap: 0.65rem;
+		font-size: 0.69rem;
+		font-variant-numeric: tabular-nums;
+		color: #78716c;
+	}
+
+	.engagement-counts span {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.25rem;
+	}
+
 	.post-meta {
 		display: flex;
 		justify-content: space-between;
 		gap: 0.75rem;
 		align-items: flex-end;
-		margin-top: 0.55rem;
+		margin-top: 0.45rem;
 		font-size: 0.66rem;
 		line-height: 1.35;
 		color: #78716c;
@@ -536,10 +952,6 @@
 		cursor: pointer;
 	}
 
-	.share-menu button + button {
-		border-top: 1px solid #e7e5e4;
-	}
-
 	.share-menu button:hover,
 	.share-menu button:focus-visible {
 		color: var(--color-missionnaire);
@@ -593,6 +1005,13 @@
 		text-align: center;
 		font-size: 0.72rem;
 		color: #a8a29e;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.reaction-picker,
+		.reaction-picker button {
+			transition: none;
+		}
 	}
 
 	@media (max-width: 640px) {
