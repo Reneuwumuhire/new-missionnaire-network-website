@@ -23,7 +23,7 @@
 	// Menu tab instead of being buried in the hamburger menu.
 	const sections = $derived([
 		{ label: $t('nav.questions'), href: '/questions', icon: BsChatDots },
-		{ label: $t('nav.extraits'), href: '/extraits', icon: BsChatQuote },
+		{ label: $t('nav.extraits'), href: '/publications', icon: BsChatQuote },
 		{ label: $t('nav.videos'), href: '/videos', icon: BsCameraVideo },
 		{ label: $t('nav.literature'), href: '/literature', icon: BsBook },
 		{ label: $t('nav.eglise'), href: '/eglise', icon: BsHouseDoor },

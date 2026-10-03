@@ -4,6 +4,7 @@
 	import type { ActionData, PageData } from './$types';
 	import { whatsappToHtml } from '$lib/whatsapp-format';
 	import { selectedSourceValues, type ExtraitSourceSuggestion } from '$lib/extrait-source';
+	import { t } from '$lib/i18n';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 	const initial = untrack(() => ({
@@ -56,26 +57,26 @@
 	let submitting = $state(false);
 	let uploadError = $state('');
 
-	let bodyHtml = $derived(whatsappToHtml(body || 'Votre extrait apparaîtra ici.'));
+	let bodyHtml = $derived(whatsappToHtml(body || $t('extraits.bodyFallback')));
 	let previewLinks = $derived(
 		[
-			{ label: 'Voir la prédication', href: sermonUrl },
-			{ label: 'Écouter la retransmission', href: liveUrl },
-			{ label: 'Voir la vidéo', href: videoUrl },
-			{ label: 'Lire le PDF', href: pdfUrl },
-			{ label: 'Écouter l’audio', href: audioUrl },
-			{ label: 'Lire la transcription', href: transcriptionUrl }
+			{ label: $t('extraits.viewSermon'), href: sermonUrl },
+			{ label: $t('extraits.listenRebroadcast'), href: liveUrl },
+			{ label: $t('extraits.viewVideo'), href: videoUrl },
+			{ label: $t('extraits.readPdf'), href: pdfUrl },
+			{ label: $t('extraits.listenAudio'), href: audioUrl },
+			{ label: $t('extraits.readTranscript'), href: transcriptionUrl }
 		].filter((link) => link.href)
 	);
 	let sourceGroups = $derived([
 		{
 			kind: 'sermon',
-			label: 'Prédications',
+			label: $t('extraits.sermons'),
 			items: sourceSuggestions.filter((source) => source.kind === 'sermon')
 		},
 		{
 			kind: 'recording',
-			label: 'Retransmissions',
+			label: $t('extraits.rebroadcasts'),
 			items: sourceSuggestions.filter((source) => source.kind === 'recording')
 		}
 	]);
@@ -90,12 +91,12 @@
 		return (
 			(
 				{
-					sermon: 'Prédication',
-					live: 'Retransmission',
-					video: 'Vidéo',
-					pdf: 'PDF',
-					audio: 'Audio',
-					transcription: 'Transcription'
+					sermon: $t('extraits.sermon'),
+					live: $t('extraits.rebroadcast'),
+					video: $t('extraits.video'),
+					pdf: $t('extraits.pdf'),
+					audio: $t('extraits.audio'),
+					transcription: $t('extraits.transcription')
 				} as Record<string, string>
 			)[kind] ?? kind
 		);
@@ -111,7 +112,7 @@
 			const response = await fetch(`/api/extraits/sources?q=${encodeURIComponent(query)}`, {
 				signal: controller.signal
 			});
-			if (!response.ok) throw new Error('La recherche est momentanément indisponible.');
+			if (!response.ok) throw new Error($t('extraits.searchUnavailable'));
 			const result = (await response.json()) as { suggestions: ExtraitSourceSuggestion[] };
 			if (query !== sourceSearch.trim()) return;
 			sourceSuggestions = result.suggestions;
@@ -120,7 +121,7 @@
 		} catch (cause) {
 			if (cause instanceof DOMException && cause.name === 'AbortError') return;
 			sourceSuggestions = [];
-			sourceSearchError = cause instanceof Error ? cause.message : 'La recherche a échoué.';
+			sourceSearchError = cause instanceof Error ? cause.message : $t('extraits.searchFailed');
 			sourceSearchOpen = true;
 		} finally {
 			if (sourceAbort === controller) sourceSearching = false;
@@ -197,7 +198,7 @@
 	async function quoteSelection() {
 		const start = bodyField.selectionStart;
 		const end = bodyField.selectionEnd;
-		const selection = body.slice(start, end) || 'Citation';
+		const selection = body.slice(start, end) || $t('extraits.quoteFallback');
 		const quoted = selection
 			.split('\n')
 			.map((line: string) => `> ${line}`)
@@ -228,7 +229,7 @@
 				body: JSON.stringify({ contentType: file.type, size: file.size })
 			});
 			if (!response.ok)
-				throw new Error((await response.text()) || 'Impossible de préparer l’image');
+				throw new Error((await response.text()) || $t('extraits.prepareImageError'));
 			const upload = (await response.json()) as {
 				uploadUrl: string;
 				key: string;
@@ -239,13 +240,13 @@
 				headers: { 'content-type': file.type },
 				body: file
 			});
-			if (!put.ok) throw new Error('L’envoi de l’image a échoué');
+			if (!put.ok) throw new Error($t('extraits.uploadImageError'));
 			imageUrl = upload.publicUrl;
 			imageKey = upload.key;
 		} catch (cause) {
 			imageUrl = '';
 			imageKey = '';
-			uploadError = cause instanceof Error ? cause.message : 'L’envoi de l’image a échoué';
+			uploadError = cause instanceof Error ? cause.message : $t('extraits.uploadImageError');
 		} finally {
 			uploading = false;
 			URL.revokeObjectURL(localPreview);
@@ -255,28 +256,28 @@
 </script>
 
 <svelte:head>
-	<title>{edit ? 'Modifier' : 'Nouvel'} extrait — Administration</title>
+	<title>{edit ? $t('extraits.pageTitleEdit') : $t('extraits.pageTitleNew')}</title>
 </svelte:head>
 
 <header class="mb-6 flex flex-col gap-4 sm:mb-7 sm:flex-row sm:items-end sm:justify-between">
 	<div>
 		<p class="mb-2 text-[10px] font-bold uppercase tracking-[0.22em] text-primary">
-			Canal WhatsApp
+			{$t('extraits.eyebrow')}
 		</p>
 		<h1 class="font-display text-3xl font-semibold leading-none text-stone-800 sm:text-4xl">
-			{edit ? 'Modifier l’extrait' : 'Nouvel extrait'}
+			{edit ? $t('extraits.editTitle') : $t('extraits.newTitle')}
 		</h1>
 		<p class="mt-2 text-sm text-stone-500">
-			Préparez la publication et vérifiez son rendu avant de la publier.
+			{$t('extraits.subtitle')}
 		</p>
 	</div>
 	<a
-		href="https://missionnaire.net/extraits"
+		href="https://missionnaire.net/publications"
 		target="_blank"
 		rel="noreferrer"
 		class="admin-btn-secondary h-11 justify-center sm:h-9"
 	>
-		Voir la page publique
+		{$t('extraits.viewPublicPage')}
 	</a>
 </header>
 
@@ -285,7 +286,7 @@
 		role="status"
 		class="mb-6 border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"
 	>
-		{data.saved === 'published' ? 'L’extrait est publié.' : 'Le brouillon est enregistré.'}
+		{data.saved === 'published' ? $t('extraits.savedPublished') : $t('extraits.savedDraft')}
 	</div>
 {/if}
 
@@ -295,10 +296,10 @@
 		class="mb-6 border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"
 	>
 		{data.managed === 'deleted'
-			? 'L’extrait a été supprimé.'
+			? $t('extraits.managedDeleted')
 			: data.managed === 'hidden'
-				? 'L’extrait est maintenant masqué.'
-				: 'L’extrait est de nouveau publié.'}
+				? $t('extraits.managedHidden')
+				: $t('extraits.managedPublished')}
 	</div>
 {/if}
 
@@ -332,11 +333,11 @@
 		<section class="border border-stone-200/70 bg-white/65 p-4 sm:p-6">
 			<div class="grid gap-5">
 				<div>
-					<label for="sourceSearch" class="admin-label">Trouver la source</label>
+					<label for="sourceSearch" class="admin-label">{$t('extraits.findSource')}</label>
 					{#if sourceKind && sourceId}
 						<div class="selected-source">
 							<div class="min-w-0 flex-1">
-								<p class="text-xs font-semibold text-primary">Source liée</p>
+								<p class="text-xs font-semibold text-primary">{$t('extraits.linkedSource')}</p>
 								<p class="mt-1 line-clamp-2 text-sm font-medium leading-5 text-stone-800">
 									{sourceTitle}
 								</p>
@@ -346,7 +347,9 @@
 									{/each}
 								</div>
 							</div>
-							<button type="button" class="source-change" onclick={changeSource}>Changer</button>
+							<button type="button" class="source-change" onclick={changeSource}
+								>{$t('extraits.change')}</button
+							>
 						</div>
 					{:else}
 						<div class="source-search-wrap">
@@ -359,7 +362,7 @@
 									id="sourceSearch"
 									class="admin-input !h-12 !pl-11 !pr-10"
 									value={sourceSearch}
-									placeholder="Titre de la prédication ou retransmission…"
+									placeholder={$t('extraits.sourcePlaceholder')}
 									autocomplete="off"
 									role="combobox"
 									aria-autocomplete="list"
@@ -375,7 +378,9 @@
 									}}
 									onblur={() => setTimeout(() => (sourceSearchOpen = false), 150)}
 								/>
-								{#if sourceSearching}<span class="source-spinner" aria-label="Recherche en cours"
+								{#if sourceSearching}<span
+										class="source-spinner"
+										aria-label={$t('extraits.searching')}
 									></span>{/if}
 							</div>
 
@@ -384,13 +389,13 @@
 									id="source-suggestions"
 									class="source-results"
 									role="listbox"
-									aria-label="Sources trouvées"
+									aria-label={$t('extraits.sourcesFound')}
 								>
 									{#if sourceSearchError}
 										<p role="alert" class="p-4 text-sm text-red-700">{sourceSearchError}</p>
 									{:else if !sourceSearching && !sourceSuggestions.length}
 										<p class="p-4 text-sm text-stone-500">
-											Aucune source trouvée. Essayez un autre mot.
+											{$t('extraits.noSourceFound')}
 										</p>
 									{:else}
 										{#each sourceGroups as group}
@@ -432,13 +437,13 @@
 							{/if}
 						</div>
 						<p class="mt-2 text-xs leading-5 text-stone-500">
-							Choisissez une source pour remplir automatiquement ses liens.
+							{$t('extraits.chooseSourceHelp')}
 						</p>
 					{/if}
 				</div>
 
 				<div>
-					<label for="sourceTitle" class="admin-label">Titre affiché</label>
+					<label for="sourceTitle" class="admin-label">{$t('extraits.displayTitle')}</label>
 					<input
 						id="sourceTitle"
 						name="sourceTitle"
@@ -446,12 +451,12 @@
 						required
 						maxlength="180"
 						bind:value={sourceTitle}
-						placeholder="Le Premier Sceau — 18 mars 1963"
+						placeholder={$t('extraits.displayTitlePlaceholder')}
 					/>
 				</div>
 
 				<div>
-					<label for="publishedAt" class="admin-label">Date et heure</label>
+					<label for="publishedAt" class="admin-label">{$t('extraits.dateTime')}</label>
 					<input
 						id="publishedAt"
 						name="publishedAt"
@@ -463,7 +468,7 @@
 				</div>
 
 				<div>
-					<label for="image" class="admin-label">Image</label>
+					<label for="image" class="admin-label">{$t('extraits.image')}</label>
 					<label
 						class="flex min-h-28 cursor-pointer items-center justify-center border border-dashed border-stone-300 bg-stone-50 px-5 text-center transition hover:border-primary hover:bg-orange-50/40"
 					>
@@ -476,10 +481,10 @@
 						/>
 						<span class="text-sm text-stone-600">
 							{uploading
-								? 'Envoi en cours…'
+								? $t('extraits.uploading')
 								: imageUrl
-									? 'Remplacer l’image'
-									: 'Choisir une image JPEG, PNG ou WebP'}
+									? $t('extraits.replaceImage')
+									: $t('extraits.chooseImage')}
 						</span>
 					</label>
 					{#if uploadError}<p class="mt-2 text-sm text-red-700">{uploadError}</p>{/if}
@@ -489,42 +494,42 @@
 					<div
 						class="mb-2 flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
 					>
-						<label for="body" class="admin-label !mb-0">Texte de l’extrait</label>
-						<div class="flex gap-1" aria-label="Mise en forme">
+						<label for="body" class="admin-label !mb-0">{$t('extraits.bodyLabel')}</label>
+						<div class="flex gap-1" aria-label={$t('extraits.formatting')}>
 							<button
 								type="button"
 								class="format-button font-bold"
 								onclick={() => wrap('*')}
-								aria-label="Mettre en gras"
-								title="Gras">B</button
+								aria-label={$t('extraits.boldAction')}
+								title={$t('extraits.bold')}>B</button
 							>
 							<button
 								type="button"
 								class="format-button italic"
 								onclick={() => wrap('_')}
-								aria-label="Mettre en italique"
-								title="Italique">I</button
+								aria-label={$t('extraits.italicAction')}
+								title={$t('extraits.italic')}>I</button
 							>
 							<button
 								type="button"
 								class="format-button line-through"
 								onclick={() => wrap('~')}
-								aria-label="Barrer le texte"
-								title="Barré">S</button
+								aria-label={$t('extraits.strikethroughAction')}
+								title={$t('extraits.strikethrough')}>S</button
 							>
 							<button
 								type="button"
 								class="format-button font-mono"
 								onclick={() => wrap('`')}
-								aria-label="Mettre en monospace"
-								title="Monospace">&lt;/&gt;</button
+								aria-label={$t('extraits.monospaceAction')}
+								title={$t('extraits.monospace')}>&lt;/&gt;</button
 							>
 							<button
 								type="button"
 								class="format-button"
 								onclick={quoteSelection}
-								aria-label="Mettre en citation"
-								title="Citation">❯</button
+								aria-label={$t('extraits.quoteAction')}
+								title={$t('extraits.quote')}>❯</button
 							>
 						</div>
 					</div>
@@ -536,11 +541,10 @@
 						maxlength="50000"
 						bind:this={bodyField}
 						bind:value={body}
-						placeholder="Collez le message WhatsApp ici…"
+						placeholder={$t('extraits.bodyPlaceholder')}
 					></textarea>
 					<p class="mt-2 text-xs text-stone-400">
-						Les marqueurs WhatsApp *gras*, _italique_, ~barré~, `monospace` et &gt; citation sont
-						reconnus.
+						{$t('extraits.formatHelp')}
 					</p>
 				</div>
 			</div>
@@ -551,11 +555,20 @@
 				class="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 p-4 sm:px-6"
 			>
 				<div>
-					<h2 class="font-display text-2xl font-semibold text-stone-800">Ajuster les liens</h2>
+					<h2 class="font-display text-2xl font-semibold text-stone-800">
+						{$t('extraits.adjustLinks')}
+					</h2>
 					<p class="mt-0.5 text-sm text-stone-500">
 						{previewLinks.length
-							? `${previewLinks.length} ressource${previewLinks.length > 1 ? 's' : ''} liée${previewLinks.length > 1 ? 's' : ''}`
-							: 'Correction manuelle si nécessaire'}
+							? $t(
+									previewLinks.length === 1
+										? 'extraits.resourceCountOne'
+										: 'extraits.resourceCountMany',
+									{
+										count: previewLinks.length
+									}
+								)
+							: $t('extraits.manualCorrection')}
 					</p>
 				</div>
 				<span
@@ -565,7 +578,7 @@
 			</summary>
 			<div class="grid gap-4 border-t border-stone-100 px-4 pb-5 pt-4 sm:grid-cols-2 sm:px-6">
 				<label class="admin-label"
-					>Prédication<input
+					>{$t('extraits.sermon')}<input
 						name="sermonUrl"
 						class="admin-input mt-1.5"
 						bind:value={sermonUrl}
@@ -573,7 +586,7 @@
 					/></label
 				>
 				<label class="admin-label"
-					>Retransmission<input
+					>{$t('extraits.rebroadcast')}<input
 						name="liveUrl"
 						class="admin-input mt-1.5"
 						bind:value={liveUrl}
@@ -581,7 +594,7 @@
 					/></label
 				>
 				<label class="admin-label"
-					>Vidéo<input
+					>{$t('extraits.video')}<input
 						name="videoUrl"
 						class="admin-input mt-1.5"
 						bind:value={videoUrl}
@@ -589,7 +602,7 @@
 					/></label
 				>
 				<label class="admin-label"
-					>PDF<input
+					>{$t('extraits.pdf')}<input
 						name="pdfUrl"
 						class="admin-input mt-1.5"
 						bind:value={pdfUrl}
@@ -597,7 +610,7 @@
 					/></label
 				>
 				<label class="admin-label"
-					>Audio<input
+					>{$t('extraits.audio')}<input
 						name="audioUrl"
 						class="admin-input mt-1.5"
 						bind:value={audioUrl}
@@ -605,7 +618,7 @@
 					/></label
 				>
 				<label class="admin-label"
-					>Transcription<input
+					>{$t('extraits.transcription')}<input
 						name="transcriptionUrl"
 						class="admin-input mt-1.5"
 						bind:value={transcriptionUrl}
@@ -619,26 +632,26 @@
 	<aside class="md:sticky md:top-6 xl:top-8">
 		<div class="mb-3 flex items-center justify-between px-1">
 			<p class="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500">
-				Aperçu en direct
+				{$t('extraits.livePreview')}
 			</p>
-			<span class="h-2 w-2 rounded-full bg-green-500" title="Aperçu à jour"></span>
+			<span class="h-2 w-2 rounded-full bg-green-500" title={$t('extraits.previewCurrent')}></span>
 		</div>
 		<article class="preview-card">
 			{#if imagePreview}
-				<figure><img src={imagePreview} alt={sourceTitle || 'Aperçu de l’extrait'} /></figure>
+				<figure><img src={imagePreview} alt={sourceTitle || $t('extraits.previewAlt')} /></figure>
 			{:else}
-				<div class="preview-empty">Votre image apparaîtra ici</div>
+				<div class="preview-empty">{$t('extraits.imagePlaceholder')}</div>
 			{/if}
 			<div class="preview-message">
 				<div class="preview-copy">{@html bodyHtml}</div>
 				{#if previewLinks.length}
-					<nav class="preview-links" aria-label="Liens de l’aperçu">
+					<nav class="preview-links" aria-label={$t('extraits.previewLinks')}>
 						{#each previewLinks as link}<span>{link.label}</span>{/each}
 					</nav>
 				{/if}
 				<footer>
-					<span class="truncate">{sourceTitle || 'Titre de la source'}</span>
-					<div><time>{previewTime}</time><span class="share">↪ Partager</span></div>
+					<span class="truncate">{sourceTitle || $t('extraits.sourceTitleFallback')}</span>
+					<div><time>{previewTime}</time><span class="share">↪ {$t('extraits.share')}</span></div>
 				</footer>
 			</div>
 		</article>
@@ -654,10 +667,10 @@
 				disabled={uploading || submitting}
 			>
 				{#if submitting}
-					Enregistrement…
+					{$t('extraits.saving')}
 				{:else}
-					<span class="xl:hidden">Enregistrer</span>
-					<span class="hidden xl:inline">Enregistrer le brouillon</span>
+					<span class="xl:hidden">{$t('extraits.save')}</span>
+					<span class="hidden xl:inline">{$t('extraits.saveDraft')}</span>
 				{/if}
 			</button>
 			<button
@@ -667,14 +680,14 @@
 				class="admin-btn-primary w-full justify-center px-3"
 				disabled={uploading || submitting}
 			>
-				Publier
+				{$t('extraits.publish')}
 			</button>
 		</div>
 
 		{#if data.recent.length}
 			<section class="mt-7 border-t border-stone-200 pt-5">
 				<h2 class="text-xs font-bold uppercase tracking-[0.18em] text-stone-500">
-					Publications récentes
+					{$t('extraits.recentPublications')}
 				</h2>
 				<div class="mt-3 grid gap-2">
 					{#each data.recent as post}
@@ -687,21 +700,21 @@
 										? 'text-green-700'
 										: 'text-amber-700'}"
 								>
-									{post.status === 'published' ? 'Publié' : 'Brouillon'}
+									{post.status === 'published' ? $t('extraits.published') : $t('extraits.draft')}
 								</span>
 							</div>
 							<div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs font-semibold">
 								<a
-									href={`/extraits?edit=${post.id}`}
+									href={`/publications?edit=${post.id}`}
 									data-sveltekit-reload
-									class="text-stone-600 hover:text-primary">Modifier</a
+									class="text-stone-600 hover:text-primary">{$t('extraits.edit')}</a
 								>
 								{#if post.status === 'published'}
 									<a
-										href={`https://missionnaire.net/extraits/${post.id}`}
+										href={`https://missionnaire.net/publications/${post.id}`}
 										target="_blank"
 										rel="noreferrer"
-										class="text-stone-600 hover:text-primary">Voir</a
+										class="text-stone-600 hover:text-primary">{$t('extraits.view')}</a
 									>
 								{/if}
 								<button
@@ -712,7 +725,7 @@
 									formnovalidate
 									class="text-stone-600 hover:text-primary"
 								>
-									{post.status === 'published' ? 'Masquer' : 'Publier'}
+									{post.status === 'published' ? $t('extraits.hide') : $t('extraits.publish')}
 								</button>
 								<button
 									type="submit"
@@ -722,11 +735,11 @@
 									formnovalidate
 									class="ml-auto text-red-700 hover:text-red-900"
 									onclick={(event) => {
-										if (!confirm(`Supprimer définitivement « ${post.sourceTitle} » ?`))
+										if (!confirm($t('extraits.confirmDelete', { title: post.sourceTitle })))
 											event.preventDefault();
 									}}
 								>
-									Supprimer
+									{$t('extraits.delete')}
 								</button>
 							</div>
 						</article>

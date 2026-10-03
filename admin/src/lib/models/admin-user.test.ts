@@ -56,6 +56,6 @@ test('default landing follows effective permissions and preserves specialist fal
 			...user,
 			permissions: { ...permissions, can_manage_extraits: true }
 		}),
-		'/extraits'
+		'/publications'
 	);
 });

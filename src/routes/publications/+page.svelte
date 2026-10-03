@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
+	import { locale, t } from '../../i18n';
 	import type { PageData } from './$types';
 
 	interface Props {
@@ -14,17 +15,21 @@
 	let visiblePosts = $derived(data.posts.slice(0, visibleCount));
 	let hasMore = $derived(visibleCount < data.posts.length);
 
-	const dateFormatter = new Intl.DateTimeFormat('fr-FR', {
-		day: 'numeric',
-		month: 'long',
-		year: 'numeric',
-		timeZone: 'Africa/Kigali'
-	});
-	const timeFormatter = new Intl.DateTimeFormat('fr-FR', {
-		hour: '2-digit',
-		minute: '2-digit',
-		timeZone: 'Africa/Kigali'
-	});
+	let dateFormatter = $derived(
+		new Intl.DateTimeFormat($locale === 'fr' ? 'fr-FR' : 'en-GB', {
+			day: 'numeric',
+			month: 'long',
+			year: 'numeric',
+			timeZone: 'Africa/Kigali'
+		})
+	);
+	let timeFormatter = $derived(
+		new Intl.DateTimeFormat($locale === 'fr' ? 'fr-FR' : 'en-GB', {
+			hour: '2-digit',
+			minute: '2-digit',
+			timeZone: 'Africa/Kigali'
+		})
+	);
 
 	function dateLabel(iso: string) {
 		return dateFormatter.format(new Date(iso));
@@ -58,12 +63,12 @@
 		void tick().then(() => document.getElementById(id)?.scrollIntoView());
 	});
 
-	async function sharePost(id: string, title: string, excerpt: string) {
-		const url = `${window.location.origin}/extraits/${encodeURIComponent(id)}`;
+	async function sharePost(id: string, title: string, text: string) {
+		const url = `${window.location.origin}/publications/${encodeURIComponent(id)}`;
 
 		if (navigator.share) {
 			try {
-				await navigator.share({ title, text: excerpt, url });
+				await navigator.share({ title, text, url });
 				return;
 			} catch (error) {
 				if (error instanceof DOMException && error.name === 'AbortError') return;
@@ -71,7 +76,7 @@
 		}
 
 		try {
-			await navigator.clipboard.writeText(url);
+			await navigator.clipboard.writeText(`${text}\n\n${url}`);
 			copiedPostId = id;
 			clearTimeout(copyResetTimer);
 			copyResetTimer = setTimeout(() => (copiedPostId = null), 2000);
@@ -81,21 +86,27 @@
 	}
 </script>
 
-<main class="extraits-page">
+<main class="publications-page">
 	<header class="hero">
-		<p class="eyebrow">Le canal sur le site</p>
-		<h1>Extraits des prédications</h1>
+		<p class="eyebrow">{$t('publications.eyebrow')}</p>
+		<h1>{$t('publications.title')}</h1>
 		<p class="introduction">
-			Les publications du canal, avec leurs images et leurs liens vers les prédications.
+			{$t('publications.introduction')}
 		</p>
 		<div class="hero-meta">
-			<span>{data.posts.length} extraits</span>
+			<span
+				>{$t(data.posts.length === 1 ? 'publications.countOne' : 'publications.countMany', {
+					count: data.posts.length
+				})}</span
+			>
 			<span aria-hidden="true">•</span>
-			<a href={data.channelUrl} target="_blank" rel="noreferrer">Ouvrir dans WhatsApp</a>
+			<a href={data.channelUrl} target="_blank" rel="noreferrer"
+				>{$t('publications.openWhatsapp')}</a
+			>
 		</div>
 	</header>
 
-	<section class="feed" aria-label="Extraits publiés">
+	<section class="feed" aria-label={$t('publications.publishedPosts')}>
 		{#each visiblePosts as post, index (post.id)}
 			{#if index === 0 || dateLabel(post.publishedAt) !== dateLabel(visiblePosts[index - 1].publishedAt)}
 				<div class="date-divider"><span>{dateLabel(post.publishedAt)}</span></div>
@@ -120,7 +131,7 @@
 					{#if post.links.length}
 						<nav
 							class="source-links"
-							aria-label={`Ressources pour l’extrait du ${dateLabel(post.publishedAt)}`}
+							aria-label={$t('publications.resourcesFor', { date: dateLabel(post.publishedAt) })}
 						>
 							{#each post.links as link}
 								{#if link.href.startsWith('http')}
@@ -139,14 +150,18 @@
 							<button
 								type="button"
 								class="share-button"
-								onclick={() => sharePost(post.id, post.sourceTitle, post.excerpt)}
-								aria-label={`Partager l’extrait du ${dateLabel(post.publishedAt)}`}
+								onclick={() => sharePost(post.id, post.sourceTitle, post.text)}
+								aria-label={$t('publications.shareFor', { date: dateLabel(post.publishedAt) })}
 							>
 								<svg aria-hidden="true" viewBox="0 0 24 24">
 									<path d="M9 7 4 12l5 5" />
 									<path d="M5 12h8.5a5.5 5.5 0 0 1 5.5 5.5V19" />
 								</svg>
-								<span>{copiedPostId === post.id ? 'Lien copié' : 'Partager'}</span>
+								<span
+									>{copiedPostId === post.id
+										? $t('publications.copied')
+										: $t('publications.share')}</span
+								>
 							</button>
 						</div>
 					</footer>
@@ -156,16 +171,16 @@
 
 		{#if hasMore}
 			<div class="feed-loader" use:infiniteScroll aria-live="polite">
-				<button type="button" onclick={revealMore}>Afficher plus d’extraits</button>
+				<button type="button" onclick={revealMore}>{$t('publications.showMore')}</button>
 			</div>
 		{:else if data.posts.length > PAGE_SIZE}
-			<p class="feed-end">Tous les extraits sont affichés</p>
+			<p class="feed-end">{$t('publications.allShown')}</p>
 		{/if}
 	</section>
 </main>
 
 <style>
-	.extraits-page {
+	.publications-page {
 		min-height: 100vh;
 		padding: clamp(2rem, 5vw, 4rem) 1rem 6rem;
 		font-family: var(--font-body);
@@ -436,7 +451,7 @@
 	}
 
 	@media (max-width: 640px) {
-		.extraits-page {
+		.publications-page {
 			padding: 1.75rem 0.55rem 4rem;
 		}
 
