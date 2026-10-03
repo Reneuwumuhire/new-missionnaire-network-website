@@ -4,7 +4,6 @@
 	import { locale, t, type TranslationKey } from '../../i18n';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
-	import BsLink45deg from 'svelte-icons-pack/bs/BsLink45deg';
 	import RiSystemEyeLine from 'svelte-icons-pack/ri/RiSystemEyeLine';
 	import RiSystemShareForwardLine from 'svelte-icons-pack/ri/RiSystemShareForwardLine';
 	import type { PageData } from './$types';
@@ -227,17 +226,6 @@
 		copyResetTimer = setTimeout(() => (shareFeedback = null), 2000);
 	}
 
-	async function copyShareLink(post: (typeof data.posts)[number]) {
-		closeMenus();
-		try {
-			await navigator.clipboard.writeText(postUrl(post.id));
-			recordShare(post.id);
-			flashShareFeedback(post.id, 'copied');
-		} catch {
-			flashShareFeedback(post.id, 'error');
-		}
-	}
-
 	async function nativeShare(post: (typeof data.posts)[number]) {
 		closeMenus();
 		const url = postUrl(post.id);
@@ -434,10 +422,11 @@
 									class="share-button"
 									onclick={(event) => {
 										event.stopPropagation();
-										toggleShareMenu(post.id);
+										if (hasNativeShare) toggleShareMenu(post.id);
+										else void nativeShare(post);
 									}}
-									aria-haspopup="menu"
-									aria-expanded={openSharePostId === post.id}
+									aria-haspopup={hasNativeShare ? 'menu' : undefined}
+									aria-expanded={hasNativeShare && openSharePostId === post.id}
 									aria-label={$t('publications.shareFor', { date: dateLabel(post.publishedAt) })}
 									title={$t('publications.share')}
 								>
@@ -445,7 +434,7 @@
 									<span>{$t('publications.share')}</span>
 								</button>
 
-								{#if openSharePostId === post.id}
+								{#if hasNativeShare && openSharePostId === post.id}
 									<!-- svelte-ignore a11y_click_events_have_key_events -->
 									<!-- svelte-ignore a11y_no_static_element_interactions -->
 									<div
@@ -455,15 +444,9 @@
 										use:focusTrap={{ onEscape: closeMenus }}
 										onclick={(event) => event.stopPropagation()}
 									>
-										{#if hasNativeShare}
-											<button type="button" role="menuitem" onclick={() => nativeShare(post)}>
-												<Icon src={RiSystemShareForwardLine} size="17" />
-												<span>{$t('publications.shareNative')}</span>
-											</button>
-										{/if}
-										<button type="button" role="menuitem" onclick={() => copyShareLink(post)}>
-											<Icon src={BsLink45deg} size="18" />
-											<span>{$t('publications.copyLink')}</span>
+										<button type="button" role="menuitem" onclick={() => nativeShare(post)}>
+											<Icon src={RiSystemShareForwardLine} size="17" />
+											<span>{$t('publications.shareNative')}</span>
 										</button>
 									</div>
 								{/if}
@@ -967,10 +950,6 @@
 		color: #44403c;
 		background: #fff;
 		cursor: pointer;
-	}
-
-	.share-menu button + button {
-		border-top: 1px solid #e7e5e4;
 	}
 
 	.share-menu button:hover,
