@@ -54,6 +54,7 @@ const en: Record<keyof typeof fr, string> = {
 	'publications.copied': 'Post copied',
 	'publications.copyFailed': 'Could not copy the post',
 	'publications.engagement': 'Post reactions and activity',
+	'publications.addReaction': 'Add a reaction',
 	'publications.reactLike': 'React with a thumbs up',
 	'publications.reactHeart': 'React with a heart',
 	'publications.reactLaugh': 'React with laughter',

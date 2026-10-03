@@ -4,6 +4,7 @@
 	import { locale, t, type TranslationKey } from '../../i18n';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
+	import BsEmojiSmile from 'svelte-icons-pack/bs/BsEmojiSmile';
 	import RiSystemEyeLine from 'svelte-icons-pack/ri/RiSystemEyeLine';
 	import RiSystemShareForwardLine from 'svelte-icons-pack/ri/RiSystemShareForwardLine';
 	import type { PageData } from './$types';
@@ -194,18 +195,11 @@
 	}
 
 	function toggleReactionSummary(postId: string) {
-		if (totalReactions(postId) === 0) {
-			openReactionSummaryPostId = null;
-			openReactionPostId = openReactionPostId === postId ? null : postId;
-			return;
-		}
 		openReactionPostId = null;
 		openReactionSummaryPostId = openReactionSummaryPostId === postId ? null : postId;
 	}
 
-	function openCardReactions(event: MouseEvent, postId: string) {
-		if (event.target instanceof Element && event.target.closest('a, button')) return;
-		event.stopPropagation();
+	function toggleReactionPicker(postId: string) {
 		openReactionSummaryPostId = null;
 		openReactionPostId = openReactionPostId === postId ? null : postId;
 	}
@@ -284,15 +278,7 @@
 				<div class="date-divider"><span>{dateLabel(post.publishedAt)}</span></div>
 			{/if}
 
-			<!-- The card click is a pointer shortcut; the reaction summary remains keyboard accessible. -->
-			<!-- svelte-ignore a11y_click_events_have_key_events -->
-			<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-			<article
-				id={post.id}
-				class="post"
-				use:trackPostView={post.id}
-				onclick={(event) => openCardReactions(event, post.id)}
-			>
+			<article id={post.id} class="post" use:trackPostView={post.id}>
 				<figure>
 					<img
 						src={post.image}
@@ -325,27 +311,40 @@
 
 					<div class="engagement-bar" aria-label={$t('publications.engagement')}>
 						<div class="reaction-zone">
-							<button
-								type="button"
-								class="reaction-summary"
-								onclick={(event) => {
-									event.stopPropagation();
-									toggleReactionSummary(post.id);
-								}}
-								aria-expanded={openReactionSummaryPostId === post.id ||
-									openReactionPostId === post.id}
-								aria-label={$t('publications.reactionCount', { count: totalReactions(post.id) })}
-							>
-								{#if totalReactions(post.id)}
+							{#if totalReactions(post.id)}
+								<button
+									type="button"
+									class="reaction-summary"
+									onclick={(event) => {
+										event.stopPropagation();
+										toggleReactionSummary(post.id);
+									}}
+									aria-expanded={openReactionSummaryPostId === post.id}
+									aria-label={$t('publications.reactionCount', {
+										count: totalReactions(post.id)
+									})}
+								>
 									<span class="reaction-stack" aria-hidden="true">
 										{#each shownReactions(post.id).slice(0, 3) as reaction}
 											<span>{reaction.emoji}</span>
 										{/each}
 									</span>
 									<strong>{formatCount(totalReactions(post.id))}</strong>
-								{:else}
-									<span class="add-reaction" aria-hidden="true">☺</span>
-								{/if}
+								</button>
+							{/if}
+
+							<button
+								type="button"
+								class="reaction-trigger"
+								onclick={(event) => {
+									event.stopPropagation();
+									toggleReactionPicker(post.id);
+								}}
+								aria-expanded={openReactionPostId === post.id}
+								aria-label={$t('publications.addReaction')}
+								title={$t('publications.addReaction')}
+							>
+								<Icon src={BsEmojiSmile} size="15" />
 							</button>
 
 							{#if openReactionSummaryPostId === post.id}
@@ -368,7 +367,7 @@
 										{/each}
 									</div>
 								</div>
-							{:else}
+							{:else if openReactionPostId === post.id}
 								<div class="reaction-picker" class:picker-open={openReactionPostId === post.id}>
 									{#each reactionOptions as reaction}
 										<button
@@ -676,7 +675,8 @@
 		position: relative;
 	}
 
-	.reaction-summary {
+	.reaction-summary,
+	.reaction-trigger {
 		display: inline-flex;
 		min-width: 32px;
 		min-height: 32px;
@@ -695,7 +695,9 @@
 	}
 
 	.reaction-summary:hover,
-	.reaction-summary:focus-visible {
+	.reaction-summary:focus-visible,
+	.reaction-trigger:hover,
+	.reaction-trigger:focus-visible {
 		border-color: #a8a29e;
 		color: #292524;
 		background: #e7e5e4;
@@ -703,6 +705,7 @@
 	}
 
 	.reaction-summary:focus-visible,
+	.reaction-trigger:focus-visible,
 	.reaction-picker button:focus-visible,
 	.reaction-breakdown button:focus-visible {
 		box-shadow:
@@ -711,9 +714,9 @@
 		outline: none;
 	}
 
-	.add-reaction {
-		font-size: 1rem;
-		line-height: 1;
+	.reaction-trigger {
+		width: 32px;
+		padding: 0;
 	}
 
 	.reaction-stack {
@@ -761,8 +764,6 @@
 			transform 120ms ease;
 	}
 
-	.post:hover .reaction-picker,
-	.post:focus-within .reaction-picker,
 	.reaction-picker.picker-open {
 		opacity: 1;
 		pointer-events: auto;
@@ -778,12 +779,22 @@
 		border-radius: 999px;
 		place-items: center;
 		font: inherit;
-		font-size: 1.35rem;
 		background: transparent;
 		cursor: pointer;
 		transition:
 			transform 100ms ease,
 			background-color 100ms ease;
+	}
+
+	.reaction-picker button > span {
+		display: grid;
+		width: 1.5rem;
+		height: 1.5rem;
+		place-items: center;
+		transform: translateY(0.08em);
+		font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+		font-size: 1.35rem;
+		line-height: 1;
 	}
 
 	.reaction-picker button:hover,

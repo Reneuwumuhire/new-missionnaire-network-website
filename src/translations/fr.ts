@@ -53,6 +53,7 @@ export default {
 	'publications.copied': 'Publication copiée',
 	'publications.copyFailed': 'Impossible de copier la publication',
 	'publications.engagement': 'Réactions et activité de la publication',
+	'publications.addReaction': 'Ajouter une réaction',
 	'publications.reactLike': 'Réagir avec un pouce levé',
 	'publications.reactHeart': 'Réagir avec un cœur',
 	'publications.reactLaugh': 'Réagir avec un rire',
