@@ -781,9 +781,7 @@
 		font: inherit;
 		background: transparent;
 		cursor: pointer;
-		transition:
-			transform 100ms ease,
-			background-color 100ms ease;
+		transition: background-color 100ms ease;
 	}
 
 	.reaction-picker button > span {
@@ -798,9 +796,9 @@
 	}
 
 	.reaction-picker button:hover,
+	.reaction-picker button:focus-visible,
 	.reaction-picker button.reaction-selected {
 		background: #44403c;
-		transform: translateY(-0.18rem) scale(1.12);
 	}
 
 	.reaction-breakdown {
