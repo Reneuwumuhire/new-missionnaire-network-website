@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
+	import { focusTrap } from '$lib/actions/focusTrap';
 	import { locale, t } from '../../i18n';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
+	import BsLink45deg from 'svelte-icons-pack/bs/BsLink45deg';
 	import RiSystemShareForwardLine from 'svelte-icons-pack/ri/RiSystemShareForwardLine';
 	import type { PageData } from './$types';
 
@@ -12,8 +14,9 @@
 
 	let { data }: Props = $props();
 	const PAGE_SIZE = 6;
-	let copiedPostId = $state<string | null>(null);
-	let sharingPostId = $state<string | null>(null);
+	let openSharePostId = $state<string | null>(null);
+	let shareFeedback = $state<{ postId: string; state: 'copied' | 'error' } | null>(null);
+	let hasNativeShare = $state(false);
 	let copyResetTimer: ReturnType<typeof setTimeout> | undefined;
 	let visibleCount = $state(PAGE_SIZE);
 	let visiblePosts = $derived(data.posts.slice(0, visibleCount));
@@ -60,6 +63,7 @@
 	}
 
 	onMount(() => {
+		hasNativeShare = typeof navigator.share === 'function';
 		const id = window.location.hash.slice(1);
 		const targetIndex = data.posts.findIndex((post) => post.id === id);
 		if (targetIndex < visibleCount) return;
@@ -67,62 +71,63 @@
 		void tick().then(() => document.getElementById(id)?.scrollIntoView());
 	});
 
-	async function shareImage(imageUrl: string, title: string): Promise<File | null> {
-		if (!navigator.canShare) return null;
+	function postUrl(id: string) {
+		return `${window.location.origin}/publications/${encodeURIComponent(id)}`;
+	}
+
+	function toggleShareMenu(id: string) {
+		openSharePostId = openSharePostId === id ? null : id;
+	}
+
+	function closeShareMenu() {
+		openSharePostId = null;
+	}
+
+	function flashShareFeedback(postId: string, state: 'copied' | 'error') {
+		shareFeedback = { postId, state };
+		clearTimeout(copyResetTimer);
+		copyResetTimer = setTimeout(() => (shareFeedback = null), 2000);
+	}
+
+	async function copyShareLink(post: (typeof data.posts)[number]) {
+		closeShareMenu();
 		try {
-			const response = await fetch(imageUrl);
-			if (!response.ok) return null;
-			const blob = await response.blob();
-			if (!blob.type.startsWith('image/')) return null;
-			const extension = blob.type.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
-			const file = new File(
-				[blob],
-				`${title.replace(/[^a-z0-9]+/gi, '-').slice(0, 48)}.${extension}`,
-				{
-					type: blob.type
-				}
-			);
-			return navigator.canShare({ files: [file] }) ? file : null;
+			await navigator.clipboard.writeText(postUrl(post.id));
+			flashShareFeedback(post.id, 'copied');
 		} catch {
-			return null;
+			flashShareFeedback(post.id, 'error');
 		}
 	}
 
-	async function sharePost(post: (typeof data.posts)[number]) {
-		const url = `${window.location.origin}/publications/${encodeURIComponent(post.id)}`;
-		const text = `${post.shareText || post.text}\n\n${url}`;
-		sharingPostId = post.id;
-
-		if (navigator.share) {
-			try {
-				const image = await shareImage(post.image, post.sourceTitle);
-				await navigator.share({
-					title: post.sourceTitle,
-					text,
-					...(image ? { files: [image] } : {})
-				});
-				sharingPostId = null;
-				return;
-			} catch (error) {
-				if (error instanceof DOMException && error.name === 'AbortError') {
-					sharingPostId = null;
-					return;
-				}
-			}
+	async function nativeShare(post: (typeof data.posts)[number]) {
+		closeShareMenu();
+		const url = postUrl(post.id);
+		try {
+			await navigator.share({
+				title: post.sourceTitle,
+				text: post.shareText || post.text,
+				url
+			});
+			return;
+		} catch (error) {
+			if (error instanceof DOMException && error.name === 'AbortError') return;
 		}
 
 		try {
-			await navigator.clipboard.writeText(text);
-			copiedPostId = post.id;
-			clearTimeout(copyResetTimer);
-			copyResetTimer = setTimeout(() => (copiedPostId = null), 2000);
+			await navigator.clipboard.writeText(`${post.shareText || post.text}\n\n${url}`);
+			flashShareFeedback(post.id, 'copied');
 		} catch {
-			window.location.hash = post.id;
-		} finally {
-			sharingPostId = null;
+			flashShareFeedback(post.id, 'error');
 		}
 	}
 </script>
+
+<svelte:window
+	onclick={closeShareMenu}
+	onkeydown={(event) => {
+		if (event.key === 'Escape') closeShareMenu();
+	}}
+/>
 
 <main class="publications-page">
 	<header class="hero">
@@ -185,23 +190,55 @@
 						<span class="source-title">{post.sourceTitle}</span>
 						<div class="post-actions">
 							<time datetime={post.publishedAt}>{timeLabel(post.publishedAt)}</time>
-							<button
-								type="button"
-								class:share-active={copiedPostId === post.id}
-								class="share-button"
-								onclick={() => sharePost(post)}
-								disabled={sharingPostId === post.id}
-								aria-busy={sharingPostId === post.id}
-								aria-label={$t('publications.shareFor', { date: dateLabel(post.publishedAt) })}
-								title={$t('publications.share')}
-							>
-								<Icon src={RiSystemShareForwardLine} size="16" />
-								<span
-									>{copiedPostId === post.id
-										? $t('publications.copied')
-										: $t('publications.share')}</span
+							<div class="share-wrap">
+								<button
+									type="button"
+									class:share-active={openSharePostId === post.id}
+									class="share-button"
+									onclick={(event) => {
+										event.stopPropagation();
+										toggleShareMenu(post.id);
+									}}
+									aria-haspopup="menu"
+									aria-expanded={openSharePostId === post.id}
+									aria-label={$t('publications.shareFor', { date: dateLabel(post.publishedAt) })}
+									title={$t('publications.share')}
 								>
-							</button>
+									<Icon src={RiSystemShareForwardLine} size="16" />
+									<span>{$t('publications.share')}</span>
+								</button>
+
+								{#if openSharePostId === post.id}
+									<!-- svelte-ignore a11y_click_events_have_key_events -->
+									<!-- svelte-ignore a11y_no_static_element_interactions -->
+									<div
+										class="share-menu"
+										role="menu"
+										tabindex="-1"
+										use:focusTrap={{ onEscape: closeShareMenu }}
+										onclick={(event) => event.stopPropagation()}
+									>
+										{#if hasNativeShare}
+											<button type="button" role="menuitem" onclick={() => nativeShare(post)}>
+												<Icon src={RiSystemShareForwardLine} size="17" />
+												<span>{$t('publications.shareNative')}</span>
+											</button>
+										{/if}
+										<button type="button" role="menuitem" onclick={() => copyShareLink(post)}>
+											<Icon src={BsLink45deg} size="18" />
+											<span>{$t('publications.copyLink')}</span>
+										</button>
+									</div>
+								{/if}
+
+								{#if shareFeedback?.postId === post.id}
+									<span class="share-feedback" role="status">
+										{shareFeedback.state === 'copied'
+											? $t('publications.copied')
+											: $t('publications.copyFailed')}
+									</span>
+								{/if}
+							</div>
 						</div>
 					</footer>
 				</div>
@@ -423,6 +460,10 @@
 		align-items: center;
 	}
 
+	.share-wrap {
+		position: relative;
+	}
+
 	.share-button {
 		display: inline-flex;
 		align-items: center;
@@ -466,9 +507,59 @@
 		box-shadow: 0 6px 18px -8px rgb(255 136 12 / 55%);
 	}
 
-	.share-button:disabled {
-		cursor: wait;
-		opacity: 0.65;
+	.share-menu {
+		position: absolute;
+		right: 0;
+		bottom: calc(100% + 0.5rem);
+		z-index: 30;
+		width: 13rem;
+		overflow: hidden;
+		border: 1px solid #e7e5e4;
+		border-radius: 0.55rem;
+		background: #fff;
+		box-shadow: 0 18px 42px rgb(41 37 36 / 18%);
+	}
+
+	.share-menu button {
+		display: flex;
+		width: 100%;
+		align-items: center;
+		gap: 0.65rem;
+		padding: 0.7rem 0.8rem;
+		border: 0;
+		font: inherit;
+		font-size: 0.75rem;
+		font-weight: 650;
+		text-align: left;
+		color: #44403c;
+		background: #fff;
+		cursor: pointer;
+	}
+
+	.share-menu button + button {
+		border-top: 1px solid #e7e5e4;
+	}
+
+	.share-menu button:hover,
+	.share-menu button:focus-visible {
+		color: var(--color-missionnaire);
+		background: #fafaf9;
+		outline: none;
+	}
+
+	.share-feedback {
+		position: absolute;
+		right: 0;
+		bottom: calc(100% + 0.5rem);
+		z-index: 31;
+		padding: 0.35rem 0.5rem;
+		border-radius: 0.35rem;
+		font-size: 0.62rem;
+		font-weight: 700;
+		white-space: nowrap;
+		color: #fff;
+		background: #1c1917;
+		box-shadow: 0 6px 18px rgb(41 37 36 / 18%);
 	}
 
 	.feed-loader {
