@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
 	import { locale, t } from '../../i18n';
+	// @ts-ignore
+	import Icon from 'svelte-icons-pack/Icon.svelte';
+	import RiSystemShareForwardLine from 'svelte-icons-pack/ri/RiSystemShareForwardLine';
 	import type { PageData } from './$types';
 
 	interface Props {
@@ -10,6 +13,7 @@
 	let { data }: Props = $props();
 	const PAGE_SIZE = 6;
 	let copiedPostId = $state<string | null>(null);
+	let sharingPostId = $state<string | null>(null);
 	let copyResetTimer: ReturnType<typeof setTimeout> | undefined;
 	let visibleCount = $state(PAGE_SIZE);
 	let visiblePosts = $derived(data.posts.slice(0, visibleCount));
@@ -63,25 +67,59 @@
 		void tick().then(() => document.getElementById(id)?.scrollIntoView());
 	});
 
-	async function sharePost(id: string, title: string, text: string) {
-		const url = `${window.location.origin}/publications/${encodeURIComponent(id)}`;
+	async function shareImage(imageUrl: string, title: string): Promise<File | null> {
+		if (!navigator.canShare) return null;
+		try {
+			const response = await fetch(imageUrl);
+			if (!response.ok) return null;
+			const blob = await response.blob();
+			if (!blob.type.startsWith('image/')) return null;
+			const extension = blob.type.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
+			const file = new File(
+				[blob],
+				`${title.replace(/[^a-z0-9]+/gi, '-').slice(0, 48)}.${extension}`,
+				{
+					type: blob.type
+				}
+			);
+			return navigator.canShare({ files: [file] }) ? file : null;
+		} catch {
+			return null;
+		}
+	}
+
+	async function sharePost(post: (typeof data.posts)[number]) {
+		const url = `${window.location.origin}/publications/${encodeURIComponent(post.id)}`;
+		const text = `${post.shareText || post.text}\n\n${url}`;
+		sharingPostId = post.id;
 
 		if (navigator.share) {
 			try {
-				await navigator.share({ title, text, url });
+				const image = await shareImage(post.image, post.sourceTitle);
+				await navigator.share({
+					title: post.sourceTitle,
+					text,
+					...(image ? { files: [image] } : {})
+				});
+				sharingPostId = null;
 				return;
 			} catch (error) {
-				if (error instanceof DOMException && error.name === 'AbortError') return;
+				if (error instanceof DOMException && error.name === 'AbortError') {
+					sharingPostId = null;
+					return;
+				}
 			}
 		}
 
 		try {
-			await navigator.clipboard.writeText(`${text}\n\n${url}`);
-			copiedPostId = id;
+			await navigator.clipboard.writeText(text);
+			copiedPostId = post.id;
 			clearTimeout(copyResetTimer);
 			copyResetTimer = setTimeout(() => (copiedPostId = null), 2000);
 		} catch {
-			window.location.hash = id;
+			window.location.hash = post.id;
+		} finally {
+			sharingPostId = null;
 		}
 	}
 </script>
@@ -149,14 +187,15 @@
 							<time datetime={post.publishedAt}>{timeLabel(post.publishedAt)}</time>
 							<button
 								type="button"
+								class:share-active={copiedPostId === post.id}
 								class="share-button"
-								onclick={() => sharePost(post.id, post.sourceTitle, post.text)}
+								onclick={() => sharePost(post)}
+								disabled={sharingPostId === post.id}
+								aria-busy={sharingPostId === post.id}
 								aria-label={$t('publications.shareFor', { date: dateLabel(post.publishedAt) })}
+								title={$t('publications.share')}
 							>
-								<svg aria-hidden="true" viewBox="0 0 24 24">
-									<path d="M9 7 4 12l5 5" />
-									<path d="M5 12h8.5a5.5 5.5 0 0 1 5.5 5.5V19" />
-								</svg>
+								<Icon src={RiSystemShareForwardLine} size="16" />
 								<span
 									>{copiedPostId === post.id
 										? $t('publications.copied')
@@ -190,7 +229,7 @@
 
 	.hero,
 	.feed {
-		width: min(100%, 560px);
+		width: min(100%, 500px);
 		margin-inline: auto;
 	}
 
@@ -387,34 +426,49 @@
 	.share-button {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.3rem;
-		min-height: 30px;
-		padding: 0.3rem 0.58rem;
-		border: 1px solid #fed7aa;
+		justify-content: center;
+		gap: 0.375rem;
+		min-height: 32px;
+		padding: 0.5rem 0.7rem;
+		border: 0;
 		border-radius: 999px;
 		font: inherit;
 		font-weight: 700;
-		color: #9a4d00;
-		background: #fff7ed;
+		line-height: 1;
+		color: #78716c;
+		background: rgb(245 245 244 / 85%);
 		cursor: pointer;
+		transition:
+			color 160ms ease,
+			background-color 160ms ease,
+			transform 160ms ease,
+			box-shadow 160ms ease;
 	}
 
-	.share-button svg {
-		width: 1rem;
-		height: 1rem;
-		fill: none;
-		stroke: currentColor;
-		stroke-linecap: round;
-		stroke-linejoin: round;
-		stroke-width: 1.8;
+	.share-button:active {
+		transform: scale(0.96);
 	}
 
 	.share-button:hover,
 	.share-button:focus-visible {
-		border-color: var(--color-missionnaire);
+		color: var(--color-missionnaire);
+		background: #e7e5e4;
+	}
+
+	.share-button:focus-visible {
+		outline: 2px solid var(--color-missionnaire);
+		outline-offset: 2px;
+	}
+
+	.share-button.share-active {
 		color: #fff;
 		background: var(--color-missionnaire);
-		outline: none;
+		box-shadow: 0 6px 18px -8px rgb(255 136 12 / 55%);
+	}
+
+	.share-button:disabled {
+		cursor: wait;
+		opacity: 0.65;
 	}
 
 	.feed-loader {
