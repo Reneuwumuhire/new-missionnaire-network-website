@@ -2,6 +2,11 @@ import archive from '$lib/data/channelPosts.json';
 import { publicAssetUrl } from '$lib/utils/librarySearch';
 import { ObjectId } from 'mongodb';
 import { getDb } from '../../db/mongo';
+import {
+	getPublicationEngagement,
+	normalizePublicationEngagement,
+	type PublicationEngagement
+} from './publicationEngagement';
 import { getTranscriptForRecording } from './recordings';
 
 type PublicationLink = { label: string; href: string; kind: string };
@@ -137,7 +142,15 @@ export async function getExtraitFeed() {
 		console.error('[Extraits] Managed posts unavailable:', cause);
 	}
 
-	const posts = [...managedPosts, ...(archive.posts as PublicationPost[])]
+	const allPosts = [...managedPosts, ...(archive.posts as PublicationPost[])];
+	let engagementByPost = new Map<string, PublicationEngagement>();
+	try {
+		engagementByPost = await getPublicationEngagement([...new Set(allPosts.map(({ id }) => id))]);
+	} catch (cause) {
+		console.error('[Publications] Engagement unavailable:', cause);
+	}
+
+	const posts = allPosts
 		.filter((post, index, all) => all.findIndex((candidate) => candidate.id === post.id) === index)
 		.sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
 		.map((post) => {
@@ -145,6 +158,7 @@ export async function getExtraitFeed() {
 			delete publicPost.source;
 			return {
 				...publicPost,
+				engagement: engagementByPost.get(post.id) ?? normalizePublicationEngagement(),
 				shareText: whatsappTextFromHtml(post.bodyHtml) || post.text
 			};
 		});
