@@ -46,6 +46,8 @@ export default {
 	'publications.countOne': '{count} publication',
 	'publications.countMany': '{count} publications',
 	'publications.openWhatsapp': 'Ouvrir dans WhatsApp',
+	'publications.follow': 'Suivre',
+	'publications.followWhatsapp': 'Suivre le canal sur WhatsApp',
 	'publications.publishedPosts': 'Publications du canal',
 	'publications.resourcesFor': 'Ressources pour la publication du {date}',
 	'publications.shareFor': 'Partager la publication du {date}',
@@ -604,6 +606,8 @@ export default {
 		"Le texte suit l'audio que vous entendez — il recule avec vous si vous revenez en arrière.",
 	'liveTranscript.fullscreenDialogAria': 'Transcription en plein écran',
 	'liveTranscript.exitFullscreen': 'Quitter le plein écran',
+	'liveTranscript.autoTranslationNotice':
+		'Traduction automatique : les sous-titres peuvent contenir des erreurs.',
 	'liveTranscript.appearance': 'Affichage',
 	'liveTranscript.theme': 'Thème',
 	'liveTranscript.textSize': 'Taille du texte',

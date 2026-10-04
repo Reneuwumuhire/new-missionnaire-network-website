@@ -69,6 +69,10 @@
 	let prefersReducedMotion = $state(false);
 	let userScrolled = $state(false);
 	let scrollAnimationFrame: number | null = null;
+	let highlightFrame: number | null = null;
+	let highlightReady = $state(false);
+	let highlightVisible = $state(false);
+	let activeHighlight = $state({ top: 0, left: 0, width: 0, height: 0 });
 	// Which way the "back to current line" pill arrow points: down when the
 	// live passage is below the reader's viewport (they scrolled up to read
 	// earlier text), up when it's above (they scrolled ahead).
@@ -106,10 +110,16 @@
 		if (!el || !panelElement) return;
 		const panelRect = panelElement.getBoundingClientRect();
 		const elRect = el.getBoundingClientRect();
-		const delta = elRect.top + elRect.height / 2 - (panelRect.top + panelRect.height / 2);
+		// Keep the spoken line just above centre. This leaves the next line in
+		// the reader's natural focal area as the transcript advances.
+		const focusPoint = fullscreenLarge ? 0.44 : 0.46;
+		const delta = elRect.top + elRect.height / 2 - (panelRect.top + panelRect.height * focusPoint);
 		const target = Math.max(
 			0,
-			Math.min(panelElement.scrollTop + delta, panelElement.scrollHeight - panelElement.clientHeight)
+			Math.min(
+				panelElement.scrollTop + delta,
+				panelElement.scrollHeight - panelElement.clientHeight
+			)
 		);
 
 		if (scrollAnimationFrame !== null) cancelAnimationFrame(scrollAnimationFrame);
@@ -122,13 +132,37 @@
 		const distance = target - start;
 		const startedAt = performance.now();
 		const animate = (now: number) => {
-			const progress = Math.min((now - startedAt) / 420, 1);
+			const progress = Math.min((now - startedAt) / 520, 1);
 			panelElement!.scrollTop = start + distance * (1 - (1 - progress) ** 3);
 			if (progress < 1) scrollAnimationFrame = requestAnimationFrame(animate);
 			else scrollAnimationFrame = null;
 		};
 
 		scrollAnimationFrame = requestAnimationFrame(animate);
+	}
+
+	function positionActiveHighlight() {
+		const el = lineElements[activeLineIndex];
+		if (!el || !panelElement || !themeKey) {
+			highlightVisible = false;
+			return;
+		}
+
+		activeHighlight = {
+			top: el.offsetTop,
+			left: el.offsetLeft,
+			width: el.offsetWidth,
+			height: el.offsetHeight
+		};
+		highlightVisible = true;
+
+		if (!highlightReady) {
+			if (highlightFrame !== null) cancelAnimationFrame(highlightFrame);
+			highlightFrame = requestAnimationFrame(() => {
+				highlightReady = true;
+				highlightFrame = null;
+			});
+		}
 	}
 
 	function resumeAutoScroll() {
@@ -271,10 +305,26 @@
 		if (activeLineIndex !== previousActiveLineIndex) {
 			previousActiveLineIndex = activeLineIndex;
 			if (activeLineIndex >= 0 && !userScrolled) {
-				// Follow within the panel only — never scroll the page.
-				void tick().then(() => scrollActiveLineIntoPanel(!prefersReducedMotion));
+				// The text rises while one shared highlight travels to the next line.
+				// Both movements stay inside this panel, never scrolling the page.
+				void tick().then(() => {
+					positionActiveHighlight();
+					scrollActiveLineIntoPanel(!prefersReducedMotion);
+				});
+			} else if (activeLineIndex < 0) {
+				highlightVisible = false;
 			}
 		}
+	});
+
+	$effect(() => {
+		// Re-measure after appearance, size, layout or transcript changes.
+		void themeKey;
+		void sizeKey;
+		void fullscreenLarge;
+		void fullscreenMobile;
+		void lines;
+		if (activeLineIndex >= 0) void tick().then(positionActiveHighlight);
 	});
 
 	onMount(() => {
@@ -285,9 +335,13 @@
 
 		updateReducedMotion();
 		mediaQuery.addEventListener('change', updateReducedMotion);
+		const resizeObserver = new ResizeObserver(() => positionActiveHighlight());
+		if (panelElement) resizeObserver.observe(panelElement);
 
 		return () => {
 			if (scrollAnimationFrame !== null) cancelAnimationFrame(scrollAnimationFrame);
+			if (highlightFrame !== null) cancelAnimationFrame(highlightFrame);
+			resizeObserver.disconnect();
 			mediaQuery.removeEventListener('change', updateReducedMotion);
 		};
 	});
@@ -312,6 +366,17 @@
 	ontouchmove={onUserScroll}
 	onscroll={() => userScrolled && updateScrollDirection()}
 >
+	{#if themeKey}
+		<div
+			class="subtitle-highlight"
+			class:is-ready={highlightReady}
+			class:is-visible={highlightVisible}
+			style:transform={`translate3d(${activeHighlight.left}px, ${activeHighlight.top}px, 0)`}
+			style:width={`${activeHighlight.width}px`}
+			style:height={`${activeHighlight.height}px`}
+			aria-hidden="true"
+		></div>
+	{/if}
 	{#each lines as line, index}
 		{@const start = getLineStart(line)}
 		{@const text = getLineText(line)}
@@ -324,7 +389,7 @@
 			<div
 				bind:this={lineElements[index]}
 				class="lyric-section"
-				class:chorus={chorus}
+				class:chorus
 				class:past={activeLineIndex >= 0 && index < activeLineIndex}
 				class:future={activeLineIndex >= 0 && index > activeLineIndex}
 			>
@@ -346,7 +411,7 @@
 				class:active={index === activeLineIndex}
 				class:continues
 				class:block-start={blockStart}
-				class:chorus={chorus}
+				class:chorus
 				class:past={activeLineIndex >= 0 && index < activeLineIndex}
 				class:future={activeLineIndex >= 0 && index > activeLineIndex}
 				onclick={() => seekToLine(line)}
@@ -364,12 +429,12 @@
 				class="lyric-line untimed"
 				class:continues
 				class:block-start={blockStart}
-				class:chorus={chorus}
+				class:chorus
 				class:past={activeLineIndex >= 0 && index < activeLineIndex}
 				class:future={activeLineIndex >= 0 && index > activeLineIndex}
 				aria-label={verseNumber !== null
-				? `${$t('syncedLyrics.verse', { number: verseNumber })} : ${text}`
-				: text}
+					? `${$t('syncedLyrics.verse', { number: verseNumber })} : ${text}`
+					: text}
 			>
 				<span class="lyric-text">{text}</span>
 			</div>
@@ -401,6 +466,7 @@
 		--lyric-rule-color: rgba(120, 113, 108, 0.42);
 		--lyric-rule-chorus: rgba(194, 100, 12, 0.65);
 
+		position: relative;
 		max-height: 42vh;
 		overflow-x: hidden;
 		overflow-y: auto;
@@ -429,6 +495,8 @@
 	   their text is faded. That preserves the song's macro structure when
 	   you're scrolling through past/future content. */
 	.lyric-line {
+		position: relative;
+		z-index: 1;
 		display: block;
 		width: 100%;
 		margin-top: 0.35rem;
@@ -579,6 +647,8 @@
 	   Chorus dividers get a heavier rule + sienna ornament so the eye
 	   instantly catches "here's the refrain block coming up". */
 	.lyric-section {
+		position: relative;
+		z-index: 1;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -603,12 +673,7 @@
 	.lyric-section-rule {
 		flex: 1;
 		height: 1px;
-		background: linear-gradient(
-			to right,
-			transparent,
-			var(--lyric-rule-color) 50%,
-			transparent
-		);
+		background: linear-gradient(to right, transparent, var(--lyric-rule-color) 50%, transparent);
 	}
 
 	.lyric-section-label {
@@ -645,12 +710,7 @@
 
 	.lyric-section.chorus .lyric-section-rule {
 		height: 1.5px;
-		background: linear-gradient(
-			to right,
-			transparent,
-			var(--lyric-rule-chorus) 50%,
-			transparent
-		);
+		background: linear-gradient(to right, transparent, var(--lyric-rule-chorus) 50%, transparent);
 	}
 
 	/* ─── Mobile fullscreen overlay theme (dark) ──────────────────────────
@@ -730,27 +790,31 @@
 		opacity: 0.55;
 	}
 
-	/* Keep the highlight layer mounted so it crossfades without changing
-	   text layout. Isolate it behind the text to preserve reading contrast. */
-	.lyrics-panel.fullscreen-large .lyric-line {
-		position: relative;
-		isolation: isolate;
-	}
-
-	.lyrics-panel.fullscreen-large .lyric-line::before {
+	/* One persistent layer glides between active subtitle lines. As the panel
+	   eases upward, this layer travels downward to meet the incoming line. */
+	.subtitle-highlight {
 		position: absolute;
-		z-index: -1;
-		inset: 0;
-		border-inline-start: 4px solid var(--lyric-color-accent);
-		border-radius: 0.5rem;
+		z-index: 0;
+		top: 0;
+		left: 0;
+		border-inline-start: 3px solid var(--lyric-color-accent);
+		border-radius: 0.6rem;
 		background: var(--subtitle-active-bg);
 		content: '';
 		pointer-events: none;
 		opacity: 0;
-		transition: opacity 420ms ease-in-out;
+		will-change: transform, width, height;
 	}
 
-	.lyrics-panel.fullscreen-large .lyric-line.active::before {
+	.subtitle-highlight.is-ready {
+		transition:
+			transform 380ms cubic-bezier(0.16, 1, 0.3, 1),
+			width 420ms cubic-bezier(0.16, 1, 0.3, 1),
+			height 420ms cubic-bezier(0.16, 1, 0.3, 1),
+			opacity 180ms ease;
+	}
+
+	.subtitle-highlight.is-visible {
 		opacity: 1;
 	}
 
@@ -826,11 +890,11 @@
 	}
 
 	.lyrics-panel:is(
-			.subtitle-theme-cream,
-			.subtitle-theme-sepia,
-			.subtitle-theme-dark,
-			.subtitle-theme-contrast
-		) {
+		.subtitle-theme-cream,
+		.subtitle-theme-sepia,
+		.subtitle-theme-dark,
+		.subtitle-theme-contrast
+	) {
 		/* Glow off — soft pill highlight reads calmer over long sessions. */
 		--lyric-glow-active: transparent;
 		background: var(--subtitle-surface);
@@ -853,7 +917,9 @@
 			.subtitle-theme-sepia,
 			.subtitle-theme-dark,
 			.subtitle-theme-contrast
-		) .lyric-line.past .lyric-text {
+		)
+		.lyric-line.past
+		.lyric-text {
 		opacity: var(--subtitle-past);
 	}
 
@@ -862,7 +928,9 @@
 			.subtitle-theme-sepia,
 			.subtitle-theme-dark,
 			.subtitle-theme-contrast
-		) .lyric-line.future .lyric-text {
+		)
+		.lyric-line.future
+		.lyric-text {
 		opacity: var(--subtitle-future);
 	}
 
@@ -872,8 +940,9 @@
 			.subtitle-theme-sepia,
 			.subtitle-theme-dark,
 			.subtitle-theme-contrast
-	) .lyric-line.active {
-		background: var(--subtitle-active-bg);
+		)
+		.lyric-line.active {
+		background: transparent;
 		border-radius: 0.6rem;
 		text-shadow: none;
 	}
@@ -920,7 +989,7 @@
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.lyrics-panel.fullscreen-large .lyric-line::before {
+		.subtitle-highlight.is-ready {
 			transition: none;
 		}
 
