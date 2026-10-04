@@ -400,12 +400,35 @@
 	</div>
 {/snippet}
 
+{#snippet autoTranslationNotice()}
+	<span class="transcript-auto-notice">
+		<svg
+			width="13"
+			height="13"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="1.8"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+			aria-hidden="true"
+		>
+			<circle cx="12" cy="12" r="9" />
+			<path d="M12 11v5M12 8h.01" />
+		</svg>
+		{$t('liveTranscript.autoTranslationNotice')}
+	</span>
+{/snippet}
+
 {#if visible}
 	<div class="border border-stone-200/60 bg-white/40 p-5 md:p-6">
 		<div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-			<p class="text-[10px] font-bold uppercase tracking-[0.25em] text-missionnaire/80 font-body">
-				{$t('liveTranscript.title')}
-			</p>
+			<div class="transcript-inline-heading">
+				<p class="text-[10px] font-bold uppercase tracking-[0.25em] text-missionnaire/80 font-body">
+					{$t('liveTranscript.title')}
+				</p>
+				{@render autoTranslationNotice()}
+			</div>
 			<div class="flex items-center gap-3">
 				{#if waitingForSync}
 					<span
@@ -481,20 +504,23 @@
 			ontouchmove={onHeaderTouchMove}
 			ontouchend={onHeaderTouchEnd}
 		>
-			<div class="flex items-center gap-2.5 min-w-0">
-				{#if mode === 'live'}
-					<span class="relative inline-flex h-2 w-2 shrink-0">
-						<span
-							class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"
-						></span>
-						<span class="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
+			<div class="transcript-fs-heading">
+				<div class="transcript-fs-title">
+					{#if mode === 'live'}
+						<span class="relative inline-flex h-2 w-2 shrink-0">
+							<span
+								class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"
+							></span>
+							<span class="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
+						</span>
+					{/if}
+					<span
+						class="transcript-fs-label truncate text-[11px] font-bold uppercase tracking-[0.25em] font-body text-stone-500"
+					>
+						{$t('liveTranscript.title')}{mode === 'live' ? ` · ${$t('live.atLive')}` : ''}
 					</span>
-				{/if}
-				<span
-					class="transcript-fs-label truncate text-[11px] font-bold uppercase tracking-[0.25em] font-body text-stone-500"
-				>
-					{$t('liveTranscript.title')}{mode === 'live' ? ` · ${$t('live.atLive')}` : ''}
-				</span>
+				</div>
+				{@render autoTranslationNotice()}
 			</div>
 			<div class="flex items-center gap-2">
 				{@render appearanceControl($subtitlePrefs.theme === 'dark')}
@@ -554,9 +580,78 @@
 	.transcript-fullscreen.overlay-dark .transcript-fs-label {
 		color: #b8afa4;
 	}
+	.transcript-fullscreen.overlay-dark .transcript-auto-notice {
+		color: #b8afa4;
+	}
+	.transcript-fullscreen.overlay-dark .transcript-auto-notice svg {
+		color: #eda35a;
+	}
 
 	/* Keep the header clear of notches/status bars on phones. */
 	.transcript-fullscreen-header {
 		padding-top: calc(0.75rem + env(safe-area-inset-top, 0px));
+	}
+
+	.transcript-fs-heading,
+	.transcript-fs-title,
+	.transcript-inline-heading,
+	.transcript-auto-notice {
+		display: flex;
+		align-items: center;
+	}
+
+	.transcript-fs-heading {
+		min-width: 0;
+		gap: 0.75rem;
+	}
+
+	.transcript-inline-heading {
+		min-width: 0;
+		gap: 0.75rem;
+	}
+
+	.transcript-fs-title {
+		min-width: 0;
+		gap: 0.625rem;
+	}
+
+	.transcript-auto-notice {
+		gap: 0.35rem;
+		font-family: var(--font-body);
+		font-size: 0.67rem;
+		font-weight: 450;
+		line-height: 1.35;
+		color: #78716c;
+	}
+
+	.transcript-auto-notice::before {
+		width: 1px;
+		height: 1rem;
+		margin-right: 0.1rem;
+		background: #d6d3d1;
+		content: '';
+	}
+
+	.transcript-auto-notice svg {
+		flex: none;
+		color: #b9610f;
+	}
+
+	@media (max-width: 640px) {
+		.transcript-fs-heading,
+		.transcript-inline-heading {
+			flex-direction: column;
+			align-items: flex-start;
+			gap: 0.25rem;
+		}
+
+		.transcript-auto-notice {
+			max-width: 34ch;
+			font-size: 0.625rem;
+		}
+
+		.transcript-auto-notice::before {
+			display: none;
+		}
 	}
 </style>

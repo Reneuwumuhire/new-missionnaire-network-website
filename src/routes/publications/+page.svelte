@@ -5,6 +5,7 @@
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import BsEmojiSmile from 'svelte-icons-pack/bs/BsEmojiSmile';
+	import RiLogoWhatsappFill from 'svelte-icons-pack/ri/RiLogoWhatsappFill';
 	import RiSystemEyeLine from 'svelte-icons-pack/ri/RiSystemEyeLine';
 	import RiSystemShareForwardLine from 'svelte-icons-pack/ri/RiSystemShareForwardLine';
 	import type { PageData } from './$types';
@@ -273,6 +274,30 @@
 		</div>
 	</header>
 
+	<div class="channel-header">
+		<div class="channel-identity">
+			<img src="/img/whatsapp-channel.jpg" alt="" width="640" height="640" decoding="async" />
+			<div class="channel-copy">
+				<strong>{data.channel}</strong>
+				<span
+					>{$t(data.posts.length === 1 ? 'publications.countOne' : 'publications.countMany', {
+						count: data.posts.length
+					})}</span
+				>
+			</div>
+		</div>
+		<a
+			class="channel-follow"
+			href={data.channelUrl}
+			target="_blank"
+			rel="noreferrer"
+			aria-label={$t('publications.followWhatsapp')}
+		>
+			<Icon src={RiLogoWhatsappFill} size="17" />
+			<span>{$t('publications.follow')}</span>
+		</a>
+	</div>
+
 	<section class="feed" aria-label={$t('publications.publishedPosts')}>
 		{#each visiblePosts as post, index (post.id)}
 			{#if index === 0 || dateLabel(post.publishedAt) !== dateLabel(visiblePosts[index - 1].publishedAt)}
@@ -507,10 +532,10 @@
 	h1 {
 		margin: 0;
 		font-family: var(--font-display);
-		font-size: clamp(2.25rem, 8vw, 3.35rem);
+		font-size: clamp(2.15rem, 5vw, 3rem);
 		font-weight: 600;
-		line-height: 0.98;
-		letter-spacing: -0.035em;
+		line-height: 1.05;
+		letter-spacing: 0;
 		color: #1c1917;
 	}
 
@@ -545,6 +570,93 @@
 		color: #9a4d00;
 	}
 
+	.channel-header {
+		position: sticky;
+		top: var(--header-height, 112px);
+		z-index: 30;
+		display: flex;
+		width: min(100%, 500px);
+		min-height: 68px;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.8rem;
+		margin: 0 auto 1rem;
+		padding: 0.58rem 0.65rem;
+		border: 1px solid rgb(68 64 60 / 90%);
+		border-radius: 0.5rem;
+		color: #fff;
+		background: rgb(28 25 23 / 96%);
+		box-shadow: 0 8px 24px rgb(28 25 23 / 18%);
+		backdrop-filter: blur(12px);
+		-webkit-backdrop-filter: blur(12px);
+	}
+
+	.channel-identity {
+		display: flex;
+		min-width: 0;
+		align-items: center;
+		gap: 0.65rem;
+	}
+
+	.channel-identity img {
+		width: 46px;
+		height: 46px;
+		flex: none;
+		border: 1px solid rgb(255 255 255 / 18%);
+		border-radius: 999px;
+		object-fit: cover;
+	}
+
+	.channel-copy {
+		display: grid;
+		min-width: 0;
+		gap: 0.12rem;
+	}
+
+	.channel-copy strong {
+		overflow: hidden;
+		font-size: 0.76rem;
+		font-weight: 700;
+		line-height: 1.2;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.channel-copy span {
+		font-size: 0.68rem;
+		color: #a8a29e;
+	}
+
+	.channel-follow {
+		display: inline-flex;
+		min-height: 40px;
+		flex: none;
+		align-items: center;
+		justify-content: center;
+		gap: 0.38rem;
+		padding: 0.55rem 0.8rem;
+		border-radius: 999px;
+		font-size: 0.72rem;
+		font-weight: 700;
+		text-decoration: none;
+		color: #102a1a;
+		background: #36c968;
+		transition:
+			background-color 160ms ease,
+			transform 160ms ease;
+	}
+
+	.channel-follow:hover,
+	.channel-follow:focus-visible {
+		background: #5bd982;
+		outline: 2px solid #fff;
+		outline-offset: 2px;
+	}
+
+	.channel-follow:active {
+		transform: scale(0.97);
+	}
+
 	.date-divider {
 		display: flex;
 		align-items: center;
@@ -573,7 +685,7 @@
 
 	.post {
 		overflow: hidden;
-		scroll-margin-top: calc(var(--header-height) + 1.5rem);
+		scroll-margin-top: calc(var(--header-height) + 5.5rem);
 		margin-bottom: 0.85rem;
 		border: 1px solid #ded9cf;
 		border-radius: 0.55rem;
@@ -1026,7 +1138,8 @@
 
 	@media (prefers-reduced-motion: reduce) {
 		.reaction-picker,
-		.reaction-picker button {
+		.reaction-picker button,
+		.channel-follow {
 			transition: none;
 		}
 	}
@@ -1041,7 +1154,31 @@
 		}
 
 		h1 {
-			font-size: clamp(2.1rem, 12vw, 2.8rem);
+			font-size: clamp(2rem, 10vw, 2.55rem);
+		}
+
+		.channel-header {
+			margin-inline: -0.05rem;
+			width: calc(100% + 0.1rem);
+			border-radius: 0.45rem;
+		}
+
+		.channel-copy strong {
+			max-width: 13rem;
+		}
+
+		.channel-follow {
+			width: 40px;
+			padding-inline: 0;
+		}
+
+		.channel-follow span {
+			position: absolute;
+			width: 1px;
+			height: 1px;
+			overflow: hidden;
+			clip: rect(0 0 0 0);
+			white-space: nowrap;
 		}
 
 		.post-copy {
