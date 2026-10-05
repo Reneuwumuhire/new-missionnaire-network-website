@@ -9,9 +9,9 @@ import {
 } from './publicationEngagement';
 import { getTranscriptForRecording } from './recordings';
 
-type PublicationLink = { label: string; href: string; kind: string };
+export type PublicationLink = { label: string; href: string; kind: string };
 
-type PublicationPost = {
+export type PublicationPost = {
 	id: string;
 	publishedAt: string;
 	text: string;
@@ -24,6 +24,8 @@ type PublicationPost = {
 	links: PublicationLink[];
 	source?: { kind: 'recording' | 'sermon'; id: string } | null;
 };
+
+export type SourceResources = { pdf?: unknown; videoId?: unknown; thumbnail?: unknown };
 
 export function addMissingPdfLink(links: PublicationLink[], value: unknown): PublicationLink[] {
 	if (links.some(({ kind }) => kind === 'pdf')) return links;
@@ -66,6 +68,22 @@ export function addMissingRecordingLinks(
 					: link
 			)
 		: updated;
+}
+
+export function applySourceResources(
+	post: PublicationPost,
+	resources?: SourceResources
+): PublicationPost {
+	const sourceThumbnail =
+		post.source?.kind === 'recording' ? publicAssetUrl(resources?.thumbnail) : '';
+	return {
+		...post,
+		image: sourceThumbnail || post.image,
+		links:
+			post.source?.kind === 'recording'
+				? addMissingRecordingLinks(post.links, resources?.videoId, resources?.pdf)
+				: addMissingPdfLink(post.links, resources?.pdf)
+	};
 }
 
 function decodeHtmlEntities(value: string): string {
@@ -162,12 +180,19 @@ export async function getExtraitFeed() {
 						.collection('recordings')
 						.find(
 							{ _id: { $in: recordingIds } },
-							{ projection: { transcript_pdf_id: 1, source_video_id: 1, started_at: 1 } }
+							{
+								projection: {
+									transcript_pdf_id: 1,
+									source_video_id: 1,
+									started_at: 1,
+									thumbnail_url: 1
+								}
+							}
 						)
 						.toArray()
 				: []
 		]);
-		const resourcesBySource = new Map<string, { pdf?: unknown; videoId?: unknown }>(
+		const resourcesBySource = new Map<string, SourceResources>(
 			sermons.map((sermon) => [sermon._id.toString(), { pdf: sermon.pdf_url }])
 		);
 		await Promise.all(
@@ -179,19 +204,14 @@ export async function getExtraitFeed() {
 				});
 				resourcesBySource.set(recording._id.toString(), {
 					pdf: transcript?.url,
-					videoId: recording.source_video_id
+					videoId: recording.source_video_id,
+					thumbnail: recording.thumbnail_url
 				});
 			})
 		);
 		const enrich = (post: PublicationPost): PublicationPost => {
 			const resources = post.source && resourcesBySource.get(post.source.id);
-			return {
-				...post,
-				links:
-					post.source?.kind === 'recording'
-						? addMissingRecordingLinks(post.links, resources?.videoId, resources?.pdf)
-						: addMissingPdfLink(post.links, resources?.pdf)
-			};
+			return applySourceResources(post, resources || undefined);
 		};
 		managedPosts = managedPosts.map(enrich);
 		archivedPosts = archivedPosts.map(enrich);
