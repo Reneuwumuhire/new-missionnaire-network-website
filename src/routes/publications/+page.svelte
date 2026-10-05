@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
 	import { afterNavigate } from '$app/navigation';
-	import { focusTrap } from '$lib/actions/focusTrap';
 	import { locale, t, type TranslationKey } from '../../i18n';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
@@ -17,9 +16,7 @@
 
 	let { data }: Props = $props();
 	const PAGE_SIZE = 6;
-	let openSharePostId = $state<string | null>(null);
 	let shareFeedback = $state<{ postId: string; state: 'copied' | 'error' } | null>(null);
-	let hasNativeShare = $state(false);
 	let copyResetTimer: ReturnType<typeof setTimeout> | undefined;
 	let visibleCount = $state(PAGE_SIZE);
 	let visiblePosts = $derived(data.posts.slice(0, visibleCount));
@@ -92,7 +89,6 @@
 	}
 
 	onMount(() => {
-		hasNativeShare = typeof navigator.share === 'function';
 		for (const post of data.posts) {
 			try {
 				const reaction = localStorage.getItem(`publication-reaction:${post.id}`);
@@ -225,12 +221,7 @@
 		openReactionPostId = openReactionPostId === postId ? null : postId;
 	}
 
-	function toggleShareMenu(id: string) {
-		openSharePostId = openSharePostId === id ? null : id;
-	}
-
 	function closeMenus() {
-		openSharePostId = null;
 		openReactionPostId = null;
 		openReactionSummaryPostId = null;
 	}
@@ -464,38 +455,17 @@
 							<div class="share-wrap">
 								<button
 									type="button"
-									class:share-active={openSharePostId === post.id}
 									class="share-button"
 									onclick={(event) => {
 										event.stopPropagation();
-										if (hasNativeShare) toggleShareMenu(post.id);
-										else void nativeShare(post);
+										void nativeShare(post);
 									}}
-									aria-haspopup={hasNativeShare ? 'menu' : undefined}
-									aria-expanded={hasNativeShare && openSharePostId === post.id}
 									aria-label={$t('publications.shareFor', { date: dateLabel(post.publishedAt) })}
 									title={$t('publications.share')}
 								>
 									<Icon src={RiSystemShareForwardLine} size="16" />
 									<span>{$t('publications.share')}</span>
 								</button>
-
-								{#if hasNativeShare && openSharePostId === post.id}
-									<!-- svelte-ignore a11y_click_events_have_key_events -->
-									<!-- svelte-ignore a11y_no_static_element_interactions -->
-									<div
-										class="share-menu"
-										role="menu"
-										tabindex="-1"
-										use:focusTrap={{ onEscape: closeMenus }}
-										onclick={(event) => event.stopPropagation()}
-									>
-										<button type="button" role="menuitem" onclick={() => nativeShare(post)}>
-											<Icon src={RiSystemShareForwardLine} size="17" />
-											<span>{$t('publications.shareNative')}</span>
-										</button>
-									</div>
-								{/if}
 
 								{#if shareFeedback?.postId === post.id}
 									<span class="share-feedback" role="status">
@@ -1065,48 +1035,6 @@
 	.share-button:focus-visible {
 		outline: 2px solid var(--color-missionnaire);
 		outline-offset: 2px;
-	}
-
-	.share-button.share-active {
-		color: #fff;
-		background: var(--color-missionnaire);
-		box-shadow: 0 6px 18px -8px rgb(255 136 12 / 55%);
-	}
-
-	.share-menu {
-		position: absolute;
-		right: 0;
-		bottom: calc(100% + 0.5rem);
-		z-index: 30;
-		width: 13rem;
-		overflow: hidden;
-		border: 1px solid #e7e5e4;
-		border-radius: 0.55rem;
-		background: #fff;
-		box-shadow: 0 18px 42px rgb(41 37 36 / 18%);
-	}
-
-	.share-menu button {
-		display: flex;
-		width: 100%;
-		align-items: center;
-		gap: 0.65rem;
-		padding: 0.7rem 0.8rem;
-		border: 0;
-		font: inherit;
-		font-size: 0.75rem;
-		font-weight: 650;
-		text-align: left;
-		color: #44403c;
-		background: #fff;
-		cursor: pointer;
-	}
-
-	.share-menu button:hover,
-	.share-menu button:focus-visible {
-		color: var(--color-missionnaire);
-		background: #fafaf9;
-		outline: none;
 	}
 
 	.share-feedback {
