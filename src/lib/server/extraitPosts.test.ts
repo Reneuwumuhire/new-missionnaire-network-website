@@ -59,14 +59,14 @@ it('recovers a legacy post source and adds its current recording links', () => {
 	]);
 });
 
-it('uses a linked recording thumbnail for publication posts', () => {
+it('uses a linked recording thumbnail only when the publication has no attachment', () => {
 	const post = {
 		id: 'post-1',
 		publishedAt: '2026-10-01T20:20:00.000Z',
 		text: 'Post body',
 		excerpt: 'Post body',
 		bodyHtml: 'Post body',
-		image: '/img/extraits/fallback.jpg',
+		image: '',
 		imageWidth: 1080,
 		imageHeight: 608,
 		sourceTitle: 'Linked recording',
@@ -79,6 +79,14 @@ it('uses a linked recording thumbnail for publication posts', () => {
 		],
 		source: { kind: 'recording' as const, id: '6abd477a1473609269a4fcb7' }
 	};
+	expect(
+		applySourceResources(
+			{ ...post, image: '/img/extraits/attached.jpg' },
+			{
+				thumbnail: 'https://cdn.example.com/recording.jpg'
+			}
+		).image
+	).toBe('/img/extraits/attached.jpg');
 
 	expect(
 		applySourceResources(post, {

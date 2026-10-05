@@ -78,7 +78,7 @@ export function applySourceResources(
 		post.source?.kind === 'recording' ? publicAssetUrl(resources?.thumbnail) : '';
 	return {
 		...post,
-		image: sourceThumbnail || post.image,
+		image: post.image || sourceThumbnail,
 		links:
 			post.source?.kind === 'recording'
 				? addMissingRecordingLinks(post.links, resources?.videoId, resources?.pdf)
@@ -157,7 +157,8 @@ export async function getExtraitFeed() {
 			(post) =>
 				post.source &&
 				ObjectId.isValid(post.source.id) &&
-				(!post.links.some(({ kind }) => kind === 'pdf') ||
+				(!post.image ||
+					!post.links.some(({ kind }) => kind === 'pdf') ||
 					(post.source.kind === 'recording' && !post.links.some(({ kind }) => kind === 'video')))
 		);
 		const sourceIds = (kind: 'sermon' | 'recording') =>

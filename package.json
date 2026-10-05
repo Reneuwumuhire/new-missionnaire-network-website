@@ -82,6 +82,7 @@
 		"mongodb": "^6.8.0",
 		"pdfjs-dist": "^6.3.289",
 		"plyr": "^3.7.8",
+		"sharp": "^0.35.5",
 		"svelte-icons-pack": "^2.1.0",
 		"web-push": "^3.6.7",
 		"zod": "^3.22.2"
