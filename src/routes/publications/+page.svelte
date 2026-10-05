@@ -108,7 +108,7 @@
 	async function scrollToSharedPost() {
 		let id: string;
 		try {
-			id = decodeURIComponent(window.location.hash.slice(1));
+			id = decodeURIComponent(window.location.hash.slice(1)) || data.selectedPostId || '';
 		} catch {
 			return;
 		}
@@ -117,7 +117,10 @@
 		visibleCount = Math.max(visibleCount, targetIndex + 1);
 		await tick();
 		requestAnimationFrame(() => {
-			if (window.location.hash === `#${encodeURIComponent(id)}`) {
+			if (
+				window.location.hash === `#${encodeURIComponent(id)}` ||
+				(!window.location.hash && data.selectedPostId === id)
+			) {
 				document.getElementById(id)?.scrollIntoView({ block: 'start' });
 			}
 		});
@@ -126,7 +129,8 @@
 	afterNavigate(() => void scrollToSharedPost());
 
 	function postUrl(id: string) {
-		return `${window.location.origin}/publications#${encodeURIComponent(id)}`;
+		const encodedId = encodeURIComponent(id);
+		return `${window.location.origin}/publications?post=${encodedId}#${encodedId}`;
 	}
 
 	async function syncEngagement(postId: string, body: Record<string, unknown>) {
