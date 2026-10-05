@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
+	import { afterNavigate } from '$app/navigation';
 	import { focusTrap } from '$lib/actions/focusTrap';
 	import { locale, t, type TranslationKey } from '../../i18n';
 	// @ts-ignore
@@ -102,15 +103,30 @@
 				/* Storage can be blocked in private mode. */
 			}
 		}
-		const id = window.location.hash.slice(1);
-		const targetIndex = data.posts.findIndex((post) => post.id === id);
-		if (targetIndex < visibleCount) return;
-		visibleCount = targetIndex + 1;
-		void tick().then(() => document.getElementById(id)?.scrollIntoView());
 	});
 
+	async function scrollToSharedPost() {
+		let id: string;
+		try {
+			id = decodeURIComponent(window.location.hash.slice(1));
+		} catch {
+			return;
+		}
+		const targetIndex = data.posts.findIndex((post) => post.id === id);
+		if (targetIndex < 0) return;
+		visibleCount = Math.max(visibleCount, targetIndex + 1);
+		await tick();
+		requestAnimationFrame(() => {
+			if (window.location.hash === `#${encodeURIComponent(id)}`) {
+				document.getElementById(id)?.scrollIntoView({ block: 'start' });
+			}
+		});
+	}
+
+	afterNavigate(() => void scrollToSharedPost());
+
 	function postUrl(id: string) {
-		return `${window.location.origin}/publications/${encodeURIComponent(id)}`;
+		return `${window.location.origin}/publications#${encodeURIComponent(id)}`;
 	}
 
 	async function syncEngagement(postId: string, body: Record<string, unknown>) {
@@ -247,6 +263,7 @@
 </script>
 
 <svelte:window
+	onhashchange={() => void scrollToSharedPost()}
 	onclick={closeMenus}
 	onkeydown={(event) => {
 		if (event.key === 'Escape') closeMenus();
