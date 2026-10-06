@@ -267,6 +267,22 @@ textarea {
 		background: rgb(var(--text-accent));
 	}
 
+	.studio-fader-vertical {
+		position: absolute;
+		left: 50%;
+		top: 50%;
+		width: 112px;
+		transform: translate(-50%, -50%) rotate(-90deg);
+	}
+
+	.studio-fader-vertical::-webkit-slider-runnable-track {
+		background: linear-gradient(
+			to right,
+			#3b82f6 var(--level, 0%),
+			rgb(var(--control-border)) var(--level, 0%)
+		);
+	}
+
 	.studio-icon-btn {
 		@apply flex h-6 w-6 shrink-0 items-center justify-center text-sm text-muted transition-colors hover:bg-fg/10 hover:text-fg disabled:pointer-events-none disabled:opacity-60;
 	}

@@ -127,6 +127,8 @@ const en = {
 	'mixer.micRetry': 'Ask again',
 	'mixer.openPrivacy': 'Open Privacy settings',
 	'mixer.monitor': 'Monitor',
+	'mixer.active': 'Active',
+	'mixer.inactive': 'Inactive',
 	'mixer.monitorWarning':
 		'Monitoring is on — use headphones, or the mic will pick up the speakers.',
 	'mixer.addSource': 'Add audio source',

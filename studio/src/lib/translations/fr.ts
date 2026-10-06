@@ -132,6 +132,8 @@ const fr: Record<keyof typeof en, string> = {
 	'mixer.micRetry': 'Redemander',
 	'mixer.openPrivacy': 'Ouvrir Confidentialit\u00e9',
 	'mixer.monitor': 'Écoute',
+	'mixer.active': 'Actif',
+	'mixer.inactive': 'Inactif',
 	'mixer.monitorWarning':
 		'Écoute locale active — au casque, sinon le micro capte les haut-parleurs.',
 	'mixer.addSource': 'Ajouter une source audio',
