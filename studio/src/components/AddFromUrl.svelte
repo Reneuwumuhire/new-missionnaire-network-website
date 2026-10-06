@@ -19,10 +19,12 @@
 
 	let {
 		onclose,
-		onready
+		onready,
+		onlive
 	}: {
 		onclose: () => void;
 		onready: (found: Resolved, url: string, audioOnly: boolean) => void;
+		onlive: (url: string) => void;
 	} = $props();
 
 	let url = $state('');
@@ -88,7 +90,14 @@
 			</button>
 		</div>
 
-		{#if error}
+		{#if error === 'LIVE_STREAM_USE_WINDOW_CAPTURE'}
+			<div class="flex flex-col gap-3 border border-amber-500/30 bg-amber-950/30 px-3 py-3">
+				<p class="text-[12px] leading-relaxed text-fg/80">{t('web.liveCaptureHint')}</p>
+				<button class="studio-chip self-start" onclick={() => onlive(url.trim())}>
+					{t('web.openLiveCapture')}
+				</button>
+			</div>
+		{:else if error}
 			<!-- Same treatment as the title bar's error strip, so a failure here reads
 			     as the same kind of event it does everywhere else in the app. -->
 			<p

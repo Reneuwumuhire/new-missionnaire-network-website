@@ -69,23 +69,36 @@ const en = {
 	'sources.urlHint': 'Play a video or a song from a link, like any media source',
 	'sources.youtubeLive': 'YouTube Live Window',
 	'sources.youtubeLiveHint': 'Capture a live player with its exact application audio',
+	'sources.pickWindow': 'Choose a window to capture',
+	'sources.pickWindowHint':
+		'Choose the window playing the live video. Studio captures it directly and leaves the mouse pointer out of the broadcast.',
+	'sources.untitledWindow': 'Untitled window',
+	'sources.noWindows':
+		'No windows found. Allow Screen Recording for Missionnaire Studio in macOS settings, then refresh.',
+	'sources.noVideoFrames':
+		'The window has not sent video. Keep it open and visible, then reconnect this source.',
+	'sources.screenPermission': 'Screen Recording settings',
+	'sources.refreshWindows': 'Refresh windows',
 	'youtubeLive.title': 'Add YouTube live',
 	'youtubeLive.url': 'YouTube live address',
 	'youtubeLive.hint':
-		'Studio opens a clean live player in your browser, then the system window picker captures it. Keep that window visible and mute other tabs in the same browser.',
+		'Studio opens the YouTube live page in your browser. Keep that window visible and mute other tabs in the same browser before selecting it for capture.',
 	'youtubeLive.invalid': 'Enter a valid secure YouTube video or live link.',
 	'youtubeLive.openPlayer': '1. Open live player',
 	'youtubeLive.playerOpened': 'Player opened',
 	'youtubeLive.openChat': 'Open live chat',
 	'youtubeLive.capture': '2. Capture window',
 	'youtubeLive.captureHint':
-		'Start playback if needed, move the pointer back over Studio so the player controls fade, then choose that browser window. On Windows, enable Share system audio; if the window has no audio, maximize it and capture that display. On macOS, Studio pairs the browser audio automatically.',
+		'Start playback if needed, move the pointer back over Studio so the player controls fade, then choose that browser window. On macOS, Studio captures it directly without the pointer and pairs its audio automatically. On Windows, enable Share system audio.',
 	'web.title': 'Add from a link',
 	'web.url': 'Address',
 	'web.audioOnly': 'Sound only',
 	'web.withPicture': 'With picture',
 	'web.add': 'Add',
 	'web.reading': 'Reading the link…',
+	'web.liveCaptureHint':
+		'Live streams cannot be relayed as a link. Capture the YouTube player window instead, then add that browser in App Audio to capture its sound.',
+	'web.openLiveCapture': 'Set up window capture',
 	'web.hintAudio':
 		'Plays straight away, at full quality, and nothing is saved to disk. It streams while you are on air, so it needs the internet to keep working.',
 	'web.hintVideo':

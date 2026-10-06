@@ -22,10 +22,12 @@ export function youtubeVideoId(value: string): string | null {
 	return candidate && VIDEO_ID.test(candidate) ? candidate : null;
 }
 
-/** Player-only page for capture: no recommendations or page furniture, while
- * retaining YouTube's own controls for the occasional pause or rewind. */
+/** Open the ordinary watch page rather than a standalone /embed URL. YouTube
+ * rejects a directly opened embed without a referring page (Error 153); the
+ * watch page supplies YouTube's expected player context and can still be
+ * selected by the system window picker. */
 export const youtubePlayerUrl = (videoId: string) =>
-	`https://www.youtube.com/embed/${encodeURIComponent(videoId)}?autoplay=1&controls=1&playsinline=1&rel=0`;
+	`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}&autoplay=1`;
 
 export const youtubeChatUrl = (videoId: string) =>
 	`https://www.youtube.com/live_chat?v=${encodeURIComponent(videoId)}&is_popout=1`;

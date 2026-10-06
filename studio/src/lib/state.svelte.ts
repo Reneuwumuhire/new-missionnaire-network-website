@@ -53,6 +53,8 @@ export interface Layer {
 	 *  because the engine hands a window over without any. Same field, same
 	 *  meaning as on an `app` audio source. */
 	appId?: string;
+	/** macOS ScreenCaptureKit window selected for native video capture. */
+	windowId?: number;
 	/** screen: leave the mouse pointer out of the shared window, where the
 	 *  engine lets us ask. */
 	hideCursor?: boolean;

@@ -3,6 +3,7 @@ mod fetch;
 mod ffmpeg;
 mod reference;
 mod service_files;
+mod window_capture;
 
 use ffmpeg::{Encoder, FfmpegInfo, StreamConfig};
 use serde::Serialize;
@@ -375,6 +376,38 @@ fn list_windows() -> Result<Vec<appaudio::AudioWindow>, String> {
 	appaudio::list_windows()
 }
 
+#[tauri::command]
+fn native_window_capture_available() -> bool {
+	cfg!(target_os = "macos")
+}
+
+#[tauri::command]
+fn start_window_capture(
+	capture: State<'_, window_capture::Capture>, id: String, window_id: u32,
+	width: u32, height: u32, fps: u32, hide_cursor: bool,
+) -> Result<window_capture::CaptureInfo, String> {
+	capture.start(&id, window_id, width, height, fps, hide_cursor)
+}
+
+#[tauri::command]
+fn window_capture_frame(
+	capture: State<'_, window_capture::Capture>, id: String, last_sequence: u64,
+) -> tauri::ipc::Response {
+	tauri::ipc::Response::new(capture.frame(&id, last_sequence))
+}
+
+#[tauri::command]
+fn set_window_capture_cursor(
+	capture: State<'_, window_capture::Capture>, id: String, hide_cursor: bool,
+) -> Result<(), String> {
+	capture.set_cursor(&id, hide_cursor)
+}
+
+#[tauri::command]
+fn stop_window_capture(capture: State<'_, window_capture::Capture>, id: Option<String>) {
+	capture.stop(id.as_deref());
+}
+
 /// Start capturing one application's audio for the mixer strip `id`. PCM
 /// arrives on `channel` as interleaved stereo f32 at 48 kHz — the rate the
 /// webview's AudioContext runs at, so nothing has to resample.
@@ -684,6 +717,7 @@ pub fn run() {
 		.manage(InterfaceZoom::default())
 		.manage(Encoder::default())
 		.manage(appaudio::Capture::default())
+		.manage(window_capture::Capture::default())
 		.manage(fetch::Streams::default())
 		// The media proxy. A `<video>` playing ytstream://s?id=… lands here, and
 		// the answer carries the CORS header googlevideo never sends — which is
@@ -809,6 +843,11 @@ pub fn run() {
 			open_privacy_settings,
 			list_audio_apps,
 			list_windows,
+			native_window_capture_available,
+			start_window_capture,
+			window_capture_frame,
+			set_window_capture_cursor,
+			stop_window_capture,
 			start_app_audio,
 			stop_app_audio,
 			resolve_media,
@@ -834,6 +873,9 @@ pub fn run() {
 						let _ = encoder.stop();
 					}
 					if let Some(capture) = window.app_handle().try_state::<appaudio::Capture>() {
+						capture.stop(None);
+					}
+					if let Some(capture) = window.app_handle().try_state::<window_capture::Capture>() {
 						capture.stop(None);
 					}
 				}

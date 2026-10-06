@@ -274,12 +274,22 @@ function drawLayer(
 
 	const handle = handleForLayer(layer);
 	const el = handle?.el;
-	if (!el) {
+	if (!el || (handle?.nativeCaptureId && !handle.nativeFrameReady)) {
 		ctx.globalAlpha = 1;
 		return false;
 	}
-	const srcW = el instanceof HTMLVideoElement ? el.videoWidth : el.naturalWidth;
-	const srcH = el instanceof HTMLVideoElement ? el.videoHeight : el.naturalHeight;
+	const srcW =
+		el instanceof HTMLVideoElement
+			? el.videoWidth
+			: el instanceof HTMLCanvasElement
+				? el.width
+				: el.naturalWidth;
+	const srcH =
+		el instanceof HTMLVideoElement
+			? el.videoHeight
+			: el instanceof HTMLCanvasElement
+				? el.height
+				: el.naturalHeight;
 	// A camera that has not delivered its first frame reports 0×0; drawing it
 	// throws in some engines and draws garbage in others.
 	if (!srcW || !srcH) {

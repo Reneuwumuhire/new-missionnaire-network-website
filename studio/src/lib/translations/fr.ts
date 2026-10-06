@@ -72,23 +72,36 @@ const fr: Record<keyof typeof en, string> = {
 	'sources.urlHint': 'Lire une vidéo ou un chant depuis un lien, comme toute autre source',
 	'sources.youtubeLive': 'Fenêtre YouTube Live',
 	'sources.youtubeLiveHint': 'Capturer un direct avec le son exact de son application',
+	'sources.pickWindow': 'Choisir une fenêtre à capturer',
+	'sources.pickWindowHint':
+		'Choisissez la fenêtre qui lit le direct. Studio la capture directement sans afficher le pointeur dans la diffusion.',
+	'sources.untitledWindow': 'Fenêtre sans titre',
+	'sources.noWindows':
+		'Aucune fenêtre trouvée. Autorisez l’enregistrement de l’écran pour Missionnaire Studio dans les réglages macOS, puis actualisez.',
+	'sources.noVideoFrames':
+		'La fenêtre n’envoie pas de vidéo. Laissez-la ouverte et visible, puis reconnectez cette source.',
+	'sources.screenPermission': 'Réglages d’enregistrement de l’écran',
+	'sources.refreshWindows': 'Actualiser les fenêtres',
 	'youtubeLive.title': 'Ajouter un direct YouTube',
 	'youtubeLive.url': 'Adresse du direct YouTube',
 	'youtubeLive.hint':
-		'Studio ouvre un lecteur épuré dans votre navigateur, puis le sélecteur système le capture. Gardez cette fenêtre visible et coupez le son des autres onglets du même navigateur.',
+		'Studio ouvre la page du direct YouTube dans votre navigateur. Gardez cette fenêtre visible et coupez le son des autres onglets avant de la sélectionner pour la capture.',
 	'youtubeLive.invalid': 'Saisissez un lien YouTube vidéo ou direct sécurisé et valide.',
 	'youtubeLive.openPlayer': '1. Ouvrir le direct',
 	'youtubeLive.playerOpened': 'Lecteur ouvert',
 	'youtubeLive.openChat': 'Ouvrir le chat',
 	'youtubeLive.capture': '2. Capturer la fenêtre',
 	'youtubeLive.captureHint':
-		'Lancez la lecture si nécessaire, ramenez le pointeur sur Studio pour masquer les commandes, puis choisissez cette fenêtre. Sous Windows, activez Partager l’audio du système ; si la fenêtre n’a pas de son, agrandissez-la et capturez cet écran. Sous macOS, Studio associe automatiquement le son du navigateur.',
+		'Lancez la lecture si nécessaire, ramenez le pointeur sur Studio pour masquer les commandes, puis choisissez cette fenêtre. Sous macOS, Studio la capture directement sans le pointeur et associe automatiquement le son du navigateur. Sous Windows, activez Partager l’audio du système.',
 	'web.title': 'Ajouter depuis un lien',
 	'web.url': 'Adresse',
 	'web.audioOnly': 'Son seul',
 	'web.withPicture': 'Avec l’image',
 	'web.add': 'Ajouter',
 	'web.reading': 'Lecture du lien…',
+	'web.liveCaptureHint':
+		'Les directs ne peuvent pas être relayés comme un lien. Capturez la fenêtre du lecteur YouTube, puis ajoutez ce navigateur dans Audio des applications pour capturer le son.',
+	'web.openLiveCapture': 'Configurer la capture de fenêtre',
 	'web.hintAudio':
 		'Lecture immédiate, en pleine qualité, et rien n’est enregistré sur le disque. Le flux est lu pendant l’antenne : il faut donc garder la connexion.',
 	'web.hintVideo':

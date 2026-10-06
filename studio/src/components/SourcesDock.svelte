@@ -4,7 +4,9 @@
 		mediaVersion,
 		openCamera,
 		openFile,
+		openNativeWindow,
 		openScreen,
+		openPrivacySettings,
 		openStream,
 		release,
 		report
@@ -17,6 +19,7 @@
 		matchWindow,
 		refreshApps
 	} from '../lib/appaudio.svelte';
+	import type { AudioWindow } from '../lib/appaudio.svelte';
 	import { addAppAudio, addAudioInput } from '../lib/state.svelte';
 	import { invoke } from '@tauri-apps/api/core';
 	import AddFromUrl from './AddFromUrl.svelte';
@@ -104,6 +107,43 @@
 	});
 	let fileInput = $state<HTMLInputElement | null>(null);
 	let pendingFileLayer = $state<Layer | null>(null);
+	let pendingWindowLayer = $state<Layer | null>(null);
+	let windowChoices = $state<AudioWindow[]>([]);
+	let windowPickerError = $state<string | null>(null);
+
+	async function refreshWindowChoices() {
+		try {
+			windowChoices = await invoke<AudioWindow[]>('list_windows');
+			windowPickerError = null;
+		} catch (error) {
+			windowChoices = [];
+			const message = String(error);
+			windowPickerError = /TCC|permission|not authorized|declined/i.test(message)
+				? t('sources.noWindows')
+				: message;
+		}
+	}
+
+	async function captureNativeWindow(layer: Layer, choice: AudioWindow) {
+		if (choice.id === undefined) return;
+		pendingWindowLayer = null;
+		const handle = await openNativeWindow(layer, choice.id);
+		if (handle.el) {
+			// A newly made layer can still be the plain object passed to the picker.
+			// Update the copy in Svelte state so the audio mixer reacts immediately.
+			const tracked = studio.scenes
+				.flatMap((scene) => scene.layers)
+				.find((candidate) => candidate.id === layer.id);
+			if (!tracked) {
+				release(layer.id);
+				return;
+			}
+			tracked.windowId = choice.id;
+			tracked.appId = choice.appId;
+			report(`native window capture app=${choice.appName} window=${JSON.stringify(choice.title)}`);
+			persist();
+		}
+	}
 
 	/** The two audio kinds are not layers: they have no picture, and they are
 	 *  global to the show. They are offered here because OBS offers them here,
@@ -241,6 +281,13 @@
 			layer.hideCursor = true;
 			layer.fit = 'cover';
 		}
+		if (await invoke<boolean>('native_window_capture_available')) {
+			await refreshWindowChoices();
+			const previous = windowChoices.find((window) => window.id === layer.windowId);
+			if (previous) await captureNativeWindow(layer, previous);
+			else pendingWindowLayer = layer;
+			return;
+		}
 		const handle = await openScreen(layer);
 		const track = handle.stream?.getVideoTracks()[0];
 		if (!track) return;
@@ -278,6 +325,13 @@
 
 	let urlOpen = $state(false);
 	let youtubeLiveOpen = $state(false);
+	let youtubeLiveInitialUrl = $state('');
+
+	function openLiveCapture(url: string) {
+		urlOpen = false;
+		youtubeLiveInitialUrl = url;
+		youtubeLiveOpen = true;
+	}
 
 	async function addYouTubeLive(url: string) {
 		youtubeLiveOpen = false;
@@ -469,11 +523,47 @@
 {/if}
 
 {#if urlOpen}
-	<AddFromUrl onclose={() => (urlOpen = false)} onready={addFetched} />
+	<AddFromUrl onclose={() => (urlOpen = false)} onready={addFetched} onlive={openLiveCapture} />
 {/if}
 
 {#if youtubeLiveOpen}
-	<AddYouTubeLive onclose={() => (youtubeLiveOpen = false)} onready={addYouTubeLive} />
+	<AddYouTubeLive
+		onclose={() => (youtubeLiveOpen = false)}
+		onready={addYouTubeLive}
+		initialUrl={youtubeLiveInitialUrl}
+	/>
+{/if}
+
+{#if pendingWindowLayer}
+	<Modal title={t('sources.pickWindow')} onclose={() => (pendingWindowLayer = null)}>
+		<div class="flex flex-col gap-3 p-5">
+			<p class="text-[12px] leading-relaxed text-muted">{t('sources.pickWindowHint')}</p>
+			{#if windowChoices.length}
+				<div class="max-h-80 space-y-1 overflow-y-auto">
+					{#each windowChoices as choice (choice.id)}
+						<button
+							class="studio-chip flex w-full flex-col items-start gap-1 text-left"
+							disabled={choice.id === undefined}
+							onclick={() => pendingWindowLayer && captureNativeWindow(pendingWindowLayer, choice)}
+						>
+							<span class="text-fg">{choice.appName}</span>
+							<span class="truncate text-muted">{choice.title || t('sources.untitledWindow')}</span>
+						</button>
+					{/each}
+				</div>
+			{:else}
+				<p class="text-[12px] text-warning">{windowPickerError || t('sources.noWindows')}</p>
+			{/if}
+			<div class="flex justify-between border-t border-ink-700 pt-3">
+				<button class="studio-chip" onclick={() => openPrivacySettings('screen')}>
+					{t('sources.screenPermission')}
+				</button>
+				<button class="studio-chip" onclick={refreshWindowChoices}
+					>{t('sources.refreshWindows')}</button
+				>
+			</div>
+		</div>
+	</Modal>
 {/if}
 
 <Dock id="sources" title={t('dock.sources')}>

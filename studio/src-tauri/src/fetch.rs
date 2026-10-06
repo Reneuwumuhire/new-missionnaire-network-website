@@ -113,11 +113,8 @@ pub fn check_url(url: &str) -> Result<(), String> {
 	Ok(())
 }
 
-/// Refusing a live stream is not a dead end, so the message names the way that
-/// does work — and that way already ships.
-const LIVE_HINT: &str = "Direct en cours : le flux ne peut pas être relayé ici. Mettez-le à \
-	l'antenne avec une capture de fenêtre du navigateur, et ajoutez ce navigateur dans la capture \
-	audio d'application pour le son.";
+/// Stable error code so the UI can offer the supported window-capture flow.
+const LIVE_HINT: &str = "LIVE_STREAM_USE_WINDOW_CAPTURE";
 
 /// Second opinion, asked only when format selection has already failed.
 fn is_live(bin: &std::path::Path, url: &str) -> bool {

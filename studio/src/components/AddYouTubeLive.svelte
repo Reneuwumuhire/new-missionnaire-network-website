@@ -4,11 +4,19 @@
 	import { youtubeChatUrl, youtubePlayerUrl, youtubeVideoId } from '../lib/youtube';
 	import Modal from './Modal.svelte';
 
-	let { onclose, onready }: { onclose: () => void; onready: (url: string) => void } = $props();
+	let {
+		onclose,
+		onready,
+		initialUrl = ''
+	}: { onclose: () => void; onready: (url: string) => void; initialUrl?: string } = $props();
 
 	let value = $state('');
 	let opened = $state(false);
 	let error = $state<string | null>(null);
+	$effect(() => {
+		value = initialUrl;
+		opened = false;
+	});
 	const videoId = $derived(youtubeVideoId(value));
 	const playerUrl = $derived(videoId ? youtubePlayerUrl(videoId) : null);
 
