@@ -296,6 +296,7 @@ export async function openNativeWindow(layer: Layer, windowId: number): Promise<
 		let cancelled = false;
 		let timer: ReturnType<typeof setTimeout> | undefined;
 		let lastSequence = 0;
+		let failures = 0;
 		const firstFrameDeadline = Date.now() + 8_000;
 		const h: Handle = {
 			kind: 'screen',
@@ -317,6 +318,7 @@ export async function openNativeWindow(layer: Layer, windowId: number): Promise<
 					id: captureId,
 					lastSequence
 				});
+				failures = 0;
 				const bytes = response instanceof ArrayBuffer ? response : new Uint8Array(response).buffer;
 				if (bytes.byteLength > 8) {
 					lastSequence = Number(new DataView(bytes).getBigUint64(0, true));
@@ -339,9 +341,12 @@ export async function openNativeWindow(layer: Layer, windowId: number): Promise<
 				}
 			} catch (err) {
 				if (!cancelled) {
-					h.error = describe(err);
-					mediaVersion.n++;
-					timer = setTimeout(next, 250);
+					const error = describe(err);
+					if (h.error !== error) {
+						h.error = error;
+						mediaVersion.n++;
+					}
+					timer = setTimeout(next, Math.min(4000, 250 * 2 ** Math.min(failures++, 4)));
 				}
 				return;
 			}

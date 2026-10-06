@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { invoke } from '@tauri-apps/api/core';
-import { handleFor, openNativeWindow, release } from './media.svelte';
+import { handleFor, mediaVersion, openNativeWindow, release } from './media.svelte';
 import { makeLayer } from './state.svelte';
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
@@ -52,4 +52,44 @@ it('keeps the newest window when an older capture starts late', async () => {
 			)
 	).toBe(true);
 	release(layer.id);
+});
+
+it('backs off repeated window frame errors without refreshing the UI again', async () => {
+	vi.useFakeTimers();
+	const layer = makeLayer('screen', 'Live');
+	vi.mocked(invoke).mockImplementation((command) => {
+		if (command === 'start_window_capture')
+			return Promise.resolve({ width: 640, height: 360 }) as never;
+		if (command === 'window_capture_frame')
+			return Promise.reject(new Error('frame unavailable')) as never;
+		return Promise.resolve() as never;
+	});
+	vi.stubGlobal('HTMLVideoElement', class {});
+	vi.stubGlobal('document', { createElement: () => ({ getContext: () => ({}) }) });
+
+	try {
+		await openNativeWindow(layer, 1);
+		await vi.advanceTimersByTimeAsync(0);
+		const versionAfterFirstError = mediaVersion.n;
+		expect(handleFor(layer.id)?.error).toContain('frame unavailable');
+
+		await vi.advanceTimersByTimeAsync(250);
+		expect(mediaVersion.n).toBe(versionAfterFirstError);
+		expect(
+			vi.mocked(invoke).mock.calls.filter(([command]) => command === 'window_capture_frame')
+		).toHaveLength(2);
+
+		await vi.advanceTimersByTimeAsync(499);
+		expect(
+			vi.mocked(invoke).mock.calls.filter(([command]) => command === 'window_capture_frame')
+		).toHaveLength(2);
+		await vi.advanceTimersByTimeAsync(1);
+		expect(
+			vi.mocked(invoke).mock.calls.filter(([command]) => command === 'window_capture_frame')
+		).toHaveLength(3);
+		expect(mediaVersion.n).toBe(versionAfterFirstError);
+	} finally {
+		release(layer.id);
+		vi.useRealTimers();
+	}
 });
