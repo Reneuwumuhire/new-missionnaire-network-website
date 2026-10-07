@@ -502,11 +502,12 @@
 							>
 								<div
 									class="absolute inset-0"
+									class:opacity-40={!connected}
 									style="background: linear-gradient(to top, #19ad4b 0%, #19ad4b 70%, #c4ba28 70%, #c4ba28 90%, #bb292d 90%, #bb292d 100%)"
 								></div>
 								{#if connected}
 									<div
-										class="absolute inset-x-0 top-0 bg-ink-950"
+										class="absolute inset-x-0 top-0 bg-ink-950/60"
 										style="height: {(1 - fraction) * 100}%"
 									></div>
 								{/if}
