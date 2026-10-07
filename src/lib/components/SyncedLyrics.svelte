@@ -822,13 +822,15 @@
 	   container so it stays visible while the reader browses history. */
 	.resume-follow {
 		position: sticky;
+		z-index: 2;
 		bottom: 0.5rem;
 		align-self: center;
 		margin-top: 0.5rem;
+		min-height: 44px;
 		border: 1px solid rgba(255, 136, 12, 0.4);
 		border-radius: 999px;
 		background: rgba(255, 251, 245, 0.95);
-		padding: 0.45rem 1.1rem;
+		padding: 0.6rem 1.1rem;
 		font-family: var(--font-body, 'Outfit', system-ui, sans-serif);
 		font-size: 0.72rem;
 		font-weight: 700;
@@ -836,6 +838,7 @@
 		color: #c2640c;
 		box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
 		cursor: pointer;
+		touch-action: manipulation;
 		transition: background-color 160ms ease;
 	}
 
