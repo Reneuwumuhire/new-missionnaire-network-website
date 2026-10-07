@@ -45,6 +45,8 @@
 		handleForLayer,
 		mediaVersion,
 		openCamera,
+		previewAudioId,
+		previewAudioLayer,
 		releaseAll
 	} from './lib/media.svelte';
 	import { Mixer, stripsToDrop } from './lib/mixer';
@@ -307,6 +309,12 @@
 		const bus = mixer;
 		if (!bus) return;
 		const wanted = new Set<string>();
+		const preview = previewAudioLayer();
+		const previewId = preview ? previewAudioId(preview.id) : null;
+		// Remove the old preview tap before Program can take that same element.
+		for (const id of bus.ids()) {
+			if (id.startsWith('preview:') && id !== previewId) bus.remove(id);
+		}
 
 		for (const source of studio.audioSources) {
 			// App audio is a worklet the native capture owns, not a device stream.
@@ -336,17 +344,27 @@
 			// A shared window's sound is the native app capture, which is already
 			// a strip and has no media handle. Claim it first, or the sweep below
 			// would tear it down a frame after it started.
-			if (bus.has(layer.id)) {
+			if (layer.appId && bus.has(layer.id)) {
 				wanted.add(layer.id);
 			} else if (handle?.stream && bus.addStream(layer.id, handle.stream)) {
 				wanted.add(layer.id);
-			} else if (handle?.el instanceof HTMLVideoElement && !handle.stream) {
+			} else if (layer.kind === 'video' && handle?.el instanceof HTMLVideoElement) {
 				bus.addElement(layer.id, handle.el);
 				wanted.add(layer.id);
 			}
 			if (wanted.has(layer.id)) {
 				bus.setLevel(layer.id, layer.gain, layer.muted);
 				bus.setReference(layer.id, layer.id === studio.service.krefeldLayerId);
+			}
+		}
+		if (preview) {
+			const element = handleForLayer(preview)?.el;
+			if (element instanceof HTMLVideoElement) {
+				const id = previewAudioId(preview.id);
+				bus.addElement(id, element, true);
+				bus.setLevel(id, preview.gain, preview.muted);
+				wanted.add(id);
+				void bus.resume();
 			}
 		}
 		// Only the scene's own layers come and go. A mic or an application strip

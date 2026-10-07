@@ -1,13 +1,69 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { invoke } from '@tauri-apps/api/core';
-import { handleFor, mediaVersion, openNativeWindow, release } from './media.svelte';
-import { makeLayer } from './state.svelte';
+import {
+	handleFor,
+	mediaVersion,
+	openFile,
+	openNativeWindow,
+	pinHandle,
+	previewAudioLayer,
+	release,
+	releaseUnusedPins
+} from './media.svelte';
+import { makeLayer, studio } from './state.svelte';
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 
 afterEach(() => {
 	vi.unstubAllGlobals();
 	vi.resetAllMocks();
+});
+
+it('auditions a disconnected Preview file but stops auditioning once Program takes it', () => {
+	class Video {
+		muted = true;
+		src = '';
+		pause() {}
+		removeAttribute() {}
+	}
+	vi.stubGlobal('HTMLVideoElement', Video);
+	vi.stubGlobal('document', { createElement: () => new Video() });
+	const original = {
+		scenes: studio.scenes,
+		activeSceneId: studio.activeSceneId,
+		programSceneId: studio.programSceneId,
+		programSceneSnapshot: studio.programSceneSnapshot,
+		selectedLayerId: studio.selectedLayerId,
+		studioMode: studio.settings.studioMode
+	};
+	const layer = makeLayer('video', 'Music');
+	const scene = { id: 'preview', name: 'Preview', layers: [layer] };
+	try {
+		studio.scenes = [scene];
+		studio.activeSceneId = studio.programSceneId = scene.id;
+		studio.programSceneSnapshot = {
+			...scene,
+			layers: [{ ...layer, mediaHandleId: null }]
+		};
+		studio.selectedLayerId = layer.id;
+		studio.settings.studioMode = true;
+		openFile(layer, new Blob());
+		expect(previewAudioLayer()?.id).toBe(layer.id);
+		studio.selectedLayerId = null;
+		expect(previewAudioLayer()?.id).toBe(layer.id);
+
+		studio.programSceneSnapshot.layers[0].mediaHandleId = pinHandle(layer.id);
+		expect(previewAudioLayer()).toBeNull();
+	} finally {
+		release(layer.id);
+		releaseUnusedPins([]);
+		studio.scenes = original.scenes;
+		studio.activeSceneId = original.activeSceneId;
+		studio.programSceneId = original.programSceneId;
+		studio.programSceneSnapshot = original.programSceneSnapshot;
+		studio.selectedLayerId = original.selectedLayerId;
+		studio.settings.studioMode = original.studioMode;
+	}
 });
 
 it('keeps the newest window when an older capture starts late', async () => {

@@ -9,6 +9,8 @@
 		openMic,
 		openPrivacySettings,
 		permissions,
+		previewAudioId,
+		previewAudioLayer,
 		release,
 		type DeviceOption
 	} from '../lib/media.svelte';
@@ -140,24 +142,41 @@
 		name: string;
 		isMic: boolean;
 		source: AudioSource | Layer;
+		preview?: boolean;
 	}
 
 	/** Global mics first, then the layers that carry sound: what the scene ON AIR
-	 *  contributes, plus any window capturing an application wherever it lives. */
-	const strips = $derived<Strip[]>([
-		...studio.audioSources.map((source) => ({
-			id: source.id,
-			name: source.name,
-			isMic: true,
-			source
-		})),
-		...audioLayers().map((layer) => ({
-			id: layer.id,
-			name: layer.name,
-			isMic: false,
-			source: layer
-		}))
-	]);
+	 *  contributes, plus any window capturing an application wherever it lives.
+	 *  A selected Preview recording gets its own local-only strip. */
+	const strips = $derived.by((): Strip[] => {
+		void mediaVersion.n;
+		const preview = previewAudioLayer();
+		return [
+			...studio.audioSources.map((source) => ({
+				id: source.id,
+				name: source.name,
+				isMic: true,
+				source
+			})),
+			...(preview
+				? [
+						{
+							id: previewAudioId(preview.id),
+							name: `${t('preview.preview')} · ${preview.name}`,
+							isMic: false,
+							source: preview,
+							preview: true
+						}
+					]
+				: []),
+			...audioLayers().map((layer) => ({
+				id: layer.id,
+				name: preview?.id === layer.id ? `${t('preview.program')} · ${layer.name}` : layer.name,
+				isMic: false,
+				source: layer
+			}))
+		];
+	});
 
 	/** Strips whose sound comes from the native per-application capture: an
 	 *  "Application audio" source, and every window or screen share — the engine
@@ -169,7 +188,7 @@
 	}
 
 	function inactiveReason(strip: Strip): string {
-		const error = handleFor(strip.id)?.error;
+		const error = handleFor(strip.source.id)?.error;
 		if (error) return error;
 		if (isAppStrip(strip))
 			return appAudio.error ?? (strip.source.appId ? t('mixer.appGone') : t('mixer.chooseApp'));
@@ -427,11 +446,17 @@
 			<div class="flex w-[112px] shrink-0 flex-col border-r border-[#3a3a3d]">
 				<div
 					class="h-[18px] text-center text-[12px] font-semibold leading-[18px] {connected
-						? 'bg-[#21355d] text-[#9ebfff]'
+						? strip.preview
+							? 'bg-[#4a331d] text-[#ffc080]'
+							: 'bg-[#21355d] text-[#9ebfff]'
 						: 'bg-[#29292d] text-[#a4a4ab]'}"
 					title={!connected ? inactiveReason(strip) : undefined}
 				>
-					{connected ? t('mixer.active') : t('mixer.inactive')}
+					{connected
+						? strip.preview
+							? t('preview.preview')
+							: t('mixer.active')
+						: t('mixer.inactive')}
 				</div>
 				<div class="flex h-[22px] min-w-0 items-center pl-1.5 pr-1">
 					{#if strip.isMic}

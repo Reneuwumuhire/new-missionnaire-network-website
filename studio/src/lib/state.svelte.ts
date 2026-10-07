@@ -591,6 +591,19 @@ export function selectedLayer(): Layer | null {
 	return activeScene().layers.find((l) => l.id === studio.selectedLayerId) ?? null;
 }
 
+/** The media transport controls the selected recording, or Program's first
+ *  recording when nothing is selected. Use the editable layer so its current
+ *  file and mute state match the handle that the transport actually plays. */
+export function transportLayer(): Layer | null {
+	const selected = selectedLayer();
+	if (selected?.kind === 'video') return selected;
+	const onAir = programScene().layers.find((layer) => layer.kind === 'video');
+	if (!onAir) return null;
+	return (
+		studio.scenes.flatMap((scene) => scene.layers).find((layer) => layer.id === onAir.id) ?? onAir
+	);
+}
+
 /** Remove only this scene's sources; global audio inputs and other scenes stay intact. */
 export function clearSceneSources(sceneId: string): string[] {
 	const scene = studio.scenes.find((item) => item.id === sceneId);

@@ -320,6 +320,7 @@ const en = {
 	'media.needsFile': 'Pick the file again \u2014 Sources \u203a Reconnect',
 	'media.needsLink': 'Link expired \u2014 Sources \u203a Reconnect',
 	'media.transport': 'Media transport',
+	'media.unmuteSource': 'Audio muted — Unmute',
 	'media.back': 'Back ten seconds',
 	'media.forward': 'Forward ten seconds',
 	'media.scrub': 'Position in the recording',

@@ -5,7 +5,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { t } from './i18n.svelte';
 import { MIX_RATE } from './mixer';
-import { studio, type Layer } from './state.svelte';
+import { audioLayers, studio, transportLayer, type Layer } from './state.svelte';
 
 /** Print to the terminal the studio was launched from. A packaged .app has no
  *  console anyone can reach, and a silent failure at 9 on a Sunday morning is
@@ -73,6 +73,20 @@ export function mediaHandleKey(layer: Layer): string | null {
 export function handleForLayer(layer: Layer): Handle | undefined {
 	const key = mediaHandleKey(layer);
 	return key ? handleFor(key) : undefined;
+}
+
+export const previewAudioId = (layerId: string) => `preview:${layerId}`;
+
+/** A media source being auditioned in Studio Mode, apart from Program.
+ *  Its sound may reach the operator's monitor, but never the broadcast bus. */
+export function previewAudioLayer(): Layer | null {
+	if (!studio.settings.studioMode) return null;
+	const layer = transportLayer();
+	if (!layer || layer.kind !== 'video' || !layer.hasAudio || !layer.visible) return null;
+	const element = handleForLayer(layer)?.el;
+	if (!(element instanceof HTMLVideoElement)) return null;
+	const onAir = audioLayers().find((item) => item.id === layer.id);
+	return onAir && handleForLayer(onAir)?.el === element ? null : layer;
 }
 
 /** Keep the exact current resource alive for a Program snapshot. */

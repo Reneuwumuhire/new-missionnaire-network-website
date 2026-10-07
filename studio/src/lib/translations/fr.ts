@@ -329,6 +329,7 @@ const fr: Record<keyof typeof en, string> = {
 	'media.needsFile': 'Rechoisir le fichier \u2014 Sources \u203a Reconnecter',
 	'media.needsLink': 'Lien expir\u00e9 \u2014 Sources \u203a Reconnecter',
 	'media.transport': 'Lecture du m\u00e9dia',
+	'media.unmuteSource': 'Son coupé — réactiver',
 	'media.back': 'Dix secondes en arri\u00e8re',
 	'media.forward': 'Dix secondes en avant',
 	'media.scrub': 'Position dans l\u2019enregistrement',

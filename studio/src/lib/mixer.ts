@@ -1,4 +1,4 @@
-// Audio mixing. Every source lands on one bus; the bus feeds the MediaRecorder.
+// Program audio feeds the MediaRecorder; Preview audition feeds only the monitor.
 // Monitoring is off by default — a laptop speaker plus the room mic is a
 // feedback loop, and finding that out on air is how services get ruined.
 
@@ -109,7 +109,8 @@ export class Mixer {
 		node: AudioNode,
 		element: HTMLMediaElement | null,
 		mono = false,
-		stream: MediaStream | null = null
+		stream: MediaStream | null = null,
+		preview = false
 	): Strip {
 		const gain = this.ctx.createGain();
 		const referenceGain = this.ctx.createGain();
@@ -149,10 +150,10 @@ export class Mixer {
 			node.connect(gain);
 			node.connect(referenceGain);
 		}
-		// The meters tap the signal; the master takes it from the gain node
-		// directly, so an analyser can never sit in the audio path.
+		// The meters tap the signal; Program or Monitor takes it from the gain
+		// node directly, so an analyser can never sit in the audio path.
 		gain.connect(splitter);
-		gain.connect(this.master);
+		gain.connect(preview ? this.monitor : this.master);
 
 		const strip: Strip = { id, gain, referenceGain, analysers, node, stream, element };
 		this.strips.set(id, strip);
@@ -198,7 +199,7 @@ export class Mixer {
 		return this.makeStrip(id, node, null);
 	}
 
-	addElement(id: string, element: HTMLMediaElement): Strip {
+	addElement(id: string, element: HTMLMediaElement, preview = false): Strip {
 		const existing = this.strips.get(id);
 		if (existing) {
 			if (existing.element === element) return existing;
@@ -213,7 +214,7 @@ export class Mixer {
 		// speakers, so the mute that kept it quiet until this moment has to come
 		// off — it applies before the tap, and would hand the mix silence.
 		element.muted = false;
-		return this.makeStrip(id, tap, element);
+		return this.makeStrip(id, tap, element, false, null, preview);
 	}
 
 	remove(id: string) {
