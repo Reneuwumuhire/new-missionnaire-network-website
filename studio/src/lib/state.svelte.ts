@@ -591,12 +591,14 @@ export function selectedLayer(): Layer | null {
 	return activeScene().layers.find((l) => l.id === studio.selectedLayerId) ?? null;
 }
 
-/** The media transport controls the selected recording, or Program's first
- *  recording when nothing is selected. Use the editable layer so its current
- *  file and mute state match the handle that the transport actually plays. */
+/** The media transport follows the scene being prepared. Fall back to Program
+ *  only when that scene has no recording of its own. Use the editable layer so
+ *  its current file and mute state match the handle that the transport plays. */
 export function transportLayer(): Layer | null {
 	const selected = selectedLayer();
 	if (selected?.kind === 'video') return selected;
+	const preview = activeScene().layers.find((layer) => layer.kind === 'video');
+	if (preview) return preview;
 	const onAir = programScene().layers.find((layer) => layer.kind === 'video');
 	if (!onAir) return null;
 	return (

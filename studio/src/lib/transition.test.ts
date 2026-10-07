@@ -7,7 +7,7 @@ import {
 	transitionPlan
 } from './compositor';
 import { mediaHandleKey } from './media.svelte';
-import { programScene, studio } from './state.svelte';
+import { makeLayer, programScene, studio, transportLayer } from './state.svelte';
 
 describe('transitionPlan', () => {
 	it('fades between two different scenes', () => {
@@ -92,6 +92,23 @@ describe('putting a scene on air', () => {
 		const plan = takeToProgram(second.id);
 		expect(plan).toEqual({ fromSceneId: first.id, durationMs: 350, type: 'fade' });
 		expect(studio.programSceneId).toBe(second.id);
+	});
+
+	it('keeps the preview scene recording available after changing scenes and returning', () => {
+		const [first, second] = studio.scenes;
+		const previousLayers = second.layers;
+		const recording = makeLayer('video', 'Music');
+		try {
+			second.layers = [recording, ...previousLayers];
+			setStudioMode(true);
+			selectScene(second.id);
+			expect(transportLayer()?.id).toBe(recording.id);
+			selectScene(first.id);
+			selectScene(second.id);
+			expect(transportLayer()?.id).toBe(recording.id);
+		} finally {
+			second.layers = previousLayers;
+		}
 	});
 
 	it('stages edits to the current scene until Transition is pressed', () => {

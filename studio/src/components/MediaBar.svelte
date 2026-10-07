@@ -17,7 +17,7 @@
 	import { syncLiveLyrics } from '../lib/live-session.svelte';
 	import { persist, programScene, studio, transportLayer } from '../lib/state.svelte';
 
-	/** The selected recording, or Program's first when nothing is selected. */
+	/** The selected recording, or the current scene's first when none is selected. */
 	const layer = $derived(transportLayer());
 
 	let position = $state(0);

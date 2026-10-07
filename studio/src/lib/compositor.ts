@@ -121,6 +121,24 @@ export function selectScene(sceneId: string) {
 	// the on-air scene IS the edit scene, so assigning first would make the
 	// transition think it was already showing the new scene and cut instead.
 	const from = onAirSceneId();
+	const outgoing = activeScene();
+	if (outgoing.id !== sceneId) {
+		// A recording in Preview otherwise keeps running while its scene is
+		// hidden. It can finish before the operator comes back to resume it.
+		// Preserve any element still in Program, including a pinned snapshot.
+		const onAirElements = new Set(
+			studio.settings.studioMode
+				? programScene().layers.map((layer) => handleForLayer(layer)?.el)
+				: []
+		);
+		for (const layer of outgoing.layers) {
+			if (layer.kind !== 'video') continue;
+			const element = handleForLayer(layer)?.el;
+			if (element && !onAirElements.has(element) && element instanceof HTMLVideoElement) {
+				element.pause();
+			}
+		}
+	}
 	studio.activeSceneId = sceneId;
 	studio.selectedLayerId = null;
 	if (!studio.settings.studioMode) takeToProgram(sceneId, studio.settings.transitionMs, from);
