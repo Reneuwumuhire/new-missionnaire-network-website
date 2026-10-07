@@ -271,16 +271,36 @@ textarea {
 		position: absolute;
 		left: 50%;
 		top: 50%;
-		width: 112px;
+		width: 136px;
 		transform: translate(-50%, -50%) rotate(-90deg);
 	}
 
 	.studio-fader-vertical::-webkit-slider-runnable-track {
-		background: linear-gradient(
-			to right,
-			#3b82f6 var(--level, 0%),
-			rgb(var(--control-border)) var(--level, 0%)
-		);
+		height: 3px;
+		background: linear-gradient(to right, #3769e1 var(--level, 0%), #46474d var(--level, 0%));
+	}
+
+	.studio-fader-vertical::-webkit-slider-thumb {
+		width: 11px;
+		height: 22px;
+		margin-top: -10px;
+		border-radius: 2px;
+		background: #f1f1f3;
+	}
+
+	.studio-obs-mixer > header {
+		position: relative;
+		justify-content: flex-end;
+		background: #3b3b3e;
+		border-color: #55555a;
+	}
+
+	.studio-obs-mixer > header h2 {
+		position: absolute;
+		inset-inline: 0;
+		text-align: center;
+		color: #f1f1f3;
+		pointer-events: none;
 	}
 
 	.studio-icon-btn {

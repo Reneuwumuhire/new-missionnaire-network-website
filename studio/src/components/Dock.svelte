@@ -23,8 +23,13 @@
 	const weight = $derived(studio.settings.layout.weights[id] ?? 1);
 </script>
 
-<section class="flex min-w-0 flex-col" style="flex: {weight} 1 0">
-	<header class="flex h-8 shrink-0 items-center justify-between border-b border-ink-700 bg-ink-850 px-3">
+<section
+	class="flex min-w-0 flex-col {id === 'mixer' ? 'studio-obs-mixer' : ''}"
+	style="flex: {weight} 1 0"
+>
+	<header
+		class="flex h-8 shrink-0 items-center justify-between border-b border-ink-700 bg-ink-850 px-3"
+	>
 		<h2 class="truncate text-[12px] font-semibold text-fg/80">{title}</h2>
 		{#if actions}
 			<div class="flex items-center gap-0.5">{@render actions()}</div>
