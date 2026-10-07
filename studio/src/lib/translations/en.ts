@@ -60,15 +60,11 @@ const en = {
 	'sources.camera': 'Camera',
 	'sources.cameraHint': 'Webcam or capture device',
 	'sources.screen': 'Display / Window Capture',
-	'sources.screenHint': 'Share a screen or an application',
+	'sources.screenHint': 'Capture a browser window or display with its application audio',
 	'sources.image': 'Image',
 	'sources.imageHint': 'Logo, verse, backdrop',
 	'sources.video': 'Media Source',
 	'sources.videoHint': 'Clip or loop, with sound',
-	'sources.url': 'YouTube / Link',
-	'sources.urlHint': 'Play a video or a song from a link, like any media source',
-	'sources.youtubeLive': 'YouTube Live Window',
-	'sources.youtubeLiveHint': 'Capture a live player with its exact application audio',
 	'sources.pickWindow': 'Choose a window to capture',
 	'sources.pickWindowHint':
 		'Choose the window playing the live video. Studio captures it directly and leaves the mouse pointer out of the broadcast.',
@@ -79,30 +75,8 @@ const en = {
 		'The window has not sent video. Keep it open and visible, then reconnect this source.',
 	'sources.screenPermission': 'Screen Recording settings',
 	'sources.refreshWindows': 'Refresh windows',
-	'youtubeLive.title': 'Add YouTube live',
-	'youtubeLive.url': 'YouTube live address',
-	'youtubeLive.hint':
-		'Studio opens the YouTube live page in your browser. Keep that window visible and mute other tabs in the same browser before selecting it for capture.',
-	'youtubeLive.invalid': 'Enter a valid secure YouTube video or live link.',
-	'youtubeLive.openPlayer': '1. Open live player',
-	'youtubeLive.playerOpened': 'Player opened',
 	'youtubeLive.openChat': 'Open live chat',
-	'youtubeLive.capture': '2. Capture window',
-	'youtubeLive.captureHint':
-		'Start playback if needed, move the pointer back over Studio so the player controls fade, then choose that browser window. On macOS, Studio captures it directly without the pointer and pairs its audio automatically. On Windows, enable Share system audio.',
-	'web.title': 'Add from a link',
-	'web.url': 'Address',
-	'web.audioOnly': 'Sound only',
-	'web.withPicture': 'With picture',
-	'web.add': 'Add',
 	'web.reading': 'Reading the link…',
-	'web.liveCaptureHint':
-		'Live streams cannot be relayed as a link. Capture the YouTube player window instead, then add that browser in App Audio to capture its sound.',
-	'web.openLiveCapture': 'Set up window capture',
-	'web.hintAudio':
-		'Plays straight away, at full quality, and nothing is saved to disk. It streams while you are on air, so it needs the internet to keep working.',
-	'web.hintVideo':
-		'Plays straight away, but YouTube only serves picture and sound together at up to 360p, so it will look soft on a 1080p broadcast. Sound only is unaffected.',
 	'sources.text': 'Text',
 	'sources.textHint': 'Title, standing message',
 	'sources.lyrics': 'Lyrics',
@@ -457,7 +431,7 @@ const en = {
 		'In Controls, choose or create the public session that listeners will open.',
 	'help.prepareTitle': 'Prepare Preview',
 	'help.prepare':
-		'Add cameras, media, or a YouTube Live Window to a scene. Connect every source and confirm its audio meter moves.',
+		'Add cameras, media, or Window Capture to a scene. Connect every source and confirm its audio meter moves.',
 	'help.programTitle': 'Send Preview to Program',
 	'help.program':
 		'In Studio Mode, edits remain private in Preview. Press Transition only when the picture is ready for Program.',
@@ -498,7 +472,7 @@ const en = {
 		'Confirm Lyrics is Shown, the correct public session is active, and the reference MP3 and matching French SRT are loaded. Automatic sync also needs audio from the captured live source; use “Sermon begins now” only as the fallback.',
 	'help.captureProblem': 'A captured YouTube window looks wrong',
 	'help.captureSolution':
-		'Use the dedicated YouTube Live Window source, keep the video visible in that window, and crop or resize the source in Preview. Move it to Program only after the result is clean.',
+		'Use Display / Window Capture, keep the video visible in the browser window, and crop or resize the source in Preview. Move it to Program only after the result is clean.',
 	'help.openSystem': 'Open System Information',
 
 	// ── Stream destinations ─────────────────────────────────────

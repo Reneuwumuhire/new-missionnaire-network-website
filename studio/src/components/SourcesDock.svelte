@@ -22,8 +22,6 @@
 	import type { AudioWindow } from '../lib/appaudio.svelte';
 	import { addAppAudio, addAudioInput } from '../lib/state.svelte';
 	import { invoke } from '@tauri-apps/api/core';
-	import AddFromUrl from './AddFromUrl.svelte';
-	import AddYouTubeLive from './AddYouTubeLive.svelte';
 	import Dock from './Dock.svelte';
 	import Modal from './Modal.svelte';
 	import { broadcast, isStreaming } from '../lib/broadcast.svelte';
@@ -148,7 +146,7 @@
 	/** The two audio kinds are not layers: they have no picture, and they are
 	 *  global to the show. They are offered here because OBS offers them here,
 	 *  and appear where they belong — in the Audio Mixer. */
-	type MenuKind = LayerKind | 'audioInput' | 'audioApp' | 'url' | 'youtubeLive';
+	type MenuKind = LayerKind | 'audioInput' | 'audioApp';
 
 	const SOURCE_KINDS: {
 		kind: MenuKind;
@@ -193,13 +191,6 @@
 			icon: 'film'
 		},
 		{
-			kind: 'youtubeLive',
-			label: () => t('sources.youtubeLive'),
-			hint: () => t('sources.youtubeLiveHint'),
-			icon: 'monitor'
-		},
-		{ kind: 'url', label: () => t('sources.url'), hint: () => t('sources.urlHint'), icon: 'link' },
-		{
 			kind: 'text',
 			label: () => t('sources.text'),
 			hint: () => t('sources.textHint'),
@@ -236,18 +227,6 @@
 			await refreshApps();
 			return;
 		}
-		if (kind === 'url') {
-			// The layer is made only once the link resolves: a bad link should
-			// leave nothing behind to tidy up.
-			adding = false;
-			urlOpen = true;
-			return;
-		}
-		if (kind === 'youtubeLive') {
-			adding = false;
-			youtubeLiveOpen = true;
-			return;
-		}
 		adding = false;
 		const label = SOURCE_KINDS.find((s) => s.kind === kind)?.label() ?? kind;
 		const layer = makeLayer(kind, label, {
@@ -260,7 +239,11 @@
 					}
 				: {}),
 			...(kind === 'color' ? { color: '#0B0B0D' } : {}),
-			...(kind === 'screen' || kind === 'video' ? { fit: 'contain' as const } : {})
+			...(kind === 'screen'
+				? { fit: 'contain' as const, hideCursor: true }
+				: kind === 'video'
+					? { fit: 'contain' as const }
+					: {})
 		});
 		const scene = activeScene();
 		scene.layers = [layer, ...scene.layers];
@@ -291,7 +274,7 @@
 		const handle = await openScreen(layer);
 		const track = handle.stream?.getVideoTracks()[0];
 		if (!track) return;
-		if (layer.youtubeLiveUrl && handle.stream) {
+		if (referenceMatcher.sourceId === layer.id && handle.stream) {
 			await observeReferenceStream(layer.id, handle.stream);
 		}
 		const label = track.label ?? '';
@@ -323,56 +306,9 @@
 		persist();
 	}
 
-	let urlOpen = $state(false);
-	let youtubeLiveOpen = $state(false);
-	let youtubeLiveInitialUrl = $state('');
-
-	function openLiveCapture(url: string) {
-		urlOpen = false;
-		youtubeLiveInitialUrl = url;
-		youtubeLiveOpen = true;
-	}
-
-	async function addYouTubeLive(url: string) {
-		youtubeLiveOpen = false;
-		const layer = makeLayer('screen', t('sources.youtubeLive'), {
-			fit: 'cover',
-			hideCursor: true,
-			youtubeLiveUrl: url
-		});
-		const scene = activeScene();
-		scene.layers = [layer, ...scene.layers];
-		studio.selectedLayerId = layer.id;
-		useReferenceSource(layer.id, layer.name);
-		persist();
-		await shareScreen(layer);
-	}
-
 	async function openLiveChat(url: string) {
 		const videoId = youtubeVideoId(url);
 		if (videoId) await invoke('open_youtube_chat', { url: youtubeChatUrl(videoId) });
-	}
-
-	/** A resolved link becomes an ordinary media layer — the compositor, the
-	 *  mixer and the transport bar have no idea it is being streamed. */
-	function addFetched(
-		found: { token: string; title: string; duration: number },
-		url: string,
-		audioOnly: boolean
-	) {
-		urlOpen = false;
-		const layer = makeLayer('video', found.title || t('sources.url'), {
-			fit: 'contain',
-			audioOnly,
-			fileName: found.title,
-			duration: found.duration,
-			url
-		});
-		const scene = activeScene();
-		scene.layers = [layer, ...scene.layers];
-		studio.selectedLayerId = layer.id;
-		openStream(layer, found.token);
-		persist();
 	}
 
 	/** Layers whose link is being resolved again. Resolving takes about twelve
@@ -520,18 +456,6 @@
 			</div>
 		</div>
 	</Modal>
-{/if}
-
-{#if urlOpen}
-	<AddFromUrl onclose={() => (urlOpen = false)} onready={addFetched} onlive={openLiveCapture} />
-{/if}
-
-{#if youtubeLiveOpen}
-	<AddYouTubeLive
-		onclose={() => (youtubeLiveOpen = false)}
-		onready={addYouTubeLive}
-		initialUrl={youtubeLiveInitialUrl}
-	/>
 {/if}
 
 {#if pendingWindowLayer}

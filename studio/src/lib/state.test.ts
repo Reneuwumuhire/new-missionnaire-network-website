@@ -6,6 +6,7 @@ import {
 	makeLayer,
 	migrateDestination,
 	persistableDestinations,
+	referenceSourceLayer,
 	reconnectWith,
 	resetLayout,
 	requiresYouTubeGoLive,
@@ -35,6 +36,14 @@ it('clears one scene and its service assignments while preserving other scenes a
 	expect(studio.service.sermonLayerId).toBeNull();
 	expect(studio.service.krefeldLayerId).toBe(other.id);
 	expect(clearSceneSources('missing')).toEqual([]);
+});
+
+it('uses an ordinary Krefeld window capture for sermon sync', () => {
+	const window = makeLayer('screen', 'Krefeld');
+	studio.scenes = [{ id: 'live', name: 'Live', layers: [window] }];
+	studio.service.type = 'live';
+	studio.service.krefeldLayerId = window.id;
+	expect(referenceSourceLayer()?.id).toBe(window.id);
 });
 
 describe('which layers get a mixer strip', () => {

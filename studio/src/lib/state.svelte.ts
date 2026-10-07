@@ -587,6 +587,15 @@ export function programScene(): Scene {
 	return studio.scenes.find((s) => s.id === onAirSceneId()) ?? activeScene();
 }
 
+/** The configured Krefeld capture supplies sermon sync, including ordinary
+ * window captures. Older saved YouTube window sources remain usable. */
+export function referenceSourceLayer(): Layer | undefined {
+	const id = studio.service.type === 'live' ? studio.service.krefeldLayerId : null;
+	return id
+		? studio.scenes.flatMap((scene) => scene.layers).find((layer) => layer.id === id)
+		: programScene().layers.find((layer) => layer.youtubeLiveUrl);
+}
+
 export function selectedLayer(): Layer | null {
 	return activeScene().layers.find((l) => l.id === studio.selectedLayerId) ?? null;
 }

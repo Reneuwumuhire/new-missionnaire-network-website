@@ -15,7 +15,7 @@
 	import { findCueIndex } from '../lib/srt';
 	import { t } from '../lib/i18n.svelte';
 	import { hideLiveLyrics, prepareLiveSubtitles, syncLiveLyrics } from '../lib/live-session.svelte';
-	import { programScene } from '../lib/state.svelte';
+	import { referenceSourceLayer } from '../lib/state.svelte';
 	import {
 		chooseReferenceAudio,
 		hideReferenceSubtitles,
@@ -48,7 +48,7 @@
 	);
 
 	$effect(() => {
-		const source = programScene().layers.find((layer) => layer.youtubeLiveUrl);
+		const source = referenceSourceLayer();
 		if (!source && referenceMatcher.sourceId) useReferenceSource(null);
 		else if (source && source.id !== referenceMatcher.sourceId)
 			useReferenceSource(source.id, source.name);
