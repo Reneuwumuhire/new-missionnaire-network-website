@@ -516,8 +516,10 @@
 					</div>
 					<div class="relative min-w-0 flex-1 font-mono text-[12px] leading-[12px] text-[#b9b9bf]">
 						{#each METER_TICKS as tick (tick)}
-							<span class="absolute left-0" style="top: {(1 - meterFraction(tick)) * 124}px"
-								>{tick}</span
+							<span
+								class="absolute left-0"
+								style="top: calc({(1 - meterFraction(tick)) * 100}% - {(1 - meterFraction(tick)) *
+									12}px)">{tick}</span
 							>
 						{/each}
 					</div>
