@@ -504,10 +504,12 @@
 									class="absolute inset-0"
 									style="background: linear-gradient(to top, #19ad4b 0%, #19ad4b 70%, #c4ba28 70%, #c4ba28 90%, #bb292d 90%, #bb292d 100%)"
 								></div>
-								<div
-									class="absolute inset-x-0 top-0 bg-ink-950"
-									style="height: {(1 - fraction) * 100}%"
-								></div>
+								{#if connected}
+									<div
+										class="absolute inset-x-0 top-0 bg-ink-950"
+										style="height: {(1 - fraction) * 100}%"
+									></div>
+								{/if}
 								{#if level && level.hold[channel] > 0.01}
 									<div
 										class="absolute inset-x-0 h-px bg-fg/80"
@@ -517,12 +519,15 @@
 							</div>
 						{/each}
 					</div>
-					<div class="relative min-w-0 flex-1 font-mono text-[12px] leading-[12px] text-[#b9b9bf]">
+					<div
+						class="relative min-w-0 flex-1 font-mono text-[#b9b9bf]"
+						style="font-size: 9px; line-height: 10px"
+					>
 						{#each METER_TICKS as tick (tick)}
 							<span
 								class="absolute left-0"
 								style="top: calc({(1 - meterFraction(tick)) * 100}% - {(1 - meterFraction(tick)) *
-									12}px)">{tick}</span
+									10}px)">{tick}</span
 							>
 						{/each}
 					</div>
