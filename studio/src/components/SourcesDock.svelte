@@ -504,25 +504,36 @@
 			}}>Clear sources…</button
 		>
 	{/snippet}
-	<ul class="py-1">
+	<ul>
 		{#each activeScene().layers as layer (layer.id)}
 			{@const issue = problem(layer)}
 			<li
-				class="studio-source-row group mx-1 flex h-[30px] items-center gap-0.5 rounded-sm border border-transparent pr-1"
-				data-selected={layer.id === studio.selectedLayerId}
-				data-hidden={!layer.visible}
+				class="group flex items-center gap-1 pr-1 {layer.id === studio.selectedLayerId
+					? 'bg-primary text-black'
+					: 'hover:bg-fg/5'}"
 			>
 				<button
-					class="flex h-full min-w-0 flex-1 items-center gap-2 pl-2 text-left"
+					class="flex min-w-0 flex-1 items-center gap-2 py-1.5 pl-3 text-left"
 					onclick={() => (studio.selectedLayerId = layer.id)}
-					ondblclick={onproperties}
+					ondblclick={() =>
+						layer.kind === 'image' || layer.kind === 'video' ? reconnect(layer) : onproperties()}
 				>
-					<Icon name={iconFor(layer.kind)} size={15} class="source-kind-icon" />
-					<span class="source-label min-w-0 flex-1 truncate text-[13px]">{layer.name}</span>
+					<Icon
+						name={iconFor(layer.kind)}
+						size={13}
+						class={layer.id === studio.selectedLayerId ? 'text-black/80' : 'text-muted'}
+					/>
+					<span
+						class="min-w-0 flex-1 truncate text-[13px] {layer.id === studio.selectedLayerId
+							? 'font-medium'
+							: layer.visible
+								? 'text-fg/85'
+								: 'text-muted'}">{layer.name}</span
+					>
 				</button>
 				{#if issue}
 					<button
-						class="shrink-0 bg-amber-500/20 px-1 py-px text-[10px] font-semibold uppercase tracking-wide text-warning hover:bg-amber-500/35"
+						class="shrink-0 bg-amber-500/15 px-1.5 py-px text-[12px] font-semibold uppercase tracking-wide text-warning hover:bg-amber-500/30"
 						title={issue}
 						disabled={relinking.has(layer.id)}
 						onclick={() => reconnect(layer)}
@@ -531,7 +542,7 @@
 				{/if}
 				{#if layer.youtubeLiveUrl}
 					<button
-						class="studio-source-control"
+						class="studio-icon-btn"
 						title={t('youtubeLive.openChat')}
 						aria-label={t('youtubeLive.openChat')}
 						onclick={() => openLiveChat(layer.youtubeLiveUrl!)}
@@ -540,7 +551,7 @@
 					</button>
 				{/if}
 				<button
-					class="studio-source-control"
+					class="studio-icon-btn"
 					title={layer.visible ? t('common.hide') : t('common.show')}
 					aria-label={layer.visible ? t('common.hide') : t('common.show')}
 					onclick={() => {
@@ -551,7 +562,7 @@
 					<Icon name={layer.visible ? 'eye' : 'eyeOff'} size={14} />
 				</button>
 				<button
-					class="studio-source-control"
+					class="studio-icon-btn"
 					title={layer.locked ? t('common.unlock') : t('common.lock')}
 					aria-label={layer.locked ? t('common.unlock') : t('common.lock')}
 					onclick={() => {

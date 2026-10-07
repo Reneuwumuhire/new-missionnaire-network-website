@@ -2,7 +2,6 @@
 	import type { Snippet } from 'svelte';
 	import type { DockId } from '../lib/layout';
 	import { studio } from '../lib/state.svelte';
-	import Icon from './Icon.svelte';
 
 	// OBS's dock: a titled panel in the bottom row. Same chrome everywhere so
 	// the row reads as one strip of tools rather than five different panels.
@@ -25,17 +24,12 @@
 </script>
 
 <section
-	class="flex min-w-0 flex-col {id === 'mixer'
-		? 'studio-obs-mixer'
-		: id === 'sources'
-			? 'studio-obs-sources'
-			: ''}"
+	class="flex min-w-0 flex-col {id === 'mixer' ? 'studio-obs-mixer' : ''}"
 	style="flex: {weight} 1 0"
 >
 	<header
 		class="flex h-8 shrink-0 items-center justify-between border-b border-ink-700 bg-ink-850 px-3"
 	>
-		{#if id === 'sources'}<Icon name="monitor" size={15} class="text-fg/80" />{/if}
 		<h2 class="truncate text-[12px] font-semibold text-fg/80">{title}</h2>
 		{#if actions}
 			<div class="flex items-center gap-0.5">{@render actions()}</div>
@@ -45,9 +39,7 @@
 		{@render children()}
 	</div>
 	{#if footer}
-		<div
-			class="studio-dock-footer flex h-9 shrink-0 items-center gap-0.5 border-t border-ink-700 bg-ink-850 px-2"
-		>
+		<div class="flex h-9 shrink-0 items-center gap-0.5 border-t border-ink-700 bg-ink-850 px-2">
 			{@render footer()}
 		</div>
 	{/if}

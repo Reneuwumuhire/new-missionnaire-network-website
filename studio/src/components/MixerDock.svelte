@@ -437,13 +437,13 @@
 		</div>
 	{/if}
 
-	<div class="flex min-h-[230px] overflow-x-auto overflow-y-hidden bg-[#1b1b1e]">
+	<div class="flex min-h-[230px] flex-1 overflow-x-auto overflow-y-hidden bg-[#1b1b1e]">
 		{#each strips as strip (strip.id)}
 			{@const level = levels[strip.id]}
 			<!-- The levels poll is reactive; the mixer's internal Map is not. -->
 			{@const connected = Boolean(level)}
 			{@const position = gainPosition(strip.source.gain)}
-			<div class="flex w-[112px] shrink-0 flex-col border-r border-[#3a3a3d]">
+			<div class="flex h-full w-[112px] shrink-0 flex-col border-r border-[#3a3a3d]">
 				<div
 					class="h-[18px] text-center text-[12px] font-semibold leading-[18px] {connected
 						? strip.preview
@@ -489,7 +489,7 @@
 					{formatDb(faderDb(position))}
 				</div>
 
-				<div class="flex h-[136px] items-stretch gap-1 px-2" data-meter={strip.id}>
+				<div class="flex min-h-0 flex-1 items-stretch gap-1 px-2" data-meter={strip.id}>
 					<div class="relative w-6 shrink-0">
 						<span
 							class="pointer-events-none absolute inset-x-0 h-px bg-fg/40"

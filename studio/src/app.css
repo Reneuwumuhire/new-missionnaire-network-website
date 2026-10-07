@@ -269,102 +269,44 @@ textarea {
 
 	.studio-fader-vertical {
 		position: absolute;
-		left: 50%;
-		top: 50%;
-		width: 136px;
-		transform: translate(-50%, -50%) rotate(-90deg);
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		writing-mode: vertical-lr;
+		direction: rtl;
 	}
 
 	.studio-fader-vertical::-webkit-slider-runnable-track {
-		height: 3px;
-		background: linear-gradient(to right, #3769e1 var(--level, 0%), #46474d var(--level, 0%));
+		width: 3px;
+		background: linear-gradient(to top, #3769e1 var(--level, 0%), #46474d var(--level, 0%));
 	}
 
 	.studio-fader-vertical::-webkit-slider-thumb {
-		width: 11px;
-		height: 22px;
-		margin-top: -10px;
+		width: 22px;
+		height: 11px;
+		margin-left: -10px;
 		border-radius: 2px;
 		background: #f1f1f3;
 	}
 
-	.studio-obs-mixer > header,
-	.studio-obs-sources > header {
+	.studio-obs-mixer > .studio-dock-body {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.studio-obs-mixer > header {
 		position: relative;
+		justify-content: flex-end;
 		background: #3b3b3e;
 		border-color: #55555a;
 	}
 
-	.studio-obs-mixer > header {
-		justify-content: flex-end;
-	}
-
-	.studio-obs-mixer > header h2,
-	.studio-obs-sources > header h2 {
+	.studio-obs-mixer > header h2 {
 		position: absolute;
 		inset-inline: 0;
 		text-align: center;
 		color: #f1f1f3;
 		pointer-events: none;
-	}
-
-	.studio-obs-sources > header > div {
-		position: relative;
-		z-index: 1;
-	}
-
-	.studio-obs-sources > .studio-dock-body {
-		background: #1f1f21;
-	}
-
-	.studio-obs-sources .studio-source-row {
-		color: #ededf0;
-	}
-
-	.studio-obs-sources .studio-source-row:hover:not([data-selected='true']) {
-		background: #333337;
-	}
-
-	.studio-obs-sources .studio-source-row[data-selected='true'] {
-		background: #214466;
-		border-color: #5a82aa;
-	}
-
-	.studio-obs-sources .studio-source-row[data-hidden='true'] .source-label,
-	.studio-obs-sources .studio-source-row[data-hidden='true'] .source-kind-icon {
-		color: #8c8f94;
-	}
-
-	.studio-source-control {
-		@apply flex h-6 w-6 shrink-0 items-center justify-center transition-colors;
-		color: #dedee1;
-	}
-
-	.studio-source-control:hover {
-		background: #55555a;
-		color: #fff;
-	}
-
-	.studio-obs-sources .studio-source-row[data-hidden='true'] .studio-source-control {
-		color: #8c8f94;
-	}
-
-	.studio-obs-sources > .studio-dock-footer {
-		gap: 0;
-		padding: 0;
-		background: #3b3b3e;
-		border-color: #55555a;
-	}
-
-	.studio-obs-sources > .studio-dock-footer > .relative {
-		height: 100%;
-	}
-
-	.studio-obs-sources > .studio-dock-footer .studio-icon-btn {
-		width: 32px;
-		height: 100%;
-		border-right: 1px solid #222226;
-		color: #f1f1f3;
 	}
 
 	.studio-icon-btn {
