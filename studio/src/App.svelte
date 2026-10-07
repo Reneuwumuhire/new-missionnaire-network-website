@@ -515,7 +515,11 @@
 	/** Dragging down grows the preview, so the dock row loses that much. Capped
 	 *  so neither the docks nor the preview can be squeezed out of existence. */
 	function resizeDockRow(delta: number) {
-		layout.dockHeight = clamp(layout.dockHeight - delta, 120, window.innerHeight - 320);
+		layout.dockHeight = clamp(
+			(dockRow?.clientHeight ?? layout.dockHeight) - delta,
+			140,
+			window.innerHeight - 320
+		);
 		persist();
 	}
 
@@ -596,11 +600,11 @@
 	{/if}
 
 	<!-- ── Preview + lyrics ───────────────────────────────── -->
-	<div class="flex min-h-0 flex-1">
-		<div class="flex min-w-0 flex-1 flex-col">
+	<div class="flex min-h-[430px] flex-1">
+		<div class="flex min-h-0 min-w-0 flex-1 flex-col">
 			<LyricsRibbon />
 			<ServicePanel {mixer} bind:setupOpen={serviceSetupOpen} />
-			<div class="flex min-h-0 flex-1 gap-4 bg-ink-950 px-4 pt-1.5">
+			<div class="flex min-h-[100px] flex-1 gap-4 bg-ink-950 px-4 pt-1.5">
 				{#if studio.settings.studioMode}
 					<Preview
 						label="{t('preview.preview')}: {activeScene().name}"
@@ -608,9 +612,9 @@
 						program={false}
 						editable={true}
 					/>
-					<div class="flex w-32 shrink-0 flex-col justify-center gap-1.5">
+					<div class="flex min-h-0 w-32 shrink-0 flex-col gap-1.5 overflow-y-auto">
 						<button
-							class="h-10 w-full text-[13px] font-medium leading-tight transition-colors {canTake
+							class="h-10 w-full shrink-0 text-[13px] font-medium leading-tight transition-colors {canTake
 								? 'bg-primary text-black hover:bg-missionnaire-400'
 								: 'border border-ink-600 text-muted'}"
 							disabled={!canTake}
@@ -621,12 +625,12 @@
 						</button>
 						<!-- OBS's Quick Transitions: take with a specific transition
 						     without disturbing the configured default. -->
-						<span class="text-[12px] uppercase tracking-wider text-muted">
+						<span class="shrink-0 text-[12px] uppercase tracking-wider text-muted">
 							{t('transitions.quick')}
 						</span>
 						{#each QUICK as quick (quick.type)}
 							<button
-								class="studio-chip w-full justify-center text-[12px] disabled:opacity-30"
+								class="studio-chip w-full shrink-0 justify-center text-[12px] disabled:opacity-30"
 								disabled={!canTake}
 								onclick={() =>
 									takeToProgram(
@@ -707,7 +711,7 @@
 
 	<div
 		bind:this={dockRow}
-		class="flex shrink-0 bg-ink-900"
+		class="flex min-h-[140px] shrink overflow-hidden bg-ink-900"
 		style="height: {layout.dockHeight}px"
 		style:display={layout.docksVisible ? undefined : 'none'}
 	>
