@@ -325,15 +325,18 @@ export async function openNativeWindow(layer: Layer, windowId: number): Promise<
 					const bitmap = await createImageBitmap(
 						new Blob([bytes.slice(8)], { type: 'image/jpeg' })
 					);
-					if (!cancelled) {
-						ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-						h.nativeFrameReady = true;
-						if (h.error) {
-							h.error = null;
-							mediaVersion.n++;
+					try {
+						if (!cancelled) {
+							ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+							h.nativeFrameReady = true;
+							if (h.error) {
+								h.error = null;
+								mediaVersion.n++;
+							}
 						}
+					} finally {
+						bitmap.close();
 					}
-					bitmap.close();
 				}
 				if (!h.nativeFrameReady && !h.error && Date.now() >= firstFrameDeadline) {
 					h.error = t('sources.noVideoFrames');

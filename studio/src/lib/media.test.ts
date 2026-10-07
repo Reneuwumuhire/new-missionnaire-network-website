@@ -93,3 +93,38 @@ it('backs off repeated window frame errors without refreshing the UI again', asy
 		vi.useRealTimers();
 	}
 });
+
+it('closes a decoded window frame when drawing fails', async () => {
+	vi.useFakeTimers();
+	const layer = makeLayer('screen', 'Live');
+	const close = vi.fn();
+	const frame = new ArrayBuffer(9);
+	new DataView(frame).setBigUint64(0, 1n, true);
+	vi.mocked(invoke).mockImplementation((command) => {
+		if (command === 'start_window_capture')
+			return Promise.resolve({ width: 640, height: 360 }) as never;
+		if (command === 'window_capture_frame') return Promise.resolve(frame) as never;
+		return Promise.resolve() as never;
+	});
+	vi.stubGlobal('HTMLVideoElement', class {});
+	vi.stubGlobal('createImageBitmap', vi.fn().mockResolvedValue({ close }));
+	vi.stubGlobal('document', {
+		createElement: () => ({
+			getContext: () => ({
+				drawImage: () => {
+					throw new Error('draw failed');
+				}
+			})
+		})
+	});
+
+	try {
+		await openNativeWindow(layer, 1);
+		await vi.advanceTimersByTimeAsync(0);
+		expect(close).toHaveBeenCalledOnce();
+		expect(handleFor(layer.id)?.error).toContain('draw failed');
+	} finally {
+		release(layer.id);
+		vi.useRealTimers();
+	}
+});

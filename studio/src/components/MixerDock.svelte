@@ -168,6 +168,14 @@
 			: (strip.source as Layer).kind === 'screen';
 	}
 
+	function inactiveReason(strip: Strip): string {
+		const error = handleFor(strip.id)?.error;
+		if (error) return error;
+		if (isAppStrip(strip))
+			return appAudio.error ?? (strip.source.appId ? t('mixer.appGone') : t('mixer.chooseApp'));
+		return strip.isMic ? t('mixer.connect') : t('mixer.noAudioTrack');
+	}
+
 	/** Captures that came back with an error, so a failing one is not retried
 	 *  forever by the effect below. Keyed by strip *and* application: pointing a
 	 *  source at a different window is a different attempt, and refusing to make
@@ -382,14 +390,8 @@
 				{@render deviceSelect(source)}
 			{/if}
 			{#if !levels[strip.id]}
-				<span
-					class="max-w-52 truncate text-[12px] text-muted"
-					title={handleFor(strip.id)?.error ?? ''}
-				>
-					{isAppStrip(strip)
-						? (appAudio.error ?? (strip.source.appId ? t('mixer.appGone') : t('mixer.chooseApp')))
-						: (handleFor(strip.id)?.error ??
-							(strip.isMic ? t('mixer.connect') : t('mixer.noAudioTrack')))}
+				<span class="max-w-52 truncate text-[12px] text-muted" title={inactiveReason(strip)}>
+					{inactiveReason(strip)}
 				</span>
 			{/if}
 			<button
@@ -427,6 +429,7 @@
 					class="h-[18px] text-center text-[12px] font-semibold leading-[18px] {connected
 						? 'bg-[#21355d] text-[#9ebfff]'
 						: 'bg-[#29292d] text-[#a4a4ab]'}"
+					title={!connected ? inactiveReason(strip) : undefined}
 				>
 					{connected ? t('mixer.active') : t('mixer.inactive')}
 				</div>
