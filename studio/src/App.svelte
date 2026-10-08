@@ -600,11 +600,11 @@
 	{/if}
 
 	<!-- ── Preview + lyrics ───────────────────────────────── -->
-	<div class="flex min-h-[430px] flex-1">
-		<div class="flex min-h-0 min-w-0 flex-1 flex-col">
+	<div class="flex min-h-min flex-1">
+		<div class="flex min-h-min min-w-0 flex-1 flex-col">
 			<LyricsRibbon />
 			<ServicePanel {mixer} bind:setupOpen={serviceSetupOpen} />
-			<div class="flex min-h-[100px] flex-1 gap-4 bg-ink-950 px-4 pt-1.5">
+			<div class="flex min-h-[300px] flex-1 gap-4 bg-ink-950 px-4 pt-1.5">
 				{#if studio.settings.studioMode}
 					<Preview
 						label="{t('preview.preview')}: {activeScene().name}"
