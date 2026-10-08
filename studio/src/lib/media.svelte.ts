@@ -31,8 +31,12 @@ export async function askForMicrophone(): Promise<void> {
 		permissions.microphone = 'granted';
 		permissions.message = '';
 	} catch (err) {
-		permissions.microphone = 'denied';
-		permissions.message = describe(err);
+		permissions.microphone =
+			err instanceof Error && ['NotAllowedError', 'SecurityError'].includes(err.name)
+				? 'denied'
+				: 'unknown';
+		permissions.message =
+			permissions.microphone === 'denied' ? t('mixer.micPermissionDenied') : describe(err);
 	}
 }
 
@@ -234,6 +238,8 @@ export async function openMic(layerId: string, deviceId?: string): Promise<Handl
 			);
 		}
 		const h: Handle = { kind: 'camera', el: null, stream, error: null, objectUrl: null };
+		permissions.microphone = 'granted';
+		permissions.message = '';
 		return set(layerId, h, request);
 	} catch (err) {
 		const h: Handle = {

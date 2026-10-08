@@ -104,6 +104,8 @@ const fr: Record<keyof typeof en, string> = {
 	// ── Audio mixer ─────────────────────────────────────────────
 	'mixer.micDenied':
 		'Pas d\u2019acc\u00e8s au micro : ce syst\u00e8me n\u2019annonce alors aucune entr\u00e9e audio.',
+	'mixer.micPermissionDenied':
+		'Autorisez le micro dans Réglages Système › Confidentialité et sécurité › Microphone.',
 	'mixer.micRetry': 'Redemander',
 	'mixer.openPrivacy': 'Ouvrir Confidentialit\u00e9',
 	'mixer.monitor': 'Écoute',

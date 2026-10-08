@@ -52,9 +52,16 @@
 	let inputs = $state<DeviceOption[]>([]);
 	let levels = $state<Record<string, { peaks: [number, number]; hold: [number, number] }>>({});
 	let devicesOpen = $state<string | null>(null);
+	let micWarningDismissed = $state(false);
 
 	onMount(() => {
 		const stopWatching = watchDevices(refreshDevices);
+		const recheckMicrophone = async () => {
+			if (permissions.microphone !== 'denied') return;
+			await askForMicrophone();
+			await refreshDevices();
+		};
+		window.addEventListener('focus', recheckMicrophone);
 		let last = performance.now();
 		// 30 Hz: enough for a meter to look alive without burning a core.
 		const timer = setInterval(() => {
@@ -79,6 +86,7 @@
 		return () => {
 			clearInterval(timer);
 			stopWatching();
+			window.removeEventListener('focus', recheckMicrophone);
 		};
 	});
 
@@ -346,7 +354,7 @@
 		</div>
 	{/snippet}
 
-	{#if permissions.microphone === 'denied'}
+	{#if permissions.microphone === 'denied' && !micWarningDismissed}
 		<!-- A refusal cannot be undone from in here, so say what happened and
 		     point at the one place it can be changed. -->
 		<div class="flex items-center gap-2 border-b border-red-500/25 bg-red-500/10 px-3 py-1.5">
@@ -363,6 +371,12 @@
 			>
 				{t('mixer.openPrivacy')}
 			</button>
+			<button
+				class="studio-icon-btn shrink-0"
+				title={t('common.close')}
+				aria-label={t('common.close')}
+				onclick={() => (micWarningDismissed = true)}><Icon name="close" size={14} /></button
+			>
 		</div>
 	{/if}
 

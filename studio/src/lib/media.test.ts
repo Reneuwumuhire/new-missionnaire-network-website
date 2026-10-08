@@ -1,11 +1,13 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { invoke } from '@tauri-apps/api/core';
 import {
+	askForMicrophone,
 	handleFor,
 	mediaVersion,
 	openFile,
 	openNativeWindow,
 	pinHandle,
+	permissions,
 	previewAudioLayer,
 	release,
 	releaseUnusedPins
@@ -17,6 +19,22 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 afterEach(() => {
 	vi.unstubAllGlobals();
 	vi.resetAllMocks();
+});
+
+it('only calls a microphone failure a permission denial when access is refused', async () => {
+	const getUserMedia = vi.fn();
+	vi.stubGlobal('navigator', { mediaDevices: { getUserMedia } });
+	getUserMedia.mockRejectedValueOnce(new DOMException('Missing', 'NotFoundError'));
+	await askForMicrophone();
+	expect(permissions.microphone).toBe('unknown');
+	getUserMedia.mockRejectedValueOnce(new DOMException('Refused', 'NotAllowedError'));
+	await askForMicrophone();
+	expect(permissions.microphone).toBe('denied');
+	expect(permissions.message).toContain('Microphone');
+	getUserMedia.mockResolvedValueOnce({ getTracks: () => [{ stop: vi.fn() }] });
+	await askForMicrophone();
+	expect(permissions.microphone).toBe('granted');
+	expect(permissions.message).toBe('');
 });
 
 it('auditions a disconnected Preview file but stops auditioning once Program takes it', () => {

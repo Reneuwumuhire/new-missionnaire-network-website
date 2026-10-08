@@ -98,6 +98,8 @@ const en = {
 
 	// ── Audio mixer ─────────────────────────────────────────────
 	'mixer.micDenied': 'No access to the microphone, so this system reports no input devices.',
+	'mixer.micPermissionDenied':
+		'Allow microphone access in System Settings › Privacy & Security › Microphone.',
 	'mixer.micRetry': 'Ask again',
 	'mixer.openPrivacy': 'Open Privacy settings',
 	'mixer.monitor': 'Monitor',
