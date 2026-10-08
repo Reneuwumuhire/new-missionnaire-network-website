@@ -23,6 +23,7 @@ pub struct AudioApp {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AudioWindow {
+	pub id: u32,
 	pub app_id: String,
 	pub app_name: String,
 	pub title: String,
@@ -175,6 +176,7 @@ mod platform {
 				}
 				let frame = window.frame();
 				Some(AudioWindow {
+					id: window.window_id(),
 					app_id,
 					app_name: app.application_name(),
 					title: window.title().unwrap_or_default(),

@@ -136,7 +136,7 @@
 					/>
 					{t('props.hideCursor')}
 				</label>
-				{#if !canHideCursor()}
+				{#if !canHideCursor(layer)}
 					<p class="text-[12px] leading-snug text-muted">{t('props.hideCursorUnsupported')}</p>
 				{/if}
 			</div>

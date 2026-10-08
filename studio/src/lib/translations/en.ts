@@ -60,36 +60,23 @@ const en = {
 	'sources.camera': 'Camera',
 	'sources.cameraHint': 'Webcam or capture device',
 	'sources.screen': 'Display / Window Capture',
-	'sources.screenHint': 'Share a screen or an application',
+	'sources.screenHint': 'Capture a browser window or display with its application audio',
 	'sources.image': 'Image',
 	'sources.imageHint': 'Logo, verse, backdrop',
 	'sources.video': 'Media Source',
 	'sources.videoHint': 'Clip or loop, with sound',
-	'sources.url': 'YouTube / Link',
-	'sources.urlHint': 'Play a video or a song from a link, like any media source',
-	'sources.youtubeLive': 'YouTube Live Window',
-	'sources.youtubeLiveHint': 'Capture a live player with its exact application audio',
-	'youtubeLive.title': 'Add YouTube live',
-	'youtubeLive.url': 'YouTube live address',
-	'youtubeLive.hint':
-		'Studio opens a clean live player in your browser, then the system window picker captures it. Keep that window visible and mute other tabs in the same browser.',
-	'youtubeLive.invalid': 'Enter a valid secure YouTube video or live link.',
-	'youtubeLive.openPlayer': '1. Open live player',
-	'youtubeLive.playerOpened': 'Player opened',
+	'sources.pickWindow': 'Choose a window to capture',
+	'sources.pickWindowHint':
+		'Choose the window playing the live video. Studio captures it directly and leaves the mouse pointer out of the broadcast.',
+	'sources.untitledWindow': 'Untitled window',
+	'sources.noWindows':
+		'No windows found. Allow Screen Recording for Missionnaire Studio in macOS settings, then refresh.',
+	'sources.noVideoFrames':
+		'The window has not sent video. Keep it open and visible, then reconnect this source.',
+	'sources.screenPermission': 'Screen Recording settings',
+	'sources.refreshWindows': 'Refresh windows',
 	'youtubeLive.openChat': 'Open live chat',
-	'youtubeLive.capture': '2. Capture window',
-	'youtubeLive.captureHint':
-		'Start playback if needed, move the pointer back over Studio so the player controls fade, then choose that browser window. On Windows, enable Share system audio; if the window has no audio, maximize it and capture that display. On macOS, Studio pairs the browser audio automatically.',
-	'web.title': 'Add from a link',
-	'web.url': 'Address',
-	'web.audioOnly': 'Sound only',
-	'web.withPicture': 'With picture',
-	'web.add': 'Add',
 	'web.reading': 'Reading the link…',
-	'web.hintAudio':
-		'Plays straight away, at full quality, and nothing is saved to disk. It streams while you are on air, so it needs the internet to keep working.',
-	'web.hintVideo':
-		'Plays straight away, but YouTube only serves picture and sound together at up to 360p, so it will look soft on a 1080p broadcast. Sound only is unaffected.',
 	'sources.text': 'Text',
 	'sources.textHint': 'Title, standing message',
 	'sources.lyrics': 'Lyrics',
@@ -111,9 +98,17 @@ const en = {
 
 	// ── Audio mixer ─────────────────────────────────────────────
 	'mixer.micDenied': 'No access to the microphone, so this system reports no input devices.',
+	'mixer.micPermissionDenied':
+		'Allow microphone access in System Settings › Privacy & Security › Microphone.',
 	'mixer.micRetry': 'Ask again',
 	'mixer.openPrivacy': 'Open Privacy settings',
 	'mixer.monitor': 'Monitor',
+	'mixer.monitorOutput': 'Monitor output',
+	'mixer.systemOutput': 'System default',
+	'mixer.outputDisconnected': 'Selected output disconnected',
+	'mixer.outputFailed': 'Could not use this output. Monitoring stays on its previous device.',
+	'mixer.active': 'Active',
+	'mixer.inactive': 'Inactive',
 	'mixer.monitorWarning':
 		'Monitoring is on — use headphones, or the mic will pick up the speakers.',
 	'mixer.addSource': 'Add audio source',
@@ -305,6 +300,7 @@ const en = {
 	'media.needsFile': 'Pick the file again \u2014 Sources \u203a Reconnect',
 	'media.needsLink': 'Link expired \u2014 Sources \u203a Reconnect',
 	'media.transport': 'Media transport',
+	'media.unmuteSource': 'Audio muted — Unmute',
 	'media.back': 'Back ten seconds',
 	'media.forward': 'Forward ten seconds',
 	'media.scrub': 'Position in the recording',
@@ -441,7 +437,7 @@ const en = {
 		'In Controls, choose or create the public session that listeners will open.',
 	'help.prepareTitle': 'Prepare Preview',
 	'help.prepare':
-		'Add cameras, media, or a YouTube Live Window to a scene. Connect every source and confirm its audio meter moves.',
+		'Add cameras, media, or Window Capture to a scene. Connect every source and confirm its audio meter moves.',
 	'help.programTitle': 'Send Preview to Program',
 	'help.program':
 		'In Studio Mode, edits remain private in Preview. Press Transition only when the picture is ready for Program.',
@@ -482,7 +478,7 @@ const en = {
 		'Confirm Lyrics is Shown, the correct public session is active, and the reference MP3 and matching French SRT are loaded. Automatic sync also needs audio from the captured live source; use “Sermon begins now” only as the fallback.',
 	'help.captureProblem': 'A captured YouTube window looks wrong',
 	'help.captureSolution':
-		'Use the dedicated YouTube Live Window source, keep the video visible in that window, and crop or resize the source in Preview. Move it to Program only after the result is clean.',
+		'Use Display / Window Capture, keep the video visible in the browser window, and crop or resize the source in Preview. Move it to Program only after the result is clean.',
 	'help.openSystem': 'Open System Information',
 
 	// ── Stream destinations ─────────────────────────────────────

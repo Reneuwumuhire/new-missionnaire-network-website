@@ -1,4 +1,4 @@
-// Audio mixing. Every source lands on one bus; the bus feeds the MediaRecorder.
+// Program audio feeds the MediaRecorder; Preview audition feeds only the monitor.
 // Monitoring is off by default — a laptop speaker plus the room mic is a
 // feedback loop, and finding that out on air is how services get ruined.
 
@@ -37,6 +37,10 @@ export class Mixer {
 	readonly master: GainNode;
 	readonly destination: MediaStreamAudioDestinationNode;
 	private readonly monitor: GainNode;
+	private readonly monitorDestination: MediaStreamAudioDestinationNode;
+	private readonly monitorPlayer: HTMLAudioElement;
+	private monitorOutputDeviceId = '';
+	private monitorSwitch: Promise<void> = Promise.resolve();
 	private readonly referenceDestination: MediaStreamAudioDestinationNode;
 	private readonly referencePlayer: HTMLAudioElement;
 	private readonly silence: ConstantSourceNode;
@@ -58,6 +62,9 @@ export class Mixer {
 		this.master = this.ctx.createGain();
 		this.destination = this.ctx.createMediaStreamDestination();
 		this.monitor = this.ctx.createGain();
+		this.monitorDestination = this.ctx.createMediaStreamDestination();
+		this.monitorPlayer = new Audio();
+		this.monitorPlayer.srcObject = this.monitorDestination.stream;
 		this.referenceDestination = this.ctx.createMediaStreamDestination();
 		this.referencePlayer = new Audio();
 		this.referencePlayer.autoplay = true;
@@ -86,6 +93,55 @@ export class Mixer {
 		this.monitor.gain.setTargetAtTime(on ? 1 : 0, this.ctx.currentTime, 0.02);
 	}
 
+	get canSelectMonitorOutput(): boolean {
+		return typeof this.monitorPlayer.setSinkId === 'function';
+	}
+
+	/** Only the local monitor is rerouted; the Program destination and the
+	 *  interpreter's separate reference player keep their existing paths. */
+	setMonitorOutput(deviceId: string): Promise<boolean> {
+		const change = this.monitorSwitch.then(() => this.switchMonitorOutput(deviceId));
+		this.monitorSwitch = change.then(
+			() => {},
+			() => {}
+		);
+		return change;
+	}
+
+	private async switchMonitorOutput(deviceId: string): Promise<boolean> {
+		if (!deviceId) {
+			if (this.monitorOutputDeviceId) {
+				this.monitor.connect(this.ctx.destination);
+				this.monitor.disconnect(this.monitorDestination);
+				this.monitorPlayer.pause();
+				this.monitorOutputDeviceId = '';
+			}
+			return true;
+		}
+		if (!this.canSelectMonitorOutput) return false;
+		const previous = this.monitorOutputDeviceId;
+		try {
+			await this.monitorPlayer.setSinkId(deviceId);
+			await this.monitorPlayer.play();
+			if (!this.monitorOutputDeviceId) {
+				this.monitor.connect(this.monitorDestination);
+				this.monitor.disconnect(this.ctx.destination);
+			}
+			this.monitorOutputDeviceId = deviceId;
+			return true;
+		} catch {
+			if (previous) {
+				try {
+					await this.monitorPlayer.setSinkId(previous);
+					await this.monitorPlayer.play();
+				} catch {
+					// A disconnected previous device cannot be restored here.
+				}
+			}
+			return false;
+		}
+	}
+
 	async setReferenceOutput(deviceId: string): Promise<boolean> {
 		const player = this.referencePlayer as HTMLAudioElement & {
 			setSinkId?: (id: string) => Promise<void>;
@@ -109,7 +165,8 @@ export class Mixer {
 		node: AudioNode,
 		element: HTMLMediaElement | null,
 		mono = false,
-		stream: MediaStream | null = null
+		stream: MediaStream | null = null,
+		preview = false
 	): Strip {
 		const gain = this.ctx.createGain();
 		const referenceGain = this.ctx.createGain();
@@ -149,10 +206,10 @@ export class Mixer {
 			node.connect(gain);
 			node.connect(referenceGain);
 		}
-		// The meters tap the signal; the master takes it from the gain node
-		// directly, so an analyser can never sit in the audio path.
+		// The meters tap the signal; Program or Monitor takes it from the gain
+		// node directly, so an analyser can never sit in the audio path.
 		gain.connect(splitter);
-		gain.connect(this.master);
+		gain.connect(preview ? this.monitor : this.master);
 
 		const strip: Strip = { id, gain, referenceGain, analysers, node, stream, element };
 		this.strips.set(id, strip);
@@ -198,7 +255,7 @@ export class Mixer {
 		return this.makeStrip(id, node, null);
 	}
 
-	addElement(id: string, element: HTMLMediaElement): Strip {
+	addElement(id: string, element: HTMLMediaElement, preview = false): Strip {
 		const existing = this.strips.get(id);
 		if (existing) {
 			if (existing.element === element) return existing;
@@ -213,7 +270,7 @@ export class Mixer {
 		// speakers, so the mute that kept it quiet until this moment has to come
 		// off — it applies before the tap, and would hand the mix silence.
 		element.muted = false;
-		return this.makeStrip(id, tap, element);
+		return this.makeStrip(id, tap, element, false, null, preview);
 	}
 
 	remove(id: string) {
@@ -283,6 +340,8 @@ export class Mixer {
 	}
 
 	close() {
+		this.monitorPlayer.pause();
+		this.monitorPlayer.srcObject = null;
 		this.referencePlayer.pause();
 		this.referencePlayer.srcObject = null;
 		this.silence.stop();

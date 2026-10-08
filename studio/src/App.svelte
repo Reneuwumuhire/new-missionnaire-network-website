@@ -45,6 +45,8 @@
 		handleForLayer,
 		mediaVersion,
 		openCamera,
+		previewAudioId,
+		previewAudioLayer,
 		releaseAll
 	} from './lib/media.svelte';
 	import { Mixer, stripsToDrop } from './lib/mixer';
@@ -162,7 +164,17 @@
 		mixer.setMonitor(studio.settings.monitorAudio);
 		// The audio context starts suspended until the page has been interacted
 		// with; a first click is enough and always happens before going live.
-		const wake = () => void mixer?.resume();
+		const wake = () =>
+			void mixer?.resume().then(() => {
+				const selected = studio.settings.monitorOutputDeviceId;
+				if (selected)
+					void mixer?.setMonitorOutput(selected).then((ok) => {
+						if (!ok && studio.settings.monitorOutputDeviceId === selected) {
+							studio.settings.monitorOutputDeviceId = '';
+							persist();
+						}
+					});
+			});
 		window.addEventListener('pointerdown', wake, { once: true });
 
 		void (async () => {
@@ -307,6 +319,12 @@
 		const bus = mixer;
 		if (!bus) return;
 		const wanted = new Set<string>();
+		const preview = previewAudioLayer();
+		const previewId = preview ? previewAudioId(preview.id) : null;
+		// Remove the old preview tap before Program can take that same element.
+		for (const id of bus.ids()) {
+			if (id.startsWith('preview:') && id !== previewId) bus.remove(id);
+		}
 
 		for (const source of studio.audioSources) {
 			// App audio is a worklet the native capture owns, not a device stream.
@@ -336,17 +354,27 @@
 			// A shared window's sound is the native app capture, which is already
 			// a strip and has no media handle. Claim it first, or the sweep below
 			// would tear it down a frame after it started.
-			if (bus.has(layer.id)) {
+			if (layer.appId && bus.has(layer.id)) {
 				wanted.add(layer.id);
 			} else if (handle?.stream && bus.addStream(layer.id, handle.stream)) {
 				wanted.add(layer.id);
-			} else if (handle?.el instanceof HTMLVideoElement && !handle.stream) {
+			} else if (layer.kind === 'video' && handle?.el instanceof HTMLVideoElement) {
 				bus.addElement(layer.id, handle.el);
 				wanted.add(layer.id);
 			}
 			if (wanted.has(layer.id)) {
 				bus.setLevel(layer.id, layer.gain, layer.muted);
 				bus.setReference(layer.id, layer.id === studio.service.krefeldLayerId);
+			}
+		}
+		if (preview) {
+			const element = handleForLayer(preview)?.el;
+			if (element instanceof HTMLVideoElement) {
+				const id = previewAudioId(preview.id);
+				bus.addElement(id, element, true);
+				bus.setLevel(id, preview.gain, preview.muted);
+				wanted.add(id);
+				void bus.resume();
 			}
 		}
 		// Only the scene's own layers come and go. A mic or an application strip
@@ -492,12 +520,20 @@
 
 	// ── Panel resizing ────────────────────────────────────
 	let dockRow = $state<HTMLDivElement | null>(null);
+	let previewRow = $state<HTMLDivElement | null>(null);
+	let transitionHeight = $state(190);
 	const layout = $derived(studio.settings.layout);
 
 	/** Dragging down grows the preview, so the dock row loses that much. Capped
 	 *  so neither the docks nor the preview can be squeezed out of existence. */
 	function resizeDockRow(delta: number) {
-		layout.dockHeight = clamp(layout.dockHeight - delta, 120, window.innerHeight - 320);
+		const current = dockRow?.clientHeight ?? layout.dockHeight;
+		const minimum = studio.settings.studioMode ? transitionHeight + 20 : 180;
+		layout.dockHeight = clamp(
+			current - delta,
+			140,
+			Math.max(140, current + (previewRow?.clientHeight ?? minimum) - minimum)
+		);
 		persist();
 	}
 
@@ -578,11 +614,15 @@
 	{/if}
 
 	<!-- ── Preview + lyrics ───────────────────────────────── -->
-	<div class="flex min-h-0 flex-1">
-		<div class="flex min-w-0 flex-1 flex-col">
+	<div class="flex min-h-[540px] flex-1">
+		<div class="flex min-h-0 min-w-0 flex-1 flex-col">
 			<LyricsRibbon />
 			<ServicePanel {mixer} bind:setupOpen={serviceSetupOpen} />
-			<div class="flex min-h-0 flex-1 gap-4 bg-ink-950 px-4 pt-1.5">
+			<div
+				bind:this={previewRow}
+				class="flex flex-1 gap-4 bg-ink-950 px-4 pt-1.5"
+				style:min-height={studio.settings.studioMode ? `${transitionHeight + 20}px` : '180px'}
+			>
 				{#if studio.settings.studioMode}
 					<Preview
 						label="{t('preview.preview')}: {activeScene().name}"
@@ -590,9 +630,12 @@
 						program={false}
 						editable={true}
 					/>
-					<div class="flex w-32 shrink-0 flex-col justify-center gap-1.5">
+					<div
+						bind:clientHeight={transitionHeight}
+						class="flex w-44 shrink-0 self-start flex-col gap-1.5 font-sans"
+					>
 						<button
-							class="h-10 w-full text-[13px] font-medium leading-tight transition-colors {canTake
+							class="h-9 w-full shrink-0 text-[12px] font-medium leading-tight transition-colors {canTake
 								? 'bg-primary text-black hover:bg-missionnaire-400'
 								: 'border border-ink-600 text-muted'}"
 							disabled={!canTake}
@@ -603,12 +646,12 @@
 						</button>
 						<!-- OBS's Quick Transitions: take with a specific transition
 						     without disturbing the configured default. -->
-						<span class="text-[12px] uppercase tracking-wider text-muted">
+						<span class="shrink-0 whitespace-nowrap text-[12px] text-muted">
 							{t('transitions.quick')}
 						</span>
 						{#each QUICK as quick (quick.type)}
 							<button
-								class="studio-chip w-full justify-center text-[12px] disabled:opacity-30"
+								class="studio-chip h-9 w-full shrink-0 justify-center px-2 py-0 text-[12px] disabled:opacity-30"
 								disabled={!canTake}
 								onclick={() =>
 									takeToProgram(
@@ -616,7 +659,10 @@
 										quick.type === 'cut' ? 0 : studio.settings.transitionMs,
 										undefined,
 										quick.type
-									)}>{quick.label()}</button
+									)}
+								>{quick.label()}{quick.type === 'cut'
+									? ''
+									: ` (${studio.settings.transitionMs}ms)`}</button
 							>
 						{/each}
 					</div>
@@ -689,7 +735,7 @@
 
 	<div
 		bind:this={dockRow}
-		class="flex shrink-0 bg-ink-900"
+		class="flex min-h-[140px] shrink overflow-hidden bg-ink-900"
 		style="height: {layout.dockHeight}px"
 		style:display={layout.docksVisible ? undefined : 'none'}
 	>

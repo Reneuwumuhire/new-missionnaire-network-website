@@ -9,6 +9,8 @@
 		openMic,
 		openPrivacySettings,
 		permissions,
+		previewAudioId,
+		previewAudioLayer,
 		release,
 		type DeviceOption
 	} from '../lib/media.svelte';
@@ -48,11 +50,20 @@
 	let { mixer }: { mixer: Mixer | null } = $props();
 
 	let inputs = $state<DeviceOption[]>([]);
+	let outputs = $state<DeviceOption[]>([]);
+	let monitorOutputError = $state('');
 	let levels = $state<Record<string, { peaks: [number, number]; hold: [number, number] }>>({});
 	let devicesOpen = $state<string | null>(null);
+	let micWarningDismissed = $state(false);
 
 	onMount(() => {
 		const stopWatching = watchDevices(refreshDevices);
+		const recheckMicrophone = async () => {
+			if (permissions.microphone !== 'denied') return;
+			await askForMicrophone();
+			await refreshDevices();
+		};
+		window.addEventListener('focus', recheckMicrophone);
 		let last = performance.now();
 		// 30 Hz: enough for a meter to look alive without burning a core.
 		const timer = setInterval(() => {
@@ -77,11 +88,25 @@
 		return () => {
 			clearInterval(timer);
 			stopWatching();
+			window.removeEventListener('focus', recheckMicrophone);
 		};
 	});
 
 	async function refreshDevices() {
-		inputs = await listDevices('audioinput');
+		[inputs, outputs] = await Promise.all([listDevices('audioinput'), listDevices('audiooutput')]);
+		outputs = outputs.filter((device) => device.deviceId && device.deviceId !== 'default');
+	}
+
+	async function chooseMonitorOutput(select: HTMLSelectElement) {
+		const deviceId = select.value;
+		if (!(await mixer?.setMonitorOutput(deviceId))) {
+			select.value = studio.settings.monitorOutputDeviceId;
+			monitorOutputError = t('mixer.outputFailed');
+			return;
+		}
+		studio.settings.monitorOutputDeviceId = deviceId;
+		monitorOutputError = '';
+		persist();
 	}
 
 	/** Input sources with a request already in flight — see the effect below. */
@@ -140,24 +165,41 @@
 		name: string;
 		isMic: boolean;
 		source: AudioSource | Layer;
+		preview?: boolean;
 	}
 
 	/** Global mics first, then the layers that carry sound: what the scene ON AIR
-	 *  contributes, plus any window capturing an application wherever it lives. */
-	const strips = $derived<Strip[]>([
-		...studio.audioSources.map((source) => ({
-			id: source.id,
-			name: source.name,
-			isMic: true,
-			source
-		})),
-		...audioLayers().map((layer) => ({
-			id: layer.id,
-			name: layer.name,
-			isMic: false,
-			source: layer
-		}))
-	]);
+	 *  contributes, plus any window capturing an application wherever it lives.
+	 *  A selected Preview recording gets its own local-only strip. */
+	const strips = $derived.by((): Strip[] => {
+		void mediaVersion.n;
+		const preview = previewAudioLayer();
+		return [
+			...studio.audioSources.map((source) => ({
+				id: source.id,
+				name: source.name,
+				isMic: true,
+				source
+			})),
+			...(preview
+				? [
+						{
+							id: previewAudioId(preview.id),
+							name: `${t('preview.preview')} · ${preview.name}`,
+							isMic: false,
+							source: preview,
+							preview: true
+						}
+					]
+				: []),
+			...audioLayers().map((layer) => ({
+				id: layer.id,
+				name: preview?.id === layer.id ? `${t('preview.program')} · ${layer.name}` : layer.name,
+				isMic: false,
+				source: layer
+			}))
+		];
+	});
 
 	/** Strips whose sound comes from the native per-application capture: an
 	 *  "Application audio" source, and every window or screen share — the engine
@@ -166,6 +208,14 @@
 		return strip.isMic
 			? (strip.source as AudioSource).kind === 'app'
 			: (strip.source as Layer).kind === 'screen';
+	}
+
+	function inactiveReason(strip: Strip): string {
+		const error = handleFor(strip.source.id)?.error;
+		if (error) return error;
+		if (isAppStrip(strip))
+			return appAudio.error ?? (strip.source.appId ? t('mixer.appGone') : t('mixer.chooseApp'));
+		return strip.isMic ? t('mixer.connect') : t('mixer.noAudioTrack');
 	}
 
 	/** Captures that came back with an error, so a failing one is not retried
@@ -220,20 +270,18 @@
 		}
 	});
 
-	/** Why a strip is silent — a source that connected without audio is not a
-	 *  broken source, and "No audio track" on its own leaves the operator
-	 *  hunting for a fault that is not theirs. */
-	function silenceReason(strip: Strip): { label: string; hint: string } {
-		const handle = handleFor(strip.id);
-		if (handle?.error) return { label: handle.error, hint: handle.error };
-		return { label: t('mixer.noAudioTrack'), hint: '' };
-	}
-
 	function setLevel(strip: Strip, gain: number, muted: boolean) {
 		strip.source.gain = gain;
 		strip.source.muted = muted;
 		mixer?.setLevel(strip.id, gain, muted);
 		persist();
+	}
+
+	const optionsStrip = $derived(strips.find((strip) => strip.id === devicesOpen));
+
+	function toggleOptions(strip: Strip) {
+		devicesOpen = devicesOpen === strip.id ? null : strip.id;
+		if (devicesOpen && isAppStrip(strip)) void refreshApps();
 	}
 </script>
 
@@ -321,7 +369,7 @@
 		</div>
 	{/snippet}
 
-	{#if permissions.microphone === 'denied'}
+	{#if permissions.microphone === 'denied' && !micWarningDismissed}
 		<!-- A refusal cannot be undone from in here, so say what happened and
 		     point at the one place it can be changed. -->
 		<div class="flex items-center gap-2 border-b border-red-500/25 bg-red-500/10 px-3 py-1.5">
@@ -338,173 +386,182 @@
 			>
 				{t('mixer.openPrivacy')}
 			</button>
+			<button
+				class="studio-icon-btn shrink-0"
+				title={t('common.close')}
+				aria-label={t('common.close')}
+				onclick={() => (micWarningDismissed = true)}><Icon name="close" size={14} /></button
+			>
 		</div>
 	{/if}
 
+	{#if mixer?.canSelectMonitorOutput}
+		<label
+			class="flex flex-wrap items-center gap-2 border-b border-ink-700 bg-ink-850 px-3 py-1 text-[12px] text-muted"
+		>
+			<span>{t('mixer.monitorOutput')}</span>
+			<select
+				class="studio-input h-7 min-w-0 flex-1 py-0 text-[12px]"
+				aria-label={t('mixer.monitorOutput')}
+				value={studio.settings.monitorOutputDeviceId}
+				onchange={(event) => void chooseMonitorOutput(event.currentTarget)}
+			>
+				<option value="">{t('mixer.systemOutput')}</option>
+				{#if studio.settings.monitorOutputDeviceId && !outputs.some((device) => device.deviceId === studio.settings.monitorOutputDeviceId)}
+					<option value={studio.settings.monitorOutputDeviceId}
+						>{t('mixer.outputDisconnected')}</option
+					>
+				{/if}
+				{#each outputs as output (output.deviceId)}
+					<option value={output.deviceId}>{output.label}</option>
+				{/each}
+			</select>
+		</label>
+	{/if}
 	{#if studio.settings.monitorAudio}
 		<p class="border-b border-amber-500/20 bg-amber-500/10 px-3 py-1 text-[12px] text-warning">
 			{t('mixer.monitorWarning')}
 		</p>
 	{/if}
+	{#if monitorOutputError}
+		<p class="border-b border-red-500/25 bg-red-500/10 px-3 py-1 text-[12px] text-danger">
+			{monitorOutputError}
+		</p>
+	{/if}
 
-	{#each strips as strip (strip.id)}
-		{@const level = levels[strip.id]}
-		<!-- Connected is read from the levels poll, not from mixer.has(): the
-		     mixer's strips live in a plain Map, so a check against it tracks
-		     nothing and Svelte never re-runs it. The row was built the instant
-		     the source was added — before the device had opened — and kept that
-		     answer, which is why the meter appeared only sometimes. -->
-		{@const connected = Boolean(level)}
-		<div class="group border-b border-ink-800 px-3 py-1.5">
-			<div class="flex items-baseline gap-2">
-				{#if strip.isMic}
-					<input
-						class="studio-input-flush min-w-0 flex-1 text-[12px]"
-						value={strip.name}
-						onchange={(e) => {
-							strip.source.name = (e.currentTarget as HTMLInputElement).value;
-							persist();
-						}}
-					/>
-				{:else}
-					<span class="min-w-0 flex-1 truncate px-1 text-[12px] text-fg/80">{strip.name}</span>
-				{/if}
-				<!-- The fader's value, which is what OBS puts here. The moving bar
-				     below is the level; a number that jumps with the audio is
-				     unreadable and tells you nothing you can act on. -->
-				<span
-					class="shrink-0 font-mono text-[12px] {strip.source.muted
-						? 'text-danger line-through'
-						: 'text-muted'}"
+	{#if optionsStrip}
+		{@const strip = optionsStrip}
+		{@const source = strip.source as AudioSource}
+		<div class="flex flex-wrap items-center gap-1 border-b border-ink-700 bg-ink-850 px-2 py-1.5">
+			<span class="max-w-32 truncate text-[12px] text-fg/80">{strip.name}</span>
+			{#if isAppStrip(strip)}
+				<select
+					class="studio-input h-7 min-w-40 flex-1 py-0 text-[12px]"
+					aria-label={t('mixer.chooseApp')}
+					value={strip.source.appId ?? ''}
+					onchange={(e) => {
+						const picked = (e.currentTarget as HTMLSelectElement).value;
+						const app =
+							picked === DESKTOP_AUDIO
+								? { id: DESKTOP_AUDIO, name: t('mixer.desktopAudio') }
+								: appAudio.apps.find((a) => a.id === picked);
+						if (app) void captureApp(strip, app);
+					}}
 				>
-					{formatDb(faderDb(gainPosition(strip.source.gain)))}
-				</span>
-			</div>
-
-			{#if devicesOpen === strip.id}
-				{@const source = strip.source as AudioSource}
-				<div class="mt-1 flex gap-1">
-					{#if isAppStrip(strip)}
-						<select
-							class="studio-input h-7 min-w-0 flex-1 py-0 text-[12px]"
-							value={strip.source.appId ?? ''}
-							onchange={(e) => {
-								const picked = (e.currentTarget as HTMLSelectElement).value;
-								const app =
-									picked === DESKTOP_AUDIO
-										? { id: DESKTOP_AUDIO, name: t('mixer.desktopAudio') }
-										: appAudio.apps.find((a) => a.id === picked);
-								if (app) void captureApp(strip, app);
-							}}
-						>
-							<option value="">{t('mixer.chooseApp')}</option>
-							<option value={DESKTOP_AUDIO}>{t('mixer.desktopAudio')}</option>
-							{#each appAudio.apps as app (app.id)}
-								<option value={app.id}>{app.name}</option>
-							{/each}
-						</select>
-						<button
-							class="studio-icon-btn"
-							title={t('mixer.refreshApps')}
-							aria-label={t('mixer.refreshApps')}
-							onclick={() => refreshApps()}><Icon name="refresh" size={13} /></button
-						>
-					{:else}
-						{@render deviceSelect(source)}
-					{/if}
-					<button
-						class="studio-chip px-2 text-[12px]"
-						title={t('mixer.unity')}
-						onclick={() => setLevel(strip, 1, strip.source.muted)}>0 dB</button
-					>
-					{#if strip.isMic}
-						<!-- A window's strip belongs to the source in the Sources dock;
-						     deleting it from here would leave the picture behind. -->
-						<button
-							class="studio-icon-btn"
-							title={t('common.remove')}
-							aria-label={t('common.remove')}
-							onclick={() => removeSource(source)}
-						>
-							<Icon name="trash" size={14} />
-						</button>
-					{/if}
-				</div>
+					<option value="">{t('mixer.chooseApp')}</option>
+					<option value={DESKTOP_AUDIO}>{t('mixer.desktopAudio')}</option>
+					{#each appAudio.apps as app (app.id)}
+						<option value={app.id}>{app.name}</option>
+					{/each}
+				</select>
+				<button
+					class="studio-icon-btn"
+					title={t('mixer.refreshApps')}
+					aria-label={t('mixer.refreshApps')}
+					onclick={() => refreshApps()}
+				>
+					<Icon name="refresh" size={13} />
+				</button>
+			{:else if strip.isMic}
+				{@render deviceSelect(source)}
 			{/if}
+			{#if !levels[strip.id]}
+				<span class="max-w-52 truncate text-[12px] text-muted" title={inactiveReason(strip)}>
+					{inactiveReason(strip)}
+				</span>
+			{/if}
+			<button
+				class="studio-chip px-2 text-[12px]"
+				title={t('mixer.unity')}
+				onclick={() => setLevel(strip, 1, strip.source.muted)}>0 dB</button
+			>
+			{#if strip.isMic}
+				<button
+					class="studio-icon-btn"
+					title={t('common.remove')}
+					aria-label={t('common.remove')}
+					onclick={() => removeSource(source)}
+				>
+					<Icon name="trash" size={14} />
+				</button>
+			{/if}
+			<button
+				class="studio-icon-btn"
+				title={t('common.close')}
+				aria-label={t('common.close')}
+				onclick={() => (devicesOpen = null)}>×</button
+			>
+		</div>
+	{/if}
 
-			{#if connected}
-				{@const position = gainPosition(strip.source.gain)}
-				<!-- One bar per channel. The gradient underneath is the whole −60→0
-				     scale and the overlay masks everything above the current level,
-				     so a given colour always sits at the same dB. Two bars because a
-				     desk feed with a dead leg meters fine when it is summed. -->
-				<div class="mt-1 space-y-px" data-meter={strip.id}>
-					{#each [0, 1] as channel (channel)}
-						{@const fraction = meterFraction(toDb(level?.peaks[channel] ?? 0))}
-						<div class="relative h-[5px] w-full bg-ink-950">
-							<div
-								class="absolute inset-0"
-								style="background: linear-gradient(to right, #10b981 0%, #10b981 66%, #fbbf24 66%, #fbbf24 85%, #ef4444 85%, #ef4444 100%)"
-							></div>
-							<!-- Opaque, not 95%: the gradient underneath bled through the
-							     mask, so a silent strip showed a warm smudge sitting in the
-							     -20..0 zone and read as a signal close to clipping. -->
-							<div
-								class="absolute inset-y-0 right-0 bg-ink-950"
-								style="left: {fraction * 100}%"
-							></div>
-							{#if level && level.hold[channel] > 0.01}
-								<div
-									class="absolute inset-y-0 w-px bg-fg/70"
-									style="left: {level.hold[channel] * 100}%"
-								></div>
-							{/if}
-						</div>
-					{/each}
+	<div class="flex min-h-[230px] flex-1 overflow-x-auto overflow-y-hidden bg-[#1b1b1e]">
+		{#each strips as strip (strip.id)}
+			{@const level = levels[strip.id]}
+			<!-- The levels poll is reactive; the mixer's internal Map is not. -->
+			{@const connected = Boolean(level)}
+			{@const position = gainPosition(strip.source.gain)}
+			<div class="flex h-full w-[112px] shrink-0 flex-col border-r border-[#3a3a3d]">
+				<div
+					class="h-[18px] text-center text-[12px] font-semibold leading-[18px] {connected
+						? strip.preview
+							? 'bg-[#4a331d] text-[#ffc080]'
+							: 'bg-[#21355d] text-[#9ebfff]'
+						: 'bg-[#29292d] text-[#a4a4ab]'}"
+					title={!connected ? inactiveReason(strip) : undefined}
+				>
+					{connected
+						? strip.preview
+							? t('preview.preview')
+							: t('mixer.active')
+						: t('mixer.inactive')}
 				</div>
-				<div class="relative mt-0.5 h-2.5">
-					{#each METER_TICKS as tick, i (tick)}
-						<!-- The end labels are pulled inside the row rather than centred on
-						     their mark: centred, half of -60 and half of 0 fell off the
-						     ends and the scale looked cropped. -->
-						<span
-							class="absolute top-0 font-mono text-[12px] text-muted {i === 0
-								? ''
-								: i === METER_TICKS.length - 1
-									? '-translate-x-full'
-									: '-translate-x-1/2'}"
-							style="left: {meterFraction(tick) * 100}%">{tick}</span
+				<div class="flex h-[22px] min-w-0 items-center pl-1.5 pr-1">
+					{#if strip.isMic}
+						<input
+							class="studio-input-flush min-w-0 flex-1 truncate text-[12px]"
+							aria-label={strip.name}
+							value={strip.name}
+							onchange={(e) => {
+								strip.source.name = (e.currentTarget as HTMLInputElement).value;
+								persist();
+							}}
+						/>
+					{:else}
+						<span class="min-w-0 flex-1 truncate text-[12px] text-fg/90" title={strip.name}
+							>{strip.name}</span
 						>
-					{/each}
+					{/if}
+					<button
+						class="text-[#bdbdc5]"
+						title={t('mixer.options')}
+						aria-label={`${strip.name}: ${t('mixer.options')}`}
+						onclick={() => toggleOptions(strip)}><Icon name="down" size={12} /></button
+					>
+				</div>
+				<div
+					class="h-[22px] px-1.5 font-mono text-[12px] leading-[20px] {strip.source.muted
+						? 'text-danger line-through'
+						: 'text-[#a7a7ae]'}"
+				>
+					{formatDb(faderDb(position))}
 				</div>
 
-				<div class="mt-0.5 flex items-center gap-2">
-					<button
-						class="shrink-0 text-sm {strip.source.muted
-							? 'text-danger'
-							: 'text-muted hover:text-fg'}"
-						title={strip.source.muted ? t('mixer.unmute') : t('mixer.mute')}
-						aria-label={strip.source.muted ? t('mixer.unmute') : t('mixer.mute')}
-						onclick={() => setLevel(strip, strip.source.gain, !strip.source.muted)}
-					>
-						<Icon name={strip.source.muted ? 'volumeOff' : 'volume'} size={16} />
-					</button>
-					<div class="relative min-w-0 flex-1">
-						<!-- Unity, marked on the track. Finding 0 dB by dragging until the
-						     number reads right is the kind of fiddling nobody has time for
-						     with a service running. -->
+				<div class="flex min-h-0 flex-1 items-stretch gap-1 px-2" data-meter={strip.id}>
+					<div class="relative w-6 shrink-0">
 						<span
-							class="pointer-events-none absolute top-1/2 h-2.5 w-px -translate-y-1/2 bg-fg/30"
-							style="left: {gainPosition(1) * 100}%"
+							class="pointer-events-none absolute inset-x-0 h-px bg-fg/40"
+							style="bottom: {gainPosition(1) * 100}%"
 						></span>
 						<input
 							type="range"
 							min="0"
 							max="1"
 							step="0.005"
-							class="studio-fader"
+							class="studio-fader studio-fader-vertical"
 							style="--level: {position * 100}%"
-							aria-label={t('mixer.fader')}
+							aria-label={`${strip.name}: ${t('mixer.fader')}`}
+							aria-orientation="vertical"
+							aria-valuetext={formatDb(faderDb(position))}
 							value={position}
 							oninput={(e) =>
 								setLevel(
@@ -514,87 +571,70 @@
 								)}
 						/>
 					</div>
-					{#if strip.isMic || isAppStrip(strip)}
-						<!-- Only where it opens something. A camera or media layer has
-						     nothing to choose, and a gear that does nothing is worse
-						     than no gear. -->
-						<button
-							class="studio-icon-btn"
-							title={t('mixer.options')}
-							aria-label={t('mixer.options')}
-							onclick={() => (devicesOpen = devicesOpen === strip.id ? null : strip.id)}
-						>
-							<Icon name="gear" size={14} />
-						</button>
-					{/if}
-				</div>
-			{:else if isAppStrip(strip)}
-				<!-- Only two ways to be here: the chosen application is gone, or none
-				     was ever chosen. Either way the answer is the list, and the gear
-				     next to it removes a strip that is no longer wanted. -->
-				<div class="mt-1.5 flex gap-1">
-					<button
-						class="studio-chip min-w-0 flex-1 truncate text-left text-[12px]"
-						onclick={async () => {
-							await refreshApps();
-							devicesOpen = strip.id;
-						}}
+					<div class="flex h-full shrink-0 gap-px">
+						{#each [0, 1] as channel (channel)}
+							{@const fraction = meterFraction(toDb(level?.peaks[channel] ?? 0))}
+							<div
+								class="relative h-full w-[8px] bg-ink-950"
+								role="meter"
+								aria-label={`${strip.name} ${channel + 1}`}
+								aria-valuemin="-60"
+								aria-valuemax="0"
+								aria-valuenow={Math.max(-60, Math.round(toDb(level?.peaks[channel] ?? 0)))}
+							>
+								<div
+									class="absolute inset-0"
+									class:opacity-40={!connected}
+									style="background: linear-gradient(to top, #19ad4b 0%, #19ad4b 70%, #c4ba28 70%, #c4ba28 90%, #bb292d 90%, #bb292d 100%)"
+								></div>
+								{#if connected}
+									<div
+										class="absolute inset-x-0 top-0 bg-ink-950/60"
+										style="height: {(1 - fraction) * 100}%"
+									></div>
+								{/if}
+								{#if level && level.hold[channel] > 0.01}
+									<div
+										class="absolute inset-x-0 h-px bg-fg/80"
+										style="bottom: {level.hold[channel] * 100}%"
+									></div>
+								{/if}
+							</div>
+						{/each}
+					</div>
+					<div
+						class="relative min-w-0 flex-1 font-mono text-[#b9b9bf]"
+						style="font-size: 9px; line-height: 10px"
 					>
-						{appAudio.error ??
-							(appAudio.supported
-								? strip.source.appId
-									? t('mixer.appGone')
-									: t('mixer.chooseApp')
-								: t('mixer.appAudioUnsupported'))}
-					</button>
-					{#if strip.isMic}
-						<button
-							class="studio-icon-btn"
-							title={t('common.remove')}
-							aria-label={t('common.remove')}
-							onclick={() => removeSource(strip.source as AudioSource)}
-						>
-							<Icon name="trash" size={14} />
-						</button>
-					{/if}
+						{#each METER_TICKS as tick (tick)}
+							<span
+								class="absolute left-0"
+								style="top: calc({(1 - meterFraction(tick)) * 100}% - {(1 - meterFraction(tick)) *
+									10}px)">{tick}</span
+							>
+						{/each}
+					</div>
 				</div>
-				{#if !appAudio.supported && !strip.isMic}
-					<p class="mt-0.5 text-[12px] leading-snug text-muted">{t('mixer.noSurfaceAudioHint')}</p>
-				{/if}
-			{:else if strip.isMic}
-				{@const source = strip.source as AudioSource}
-				{@const error = handleFor(strip.id)?.error}
-				<div class="mt-1.5 flex gap-1">
-					{@render deviceSelect(source)}
+
+				<div class="flex h-8 items-center justify-between px-2">
+					<button
+						class="text-sm {strip.source.muted ? 'text-danger' : 'text-muted hover:text-fg'}"
+						title={strip.source.muted ? t('mixer.unmute') : t('mixer.mute')}
+						aria-label={strip.source.muted ? t('mixer.unmute') : t('mixer.mute')}
+						onclick={() => setLevel(strip, strip.source.gain, !strip.source.muted)}
+					>
+						<Icon name={strip.source.muted ? 'volumeOff' : 'volume'} size={16} />
+					</button>
 					<button
 						class="studio-icon-btn"
-						title={t('mixer.connect')}
-						aria-label={t('mixer.connect')}
-						onclick={() => connect(source)}><Icon name="refresh" size={13} /></button
+						title={t('mixer.options')}
+						aria-label={`${strip.name}: ${t('mixer.options')}`}
+						onclick={() => toggleOptions(strip)}><Icon name="gear" size={14} /></button
 					>
-					<button
-						class="studio-icon-btn"
-						title={t('common.remove')}
-						aria-label={t('common.remove')}
-						onclick={() => removeSource(source)}
-					>
-						<Icon name="trash" size={14} />
-					</button>
 				</div>
-				{#if error}
-					<p class="mt-0.5 text-[12px] leading-snug text-warning">{error}</p>
-				{/if}
-			{:else}
-				{@const reason = silenceReason(strip)}
-				<p class="mt-1.5 text-[12px] leading-snug text-muted" title={reason.hint}>
-					{reason.label}
-				</p>
-				{#if reason.hint}
-					<p class="mt-0.5 text-[12px] leading-snug text-muted">{reason.hint}</p>
-				{/if}
-			{/if}
-		</div>
-	{:else}
-		<p class="px-3 py-4 text-[12px] text-muted">{t('mixer.empty')}</p>
-	{/each}
+			</div>
+		{:else}
+			<p class="px-3 py-4 text-[12px] text-muted">{t('mixer.empty')}</p>
+		{/each}
+	</div>
 </Dock>

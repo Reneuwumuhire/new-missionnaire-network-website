@@ -16,8 +16,9 @@ describe('YouTube live links', () => {
 	])('rejects %s', (url) => expect(youtubeVideoId(url)).toBeNull());
 
 	it('builds canonical player and chat URLs', () => {
-		expect(youtubePlayerUrl('dQw4w9WgXcQ')).toContain('/embed/dQw4w9WgXcQ?');
-		expect(youtubePlayerUrl('dQw4w9WgXcQ')).toContain('controls=1');
+		expect(youtubePlayerUrl('dQw4w9WgXcQ')).toBe(
+			'https://www.youtube.com/watch?v=dQw4w9WgXcQ&autoplay=1'
+		);
 		expect(youtubeChatUrl('dQw4w9WgXcQ')).toContain('live_chat?v=dQw4w9WgXcQ');
 	});
 });

@@ -6,19 +6,19 @@
 
 	import Icon from './Icon.svelte';
 	import { t } from '../lib/i18n.svelte';
-	import { clampTime, handleFor, mediaVersion, shownDuration } from '../lib/media.svelte';
+	import {
+		clampTime,
+		handleFor,
+		handleForLayer,
+		mediaVersion,
+		shownDuration
+	} from '../lib/media.svelte';
 	import { followMedia, lyrics } from '../lib/lyrics.svelte';
 	import { syncLiveLyrics } from '../lib/live-session.svelte';
-	import { programScene, selectedLayer, studio, type Layer } from '../lib/state.svelte';
+	import { persist, programScene, studio, transportLayer } from '../lib/state.svelte';
 
-	/** The recording this bar drives: whichever media source is selected, else
-	 *  the first one on air. ponytail: first wins — give it a picker if a
-	 *  service ever runs two recordings in one scene. */
-	const layer = $derived.by((): Layer | null => {
-		const selected = selectedLayer();
-		if (selected?.kind === 'video') return selected;
-		return programScene().layers.find((l) => l.kind === 'video') ?? null;
-	});
+	/** The selected recording, or the current scene's first when none is selected. */
+	const layer = $derived(transportLayer());
 
 	let position = $state(0);
 	let duration = $state(0);
@@ -94,6 +94,16 @@
 		playing = !element.paused;
 	}
 
+	function unmuteSource() {
+		if (!layer) return;
+		layer.muted = false;
+		// When this is the exact media generation already on air, unmute its
+		// frozen Program settings too; otherwise only the Preview changes.
+		const onAir = programScene().layers.find((source) => source.id === layer.id);
+		if (onAir && handleForLayer(onAir)?.el === element) onAir.muted = false;
+		persist();
+	}
+
 	/** m:ss, and h:mm:ss once a recording is long enough to need it — a sermon
 	 *  runs past the hour and "63:20" is a worse answer than "1:03:20". */
 	function clock(seconds: number): string {
@@ -107,6 +117,11 @@
 
 	const remaining = $derived(Math.max(0, duration - position));
 	const following = $derived(Boolean(layer) && lyrics.followLayerId === layer?.id);
+	const mutedForPlayback = $derived.by(() => {
+		if (!layer) return false;
+		const onAir = programScene().layers.find((source) => source.id === layer.id);
+		return onAir && handleForLayer(onAir)?.el === element ? onAir.muted : layer.muted;
+	});
 </script>
 
 {#if layer}
@@ -118,6 +133,11 @@
 		<span class="min-w-0 max-w-[14rem] shrink truncate text-[12px] text-fg/70">
 			{layer.fileName || layer.name}
 		</span>
+		{#if element && mutedForPlayback}
+			<button class="shrink-0 text-[12px] text-warning underline" onclick={unmuteSource}
+				>{t('media.unmuteSource')}</button
+			>
+		{/if}
 		{#if !element}
 			<!-- Neither a blob nor a signed link survives a restart, so the source
 			     has to be fetched again. Dead controls with no reason given is the

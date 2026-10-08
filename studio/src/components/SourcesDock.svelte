@@ -4,7 +4,9 @@
 		mediaVersion,
 		openCamera,
 		openFile,
+		openNativeWindow,
 		openScreen,
+		openPrivacySettings,
 		openStream,
 		release,
 		report
@@ -17,10 +19,9 @@
 		matchWindow,
 		refreshApps
 	} from '../lib/appaudio.svelte';
+	import type { AudioWindow } from '../lib/appaudio.svelte';
 	import { addAppAudio, addAudioInput } from '../lib/state.svelte';
 	import { invoke } from '@tauri-apps/api/core';
-	import AddFromUrl from './AddFromUrl.svelte';
-	import AddYouTubeLive from './AddYouTubeLive.svelte';
 	import Dock from './Dock.svelte';
 	import Modal from './Modal.svelte';
 	import { broadcast, isStreaming } from '../lib/broadcast.svelte';
@@ -104,11 +105,48 @@
 	});
 	let fileInput = $state<HTMLInputElement | null>(null);
 	let pendingFileLayer = $state<Layer | null>(null);
+	let pendingWindowLayer = $state<Layer | null>(null);
+	let windowChoices = $state<AudioWindow[]>([]);
+	let windowPickerError = $state<string | null>(null);
+
+	async function refreshWindowChoices() {
+		try {
+			windowChoices = await invoke<AudioWindow[]>('list_windows');
+			windowPickerError = null;
+		} catch (error) {
+			windowChoices = [];
+			const message = String(error);
+			windowPickerError = /TCC|permission|not authorized|declined/i.test(message)
+				? t('sources.noWindows')
+				: message;
+		}
+	}
+
+	async function captureNativeWindow(layer: Layer, choice: AudioWindow) {
+		if (choice.id === undefined) return;
+		pendingWindowLayer = null;
+		const handle = await openNativeWindow(layer, choice.id);
+		if (handle.el) {
+			// A newly made layer can still be the plain object passed to the picker.
+			// Update the copy in Svelte state so the audio mixer reacts immediately.
+			const tracked = studio.scenes
+				.flatMap((scene) => scene.layers)
+				.find((candidate) => candidate.id === layer.id);
+			if (!tracked) {
+				release(layer.id);
+				return;
+			}
+			tracked.windowId = choice.id;
+			tracked.appId = choice.appId;
+			report(`native window capture app=${choice.appName} window=${JSON.stringify(choice.title)}`);
+			persist();
+		}
+	}
 
 	/** The two audio kinds are not layers: they have no picture, and they are
 	 *  global to the show. They are offered here because OBS offers them here,
 	 *  and appear where they belong — in the Audio Mixer. */
-	type MenuKind = LayerKind | 'audioInput' | 'audioApp' | 'url' | 'youtubeLive';
+	type MenuKind = LayerKind | 'audioInput' | 'audioApp';
 
 	const SOURCE_KINDS: {
 		kind: MenuKind;
@@ -153,13 +191,6 @@
 			icon: 'film'
 		},
 		{
-			kind: 'youtubeLive',
-			label: () => t('sources.youtubeLive'),
-			hint: () => t('sources.youtubeLiveHint'),
-			icon: 'monitor'
-		},
-		{ kind: 'url', label: () => t('sources.url'), hint: () => t('sources.urlHint'), icon: 'link' },
-		{
 			kind: 'text',
 			label: () => t('sources.text'),
 			hint: () => t('sources.textHint'),
@@ -196,18 +227,6 @@
 			await refreshApps();
 			return;
 		}
-		if (kind === 'url') {
-			// The layer is made only once the link resolves: a bad link should
-			// leave nothing behind to tidy up.
-			adding = false;
-			urlOpen = true;
-			return;
-		}
-		if (kind === 'youtubeLive') {
-			adding = false;
-			youtubeLiveOpen = true;
-			return;
-		}
 		adding = false;
 		const label = SOURCE_KINDS.find((s) => s.kind === kind)?.label() ?? kind;
 		const layer = makeLayer(kind, label, {
@@ -220,7 +239,11 @@
 					}
 				: {}),
 			...(kind === 'color' ? { color: '#0B0B0D' } : {}),
-			...(kind === 'screen' || kind === 'video' ? { fit: 'contain' as const } : {})
+			...(kind === 'screen'
+				? { fit: 'contain' as const, hideCursor: true }
+				: kind === 'video'
+					? { fit: 'contain' as const }
+					: {})
 		});
 		const scene = activeScene();
 		scene.layers = [layer, ...scene.layers];
@@ -241,10 +264,17 @@
 			layer.hideCursor = true;
 			layer.fit = 'cover';
 		}
+		if (await invoke<boolean>('native_window_capture_available')) {
+			await refreshWindowChoices();
+			const previous = windowChoices.find((window) => window.id === layer.windowId);
+			if (previous) await captureNativeWindow(layer, previous);
+			else pendingWindowLayer = layer;
+			return;
+		}
 		const handle = await openScreen(layer);
 		const track = handle.stream?.getVideoTracks()[0];
 		if (!track) return;
-		if (layer.youtubeLiveUrl && handle.stream) {
+		if (referenceMatcher.sourceId === layer.id && handle.stream) {
 			await observeReferenceStream(layer.id, handle.stream);
 		}
 		const label = track.label ?? '';
@@ -276,49 +306,9 @@
 		persist();
 	}
 
-	let urlOpen = $state(false);
-	let youtubeLiveOpen = $state(false);
-
-	async function addYouTubeLive(url: string) {
-		youtubeLiveOpen = false;
-		const layer = makeLayer('screen', t('sources.youtubeLive'), {
-			fit: 'cover',
-			hideCursor: true,
-			youtubeLiveUrl: url
-		});
-		const scene = activeScene();
-		scene.layers = [layer, ...scene.layers];
-		studio.selectedLayerId = layer.id;
-		useReferenceSource(layer.id, layer.name);
-		persist();
-		await shareScreen(layer);
-	}
-
 	async function openLiveChat(url: string) {
 		const videoId = youtubeVideoId(url);
 		if (videoId) await invoke('open_youtube_chat', { url: youtubeChatUrl(videoId) });
-	}
-
-	/** A resolved link becomes an ordinary media layer — the compositor, the
-	 *  mixer and the transport bar have no idea it is being streamed. */
-	function addFetched(
-		found: { token: string; title: string; duration: number },
-		url: string,
-		audioOnly: boolean
-	) {
-		urlOpen = false;
-		const layer = makeLayer('video', found.title || t('sources.url'), {
-			fit: 'contain',
-			audioOnly,
-			fileName: found.title,
-			duration: found.duration,
-			url
-		});
-		const scene = activeScene();
-		scene.layers = [layer, ...scene.layers];
-		studio.selectedLayerId = layer.id;
-		openStream(layer, found.token);
-		persist();
 	}
 
 	/** Layers whose link is being resolved again. Resolving takes about twelve
@@ -468,12 +458,36 @@
 	</Modal>
 {/if}
 
-{#if urlOpen}
-	<AddFromUrl onclose={() => (urlOpen = false)} onready={addFetched} />
-{/if}
-
-{#if youtubeLiveOpen}
-	<AddYouTubeLive onclose={() => (youtubeLiveOpen = false)} onready={addYouTubeLive} />
+{#if pendingWindowLayer}
+	<Modal title={t('sources.pickWindow')} onclose={() => (pendingWindowLayer = null)}>
+		<div class="flex flex-col gap-3 p-5">
+			<p class="text-[12px] leading-relaxed text-muted">{t('sources.pickWindowHint')}</p>
+			{#if windowChoices.length}
+				<div class="max-h-80 space-y-1 overflow-y-auto">
+					{#each windowChoices as choice (choice.id)}
+						<button
+							class="studio-chip flex w-full flex-col items-start gap-1 text-left"
+							disabled={choice.id === undefined}
+							onclick={() => pendingWindowLayer && captureNativeWindow(pendingWindowLayer, choice)}
+						>
+							<span class="text-fg">{choice.appName}</span>
+							<span class="truncate text-muted">{choice.title || t('sources.untitledWindow')}</span>
+						</button>
+					{/each}
+				</div>
+			{:else}
+				<p class="text-[12px] text-warning">{windowPickerError || t('sources.noWindows')}</p>
+			{/if}
+			<div class="flex justify-between border-t border-ink-700 pt-3">
+				<button class="studio-chip" onclick={() => openPrivacySettings('screen')}>
+					{t('sources.screenPermission')}
+				</button>
+				<button class="studio-chip" onclick={refreshWindowChoices}
+					>{t('sources.refreshWindows')}</button
+				>
+			</div>
+		</div>
+	</Modal>
 {/if}
 
 <Dock id="sources" title={t('dock.sources')}>
@@ -501,7 +515,8 @@
 				<button
 					class="flex min-w-0 flex-1 items-center gap-2 py-1.5 pl-3 text-left"
 					onclick={() => (studio.selectedLayerId = layer.id)}
-					ondblclick={onproperties}
+					ondblclick={() =>
+						layer.kind === 'image' || layer.kind === 'video' ? reconnect(layer) : onproperties()}
 				>
 					<Icon
 						name={iconFor(layer.kind)}

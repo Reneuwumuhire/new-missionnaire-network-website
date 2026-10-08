@@ -63,36 +63,24 @@ const fr: Record<keyof typeof en, string> = {
 	'sources.camera': 'Caméra',
 	'sources.cameraHint': 'Webcam ou boîtier de capture',
 	'sources.screen': 'Capture d’écran / de fenêtre',
-	'sources.screenHint': 'Partage un écran ou une application',
+	'sources.screenHint':
+		'Capture une fenêtre du navigateur ou un écran avec le son de l’application',
 	'sources.image': 'Image',
 	'sources.imageHint': 'Logo, verset, arrière-plan',
 	'sources.video': 'Source multimédia',
 	'sources.videoHint': 'Clip ou boucle, avec son',
-	'sources.url': 'YouTube / Lien',
-	'sources.urlHint': 'Lire une vidéo ou un chant depuis un lien, comme toute autre source',
-	'sources.youtubeLive': 'Fenêtre YouTube Live',
-	'sources.youtubeLiveHint': 'Capturer un direct avec le son exact de son application',
-	'youtubeLive.title': 'Ajouter un direct YouTube',
-	'youtubeLive.url': 'Adresse du direct YouTube',
-	'youtubeLive.hint':
-		'Studio ouvre un lecteur épuré dans votre navigateur, puis le sélecteur système le capture. Gardez cette fenêtre visible et coupez le son des autres onglets du même navigateur.',
-	'youtubeLive.invalid': 'Saisissez un lien YouTube vidéo ou direct sécurisé et valide.',
-	'youtubeLive.openPlayer': '1. Ouvrir le direct',
-	'youtubeLive.playerOpened': 'Lecteur ouvert',
+	'sources.pickWindow': 'Choisir une fenêtre à capturer',
+	'sources.pickWindowHint':
+		'Choisissez la fenêtre qui lit le direct. Studio la capture directement sans afficher le pointeur dans la diffusion.',
+	'sources.untitledWindow': 'Fenêtre sans titre',
+	'sources.noWindows':
+		'Aucune fenêtre trouvée. Autorisez l’enregistrement de l’écran pour Missionnaire Studio dans les réglages macOS, puis actualisez.',
+	'sources.noVideoFrames':
+		'La fenêtre n’envoie pas de vidéo. Laissez-la ouverte et visible, puis reconnectez cette source.',
+	'sources.screenPermission': 'Réglages d’enregistrement de l’écran',
+	'sources.refreshWindows': 'Actualiser les fenêtres',
 	'youtubeLive.openChat': 'Ouvrir le chat',
-	'youtubeLive.capture': '2. Capturer la fenêtre',
-	'youtubeLive.captureHint':
-		'Lancez la lecture si nécessaire, ramenez le pointeur sur Studio pour masquer les commandes, puis choisissez cette fenêtre. Sous Windows, activez Partager l’audio du système ; si la fenêtre n’a pas de son, agrandissez-la et capturez cet écran. Sous macOS, Studio associe automatiquement le son du navigateur.',
-	'web.title': 'Ajouter depuis un lien',
-	'web.url': 'Adresse',
-	'web.audioOnly': 'Son seul',
-	'web.withPicture': 'Avec l’image',
-	'web.add': 'Ajouter',
 	'web.reading': 'Lecture du lien…',
-	'web.hintAudio':
-		'Lecture immédiate, en pleine qualité, et rien n’est enregistré sur le disque. Le flux est lu pendant l’antenne : il faut donc garder la connexion.',
-	'web.hintVideo':
-		'Lecture immédiate, mais YouTube ne sert l’image et le son ensemble qu’en 360p au plus : ce sera flou sur une diffusion 1080p. Le son seul n’est pas concerné.',
 	'sources.text': 'Texte',
 	'sources.textHint': 'Titre, message fixe',
 	'sources.lyrics': 'Paroles',
@@ -116,9 +104,17 @@ const fr: Record<keyof typeof en, string> = {
 	// ── Audio mixer ─────────────────────────────────────────────
 	'mixer.micDenied':
 		'Pas d\u2019acc\u00e8s au micro : ce syst\u00e8me n\u2019annonce alors aucune entr\u00e9e audio.',
+	'mixer.micPermissionDenied':
+		'Autorisez le micro dans Réglages Système › Confidentialité et sécurité › Microphone.',
 	'mixer.micRetry': 'Redemander',
 	'mixer.openPrivacy': 'Ouvrir Confidentialit\u00e9',
 	'mixer.monitor': 'Écoute',
+	'mixer.monitorOutput': 'Sortie d’écoute',
+	'mixer.systemOutput': 'Sortie système',
+	'mixer.outputDisconnected': 'Sortie sélectionnée déconnectée',
+	'mixer.outputFailed': 'Sortie indisponible. L’écoute reste sur la sortie précédente.',
+	'mixer.active': 'Actif',
+	'mixer.inactive': 'Inactif',
 	'mixer.monitorWarning':
 		'Écoute locale active — au casque, sinon le micro capte les haut-parleurs.',
 	'mixer.addSource': 'Ajouter une source audio',
@@ -314,6 +310,7 @@ const fr: Record<keyof typeof en, string> = {
 	'media.needsFile': 'Rechoisir le fichier \u2014 Sources \u203a Reconnecter',
 	'media.needsLink': 'Lien expir\u00e9 \u2014 Sources \u203a Reconnecter',
 	'media.transport': 'Lecture du m\u00e9dia',
+	'media.unmuteSource': 'Son coupé — réactiver',
 	'media.back': 'Dix secondes en arri\u00e8re',
 	'media.forward': 'Dix secondes en avant',
 	'media.scrub': 'Position dans l\u2019enregistrement',
@@ -451,7 +448,7 @@ const fr: Record<keyof typeof en, string> = {
 		'Dans Contrôles, choisissez ou créez la session publique que les auditeurs ouvriront.',
 	'help.prepareTitle': 'Préparer l’aperçu',
 	'help.prepare':
-		'Ajoutez des caméras, des médias ou une fenêtre YouTube Live à une scène. Connectez chaque source et vérifiez que son vumètre réagit.',
+		'Ajoutez des caméras, des médias ou une capture de fenêtre à une scène. Connectez chaque source et vérifiez que son vumètre réagit.',
 	'help.programTitle': 'Envoyer l’aperçu au programme',
 	'help.program':
 		'En Mode Studio, les modifications restent privées dans l’aperçu. Appuyez sur Transition uniquement lorsque l’image est prête pour le programme.',
@@ -492,7 +489,7 @@ const fr: Record<keyof typeof en, string> = {
 		'Vérifiez que Paroles est affiché, que la bonne session publique est active et que le MP3 de référence et son SRT français sont chargés. La synchronisation automatique a aussi besoin du son de la source capturée ; utilisez « Le sermon commence maintenant » uniquement en secours.',
 	'help.captureProblem': 'Une fenêtre YouTube capturée est mal cadrée',
 	'help.captureSolution':
-		'Utilisez la source Fenêtre YouTube Live dédiée, gardez la vidéo visible dans cette fenêtre, puis recadrez ou redimensionnez la source dans l’aperçu. Envoyez-la au programme seulement lorsque le résultat est propre.',
+		'Utilisez Capture d’écran / de fenêtre, gardez la vidéo visible dans le navigateur, puis recadrez ou redimensionnez la source dans l’aperçu. Envoyez-la au programme seulement lorsque le résultat est propre.',
 	'help.openSystem': 'Ouvrir les informations système',
 
 	// ── Stream destinations ─────────────────────────────────────

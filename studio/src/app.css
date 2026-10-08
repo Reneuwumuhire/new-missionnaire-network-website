@@ -267,6 +267,48 @@ textarea {
 		background: rgb(var(--text-accent));
 	}
 
+	.studio-fader-vertical {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		writing-mode: vertical-lr;
+		direction: rtl;
+	}
+
+	.studio-fader-vertical::-webkit-slider-runnable-track {
+		width: 3px;
+		background: linear-gradient(to top, #3769e1 var(--level, 0%), #46474d var(--level, 0%));
+	}
+
+	.studio-fader-vertical::-webkit-slider-thumb {
+		width: 22px;
+		height: 11px;
+		margin-left: -10px;
+		border-radius: 2px;
+		background: #f1f1f3;
+	}
+
+	.studio-obs-mixer > .studio-dock-body {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.studio-obs-mixer > header {
+		position: relative;
+		justify-content: flex-end;
+		background: #3b3b3e;
+		border-color: #55555a;
+	}
+
+	.studio-obs-mixer > header h2 {
+		position: absolute;
+		inset-inline: 0;
+		text-align: center;
+		color: #f1f1f3;
+		pointer-events: none;
+	}
+
 	.studio-icon-btn {
 		@apply flex h-6 w-6 shrink-0 items-center justify-center text-sm text-muted transition-colors hover:bg-fg/10 hover:text-fg disabled:pointer-events-none disabled:opacity-60;
 	}

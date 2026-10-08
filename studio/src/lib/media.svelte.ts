@@ -5,7 +5,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { t } from './i18n.svelte';
 import { MIX_RATE } from './mixer';
-import type { Layer } from './state.svelte';
+import { audioLayers, studio, transportLayer, type Layer } from './state.svelte';
 
 /** Print to the terminal the studio was launched from. A packaged .app has no
  *  console anyone can reach, and a silent failure at 9 on a Sunday morning is
@@ -31,8 +31,12 @@ export async function askForMicrophone(): Promise<void> {
 		permissions.microphone = 'granted';
 		permissions.message = '';
 	} catch (err) {
-		permissions.microphone = 'denied';
-		permissions.message = describe(err);
+		permissions.microphone =
+			err instanceof Error && ['NotAllowedError', 'SecurityError'].includes(err.name)
+				? 'denied'
+				: 'unknown';
+		permissions.message =
+			permissions.microphone === 'denied' ? t('mixer.micPermissionDenied') : describe(err);
 	}
 }
 
@@ -45,15 +49,19 @@ export function openPrivacySettings(pane: 'microphone' | 'camera' | 'screen'): v
 export interface Handle {
 	kind: Layer['kind'];
 	/** What the compositor draws. */
-	el: HTMLVideoElement | HTMLImageElement | null;
+	el: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement | null;
 	stream: MediaStream | null;
 	/** Set when the source failed, shown on the layer row instead of silence. */
 	error: string | null;
 	objectUrl: string | null;
+	nativeCaptureId?: string;
+	nativeCancel?: () => void;
+	nativeFrameReady?: boolean;
 }
 
 const handles = new Map<string, Handle>();
 const pinnedHandles = new Map<string, Handle>();
+const openRequests = new Map<string, symbol>();
 let nextPin = 0;
 /** Bumped every time a handle appears or fails, so Svelte can re-read. */
 export const mediaVersion = $state({ n: 0 });
@@ -69,6 +77,20 @@ export function mediaHandleKey(layer: Layer): string | null {
 export function handleForLayer(layer: Layer): Handle | undefined {
 	const key = mediaHandleKey(layer);
 	return key ? handleFor(key) : undefined;
+}
+
+export const previewAudioId = (layerId: string) => `preview:${layerId}`;
+
+/** A media source being auditioned in Studio Mode, apart from Program.
+ *  Its sound may reach the operator's monitor, but never the broadcast bus. */
+export function previewAudioLayer(): Layer | null {
+	if (!studio.settings.studioMode) return null;
+	const layer = transportLayer();
+	if (!layer || layer.kind !== 'video' || !layer.hasAudio || !layer.visible) return null;
+	const element = handleForLayer(layer)?.el;
+	if (!(element instanceof HTMLVideoElement)) return null;
+	const onAir = audioLayers().find((item) => item.id === layer.id);
+	return onAir && handleForLayer(onAir)?.el === element ? null : layer;
 }
 
 /** Keep the exact current resource alive for a Program snapshot. */
@@ -93,12 +115,26 @@ export function releaseUnusedPins(keep: Iterable<string | null | undefined>) {
 	if (changed) mediaVersion.n++;
 }
 
-function set(layerId: string, handle: Handle) {
+function set(layerId: string, handle: Handle, request?: symbol): Handle {
+	if (request && openRequests.get(layerId) !== request) {
+		destroy(handle);
+		return { kind: handle.kind, el: null, stream: null, error: null, objectUrl: null };
+	}
+	if (request) openRequests.delete(layerId);
 	handles.set(layerId, handle);
 	mediaVersion.n++;
+	return handle;
+}
+
+function beginOpen(layerId: string): symbol {
+	release(layerId);
+	const request = Symbol();
+	openRequests.set(layerId, request);
+	return request;
 }
 
 export function release(layerId: string) {
+	openRequests.delete(layerId);
 	const h = handles.get(layerId);
 	if (!h) return;
 	handles.delete(layerId);
@@ -111,6 +147,8 @@ export function release(layerId: string) {
 }
 
 function destroy(h: Handle) {
+	h.nativeCancel?.();
+	if (h.nativeCaptureId) void invoke('stop_window_capture', { id: h.nativeCaptureId });
 	h.stream?.getTracks().forEach((t) => t.stop());
 	if (h.el instanceof HTMLVideoElement) {
 		h.el.pause();
@@ -121,6 +159,7 @@ function destroy(h: Handle) {
 }
 
 export function releaseAll() {
+	openRequests.clear();
 	for (const handle of new Set([...handles.values(), ...pinnedHandles.values()])) destroy(handle);
 	handles.clear();
 	pinnedHandles.clear();
@@ -138,7 +177,7 @@ function videoEl(stream: MediaStream): HTMLVideoElement {
 }
 
 export async function openCamera(layer: Layer, width: number, height: number): Promise<Handle> {
-	release(layer.id);
+	const request = beginOpen(layer.id);
 	try {
 		const stream = await navigator.mediaDevices.getUserMedia({
 			video: layer.deviceId
@@ -149,8 +188,7 @@ export async function openCamera(layer: Layer, width: number, height: number): P
 			audio: false
 		});
 		const h: Handle = { kind: 'camera', el: videoEl(stream), stream, error: null, objectUrl: null };
-		set(layer.id, h);
-		return h;
+		return set(layer.id, h, request);
 	} catch (err) {
 		const h: Handle = {
 			kind: 'camera',
@@ -159,15 +197,14 @@ export async function openCamera(layer: Layer, width: number, height: number): P
 			error: describe(err),
 			objectUrl: null
 		};
-		set(layer.id, h);
-		return h;
+		return set(layer.id, h, request);
 	}
 }
 
 /** Microphone / any audio input. No picture, so no element — the mixer takes
  *  the stream directly. */
 export async function openMic(layerId: string, deviceId?: string): Promise<Handle> {
-	release(layerId);
+	const request = beginOpen(layerId);
 	try {
 		// The processing is off because this is a broadcast desk, not a phone
 		// call: the operator rides the level, and gates chewing the front of a
@@ -201,8 +238,9 @@ export async function openMic(layerId: string, deviceId?: string): Promise<Handl
 			);
 		}
 		const h: Handle = { kind: 'camera', el: null, stream, error: null, objectUrl: null };
-		set(layerId, h);
-		return h;
+		permissions.microphone = 'granted';
+		permissions.message = '';
+		return set(layerId, h, request);
 	} catch (err) {
 		const h: Handle = {
 			kind: 'camera',
@@ -211,13 +249,12 @@ export async function openMic(layerId: string, deviceId?: string): Promise<Handl
 			error: describe(err),
 			objectUrl: null
 		};
-		set(layerId, h);
-		return h;
+		return set(layerId, h, request);
 	}
 }
 
 export async function openScreen(layer: Layer): Promise<Handle> {
-	release(layer.id);
+	const request = beginOpen(layer.id);
 	try {
 		// The picker is the OS one — which window/screen is the operator's call,
 		// so there is nothing for us to configure here.
@@ -229,12 +266,21 @@ export async function openScreen(layer: Layer): Promise<Handle> {
 		// honour this, which is why it is still requested.
 		// ponytail: real per-app audio needs ScreenCaptureKit on the Rust side.
 		const stream = await navigator.mediaDevices.getDisplayMedia({
-			video: cursorConstraint(layer),
+			// The program canvas cannot use more pixels or frames than it outputs.
+			// Leaving this unconstrained makes WebKit capture a Retina browser
+			// window at the display's full rate, even though the encoder later
+			// downsizes it to (usually) 1280×720 at 30 fps. Keep capture work in
+			// step with the actual broadcast workload.
+			video: {
+				...cursorConstraint(layer),
+				width: { max: studio.settings.width },
+				height: { max: studio.settings.height },
+				frameRate: { max: studio.settings.fps }
+			},
 			audio: true
 		});
 		const h: Handle = { kind: 'screen', el: videoEl(stream), stream, error: null, objectUrl: null };
-		set(layer.id, h);
-		return h;
+		return set(layer.id, h, request);
 	} catch (err) {
 		const h: Handle = {
 			kind: 'screen',
@@ -243,8 +289,110 @@ export async function openScreen(layer: Layer): Promise<Handle> {
 			error: describe(err),
 			objectUrl: null
 		};
-		set(layer.id, h);
+		return set(layer.id, h, request);
+	}
+}
+
+/** ScreenCaptureKit sends its newest JPEG frame when the compositor asks for
+ * it. Only one request and one decode are in flight, so a slow webview cannot
+ * build an unbounded frame queue or stall the macOS capture callback. */
+export async function openNativeWindow(layer: Layer, windowId: number): Promise<Handle> {
+	const request = beginOpen(layer.id);
+	const captureId = `${layer.id}:${crypto.randomUUID()}`;
+	try {
+		const info = await invoke<{ width: number; height: number }>('start_window_capture', {
+			id: captureId,
+			windowId,
+			width: studio.settings.width,
+			height: studio.settings.height,
+			fps: studio.settings.fps,
+			hideCursor: layer.hideCursor ?? false
+		});
+		const canvas = document.createElement('canvas');
+		canvas.width = info.width;
+		canvas.height = info.height;
+		const ctx = canvas.getContext('2d', { alpha: false });
+		if (!ctx) throw new Error('Canvas 2D unavailable');
+		let cancelled = false;
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		let lastSequence = 0;
+		let failures = 0;
+		const firstFrameDeadline = Date.now() + 8_000;
+		const h: Handle = {
+			kind: 'screen',
+			el: canvas,
+			stream: null,
+			error: null,
+			objectUrl: null,
+			nativeCaptureId: captureId,
+			nativeCancel: () => {
+				cancelled = true;
+				if (timer) clearTimeout(timer);
+			}
+		};
+		const next = async () => {
+			if (cancelled) return;
+			const started = performance.now();
+			try {
+				const response = await invoke<ArrayBuffer | number[]>('window_capture_frame', {
+					id: captureId,
+					lastSequence
+				});
+				failures = 0;
+				const bytes = response instanceof ArrayBuffer ? response : new Uint8Array(response).buffer;
+				if (bytes.byteLength > 8) {
+					lastSequence = Number(new DataView(bytes).getBigUint64(0, true));
+					const bitmap = await createImageBitmap(
+						new Blob([bytes.slice(8)], { type: 'image/jpeg' })
+					);
+					try {
+						if (!cancelled) {
+							ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+							h.nativeFrameReady = true;
+							if (h.error) {
+								h.error = null;
+								mediaVersion.n++;
+							}
+						}
+					} finally {
+						bitmap.close();
+					}
+				}
+				if (!h.nativeFrameReady && !h.error && Date.now() >= firstFrameDeadline) {
+					h.error = t('sources.noVideoFrames');
+					mediaVersion.n++;
+				}
+			} catch (err) {
+				if (!cancelled) {
+					const error = describe(err);
+					if (h.error !== error) {
+						h.error = error;
+						mediaVersion.n++;
+					}
+					timer = setTimeout(next, Math.min(4000, 250 * 2 ** Math.min(failures++, 4)));
+				}
+				return;
+			}
+			if (!cancelled)
+				timer = setTimeout(
+					next,
+					Math.max(0, 1000 / Math.min(studio.settings.fps, 30) - (performance.now() - started))
+				);
+		};
+		const current = set(layer.id, h, request);
+		if (current !== h) return current;
+		void next();
 		return h;
+	} catch (err) {
+		void invoke('stop_window_capture', { id: captureId });
+		const h: Handle = {
+			kind: 'screen',
+			el: null,
+			stream: null,
+			error: describe(err),
+			objectUrl: null
+		};
+		return set(layer.id, h, request);
 	}
 }
 
@@ -259,12 +407,25 @@ function cursorConstraint(layer: Layer): CursorConstraints {
 /** Whether this engine admits to understanding the cursor constraint. WebKit
  *  does not, and keeps drawing the pointer whatever is asked — the UI says so
  *  rather than offering a switch that quietly does nothing. */
-export const canHideCursor = (): boolean =>
-	'cursor' in navigator.mediaDevices.getSupportedConstraints();
+export const canHideCursor = (layer: Layer): boolean => {
+	void mediaVersion.n;
+	return (
+		Boolean(handleFor(layer.id)?.nativeCaptureId) ||
+		'cursor' in navigator.mediaDevices.getSupportedConstraints()
+	);
+};
 
 /** Apply the choice to a share already running, so the toggle does not wait
  *  for a reconnect and a second trip through the OS picker. */
 export async function applyCursor(layer: Layer): Promise<void> {
+	const captureId = handleFor(layer.id)?.nativeCaptureId;
+	if (captureId) {
+		await invoke('set_window_capture_cursor', {
+			id: captureId,
+			hideCursor: layer.hideCursor ?? false
+		});
+		return;
+	}
 	const track = handleFor(layer.id)?.stream?.getVideoTracks()[0];
 	// An engine that ignores the constraint also rejects it here; the setting
 	// is kept either way and applied to the next share.

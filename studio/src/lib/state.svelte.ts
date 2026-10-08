@@ -53,6 +53,8 @@ export interface Layer {
 	 *  because the engine hands a window over without any. Same field, same
 	 *  meaning as on an `app` audio source. */
 	appId?: string;
+	/** macOS ScreenCaptureKit window selected for native video capture. */
+	windowId?: number;
 	/** screen: leave the mouse pointer out of the shared window, where the
 	 *  engine lets us ask. */
 	hideCursor?: boolean;
@@ -234,6 +236,8 @@ export interface Settings {
 	 *  on air on the right, then cut to it deliberately. */
 	studioMode: boolean;
 	monitorAudio: boolean;
+	/** Physical output for local monitoring only; Program audio keeps its bus. */
+	monitorOutputDeviceId: string;
 	/** Physical output used only for the interpreter's pre-fader French feed. */
 	interpreterOutputDeviceId: string;
 	/** Panel sizes the operator has dragged to. */
@@ -258,6 +262,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	barsWhenNoSource: true,
 	studioMode: false,
 	monitorAudio: false,
+	monitorOutputDeviceId: '',
 	interpreterOutputDeviceId: '',
 	layout: DEFAULT_LAYOUT,
 	recordingMode: 'off',
@@ -585,8 +590,32 @@ export function programScene(): Scene {
 	return studio.scenes.find((s) => s.id === onAirSceneId()) ?? activeScene();
 }
 
+/** The configured Krefeld capture supplies sermon sync, including ordinary
+ * window captures. Older saved YouTube window sources remain usable. */
+export function referenceSourceLayer(): Layer | undefined {
+	const id = studio.service.type === 'live' ? studio.service.krefeldLayerId : null;
+	return id
+		? studio.scenes.flatMap((scene) => scene.layers).find((layer) => layer.id === id)
+		: programScene().layers.find((layer) => layer.youtubeLiveUrl);
+}
+
 export function selectedLayer(): Layer | null {
 	return activeScene().layers.find((l) => l.id === studio.selectedLayerId) ?? null;
+}
+
+/** The media transport follows the scene being prepared. Fall back to Program
+ *  only when that scene has no recording of its own. Use the editable layer so
+ *  its current file and mute state match the handle that the transport plays. */
+export function transportLayer(): Layer | null {
+	const selected = selectedLayer();
+	if (selected?.kind === 'video') return selected;
+	const preview = activeScene().layers.find((layer) => layer.kind === 'video');
+	if (preview) return preview;
+	const onAir = programScene().layers.find((layer) => layer.kind === 'video');
+	if (!onAir) return null;
+	return (
+		studio.scenes.flatMap((scene) => scene.layers).find((layer) => layer.id === onAir.id) ?? onAir
+	);
 }
 
 /** Remove only this scene's sources; global audio inputs and other scenes stay intact. */

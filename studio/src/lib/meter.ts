@@ -52,7 +52,7 @@ export function gainPosition(gain: number): number {
 }
 
 /** Ticks drawn under a strip, matching OBS's spacing. */
-export const METER_TICKS = [-60, -50, -40, -30, -20, -10, 0];
+export const METER_TICKS = [-60, -54, -48, -42, -36, -30, -24, -18, -12, -6, 0];
 
 /** Peak hold with a slow fall, so a transient you missed is still visible a
  *  moment later. Returns the new held value. */

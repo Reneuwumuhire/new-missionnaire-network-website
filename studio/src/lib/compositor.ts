@@ -121,6 +121,24 @@ export function selectScene(sceneId: string) {
 	// the on-air scene IS the edit scene, so assigning first would make the
 	// transition think it was already showing the new scene and cut instead.
 	const from = onAirSceneId();
+	const outgoing = activeScene();
+	if (outgoing.id !== sceneId) {
+		// A recording in Preview otherwise keeps running while its scene is
+		// hidden. It can finish before the operator comes back to resume it.
+		// Preserve any element still in Program, including a pinned snapshot.
+		const onAirElements = new Set(
+			studio.settings.studioMode
+				? programScene().layers.map((layer) => handleForLayer(layer)?.el)
+				: []
+		);
+		for (const layer of outgoing.layers) {
+			if (layer.kind !== 'video') continue;
+			const element = handleForLayer(layer)?.el;
+			if (element && !onAirElements.has(element) && element instanceof HTMLVideoElement) {
+				element.pause();
+			}
+		}
+	}
 	studio.activeSceneId = sceneId;
 	studio.selectedLayerId = null;
 	if (!studio.settings.studioMode) takeToProgram(sceneId, studio.settings.transitionMs, from);
@@ -274,12 +292,22 @@ function drawLayer(
 
 	const handle = handleForLayer(layer);
 	const el = handle?.el;
-	if (!el) {
+	if (!el || (handle?.nativeCaptureId && !handle.nativeFrameReady)) {
 		ctx.globalAlpha = 1;
 		return false;
 	}
-	const srcW = el instanceof HTMLVideoElement ? el.videoWidth : el.naturalWidth;
-	const srcH = el instanceof HTMLVideoElement ? el.videoHeight : el.naturalHeight;
+	const srcW =
+		el instanceof HTMLVideoElement
+			? el.videoWidth
+			: el instanceof HTMLCanvasElement
+				? el.width
+				: el.naturalWidth;
+	const srcH =
+		el instanceof HTMLVideoElement
+			? el.videoHeight
+			: el instanceof HTMLCanvasElement
+				? el.height
+				: el.naturalHeight;
 	// A camera that has not delivered its first frame reports 0×0; drawing it
 	// throws in some engines and draws garbage in others.
 	if (!srcW || !srcH) {

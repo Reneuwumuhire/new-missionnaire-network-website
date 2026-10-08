@@ -60,6 +60,7 @@ export function matchApp(label: string, apps: AudioApp[]): AudioApp | null {
 export const DESKTOP_AUDIO = '__desktop';
 
 export interface AudioWindow {
+	id?: number;
 	appId: string;
 	appName: string;
 	title: string;
