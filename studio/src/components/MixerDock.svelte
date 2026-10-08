@@ -50,6 +50,8 @@
 	let { mixer }: { mixer: Mixer | null } = $props();
 
 	let inputs = $state<DeviceOption[]>([]);
+	let outputs = $state<DeviceOption[]>([]);
+	let monitorOutputError = $state('');
 	let levels = $state<Record<string, { peaks: [number, number]; hold: [number, number] }>>({});
 	let devicesOpen = $state<string | null>(null);
 	let micWarningDismissed = $state(false);
@@ -91,7 +93,20 @@
 	});
 
 	async function refreshDevices() {
-		inputs = await listDevices('audioinput');
+		[inputs, outputs] = await Promise.all([listDevices('audioinput'), listDevices('audiooutput')]);
+		outputs = outputs.filter((device) => device.deviceId && device.deviceId !== 'default');
+	}
+
+	async function chooseMonitorOutput(select: HTMLSelectElement) {
+		const deviceId = select.value;
+		if (!(await mixer?.setMonitorOutput(deviceId))) {
+			select.value = studio.settings.monitorOutputDeviceId;
+			monitorOutputError = t('mixer.outputFailed');
+			return;
+		}
+		studio.settings.monitorOutputDeviceId = deviceId;
+		monitorOutputError = '';
+		persist();
 	}
 
 	/** Input sources with a request already in flight — see the effect below. */
@@ -380,9 +395,37 @@
 		</div>
 	{/if}
 
+	{#if mixer?.canSelectMonitorOutput}
+		<label
+			class="flex flex-wrap items-center gap-2 border-b border-ink-700 bg-ink-850 px-3 py-1 text-[12px] text-muted"
+		>
+			<span>{t('mixer.monitorOutput')}</span>
+			<select
+				class="studio-input h-7 min-w-0 flex-1 py-0 text-[12px]"
+				aria-label={t('mixer.monitorOutput')}
+				value={studio.settings.monitorOutputDeviceId}
+				onchange={(event) => void chooseMonitorOutput(event.currentTarget)}
+			>
+				<option value="">{t('mixer.systemOutput')}</option>
+				{#if studio.settings.monitorOutputDeviceId && !outputs.some((device) => device.deviceId === studio.settings.monitorOutputDeviceId)}
+					<option value={studio.settings.monitorOutputDeviceId}
+						>{t('mixer.outputDisconnected')}</option
+					>
+				{/if}
+				{#each outputs as output (output.deviceId)}
+					<option value={output.deviceId}>{output.label}</option>
+				{/each}
+			</select>
+		</label>
+	{/if}
 	{#if studio.settings.monitorAudio}
 		<p class="border-b border-amber-500/20 bg-amber-500/10 px-3 py-1 text-[12px] text-warning">
 			{t('mixer.monitorWarning')}
+		</p>
+	{/if}
+	{#if monitorOutputError}
+		<p class="border-b border-red-500/25 bg-red-500/10 px-3 py-1 text-[12px] text-danger">
+			{monitorOutputError}
 		</p>
 	{/if}
 

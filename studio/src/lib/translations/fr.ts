@@ -109,6 +109,10 @@ const fr: Record<keyof typeof en, string> = {
 	'mixer.micRetry': 'Redemander',
 	'mixer.openPrivacy': 'Ouvrir Confidentialit\u00e9',
 	'mixer.monitor': 'Écoute',
+	'mixer.monitorOutput': 'Sortie d’écoute',
+	'mixer.systemOutput': 'Sortie système',
+	'mixer.outputDisconnected': 'Sortie sélectionnée déconnectée',
+	'mixer.outputFailed': 'Sortie indisponible. L’écoute reste sur la sortie précédente.',
 	'mixer.active': 'Actif',
 	'mixer.inactive': 'Inactif',
 	'mixer.monitorWarning':

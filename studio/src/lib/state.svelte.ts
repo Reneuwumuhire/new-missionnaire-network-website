@@ -236,6 +236,8 @@ export interface Settings {
 	 *  on air on the right, then cut to it deliberately. */
 	studioMode: boolean;
 	monitorAudio: boolean;
+	/** Physical output for local monitoring only; Program audio keeps its bus. */
+	monitorOutputDeviceId: string;
 	/** Physical output used only for the interpreter's pre-fader French feed. */
 	interpreterOutputDeviceId: string;
 	/** Panel sizes the operator has dragged to. */
@@ -260,6 +262,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	barsWhenNoSource: true,
 	studioMode: false,
 	monitorAudio: false,
+	monitorOutputDeviceId: '',
 	interpreterOutputDeviceId: '',
 	layout: DEFAULT_LAYOUT,
 	recordingMode: 'off',

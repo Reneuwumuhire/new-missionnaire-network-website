@@ -37,6 +37,10 @@ export class Mixer {
 	readonly master: GainNode;
 	readonly destination: MediaStreamAudioDestinationNode;
 	private readonly monitor: GainNode;
+	private readonly monitorDestination: MediaStreamAudioDestinationNode;
+	private readonly monitorPlayer: HTMLAudioElement;
+	private monitorOutputDeviceId = '';
+	private monitorSwitch: Promise<void> = Promise.resolve();
 	private readonly referenceDestination: MediaStreamAudioDestinationNode;
 	private readonly referencePlayer: HTMLAudioElement;
 	private readonly silence: ConstantSourceNode;
@@ -58,6 +62,9 @@ export class Mixer {
 		this.master = this.ctx.createGain();
 		this.destination = this.ctx.createMediaStreamDestination();
 		this.monitor = this.ctx.createGain();
+		this.monitorDestination = this.ctx.createMediaStreamDestination();
+		this.monitorPlayer = new Audio();
+		this.monitorPlayer.srcObject = this.monitorDestination.stream;
 		this.referenceDestination = this.ctx.createMediaStreamDestination();
 		this.referencePlayer = new Audio();
 		this.referencePlayer.autoplay = true;
@@ -84,6 +91,55 @@ export class Mixer {
 
 	setMonitor(on: boolean) {
 		this.monitor.gain.setTargetAtTime(on ? 1 : 0, this.ctx.currentTime, 0.02);
+	}
+
+	get canSelectMonitorOutput(): boolean {
+		return typeof this.monitorPlayer.setSinkId === 'function';
+	}
+
+	/** Only the local monitor is rerouted; the Program destination and the
+	 *  interpreter's separate reference player keep their existing paths. */
+	setMonitorOutput(deviceId: string): Promise<boolean> {
+		const change = this.monitorSwitch.then(() => this.switchMonitorOutput(deviceId));
+		this.monitorSwitch = change.then(
+			() => {},
+			() => {}
+		);
+		return change;
+	}
+
+	private async switchMonitorOutput(deviceId: string): Promise<boolean> {
+		if (!deviceId) {
+			if (this.monitorOutputDeviceId) {
+				this.monitor.connect(this.ctx.destination);
+				this.monitor.disconnect(this.monitorDestination);
+				this.monitorPlayer.pause();
+				this.monitorOutputDeviceId = '';
+			}
+			return true;
+		}
+		if (!this.canSelectMonitorOutput) return false;
+		const previous = this.monitorOutputDeviceId;
+		try {
+			await this.monitorPlayer.setSinkId(deviceId);
+			await this.monitorPlayer.play();
+			if (!this.monitorOutputDeviceId) {
+				this.monitor.connect(this.monitorDestination);
+				this.monitor.disconnect(this.ctx.destination);
+			}
+			this.monitorOutputDeviceId = deviceId;
+			return true;
+		} catch {
+			if (previous) {
+				try {
+					await this.monitorPlayer.setSinkId(previous);
+					await this.monitorPlayer.play();
+				} catch {
+					// A disconnected previous device cannot be restored here.
+				}
+			}
+			return false;
+		}
 	}
 
 	async setReferenceOutput(deviceId: string): Promise<boolean> {
@@ -284,6 +340,8 @@ export class Mixer {
 	}
 
 	close() {
+		this.monitorPlayer.pause();
+		this.monitorPlayer.srcObject = null;
 		this.referencePlayer.pause();
 		this.referencePlayer.srcObject = null;
 		this.silence.stop();

@@ -103,6 +103,10 @@ const en = {
 	'mixer.micRetry': 'Ask again',
 	'mixer.openPrivacy': 'Open Privacy settings',
 	'mixer.monitor': 'Monitor',
+	'mixer.monitorOutput': 'Monitor output',
+	'mixer.systemOutput': 'System default',
+	'mixer.outputDisconnected': 'Selected output disconnected',
+	'mixer.outputFailed': 'Could not use this output. Monitoring stays on its previous device.',
 	'mixer.active': 'Active',
 	'mixer.inactive': 'Inactive',
 	'mixer.monitorWarning':

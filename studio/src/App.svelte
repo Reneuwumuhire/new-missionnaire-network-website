@@ -164,7 +164,17 @@
 		mixer.setMonitor(studio.settings.monitorAudio);
 		// The audio context starts suspended until the page has been interacted
 		// with; a first click is enough and always happens before going live.
-		const wake = () => void mixer?.resume();
+		const wake = () =>
+			void mixer?.resume().then(() => {
+				const selected = studio.settings.monitorOutputDeviceId;
+				if (selected)
+					void mixer?.setMonitorOutput(selected).then((ok) => {
+						if (!ok && studio.settings.monitorOutputDeviceId === selected) {
+							studio.settings.monitorOutputDeviceId = '';
+							persist();
+						}
+					});
+			});
 		window.addEventListener('pointerdown', wake, { once: true });
 
 		void (async () => {
