@@ -612,9 +612,9 @@
 						program={false}
 						editable={true}
 					/>
-					<div class="flex min-h-0 w-32 shrink-0 flex-col gap-1.5 overflow-y-auto">
+					<div class="flex min-h-0 w-44 shrink-0 flex-col gap-1.5 overflow-y-auto font-sans">
 						<button
-							class="h-10 w-full shrink-0 text-[13px] font-medium leading-tight transition-colors {canTake
+							class="h-9 w-full shrink-0 text-[12px] font-medium leading-tight transition-colors {canTake
 								? 'bg-primary text-black hover:bg-missionnaire-400'
 								: 'border border-ink-600 text-muted'}"
 							disabled={!canTake}
@@ -625,12 +625,12 @@
 						</button>
 						<!-- OBS's Quick Transitions: take with a specific transition
 						     without disturbing the configured default. -->
-						<span class="shrink-0 text-[12px] uppercase tracking-wider text-muted">
+						<span class="shrink-0 whitespace-nowrap text-[12px] text-muted">
 							{t('transitions.quick')}
 						</span>
 						{#each QUICK as quick (quick.type)}
 							<button
-								class="studio-chip w-full shrink-0 justify-center text-[12px] disabled:opacity-30"
+								class="studio-chip h-9 w-full shrink-0 justify-center px-2 py-0 text-[12px] disabled:opacity-30"
 								disabled={!canTake}
 								onclick={() =>
 									takeToProgram(
@@ -638,7 +638,10 @@
 										quick.type === 'cut' ? 0 : studio.settings.transitionMs,
 										undefined,
 										quick.type
-									)}>{quick.label()}</button
+									)}
+								>{quick.label()}{quick.type === 'cut'
+									? ''
+									: ` (${studio.settings.transitionMs}ms)`}</button
 							>
 						{/each}
 					</div>
