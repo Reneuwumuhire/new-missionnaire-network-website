@@ -16,7 +16,7 @@
 				"width": 1680,
 				"height": 1000,
 				"minWidth": 1100,
-				"minHeight": 900,
+				"minHeight": 760,
 				"resizable": true,
 				"backgroundColor": "#0B0B0D",
 				"titleBarStyle": "Overlay",

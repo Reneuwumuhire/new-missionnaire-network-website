@@ -510,15 +510,19 @@
 
 	// ── Panel resizing ────────────────────────────────────
 	let dockRow = $state<HTMLDivElement | null>(null);
+	let previewRow = $state<HTMLDivElement | null>(null);
+	let transitionHeight = $state(190);
 	const layout = $derived(studio.settings.layout);
 
 	/** Dragging down grows the preview, so the dock row loses that much. Capped
 	 *  so neither the docks nor the preview can be squeezed out of existence. */
 	function resizeDockRow(delta: number) {
+		const current = dockRow?.clientHeight ?? layout.dockHeight;
+		const minimum = studio.settings.studioMode ? transitionHeight + 20 : 180;
 		layout.dockHeight = clamp(
-			(dockRow?.clientHeight ?? layout.dockHeight) - delta,
+			current - delta,
 			140,
-			window.innerHeight - 320
+			Math.max(140, current + (previewRow?.clientHeight ?? minimum) - minimum)
 		);
 		persist();
 	}
@@ -600,11 +604,15 @@
 	{/if}
 
 	<!-- ── Preview + lyrics ───────────────────────────────── -->
-	<div class="flex min-h-min flex-1">
-		<div class="flex min-h-min min-w-0 flex-1 flex-col">
+	<div class="flex min-h-[540px] flex-1">
+		<div class="flex min-h-0 min-w-0 flex-1 flex-col">
 			<LyricsRibbon />
 			<ServicePanel {mixer} bind:setupOpen={serviceSetupOpen} />
-			<div class="flex min-h-[300px] flex-1 gap-4 bg-ink-950 px-4 pt-1.5">
+			<div
+				bind:this={previewRow}
+				class="flex flex-1 gap-4 bg-ink-950 px-4 pt-1.5"
+				style:min-height={studio.settings.studioMode ? `${transitionHeight + 20}px` : '180px'}
+			>
 				{#if studio.settings.studioMode}
 					<Preview
 						label="{t('preview.preview')}: {activeScene().name}"
@@ -612,7 +620,10 @@
 						program={false}
 						editable={true}
 					/>
-					<div class="flex min-h-0 w-44 shrink-0 flex-col gap-1.5 overflow-y-auto font-sans">
+					<div
+						bind:clientHeight={transitionHeight}
+						class="flex w-44 shrink-0 self-start flex-col gap-1.5 font-sans"
+					>
 						<button
 							class="h-9 w-full shrink-0 text-[12px] font-medium leading-tight transition-colors {canTake
 								? 'bg-primary text-black hover:bg-missionnaire-400'
