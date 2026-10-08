@@ -316,6 +316,28 @@
 		{/if}
 	</div>
 
+	<section class="mb-10" aria-labelledby="branham-playlist-title">
+		<h2 id="branham-playlist-title" class="font-display text-2xl font-semibold text-stone-900 mb-4">
+			Chants de William Marrion Branham
+		</h2>
+		<div class="aspect-video w-full overflow-hidden bg-stone-100">
+			<iframe
+				class="h-full w-full"
+				src="https://www.youtube.com/embed/videoseries?list=PLQea2ssRcPE1ARbfWjAL4j3M8KRE7FQWP"
+				title="Playlist des chants de William Marrion Branham"
+				loading="lazy"
+				allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+				allowfullscreen
+			></iframe>
+		</div>
+		<a
+			class="mt-3 inline-block text-sm text-missionnaire hover:underline"
+			href="https://www.youtube.com/playlist?list=PLQea2ssRcPE1ARbfWjAL4j3M8KRE7FQWP"
+			target="_blank"
+			rel="noopener noreferrer">Ouvrir la playlist sur YouTube</a
+		>
+	</section>
+
 	<!-- Controls Row -->
 	<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
 		<div class="flex items-center gap-6">
