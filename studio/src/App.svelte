@@ -735,7 +735,7 @@
 
 	<div
 		bind:this={dockRow}
-		class="flex min-h-[140px] shrink overflow-hidden bg-ink-900"
+		class="flex min-h-[140px] shrink bg-ink-900"
 		style="height: {layout.dockHeight}px"
 		style:display={layout.docksVisible ? undefined : 'none'}
 	>
