@@ -76,11 +76,17 @@
 	// Measured on open: the docks are resizable, so how much room a menu has
 	// is not something the stylesheet can know.
 	let menuFit = $state({ direction: 'up' as 'up' | 'down', maxHeight: 320 });
+	let menuPosition = $state({ left: 0, top: 0, bottom: 0 });
 
 	function openMenu() {
 		if (!adding && addButton) {
 			const rect = addButton.getBoundingClientRect();
 			menuFit = popoverFit(rect.top, rect.bottom, window.innerHeight);
+			menuPosition = {
+				left: rect.left,
+				top: rect.bottom + 8,
+				bottom: window.innerHeight - rect.top + 8
+			};
 		}
 		adding = adding ? false : 'menu';
 	}
@@ -596,11 +602,10 @@
 				     left, so no entry is ever clipped off the window however the
 				     operator has sized the docks. -->
 				<div
-					class="absolute left-0 z-30 w-60 overflow-y-auto border border-ink-600 bg-ink-850 py-1 shadow-2xl shadow-black/70 {menuFit.direction ===
-					'up'
-						? 'bottom-8'
-						: 'top-8'}"
-					style="max-height: {menuFit.maxHeight}px"
+					class="fixed z-30 w-60 overflow-y-auto border border-ink-600 bg-ink-850 py-1 shadow-2xl shadow-black/70"
+					style="left: {menuPosition.left}px; {menuFit.direction === 'up'
+						? `bottom: ${menuPosition.bottom}px`
+						: `top: ${menuPosition.top}px`}; max-height: {menuFit.maxHeight}px"
 				>
 					{#if adding === 'apps'}
 						{#each appAudio.apps as app (app.id)}
