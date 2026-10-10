@@ -77,7 +77,7 @@ export function evaluatePreflight(input: PreflightInput): PreflightCheck[] {
 		{ id: 'network', level: input.isOnline ? 'pass' : 'block' },
 		{
 			id: 'service',
-			level: input.serviceMissing.length ? 'block' : 'pass',
+			level: input.serviceMissing.length ? 'warning' : 'pass',
 			detail: input.serviceMissing.join(', ') || undefined
 		},
 		{

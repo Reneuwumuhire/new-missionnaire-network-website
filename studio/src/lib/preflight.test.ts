@@ -46,6 +46,16 @@ describe('preflight', () => {
 		expect(checks.find(({ id }) => id === 'audio')?.level).toBe('warning');
 	});
 
+	it('allows the preview signal before service setup is complete', () => {
+		const checks = evaluatePreflight({ ...ready, serviceMissing: ['sermon subtitles'] });
+		expect(checks.find(({ id }) => id === 'service')).toEqual({
+			id: 'service',
+			level: 'warning',
+			detail: 'sermon subtitles'
+		});
+		expect(checks.some(({ level }) => level === 'block')).toBe(false);
+	});
+
 	it('validates RTMP destinations without exposing stream keys', () => {
 		expect(destinationProblem('rtmps://example.test/live/key')).toBeNull();
 		expect(destinationProblem('https://example.test/live')).toBe('scheme');
