@@ -61,7 +61,10 @@ function serialize(post: Record<string, any>) {
 		links: post.links,
 		sourceKind: post.source?.kind ?? '',
 		sourceId: post.source?.id ?? '',
-		updatedAt: new Date(post.updatedAt).toISOString()
+		updatedAt: new Date(post.updatedAt).toISOString(),
+		createdAt: new Date(post.createdAt ?? post.updatedAt).toISOString(),
+		createdBy: post.createdBy ?? null,
+		channelSharedAt: post.channelSharedAt ? new Date(post.channelSharedAt).toISOString() : null
 	};
 }
 
@@ -78,7 +81,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const recent = await db
 		.collection('extrait_posts')
 		.find({})
-		.sort({ updatedAt: -1 })
+		.sort({ createdAt: -1 })
 		.limit(12)
 		.toArray();
 
@@ -162,9 +165,18 @@ export const actions: Actions = {
 		let id = values.postId;
 		if (id) {
 			if (!ObjectId.isValid(id)) throw error(400, 'Extrait invalide');
-			const result = await db
-				.collection('extrait_posts')
-				.updateOne({ _id: new ObjectId(id) }, { $set: document });
+			const posts = db.collection('extrait_posts');
+			const previous = await posts.findOne(
+				{ _id: new ObjectId(id) },
+				{ projection: { text: 1, image: 1 } }
+			);
+			if (!previous) throw error(404, 'Extrait introuvable');
+			const result = await posts.updateOne(
+				{ _id: previous._id },
+				previous.text !== document.text || previous.image !== document.image
+					? { $set: document, $unset: { channelSharedAt: '' } }
+					: { $set: document }
+			);
 			if (!result.matchedCount) throw error(404, 'Extrait introuvable');
 		} else {
 			const result = await db.collection('extrait_posts').insertOne({
@@ -176,6 +188,26 @@ export const actions: Actions = {
 		}
 
 		throw redirect(303, `/publications?edit=${id}&saved=${intent}`);
+	},
+	share: async ({ request, locals }) => {
+		if (!getPermissions(locals.user).can_manage_extraits) throw error(403, 'Accès refusé');
+		const formData = await request.formData();
+		const undo = formData.has('undo');
+		const id = formData.get(undo ? 'undo' : 'targetId')?.toString() ?? '';
+		if (!ObjectId.isValid(id)) throw error(400, 'Publication invalide');
+
+		const result = await (
+			await getDb()
+		)
+			.collection('extrait_posts')
+			.updateOne(
+				undo
+					? { _id: new ObjectId(id), channelSharedAt: { $exists: true } }
+					: { _id: new ObjectId(id), status: 'published', channelSharedAt: { $exists: false } },
+				undo ? { $unset: { channelSharedAt: '' } } : { $set: { channelSharedAt: new Date() } }
+			);
+		if (!result.matchedCount) throw error(409, 'État de partage modifié entre-temps');
+		throw redirect(303, `/publications?managed=${undo ? 'unshared' : 'shared'}`);
 	},
 	toggle: async ({ request, locals }) => {
 		const permissions = getPermissions(locals.user);
