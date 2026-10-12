@@ -836,6 +836,39 @@
 				</div>
 			</section>
 		{/if}
+
+		{#if data.archiveUnavailable}
+			<p role="alert" class="mt-7 border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+				{$t('extraits.archiveUnavailable')}
+			</p>
+		{:else if data.archived.length}
+			<section class="mt-7 border-t border-stone-200 pt-5">
+				<h2 class="text-xs font-bold uppercase tracking-[0.18em] text-stone-500">
+					{$t('extraits.archiveTitle', { count: data.archived.length })}
+				</h2>
+				<p class="mt-2 text-xs leading-5 text-stone-500">{$t('extraits.archiveIntro')}</p>
+				<div class="mt-3 grid gap-2">
+					{#each data.archived as post}
+						<article class="border border-stone-200/70 bg-white/60 p-3 text-sm">
+							<p class="line-clamp-2 text-stone-700">{post.excerpt || post.sourceTitle}</p>
+							<p class="mt-1 text-xs text-stone-500">{post.sourceTitle}</p>
+							<div class="mt-2 flex items-center justify-between gap-3 text-xs">
+								<time datetime={post.publishedAt} class="text-stone-500"
+									>{adminDate(post.publishedAt)}</time
+								>
+								<a
+									href={`https://missionnaire.net/publications/${encodeURIComponent(post.id)}`}
+									target="_blank"
+									rel="noreferrer"
+									class="shrink-0 font-semibold text-primary hover:underline"
+									>{$t('extraits.view')}</a
+								>
+							</div>
+						</article>
+					{/each}
+				</div>
+			</section>
+		{/if}
 	</aside>
 </form>
 

@@ -134,6 +134,11 @@ export default {
 	'extraits.saveDraft': 'Enregistrer le brouillon',
 	'extraits.publish': 'Publier',
 	'extraits.recentPublications': 'Publications récentes',
+	'extraits.archiveTitle': 'Anciennes publications du canal ({count})',
+	'extraits.archiveIntro':
+		'Publications importées avant le suivi dans Admin. Le compte qui les a ajoutées au site n’a pas été enregistré.',
+	'extraits.archiveUnavailable':
+		'Les anciennes publications sont momentanément indisponibles. Réessayez plus tard.',
 	'extraits.addedBy': 'Ajoutée par {name} le {date}',
 	'extraits.websiteDate': 'Date sur le site : {date}',
 	'extraits.unknownPoster': 'auteur inconnu',

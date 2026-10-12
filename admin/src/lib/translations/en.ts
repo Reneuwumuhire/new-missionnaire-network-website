@@ -135,6 +135,11 @@ const en: Record<keyof typeof fr, string> = {
 	'extraits.saveDraft': 'Save draft',
 	'extraits.publish': 'Publish',
 	'extraits.recentPublications': 'Recent posts',
+	'extraits.archiveTitle': 'Earlier channel posts ({count})',
+	'extraits.archiveIntro':
+		'Posts imported before Admin tracking. The website editor was not recorded for these posts.',
+	'extraits.archiveUnavailable':
+		'Earlier posts are temporarily unavailable. Please try again later.',
 	'extraits.addedBy': 'Added by {name} on {date}',
 	'extraits.websiteDate': 'Website date: {date}',
 	'extraits.unknownPoster': 'unknown editor',
