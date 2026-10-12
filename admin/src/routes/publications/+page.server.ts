@@ -21,7 +21,44 @@ type ArchivedPost = {
 	publishedAt: string;
 	sourceTitle: string;
 	excerpt: string;
+	text: string;
+	bodyHtml: string;
+	image: string;
+	imageWidth: number;
+	imageHeight: number;
+	links: { label: string; href: string; kind: string }[];
+	source?: { kind: string; id: string } | null;
 };
+type ExtraitRecord = { _id: ObjectId | string; [key: string]: any };
+
+async function fetchArchive(fetch: typeof globalThis.fetch): Promise<ArchivedPost[] | null> {
+	try {
+		const response = await fetch(
+			`${(env.MAIN_SITE_URL || 'https://missionnaire.net').replace(/\/$/, '')}/api/publications/archive`,
+			{ signal: AbortSignal.timeout(5000) }
+		);
+		if (!response.ok) throw new Error(`Archive returned ${response.status}`);
+		const payload = await response.json();
+		if (!Array.isArray(payload.posts)) throw new Error('Invalid archive response');
+		return payload.posts.filter(
+			(post: unknown): post is ArchivedPost =>
+				typeof post === 'object' &&
+				post !== null &&
+				typeof (post as ArchivedPost).id === 'string' &&
+				typeof (post as ArchivedPost).publishedAt === 'string' &&
+				typeof (post as ArchivedPost).sourceTitle === 'string' &&
+				typeof (post as ArchivedPost).excerpt === 'string' &&
+				typeof (post as ArchivedPost).text === 'string' &&
+				typeof (post as ArchivedPost).bodyHtml === 'string' &&
+				typeof (post as ArchivedPost).image === 'string' &&
+				Array.isArray((post as ArchivedPost).links) &&
+				Number.isFinite(Date.parse((post as ArchivedPost).publishedAt))
+		);
+	} catch (cause) {
+		console.error('[Publications] Archive unavailable:', cause);
+		return null;
+	}
+}
 
 function localDateTime(value = new Date()): string {
 	return new Date(value.getTime() + 2 * 60 * 60 * 1000).toISOString().slice(0, 16);
@@ -61,6 +98,7 @@ function serialize(post: Record<string, any>) {
 		status: post.status,
 		sourceTitle: post.sourceTitle,
 		body: post.text,
+		bodyHtml: post.bodyHtml,
 		publishedAt: localDateTime(new Date(post.publishedAt)),
 		imageUrl: post.image,
 		imageKey: post.imageKey,
@@ -72,55 +110,76 @@ function serialize(post: Record<string, any>) {
 		updatedAt: new Date(post.updatedAt).toISOString(),
 		createdAt: new Date(post.createdAt ?? post.updatedAt).toISOString(),
 		createdBy: post.createdBy ?? null,
+		updatedBy: post.updatedBy ?? null,
 		channelSharedAt: post.channelSharedAt ? new Date(post.channelSharedAt).toISOString() : null
+	};
+}
+
+function serializeArchive(post: ArchivedPost) {
+	return {
+		id: post.id,
+		status: 'published',
+		sourceTitle: post.sourceTitle,
+		body: post.text,
+		bodyHtml: post.bodyHtml,
+		publishedAt: localDateTime(new Date(post.publishedAt)),
+		imageUrl: post.image,
+		imageKey: '',
+		imageWidth: post.imageWidth,
+		imageHeight: post.imageHeight,
+		links: post.links,
+		sourceKind: post.source?.kind ?? '',
+		sourceId: post.source?.id ?? '',
+		updatedAt: post.publishedAt,
+		createdAt: post.publishedAt,
+		createdBy: null,
+		updatedBy: null,
+		channelSharedAt: null
 	};
 }
 
 export const load: PageServerLoad = async ({ locals, url, fetch }) => {
 	const permissions = getPermissions(locals.user);
 	if (!permissions.can_manage_extraits) throw error(403, 'Accès refusé');
-	const archivedRequest: Promise<ArchivedPost[] | null> = fetch(
-		`${(env.MAIN_SITE_URL || 'https://missionnaire.net').replace(/\/$/, '')}/api/publications/archive`,
-		{ signal: AbortSignal.timeout(5000) }
-	)
-		.then(async (response) => {
-			if (!response.ok) throw new Error(`Archive returned ${response.status}`);
-			const payload = await response.json();
-			if (!Array.isArray(payload.posts)) throw new Error('Invalid archive response');
-			return payload.posts.filter(
-				(post: unknown): post is ArchivedPost =>
-					typeof post === 'object' &&
-					post !== null &&
-					typeof (post as ArchivedPost).id === 'string' &&
-					typeof (post as ArchivedPost).publishedAt === 'string' &&
-					typeof (post as ArchivedPost).sourceTitle === 'string' &&
-					typeof (post as ArchivedPost).excerpt === 'string' &&
-					Number.isFinite(Date.parse((post as ArchivedPost).publishedAt))
-			);
-		})
-		.catch((cause) => {
-			console.error('[Publications] Archive unavailable:', cause);
-			return null;
-		});
+	const archivedRequest = fetchArchive(fetch);
 
 	const db = await getDb();
+	const posts = db.collection<ExtraitRecord>('extrait_posts');
 	const requestedId = url.searchParams.get('edit');
 	const edit =
 		requestedId && ObjectId.isValid(requestedId)
-			? await db.collection('extrait_posts').findOne({ _id: new ObjectId(requestedId) })
-			: null;
-	const recent = await db
-		.collection('extrait_posts')
-		.find({})
+			? await posts.findOne({ _id: new ObjectId(requestedId) })
+			: requestedId
+				? await posts.findOne({ _id: requestedId })
+				: null;
+	const recent = await posts
+		.find({ _id: { $type: 'objectId' } })
 		.sort({ createdAt: -1 })
 		.limit(12)
 		.toArray();
 	const archived = await archivedRequest;
+	const overlays = archived?.length
+		? await posts.find({ _id: { $in: archived.map(({ id }) => id) } }).toArray()
+		: [];
+	const byId = new Map(overlays.map((post) => [post._id.toString(), post]));
+	const archivedEdit = archived?.find(({ id }) => id === requestedId);
 
 	return {
-		edit: edit ? serialize(edit) : null,
+		edit: edit ? serialize(edit) : archivedEdit ? serializeArchive(archivedEdit) : null,
 		recent: recent.map(serialize),
-		archived: archived ?? [],
+		archived: (archived ?? []).map((post) => {
+			const overlay = byId.get(post.id);
+			return {
+				id: post.id,
+				publishedAt: overlay ? new Date(overlay.publishedAt).toISOString() : post.publishedAt,
+				sourceTitle: overlay?.sourceTitle ?? post.sourceTitle,
+				excerpt: overlay?.excerpt ?? post.excerpt,
+				image: overlay?.image ?? post.image,
+				status: overlay?.status ?? 'published',
+				updatedAt: overlay?.updatedAt ? new Date(overlay.updatedAt).toISOString() : null,
+				updatedBy: overlay?.updatedBy ?? null
+			};
+		}),
 		archiveUnavailable: archived === null,
 		defaultPublishedAt: localDateTime(),
 		saved: url.searchParams.get('saved'),
@@ -129,7 +188,7 @@ export const load: PageServerLoad = async ({ locals, url, fetch }) => {
 };
 
 export const actions: Actions = {
-	save: async ({ request, locals }) => {
+	save: async ({ request, locals, fetch }) => {
 		const permissions = getPermissions(locals.user);
 		if (!permissions.can_manage_extraits) throw error(403, 'Accès refusé');
 
@@ -160,11 +219,33 @@ export const actions: Actions = {
 				return fail(400, { error: `Le lien « ${label} » est invalide.`, values });
 			if (href) links.push({ label, href, kind });
 		}
+		const db = await getDb();
+		const posts = db.collection<ExtraitRecord>('extrait_posts');
+		let id = values.postId;
+		const archivePost =
+			id && !ObjectId.isValid(id)
+				? (await fetchArchive(fetch))?.find((post) => post.id === id)
+				: null;
+		if (id && !ObjectId.isValid(id) && !archivePost)
+			throw error(404, 'Ancienne publication introuvable');
+		const postId = id ? (ObjectId.isValid(id) ? new ObjectId(id) : id) : null;
+		const previous = postId ? await posts.findOne({ _id: postId }) : null;
+		if (postId instanceof ObjectId && !previous) throw error(404, 'Extrait introuvable');
+		const original = previous ?? archivePost;
+		if (original?.links) {
+			links.push(
+				...original.links.filter(
+					(link: { kind: string }) => !linkFields.some(([, , kind]) => kind === link.kind)
+				)
+			);
+		}
 
 		const imageKey = values.imageKey;
 		const image = values.imageUrl;
-		const validImage =
+		const validUploadedImage =
 			imageKey.startsWith('broadcast-thumbnails/extraits/') && image === getS3Url(imageKey);
+		const validArchiveImage = !!archivePost?.image && !imageKey && image === archivePost.image;
+		const validImage = validUploadedImage || validArchiveImage;
 		if (image && !validImage) return fail(400, { error: 'L’image envoyée est invalide.', values });
 		if (intent === 'published' && !validImage) {
 			return fail(400, { error: 'Ajoutez une image avant de publier.', values });
@@ -183,9 +264,9 @@ export const actions: Actions = {
 			publishedAt,
 			text: body.trim(),
 			excerpt: whatsappExcerpt(body),
-			bodyHtml: whatsappToHtml(body),
+			bodyHtml: original?.text === body.trim() ? original.bodyHtml : whatsappToHtml(body),
 			image: validImage ? image : '',
-			imageKey: validImage ? imageKey : '',
+			imageKey: validUploadedImage ? imageKey : '',
 			imageWidth: Number.isFinite(width) && width > 0 ? width : 1200,
 			imageHeight: Number.isFinite(height) && height > 0 ? height : 675,
 			sourceTitle,
@@ -195,25 +276,26 @@ export const actions: Actions = {
 			updatedBy: locals.user.email
 		};
 
-		const db = await getDb();
-		let id = values.postId;
-		if (id) {
-			if (!ObjectId.isValid(id)) throw error(400, 'Extrait invalide');
-			const posts = db.collection('extrait_posts');
-			const previous = await posts.findOne(
-				{ _id: new ObjectId(id) },
-				{ projection: { text: 1, image: 1 } }
-			);
-			if (!previous) throw error(404, 'Extrait introuvable');
-			const result = await posts.updateOne(
-				{ _id: previous._id },
-				previous.text !== document.text || previous.image !== document.image
-					? { $set: document, $unset: { channelSharedAt: '' } }
-					: { $set: document }
-			);
-			if (!result.matchedCount) throw error(404, 'Extrait introuvable');
+		if (postId) {
+			if (previous) {
+				const result = await posts.updateOne(
+					{ _id: postId },
+					previous.text !== document.text || previous.image !== document.image
+						? { $set: document, $unset: { channelSharedAt: '' } }
+						: { $set: document }
+				);
+				if (!result.matchedCount) throw error(404, 'Extrait introuvable');
+			} else {
+				await posts.insertOne({
+					_id: postId,
+					...document,
+					createdAt: now,
+					createdBy: null
+				});
+			}
 		} else {
-			const result = await db.collection('extrait_posts').insertOne({
+			const result = await posts.insertOne({
+				_id: new ObjectId(),
 				...document,
 				createdAt: now,
 				createdBy: locals.user.email

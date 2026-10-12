@@ -135,8 +135,12 @@ export default {
 	'extraits.publish': 'Publier',
 	'extraits.recentPublications': 'Publications récentes',
 	'extraits.archiveTitle': 'Anciennes publications du canal ({count})',
+	'extraits.archiveLink': 'Anciennes publications ({count})',
 	'extraits.archiveIntro':
-		'Publications importées avant le suivi dans Admin. Le compte qui les a ajoutées au site n’a pas été enregistré.',
+		'Modifiez les anciennes publications ici. Le compte qui les a ajoutées au site n’a pas été enregistré.',
+	'extraits.searchPastPosts': 'Rechercher dans les anciennes publications…',
+	'extraits.noPastPostsFound': 'Aucune publication correspondante.',
+	'extraits.editedBy': 'Modifiée par {name} le {date}',
 	'extraits.archiveUnavailable':
 		'Les anciennes publications sont momentanément indisponibles. Réessayez plus tard.',
 	'extraits.addedBy': 'Ajoutée par {name} le {date}',

@@ -58,8 +58,24 @@
 	let uploadError = $state('');
 	let copiedPostId = $state('');
 	let copyError = $state('');
+	let archiveSearch = $state('');
+	let visibleArchive = $derived(
+		data.archived.filter((post) =>
+			`${post.sourceTitle} ${post.excerpt}`
+				.toLocaleLowerCase()
+				.includes(archiveSearch.toLocaleLowerCase())
+		)
+	);
 
-	let bodyHtml = $derived(whatsappToHtml(body || $t('extraits.bodyFallback')));
+	function publicUrl(value: string): string {
+		return value.startsWith('/') ? `https://missionnaire.net${value}` : value;
+	}
+
+	let bodyHtml = $derived(
+		edit?.body === body && edit.bodyHtml
+			? edit.bodyHtml
+			: whatsappToHtml(body || $t('extraits.bodyFallback'))
+	);
 	let previewLinks = $derived(
 		[
 			{ label: $t('extraits.viewSermon'), href: sermonUrl },
@@ -291,14 +307,19 @@
 			{$t('extraits.subtitle')}
 		</p>
 	</div>
-	<a
-		href="https://missionnaire.net/publications"
-		target="_blank"
-		rel="noreferrer"
-		class="admin-btn-secondary h-11 justify-center sm:h-9"
-	>
-		{$t('extraits.viewPublicPage')}
-	</a>
+	<div class="flex flex-wrap gap-2">
+		<a href="#earlier-posts" class="admin-btn-secondary h-11 justify-center sm:h-9"
+			>{$t('extraits.archiveLink', { count: data.archived.length })}</a
+		>
+		<a
+			href="https://missionnaire.net/publications"
+			target="_blank"
+			rel="noreferrer"
+			class="admin-btn-secondary h-11 justify-center sm:h-9"
+		>
+			{$t('extraits.viewPublicPage')}
+		</a>
+	</div>
 </header>
 
 {#if data.saved}
@@ -662,7 +683,9 @@
 		</div>
 		<article class="preview-card">
 			{#if imagePreview}
-				<figure><img src={imagePreview} alt={sourceTitle || $t('extraits.previewAlt')} /></figure>
+				<figure>
+					<img src={publicUrl(imagePreview)} alt={sourceTitle || $t('extraits.previewAlt')} />
+				</figure>
 			{:else}
 				<div class="preview-empty">{$t('extraits.imagePlaceholder')}</div>
 			{/if}
@@ -842,30 +865,70 @@
 				{$t('extraits.archiveUnavailable')}
 			</p>
 		{:else if data.archived.length}
-			<section class="mt-7 border-t border-stone-200 pt-5">
+			<section id="earlier-posts" class="mt-7 scroll-mt-6 border-t border-stone-200 pt-5">
 				<h2 class="text-xs font-bold uppercase tracking-[0.18em] text-stone-500">
 					{$t('extraits.archiveTitle', { count: data.archived.length })}
 				</h2>
 				<p class="mt-2 text-xs leading-5 text-stone-500">{$t('extraits.archiveIntro')}</p>
-				<div class="mt-3 grid gap-2">
-					{#each data.archived as post}
-						<article class="border border-stone-200/70 bg-white/60 p-3 text-sm">
-							<p class="line-clamp-2 text-stone-700">{post.excerpt || post.sourceTitle}</p>
-							<p class="mt-1 text-xs text-stone-500">{post.sourceTitle}</p>
-							<div class="mt-2 flex items-center justify-between gap-3 text-xs">
-								<time datetime={post.publishedAt} class="text-stone-500"
+				<label class="sr-only" for="archive-search">{$t('extraits.searchPastPosts')}</label>
+				<input
+					id="archive-search"
+					class="admin-input mt-3"
+					placeholder={$t('extraits.searchPastPosts')}
+					bind:value={archiveSearch}
+				/>
+				<div class="mt-3 grid max-h-[42rem] gap-2 overflow-y-auto pr-1">
+					{#each visibleArchive as post}
+						<article class="flex gap-3 border border-stone-200/70 bg-white/75 p-3 text-sm">
+							{#if post.image}
+								<img
+									src={publicUrl(post.image)}
+									alt=""
+									loading="lazy"
+									class="h-16 w-16 shrink-0 rounded-sm object-cover"
+								/>
+							{/if}
+							<div class="min-w-0 flex-1">
+								<div class="flex items-start justify-between gap-2">
+									<p class="line-clamp-2 font-medium text-stone-800">{post.sourceTitle}</p>
+									{#if post.status === 'draft'}<span
+											class="text-[10px] font-bold uppercase text-amber-700"
+											>{$t('extraits.draft')}</span
+										>{/if}
+								</div>
+								<p class="mt-1 line-clamp-2 text-xs leading-5 text-stone-500">{post.excerpt}</p>
+								<time datetime={post.publishedAt} class="mt-1 block text-xs text-stone-500"
 									>{adminDate(post.publishedAt)}</time
 								>
-								<a
-									href={`https://missionnaire.net/publications/${encodeURIComponent(post.id)}`}
-									target="_blank"
-									rel="noreferrer"
-									class="shrink-0 font-semibold text-primary hover:underline"
-									>{$t('extraits.view')}</a
-								>
+								{#if post.updatedBy && post.updatedAt}
+									<p class="mt-1 text-xs text-stone-500">
+										{$t('extraits.editedBy', {
+											name: post.updatedBy,
+											date: adminDate(post.updatedAt)
+										})}
+									</p>
+								{/if}
+								<div class="mt-2 flex gap-3 text-xs font-semibold">
+									<a
+										href={`/publications?edit=${encodeURIComponent(post.id)}`}
+										data-sveltekit-reload
+										class="text-primary hover:underline">{$t('extraits.edit')}</a
+									>
+									{#if post.status === 'published'}
+										<a
+											href={`https://missionnaire.net/publications/${encodeURIComponent(post.id)}`}
+											target="_blank"
+											rel="noreferrer"
+											class="text-stone-600 hover:underline">{$t('extraits.view')}</a
+										>
+									{/if}
+								</div>
 							</div>
 						</article>
 					{/each}
+					{#if !visibleArchive.length}<p class="p-3 text-xs text-stone-500">
+							{$t('extraits.noPastPostsFound')}
+						</p>{/if}
 				</div>
 			</section>
 		{/if}
