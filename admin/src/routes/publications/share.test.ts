@@ -13,7 +13,7 @@ vi.mock('$lib/models/admin-user', () => ({
 }));
 vi.mock('$lib/server/s3', () => ({ getS3Url: vi.fn(), deleteObject: vi.fn() }));
 
-import { actions } from './+page.server';
+import { actions, load } from './+page.server';
 
 const id = new ObjectId();
 const event = (fields: Record<string, string>) => ({
@@ -67,4 +67,36 @@ it('clears the share marker when the website text changes', async () => {
 		$set: { text: 'New text' },
 		$unset: { channelSharedAt: '' }
 	});
+});
+
+it('shows archived posts even when no posts were created in Admin', async () => {
+	getDb.mockResolvedValue({
+		collection: () => ({
+			find: () => ({ sort: () => ({ limit: () => ({ toArray: async () => [] }) }) })
+		})
+	});
+	const archived = {
+		id: 'WA202610012220',
+		publishedAt: '2026-10-01T20:20:00.000Z',
+		sourceTitle: 'A source',
+		excerpt: 'An earlier channel post'
+	};
+	const fetch = vi.fn().mockResolvedValue(
+		new Response(JSON.stringify({ posts: [archived] }), {
+			status: 200,
+			headers: { 'content-type': 'application/json' }
+		})
+	);
+	const data = (await load({
+		locals: { user: { email: 'editor@example.com' } },
+		url: new URL('https://admin.missionnaire.net/publications'),
+		fetch
+	} as any)) as any;
+	expect(data.recent).toEqual([]);
+	expect(data.archived).toEqual([archived]);
+	expect(data.archiveUnavailable).toBe(false);
+	expect(fetch).toHaveBeenCalledWith(
+		expect.stringMatching(/\/api\/publications\/archive$/),
+		expect.objectContaining({ signal: expect.any(AbortSignal) })
+	);
 });

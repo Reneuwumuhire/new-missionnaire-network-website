@@ -1,5 +1,6 @@
 import { error, fail, redirect, type Actions } from '@sveltejs/kit';
 import { ObjectId } from 'mongodb';
+import { env } from '$env/dynamic/private';
 import type { PageServerLoad } from './$types';
 import { getDb } from '../../db/mongo';
 import { getPermissions } from '$lib/models/admin-user';
@@ -14,6 +15,13 @@ const linkFields = [
 	['audioUrl', 'Écouter l’audio', 'audio'],
 	['transcriptionUrl', 'Lire la transcription', 'transcription']
 ] as const;
+
+type ArchivedPost = {
+	id: string;
+	publishedAt: string;
+	sourceTitle: string;
+	excerpt: string;
+};
 
 function localDateTime(value = new Date()): string {
 	return new Date(value.getTime() + 2 * 60 * 60 * 1000).toISOString().slice(0, 16);
@@ -68,9 +76,32 @@ function serialize(post: Record<string, any>) {
 	};
 }
 
-export const load: PageServerLoad = async ({ locals, url }) => {
+export const load: PageServerLoad = async ({ locals, url, fetch }) => {
 	const permissions = getPermissions(locals.user);
 	if (!permissions.can_manage_extraits) throw error(403, 'Accès refusé');
+	const archivedRequest: Promise<ArchivedPost[] | null> = fetch(
+		`${(env.MAIN_SITE_URL || 'https://missionnaire.net').replace(/\/$/, '')}/api/publications/archive`,
+		{ signal: AbortSignal.timeout(5000) }
+	)
+		.then(async (response) => {
+			if (!response.ok) throw new Error(`Archive returned ${response.status}`);
+			const payload = await response.json();
+			if (!Array.isArray(payload.posts)) throw new Error('Invalid archive response');
+			return payload.posts.filter(
+				(post: unknown): post is ArchivedPost =>
+					typeof post === 'object' &&
+					post !== null &&
+					typeof (post as ArchivedPost).id === 'string' &&
+					typeof (post as ArchivedPost).publishedAt === 'string' &&
+					typeof (post as ArchivedPost).sourceTitle === 'string' &&
+					typeof (post as ArchivedPost).excerpt === 'string' &&
+					Number.isFinite(Date.parse((post as ArchivedPost).publishedAt))
+			);
+		})
+		.catch((cause) => {
+			console.error('[Publications] Archive unavailable:', cause);
+			return null;
+		});
 
 	const db = await getDb();
 	const requestedId = url.searchParams.get('edit');
@@ -84,10 +115,13 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		.sort({ createdAt: -1 })
 		.limit(12)
 		.toArray();
+	const archived = await archivedRequest;
 
 	return {
 		edit: edit ? serialize(edit) : null,
 		recent: recent.map(serialize),
+		archived: archived ?? [],
+		archiveUnavailable: archived === null,
 		defaultPublishedAt: localDateTime(),
 		saved: url.searchParams.get('saved'),
 		managed: url.searchParams.get('managed')
