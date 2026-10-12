@@ -4,7 +4,7 @@
 	import type { ActionData, PageData } from './$types';
 	import { whatsappToHtml } from '$lib/whatsapp-format';
 	import { selectedSourceValues, type ExtraitSourceSuggestion } from '$lib/extrait-source';
-	import { t } from '$lib/i18n';
+	import { locale, t } from '$lib/i18n';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 	const initial = untrack(() => ({
@@ -56,6 +56,8 @@
 	let uploading = $state(false);
 	let submitting = $state(false);
 	let uploadError = $state('');
+	let copiedPostId = $state('');
+	let copyError = $state('');
 
 	let bodyHtml = $derived(whatsappToHtml(body || $t('extraits.bodyFallback')));
 	let previewLinks = $derived(
@@ -86,6 +88,24 @@
 			? '--:--'
 			: new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(date);
 	});
+
+	function adminDate(value: string): string {
+		return new Date(value).toLocaleString($locale === 'fr' ? 'fr-FR' : 'en-GB', {
+			dateStyle: 'medium',
+			timeStyle: 'short',
+			timeZone: 'Africa/Kigali'
+		});
+	}
+
+	async function copyPostText(id: string, text: string) {
+		try {
+			await navigator.clipboard.writeText(text);
+			copiedPostId = id;
+			copyError = '';
+		} catch {
+			copyError = $t('extraits.copyFailed');
+		}
+	}
 
 	function resourceName(kind: string): string {
 		return (
@@ -299,7 +319,11 @@
 			? $t('extraits.managedDeleted')
 			: data.managed === 'hidden'
 				? $t('extraits.managedHidden')
-				: $t('extraits.managedPublished')}
+				: data.managed === 'shared'
+					? $t('extraits.managedShared')
+					: data.managed === 'unshared'
+						? $t('extraits.managedUnshared')
+						: $t('extraits.managedPublished')}
 	</div>
 {/if}
 
@@ -689,6 +713,15 @@
 				<h2 class="text-xs font-bold uppercase tracking-[0.18em] text-stone-500">
 					{$t('extraits.recentPublications')}
 				</h2>
+				<p class="mt-2 text-xs leading-5 text-stone-500">{$t('extraits.sharingSteps')}</p>
+				<a
+					href="https://whatsapp.com/channel/0029VbC7KvqEVccBdAOEYp1I"
+					target="_blank"
+					rel="noreferrer"
+					class="mt-1 inline-block text-xs font-semibold text-primary hover:underline"
+					>{$t('extraits.openChannel')}</a
+				>
+				{#if copyError}<p role="alert" class="mt-2 text-xs text-red-700">{copyError}</p>{/if}
 				<div class="mt-3 grid gap-2">
 					{#each data.recent as post}
 						<article class="border border-stone-200/70 bg-white/60 p-3 text-sm">
@@ -703,6 +736,24 @@
 									{post.status === 'published' ? $t('extraits.published') : $t('extraits.draft')}
 								</span>
 							</div>
+							<p class="mt-2 text-xs text-stone-500">
+								{$t('extraits.addedBy', {
+									name: post.createdBy ?? $t('extraits.unknownPoster'),
+									date: adminDate(post.createdAt)
+								})}
+							</p>
+							{#if post.status === 'published'}
+								<p class="mt-1 text-xs text-stone-500">
+									{$t('extraits.websiteDate', { date: post.publishedAt.replace('T', ' ') })}
+								</p>
+							{/if}
+							{#if post.channelSharedAt}
+								<p class="mt-1 text-xs text-green-700">
+									{$t('extraits.sharedAt', { date: adminDate(post.channelSharedAt) })}
+								</p>
+							{:else if post.status === 'published'}
+								<p class="mt-1 text-xs text-amber-700">{$t('extraits.pendingWhatsapp')}</p>
+							{/if}
 							<div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs font-semibold">
 								<a
 									href={`/publications?edit=${post.id}`}
@@ -710,6 +761,44 @@
 									class="text-stone-600 hover:text-primary">{$t('extraits.edit')}</a
 								>
 								{#if post.status === 'published'}
+									<button
+										type="button"
+										class="text-stone-600 hover:text-primary"
+										onclick={() => copyPostText(post.id, post.body)}
+									>
+										{copiedPostId === post.id ? $t('extraits.copied') : $t('extraits.copyText')}
+									</button>
+									{#if post.imageUrl}
+										<a
+											href={post.imageUrl}
+											target="_blank"
+											rel="noreferrer"
+											class="text-stone-600 hover:text-primary">{$t('extraits.openImage')}</a
+										>
+									{/if}
+									{#if !post.channelSharedAt}
+										<button
+											type="submit"
+											name="targetId"
+											value={post.id}
+											formaction="?/share"
+											formnovalidate
+											class="text-stone-600 hover:text-primary"
+										>
+											{$t('extraits.markShared')}
+										</button>
+									{:else}
+										<button
+											type="submit"
+											name="undo"
+											value={post.id}
+											formaction="?/share"
+											formnovalidate
+											class="text-stone-600 hover:text-primary"
+										>
+											{$t('extraits.undoShared')}
+										</button>
+									{/if}
 									<a
 										href={`https://missionnaire.net/publications/${post.id}`}
 										target="_blank"
