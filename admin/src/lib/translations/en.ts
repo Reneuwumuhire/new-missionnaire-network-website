@@ -136,8 +136,11 @@ const en: Record<keyof typeof fr, string> = {
 	'extraits.publish': 'Publish',
 	'extraits.recentPublications': 'Recent posts',
 	'extraits.archiveTitle': 'Earlier channel posts ({count})',
-	'extraits.archiveIntro':
-		'Posts imported before Admin tracking. The website editor was not recorded for these posts.',
+	'extraits.archiveLink': 'Earlier posts ({count})',
+	'extraits.archiveIntro': 'Edit earlier posts here. The original website editor was not recorded.',
+	'extraits.searchPastPosts': 'Search earlier posts…',
+	'extraits.noPastPostsFound': 'No matching posts.',
+	'extraits.editedBy': 'Edited by {name} on {date}',
 	'extraits.archiveUnavailable':
 		'Earlier posts are temporarily unavailable. Please try again later.',
 	'extraits.addedBy': 'Added by {name} on {date}',

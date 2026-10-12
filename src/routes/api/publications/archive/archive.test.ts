@@ -10,5 +10,10 @@ it('exposes all archived channel posts for the admin history', async () => {
 		publishedAt: '2026-10-01T20:20:00.000Z'
 	});
 	expect(data.posts[0]).toHaveProperty('excerpt');
-	expect(data.posts[0]).not.toHaveProperty('bodyHtml');
+	expect(data.posts[0]).toHaveProperty('bodyHtml');
+	expect(data.posts[0]).toHaveProperty('image');
+	expect(data.posts[0]).toHaveProperty('source', {
+		kind: 'recording',
+		id: '6abd477a1473609269a4fcb7'
+	});
 });

@@ -133,13 +133,22 @@ export async function getExtraitFeed() {
 	}));
 	try {
 		const db = await getDb();
+		const archivedOverrides = await db
+			.collection<{ _id: string | ObjectId; [key: string]: any }>('extrait_posts')
+			.find({ _id: { $in: archivedPosts.map(({ id }) => id) } })
+			.toArray();
+		const overriddenIds = new Set(archivedOverrides.map((post) => post._id.toString()));
+		archivedPosts = archivedPosts.filter(({ id }) => !overriddenIds.has(id));
 		const rows = await db
 			.collection('extrait_posts')
-			.find({ status: 'published' })
+			.find({ status: 'published', _id: { $type: 'objectId' } })
 			.sort({ publishedAt: -1 })
 			.limit(100)
 			.toArray();
-		managedPosts = rows.map((post) => ({
+		managedPosts = [
+			...rows,
+			...archivedOverrides.filter((post) => post.status === 'published')
+		].map((post) => ({
 			id: post._id.toString(),
 			publishedAt: new Date(post.publishedAt).toISOString(),
 			text: post.text,
