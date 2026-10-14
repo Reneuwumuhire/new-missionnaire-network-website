@@ -1099,6 +1099,9 @@
 		if (audio.category === 'Direct' && id) {
 			return `${window.location.origin}/live/rediffusions/${id}?autoplay=1`;
 		}
+		if (audio.category === 'Instrumental' && id) {
+			return `${window.location.origin}/musique/instrumental?play=${encodeURIComponent(id)}`;
+		}
 		const slug = songSlug(typeof audio.title === 'string' ? audio.title : '');
 		const key = slug || id;
 		if (!key) return '';

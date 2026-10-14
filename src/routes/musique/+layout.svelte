@@ -29,6 +29,8 @@
 	});
 
 	let isAudioActive = $derived($page.url.pathname === '/musique');
+	let isInstrumentalActive = $derived($page.url.pathname === '/musique/instrumental');
+	let isVideoActive = $derived($page.url.pathname === '/musique/videos');
 </script>
 
 <!-- Compact header band: one line of identity (kicker + Cormorant title +
@@ -48,9 +50,9 @@
 				</p>
 				<div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
 					<h1 class="font-display text-[26px] font-semibold leading-none text-white md:text-4xl">
-						{$t('music.headerTitle')}
+						{isInstrumentalActive ? $t('music.instrumentalHeaderTitle') : $t('music.headerTitle')}
 					</h1>
-					{#if totalSongs !== null}
+					{#if !isInstrumentalActive && totalSongs !== null}
 						<span class="font-body text-[11px] tabular-nums text-white/50 md:text-xs">
 							{$t('music.headerCount', { count: formattedTotal(totalSongs) })}
 						</span>
@@ -59,15 +61,17 @@
 			</div>
 
 			<div class="flex items-center justify-between gap-3 md:justify-end md:gap-4">
-				<div class="hidden w-72 md:block lg:w-96">
-					<MusicSearch id="musique-band-search" suggestions={isAudioActive} />
-				</div>
+				{#if !isInstrumentalActive}
+					<div class="hidden w-72 md:block lg:w-96">
+						<MusicSearch id="musique-band-search" suggestions={isAudioActive} />
+					</div>
+				{/if}
 
 				<!-- Audio / Vidéos segmented control — h-11 on md+ so it sits on
 				     the same baseline as the inline search field beside it. -->
 				<nav
 					class="inline-flex shrink-0 items-stretch border border-white/25 bg-white/5 p-0.5 md:h-11 md:p-1"
-					aria-label="Audio ou vidéos"
+					aria-label="Audio, instrumental ou vidéos"
 				>
 					<a
 						href="/musique"
@@ -79,9 +83,18 @@
 						{$t('music.audioTab')}
 					</a>
 					<a
+						href="/musique/instrumental"
+						aria-current={isInstrumentalActive ? 'page' : undefined}
+						class="inline-flex items-center px-4 py-1.5 font-body text-[10px] font-bold uppercase tracking-[0.15em] transition-colors duration-150 md:px-5 md:py-0 {isInstrumentalActive
+							? 'bg-missionnaire text-white'
+							: 'text-white/65 hover:bg-white/10 hover:text-white'}"
+					>
+						{$t('music.instrumentalTab')}
+					</a>
+					<a
 						href="/musique/videos"
-						aria-current={!isAudioActive ? 'page' : undefined}
-						class="inline-flex items-center px-4 py-1.5 font-body text-[10px] font-bold uppercase tracking-[0.15em] transition-colors duration-150 md:px-5 md:py-0 {!isAudioActive
+						aria-current={isVideoActive ? 'page' : undefined}
+						class="inline-flex items-center px-4 py-1.5 font-body text-[10px] font-bold uppercase tracking-[0.15em] transition-colors duration-150 md:px-5 md:py-0 {isVideoActive
 							? 'bg-missionnaire text-white'
 							: 'text-white/65 hover:bg-white/10 hover:text-white'}"
 					>
