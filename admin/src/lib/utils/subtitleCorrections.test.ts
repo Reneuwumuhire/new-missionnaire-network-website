@@ -72,4 +72,29 @@ describe('subtitle auto correction', () => {
 		);
 		expect(correctSubtitleSrt(corrected.text).text).toBe(corrected.text);
 	});
+
+	it('uses the linked PDF to correct Bernard to Branham without duplicating the surname', () => {
+		const srt =
+			'1\n00:00:00,000 --> 00:00:02,000\nFrère Bernard Branham est entré.\n\n2\n00:00:02,000 --> 00:00:04,000\nfrère bernard a parlé.\n';
+		const pdf = 'Frère Branham est entré. Plus tard, Frère Branham a parlé.';
+		const result = correctSubtitleSrt(srt, pdf);
+		expect(result.text).toContain('Frère Branham est entré.');
+		expect(result.text).toContain('frère Branham a parlé.');
+		expect(result.changes.filter((change) => change.source === 'pdf')).toContainEqual({
+			from: 'Bernard Branham',
+			to: 'Branham',
+			source: 'pdf'
+		});
+		expect(parseSrt(result.text).map(({ startMs, endMs }) => [startMs, endMs])).toEqual(
+			parseSrt(srt).map(({ startMs, endMs }) => [startMs, endMs])
+		);
+		expect(correctSubtitleSrt(result.text, pdf).text).toBe(result.text);
+		expect(correctSubtitleSrt(srt).text).toBe(srt);
+		expect(
+			correctSubtitleSrt(
+				srt,
+				'Dans ce document, Frère Bernard et Frère Branham sont deux personnes distinctes.'
+			).text
+		).toBe(srt);
+	});
 });

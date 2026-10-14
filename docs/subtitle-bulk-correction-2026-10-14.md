@@ -15,3 +15,9 @@ The run used [the bulk correction script](../admin/scripts/apply-past-subtitle-c
 ## Scope limit
 
 The 19 ended lives without SRT files were not changed. The two SRT-backed lives without linked PDFs received only the reusable rules. The PDF alignment deliberately leaves uncertain passages unchanged for human review.
+
+## Follow-up: Bernard and Branham
+
+A later check found seven `Bernard` occurrences in six corrected sermons. In each matching passage, the linked PDF says `Frère Branham`; one subtitle even said `Frère Bernard Branham`. The six SRTs were updated again with seven name fixes and five nearby PDF-supported edits. A read-back check found no `Bernard` in those six stored SRTs, confirmed each new live reference and audit entry, and confirmed the previous SRT objects still exist.
+
+Future **Auto Correct** uses this name correction only when the linked PDF says `Frère Branham` and contains no `Bernard`. Without that evidence, a genuine person named Bernard is left alone.
