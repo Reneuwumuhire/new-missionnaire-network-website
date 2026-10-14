@@ -63,6 +63,24 @@ jobs:
         working-directory: studio
         run: pnpm install --frozen-lockfile
 
+      - name: Install macOS build libraries
+        if: runner.os == 'macOS'
+        run: brew install pkgconf
+
+      - name: Prepare bundled media tools
+        working-directory: studio
+        shell: bash
+        run: |
+          if [[ "${{ matrix.name }}" == "macOS universal" ]]; then
+            node scripts/prepare-media-tools.mjs aarch64-apple-darwin x86_64-apple-darwin
+          else
+            node scripts/prepare-media-tools.mjs x86_64-pc-windows-msvc
+          fi
+
+      - name: Verify bundled encoders and network support
+        working-directory: studio
+        run: pnpm verify:media-tools
+
       # Studio is intentionally installable by itself. Vite still discovers
       # the parent site's tsconfig, whose generated base does not exist in this
       # Studio-only job, so provide the harmless generated placeholder.
