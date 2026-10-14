@@ -1391,6 +1391,17 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.scheduled.startLive': 'Start the live',
 	'recordings.scheduled.alreadyLiveShort': 'A live is already running',
 	'recordings.scheduled.history': 'History ({count})',
+	'recordings.scheduled.autoCorrect': 'Auto Correct',
+	'recordings.scheduled.autoCorrectApply': 'Apply corrections',
+	'recordings.scheduled.autoCorrectPreview':
+		'{count} suggested corrections across {cues} subtitle cues.',
+	'recordings.scheduled.autoCorrectPdfUsed':
+		'{count} edits come from the linked PDF. Passages without a clear match need review.',
+	'recordings.scheduled.autoCorrectCommonOnly':
+		'No linked PDF: only common errors will be corrected.',
+	'recordings.scheduled.autoCorrectDone': '{count} subtitle corrections applied.',
+	'recordings.scheduled.autoCorrectNone': 'No safe corrections to apply.',
+	'recordings.scheduled.autoCorrectFailed': 'Could not correct the subtitles.',
 	'recordings.scheduled.replay': 'Replay',
 	'recordings.scheduled.copyLink': 'Copy link',
 	'recordings.scheduled.attachReplay': 'Attach replay',

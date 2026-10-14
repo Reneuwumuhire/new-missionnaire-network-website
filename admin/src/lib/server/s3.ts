@@ -80,6 +80,18 @@ export async function getObjectBytes(
 	};
 }
 
+export async function putSubtitleText(key: string, text: string): Promise<void> {
+	if (!/^subtitles\/[A-Za-z0-9._-]+\.srt$/.test(key)) throw new Error('Invalid subtitle key');
+	await s3.send(
+		new PutObjectCommand({
+			Bucket: env.AWS_S3_BUCKET,
+			Key: key,
+			Body: Buffer.from(text, 'utf8'),
+			ContentType: 'text/plain; charset=utf-8'
+		})
+	);
+}
+
 function sanitizeDownloadName(input: string): string {
 	return input
 		.replaceAll(/[\\/:*?"<>|\x00-\x1F]/g, '')

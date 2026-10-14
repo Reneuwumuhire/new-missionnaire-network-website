@@ -1,0 +1,650 @@
+{
+	"generatedAt": "2026-10-14T11:23:17.102Z",
+	"audited": 10,
+	"pairedWithPdf": 10,
+	"candidates": [
+		{
+			"from": "dieu",
+			"to": "Dieu",
+			"count": 25,
+			"broadcasts": [
+				"2026-09-26",
+				"2026-09-27",
+				"2026-10-03",
+				"2026-10-04",
+				"2026-10-10",
+				"2026-10-11"
+			]
+		},
+		{
+			"from": "du",
+			"to": "de",
+			"count": 5,
+			"broadcasts": ["2026-09-26", "2026-09-30", "2026-10-10", "2026-10-11"]
+		},
+		{
+			"from": "Rousse",
+			"to": "Russ",
+			"count": 4,
+			"broadcasts": ["2026-09-23", "2026-09-27", "2026-10-07", "2026-10-11"]
+		},
+		{
+			"from": "hébreux",
+			"to": "Hébreux",
+			"count": 14,
+			"broadcasts": ["2026-09-27", "2026-10-04", "2026-10-10"]
+		},
+		{
+			"from": "hébreu",
+			"to": "Hébreux",
+			"count": 6,
+			"broadcasts": ["2026-09-27", "2026-10-10", "2026-10-11"]
+		},
+		{
+			"from": "dessein",
+			"to": "Dessein",
+			"count": 5,
+			"broadcasts": ["2026-09-27", "2026-10-04", "2026-10-07"]
+		},
+		{
+			"from": "à",
+			"to": "en",
+			"count": 4,
+			"broadcasts": ["2026-09-27", "2026-09-30", "2026-10-11"]
+		},
+		{
+			"from": "Bonhomme",
+			"to": "Branham",
+			"count": 4,
+			"broadcasts": ["2026-09-20", "2026-09-30", "2026-10-11"]
+		},
+		{
+			"from": "coeur",
+			"to": "cœur",
+			"count": 4,
+			"broadcasts": ["2026-09-27", "2026-10-03", "2026-10-10"]
+		},
+		{
+			"from": "Hébreu",
+			"to": "Hébreux",
+			"count": 3,
+			"broadcasts": ["2026-10-04", "2026-10-07"]
+		},
+		{
+			"from": "Abraham",
+			"to": "Branham",
+			"count": 3,
+			"broadcasts": ["2026-09-20", "2026-09-30"]
+		},
+		{
+			"from": "mathieu",
+			"to": "Matthieu",
+			"count": 3,
+			"broadcasts": ["2026-09-26", "2026-09-27"]
+		},
+		{
+			"from": "reconnaissant",
+			"to": "reconnaissants",
+			"count": 2,
+			"broadcasts": ["2026-09-27", "2026-10-11"]
+		},
+		{
+			"from": "Dieu",
+			"to": "dieu",
+			"count": 2,
+			"broadcasts": ["2026-09-30", "2026-10-11"]
+		},
+		{
+			"from": "serment",
+			"to": "sermon",
+			"count": 2,
+			"broadcasts": ["2026-09-27", "2026-10-10"]
+		},
+		{
+			"from": "franck",
+			"to": "Frank",
+			"count": 2,
+			"broadcasts": ["2026-09-26", "2026-10-04"]
+		},
+		{
+			"from": "dessin",
+			"to": "Dessein",
+			"count": 2,
+			"broadcasts": ["2026-09-27", "2026-10-03"]
+		},
+		{
+			"from": "nuit",
+			"to": "Nuée",
+			"count": 2,
+			"broadcasts": ["2026-09-20", "2026-09-23"]
+		},
+		{
+			"from": "abraham",
+			"to": "Abraham",
+			"count": 3,
+			"broadcasts": ["2026-10-10"]
+		},
+		{
+			"from": "grâces",
+			"to": "Grâce",
+			"count": 2,
+			"broadcasts": ["2026-10-07"]
+		},
+		{
+			"from": "soeur",
+			"to": "sœur",
+			"count": 2,
+			"broadcasts": ["2026-10-04"]
+		},
+		{
+			"from": "Hebreu",
+			"to": "Hébreux",
+			"count": 2,
+			"broadcasts": ["2026-10-04"]
+		},
+		{
+			"from": "coeurs",
+			"to": "cœurs",
+			"count": 2,
+			"broadcasts": ["2026-10-03"]
+		},
+		{
+			"from": "message",
+			"to": "Message",
+			"count": 2,
+			"broadcasts": ["2026-09-27"]
+		},
+		{
+			"from": "Mathieu",
+			"to": "Matthieu",
+			"count": 2,
+			"broadcasts": ["2026-09-20"]
+		},
+		{
+			"from": "doit",
+			"to": "dois",
+			"count": 1,
+			"broadcasts": ["2026-10-11"]
+		},
+		{
+			"from": "expérimenté",
+			"to": "expérimentée",
+			"count": 1,
+			"broadcasts": ["2026-10-11"]
+		},
+		{
+			"from": "a",
+			"to": "est",
+			"count": 1,
+			"broadcasts": ["2026-10-11"]
+		},
+		{
+			"from": "couleur",
+			"to": "colère",
+			"count": 1,
+			"broadcasts": ["2026-10-11"]
+		},
+		{
+			"from": "voix",
+			"to": "Voie",
+			"count": 1,
+			"broadcasts": ["2026-10-11"]
+		},
+		{
+			"from": "voix",
+			"to": "voies",
+			"count": 1,
+			"broadcasts": ["2026-10-11"]
+		},
+		{
+			"from": "chair",
+			"to": "chaire",
+			"count": 1,
+			"broadcasts": ["2026-10-11"]
+		},
+		{
+			"from": "pentecostistes",
+			"to": "Pentecôtistes",
+			"count": 1,
+			"broadcasts": ["2026-10-11"]
+		},
+		{
+			"from": "ces",
+			"to": "ses",
+			"count": 1,
+			"broadcasts": ["2026-10-11"]
+		},
+		{
+			"from": "Gorbachev",
+			"to": "Gorbatchev",
+			"count": 1,
+			"broadcasts": ["2026-10-11"]
+		},
+		{
+			"from": "abram",
+			"to": "Abraham",
+			"count": 1,
+			"broadcasts": ["2026-10-10"]
+		},
+		{
+			"from": "bonhomme",
+			"to": "Branham",
+			"count": 1,
+			"broadcasts": ["2026-10-10"]
+		},
+		{
+			"from": "fois",
+			"to": "Foi",
+			"count": 1,
+			"broadcasts": ["2026-10-10"]
+		},
+		{
+			"from": "foi",
+			"to": "Foi",
+			"count": 1,
+			"broadcasts": ["2026-10-10"]
+		},
+		{
+			"from": "passe",
+			"to": "passent",
+			"count": 1,
+			"broadcasts": ["2026-10-10"]
+		},
+		{
+			"from": "prêché",
+			"to": "prêchée",
+			"count": 1,
+			"broadcasts": ["2026-10-10"]
+		},
+		{
+			"from": "oeuvres",
+			"to": "œuvres",
+			"count": 1,
+			"broadcasts": ["2026-10-10"]
+		},
+		{
+			"from": "entendu",
+			"to": "entendue",
+			"count": 1,
+			"broadcasts": ["2026-10-10"]
+		},
+		{
+			"from": "ses",
+			"to": "ces",
+			"count": 1,
+			"broadcasts": ["2026-10-10"]
+		},
+		{
+			"from": "parole",
+			"to": "Parole",
+			"count": 1,
+			"broadcasts": ["2026-10-10"]
+		},
+		{
+			"from": "ces",
+			"to": "Ses",
+			"count": 1,
+			"broadcasts": ["2026-10-10"]
+		},
+		{
+			"from": "feront",
+			"to": "ferons",
+			"count": 1,
+			"broadcasts": ["2026-10-10"]
+		},
+		{
+			"from": "celles",
+			"to": "ces",
+			"count": 1,
+			"broadcasts": ["2026-10-10"]
+		},
+		{
+			"from": "pouvoira",
+			"to": "pourvoira",
+			"count": 1,
+			"broadcasts": ["2026-10-10"]
+		},
+		{
+			"from": "braham",
+			"to": "Branham",
+			"count": 1,
+			"broadcasts": ["2026-10-10"]
+		},
+		{
+			"from": "nécessaire",
+			"to": "nécessaires",
+			"count": 1,
+			"broadcasts": ["2026-10-10"]
+		},
+		{
+			"from": "est",
+			"to": "ait",
+			"count": 1,
+			"broadcasts": ["2026-10-07"]
+		},
+		{
+			"from": "du",
+			"to": "des",
+			"count": 1,
+			"broadcasts": ["2026-10-07"]
+		},
+		{
+			"from": "réside",
+			"to": "résident",
+			"count": 1,
+			"broadcasts": ["2026-10-07"]
+		},
+		{
+			"from": "trône",
+			"to": "Trône",
+			"count": 1,
+			"broadcasts": ["2026-10-07"]
+		},
+		{
+			"from": "te",
+			"to": "Te",
+			"count": 1,
+			"broadcasts": ["2026-10-04"]
+		},
+		{
+			"from": "regardent",
+			"to": "regardes",
+			"count": 1,
+			"broadcasts": ["2026-10-04"]
+		},
+		{
+			"from": "bernam",
+			"to": "Branham",
+			"count": 1,
+			"broadcasts": ["2026-10-04"]
+		},
+		{
+			"from": "est",
+			"to": "les",
+			"count": 1,
+			"broadcasts": ["2026-10-04"]
+		},
+		{
+			"from": "donné",
+			"to": "donnée",
+			"count": 1,
+			"broadcasts": ["2026-10-04"]
+		},
+		{
+			"from": "faisait",
+			"to": "faisaient",
+			"count": 1,
+			"broadcasts": ["2026-10-04"]
+		},
+		{
+			"from": "teint",
+			"to": "tint",
+			"count": 1,
+			"broadcasts": ["2026-10-04"]
+		},
+		{
+			"from": "ménonites",
+			"to": "mennonites",
+			"count": 1,
+			"broadcasts": ["2026-10-04"]
+		},
+		{
+			"from": "exprimé",
+			"to": "exprimée",
+			"count": 1,
+			"broadcasts": ["2026-10-04"]
+		},
+		{
+			"from": "Créfelde",
+			"to": "Krefeld",
+			"count": 1,
+			"broadcasts": ["2026-10-04"]
+		},
+		{
+			"from": "Adam",
+			"to": "Branham",
+			"count": 1,
+			"broadcasts": ["2026-10-04"]
+		},
+		{
+			"from": "seau",
+			"to": "Sceau",
+			"count": 1,
+			"broadcasts": ["2026-10-04"]
+		},
+		{
+			"from": "envahi",
+			"to": "envahie",
+			"count": 1,
+			"broadcasts": ["2026-10-04"]
+		},
+		{
+			"from": "Abbanam",
+			"to": "Branham",
+			"count": 1,
+			"broadcasts": ["2026-10-04"]
+		},
+		{
+			"from": "Bétanie",
+			"to": "Béthanie",
+			"count": 1,
+			"broadcasts": ["2026-10-04"]
+		},
+		{
+			"from": "oeuvre",
+			"to": "Œuvre",
+			"count": 1,
+			"broadcasts": ["2026-10-04"]
+		},
+		{
+			"from": "prise",
+			"to": "pris",
+			"count": 1,
+			"broadcasts": ["2026-10-03"]
+		},
+		{
+			"from": "Corinthien",
+			"to": "Corinthiens",
+			"count": 1,
+			"broadcasts": ["2026-10-03"]
+		},
+		{
+			"from": "peut",
+			"to": "put",
+			"count": 1,
+			"broadcasts": ["2026-10-03"]
+		},
+		{
+			"from": "crié",
+			"to": "créé",
+			"count": 1,
+			"broadcasts": ["2026-09-30"]
+		},
+		{
+			"from": "esprit",
+			"to": "Esprit",
+			"count": 1,
+			"broadcasts": ["2026-09-30"]
+		},
+		{
+			"from": "envoyé",
+			"to": "envoyée",
+			"count": 1,
+			"broadcasts": ["2026-09-30"]
+		},
+		{
+			"from": "nom",
+			"to": "Nom",
+			"count": 1,
+			"broadcasts": ["2026-09-30"]
+		},
+		{
+			"from": "Chakarian",
+			"to": "Shakarian",
+			"count": 1,
+			"broadcasts": ["2026-09-30"]
+		},
+		{
+			"from": "Pentecostis",
+			"to": "pentecôtiste",
+			"count": 1,
+			"broadcasts": ["2026-09-30"]
+		},
+		{
+			"from": "fâchissement",
+			"to": "fascisme",
+			"count": 1,
+			"broadcasts": ["2026-09-30"]
+		},
+		{
+			"from": "son",
+			"to": "Son",
+			"count": 1,
+			"broadcasts": ["2026-09-30"]
+		},
+		{
+			"from": "au",
+			"to": "ô",
+			"count": 1,
+			"broadcasts": ["2026-09-27"]
+		},
+		{
+			"from": "pas",
+			"to": "par",
+			"count": 1,
+			"broadcasts": ["2026-09-27"]
+		},
+		{
+			"from": "tout",
+			"to": "tous",
+			"count": 1,
+			"broadcasts": ["2026-09-27"]
+		},
+		{
+			"from": "prosternais",
+			"to": "prosternai",
+			"count": 1,
+			"broadcasts": ["2026-09-27"]
+		},
+		{
+			"from": "pourrait",
+			"to": "pourraient",
+			"count": 1,
+			"broadcasts": ["2026-09-27"]
+		},
+		{
+			"from": "obtenu",
+			"to": "opéré",
+			"count": 1,
+			"broadcasts": ["2026-09-27"]
+		},
+		{
+			"from": "pur",
+			"to": "pure",
+			"count": 1,
+			"broadcasts": ["2026-09-27"]
+		},
+		{
+			"from": "au",
+			"to": "aux",
+			"count": 1,
+			"broadcasts": ["2026-09-27"]
+		},
+		{
+			"from": "accompli",
+			"to": "accomplit",
+			"count": 1,
+			"broadcasts": ["2026-09-27"]
+		},
+		{
+			"from": "rendent",
+			"to": "rend",
+			"count": 1,
+			"broadcasts": ["2026-09-27"]
+		},
+		{
+			"from": "manger",
+			"to": "mangé",
+			"count": 1,
+			"broadcasts": ["2026-09-27"]
+		},
+		{
+			"from": "évangile",
+			"to": "Évangile",
+			"count": 1,
+			"broadcasts": ["2026-09-26"]
+		},
+		{
+			"from": "grand",
+			"to": "Grand",
+			"count": 1,
+			"broadcasts": ["2026-09-26"]
+		},
+		{
+			"from": "maltraitent",
+			"to": "maltraitèrent",
+			"count": 1,
+			"broadcasts": ["2026-09-26"]
+		},
+		{
+			"from": "repris",
+			"to": "reprit",
+			"count": 1,
+			"broadcasts": ["2026-09-26"]
+		},
+		{
+			"from": "cette",
+			"to": "sept",
+			"count": 1,
+			"broadcasts": ["2026-09-26"]
+		},
+		{
+			"from": "séparé",
+			"to": "séparés",
+			"count": 1,
+			"broadcasts": ["2026-09-26"]
+		},
+		{
+			"from": "véritable",
+			"to": "Véritable",
+			"count": 1,
+			"broadcasts": ["2026-09-26"]
+		},
+		{
+			"from": "Rose",
+			"to": "Russ",
+			"count": 1,
+			"broadcasts": ["2026-09-23"]
+		},
+		{
+			"from": "avaient",
+			"to": "avait",
+			"count": 1,
+			"broadcasts": ["2026-09-23"]
+		},
+		{
+			"from": "parlons",
+			"to": "parlerons",
+			"count": 1,
+			"broadcasts": ["2026-09-23"]
+		},
+		{
+			"from": "mariage",
+			"to": "Mariage",
+			"count": 1,
+			"broadcasts": ["2026-09-23"]
+		},
+		{
+			"from": "scellé",
+			"to": "scellée",
+			"count": 1,
+			"broadcasts": ["2026-09-20"]
+		},
+		{
+			"from": "conclue",
+			"to": "conclus",
+			"count": 1,
+			"broadcasts": ["2026-09-20"]
+		}
+	]
+}
