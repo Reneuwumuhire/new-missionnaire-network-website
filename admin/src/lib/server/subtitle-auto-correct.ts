@@ -2,6 +2,7 @@ import { ObjectId } from 'mongodb';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { getDb } from '../../db/mongo';
 import type { ScheduledLive } from '../../db/collections';
+import type { Recording } from '$lib/models/recording';
 import { getTranscriptPdfForRecording } from './video-sync';
 import { getObjectBytes } from './s3';
 import { correctSubtitleSrt } from '$lib/utils/subtitleCorrections';
@@ -62,15 +63,16 @@ async function extractPdfText(key: string): Promise<string> {
 	}
 }
 
-export async function prepareSubtitleCorrection(live: ScheduledLive) {
-	if (!live.subtitle_srt_s3_key?.startsWith('subtitles/'))
-		throw new Error('Aucun fichier .srt attaché');
-	const { bytes } = await getObjectBytes(live.subtitle_srt_s3_key);
+async function prepareForKey(
+	key: string | null | undefined,
+	pdf: { key: string; id: string } | null
+) {
+	if (!key?.startsWith('subtitles/')) throw new Error('Aucun fichier .srt attaché');
+	const { bytes } = await getObjectBytes(key);
 	if (bytes.byteLength > 2 * 1024 * 1024) throw new Error('Fichier .srt trop volumineux');
 	const raw = new TextDecoder('utf-8').decode(bytes);
 	const originalCues = parseSrt(raw);
 	if (!originalCues.length) throw new Error('Fichier .srt vide ou illisible');
-	const pdf = await pdfForLive(live);
 	const reference = pdf ? await extractPdfText(pdf.key) : undefined;
 	const result = correctSubtitleSrt(raw, reference);
 	const correctedCues = parseSrt(result.text);
@@ -86,6 +88,18 @@ export async function prepareSubtitleCorrection(live: ScheduledLive) {
 		...result,
 		pdfId: pdf?.id ?? null,
 		cueCount: originalCues.length,
-		originalKey: live.subtitle_srt_s3_key
+		originalKey: key
 	};
+}
+
+export async function prepareSubtitleCorrection(live: ScheduledLive) {
+	return prepareForKey(live.subtitle_srt_s3_key, await pdfForLive(live));
+}
+
+export async function prepareRecordingSubtitleCorrection(recording: Recording, key: string) {
+	const pdf = await getTranscriptPdfForRecording(recording);
+	return prepareForKey(
+		key,
+		pdf?.s3Key?.startsWith('pdf/') ? { key: pdf.s3Key, id: pdf._id } : null
+	);
 }

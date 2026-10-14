@@ -439,6 +439,18 @@
 	let recSubtitleAction = $state<'keep' | 'replace' | 'remove'>('keep');
 	let recSubtitleOffsetSec = $state<number>(0);
 	let recSubtitlesHidden = $state<boolean>(false);
+	type RecordingSubtitleInfo = {
+		source: 'recording' | 'scheduled';
+		key: string;
+		filename: string;
+		scheduledLiveId: string | null;
+		syncReady: boolean;
+		offsetIntoRecordingMs: number | null;
+	};
+	let recSubtitleInfo = $state<RecordingSubtitleInfo | null>(null);
+	let recSubtitleInfoLoading = $state(false);
+	let recSubtitleInfoError = $state<string | null>(null);
+	let recSubtitleCorrecting = $state(false);
 	let recSaving = $state(false);
 
 	// ── Backfill upload (manual recording for a missed live) ──────────
@@ -808,6 +820,8 @@
 		recSubtitleAction = 'keep';
 		recSubtitleOffsetSec = (rec.subtitle_offset_into_recording_ms ?? 0) / 1000;
 		recSubtitlesHidden = rec.subtitles_hidden ?? false;
+		recSubtitleInfo = null;
+		recSubtitleInfoError = null;
 		recDraftTitle = rec.title ?? '';
 		recDraftDescription = rec.description ?? '';
 		recDraftYoutubeUrl = rec.source_video_id
@@ -816,6 +830,7 @@
 		recYoutubeError = null;
 		editingRecordingId = rec._id!;
 		void loadExistingRecordingTranscript(rec._id!);
+		void loadRecordingSubtitleInfo(rec._id!, true);
 	}
 
 	function cancelRecordingEdit() {
@@ -845,6 +860,9 @@
 		recSubtitleAction = 'keep';
 		recSubtitleOffsetSec = 0;
 		recSubtitlesHidden = false;
+		recSubtitleInfo = null;
+		recSubtitleInfoLoading = false;
+		recSubtitleInfoError = null;
 		editingRecordingId = null;
 	}
 
@@ -1013,6 +1031,108 @@
 		recSubtitleAction = 'remove';
 	}
 
+	async function loadRecordingSubtitleInfo(id: string, initializeOffset = false) {
+		recSubtitleInfoLoading = true;
+		recSubtitleInfoError = null;
+		try {
+			const res = await fetch(`/api/recordings/${id}/auto-correct`);
+			if (!res.ok) throw new Error(await res.text());
+			const body = (await res.json()) as { subtitle: RecordingSubtitleInfo | null };
+			if (editingRecordingId === id) {
+				recSubtitleInfo = body.subtitle;
+				if (
+					initializeOffset &&
+					body.subtitle?.source === 'scheduled' &&
+					body.subtitle.offsetIntoRecordingMs !== null
+				) {
+					recSubtitleOffsetSec = body.subtitle.offsetIntoRecordingMs / 1000;
+				}
+			}
+		} catch (cause) {
+			if (editingRecordingId === id) {
+				recSubtitleInfoError =
+					cause instanceof Error ? cause.message : $t('recordings.scheduled.autoCorrectFailed');
+			}
+		} finally {
+			if (editingRecordingId === id) recSubtitleInfoLoading = false;
+		}
+	}
+
+	async function autoCorrectRecordingSubtitle(id: string) {
+		if (recSubtitleCorrecting || recSaving || recSubtitleAction !== 'keep' || !recSubtitleInfo)
+			return;
+		const rec = recordings.find((item) => item._id === id);
+		const savedYoutubeUrl = rec?.source_video_id
+			? `https://www.youtube.com/watch?v=${rec.source_video_id}`
+			: '';
+		if (recPdfFile || recDraftYoutubeUrl.trim() !== savedYoutubeUrl) return;
+		recSubtitleCorrecting = true;
+		recSubtitleError = null;
+		try {
+			const endpoint = `/api/recordings/${id}/auto-correct`;
+			const previewRes = await fetch(endpoint, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: '{}'
+			});
+			if (!previewRes.ok) throw new Error(await previewRes.text());
+			const preview = (await previewRes.json()) as {
+				changeCount: number;
+				pdfChangeCount: number;
+				cueCount: number;
+				pdfUsed: boolean;
+				pdfId: string | null;
+				originalKey: string;
+				samples: Array<{ from: string; to: string }>;
+			};
+			if (preview.changeCount === 0) {
+				toast.success($t('recordings.scheduled.autoCorrectNone'));
+				return;
+			}
+			const examples = preview.samples
+				.slice(0, 6)
+				.map((item) => `${item.from} → ${item.to}`)
+				.join(', ');
+			const accepted = await confirmDialog.ask({
+				title: $t('recordings.scheduled.autoCorrect'),
+				message: `${$t('recordings.scheduled.autoCorrectPreview', {
+					count: preview.changeCount,
+					cues: preview.cueCount
+				})}\n${$t(
+					preview.pdfUsed
+						? 'recordings.scheduled.autoCorrectPdfUsed'
+						: 'recordings.scheduled.autoCorrectCommonOnly',
+					{ count: preview.pdfChangeCount }
+				)}\n${examples}`,
+				confirmLabel: $t('recordings.scheduled.autoCorrectApply'),
+				cancelLabel: $t('recordings.common.cancel')
+			});
+			if (!accepted) return;
+			const applyRes = await fetch(endpoint, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					apply: true,
+					expectedKey: preview.originalKey,
+					expectedPdfId: preview.pdfId
+				})
+			});
+			if (!applyRes.ok) throw new Error(await applyRes.text());
+			const applied = (await applyRes.json()) as { applied: boolean; changeCount: number };
+			if (applied.applied) {
+				toast.success($t('recordings.scheduled.autoCorrectDone', { count: applied.changeCount }));
+				await Promise.all([loadRecordingSubtitleInfo(id), refreshVisibleRecordings()]);
+			} else {
+				toast.success($t('recordings.scheduled.autoCorrectNone'));
+			}
+		} catch (cause) {
+			recSubtitleError =
+				cause instanceof Error ? cause.message : $t('recordings.scheduled.autoCorrectFailed');
+		} finally {
+			recSubtitleCorrecting = false;
+		}
+	}
+
 	/** Presign + PUT the staged SRT to S3. Returns the triple or null on failure
 	 *  (recSubtitleError is set). Reuses the broadcast subtitle presign route,
 	 *  which writes under the shared `subtitles/` prefix. */
@@ -1067,7 +1187,11 @@
 			patch.subtitle_srt_s3_key = uploaded.key;
 			patch.subtitle_filename = uploaded.filename;
 			patch.subtitle_offset_into_recording_ms = offsetMs;
-		} else if (offsetMs !== (rec.subtitle_offset_into_recording_ms ?? 0)) {
+		} else if (
+			recSubtitleInfo?.source === 'recording' &&
+			(offsetMs !== (rec.subtitle_offset_into_recording_ms ?? 0) ||
+				rec.subtitle_offset_into_recording_ms == null)
+		) {
 			// Keep the file, just resync.
 			patch.subtitle_offset_into_recording_ms = offsetMs;
 		}
@@ -1100,7 +1224,9 @@
 		return (
 			recSubtitleAction !== 'keep' ||
 			recSubtitlesHidden !== (rec.subtitles_hidden ?? false) ||
-			offsetMs !== (rec.subtitle_offset_into_recording_ms ?? 0)
+			(recSubtitleInfo?.source === 'recording' &&
+				(offsetMs !== (rec.subtitle_offset_into_recording_ms ?? 0) ||
+					rec.subtitle_offset_into_recording_ms == null))
 		);
 	}
 
@@ -4483,14 +4609,24 @@
 										{$t('recordings.edit.keepExisting')}
 									</button>
 								</div>
-							{:else if editingRec.subtitle_filename}
+							{:else if recSubtitleInfoLoading}
+								<p class="text-xs text-stone-500">{$t('recordings.edit.subtitleChecking')}</p>
+							{:else if recSubtitleInfo}
 								<div
 									class="flex min-w-0 items-center justify-between gap-3 overflow-hidden border border-green-200 bg-green-50/60 px-3 py-2"
 								>
 									<p class="truncate text-xs font-medium text-green-900">
-										{editingRec.subtitle_filename}
+										{recSubtitleInfo.filename}
 									</p>
 									<div class="flex shrink-0 items-center gap-3">
+										<a
+											href={`/api/recordings/${editingRec._id}/subtitle`}
+											target="_blank"
+											rel="noopener noreferrer"
+											class="text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 hover:text-primary"
+										>
+											{$t('recordings.edit.viewSubtitle')}
+										</a>
 										<label
 											class="cursor-pointer text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 hover:text-primary"
 										>
@@ -4503,16 +4639,42 @@
 												disabled={recSaving}
 											/>
 										</label>
-										<button
-											type="button"
-											onclick={markRecSubtitleRemove}
-											disabled={recSaving}
-											class="text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 hover:text-red-600 disabled:opacity-50"
-										>
-											{$t('recordings.common.remove')}
-										</button>
+										{#if recSubtitleInfo.source === 'recording'}
+											<button
+												type="button"
+												onclick={markRecSubtitleRemove}
+												disabled={recSaving || recSubtitleCorrecting}
+												class="text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-500 hover:text-red-600 disabled:opacity-50"
+											>
+												{$t('recordings.common.remove')}
+											</button>
+										{/if}
 									</div>
 								</div>
+								<p class="text-[10px] text-stone-500">
+									{$t(
+										recSubtitleInfo.source === 'scheduled'
+											? 'recordings.edit.subtitleInherited'
+											: 'recordings.edit.subtitleDirect'
+									)}
+									{#if !recSubtitleInfo.syncReady}
+										· {$t('recordings.edit.subtitleNeedsSync')}
+									{/if}
+								</p>
+								{#if !recPdfFile && recDraftYoutubeUrl.trim() === (editingRec.source_video_id ? `https://www.youtube.com/watch?v=${editingRec.source_video_id}` : '')}
+									<button
+										type="button"
+										onclick={() => autoCorrectRecordingSubtitle(editingRec._id!)}
+										disabled={recSaving || recSubtitleCorrecting}
+										class="w-fit border border-sky-200 bg-sky-50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-sky-700 transition-colors hover:bg-sky-700 hover:text-white disabled:opacity-50"
+									>
+										{$t('recordings.scheduled.autoCorrect')}
+									</button>
+								{:else}
+									<p class="text-[10px] text-stone-500">
+										{$t('recordings.edit.subtitleSavePdfFirst')}
+									</p>
+								{/if}
 							{:else}
 								<div class="flex items-center gap-2">
 									<label
@@ -4531,7 +4693,7 @@
 								</div>
 							{/if}
 
-							{#if recSubtitleFile || (editingRec.subtitle_filename && recSubtitleAction !== 'remove')}
+							{#if recSubtitleFile || (recSubtitleInfo?.source === 'recording' && recSubtitleAction !== 'remove')}
 								<label class="mt-1 flex flex-col gap-1">
 									<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-400"
 										>{$t('recordings.edit.subtitleOffsetLabel')}</span
@@ -4568,6 +4730,9 @@
 
 							{#if recSubtitleError}
 								<p class="bg-red-50 px-3 py-2 text-xs text-red-700">{recSubtitleError}</p>
+							{/if}
+							{#if recSubtitleInfoError}
+								<p class="bg-red-50 px-3 py-2 text-xs text-red-700">{recSubtitleInfoError}</p>
 							{/if}
 						</div>
 					</div>
