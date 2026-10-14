@@ -8,6 +8,8 @@ The run made 4,761 edit operations: 4,295 from aligned PDF text and 466 from reu
 
 For each sermon, the script checked that the corrected SRT has the same number of cues and the same start and end time for every cue. It uploaded a new SRT object and changed the scheduled live reference only when the record still pointed to the original key. The original S3 objects were retained. Each changed record has an `audit_log` entry containing the old and new keys. A database check confirmed all 42 records point to their new keys and have audit entries.
 
+A fresh read-only pass downloaded all 42 newly attached SRTs and found zero remaining correction edits and zero file errors.
+
 The run used [the bulk correction script](../admin/scripts/apply-past-subtitle-corrections.mjs). It previews by default and writes only with `--apply`. It repeats the correction pass until no further changes are found, with a six-pass limit and cycle detection.
 
 ## Scope limit
