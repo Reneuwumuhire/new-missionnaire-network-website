@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { invoke } from '@tauri-apps/api/core';
 	import { listen } from '@tauri-apps/api/event';
 	import ControlsDock from './components/ControlsDock.svelte';
 	import DeveloperConfigDialog from './components/DeveloperConfigDialog.svelte';
@@ -92,6 +93,16 @@
 	let mixer = $state<Mixer | null>(null);
 	let now = $state(Date.now());
 	let confirmStop = $state(false);
+	let lastLoggedError = '';
+	$effect(() => {
+		const error = broadcast.error;
+		if (error && error !== lastLoggedError) {
+			lastLoggedError = error;
+			void invoke('report', { line: `Studio error: ${error}` }).catch(() => {});
+		} else if (!error) {
+			lastLoggedError = '';
+		}
+	});
 	let subtitleAttachAttempt = '';
 	const SETUP_KEY = 'missionnaire-studio-configured-v1';
 	const needsSetup = localStorage.getItem(SETUP_KEY) !== '1';

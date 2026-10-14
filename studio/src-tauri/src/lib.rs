@@ -1,4 +1,5 @@
 mod appaudio;
+mod diagnostics;
 mod fetch;
 mod ffmpeg;
 mod local_media;
@@ -35,6 +36,10 @@ fn next_zoom(current: u32, action: &str) -> u32 {
 
 fn open_recordings_folder(app: &AppHandle) -> Result<(), String> {
 	let folder = app.path().video_dir().map_err(|e| e.to_string())?.join("Missionnaire Studio");
+	open_folder(&folder)
+}
+
+fn open_folder(folder: &std::path::Path) -> Result<(), String> {
 	std::fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
 	#[cfg(target_os = "macos")]
 	let opener = "open";
@@ -43,6 +48,11 @@ fn open_recordings_folder(app: &AppHandle) -> Result<(), String> {
 	#[cfg(target_os = "windows")]
 	let opener = "explorer";
 	Command::new(opener).arg(folder).spawn().map(|_| ()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn open_logs_folder(logs: State<'_, diagnostics::Logs>) -> Result<(), String> {
+	open_folder(logs.directory())
 }
 
 fn notify_close_blocked(app: &AppHandle) {
@@ -541,8 +551,10 @@ async fn resolve_media(
 /// Bridge for webview logging — a packaged .app has no devtools console you can
 /// reach from a terminal, so the UI sends anything worth seeing through here.
 #[tauri::command]
-fn report(line: String) {
+fn report(logs: State<'_, diagnostics::Logs>, line: String) -> Result<(), String> {
 	println!("[studio] {line}");
+	let safe = diagnostics::redact_stream_urls(&line);
+	logs.append("studio", &safe).map_err(|error| error.to_string())
 }
 
 /// WebKit throttles timers and stops requestAnimationFrame entirely once macOS
@@ -813,6 +825,12 @@ pub fn run() {
 			});
 		})
 		.setup(|app| {
+			let dir = app.path().app_log_dir().map_err(|error| error.to_string())?;
+			let logs = diagnostics::Logs::new(dir);
+			if let Err(error) = logs.append("studio", &format!("Started version {}", app.package_info().version)) {
+				eprintln!("[studio] unable to write diagnostics: {error}");
+			}
+			app.manage(logs);
 			// Bring the window to the front on launch. Beyond being polite, a
 			// window that never activates is reported as hidden by WebKit, which
 			// throttles the compositor down to a frame a second.
@@ -855,6 +873,7 @@ pub fn run() {
 			service_files::pick_service_file,
 			check_ffmpeg,
 			recording_space,
+			open_logs_folder,
 			studio_device_info,
 			extract_reference_features,
 			start_stream,
@@ -901,6 +920,9 @@ pub fn run() {
 					}
 				}
 				tauri::WindowEvent::Destroyed => {
+					if let Some(logs) = window.app_handle().try_state::<diagnostics::Logs>() {
+						let _ = logs.append("studio", "Window closed");
+					}
 					if let Some(encoder) = window.app_handle().try_state::<Encoder>() {
 						let _ = encoder.stop();
 					}

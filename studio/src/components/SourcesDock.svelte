@@ -354,6 +354,7 @@
 			tracked.name = picked.name.replace(/\.[^.]+$/, '');
 			openLocalMedia(tracked, picked.token);
 			persist();
+			report(`selected local source ${tracked.name}`);
 		} catch (error) {
 			report(`pick local media failed: ${error}`);
 		}

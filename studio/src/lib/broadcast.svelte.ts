@@ -73,6 +73,11 @@ export const broadcast = $state({
 	localRecordingPath: null as string | null
 });
 
+function noteBroadcast(line: string) {
+	broadcast.log = [...broadcast.log.slice(-199), line];
+	void invoke('report', { line: `broadcast: ${line}` }).catch(() => {});
+}
+
 /** Anything past `idle` is holding connections open and must be stopped. */
 export const isStreaming = () => broadcast.phase !== 'idle';
 
@@ -280,10 +285,7 @@ async function restartEncoder(
 		try {
 			return await startEncoder(group, config);
 		} catch (error) {
-			broadcast.log = [
-				...broadcast.log.slice(-199),
-				`${group} encoder recovery failed: ${String(error)}`
-			];
+			noteBroadcast(`${group} encoder recovery failed: ${String(error)}`);
 			throw error;
 		}
 	}, stillCurrent);
@@ -333,10 +335,7 @@ async function runHeldRecovery(active: Runtime, generation: number, epoch: numbe
 			if (target.group === 'held') target.state = 'connecting';
 		}
 	} catch (error) {
-		broadcast.log = [
-			...broadcast.log.slice(-199),
-			`Held encoder recovery stopped: ${String(error)}`
-		];
+		noteBroadcast(`Held encoder recovery stopped: ${String(error)}`);
 		for (const target of broadcast.targets) {
 			if (target.group === 'held') target.state = 'failed';
 		}
@@ -379,8 +378,7 @@ async function recoverCapture() {
 	recoveryTimes.push(now);
 	broadcast.captureState = 'recovering';
 	broadcast.recoveries++;
-	broadcast.log = [...broadcast.log.slice(-199), 'Studio capture stalled; reconnecting encoder.'];
-	void invoke('report', { line: 'capture stalled; reconnecting encoder' });
+	noteBroadcast('Studio capture stalled; reconnecting encoder.');
 
 	try {
 		await stopRecorder();
@@ -418,7 +416,7 @@ async function recoverCapture() {
 		startRecorder(active);
 		if (active.held) void recoverHeld(active, generation);
 	} catch (error) {
-		broadcast.log = [...broadcast.log.slice(-199), `Capture recovery failed: ${String(error)}`];
+		noteBroadcast(`Capture recovery failed: ${String(error)}`);
 		await failCapture();
 	} finally {
 		recovering = false;

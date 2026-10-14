@@ -56,12 +56,16 @@ export async function restoreSavedSources(): Promise<void> {
 						layer.windowId = window.id;
 						layer.windowTitle = window.title;
 						persist();
+						report(`restored window source ${layer.name}`);
 					}
 				} else if ((layer.kind === 'image' || layer.kind === 'video') && layer.filePath) {
 					const saved = await invoke<{ token: string }>('register_local_media', {
 						path: layer.filePath
 					});
-					if (stillSaved(layer) && !handleFor(layer.id)) openLocalMedia(layer, saved.token);
+					if (stillSaved(layer) && !handleFor(layer.id)) {
+						openLocalMedia(layer, saved.token);
+						report(`restored local source ${layer.name}`);
+					}
 				} else if (layer.kind === 'video' && layer.url) {
 					const found = await invoke<{ token: string; duration: number }>('resolve_media', {
 						url: layer.url,
@@ -71,6 +75,7 @@ export async function restoreSavedSources(): Promise<void> {
 						layer.duration = found.duration;
 						openStream(layer, found.token);
 						persist();
+						report(`restored linked source ${layer.name}`);
 					}
 				}
 			} catch (error) {

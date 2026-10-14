@@ -19,6 +19,8 @@ use std::thread;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 
+use crate::diagnostics::{redact_stream_urls, Logs};
+
 /// Chunks buffered between the webview and ffmpeg's stdin. MediaRecorder emits
 /// one per timeslice (~250 ms), so this is ~30 s of slack. A full queue applies
 /// backpressure; encoded WebM chunks must never be discarded because one chunk
@@ -496,7 +498,10 @@ impl Encoder {
 		let child_wait = child_handle.clone();
 		thread::spawn(move || {
 			let mut tail: VecDeque<String> = VecDeque::with_capacity(LOG_TAIL);
+			let _ = app_log.state::<Logs>().append("ffmpeg", &format!("{group_log} encoder started (run {run_id})"));
 			for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+				let line = redact_stream_urls(&line);
+				let _ = app_log.state::<Logs>().append("ffmpeg", &format!("{group_log} run {run_id}: {line}"));
 				if tail.len() == LOG_TAIL {
 					tail.pop_front();
 				}
@@ -519,6 +524,7 @@ impl Encoder {
 			// the UI, so a dead encoder can never look "live".
 			let status = child_wait.lock().ok().and_then(|mut c| c.wait().ok());
 			let code = status.and_then(|s| s.code()).unwrap_or(-1);
+			let _ = app_log.state::<Logs>().append("ffmpeg", &format!("{group_log} encoder exited (run {run_id}, code {code})"));
 			let _ = app_log.emit(
 				"stream://exited",
 				serde_json::json!({
