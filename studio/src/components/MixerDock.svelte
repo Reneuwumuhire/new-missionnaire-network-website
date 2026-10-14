@@ -58,6 +58,13 @@
 
 	onMount(() => {
 		const stopWatching = watchDevices(refreshDevices);
+		if (
+			studio.audioSources.some((source) => source.kind === 'app') ||
+			studio.scenes.some((scene) =>
+				scene.layers.some((layer) => layer.kind === 'screen' && layer.appId)
+			)
+		)
+			void refreshApps();
 		const recheckMicrophone = async () => {
 			if (permissions.microphone !== 'denied') return;
 			await askForMicrophone();
@@ -213,6 +220,8 @@
 	function inactiveReason(strip: Strip): string {
 		const error = handleFor(strip.source.id)?.error;
 		if (error) return error;
+		if (isAppStrip(strip) && !appAudio.supported)
+			return strip.isMic ? t('mixer.appAudioUnsupported') : t('mixer.noAudioTrack');
 		if (isAppStrip(strip))
 			return appAudio.error ?? (strip.source.appId ? t('mixer.appGone') : t('mixer.chooseApp'));
 		return strip.isMic ? t('mixer.connect') : t('mixer.noAudioTrack');
@@ -252,6 +261,7 @@
 		}
 
 		const wanting = [...studio.audioSources.filter((s) => s.kind === 'app'), ...audioLayers()];
+		if (!appAudio.supported) return;
 		for (const source of wanting) {
 			if (!source.appId) continue;
 			// What the strip is actually capturing, not merely whether it has one.

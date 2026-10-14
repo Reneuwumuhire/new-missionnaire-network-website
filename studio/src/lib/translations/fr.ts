@@ -93,6 +93,8 @@ const fr: Record<keyof typeof en, string> = {
 
 	// ── Source errors ───────────────────────────────────────────
 	'source.notConnected': 'Non connectée',
+	'source.screenNeedsSelection':
+		'Choisissez à nouveau l’écran ou la fenêtre. Le partage exige votre autorisation à chaque fois.',
 	'source.denied':
 		'Accès refusé — autorisez la caméra/l’écran dans Réglages Système › Confidentialité',
 	'source.notFound': 'Aucun appareil trouvé',

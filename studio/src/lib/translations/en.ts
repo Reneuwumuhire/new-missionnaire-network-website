@@ -89,6 +89,8 @@ const en = {
 
 	// ── Source errors ───────────────────────────────────────────
 	'source.notConnected': 'Not connected',
+	'source.screenNeedsSelection':
+		'Choose the display or window again. Screen sharing requires your approval each time.',
 	'source.denied': 'Access denied — allow the camera/screen in System Settings › Privacy',
 	'source.notFound': 'No device found',
 	'source.busy': 'Device already in use by another application',

@@ -6,6 +6,7 @@ import {
 	mediaVersion,
 	openFile,
 	openNativeWindow,
+	openScreen,
 	pinHandle,
 	permissions,
 	previewAudioLayer,
@@ -35,6 +36,33 @@ it('only calls a microphone failure a permission denial when access is refused',
 	await askForMicrophone();
 	expect(permissions.microphone).toBe('granted');
 	expect(permissions.message).toBe('');
+});
+
+it('marks a shared display disconnected when the user stops Windows screen sharing', async () => {
+	class Video {
+		srcObject: unknown;
+		muted = false;
+		playsInline = false;
+		autoplay = false;
+		play() {
+			return Promise.resolve();
+		}
+		pause() {}
+		removeAttribute() {}
+	}
+	const track = Object.assign(new EventTarget(), { stop: vi.fn() });
+	const stream = {
+		getVideoTracks: () => [track],
+		getTracks: () => [track]
+	};
+	vi.stubGlobal('HTMLVideoElement', Video);
+	vi.stubGlobal('document', { createElement: () => new Video() });
+	vi.stubGlobal('navigator', { mediaDevices: { getDisplayMedia: () => Promise.resolve(stream) } });
+	const layer = makeLayer('screen', 'Display');
+	await openScreen(layer);
+	expect(handleFor(layer.id)?.el).toBeInstanceOf(Video);
+	track.dispatchEvent(new Event('ended'));
+	expect(handleFor(layer.id)).toBeUndefined();
 });
 
 it('auditions a disconnected Preview file but stops auditioning once Program takes it', () => {
