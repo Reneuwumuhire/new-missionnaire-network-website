@@ -34,6 +34,15 @@ export function subtitleContentError(text: string): string | null {
 /** Check the webview can decode the file before replacing a working source. */
 export async function audioContentError(file: File): Promise<string | null> {
 	const url = URL.createObjectURL(file);
+	try {
+		return await audioUrlError(url);
+	} finally {
+		URL.revokeObjectURL(url);
+	}
+}
+
+/** Check a native media URL before assigning it to a prepared programme. */
+export async function audioUrlError(url: string): Promise<string | null> {
 	const audio = document.createElement('audio');
 	try {
 		return await new Promise((resolve) => {
@@ -61,6 +70,5 @@ export async function audioContentError(file: File): Promise<string | null> {
 		audio.onerror = null;
 		audio.removeAttribute('src');
 		audio.load();
-		URL.revokeObjectURL(url);
 	}
 }

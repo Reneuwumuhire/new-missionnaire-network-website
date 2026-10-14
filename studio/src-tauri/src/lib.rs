@@ -1,6 +1,7 @@
 mod appaudio;
 mod fetch;
 mod ffmpeg;
+mod local_media;
 mod reference;
 mod service_files;
 mod window_capture;
@@ -719,6 +720,35 @@ pub fn run() {
 		.manage(appaudio::Capture::default())
 		.manage(window_capture::Capture::default())
 		.manage(fetch::Streams::default())
+		.manage(local_media::LocalMedia::default())
+		.register_asynchronous_uri_scheme_protocol("localmedia", |ctx, request, responder| {
+			let media = ctx.app_handle().state::<local_media::LocalMedia>();
+			let token = request.uri().query()
+				.and_then(|query| query.split('&').find_map(|pair| pair.strip_prefix("id=")))
+				.unwrap_or_default();
+			let path = media.get(token);
+			let range = request.headers().get("range")
+				.and_then(|value| value.to_str().ok()).map(str::to_string);
+			std::thread::spawn(move || {
+				let result = path.as_deref().ok_or("Unknown media token".to_string())
+					.and_then(|path| local_media::chunk(path, range.as_deref()));
+				let response = match result {
+					Ok(part) => {
+						let mut build = tauri::http::Response::builder()
+							.status(part.status)
+							.header("Access-Control-Allow-Origin", "*")
+							.header("Accept-Ranges", "bytes")
+							.header("Content-Type", part.content_type)
+							.header("Content-Length", part.body.len().to_string());
+						if let Some(range) = part.content_range { build = build.header("Content-Range", range); }
+						build.body(part.body).unwrap()
+					}
+					Err(_) => tauri::http::Response::builder().status(404)
+						.header("Access-Control-Allow-Origin", "*").body(Vec::new()).unwrap(),
+				};
+				responder.respond(response);
+			});
+		})
 		// The media proxy. A `<video>` playing ytstream://s?id=… lands here, and
 		// the answer carries the CORS header googlevideo never sends — which is
 		// what keeps the program canvas untainted and capturable. Asynchronous
@@ -845,6 +875,8 @@ pub fn run() {
 			list_windows,
 			native_window_capture_available,
 			start_window_capture,
+			local_media::pick_local_media,
+			local_media::register_local_media,
 			window_capture_frame,
 			set_window_capture_cursor,
 			stop_window_capture,

@@ -24,6 +24,7 @@
 	import Splitter from './components/Splitter.svelte';
 	import TransitionsDock from './components/TransitionsDock.svelte';
 	import { stopAppAudio } from './lib/appaudio.svelte';
+	import { restoreSavedSources } from './lib/source-restore';
 	import {
 		broadcast,
 		isStreaming,
@@ -206,6 +207,7 @@
 			// application under Privacy & Security once it has asked, and until the
 			// answer is yes the engine reports no input devices at all.
 			await askForMicrophone();
+			void restoreSavedSources();
 			// Bring cameras up straight away so the operator sees a picture without
 			// hunting for a button. Each layer opens its own stream; if a device is
 			// already taken the layer says so instead of failing silently.

@@ -71,9 +71,12 @@ export interface Layer {
 	/** video: the file is a recording with no picture. It still carries sound
 	 *  into the mix, but it is not a video source that has failed to draw. */
 	audioOnly?: boolean;
-	/** Display-only: the file the operator picked. Blobs cannot be persisted,
-	 *  so after a restart the layer asks for the file again. */
+	/** The original name of a local file. Older shows only have this field. */
 	fileName?: string;
+	/** Native file path, saved so Studio can reopen the selected media after restart. */
+	filePath?: string;
+	/** Native window title helps find the same window when its OS id changes. */
+	windowTitle?: string;
 	/** The page this source was added from, for a streamed one. Kept so
 	 *  Reconnect can resolve it again rather than asking for it back: the signed
 	 *  media address behind it expires after a few hours, so re-resolving is the

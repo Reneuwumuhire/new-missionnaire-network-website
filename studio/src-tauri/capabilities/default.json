@@ -1,7 +1,7 @@
 {
 	"$schema": "../gen/schemas/desktop-schema.json",
 	"identifier": "default",
-	"description": "Studio window. Media files are picked with a plain file input in the webview, so no filesystem permission is needed \u2014 everything else goes through this app's own commands.",
+	"description": "Studio window. Media files are selected by native dialog and served by scoped app commands; the webview has no general filesystem permission.",
 	"windows": ["main"],
 	"permissions": [
 		"core:default",
