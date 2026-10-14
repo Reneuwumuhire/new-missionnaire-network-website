@@ -123,6 +123,25 @@ function applyCommon(body: string, changes: SubtitleChange[]): string {
 	return body;
 }
 
+function applyPdfGroundedNames(body: string, pdfText: string, changes: SubtitleChange[]): string {
+	// Speech recognition repeatedly renders "Frère Branham" as "Frère Bernard".
+	// Require the linked transcript to name Branham and never mention Bernard:
+	// a real Frère Bernard must remain untouched.
+	if (
+		!/(?<![\p{L}])fr[eè]re\s+branham(?![\p{L}])/iu.test(pdfText) ||
+		/(?<![\p{L}])bernard(?![\p{L}])/iu.test(pdfText)
+	) {
+		return body;
+	}
+	return body.replace(
+		/(?<![\p{L}])(fr[eè]re\s+)bernard(?:\s+branham)?(?![\p{L}])/giu,
+		(match, prefix: string) => {
+			changes.push({ from: match.slice(prefix.length), to: 'Branham', source: 'pdf' });
+			return prefix + 'Branham';
+		}
+	);
+}
+
 function gram(words: Token[], at: number): string {
 	return words
 		.slice(at, at + ANCHOR_WORDS)
@@ -276,6 +295,8 @@ export function correctSubtitleSrt(
 		differingWords = 0;
 	for (const block of blocks) if (block.body) block.body = applyCommon(block.body, changes);
 	if (pdfText) {
+		for (const block of blocks)
+			if (block.body) block.body = applyPdfGroundedNames(block.body, pdfText, changes);
 		const source = blocks.flatMap((block, index) => tokens(block.body, index));
 		const reference = tokens(pdfText);
 		const anchors = anchorPairs(source, reference);
