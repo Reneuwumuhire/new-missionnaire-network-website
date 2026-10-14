@@ -82,6 +82,15 @@ fn resolve_ytdlp() -> Result<std::path::PathBuf, String> {
 			return Ok(p);
 		}
 	}
+	if let Ok(executable) = std::env::current_exe() {
+		if let Some(directory) = executable.parent() {
+			let name = format!("yt-dlp-{}{}", std::env::consts::ARCH, std::env::consts::EXE_SUFFIX);
+			for resources in [directory.join("binaries"), directory.join("../Resources/binaries")] {
+				let path = resources.join(&name);
+				if path.is_file() { return Ok(path); }
+			}
+		}
+	}
 	for candidate in YTDLP_CANDIDATES {
 		let p = std::path::PathBuf::from(candidate);
 		if p.is_file() {
@@ -97,7 +106,7 @@ fn resolve_ytdlp() -> Result<std::path::PathBuf, String> {
 	{
 		return Ok(std::path::PathBuf::from("yt-dlp"));
 	}
-	Err("yt-dlp introuvable. Installez-le (brew install yt-dlp) ou définissez YTDLP_PATH.".into())
+	Err("yt-dlp introuvable. Réinstallez Studio ou définissez YTDLP_PATH.".into())
 }
 
 /// The webview hands this straight to a subprocess argument. It is never passed

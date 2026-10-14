@@ -9,9 +9,11 @@
 		"preview": "vite preview",
 		"check": "svelte-check --tsconfig ./tsconfig.json",
 		"test": "vitest run",
+		"prepare:media-tools": "node scripts/prepare-media-tools.mjs",
+		"verify:media-tools": "node scripts/verify-media-tools.mjs",
 		"tauri": "tauri",
-		"studio": "tauri dev",
-		"studio:build": "tauri build"
+		"studio": "pnpm prepare:media-tools && tauri dev",
+		"studio:build": "pnpm prepare:media-tools && tauri build"
 	},
 	"dependencies": {
 		"@tauri-apps/api": "^2.9.0",

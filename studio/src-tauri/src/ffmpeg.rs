@@ -131,6 +131,17 @@ pub fn resolve_ffmpeg() -> Result<PathBuf, String> {
 			return Ok(p);
 		}
 	}
+	// Release installers carry FFmpeg in their resource directory. Prefer that
+	// known build over a different installation found on the user's PATH.
+	if let Ok(executable) = std::env::current_exe() {
+		if let Some(directory) = executable.parent() {
+			let name = format!("ffmpeg-{}{}", std::env::consts::ARCH, std::env::consts::EXE_SUFFIX);
+			for resources in [directory.join("binaries"), directory.join("../Resources/binaries")] {
+				let path = resources.join(&name);
+				if path.is_file() { return Ok(path); }
+			}
+		}
+	}
 	for candidate in FFMPEG_CANDIDATES {
 		let p = PathBuf::from(candidate);
 		if p.is_file() {
@@ -148,7 +159,7 @@ pub fn resolve_ffmpeg() -> Result<PathBuf, String> {
 	{
 		return Ok(PathBuf::from("ffmpeg"));
 	}
-	Err("ffmpeg introuvable. Installez-le (brew install ffmpeg) ou définissez FFMPEG_PATH.".into())
+	Err("FFmpeg introuvable. Réinstallez Studio ou définissez FFMPEG_PATH.".into())
 }
 
 pub fn probe_ffmpeg() -> Result<FfmpegInfo, String> {
@@ -157,7 +168,11 @@ pub fn probe_ffmpeg() -> Result<FfmpegInfo, String> {
 		.args(["-hide_banner", "-encoders"])
 		.output()
 		.map_err(|e| format!("ffmpeg illisible: {e}"))?;
+	if !out.status.success() { return Err("Impossible de vérifier les encodeurs FFmpeg".into()); }
 	let encoders = String::from_utf8_lossy(&out.stdout);
+	if !encoders.contains("libx264") || !encoders.contains(" aac ") {
+		return Err("FFmpeg ne contient pas les encodeurs H.264/AAC requis".into());
+	}
 
 	let version_out = Command::new(&path)
 		.arg("-version")
@@ -172,7 +187,7 @@ pub fn probe_ffmpeg() -> Result<FfmpegInfo, String> {
 	Ok(FfmpegInfo {
 		path: path.to_string_lossy().to_string(),
 		version,
-		hardware_h264: encoders.contains("h264_videotoolbox") || encoders.contains("h264_nvenc"),
+		hardware_h264: cfg!(target_os = "macos") && encoders.contains("h264_videotoolbox"),
 	})
 }
 
@@ -243,7 +258,9 @@ fn video_args(cfg: &StreamConfig) -> Vec<String> {
 	// `0:a:0?` — optional: a scene with no audio source must still stream.
 	push!("-map", "0:v:0", "-map", "0:a:0?");
 
-	if cfg.encoder == "software" {
+	// VideoToolbox options do not exist in Windows FFmpeg. Use libx264 there,
+	// including for settings saved as "hardware" by an older Studio release.
+	if cfg.encoder == "software" || !cfg!(target_os = "macos") {
 		// Live: no B-frames, no lookahead. Latency over compression ratio.
 		push!("-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency");
 		push!("-profile:v", "high", "-sc_threshold", "0", "-refs", "1");
@@ -252,7 +269,7 @@ fn video_args(cfg: &StreamConfig) -> Vec<String> {
 		// `-allow_sw 1` falls back inside VideoToolbox rather than dying if the
 		// GPU session cannot be created (happens under screen sharing).
 		push!("-c:v", "h264_videotoolbox", "-realtime", "1", "-allow_sw", "1");
-		push!("-constant_bit_rate", "1", "-prio_speed", "1", "-max_ref_frames", "1");
+		push!("-prio_speed", "1");
 		push!("-profile:v", "high");
 	}
 	push!("-pix_fmt", "yuv420p");
@@ -852,7 +869,7 @@ mod tests {
 	fn scene_change_threshold_is_x264_only() {
 		// VideoToolbox has no such option and ffmpeg warns loudly about it.
 		let hw = build_args(&cfg(&["rtmp://h/live/k"])).unwrap();
-		assert!(!hw.contains(&"-sc_threshold".to_string()));
+		assert_eq!(hw.contains(&"-sc_threshold".to_string()), !cfg!(target_os = "macos"));
 		let mut c = cfg(&["rtmp://h/live/k"]);
 		c.encoder = "software".into();
 		assert!(build_args(&c).unwrap().contains(&"-sc_threshold".to_string()));
@@ -865,6 +882,20 @@ mod tests {
 		let args = build_args(&c).unwrap();
 		assert!(args.contains(&"libx264".to_string()));
 		assert!(!args.contains(&"h264_videotoolbox".to_string()));
+	}
+
+	#[test]
+	fn hardware_options_match_the_current_platform() {
+		let args = build_args(&cfg(&["rtmp://h/live/k"])).unwrap();
+		if cfg!(target_os = "macos") {
+			assert!(args.contains(&"h264_videotoolbox".to_string()));
+			assert!(args.contains(&"-realtime".to_string()));
+			assert!(!args.contains(&"-max_ref_frames".to_string()));
+		} else {
+			assert!(args.contains(&"libx264".to_string()));
+			assert!(!args.contains(&"-realtime".to_string()));
+			assert!(!args.contains(&"h264_videotoolbox".to_string()));
+		}
 	}
 
 	#[test]
