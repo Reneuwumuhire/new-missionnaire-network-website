@@ -47,7 +47,9 @@
 	},
 	"pnpm": {
 		"overrides": {
-			"cookie": "^0.7.0"
+			"cookie": "^0.7.0",
+			"postcss-selector-parser": "7.1.6",
+			"source-map-js": "1.2.2"
 		}
 	}
 }

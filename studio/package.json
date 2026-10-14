@@ -32,5 +32,11 @@
 		"typescript": "^5.5",
 		"vite": "^6.4.3",
 		"vitest": "^5.0.0"
+	},
+	"pnpm": {
+		"overrides": {
+			"postcss-selector-parser": "7.1.6",
+			"source-map-js": "1.2.2"
+		}
 	}
 }

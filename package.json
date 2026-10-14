@@ -68,7 +68,9 @@
 	"pnpm": {
 		"overrides": {
 			"cookie": "^0.7.0",
-			"undici": "7.29.1"
+			"undici": "7.29.1",
+			"postcss-selector-parser": "7.1.6",
+			"source-map-js": "1.2.2"
 		}
 	},
 	"dependencies": {
