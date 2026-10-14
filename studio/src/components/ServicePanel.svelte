@@ -5,17 +5,19 @@
 	import {
 		listDevices,
 		watchDevices,
-		openFile,
+		openLocalMedia,
 		mediaVersion,
-		type DeviceOption
+		type DeviceOption,
+		type RegisteredLocalMedia
 	} from '../lib/media.svelte';
 	import Modal from './Modal.svelte';
 	import {
 		pickServiceFile,
 		serviceFileError,
 		subtitleContentError,
-		audioContentError
+		audioUrlError
 	} from '../lib/service-files';
+	import { invoke } from '@tauri-apps/api/core';
 	import type { Mixer } from '../lib/mixer';
 	import { recording } from '../lib/recording.svelte';
 	import {
@@ -98,10 +100,14 @@
 		pickingFile = true;
 		fileError = '';
 		try {
-			const file = await pickServiceFile(role === 'subtitle' ? 'subtitle' : 'audio');
-			if (file) {
-				if (role === 'subtitle') await assignSubtitle(file);
-				else await assignFile(role, file);
+			if (role === 'subtitle') {
+				const file = await pickServiceFile('subtitle');
+				if (file) await assignSubtitle(file);
+			} else {
+				const file = await invoke<RegisteredLocalMedia | null>('pick_local_media', {
+					kind: 'audio'
+				});
+				if (file) await assignFile(role, file);
 			}
 		} catch (error) {
 			fileError = String(error);
@@ -117,12 +123,15 @@
 		complete: 'Programme complete'
 	};
 
-	async function assignFile(role: PreparedRole, file: File) {
+	async function assignFile(role: PreparedRole, file: RegisteredLocalMedia) {
 		fileError = serviceFileError(file, 'audio') ?? '';
 		if (fileError) return;
 		validatingFile = true;
 		try {
-			fileError = (await audioContentError(file)) ?? '';
+			fileError =
+				(await audioUrlError(
+					`localmedia://localhost/media?id=${encodeURIComponent(file.token)}`
+				)) ?? '';
 		} catch {
 			fileError = 'Could not read this audio file. Please try again.';
 		} finally {
@@ -133,14 +142,20 @@
 			.flatMap((scene) => scene.layers)
 			.find(({ id }) => id === studio.service[role]);
 		if (!layer) {
-			layer = makeLayer('video', file.name, { audioOnly: true, muted: true, fileName: file.name });
+			layer = makeLayer('video', file.name, {
+				audioOnly: true,
+				muted: true,
+				fileName: file.name,
+				filePath: file.path
+			});
 			activeScene().layers = [layer, ...activeScene().layers];
 			studio.service[role] = layer.id;
 		} else {
 			layer.fileName = file.name;
+			layer.filePath = file.path;
 			layer.name = file.name;
 		}
-		openFile(layer, file);
+		openLocalMedia(layer, file.token);
 		applyRouting();
 		persist();
 		bindPreparedQueue();

@@ -412,6 +412,8 @@ const en = {
 	'settings.capture': 'Capture: {mime}',
 	'settings.ffmpegCommand': 'ffmpeg command',
 	'settings.ffmpegLog': 'ffmpeg log ({count})',
+	'settings.openLogs': 'Open log folder',
+	'settings.logsHint': 'Studio saves a dated log file with timestamps for each day.',
 
 	// ── Updates ─────────────────────────────────────────────────
 	'update.currentVersion': 'Version {version}',

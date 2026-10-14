@@ -3,13 +3,14 @@
 		handleFor,
 		mediaVersion,
 		openCamera,
-		openFile,
+		openLocalMedia,
 		openNativeWindow,
 		openScreen,
 		openPrivacySettings,
 		openStream,
 		release,
-		report
+		report,
+		type RegisteredLocalMedia
 	} from '../lib/media.svelte';
 	import {
 		DESKTOP_AUDIO,
@@ -66,7 +67,6 @@
 		if (lyrics.followLayerId && ids.includes(lyrics.followLayerId)) lyrics.followLayerId = null;
 		if (referenceMatcher.sourceId && ids.includes(referenceMatcher.sourceId))
 			useReferenceSource(null);
-		pendingFileLayer = null;
 		clearingSceneId = null;
 	}
 
@@ -103,8 +103,6 @@
 			window.removeEventListener('keydown', onKey);
 		};
 	});
-	let fileInput = $state<HTMLInputElement | null>(null);
-	let pendingFileLayer = $state<Layer | null>(null);
 	let pendingWindowLayer = $state<Layer | null>(null);
 	let windowChoices = $state<AudioWindow[]>([]);
 	let windowPickerError = $state<string | null>(null);
@@ -138,6 +136,7 @@
 			}
 			tracked.windowId = choice.id;
 			tracked.appId = choice.appId;
+			tracked.windowTitle = choice.title;
 			report(`native window capture app=${choice.appName} window=${JSON.stringify(choice.title)}`);
 			persist();
 		}
@@ -339,27 +338,26 @@
 		}
 	}
 
-	function pickFile(layer: Layer) {
-		pendingFileLayer = layer;
-		if (fileInput) {
-			// Audio too: a service often plays a recording that was made earlier,
-			// and it belongs in the mixer like any other media source.
-			fileInput.accept = layer.kind === 'image' ? 'image/*' : 'video/*,audio/*';
-			fileInput.click();
+	async function pickFile(layer: Layer) {
+		try {
+			const picked = await invoke<RegisteredLocalMedia | null>('pick_local_media', {
+				kind: layer.kind
+			});
+			if (!picked) return;
+			const tracked = studio.scenes
+				.flatMap((scene) => scene.layers)
+				.find((candidate) => candidate.id === layer.id);
+			if (!tracked) return;
+			tracked.fileName = picked.name;
+			tracked.filePath = picked.path;
+			tracked.audioOnly = /\.(mp3|m4a|aac|wav|flac|ogg|opus|aiff|aif)$/i.test(picked.name);
+			tracked.name = picked.name.replace(/\.[^.]+$/, '');
+			openLocalMedia(tracked, picked.token);
+			persist();
+			report(`selected local source ${tracked.name}`);
+		} catch (error) {
+			report(`pick local media failed: ${error}`);
 		}
-	}
-
-	function onFileChosen(event: Event) {
-		const input = event.target as HTMLInputElement;
-		const file = input.files?.[0];
-		input.value = '';
-		if (!file || !pendingFileLayer) return;
-		pendingFileLayer.fileName = file.name;
-		pendingFileLayer.audioOnly = file.type.startsWith('audio/');
-		pendingFileLayer.name = file.name.replace(/\.[^.]+$/, '');
-		openFile(pendingFileLayer, file);
-		persist();
-		pendingFileLayer = null;
 	}
 
 	function removeLayer(layer: Layer | null) {
@@ -407,7 +405,22 @@
 				await relink(layer);
 				return;
 			default:
-				pickFile(layer);
+				if (handleFor(layer.id)?.error) {
+					await pickFile(layer);
+					return;
+				}
+				if (layer.filePath) {
+					try {
+						const saved = await invoke<{ token: string }>('register_local_media', {
+							path: layer.filePath
+						});
+						openLocalMedia(layer, saved.token);
+						return;
+					} catch (error) {
+						report(`restore local media failed: ${error}`);
+					}
+				}
+				await pickFile(layer);
 		}
 	}
 
@@ -427,8 +440,6 @@
 		return null;
 	}
 </script>
-
-<input bind:this={fileInput} type="file" class="hidden" onchange={onFileChosen} />
 
 {#if clearingScene}
 	<Modal title="Clear sources?" onclose={() => (clearingSceneId = null)}>
@@ -516,7 +527,11 @@
 					class="flex min-w-0 flex-1 items-center gap-2 py-1.5 pl-3 text-left"
 					onclick={() => (studio.selectedLayerId = layer.id)}
 					ondblclick={() =>
-						layer.kind === 'image' || layer.kind === 'video' ? reconnect(layer) : onproperties()}
+						layer.url || layer.youtubeLiveUrl
+							? reconnect(layer)
+							: layer.kind === 'image' || layer.kind === 'video'
+								? pickFile(layer)
+								: onproperties()}
 				>
 					<Icon
 						name={iconFor(layer.kind)}

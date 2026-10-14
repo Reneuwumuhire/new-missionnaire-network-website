@@ -86,6 +86,15 @@
 
 	let ffmpeg = $state<FfmpegInfo | null>(null);
 	let ffmpegError = $state<string | null>(null);
+	let logsError = $state<string | null>(null);
+	async function openLogsFolder() {
+		logsError = null;
+		try {
+			await invoke('open_logs_folder');
+		} catch (error) {
+			logsError = String(error);
+		}
+	}
 	const mime = pickMimeType();
 	const updateBlocked = $derived(isStreaming() || recording.startedAt !== null);
 
@@ -471,6 +480,13 @@
 						<p class="text-muted">
 							{t('settings.capture', { mime: mime ?? t('settings.unavailable') })}
 						</p>
+					</div>
+					<div class="border-t border-ink-700 pt-4">
+						<button class="studio-chip" onclick={() => void openLogsFolder()}>
+							{t('settings.openLogs')}
+						</button>
+						<p class="mt-2 text-muted">{t('settings.logsHint')}</p>
+						{#if logsError}<p class="mt-2 text-danger">{logsError}</p>{/if}
 					</div>
 
 					{#if broadcast.command.length > 0}

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { invoke } from '@tauri-apps/api/core';
 	import { listen } from '@tauri-apps/api/event';
 	import ControlsDock from './components/ControlsDock.svelte';
 	import DeveloperConfigDialog from './components/DeveloperConfigDialog.svelte';
@@ -24,6 +25,7 @@
 	import Splitter from './components/Splitter.svelte';
 	import TransitionsDock from './components/TransitionsDock.svelte';
 	import { stopAppAudio } from './lib/appaudio.svelte';
+	import { restoreSavedSources } from './lib/source-restore';
 	import {
 		broadcast,
 		isStreaming,
@@ -91,6 +93,16 @@
 	let mixer = $state<Mixer | null>(null);
 	let now = $state(Date.now());
 	let confirmStop = $state(false);
+	let lastLoggedError = '';
+	$effect(() => {
+		const error = broadcast.error;
+		if (error && error !== lastLoggedError) {
+			lastLoggedError = error;
+			void invoke('report', { line: `Studio error: ${error}` }).catch(() => {});
+		} else if (!error) {
+			lastLoggedError = '';
+		}
+	});
 	let subtitleAttachAttempt = '';
 	const SETUP_KEY = 'missionnaire-studio-configured-v1';
 	const needsSetup = localStorage.getItem(SETUP_KEY) !== '1';
@@ -206,6 +218,7 @@
 			// application under Privacy & Security once it has asked, and until the
 			// answer is yes the engine reports no input devices at all.
 			await askForMicrophone();
+			void restoreSavedSources();
 			// Bring cameras up straight away so the operator sees a picture without
 			// hunting for a button. Each layer opens its own stream; if a device is
 			// already taken the layer says so instead of failing silently.

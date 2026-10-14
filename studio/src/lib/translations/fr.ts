@@ -423,6 +423,8 @@ const fr: Record<keyof typeof en, string> = {
 	'settings.capture': 'Capture : {mime}',
 	'settings.ffmpegCommand': 'Commande ffmpeg',
 	'settings.ffmpegLog': 'Journal ffmpeg ({count})',
+	'settings.openLogs': 'Ouvrir le dossier des journaux',
+	'settings.logsHint': 'Studio conserve un journal daté et horodaté pour chaque jour.',
 
 	// ── Mises à jour ────────────────────────────────────────────
 	'update.currentVersion': 'Version {version}',

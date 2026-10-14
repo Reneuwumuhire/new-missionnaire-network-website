@@ -59,6 +59,13 @@ export interface Handle {
 	nativeFrameReady?: boolean;
 }
 
+export interface RegisteredLocalMedia {
+	path: string;
+	name: string;
+	size: number;
+	token: string;
+}
+
 const handles = new Map<string, Handle>();
 const pinnedHandles = new Map<string, Handle>();
 const openRequests = new Map<string, symbol>();
@@ -515,6 +522,38 @@ export function openFile(layer: Layer, file: Blob): Handle {
 	el.onloadedmetadata = () => mediaVersion.n++;
 	set(layer.id, h);
 	return h;
+}
+
+/** Play a file selected through Studio's native picker. The Rust side serves
+ * bounded byte ranges, so a long recording is never copied into webview RAM. */
+export function openLocalMedia(layer: Layer, token: string): Handle {
+	release(layer.id);
+	const url = `localmedia://localhost/media?id=${encodeURIComponent(token)}`;
+	if (layer.kind === 'image') {
+		const el = new Image();
+		el.crossOrigin = 'anonymous';
+		const h: Handle = { kind: 'image', el, stream: null, error: null, objectUrl: null };
+		el.onerror = () => {
+			h.error = t('source.badImage');
+			mediaVersion.n++;
+		};
+		el.onload = () => mediaVersion.n++;
+		el.src = url;
+		return set(layer.id, h);
+	}
+	const el = document.createElement('video');
+	el.crossOrigin = 'anonymous';
+	el.preload = 'auto';
+	el.playsInline = true;
+	el.muted = true;
+	el.src = url;
+	const h: Handle = { kind: 'video', el, stream: null, error: null, objectUrl: null };
+	el.onerror = () => {
+		h.error = t('source.badVideo');
+		mediaVersion.n++;
+	};
+	el.onloadedmetadata = () => mediaVersion.n++;
+	return set(layer.id, h);
 }
 
 function describe(err: unknown): string {
