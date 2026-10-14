@@ -1249,7 +1249,15 @@ const en: Record<keyof typeof fr, string> = {
 	'lang.name.en': 'English',
 	'recordings.edit.subtitleLabel': 'Subtitles (replay)',
 	'recordings.edit.subtitleHint':
-		'.srt file shown on the replay page, synced to the audio above. Overrides the subtitles inherited from the scheduled live.',
+		'The replay uses its own .srt when present, otherwise the subtitles attached to its scheduled live.',
+	'recordings.edit.subtitleChecking': 'Checking attached subtitles…',
+	'recordings.edit.subtitleInherited':
+		'Inherited from the scheduled live. Correcting this file also updates that live’s subtitles.',
+	'recordings.edit.subtitleDirect': 'Attached directly to this recording.',
+	'recordings.edit.subtitleNeedsSync': 'This file is not synced for the replay yet.',
+	'recordings.edit.subtitleSavePdfFirst':
+		'Save the PDF or YouTube link first, then use Auto Correct.',
+	'recordings.edit.viewSubtitle': 'View .srt',
 	'recordings.edit.subtitleFormats': '.srt only · 2 MB max',
 	'recordings.edit.addSubtitle': 'Add an .srt',
 	'recordings.edit.replaceSubtitle': 'Replace the .srt',

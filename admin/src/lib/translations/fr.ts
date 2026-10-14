@@ -1264,7 +1264,16 @@ export default {
 	'lang.name.en': 'Anglais',
 	'recordings.edit.subtitleLabel': 'Sous-titres (rediffusion)',
 	'recordings.edit.subtitleHint':
-		"Fichier .srt affiché sur la page de rediffusion, synchronisé avec l'audio ci-dessus. Remplace les sous-titres hérités du direct programmé.",
+		'La rediffusion utilise son propre .srt, ou à défaut les sous-titres du direct programmé.',
+	'recordings.edit.subtitleChecking': 'Vérification des sous-titres attachés…',
+	'recordings.edit.subtitleInherited':
+		'Hérités du direct programmé. Corriger ce fichier modifie aussi les sous-titres de ce direct.',
+	'recordings.edit.subtitleDirect': 'Attachés directement à cet enregistrement.',
+	'recordings.edit.subtitleNeedsSync':
+		'Ce fichier n’est pas encore synchronisé pour la rediffusion.',
+	'recordings.edit.subtitleSavePdfFirst':
+		'Enregistrez d’abord le PDF ou le lien YouTube, puis utilisez Auto-corriger.',
+	'recordings.edit.viewSubtitle': 'Voir le .srt',
 	'recordings.edit.subtitleFormats': '.srt uniquement · 2 Mo max',
 	'recordings.edit.addSubtitle': 'Ajouter un .srt',
 	'recordings.edit.replaceSubtitle': 'Remplacer le .srt',
