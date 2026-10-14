@@ -79,6 +79,8 @@
 	};
 
 	let { data } = $props();
+	let regularFavorites = $derived($favorites.filter((item) => item.category !== 'Instrumental'));
+	let regularRecent = $derived($recentlyPlayed.filter((item) => item.category !== 'Instrumental'));
 
 	let musicList: MusicAudio[] = $state([]);
 	let musicPlaylist: MusicAudio[] = $state([]);
@@ -411,7 +413,7 @@
 	}
 
 	function playAllFavorites() {
-		const favSongs = $favorites
+		const favSongs = regularFavorites
 			.map((fav) => findSongById(musicPlaylist, fav.id))
 			.filter(Boolean) as MusicAudio[];
 		if (favSongs.length === 0) return;
@@ -862,10 +864,10 @@
 
 			// Favorites first (most intentionally retained), then recents,
 			// then current page — preserves a sensible default ordering.
-			for (const fav of $favorites) {
+			for (const fav of regularFavorites) {
 				pushIfCached(fav.id, fav.title, fav.s3_url, fav.artist, fav.category);
 			}
-			for (const rec of $recentlyPlayed) {
+			for (const rec of regularRecent) {
 				pushIfCached(rec.id, rec.title, rec.s3_url, rec.artist, rec.category);
 			}
 			for (const song of (musicPlaylist || []) as MusicAudio[]) {
@@ -892,7 +894,9 @@
 			(musicPlaylist || []).map((song: MusicAudio, index: number) => [song.s3_url, index])
 		)
 	);
-	let activeMusicSong = $derived(isMusicAudio($selectAudio) ? $selectAudio : null);
+	let activeMusicSong = $derived(
+		isMusicAudio($selectAudio) && $selectAudio.category !== 'Instrumental' ? $selectAudio : null
+	);
 	let activeMusicSongIndex = $derived(
 		activeMusicSong ? (playlistIndexByUrl.get(activeMusicSong.s3_url) ?? -1) : -1
 	);
@@ -1096,9 +1100,9 @@
 				/>
 			{/if}
 		</div>
-		{#if $favorites.length > 0 || $recentlyPlayed.length > 0 || cachedCount > 0}
+		{#if regularFavorites.length > 0 || regularRecent.length > 0 || cachedCount > 0}
 			<div class="ml-auto flex shrink-0 items-center gap-3 font-body text-[11px]">
-				{#if $favorites.length > 0}
+				{#if regularFavorites.length > 0}
 					<button
 						class="underline decoration-stone-300 underline-offset-2 transition-colors duration-150 {showFavorites
 							? 'font-semibold text-red-600 decoration-red-300'
@@ -1110,10 +1114,10 @@
 							showCached = false;
 						}}
 					>
-						{$t('music.favoritesCount', { count: $favorites.length })}
+						{$t('music.favoritesCount', { count: regularFavorites.length })}
 					</button>
 				{/if}
-				{#if $recentlyPlayed.length > 0}
+				{#if regularRecent.length > 0}
 					<button
 						class="underline decoration-stone-300 underline-offset-2 transition-colors duration-150 {showRecent
 							? 'font-semibold text-missionnaire decoration-missionnaire/40'
@@ -1125,7 +1129,7 @@
 							showCached = false;
 						}}
 					>
-						{$t('music.recentsCount', { count: $recentlyPlayed.length })}
+						{$t('music.recentsCount', { count: regularRecent.length })}
 					</button>
 				{/if}
 				{#if cachedCount > 0}
@@ -1147,14 +1151,14 @@
 		{/if}
 	</div>
 
-	{#if showFavorites && $favorites.length > 0}
+	{#if showFavorites && regularFavorites.length > 0}
 		<div class="bg-white/40 border border-stone-200/60 mb-6 overflow-hidden">
 			<div
 				class="flex items-center justify-between px-4 py-3 border-b border-stone-200 bg-stone-50/50"
 			>
 				<span class="text-[10px] font-bold uppercase tracking-widest text-stone-400">
-					{$t('music.favorites')} — {$favorites.length}
-					{$favorites.length > 1 ? $t('music.songs') : $t('music.song')}
+					{$t('music.favorites')} — {regularFavorites.length}
+					{regularFavorites.length > 1 ? $t('music.songs') : $t('music.song')}
 				</span>
 				<button
 					class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-900 hover:bg-stone-800 text-white text-[10px] font-bold uppercase tracking-wider transition-colors"
@@ -1165,7 +1169,7 @@
 				</button>
 			</div>
 			<div class="divide-y divide-stone-50 max-h-[300px] overflow-y-auto">
-				{#each $favorites as fav, i}
+				{#each regularFavorites as fav, i}
 					{@const favSong = findSongById(musicPlaylist, fav.id)}
 					<div
 						class="flex items-center gap-3 px-4 py-2.5 hover:bg-stone-100/50 transition-colors group"
@@ -1214,7 +1218,7 @@
 		</div>
 	{/if}
 
-	{#if showRecent && $recentlyPlayed.length > 0}
+	{#if showRecent && regularRecent.length > 0}
 		<div class="bg-white/40 border border-stone-200/60 mb-6 overflow-hidden">
 			<div class="px-4 py-3 border-b border-stone-200 bg-stone-50/50">
 				<span class="text-[10px] font-bold uppercase tracking-widest text-stone-400">
@@ -1222,7 +1226,7 @@
 				</span>
 			</div>
 			<div class="divide-y divide-stone-50 max-h-[300px] overflow-y-auto">
-				{#each $recentlyPlayed as recent, i}
+				{#each regularRecent as recent, i}
 					{@const recentSong = findSongById(musicPlaylist, recent.id)}
 					<div
 						class="flex items-center gap-3 px-4 py-2.5 hover:bg-stone-100/50 transition-colors group"
@@ -1510,7 +1514,7 @@
 							<button
 								class="transition-colors p-1 md:p-1.5 {isFavorite(
 									song._id || song.s3_url,
-									$favorites
+									regularFavorites
 								)
 									? 'text-red-500'
 									: 'text-stone-300 hover:text-red-400'}"
@@ -1518,12 +1522,14 @@
 									e.stopPropagation();
 									toggleFavorite(song);
 								}}
-								title={isFavorite(song._id || song.s3_url, $favorites)
+								title={isFavorite(song._id || song.s3_url, regularFavorites)
 									? $t('player.unfavorite')
 									: $t('player.favorite')}
 							>
 								<Icon
-									src={isFavorite(song._id || song.s3_url, $favorites) ? BsHeartFill : BsHeart}
+									src={isFavorite(song._id || song.s3_url, regularFavorites)
+										? BsHeartFill
+										: BsHeart}
 									size="13"
 								/>
 							</button>
