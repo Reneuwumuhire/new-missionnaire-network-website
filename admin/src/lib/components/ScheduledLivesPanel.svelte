@@ -5,6 +5,7 @@
 	import { toast } from '$lib/stores/toast';
 	import { t, type TranslationKey } from '$lib/i18n';
 	import { parseSrt } from '$lib/utils/srt';
+	import { correctSubtitleSrt } from '$lib/utils/subtitleCorrections';
 
 	// Embedded in /recordings, right under the broadcast control card —
 	// scheduling lives next to the Go Live controls keeps the whole broadcast
@@ -288,6 +289,17 @@
 		subtitleDurationLabel = null;
 	}
 
+	async function autoCorrectStagedSubtitle() {
+		if (!subtitleFile) return;
+		const result = correctSubtitleSrt(await subtitleFile.text());
+		if (!result.changes.length) {
+			toast.success($t('recordings.scheduled.autoCorrectNone'));
+			return;
+		}
+		subtitleFile = new File([result.text], subtitleFile.name, { type: 'text/plain' });
+		toast.success($t('recordings.scheduled.autoCorrectDone', { count: result.changes.length }));
+	}
+
 	/** Uploads the staged SRT (or signals removal). Only called when
 	 *  subtitleAction !== 'keep'. Returns null on failure (formError is set). */
 	async function uploadSubtitleIfNeeded(): Promise<{
@@ -450,6 +462,78 @@
 
 	// ── Row actions ────────────────────────────────────────────────
 	let busyId = $state<string | null>(null);
+	type CorrectionPreview = {
+		changeCount: number;
+		pdfChangeCount: number;
+		cueCount: number;
+		pdfUsed: boolean;
+		originalKey: string;
+		samples: Array<{ from: string; to: string }>;
+	};
+
+	async function autoCorrectEntry(entry: ScheduledLive) {
+		if (busyId || !entry.subtitle_srt_s3_key) return;
+		busyId = entry._id;
+		try {
+			const endpoint = `/api/scheduled-lives/${entry._id}/auto-correct`;
+			const previewRes = await fetch(endpoint, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: '{}'
+			});
+			if (!previewRes.ok) throw new Error(await previewRes.text());
+			const preview = (await previewRes.json()) as CorrectionPreview;
+			if (preview.changeCount === 0) {
+				toast.success($t('recordings.scheduled.autoCorrectNone'));
+				return;
+			}
+			const examples = preview.samples
+				.slice(0, 6)
+				.map((item) => `${item.from} → ${item.to}`)
+				.join(', ');
+			const accepted = await confirmDialog.ask({
+				title: $t('recordings.scheduled.autoCorrect'),
+				message: `${$t('recordings.scheduled.autoCorrectPreview', {
+					count: preview.changeCount,
+					cues: preview.cueCount
+				})}\n${$t(
+					preview.pdfUsed
+						? 'recordings.scheduled.autoCorrectPdfUsed'
+						: 'recordings.scheduled.autoCorrectCommonOnly',
+					{ count: preview.pdfChangeCount }
+				)}\n${examples}`,
+				confirmLabel: $t('recordings.scheduled.autoCorrectApply'),
+				cancelLabel: $t('recordings.common.cancel')
+			});
+			if (!accepted) return;
+			const applyRes = await fetch(endpoint, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ apply: true, expectedKey: preview.originalKey })
+			});
+			if (!applyRes.ok) throw new Error(await applyRes.text());
+			const applied = (await applyRes.json()) as { applied: boolean; changeCount: number };
+			if (!applied.applied) {
+				toast.success($t('recordings.scheduled.autoCorrectNone'));
+				await invalidateAll();
+				return;
+			}
+			toast.success($t('recordings.scheduled.autoCorrectDone', { count: applied.changeCount }));
+			if (editingId === entry._id) {
+				existingSubtitleFilename = (entry.subtitle_filename || 'transcription.srt').replace(
+					/(?:\.corrig[eé])?\.srt$/i,
+					'.corrigé.srt'
+				);
+			}
+			await invalidateAll();
+		} catch (cause) {
+			toast.error(
+				cause instanceof Error ? cause.message : $t('recordings.scheduled.autoCorrectFailed')
+			);
+		} finally {
+			busyId = null;
+		}
+	}
 	let startingDefaults = $state(false);
 	let notifyFromDefaults = $state(false);
 
@@ -964,6 +1048,16 @@
 							>
 								{$t('recordings.common.edit')}
 							</button>
+							{#if entry.subtitle_srt_s3_key}
+								<button
+									type="button"
+									class="border border-sky-200 bg-sky-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.15em] text-sky-700 transition-colors hover:bg-sky-700 hover:text-white disabled:opacity-50"
+									disabled={busyId === entry._id}
+									onclick={() => autoCorrectEntry(entry)}
+								>
+									{$t('recordings.scheduled.autoCorrect')}
+								</button>
+							{/if}
 							<button
 								type="button"
 								class="border border-rose-200 bg-rose-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.15em] text-rose-700 transition-colors hover:border-rose-600 hover:bg-rose-600 hover:text-white disabled:opacity-50"
@@ -1049,6 +1143,16 @@
 							<p class="text-[11px] text-stone-400">{fmtDate(entry.scheduled_at)}</p>
 						</div>
 						<div class="flex shrink-0 items-center gap-2">
+							{#if entry.status === 'ended' && entry.subtitle_srt_s3_key}
+								<button
+									type="button"
+									class="border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-700 transition-colors hover:bg-sky-700 hover:text-white disabled:opacity-50"
+									disabled={busyId === entry._id}
+									onclick={() => autoCorrectEntry(entry)}
+								>
+									{$t('recordings.scheduled.autoCorrect')}
+								</button>
+							{/if}
 							{#if entry.status === 'ended' && entry.recording_id}
 								<a
 									href={`${publicBaseUrl}/live/rediffusions/${entry.recording_id}`}
@@ -1272,6 +1376,27 @@
 								{/if}
 							</div>
 						</div>
+						{#if subtitleFile}
+							<button
+								type="button"
+								class="mt-2 border border-sky-200 bg-sky-50 px-3 py-1.5 text-[11px] font-semibold text-sky-700 hover:bg-sky-700 hover:text-white"
+								onclick={autoCorrectStagedSubtitle}
+							>
+								{$t('recordings.scheduled.autoCorrect')}
+							</button>
+						{:else if editingId && subtitleAction === 'keep' && subtitleDisplayName}
+							{@const existingEntry = upcoming.find((item) => item._id === editingId)}
+							{#if existingEntry}
+								<button
+									type="button"
+									class="mt-2 border border-sky-200 bg-sky-50 px-3 py-1.5 text-[11px] font-semibold text-sky-700 hover:bg-sky-700 hover:text-white disabled:opacity-50"
+									disabled={busyId === editingId}
+									onclick={() => autoCorrectEntry(existingEntry)}
+								>
+									{$t('recordings.scheduled.autoCorrect')}
+								</button>
+							{/if}
+						{/if}
 					</div>
 
 					<!-- Notifications -->

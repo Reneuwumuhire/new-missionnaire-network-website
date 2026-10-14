@@ -23,16 +23,16 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	const [statusResult, icecast, broadcast, subscriberCount, upcomingLives, pastLives] =
 		await Promise.all([
-		recorderStatus().catch((err: unknown) => {
-			const message = err instanceof RecorderError ? err.message : (err as Error).message;
-			return { error: message } as const;
-		}),
-		getIcecastSnapshot(),
-		getBroadcastAdminState(),
-		countPushSubscriptions().catch(() => 0),
-		listScheduledLives({ statuses: ['scheduled', 'live'], ascending: true }),
-		listScheduledLives({ statuses: ['ended', 'cancelled'], ascending: false, limit: 20 })
-	]);
+			recorderStatus().catch((err: unknown) => {
+				const message = err instanceof RecorderError ? err.message : (err as Error).message;
+				return { error: message } as const;
+			}),
+			getIcecastSnapshot(),
+			getBroadcastAdminState(),
+			countPushSubscriptions().catch(() => 0),
+			listScheduledLives({ statuses: ['scheduled', 'live'], ascending: true }),
+			listScheduledLives({ statuses: ['ended', 'cancelled'], ascending: false, limit: 100 })
+		]);
 
 	const hasRecorderStatus = (v: unknown): v is RecorderStatus =>
 		typeof v === 'object' && v !== null && 'recording' in v;

@@ -1412,6 +1412,17 @@ export default {
 	'recordings.scheduled.startLive': 'Démarrer le direct',
 	'recordings.scheduled.alreadyLiveShort': 'Un direct est déjà en cours',
 	'recordings.scheduled.history': 'Historique ({count})',
+	'recordings.scheduled.autoCorrect': 'Auto-corriger',
+	'recordings.scheduled.autoCorrectApply': 'Appliquer les corrections',
+	'recordings.scheduled.autoCorrectPreview':
+		'{count} corrections proposées dans {cues} sous-titres.',
+	'recordings.scheduled.autoCorrectPdfUsed':
+		'{count} modifications proviennent du PDF lié. Les passages sans correspondance claire restent à vérifier.',
+	'recordings.scheduled.autoCorrectCommonOnly':
+		'Aucun PDF lié : seules les erreurs courantes seront corrigées.',
+	'recordings.scheduled.autoCorrectDone': '{count} corrections appliquées aux sous-titres.',
+	'recordings.scheduled.autoCorrectNone': 'Aucune correction sûre à appliquer.',
+	'recordings.scheduled.autoCorrectFailed': 'Correction des sous-titres impossible.',
 	'recordings.scheduled.replay': 'Rediffusion',
 	'recordings.scheduled.copyLink': 'Copier le lien',
 	'recordings.scheduled.attachReplay': 'Attacher la rediffusion',
