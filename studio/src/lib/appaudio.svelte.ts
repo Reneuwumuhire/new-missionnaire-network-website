@@ -22,7 +22,7 @@ export const appAudio = $state({
 	capturing: [] as string[],
 	error: null as string | null,
 	/** False once the system has told us it cannot do this. */
-	supported: true
+	supported: false
 });
 
 export async function refreshApps(): Promise<void> {
