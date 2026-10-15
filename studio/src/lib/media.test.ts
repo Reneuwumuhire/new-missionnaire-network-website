@@ -5,6 +5,7 @@ import {
 	handleFor,
 	mediaVersion,
 	openFile,
+	openLocalMedia,
 	openNativeWindow,
 	openScreen,
 	pinHandle,
@@ -50,19 +51,46 @@ it('marks a shared display disconnected when the user stops Windows screen shari
 		pause() {}
 		removeAttribute() {}
 	}
-	const track = Object.assign(new EventTarget(), { stop: vi.fn() });
+	const track = Object.assign(new EventTarget(), {
+		stop: vi.fn(),
+		applyConstraints: vi.fn().mockResolvedValue(undefined)
+	});
 	const stream = {
 		getVideoTracks: () => [track],
 		getTracks: () => [track]
 	};
 	vi.stubGlobal('HTMLVideoElement', Video);
 	vi.stubGlobal('document', { createElement: () => new Video() });
-	vi.stubGlobal('navigator', { mediaDevices: { getDisplayMedia: () => Promise.resolve(stream) } });
+	const getDisplayMedia = vi.fn().mockResolvedValue(stream);
+	vi.stubGlobal('navigator', { mediaDevices: { getDisplayMedia } });
 	const layer = makeLayer('screen', 'Display');
 	await openScreen(layer);
+	expect(getDisplayMedia).toHaveBeenCalledWith({ video: true, audio: true });
 	expect(handleFor(layer.id)?.el).toBeInstanceOf(Video);
 	track.dispatchEvent(new Event('ended'));
 	expect(handleFor(layer.id)).toBeUndefined();
+});
+
+it('loads a selected Windows image through WebView2’s custom protocol origin', () => {
+	class ImageElement {
+		crossOrigin = '';
+		src = '';
+		onerror: (() => void) | null = null;
+		onload: (() => void) | null = null;
+	}
+	vi.stubGlobal('navigator', { userAgent: 'Windows NT 10.0' });
+	vi.stubGlobal('Image', ImageElement);
+	vi.stubGlobal('HTMLVideoElement', class {});
+	const layer = makeLayer('image', 'Photo');
+	try {
+		const handle = openLocalMedia(layer, 'l42');
+		expect((handle.el as unknown as ImageElement).src).toBe(
+			'http://localmedia.localhost/media?id=l42'
+		);
+		expect((handle.el as unknown as ImageElement).crossOrigin).toBe('anonymous');
+	} finally {
+		release(layer.id);
+	}
 });
 
 it('auditions a disconnected Preview file but stops auditioning once Program takes it', () => {

@@ -124,6 +124,19 @@ const FFMPEG_CANDIDATES: &[&str] = &[
 	"/opt/local/bin/ffmpeg",
 ];
 
+/// Windows GUI apps otherwise show a blank console for every FFmpeg probe and
+/// for the long-running encoder. Pipes still work with CREATE_NO_WINDOW.
+pub fn ffmpeg_command(path: impl AsRef<std::ffi::OsStr>) -> Command {
+	#[allow(unused_mut)]
+	let mut command = Command::new(path);
+	#[cfg(windows)]
+	{
+		use std::os::windows::process::CommandExt;
+		command.creation_flags(windows_sys::Win32::System::Threading::CREATE_NO_WINDOW);
+	}
+	command
+}
+
 pub fn resolve_ffmpeg() -> Result<PathBuf, String> {
 	if let Ok(explicit) = std::env::var("FFMPEG_PATH") {
 		let p = PathBuf::from(explicit);
@@ -150,7 +163,7 @@ pub fn resolve_ffmpeg() -> Result<PathBuf, String> {
 	}
 	// Last resort: whatever PATH we did inherit (covers `pnpm studio` from a
 	// terminal, and Linux/Windows installs).
-	if Command::new("ffmpeg")
+	if ffmpeg_command("ffmpeg")
 		.arg("-version")
 		.stdout(Stdio::null())
 		.stderr(Stdio::null())
@@ -164,7 +177,7 @@ pub fn resolve_ffmpeg() -> Result<PathBuf, String> {
 
 pub fn probe_ffmpeg() -> Result<FfmpegInfo, String> {
 	let path = resolve_ffmpeg()?;
-	let out = Command::new(&path)
+	let out = ffmpeg_command(&path)
 		.args(["-hide_banner", "-encoders"])
 		.output()
 		.map_err(|e| format!("ffmpeg illisible: {e}"))?;
@@ -174,7 +187,7 @@ pub fn probe_ffmpeg() -> Result<FfmpegInfo, String> {
 		return Err("FFmpeg ne contient pas les encodeurs H.264/AAC requis".into());
 	}
 
-	let version_out = Command::new(&path)
+	let version_out = ffmpeg_command(&path)
 		.arg("-version")
 		.output()
 		.map_err(|e| format!("ffmpeg illisible: {e}"))?;
@@ -434,7 +447,7 @@ impl Encoder {
 		};
 		let args = build_args_with_path(&cfg, local_path.as_deref())?;
 
-		let mut child = Command::new(&bin)
+		let mut child = ffmpeg_command(&bin)
 			.args(&args)
 			.stdin(Stdio::piped())
 			.stdout(Stdio::piped())
