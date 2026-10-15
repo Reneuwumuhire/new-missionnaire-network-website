@@ -5,6 +5,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { t } from './i18n.svelte';
 import { MIX_RATE } from './mixer';
+import { mediaUrl } from './media-url';
 import { audioLayers, studio, transportLayer, type Layer } from './state.svelte';
 
 /** Print to the terminal the studio was launched from. A packaged .app has no
@@ -272,22 +273,22 @@ export async function openScreen(layer: Layer): Promise<Handle> {
 		// so and points at the way round it. Chromium (the Windows webview) does
 		// honour this, which is why it is still requested.
 		// ponytail: real per-app audio needs ScreenCaptureKit on the Rust side.
-		const stream = await navigator.mediaDevices.getDisplayMedia({
-			// The program canvas cannot use more pixels or frames than it outputs.
-			// Leaving this unconstrained makes WebKit capture a Retina browser
-			// window at the display's full rate, even though the encoder later
-			// downsizes it to (usually) 1280×720 at 30 fps. Keep capture work in
-			// step with the actual broadcast workload.
-			video: {
+		// Keep the picker request simple. WebView2 can reject optional video
+		// constraints before showing the window picker at all. Apply the desired
+		// output size and cursor setting once a track has been selected.
+		const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+		const track = stream.getVideoTracks()[0];
+		if (!track) throw new Error(t('source.notFound'));
+		void track
+			.applyConstraints({
 				...cursorConstraint(layer),
 				width: { max: studio.settings.width },
 				height: { max: studio.settings.height },
 				frameRate: { max: studio.settings.fps }
-			},
-			audio: true
-		});
+			})
+			.catch((error) => report(`screen constraints unavailable: ${error}`));
 		const h: Handle = { kind: 'screen', el: videoEl(stream), stream, error: null, objectUrl: null };
-		stream.getVideoTracks()[0]?.addEventListener('ended', () => {
+		track.addEventListener('ended', () => {
 			if (handleFor(layer.id) === h) release(layer.id);
 		});
 		return set(layer.id, h, request);
@@ -479,7 +480,7 @@ export function openStream(layer: Layer, token: string): Handle {
 	el.playsInline = true;
 	// Muted until the mixer taps it — same reason as openFile below.
 	el.muted = true;
-	el.src = `ytstream://localhost/media?id=${encodeURIComponent(token)}`;
+	el.src = mediaUrl('ytstream', token, navigator.userAgent);
 	const h: Handle = { kind: 'video', el, stream: null, error: null, objectUrl: null };
 	el.onerror = () => {
 		h.error = t('source.badVideo');
@@ -532,7 +533,7 @@ export function openFile(layer: Layer, file: Blob): Handle {
  * bounded byte ranges, so a long recording is never copied into webview RAM. */
 export function openLocalMedia(layer: Layer, token: string): Handle {
 	release(layer.id);
-	const url = `localmedia://localhost/media?id=${encodeURIComponent(token)}`;
+	const url = mediaUrl('localmedia', token, navigator.userAgent);
 	if (layer.kind === 'image') {
 		const el = new Image();
 		el.crossOrigin = 'anonymous';

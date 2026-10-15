@@ -5,7 +5,7 @@
 use serde::Serialize;
 use std::io::Read;
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 const SAMPLE_RATE: usize = 8_000;
 pub const FRAME_MS: u32 = 100;
@@ -64,7 +64,7 @@ pub fn extract(path: String) -> Result<ReferenceFeatures, String> {
 		return Err("Choose an MP3, M4A, AAC, WAV, FLAC, OGG or Opus reference audio file".into());
 	}
 
-	let mut child = Command::new(crate::ffmpeg::resolve_ffmpeg()?)
+	let mut child = crate::ffmpeg::ffmpeg_command(crate::ffmpeg::resolve_ffmpeg()?)
 		.args([
 			"-hide_banner",
 			"-loglevel",
