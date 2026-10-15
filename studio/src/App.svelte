@@ -166,7 +166,6 @@
 		};
 		window.addEventListener('focus', checkWhenVisible);
 		document.addEventListener('visibilitychange', checkWhenVisible);
-		const updateCheck = setInterval(checkWhenVisible, 5 * 60_000);
 		void listen<string>('studio://menu', (event) => openMenuItem(event.payload)).then(
 			(unlisten) => (stopMenuListener = unlisten)
 		);
@@ -255,7 +254,6 @@
 			stopCloseListener?.();
 			clearInterval(clock);
 			clearInterval(heartbeat);
-			clearInterval(updateCheck);
 			window.removeEventListener('focus', checkWhenVisible);
 			document.removeEventListener('visibilitychange', checkWhenVisible);
 			window.removeEventListener('pointerdown', wake);
