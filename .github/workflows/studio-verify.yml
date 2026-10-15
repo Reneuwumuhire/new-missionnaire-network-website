@@ -1,0 +1,67 @@
+name: Verify Missionnaire Studio
+
+on:
+  pull_request:
+    paths:
+      - 'studio/**'
+      - 'admin/src/routes/studio/**'
+      - '.github/workflows/studio-release.yml'
+      - '.github/workflows/studio-verify.yml'
+
+jobs:
+  studio:
+    name: Studio on ${{ matrix.platform }}
+    runs-on: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            bundle: app
+          - platform: windows-latest
+            bundle: nsis
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: studio/pnpm-lock.yaml
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Studio dependencies
+        working-directory: studio
+        run: pnpm install --frozen-lockfile
+      - name: Install macOS build libraries
+        if: runner.os == 'macOS'
+        run: brew install pkgconf
+      - name: Prepare parent TypeScript base
+        run: |
+          node -e 'require("node:fs").mkdirSync(".svelte-kit", { recursive: true }); require("node:fs").writeFileSync(".svelte-kit/tsconfig.json", "{}\n")'
+      - name: Prepare bundled media tools
+        working-directory: studio
+        run: pnpm prepare:media-tools
+      - name: Verify bundled encoders and network support
+        working-directory: studio
+        run: pnpm verify:media-tools
+      - name: Check Studio frontend
+        working-directory: studio
+        run: pnpm check
+      - name: Test Studio frontend
+        working-directory: studio
+        run: pnpm test
+      - name: Test Studio native code
+        working-directory: studio/src-tauri
+        run: cargo test --lib
+      - name: Build Studio installer with bundled resources
+        working-directory: studio
+        run: pnpm tauri build --bundles ${{ matrix.bundle }} --config src-tauri/tauri.verify.conf.json
+      - name: Check tools inside macOS app
+        if: runner.os == 'macOS'
+        working-directory: studio
+        shell: bash
+        run: |
+          resources='src-tauri/target/release/bundle/macos/Missionnaire Studio.app/Contents/Resources/binaries'
+          test -x "$resources/ffmpeg-aarch64"
+          test -x "$resources/yt-dlp-aarch64"
+          test -f "$resources/ffmpeg-aarch64.LICENSE"

@@ -29,8 +29,9 @@ reconnecting YouTube output cannot block the church's own stream.**
 
 ## Running it
 
-Needs `ffmpeg` on the machine (`brew install ffmpeg`) and a Rust toolchain
-(`rustup`). Then:
+Release installers include FFmpeg and yt-dlp for macOS and Windows; operators do not need
+to install it separately. Building Studio requires Node.js, pnpm and a Rust
+toolchain (`rustup`). Then:
 
 ```bash
 cd studio
@@ -38,6 +39,18 @@ pnpm install
 pnpm studio          # dev
 pnpm studio:build    # .app + .dmg in src-tauri/target/release/bundle
 ```
+
+`pnpm studio` and `pnpm studio:build` prepare the media tools before building.
+The release workflow packages both macOS architectures and Windows x64 into
+the installers and updater artifacts. Apple Silicon FFmpeg is built from
+[FFmpeg 6.1.1 source](https://ffmpeg.org/releases/ffmpeg-6.1.1.tar.xz) with the
+checked-in `scripts/build-macos-ffmpeg.sh` recipe. The script builds x264 and
+LAME from pinned source and only needs pkgconf on the build machine. The Intel
+macOS and Windows binaries are
+pinned [ffmpeg-static b6.1.1](https://github.com/eugeneware/ffmpeg-static/releases/tag/b6.1.1)
+assets. Downloaded tools are SHA-256 verified, and FFmpeg's license and build
+notes ship beside the binary in Studio's resources.
+The bundled yt-dlp is from [yt-dlp 2026.08.19](https://github.com/yt-dlp/yt-dlp/releases/tag/2026.08.19).
 
 On first launch macOS asks for camera, microphone and screen-recording
 permission. Screen recording additionally needs the app ticked in

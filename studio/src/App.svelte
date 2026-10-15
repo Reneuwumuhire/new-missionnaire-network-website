@@ -161,6 +161,11 @@
 	onMount(() => {
 		initReferenceMatcher();
 		void initUpdater();
+		const checkWhenVisible = () => {
+			if (!document.hidden) void checkForUpdate(true);
+		};
+		window.addEventListener('focus', checkWhenVisible);
+		document.addEventListener('visibilitychange', checkWhenVisible);
 		void listen<string>('studio://menu', (event) => openMenuItem(event.payload)).then(
 			(unlisten) => (stopMenuListener = unlisten)
 		);
@@ -249,6 +254,8 @@
 			stopCloseListener?.();
 			clearInterval(clock);
 			clearInterval(heartbeat);
+			window.removeEventListener('focus', checkWhenVisible);
+			document.removeEventListener('visibilitychange', checkWhenVisible);
 			window.removeEventListener('pointerdown', wake);
 			void stopBroadcast();
 			releaseAll();

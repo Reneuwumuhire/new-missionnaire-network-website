@@ -8,7 +8,7 @@ const headers = {
 };
 
 export async function GET({ fetch }) {
-	const releaseResponse = await fetch(`${API}/releases/latest`, { headers });
+	const releaseResponse = await fetch(`${API}/releases/latest`, { headers, cache: 'no-store' });
 	if (!releaseResponse.ok) throw error(502, 'Latest Studio release is unavailable');
 	const release = (await releaseResponse.json()) as {
 		assets?: { id?: unknown; name?: unknown }[];
@@ -19,7 +19,8 @@ export async function GET({ fetch }) {
 	if (!asset || typeof asset.id !== 'number') throw error(502, 'Studio update manifest is missing');
 
 	const manifestResponse = await fetch(`${API}/releases/assets/${asset.id}`, {
-		headers: { ...headers, accept: 'application/octet-stream' }
+		headers: { ...headers, accept: 'application/octet-stream' },
+		cache: 'no-store'
 	});
 	if (!manifestResponse.ok) throw error(502, 'Studio update manifest is unavailable');
 	const manifest = (await manifestResponse.json()) as { version?: unknown; platforms?: unknown };
@@ -31,6 +32,6 @@ export async function GET({ fetch }) {
 		throw error(502, 'Studio update manifest is invalid');
 
 	return json(manifest, {
-		headers: { 'cache-control': 'public, s-maxage=300, stale-while-revalidate=86400' }
+		headers: { 'cache-control': 'no-store, max-age=0' }
 	});
 }

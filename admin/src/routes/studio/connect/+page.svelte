@@ -3,11 +3,20 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 	let closeBlocked = $state(false);
+	let closeAttempted = false;
 
 	function closeWindow() {
 		window.close();
-		window.setTimeout(() => (closeBlocked = true), 250);
+		window.setTimeout(() => (closeBlocked = !window.closed), 500);
 	}
+
+	$effect(() => {
+		if (!form?.approved || closeAttempted) return;
+		closeAttempted = true;
+		// Studio's approval poll raises its window. Close the browser tab when
+		// the browser permits script closing; otherwise leave a clear fallback.
+		window.setTimeout(closeWindow, 400);
+	});
 </script>
 
 <svelte:head>
@@ -93,9 +102,7 @@
 								<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01" />
 								<circle cx="12" cy="12" r="9" />
 							</svg>
-							<p class="text-sm leading-6 text-stone-600">
-								Return to Missionnaire Studio. The desktop app will finish setup automatically.
-							</p>
+							<p class="text-sm leading-6 text-stone-600">Returning to Missionnaire Studio…</p>
 						</div>
 
 						<button

@@ -139,6 +139,7 @@
 			tracked.windowTitle = choice.title;
 			report(`native window capture app=${choice.appName} window=${JSON.stringify(choice.title)}`);
 			persist();
+			if (!appAudio.supported) void refreshApps();
 		}
 	}
 
@@ -263,7 +264,12 @@
 			layer.hideCursor = true;
 			layer.fit = 'cover';
 		}
-		if (await invoke<boolean>('native_window_capture_available')) {
+		// The browser requires a user gesture for the screen picker. On Windows
+		// and Linux, call it before any asynchronous native capability probe.
+		if (
+			/Macintosh|Mac OS X/.test(navigator.userAgent) &&
+			(await invoke<boolean>('native_window_capture_available'))
+		) {
 			await refreshWindowChoices();
 			const previous = windowChoices.find((window) => window.id === layer.windowId);
 			if (previous) await captureNativeWindow(layer, previous);
@@ -287,15 +293,16 @@
 		// with the native macOS capture would tear down a working mixer strip.
 		const surface = (size as MediaTrackSettings & { displaySurface?: string }).displaySurface;
 		const window = matchWindow(label, size, windows);
-		const app = hasCapturedAudio
-			? null
-			: surface === 'monitor'
-				? { id: DESKTOP_AUDIO, name: t('mixer.desktopAudio') }
-				: window
-					? { id: window.appId, name: window.appName }
-					: matchApp(label, appAudio.apps);
+		const app =
+			hasCapturedAudio || !appAudio.supported
+				? null
+				: surface === 'monitor'
+					? { id: DESKTOP_AUDIO, name: t('mixer.desktopAudio') }
+					: window
+						? { id: window.appId, name: window.appName }
+						: matchApp(label, appAudio.apps);
 		// No guess is not a failure: the mixer strip offers the list.
-		if (hasCapturedAudio) delete layer.appId;
+		if (hasCapturedAudio || !appAudio.supported) delete layer.appId;
 		else if (app) layer.appId = app.id;
 		// What the engine actually said about the share. Without this line a bad
 		// guess is unexplainable after the fact.
@@ -436,6 +443,8 @@
 		void mediaVersion.n;
 		const handle = handleFor(layer.id);
 		if (handle?.error) return handle.error;
+		if (layer.kind === 'screen' && !layer.windowId && !handle?.el)
+			return t('source.screenNeedsSelection');
 		if (!handle?.el) return t('source.notConnected');
 		return null;
 	}

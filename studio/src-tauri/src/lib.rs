@@ -333,10 +333,10 @@ fn studio_open_youtube_login(code: String, admin_url: String) -> Result<(), Stri
 
 #[tauri::command]
 fn focus_main_window(app: AppHandle) -> Result<(), String> {
-	app.get_webview_window("main")
-		.ok_or("Fenêtre Studio introuvable")?
-		.set_focus()
-		.map_err(|e| e.to_string())
+	let window = app.get_webview_window("main").ok_or("Fenêtre Studio introuvable")?;
+	window.show().map_err(|e| e.to_string())?;
+	window.unminimize().map_err(|e| e.to_string())?;
+	window.set_focus().map_err(|e| e.to_string())
 }
 
 /// Media chunks arrive as a raw IPC body (not JSON) — a JSON number array

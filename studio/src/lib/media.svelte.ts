@@ -287,8 +287,12 @@ export async function openScreen(layer: Layer): Promise<Handle> {
 			audio: true
 		});
 		const h: Handle = { kind: 'screen', el: videoEl(stream), stream, error: null, objectUrl: null };
+		stream.getVideoTracks()[0]?.addEventListener('ended', () => {
+			if (handleFor(layer.id) === h) release(layer.id);
+		});
 		return set(layer.id, h, request);
 	} catch (err) {
+		report(`screen capture failed for ${layer.name}: ${err}`);
 		const h: Handle = {
 			kind: 'screen',
 			el: null,

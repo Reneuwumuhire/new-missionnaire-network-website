@@ -31,6 +31,7 @@
 	"bundle": {
 		"active": true,
 		"targets": "all",
+		"resources": ["binaries/*"],
 		"createUpdaterArtifacts": true,
 		"icon": [
 			"icons/32x32.png",
@@ -47,7 +48,7 @@
 	"plugins": {
 		"updater": {
 			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEYzNEZGQTU0RDRCNkJFNjkKUldScHZyYlVWUHBQODlMaldzSks2cFNPRERxUDJvTnRKa3A5RjRSYVRwN1IzOUtXd3NyNGtJU0QK",
-			"endpoints": ["https://admin.missionnaire.net/api/studio/update"],
+			"endpoints": ["https://admin.missionnaire.net/api/studio/update?manifest=2"],
 			"windows": {
 				"installMode": "passive"
 			}
