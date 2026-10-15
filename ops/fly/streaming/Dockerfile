@@ -4,7 +4,7 @@
 #                            --dockerfile ops/fly/streaming/Dockerfile
 
 # ── Stage 1: compile the recorder (TypeScript → JS) ──
-FROM node:22-slim AS recorder-build
+FROM node:24-slim AS recorder-build
 
 WORKDIR /build
 COPY ops/streaming/recorder/package.json ops/streaming/recorder/tsconfig.json ./
@@ -28,7 +28,7 @@ RUN set -eux; \
 		icecast2 \
 		jq \
 		tini; \
-	curl -fsSL https://deb.nodesource.com/setup_22.x | bash -; \
+	curl -fsSL https://deb.nodesource.com/setup_24.x | bash -; \
 	apt-get install -y --no-install-recommends nodejs; \
 	arch="$(dpkg --print-architecture)"; \
 	case "$arch" in \
