@@ -52,6 +52,8 @@ export async function initUpdater(): Promise<void> {
 /** Silent startup checks do not turn a temporary network problem into a red
  * banner; a manual check in About still reports the same error. */
 export async function checkForUpdate(silent = false): Promise<void> {
+	if (silent && ['available', 'downloading', 'installing', 'restarting'].includes(appUpdate.phase))
+		return;
 	if (checking) {
 		await checking;
 		// A click during the silent startup check must still perform a visible
@@ -63,7 +65,9 @@ export async function checkForUpdate(silent = false): Promise<void> {
 		appUpdate.phase = 'checking';
 		appUpdate.error = null;
 		try {
-			const found = await retry(() => check({ timeout: 15_000 }));
+			const found = await retry(() =>
+				check({ timeout: 15_000, headers: { 'Cache-Control': 'no-cache' } })
+			);
 			if (pending && pending !== found) await pending.close().catch(() => {});
 			pending = found;
 			appUpdate.availableVersion = found?.version ?? null;
