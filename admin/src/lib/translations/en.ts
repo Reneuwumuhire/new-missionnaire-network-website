@@ -1399,6 +1399,7 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.scheduled.startLive': 'Start the live',
 	'recordings.scheduled.alreadyLiveShort': 'A live is already running',
 	'recordings.scheduled.history': 'History ({count})',
+	'recordings.scheduled.restore': 'Restore',
 	'recordings.scheduled.autoCorrect': 'Auto Correct',
 	'recordings.scheduled.autoCorrectApply': 'Apply corrections',
 	'recordings.scheduled.autoCorrectPreview':
@@ -1458,6 +1459,9 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.scheduled.confirm.startNotifyMany':
 		'"{title}" will go live and {count} subscribers will be notified.',
 	'recordings.scheduled.confirm.cancelTitle': 'Cancel this live',
+	'recordings.scheduled.confirm.restoreTitle': 'Restore this live',
+	'recordings.scheduled.confirm.restoreMessage':
+		'"{title}" will return to the upcoming schedule. Its existing share link will keep working.',
 	'recordings.scheduled.confirm.cancelMessage':
 		'"{title}" will be marked as cancelled. The share link will show "live cancelled".',
 	'recordings.scheduled.confirm.cancelConfirm': 'Cancel the live',
@@ -1474,6 +1478,7 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.scheduled.toast.updated': 'Live updated',
 	'recordings.scheduled.toast.started': 'The live has started',
 	'recordings.scheduled.toast.cancelled': 'Live cancelled',
+	'recordings.scheduled.toast.restored': 'Live restored to the schedule',
 	'recordings.scheduled.toast.deleted': 'Entry deleted',
 	'recordings.scheduled.toast.ended': 'Live ended',
 	'recordings.subtitles.title': 'Live subtitles',

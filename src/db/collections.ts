@@ -1134,6 +1134,8 @@ export type ScheduledLive = {
 	live_started_at: string | null;
 	live_ended_at: string | null;
 	recording_id: string | null;
+	/** Previous replay ids stay associated for subtitle lookup when a schedule is reused. */
+	recording_history?: string[];
 	announce_pending: boolean;
 	announced_at: string | null;
 	reminder_enabled: boolean;
@@ -1443,7 +1445,9 @@ export async function getScheduledLiveByRecordingId(
 ): Promise<ScheduledLive | null> {
 	try {
 		const db = await getDb();
-		const doc = await db.collection('scheduled_lives').findOne({ recording_id: recordingId });
+		const doc = await db.collection('scheduled_lives').findOne({
+			$or: [{ recording_id: recordingId }, { recording_history: recordingId }]
+		});
 		return doc ? serializeDocument<ScheduledLive>(doc) : null;
 	} catch (e) {
 		console.error('[ScheduledLive] getByRecordingId error:', e);
