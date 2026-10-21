@@ -653,6 +653,29 @@
 		}
 	}
 
+	async function restoreEntry(entry: ScheduledLive) {
+		if (busyId) return;
+		const ok = await confirmDialog.ask({
+			title: $t('recordings.scheduled.confirm.restoreTitle'),
+			message: $t('recordings.scheduled.confirm.restoreMessage', { title: entry.title }),
+			confirmLabel: $t('recordings.scheduled.restore'),
+			cancelLabel: $t('recordings.scheduled.confirm.back')
+		});
+		if (!ok) return;
+		busyId = entry._id;
+		try {
+			const res = await fetch(`/api/scheduled-lives/${entry._id}/restore`, { method: 'POST' });
+			if (!res.ok) {
+				toast.error((await res.text()) || $t('recordings.error.http', { status: res.status }));
+				return;
+			}
+			toast.success($t('recordings.scheduled.toast.restored'));
+			await invalidateAll();
+		} finally {
+			busyId = null;
+		}
+	}
+
 	async function deleteEntry(entry: ScheduledLive) {
 		if (busyId) return;
 		const ok = await confirmDialog.ask({
@@ -1143,6 +1166,16 @@
 							<p class="text-[11px] text-stone-400">{fmtDate(entry.scheduled_at)}</p>
 						</div>
 						<div class="flex shrink-0 items-center gap-2">
+							{#if entry.status === 'ended' || entry.status === 'cancelled'}
+								<button
+									type="button"
+									class="border border-orange-200 bg-orange-50 px-2.5 py-1 text-[11px] font-semibold text-primary transition-colors hover:border-primary hover:bg-primary hover:text-white disabled:opacity-50"
+									disabled={busyId === entry._id}
+									onclick={() => restoreEntry(entry)}
+								>
+									{$t('recordings.scheduled.restore')}
+								</button>
+							{/if}
 							{#if entry.status === 'ended' && entry.subtitle_srt_s3_key}
 								<button
 									type="button"

@@ -1421,6 +1421,7 @@ export default {
 	'recordings.scheduled.startLive': 'Démarrer le direct',
 	'recordings.scheduled.alreadyLiveShort': 'Un direct est déjà en cours',
 	'recordings.scheduled.history': 'Historique ({count})',
+	'recordings.scheduled.restore': 'Restaurer',
 	'recordings.scheduled.autoCorrect': 'Auto-corriger',
 	'recordings.scheduled.autoCorrectApply': 'Appliquer les corrections',
 	'recordings.scheduled.autoCorrectPreview':
@@ -1480,6 +1481,9 @@ export default {
 	'recordings.scheduled.confirm.startNotifyMany':
 		'« {title} » passera en direct et {count} abonnés seront notifiés.',
 	'recordings.scheduled.confirm.cancelTitle': 'Annuler ce direct',
+	'recordings.scheduled.confirm.restoreTitle': 'Restaurer ce direct',
+	'recordings.scheduled.confirm.restoreMessage':
+		'« {title} » sera de nouveau programmé. Son lien de partage actuel restera valable.',
 	'recordings.scheduled.confirm.cancelMessage':
 		'« {title} » sera marqué comme annulé. Le lien de partage affichera « direct annulé ».',
 	'recordings.scheduled.confirm.cancelConfirm': 'Annuler le direct',
@@ -1496,6 +1500,7 @@ export default {
 	'recordings.scheduled.toast.updated': 'Direct mis à jour',
 	'recordings.scheduled.toast.started': 'Le direct a commencé',
 	'recordings.scheduled.toast.cancelled': 'Direct annulé',
+	'recordings.scheduled.toast.restored': 'Direct rétabli dans la programmation',
 	'recordings.scheduled.toast.deleted': 'Entrée supprimée',
 	'recordings.scheduled.toast.ended': 'Direct terminé',
 	'recordings.subtitles.title': 'Sous-titres du direct',

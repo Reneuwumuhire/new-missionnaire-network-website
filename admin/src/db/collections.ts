@@ -1389,6 +1389,8 @@ export type ScheduledLive = {
 	live_started_at: string | null;
 	live_ended_at: string | null;
 	recording_id: string | null;
+	/** Previous replay ids stay associated for subtitle lookup when a schedule is reused. */
+	recording_history?: string[];
 	announce_pending: boolean;
 	announced_at: string | null;
 	reminder_enabled: boolean;
@@ -1581,6 +1583,38 @@ export async function setScheduledLiveStatus(
 			{ _id: new ObjectId(id) },
 			{ $set: { status, ...extra, updated_at: new Date().toISOString() } }
 		);
+	return result.matchedCount > 0;
+}
+
+/** Restore an ended or cancelled entry while preserving its stable slug and past replay lookup. */
+export async function restoreScheduledLive(id: string): Promise<boolean> {
+	if (!ObjectId.isValid(id)) return false;
+	const db = await getDb();
+	const result = await db
+		.collection('scheduled_lives')
+		.updateOne({ _id: new ObjectId(id), status: { $in: ['ended', 'cancelled'] } }, [
+			{
+				$set: {
+					status: 'scheduled',
+					live_started_at: null,
+					live_ended_at: null,
+					recording_history: {
+						$setUnion: [
+							{ $ifNull: ['$recording_history', []] },
+							{
+								$cond: [
+									{ $ne: [{ $ifNull: ['$recording_id', null] }, null] },
+									['$recording_id'],
+									[]
+								]
+							}
+						]
+					},
+					recording_id: null,
+					updated_at: new Date().toISOString()
+				}
+			}
+		]);
 	return result.matchedCount > 0;
 }
 
