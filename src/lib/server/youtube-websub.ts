@@ -1,9 +1,10 @@
 import { env } from '$env/dynamic/public';
+import { env as privateEnv } from '$env/dynamic/private';
 import { claimCheckSlot } from '../../db/collections';
 
-const CHANNEL_ID = 'UCS3zqpqnCvT0SFa_jI662Kg';
+export const YOUTUBE_CHANNEL_ID = 'UCS3zqpqnCvT0SFa_jI662Kg';
 const HUB_URL = 'https://pubsubhubbub.appspot.com/subscribe';
-const TOPIC_URL = `https://www.youtube.com/xml/feeds/videos.xml?channel_id=${CHANNEL_ID}`;
+export const YOUTUBE_TOPIC_URL = `https://www.youtube.com/xml/feeds/videos.xml?channel_id=${YOUTUBE_CHANNEL_ID}`;
 
 // Re-subscribe every 4 days (subscriptions expire after ~5 days)
 const SUBSCRIBE_INTERVAL = 4 * 24 * 60 * 60 * 1000;
@@ -18,8 +19,18 @@ const SUBSCRIBE_INTERVAL = 4 * 24 * 60 * 60 * 1000;
  * send duplicate subscription requests.
  */
 export async function ensureWebSubSubscription(): Promise<void> {
+	const secret = privateEnv.YOUTUBE_WEBSUB_SECRET?.trim() || privateEnv.INTERNAL_API_SECRET?.trim();
+	if (!secret) {
+		console.warn(
+			'[WebSub] Set YOUTUBE_WEBSUB_SECRET (or INTERNAL_API_SECRET) to secure webhook notifications'
+		);
+		return;
+	}
+
 	// Only re-subscribe every 4 days
-	const canSubscribe = await claimCheckSlot('youtube_websub', SUBSCRIBE_INTERVAL);
+	// The versioned lock forces one fresh signed subscription after deploy,
+	// replacing an older unsigned registration at the hub.
+	const canSubscribe = await claimCheckSlot('youtube_websub_signed_v1', SUBSCRIBE_INTERVAL);
 	if (!canSubscribe) return;
 
 	const callbackUrl = getCallbackUrl();
@@ -31,10 +42,11 @@ export async function ensureWebSubSubscription(): Promise<void> {
 	try {
 		const body = new URLSearchParams({
 			'hub.callback': callbackUrl,
-			'hub.topic': TOPIC_URL,
+			'hub.topic': YOUTUBE_TOPIC_URL,
 			'hub.verify': 'async',
 			'hub.mode': 'subscribe',
-			'hub.lease_seconds': '432000' // 5 days
+			'hub.lease_seconds': '432000', // 5 days
+			'hub.secret': secret
 		});
 
 		const response = await fetch(HUB_URL, {

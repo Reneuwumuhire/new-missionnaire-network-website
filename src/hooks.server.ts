@@ -55,17 +55,20 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	const userAgent = event.request.headers.get('user-agent') || 'unknown';
 	const isPageRequest =
+		event.request.method === 'GET' &&
+		event.route.id !== null &&
 		!pathname.includes('.') &&
 		!pathname.startsWith('/api/') &&
 		!pathname.startsWith('/_') &&
 		!isBotUserAgent(userAgent);
 
-	// Fire and forget livestream check (self-throttled via DB lock)
-	if (isPageRequest) {
+	const response = await resolve(event);
+
+	// Only successful, matched page requests should wake the self-throttled
+	// YouTube poller. Unmatched scanner paths and page 404s must not trigger it.
+	if (isPageRequest && response.status < 400) {
 		checkAndIngestLiveStream().catch((e) => console.error('[Hooks] Poller error:', e));
 	}
-
-	const response = await resolve(event);
 
 	// Fire and forget missed route tracking
 	trackMissedRoute(event, response, isPageRequest);
