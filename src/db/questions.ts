@@ -65,6 +65,7 @@ async function ensureQuestionIndexes(): Promise<void> {
 			db.collection('questions').createIndex({ status: 1, lastActivityAt: -1 }),
 			db.collection('questions').createIndex({ status: 1, featured: -1, answeredAt: -1 }),
 			db.collection('questions').createIndex({ authorId: 1, createdAt: -1 }),
+			db.collection('questions').createIndex({ clientKey: 1, createdAt: -1 }),
 			db.collection('questions').createIndex({ category: 1, status: 1, lastActivityAt: -1 }),
 			db.collection('questions').createIndex({ contentFingerprint: 1, authorId: 1, createdAt: -1 }),
 			db.collection('questions').createIndex({ title: 'text', body: 'text', tags: 'text' }),
@@ -292,10 +293,22 @@ export async function createQuestion(input: {
 	const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 	const authorId = input.author.email;
 
-	const [recentBurst, recentDay] = await Promise.all([
+	const [recentBurst, recentDay, clientBurst, clientDay] = await Promise.all([
 		db.collection('questions').countDocuments({ authorId, createdAt: { $gte: tenMinutesAgo } }),
-		db.collection('questions').countDocuments({ authorId, createdAt: { $gte: dayAgo } })
+		db.collection('questions').countDocuments({ authorId, createdAt: { $gte: dayAgo } }),
+		db.collection('questions').countDocuments({
+			clientKey: input.clientKey,
+			createdAt: { $gte: tenMinutesAgo }
+		}),
+		db.collection('questions').countDocuments({
+			clientKey: input.clientKey,
+			createdAt: { $gte: dayAgo }
+		})
 	]);
+
+	if (clientBurst >= 5 || clientDay >= 20) {
+		return { ok: false, error: 'Merci de patienter avant de soumettre une nouvelle question.' };
+	}
 
 	if (recentBurst >= 2 || recentDay >= 10) {
 		return { ok: false, error: 'Merci de patienter avant de soumettre une nouvelle question.' };
