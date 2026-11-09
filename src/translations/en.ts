@@ -617,6 +617,11 @@ const en: Record<keyof typeof fr, string> = {
 		'The text follows the audio you hear — it rewinds with you if you go back.',
 	'liveTranscript.fullscreenDialogAria': 'Transcript in fullscreen',
 	'liveTranscript.exitFullscreen': 'Exit fullscreen',
+	'liveTranscript.autoScroll': 'Auto-scroll',
+	'liveTranscript.scrollSpeed': 'Scroll speed',
+	'liveTranscript.speedPerSecond': '{speed} px/s',
+	'liveTranscript.autoScrollHint':
+		'Set a speed to follow external audio; manual scrolling changes where it continues.',
 	'liveTranscript.autoTranslationNotice': 'Automatically translated subtitles may contain errors.',
 	'liveTranscript.appearance': 'Display',
 	'liveTranscript.theme': 'Theme',

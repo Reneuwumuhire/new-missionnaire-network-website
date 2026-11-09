@@ -32,7 +32,7 @@ describe('recording subtitle source', () => {
 			filename: 'sermon.srt',
 			scheduledLiveId: 'live-1',
 			syncReady: true,
-			offsetIntoRecordingMs: 50000
+			offsetIntoRecordingMs: 70000
 		});
 		expect(findOne).toHaveBeenCalledWith(
 			{ recording_id: 'recording-1' },

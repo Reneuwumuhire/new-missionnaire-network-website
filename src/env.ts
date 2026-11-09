@@ -16,6 +16,7 @@ export const variables = defineEnvVars({
 	PUSH_NOTIFICATIONS_ENABLED: { schema: (value) => value },
 	VAPID_PRIVATE_KEY: { schema: (value) => value },
 	YOUTUBE_API_KEY: { schema: (value) => value },
+	YOUTUBE_WEBSUB_SECRET: { schema: (value) => value },
 	PUBLIC_MAIN_URL: { public: true, schema: (value) => value },
 	PUBLIC_VAPID_KEY: { public: true, schema: (value) => value }
 });

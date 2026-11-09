@@ -44,7 +44,7 @@ export async function resolveRecordingSubtitle(
 	const started = new Date(recording.started_at).getTime();
 	const offset =
 		typeof live.subtitle_anchor_epoch_ms === 'number' && Number.isFinite(started)
-			? live.subtitle_anchor_epoch_ms + (live.subtitle_offset_ms ?? 0) - started
+			? live.subtitle_anchor_epoch_ms - (live.subtitle_offset_ms ?? 0) - started
 			: null;
 	return {
 		source: 'scheduled',
