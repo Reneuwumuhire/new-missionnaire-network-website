@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { t } from '$lib/i18n';
 
 	let {
@@ -11,11 +11,11 @@
 		artists: string[];
 	} = $props();
 
-	let searchValue = $state($page.url.searchParams.get('search') ?? '');
+	let searchValue = $state(page.url.searchParams.get('search') ?? '');
 	let debounceTimer: ReturnType<typeof setTimeout>;
 
 	function updateParam(key: string, value: string) {
-		const params = new URLSearchParams($page.url.searchParams);
+		const params = new URLSearchParams(page.url.searchParams);
 		if (value) {
 			params.set(key, value);
 		} else {
@@ -38,21 +38,21 @@
 	}
 
 	const hasFilters = $derived(
-		$page.url.searchParams.has('search') ||
-			$page.url.searchParams.has('category') ||
-			$page.url.searchParams.has('artist') ||
-			$page.url.searchParams.has('lyrics') ||
-			$page.url.searchParams.has('metadata')
+		page.url.searchParams.has('search') ||
+			page.url.searchParams.has('category') ||
+			page.url.searchParams.has('artist') ||
+			page.url.searchParams.has('lyrics') ||
+			page.url.searchParams.has('metadata')
 	);
 
-	const activeCategory = $derived($page.url.searchParams.get('category') ?? '');
-	const activeArtist = $derived($page.url.searchParams.get('artist') ?? '');
-	const activeLyrics = $derived($page.url.searchParams.get('lyrics') ?? '');
-	const activeSort = $derived($page.url.searchParams.get('sort') ?? 'uploaded_at:desc');
+	const activeCategory = $derived(page.url.searchParams.get('category') ?? '');
+	const activeArtist = $derived(page.url.searchParams.get('artist') ?? '');
+	const activeLyrics = $derived(page.url.searchParams.get('lyrics') ?? '');
+	const activeSort = $derived(page.url.searchParams.get('sort') ?? 'uploaded_at:desc');
 </script>
 
 <div class="border border-stone-200/60 bg-white/40 p-4">
-	{#if $page.url.searchParams.get('metadata') === 'missing'}
+	{#if page.url.searchParams.get('metadata') === 'missing'}
 		<button
 			class="mb-3 border border-primary/30 bg-orange-50 px-3 py-2 text-xs text-stone-700"
 			onclick={() => updateParam('metadata', '')}
