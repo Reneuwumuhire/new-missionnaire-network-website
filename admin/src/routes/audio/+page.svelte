@@ -8,7 +8,7 @@
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import { selection } from '$lib/stores/selection';
 	import { audioPreview } from '$lib/stores/audio-preview';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { invalidateAll } from '$app/navigation';
 	import { t } from '$lib/i18n';
 	import type { PageData } from './$types';
@@ -16,7 +16,7 @@
 	let { data }: { data: PageData } = $props();
 
 	const perms = $derived(
-		$page.data.user?.permissions ?? { can_add: false, can_edit: false, can_delete: false }
+		page.data.user?.permissions ?? { can_add: false, can_edit: false, can_delete: false }
 	);
 	const canSelectAudio = $derived(perms.can_edit || perms.can_delete);
 
@@ -77,7 +77,7 @@
 
 	const allIds = $derived(audioList.map((a) => a._id).filter((id): id is string => !!id));
 	const allSelected = $derived($selection.size > 0 && allIds.every((id) => $selection.has(id)));
-	const filterQuery = $derived($page.url.search);
+	const filterQuery = $derived(page.url.search);
 	const hasFilters = $derived(
 		Boolean(
 			data.filters.search || data.filters.category || data.filters.artist || data.filters.lyrics

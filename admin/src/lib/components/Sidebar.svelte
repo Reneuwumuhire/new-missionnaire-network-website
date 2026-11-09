@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { locale, setLocale, t, type Locale, type TranslationKey } from '$lib/i18n';
 
 	interface NavItem {
@@ -143,7 +143,7 @@
 	<nav class="flex-1 px-4 py-5" aria-label={$t('nav.menu')}>
 		<div class="space-y-0.5">
 			{#each navItems as item}
-				{@const active = isActive(item.href, $page.url.pathname)}
+				{@const active = isActive(item.href, page.url.pathname)}
 				<a
 					href={item.href}
 					aria-current={active ? 'page' : undefined}
@@ -315,9 +315,9 @@
 		{#if user.canManageRecordings}
 			<a
 				href="/studio/help"
-				aria-current={$page.url.pathname.startsWith('/studio/help') ? 'page' : undefined}
+				aria-current={page.url.pathname.startsWith('/studio/help') ? 'page' : undefined}
 				onclick={() => (mobileOpen = false)}
-				class="mt-2 flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] font-medium transition-colors {$page.url.pathname.startsWith(
+				class="mt-2 flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] font-medium transition-colors {page.url.pathname.startsWith(
 					'/studio/help'
 				)
 					? 'bg-primary/10 text-primary'

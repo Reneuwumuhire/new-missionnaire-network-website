@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import { goto, invalidateAll } from '$app/navigation';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { toast } from '$lib/stores/toast';
 	import { audioPreview } from '$lib/stores/audio-preview';
 	import { t } from '$lib/i18n';
@@ -71,7 +71,7 @@
 		lyricsSourceUrl = data.lyrics?.source_url ?? '';
 	});
 
-	const backHref = $derived(`/audio${$page.url.search}`);
+	const backHref = $derived(`/audio${page.url.search}`);
 
 	function formatBytes(bytes: number): string {
 		if (bytes === 0) return '0 B';

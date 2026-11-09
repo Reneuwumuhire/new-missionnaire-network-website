@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { t } from '$lib/i18n';
 
 	let {
@@ -16,7 +16,7 @@
 	const totalPages = $derived(Math.ceil(total / limit));
 
 	function goToPage(p: number) {
-		const params = new URLSearchParams($page.url.searchParams);
+		const params = new URLSearchParams(page.url.searchParams);
 		params.set('pageNumber', p.toString());
 		goto(`?${params.toString()}`, { replaceState: true });
 	}
@@ -33,7 +33,11 @@
 {#if totalPages > 1}
 	<div class="flex items-center justify-between">
 		<p class="text-sm text-stone-500">
-			{$t('common.pagination.range', { from: (currentPage - 1) * limit + 1, to: Math.min(currentPage * limit, total), total })}
+			{$t('common.pagination.range', {
+				from: (currentPage - 1) * limit + 1,
+				to: Math.min(currentPage * limit, total),
+				total
+			})}
 		</p>
 		<div class="flex items-center gap-1">
 			<button
@@ -45,7 +49,10 @@
 			</button>
 
 			{#if visiblePages[0] > 1}
-				<button onclick={() => goToPage(1)} class="rounded-none px-3 py-1.5 text-sm text-stone-600 hover:bg-cream-dark">
+				<button
+					onclick={() => goToPage(1)}
+					class="rounded-none px-3 py-1.5 text-sm text-stone-600 hover:bg-cream-dark"
+				>
 					1
 				</button>
 				{#if visiblePages[0] > 2}
@@ -67,7 +74,10 @@
 				{#if visiblePages[visiblePages.length - 1] < totalPages - 1}
 					<span class="px-1 text-stone-400">&hellip;</span>
 				{/if}
-				<button onclick={() => goToPage(totalPages)} class="rounded-none px-3 py-1.5 text-sm text-stone-600 hover:bg-cream-dark">
+				<button
+					onclick={() => goToPage(totalPages)}
+					class="rounded-none px-3 py-1.5 text-sm text-stone-600 hover:bg-cream-dark"
+				>
 					{totalPages}
 				</button>
 			{/if}
