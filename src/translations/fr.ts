@@ -619,6 +619,11 @@ export default {
 		"Le texte suit l'audio que vous entendez — il recule avec vous si vous revenez en arrière.",
 	'liveTranscript.fullscreenDialogAria': 'Transcription en plein écran',
 	'liveTranscript.exitFullscreen': 'Quitter le plein écran',
+	'liveTranscript.autoScroll': 'Défilement auto',
+	'liveTranscript.scrollSpeed': 'Vitesse de défilement',
+	'liveTranscript.speedPerSecond': '{speed} px/s',
+	'liveTranscript.autoScrollHint':
+		'Réglez la vitesse pour suivre un audio externe ; le défilement manuel change le point de reprise.',
 	'liveTranscript.autoTranslationNotice':
 		'Traduction automatique : les sous-titres peuvent contenir des erreurs.',
 	'liveTranscript.appearance': 'Affichage',

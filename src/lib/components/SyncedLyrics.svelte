@@ -49,6 +49,8 @@
 		// palette + out-of-focus contrast; `sizeKey` scales the text.
 		themeKey?: '' | 'cream' | 'sepia' | 'dark' | 'contrast';
 		sizeKey?: '' | 'sm' | 'md' | 'lg' | 'xl';
+		continuousScroll?: boolean;
+		continuousScrollSpeed?: number;
 	}
 
 	let {
@@ -59,7 +61,9 @@
 		fullscreenLarge = false,
 		onseek,
 		themeKey = '',
-		sizeKey = ''
+		sizeKey = '',
+		continuousScroll = false,
+		continuousScrollSpeed = 32
 	}: Props = $props();
 
 	let panelElement: HTMLDivElement | undefined = $state();
@@ -69,6 +73,9 @@
 	let prefersReducedMotion = $state(false);
 	let userScrolled = $state(false);
 	let scrollAnimationFrame: number | null = null;
+	let continuousFrame: number | null = null;
+	let continuousLastFrameAt: number | null = null;
+	let manualScrollUntil = 0;
 	// Which way the "back to current line" pill arrow points: down when the
 	// live passage is below the reader's viewport (they scrolled up to read
 	// earlier text), up when it's above (they scrolled ahead).
@@ -87,6 +94,13 @@
 	}
 
 	function onUserScroll() {
+		if (continuousScroll) {
+			manualScrollUntil = performance.now() + 550;
+			continuousLastFrameAt = null;
+			if (continuousFrame === null)
+				continuousFrame = requestAnimationFrame(advanceContinuousScroll);
+			return;
+		}
 		if (!pauseOnUserScroll) return;
 		if (scrollAnimationFrame !== null) {
 			cancelAnimationFrame(scrollAnimationFrame);
@@ -94,6 +108,31 @@
 		}
 		userScrolled = true;
 		updateScrollDirection();
+	}
+
+	function advanceContinuousScroll(now: number) {
+		continuousFrame = null;
+		if (!continuousScroll || !panelElement) return;
+		if (continuousLastFrameAt === null) continuousLastFrameAt = now;
+		const elapsed = Math.min(now - continuousLastFrameAt, 80);
+		continuousLastFrameAt = now;
+
+		if (now >= manualScrollUntil) {
+			const maxScroll = panelElement.scrollHeight - panelElement.clientHeight;
+			if (panelElement.scrollTop < maxScroll - 0.5) {
+				panelElement.scrollTop = Math.min(
+					maxScroll,
+					panelElement.scrollTop + (continuousScrollSpeed * elapsed) / 1000
+				);
+			}
+		}
+
+		const maxScroll = panelElement.scrollHeight - panelElement.clientHeight;
+		if (now < manualScrollUntil || panelElement.scrollTop < maxScroll - 0.5) {
+			continuousFrame = requestAnimationFrame(advanceContinuousScroll);
+		} else {
+			continuousLastFrameAt = null;
+		}
 	}
 
 	/** Center the active line WITHIN the panel's own scroll area only. We avoid
@@ -301,7 +340,27 @@
 	}
 
 	$effect(() => {
-		activeLineIndex = findActiveLineIndex(currentTime);
+		activeLineIndex = continuousScroll ? -1 : findActiveLineIndex(currentTime);
+	});
+
+	$effect(() => {
+		void continuousScrollSpeed;
+		if (!continuousScroll || !panelElement) {
+			if (continuousFrame !== null) cancelAnimationFrame(continuousFrame);
+			continuousFrame = null;
+			continuousLastFrameAt = null;
+			return;
+		}
+
+		if (scrollAnimationFrame !== null) cancelAnimationFrame(scrollAnimationFrame);
+		scrollAnimationFrame = null;
+		continuousLastFrameAt = null;
+		continuousFrame = requestAnimationFrame(advanceContinuousScroll);
+		return () => {
+			if (continuousFrame !== null) cancelAnimationFrame(continuousFrame);
+			continuousFrame = null;
+			continuousLastFrameAt = null;
+		};
 	});
 
 	$effect(() => {
@@ -315,7 +374,7 @@
 	$effect(() => {
 		if (activeLineIndex !== previousActiveLineIndex) {
 			previousActiveLineIndex = activeLineIndex;
-			if (activeLineIndex >= 0 && !userScrolled) {
+			if (!continuousScroll && activeLineIndex >= 0 && !userScrolled) {
 				// The text rises while one shared highlight travels to the next line.
 				// Both movements stay inside this panel, never scrolling the page.
 				void tick().then(() => {
@@ -366,6 +425,8 @@
 	aria-label={$t('syncedLyrics.label')}
 	onwheel={onUserScroll}
 	ontouchmove={onUserScroll}
+	onpointerdown={onUserScroll}
+	onpointermove={(event) => event.buttons > 0 && onUserScroll()}
 	onscroll={() => userScrolled && updateScrollDirection()}
 >
 	{#each lines as line, index}
@@ -464,7 +525,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0;
-		padding: 0.5rem 0.5rem 1.25rem;
+		padding: 0.5rem 4px 1.25rem;
 		scroll-padding-block: 38%;
 		scrollbar-width: thin;
 		scrollbar-color: rgba(168, 162, 158, 0.4) transparent;
@@ -492,7 +553,7 @@
 		margin-top: 0.35rem;
 		border: 0;
 		background: transparent;
-		padding: 0.45rem 1rem;
+		padding: 0.45rem 4px;
 		color: var(--lyric-color-default);
 		text-align: center;
 		cursor: default;
@@ -721,7 +782,7 @@
 
 		.lyrics-panel.fullscreen-mobile .lyric-line {
 			margin-top: 0.25rem;
-			padding: 0.55rem 0.85rem;
+			padding: 0.55rem 4px;
 		}
 
 		.lyrics-panel.fullscreen-mobile .lyric-line:first-child {
@@ -755,7 +816,7 @@
 		min-width: 0;
 		min-height: 0;
 		flex: 1 1 auto;
-		padding: 1rem 1rem calc(2rem + env(safe-area-inset-bottom, 0px));
+		padding: 1rem 4px calc(2rem + env(safe-area-inset-bottom, 0px));
 		scroll-padding-block: 42%;
 	}
 
