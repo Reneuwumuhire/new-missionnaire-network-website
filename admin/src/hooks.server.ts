@@ -2,6 +2,7 @@ import { redirect, type Handle } from '@sveltejs/kit';
 import { validateSession, SESSION_COOKIE } from '$lib/server/auth';
 
 const PUBLIC_PATHS = [
+	'/healthz',
 	'/login',
 	'/api/youtube/oauth/callback',
 	'/api/studio/youtube',
