@@ -3,7 +3,8 @@
 /// <reference lib="esnext" />
 /// <reference lib="webworker" />
 
-import { build, files, version } from '$service-worker';
+import { version } from '$app/env';
+import { assets, immutable } from '$app/manifest';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
@@ -58,8 +59,10 @@ function isAudioRequest(url: URL): boolean {
 // MP3, and downloading it while iOS is launching/installing the PWA can
 // exhaust WebKit's page process. Audio keeps its own on-demand cache.
 const APP_SHELL_ASSETS = [
-	...build,
-	...files.filter((asset) => !isAudioRequest(new URL(asset, sw.location.origin))),
+	...immutable.map(({ path }) => path),
+	...assets
+		.map(({ path }) => path)
+		.filter((asset) => !isAudioRequest(new URL(asset, sw.location.origin))),
 	OFFLINE_URL,
 	'/'
 ];

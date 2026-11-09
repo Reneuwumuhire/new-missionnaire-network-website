@@ -30,9 +30,9 @@
 		"channel:test": "node scripts/import-whatsapp-channel.mjs --test"
 	},
 	"devDependencies": {
-		"@sveltejs/adapter-auto": "^3.3.1",
-		"@sveltejs/adapter-node": "^5.5.4",
-		"@sveltejs/adapter-vercel": "^6.3.2",
+		"@sveltejs/adapter-auto": "^8.0.0",
+		"@sveltejs/adapter-node": "^6.0.1",
+		"@sveltejs/adapter-vercel": "^7.0.2",
 		"@sveltejs/kit": "^3.0.0",
 		"@sveltejs/vite-plugin-svelte": "^7.3.0",
 		"@types/node": "^25.0.3",
@@ -57,7 +57,7 @@
 		"svelte-check": "^4.4.5",
 		"tailwindcss": "^3.3.3",
 		"tslib": "^2.6.2",
-		"typescript": "^5.5",
+		"typescript": "^6.0.3",
 		"vite": "^8.3.5",
 		"vitest": "^5.0.0"
 	},
