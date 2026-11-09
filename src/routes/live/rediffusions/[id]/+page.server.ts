@@ -51,7 +51,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
 	// the admin anchored them during the live, translate that wall-clock anchor
 	// into an offset from the recording start. The recorder captures the same
 	// Icecast output listeners heard, so recording position t was on air at
-	// started_at + t — hence SRT 00:00 sits at (anchor + offset − started_at)
+	// started_at + t — hence SRT 00:00 sits at (anchor − offset − started_at)
 	// into the file.
 	let subtitles: { url: string; offsetIntoRecordingMs: number } | null = null;
 	// Admin hide kill-switch wins over everything.
@@ -81,7 +81,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
 					subtitles = {
 						url: `/api/subtitles/file?key=${encodeURIComponent(scheduled.subtitle_srt_s3_key)}`,
 						offsetIntoRecordingMs:
-							scheduled.subtitle_anchor_epoch_ms + (scheduled.subtitle_offset_ms ?? 0) - startedMs
+							scheduled.subtitle_anchor_epoch_ms - (scheduled.subtitle_offset_ms ?? 0) - startedMs
 					};
 				}
 			}

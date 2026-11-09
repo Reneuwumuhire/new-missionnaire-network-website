@@ -99,6 +99,7 @@
 	// Big dark overlay for comfortable reading (or projecting the text in a
 	// hall while the live audio plays). Esc or the ✕ button closes it.
 	let isFullscreen = $state(false);
+	let autoScroll = $state(false);
 
 	/** Re-parent the overlay to <body>: the transcript sits inside cards with
 	 *  backdrop-blur/transform, which create stacking contexts that would trap
@@ -400,6 +401,37 @@
 	</div>
 {/snippet}
 
+{#snippet autoScrollControl(onDark: boolean)}
+	<div class="inline-flex items-center gap-2">
+		<button
+			type="button"
+			onclick={() => (autoScroll = !autoScroll)}
+			aria-label={$t('liveTranscript.autoScroll')}
+			aria-pressed={autoScroll}
+			class="inline-flex items-center gap-1.5 border px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] font-body transition-colors {onDark
+				? autoScroll
+					? 'border-amber-300 bg-amber-300/15 text-amber-200'
+					: 'border-white/20 bg-white/10 text-stone-200 hover:border-white/50 hover:text-white'
+				: autoScroll
+					? 'border-missionnaire bg-orange-50 text-missionnaire'
+					: 'border-stone-200/60 bg-white/60 text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
+		>
+			<svg
+				width="12"
+				height="12"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				aria-hidden="true"
+			>
+				<path d="M12 3v18M5 10l7-7 7 7M5 14l7 7 7-7" />
+			</svg>
+			{$t('liveTranscript.autoScroll')}
+		</button>
+	</div>
+{/snippet}
+
 {#snippet autoTranslationNotice()}
 	<span class="transcript-auto-notice">
 		<svg
@@ -438,6 +470,7 @@
 						{$t('liveTranscript.waitingSync')}
 					</span>
 				{/if}
+				{@render autoScrollControl(false)}
 				{@render appearanceControl(false)}
 				<button
 					type="button"
@@ -468,6 +501,7 @@
 				{lines}
 				currentTime={displayTime}
 				pauseOnUserScroll
+				continuousScroll={autoScroll}
 				themeKey={$subtitlePrefs.theme}
 				sizeKey={$subtitlePrefs.size}
 				onseek={handleSeek}
@@ -477,11 +511,9 @@
 				{$t('liveTranscript.shownFullscreen')}
 			</p>
 		{/if}
-		{#if mode === 'live'}
-			<p class="mt-2 text-[10px] text-stone-400 font-body">
-				{$t('liveTranscript.followHint')}
-			</p>
-		{/if}
+		<p class="mt-2 text-[10px] text-stone-400 font-body">
+			{$t(autoScroll ? 'liveTranscript.autoScrollHint' : 'liveTranscript.followHint')}
+		</p>
 	</div>
 {/if}
 
@@ -522,7 +554,8 @@
 				</div>
 				{@render autoTranslationNotice()}
 			</div>
-			<div class="flex items-center gap-2">
+			<div class="flex flex-wrap items-center justify-end gap-2">
+				{@render autoScrollControl($subtitlePrefs.theme === 'dark')}
 				{@render appearanceControl($subtitlePrefs.theme === 'dark')}
 				<button
 					type="button"
@@ -550,6 +583,7 @@
 			{lines}
 			currentTime={displayTime}
 			pauseOnUserScroll
+			continuousScroll={autoScroll}
 			fullscreenLarge
 			themeKey={$subtitlePrefs.theme}
 			sizeKey={$subtitlePrefs.size}
