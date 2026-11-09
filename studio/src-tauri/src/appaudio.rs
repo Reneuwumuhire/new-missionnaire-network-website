@@ -17,7 +17,7 @@ pub struct AudioApp {
 	pub name: String,
 }
 
-/// An on-screen window and the application behind it. The webview shares a
+/// A shareable window and the application behind it. The webview shares a
 /// window through the OS picker and tells us almost nothing about what was
 /// picked, so this is what the choice is matched against.
 #[derive(Debug, Clone, Serialize)]
@@ -159,15 +159,16 @@ mod platform {
 		}
 	}
 
-	/// Every on-screen window with the application behind it, so a share picked
-	/// in the OS panel can be traced back to the app whose sound it is.
+	/// Include windows on other macOS desktops so an operator can pick a window
+	/// on a second monitor without moving it onto Studio's desktop first.
 	pub fn list_windows() -> Result<Vec<AudioWindow>, String> {
-		let content = SCShareableContent::get()
+		let content = SCShareableContent::create()
+			.with_on_screen_windows_only(false)
+			.get()
 			.map_err(|e| format!("Partage d'écran non autorisé ou indisponible: {e:?}"))?;
 		Ok(content
 			.windows()
 			.into_iter()
-			.filter(|window| window.is_on_screen())
 			.filter_map(|window| {
 				let app = window.owning_application()?;
 				let app_id = app.bundle_identifier();
