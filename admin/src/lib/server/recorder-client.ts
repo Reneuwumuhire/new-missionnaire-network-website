@@ -1,5 +1,3 @@
-import { env } from '$env/dynamic/private';
-
 export interface RecorderStatus {
 	recording: boolean;
 	id?: string;
@@ -50,8 +48,8 @@ const RECORDER_STATUS_TIMEOUT_MS = 3000;
 const RECORDER_COMMAND_TIMEOUT_MS = 20_000;
 
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
-	const baseUrl = env.RECORDER_URL;
-	const token = env.RECORDER_TOKEN;
+	const baseUrl = process.env.RECORDER_URL;
+	const token = process.env.RECORDER_TOKEN;
 	if (!baseUrl || !token) {
 		throw new RecorderError('Recorder service not configured', 503, 'not_configured');
 	}

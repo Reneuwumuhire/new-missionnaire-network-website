@@ -1,4 +1,3 @@
-import { env } from '$env/dynamic/private';
 import { getDb } from '../../db/mongo';
 import {
 	authorizationUrl,
@@ -34,9 +33,9 @@ async function ensureAuthorizationIndexes(): Promise<void> {
 }
 
 function config() {
-	const clientId = env.YOUTUBE_OAUTH_CLIENT_ID?.trim();
-	const clientSecret = env.YOUTUBE_OAUTH_CLIENT_SECRET?.trim();
-	const encryptionSecret = env.INTERNAL_API_SECRET?.trim();
+	const clientId = process.env.YOUTUBE_OAUTH_CLIENT_ID?.trim();
+	const clientSecret = process.env.YOUTUBE_OAUTH_CLIENT_SECRET?.trim();
+	const encryptionSecret = process.env.INTERNAL_API_SECRET?.trim();
 	if (!clientId || !clientSecret || !encryptionSecret) {
 		throw new Error('YouTube OAuth is not configured');
 	}
@@ -44,7 +43,7 @@ function config() {
 		clientId,
 		clientSecret,
 		encryptionSecret,
-		redirectUri: env.YOUTUBE_OAUTH_REDIRECT_URI?.trim() || REDIRECT_URI
+		redirectUri: process.env.YOUTUBE_OAUTH_REDIRECT_URI?.trim() || REDIRECT_URI
 	};
 }
 
@@ -160,7 +159,9 @@ export async function youtubeConnection(userEmail: string): Promise<YouTubeChann
 }
 
 export async function disconnectYouTube(userEmail: string, channelId: string): Promise<void> {
-	await (await getDb())
+	await (
+		await getDb()
+	)
 		.collection('youtube_authorizations')
 		.deleteOne({ user_email: userEmail, channel_id: channelId });
 }

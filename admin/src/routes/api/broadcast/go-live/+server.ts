@@ -1,5 +1,4 @@
 import { json, error } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
 import type { RequestHandler } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
 import {
@@ -164,9 +163,9 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 	// immediately. Fire-and-forget — failure here must not block the Go Live
 	// action; the flag stays pending and the main-site cron picks it up as a
 	// backstop on its next minute tick.
-	const internalSecret = env.INTERNAL_API_SECRET;
-	if (env.MAIN_SITE_URL && internalSecret) {
-		fetch(`${env.MAIN_SITE_URL.replace(/\/$/, '')}/api/internal/broadcast-event`, {
+	const internalSecret = process.env.INTERNAL_API_SECRET;
+	if (process.env.MAIN_SITE_URL && internalSecret) {
+		fetch(`${process.env.MAIN_SITE_URL.replace(/\/$/, '')}/api/internal/broadcast-event`, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',

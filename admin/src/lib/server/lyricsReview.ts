@@ -1,6 +1,5 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { env } from '$env/dynamic/private';
 import { getDb } from '../../db/mongo';
 import { loadIndirimboSongs } from './indirimboSource';
 // Build-time CSV fallback. Vercel serverless functions can't read arbitrary
@@ -432,7 +431,7 @@ function validateReviewStatus(reviewStatus: ReviewStatus) {
 }
 
 function getCsvPath() {
-	const configured = env.LYRICS_MATCHES_CSV_PATH?.trim() || DEFAULT_CSV_PATH;
+	const configured = process.env.LYRICS_MATCHES_CSV_PATH?.trim() || DEFAULT_CSV_PATH;
 	return path.isAbsolute(configured) ? configured : path.join(process.cwd(), configured);
 }
 

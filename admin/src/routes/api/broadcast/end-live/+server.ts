@@ -1,5 +1,4 @@
 import { json, error } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
 import type { RequestHandler } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
 import {
@@ -48,9 +47,9 @@ export const POST: RequestHandler = async ({ locals, getClientAddress }) => {
 	// push so open tabs flip their radio banner off without reloading.
 	// Fire-and-forget — failure is non-fatal; the cron clears stale Icecast
 	// cache within a minute as a backstop.
-	const internalSecret = env.INTERNAL_API_SECRET;
-	if (env.MAIN_SITE_URL && internalSecret) {
-		fetch(`${env.MAIN_SITE_URL.replace(/\/$/, '')}/api/internal/broadcast-event`, {
+	const internalSecret = process.env.INTERNAL_API_SECRET;
+	if (process.env.MAIN_SITE_URL && internalSecret) {
+		fetch(`${process.env.MAIN_SITE_URL.replace(/\/$/, '')}/api/internal/broadcast-event`, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',

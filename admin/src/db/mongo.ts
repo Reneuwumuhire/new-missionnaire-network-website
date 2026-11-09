@@ -1,5 +1,4 @@
 import { MongoClient, ServerApiVersion } from 'mongodb';
-import { env } from '$env/dynamic/private';
 
 let client: MongoClient | null = null;
 let isConnecting = false;
@@ -20,7 +19,7 @@ export async function connect() {
 		isConnecting = true;
 		connectionPromise = new Promise((resolve, reject) => {
 			console.log('[MongoDB Admin] Attempting to connect...');
-			const newClient = new MongoClient(env.MONGODB_URI, {
+			const newClient = new MongoClient(process.env.MONGODB_URI, {
 				serverApi: {
 					version: ServerApiVersion.v1,
 					strict: false,

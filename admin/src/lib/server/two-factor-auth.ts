@@ -1,4 +1,3 @@
-import { env } from '$env/dynamic/private';
 import type { AdminUser } from '$lib/models/admin-user';
 import { decryptTwoFactorSecret, hashRecoveryCode, verifyTotp } from '$lib/two-factor';
 import { consumeRecoveryCode } from '../../db/collections';
@@ -6,7 +5,7 @@ import { consumeRecoveryCode } from '../../db/collections';
 export const TWO_FACTOR_CHALLENGE_COOKIE = 'admin_2fa_challenge';
 
 export function twoFactorKey(): string | null {
-	const key = env.ADMIN_2FA_ENCRYPTION_KEY?.trim();
+	const key = process.env.ADMIN_2FA_ENCRYPTION_KEY?.trim();
 	return key && key.length >= 32 ? key : null;
 }
 
