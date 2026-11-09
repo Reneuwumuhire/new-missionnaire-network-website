@@ -3,8 +3,7 @@ import { getDb } from '../../../../db/mongo';
 
 // Serves a broadcast's SRT transcript to the player. Proxying (instead of a
 // direct browser→S3 fetch) avoids any S3 CORS configuration and normalizes
-// the charset. The key is resolved against scheduled_lives, so only files
-// actually attached to a broadcast can be fetched — this is not an open
+// the charset. The key must be attached to a scheduled broadcast or a published replay — this is not an open
 // proxy onto the bucket. Keys are unique per upload (timestamp+uuid), so the
 // response is immutable and can be cached aggressively at the edge.
 export async function GET({ url, fetch, setHeaders }) {
@@ -19,7 +18,18 @@ export async function GET({ url, fetch, setHeaders }) {
 		const doc = await db
 			.collection('scheduled_lives')
 			.findOne({ subtitle_srt_s3_key: key }, { projection: { subtitle_srt_url: 1 } });
-		srtUrl = (doc?.subtitle_srt_url as string | undefined) ?? null;
+		const replay = doc?.subtitle_srt_url
+			? null
+			: await db.collection('recordings').findOne(
+					{
+						subtitle_srt_s3_key: key,
+						published: true,
+						status: 'ready',
+						subtitles_hidden: { $ne: true }
+					},
+					{ projection: { subtitle_srt_url: 1 } }
+				);
+		srtUrl = (doc?.subtitle_srt_url ?? replay?.subtitle_srt_url ?? null) as string | null;
 	} catch (e) {
 		console.error('[subtitles/file] lookup error:', e);
 	}
