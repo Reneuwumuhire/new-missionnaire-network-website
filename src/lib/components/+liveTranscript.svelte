@@ -490,9 +490,7 @@
 						{$t('liveTranscript.waitingSync')}
 					</span>
 				{/if}
-				{#if mode === 'live'}
-					{@render autoScrollControl(false)}
-				{/if}
+				{@render autoScrollControl(false)}
 				{@render appearanceControl(false)}
 				<button
 					type="button"
@@ -523,7 +521,7 @@
 				{lines}
 				currentTime={displayTime}
 				pauseOnUserScroll
-				continuousScroll={mode === 'live' && autoScroll}
+				continuousScroll={autoScroll}
 				continuousScrollSpeed={autoScrollSpeed}
 				themeKey={$subtitlePrefs.theme}
 				sizeKey={$subtitlePrefs.size}
@@ -534,11 +532,9 @@
 				{$t('liveTranscript.shownFullscreen')}
 			</p>
 		{/if}
-		{#if mode === 'live'}
-			<p class="mt-2 text-[10px] text-stone-400 font-body">
-				{$t(autoScroll ? 'liveTranscript.autoScrollHint' : 'liveTranscript.followHint')}
-			</p>
-		{/if}
+		<p class="mt-2 text-[10px] text-stone-400 font-body">
+			{$t(autoScroll ? 'liveTranscript.autoScrollHint' : 'liveTranscript.followHint')}
+		</p>
 	</div>
 {/if}
 
@@ -580,9 +576,7 @@
 				{@render autoTranslationNotice()}
 			</div>
 			<div class="flex flex-wrap items-center justify-end gap-2">
-				{#if mode === 'live'}
-					{@render autoScrollControl($subtitlePrefs.theme === 'dark')}
-				{/if}
+				{@render autoScrollControl($subtitlePrefs.theme === 'dark')}
 				{@render appearanceControl($subtitlePrefs.theme === 'dark')}
 				<button
 					type="button"
@@ -610,7 +604,7 @@
 			{lines}
 			currentTime={displayTime}
 			pauseOnUserScroll
-			continuousScroll={mode === 'live' && autoScroll}
+			continuousScroll={autoScroll}
 			continuousScrollSpeed={autoScrollSpeed}
 			fullscreenLarge
 			themeKey={$subtitlePrefs.theme}
