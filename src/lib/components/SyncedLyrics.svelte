@@ -69,10 +69,6 @@
 	let prefersReducedMotion = $state(false);
 	let userScrolled = $state(false);
 	let scrollAnimationFrame: number | null = null;
-	let highlightFrame: number | null = null;
-	let highlightReady = $state(false);
-	let highlightVisible = $state(false);
-	let activeHighlight = $state({ top: 0, left: 0, width: 0, height: 0 });
 	// Which way the "back to current line" pill arrow points: down when the
 	// live passage is below the reader's viewport (they scrolled up to read
 	// earlier text), up when it's above (they scrolled ahead).
@@ -139,30 +135,6 @@
 		};
 
 		scrollAnimationFrame = requestAnimationFrame(animate);
-	}
-
-	function positionActiveHighlight() {
-		const el = lineElements[activeLineIndex];
-		if (!el || !panelElement || !themeKey) {
-			highlightVisible = false;
-			return;
-		}
-
-		activeHighlight = {
-			top: el.offsetTop,
-			left: el.offsetLeft,
-			width: el.offsetWidth,
-			height: el.offsetHeight
-		};
-		highlightVisible = true;
-
-		if (!highlightReady) {
-			if (highlightFrame !== null) cancelAnimationFrame(highlightFrame);
-			highlightFrame = requestAnimationFrame(() => {
-				highlightReady = true;
-				highlightFrame = null;
-			});
-		}
 	}
 
 	function resumeAutoScroll() {
@@ -264,22 +236,61 @@
 		return coerceSeconds(line.end ?? line.end_time ?? line.endTime);
 	}
 
-	function findActiveLineIndex(time: number): number {
-		let activeIndex = -1;
-
-		for (let index = 0; index < lines.length; index += 1) {
+	type TimedLine = { index: number; start: number; end: number | null; nextStart: number | null };
+	let timedLineState = $derived.by(() => {
+		const entries: TimedLine[] = [];
+		let nextStart: number | null = null;
+		for (let index = lines.length - 1; index >= 0; index -= 1) {
 			const start = getLineStart(lines[index]);
-			if (start === null || start > time) continue;
+			if (start === null) continue;
+			entries.push({ index, start, end: getLineEnd(lines[index]), nextStart });
+			nextStart = start;
+		}
+		entries.reverse();
+		return {
+			entries,
+			chronological: entries.every(
+				(line, index) => index === 0 || line.start >= entries[index - 1].start
+			)
+		};
+	});
 
-			const end = getLineEnd(lines[index]);
-			const nextTimedLine = lines.slice(index + 1).find((line) => getLineStart(line) !== null);
-			const nextStart = nextTimedLine ? getLineStart(nextTimedLine) : null;
+	function findActiveLineIndex(time: number): number {
+		// Most transcripts are chronological. Binary search to the last cue that
+		// has started, then walk back only if overlapping cue times require it.
+		const timedLines = timedLineState.entries;
+		let low = 0;
+		let high = timedLines.length;
 
-			if ((end === null || time <= end) && (nextStart === null || time < nextStart)) {
-				activeIndex = index;
+		if (timedLineState.chronological) {
+			while (low < high) {
+				const middle = (low + high) >>> 1;
+				if (timedLines[middle].start <= time) low = middle + 1;
+				else high = middle;
 			}
+			for (let index = low - 1; index >= 0; index -= 1) {
+				const line = timedLines[index];
+				if (
+					(line.end === null || time <= line.end) &&
+					(line.nextStart === null || time < line.nextStart)
+				) {
+					return line.index;
+				}
+			}
+			return -1;
 		}
 
+		// Preserve the old document-order behavior for unusual, out-of-order lyrics.
+		let activeIndex = -1;
+		for (const line of timedLines) {
+			if (
+				line.start <= time &&
+				(line.end === null || time <= line.end) &&
+				(line.nextStart === null || time < line.nextStart)
+			) {
+				activeIndex = line.index;
+			}
+		}
 		return activeIndex;
 	}
 
@@ -308,11 +319,8 @@
 				// The text rises while one shared highlight travels to the next line.
 				// Both movements stay inside this panel, never scrolling the page.
 				void tick().then(() => {
-					positionActiveHighlight();
 					scrollActiveLineIntoPanel(!prefersReducedMotion);
 				});
-			} else if (activeLineIndex < 0) {
-				highlightVisible = false;
 			}
 		}
 	});
@@ -324,7 +332,6 @@
 		void fullscreenLarge;
 		void fullscreenMobile;
 		void lines;
-		if (activeLineIndex >= 0) void tick().then(positionActiveHighlight);
 	});
 
 	onMount(() => {
@@ -335,13 +342,8 @@
 
 		updateReducedMotion();
 		mediaQuery.addEventListener('change', updateReducedMotion);
-		const resizeObserver = new ResizeObserver(() => positionActiveHighlight());
-		if (panelElement) resizeObserver.observe(panelElement);
-
 		return () => {
 			if (scrollAnimationFrame !== null) cancelAnimationFrame(scrollAnimationFrame);
-			if (highlightFrame !== null) cancelAnimationFrame(highlightFrame);
-			resizeObserver.disconnect();
 			mediaQuery.removeEventListener('change', updateReducedMotion);
 		};
 	});
@@ -366,17 +368,6 @@
 	ontouchmove={onUserScroll}
 	onscroll={() => userScrolled && updateScrollDirection()}
 >
-	{#if themeKey}
-		<div
-			class="subtitle-highlight"
-			class:is-ready={highlightReady}
-			class:is-visible={highlightVisible}
-			style:transform={`translate3d(${activeHighlight.left}px, ${activeHighlight.top}px, 0)`}
-			style:width={`${activeHighlight.width}px`}
-			style:height={`${activeHighlight.height}px`}
-			aria-hidden="true"
-		></div>
-	{/if}
 	{#each lines as line, index}
 		{@const start = getLineStart(line)}
 		{@const text = getLineText(line)}
@@ -462,7 +453,6 @@
 		--lyric-color-accent: #c2640c; /* deeper sienna — chorus active state */
 		--lyric-chorus-bg: rgba(255, 136, 12, 0.045);
 		--lyric-chorus-bg-active: rgba(255, 136, 12, 0.085);
-		--lyric-glow-active: rgba(255, 136, 12, 0.32);
 		--lyric-rule-color: rgba(120, 113, 108, 0.42);
 		--lyric-rule-chorus: rgba(194, 100, 12, 0.65);
 
@@ -547,8 +537,7 @@
 	}
 
 	.lyric-text {
-		display: inline-block;
-		max-width: min(100%, 38rem);
+		display: inline;
 		/* Cormorant Garamond is the site's display serif — gives lyrics a
 		   hymnal/liturgical character that distinguishes this from a generic
 		   sans-serif music app. Letter-spacing nudged up for breathing room
@@ -621,25 +610,27 @@
 		border-bottom-right-radius: 0.6rem;
 	}
 
-	/* ─── The current line gets the spotlight ──────────────
-	   Keep its size and weight fixed so wrapping never shifts the lines below. */
+	/* Mark only the spoken words, following the flat highlighter style in the
+	   reference. Cloned inline decoration keeps wrapped lines independently
+	   highlighted without a measuring or animated overlay. */
 	.lyric-line.active {
 		color: var(--lyric-color-active);
-		text-shadow:
-			0 0 22px var(--lyric-glow-active),
-			0 0 1px rgba(255, 136, 12, 0.18);
+		text-shadow: none;
 	}
 
 	.lyric-line.active .lyric-text {
 		opacity: 1;
+		background: var(--subtitle-active-bg, rgba(255, 136, 12, 0.18));
+		box-decoration-break: clone;
+		-webkit-box-decoration-break: clone;
+		padding: 0 0.08em;
+		border-radius: 0.16em;
 	}
 
 	.lyric-line.active.chorus {
-		color: var(--lyric-color-accent);
-		background-color: var(--lyric-chorus-bg-active);
-		text-shadow:
-			0 0 24px rgba(255, 136, 12, 0.45),
-			0 0 1px rgba(255, 136, 12, 0.32);
+		color: var(--lyric-color-active);
+		background-color: transparent;
+		text-shadow: none;
 	}
 
 	/* ─── Section dividers (Refrain, Couplet N) ───────────────────────────
@@ -790,34 +781,6 @@
 		opacity: 0.55;
 	}
 
-	/* One persistent layer glides between active subtitle lines. As the panel
-	   eases upward, this layer travels downward to meet the incoming line. */
-	.subtitle-highlight {
-		position: absolute;
-		z-index: 0;
-		top: 0;
-		left: 0;
-		border-inline-start: 3px solid var(--lyric-color-accent);
-		border-radius: 0.6rem;
-		background: var(--subtitle-active-bg);
-		content: '';
-		pointer-events: none;
-		opacity: 0;
-		will-change: transform, width, height;
-	}
-
-	.subtitle-highlight.is-ready {
-		transition:
-			transform 380ms cubic-bezier(0.16, 1, 0.3, 1),
-			width 420ms cubic-bezier(0.16, 1, 0.3, 1),
-			height 420ms cubic-bezier(0.16, 1, 0.3, 1),
-			opacity 180ms ease;
-	}
-
-	.subtitle-highlight.is-visible {
-		opacity: 1;
-	}
-
 	/* Floating "back to current line" pill — sticky inside the scroll
 	   container so it stays visible while the reader browses history. */
 	.resume-follow {
@@ -849,7 +812,7 @@
 	/* ─── Reader-comfort themes (transcript only) ─────────────────────────
 	   Opt-in via themeKey. Each palette raises the out-of-focus contrast so
 	   non-active lines stay readable, drops the warm text-glow that tires the
-	   eyes on long reads, and marks the active line with a calm pill highlight
+	   eyes on long reads, and marks the active words with an inline highlight
 	   instead. Music lyrics pass no themeKey and keep their original look. */
 	.subtitle-theme-cream {
 		--lyric-color-active: #2a2521;
@@ -899,7 +862,6 @@
 		.subtitle-theme-contrast
 	) {
 		/* Glow off — soft pill highlight reads calmer over long sessions. */
-		--lyric-glow-active: transparent;
 		background: var(--subtitle-surface);
 		border-radius: 0.85rem;
 		padding: 0.75rem 0.6rem 1.25rem;
@@ -937,7 +899,7 @@
 		opacity: var(--subtitle-future);
 	}
 
-	/* Calm highlight on the active line: subtle tinted pill + weight, no glow. */
+	/* Transcript themes keep the same highlighter mark across palettes. */
 	.lyrics-panel:is(
 			.subtitle-theme-cream,
 			.subtitle-theme-sepia,
@@ -946,7 +908,7 @@
 		)
 		.lyric-line.active {
 		background: transparent;
-		border-radius: 0.6rem;
+		border-radius: 0;
 		text-shadow: none;
 	}
 
@@ -992,10 +954,6 @@
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.subtitle-highlight.is-ready {
-			transition: none;
-		}
-
 		.lyric-line,
 		.lyric-section {
 			transition:
