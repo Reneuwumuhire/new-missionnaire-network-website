@@ -623,7 +623,7 @@
 		background: var(--subtitle-active-bg, rgba(255, 136, 12, 0.18));
 		box-decoration-break: clone;
 		-webkit-box-decoration-break: clone;
-		padding: 0 0.08em;
+		padding: 0 4px;
 		border-radius: 0.16em;
 	}
 
