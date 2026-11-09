@@ -108,10 +108,12 @@ mod platform {
 		pub fn start(&self, id: &str, window_id: u32, max_width: u32, max_height: u32,
 			fps: u32, hide_cursor: bool) -> Result<CaptureInfo, String> {
 			self.stop(Some(id));
-			let content = SCShareableContent::get()
+			let content = SCShareableContent::create()
+				.with_on_screen_windows_only(false)
+				.get()
 				.map_err(|e| format!("Windows unavailable: {e:?}"))?;
 			let window = content.windows().into_iter()
-				.find(|window| window.window_id() == window_id && window.is_on_screen())
+				.find(|window| window.window_id() == window_id)
 				.ok_or("The selected window is no longer open")?;
 			let frame = window.frame();
 			let source_width = frame.size.width.max(1.0);
