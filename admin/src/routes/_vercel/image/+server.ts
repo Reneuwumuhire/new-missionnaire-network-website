@@ -21,5 +21,5 @@ export function GET({ url }) {
 		throw error(400, 'Image host is not allowed');
 	}
 
-	redirect(302, imageUrl.toString());
+	redirect(302, imageUrl, { external: [`https://${expectedHost}`] });
 }
