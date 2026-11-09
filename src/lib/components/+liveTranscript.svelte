@@ -100,7 +100,6 @@
 	// hall while the live audio plays). Esc or the ✕ button closes it.
 	let isFullscreen = $state(false);
 	let autoScroll = $state(false);
-	let autoScrollSpeed = $state(32);
 
 	/** Re-parent the overlay to <body>: the transcript sits inside cards with
 	 *  backdrop-blur/transform, which create stacking contexts that would trap
@@ -430,25 +429,6 @@
 			</svg>
 			{$t('liveTranscript.autoScroll')}
 		</button>
-		<label
-			class="inline-flex items-center gap-1.5 text-[10px] font-body {onDark
-				? 'text-stone-300'
-				: 'text-stone-500'}"
-		>
-			<span class="sr-only">{$t('liveTranscript.scrollSpeed')}</span>
-			<input
-				type="range"
-				min="8"
-				max="80"
-				step="2"
-				bind:value={autoScrollSpeed}
-				aria-label={$t('liveTranscript.scrollSpeed')}
-				class="w-14 accent-missionnaire sm:w-20"
-			/>
-			<span class="min-w-8 tabular-nums"
-				>{$t('liveTranscript.speedPerSecond', { speed: autoScrollSpeed })}</span
-			>
-		</label>
 	</div>
 {/snippet}
 
@@ -522,7 +502,6 @@
 				currentTime={displayTime}
 				pauseOnUserScroll
 				continuousScroll={autoScroll}
-				continuousScrollSpeed={autoScrollSpeed}
 				themeKey={$subtitlePrefs.theme}
 				sizeKey={$subtitlePrefs.size}
 				onseek={handleSeek}
@@ -605,7 +584,6 @@
 			currentTime={displayTime}
 			pauseOnUserScroll
 			continuousScroll={autoScroll}
-			continuousScrollSpeed={autoScrollSpeed}
 			fullscreenLarge
 			themeKey={$subtitlePrefs.theme}
 			sizeKey={$subtitlePrefs.size}

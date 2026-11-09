@@ -50,7 +50,6 @@
 		themeKey?: '' | 'cream' | 'sepia' | 'dark' | 'contrast';
 		sizeKey?: '' | 'sm' | 'md' | 'lg' | 'xl';
 		continuousScroll?: boolean;
-		continuousScrollSpeed?: number;
 	}
 
 	let {
@@ -62,8 +61,7 @@
 		onseek,
 		themeKey = '',
 		sizeKey = '',
-		continuousScroll = false,
-		continuousScrollSpeed = 32
+		continuousScroll = false
 	}: Props = $props();
 
 	let panelElement: HTMLDivElement | undefined = $state();
@@ -73,9 +71,11 @@
 	let prefersReducedMotion = $state(false);
 	let userScrolled = $state(false);
 	let scrollAnimationFrame: number | null = null;
-	let continuousFrame: number | null = null;
-	let continuousLastFrameAt: number | null = null;
+	let syncScrollFrame: number | null = null;
+	let syncScrollOffset: number | null = null;
+	let userScrollFrame: number | null = null;
 	let manualScrollUntil = 0;
+	const SCROLL_SYNC_TRANSITION_MS = 400;
 	// Which way the "back to current line" pill arrow points: down when the
 	// live passage is below the reader's viewport (they scrolled up to read
 	// earlier text), up when it's above (they scrolled ahead).
@@ -96,9 +96,17 @@
 	function onUserScroll() {
 		if (continuousScroll) {
 			manualScrollUntil = performance.now() + 550;
-			continuousLastFrameAt = null;
-			if (continuousFrame === null)
-				continuousFrame = requestAnimationFrame(advanceContinuousScroll);
+			if (syncScrollFrame !== null) cancelAnimationFrame(syncScrollFrame);
+			syncScrollFrame = null;
+			if (userScrollFrame !== null) cancelAnimationFrame(userScrollFrame);
+			userScrollFrame = requestAnimationFrame(() => {
+				userScrollFrame = null;
+				if (!panelElement || currentTime < 0) return;
+				const playbackPosition = getPlaybackScrollTop(currentTime);
+				if (playbackPosition !== null) {
+					syncScrollOffset = panelElement.scrollTop - playbackPosition;
+				}
+			});
 			return;
 		}
 		if (!pauseOnUserScroll) return;
@@ -110,29 +118,60 @@
 		updateScrollDirection();
 	}
 
-	function advanceContinuousScroll(now: number) {
-		continuousFrame = null;
-		if (!continuousScroll || !panelElement) return;
-		if (continuousLastFrameAt === null) continuousLastFrameAt = now;
-		const elapsed = Math.min(now - continuousLastFrameAt, 80);
-		continuousLastFrameAt = now;
+	function getPlaybackScrollTop(time: number): number | null {
+		if (!panelElement || time < 0) return null;
+		const cues = timedLineState.entries;
+		if (cues.length === 0 || time < cues[0].start) return null;
 
-		if (now >= manualScrollUntil) {
-			const maxScroll = panelElement.scrollHeight - panelElement.clientHeight;
-			if (panelElement.scrollTop < maxScroll - 0.5) {
-				panelElement.scrollTop = Math.min(
-					maxScroll,
-					panelElement.scrollTop + (continuousScrollSpeed * elapsed) / 1000
-				);
-			}
+		let low = 0;
+		let high = cues.length;
+		while (low < high) {
+			const middle = (low + high) >>> 1;
+			if (cues[middle].start <= time) low = middle + 1;
+			else high = middle;
 		}
-
+		const leftCue = cues[low - 1];
+		const rightCue = cues[Math.min(low, cues.length - 1)];
+		const getCenter = (index: number) => {
+			const element = lineElements[index];
+			if (!element || !panelElement) return null;
+			const panelRect = panelElement.getBoundingClientRect();
+			const lineRect = element.getBoundingClientRect();
+			return lineRect.top - panelRect.top + panelElement.scrollTop + lineRect.height / 2;
+		};
+		const leftCenter = getCenter(leftCue.index);
+		const rightCenter = getCenter(rightCue.index);
+		if (leftCenter === null || rightCenter === null) return null;
+		const span = rightCue.start - leftCue.start;
+		const progress = span > 0 ? Math.max(0, Math.min(1, (time - leftCue.start) / span)) : 0;
+		const focusPoint = fullscreenLarge ? 0.44 : 0.46;
 		const maxScroll = panelElement.scrollHeight - panelElement.clientHeight;
-		if (now < manualScrollUntil || panelElement.scrollTop < maxScroll - 0.5) {
-			continuousFrame = requestAnimationFrame(advanceContinuousScroll);
-		} else {
-			continuousLastFrameAt = null;
-		}
+		return Math.max(
+			0,
+			Math.min(
+				leftCenter + (rightCenter - leftCenter) * progress - panelElement.clientHeight * focusPoint,
+				maxScroll
+			)
+		);
+	}
+
+	function animateSyncedScroll(target: number) {
+		if (!panelElement) return;
+		if (syncScrollFrame !== null) cancelAnimationFrame(syncScrollFrame);
+		const start = panelElement.scrollTop;
+		const distance = target - start;
+		const startedAt = performance.now();
+		const animate = (now: number) => {
+			if (!panelElement) {
+				syncScrollFrame = null;
+				return;
+			}
+			const progress = Math.min((now - startedAt) / SCROLL_SYNC_TRANSITION_MS, 1);
+			panelElement.scrollTop = start + distance * progress;
+			if (progress < 1) syncScrollFrame = requestAnimationFrame(animate);
+			else syncScrollFrame = null;
+		};
+		syncScrollFrame = requestAnimationFrame(animate);
 	}
 
 	/** Center the active line WITHIN the panel's own scroll area only. We avoid
@@ -344,23 +383,26 @@
 	});
 
 	$effect(() => {
-		void continuousScrollSpeed;
+		void currentTime;
+		void lines;
+		void fullscreenLarge;
 		if (!continuousScroll || !panelElement) {
-			if (continuousFrame !== null) cancelAnimationFrame(continuousFrame);
-			continuousFrame = null;
-			continuousLastFrameAt = null;
+			if (syncScrollFrame !== null) cancelAnimationFrame(syncScrollFrame);
+			syncScrollFrame = null;
+			syncScrollOffset = null;
 			return;
 		}
 
 		if (scrollAnimationFrame !== null) cancelAnimationFrame(scrollAnimationFrame);
 		scrollAnimationFrame = null;
-		continuousLastFrameAt = null;
-		continuousFrame = requestAnimationFrame(advanceContinuousScroll);
-		return () => {
-			if (continuousFrame !== null) cancelAnimationFrame(continuousFrame);
-			continuousFrame = null;
-			continuousLastFrameAt = null;
-		};
+		void tick().then(() => {
+			if (!continuousScroll || !panelElement || performance.now() < manualScrollUntil) return;
+			const playbackPosition = getPlaybackScrollTop(currentTime);
+			if (playbackPosition === null) return;
+			if (syncScrollOffset === null) syncScrollOffset = panelElement.scrollTop - playbackPosition;
+			const maxScroll = panelElement.scrollHeight - panelElement.clientHeight;
+			animateSyncedScroll(Math.max(0, Math.min(playbackPosition + syncScrollOffset, maxScroll)));
+		});
 	});
 
 	$effect(() => {
