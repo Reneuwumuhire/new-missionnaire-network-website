@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { page, navigating } from '$app/stores';
+	import { page, navigating } from '$app/state';
 	import type { Literature } from '$lib/models/literature';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
@@ -59,14 +59,14 @@
 	];
 
 	function handleLanguageChange(lang: string) {
-		const params = new URLSearchParams($page.url.searchParams);
+		const params = new URLSearchParams(page.url.searchParams);
 		params.set('language', lang);
 		params.set('page', '1');
 		goto(`?${params.toString()}`);
 	}
 
 	function handleAuthorChange(author: string) {
-		const params = new URLSearchParams($page.url.searchParams);
+		const params = new URLSearchParams(page.url.searchParams);
 		if (author === 'Tous') params.delete('author');
 		else params.set('author', author);
 
@@ -80,7 +80,7 @@
 	}
 
 	function handleTypeChange(type: string) {
-		const params = new URLSearchParams($page.url.searchParams);
+		const params = new URLSearchParams(page.url.searchParams);
 		if (type === 'All') params.delete('category');
 		else params.set('category', type);
 		params.set('page', '1');
@@ -88,7 +88,7 @@
 	}
 
 	function handleSourceChange(source: string) {
-		const params = new URLSearchParams($page.url.searchParams);
+		const params = new URLSearchParams(page.url.searchParams);
 		if (source === 'All') params.delete('source');
 		else params.set('source', source);
 		params.set('page', '1');
@@ -96,7 +96,7 @@
 	}
 
 	function handleSortChange(property: string) {
-		const params = new URLSearchParams($page.url.searchParams);
+		const params = new URLSearchParams(page.url.searchParams);
 		const current = params.get('sort') || 'release_date:desc';
 		const [currentProp, currentOrder] = current.split(':');
 
@@ -114,7 +114,7 @@
 
 	function handleSearch(e: Event) {
 		const target = e.target as HTMLInputElement;
-		const params = new URLSearchParams($page.url.searchParams);
+		const params = new URLSearchParams(page.url.searchParams);
 		if (target.value) params.set('search', target.value);
 		else params.delete('search');
 		params.set('page', '1');
@@ -328,7 +328,7 @@
 
 	<!-- Main List -->
 	<div class="relative min-h-[400px]">
-		{#if $navigating}
+		{#if navigating}
 			<div
 				class="absolute inset-0 z-20 flex items-center justify-center bg-white/70 backdrop-blur-[1px]"
 			>
@@ -616,7 +616,7 @@
 				current={currentPage}
 				total={totalPages}
 				getHref={(pageNumber) => {
-					const params = new URLSearchParams($page.url.searchParams);
+					const params = new URLSearchParams(page.url.searchParams);
 					params.set('page', String(pageNumber));
 					return `?${params.toString()}`;
 				}}

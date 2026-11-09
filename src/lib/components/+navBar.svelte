@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import HeaderMenuLink from '$lib/components/+headerMenuLink.svelte';
 	import GlobalSearch from '$lib/components/GlobalSearch.svelte';
 	import { locale, setLocale, t, type Locale } from '../../i18n';
@@ -119,13 +119,23 @@
 
 <svelte:window onclick={handleWindowClick} />
 
-<nav class="navbar relative z-[120] max-w-full border-b border-stone-200/40 backdrop-blur-md bg-[#FAF8F3]/90" bind:this={navEl}>
+<nav
+	class="navbar relative z-[120] max-w-full border-b border-stone-200/40 backdrop-blur-md bg-[#FAF8F3]/90"
+	bind:this={navEl}
+>
 	<div class="flex items-center justify-between max-w-[1600px] mx-auto px-4 md:px-6 h-16">
 		<!-- Logo -->
 		<a href="/" class="flex items-center shrink-0">
 			<picture>
 				<source srcset="/icons/logo.webp" type="image/webp" />
-				<img src="/icons/logo.png" class="w-auto h-7" alt="logo" width="75" height="32" fetchpriority="high" />
+				<img
+					src="/icons/logo.png"
+					class="w-auto h-7"
+					alt="logo"
+					width="75"
+					height="32"
+					fetchpriority="high"
+				/>
 			</picture>
 		</a>
 
@@ -203,7 +213,6 @@
 				<Icon src={HiSolidMenuAlt3} className="w-5 h-5" />
 			{/if}
 		</button>
-
 	</div>
 
 	<!-- Mobile menu overlay — direct child of nav for correct absolute positioning -->

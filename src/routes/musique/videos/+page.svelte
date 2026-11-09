@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Breadcrumbs from '$lib/components/+breadcrumbs.svelte';
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import type { YoutubeVideo } from '$lib/models/youtube';
 	import SongVideoCard from '$lib/components/+songVideoCard.svelte';
 	import LoadingRing from '$lib/components/LoadingRing.svelte';

@@ -7,7 +7,7 @@
 	import { derived as derivedStore } from 'svelte/store';
 	import { onMount, onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { t } from '../../../../i18n';
 	import { vercelImage, vercelImagePlaceholder } from '$lib/utils/vercelImage';
 	import BlurUpImage from '$lib/components/BlurUpImage.svelte';
@@ -232,7 +232,7 @@
 	// stripped so a manual refresh doesn't silently restart playback.
 	onMount(() => {
 		if (!browser) return;
-		if ($page.url.searchParams.get('autoplay') !== '1') return;
+		if (page.url.searchParams.get('autoplay') !== '1') return;
 		playRecording();
 		try {
 			window.history.replaceState(window.history.state, '', `/live/rediffusions/${rec.id}`);

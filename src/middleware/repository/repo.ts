@@ -1,7 +1,6 @@
+import { PUBLIC_MAIN_URL } from '$app/env/public';
 export type Methods = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
-import { env } from '$env/dynamic/public';
-
-const URLInstance = new URL(env.PUBLIC_MAIN_URL || 'http://localhost:8080/');
+const URLInstance = new URL(PUBLIC_MAIN_URL || 'http://localhost:8080/');
 
 export default class ApiRepository {
 	private requestDefaultHeaders: HeadersInit;

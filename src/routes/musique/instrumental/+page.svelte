@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { t } from '../../../i18n';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { tick, untrack } from 'svelte';
 	import type { MusicAudio } from '$lib/models/music-audio';
 	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
@@ -57,7 +57,7 @@
 		'md:grid-cols-[28px_minmax(0,2fr)_minmax(0,0.95fr)_minmax(0,0.85fr)_58px_28px_36px_36px] lg:grid-cols-[30px_minmax(0,2.2fr)_minmax(0,1.05fr)_minmax(0,0.95fr)_68px_32px_40px_40px] xl:grid-cols-[30px_minmax(0,2.5fr)_minmax(0,1.2fr)_minmax(0,1fr)_80px_32px_40px_40px]';
 
 	$effect(() => {
-		const playId = $page.url.searchParams.get('play');
+		const playId = page.url.searchParams.get('play');
 		if (!playId || playId === handledPlayId || tracks.length === 0) return;
 		const track = tracks.find((item) => item._id === playId);
 		if (!track) return;

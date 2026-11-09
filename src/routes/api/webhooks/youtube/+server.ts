@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { env } from '$env/dynamic/private';
+import { INTERNAL_API_SECRET, YOUTUBE_API_KEY, YOUTUBE_WEBSUB_SECRET } from '$app/env/private';
 import type { RequestHandler } from './$types';
 import { claimCheckSlot } from '../../../../db/collections';
 import { checkVideoLiveStatus } from '$lib/server/youtube-poller';
@@ -16,7 +16,7 @@ const MAX_NOTIFICATION_BYTES = 64 * 1024;
 const MIN_VIDEO_CHECK_INTERVAL_MS = 30_000;
 
 function webSubSecret(): string | null {
-	return env.YOUTUBE_WEBSUB_SECRET?.trim() || env.INTERNAL_API_SECRET?.trim() || null;
+	return YOUTUBE_WEBSUB_SECRET?.trim() || INTERNAL_API_SECRET?.trim() || null;
 }
 
 async function readBoundedBody(request: Request): Promise<Uint8Array | null> {
@@ -104,11 +104,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	const channelId = /<yt:channelId>([^<]+)<\/yt:channelId>/.exec(body)?.[1];
 	const videoId = /<yt:videoId>([^<]+)<\/yt:videoId>/.exec(body)?.[1];
-	if (
-		channelId !== YOUTUBE_CHANNEL_ID ||
-		!videoId ||
-		!/^[A-Za-z0-9_-]{11}$/.test(videoId)
-	) {
+	if (channelId !== YOUTUBE_CHANNEL_ID || !videoId || !/^[A-Za-z0-9_-]{11}$/.test(videoId)) {
 		return new Response('OK', { status: 202 });
 	}
 
@@ -117,7 +113,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		return new Response('OK', { status: 202 });
 	}
 
-	const apiKey = env.YOUTUBE_API_KEY;
+	const apiKey = YOUTUBE_API_KEY;
 	if (apiKey) {
 		checkVideoLiveStatus(videoId, apiKey).catch((error) =>
 			console.error('[WebSub] Live status check error:', error)

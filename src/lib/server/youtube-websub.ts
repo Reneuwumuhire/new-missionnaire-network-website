@@ -1,5 +1,5 @@
-import { env } from '$env/dynamic/public';
-import { env as privateEnv } from '$env/dynamic/private';
+import { PUBLIC_MAIN_URL } from '$app/env/public';
+import { INTERNAL_API_SECRET, YOUTUBE_WEBSUB_SECRET } from '$app/env/private';
 import { claimCheckSlot } from '../../db/collections';
 
 export const YOUTUBE_CHANNEL_ID = 'UCS3zqpqnCvT0SFa_jI662Kg';
@@ -19,7 +19,7 @@ const SUBSCRIBE_INTERVAL = 4 * 24 * 60 * 60 * 1000;
  * send duplicate subscription requests.
  */
 export async function ensureWebSubSubscription(): Promise<void> {
-	const secret = privateEnv.YOUTUBE_WEBSUB_SECRET?.trim() || privateEnv.INTERNAL_API_SECRET?.trim();
+	const secret = YOUTUBE_WEBSUB_SECRET?.trim() || INTERNAL_API_SECRET?.trim();
 	if (!secret) {
 		console.warn(
 			'[WebSub] Set YOUTUBE_WEBSUB_SECRET (or INTERNAL_API_SECRET) to secure webhook notifications'
@@ -67,7 +67,7 @@ export async function ensureWebSubSubscription(): Promise<void> {
 }
 
 function getCallbackUrl(): string | null {
-	const baseUrl = env.PUBLIC_MAIN_URL;
+	const baseUrl = PUBLIC_MAIN_URL;
 	if (!baseUrl) return null;
 
 	// Normalize: remove trailing slash, add webhook path
@@ -103,7 +103,7 @@ export function isNearScheduledLiveTime(): boolean {
 	const schedules: Array<{ day: number; time: number }> = [
 		{ day: 3, time: 19 * 60 + 30 }, // Wednesday 19:30
 		{ day: 6, time: 19 * 60 + 30 }, // Saturday 19:30
-		{ day: 0, time: 10 * 60 },       // Sunday 10:00
+		{ day: 0, time: 10 * 60 } // Sunday 10:00
 	];
 
 	return schedules.some(({ day: schedDay, time: schedTime }) => {

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { t } from '../../i18n';
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import type { Sermon } from '$lib/models/sermon';
 	import type { PublishedRecording } from '$lib/server/recordings';
 	import { basePlaylist, playlist, isShuffle } from '$lib/stores/global';
@@ -158,7 +158,7 @@
 	let lastSyncedListSearch = $state(((data as any).search || '') as string);
 
 	function applyListSearch() {
-		const params = new URLSearchParams($page.url.searchParams);
+		const params = new URLSearchParams(page.url.searchParams);
 		const value = (searchInput || '').trim();
 		if (value) params.set('search', value);
 		else params.delete('search');
@@ -419,7 +419,7 @@
 	});
 
 	function handleAuthorChange(author: string) {
-		const params = new URLSearchParams($page.url.searchParams);
+		const params = new URLSearchParams(page.url.searchParams);
 		if (author === BRANHAM_AUTHOR) params.delete('author');
 		else params.set('author', author);
 		if ((author === 'Retransmissions') !== (currentAuthor === 'Retransmissions'))
@@ -429,7 +429,7 @@
 	}
 
 	function handleAlphaChange(letter: string) {
-		const params = new URLSearchParams($page.url.searchParams);
+		const params = new URLSearchParams(page.url.searchParams);
 		if (currentAlpha === letter) params.delete('alpha');
 		else params.set('alpha', letter);
 		params.delete('search');
@@ -438,7 +438,7 @@
 	}
 
 	function handleYearChange(year: string) {
-		const params = new URLSearchParams($page.url.searchParams);
+		const params = new URLSearchParams(page.url.searchParams);
 		if (currentYear === year) params.delete('year');
 		else params.set('year', year);
 		params.delete('search');
@@ -447,7 +447,7 @@
 	}
 
 	function handleAudioFilterToggle() {
-		const params = new URLSearchParams($page.url.searchParams);
+		const params = new URLSearchParams(page.url.searchParams);
 		if (currentHasAudio) params.delete('hasAudio');
 		else params.set('hasAudio', 'true');
 		params.set('page', '1');
@@ -456,14 +456,14 @@
 
 	function handleLanguageChange(lang: SermonLanguageFilter) {
 		if (currentLanguage === lang) return;
-		const params = new URLSearchParams($page.url.searchParams);
+		const params = new URLSearchParams(page.url.searchParams);
 		params.set('language', lang);
 		params.set('page', '1');
 		goto(`?${params.toString()}`);
 	}
 
 	function handleSortChange(property: string) {
-		const params = new URLSearchParams($page.url.searchParams);
+		const params = new URLSearchParams(page.url.searchParams);
 		const current = params.get('sort') || 'iso_date:desc';
 		const [currentProp, currentOrder] = current.split(':');
 
@@ -821,7 +821,7 @@
 							class="border border-stone-200 bg-white px-3 py-1.5 outline-none text-stone-800 tabular-nums focus:ring-2 focus:ring-missionnaire/20 transition-all cursor-pointer"
 							value={limit}
 							onchange={(e) => {
-								const params = new URLSearchParams($page.url.searchParams);
+								const params = new URLSearchParams(page.url.searchParams);
 								params.set('limit', e.currentTarget.value);
 								params.set('page', '1');
 								goto(`?${params.toString()}`);
@@ -838,7 +838,7 @@
 					current={currentPage}
 					total={totalPages}
 					getHref={(p) => {
-						const params = new URLSearchParams($page.url.searchParams);
+						const params = new URLSearchParams(page.url.searchParams);
 						params.set('page', String(p));
 						return `?${params.toString()}`;
 					}}
@@ -860,7 +860,7 @@
 					{#if (recordingsTotal ?? 0) > recordings.length}
 						<a
 							href={(() => {
-								const p = new URLSearchParams($page.url.searchParams);
+								const p = new URLSearchParams(page.url.searchParams);
 								p.set('author', 'Retransmissions');
 								p.set('page', '1');
 								return `?${p.toString()}`;

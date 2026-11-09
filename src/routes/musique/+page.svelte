@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { t } from '../../i18n';
 	import type { MusicAudio } from '$lib/models/music-audio';
 	import type { LiveStreamTrack } from '$lib/utils/liveTrack';
@@ -346,10 +346,10 @@
 	// Track the `play` query param reactively rather than only on mount.
 	// Picking a song from the global search uses a client-side goto, which
 	// updates the URL without remounting this page — so an onMount-only read
-	// would miss it when the user is already on /musique. Reading $page.url
+	// would miss it when the user is already on /musique. Reading page.url
 	// here re-runs on every navigation and queues the newly selected song.
 	$effect(() => {
-		const playParam = $page.url.searchParams.get('play');
+		const playParam = page.url.searchParams.get('play');
 		if (playParam && playParam !== pendingPlayId) {
 			untrack(() => {
 				pendingPlayId = playParam;
@@ -503,7 +503,7 @@
 	}
 
 	function handleArtistChange(artist: string) {
-		const params = new URLSearchParams($page.url.searchParams);
+		const params = new URLSearchParams(page.url.searchParams);
 		if (currentArtist === artist) {
 			params.delete('artist');
 		} else {
@@ -517,7 +517,7 @@
 	}
 
 	function handleAlphaChange(letter: string) {
-		const params = new URLSearchParams($page.url.searchParams);
+		const params = new URLSearchParams(page.url.searchParams);
 		if (currentAlpha === letter) {
 			params.delete('alpha');
 		} else {
@@ -531,7 +531,7 @@
 	}
 
 	function handleCategoryChange(category: string) {
-		const params = new URLSearchParams($page.url.searchParams);
+		const params = new URLSearchParams(page.url.searchParams);
 		params.set('category', category);
 		params.delete('artist');
 		params.set('page', '1');
@@ -563,7 +563,7 @@
 	}
 
 	function handleSortChange(property: string) {
-		const params = new URLSearchParams($page.url.searchParams);
+		const params = new URLSearchParams(page.url.searchParams);
 
 		if (property === 'random') {
 			params.set('sort', 'random');
@@ -595,7 +595,7 @@
 	}
 
 	function refreshRandomList() {
-		const params = new URLSearchParams($page.url.searchParams);
+		const params = new URLSearchParams(page.url.searchParams);
 		params.set('sort', 'random');
 		params.set('seed', createPlaylistSeed());
 		params.set('page', '1');
@@ -644,7 +644,7 @@
 
 	function goToActiveSongPage() {
 		if (!activeMusicSongPage || activeMusicSongPage === currentPage) return;
-		const params = new URLSearchParams($page.url.searchParams);
+		const params = new URLSearchParams(page.url.searchParams);
 		params.set('page', activeMusicSongPage.toString());
 		syncSeedParam(params);
 		goto(`?${params.toString()}`);
@@ -1603,7 +1603,7 @@
 						class="bg-stone-100 rounded-lg px-3 py-1.5 outline-none text-stone-800 focus:ring-2 focus:ring-missionnaire/20 transition-all cursor-pointer"
 						value={limit}
 						onchange={(e) => {
-							const params = new URLSearchParams($page.url.searchParams);
+							const params = new URLSearchParams(page.url.searchParams);
 							params.set('limit', e.currentTarget.value);
 							params.set('page', '1');
 							syncSeedParam(params);
@@ -1621,7 +1621,7 @@
 				current={currentPage}
 				total={totalPages}
 				getHref={(p) => {
-					const params = new URLSearchParams($page.url.searchParams);
+					const params = new URLSearchParams(page.url.searchParams);
 					params.set('page', String(p));
 					syncSeedParam(params);
 					return `?${params.toString()}`;

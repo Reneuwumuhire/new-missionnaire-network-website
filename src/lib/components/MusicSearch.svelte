@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { t } from '../../i18n';
 	import type { MusicAudio } from '$lib/models/music-audio';
 
@@ -16,14 +16,14 @@
 
 	// Only navigation syncs the draft. Typing never navigates or reloads the list.
 	$effect(() => {
-		query = $page.url.searchParams.get('search') ?? '';
+		query = page.url.searchParams.get('search') ?? '';
 		open = false;
 		active = -1;
 	});
 
 	$effect(() => {
 		const search = query.trim();
-		const category = $page.url.searchParams.get('category');
+		const category = page.url.searchParams.get('category');
 		if (!suggestions || !open || !search) return;
 		const controller = new AbortController();
 		matches = [];
@@ -52,7 +52,7 @@
 	function submit(song?: MusicAudio) {
 		open = false;
 		active = -1;
-		const params = new URLSearchParams($page.url.searchParams);
+		const params = new URLSearchParams(page.url.searchParams);
 		const search = query.trim();
 		if (search) params.set('search', search);
 		else params.delete('search');
@@ -149,7 +149,7 @@
 					query = '';
 					active = -1;
 					input.focus();
-					if ($page.url.searchParams.has('search')) submit();
+					if (page.url.searchParams.has('search')) submit();
 				}}
 			>
 				<svg

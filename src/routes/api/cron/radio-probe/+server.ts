@@ -1,5 +1,5 @@
+import { CRON_SECRET } from '$app/env/private';
 import { json, error } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
 import { getLiveAudioSourceUrl, applyAutoEndSafety } from '$lib/server/live-audio';
 import { checkLiveAudio } from '$lib/server/icecast';
 import {
@@ -46,7 +46,7 @@ import {
 // as a free load-generator against Icecast.
 
 function authorized(request: Request): boolean {
-	const cronSecret = env.CRON_SECRET;
+	const cronSecret = CRON_SECRET;
 	if (!cronSecret) {
 		// Treat missing secret as a misconfiguration — fail closed in prod.
 		console.warn('[CronRadioProbe] CRON_SECRET not configured — denying request');

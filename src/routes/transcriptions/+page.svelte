@@ -2,7 +2,7 @@
 	import type { PageData } from './$types';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { onDestroy, onMount, untrack } from 'svelte';
 	import { formatFileSize } from '../../utils/FormatTime';
 	import DocumentText1 from 'iconsax-svelte/DocumentText1.svelte';
@@ -58,32 +58,38 @@
 	let initialTotal = $derived((data.pagination?.total || 0) as number);
 	let initialYears = $derived(((data as any).years || []) as number[]);
 	let loadedSearch = $derived(((data as any).search || '') as string);
-	let currentPageNumber = $derived(Number($page.url.searchParams.get('page')) || data.pagination.page || 1);
+	let currentPageNumber = $derived(
+		Number(page.url.searchParams.get('page')) || data.pagination.page || 1
+	);
 	let currentLimit = $derived(data.pagination.limit);
-	let sortOrder = $derived((
-		$page.url.searchParams.get('sort') === 'asc'
+	let sortOrder = $derived(
+		(page.url.searchParams.get('sort') === 'asc'
 			? 'asc'
-			: $page.url.searchParams.get('sort') === 'desc'
+			: page.url.searchParams.get('sort') === 'desc'
 				? 'desc'
-				: data.sort || 'desc'
-	) as 'asc' | 'desc');
-	let selectedYear = $derived($page.url.searchParams.get('year') || data.selectedYear || '');
-	let currentSearch = $derived($page.url.searchParams.get('search') || loadedSearch || '');
+				: data.sort || 'desc') as 'asc' | 'desc'
+	);
+	let selectedYear = $derived(page.url.searchParams.get('year') || data.selectedYear || '');
+	let currentSearch = $derived(page.url.searchParams.get('search') || loadedSearch || '');
 	let isDeferredData = $derived(Boolean((data as any).deferred));
-	let requestKey = $derived(JSON.stringify({
-		page: currentPageNumber,
-		limit: currentLimit,
-		sort: sortOrder,
-		year: selectedYear || '',
-		search: currentSearch || ''
-	}));
-	let dataRequestKey = $derived(JSON.stringify({
-		page: data.pagination.page,
-		limit: currentLimit,
-		sort: (data.sort || 'desc') as 'asc' | 'desc',
-		year: data.selectedYear || '',
-		search: loadedSearch || ''
-	}));
+	let requestKey = $derived(
+		JSON.stringify({
+			page: currentPageNumber,
+			limit: currentLimit,
+			sort: sortOrder,
+			year: selectedYear || '',
+			search: currentSearch || ''
+		})
+	);
+	let dataRequestKey = $derived(
+		JSON.stringify({
+			page: data.pagination.page,
+			limit: currentLimit,
+			sort: (data.sort || 'desc') as 'asc' | 'desc',
+			year: data.selectedYear || '',
+			search: loadedSearch || ''
+		})
+	);
 	let totalPages = $derived(Math.ceil(total / currentLimit));
 	let showPagination = $derived(total > 10);
 	let summaryFrom = $derived(total === 0 ? 0 : (currentPageNumber - 1) * currentLimit + 1);
@@ -147,8 +153,7 @@
 		} catch (error) {
 			if ((error as Error).name === 'AbortError') return;
 			if (token !== currentRequestToken || key !== requestKey) return;
-			listLoadError =
-				error instanceof Error ? error.message : $t('transcriptions.loadFailed');
+			listLoadError = error instanceof Error ? error.message : $t('transcriptions.loadFailed');
 			isSearching = false;
 		} finally {
 			if (token === currentRequestToken) isListLoading = false;
@@ -281,7 +286,9 @@
 				>
 					Missionnaire Network
 				</p>
-				<h1 class="font-display text-4xl md:text-5xl font-semibold tracking-tight leading-[1.05] text-stone-900 mb-3">
+				<h1
+					class="font-display text-4xl md:text-5xl font-semibold tracking-tight leading-[1.05] text-stone-900 mb-3"
+				>
 					{$t('nav.transcriptions')}
 				</h1>
 				<p class="text-sm text-stone-500 font-body mb-2">
@@ -405,7 +412,9 @@
 					: 'hidden md:flex'}"
 			>
 				<div class="flex items-center space-x-2 w-full sm:w-auto">
-					<label for="year-filter" class="text-sm text-stone-600 font-body">{$t('transcriptions.yearLabel')}</label>
+					<label for="year-filter" class="text-sm text-stone-600 font-body"
+						>{$t('transcriptions.yearLabel')}</label
+					>
 					<select
 						id="year-filter"
 						class="border border-stone-200 px-3 py-2 text-sm font-body text-stone-700 bg-white tabular-nums focus:outline-none focus:ring-2 focus:ring-missionnaire/30 focus:border-missionnaire/40 w-full sm:w-auto"
@@ -466,7 +475,7 @@
 					</div>
 				{/if}
 				<div class="mb-2 px-2 sm:px-0">
-					<ResultsSummary from={summaryFrom} to={summaryTo} total={total} query={currentSearch} />
+					<ResultsSummary from={summaryFrom} to={summaryTo} {total} query={currentSearch} />
 				</div>
 				<div class="border border-stone-200/60 bg-white/40 mx-2 sm:mx-0">
 					{#each documents as document (document._id)}
@@ -530,7 +539,7 @@
 							current={currentPageNumber}
 							total={totalPages}
 							getHref={(p) => {
-								const params = new URLSearchParams($page.url.searchParams);
+								const params = new URLSearchParams(page.url.searchParams);
 								params.set('page', String(p));
 								return `?${params.toString()}`;
 							}}
@@ -570,7 +579,9 @@
 						<div class="mb-6">
 							<dl class="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
 								<div>
-									<dt class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.15em] text-stone-400 font-body">
+									<dt
+										class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.15em] text-stone-400 font-body"
+									>
 										{$t('transcriptions.fileSize')}
 									</dt>
 									<dd class="mt-1 text-xs sm:text-sm text-stone-800 tabular-nums">
@@ -578,7 +589,9 @@
 									</dd>
 								</div>
 								<div>
-									<dt class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.15em] text-stone-400 font-body">
+									<dt
+										class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.15em] text-stone-400 font-body"
+									>
 										{$t('transcriptions.publishDate')}
 									</dt>
 									<dd class="mt-1 text-xs sm:text-sm text-stone-800 tabular-nums">

@@ -1,6 +1,6 @@
+import { PUBLIC_VAPID_KEY } from '$app/env/public';
+import { PUSH_NOTIFICATIONS_ENABLED, VAPID_PRIVATE_KEY } from '$app/env/private';
 import webpush from 'web-push';
-import { env } from '$env/dynamic/private';
-import { env as publicEnv } from '$env/dynamic/public';
 import { getAllPushSubscriptions, removePushSubscription } from '../../db/collections';
 
 let vapidConfigured = false;
@@ -8,8 +8,8 @@ let vapidConfigured = false;
 function ensureVapidConfigured() {
 	if (vapidConfigured) return true;
 
-	const publicKey = publicEnv.PUBLIC_VAPID_KEY;
-	const privateKey = env.VAPID_PRIVATE_KEY;
+	const publicKey = PUBLIC_VAPID_KEY;
+	const privateKey = VAPID_PRIVATE_KEY;
 
 	if (!publicKey || !privateKey) {
 		console.warn('[Push] VAPID keys not configured — push notifications disabled');
@@ -71,8 +71,10 @@ export async function sendPushToAll(payload: PushPayload): Promise<void> {
 	// in main-site .env.local during local dev so test "Aller en direct" clicks
 	// don't spam real subscribers. Production should leave this unset (defaults
 	// to enabled).
-	if (env.PUSH_NOTIFICATIONS_ENABLED === 'false') {
-		console.log(`[Push] Disabled via PUSH_NOTIFICATIONS_ENABLED — would have sent: "${payload.title}"`);
+	if (PUSH_NOTIFICATIONS_ENABLED === 'false') {
+		console.log(
+			`[Push] Disabled via PUSH_NOTIFICATIONS_ENABLED — would have sent: "${payload.title}"`
+		);
 		return;
 	}
 
@@ -104,7 +106,10 @@ export async function sendPushToAll(payload: PushPayload): Promise<void> {
 		if (statusCode === 410 || statusCode === 404 || statusCode === 401 || statusCode === 403) {
 			await removePushSubscription(subscriptions[i].endpoint);
 			removed++;
-			console.log(`[Push] Removed invalid subscription (${statusCode}):`, subscriptions[i].endpoint);
+			console.log(
+				`[Push] Removed invalid subscription (${statusCode}):`,
+				subscriptions[i].endpoint
+			);
 		} else {
 			failed++;
 			// Timeouts (ETIMEDOUT / EHOSTUNREACH) are transient — the subscription
@@ -143,7 +148,9 @@ export function radioLivePayload(opts?: {
 	const payload: PushPayload = {
 		// Lead with the broadcast's real title so the lock-screen card is
 		// informative on its own; sensible generic copy when admin left it blank.
-		title: broadcastTitle ? `\u{1F534} En direct\u00a0: ${clampBody(broadcastTitle, 80)}` : 'Audio en direct',
+		title: broadcastTitle
+			? `\u{1F534} En direct\u00a0: ${clampBody(broadcastTitle, 80)}`
+			: 'Audio en direct',
 		body: broadcastDescription
 			? clampBody(broadcastDescription)
 			: 'Missionnaire Network est en direct audio maintenant\u00a0!',
@@ -212,7 +219,9 @@ export function liveScheduledPayload(opts: {
 }): PushPayload {
 	const payload: PushPayload = {
 		title: 'Direct \u00e0 venir',
-		body: clampBody(`\u00ab\u00a0${opts.title}\u00a0\u00bb \u2014 ${formatScheduledDateFr(opts.scheduledAtIso)}`),
+		body: clampBody(
+			`\u00ab\u00a0${opts.title}\u00a0\u00bb \u2014 ${formatScheduledDateFr(opts.scheduledAtIso)}`
+		),
 		url: `/live/${opts.slug}`,
 		icon: '/favicon.png',
 		// Per-broadcast tag: the later "starts soon" reminder replaces this
@@ -234,7 +243,9 @@ export function liveReminderPayload(opts: {
 }): PushPayload {
 	const payload: PushPayload = {
 		title: 'Le direct commence bient\u00f4t',
-		body: clampBody(`\u00ab\u00a0${opts.title}\u00a0\u00bb commence \u00e0 ${formatScheduledTimeFr(opts.scheduledAtIso)}.`),
+		body: clampBody(
+			`\u00ab\u00a0${opts.title}\u00a0\u00bb commence \u00e0 ${formatScheduledTimeFr(opts.scheduledAtIso)}.`
+		),
 		url: `/live/${opts.slug}`,
 		icon: '/favicon.png',
 		// Replaces the earlier announcement card for this same broadcast.
@@ -245,4 +256,3 @@ export function liveReminderPayload(opts: {
 	if (image) payload.image = image;
 	return payload;
 }
-
