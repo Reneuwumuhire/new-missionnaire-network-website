@@ -3,7 +3,7 @@
 	import BsPlayCircleFill from 'svelte-icons-pack/bs/BsPlayCircleFill';
 	import { formatDate, formatTime, formatFileSize } from '../../utils/FormatTime';
 	import type { YoutubeVideo } from '$lib/models/youtube';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { selectedVideo } from '$lib/stores/videoStore';
 	import AiOutlineFilePdf from 'svelte-icons-pack/ai/AiOutlineFilePdf';
 	import HiOutlineEye from 'svelte-icons-pack/hi/HiOutlineEye';
@@ -20,7 +20,9 @@
 	<div class="flex w-full flex-col space-y-10">
 		<!-- video player container -->
 		<div class="w-full">
-			<div class="relative w-full aspect-[4/5] md:aspect-video bg-hardBlack rounded-2xl md:rounded-[2.5rem] overflow-hidden shadow-2xl group">
+			<div
+				class="relative w-full aspect-[4/5] md:aspect-video bg-hardBlack rounded-2xl md:rounded-[2.5rem] overflow-hidden shadow-2xl group"
+			>
 				{#if playNow}
 					<div class="flex flex-row items-center justify-center w-full h-full" id="player">
 						<iframe
@@ -38,16 +40,24 @@
 						src={$selectedVideo?.thumbnail}
 						alt={$selectedVideo?.title ?? ''}
 					/>
-					
+
 					<!-- Overlay Gradient -->
-					<div class="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent transition-opacity duration-500 opacity-95 group-hover:opacity-90"></div>
+					<div
+						class="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent transition-opacity duration-500 opacity-95 group-hover:opacity-90"
+					></div>
 
 					<!-- Overlay Content -->
-					<div class="absolute inset-0 p-6 md:p-12 flex flex-col justify-between pointer-events-none">
+					<div
+						class="absolute inset-0 p-6 md:p-12 flex flex-col justify-between pointer-events-none"
+					>
 						<!-- Top badge area -->
 						<div class="flex justify-between items-start">
-							<div class="px-4 py-2 bg-black/60 backdrop-blur-md rounded-full border border-white/10">
-								<span class="text-missionnaire font-bold text-xs tracking-wider uppercase">{$selectedVideo?.duration_string}</span>
+							<div
+								class="px-4 py-2 bg-black/60 backdrop-blur-md rounded-full border border-white/10"
+							>
+								<span class="text-missionnaire font-bold text-xs tracking-wider uppercase"
+									>{$selectedVideo?.duration_string}</span
+								>
 							</div>
 
 							{#if $selectedVideo?.pdfInfo && $selectedVideo.pdfInfo.length > 0}
@@ -55,7 +65,8 @@
 									{#each $selectedVideo.pdfInfo as pdf}
 										<a
 											href={pdf.url}
-											target="_blank" rel="noopener noreferrer"
+											target="_blank"
+											rel="noopener noreferrer"
 											class="flex items-center gap-2 px-4 py-2 bg-missionnaire/90 hover:bg-missionnaire text-white rounded-full shadow-lg transition-all hover:scale-105 active:scale-95 group/pdf"
 											title={pdf.filename}
 										>
@@ -81,23 +92,34 @@
 						<!-- Bottom Info -->
 						<div class="space-y-4 max-w-4xl">
 							<div class="space-y-3">
-								<h1 class="text-white font-bold text-md md:text-3xl leading-tight drop-shadow-lg line-clamp-2">
+								<h1
+									class="text-white font-bold text-md md:text-3xl leading-tight drop-shadow-lg line-clamp-2"
+								>
 									{$selectedVideo?.title}
 								</h1>
-								
-								<p class="text-white/70 text-sm md:text-lg line-clamp-2 leading-relaxed drop-shadow-md">
+
+								<p
+									class="text-white/70 text-sm md:text-lg line-clamp-2 leading-relaxed drop-shadow-md"
+								>
 									{$selectedVideo?.description}
 								</p>
 							</div>
-							
+
 							<div class="flex flex-wrap items-center gap-6 text-white/50 text-xs md:text-base">
 								<div class="flex items-center gap-2">
 									<Icon src={HiOutlineCalendar} size="1.1rem" />
-									<span>{formatDate($selectedVideo?.release_timestamp ? new Date($selectedVideo.release_timestamp * 1000) : $selectedVideo?.upload_date || '')}</span>
+									<span
+										>{formatDate(
+											$selectedVideo?.release_timestamp
+												? new Date($selectedVideo.release_timestamp * 1000)
+												: $selectedVideo?.upload_date || ''
+										)}</span
+									>
 								</div>
 								<div class="flex items-center gap-2">
 									<Icon src={HiOutlineEye} size="1.1rem" />
-									<span>{$selectedVideo?.view_count?.toLocaleString() || 0} {$t('misc.views')}</span>
+									<span>{$selectedVideo?.view_count?.toLocaleString() || 0} {$t('misc.views')}</span
+									>
 								</div>
 							</div>
 						</div>

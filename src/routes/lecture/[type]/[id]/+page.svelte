@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { afterNavigate } from '$app/navigation';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { t } from '../../../../i18n';
 	import { libraryHref } from '$lib/utils/librarySearch';
 	import { playLibraryResult } from '$lib/utils/playLibraryResult';
@@ -17,12 +17,12 @@
 		expandedText = false;
 	});
 	const occurrenceHref = (occurrence: number) => {
-		const params = new URLSearchParams($page.url.searchParams);
+		const params = new URLSearchParams(page.url.searchParams);
 		params.set('occurrence', String(occurrence));
-		return `${$page.url.pathname}?${params}`;
+		return `${page.url.pathname}?${params}`;
 	};
 	let pdfUrl = $derived(
-		`/api/library/${data.result.type}/${data.result.id}/pdf?${$page.url.searchParams}`
+		`/api/library/${data.result.type}/${data.result.id}/pdf?${page.url.searchParams}`
 	);
 	afterNavigate(() => {
 		if (data.pages.length) return;
@@ -38,7 +38,7 @@
 			href={libraryHref({
 				q: data.query,
 				match: data.mode,
-				language: $page.url.searchParams.get('language') || ''
+				language: page.url.searchParams.get('language') || ''
 			})}>{$t('reader.back')}</a
 		>
 		<p class="text-xs uppercase tracking-widest text-stone-500 mt-5">

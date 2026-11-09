@@ -3,7 +3,7 @@
 	import type { PublishedRecording, RecordingType } from '$lib/server/recordings';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
-	import { navigating, page } from '$app/stores';
+	import { navigating, page } from '$app/state';
 	import { vercelImage, vercelImageSrcSet, vercelImagePlaceholder } from '$lib/utils/vercelImage';
 	import BlurUpImage from '$lib/components/BlurUpImage.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
@@ -75,19 +75,21 @@
 		return qs ? `?${qs}` : '';
 	}
 
-	// Reactive on $page so the hrefs Pagination receives stay in sync with
+	// Reactive on page so the hrefs Pagination receives stay in sync with
 	// the URL even when only the search box changes (Pagination tracks only
 	// its `getHref` prop reference — a stable function would never trigger
 	// a re-render, leaving stale page-2 links that drop the search). The
-	// $:-block depends on $page.url.searchParams, so each navigation hands
+	// $:-block depends on page.url.searchParams, so each navigation hands
 	// Pagination a fresh function reference.
-	let listHref = $derived(((sp: URLSearchParams) => (pageN: number) => {
-		const params = new URLSearchParams(sp);
-		if (pageN > 1) params.set('page', String(pageN));
-		else params.delete('page');
-		const qs = params.toString();
-		return `/live/rediffusions${qs ? `?${qs}` : ''}`;
-	})($page.url.searchParams));
+	let listHref = $derived(
+		((sp: URLSearchParams) => (pageN: number) => {
+			const params = new URLSearchParams(sp);
+			if (pageN > 1) params.set('page', String(pageN));
+			else params.delete('page');
+			const qs = params.toString();
+			return `/live/rediffusions${qs ? `?${qs}` : ''}`;
+		})(page.url.searchParams)
+	);
 
 	// Link to a recording, carrying the current list state so the detail
 	// page can rebuild the exact same "Tous les directs" URL.
@@ -133,7 +135,9 @@
 		goto('/live/rediffusions', { noScroll: true });
 	}
 
-	let hasActiveFilters = $derived(Boolean(data.filters.q || data.filters.year || data.filters.type));
+	let hasActiveFilters = $derived(
+		Boolean(data.filters.q || data.filters.year || data.filters.type)
+	);
 
 	let expandedThumb: PublishedRecording | null = $state(null);
 	let failedThumbs = $state(new Set<string>());
@@ -268,7 +272,11 @@
 		{/if}
 		{#if $mobileFiltersOpen}
 			<div class="md:hidden -mx-6 border-b border-stone-200 bg-cream px-4 py-3 space-y-3">
-				<div class="flex flex-wrap items-center gap-1.5" role="group" aria-label={$t('rediffusions.typeGroup')}>
+				<div
+					class="flex flex-wrap items-center gap-1.5"
+					role="group"
+					aria-label={$t('rediffusions.typeGroup')}
+				>
 					{#each [{ v: '', label: $t('list.all') }, { v: 'retransmission', label: $t('rediffusions.retransmissions') }, { v: 'local', label: $t('rediffusions.local') }] as opt}
 						{@const typeValue = opt.v as '' | RecordingType}
 						<button
@@ -335,15 +343,19 @@
 			method="GET"
 			action="/live/rediffusions"
 			onsubmit={(e) => {
-			e.preventDefault();
-			onSearchInput();
-		}}
+				e.preventDefault();
+				onSearchInput();
+			}}
 			class="hidden md:block mb-6 border border-stone-200/60 bg-white/40 p-3 sm:p-4"
 		>
 			<!-- Type segmented control: Retransmission = relayed broadcast
 			     (Frank/Ewald/retransmission title), Locales = everything else
 			     (sermons recorded at this assembly, e.g. by Chauffeur). -->
-			<div class="mb-3 flex flex-wrap items-center gap-1.5" role="group" aria-label={$t('rediffusions.typeGroup')}>
+			<div
+				class="mb-3 flex flex-wrap items-center gap-1.5"
+				role="group"
+				aria-label={$t('rediffusions.typeGroup')}
+			>
 				<button
 					type="button"
 					onclick={() => selectType('')}
@@ -409,7 +421,7 @@
 					name="year"
 					bind:value={yearInput}
 					onchange={onFilterChange}
-					disabled={$navigating ? true : false}
+					disabled={navigating ? true : false}
 					class="border border-stone-200/80 bg-white px-3 py-2.5 min-h-11 text-sm font-body text-stone-800 disabled:opacity-50 disabled:cursor-not-allowed focus:border-missionnaire/40 focus:outline-none focus:ring-2 focus:ring-missionnaire/30"
 					aria-label={$t('rediffusions.filterByYear')}
 				>
@@ -423,7 +435,7 @@
 					name="month"
 					bind:value={monthInput}
 					onchange={onFilterChange}
-					disabled={!yearInput || !!$navigating}
+					disabled={!yearInput || !!navigating}
 					class="border border-stone-200/80 bg-white px-3 py-2.5 min-h-11 text-sm font-body text-stone-800 disabled:opacity-50 disabled:cursor-not-allowed focus:border-missionnaire/40 focus:outline-none focus:ring-2 focus:ring-missionnaire/30"
 					aria-label={$t('rediffusions.filterByMonth')}
 				>
@@ -462,7 +474,7 @@
 
 		<!-- Results: skeleton rows while SvelteKit loads a new filter/page. -->
 		<div class="relative min-h-[200px]">
-			{#if $navigating?.to?.url.pathname === '/live/rediffusions'}
+			{#if navigating?.to?.url.pathname === '/live/rediffusions'}
 				<div class="border border-stone-200/60 bg-white/40">
 					<ListSkeleton rows={8} />
 				</div>

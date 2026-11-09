@@ -2,7 +2,7 @@
 	import AndroidBanner from '$lib/components/+androidBanner.svelte';
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { t } from '../../i18n';
 	import MusicSearch from '$lib/components/MusicSearch.svelte';
 
@@ -28,9 +28,9 @@
 		}
 	});
 
-	let isAudioActive = $derived($page.url.pathname === '/musique');
-	let isInstrumentalActive = $derived($page.url.pathname === '/musique/instrumental');
-	let isVideoActive = $derived($page.url.pathname === '/musique/videos');
+	let isAudioActive = $derived(page.url.pathname === '/musique');
+	let isInstrumentalActive = $derived(page.url.pathname === '/musique/instrumental');
+	let isVideoActive = $derived(page.url.pathname === '/musique/videos');
 </script>
 
 <!-- Compact header band: one line of identity (kicker + Cormorant title +

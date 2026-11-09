@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { radioIsLive } from '$lib/stores/global';
 	import { t, type TranslationKey } from '../../i18n';
 	import { portal } from '$lib/actions/portal';
@@ -63,11 +63,12 @@
 	// every navigation (client-side included) — computing the match
 	// inside a plain helper hides `pathname` from the dependency
 	// tracker and leaves the highlight stuck on first paint.
-	let pathname = $derived($page.url.pathname);
-	let activeHref =
-		$derived(items.find((item) =>
+	let pathname = $derived(page.url.pathname);
+	let activeHref = $derived(
+		items.find((item) =>
 			item.match.some((base) => pathname === base || pathname.startsWith(`${base}/`))
-		)?.href ?? null);
+		)?.href ?? null
+	);
 
 	// "Menu" opens a bottom sheet with the sections the four tabs don't
 	// cover (Questions, Documents…) — one tap to reach anything,

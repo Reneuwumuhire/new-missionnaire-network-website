@@ -1,7 +1,7 @@
 <script lang="ts">
 	import ResumeToast from '$lib/components/+resumeToast.svelte';
 	import { browser } from '$app/environment';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { searchQuery } from '$lib/stores/global';
 	import { goto } from '$app/navigation';
 	import { onDestroy, onMount, untrack } from 'svelte';
@@ -11,12 +11,12 @@
 	let { children } = $props();
 	// Seeded from the URL (not load data) so there's no initial-value capture;
 	// the sync $effect below keeps it aligned on every navigation.
-	let heroSearchValue = $state($page.url.searchParams.get('search') || '');
+	let heroSearchValue = $state(page.url.searchParams.get('search') || '');
 	let debounceTimer: ReturnType<typeof setTimeout> | undefined = $state();
 	let isHeroSearchLoading = $state(false);
 	let lastSyncedSearch = $state('');
 
-	let currentSearch = $derived($page.url.searchParams.get('search') || '');
+	let currentSearch = $derived(page.url.searchParams.get('search') || '');
 	$effect(() => {
 		if (currentSearch !== lastSyncedSearch) {
 			heroSearchValue = currentSearch;
@@ -28,7 +28,7 @@
 
 	async function handleHeroSearch() {
 		if (!browser) return;
-		const params = new URLSearchParams($page.url.searchParams);
+		const params = new URLSearchParams(page.url.searchParams);
 		if (heroSearchValue.trim()) {
 			params.set('search', heroSearchValue.trim());
 		} else {

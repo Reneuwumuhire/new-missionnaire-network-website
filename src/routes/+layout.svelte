@@ -15,7 +15,7 @@
 	import { selectAudio } from '$lib/stores/global';
 	import type { LayoutData } from './$types';
 	import { QueryClientProvider } from '@tanstack/svelte-query';
-	import { navigating, page } from '$app/stores';
+	import { navigating, page } from '$app/state';
 	import { afterNavigate, goto } from '$app/navigation';
 	import { browser, dev } from '$app/environment';
 	import { onMount, tick } from 'svelte';
@@ -169,13 +169,13 @@
 		};
 	});
 
-	let canonicalUrl = $derived(`${SITE_URL}${$page.url.pathname}`);
+	let canonicalUrl = $derived(`${SITE_URL}${page.url.pathname}`);
 	// Pages can publish per-route OG overrides through their `load`'s
 	// returned `meta` object. We surface a single set of og:* meta tags
 	// in <svelte:head> using these values so crawlers like WhatsApp
 	// never see duplicated og:title / og:description tags from layout +
 	// page (which they handle inconsistently).
-	let pageMeta = $derived((($page.data as any)?.meta ?? {}) as PageMeta);
+	let pageMeta = $derived(((page.data as any)?.meta ?? {}) as PageMeta);
 	let ogTitle = $derived(pageMeta.title || DEFAULT_SEO_TITLE);
 	let ogDescription = $derived(pageMeta.description || DEFAULT_SEO_DESCRIPTION);
 	let ogUrl = $derived(pageMeta.url || canonicalUrl);
@@ -197,7 +197,7 @@
 	);
 
 	const ytPages = ['/videos', '/musique', '/predications'];
-	let needsYouTube = $derived(ytPages.some((p) => $page.url.pathname.startsWith(p)));
+	let needsYouTube = $derived(ytPages.some((p) => page.url.pathname.startsWith(p)));
 
 	// Radio live status — push-driven, no polling.
 	// 1. SSR seeds `data.radioState` so first paint shows truth.
@@ -404,7 +404,7 @@
 	<meta name="twitter:image" content={ogImage} />
 </svelte:head>
 
-{#if $navigating}
+{#if navigating}
 	<div class="fixed top-0 left-0 right-0 z-[9999] h-[2px] overflow-hidden">
 		<div class="h-full w-full animate-progress"></div>
 	</div>
@@ -420,7 +420,7 @@
 			<NavBar />
 		</div>
 		<div class="relative mt-[120px]" style={browser ? `margin-top: ${headerHeight}px;` : undefined}>
-			{#key $page.url.pathname}
+			{#key page.url.pathname}
 				<div class="page-fade-in">
 					{@render children?.()}
 				</div>

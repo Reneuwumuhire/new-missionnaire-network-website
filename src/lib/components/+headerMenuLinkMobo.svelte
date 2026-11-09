@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import BsChevronDown from 'svelte-icons-pack/bs/BsChevronDown';
 	import type { NavigationLinkSubmenu } from '../../helpers/NavigationLinkList';
@@ -28,10 +28,10 @@
 	}: Props = $props();
 
 	let isActive = $derived(
-		$page.url.pathname === link ||
-			$page.url.pathname.startsWith(link + '/') ||
+		page.url.pathname === link ||
+			page.url.pathname.startsWith(link + '/') ||
 			subMenu.some(
-				(item) => $page.url.pathname === item.link || $page.url.pathname.startsWith(item.link + '/')
+				(item) => page.url.pathname === item.link || page.url.pathname.startsWith(item.link + '/')
 			)
 	);
 </script>
@@ -79,7 +79,7 @@
 		<div class="mobo-submenu flex flex-col ml-4 mb-3 border-l border-stone-200 pl-4">
 			{#each subMenu as { subName, link: subLink, subText, image, icon }, i (subName)}
 				{@const isSubActive =
-					$page.url.pathname === subLink || $page.url.pathname.startsWith(subLink + '/')}
+					page.url.pathname === subLink || page.url.pathname.startsWith(subLink + '/')}
 				<a
 					href={subLink}
 					class="group flex items-start gap-3 py-2.5 transition-colors duration-200"

@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { t } from '../i18n';
 
-	let isNotFound = $derived($page.status === 404);
+	let isNotFound = $derived(page.status === 404);
 
 	const quickLinks = [
 		{ href: '/predications', key: 'nav.predications' },
@@ -13,12 +13,12 @@
 </script>
 
 <svelte:head>
-	<title>{$page.status} — Missionnaire Network</title>
+	<title>{page.status} — Missionnaire Network</title>
 </svelte:head>
 
 <div class="bg-cream flex flex-col items-center justify-center min-h-[70vh] px-6 py-16 text-center">
 	<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-4 font-body">
-		{$page.status}
+		{page.status}
 	</p>
 	<h1 class="font-display text-4xl md:text-5xl font-semibold text-stone-900 mb-4">
 		{isNotFound ? $t('errors.notFoundTitle') : $t('errors.serverTitle')}
@@ -26,8 +26,8 @@
 	<p class="text-sm md:text-base text-stone-500 font-body max-w-md mb-2">
 		{isNotFound ? $t('errors.notFoundBody') : $t('errors.serverBody')}
 	</p>
-	{#if !isNotFound && $page.error?.message}
-		<p class="text-xs text-stone-400 font-body max-w-md">{$page.error.message}</p>
+	{#if !isNotFound && page.error?.message}
+		<p class="text-xs text-stone-400 font-body max-w-md">{page.error.message}</p>
 	{/if}
 
 	<div class="mt-8 flex flex-col sm:flex-row items-center gap-3">

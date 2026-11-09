@@ -3,7 +3,7 @@
 	import type { PageData } from './$types';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { formatFileSize } from '../../utils/FormatTime';
 	import DocumentText1 from 'iconsax-svelte/DocumentText1.svelte';

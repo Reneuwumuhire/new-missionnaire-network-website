@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { MAX_PASSAGE_QUERY } from '$lib/utils/passageSearch';
 	import { playLibraryResult } from '$lib/utils/playLibraryResult';
-	import { page, navigating } from '$app/stores';
+	import { page, navigating } from '$app/state';
 	import { t } from '../../i18n';
 	import {
 		libraryTypes,
@@ -22,7 +22,7 @@
 	<div class="mx-auto max-w-5xl">
 		<h1 class="font-display text-4xl sm:text-5xl leading-tight">{$t('search.library')}</h1>
 		<p class="mt-3 text-stone-600 max-w-2xl">{$t('search.libraryDescription')}</p>
-		{#key $page.url.search}
+		{#key page.url.search}
 			<form
 				action="/recherche"
 				method="GET"
@@ -128,7 +128,7 @@
 	</div>
 </section>
 
-<section class="px-5 sm:px-8 pb-14 font-body" aria-busy={!!$navigating}>
+<section class="px-5 sm:px-8 pb-14 font-body" aria-busy={!!navigating}>
 	<div class="max-w-5xl mx-auto">
 		<p class="sr-only" role="status">{playbackMessage}</p>
 		{#if data.failure}
@@ -136,7 +136,7 @@
 				<p>{data.failure === 'invalid' ? $t('search.invalidFilters') : $t('search.unavailable')}</p>
 				{#if data.failure === 'unavailable'}<a
 						class="underline min-h-11 inline-flex items-center"
-						href={$page.url.pathname + $page.url.search}
+						href={page.url.pathname + page.url.search}
 						data-sveltekit-reload>{$t('errors.retry')}</a
 					>{/if}
 			</div>
