@@ -1,4 +1,4 @@
-import { env } from '$env/dynamic/public';
+import { PUBLIC_MAIN_URL } from '$app/env/public';
 import { claimCheckSlot } from '../../db/collections';
 
 const CHANNEL_ID = 'UCS3zqpqnCvT0SFa_jI662Kg';
@@ -55,7 +55,7 @@ export async function ensureWebSubSubscription(): Promise<void> {
 }
 
 function getCallbackUrl(): string | null {
-	const baseUrl = env.PUBLIC_MAIN_URL;
+	const baseUrl = PUBLIC_MAIN_URL;
 	if (!baseUrl) return null;
 
 	// Normalize: remove trailing slash, add webhook path
@@ -91,7 +91,7 @@ export function isNearScheduledLiveTime(): boolean {
 	const schedules: Array<{ day: number; time: number }> = [
 		{ day: 3, time: 19 * 60 + 30 }, // Wednesday 19:30
 		{ day: 6, time: 19 * 60 + 30 }, // Saturday 19:30
-		{ day: 0, time: 10 * 60 },       // Sunday 10:00
+		{ day: 0, time: 10 * 60 } // Sunday 10:00
 	];
 
 	return schedules.some(({ day: schedDay, time: schedTime }) => {

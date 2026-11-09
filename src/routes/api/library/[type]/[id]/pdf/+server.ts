@@ -1,5 +1,5 @@
+import { LIBRARY_ASSET_HOSTS } from '$app/env/private';
 import { error } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
 import { loadLibrarySource } from '$lib/server/libraryPassage';
 import type { RequestHandler } from './$types';
 
@@ -7,7 +7,7 @@ export const GET: RequestHandler = async ({ params, url, request, fetch }) => {
 	const { asset, parts } = await loadLibrarySource(params.type, params.id, url.searchParams);
 	if (!asset || !parts.some((part) => part.page)) error(404);
 	const target = new URL(asset);
-	const hosts = (env.LIBRARY_ASSET_HOSTS || 'missionnaire-bucket.s3.af-south-1.amazonaws.com')
+	const hosts = (LIBRARY_ASSET_HOSTS || 'missionnaire-bucket.s3.af-south-1.amazonaws.com')
 		.split(',')
 		.map((host) => host.trim());
 	if (target.protocol !== 'https:' || target.port || !hosts.includes(target.hostname)) error(404);

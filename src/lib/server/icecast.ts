@@ -1,4 +1,4 @@
-import { env } from '$env/dynamic/private';
+import { ICECAST_STATUS_URL } from '$app/env/private';
 import { getLiveAudioHlsUrl, getLiveAudioSourceUrl, probeLiveAudio } from '$lib/server/live-audio';
 
 // Reads the real listener count from Icecast's public `/status-json.xsl`, the
@@ -37,8 +37,8 @@ const STATUS_FETCH_TIMEOUT_MS = 10_000;
  * needed (e.g. `https://…/radio.mp3` → `https://…/status-json.xsl`).
  */
 function icecastStatusUrl(): string {
-	if (env.ICECAST_STATUS_URL && env.ICECAST_STATUS_URL.length > 0) {
-		return env.ICECAST_STATUS_URL;
+	if (ICECAST_STATUS_URL && ICECAST_STATUS_URL.length > 0) {
+		return ICECAST_STATUS_URL;
 	}
 	try {
 		return new URL('/status-json.xsl', getLiveAudioSourceUrl()).toString();
@@ -77,9 +77,7 @@ function isStreamMount(source: IcecastSource, mount: string): boolean {
  *  neither. Without this check the admin showed "live detected" and the
  *  monitor played fallback silence while OBS was off. */
 function hasConnectedSource(source: IcecastSource): boolean {
-	return (
-		typeof source.stream_start_iso8601 === 'string' || typeof source.server_type === 'string'
-	);
+	return typeof source.stream_start_iso8601 === 'string' || typeof source.server_type === 'string';
 }
 
 /** Distinct clients currently pulling the HLS DVR feed (the default playback

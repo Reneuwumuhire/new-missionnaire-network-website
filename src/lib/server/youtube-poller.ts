@@ -1,4 +1,4 @@
-import { env } from '$env/dynamic/private';
+import { YOUTUBE_API_KEY } from '$app/env/private';
 import {
 	claimCheckSlot,
 	getYouTubeCachedStatus,
@@ -8,8 +8,8 @@ import { isNearScheduledLiveTime } from './youtube-websub';
 
 // Near scheduled live times, poll every 2 min as safety net for WebSub.
 // Outside live windows, poll every 15 min (just to catch edge cases).
-const CHECK_INTERVAL_NEAR_LIVE = 2 * 60 * 1000;   // 2 minutes
-const CHECK_INTERVAL_DEFAULT = 15 * 60 * 1000;     // 15 minutes
+const CHECK_INTERVAL_NEAR_LIVE = 2 * 60 * 1000; // 2 minutes
+const CHECK_INTERVAL_DEFAULT = 15 * 60 * 1000; // 15 minutes
 
 export type LiveStatus = {
 	isLive: boolean;
@@ -96,7 +96,7 @@ export async function checkAndIngestLiveStream(force = false) {
 	}
 
 	try {
-		const apiKey = env.YOUTUBE_API_KEY;
+		const apiKey = YOUTUBE_API_KEY;
 		if (!apiKey) {
 			console.warn('[YouTube Poller] YOUTUBE_API_KEY is not defined. Skipping check.');
 			return;
@@ -167,7 +167,9 @@ export async function checkVideoLiveStatus(videoId: string, apiKey: string): Pro
 			}
 		}
 	} catch (error) {
-		console.error(`[YouTube WebSub] Check error: ${error instanceof Error ? error.message : error}`);
+		console.error(
+			`[YouTube WebSub] Check error: ${error instanceof Error ? error.message : error}`
+		);
 	}
 }
 
@@ -200,7 +202,9 @@ async function checkViaRss(apiKey: string): Promise<boolean> {
 		const data = (await apiResponse.json()) as VideoListResponse;
 		return handleLiveResult(data);
 	} catch (error) {
-		console.error(`[YouTube Poller] RSS check error: ${error instanceof Error ? error.message : error}`);
+		console.error(
+			`[YouTube Poller] RSS check error: ${error instanceof Error ? error.message : error}`
+		);
 		return false;
 	}
 }
@@ -228,7 +232,9 @@ async function checkViaSearch(apiKey: string): Promise<boolean> {
 		}
 		return false;
 	} catch (error) {
-		console.error(`[YouTube Poller] search check error: ${error instanceof Error ? error.message : error}`);
+		console.error(
+			`[YouTube Poller] search check error: ${error instanceof Error ? error.message : error}`
+		);
 		return false;
 	}
 }

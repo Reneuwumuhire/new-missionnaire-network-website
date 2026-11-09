@@ -1,5 +1,5 @@
+import { INTERNAL_API_SECRET } from '$app/env/private';
 import { json, error } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
 import {
 	sendPushToAll,
 	radioLivePayload,
@@ -27,7 +27,7 @@ type BroadcastEventBody = {
 };
 
 function authorized(request: Request): boolean {
-	const secret = env.INTERNAL_API_SECRET;
+	const secret = INTERNAL_API_SECRET;
 	if (!secret) {
 		console.warn('[BroadcastEvent] INTERNAL_API_SECRET not configured — denying request');
 		return false;

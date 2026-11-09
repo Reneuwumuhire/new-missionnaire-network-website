@@ -1,4 +1,8 @@
-import { env } from '$env/dynamic/private';
+import {
+	ICECAST_OFFLINE_AUTO_END_MS as ICECAST_OFFLINE_AUTO_END_MS_ENV,
+	LIVE_AUDIO_HLS_URL,
+	LIVE_AUDIO_SOURCE_URL
+} from '$app/env/private';
 import { normalizeLiveStreamUrl } from '$lib/utils/liveStreamUrl';
 import {
 	setBroadcastAdminState,
@@ -18,7 +22,7 @@ const LIVE_AUDIO_PROBE_TIMEOUT_MS = 10_000;
 // recording, which the Fly.io recorder finalizes when its Icecast read EOFs).
 // Override via ICECAST_OFFLINE_AUTO_END_MS env var.
 export const ICECAST_OFFLINE_AUTO_END_MS = (() => {
-	const raw = Number(env.ICECAST_OFFLINE_AUTO_END_MS);
+	const raw = Number(ICECAST_OFFLINE_AUTO_END_MS_ENV);
 	return Number.isFinite(raw) && raw > 0 ? raw : 300_000;
 })();
 
@@ -49,7 +53,7 @@ export type LiveAudioProbe = {
 };
 
 export function getLiveAudioSourceUrl(): string {
-	const configuredSource = normalizeLiveStreamUrl(env.LIVE_AUDIO_SOURCE_URL);
+	const configuredSource = normalizeLiveStreamUrl(LIVE_AUDIO_SOURCE_URL);
 	if (configuredSource && configuredSource.length > 0) {
 		return configuredSource;
 	}
@@ -60,7 +64,7 @@ export function getLiveAudioSourceUrl(): string {
  *  not configured — the player then falls back to the Icecast byte stream
  *  (live-edge only, no server-side pause/seek window). */
 export function getLiveAudioHlsUrl(): string {
-	return normalizeLiveStreamUrl(env.LIVE_AUDIO_HLS_URL);
+	return normalizeLiveStreamUrl(LIVE_AUDIO_HLS_URL);
 }
 
 /** Read at least `minBytes` from a ReadableStreamDefaultReader. */

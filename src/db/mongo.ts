@@ -1,6 +1,5 @@
+import { MONGODB_URI } from '$app/env/private';
 import { MongoClient, ServerApiVersion } from 'mongodb';
-import { env } from '$env/dynamic/private';
-
 let client: MongoClient | null = null;
 let isConnecting = false;
 let connectionPromise: Promise<MongoClient> | null = null;
@@ -12,7 +11,7 @@ export async function connect() {
 	}
 
 	try {
-		const mongoUri = env.MONGODB_URI;
+		const mongoUri = MONGODB_URI;
 		if (!mongoUri) throw new Error('MONGODB_URI is not configured');
 
 		// Reuse the existing pooled client without an explicit ping. The
