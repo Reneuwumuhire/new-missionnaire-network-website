@@ -4,7 +4,7 @@ import {
 	getYouTubeCachedStatus,
 	setYouTubeCachedStatus
 } from '../../db/collections';
-import { isNearScheduledLiveTime } from './youtube-websub';
+import { isNearScheduledLiveTime, YOUTUBE_CHANNEL_ID } from './youtube-websub';
 
 // Near scheduled live times, poll every 2 min as safety net for WebSub.
 // Outside live windows, poll every 15 min (just to catch edge cases).
@@ -143,6 +143,8 @@ export async function checkAndIngestLiveStream(force = false) {
  * Costs 1 quota unit.
  */
 export async function checkVideoLiveStatus(videoId: string, apiKey: string): Promise<void> {
+	if (!/^[A-Za-z0-9_-]{11}$/.test(videoId)) return;
+
 	try {
 		const apiUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,liveStreamingDetails&id=${videoId}&key=${apiKey}`;
 		const response = await fetch(apiUrl);
@@ -153,7 +155,12 @@ export async function checkVideoLiveStatus(videoId: string, apiKey: string): Pro
 		}
 
 		const data = (await response.json()) as VideoListResponse;
-		const liveItem = data.items?.find((item) => item.snippet.liveBroadcastContent === 'live');
+		const video = data.items?.find((item) => item.id === videoId);
+		// The webhook is public by design, so do not let a valid video ID from a
+		// different channel change the site's live status.
+		if (!video || video.snippet.channelId !== YOUTUBE_CHANNEL_ID) return;
+
+		const liveItem = video.snippet.liveBroadcastContent === 'live' ? video : undefined;
 
 		if (liveItem) {
 			await applyLiveStatus(liveItem.id, liveItem.snippet);
@@ -237,6 +244,7 @@ type VideoListResponse = {
 	items?: Array<{
 		id: string;
 		snippet: {
+			channelId: string;
 			title: string;
 			description: string;
 			liveBroadcastContent: string;
