@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { PUBLIC_VAPID_KEY } from '$app/env/public';
 	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
 	import { get } from 'svelte/store';
@@ -129,8 +130,6 @@
 		return outputArray.buffer as ArrayBuffer;
 	}
 </script>
-
-import {PUBLIC_VAPID_KEY} from '$app/env/public';
 
 {#if isSupported && permission !== 'denied'}
 	<span class="relative inline-flex shrink-0" class:animate-wiggle={justToggled && isSubscribed}>
