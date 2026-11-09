@@ -3,12 +3,13 @@
 /// <reference lib="esnext" />
 /// <reference lib="webworker" />
 
-import { build, files, version } from '$service-worker';
+import { version } from '$app/env';
+import { assets, immutable } from '$app/manifest';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
 const CACHE_NAME = `admin-cache-${version}`;
-const ASSETS = [...build, ...files];
+const ASSETS = [...immutable.map(({ path }) => path), ...assets.map(({ path }) => path)];
 
 sw.addEventListener('install', (event) => {
 	event.waitUntil(
@@ -44,7 +45,11 @@ sw.addEventListener('fetch', (event) => {
 	if (url.origin !== sw.location.origin) return;
 
 	// Skip API routes and auth-related requests
-	if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/login') || url.pathname.startsWith('/logout')) {
+	if (
+		url.pathname.startsWith('/api/') ||
+		url.pathname.startsWith('/login') ||
+		url.pathname.startsWith('/logout')
+	) {
 		return;
 	}
 
