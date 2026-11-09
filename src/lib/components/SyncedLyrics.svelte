@@ -592,6 +592,8 @@
 		z-index: 1;
 		display: block;
 		width: 100%;
+		max-width: min(100%, 38rem);
+		margin-inline: auto;
 		margin-top: 0.35rem;
 		border: 0;
 		background: transparent;
@@ -862,9 +864,12 @@
 		scroll-padding-block: 42%;
 	}
 
+	.lyrics-panel.fullscreen-large .lyric-line {
+		max-width: min(100%, 52rem);
+	}
+
 	/* Bigger type for reading at a distance (projection / across the room) */
 	.lyrics-panel.fullscreen-large .lyric-text {
-		max-width: min(100%, 52rem);
 		font-size: calc(1.7rem * var(--lyric-font-scale, 1));
 		line-height: 1.55;
 	}
