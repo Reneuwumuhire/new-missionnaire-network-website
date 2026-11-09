@@ -1,5 +1,3 @@
-import { env } from '$env/dynamic/private';
-
 interface IcecastSource {
 	listenurl?: string;
 	stream_start_iso8601?: string;
@@ -20,12 +18,12 @@ export interface IcecastSnapshot {
 }
 
 function icecastStatusUrl(): string {
-	return env.ICECAST_STATUS_URL ?? 'http://localhost:8000/status-json.xsl';
+	return process.env.ICECAST_STATUS_URL ?? 'http://localhost:8000/status-json.xsl';
 }
 
 /** Public MP3 stream URL. Falls back to deriving from the status URL. */
 export function icecastStreamUrl(): string {
-	if (env.ICECAST_STREAM_URL) return env.ICECAST_STREAM_URL;
+	if (process.env.ICECAST_STREAM_URL) return process.env.ICECAST_STREAM_URL;
 	return icecastStatusUrl().replace(/\/status-json\.xsl$/, '/radio.mp3');
 }
 
@@ -35,8 +33,9 @@ export function icecastStreamUrl(): string {
  *  for every listener regardless of anyone's buffering latency. Derives from
  *  RECORDER_URL (the recorder serves /hls/*) unless overridden. */
 export function liveAudioHlsUrl(): string | null {
-	if (env.LIVE_AUDIO_HLS_URL) return env.LIVE_AUDIO_HLS_URL;
-	if (env.RECORDER_URL) return `${env.RECORDER_URL.replace(/\/$/, '')}/hls/live.m3u8`;
+	if (process.env.LIVE_AUDIO_HLS_URL) return process.env.LIVE_AUDIO_HLS_URL;
+	if (process.env.RECORDER_URL)
+		return `${process.env.RECORDER_URL.replace(/\/$/, '')}/hls/live.m3u8`;
 	return null;
 }
 
@@ -69,9 +68,7 @@ function isStreamMount(source: IcecastSource, mount: string): boolean {
  *  neither. Without this check the admin showed "live detected" and the
  *  monitor played fallback silence while OBS was off. */
 function hasConnectedSource(source: IcecastSource): boolean {
-	return (
-		typeof source.stream_start_iso8601 === 'string' || typeof source.server_type === 'string'
-	);
+	return typeof source.stream_start_iso8601 === 'string' || typeof source.server_type === 'string';
 }
 
 /** Distinct clients currently pulling the HLS DVR feed (the default playback

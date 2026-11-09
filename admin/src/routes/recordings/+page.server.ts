@@ -1,5 +1,4 @@
 import { error } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
 import type { PageServerLoad } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
 import {
@@ -54,6 +53,6 @@ export const load: PageServerLoad = async ({ locals }) => {
 		upcomingLives,
 		pastLives,
 		// Base for the public watch links (/live/<slug>).
-		publicBaseUrl: (env.MAIN_SITE_URL || 'https://missionnaire.net').replace(/\/$/, '')
+		publicBaseUrl: (process.env.MAIN_SITE_URL || 'https://missionnaire.net').replace(/\/$/, '')
 	};
 };

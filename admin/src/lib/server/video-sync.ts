@@ -1,4 +1,3 @@
-import { env } from '$env/dynamic/private';
 import { ObjectId } from 'mongodb';
 import { getDb } from '../../db/mongo';
 
@@ -86,7 +85,9 @@ function formatDuration(seconds: number): string {
 		: `${m}:${String(s).padStart(2, '0')}`;
 }
 
-function bestThumbnail(thumbnails: Record<string, { url: string; width?: number; height?: number }> = {}) {
+function bestThumbnail(
+	thumbnails: Record<string, { url: string; width?: number; height?: number }> = {}
+) {
 	return (
 		thumbnails.maxres?.url ||
 		thumbnails.standard?.url ||
@@ -102,12 +103,12 @@ function normalizeDate(value: string | Date | null | undefined): Date | null {
 	return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function normalizeTags(rawTags: string[] | undefined, title: string, description: string): string[] {
-	const tags = new Set(
-		(rawTags || [])
-			.map((tag) => tag.trim().toLowerCase())
-			.filter(Boolean)
-	);
+function normalizeTags(
+	rawTags: string[] | undefined,
+	title: string,
+	description: string
+): string[] {
+	const tags = new Set((rawTags || []).map((tag) => tag.trim().toLowerCase()).filter(Boolean));
 	const text = `${title} ${description}`.toLowerCase();
 
 	if (
@@ -139,7 +140,7 @@ function normalizeTags(rawTags: string[] | undefined, title: string, description
 }
 
 async function fetchFromYouTubeApi(videoId: string): Promise<VideoMetadata | null> {
-	const apiKey = env.YOUTUBE_API_KEY?.trim();
+	const apiKey = process.env.YOUTUBE_API_KEY?.trim();
 	if (!apiKey) return null;
 
 	try {
@@ -165,7 +166,8 @@ async function fetchFromYouTubeApi(videoId: string): Promise<VideoMetadata | nul
 			title: snippet.title || `YouTube ${videoId}`,
 			description: snippet.description || '',
 			publishedAt,
-			thumbnail: bestThumbnail(snippet.thumbnails) || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+			thumbnail:
+				bestThumbnail(snippet.thumbnails) || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
 			thumbnails: thumbs,
 			duration,
 			viewCount: Number.parseInt(item.statistics?.viewCount || '0', 10) || 0,
@@ -224,13 +226,17 @@ export async function ensureVideoForRecording(source: RecordingVideoSource): Pro
 
 	const metadata = await fetchVideoMetadata(source.videoId);
 	const fallbackDate = normalizeDate(source.startedAt) ?? new Date();
-	const publishedAt = normalizeDate(metadata?.publishedAt as Date | string | undefined) ?? fallbackDate;
+	const publishedAt =
+		normalizeDate(metadata?.publishedAt as Date | string | undefined) ?? fallbackDate;
 	const timestamp = Math.floor(publishedAt.getTime() / 1000);
 	const title = metadata?.title || source.title || `YouTube ${source.videoId}`;
 	const description = metadata?.description || source.description || '';
-	const duration = metadata?.duration && metadata.duration > 0 ? metadata.duration : source.durationSec ?? 0;
+	const duration =
+		metadata?.duration && metadata.duration > 0 ? metadata.duration : (source.durationSec ?? 0);
 	const thumbnail =
-		metadata?.thumbnail || source.thumbnailUrl || `https://i.ytimg.com/vi/${source.videoId}/hqdefault.jpg`;
+		metadata?.thumbnail ||
+		source.thumbnailUrl ||
+		`https://i.ytimg.com/vi/${source.videoId}/hqdefault.jpg`;
 	const url = `https://www.youtube.com/watch?v=${source.videoId}`;
 
 	await videos.updateOne(
@@ -277,11 +283,12 @@ export async function ensureVideoForRecording(source: RecordingVideoSource): Pro
 
 function serializeTranscriptPdf(pdf: Record<string, unknown>): LinkedTranscriptPdf | null {
 	if (!pdf.url) return null;
-	const publishedOn = pdf.publishedOn instanceof Date
-		? pdf.publishedOn.toISOString()
-		: typeof pdf.publishedOn === 'string'
-			? pdf.publishedOn
-			: undefined;
+	const publishedOn =
+		pdf.publishedOn instanceof Date
+			? pdf.publishedOn.toISOString()
+			: typeof pdf.publishedOn === 'string'
+				? pdf.publishedOn
+				: undefined;
 	return {
 		_id: String(pdf._id),
 		url: String(pdf.url),

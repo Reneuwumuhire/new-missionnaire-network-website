@@ -1,6 +1,5 @@
 import { error, fail, redirect, type Actions } from '@sveltejs/kit';
 import { ObjectId } from 'mongodb';
-import { env } from '$env/dynamic/private';
 import type { PageServerLoad } from './$types';
 import { getDb } from '../../db/mongo';
 import { getPermissions } from '$lib/models/admin-user';
@@ -34,7 +33,7 @@ type ExtraitRecord = { _id: ObjectId | string; [key: string]: any };
 async function fetchArchive(fetch: typeof globalThis.fetch): Promise<ArchivedPost[] | null> {
 	try {
 		const response = await fetch(
-			`${(env.MAIN_SITE_URL || 'https://missionnaire.net').replace(/\/$/, '')}/api/publications/archive`,
+			`${(process.env.MAIN_SITE_URL || 'https://missionnaire.net').replace(/\/$/, '')}/api/publications/archive`,
 			{ signal: AbortSignal.timeout(5000) }
 		);
 		if (!response.ok) throw new Error(`Archive returned ${response.status}`);
