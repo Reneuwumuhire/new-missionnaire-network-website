@@ -306,7 +306,7 @@ export function librarySourcePipeline(
 				{
 					$subtract: [
 						{
-							$add: [
+							$subtract: [
 								'$scheduled.subtitle_anchor_epoch_ms',
 								fallback('$scheduled.subtitle_offset_ms', 0)
 							]
