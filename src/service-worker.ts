@@ -67,6 +67,13 @@ const APP_SHELL_ASSETS = [
 	'/'
 ];
 
+// Manifest paths are relative to the site root; request URL pathnames
+// include a leading slash. Keep this list separate from navigations so
+// the home page still gets refreshed in the background.
+const CACHE_FIRST_ASSET_PATHS = new Set(
+	[...immutable, ...assets].map(({ path }) => new URL(path, sw.location.origin).pathname)
+);
+
 // ── Install ───────────────────────────────────────────────────────
 // Pre-cache the app shell so the first paint after install works
 // fully offline. We DO NOT auto-skipWaiting here — that's handled
@@ -321,10 +328,8 @@ async function handleThumbnailFetch(request: Request): Promise<Response> {
 async function handleAppShellFetch(request: Request, url: URL): Promise<Response> {
 	const cache = await caches.open(APP_SHELL_CACHE);
 
-	// Build artefacts and pinned static files: cache-first. These are
-	// content-hashed by SvelteKit, so a cache hit is always correct
-	// for the version we have installed.
-	if (build.includes(url.pathname) || files.includes(url.pathname)) {
+	// Build artefacts and static files from SvelteKit's manifest: cache-first.
+	if (CACHE_FIRST_ASSET_PATHS.has(url.pathname)) {
 		const cached = await cache.match(request);
 		if (cached) return cached;
 		try {
