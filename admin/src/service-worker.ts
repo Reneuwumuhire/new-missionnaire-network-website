@@ -3,12 +3,13 @@
 /// <reference lib="esnext" />
 /// <reference lib="webworker" />
 
-import { build, files, version } from '$service-worker';
+import { version } from '$app/env';
+import { assets, immutable } from '$app/manifest';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
 const CACHE_NAME = `admin-cache-${version}`;
-const ASSETS = [...build, ...files];
+const ASSETS = [...immutable.map(({ path }) => path), ...assets.map(({ path }) => path)];
 
 sw.addEventListener('install', (event) => {
 	event.waitUntil(
