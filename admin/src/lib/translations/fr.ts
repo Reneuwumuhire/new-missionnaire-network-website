@@ -38,6 +38,7 @@ export default {
 
 	// ── Navigation (sidebar) ────────────────────────────────────
 	'nav.dashboard': 'Tableau de bord',
+	'nav.audience': 'Audience du site',
 	'nav.questions': 'Questions',
 	'nav.recordings': 'Enregistrements',
 	'nav.audioLibrary': 'Bibliothèque audio',

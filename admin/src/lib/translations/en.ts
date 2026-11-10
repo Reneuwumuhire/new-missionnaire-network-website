@@ -39,6 +39,7 @@ const en: Record<keyof typeof fr, string> = {
 
 	// ── Navigation (sidebar) ────────────────────────────────────
 	'nav.dashboard': 'Dashboard',
+	'nav.audience': 'Website audience',
 	'nav.questions': 'Questions',
 	'nav.recordings': 'Recordings',
 	'nav.audioLibrary': 'Audio library',

@@ -45,7 +45,6 @@
 		stopPendingAnalytics();
 		if (
 			!browser ||
-			dev ||
 			navigator.webdriver ||
 			navigator.doNotTrack === '1' ||
 			url.pathname.startsWith('/__')
