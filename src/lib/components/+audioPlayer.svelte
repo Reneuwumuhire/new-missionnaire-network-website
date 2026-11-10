@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
+	import { recordPlayback, type PlaybackKind } from '$lib/utils/playbackAnalytics';
 	import { getContext, onDestroy, onMount, tick } from 'svelte';
 	import { get } from 'svelte/store';
 	import {
@@ -92,6 +93,7 @@
 	// Tracks which element we've already wired listeners to, so the reactive
 	// attach block below doesn't double-bind when other state triggers a re-run.
 	let listenersBoundTo: HTMLAudioElement | null = null;
+	let playbackAnalyticsTimer: ReturnType<typeof setTimeout> | undefined;
 	let currentTime = $state(0);
 	let duration = $state(0);
 	let progressBarWidth = $state(0);
@@ -1265,6 +1267,7 @@
 	}
 
 	onDestroy(() => {
+		clearTimeout(playbackAnalyticsTimer);
 		if (prefetchTimer) clearTimeout(prefetchTimer);
 		if (downloadFeedbackTimeout) clearTimeout(downloadFeedbackTimeout);
 		downloadController?.abort();
@@ -1278,6 +1281,7 @@
 	}
 
 	function handleEnded() {
+		clearTimeout(playbackAnalyticsTimer);
 		cancelSessionReload();
 		console.log('[Audio] ended event');
 		// A live stream only "ends" when the connection breaks (Icecast
@@ -1526,6 +1530,7 @@
 	}
 
 	function handleAudioPause() {
+		clearTimeout(playbackAnalyticsTimer);
 		console.log('[Audio] pause event', {
 			readyState: audio?.readyState,
 			currentTime: audio?.currentTime,
@@ -1654,14 +1659,47 @@
 
 	function handleAudioPlaying() {
 		isAudioReady = true;
+		clearTimeout(playbackAnalyticsTimer);
+		const item = $selectAudio;
+		if (!item) return;
+		playbackAnalyticsTimer = setTimeout(() => {
+			if (audio?.paused || $selectAudio !== item) return;
+			const tags = 'tags' in item ? item.tags : [];
+			const kind: PlaybackKind = isLiveStreamTrack(item)
+				? 'live'
+				: isSermonItem(item) || tags.includes('predication')
+					? 'sermon'
+					: 's3_url' in item || tags.includes('song')
+						? 'song'
+						: 'recording';
+			const id = isLiveStreamTrack(item)
+				? 'live-radio'
+				: '_id' in item && item._id
+					? String(item._id)
+					: 'full_date_code' in item
+						? item.full_date_code
+						: 'path' in item
+							? item.path
+							: '';
+			const title = isLiveStreamTrack(item)
+				? 'Radio en direct'
+				: 'title' in item && item.title
+					? item.title
+					: 'french_title' in item
+						? item.french_title || item.full_date_code
+						: '';
+			recordPlayback(kind, id, title || id);
+		}, 10_000);
 	}
 
 	function handleAudioWaiting() {
+		clearTimeout(playbackAnalyticsTimer);
 		isAudioReady = false;
 		console.log('[Audio] waiting');
 	}
 
 	function handleAudioError(e: Event) {
+		clearTimeout(playbackAnalyticsTimer);
 		setPendingPlaybackIntent(null);
 		console.error('[AudioPlayer] Audio error:', e);
 		isPlaying.set(false);
