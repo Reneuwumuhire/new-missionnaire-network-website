@@ -1,7 +1,7 @@
 import { getDb } from '../../db/mongo';
 import { dev } from '$app/environment';
+import type { AudiencePeriod } from './audience-period';
 
-export type AudienceRange = '5m' | 7 | 30 | 90;
 export type AudienceData = {
 	from: string;
 	through: string;
@@ -10,7 +10,7 @@ export type AudienceData = {
 	visits: number;
 	pageVisits: number;
 	daily: { date: string; visitors: number }[];
-	minutes: { slot: number; visitors: number }[];
+	timeBuckets: { slot: number; visitors: number }[];
 	topPages: { path: string; visitors: number }[];
 	devices: { name: string; count: number }[];
 	countries: { name: string; count: number }[];
@@ -39,22 +39,17 @@ type PlayFacet = {
 type RecentVisitFacet = {
 	visitors: { count: number }[];
 	pageVisits: { count: number }[];
-	minutes: { _id: number; count: number }[];
+	timeBuckets: { _id: number; count: number }[];
 	pages: { _id: string; count: number }[];
 	devices: { _id: string; count: number }[];
 	countries: { _id: string; count: number }[];
 	referrers: { _id: string; count: number }[];
 };
 
-async function getRecentAudienceData(): Promise<AudienceData> {
+async function getRecentAudienceData(period: AudiencePeriod): Promise<AudienceData> {
 	const now = Date.now();
-	const cutoff = new Date(now - 5 * 60 * 1000);
-	const today = new Intl.DateTimeFormat('en-CA', {
-		timeZone: 'Africa/Kigali',
-		year: 'numeric',
-		month: '2-digit',
-		day: '2-digit'
-	}).format(new Date(now));
+	const cutoff = new Date(now - (period.recentMinutes ?? 5) * 60_000);
+	const bucketMs = period.bucketMinutes * 60_000;
 	const db = await getDb();
 	const [visitResult, playResult] = await Promise.all([
 		db
@@ -65,11 +60,13 @@ async function getRecentAudienceData(): Promise<AudienceData> {
 					$facet: {
 						visitors: [{ $group: { _id: '$visitorId' } }, { $count: 'count' }],
 						pageVisits: [{ $count: 'count' }],
-						minutes: [
+						timeBuckets: [
 							{
 								$group: {
 									_id: {
-										slot: { $floor: { $divide: [{ $subtract: ['$occurredAt', cutoff] }, 60_000] } },
+										slot: {
+											$floor: { $divide: [{ $subtract: ['$occurredAt', cutoff] }, bucketMs] }
+										},
 										visitor: '$visitorId'
 									}
 								}
@@ -139,7 +136,7 @@ async function getRecentAudienceData(): Promise<AudienceData> {
 	const visits = visitResult ?? {
 		visitors: [],
 		pageVisits: [],
-		minutes: [],
+		timeBuckets: [],
 		pages: [],
 		devices: [],
 		countries: [],
@@ -153,14 +150,14 @@ async function getRecentAudienceData(): Promise<AudienceData> {
 		count: row.count
 	}));
 	return {
-		from: today,
-		through: today,
+		from: period.from,
+		through: period.through,
 		windowStartedAt: cutoff.toISOString(),
 		visitors: visits.visitors[0]?.count ?? 0,
 		visits: visits.visitors[0]?.count ?? 0,
 		pageVisits: visits.pageVisits[0]?.count ?? 0,
 		daily: [],
-		minutes: visits.minutes.map((row) => ({ slot: row._id, visitors: row.count })),
+		timeBuckets: visits.timeBuckets.map((row) => ({ slot: row._id, visitors: row.count })),
 		topPages: visits.pages.map((row) => ({ path: row._id, visitors: row.count })),
 		devices: visits.devices.map((row) => ({ name: row._id, count: row.count })),
 		countries: visits.countries.map((row) => ({ name: row._id, count: row.count })),
@@ -172,17 +169,9 @@ async function getRecentAudienceData(): Promise<AudienceData> {
 	};
 }
 
-export async function getAudienceData(days: AudienceRange): Promise<AudienceData> {
-	if (days === '5m') return getRecentAudienceData();
-	const through = new Intl.DateTimeFormat('en-CA', {
-		timeZone: 'Africa/Kigali',
-		year: 'numeric',
-		month: '2-digit',
-		day: '2-digit'
-	}).format(new Date());
-	const start = new Date(`${through}T00:00:00Z`);
-	start.setUTCDate(start.getUTCDate() - days + 1);
-	const from = start.toISOString().slice(0, 10);
+export async function getAudienceData(period: AudiencePeriod): Promise<AudienceData> {
+	if (period.recentMinutes !== null) return getRecentAudienceData(period);
+	const { from, through } = period;
 	const end = new Date(`${through}T00:00:00Z`);
 	end.setUTCDate(end.getUTCDate() + 1);
 	const exclusiveEnd = end.toISOString().slice(0, 10);
@@ -290,7 +279,7 @@ export async function getAudienceData(days: AudienceRange): Promise<AudienceData
 		visits: visits.visits[0]?.count ?? 0,
 		pageVisits: visits.pageVisits[0]?.count ?? 0,
 		daily: visits.daily.map((row) => ({ date: row._id, visitors: row.count })),
-		minutes: [],
+		timeBuckets: [],
 		topPages: visits.pages.map((row) => ({ path: row._id, visitors: row.count })),
 		devices: visits.devices.map((row) => ({ name: row._id, count: row.count })),
 		countries: visits.countries.map((row) => ({ name: row._id, count: row.count })),
