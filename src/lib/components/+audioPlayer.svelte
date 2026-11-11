@@ -1667,11 +1667,13 @@
 			const tags = 'tags' in item ? item.tags : [];
 			const kind: PlaybackKind = isLiveStreamTrack(item)
 				? 'live'
-				: isSermonItem(item) || tags.includes('predication')
-					? 'sermon'
-					: 's3_url' in item || tags.includes('song')
-						? 'song'
-						: 'recording';
+				: 'analyticsKind' in item && item.analyticsKind === 'recording'
+					? 'recording'
+					: isSermonItem(item) || tags.includes('predication')
+						? 'sermon'
+						: 's3_url' in item || tags.includes('song')
+							? 'song'
+							: 'recording';
 			const id = isLiveStreamTrack(item)
 				? 'live-radio'
 				: '_id' in item && item._id
