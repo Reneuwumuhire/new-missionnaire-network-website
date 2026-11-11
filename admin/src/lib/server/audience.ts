@@ -1,6 +1,10 @@
 import { getDb } from '../../db/mongo';
 import { dev } from '$app/environment';
-import type { AudiencePeriod } from './audience-period';
+import {
+	isAudiencePageRoute,
+	STATIC_AUDIENCE_ROUTES,
+	type AudiencePeriod
+} from './audience-period';
 
 export type AudienceData = {
 	from: string;
@@ -8,7 +12,7 @@ export type AudienceData = {
 	windowStartedAt: string | null;
 	visitors: number;
 	visits: number;
-	pageVisits: number;
+	pageVisits: number | null;
 	daily: { date: string; visitors: number }[];
 	timeBuckets: { slot: number; visitors: number }[];
 	topPages: { path: string; visitors: number }[];
@@ -83,7 +87,10 @@ const recordingKindCorrectionStages = [
 	{ $unset: ['recordingCandidateId', 'recordingMatches'] }
 ];
 
-async function getRecentAudienceData(period: AudiencePeriod): Promise<AudienceData> {
+async function getRecentAudienceData(
+	period: AudiencePeriod,
+	route: string | null
+): Promise<AudienceData> {
 	const now = Date.now();
 	const cutoff = new Date(now - (period.recentMinutes ?? 5) * 60_000);
 	const bucketMs = period.bucketMinutes * 60_000;
@@ -92,7 +99,12 @@ async function getRecentAudienceData(period: AudiencePeriod): Promise<AudienceDa
 		db
 			.collection(dev ? 'analytics_preview_page_events' : 'analytics_page_events')
 			.aggregate<RecentVisitFacet>([
-				{ $match: { occurredAt: { $gte: cutoff, $lt: new Date(now) } } },
+				{
+					$match: {
+						occurredAt: { $gte: cutoff, $lt: new Date(now) },
+						...(route ? { path: route } : {})
+					}
+				},
 				{
 					$facet: {
 						visitors: [{ $group: { _id: '$visitorId' } }, { $count: 'count' }],
@@ -141,35 +153,37 @@ async function getRecentAudienceData(period: AudiencePeriod): Promise<AudienceDa
 				}
 			])
 			.next(),
-		db
-			.collection(dev ? 'analytics_preview_play_events' : 'analytics_play_events')
-			.aggregate<PlayFacet>([
-				{ $match: { occurredAt: { $gte: cutoff, $lt: new Date(now) } } },
-				...recordingKindCorrectionStages,
-				{
-					$group: {
-						_id: { visitor: '$visitorId', kind: '$kind', id: '$itemId' },
-						title: { $last: '$title' }
-					}
-				},
-				{
-					$facet: {
-						kinds: [{ $group: { _id: '$_id.kind', count: { $sum: 1 } } }],
-						items: [
-							{
-								$group: {
-									_id: { kind: '$_id.kind', id: '$_id.id' },
-									title: { $last: '$title' },
-									count: { $sum: 1 }
-								}
-							},
-							{ $sort: { count: -1 } },
-							{ $limit: 1000 }
-						]
-					}
-				}
-			])
-			.next()
+		route
+			? Promise.resolve(null)
+			: db
+					.collection(dev ? 'analytics_preview_play_events' : 'analytics_play_events')
+					.aggregate<PlayFacet>([
+						{ $match: { occurredAt: { $gte: cutoff, $lt: new Date(now) } } },
+						...recordingKindCorrectionStages,
+						{
+							$group: {
+								_id: { visitor: '$visitorId', kind: '$kind', id: '$itemId' },
+								title: { $last: '$title' }
+							}
+						},
+						{
+							$facet: {
+								kinds: [{ $group: { _id: '$_id.kind', count: { $sum: 1 } } }],
+								items: [
+									{
+										$group: {
+											_id: { kind: '$_id.kind', id: '$_id.id' },
+											title: { $last: '$title' },
+											count: { $sum: 1 }
+										}
+									},
+									{ $sort: { count: -1 } },
+									{ $limit: 1000 }
+								]
+							}
+						}
+					])
+					.next()
 	]);
 	const visits = visitResult ?? {
 		visitors: [],
@@ -207,8 +221,62 @@ async function getRecentAudienceData(period: AudiencePeriod): Promise<AudienceDa
 	};
 }
 
-export async function getAudienceData(period: AudiencePeriod): Promise<AudienceData> {
-	if (period.recentMinutes !== null) return getRecentAudienceData(period);
+export type AudienceRouteOptions = { main: string[]; visited: string[] };
+
+function toRouteOptions(rows: { _id: string }[]): AudienceRouteOptions {
+	const main: string[] = [...STATIC_AUDIENCE_ROUTES];
+	const mainSet = new Set(main);
+	return {
+		main,
+		visited: rows
+			.map((row) => row._id)
+			.filter((route) => isAudiencePageRoute(route) && !mainSet.has(route))
+	};
+}
+
+export async function getAudienceRouteOptions(
+	period: AudiencePeriod
+): Promise<AudienceRouteOptions> {
+	const db = await getDb();
+	if (period.recentMinutes !== null) {
+		const cutoff = new Date(Date.now() - period.recentMinutes * 60_000);
+		const rows = await db
+			.collection(dev ? 'analytics_preview_page_events' : 'analytics_page_events')
+			.aggregate<{ _id: string }>([
+				{ $match: { occurredAt: { $gte: cutoff }, path: { $type: 'string' } } },
+				{ $group: { _id: '$path', count: { $sum: 1 } } },
+				{ $sort: { count: -1 } }
+			])
+			.toArray();
+		return toRouteOptions(rows);
+	}
+	const rows = await db
+		.collection('analytics')
+		.aggregate<{ _id: string }>(
+			[
+				{
+					$match: {
+						date: { $gte: period.from, $lte: period.through },
+						device: { $ne: 'Bot' },
+						$or: [{ verifiedHuman: true }, { pageViews: { $gt: 1 } }]
+					}
+				},
+				{ $unwind: '$viewedPaths' },
+				{ $match: { viewedPaths: { $type: 'string' } } },
+				{ $group: { _id: '$viewedPaths', count: { $sum: 1 } } },
+				{ $sort: { count: -1 } }
+			],
+			{ allowDiskUse: true }
+		)
+		.toArray();
+	return toRouteOptions(rows);
+}
+
+export async function getAudienceData(
+	period: AudiencePeriod,
+	route: string | null = null
+): Promise<AudienceData> {
+	if (period.recentMinutes !== null) return getRecentAudienceData(period, route);
 	const { from, through } = period;
 	const end = new Date(`${through}T00:00:00Z`);
 	end.setUTCDate(end.getUTCDate() + 1);
@@ -223,7 +291,8 @@ export async function getAudienceData(period: AudiencePeriod): Promise<AudienceD
 						$match: {
 							date: { $gte: from, $lte: through },
 							device: { $ne: 'Bot' },
-							$or: [{ verifiedHuman: true }, { pageViews: { $gt: 1 } }]
+							$or: [{ verifiedHuman: true }, { pageViews: { $gt: 1 } }],
+							...(route ? { viewedPaths: route } : {})
 						}
 					},
 					{ $set: { visitorKey: { $ifNull: ['$visitorId', '$ip'] } } },
@@ -240,7 +309,7 @@ export async function getAudienceData(period: AudiencePeriod): Promise<AudienceD
 							daily: [{ $group: { _id: '$date', count: { $sum: 1 } } }, { $sort: { _id: 1 } }],
 							pages: [
 								{ $unwind: '$viewedPaths' },
-								{ $match: { viewedPaths: { $type: 'string' } } },
+								{ $match: { viewedPaths: route ?? { $type: 'string' } } },
 								{ $group: { _id: '$viewedPaths', count: { $sum: 1 } } },
 								{ $sort: { count: -1 } },
 								{ $limit: 10 }
@@ -266,45 +335,47 @@ export async function getAudienceData(period: AudiencePeriod): Promise<AudienceD
 				{ allowDiskUse: true }
 			)
 			.next(),
-		db
-			.collection('analytics_plays')
-			.aggregate<PlayFacet>(
-				[
-					{ $match: { _id: { $gte: `${from}:`, $lt: `${exclusiveEnd}:` } } },
-					...recordingKindCorrectionStages,
-					{
-						$group: {
-							_id: { date: '$date', visitor: '$visitorId', kind: '$kind', id: '$itemId' },
-							title: { $last: '$title' }
-						}
-					},
-					{
-						$project: {
-							kind: '$_id.kind',
-							itemId: '$_id.id',
-							title: 1
-						}
-					},
-					{
-						$facet: {
-							kinds: [{ $group: { _id: '$kind', count: { $sum: 1 } } }],
-							items: [
-								{
-									$group: {
-										_id: { kind: '$kind', id: '$itemId' },
-										title: { $last: '$title' },
-										count: { $sum: 1 }
-									}
-								},
-								{ $sort: { count: -1 } },
-								{ $limit: 1000 }
-							]
-						}
-					}
-				],
-				{ allowDiskUse: true }
-			)
-			.next()
+		route
+			? Promise.resolve(null)
+			: db
+					.collection('analytics_plays')
+					.aggregate<PlayFacet>(
+						[
+							{ $match: { _id: { $gte: `${from}:`, $lt: `${exclusiveEnd}:` } } },
+							...recordingKindCorrectionStages,
+							{
+								$group: {
+									_id: { date: '$date', visitor: '$visitorId', kind: '$kind', id: '$itemId' },
+									title: { $last: '$title' }
+								}
+							},
+							{
+								$project: {
+									kind: '$_id.kind',
+									itemId: '$_id.id',
+									title: 1
+								}
+							},
+							{
+								$facet: {
+									kinds: [{ $group: { _id: '$kind', count: { $sum: 1 } } }],
+									items: [
+										{
+											$group: {
+												_id: { kind: '$kind', id: '$itemId' },
+												title: { $last: '$title' },
+												count: { $sum: 1 }
+											}
+										},
+										{ $sort: { count: -1 } },
+										{ $limit: 1000 }
+									]
+								}
+							}
+						],
+						{ allowDiskUse: true }
+					)
+					.next()
 	]);
 	const visits = visitResult ?? {
 		visitors: [],
@@ -329,7 +400,7 @@ export async function getAudienceData(period: AudiencePeriod): Promise<AudienceD
 		windowStartedAt: null,
 		visitors: visits.visitors[0]?.count ?? 0,
 		visits: visits.visits[0]?.count ?? 0,
-		pageVisits: visits.pageVisits[0]?.count ?? 0,
+		pageVisits: route ? null : (visits.pageVisits[0]?.count ?? 0),
 		daily: visits.daily.map((row) => ({ date: row._id, visitors: row.count })),
 		timeBuckets: [],
 		topPages: visits.pages.map((row) => ({ path: row._id, visitors: row.count })),

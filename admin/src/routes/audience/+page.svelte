@@ -11,6 +11,8 @@
 	}: {
 		data: {
 			period: AudiencePeriod;
+			route: string | null;
+			routeOptions: { main: string[]; visited: string[] };
 			audience: AudienceData;
 			updatedAt: string;
 			isPreview: boolean;
@@ -108,6 +110,13 @@
 					intro:
 						'Comprendre ce que les visiteurs consultent et écoutent pour choisir où concentrer vos efforts.',
 					period: 'Période',
+					route: 'Page',
+					showRoute: 'Voir le trafic',
+					allPages: 'Toutes les pages',
+					mainPages: 'Pages principales',
+					visitedDetails: 'Pages consultées',
+					routeHelp: 'Sélectionnez une page pour afficher son trafic.',
+					selectedPage: 'Page sélectionnée',
 					quickRanges: 'Périodes rapides',
 					calendarRanges: 'Périodes calendaires',
 					customRange: 'Dates personnalisées',
@@ -174,13 +183,24 @@
 					preview: 'Aperçu local : seules les visites sur localhost apparaissent ici.',
 					note: 'Les visites proviennent de navigateurs confirmés. Les robots reconnus sont exclus. Une écoute est comptée après 10 secondes de lecture, une fois par visiteur, contenu et jour. Les écoutes sont enregistrées à partir de la mise en ligne de cette fonctionnalité.',
 					noteRecent:
-						'Cette vue montre les visites confirmées pendant la période sélectionnée. Les robots reconnus sont exclus. Une écoute est comptée après 10 secondes de lecture, une fois par visiteur et contenu dans cette période. Les données récentes commencent à partir de la mise en ligne de cette fonctionnalité.'
+						'Cette vue montre les visites confirmées pendant la période sélectionnée. Les robots reconnus sont exclus. Une écoute est comptée après 10 secondes de lecture, une fois par visiteur et contenu dans cette période. Les données récentes commencent à partir de la mise en ligne de cette fonctionnalité.',
+					noteRouteRecent:
+						'Les visiteurs et les pages vues concernent uniquement cette page pendant la période sélectionnée. Les écoutes ne sont pas liées à une page précise.',
+					noteRouteLong:
+						'Le graphique et les visites comptent chaque visiteur une fois par jour sur cette page. Le total des visiteurs compte les personnes distinctes sur toute la période. Le nombre exact de vues répétées est disponible uniquement dans les périodes récentes.'
 				}
 			: {
 					title: 'Website audience',
 					intro:
 						'See what visitors read and listen to so you can decide where to focus your efforts.',
 					period: 'Period',
+					route: 'Page',
+					showRoute: 'Show traffic',
+					allPages: 'All pages',
+					mainPages: 'Main pages',
+					visitedDetails: 'Visited pages',
+					routeHelp: 'Select a page to see its traffic.',
+					selectedPage: 'Selected page',
 					quickRanges: 'Quick ranges',
 					calendarRanges: 'Calendar ranges',
 					customRange: 'Custom dates',
@@ -247,7 +267,11 @@
 					preview: 'Local preview: only visits on localhost appear here.',
 					note: 'Visits come from confirmed browsers. Recognized bots are excluded. A listen counts after 10 seconds of playback, once per visitor, item, and day. Listening data begins when this feature goes live.',
 					noteRecent:
-						'This view shows confirmed visits in the selected period. Recognized bots are excluded. A listen counts after 10 seconds of playback, once per visitor and item in this period. Recent data begins when this feature goes live.'
+						'This view shows confirmed visits in the selected period. Recognized bots are excluded. A listen counts after 10 seconds of playback, once per visitor and item in this period. Recent data begins when this feature goes live.',
+					noteRouteRecent:
+						'Visitors and page views refer only to this page during the selected period. Listens are not tied to a specific page.',
+					noteRouteLong:
+						'The chart and Visits count each visitor once per day on this page. Visitors counts unique people across the period. Exact repeat page views are available only in recent periods.'
 				}
 	);
 
@@ -323,6 +347,15 @@
 			? `${data.period.from} – ${data.period.through}`
 			: copy.rangeLabels[data.period.key]
 	);
+	function periodHref(range: AudienceRange, includeRoute = true): string {
+		const params = new URLSearchParams({ days: range });
+		if (range === 'custom') {
+			params.set('from', data.period.from);
+			params.set('through', data.period.through);
+		}
+		if (includeRoute && data.route) params.set('route', data.route);
+		return `/audience?${params.toString()}`;
+	}
 	const refreshDescription = $derived(
 		!autoRefresh
 			? copy.pausedRefresh
@@ -400,8 +433,10 @@
 	const metrics = $derived([
 		{ label: copy.visitors, value: data.audience.visitors },
 		...(isRecent ? [] : [{ label: copy.visits, value: data.audience.visits }]),
-		{ label: copy.pageViews, value: data.audience.pageVisits },
-		{ label: copy.listens, value: allListens }
+		...(data.audience.pageVisits === null
+			? []
+			: [{ label: copy.pageViews, value: data.audience.pageVisits }]),
+		...(!data.route ? [{ label: copy.listens, value: allListens }] : [])
 	]);
 	const listeningGroups = $derived([
 		{ label: copy.live, count: playCount('live') },
@@ -483,7 +518,7 @@
 							<div class="grid grid-cols-2 gap-1">
 								{#each quickRanges as range}
 									<a
-										href={`/audience?days=${range}`}
+										href={periodHref(range)}
 										aria-current={data.period.key === range ? 'page' : undefined}
 										onclick={() => (pickerOpen = false)}
 										class="px-3 py-2 text-sm leading-snug hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-primary {data
@@ -499,7 +534,7 @@
 							<div class="grid grid-cols-2 gap-1">
 								{#each calendarRanges as range}
 									<a
-										href={`/audience?days=${range}`}
+										href={periodHref(range)}
 										aria-current={data.period.key === range ? 'page' : undefined}
 										onclick={() => (pickerOpen = false)}
 										class="px-3 py-2 text-sm leading-snug hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-primary {data
@@ -518,6 +553,7 @@
 						>
 							<p class="mb-3 text-xs font-semibold text-stone-500">{copy.customRange}</p>
 							<input type="hidden" name="days" value="custom" />
+							{#if data.route}<input type="hidden" name="route" value={data.route} />{/if}
 							<div class="grid grid-cols-2 gap-3">
 								<label class="space-y-1 text-xs font-medium text-stone-600">
 									<span>{copy.fromDate}</span>
@@ -575,6 +611,63 @@
 			</button>
 		</div>
 	</header>
+	<section class="border border-stone-200 bg-white p-4 sm:px-6" aria-label={copy.route}>
+		<form action="/audience" method="GET" class="flex flex-wrap items-end gap-3">
+			<input type="hidden" name="days" value={data.period.key} />
+			{#if data.period.key === 'custom'}
+				<input type="hidden" name="from" value={data.period.from} />
+				<input type="hidden" name="through" value={data.period.through} />
+			{/if}
+			<label class="min-w-[12rem] flex-1 space-y-1.5 text-xs font-semibold text-stone-700">
+				<span>{copy.route}</span>
+				<div class="relative">
+					<select
+						name="route"
+						class="h-11 w-full appearance-none border border-stone-300 bg-white pl-3 pr-12 text-sm font-medium text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+					>
+						<option value="" selected={!data.route}>{copy.allPages}</option>
+						<optgroup label={copy.mainPages}>
+							{#each data.routeOptions.main as path}<option
+									value={path}
+									selected={data.route === path}>{path}</option
+								>{/each}
+						</optgroup>
+						{#if data.routeOptions.visited.length}
+							<optgroup label={copy.visitedDetails}>
+								{#each data.routeOptions.visited as path}<option
+										value={path}
+										selected={data.route === path}>{path}</option
+									>{/each}
+							</optgroup>
+						{/if}
+					</select>
+					<svg
+						class="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-600"
+						viewBox="0 0 20 20"
+						fill="none"
+						aria-hidden="true"
+					>
+						<path d="m5 7.5 5 5 5-5" stroke="currentColor" stroke-width="1.7" />
+					</svg>
+				</div>
+			</label>
+			<button
+				type="submit"
+				class="h-11 bg-stone-900 px-5 text-sm font-semibold text-white hover:bg-stone-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+				>{copy.showRoute}</button
+			>
+			{#if data.route}
+				<a
+					href={periodHref(data.period.key, false)}
+					class="flex h-11 items-center px-2 text-sm font-semibold text-primary underline underline-offset-4 hover:text-orange-700"
+					>{copy.allPages}</a
+				>
+			{/if}
+		</form>
+		<p class="mt-2 text-xs text-stone-500">
+			{data.route ? (isRecent ? copy.noteRouteRecent : copy.noteRouteLong) : copy.routeHelp}
+		</p>
+	</section>
 	<div
 		class="flex flex-wrap items-center justify-between gap-3 text-xs text-stone-600"
 		aria-live="polite"
@@ -596,9 +689,11 @@
 	</div>
 
 	<div
-		class="grid grid-cols-2 gap-px overflow-hidden border border-stone-200 bg-stone-200 {isRecent
-			? 'lg:grid-cols-3'
-			: 'lg:grid-cols-4'}"
+		class="grid grid-cols-2 gap-px overflow-hidden border border-stone-200 bg-stone-200 {data.route
+			? 'lg:grid-cols-2'
+			: isRecent
+				? 'lg:grid-cols-3'
+				: 'lg:grid-cols-4'}"
 	>
 		{#each metrics as metric}
 			<div class="bg-white px-4 py-5 sm:px-6">
@@ -707,10 +802,10 @@
 		</div>
 	</section>
 
-	<div class="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+	<div class={data.route ? '' : 'grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]'}>
 		<section class="border border-stone-200 bg-white p-5 sm:p-7" aria-labelledby="audience-pages">
 			<h2 id="audience-pages" class="font-display text-2xl font-semibold text-stone-900">
-				{copy.pages}
+				{data.route ? copy.selectedPage : copy.pages}
 			</h2>
 			<p class="mt-1 text-xs text-stone-500">
 				{isRecent ? copy.pageMetricRecent : copy.pageMetric}
@@ -735,41 +830,45 @@
 				{:else}<p class="py-6 text-sm text-stone-500">{copy.empty}</p>{/each}
 			</div>
 		</section>
-		<section
-			class="border border-stone-200 bg-white p-5 sm:p-7"
-			aria-labelledby="audience-listening"
-		>
-			<h2 id="audience-listening" class="font-display text-2xl font-semibold text-stone-900">
-				{copy.listening}
-			</h2>
-			<div class="mt-5 divide-y divide-stone-100">
-				{#each listeningGroups as row}
-					<div class="flex justify-between gap-3 py-3 text-sm">
-						<span class="text-stone-700">{row.label}</span><strong class="tabular-nums"
-							>{number.format(row.count)}</strong
-						>
-					</div>
-				{/each}
-			</div>
-		</section>
-	</div>
-
-	<div class="grid gap-6 xl:grid-cols-3">
-		{#each topGroups as group}
-			<section class="border border-stone-200 bg-white p-5 sm:p-7">
-				<h2 class="font-display text-2xl font-semibold text-stone-900">{group.title}</h2>
+		{#if !data.route}
+			<section
+				class="border border-stone-200 bg-white p-5 sm:p-7"
+				aria-labelledby="audience-listening"
+			>
+				<h2 id="audience-listening" class="font-display text-2xl font-semibold text-stone-900">
+					{copy.listening}
+				</h2>
 				<div class="mt-5 divide-y divide-stone-100">
-					{#each group.rows as row}
-						<div class="flex items-start justify-between gap-3 py-3 text-sm">
-							<span class="min-w-0 break-words text-stone-700">{row.title}</span><strong
-								class="shrink-0 tabular-nums">{number.format(row.count)}</strong
+					{#each listeningGroups as row}
+						<div class="flex justify-between gap-3 py-3 text-sm">
+							<span class="text-stone-700">{row.label}</span><strong class="tabular-nums"
+								>{number.format(row.count)}</strong
 							>
 						</div>
-					{:else}<p class="py-6 text-sm text-stone-500">{copy.empty}</p>{/each}
+					{/each}
 				</div>
 			</section>
-		{/each}
+		{/if}
 	</div>
+
+	{#if !data.route}
+		<div class="grid gap-6 xl:grid-cols-3">
+			{#each topGroups as group}
+				<section class="border border-stone-200 bg-white p-5 sm:p-7">
+					<h2 class="font-display text-2xl font-semibold text-stone-900">{group.title}</h2>
+					<div class="mt-5 divide-y divide-stone-100">
+						{#each group.rows as row}
+							<div class="flex items-start justify-between gap-3 py-3 text-sm">
+								<span class="min-w-0 break-words text-stone-700">{row.title}</span><strong
+									class="shrink-0 tabular-nums">{number.format(row.count)}</strong
+								>
+							</div>
+						{:else}<p class="py-6 text-sm text-stone-500">{copy.empty}</p>{/each}
+					</div>
+				</section>
+			{/each}
+		</div>
+	{/if}
 
 	<div class="grid gap-6 lg:grid-cols-3">
 		{#each distributionGroups as group}
@@ -786,7 +885,9 @@
 			</section>
 		{/each}
 	</div>
-	<p class="max-w-4xl border-l-2 border-primary pl-4 text-xs leading-relaxed text-stone-600">
-		{isRecent ? copy.noteRecent : copy.note}
-	</p>
+	{#if !data.route}
+		<p class="max-w-4xl border-l-2 border-primary pl-4 text-xs leading-relaxed text-stone-600">
+			{isRecent ? copy.noteRecent : copy.note}
+		</p>
+	{/if}
 </div>

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { resolveAudiencePeriod } from './audience-period';
+import {
+	isAudiencePageRoute,
+	resolveAudiencePeriod,
+	resolveAudienceRoute
+} from './audience-period';
 
 const now = new Date('2026-11-11T04:45:00Z'); // 06:45 in Kigali
 
@@ -51,5 +55,34 @@ describe('audience time ranges', () => {
 		]) {
 			expect(select(query).key).toBe('30');
 		}
+	});
+});
+
+describe('audience route filter', () => {
+	it('accepts a page path and treats a blank route as all pages', () => {
+		expect(resolveAudienceRoute(new URLSearchParams('route=%2Flive%2Frediffusions'))).toBe(
+			'/live/rediffusions'
+		);
+		expect(resolveAudienceRoute(new URLSearchParams('route=+'))).toBeNull();
+	});
+
+	it('rejects URLs, control characters, and query strings', () => {
+		for (const route of [
+			'https://example.com',
+			'//example.com',
+			'/bad\\path',
+			'/bad\npath',
+			'/music?x=1',
+			'/wp/'
+		]) {
+			expect(resolveAudienceRoute(new URLSearchParams({ route }))).toBeNull();
+		}
+	});
+
+	it('lists website pages without scanner paths', () => {
+		expect(isAudiencePageRoute('/musique')).toBe(true);
+		expect(isAudiencePageRoute('/live/rediffusions/6af0a3059cdc999b30c03912')).toBe(true);
+		expect(isAudiencePageRoute('/wp/')).toBe(false);
+		expect(isAudiencePageRoute('/graphql')).toBe(false);
 	});
 });
