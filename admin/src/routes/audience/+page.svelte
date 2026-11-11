@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { AudienceData } from '../../lib/server/audience';
 	import type { AudiencePeriod, AudienceRange } from '../../lib/server/audience-period';
+	import { visitedPageUrl } from '$lib/utils/audienceLinks';
 	import { locale } from '$lib/i18n';
 	import { invalidate } from '$app/navigation';
 	import { onMount } from 'svelte';
@@ -13,6 +14,7 @@
 			audience: AudienceData;
 			updatedAt: string;
 			isPreview: boolean;
+			publicSiteBase: string;
 		};
 	} = $props();
 	const refreshIntervalMs = $derived(
@@ -30,7 +32,30 @@
 	let customThrough = $state('');
 	let refreshing = $state(false);
 	let refreshError = $state(false);
+	let hoveredChartIndex = $state<number | null>(null);
+	let focusedChartIndex = $state<number | null>(null);
+	let selectedChartIndex = $state<number | null>(null);
+	let keyboardChartIndex = $state(0);
 	let lastRefreshAttempt = 0;
+
+	function handleChartKeydown(event: KeyboardEvent, index: number) {
+		let next = index;
+		if (event.key === 'ArrowRight') next = Math.min(chartRows.length - 1, index + 1);
+		else if (event.key === 'ArrowLeft') next = Math.max(0, index - 1);
+		else if (event.key === 'Home') next = 0;
+		else if (event.key === 'End') next = chartRows.length - 1;
+		else if (event.key === 'Escape') {
+			selectedChartIndex = null;
+			(event.currentTarget as HTMLButtonElement).blur();
+			return;
+		} else return;
+		event.preventDefault();
+		keyboardChartIndex = next;
+		const buttons = (
+			event.currentTarget as HTMLButtonElement
+		).parentElement?.querySelectorAll<HTMLButtonElement>('[data-chart-bar]');
+		buttons?.[next]?.focus();
+	}
 
 	async function refreshData(): Promise<void> {
 		if (refreshing) return;
@@ -120,6 +145,7 @@
 					listens: 'Écoutes',
 					trend: 'Visiteurs par jour',
 					trendRecent: 'Visiteurs dans le temps',
+					chartHint: 'Survolez ou sélectionnez une barre pour voir les détails.',
 					pages: 'Pages les plus visitées',
 					pageMetric: 'Visiteurs par page et par jour',
 					pageMetricRecent: 'Pages vues pendant la période sélectionnée',
@@ -192,6 +218,7 @@
 					listens: 'Listens',
 					trend: 'Visitors by day',
 					trendRecent: 'Visitors over time',
+					chartHint: 'Hover over or select a bar to see details.',
 					pages: 'Most visited pages',
 					pageMetric: 'Visitors per page per day',
 					pageMetricRecent: 'Page views in the selected period',
@@ -236,6 +263,12 @@
 		new Intl.DateTimeFormat($locale === 'fr' ? 'fr-FR' : 'en-US', {
 			day: 'numeric',
 			month: 'short',
+			timeZone: 'UTC'
+		})
+	);
+	const fullDateFormat = $derived(
+		new Intl.DateTimeFormat($locale === 'fr' ? 'fr-FR' : 'en-US', {
+			dateStyle: 'full',
 			timeZone: 'UTC'
 		})
 	);
@@ -324,20 +357,42 @@
 		if (isRecent) {
 			const startedAt = Date.parse(data.audience.windowStartedAt ?? data.updatedAt);
 			const counts = new Map(data.audience.timeBuckets.map((row) => [row.slot, row.visitors]));
-			return Array.from({ length: data.period.bucketCount }, (_, slot) => ({
-				label:
-					(data.period.recentMinutes ?? 0) >= 1_440
-						? dateTimeFormat.format(new Date(startedAt + slot * data.period.bucketMinutes * 60_000))
-						: minuteFormat.format(new Date(startedAt + slot * data.period.bucketMinutes * 60_000)),
-				visitors: counts.get(slot) ?? 0
-			}));
+			const intervalFormat =
+				(data.period.recentMinutes ?? 0) >= 1_440 ? dateTimeFormat : minuteFormat;
+			return Array.from({ length: data.period.bucketCount }, (_, slot) => {
+				const bucketStart = new Date(startedAt + slot * data.period.bucketMinutes * 60_000);
+				const bucketEnd = new Date(bucketStart.getTime() + data.period.bucketMinutes * 60_000);
+				return {
+					label: intervalFormat.format(bucketStart),
+					detail: `${intervalFormat.format(bucketStart)} – ${intervalFormat.format(bucketEnd)}`,
+					visitors: counts.get(slot) ?? 0
+				};
+			});
 		}
 		return daily.map((row) => ({
 			label: dateFormat.format(new Date(`${row.date}T00:00:00Z`)),
+			detail: fullDateFormat.format(new Date(`${row.date}T00:00:00Z`)),
 			visitors: row.visitors
 		}));
 	});
 	const maxChart = $derived(Math.max(1, ...chartRows.map((row) => row.visitors)));
+	const chartStep = $derived(maxChart <= 4 ? 1 : Math.ceil(maxChart / 4));
+	const chartCeiling = $derived(maxChart <= 4 ? maxChart : chartStep * 4);
+	const chartTicks = $derived(
+		Array.from(
+			{ length: Math.min(chartCeiling, 4) + 1 },
+			(_, index) => chartCeiling - index * chartStep
+		)
+	);
+	const chartMinWidth = $derived(Math.max(520, chartRows.length * (isRecent ? 20 : 10)));
+	const activeChartIndex = $derived.by(() => {
+		const index = hoveredChartIndex ?? focusedChartIndex ?? selectedChartIndex;
+		return index !== null && index < chartRows.length ? index : null;
+	});
+	const activeChartRow = $derived(activeChartIndex === null ? null : chartRows[activeChartIndex]);
+	const activeChartPosition = $derived(
+		activeChartIndex === null ? 0 : ((activeChartIndex + 0.5) / chartRows.length) * 100
+	);
 	const playCount = $derived(
 		(kind: string) => data.audience.plays.find((row) => row.kind === kind)?.count ?? 0
 	);
@@ -559,31 +614,96 @@
 		<h2 id="audience-trend" class="font-display text-2xl font-semibold text-stone-900">
 			{isRecent ? copy.trendRecent : copy.trend}
 		</h2>
+		<p class="mt-1 text-xs text-stone-500">{copy.chartHint}</p>
 		<div
-			class="mt-6 flex h-44 items-end gap-0.5 border-b border-stone-200 sm:gap-1"
-			role="img"
+			class="mt-6 grid grid-cols-[2rem_minmax(0,1fr)] gap-3"
+			role="group"
 			aria-label={isRecent ? copy.trendRecent : copy.trend}
 		>
-			{#each chartRows as row}
-				<div
-					class="group relative flex h-full min-w-0 flex-1 items-end"
-					title={`${row.label}: ${number.format(row.visitors)}`}
-				>
-					<div
-						class="w-full bg-primary/75 group-hover:bg-primary"
-						style={`height: ${row.visitors ? Math.max(3, (row.visitors / maxChart) * 100) : 0}%`}
-					></div>
-				</div>
-			{/each}
-		</div>
-		<div class="mt-2 flex justify-between text-xs text-stone-500">
-			<span>{chartRows[0]?.label}</span><span
-				>{isRecent
-					? (data.period.recentMinutes ?? 0) >= 1_440
-						? dateTimeFormat.format(new Date(data.updatedAt))
-						: updatedTime
-					: chartRows.at(-1)?.label}</span
+			<div
+				class="flex h-48 flex-col justify-between text-right text-xs tabular-nums text-stone-500"
+				aria-hidden="true"
 			>
+				{#each chartTicks as tick}<span>{number.format(tick)}</span>{/each}
+			</div>
+			<div class="min-w-0 overflow-x-auto pb-1">
+				<div style={`min-width: ${chartMinWidth}px`}>
+					<div
+						class="relative h-48 border-b border-stone-300"
+						role="presentation"
+						onpointerleave={() => (hoveredChartIndex = null)}
+					>
+						<div
+							class="pointer-events-none absolute inset-0 flex flex-col justify-between"
+							aria-hidden="true"
+						>
+							{#each chartTicks as _}<div class="w-full border-t border-stone-200"></div>{/each}
+						</div>
+						{#if activeChartRow}
+							<div
+								class="pointer-events-none absolute inset-y-0 z-20 border-l border-stone-500/70"
+								style={`left: ${activeChartPosition}%`}
+								aria-hidden="true"
+							></div>
+							<div
+								class="pointer-events-none absolute top-2 z-30 min-w-40 -translate-x-1/2 border border-stone-300 bg-white px-3 py-2 text-xs shadow-lg"
+								style={`left: ${Math.min(85, Math.max(15, activeChartPosition))}%`}
+							>
+								<p class="whitespace-nowrap font-medium text-stone-600">{activeChartRow.detail}</p>
+								<p class="mt-1 flex justify-between gap-5 text-stone-900">
+									<span>{copy.visitors}</span><strong class="tabular-nums"
+										>{number.format(activeChartRow.visitors)}</strong
+									>
+								</p>
+							</div>
+						{/if}
+						<div class="relative z-10 flex h-full gap-px px-0.5">
+							{#each chartRows as row, index}
+								<button
+									type="button"
+									data-chart-bar
+									tabindex={index === Math.min(keyboardChartIndex, chartRows.length - 1) ? 0 : -1}
+									aria-label={`${row.detail}: ${number.format(row.visitors)} ${copy.visitors}`}
+									aria-pressed={selectedChartIndex === index}
+									onpointerenter={() => (hoveredChartIndex = index)}
+									onfocus={() => {
+										focusedChartIndex = index;
+										keyboardChartIndex = index;
+									}}
+									onblur={() => (focusedChartIndex = null)}
+									onkeydown={(event) => handleChartKeydown(event, index)}
+									onclick={() => (selectedChartIndex = selectedChartIndex === index ? null : index)}
+									class="group flex h-full min-w-0 flex-1 items-end border-x border-transparent px-px hover:bg-primary/10 focus-visible:border-primary focus-visible:bg-primary/10 focus-visible:outline-none {activeChartIndex ===
+									index
+										? 'bg-primary/10'
+										: ''}"
+								>
+									<span
+										class="block w-full bg-primary/65 transition-colors group-hover:bg-primary group-focus-visible:bg-primary {activeChartIndex ===
+										index
+											? 'bg-primary'
+											: ''}"
+										style={`height: ${row.visitors ? Math.max(3, (row.visitors / chartCeiling) * 100) : 0}%`}
+									></span>
+								</button>
+							{/each}
+						</div>
+					</div>
+					<div class="mt-2 flex justify-between gap-3 text-xs text-stone-500" aria-hidden="true">
+						<span>{chartRows[0]?.label}</span>
+						{#if chartRows.length > 4}<span
+								>{chartRows[Math.floor(chartRows.length / 2)]?.label}</span
+							>{/if}
+						<span
+							>{isRecent
+								? (data.period.recentMinutes ?? 0) >= 1_440
+									? dateTimeFormat.format(new Date(data.updatedAt))
+									: updatedTime
+								: chartRows.at(-1)?.label}</span
+						>
+					</div>
+				</div>
+			</div>
 		</div>
 	</section>
 
@@ -597,8 +717,17 @@
 			</p>
 			<div class="mt-5 divide-y divide-stone-100">
 				{#each data.audience.topPages as row}
+					{@const href = visitedPageUrl(row.path, data.publicSiteBase)}
 					<div class="flex items-center justify-between gap-4 py-3 text-sm">
-						<span class="min-w-0 break-all font-medium text-stone-800">{row.path}</span>
+						{#if href}
+							<a
+								{href}
+								class="min-w-0 break-all font-semibold text-primary underline decoration-primary/40 underline-offset-4 hover:text-orange-700 hover:decoration-orange-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+								>{row.path}</a
+							>
+						{:else}
+							<span class="min-w-0 break-all font-medium text-stone-800">{row.path}</span>
+						{/if}
 						<strong class="shrink-0 tabular-nums text-stone-900"
 							>{number.format(row.visitors)}</strong
 						>

@@ -13,6 +13,9 @@ export const load: PageServerLoad = async ({ locals, url, depends }) => {
 		period,
 		audience,
 		updatedAt: new Date().toISOString(),
-		isPreview: dev && period.recentMinutes !== null
+		isPreview: dev && period.recentMinutes !== null,
+		publicSiteBase: dev
+			? 'http://localhost:5174'
+			: process.env.MAIN_SITE_URL || 'https://missionnaire.net'
 	};
 };
