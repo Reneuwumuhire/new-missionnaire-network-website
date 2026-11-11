@@ -33,6 +33,67 @@ export type AudiencePeriod = {
 	bucketCount: number;
 };
 
+// Public page routes from the website. This keeps scanner paths out of the
+// selector while allowing recorded sermon, song, replay, and article pages.
+export const STATIC_AUDIENCE_ROUTES = [
+	'/',
+	'/transcriptions',
+	'/musique',
+	'/live',
+	'/live/rediffusions',
+	'/predications',
+	'/literature',
+	'/videos',
+	'/questions',
+	'/publications',
+	'/recherche',
+	'/a-propos',
+	'/eglise',
+	'/ewald-frank',
+	'/william-branham',
+	'/william-branham/biographie',
+	'/musique/videos',
+	'/musique/instrumental',
+	'/documents',
+	'/extraits',
+	'/studio',
+	'/privacy',
+	'/terms',
+	'/questions/ask'
+] as const;
+
+const dynamicAudienceRoutes = [
+	/^\/questions\/[^/]+$/u,
+	/^\/predications\/[^/]+$/u,
+	/^\/musique\/[^/]+$/u,
+	/^\/live\/[A-Za-z0-9_-]{8,16}$/u,
+	/^\/live\/rediffusions\/[0-9a-f]{24}$/u,
+	/^\/publications\/[^/]+$/u,
+	/^\/lecture\/[^/]+\/[^/]+$/u,
+	/^\/extraits\/[^/]+$/u
+];
+
+export function isAudiencePageRoute(route: string): boolean {
+	return (
+		(STATIC_AUDIENCE_ROUTES as readonly string[]).includes(route) ||
+		dynamicAudienceRoutes.some((pattern) => pattern.test(route))
+	);
+}
+
+export function resolveAudienceRoute(params: URLSearchParams): string | null {
+	const route = params.get('route')?.trim();
+	if (!route) return null;
+	if (
+		route.length > 500 ||
+		!route.startsWith('/') ||
+		route.startsWith('//') ||
+		/[\\?#\u0000-\u001f\u007f]/u.test(route) ||
+		!isAudiencePageRoute(route)
+	)
+		return null;
+	return route;
+}
+
 const DAY_MS = 86_400_000;
 const dateFormatter = new Intl.DateTimeFormat('en-CA', {
 	timeZone: 'Africa/Kigali',
