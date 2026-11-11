@@ -96,6 +96,7 @@
 			title: rec.title,
 			artist: 'Missionnaire Network',
 			category: 'Direct',
+			analyticsKind: 'recording',
 			s3_key: '',
 			s3_url: urlFor(v),
 			file_size: sizeFor(v),

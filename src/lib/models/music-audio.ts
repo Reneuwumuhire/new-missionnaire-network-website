@@ -8,6 +8,8 @@ export const MusicAudioSchema = z.object({
 	title: z.string().nullable(),
 	artist: z.string().nullable(),
 	category: z.string(),
+	/** Synthetic replay tracks use the shared music player but count as recordings. */
+	analyticsKind: z.literal('recording').optional(),
 	s3_key: z.string(),
 	s3_url: z.string().url(),
 	file_size: z.number(),

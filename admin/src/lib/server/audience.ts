@@ -46,6 +46,43 @@ type RecentVisitFacet = {
 	referrers: { _id: string; count: number }[];
 };
 
+// Replay tracks were previously sent through the music player as songs. Resolve
+// their item IDs against recordings so historical listens appear as replays too.
+const recordingKindCorrectionStages = [
+	{
+		$set: {
+			recordingCandidateId: {
+				$cond: [
+					{ $eq: ['$kind', 'song'] },
+					{ $convert: { input: '$itemId', to: 'objectId', onError: null, onNull: null } },
+					null
+				]
+			}
+		}
+	},
+	{
+		$lookup: {
+			from: 'recordings',
+			localField: 'recordingCandidateId',
+			foreignField: '_id',
+			pipeline: [{ $project: { _id: 1 } }],
+			as: 'recordingMatches'
+		}
+	},
+	{
+		$set: {
+			kind: {
+				$cond: [
+					{ $and: [{ $eq: ['$kind', 'song'] }, { $gt: [{ $size: '$recordingMatches' }, 0] }] },
+					'recording',
+					'$kind'
+				]
+			}
+		}
+	},
+	{ $unset: ['recordingCandidateId', 'recordingMatches'] }
+];
+
 async function getRecentAudienceData(period: AudiencePeriod): Promise<AudienceData> {
 	const now = Date.now();
 	const cutoff = new Date(now - (period.recentMinutes ?? 5) * 60_000);
@@ -108,6 +145,7 @@ async function getRecentAudienceData(period: AudiencePeriod): Promise<AudienceDa
 			.collection(dev ? 'analytics_preview_play_events' : 'analytics_play_events')
 			.aggregate<PlayFacet>([
 				{ $match: { occurredAt: { $gte: cutoff, $lt: new Date(now) } } },
+				...recordingKindCorrectionStages,
 				{
 					$group: {
 						_id: { visitor: '$visitorId', kind: '$kind', id: '$itemId' },
@@ -233,6 +271,20 @@ export async function getAudienceData(period: AudiencePeriod): Promise<AudienceD
 			.aggregate<PlayFacet>(
 				[
 					{ $match: { _id: { $gte: `${from}:`, $lt: `${exclusiveEnd}:` } } },
+					...recordingKindCorrectionStages,
+					{
+						$group: {
+							_id: { date: '$date', visitor: '$visitorId', kind: '$kind', id: '$itemId' },
+							title: { $last: '$title' }
+						}
+					},
+					{
+						$project: {
+							kind: '$_id.kind',
+							itemId: '$_id.id',
+							title: 1
+						}
+					},
 					{
 						$facet: {
 							kinds: [{ $group: { _id: '$kind', count: { $sum: 1 } } }],
