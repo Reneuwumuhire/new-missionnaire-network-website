@@ -263,19 +263,16 @@ and stopping one leaves the others playing. Configured strips start themselves:
 after a restart, or when a scene comes back on air, a strip that already knows
 its application does not ask again.
 
-Adding a **Display / Window Capture** does this by itself: the shared window is
-matched to the application behind it and that application's sound comes up on
-the window's own strip — fader, meter, mute — so a shared video plays out live
-and can be ridden against the preacher's mic. If the guess is wrong, or there
-was none, the strip's gear opens the list of applications.
+On macOS 13+, **Display / Window Capture** automatically adds the selected
+window's application to the mixer, even if playback starts later. The same
+ScreenCaptureKit stream captures the picture and audio across monitors. macOS
+captures audio at the application level, so other windows or tabs of that app
+can also be heard. Closing the window or removing the source clears its mixer
+strip. The Sources dock keeps a closed window's entry available to reconnect.
 
-The match works from what the engine says about the surface it shared: the
-capture track's label against every on-screen window's title, then against
-application names, and failing both a window whose size on screen is unique.
-Sharing a whole display attaches **Desktop audio** instead — a screen has no
-one application behind it, but it does have a sound. Every share prints what it
-was given (`share label=… size=… matched=…`) to the terminal, which is the
-first thing to read if the wrong application comes up.
+On Windows, Studio requests window audio from WebView2. Enable audio in the
+system picker when it offers the option. Studio adds the track to the mixer
+and removes it when the share ends.
 
 Application sound carries across scenes. A window's picture stops when its
 scene goes off air, but the application it is capturing keeps playing — cutting
@@ -322,13 +319,12 @@ attributes the request to whatever launched it — your terminal — and
 launch the built `.app` to get an entry of its own.
 
 Needs **Screen Recording** permission (System Settings › Privacy & Security);
-macOS asks the first time. Video of a shared window still comes from the
-webview's own picker — only the audio is native.
+macOS asks the first time. Studio lists and captures macOS windows with
+ScreenCaptureKit.
 
-**Properties → Hide the mouse pointer** asks the engine to leave the cursor out
-of a share. It is a request: WebKit does not implement the `cursor` constraint
-and paints the pointer in before we see the frame, so on macOS the panel says
-so instead of pretending the switch worked. Chromium honours it.
+**Properties → Hide the mouse pointer** changes the cursor setting on the
+running macOS capture. Browser-managed shares use the video track's `cursor`
+constraint when the webview supports it.
 
 ## Windows
 
@@ -336,10 +332,8 @@ The app builds and runs on Windows: the webview there is Chromium, which does
 support display-capture audio, and `pnpm studio:build` produces an installer.
 Two differences to know about:
 
-- **Application audio capture is macOS-only for now.** The module is
-  platform-gated; on Windows the picker reports that the system cannot do it
-  rather than failing. WASAPI process loopback is the equivalent API and is not
-  written yet.
+- Standalone **Application audio** sources use ScreenCaptureKit on macOS.
+  Windows window shares receive audio through the WebView2 picker.
 - `ffmpeg` must be on `PATH` (or in `FFMPEG_PATH`) — the bundled search paths
   are the Homebrew/MacPorts ones.
 

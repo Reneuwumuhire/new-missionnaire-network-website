@@ -3,8 +3,9 @@
 // here is keyed by layer id and torn down explicitly.
 
 import { invoke } from '@tauri-apps/api/core';
+import { createPcmNode, pcmChannel } from './appaudio.svelte';
 import { t } from './i18n.svelte';
-import { MIX_RATE } from './mixer';
+import { MIX_RATE, type Mixer } from './mixer';
 import { mediaUrl } from './media-url';
 import { audioLayers, studio, transportLayer, type Layer } from './state.svelte';
 
@@ -58,6 +59,11 @@ export interface Handle {
 	nativeCaptureId?: string;
 	nativeCancel?: () => void;
 	nativeFrameReady?: boolean;
+	nativeAudio?: {
+		mixer?: Mixer;
+		node?: AudioWorkletNode;
+		error?: string;
+	};
 }
 
 export interface RegisteredLocalMedia {
@@ -85,6 +91,43 @@ export function mediaHandleKey(layer: Layer): string | null {
 export function handleForLayer(layer: Layer): Handle | undefined {
 	const key = mediaHandleKey(layer);
 	return key ? handleFor(key) : undefined;
+}
+
+/** Window audio stays live across scenes while its source is visible. Only
+ * the editable handle owns audio, even when Program has pinned its picture. */
+export function mixerAudioLayers(): Layer[] {
+	void mediaVersion.n;
+	const layers = audioLayers().filter(
+		(layer) => layer.kind !== 'screen' || Boolean(handleFor(layer.id)?.stream)
+	);
+	for (const scene of studio.scenes) {
+		for (const layer of scene.layers) {
+			if (layer.visible && layer.hasAudio && handleFor(layer.id)?.nativeAudio) layers.push(layer);
+		}
+	}
+	return layers;
+}
+
+export function nativeWindowAudioNode(handle: Handle, mixer: Mixer): AudioWorkletNode | undefined {
+	const audio = handle.nativeAudio;
+	if (!audio) return;
+	if (!audio.mixer) {
+		audio.mixer = mixer;
+		void mixer.resume().catch(() => {});
+		void createPcmNode(mixer)
+			.then((node) => {
+				if (handle.nativeAudio === audio) audio.node = node;
+				else node.port.close();
+			})
+			.catch((error) => {
+				audio.error = describe(error);
+				report(`window audio failed: ${audio.error}`);
+			})
+			.finally(() => {
+				if (handle.nativeAudio === audio) mediaVersion.n++;
+			});
+	}
+	return audio.node;
 }
 
 export const previewAudioId = (layerId: string) => `preview:${layerId}`;
@@ -147,6 +190,7 @@ export function release(layerId: string) {
 	if (!h) return;
 	handles.delete(layerId);
 	if ([...pinnedHandles.values()].some((pinned) => pinned === h)) {
+		stopNativeWindowAudio(layerId, h);
 		mediaVersion.n++;
 		return;
 	}
@@ -155,8 +199,7 @@ export function release(layerId: string) {
 }
 
 function destroy(h: Handle) {
-	h.nativeCancel?.();
-	if (h.nativeCaptureId) void invoke('stop_window_capture', { id: h.nativeCaptureId });
+	stopNativeWindow(h);
 	h.stream?.getTracks().forEach((t) => t.stop());
 	if (h.el instanceof HTMLVideoElement) {
 		h.el.pause();
@@ -164,6 +207,24 @@ function destroy(h: Handle) {
 		h.el.removeAttribute('src');
 	}
 	if (h.objectUrl) URL.revokeObjectURL(h.objectUrl);
+}
+
+function stopNativeWindowAudio(layerId: string, h: Handle) {
+	const { mixer, node } = h.nativeAudio ?? {};
+	if (node) {
+		if (mixer?.has(layerId, node)) mixer.remove(layerId);
+		node.port.close();
+	}
+	h.nativeAudio = undefined;
+}
+
+function stopNativeWindow(h: Handle) {
+	h.nativeCancel?.();
+	h.nativeCancel = undefined;
+	if (h.nativeCaptureId) {
+		void invoke('stop_window_capture', { id: h.nativeCaptureId }).catch(() => {});
+		h.nativeCaptureId = undefined;
+	}
 }
 
 export function releaseAll() {
@@ -264,21 +325,19 @@ export async function openMic(layerId: string, deviceId?: string): Promise<Handl
 export async function openScreen(layer: Layer): Promise<Handle> {
 	const request = beginOpen(layer.id);
 	try {
-		// The picker is the OS one — which window/screen is the operator's call,
-		// so there is nothing for us to configure here.
-		//
-		// `audio` is asked for and WebKit ignores it: it does not implement audio
-		// capture of the shared surface, and returns video only without an error.
-		// So on macOS a shared tab arrives silent no matter what — the mixer says
-		// so and points at the way round it. Chromium (the Windows webview) does
-		// honour this, which is why it is still requested.
-		// ponytail: real per-app audio needs ScreenCaptureKit on the Rust side.
-		// Keep the picker request simple. WebView2 can reject optional video
-		// constraints before showing the window picker at all. Apply the desired
-		// output size and cursor setting once a track has been selected.
-		const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+		// Chromium can offer the selected application's audio in the picker.
+		// Apply video constraints after selection so WebView2 can open the picker.
+		const options: DisplayMediaStreamOptions & { windowAudio?: 'window' } = {
+			video: true,
+			audio: true,
+			windowAudio: 'window'
+		};
+		const stream = await navigator.mediaDevices.getDisplayMedia(options);
 		const track = stream.getVideoTracks()[0];
-		if (!track) throw new Error(t('source.notFound'));
+		if (!track) {
+			stream.getTracks().forEach((track) => track.stop());
+			throw new Error(t('source.notFound'));
+		}
 		void track
 			.applyConstraints({
 				...cursorConstraint(layer),
@@ -289,8 +348,13 @@ export async function openScreen(layer: Layer): Promise<Handle> {
 			.catch((error) => report(`screen constraints unavailable: ${error}`));
 		const h: Handle = { kind: 'screen', el: videoEl(stream), stream, error: null, objectUrl: null };
 		track.addEventListener('ended', () => {
-			if (handleFor(layer.id) === h) release(layer.id);
-		});
+			if (handles.get(layer.id) === h) handles.delete(layer.id);
+			for (const [id, pinned] of pinnedHandles) {
+				if (pinned === h) pinnedHandles.delete(id);
+			}
+			destroy(h);
+			mediaVersion.n++;
+		}, { once: true });
 		return set(layer.id, h, request);
 	} catch (err) {
 		report(`screen capture failed for ${layer.name}: ${err}`);
@@ -312,13 +376,20 @@ export async function openNativeWindow(layer: Layer, windowId: number): Promise<
 	const request = beginOpen(layer.id);
 	const captureId = `${layer.id}:${crypto.randomUUID()}`;
 	try {
-		const info = await invoke<{ width: number; height: number }>('start_window_capture', {
+		const audio = pcmChannel(layer.id, () => {
+			const handle = handles.get(layer.id);
+			if (handle?.nativeCaptureId !== captureId) return;
+			const { mixer, node } = handle.nativeAudio ?? {};
+			return node && mixer?.has(layer.id, node) ? node : undefined;
+		});
+		const info = await invoke<{ width: number; height: number; hasAudio: boolean }>('start_window_capture', {
 			id: captureId,
 			windowId,
 			width: studio.settings.width,
 			height: studio.settings.height,
 			fps: studio.settings.fps,
-			hideCursor: layer.hideCursor ?? false
+			hideCursor: layer.hideCursor ?? false,
+			audio
 		});
 		const canvas = document.createElement('canvas');
 		canvas.width = info.width;
@@ -337,9 +408,11 @@ export async function openNativeWindow(layer: Layer, windowId: number): Promise<
 			error: null,
 			objectUrl: null,
 			nativeCaptureId: captureId,
+			nativeAudio: info.hasAudio ? {} : undefined,
 			nativeCancel: () => {
 				cancelled = true;
 				if (timer) clearTimeout(timer);
+				stopNativeWindowAudio(layer.id, h);
 			}
 		};
 		const next = async () => {
@@ -350,8 +423,16 @@ export async function openNativeWindow(layer: Layer, windowId: number): Promise<
 					id: captureId,
 					lastSequence
 				});
+				if (cancelled) return;
 				failures = 0;
 				const bytes = response instanceof ArrayBuffer ? response : new Uint8Array(response).buffer;
+				if (bytes.byteLength === 1 && new Uint8Array(bytes)[0] === 1) {
+					stopNativeWindow(h);
+					h.el = null;
+					h.error = t('sources.windowCaptureEnded');
+					mediaVersion.n++;
+					return;
+				}
 				if (bytes.byteLength > 8) {
 					lastSequence = Number(new DataView(bytes).getBigUint64(0, true));
 					const bitmap = await createImageBitmap(
@@ -396,7 +477,7 @@ export async function openNativeWindow(layer: Layer, windowId: number): Promise<
 		void next();
 		return h;
 	} catch (err) {
-		void invoke('stop_window_capture', { id: captureId });
+		void invoke('stop_window_capture', { id: captureId }).catch(() => {});
 		const h: Handle = {
 			kind: 'screen',
 			el: null,

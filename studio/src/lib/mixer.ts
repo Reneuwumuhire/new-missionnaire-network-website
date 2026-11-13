@@ -251,7 +251,8 @@ export class Mixer {
 	 *  ordinary source with a fader, a meter and monitoring. */
 	addNode(id: string, node: AudioNode): Strip {
 		const existing = this.strips.get(id);
-		if (existing) return existing;
+		if (existing?.node === node) return existing;
+		if (existing) this.remove(id);
 		return this.makeStrip(id, node, null);
 	}
 
@@ -290,8 +291,8 @@ export class Mixer {
 		this.strips.delete(id);
 	}
 
-	has(id: string): boolean {
-		return this.strips.has(id);
+	has(id: string, node?: AudioNode): boolean {
+		return node ? this.strips.get(id)?.node === node : this.strips.has(id);
 	}
 
 	ids(): string[] {

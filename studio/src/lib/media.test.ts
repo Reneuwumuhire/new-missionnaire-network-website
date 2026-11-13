@@ -1,9 +1,11 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, type Channel } from '@tauri-apps/api/core';
 import {
 	askForMicrophone,
 	handleFor,
 	mediaVersion,
+	mixerAudioLayers,
+	nativeWindowAudioNode,
 	openFile,
 	openLocalMedia,
 	openNativeWindow,
@@ -15,8 +17,14 @@ import {
 	releaseUnusedPins
 } from './media.svelte';
 import { makeLayer, studio } from './state.svelte';
+import type { Mixer } from './mixer';
 
-vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
+vi.mock('@tauri-apps/api/core', () => ({
+	invoke: vi.fn(),
+	Channel: class {
+		constructor(public onmessage: (payload: ArrayBuffer | number[]) => void) {}
+	}
+}));
 
 afterEach(() => {
 	vi.unstubAllGlobals();
@@ -55,9 +63,11 @@ it('marks a shared display disconnected when the user stops Windows screen shari
 		stop: vi.fn(),
 		applyConstraints: vi.fn().mockResolvedValue(undefined)
 	});
+	const audioTrack = { stop: vi.fn() };
 	const stream = {
 		getVideoTracks: () => [track],
-		getTracks: () => [track]
+		getAudioTracks: () => [audioTrack],
+		getTracks: () => [track, audioTrack]
 	};
 	vi.stubGlobal('HTMLVideoElement', Video);
 	vi.stubGlobal('document', { createElement: () => new Video() });
@@ -65,10 +75,13 @@ it('marks a shared display disconnected when the user stops Windows screen shari
 	vi.stubGlobal('navigator', { mediaDevices: { getDisplayMedia } });
 	const layer = makeLayer('screen', 'Display');
 	await openScreen(layer);
-	expect(getDisplayMedia).toHaveBeenCalledWith({ video: true, audio: true });
+	expect(getDisplayMedia).toHaveBeenCalledWith({ video: true, audio: true, windowAudio: 'window' });
 	expect(handleFor(layer.id)?.el).toBeInstanceOf(Video);
+	const pin = pinHandle(layer.id)!;
 	track.dispatchEvent(new Event('ended'));
 	expect(handleFor(layer.id)).toBeUndefined();
+	expect(handleFor(pin)).toBeUndefined();
+	expect(audioTrack.stop).toHaveBeenCalledOnce();
 });
 
 it('loads a selected Windows image through WebView2’s custom protocol origin', () => {
@@ -182,6 +195,69 @@ it('keeps the newest window when an older capture starts late', async () => {
 			)
 	).toBe(true);
 	release(layer.id);
+});
+
+it.each(['window closes', 'source is removed'])('clears captured window audio when the %s', async (end) => {
+	vi.useFakeTimers();
+	const previousScenes = studio.scenes;
+	const layer = makeLayer('screen', 'Live', { windowId: 1, appId: 'org.browser' });
+	studio.scenes = [{ id: 'scene', name: 'Scene', layers: [layer] }];
+	let channel: Channel<ArrayBuffer | number[]> | undefined;
+	let frame: number[] = [];
+	vi.mocked(invoke).mockImplementation(async (command, args) => {
+		if (command === 'start_window_capture') {
+			channel = (args as { audio: typeof channel }).audio;
+			return { width: 640, height: 360, hasAudio: true } as never;
+		}
+		if (command === 'window_capture_frame') return frame as never;
+		return undefined as never;
+	});
+	const port = { postMessage: vi.fn(), close: vi.fn() };
+	vi.stubGlobal('AudioWorkletNode', class { port = port; });
+	vi.stubGlobal('HTMLVideoElement', class {});
+	vi.stubGlobal('document', { createElement: () => ({ getContext: () => ({}) }) });
+	const mixer = {
+		ensureWorklet: vi.fn().mockResolvedValue(undefined),
+		resume: vi.fn().mockResolvedValue(undefined),
+		has: vi.fn().mockReturnValue(true),
+		remove: vi.fn()
+	} as unknown as Mixer;
+
+	try {
+		expect(mixerAudioLayers()).toEqual([]);
+		const handle = await openNativeWindow(layer, 1);
+		const captureId = handle.nativeCaptureId;
+		expect(mixerAudioLayers().map((source) => source.id)).toEqual([layer.id]);
+		nativeWindowAudioNode(handle, mixer);
+		await vi.advanceTimersByTimeAsync(0);
+		const samples = new Float32Array([0.5, -0.25]);
+		channel!.onmessage(samples.buffer);
+		expect(port.postMessage).toHaveBeenCalledWith(samples);
+
+		if (end === 'window closes') {
+			frame = [1];
+			await vi.advanceTimersByTimeAsync(100);
+			expect(handleFor(layer.id)?.error).toContain('Window capture ended');
+			expect(handleFor(layer.id)?.el).toBeNull();
+		} else {
+			const pin = pinHandle(layer.id)!;
+			release(layer.id);
+			expect(handleFor(pin)?.el).toBeTruthy();
+			expect(mixerAudioLayers()).toEqual([]);
+			releaseUnusedPins([]);
+		}
+		expect(mixerAudioLayers()).toEqual([]);
+		expect(mixer.remove).toHaveBeenCalledWith(layer.id);
+		expect(port.close).toHaveBeenCalledOnce();
+		expect(invoke).toHaveBeenCalledWith('stop_window_capture', { id: captureId });
+		channel!.onmessage(samples.buffer);
+		expect(port.postMessage).toHaveBeenCalledOnce();
+	} finally {
+		release(layer.id);
+		releaseUnusedPins([]);
+		studio.scenes = previousScenes;
+		vi.useRealTimers();
+	}
 });
 
 it('backs off repeated window frame errors without refreshing the UI again', async () => {

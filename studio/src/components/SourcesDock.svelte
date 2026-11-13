@@ -139,7 +139,6 @@
 			tracked.windowTitle = choice.title;
 			report(`native window capture app=${choice.appName} window=${JSON.stringify(choice.title)}`);
 			persist();
-			if (!appAudio.supported) void refreshApps();
 		}
 	}
 
@@ -271,7 +270,9 @@
 			(await invoke<boolean>('native_window_capture_available'))
 		) {
 			await refreshWindowChoices();
-			const previous = windowChoices.find((window) => window.id === layer.windowId);
+			const previous = windowChoices.find(
+				(window) => window.id === layer.windowId && window.appId === layer.appId
+			);
 			if (previous) await captureNativeWindow(layer, previous);
 			else pendingWindowLayer = layer;
 			return;
