@@ -1,4 +1,5 @@
 import { expect, it, vi } from 'vitest';
+import archive from '$lib/data/channelPosts.json';
 
 const { getDb } = vi.hoisted(() => ({ getDb: vi.fn() }));
 vi.mock('../../db/mongo', () => ({ getDb }));
@@ -22,7 +23,7 @@ it('does not revive an archived post that an editor saved as a draft', async () 
 		})
 	});
 	const feed = await getExtraitFeed();
-	expect(feed.posts).toHaveLength(42);
+	expect(feed.posts).toHaveLength(archive.posts.length - 1);
 	expect(feed.posts.some((post) => post.id === 'WA202610012220')).toBe(false);
 });
 
