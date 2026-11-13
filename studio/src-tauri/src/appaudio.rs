@@ -111,32 +111,28 @@ mod platform {
 	use screencapturekit::shareable_content::SCShareableContent;
 	use screencapturekit::stream::{
 		configuration::SCStreamConfiguration, content_filter::SCContentFilter,
-		output_trait::SCStreamOutputTrait, output_type::SCStreamOutputType, SCStream,
+		output_type::SCStreamOutputType, SCStream,
 	};
 	use tauri::ipc::{Channel, InvokeResponseBody};
 
 	/// SCK hands us 32-bit float, one buffer per channel. The webview wants a
 	/// single interleaved stereo block, which is also what an AudioWorklet can
 	/// copy straight into its ring buffer.
-	struct Handler {
-		channel: Channel<InvokeResponseBody>,
+	pub fn send_pcm(sample: CMSampleBuffer, channel: &Channel<InvokeResponseBody>) {
+		let Some(list) = sample.audio_buffer_list() else { return };
+		let planes: Vec<&[u8]> = list.iter().map(|buffer| buffer.data()).collect();
+		let interleaved = super::interleave_stereo(&planes);
+		if !interleaved.is_empty() {
+			let _ = channel.send(InvokeResponseBody::Raw(interleaved));
+		}
 	}
 
-	impl SCStreamOutputTrait for Handler {
-		fn did_output_sample_buffer(&self, sample: CMSampleBuffer, of_type: SCStreamOutputType) {
-			if of_type != SCStreamOutputType::Audio {
-				return;
-			}
-			let Some(list) = sample.audio_buffer_list() else { return };
-			let planes: Vec<&[u8]> = list.iter().map(|buffer| buffer.data()).collect();
-			let interleaved = super::interleave_stereo(&planes);
-			if interleaved.is_empty() {
-				return;
-			}
-			// A dead webview must not kill the capture thread; the next start
-			// replaces the channel anyway.
-			let _ = self.channel.send(InvokeResponseBody::Raw(interleaved));
-		}
+	pub fn configure_audio(config: &mut SCStreamConfiguration) {
+		config
+			.set_captures_audio(true)
+			.set_sample_rate(48_000)
+			.set_channel_count(2)
+			.set_excludes_current_process_audio(true);
 	}
 
 	// SCStream is an ObjC object driven from its own dispatch queue. Holding it
@@ -249,18 +245,11 @@ mod platform {
 			};
 
 			let mut config = SCStreamConfiguration::new();
-			config
-				.set_captures_audio(true)
-				.set_sample_rate(48_000)
-				.set_channel_count(2)
-				// Without this the studio's own monitoring would be captured and
-				// fed back into the mix.
-				.set_excludes_current_process_audio(true)
-				.set_width(2)
-				.set_height(2);
+			configure_audio(&mut config);
+			config.set_width(2).set_height(2);
 
 			let mut stream = SCStream::new(&filter, &config);
-			stream.add_output_handler(Handler { channel }, SCStreamOutputType::Audio);
+			stream.add_output_handler(move |sample, _| send_pcm(sample, &channel), SCStreamOutputType::Audio);
 			stream
 				.start_capture()
 				.map_err(|e| format!("Capture audio impossible: {e:?}"))?;
@@ -326,3 +315,5 @@ mod platform {
 }
 
 pub use platform::{list, list_windows, Capture};
+#[cfg(target_os = "macos")]
+pub use platform::{configure_audio, send_pcm};

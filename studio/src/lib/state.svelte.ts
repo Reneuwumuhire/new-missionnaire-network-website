@@ -49,11 +49,10 @@ export interface Layer {
 	fit: FitMode;
 	/** camera / screen: which device. Empty = system default. */
 	deviceId?: string;
-	/** screen: the application whose own audio stands in for the share's sound,
-	 *  because the engine hands a window over without any. Same field, same
-	 *  meaning as on an `app` audio source. */
+	/** Screen capture: the owner of a saved native window, or the application
+	 * supplying audio for a browser-managed share. */
 	appId?: string;
-	/** macOS ScreenCaptureKit window selected for native video capture. */
+	/** macOS ScreenCaptureKit window selected for native capture. */
 	windowId?: number;
 	/** screen: leave the mouse pointer out of the shared window, where the
 	 *  engine lets us ask. */
@@ -641,7 +640,7 @@ export function clearSceneSources(sceneId: string): string[] {
 	return ids;
 }
 
-/** The layers that get a mixer strip.
+/** The layers that get a mixer strip without a native window capture handle.
  *
  *  Audio-bearing layers of the scene currently ON AIR — the program scene, not
  *  the one being edited, so setting up a scene in Studio Mode does not push its
@@ -654,11 +653,11 @@ export function clearSceneSources(sceneId: string): string[] {
 export function audioLayers(): Layer[] {
 	const strips = new Map<string, Layer>();
 	for (const layer of programScene().layers) {
-		if (layer.hasAudio && layer.visible) strips.set(layer.id, layer);
+		if (!layer.windowId && layer.hasAudio && layer.visible) strips.set(layer.id, layer);
 	}
 	for (const scene of studio.scenes) {
 		for (const layer of scene.layers) {
-			if (layer.appId && layer.visible) strips.set(layer.id, layer);
+			if (!layer.windowId && layer.appId && layer.visible) strips.set(layer.id, layer);
 		}
 	}
 	return [...strips.values()];

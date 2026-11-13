@@ -133,6 +133,28 @@ export const capturingApp = (sourceId: string): string | undefined => capturedAp
  *  tell "capture started" from "capture is actually delivering". */
 export const received = $state({ bytes: 0, blocks: 0 });
 
+export function pcmChannel(sourceId: string, sink: () => AudioWorkletNode | undefined) {
+	return new Channel<ArrayBuffer | number[]>((payload) => {
+		const node = sink();
+		if (!node) return;
+		const bytes = payload instanceof ArrayBuffer ? payload : new Uint8Array(payload).buffer;
+		received.bytes += bytes.byteLength;
+		received.blocks++;
+		const samples = new Float32Array(bytes);
+		for (const observer of pcmObservers) observer(sourceId, samples);
+		node.port.postMessage(samples);
+	});
+}
+
+export async function createPcmNode(mixer: Mixer): Promise<AudioWorkletNode> {
+	await mixer.ensureWorklet(workletUrl);
+	return new AudioWorkletNode(mixer.ctx, 'pcm-source', {
+		numberOfInputs: 0,
+		numberOfOutputs: 1,
+		outputChannelCount: [2]
+	});
+}
+
 export async function startAppAudio(
 	mixer: Mixer,
 	sourceId: string,
@@ -141,25 +163,8 @@ export async function startAppAudio(
 	await stopAppAudio(mixer, sourceId);
 	try {
 		await mixer.resume();
-		await mixer.ensureWorklet(workletUrl);
-		const node = new AudioWorkletNode(mixer.ctx, 'pcm-source', {
-			numberOfInputs: 0,
-			numberOfOutputs: 1,
-			outputChannelCount: [2]
-		});
-
-		const channel = new Channel<ArrayBuffer | number[]>();
-		channel.onmessage = (payload) => {
-			// Raw IPC bodies arrive as ArrayBuffer; a JSON fallback would be an
-			// array of bytes. Handle both rather than assume.
-			const bytes =
-				payload instanceof ArrayBuffer ? payload : new Uint8Array(payload as number[]).buffer;
-			received.bytes += bytes.byteLength;
-			received.blocks++;
-			const samples = new Float32Array(bytes);
-			for (const observer of pcmObservers) observer(sourceId, samples);
-			node.port.postMessage(samples);
-		};
+		const node = await createPcmNode(mixer);
+		const channel = pcmChannel(sourceId, () => nodes.get(sourceId) === node ? node : undefined);
 
 		// The sentinel travels as an empty bundle id, which the native side reads
 		// as "the whole display".

@@ -46,6 +46,8 @@
 		handleFor,
 		handleForLayer,
 		mediaVersion,
+		mixerAudioLayers,
+		nativeWindowAudioNode,
 		openCamera,
 		previewAudioId,
 		previewAudioLayer,
@@ -64,7 +66,6 @@
 	} from './lib/selftest';
 	import {
 		activeScene,
-		audioLayers,
 		onAirSceneId,
 		persist,
 		resetLayout,
@@ -369,14 +370,17 @@
 				void bus.resume();
 			}
 		}
-		for (const layer of audioLayers()) {
-			const handle = handleForLayer(layer);
-			// A shared window's sound is the native app capture, which is already
-			// a strip and has no media handle. Claim it first, or the sweep below
-			// would tear it down a frame after it started.
-			if (layer.appId && bus.has(layer.id)) {
+		for (const layer of mixerAudioLayers()) {
+			const handle = layer.kind === 'screen' ? handleFor(layer.id) : handleForLayer(layer);
+			if (handle?.nativeAudio) {
+				const node = nativeWindowAudioNode(handle, bus);
+				if (node) {
+					bus.addNode(layer.id, node);
+					wanted.add(layer.id);
+				}
+			} else if (handle?.stream?.getAudioTracks().length && bus.addStream(layer.id, handle.stream)) {
 				wanted.add(layer.id);
-			} else if (handle?.stream && bus.addStream(layer.id, handle.stream)) {
+			} else if (layer.appId && bus.has(layer.id)) {
 				wanted.add(layer.id);
 			} else if (layer.kind === 'video' && handle?.el instanceof HTMLVideoElement) {
 				bus.addElement(layer.id, handle.el);

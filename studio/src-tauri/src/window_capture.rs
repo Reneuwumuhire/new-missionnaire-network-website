@@ -1,31 +1,43 @@
-//! Native macOS window video capture. WebKit's getDisplayMedia path can stall
+//! Native macOS window capture. WebKit's getDisplayMedia path can stall
 //! the desktop while sharing a browser playing live video. ScreenCaptureKit
 //! captures one selected window directly and can omit the pointer before it
 //! becomes part of the frame, as OBS does.
 
 use serde::Serialize;
+use tauri::ipc::{Channel, InvokeResponseBody};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CaptureInfo {
 	pub width: u32,
 	pub height: u32,
+	pub has_audio: bool,
 }
 
 #[cfg(target_os = "macos")]
 mod platform {
-	use super::CaptureInfo;
+	use super::{CaptureInfo, Channel, InvokeResponseBody};
+	use crate::appaudio::{configure_audio, send_pcm};
+	use core_graphics::window::{create_window_list, kCGNullWindowID, kCGWindowListOptionAll};
 	use image::{codecs::jpeg::JpegEncoder, ColorType};
+	use objc2_foundation::NSProcessInfo;
 	use screencapturekit::cm::{CMSampleBuffer, CMSampleBufferExt};
 	use screencapturekit::shareable_content::SCShareableContent;
 	use screencapturekit::stream::{
 		configuration::SCStreamConfiguration, content_filter::SCContentFilter,
+		delegate_trait::ErrorHandler,
 		output_trait::SCStreamOutputTrait, output_type::SCStreamOutputType, SCStream,
 	};
 	use std::collections::HashMap;
 	use std::sync::{
 		atomic::{AtomicBool, Ordering}, Arc, Condvar, Mutex,
 	};
+	use std::time::{Duration, Instant};
+
+	const WINDOW_CHECK_INTERVAL: Duration = Duration::from_millis(500);
+	// An empty packet means there is no new frame. A one-byte packet means the
+	// capture ended. Image packets always contain an eight-byte sequence prefix.
+	const CAPTURE_ENDED: u8 = 1;
 
 	struct RawFrame {
 		width: u32,
@@ -83,6 +95,16 @@ mod platform {
 		width: u32,
 		height: u32,
 		fps: u32,
+		has_audio: bool,
+		window_id: u32,
+		next_window_check: Instant,
+	}
+
+	fn end_capture(running: &AtomicBool, frames: &(Mutex<Option<RawFrame>>, Condvar)) {
+		// Use the worker's mutex so the notification cannot race its wait.
+		let _slot = frames.0.lock();
+		running.store(false, Ordering::Relaxed);
+		frames.1.notify_all();
 	}
 
 	pub struct Capture(Mutex<HashMap<String, Active>>);
@@ -96,17 +118,21 @@ mod platform {
 		fn default() -> Self { Self(Mutex::new(HashMap::new())) }
 	}
 
-	fn configuration(width: u32, height: u32, fps: u32, hide_cursor: bool) -> SCStreamConfiguration {
+	fn configuration(
+		width: u32, height: u32, fps: u32, hide_cursor: bool, has_audio: bool,
+	) -> SCStreamConfiguration {
 		let mut config = SCStreamConfiguration::new();
 		config.set_width(width).set_height(height).set_fps(fps)
-			.set_queue_depth(3).set_shows_cursor(!hide_cursor)
-			.set_captures_audio(false).set_scales_to_fit(true);
+			.set_queue_depth(3).set_shows_cursor(!hide_cursor).set_scales_to_fit(true);
+		if has_audio {
+			configure_audio(&mut config);
+		}
 		config
 	}
 
 	impl Capture {
 		pub fn start(&self, id: &str, window_id: u32, max_width: u32, max_height: u32,
-			fps: u32, hide_cursor: bool) -> Result<CaptureInfo, String> {
+			fps: u32, hide_cursor: bool, audio: Channel<InvokeResponseBody>) -> Result<CaptureInfo, String> {
 			self.stop(Some(id));
 			let content = SCShareableContent::create()
 				.with_on_screen_windows_only(false)
@@ -123,12 +149,28 @@ mod platform {
 			let width = (source_width * scale).round().max(2.0) as u32;
 			let height = (source_height * scale).round().max(2.0) as u32;
 			let filter = SCContentFilter::create().with_window(&window).build();
-			let config = configuration(width, height, fps.clamp(1, 30), hide_cursor);
+			let fps = fps.clamp(1, 30);
+			let has_audio = NSProcessInfo::processInfo().operatingSystemVersion().majorVersion >= 13;
+			let config = configuration(width, height, fps, hide_cursor, has_audio);
 			let frames = Arc::new((Mutex::new(None::<RawFrame>), Condvar::new()));
 			let latest = Arc::new(Mutex::new(LatestFrame::default()));
 			let running = Arc::new(AtomicBool::new(true));
-			let mut stream = SCStream::new(&filter, &config);
+			let ended_running = Arc::clone(&running);
+			let ended_frames = Arc::clone(&frames);
+			let delegate = ErrorHandler::new(move |error| {
+				eprintln!("Window capture stopped: {error}");
+				end_capture(&ended_running, &ended_frames);
+			});
+			let mut stream = SCStream::new_with_delegate(&filter, &config, delegate);
 			stream.add_output_handler(Handler { frames: Arc::clone(&frames) }, SCStreamOutputType::Screen);
+			if has_audio {
+				let audio_running = Arc::clone(&running);
+				stream.add_output_handler(move |sample, _| {
+					if audio_running.load(Ordering::Relaxed) {
+						send_pcm(sample, &audio);
+					}
+				}, SCStreamOutputType::Audio).ok_or("Window audio output could not be registered")?;
+			}
 			stream.start_capture()
 				.map_err(|e| format!("Window capture could not start: {e:?}"))?;
 			let worker_latest = Arc::clone(&latest);
@@ -157,22 +199,35 @@ mod platform {
 			let mut streams = match self.0.lock() {
 				Ok(streams) => streams,
 				Err(err) => {
-					running.store(false, Ordering::Relaxed);
-					frames.1.notify_all();
+					end_capture(&running, &frames);
 					let _ = stream.stop_capture();
 					return Err(err.to_string());
 				}
 			};
 			streams.insert(id.to_owned(), Active {
-				stream, latest, frames, running, width, height, fps: fps.clamp(1, 30),
+				stream, latest, frames, running, width, height, fps, has_audio, window_id,
+				next_window_check: Instant::now() + WINDOW_CHECK_INTERVAL,
 			});
-			Ok(CaptureInfo { width, height })
+			Ok(CaptureInfo { width, height, has_audio })
 		}
 
 		pub fn frame(&self, id: &str, last_sequence: u64) -> Vec<u8> {
-			let latest = self.0.lock().ok()
-				.and_then(|streams| streams.get(id).map(|active| Arc::clone(&active.latest)));
-			let Some(latest) = latest else { return Vec::new() };
+			let Ok(mut streams) = self.0.lock() else { return vec![CAPTURE_ENDED] };
+			let Some(active) = streams.get_mut(id) else { return vec![CAPTURE_ENDED] };
+			let now = Instant::now();
+			if active.running.load(Ordering::Relaxed) && now >= active.next_window_check {
+				active.next_window_check = now + WINDOW_CHECK_INTERVAL;
+				// An app can keep playing after its window closes. Check the actual
+				// window ID, including offscreen and minimized windows.
+				if let Some(windows) = create_window_list(kCGWindowListOptionAll, kCGNullWindowID) {
+					if !windows.iter().any(|id| *id == active.window_id) {
+						end_capture(&active.running, &active.frames);
+					}
+				}
+			}
+			if !active.running.load(Ordering::Relaxed) { return vec![CAPTURE_ENDED]; }
+			let latest = Arc::clone(&active.latest);
+			drop(streams);
 			let Ok(frame) = latest.lock() else { return Vec::new() };
 			if frame.sequence <= last_sequence || frame.jpeg.is_empty() { return Vec::new(); }
 			let mut packet = Vec::with_capacity(8 + frame.jpeg.len());
@@ -185,7 +240,7 @@ mod platform {
 			let streams = self.0.lock().map_err(|e| e.to_string())?;
 			let active = streams.get(id).ok_or("Window capture has ended")?;
 			active.stream.update_configuration(
-				&configuration(active.width, active.height, active.fps, hide_cursor)
+				&configuration(active.width, active.height, active.fps, hide_cursor, active.has_audio)
 			).map_err(|e| format!("Cursor setting could not be applied: {e:?}"))
 		}
 
@@ -195,9 +250,9 @@ mod platform {
 					Some(id) => streams.remove(id).into_iter().collect(),
 					None => streams.drain().map(|(_, active)| active).collect(),
 				};
+				drop(streams);
 				for active in removed {
-					active.running.store(false, Ordering::Relaxed);
-					active.frames.1.notify_all();
+					end_capture(&active.running, &active.frames);
 					let _ = active.stream.stop_capture();
 				}
 			}
@@ -207,11 +262,11 @@ mod platform {
 
 #[cfg(not(target_os = "macos"))]
 mod platform {
-	use super::CaptureInfo;
+	use super::{CaptureInfo, Channel, InvokeResponseBody};
 	#[derive(Default)]
 	pub struct Capture;
 	impl Capture {
-		pub fn start(&self, _: &str, _: u32, _: u32, _: u32, _: u32, _: bool) -> Result<CaptureInfo, String> {
+		pub fn start(&self, _: &str, _: u32, _: u32, _: u32, _: u32, _: bool, _: Channel<InvokeResponseBody>) -> Result<CaptureInfo, String> {
 			Err("Native window capture is available on macOS only".into())
 		}
 		pub fn frame(&self, _: &str, _: u64) -> Vec<u8> { Vec::new() }

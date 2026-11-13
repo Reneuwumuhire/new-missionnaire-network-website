@@ -396,8 +396,9 @@ fn native_window_capture_available() -> bool {
 fn start_window_capture(
 	capture: State<'_, window_capture::Capture>, id: String, window_id: u32,
 	width: u32, height: u32, fps: u32, hide_cursor: bool,
+	audio: tauri::ipc::Channel<tauri::ipc::InvokeResponseBody>,
 ) -> Result<window_capture::CaptureInfo, String> {
-	capture.start(&id, window_id, width, height, fps, hide_cursor)
+	capture.start(&id, window_id, width, height, fps, hide_cursor, audio)
 }
 
 #[tauri::command]

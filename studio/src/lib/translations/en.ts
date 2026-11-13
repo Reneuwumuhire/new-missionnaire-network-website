@@ -67,12 +67,13 @@ const en = {
 	'sources.videoHint': 'Clip or loop, with sound',
 	'sources.pickWindow': 'Choose a window to capture',
 	'sources.pickWindowHint':
-		'Choose the window playing the live video. Studio captures it directly and leaves the mouse pointer out of the broadcast.',
+		'Choose a window. On macOS 13 or later, audio from its application is added to the mixer automatically.',
 	'sources.untitledWindow': 'Untitled window',
 	'sources.noWindows':
 		'No windows found. Allow Screen Recording for Missionnaire Studio in macOS settings, then refresh.',
 	'sources.noVideoFrames':
 		'The window has not sent video. Keep it open and visible, then reconnect this source.',
+	'sources.windowCaptureEnded': 'Window capture ended. Reconnect this source to choose a window.',
 	'sources.screenPermission': 'Screen Recording settings',
 	'sources.refreshWindows': 'Refresh windows',
 	'youtubeLive.openChat': 'Open live chat',

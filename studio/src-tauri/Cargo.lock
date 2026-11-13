@@ -1967,6 +1967,7 @@ name = "missionnaire-studio"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "core-graphics",
  "image",
  "objc2",
  "objc2-foundation",

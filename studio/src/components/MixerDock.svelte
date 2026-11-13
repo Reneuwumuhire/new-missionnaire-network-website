@@ -6,6 +6,7 @@
 		listDevices,
 		watchDevices,
 		mediaVersion,
+		mixerAudioLayers,
 		openMic,
 		openPrivacySettings,
 		permissions,
@@ -40,7 +41,6 @@
 	import {
 		addAppAudio,
 		addAudioInput,
-		audioLayers,
 		persist,
 		studio,
 		type AudioSource,
@@ -61,7 +61,7 @@
 		if (
 			studio.audioSources.some((source) => source.kind === 'app') ||
 			studio.scenes.some((scene) =>
-				scene.layers.some((layer) => layer.kind === 'screen' && layer.appId)
+				scene.layers.some((layer) => layer.kind === 'screen' && layer.appId && !layer.windowId)
 			)
 		)
 			void refreshApps();
@@ -199,7 +199,7 @@
 						}
 					]
 				: []),
-			...audioLayers().map((layer) => ({
+			...mixerAudioLayers().map((layer) => ({
 				id: layer.id,
 				name: preview?.id === layer.id ? `${t('preview.program')} · ${layer.name}` : layer.name,
 				isMic: false,
@@ -208,17 +208,17 @@
 		];
 	});
 
-	/** Strips whose sound comes from the native per-application capture: an
-	 *  "Application audio" source, and every window or screen share — the engine
-	 *  hands those over silent, so the application's own output stands in. */
+	/** Strips with an application picker for a separate audio capture. */
 	function isAppStrip(strip: Strip): boolean {
-		return strip.isMic
-			? (strip.source as AudioSource).kind === 'app'
-			: (strip.source as Layer).kind === 'screen';
+		if (strip.isMic) return strip.source.kind === 'app';
+		void mediaVersion.n;
+		const handle = handleFor(strip.id);
+		return strip.source.kind === 'screen' && !handle?.nativeCaptureId && !handle?.stream?.getAudioTracks().length;
 	}
 
 	function inactiveReason(strip: Strip): string {
-		const error = handleFor(strip.source.id)?.error;
+		const handle = handleFor(strip.source.id);
+		const error = handle?.nativeAudio?.error ?? handle?.error;
 		if (error) return error;
 		if (isAppStrip(strip) && !appAudio.supported)
 			return strip.isMic ? t('mixer.appAudioUnsupported') : t('mixer.noAudioTrack');
@@ -260,10 +260,12 @@
 			void connect(source).finally(() => opening.delete(source.id));
 		}
 
-		const wanting = [...studio.audioSources.filter((s) => s.kind === 'app'), ...audioLayers()];
+		const wanting = [...studio.audioSources.filter((s) => s.kind === 'app'), ...mixerAudioLayers()];
 		if (!appAudio.supported) return;
 		for (const source of wanting) {
 			if (!source.appId) continue;
+			const handle = handleFor(source.id);
+			if (handle?.nativeCaptureId || handle?.stream?.getAudioTracks().length) continue;
 			// What the strip is actually capturing, not merely whether it has one.
 			// Re-sharing a window points the source at another application, and a
 			// strip left running the old one is a meter that never matches the

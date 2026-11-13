@@ -3,7 +3,7 @@
 	import { invoke } from '@tauri-apps/api/core';
 	import { pickMimeType } from '../lib/broadcast.svelte';
 	import { t, type TranslationKey } from '../lib/i18n.svelte';
-	import { handleForLayer, mediaVersion } from '../lib/media.svelte';
+	import { handleForLayer, mediaVersion, mixerAudioLayers } from '../lib/media.svelte';
 	import type { Mixer } from '../lib/mixer';
 	import {
 		destinationProblem,
@@ -15,7 +15,6 @@
 	import { recordsCloud, recordsLocal } from '../lib/recording.svelte';
 	import { liveReady, preparedReady } from '../lib/service-workflow.svelte';
 	import {
-		audioLayers,
 		destinationPlatform,
 		destinationUrl,
 		programScene,
@@ -80,11 +79,11 @@
 	});
 	const audioIds = $derived([
 		...studio.audioSources.filter((source) => !source.muted).map((source) => source.id),
-		...audioLayers()
+		...mixerAudioLayers()
 			.filter((layer) => !layer.muted)
 			.map((layer) => layer.id)
 	]);
-	const audioConfigured = $derived(studio.audioSources.length + audioLayers().length > 0);
+	const audioConfigured = $derived(studio.audioSources.length + mixerAudioLayers().length > 0);
 	const audioMuted = $derived(audioConfigured && audioIds.length === 0);
 	const audioConnected = $derived(audioIds.some((id) => mixer?.has(id)));
 	const missionnaireEnabled = $derived(

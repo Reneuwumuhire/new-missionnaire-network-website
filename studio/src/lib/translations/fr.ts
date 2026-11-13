@@ -71,12 +71,14 @@ const fr: Record<keyof typeof en, string> = {
 	'sources.videoHint': 'Clip ou boucle, avec son',
 	'sources.pickWindow': 'Choisir une fenêtre à capturer',
 	'sources.pickWindowHint':
-		'Choisissez la fenêtre qui lit le direct. Studio la capture directement sans afficher le pointeur dans la diffusion.',
+		'Choisissez une fenêtre. Sur macOS 13 ou version ultérieure, le son de son application est ajouté automatiquement au mixeur.',
 	'sources.untitledWindow': 'Fenêtre sans titre',
 	'sources.noWindows':
 		'Aucune fenêtre trouvée. Autorisez l’enregistrement de l’écran pour Missionnaire Studio dans les réglages macOS, puis actualisez.',
 	'sources.noVideoFrames':
 		'La fenêtre n’envoie pas de vidéo. Laissez-la ouverte et visible, puis reconnectez cette source.',
+	'sources.windowCaptureEnded':
+		'La capture de la fenêtre est terminée. Reconnectez cette source pour choisir une fenêtre.',
 	'sources.screenPermission': 'Réglages d’enregistrement de l’écran',
 	'sources.refreshWindows': 'Actualiser les fenêtres',
 	'youtubeLive.openChat': 'Ouvrir le chat',
