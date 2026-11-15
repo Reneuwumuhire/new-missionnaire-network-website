@@ -92,7 +92,7 @@ async function fetchHlsListenerCount(): Promise<number> {
 	}
 }
 
-async function fetchIcecastStatus(): Promise<IcecastSnapshot> {
+export async function fetchIcecastStatus(): Promise<IcecastSnapshot> {
 	try {
 		const controller = new AbortController();
 		// Production TTFB from the Fly app is 4-6s under load; a 3s timeout

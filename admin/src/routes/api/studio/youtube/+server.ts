@@ -27,6 +27,7 @@ import {
 import { buildWatchUrl, pingBroadcastEvent } from '$lib/server/main-site';
 import { generatePresignedUploadUrl, getObjectBytes, getS3Url } from '$lib/server/s3';
 import { RecorderError, recorderStart, recorderStop } from '$lib/server/recorder-client';
+import { fetchIcecastStatus } from '$lib/server/icecast';
 import {
 	missionnaireIngestForAuthorization,
 	revokeMissionnaireIngest,
@@ -101,6 +102,10 @@ export async function POST({ request, getClientAddress }) {
 		await updateStudioAuthorizationActivity(user.code, body.deviceInfo);
 	}
 	if (body.action === 'heartbeat') return json({ ok: true });
+	if (body.action === 'audio-status') {
+		const { reachable, sourceActive } = await fetchIcecastStatus();
+		return json({ reachable, sourceActive });
+	}
 	if (body.action === 'status') {
 		const [channels, missionnaire] = await Promise.all([
 			youtubeConnection(user.email),
