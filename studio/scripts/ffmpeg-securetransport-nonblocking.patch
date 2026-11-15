@@ -1,0 +1,15 @@
+--- a/libavformat/tls_securetransport.c
++++ b/libavformat/tls_securetransport.c
+@@ -368,7 +368,12 @@
+     SSLGetBufferedReadSize(c->ssl_context, &available);
+     if (available)
+         size = FFMIN(available, size);
++    /* RTMP probes the TLS stream for control messages without blocking. */
++    int tcp_flags = c->tls_shared.tcp->flags;
++    c->tls_shared.tcp->flags = (tcp_flags & ~AVIO_FLAG_NONBLOCK) |
++                              (h->flags & AVIO_FLAG_NONBLOCK);
+     ret = SSLRead(c->ssl_context, buf, size, &processed);
++    c->tls_shared.tcp->flags = tcp_flags;
+     ret = map_ssl_error(ret, processed);
+     if (ret > 0)
+         return ret;

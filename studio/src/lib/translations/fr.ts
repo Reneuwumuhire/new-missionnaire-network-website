@@ -199,6 +199,10 @@ const fr: Record<keyof typeof en, string> = {
 		'YouTube reçoit le signal test. Vérifiez l’image, le son et l’état du flux avant le direct.',
 	'error.youtubeChannelMissing': 'Connectez la chaîne YouTube utilisée par ce service.',
 	'error.missionnaireGoLive': 'Missionnaire n’a pas pu passer en direct.',
+	'error.missionnaireAudioUnreachable':
+		'Impossible de vérifier le serveur audio Missionnaire. Réessayez de passer en direct.',
+	'error.missionnaireAudioMissing':
+		'Missionnaire attend le signal audio. Laissez la prévisualisation tourner et passez en direct quand le moniteur de l’administration reçoit le son.',
 
 	// ── Vérification avant diffusion ─────────────────────────────
 	'preflight.title': 'Vérification avant diffusion',

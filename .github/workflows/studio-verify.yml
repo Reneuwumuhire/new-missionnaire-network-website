@@ -34,7 +34,7 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Install macOS build libraries
         if: runner.os == 'macOS'
-        run: brew install pkgconf
+        run: brew install pkgconf nasm
       - name: Prepare parent TypeScript base
         run: |
           node -e 'require("node:fs").mkdirSync(".svelte-kit", { recursive: true }); require("node:fs").writeFileSync(".svelte-kit/tsconfig.json", "{}\n")'

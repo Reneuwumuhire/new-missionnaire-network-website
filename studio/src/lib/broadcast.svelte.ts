@@ -1,11 +1,8 @@
 // Program canvas + audio bus → MediaRecorder → Rust → ffmpeg → RTMP.
 //
 // The webview encodes to VP8/Opus and ffmpeg transcodes to H.264/AAC. That is
-// one encode more than strictly necessary, but it is the only path that is the
-// same on every machine: WebKit's MP4 recorder output cannot be relied on to
-// be fragmented, and a half-written MP4 on a pipe is silence on air.
-// ponytail: if CPU becomes the limit on the church laptop, revisit passthrough
-// (`-c copy`) with the mp4 recorder and verify with a long soak test first.
+// one encode more than strictly necessary. For a single Missionnaire preview
+// on Intel macOS, WebKit can produce fragmented H.264/AAC MP4 directly.
 
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
@@ -15,10 +12,12 @@ import {
 	endSelectedSession,
 	goLiveYouTube,
 	liveSession,
+	missionnaireAudioStatus,
 	sessionYouTubeChannelId,
-	startSelectedSession
+	startSelectedSession,
+	studioDeviceInfo
 } from './live-session.svelte';
-import { destinationUrl, requiresYouTubeGoLive, studio } from './state.svelte';
+import { destinationPlatform, destinationUrl, requiresYouTubeGoLive, studio } from './state.svelte';
 import { sampleOutputClock, startStreamClock, stopStreamClock } from './stream-clock';
 import { captureHasStalled, retryRecovery, type CaptureState } from './stream-health';
 
@@ -93,6 +92,8 @@ let hasAudio = false;
 let runtime: Runtime | null = null;
 let watchdog: ReturnType<typeof setInterval> | null = null;
 let lastChunkAt = 0;
+let recorderHasChunks = false;
+let lastOutputAt = 0;
 let recovering = false;
 let heldRecoveryEpoch = 0;
 let heldRecoveryTask: Promise<void> | null = null;
@@ -102,6 +103,9 @@ let recoveryTimes: number[] = [];
 let heldRecoveryTimes: number[] = [];
 
 const CAPTURE_STALL_MS = 4_000;
+// WebKit can wait for a complete initial cluster before delivering any bytes.
+const CAPTURE_STARTUP_STALL_MS = 15_000;
+const OUTPUT_STALL_MS = 15_000;
 const RECOVERY_WINDOW_MS = 60_000;
 const MAX_RECOVERIES_PER_WINDOW = 3;
 
@@ -147,6 +151,7 @@ interface Runtime {
 	audioTrack?: MediaStreamTrack;
 	mime: string;
 	main: StreamConfig;
+	checkMissionnaireAudio: boolean;
 	held?: StreamConfig;
 	runIds: Partial<Record<StreamGroup, number>>;
 }
@@ -176,8 +181,21 @@ function startWatchdog() {
 	watchdog = setInterval(() => {
 		if (!runtime || recovering || stopping || broadcast.phase === 'idle') return;
 		const state = recorder?.state ?? 'missing';
-		if (captureHasStalled(state, lastChunkAt, Date.now(), CAPTURE_STALL_MS)) {
+		if (
+			captureHasStalled(
+				state,
+				lastChunkAt,
+				Date.now(),
+				recorderHasChunks ? CAPTURE_STALL_MS : CAPTURE_STARTUP_STALL_MS
+			)
+		) {
 			void recoverCapture();
+		} else if (
+			runtime.main.targets.length === 1 &&
+			!runtime.main.record_local &&
+			Date.now() - lastOutputAt >= OUTPUT_STALL_MS
+		) {
+			void recoverCapture('Studio RTMP output stalled; reconnecting encoder.');
 		}
 	}, 1_000);
 }
@@ -204,9 +222,16 @@ function startRecorder(active: Runtime) {
 			) * 1000
 	});
 	recorder = current;
+	recorderHasChunks = false;
 	lastChunkAt = Date.now();
+	lastOutputAt = lastChunkAt;
 	current.ondataavailable = (event) => {
 		if (event.data.size === 0 || recorder !== current) return;
+		if (!recorderHasChunks) {
+			lastOutputAt = Date.now();
+			noteBroadcast(`Studio capture produced its first ${active.mime} chunk.`);
+		}
+		recorderHasChunks = true;
 		lastChunkAt = Date.now();
 		if (!recovering) broadcast.captureState = 'healthy';
 		chunks++;
@@ -220,9 +245,9 @@ function startRecorder(active: Runtime) {
 	current.onerror = () => {
 		if (recorder === current) void recoverCapture();
 	};
-	// 250 ms slices keep latency low without making IPC itself significant.
 	startStreamClock();
-	current.start(250);
+	// WebKit's MP4 recorder emits a fragment about once per second.
+	current.start(active.main.container === 'mp4' ? 1_000 : 250);
 	startWatchdog();
 }
 
@@ -256,9 +281,9 @@ async function failCapture() {
 	stopWatchdog();
 	await cancelHeldRecovery();
 	await stopRecorder();
-	await chain.catch(() => {});
 	if (runtime) runtime.runIds = {};
 	await invoke('abort_stream', { group: null }).catch(() => {});
+	await chain.catch(() => {});
 	broadcast.phase = 'idle';
 	broadcast.heldLive = false;
 	broadcast.captureState = 'failed';
@@ -358,7 +383,7 @@ async function cancelHeldRecovery() {
 	await heldRecoveryTask?.catch(() => {});
 }
 
-async function recoverCapture() {
+async function recoverCapture(reason = 'Studio capture stalled; reconnecting encoder.') {
 	const active = runtime;
 	const generation = lifecycle;
 	if (!active || recovering || stopping || broadcast.phase === 'idle') return;
@@ -378,14 +403,15 @@ async function recoverCapture() {
 	recoveryTimes.push(now);
 	broadcast.captureState = 'recovering';
 	broadcast.recoveries++;
-	noteBroadcast('Studio capture stalled; reconnecting encoder.');
+	noteBroadcast(reason);
 
 	try {
 		await stopRecorder();
-		await chain.catch(() => {});
 		if (generation !== lifecycle || stopping) return;
 		active.runIds = {};
 		await invoke('abort_stream', { group: null });
+		// Killing a stalled writer releases any push waiting for queue space.
+		await chain.catch(() => {});
 		if (generation !== lifecycle || stopping) return;
 
 		const main = await restartEncoder(
@@ -442,17 +468,29 @@ export async function startBroadcast(
 	heldRecoveryTimes = [];
 	chain = Promise.resolve();
 	try {
-		const enabled =
-			targets ??
-			studio.destinations
-				.filter((d) => d.enabled && !d.hold && d.url.trim())
-				.map((d) => ({ name: d.name, url: destinationUrl(d) }));
-		if (enabled.length === 0 && !recordsLocal()) throw new Error(t('error.noImmediateDestination'));
-
-		const mime = pickMimeType();
+		const destinations = studio.destinations.filter((d) => d.enabled && !d.hold && d.url.trim());
+		const enabled = targets ?? destinations.map((d) => ({ name: d.name, url: destinationUrl(d) }));
+		const { settings } = studio;
+		const recordLocal = recordsLocal();
+		if (enabled.length === 0 && !recordLocal) throw new Error(t('error.noImmediateDestination'));
+		const checkMissionnaireAudio =
+			!targets && destinations.some((d) => destinationPlatform(d) === 'missionnaire');
+		let mime = pickMimeType();
+		if (
+			checkMissionnaireAudio &&
+			enabled.length === 1 &&
+			!recordLocal &&
+			settings.encoder === 'hardware' &&
+			heldDestinations().length === 0 &&
+			typeof MediaRecorder !== 'undefined' &&
+			MediaRecorder.isTypeSupported('video/mp4')
+		) {
+			const device = await studioDeviceInfo().catch(() => null);
+			if (device?.os === 'macOS' && device.architecture === 'x86_64') mime = 'video/mp4';
+		}
+		if (generation !== lifecycle || stopping) return;
 		if (!mime) throw new Error(t('error.noRecorder'));
 
-		const { settings } = studio;
 		const config: StreamConfig = {
 			container: containerOf(mime),
 			targets: enabled,
@@ -461,12 +499,19 @@ export async function startBroadcast(
 			audio_bitrate_kbps: settings.audioBitrateKbps,
 			encoder: settings.encoder,
 			has_audio: Boolean(audioTrack),
-			record_local: recordsLocal(),
+			record_local: recordLocal,
 			recording_format: settings.recordingFormat,
 			recording_video_bitrate_kbps: settings.recordingVideoBitrateKbps,
 			recording_audio_bitrate_kbps: settings.recordingAudioBitrateKbps
 		};
-		runtime = { canvas, audioTrack, mime, main: config, runIds: {} };
+		runtime = {
+			canvas,
+			audioTrack,
+			mime,
+			main: config,
+			checkMissionnaireAudio,
+			runIds: {}
+		};
 		await attachListeners();
 		if (generation !== lifecycle || stopping) return;
 		const result = await startEncoder('main', config);
@@ -480,8 +525,7 @@ export async function startBroadcast(
 		recording.localPath = result.localRecordingPath;
 		broadcast.targets = statuses(config, 'main');
 		chunks = 0;
-		// Connecting, not live: `live` is set by the first stats frame, which is
-		// ffmpeg telling us it has actually pushed something to the servers.
+		// Wait for the encoder to report output before enabling the next step.
 		broadcast.phase = 'connecting';
 		broadcast.startedAt = null;
 		startRecorder(runtime);
@@ -501,24 +545,28 @@ async function attachListeners() {
 	await detachListeners();
 	unlisteners = [
 		await listen<{ group: StreamGroup; runId: number; stats: Stats }>('stream://stats', (event) => {
-			if (event.payload.group !== 'main' || runtime?.runIds.main !== event.payload.runId) return;
-			broadcast.stats = event.payload.stats;
-			sampleOutputClock(event.payload.stats.out_time_ms);
-			// Output is flowing — every target that has not reported a failure is
-			// connected, and this is the instant we count as on air.
-			// Audio-only recordings advance time without producing video frames.
-			if (
-				broadcast.phase === 'connecting' &&
-				(event.payload.stats.frames > 0 || event.payload.stats.out_time_ms > 0)
-			) {
+			const { group, runId, stats } = event.payload;
+			if (runtime?.runIds[group] !== runId) return;
+			const hasOutput = stats.out_time_ms > 0;
+			if (group === 'held') {
+				if (hasOutput) {
+					for (const target of broadcast.targets) {
+						if (target.group === 'held' && target.state === 'connecting') target.state = 'live';
+					}
+				}
+				return;
+			}
+			if (stats.out_time_ms > (broadcast.stats?.out_time_ms ?? 0)) lastOutputAt = Date.now();
+			broadcast.stats = stats;
+			sampleOutputClock(stats.out_time_ms);
+			// The encoder clock advances for audio-only recordings as well.
+			if (broadcast.phase === 'connecting' && hasOutput) {
 				broadcast.phase = 'live';
 				broadcast.startedAt ??= Date.now();
 			}
 			if (broadcast.phase === 'live') {
 				for (const target of broadcast.targets) {
-					// A held target is only connected once its own encoder runs.
-					if (target.state !== 'connecting') continue;
-					if (target.group === 'main' || broadcast.heldLive) target.state = 'live';
+					if (target.group === 'main' && target.state === 'connecting') target.state = 'live';
 				}
 			}
 		}),
@@ -578,12 +626,20 @@ export async function stopBroadcast() {
 		// has a clean signal; both remote requests are started together.
 		await endSelectedSession();
 		await stopRecorder();
-		// Let the queued chunks land before closing ffmpeg's stdin, so the last
-		// second of the service is not truncated.
-		await chain.catch(() => {});
+		// Give the recorder's final chunk time to enter the encoder queue. A
+		// stalled writer is shut down by Rust even if the push cannot finish.
+		let drainTimeout: ReturnType<typeof setTimeout> | undefined;
+		await Promise.race([
+			chain.catch(() => {}),
+			new Promise<void>((resolve) => {
+				drainTimeout = setTimeout(resolve, 2_000);
+			})
+		]);
+		clearTimeout(drainTimeout);
 		await invoke('stop_stream', { group: null }).catch((err) => {
 			broadcast.error = String(err);
 		});
+		await chain.catch(() => {});
 		broadcast.phase = 'idle';
 		broadcast.heldLive = false;
 		broadcast.captureState = 'healthy';
@@ -661,14 +717,30 @@ export async function goLiveHeld(): Promise<void> {
 /** Open the selected Missionnaire watch page only after the operator has
  * checked the incoming signal in admin and YouTube Studio. */
 export async function goLivePublic(): Promise<void> {
-	if (broadcast.phase !== 'live' || broadcast.publishing || liveSession.activeId) return;
+	if (
+		broadcast.phase !== 'live' ||
+		broadcast.publishing ||
+		liveSession.activeId ||
+		recovering ||
+		stopping
+	)
+		return;
 	broadcast.publishing = true;
+	const generation = lifecycle;
+	const previewRun = runtime?.runIds.main;
 	const session = liveSession.sessions.find((item) => item._id === liveSession.selectedId);
 	const youtube =
 		!session?.is_test &&
 		(Boolean(session?.youtube_url) || requiresYouTubeGoLive(studio.destinations));
 	broadcast.error = null;
 	try {
+		if (runtime?.checkMissionnaireAudio) {
+			const audio = await missionnaireAudioStatus();
+			if (generation !== lifecycle || previewRun !== runtime?.runIds.main || stopping || recovering)
+				return;
+			if (!audio.reachable) throw new Error(t('error.missionnaireAudioUnreachable'));
+			if (!audio.sourceActive) throw new Error(t('error.missionnaireAudioMissing'));
+		}
 		if (youtube) {
 			const channelId = sessionYouTubeChannelId(session, liveSession.youtubeChannels);
 			if (!channelId || !liveSession.youtubeChannels.some((channel) => channel.id === channelId)) {

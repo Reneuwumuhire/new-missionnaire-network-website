@@ -19,15 +19,9 @@ const platforms = {
 		youtube: ['yt-dlp_macos', '0f192b7ec147ab6288885d6351d9ab67367640029b4377576ef46dd79cf7b202']
 	},
 	'x86_64-apple-darwin': {
-		asset: 'darwin-x64',
 		arch: 'x86_64',
 		suffix: '',
-		youtube: ['yt-dlp_macos', '0f192b7ec147ab6288885d6351d9ab67367640029b4377576ef46dd79cf7b202'],
-		sha: [
-			'ebdddc936f61e14049a2d4b549a412b8a40deeff6540e58a9f2a2da9e6b18894',
-			'2e1d16c72fd74e12063776371da757322f8b77589386532f4fd8634bde7de1af',
-			'e88a0325f8e5b75210355e37341824f074d3cd82def2125be54c914b62848a36'
-		]
+		youtube: ['yt-dlp_macos', '0f192b7ec147ab6288885d6351d9ab67367640029b4377576ef46dd79cf7b202']
 	},
 	'x86_64-pc-windows-msvc': {
 		asset: 'win32-x64',
@@ -114,13 +108,15 @@ async function prepare(url, name, expected, executable = false) {
 for (const target of targets) {
 	const platform = platforms[target];
 	if (!platform) throw new Error(`Unsupported Studio build target: ${target}`);
-	if (target === 'aarch64-apple-darwin') {
-		if (process.platform !== 'darwin' || process.arch !== 'arm64') {
-			throw new Error('Apple Silicon FFmpeg must be built on an Apple Silicon macOS runner');
+	if (target.endsWith('-apple-darwin')) {
+		if (process.platform !== 'darwin') {
+			throw new Error('macOS FFmpeg must be built on a macOS runner');
 		}
-		execFileSync('bash', [fileURLToPath(new URL('./build-macos-ffmpeg.sh', import.meta.url))], {
-			stdio: 'inherit'
-		});
+		execFileSync(
+			'bash',
+			[fileURLToPath(new URL('./build-macos-ffmpeg.sh', import.meta.url)), platform.arch],
+			{ stdio: 'inherit' }
+		);
 	} else {
 		const files = [
 			[`ffmpeg-${platform.asset}`, `ffmpeg-${platform.arch}${platform.suffix}`],

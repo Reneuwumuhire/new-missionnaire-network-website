@@ -42,13 +42,13 @@ pnpm studio:build    # .app + .dmg in src-tauri/target/release/bundle
 
 `pnpm studio` and `pnpm studio:build` prepare the media tools before building.
 The release workflow packages both macOS architectures and Windows x64 into
-the installers and updater artifacts. Apple Silicon FFmpeg is built from
+the installers and updater artifacts. Both macOS binaries are built from
 [FFmpeg 6.1.1 source](https://ffmpeg.org/releases/ffmpeg-6.1.1.tar.xz) with the
 checked-in `scripts/build-macos-ffmpeg.sh` recipe. The script builds x264 and
-LAME from pinned source and only needs pkgconf on the build machine. The Intel
-macOS and Windows binaries are
-pinned [ffmpeg-static b6.1.1](https://github.com/eugeneware/ffmpeg-static/releases/tag/b6.1.1)
-assets. Downloaded tools are SHA-256 verified, and FFmpeg's license and build
+LAME from pinned source and applies the SecureTransport RTMPS fix. Install
+pkgconf on the build machine and NASM for Intel builds. On Windows, the binary
+comes from [ffmpeg-static b6.1.1](https://github.com/eugeneware/ffmpeg-static/releases/tag/b6.1.1).
+Downloaded tools are SHA-256 verified, and FFmpeg's license and build
 notes ship beside the binary in Studio's resources.
 The bundled yt-dlp is from [yt-dlp 2026.08.19](https://github.com/yt-dlp/yt-dlp/releases/tag/2026.08.19).
 

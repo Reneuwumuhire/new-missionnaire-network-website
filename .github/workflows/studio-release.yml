@@ -65,7 +65,7 @@ jobs:
 
       - name: Install macOS build libraries
         if: runner.os == 'macOS'
-        run: brew install pkgconf
+        run: brew install pkgconf nasm
 
       - name: Prepare bundled media tools
         working-directory: studio

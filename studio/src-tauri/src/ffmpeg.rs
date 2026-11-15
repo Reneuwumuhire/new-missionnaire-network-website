@@ -26,6 +26,7 @@ use crate::diagnostics::{redact_stream_urls, Logs};
 /// backpressure; encoded WebM chunks must never be discarded because one chunk
 /// can contain reference video frames and audio from the same time range.
 const CHUNK_QUEUE: usize = 120;
+const NETWORK_TIMEOUT_US: &str = "8000000";
 /// stderr lines kept so a crash can be explained instead of just reported.
 const LOG_TAIL: usize = 40;
 
@@ -347,11 +348,29 @@ fn build_args_with_path(cfg: &StreamConfig, local_path: Option<&str>) -> Result<
 		.iter()
 		.map(|t| {
 			format!(
-				"[f=flv:flvflags=no_duration_filesize:onfail=ignore:use_fifo=1:fifo_options={FIFO_OPTIONS}]{}",
+				"[f=flv:flvflags=no_duration_filesize:rw_timeout={NETWORK_TIMEOUT_US}:onfail=ignore:use_fifo=1:fifo_options={FIFO_OPTIONS}]{}",
 				t.url
 			)
 		})
 		.collect::<Vec<_>>();
+	if let [target] = cfg.targets.as_slice() {
+		if local_path.is_none() {
+			// A single output needs no fan-out queue. Progress now describes
+			// the FLV writer, and an RTMP write failure exits the encoder so
+			// Studio can use its existing reconnect flow.
+			if container == "mp4" {
+				// WebKit already encoded fragmented H.264/AAC for this stream.
+				push!("-map", "0:v:0", "-map", "0:a:0?", "-c", "copy");
+			} else {
+				a.extend(video_args(cfg));
+			}
+			push!(
+				"-rw_timeout", NETWORK_TIMEOUT_US, "-flvflags", "no_duration_filesize",
+				"-f", "flv", &target.url
+			);
+			return Ok(a);
+		}
+	}
 	if !cfg.targets.is_empty() {
 		a.extend(video_args(cfg));
 		push!("-flags", "+global_header", "-f", "tee", outputs.join("|"));
@@ -788,13 +807,30 @@ mod tests {
 	}
 
 	#[test]
-	fn single_target_uses_recovering_fifo() {
+	fn single_target_writes_directly_with_a_network_timeout() {
 		let args = build_args(&cfg(&["rtmp://localhost:1935/live/obs"])).unwrap();
-		assert!(args.iter().any(|a| a == "tee"));
-		let spec = args.last().unwrap();
-		assert!(spec.contains("use_fifo=1"));
-		assert!(spec.contains("attempt_recovery"));
-		assert!(spec.ends_with("rtmp://localhost:1935/live/obs"));
+		assert!(!args.iter().any(|a| a == "tee"));
+		assert!(args.windows(2).any(|pair| pair == ["-rw_timeout", "8000000"]));
+		assert_eq!(&args[args.len() - 3..], ["-f", "flv", "rtmp://localhost:1935/live/obs"]);
+	}
+
+	#[test]
+	fn single_target_copies_h264_and_aac_from_mp4_capture() {
+		let mut c = cfg(&["rtmps://localhost:1936/live/studio"]);
+		c.container = "mp4".into();
+		let args = build_args(&c).unwrap();
+		assert!(args.windows(2).any(|pair| pair == ["-c", "copy"]));
+		assert!(!args.iter().any(|arg| arg == "-c:v" || arg == "-c:a"));
+	}
+
+	#[test]
+	fn recording_keeps_the_network_output_isolated() {
+		let c = cfg(&["rtmp://localhost:1935/live/obs"]);
+		let args = build_args_with_path(&c, Some("/tmp/recording.mp4")).unwrap();
+		let tee = args.iter().position(|arg| arg == "tee").unwrap();
+		assert!(args[tee + 1].contains("use_fifo=1"));
+		assert!(args[tee + 1].contains("attempt_recovery"));
+		assert!(args[tee + 1].contains("rw_timeout=8000000"));
 	}
 
 	#[test]
