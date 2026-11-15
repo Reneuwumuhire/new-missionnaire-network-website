@@ -145,7 +145,7 @@ export function isLatestStatusRequest(request: number, latest: number): boolean 
 	return request === latest;
 }
 
-function studioDeviceInfo() {
+export function studioDeviceInfo() {
 	deviceInfoPromise ??= invoke<Omit<StudioDeviceInfo, 'installationId'>>('studio_device_info')
 		.then((device) => ({ ...device, installationId: studioInstallationId() }))
 		.catch((error) => {
@@ -204,6 +204,10 @@ async function adminPost<T>(body: object): Promise<T> {
 
 export function controlCloudRecording(action: 'start' | 'stop') {
 	return adminPost<{ id: string }>({ action: `recorder-${action}` });
+}
+
+export function missionnaireAudioStatus() {
+	return adminPost<{ reachable: boolean; sourceActive: boolean }>({ action: 'audio-status' });
 }
 
 function applyMissionnaireIngest(ingest: MissionnaireIngest) {

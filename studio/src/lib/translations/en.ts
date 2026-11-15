@@ -191,6 +191,10 @@ const en = {
 		'YouTube is receiving the preview signal. Check its picture, sound and stream health before Go Live.',
 	'error.youtubeChannelMissing': 'Connect the YouTube channel used by this service.',
 	'error.missionnaireGoLive': 'Missionnaire could not go live.',
+	'error.missionnaireAudioUnreachable':
+		'Could not check the Missionnaire audio server. Try Go Live again.',
+	'error.missionnaireAudioMissing':
+		'Missionnaire is waiting for audio. Keep the preview running and try Go Live when the admin monitor receives audio.',
 
 	// ── Preflight ────────────────────────────────────────────────
 	'preflight.title': 'Broadcast preflight',
