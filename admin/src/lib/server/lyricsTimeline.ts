@@ -1,3 +1,4 @@
+import { objectIdString } from '$lib/server/mongo-input';
 import crypto from 'node:crypto';
 import { ObjectId } from 'mongodb';
 import { getDb } from '../../db/mongo';
@@ -721,7 +722,7 @@ async function findReviewRow(audioId: string) {
 }
 
 async function findMusicAudio(audioId: string) {
-	if (!ObjectId.isValid(audioId)) return null;
+	if (!objectIdString.safeParse(audioId).success) return null;
 	const db = await getDb();
 	return db.collection('music_audio').findOne({ _id: new ObjectId(audioId) });
 }

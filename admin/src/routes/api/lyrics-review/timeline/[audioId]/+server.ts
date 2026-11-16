@@ -1,3 +1,4 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { json, type RequestEvent } from '@sveltejs/kit';
 import { canReviewLyrics } from '$lib/models/admin-user';
 import {
@@ -10,7 +11,8 @@ import {
 } from '$lib/server/lyricsTimeline';
 
 export async function GET(event: RequestEvent) {
-	if (!canReviewLyrics(event.locals.user)) {
+	const adminUser = await verifyAdminSession(event.cookies);
+	if (!canReviewLyrics(adminUser)) {
 		return json({ error: 'Accès refusé' }, { status: 403 });
 	}
 
@@ -26,7 +28,8 @@ export async function GET(event: RequestEvent) {
 }
 
 export async function POST(event: RequestEvent) {
-	if (!canReviewLyrics(event.locals.user)) {
+	const adminUser = await verifyAdminSession(event.cookies);
+	if (!canReviewLyrics(adminUser)) {
 		return json({ error: 'Accès refusé' }, { status: 403 });
 	}
 
@@ -34,7 +37,7 @@ export async function POST(event: RequestEvent) {
 		const body = await event.request.json();
 		const action = String(body.action ?? '');
 		const audioId = event.params.audioId ?? '';
-		const actor = event.locals.user?.email ?? '';
+		const actor = adminUser?.email ?? '';
 
 		if (action === 'sync') {
 			const result = await syncLyricsForAudioId(audioId, actor);

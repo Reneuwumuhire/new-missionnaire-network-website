@@ -16,10 +16,14 @@ export async function connect() {
 	}
 
 	try {
+		const mongoUri = process.env.MONGODB_URI;
+		if (!mongoUri) throw new Error('MONGODB_URI is not configured');
 		isConnecting = true;
 		connectionPromise = new Promise((resolve, reject) => {
 			console.log('[MongoDB Admin] Attempting to connect...');
-			const newClient = new MongoClient(process.env.MONGODB_URI, {
+			const production = process.env.NODE_ENV === 'production';
+			const newClient = new MongoClient(mongoUri, {
+				...(production ? { tls: true } : {}),
 				serverApi: {
 					version: ServerApiVersion.v1,
 					strict: false,
@@ -35,6 +39,16 @@ export async function connect() {
 				socketTimeoutMS: 45000,
 				connectTimeoutMS: 10000
 			});
+
+			if (
+				production &&
+				(!newClient.options.tls ||
+					newClient.options.rejectUnauthorized === false ||
+					newClient.options.checkServerIdentity ||
+					process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0')
+			) {
+				throw new Error('MongoDB production connections require verified TLS');
+			}
 
 			newClient
 				.connect()

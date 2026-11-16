@@ -1,5 +1,5 @@
 import { getDb } from '../../db/mongo';
-import { dev } from '$app/environment';
+import { dev } from '$app/env';
 import {
 	isAudiencePageRoute,
 	STATIC_AUDIENCE_ROUTES,

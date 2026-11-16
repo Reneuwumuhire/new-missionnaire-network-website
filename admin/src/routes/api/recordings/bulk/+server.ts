@@ -1,3 +1,5 @@
+import { objectIdString } from '$lib/server/mongo-input';
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { json } from '@sveltejs/kit';
 import { z } from 'zod';
 import type { RequestEvent } from './$types';
@@ -8,12 +10,13 @@ import { deleteRecordingBulk, logAudit } from '../../../../db/collections';
 const BulkActionSchema = z.discriminatedUnion('action', [
 	z.object({
 		action: z.literal('delete'),
-		ids: z.array(z.string()).min(1)
+		ids: z.array(objectIdString).min(1).max(1000)
 	})
 ]);
 
-export async function POST({ request, locals, getClientAddress }: RequestEvent) {
-	if (!canDeleteRecordings(locals.user)) {
+export async function POST({ request, getClientAddress, cookies }: RequestEvent) {
+	const adminUser = await verifyAdminSession(cookies);
+	if (!canDeleteRecordings(adminUser)) {
 		return json(
 			{ data: null, error: "Vous n'avez pas la permission de supprimer des enregistrements" },
 			{ status: 403 }
@@ -40,8 +43,8 @@ export async function POST({ request, locals, getClientAddress }: RequestEvent) 
 		}
 
 		await logAudit({
-			user_id: locals.user.email,
-			user_email: locals.user.email,
+			user_id: adminUser.email,
+			user_email: adminUser.email,
 			action: 'bulk_delete',
 			target_collection: 'recordings',
 			target_id: null,

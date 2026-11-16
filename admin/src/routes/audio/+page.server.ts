@@ -1,10 +1,12 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { error } from '@sveltejs/kit';
 import { queryMusicAudio, getMusicArtists, getMusicCategories } from '../../db/collections';
 import { canManageMusicAudio } from '$lib/models/admin-user';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals, url }) => {
-	if (!canManageMusicAudio(locals.user)) throw error(403, 'Accès refusé');
+export const load: PageServerLoad = async ({ url, cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	if (!canManageMusicAudio(adminUser)) throw error(403, 'Accès refusé');
 
 	const category = url.searchParams.get('category') ?? undefined;
 	const search = url.searchParams.get('search') ?? undefined;

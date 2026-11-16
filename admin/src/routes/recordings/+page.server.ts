@@ -1,3 +1,4 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
@@ -10,8 +11,9 @@ import {
 import { RecorderError, recorderStatus, type RecorderStatus } from '$lib/server/recorder-client';
 import { getIcecastSnapshot, icecastStreamUrl, liveAudioHlsUrl } from '$lib/server/icecast';
 
-export const load: PageServerLoad = async ({ locals }) => {
-	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
+export const load: PageServerLoad = async ({ cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	if (!getPermissions(adminUser).can_manage_recordings) throw error(403, 'Accès refusé');
 
 	// Initial paint just shows the 5 most recent recordings — the rest are
 	// fetched on demand via /api/recordings/list (search / load more). The

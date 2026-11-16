@@ -1,3 +1,4 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { error } from '@sveltejs/kit';
 import { getDb } from '../../../db/mongo';
 import { getPermissions } from '$lib/models/admin-user';
@@ -10,15 +11,17 @@ function codeFrom(url: URL): string {
 	return code;
 }
 
-export const load: PageServerLoad = async ({ url, locals }) => {
-	if (!getPermissions(locals.user).can_manage_recordings)
+export const load: PageServerLoad = async ({ url, cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	if (!getPermissions(adminUser).can_manage_recordings)
 		throw error(403, 'Recording permission required');
-	return { code: codeFrom(url), name: locals.user.name };
+	return { code: codeFrom(url), name: adminUser.name };
 };
 
 export const actions: Actions = {
-	default: async ({ request, locals }) => {
-		if (!getPermissions(locals.user).can_manage_recordings)
+	default: async ({ request, cookies }) => {
+		const adminUser = await verifyAdminSession(cookies);
+		if (!getPermissions(adminUser).can_manage_recordings)
 			throw error(403, 'Recording permission required');
 		const form = await request.formData();
 		const code = form.get('code')?.toString() ?? '';
@@ -33,8 +36,8 @@ export const actions: Actions = {
 			{
 				$set: {
 					code,
-					user_email: locals.user.email,
-					user_name: locals.user.name,
+					user_email: adminUser.email,
+					user_name: adminUser.name,
 					approved_at: now,
 					expires_at: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
 				},

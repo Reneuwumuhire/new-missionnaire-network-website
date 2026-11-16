@@ -1,3 +1,4 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { canDeleteRecordings, getPermissions } from '$lib/models/admin-user';
@@ -21,8 +22,9 @@ const MAX_SUBTITLE_OFFSET_MS = 6 * 60 * 60 * 1000; // ±6h guard against bad inp
 const MAX_TITLE_LEN = 200;
 const MAX_DESCRIPTION_LEN = 2000;
 
-export const PATCH: RequestHandler = async ({ locals, params, request, getClientAddress }) => {
-	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
+export const PATCH: RequestHandler = async ({ params, request, getClientAddress, cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	if (!getPermissions(adminUser).can_manage_recordings) throw error(403, 'Accès refusé');
 
 	const { id } = params;
 	if (!id) throw error(400, 'ID manquant');
@@ -294,8 +296,8 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 	}
 
 	await logAudit({
-		user_id: locals.user.email,
-		user_email: locals.user.email,
+		user_id: adminUser.email,
+		user_email: adminUser.email,
 		action: 'update',
 		target_collection: 'recordings',
 		target_id: id,
@@ -308,8 +310,9 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 	return json({ ok: true });
 };
 
-export const DELETE: RequestHandler = async ({ locals, params, getClientAddress }) => {
-	if (!canDeleteRecordings(locals.user)) {
+export const DELETE: RequestHandler = async ({ params, getClientAddress, cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	if (!canDeleteRecordings(adminUser)) {
 		throw error(403, "Vous n'avez pas la permission de supprimer des enregistrements");
 	}
 
@@ -331,8 +334,8 @@ export const DELETE: RequestHandler = async ({ locals, params, getClientAddress 
 	await deleteRecording(id);
 
 	await logAudit({
-		user_id: locals.user.email,
-		user_email: locals.user.email,
+		user_id: adminUser.email,
+		user_email: adminUser.email,
 		action: 'delete',
 		target_collection: 'recordings',
 		target_id: id,

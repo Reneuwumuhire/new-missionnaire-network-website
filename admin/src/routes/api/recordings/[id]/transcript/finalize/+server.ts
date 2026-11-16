@@ -1,3 +1,5 @@
+import { objectIdString } from '$lib/server/mongo-input';
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { ObjectId, type Document } from 'mongodb';
@@ -15,7 +17,7 @@ const FinalizeSchema = z.object({
 	s3Key: z.string().min(1),
 	s3Url: z.string().url(),
 	size: z.number().int().positive().max(MAX_PDF_BYTES),
-	replacePdfId: z.string().nullable().optional()
+	replacePdfId: objectIdString.nullish()
 });
 
 function parseDate(value: string | Date | null | undefined): Date | null {
@@ -34,8 +36,9 @@ function publishedDateFromFilename(filename: string, fallback: string | Date | n
 	return parseDate(fallback) ?? new Date();
 }
 
-export const POST: RequestHandler = async ({ locals, params, request, getClientAddress }) => {
-	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
+export const POST: RequestHandler = async ({ params, request, getClientAddress, cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	if (!getPermissions(adminUser).can_manage_recordings) throw error(403, 'Accès refusé');
 
 	const recording = await getRecordingById(params.id);
 	if (!recording) throw error(404, 'Enregistrement introuvable');
@@ -65,16 +68,15 @@ export const POST: RequestHandler = async ({ locals, params, request, getClientA
 	const pdfs = db.collection('pdfs');
 	const videos = db.collection('videos');
 	const now = new Date();
-	const replaceId = replacePdfId && ObjectId.isValid(replacePdfId) ? new ObjectId(replacePdfId) : null;
+	const replaceId = replacePdfId ? new ObjectId(replacePdfId) : null;
+	const videoIds = [videoObjectId, String(videoObjectId)];
 	const existingByKey = await pdfs.findOne({ s3Key });
-	const existingForReplace = replaceId ? await pdfs.findOne({ _id: replaceId }) : null;
-	if (replacePdfId && !replaceId) throw error(400, 'PDF à remplacer invalide');
+	const existingForReplace = replaceId
+		? await pdfs.findOne({ _id: replaceId, videoId: { $in: videoIds } })
+		: null;
 	if (replaceId && !existingForReplace) throw error(404, 'PDF à remplacer introuvable');
-	if (
-		existingForReplace?.videoId &&
-		String(existingForReplace.videoId) !== String(videoObjectId)
-	) {
-		throw error(400, 'Ce PDF appartient à une autre vidéo');
+	if (existingByKey && !videoIds.some((id) => String(id) === String(existingByKey.videoId))) {
+		throw error(409, 'Ce PDF appartient à une autre vidéo');
 	}
 
 	const previousS3Key =
@@ -103,7 +105,11 @@ export const POST: RequestHandler = async ({ locals, params, request, getClientA
 
 	if (existingForReplace || existingByKey) {
 		const { _id: _pdfId, ...pdfUpdateFields } = updatedPdfInfo as Record<string, unknown>;
-		await pdfs.updateOne({ _id: pdfInfo._id }, { $set: pdfUpdateFields });
+		const updated = await pdfs.updateOne(
+			{ _id: pdfInfo._id, videoId: { $in: videoIds } },
+			{ $set: pdfUpdateFields }
+		);
+		if (!updated.matchedCount) throw error(409, 'Le PDF a été modifié entre-temps');
 	} else {
 		await pdfs.insertOne(updatedPdfInfo);
 	}
@@ -124,8 +130,8 @@ export const POST: RequestHandler = async ({ locals, params, request, getClientA
 	}
 
 	await logAudit({
-		user_id: locals.user._id ?? locals.user.email,
-		user_email: locals.user.email,
+		user_id: adminUser._id ?? adminUser.email,
+		user_email: adminUser.email,
 		action: existingForReplace ? 'update' : 'create',
 		target_collection: 'pdfs',
 		target_id: String(updatedPdfInfo._id),

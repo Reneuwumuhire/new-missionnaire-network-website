@@ -1,3 +1,4 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { error, json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
@@ -9,8 +10,9 @@ const types: Record<string, string> = {
 	'image/webp': 'webp'
 };
 
-export const POST: RequestHandler = async ({ locals, request }) => {
-	if (!getPermissions(locals.user).can_manage_extraits) throw error(403, 'Accès refusé');
+export const POST: RequestHandler = async ({ request, cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	if (!getPermissions(adminUser).can_manage_extraits) throw error(403, 'Accès refusé');
 
 	const body = (await request.json().catch(() => ({}))) as {
 		contentType?: unknown;

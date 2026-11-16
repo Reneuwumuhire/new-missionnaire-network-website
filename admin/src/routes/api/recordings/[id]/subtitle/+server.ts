@@ -1,3 +1,4 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
@@ -7,8 +8,9 @@ import { getObjectBytes } from '$lib/server/s3';
 
 // Admin preview of a replay SRT, including subtitles inherited from the
 // linked scheduled live. Server-side access avoids depending on S3 CORS.
-export const GET: RequestHandler = async ({ locals, params }) => {
-	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
+export const GET: RequestHandler = async ({ params, cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	if (!getPermissions(adminUser).can_manage_recordings) throw error(403, 'Accès refusé');
 	if (!params.id) throw error(400, 'ID manquant');
 
 	const recording = await getRecordingById(params.id);

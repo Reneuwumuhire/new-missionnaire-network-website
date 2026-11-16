@@ -14,8 +14,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  security-gate:
+    uses: ./.github/workflows/security-gate.yml
+
   deploy-website:
     name: Deploy public website
+    needs: security-gate
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -43,6 +47,7 @@ jobs:
 
   deploy-admin:
     name: Deploy admin panel
+    needs: security-gate
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:

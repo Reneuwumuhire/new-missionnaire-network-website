@@ -1,3 +1,5 @@
+import { objectIdString } from '$lib/server/mongo-input';
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { error, fail, redirect, type Actions } from '@sveltejs/kit';
 import { ObjectId } from 'mongodb';
 import type { PageServerLoad } from './$types';
@@ -137,8 +139,9 @@ function serializeArchive(post: ArchivedPost) {
 	};
 }
 
-export const load: PageServerLoad = async ({ locals, url, fetch }) => {
-	const permissions = getPermissions(locals.user);
+export const load: PageServerLoad = async ({ url, fetch, cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	const permissions = getPermissions(adminUser);
 	if (!permissions.can_manage_extraits) throw error(403, 'Accès refusé');
 	const archivedRequest = fetchArchive(fetch);
 
@@ -146,7 +149,7 @@ export const load: PageServerLoad = async ({ locals, url, fetch }) => {
 	const posts = db.collection<ExtraitRecord>('extrait_posts');
 	const requestedId = url.searchParams.get('edit');
 	const edit =
-		requestedId && ObjectId.isValid(requestedId)
+		requestedId && objectIdString.safeParse(requestedId).success
 			? await posts.findOne({ _id: new ObjectId(requestedId) })
 			: requestedId
 				? await posts.findOne({ _id: requestedId })
@@ -187,8 +190,9 @@ export const load: PageServerLoad = async ({ locals, url, fetch }) => {
 };
 
 export const actions: Actions = {
-	save: async ({ request, locals, fetch }) => {
-		const permissions = getPermissions(locals.user);
+	save: async ({ request, fetch, cookies }) => {
+		const adminUser = await verifyAdminSession(cookies);
+		const permissions = getPermissions(adminUser);
 		if (!permissions.can_manage_extraits) throw error(403, 'Accès refusé');
 
 		const formData = await request.formData();
@@ -222,12 +226,12 @@ export const actions: Actions = {
 		const posts = db.collection<ExtraitRecord>('extrait_posts');
 		let id = values.postId;
 		const archivePost =
-			id && !ObjectId.isValid(id)
+			id && !objectIdString.safeParse(id).success
 				? (await fetchArchive(fetch))?.find((post) => post.id === id)
 				: null;
-		if (id && !ObjectId.isValid(id) && !archivePost)
+		if (id && !objectIdString.safeParse(id).success && !archivePost)
 			throw error(404, 'Ancienne publication introuvable');
-		const postId = id ? (ObjectId.isValid(id) ? new ObjectId(id) : id) : null;
+		const postId = id ? (objectIdString.safeParse(id).success ? new ObjectId(id) : id) : null;
 		const previous = postId ? await posts.findOne({ _id: postId }) : null;
 		if (postId instanceof ObjectId && !previous) throw error(404, 'Extrait introuvable');
 		const original = previous ?? archivePost;
@@ -272,7 +276,7 @@ export const actions: Actions = {
 			source: validSource ? { kind: values.sourceKind, id: values.sourceId } : null,
 			links,
 			updatedAt: now,
-			updatedBy: locals.user.email
+			updatedBy: adminUser.email
 		};
 
 		if (postId) {
@@ -297,19 +301,20 @@ export const actions: Actions = {
 				_id: new ObjectId(),
 				...document,
 				createdAt: now,
-				createdBy: locals.user.email
+				createdBy: adminUser.email
 			});
 			id = result.insertedId.toString();
 		}
 
 		throw redirect(303, `/publications?edit=${id}&saved=${intent}`);
 	},
-	share: async ({ request, locals }) => {
-		if (!getPermissions(locals.user).can_manage_extraits) throw error(403, 'Accès refusé');
+	share: async ({ request, cookies }) => {
+		const adminUser = await verifyAdminSession(cookies);
+		if (!getPermissions(adminUser).can_manage_extraits) throw error(403, 'Accès refusé');
 		const formData = await request.formData();
 		const undo = formData.has('undo');
 		const id = formData.get(undo ? 'undo' : 'targetId')?.toString() ?? '';
-		if (!ObjectId.isValid(id)) throw error(400, 'Publication invalide');
+		if (!objectIdString.safeParse(id).success) throw error(400, 'Publication invalide');
 
 		const result = await (
 			await getDb()
@@ -324,12 +329,13 @@ export const actions: Actions = {
 		if (!result.matchedCount) throw error(409, 'État de partage modifié entre-temps');
 		throw redirect(303, `/publications?managed=${undo ? 'unshared' : 'shared'}`);
 	},
-	toggle: async ({ request, locals }) => {
-		const permissions = getPermissions(locals.user);
+	toggle: async ({ request, cookies }) => {
+		const adminUser = await verifyAdminSession(cookies);
+		const permissions = getPermissions(adminUser);
 		if (!permissions.can_manage_extraits) throw error(403, 'Accès refusé');
 
 		const id = (await request.formData()).get('targetId')?.toString() ?? '';
-		if (!ObjectId.isValid(id)) throw error(400, 'Extrait invalide');
+		if (!objectIdString.safeParse(id).success) throw error(400, 'Extrait invalide');
 
 		const db = await getDb();
 		const post = await db.collection('extrait_posts').findOne({ _id: new ObjectId(id) });
@@ -348,16 +354,17 @@ export const actions: Actions = {
 			.collection('extrait_posts')
 			.updateOne(
 				{ _id: post._id },
-				{ $set: { status, updatedAt: new Date(), updatedBy: locals.user.email } }
+				{ $set: { status, updatedAt: new Date(), updatedBy: adminUser.email } }
 			);
 		throw redirect(303, `/publications?managed=${status === 'published' ? 'published' : 'hidden'}`);
 	},
-	delete: async ({ request, locals }) => {
-		const permissions = getPermissions(locals.user);
+	delete: async ({ request, cookies }) => {
+		const adminUser = await verifyAdminSession(cookies);
+		const permissions = getPermissions(adminUser);
 		if (!permissions.can_manage_extraits) throw error(403, 'Accès refusé');
 
 		const id = (await request.formData()).get('targetId')?.toString() ?? '';
-		if (!ObjectId.isValid(id)) throw error(400, 'Extrait invalide');
+		if (!objectIdString.safeParse(id).success) throw error(400, 'Extrait invalide');
 
 		const db = await getDb();
 		const post = await db.collection('extrait_posts').findOneAndDelete({ _id: new ObjectId(id) });

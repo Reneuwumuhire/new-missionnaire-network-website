@@ -1,3 +1,4 @@
+import { objectIdString } from '$lib/server/mongo-input';
 import { ObjectId } from 'mongodb';
 import { getDb } from '../../db/mongo';
 import { extractDateCodeFromSlug } from '../../utils/sermonSlug';
@@ -43,7 +44,7 @@ export async function findSermonByIdentifier(identifier: string): Promise<Sermon
 	let doc = await sermons.findOne({ slug: identifier } as unknown as Record<string, unknown>);
 	if (doc) return doc;
 
-	if (ObjectId.isValid(identifier)) {
+	if (objectIdString.safeParse(identifier).success) {
 		doc = await sermons.findOne({ _id: new ObjectId(identifier) } as unknown as Record<
 			string,
 			unknown

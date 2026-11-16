@@ -1,3 +1,4 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
@@ -21,8 +22,9 @@ import {
 	parseYoutubeUrl
 } from '$lib/server/scheduled-live-validation';
 
-export const PATCH: RequestHandler = async ({ locals, params, request, getClientAddress }) => {
-	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
+export const PATCH: RequestHandler = async ({ params, request, getClientAddress, cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	if (!getPermissions(adminUser).can_manage_recordings) throw error(403, 'Accès refusé');
 
 	const current = await getScheduledLiveById(params.id);
 	if (!current) throw error(404, 'Direct programmé introuvable');
@@ -146,8 +148,8 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 	}
 
 	await logAudit({
-		user_id: locals.user.email,
-		user_email: locals.user.email,
+		user_id: adminUser.email,
+		user_email: adminUser.email,
 		action: 'update',
 		target_collection: 'scheduled_lives',
 		target_id: params.id,
@@ -164,8 +166,9 @@ export const PATCH: RequestHandler = async ({ locals, params, request, getClient
 	return json({ ok: true, live: updated });
 };
 
-export const DELETE: RequestHandler = async ({ locals, params, getClientAddress }) => {
-	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
+export const DELETE: RequestHandler = async ({ params, getClientAddress, cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	if (!getPermissions(adminUser).can_manage_recordings) throw error(403, 'Accès refusé');
 
 	const current = await getScheduledLiveById(params.id);
 	if (!current) throw error(404, 'Direct programmé introuvable');
@@ -188,8 +191,8 @@ export const DELETE: RequestHandler = async ({ locals, params, getClientAddress 
 	}
 
 	await logAudit({
-		user_id: locals.user.email,
-		user_email: locals.user.email,
+		user_id: adminUser.email,
+		user_email: adminUser.email,
 		action: 'delete',
 		target_collection: 'scheduled_lives',
 		target_id: params.id,

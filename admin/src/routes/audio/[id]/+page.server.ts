@@ -1,14 +1,16 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { error } from '@sveltejs/kit';
 import { getMusicAudioById, getMusicCategories, getMusicArtists } from '../../../db/collections';
 import { canManageMusicAudio, canReviewLyrics, getPermissions } from '$lib/models/admin-user';
 import { getLyricsTimelineDetail } from '$lib/server/lyricsTimeline';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals, params }) => {
-	if (!canManageMusicAudio(locals.user) && !canReviewLyrics(locals.user)) {
+export const load: PageServerLoad = async ({ params, cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	if (!canManageMusicAudio(adminUser) && !canReviewLyrics(adminUser)) {
 		throw error(403, 'Accès refusé');
 	}
-	const permissions = getPermissions(locals.user);
+	const permissions = getPermissions(adminUser);
 
 	const [audio, categories, artists] = await Promise.all([
 		getMusicAudioById(params.id),

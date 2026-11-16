@@ -1,3 +1,4 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { z } from 'zod';
@@ -19,8 +20,9 @@ function parseDate(value: string | Date | null | undefined): Date {
 	return Number.isNaN(date.getTime()) ? new Date() : date;
 }
 
-export const POST: RequestHandler = async ({ locals, params, request }) => {
-	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
+export const POST: RequestHandler = async ({ params, request, cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	if (!getPermissions(adminUser).can_manage_recordings) throw error(403, 'Accès refusé');
 
 	const recording = await getRecordingById(params.id);
 	if (!recording) throw error(404, 'Enregistrement introuvable');

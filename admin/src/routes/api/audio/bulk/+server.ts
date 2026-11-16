@@ -1,3 +1,5 @@
+import { objectIdString } from '$lib/server/mongo-input';
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { json } from '@sveltejs/kit';
 import { z } from 'zod';
 import { deleteMusicAudioBulk, bulkUpdateCategory, logAudit } from '../../../../db/collections';
@@ -8,17 +10,18 @@ import type { RequestEvent } from './$types';
 const BulkActionSchema = z.discriminatedUnion('action', [
 	z.object({
 		action: z.literal('delete'),
-		ids: z.array(z.string()).min(1)
+		ids: z.array(objectIdString).min(1).max(1000)
 	}),
 	z.object({
 		action: z.literal('update_category'),
-		ids: z.array(z.string()).min(1),
+		ids: z.array(objectIdString).min(1).max(1000),
 		category: z.string().min(1)
 	})
 ]);
 
-export async function POST({ request, locals, getClientAddress }: RequestEvent) {
-	const perms = getPermissions(locals.user);
+export async function POST({ request, getClientAddress, cookies }: RequestEvent) {
+	const adminUser = await verifyAdminSession(cookies);
+	const perms = getPermissions(adminUser);
 
 	try {
 		const body = await request.json();
@@ -37,7 +40,7 @@ export async function POST({ request, locals, getClientAddress }: RequestEvent) 
 		}
 
 		const ip = getClientAddress();
-		const userId = locals.user._id ?? locals.user.email;
+		const userId = adminUser._id ?? adminUser.email;
 
 		if (parsed.data.action === 'delete') {
 			const { s3_keys } = await deleteMusicAudioBulk(parsed.data.ids);
@@ -50,7 +53,7 @@ export async function POST({ request, locals, getClientAddress }: RequestEvent) 
 
 			await logAudit({
 				user_id: userId,
-				user_email: locals.user.email,
+				user_email: adminUser.email,
 				action: 'bulk_delete',
 				target_collection: 'music_audio',
 				target_id: null,
@@ -65,11 +68,11 @@ export async function POST({ request, locals, getClientAddress }: RequestEvent) 
 		}
 
 		if (parsed.data.action === 'update_category') {
-			const count = await bulkUpdateCategory(parsed.data.ids, parsed.data.category, locals.user.email);
+			const count = await bulkUpdateCategory(parsed.data.ids, parsed.data.category, adminUser.email);
 
 			await logAudit({
 				user_id: userId,
-				user_email: locals.user.email,
+				user_email: adminUser.email,
 				action: 'bulk_update',
 				target_collection: 'music_audio',
 				target_id: null,

@@ -1,3 +1,5 @@
+import { z } from 'zod';
+import { objectIdString } from '$lib/server/mongo-input';
 import { json, error } from '@sveltejs/kit';
 import {
 	getStudioAuthorization,
@@ -14,13 +16,45 @@ import {
 } from '../../../../db/collections';
 import { presignUpload, s3Url } from '$lib/server/s3';
 
+const studioLiveBody = z.object({
+	action: z.string().max(2048).optional(),
+	title: z.string().max(2048).optional(),
+	scheduledAt: z.string().max(2048).optional(),
+	description: z.string().max(10000).nullish(),
+	youtubeUrl: z.string().max(2048).nullish(),
+	thumbnailUrl: z.string().max(2048).nullish(),
+	thumbnailKey: z.string().max(2048).nullish(),
+	subtitleUrl: z.string().max(2048).nullish(),
+	subtitleKey: z.string().max(2048).nullish(),
+	subtitleFilename: z.string().max(2048).nullish(),
+	filename: z.string().max(2048).optional(),
+	contentType: z.string().max(2048).optional(),
+	subtitleTimingLanguage: z.string().max(2048).nullish(),
+	announce: z.boolean().optional(),
+	reminderEnabled: z.boolean().optional(),
+	notifyOnStart: z.boolean().optional(),
+	paused: z.boolean().optional(),
+	size: z.number().optional(),
+	positionMs: z.number().optional(),
+	offsetMs: z.number().optional(),
+	atEpochMs: z.number().optional(),
+	sermonStartMs: z.number().nullish(),
+	sermonEndMs: z.number().nullish(),
+	sessionId: objectIdString.optional(),
+	subtitleMode: z.enum(['broadcast', 'armed']).optional(),
+	serviceType: z.enum(['prepared', 'live']).optional(),
+	phase: z.enum(['ready', 'opening', 'sermon', 'closing', 'complete']).optional()
+});
+const pairingCode = z.guid();
+
 async function authorized(
 	request: Request
-): Promise<{ email: string; name: string; code: string }> {
-	const code = request.headers.get('authorization')?.replace(/^Bearer\s+/, '') ?? '';
+): Promise<{ email: string; name: string }> {
+	const code = pairingCode.safeParse(request.headers.get('authorization')?.replace(/^Bearer\s+/, '')).data;
+	if (!code) error(401, 'Invalid Studio authorization');
 	const authorization = await getStudioAuthorization(code);
 	if (!authorization) throw error(401, 'Authorize Studio in the admin app first');
-	return { ...authorization, code };
+	return authorization;
 }
 
 function defaultTitle(template: string | null): string {
@@ -34,7 +68,7 @@ function defaultTitle(template: string | null): string {
 	return value.includes('{date}') ? value.replaceAll('{date}', date) : `${date} ${value}`;
 }
 
-function validSubtitleUpload(key?: string, url?: string): boolean {
+function validSubtitleUpload(key?: string | null, url?: string | null): boolean {
 	if (typeof key !== 'string' || typeof url !== 'string' || !key.startsWith('subtitles/'))
 		return false;
 	try {
@@ -52,38 +86,12 @@ function validSubtitleUpload(key?: string, url?: string): boolean {
 
 export async function POST({ request, url }) {
 	const serverReceivedAtMs = Date.now();
-	const body = (await request.json().catch(() => ({}))) as {
-		action?: string;
-		sessionId?: string;
-		title?: string;
-		scheduledAt?: string;
-		description?: string;
-		youtubeUrl?: string;
-		thumbnailUrl?: string;
-		thumbnailKey?: string;
-		subtitleUrl?: string;
-		subtitleKey?: string;
-		subtitleFilename?: string;
-		announce?: boolean;
-		reminderEnabled?: boolean;
-		notifyOnStart?: boolean;
-		filename?: string;
-		contentType?: string;
-		size?: number;
-		positionMs?: number;
-		offsetMs?: number;
-		atEpochMs?: number;
-		paused?: boolean;
-		subtitleMode?: 'broadcast' | 'armed';
-		serviceType?: 'prepared' | 'live';
-		phase?: 'ready' | 'opening' | 'sermon' | 'closing' | 'complete';
-		sermonStartMs?: number | null;
-		sermonEndMs?: number | null;
-		subtitleTimingLanguage?: string;
-	};
+	const parsed = studioLiveBody.safeParse(await request.json().catch(() => null));
+	if (!parsed.success) error(400, 'Invalid Studio request');
+	const body = parsed.data;
 	if (body.action === 'logout') {
-		const code = request.headers.get('authorization')?.replace(/^Bearer\s+/, '') ?? '';
-		await revokeStudioAuthorization(code);
+		const code = pairingCode.safeParse(request.headers.get('authorization')?.replace(/^Bearer\s+/, '')).data;
+		if (code) await revokeStudioAuthorization(code);
 		return json({ ok: true });
 	}
 	const operator = await authorized(request);
@@ -177,10 +185,11 @@ export async function POST({ request, url }) {
 	}
 	if (!body.sessionId) throw error(400, 'sessionId required');
 	if (body.action === 'workflow') {
-		if (
-			!body.phase ||
-			!['ready', 'opening', 'sermon', 'closing', 'complete'].includes(body.phase)
-		) {
+		const session = await getScheduledLiveById(body.sessionId);
+		if (!session || (session.is_test && session.created_by !== operator.email)) {
+			error(404, 'Session not found');
+		}
+		if (!body.phase) {
 			throw error(400, 'Invalid service phase');
 		}
 		await updateStudioLiveWorkflow(body.sessionId, {
@@ -195,6 +204,7 @@ export async function POST({ request, url }) {
 	}
 	if (body.action === 'attach-subtitles') {
 		const current = await getBroadcastAdminState();
+		if (current.is_test && current.started_by !== operator.email) error(404, 'Session not found');
 		if (!current.is_live || current.scheduled_live_id !== body.sessionId) {
 			throw error(409, 'This session is not live');
 		}
@@ -219,6 +229,7 @@ export async function POST({ request, url }) {
 	}
 	if (body.action === 'hide-subtitles') {
 		const current = await getBroadcastAdminState();
+		if (current.is_test && current.started_by !== operator.email) error(404, 'Session not found');
 		if (!current.is_live || current.scheduled_live_id !== body.sessionId) {
 			throw error(409, 'This session is not live');
 		}
@@ -240,6 +251,7 @@ export async function POST({ request, url }) {
 	}
 	if (body.action === 'sync-subtitles') {
 		const current = await getBroadcastAdminState();
+		if (current.is_test && current.started_by !== operator.email) error(404, 'Session not found');
 		if (!current.is_live || current.scheduled_live_id !== body.sessionId) {
 			throw error(409, 'This session is not live');
 		}
@@ -304,7 +316,9 @@ export async function POST({ request, url }) {
 	}
 	if (body.action === 'start') {
 		const session = await getScheduledLiveById(body.sessionId);
-		if (!session) throw error(404, 'Session not found');
+		if (!session || (session.is_test && session.created_by !== operator.email)) {
+			error(404, 'Session not found');
+		}
 		if (session.status !== 'scheduled') throw error(400, 'Session is no longer available');
 		const current = await getBroadcastAdminState();
 		if (current.is_live) throw error(409, 'Another session is already live');
@@ -356,6 +370,7 @@ export async function POST({ request, url }) {
 	if (body.action === 'end') {
 		const current = await getBroadcastAdminState();
 		if (!current.is_live || current.scheduled_live_id !== body.sessionId) return json({ ok: true });
+		if (current.is_test && current.started_by !== operator.email) error(404, 'Session not found');
 		const endedAt = new Date().toISOString();
 		await setBroadcastAdminState({
 			is_live: false,

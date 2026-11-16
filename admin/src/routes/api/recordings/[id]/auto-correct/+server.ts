@@ -1,28 +1,32 @@
+import { objectIdString } from '$lib/server/mongo-input';
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { error, json } from '@sveltejs/kit';
 import { ObjectId } from 'mongodb';
 import type { RequestHandler } from './$types';
-import { getPermissions } from '$lib/models/admin-user';
+import { getPermissions, type AdminUser } from '$lib/models/admin-user';
 import { getRecordingById, logAudit } from '../../../../../db/collections';
 import { getDb } from '../../../../../db/mongo';
 import { resolveRecordingSubtitle } from '$lib/server/recording-subtitle';
 import { prepareRecordingSubtitleCorrection } from '$lib/server/subtitle-auto-correct';
 import { deleteObject, getS3Url, putSubtitleText } from '$lib/server/s3';
 
-async function context(id: string, user: App.Locals['user']) {
+async function context(id: string, user: AdminUser) {
 	if (!getPermissions(user).can_manage_recordings) throw error(403, 'Accès refusé');
-	if (!ObjectId.isValid(id)) throw error(400, 'Enregistrement invalide');
+	if (!objectIdString.safeParse(id).success) throw error(400, 'Enregistrement invalide');
 	const recording = await getRecordingById(id);
 	if (!recording) throw error(404, 'Enregistrement introuvable');
 	return { recording, subtitle: await resolveRecordingSubtitle(recording) };
 }
 
-export const GET: RequestHandler = async ({ locals, params }) => {
-	const { subtitle } = await context(params.id, locals.user);
+export const GET: RequestHandler = async ({ params, cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	const { subtitle } = await context(params.id, adminUser);
 	return json({ subtitle }, { headers: { 'Cache-Control': 'no-store' } });
 };
 
-export const POST: RequestHandler = async ({ locals, params, request, getClientAddress }) => {
-	const { recording, subtitle } = await context(params.id, locals.user);
+export const POST: RequestHandler = async ({ params, request, getClientAddress, cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	const { recording, subtitle } = await context(params.id, adminUser);
 	if (!subtitle) throw error(422, 'Aucun fichier .srt attaché à la rediffusion ou au direct');
 	const body = (await request.json().catch(() => ({}))) as {
 		apply?: unknown;
@@ -116,8 +120,8 @@ export const POST: RequestHandler = async ({ locals, params, request, getClientA
 		throw error(409, 'Le fichier ou le direct a changé pendant la correction');
 	}
 	await logAudit({
-		user_id: locals.user.email,
-		user_email: locals.user.email,
+		user_id: adminUser.email,
+		user_email: adminUser.email,
 		action: 'update',
 		target_collection: subtitle.source === 'recording' ? 'recordings' : 'scheduled_lives',
 		target_id: subtitle.scheduledLiveId ?? params.id,

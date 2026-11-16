@@ -1,3 +1,4 @@
+import { objectIdString } from '$lib/server/mongo-input';
 import { ObjectId, type Document } from 'mongodb';
 import { getDb } from '../../db/mongo';
 import { recorderIngest, type MissionnaireIngest } from './recorder-client';
@@ -244,7 +245,7 @@ export async function listStudioAuthorizations(email: string) {
 }
 
 export async function revokeStudioAuthorizationById(id: string, email: string): Promise<boolean> {
-	if (!ObjectId.isValid(id)) return false;
+	if (!objectIdString.safeParse(id).success) return false;
 	const db = await getDb();
 	const collection = db.collection<Authorization>('studio_authorizations');
 	const doc = await collection.findOneAndUpdate(
@@ -260,7 +261,7 @@ export async function deleteDisconnectedStudioAuthorizationById(
 	id: string,
 	email: string
 ): Promise<boolean> {
-	if (!ObjectId.isValid(id)) return false;
+	if (!objectIdString.safeParse(id).success) return false;
 	const collection = (await getDb()).collection<Authorization>('studio_authorizations');
 	const doc = await collection.findOne({ _id: new ObjectId(id), user_email: email });
 	if (!doc) return false;

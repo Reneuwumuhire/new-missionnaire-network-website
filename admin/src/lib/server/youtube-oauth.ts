@@ -77,11 +77,13 @@ export async function beginYouTubeOAuth(userEmail: string, studioCode: string): 
 
 export async function finishYouTubeOAuth(
 	code: string,
-	state: string
+	state: string,
+	userEmail: string
 ): Promise<{ channelTitle: string }> {
 	const db = await getDb();
 	const pending = await db.collection('youtube_oauth_states').findOneAndDelete({
 		state,
+		user_email: userEmail,
 		expires_at: { $gt: new Date() }
 	});
 	if (!pending || typeof pending.user_email !== 'string')

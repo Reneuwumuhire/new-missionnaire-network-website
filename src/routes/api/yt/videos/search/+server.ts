@@ -5,8 +5,8 @@ import { getCollection } from '../../../../../db/collections';
 import { parseSearchParams } from '../../../../../utils/url';
 
 const Params = z.object({
-	limit: z.coerce.number().default(20),
-	pageNumber: z.coerce.number().default(1),
+	limit: z.coerce.number().int().min(1).max(1000).default(20),
+	pageNumber: z.coerce.number().int().min(1).max(100_000).default(1),
 	query: z.string()
 });
 

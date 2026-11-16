@@ -14,7 +14,7 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"test": "vitest",
-		"lint": "prettier --check . && ESLINT_USE_FLAT_CONFIG=false eslint .",
+		"lint": "npm run lint:mongodb && prettier --check . && ESLINT_USE_FLAT_CONFIG=false eslint .",
 		"format": "prettier --write .",
 		"prepare": "husky",
 		"stream:up": "docker compose -f ops/streaming/docker-compose.yml up -d --build",
@@ -27,7 +27,10 @@
 		"sermons:migrate-assets": "node --env-file-if-exists=admin/.env.local scripts/migrate-sermon-assets.mjs",
 		"sermons:backfill-durations": "node --env-file-if-exists=admin/.env.local scripts/backfill-sermon-durations.mjs",
 		"channel:import": "node scripts/import-whatsapp-channel.mjs",
-		"channel:test": "node scripts/import-whatsapp-channel.mjs --test"
+		"channel:test": "node scripts/import-whatsapp-channel.mjs --test",
+		"lint:mongodb": "npm exec --yes --ignore-scripts --package=eslint-plugin-mongodb-security@9.1.3 -- eslint --config eslint.security.config.mjs src admin/src",
+		"security:gate": "node scripts/security-gate.mjs",
+		"security:verify": "node scripts/verify-web-security.mjs && DEPLOY_TARGET=node pnpm build && DEPLOY_TARGET=node pnpm --dir admin build && node scripts/smoke-web-security.mjs"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^8.0.0",

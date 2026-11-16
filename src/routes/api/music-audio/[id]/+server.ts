@@ -1,3 +1,4 @@
+import { objectIdString } from '$lib/server/mongo-input';
 import { json } from '@sveltejs/kit';
 import { ObjectId, type Collection, type Filter } from 'mongodb';
 import { getDb } from '../../../../db/mongo';
@@ -48,7 +49,7 @@ async function findById(
 	collection: Collection<MusicAudioDoc>,
 	param: string
 ): Promise<MusicAudioDoc | null> {
-	if (!looksLikeObjectId(param) || !ObjectId.isValid(param)) return null;
+	if (!looksLikeObjectId(param) || !objectIdString.safeParse(param).success) return null;
 	return collection.findOne({ _id: new ObjectId(param) } as Filter<MusicAudioDoc>);
 }
 

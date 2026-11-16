@@ -1,3 +1,4 @@
+import { objectIdString } from '$lib/server/mongo-input';
 import { json } from '@sveltejs/kit';
 import { ObjectId, type Filter } from 'mongodb';
 import { getDb } from '../../../../../db/mongo';
@@ -24,7 +25,7 @@ export async function GET({ params }: RequestEvent) {
 		}
 
 		const audioIdMatches: Array<string | ObjectId> = [audioId];
-		if (ObjectId.isValid(audioId)) {
+		if (objectIdString.safeParse(audioId).success) {
 			audioIdMatches.push(new ObjectId(audioId));
 		}
 
@@ -38,7 +39,7 @@ export async function GET({ params }: RequestEvent) {
 		// the short book name (e.g. "A.F", "JEM") to prefix the title heading.
 		// music_audio uses ObjectId _id, so only look it up when the param
 		// parses as one. A non-ObjectId audioId just skips the book prefix.
-		const audioObjectId = ObjectId.isValid(audioId) ? new ObjectId(audioId) : null;
+		const audioObjectId = objectIdString.safeParse(audioId).success ? new ObjectId(audioId) : null;
 		const [lyrics, audio] = await Promise.all([
 			db.collection<MusicLyricsDoc>('music_lyrics').findOne(query, {
 				projection: { _id: 0, lines: 1, timeline_published: 1, title: 1 }

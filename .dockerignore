@@ -4,3 +4,5 @@ build
 .git
 .env*
 README.md
+
+cookies.txt

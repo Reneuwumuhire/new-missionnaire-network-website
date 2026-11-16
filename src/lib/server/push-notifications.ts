@@ -1,3 +1,4 @@
+import { pushEndpoint } from '$lib/server/push-endpoint';
 import { PUBLIC_VAPID_KEY } from '$app/env/public';
 import { PUSH_NOTIFICATIONS_ENABLED, VAPID_PRIVATE_KEY } from '$app/env/private';
 import webpush from 'web-push';
@@ -80,7 +81,10 @@ export async function sendPushToAll(payload: PushPayload): Promise<void> {
 
 	if (!ensureVapidConfigured()) return;
 
-	const subscriptions = await getAllPushSubscriptions();
+	// Older records predate endpoint validation.
+	const subscriptions = (await getAllPushSubscriptions()).filter((sub) =>
+		pushEndpoint.safeParse(sub.endpoint).success
+	);
 	if (subscriptions.length === 0) return;
 
 	const jsonPayload = JSON.stringify(payload);

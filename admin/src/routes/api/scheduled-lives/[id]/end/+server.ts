@@ -1,3 +1,4 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
@@ -9,8 +10,9 @@ import { getScheduledLiveById, setScheduledLiveStatus, logAudit } from '../../..
 // active-broadcast case goes through /api/broadcast/end-live instead, which
 // also closes the gate; here there is no gate to close — we just reconcile the
 // entry so it leaves the "upcoming" list.
-export const POST: RequestHandler = async ({ locals, params, getClientAddress }) => {
-	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
+export const POST: RequestHandler = async ({ params, getClientAddress, cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	if (!getPermissions(adminUser).can_manage_recordings) throw error(403, 'Accès refusé');
 
 	const current = await getScheduledLiveById(params.id);
 	if (!current) throw error(404, 'Direct programmé introuvable');
@@ -23,8 +25,8 @@ export const POST: RequestHandler = async ({ locals, params, getClientAddress })
 	await setScheduledLiveStatus(params.id, 'ended', { live_ended_at: endedAt });
 
 	await logAudit({
-		user_id: locals.user.email,
-		user_email: locals.user.email,
+		user_id: adminUser.email,
+		user_email: adminUser.email,
 		action: 'update',
 		target_collection: 'scheduled_lives',
 		target_id: params.id,

@@ -1,3 +1,4 @@
+import { objectIdString } from '$lib/server/mongo-input';
 import { createHash } from 'node:crypto';
 import { ObjectId, type Document, type Filter, type Sort } from 'mongodb';
 import { getDb } from './mongo';
@@ -50,7 +51,7 @@ function serializeDocument<T = unknown>(doc: unknown): T {
 }
 
 function idFromString(id: string): ObjectId {
-	if (!ObjectId.isValid(id)) throw new Error('Identifiant invalide');
+	if (!objectIdString.safeParse(id).success) throw new Error('Identifiant invalide');
 	return new ObjectId(id);
 }
 
@@ -388,10 +389,11 @@ export async function editQuestionForModeration(input: {
 
 export async function setReplyVisibility(input: {
 	replyId: string;
+	questionId: string;
 	visibilityStatus: 'visible' | 'hidden' | 'deleted';
 	reason: string | null;
 	moderator: AdminUser;
-}): Promise<void> {
+}): Promise<boolean> {
 	const db = await getDb();
 	const now = new Date();
 	const set: Record<string, unknown> = {
@@ -404,7 +406,8 @@ export async function setReplyVisibility(input: {
 
 	const reply = await db
 		.collection('questionReplies')
-		.findOneAndUpdate({ _id: idFromString(input.replyId) }, { $set: set });
+		.findOneAndUpdate({ _id: idFromString(input.replyId), questionId: input.questionId }, { $set: set });
+	if (!reply) return false;
 
 	// Hiding/restoring/deleting a reply changes how many are visible, so keep the
 	// question's cached `replyCount` accurate.
@@ -425,6 +428,7 @@ export async function setReplyVisibility(input: {
 		action: input.visibilityStatus,
 		reason: input.reason
 	});
+	return true;
 }
 
 export async function upsertOfficialAnswer(input: {
@@ -441,7 +445,7 @@ export async function upsertOfficialAnswer(input: {
 	if (!question) throw new Error('Question introuvable');
 
 	let replyId = question.officialAnswerId as string | null;
-	if (replyId && ObjectId.isValid(replyId)) {
+	if (replyId && objectIdString.safeParse(replyId).success) {
 		await db.collection('questionReplies').updateOne(
 			{ _id: idFromString(replyId) },
 			{
@@ -813,7 +817,7 @@ export async function listOpenReports(options: {
 	]);
 	const reports = reportDocs.map((doc) => serializeDocument<QuestionReport>(doc));
 	const questionIds = [...new Set(reports.map((report) => report.questionId))]
-		.filter((id) => ObjectId.isValid(id))
+		.filter((id) => objectIdString.safeParse(id).success)
 		.map((id) => new ObjectId(id));
 	const questionDocs = questionIds.length
 		? await db
@@ -832,12 +836,13 @@ export async function listOpenReports(options: {
 
 export async function resolveQuestionReport(input: {
 	reportId: string;
+	questionId?: string;
 	status: 'reviewed' | 'dismissed';
 	moderator: AdminUser;
-}): Promise<void> {
+}): Promise<boolean> {
 	const db = await getDb();
-	await db.collection('questionReports').updateOne(
-		{ _id: idFromString(input.reportId) },
+	const result = await db.collection('questionReports').updateOne(
+		{ _id: idFromString(input.reportId), ...(input.questionId ? { questionId: input.questionId } : {}) },
 		{
 			$set: {
 				status: input.status,
@@ -846,6 +851,7 @@ export async function resolveQuestionReport(input: {
 			}
 		}
 	);
+	if (!result.matchedCount) return false;
 	await recordModerationAction({
 		targetType: 'report',
 		targetId: input.reportId,
@@ -853,4 +859,5 @@ export async function resolveQuestionReport(input: {
 		action: input.status,
 		reason: null
 	});
+	return true;
 }

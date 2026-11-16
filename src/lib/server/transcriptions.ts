@@ -1,3 +1,5 @@
+import { z } from 'zod';
+import { literalSearch, objectIdString, pageLimit, pageNumber } from '$lib/server/mongo-input';
 import { ObjectId, type Db, type Filter } from 'mongodb';
 import { getDb } from '../../db/mongo';
 import type { PDF } from '../../core/model/pdf';
@@ -55,15 +57,21 @@ export async function queryTranscriptions(options: {
 	year?: string | null;
 	search?: string | null;
 }): Promise<{ documents: SerializedTranscription[]; total: number }> {
-	const { page = 1, limit = 12, sort = 'desc', year = null, search = null } = options;
+	const { page, limit, sort, year, search } = z.object({
+		page: pageNumber.default(1),
+		limit: pageLimit.default(12),
+		sort: z.enum(['asc', 'desc']).default('desc'),
+		year: z.string().regex(/^\d{4}$/).nullish(),
+		search: literalSearch.nullish()
+	}).parse(options);
 
 	const db = await getDb();
 	await ensureListIndex(db);
 	const collection = db.collection<PDF>('pdfs');
 
 	const query: Filter<PDF> = {};
-	if (search?.trim()) {
-		query['filename'] = { $regex: search.trim(), $options: 'i' };
+	if (search) {
+		query['filename'] = { $regex: search, $options: 'i' };
 	}
 	if (year) {
 		const y = Number.parseInt(year);
@@ -93,7 +101,7 @@ export async function queryTranscriptions(options: {
 
 	const videoIds = documents
 		.map((d) => d.videoId)
-		.filter((v): v is string => Boolean(v) && ObjectId.isValid(String(v)))
+		.filter((v): v is string => Boolean(v) && objectIdString.safeParse(String(v)).success)
 		.map((v) => new ObjectId(String(v)));
 
 	const videoMap = new Map<string, string>();

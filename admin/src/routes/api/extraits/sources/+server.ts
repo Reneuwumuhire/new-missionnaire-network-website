@@ -1,3 +1,4 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { error, json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
@@ -19,8 +20,9 @@ function dateLabel(value: unknown): string {
 			}).format(date);
 }
 
-export const GET: RequestHandler = async ({ locals, url }) => {
-	const permissions = getPermissions(locals.user);
+export const GET: RequestHandler = async ({ url, cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	const permissions = getPermissions(adminUser);
 	if (!permissions.can_manage_extraits) throw error(403, 'Accès refusé');
 
 	const query = url.searchParams.get('q')?.trim() ?? '';

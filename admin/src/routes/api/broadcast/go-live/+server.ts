@@ -1,3 +1,4 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
@@ -39,8 +40,9 @@ function renderDefaultTitle(template: string): string {
 	return template.includes('{date}') ? template.replaceAll('{date}', date) : `${date} ${template}`;
 }
 
-export const POST: RequestHandler = async ({ locals, request, getClientAddress }) => {
-	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
+export const POST: RequestHandler = async ({ request, getClientAddress, cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	if (!getPermissions(adminUser).can_manage_recordings) throw error(403, 'Accès refusé');
 
 	// Notifications are opt-in. Missing or malformed input always starts silently.
 	// `scheduledLiveId` explicitly attaches this broadcast to a scheduled entry
@@ -107,7 +109,7 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 			scheduled_at: new Date(startedAt),
 			status: 'live',
 			live_started_at: startedAt,
-			created_by: locals.user.email
+			created_by: adminUser.email
 		});
 	}
 
@@ -126,8 +128,8 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		is_live: true,
 		started_at: startedAt,
 		ended_at: null,
-		started_by: locals.user.email,
-		started_by_name: locals.user.name || null,
+		started_by: adminUser.email,
+		started_by_name: adminUser.name || null,
 		icecast_offline_since: null,
 		scheduled_live_id: entry._id,
 		scheduled_live_slug: entry.slug,
@@ -182,8 +184,8 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 	}
 
 	await logAudit({
-		user_id: locals.user.email,
-		user_email: locals.user.email,
+		user_id: adminUser.email,
+		user_email: adminUser.email,
 		action: 'create',
 		target_collection: 'broadcast_admin_state',
 		target_id: 'current',

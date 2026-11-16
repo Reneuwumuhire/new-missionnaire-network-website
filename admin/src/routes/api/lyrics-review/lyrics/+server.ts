@@ -1,9 +1,11 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { json, type RequestEvent } from '@sveltejs/kit';
 import { canReviewLyrics } from '$lib/models/admin-user';
 import { extractLyricsFromUrl } from '$lib/server/lyricsReview';
 
 export async function GET(event: RequestEvent) {
-	if (!canReviewLyrics(event.locals.user)) {
+	const adminUser = await verifyAdminSession(event.cookies);
+	if (!canReviewLyrics(adminUser)) {
 		return json({ error: 'Accès refusé' }, { status: 403 });
 	}
 

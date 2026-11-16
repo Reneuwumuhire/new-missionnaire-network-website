@@ -60,7 +60,7 @@ export const AdminUserSchema = z.object({
 export type AdminUser = z.infer<typeof AdminUserSchema>;
 
 /** Resolve effective permissions — superadmins always get full access */
-export function getPermissions(user: AdminUser): Permissions {
+export function getPermissions(user: Pick<AdminUser, 'role' | 'permissions'>): Permissions {
 	if (user.role === 'superadmin') return SUPERADMIN_PERMISSIONS;
 	const stored = user.permissions ?? {};
 	return { ...DEFAULT_PERMISSIONS, ...stored };

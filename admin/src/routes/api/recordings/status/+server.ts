@@ -1,3 +1,4 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
@@ -6,10 +7,9 @@ import { getIcecastSnapshot, type IcecastSnapshot } from '$lib/server/icecast';
 import { buildOperationalAlerts } from '$lib/operational-alerts';
 import { countRecordingsByStatus, getBroadcastAdminState } from '../../../../db/collections';
 
-export const GET: RequestHandler = async ({ locals, setHeaders }) => {
-	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
-
-	setHeaders({ 'Cache-Control': 'no-store' });
+export const GET: RequestHandler = async ({ cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	if (!getPermissions(adminUser).can_manage_recordings) throw error(403, 'Accès refusé');
 
 	const [recorderResult, icecast, broadcast, failedRecordings] = await Promise.all([
 		recorderStatus().catch((err: unknown) => {

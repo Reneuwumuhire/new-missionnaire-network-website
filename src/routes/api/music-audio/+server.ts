@@ -1,3 +1,4 @@
+import { objectIdString } from '$lib/server/mongo-input';
 import { json } from '@sveltejs/kit';
 import { ObjectId } from 'mongodb';
 import { queryMusicAudio } from '../../../db/collections';
@@ -12,7 +13,7 @@ type LyricsAudioIdRow = { audio_id?: string | ObjectId };
 async function lyricsAvailableIds(audioIds: string[]): Promise<Set<string>> {
 	if (audioIds.length === 0) return new Set();
 	const objectIds = audioIds
-		.filter((id) => ObjectId.isValid(id))
+		.filter((id) => objectIdString.safeParse(id).success)
 		.map((id) => new ObjectId(id));
 	const db = await getDb();
 	const rows = await db
