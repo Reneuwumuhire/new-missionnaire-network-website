@@ -64,10 +64,10 @@ async function findBySlug(
 ): Promise<MusicAudioDoc | null> {
 	const firstSegment = slug.split('-')[0] ?? '';
 	if (!firstSegment) return null;
-	const escaped = firstSegment.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+	const titlePrefixPattern = '^' + firstSegment.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 	const candidates = await collection
 		.find(
-			{ title: { $type: 'string', $ne: '', $regex: `^${escaped}`, $options: 'i' } },
+			{ title: { $type: 'string', $ne: '', $regex: titlePrefixPattern, $options: 'i' } },
 			{ projection: { _id: 1, title: 1 } }
 		)
 		.collation({ locale: 'fr', strength: 1 })
