@@ -13,6 +13,9 @@ const checks = [
 		'.',
 		'--preset',
 		'app',
+		// The audio recorder is deployed separately from the web apps.
+		'--exclude',
+		'ops/streaming/recorder/**',
 		'--fail-on',
 		'high'
 	],

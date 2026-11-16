@@ -13,12 +13,10 @@ const pluginPath = (process.env.PATH ?? '').split(delimiter).find((directory) =>
 });
 if (!pluginPath) throw new Error('Load the MongoDB plugin with npm run lint:mongodb');
 
-const loaded = createRequire(join(pluginPath, 'eslint-security.cjs'))(
+const { configs } = createRequire(join(pluginPath, 'eslint-security.cjs'))(
 	'eslint-plugin-mongodb-security'
 );
-const mongodb = loaded.default ?? loaded;
-const recommended = mongodb.configs['flat/recommended'] ?? mongodb.configs.recommended;
-const rules = Object.assign({}, ...[recommended].flat().map((config) => config.rules));
+const { plugins, rules } = configs.recommended;
 if (Object.keys(rules).length === 0) throw new Error('MongoDB recommended rules were not loaded');
 
 export default [
@@ -26,7 +24,7 @@ export default [
 	{
 		files: ['src/**/*.{ts,js}', 'admin/src/**/*.{ts,js}'],
 		languageOptions: { parser },
-		plugins: { 'mongodb-security': mongodb },
+		plugins,
 		rules
 	}
 ];
