@@ -4,7 +4,6 @@ on:
   pull_request:
     paths:
       - 'studio/**'
-      - 'admin/src/routes/studio/**'
       - '.github/workflows/studio-release.yml'
       - '.github/workflows/studio-verify.yml'
 
