@@ -1,4 +1,4 @@
-import { dev } from '$app/environment';
+import { dev } from '$app/env';
 import { fail, redirect } from '@sveltejs/kit';
 import { authenticatePassword, completeLogin, SESSION_COOKIE } from '$lib/server/auth';
 import { TWO_FACTOR_CHALLENGE_COOKIE } from '$lib/server/two-factor-auth';

@@ -1,3 +1,4 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
@@ -47,8 +48,9 @@ async function autoAnchorSubtitles(atEpochMs?: number): Promise<boolean> {
 	}
 }
 
-export const POST: RequestHandler = async ({ locals, request, getClientAddress }) => {
-	const user = locals.user;
+export const POST: RequestHandler = async ({ request, getClientAddress, cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	const user = adminUser;
 	if (!getPermissions(user).can_manage_recordings) throw error(403, 'Accès refusé');
 
 	// Optional: the operator monitor's on-air position, used as the subtitle

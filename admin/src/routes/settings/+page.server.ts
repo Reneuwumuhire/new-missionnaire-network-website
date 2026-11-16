@@ -1,9 +1,9 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { fail, redirect } from '@sveltejs/kit';
 import { renderSVG } from 'uqr';
 import {
 	verifyPassword,
 	hashPassword,
-	invalidateSessionCache,
 	revokeOtherSessions,
 	SESSION_COOKIE
 } from '$lib/server/auth';
@@ -63,27 +63,28 @@ function deviceName(userAgent: string | null): string {
 	return `${browser} on ${system}`;
 }
 
-export const load: PageServerLoad = async ({ locals, cookies, url }) => {
+export const load: PageServerLoad = async ({ cookies, url }) => {
+	const adminUser = await verifyAdminSession(cookies, { allowPasswordChangeRequired: true });
 	const currentToken = cookies.get(SESSION_COOKIE) ?? '';
 	const [studioAuthorizations, sessions, passkeys, failedLoginAttempts] = await Promise.all([
-		listStudioAuthorizations(locals.user.email),
-		listSessionsForUser(locals.user.email),
-		listPasskeysForUser(locals.user.email),
-		countRecentLoginFailuresForEmail(locals.user.email)
+		listStudioAuthorizations(adminUser.email),
+		listSessionsForUser(adminUser.email),
+		listPasskeysForUser(adminUser.email),
+		countRecentLoginFailuresForEmail(adminUser.email)
 	]);
 	return {
 		user: {
-			name: locals.user.name,
-			email: locals.user.email,
-			role: locals.user.role,
-			created_at: locals.user.created_at,
-			last_login: locals.user.last_login,
-			must_change_password: locals.user.must_change_password,
-			two_factor_enabled: locals.user.two_factor_enabled,
-			recovery_codes_remaining: locals.user.recovery_code_hashes?.length ?? 0
+			name: adminUser.name,
+			email: adminUser.email,
+			role: adminUser.role,
+			created_at: adminUser.created_at,
+			last_login: adminUser.last_login,
+			must_change_password: adminUser.must_change_password,
+			two_factor_enabled: adminUser.two_factor_enabled,
+			recovery_codes_remaining: adminUser.recovery_code_hashes?.length ?? 0
 		},
 		passwordRequired:
-			locals.user.must_change_password || url.searchParams.get('password') === 'required',
+			adminUser.must_change_password || url.searchParams.get('password') === 'required',
 		twoFactorStatus: url.searchParams.get('twoFactor'),
 		twoFactorConfigured: Boolean(twoFactorKey()),
 		failedLoginAttempts,
@@ -109,7 +110,8 @@ export const load: PageServerLoad = async ({ locals, cookies, url }) => {
 };
 
 export const actions: Actions = {
-	profile: async ({ request, locals, getClientAddress }) => {
+	profile: async ({ request, getClientAddress, cookies }) => {
+		const adminUser = await verifyAdminSession(cookies);
 		const formData = await request.formData();
 		const name = formData.get('name')?.toString()?.trim();
 
@@ -123,15 +125,15 @@ export const actions: Actions = {
 		}
 
 		try {
-			await updateAdminProfile(locals.user.email, { name });
+			await updateAdminProfile(adminUser.email, { name });
 
 			await logAudit({
-				user_id: locals.user.email,
-				user_email: locals.user.email,
+				user_id: adminUser.email,
+				user_email: adminUser.email,
 				action: 'update',
 				target_collection: 'admin_users',
-				target_id: locals.user._id ?? null,
-				changes: { name: { old: locals.user.name, new: name } },
+				target_id: adminUser._id ?? null,
+				changes: { name: { old: adminUser.name, new: name } },
 				ip_address: getClientAddress()
 			});
 
@@ -141,7 +143,8 @@ export const actions: Actions = {
 		}
 	},
 
-	password: async ({ request, locals, cookies, getClientAddress }) => {
+	password: async ({ request, cookies, getClientAddress }) => {
+		const adminUser = await verifyAdminSession(cookies, { allowPasswordChangeRequired: true });
 		const formData = await request.formData();
 		const currentPassword = formData.get('currentPassword')?.toString();
 		const newPassword = formData.get('newPassword')?.toString();
@@ -166,7 +169,7 @@ export const actions: Actions = {
 		}
 
 		// Verify current password
-		const user = await findAdminByEmail(locals.user.email);
+		const user = await findAdminByEmail(adminUser.email);
 		if (!user) {
 			return fail(400, { passwordError: 'Utilisateur introuvable', passwordSuccess: false });
 		}
@@ -181,18 +184,18 @@ export const actions: Actions = {
 
 		try {
 			const hash = await hashPassword(newPassword);
-			await revokeStudioAuthorizationsForUser(locals.user.email);
-			await updateAdminPassword(locals.user.email, hash);
+			await revokeStudioAuthorizationsForUser(adminUser.email);
+			await updateAdminPassword(adminUser.email, hash);
 			const currentToken = cookies.get(SESSION_COOKIE) ?? '';
-			await revokeOtherSessions(locals.user.email, currentToken);
-			invalidateSessionCache(currentToken);
+			await revokeOtherSessions(adminUser.email, currentToken);
+
 
 			await logAudit({
-				user_id: locals.user.email,
-				user_email: locals.user.email,
+				user_id: adminUser.email,
+				user_email: adminUser.email,
 				action: 'update',
 				target_collection: 'admin_users',
-				target_id: locals.user._id ?? null,
+				target_id: adminUser._id ?? null,
 				changes: { password: { old: '***', new: '***' } },
 				ip_address: getClientAddress()
 			});
@@ -203,12 +206,13 @@ export const actions: Actions = {
 		}
 	},
 
-	beginTwoFactor: async ({ request, locals, getClientAddress }) => {
-		if (locals.user.role !== 'superadmin') return fail(403, { twoFactorError: 'Superadmins only' });
+	beginTwoFactor: async ({ request, getClientAddress, cookies }) => {
+		const adminUser = await verifyAdminSession(cookies);
+		if (adminUser.role !== 'superadmin') return fail(403, { twoFactorError: 'Superadmins only' });
 		const key = twoFactorKey();
 		if (!key) return fail(503, { twoFactorError: 'Two-factor authentication is not configured' });
 		const currentPassword = (await request.formData()).get('currentPassword')?.toString() ?? '';
-		const user = await findAdminByEmail(locals.user.email);
+		const user = await findAdminByEmail(adminUser.email);
 		if (user?.two_factor_enabled) {
 			return fail(409, { twoFactorError: 'Two-factor authentication is already enabled' });
 		}
@@ -242,11 +246,12 @@ export const actions: Actions = {
 		};
 	},
 
-	enableTwoFactor: async ({ request, locals, cookies, getClientAddress }) => {
-		if (locals.user.role !== 'superadmin') return fail(403, { twoFactorError: 'Superadmins only' });
+	enableTwoFactor: async ({ request, cookies, getClientAddress }) => {
+		const adminUser = await verifyAdminSession(cookies);
+		if (adminUser.role !== 'superadmin') return fail(403, { twoFactorError: 'Superadmins only' });
 		const key = twoFactorKey();
 		const code = (await request.formData()).get('code')?.toString() ?? '';
-		const user = await findAdminByEmail(locals.user.email);
+		const user = await findAdminByEmail(adminUser.email);
 		if (!key || !user?.two_factor_secret) return fail(400, { twoFactorError: 'Start setup again' });
 		try {
 			if (!verifyTotp(decryptTwoFactorSecret(user.two_factor_secret, key), code)) {
@@ -258,7 +263,7 @@ export const actions: Actions = {
 		await setTwoFactorEnabled(user.email, true);
 		const currentToken = cookies.get(SESSION_COOKIE) ?? '';
 		await revokeOtherSessions(user.email, currentToken);
-		invalidateSessionCache(currentToken);
+
 		await logAudit({
 			user_id: user.email,
 			user_email: user.email,
@@ -271,12 +276,13 @@ export const actions: Actions = {
 		throw redirect(303, '/settings?twoFactor=enabled');
 	},
 
-	disableTwoFactor: async ({ request, locals, cookies, getClientAddress }) => {
-		if (locals.user.role !== 'superadmin') return fail(403, { twoFactorError: 'Superadmins only' });
+	disableTwoFactor: async ({ request, cookies, getClientAddress }) => {
+		const adminUser = await verifyAdminSession(cookies);
+		if (adminUser.role !== 'superadmin') return fail(403, { twoFactorError: 'Superadmins only' });
 		const formData = await request.formData();
 		const password = formData.get('currentPassword')?.toString() ?? '';
 		const code = formData.get('code')?.toString() ?? '';
-		const user = await findAdminByEmail(locals.user.email);
+		const user = await findAdminByEmail(adminUser.email);
 		if (
 			!user ||
 			!(await verifyPassword(password, user.password_hash)) ||
@@ -287,7 +293,7 @@ export const actions: Actions = {
 		await setTwoFactorEnabled(user.email, false);
 		const currentToken = cookies.get(SESSION_COOKIE) ?? '';
 		await revokeOtherSessions(user.email, currentToken);
-		invalidateSessionCache(currentToken);
+
 		await logAudit({
 			user_id: user.email,
 			user_email: user.email,
@@ -300,15 +306,16 @@ export const actions: Actions = {
 		throw redirect(303, '/settings?twoFactor=disabled');
 	},
 
-	revokeSession: async ({ request, locals, cookies, getClientAddress }) => {
+	revokeSession: async ({ request, cookies, getClientAddress }) => {
+		const adminUser = await verifyAdminSession(cookies);
 		const id = (await request.formData()).get('id')?.toString() ?? '';
 		const currentToken = cookies.get(SESSION_COOKIE) ?? '';
-		const revokedToken = await deleteSessionForUser(id, locals.user.email, currentToken);
+		const revokedToken = await deleteSessionForUser(id, adminUser.email, currentToken);
 		if (!revokedToken) return fail(404, { sessionError: 'Session not found' });
-		invalidateSessionCache(revokedToken);
+
 		await logAudit({
-			user_id: locals.user.email,
-			user_email: locals.user.email,
+			user_id: adminUser.email,
+			user_email: adminUser.email,
 			action: 'delete',
 			target_collection: 'admin_sessions',
 			target_id: id,
@@ -317,11 +324,12 @@ export const actions: Actions = {
 		return { sessionRevoked: true };
 	},
 
-	revokeOtherSessions: async ({ locals, cookies, getClientAddress }) => {
-		const count = await revokeOtherSessions(locals.user.email, cookies.get(SESSION_COOKIE) ?? '');
+	revokeOtherSessions: async ({ cookies, getClientAddress }) => {
+		const adminUser = await verifyAdminSession(cookies);
+		const count = await revokeOtherSessions(adminUser.email, cookies.get(SESSION_COOKIE) ?? '');
 		await logAudit({
-			user_id: locals.user.email,
-			user_email: locals.user.email,
+			user_id: adminUser.email,
+			user_email: adminUser.email,
 			action: 'delete',
 			target_collection: 'admin_sessions',
 			target_id: null,
@@ -331,14 +339,15 @@ export const actions: Actions = {
 		return { otherSessionsRevoked: count };
 	},
 
-	deletePasskey: async ({ request, locals, getClientAddress }) => {
+	deletePasskey: async ({ request, getClientAddress, cookies }) => {
+		const adminUser = await verifyAdminSession(cookies);
 		const id = (await request.formData()).get('id')?.toString() ?? '';
-		if (!(await deletePasskeyForUser(id, locals.user.email))) {
+		if (!(await deletePasskeyForUser(id, adminUser.email))) {
 			return fail(404, { passkeyDeleteError: true });
 		}
 		await logAudit({
-			user_id: locals.user._id ?? locals.user.email,
-			user_email: locals.user.email,
+			user_id: adminUser._id ?? adminUser.email,
+			user_email: adminUser.email,
 			action: 'delete',
 			target_collection: 'admin_passkeys',
 			target_id: id,
@@ -347,15 +356,16 @@ export const actions: Actions = {
 		return { passkeyDeleted: true };
 	},
 
-	revokeStudio: async ({ request, locals, getClientAddress }) => {
+	revokeStudio: async ({ request, getClientAddress, cookies }) => {
+		const adminUser = await verifyAdminSession(cookies);
 		const id = (await request.formData()).get('id')?.toString();
 		if (!id) return fail(400, { studioError: 'Invalid Studio session' });
-		if (!(await revokeStudioAuthorizationById(id, locals.user.email))) {
+		if (!(await revokeStudioAuthorizationById(id, adminUser.email))) {
 			return fail(404, { studioError: 'Studio session not found' });
 		}
 		await logAudit({
-			user_id: locals.user.email,
-			user_email: locals.user.email,
+			user_id: adminUser.email,
+			user_email: adminUser.email,
 			action: 'update',
 			target_collection: 'studio_authorizations',
 			target_id: id,
@@ -364,15 +374,16 @@ export const actions: Actions = {
 		return { studioRevoked: true };
 	},
 
-	deleteStudio: async ({ request, locals, getClientAddress }) => {
+	deleteStudio: async ({ request, getClientAddress, cookies }) => {
+		const adminUser = await verifyAdminSession(cookies);
 		const id = (await request.formData()).get('id')?.toString();
 		if (!id) return fail(400, { studioDeleteError: true });
-		if (!(await deleteDisconnectedStudioAuthorizationById(id, locals.user.email))) {
+		if (!(await deleteDisconnectedStudioAuthorizationById(id, adminUser.email))) {
 			return fail(409, { studioDeleteError: true });
 		}
 		await logAudit({
-			user_id: locals.user.email,
-			user_email: locals.user.email,
+			user_id: adminUser.email,
+			user_email: adminUser.email,
 			action: 'delete',
 			target_collection: 'studio_authorizations',
 			target_id: id,

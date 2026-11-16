@@ -1,3 +1,5 @@
+import { z } from 'zod';
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { error, fail } from '@sveltejs/kit';
 import { getDb } from '../../db/mongo';
 import { logAudit } from '../../db/collections';
@@ -16,8 +18,9 @@ type Job = {
 	updatedAt: Date;
 };
 
-export const load: PageServerLoad = async ({ locals, url }) => {
-	if (!locals.user || !getPermissions(locals.user).can_manage_recordings)
+export const load: PageServerLoad = async ({ url, cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	if (!adminUser || !getPermissions(adminUser).can_manage_recordings)
 		error(403, 'Accès refusé');
 	const status = statuses.find((value) => value === url.searchParams.get('status')) ?? 'pending';
 	const page = Math.max(
@@ -73,11 +76,12 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 };
 
 export const actions: Actions = {
-	retry: async ({ locals, request }) => {
-		if (!locals.user || !getPermissions(locals.user).can_manage_recordings)
+	retry: async ({ request, cookies }) => {
+		const adminUser = await verifyAdminSession(cookies);
+		if (!adminUser || !getPermissions(adminUser).can_manage_recordings)
 			error(403, 'Accès refusé');
-		const id = (await request.formData()).get('id');
-		if (typeof id !== 'string' || !/^[a-f0-9]{64}$/.test(id))
+		const id = z.string().regex(/^[a-f0-9]{64}$/).safeParse((await request.formData()).get('id')).data;
+		if (!id)
 			return fail(400, { retryFailed: true });
 		const db = await getDb();
 		const result = await db.collection<Job>('library_index_jobs').updateOne(
@@ -94,8 +98,8 @@ export const actions: Actions = {
 		);
 		if (!result.matchedCount) return fail(409, { retryFailed: true });
 		await logAudit({
-			user_id: locals.user._id!,
-			user_email: locals.user.email,
+			user_id: adminUser._id!,
+			user_email: adminUser.email,
 			action: 'update',
 			target_collection: 'library_index_jobs',
 			target_id: id,

@@ -1,3 +1,4 @@
+import { adminEmail, objectIdString } from '$lib/server/mongo-input';
 import { randomBytes } from 'node:crypto';
 import { getDb } from './mongo';
 import { ObjectId, type Document, type Filter } from 'mongodb';
@@ -146,7 +147,7 @@ export async function queryMusicAudio(options: {
 	if (lyrics === 'with' || lyrics === 'without') {
 		const lyricsAudioIds = await db.collection('music_lyrics').distinct('audio_id');
 		const objectIds = lyricsAudioIds
-			.filter((value): value is string => typeof value === 'string' && ObjectId.isValid(value))
+			.filter((value): value is string => typeof value === 'string' && objectIdString.safeParse(value).success)
 			.map((value) => new ObjectId(value));
 		conditions.push({ _id: lyrics === 'with' ? { $in: objectIds } : { $nin: objectIds } });
 	}
@@ -177,6 +178,7 @@ export async function queryMusicAudio(options: {
 }
 
 export async function getMusicAudioById(id: string): Promise<MusicAudio | null> {
+	if (!objectIdString.safeParse(id).success) return null;
 	const db = await getDb();
 	const doc = await db.collection('music_audio').findOne({ _id: new ObjectId(id) });
 	return doc ? serializeDocument<MusicAudio>(doc) : null;
@@ -214,7 +216,7 @@ export async function updateMusicAudio(
 ): Promise<boolean> {
 	const db = await getDb();
 	const result = await db.collection('music_audio').updateOne(
-		{ _id: new ObjectId(id) },
+		{ _id: new ObjectId(objectIdString.parse(id)) },
 		{
 			$set: {
 				...updates,
@@ -229,16 +231,16 @@ export async function updateMusicAudio(
 
 export async function deleteMusicAudio(id: string): Promise<{ s3_key: string } | null> {
 	const db = await getDb();
-	const doc = await db.collection('music_audio').findOne({ _id: new ObjectId(id) });
+	const doc = await db.collection('music_audio').findOne({ _id: new ObjectId(objectIdString.parse(id)) });
 	if (!doc) return null;
-	await db.collection('music_audio').deleteOne({ _id: new ObjectId(id) });
+	await db.collection('music_audio').deleteOne({ _id: new ObjectId(objectIdString.parse(id)) });
 	invalidateMusicCatalogCache();
 	return { s3_key: doc.s3_key as string };
 }
 
 export async function deleteMusicAudioBulk(ids: string[]): Promise<{ s3_keys: string[] }> {
 	const db = await getDb();
-	const objectIds = ids.map((id) => new ObjectId(id));
+	const objectIds = ids.map((id) => new ObjectId(objectIdString.parse(id)));
 	const docs = await db
 		.collection('music_audio')
 		.find({ _id: { $in: objectIds } })
@@ -256,7 +258,7 @@ export async function bulkUpdateCategory(
 	updatedBy: string
 ): Promise<number> {
 	const db = await getDb();
-	const objectIds = ids.map((id) => new ObjectId(id));
+	const objectIds = ids.map((id) => new ObjectId(objectIdString.parse(id)));
 	const result = await db
 		.collection('music_audio')
 		.updateMany(
@@ -378,8 +380,10 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 // ══════════════════════════════════════
 
 export async function findAdminByEmail(email: string): Promise<AdminUser | null> {
+	const parsed = adminEmail.safeParse(email);
+	if (!parsed.success) return null;
 	const db = await getDb();
-	const doc = await db.collection('admin_users').findOne({ email: email.toLowerCase() });
+	const doc = await db.collection('admin_users').findOne({ email: parsed.data });
 	return doc ? serializeDocument<AdminUser>(doc) : null;
 }
 
@@ -387,7 +391,7 @@ export async function updateLastLogin(userId: string): Promise<void> {
 	const db = await getDb();
 	await db
 		.collection('admin_users')
-		.updateOne({ _id: new ObjectId(userId) }, { $set: { last_login: new Date() } });
+		.updateOne({ _id: new ObjectId(objectIdString.parse(userId)) }, { $set: { last_login: new Date() } });
 }
 
 export async function updateAdminProfile(
@@ -397,7 +401,7 @@ export async function updateAdminProfile(
 	const db = await getDb();
 	const result = await db
 		.collection('admin_users')
-		.updateOne({ email: email.toLowerCase() }, { $set: updates });
+		.updateOne({ email: adminEmail.parse(email) }, { $set: updates });
 	return result.modifiedCount > 0;
 }
 
@@ -409,7 +413,7 @@ export async function updateAdminPassword(
 	const result = await db
 		.collection('admin_users')
 		.updateOne(
-			{ email: email.toLowerCase() },
+			{ email: adminEmail.parse(email) },
 			{ $set: { password_hash: newPasswordHash, must_change_password: false } }
 		);
 	return result.modifiedCount > 0;
@@ -424,7 +428,7 @@ export async function createAdminUser(user: {
 	const db = await getDb();
 	const result = await db.collection('admin_users').insertOne({
 		...user,
-		email: user.email.toLowerCase(),
+		email: adminEmail.parse(user.email),
 		created_at: new Date(),
 		last_login: null,
 		is_active: true,
@@ -435,17 +439,28 @@ export async function createAdminUser(user: {
 	return result.insertedId.toString();
 }
 
-export async function getAllAdminUsers(): Promise<AdminUser[]> {
+type PublicAdminUser = Pick<
+	AdminUser,
+	'_id' | 'email' | 'name' | 'role' | 'permissions' | 'created_at' | 'last_login' | 'is_active'
+>;
+
+export async function getAllAdminUsers(): Promise<PublicAdminUser[]> {
 	const db = await getDb();
-	const docs = await db.collection('admin_users').find().sort({ created_at: -1 }).toArray();
-	return docs.map((doc) => serializeDocument<AdminUser>(doc));
+	const docs = await db
+		.collection('admin_users')
+		.find({}, {
+			projection: { email: 1, name: 1, role: 1, permissions: 1, created_at: 1, last_login: 1, is_active: 1 }
+		})
+		.sort({ created_at: -1 })
+		.toArray();
+	return docs.map((doc) => serializeDocument<PublicAdminUser>(doc));
 }
 
 export async function toggleAdminUserActive(email: string, isActive: boolean): Promise<boolean> {
 	const db = await getDb();
 	const result = await db
 		.collection('admin_users')
-		.updateOne({ email: email.toLowerCase() }, { $set: { is_active: isActive } });
+		.updateOne({ email: adminEmail.parse(email) }, { $set: { is_active: isActive } });
 	return result.modifiedCount > 0;
 }
 
@@ -454,7 +469,7 @@ export async function resetAdminPassword(email: string, newPasswordHash: string)
 	const result = await db
 		.collection('admin_users')
 		.updateOne(
-			{ email: email.toLowerCase() },
+			{ email: adminEmail.parse(email) },
 			{ $set: { password_hash: newPasswordHash, must_change_password: true } }
 		);
 	return result.modifiedCount > 0;
@@ -467,7 +482,7 @@ export async function beginTwoFactorSetup(
 ): Promise<void> {
 	const db = await getDb();
 	await db.collection('admin_users').updateOne(
-		{ email: email.toLowerCase() },
+		{ email: adminEmail.parse(email) },
 		{
 			$set: {
 				two_factor_secret: encryptedSecret,
@@ -483,11 +498,11 @@ export async function setTwoFactorEnabled(email: string, enabled: boolean): Prom
 	if (enabled) {
 		await db
 			.collection('admin_users')
-			.updateOne({ email: email.toLowerCase() }, { $set: { two_factor_enabled: true } });
+			.updateOne({ email: adminEmail.parse(email) }, { $set: { two_factor_enabled: true } });
 		return;
 	}
 	await db.collection('admin_users').updateOne(
-		{ email: email.toLowerCase() },
+		{ email: adminEmail.parse(email) },
 		{
 			$set: { two_factor_enabled: false, recovery_code_hashes: [] },
 			$unset: { two_factor_secret: '' }
@@ -500,7 +515,7 @@ export async function consumeRecoveryCode(email: string, codeHash: string): Prom
 	const result = await db
 		.collection<{ email: string; recovery_code_hashes: string[] }>('admin_users')
 		.updateOne(
-			{ email: email.toLowerCase(), recovery_code_hashes: codeHash },
+			{ email: adminEmail.parse(email), recovery_code_hashes: codeHash },
 			{ $pull: { recovery_code_hashes: { $eq: codeHash } } }
 		);
 	return result.modifiedCount === 1;
@@ -523,7 +538,7 @@ export async function updateAdminPermissions(
 	const db = await getDb();
 	const result = await db
 		.collection('admin_users')
-		.updateOne({ email: email.toLowerCase() }, { $set: { permissions } });
+		.updateOne({ email: adminEmail.parse(email) }, { $set: { permissions } });
 	return result.modifiedCount > 0;
 }
 
@@ -586,10 +601,10 @@ export async function deleteSessionForUser(
 	userId: string,
 	currentToken: string
 ): Promise<string | null> {
-	if (!ObjectId.isValid(id)) return null;
+	if (!objectIdString.safeParse(id).success) return null;
 	const db = await getDb();
 	const session = await db.collection('admin_sessions').findOneAndDelete({
-		_id: new ObjectId(id),
+		_id: new ObjectId(objectIdString.parse(id)),
 		user_id: userId.toLowerCase(),
 		token: { $ne: currentToken }
 	});
@@ -698,10 +713,10 @@ export async function updatePasskeyCounter(
 }
 
 export async function deletePasskeyForUser(id: string, userId: string): Promise<boolean> {
-	if (!ObjectId.isValid(id)) return false;
+	if (!objectIdString.safeParse(id).success) return false;
 	const db = await getDb();
 	const result = await db.collection(PASSKEYS_COLLECTION).deleteOne({
-		_id: new ObjectId(id),
+		_id: new ObjectId(objectIdString.parse(id)),
 		user_id: userId.toLowerCase()
 	});
 	return result.deletedCount === 1;
@@ -852,7 +867,7 @@ export async function recordLoginFailure(email: string, ip: string | null): Prom
 	await ensureLoginAttemptIndexes();
 	const db = await getDb();
 	await db.collection(LOGIN_ATTEMPTS_COLLECTION).insertOne({
-		email: email.toLowerCase(),
+		email: adminEmail.parse(email),
 		ip_address: ip,
 		created_at: new Date()
 	});
@@ -864,7 +879,7 @@ export async function countRecentLoginFailures(email: string, ip: string | null)
 	await ensureLoginAttemptIndexes();
 	const db = await getDb();
 	return db.collection(LOGIN_ATTEMPTS_COLLECTION).countDocuments({
-		email: email.toLowerCase(),
+		email: adminEmail.parse(email),
 		ip_address: ip,
 		created_at: { $gte: new Date(Date.now() - LOGIN_ATTEMPT_WINDOW_MS) }
 	});
@@ -874,7 +889,7 @@ export async function countRecentLoginFailuresForEmail(email: string): Promise<n
 	await ensureLoginAttemptIndexes();
 	const db = await getDb();
 	return db.collection(LOGIN_ATTEMPTS_COLLECTION).countDocuments({
-		email: email.toLowerCase(),
+		email: adminEmail.parse(email),
 		created_at: { $gte: new Date(Date.now() - LOGIN_ATTEMPT_WINDOW_MS) }
 	});
 }
@@ -882,7 +897,7 @@ export async function countRecentLoginFailuresForEmail(email: string): Promise<n
 export async function clearLoginFailures(email: string, ip: string | null): Promise<void> {
 	const db = await getDb();
 	await db.collection(LOGIN_ATTEMPTS_COLLECTION).deleteMany({
-		email: email.toLowerCase(),
+		email: adminEmail.parse(email),
 		ip_address: ip
 	});
 }
@@ -982,6 +997,7 @@ export async function listRecordings(
 }
 
 export async function getRecordingById(id: string): Promise<Recording | null> {
+	if (!objectIdString.safeParse(id).success) return null;
 	const db = await getDb();
 	const doc = await db.collection('recordings').findOne({ _id: new ObjectId(id) });
 	return doc ? serializeDocument<Recording>(doc) : null;
@@ -1061,7 +1077,7 @@ export async function updateRecording(
 ): Promise<boolean> {
 	const db = await getDb();
 	const result = await db.collection('recordings').updateOne(
-		{ _id: new ObjectId(id) },
+		{ _id: new ObjectId(objectIdString.parse(id)) },
 		{
 			$set: {
 				...updates,
@@ -1074,9 +1090,9 @@ export async function updateRecording(
 
 export async function deleteRecording(id: string): Promise<{ s3_key: string | null } | null> {
 	const db = await getDb();
-	const doc = await db.collection('recordings').findOne({ _id: new ObjectId(id) });
+	const doc = await db.collection('recordings').findOne({ _id: new ObjectId(objectIdString.parse(id)) });
 	if (!doc) return null;
-	await db.collection('recordings').deleteOne({ _id: new ObjectId(id) });
+	await db.collection('recordings').deleteOne({ _id: new ObjectId(objectIdString.parse(id)) });
 	return { s3_key: (doc.s3_key as string | null | undefined) ?? null };
 }
 
@@ -1102,7 +1118,7 @@ export async function isThumbnailS3KeyReferenced(
 	const db = await getDb();
 
 	const recordingFilter: Filter<Document> = { thumbnail_s3_key: key };
-	if (options.excludeRecordingId && ObjectId.isValid(options.excludeRecordingId)) {
+	if (options.excludeRecordingId && objectIdString.safeParse(options.excludeRecordingId).success) {
 		recordingFilter._id = { $ne: new ObjectId(options.excludeRecordingId) };
 	}
 	const recordingHit = await db
@@ -1111,7 +1127,7 @@ export async function isThumbnailS3KeyReferenced(
 	if (recordingHit) return true;
 
 	const scheduledFilter: Filter<Document> = { thumbnail_s3_key: key };
-	if (options.excludeScheduledLiveId && ObjectId.isValid(options.excludeScheduledLiveId)) {
+	if (options.excludeScheduledLiveId && objectIdString.safeParse(options.excludeScheduledLiveId).success) {
 		scheduledFilter._id = { $ne: new ObjectId(options.excludeScheduledLiveId) };
 	}
 	const scheduledHit = await db
@@ -1140,7 +1156,7 @@ export async function deleteRecordingBulk(
 ): Promise<{ deleted: number; s3_keys: string[] }> {
 	if (ids.length === 0) return { deleted: 0, s3_keys: [] };
 	const db = await getDb();
-	const objectIds = ids.map((id) => new ObjectId(id));
+	const objectIds = ids.map((id) => new ObjectId(objectIdString.parse(id)));
 	const docs = await db
 		.collection('recordings')
 		.find({ _id: { $in: objectIds } })
@@ -1518,9 +1534,9 @@ export async function createScheduledLive(input: {
 }
 
 export async function getScheduledLiveById(id: string): Promise<ScheduledLive | null> {
-	if (!ObjectId.isValid(id)) return null;
+	if (!objectIdString.safeParse(id).success) return null;
 	const db = await getDb();
-	const doc = await db.collection('scheduled_lives').findOne({ _id: new ObjectId(id) });
+	const doc = await db.collection('scheduled_lives').findOne({ _id: new ObjectId(objectIdString.parse(id)) });
 	return doc ? serializeDocument<ScheduledLive>(doc) : null;
 }
 
@@ -1559,12 +1575,12 @@ export async function updateScheduledLive(
 		subtitle_offset_ms: number;
 	}>
 ): Promise<boolean> {
-	if (!ObjectId.isValid(id)) return false;
+	if (!objectIdString.safeParse(id).success) return false;
 	const db = await getDb();
 	const result = await db
 		.collection('scheduled_lives')
 		.updateOne(
-			{ _id: new ObjectId(id) },
+			{ _id: new ObjectId(objectIdString.parse(id)) },
 			{ $set: { ...updates, updated_at: new Date().toISOString() } }
 		);
 	return result.matchedCount > 0;
@@ -1575,12 +1591,12 @@ export async function setScheduledLiveStatus(
 	status: ScheduledLiveStatus,
 	extra: Partial<{ live_started_at: string; live_ended_at: string; recording_id: string }> = {}
 ): Promise<boolean> {
-	if (!ObjectId.isValid(id)) return false;
+	if (!objectIdString.safeParse(id).success) return false;
 	const db = await getDb();
 	const result = await db
 		.collection('scheduled_lives')
 		.updateOne(
-			{ _id: new ObjectId(id) },
+			{ _id: new ObjectId(objectIdString.parse(id)) },
 			{ $set: { status, ...extra, updated_at: new Date().toISOString() } }
 		);
 	return result.matchedCount > 0;
@@ -1588,11 +1604,11 @@ export async function setScheduledLiveStatus(
 
 /** Restore an ended or cancelled entry while preserving its stable slug and past replay lookup. */
 export async function restoreScheduledLive(id: string): Promise<boolean> {
-	if (!ObjectId.isValid(id)) return false;
+	if (!objectIdString.safeParse(id).success) return false;
 	const db = await getDb();
 	const result = await db
 		.collection('scheduled_lives')
-		.updateOne({ _id: new ObjectId(id), status: { $in: ['ended', 'cancelled'] } }, [
+		.updateOne({ _id: new ObjectId(objectIdString.parse(id)), status: { $in: ['ended', 'cancelled'] } }, [
 			{
 				$set: {
 					status: 'scheduled',
@@ -1625,12 +1641,12 @@ export async function setScheduledLiveRecordingId(
 	id: string,
 	recordingId: string
 ): Promise<boolean> {
-	if (!ObjectId.isValid(id)) return false;
+	if (!objectIdString.safeParse(id).success) return false;
 	const db = await getDb();
 	const result = await db
 		.collection('scheduled_lives')
 		.updateOne(
-			{ _id: new ObjectId(id) },
+			{ _id: new ObjectId(objectIdString.parse(id)) },
 			{ $set: { recording_id: recordingId, updated_at: new Date().toISOString() } }
 		);
 	return result.matchedCount > 0;
@@ -1639,11 +1655,11 @@ export async function setScheduledLiveRecordingId(
 export async function deleteScheduledLive(
 	id: string
 ): Promise<{ thumbnail_s3_key: string | null; subtitle_srt_s3_key: string | null } | null> {
-	if (!ObjectId.isValid(id)) return null;
+	if (!objectIdString.safeParse(id).success) return null;
 	const db = await getDb();
-	const doc = await db.collection('scheduled_lives').findOne({ _id: new ObjectId(id) });
+	const doc = await db.collection('scheduled_lives').findOne({ _id: new ObjectId(objectIdString.parse(id)) });
 	if (!doc) return null;
-	await db.collection('scheduled_lives').deleteOne({ _id: new ObjectId(id) });
+	await db.collection('scheduled_lives').deleteOne({ _id: new ObjectId(objectIdString.parse(id)) });
 	return {
 		thumbnail_s3_key: (doc.thumbnail_s3_key as string | null | undefined) ?? null,
 		subtitle_srt_s3_key: (doc.subtitle_srt_s3_key as string | null | undefined) ?? null

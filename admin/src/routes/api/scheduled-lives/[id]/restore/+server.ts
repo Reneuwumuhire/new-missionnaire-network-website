@@ -1,3 +1,4 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
@@ -9,8 +10,9 @@ import {
 } from '../../../../../db/collections';
 
 /** Return an ended or cancelled entry to the upcoming schedule, keeping its slug. */
-export const POST: RequestHandler = async ({ locals, params, getClientAddress }) => {
-	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
+export const POST: RequestHandler = async ({ params, getClientAddress, cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	if (!getPermissions(adminUser).can_manage_recordings) throw error(403, 'Accès refusé');
 
 	const current = await getScheduledLiveById(params.id);
 	if (!current) throw error(404, 'Direct programmé introuvable');
@@ -27,8 +29,8 @@ export const POST: RequestHandler = async ({ locals, params, getClientAddress })
 	if (!restored) throw error(409, 'Le statut de ce direct a changé. Actualisez la page.');
 
 	await logAudit({
-		user_id: locals.user.email,
-		user_email: locals.user.email,
+		user_id: adminUser.email,
+		user_email: adminUser.email,
 		action: 'update',
 		target_collection: 'scheduled_lives',
 		target_id: params.id,

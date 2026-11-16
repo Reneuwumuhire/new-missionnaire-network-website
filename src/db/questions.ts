@@ -1,3 +1,4 @@
+import { objectIdString } from '$lib/server/mongo-input';
 import { createHash } from 'crypto';
 import { ObjectId, MongoServerError, type Document, type Filter, type Sort } from 'mongodb';
 import { getDb } from './mongo';
@@ -38,7 +39,7 @@ function escapeRegex(value: string): string {
 }
 
 function idFromString(id: string): ObjectId {
-	if (!ObjectId.isValid(id)) throw new Error('Identifiant invalide');
+	if (!objectIdString.safeParse(id).success) throw new Error('Identifiant invalide');
 	return new ObjectId(id);
 }
 

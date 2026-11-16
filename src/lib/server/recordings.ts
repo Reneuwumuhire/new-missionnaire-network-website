@@ -1,3 +1,4 @@
+import { objectIdString } from '$lib/server/mongo-input';
 import { ObjectId } from 'mongodb';
 import { getDb } from '../../db/mongo';
 
@@ -517,7 +518,7 @@ export async function listRetransmissions(
 export async function getPublishedById(id: string): Promise<PublishedRecording | null> {
 	try {
 		const { ObjectId } = await import('mongodb');
-		if (!ObjectId.isValid(id)) return null;
+		if (!objectIdString.safeParse(id).success) return null;
 		const db = await getDb();
 		const row = (await db.collection('recordings').findOne(
 			{
@@ -541,7 +542,7 @@ export async function getPublishedById(id: string): Promise<PublishedRecording |
  *  if nothing matched. */
 export async function incrementViewCount(id: string): Promise<number | null> {
 	try {
-		if (!ObjectId.isValid(id)) return null;
+		if (!objectIdString.safeParse(id).success) return null;
 		const db = await getDb();
 		const result = await db
 			.collection('recordings')
@@ -598,7 +599,7 @@ export async function getTranscriptForRecording(recording: {
 		if (recording.transcript_pdf_id === 'none') return null;
 
 		const db = await getDb();
-		if (recording.transcript_pdf_id && ObjectId.isValid(recording.transcript_pdf_id)) {
+		if (recording.transcript_pdf_id && objectIdString.safeParse(recording.transcript_pdf_id).success) {
 			const attached = await db
 				.collection('pdfs')
 				.findOne(

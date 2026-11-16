@@ -1,3 +1,5 @@
+import { objectIdString } from '$lib/server/mongo-input';
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { error, fail, redirect, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { toggleAdminUserActive, logAudit } from '../../../db/collections';
@@ -40,8 +42,9 @@ const REFERENCE_TYPES: QuestionReferenceType[] = [
 	'bible'
 ];
 
-export const load: PageServerLoad = async ({ params, locals, url }) => {
-	if (!canViewQuestionsAdmin(locals.user)) throw error(403, 'Accès refusé');
+export const load: PageServerLoad = async ({ params, url, cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	if (!canViewQuestionsAdmin(adminUser)) throw error(403, 'Accès refusé');
 	const detail = await getQuestionAdminDetail(params.id);
 	if (!detail) throw error(404, 'Question introuvable');
 	const referenceSearch = url.searchParams.get('referenceSearch') ?? '';
@@ -51,12 +54,12 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 		: 'sermon';
 	return {
 		...detail,
-		canPublishOfficial: canPublishOfficialAnswer(locals.user),
-		canAnswer: canAnswerQuestions(locals.user),
-		canModerate: canModerateQuestions(locals.user),
-		canDelete: canDeleteQuestions(locals.user),
-		canDeletePermanently: locals.user.role === 'superadmin',
-		canManageUsers: locals.user.role === 'superadmin',
+		canPublishOfficial: canPublishOfficialAnswer(adminUser),
+		canAnswer: canAnswerQuestions(adminUser),
+		canModerate: canModerateQuestions(adminUser),
+		canDelete: canDeleteQuestions(adminUser),
+		canDeletePermanently: adminUser.role === 'superadmin',
+		canManageUsers: adminUser.role === 'superadmin',
 		referenceOptions: await listReferenceOptions(referenceSearch, 25),
 		referenceType,
 		referenceSearch
@@ -64,7 +67,8 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 };
 
 export const actions: Actions = {
-	moderate: async ({ request, params, locals }) => {
+	moderate: async ({ request, params, cookies }) => {
+		const adminUser = await verifyAdminSession(cookies);
 		if (!params.id) return fail(400, { error: 'Question invalide' });
 		const formData = await request.formData();
 		const action = formData.get('actionName')?.toString();
@@ -72,27 +76,28 @@ export const actions: Actions = {
 		const reason = validateModerationReason(formData.get('reason'));
 
 		if (action === 'permanent_delete') {
-			if (locals.user.role !== 'superadmin') throw error(403, 'Accès refusé');
-			await permanentlyDeleteQuestion({ id: params.id, reason, moderator: locals.user });
+			if (adminUser.role !== 'superadmin') throw error(403, 'Accès refusé');
+			await permanentlyDeleteQuestion({ id: params.id, reason, moderator: adminUser });
 			throw redirect(303, '/questions');
 		}
 
-		if (action === 'soft_delete' && !canDeleteQuestions(locals.user)) {
+		if (action === 'soft_delete' && !canDeleteQuestions(adminUser)) {
 			throw error(403, 'Accès refusé');
 		}
-		if (!canModerateQuestions(locals.user)) throw error(403, 'Accès refusé');
+		if (!canModerateQuestions(adminUser)) throw error(403, 'Accès refusé');
 
 		await updateQuestionModeration({
 			id: params.id,
 			action,
 			reason,
-			moderator: locals.user
+			moderator: adminUser
 		});
 		return { success: true };
 	},
 
-	edit: async ({ request, params, locals }) => {
-		if (!canModerateQuestions(locals.user)) throw error(403, 'Accès refusé');
+	edit: async ({ request, params, cookies }) => {
+		const adminUser = await verifyAdminSession(cookies);
+		if (!canModerateQuestions(adminUser)) throw error(403, 'Accès refusé');
 		if (!params.id) return fail(400, { editError: 'Question invalide' });
 		const formData = await request.formData();
 		const parsed = validateEditedQuestion({
@@ -108,15 +113,16 @@ export const actions: Actions = {
 			body: parsed.body,
 			category: parsed.category,
 			tags: parsed.tags,
-			moderator: locals.user,
+			moderator: adminUser,
 			reason: validateModerationReason(formData.get('reason'))
 		});
 		return { editSuccess: true };
 	},
 
-	official: async ({ request, params, locals }) => {
+	official: async ({ request, params, cookies }) => {
+		const adminUser = await verifyAdminSession(cookies);
 		if (!params.id) return fail(400, { officialError: 'Question invalide' });
-		if (!canPublishOfficialAnswer(locals.user)) {
+		if (!canPublishOfficialAnswer(adminUser)) {
 			throw error(403, 'Permission requise pour publier une réponse officielle.');
 		}
 		const formData = await request.formData();
@@ -125,30 +131,35 @@ export const actions: Actions = {
 		await upsertOfficialAnswer({
 			questionId: params.id,
 			body: parsed.body,
-			moderator: locals.user
+			moderator: adminUser
 		});
 		return { officialSuccess: true };
 	},
 
-	replyVisibility: async ({ request, locals }) => {
-		if (!canModerateQuestions(locals.user)) throw error(403, 'Accès refusé');
+	replyVisibility: async ({ request, params, cookies }) => {
+		const adminUser = await verifyAdminSession(cookies);
+		if (!canModerateQuestions(adminUser)) throw error(403, 'Accès refusé');
+		const questionId = objectIdString.safeParse(params.id).data;
 		const formData = await request.formData();
-		const replyId = formData.get('replyId')?.toString();
+		const replyId = objectIdString.safeParse(formData.get('replyId')).data;
 		const visibilityStatus = formData.get('visibilityStatus')?.toString();
-		if (!replyId || !['visible', 'hidden', 'deleted'].includes(visibilityStatus ?? '')) {
+		if (!replyId || !questionId || !['visible', 'hidden', 'deleted'].includes(visibilityStatus ?? '')) {
 			return fail(400, { error: 'Paramètres invalides' });
 		}
-		await setReplyVisibility({
+		const updated = await setReplyVisibility({
 			replyId,
+			questionId,
 			visibilityStatus: visibilityStatus as 'visible' | 'hidden' | 'deleted',
 			reason: validateModerationReason(formData.get('reason')),
-			moderator: locals.user
+			moderator: adminUser
 		});
+		if (!updated) return fail(404, { error: 'Réponse introuvable' });
 		return { success: true };
 	},
 
-	addReference: async ({ request, params, locals }) => {
-		if (!canAnswerQuestions(locals.user)) throw error(403, 'Accès refusé');
+	addReference: async ({ request, params, cookies }) => {
+		const adminUser = await verifyAdminSession(cookies);
+		if (!canAnswerQuestions(adminUser)) throw error(403, 'Accès refusé');
 		if (!params.id) return fail(400, { referenceError: 'Question invalide' });
 		const formData = await request.formData();
 		const type = formData.get('type')?.toString() as QuestionReferenceType;
@@ -171,7 +182,7 @@ export const actions: Actions = {
 				passage: parsed.passage,
 				text: parsed.text,
 				translation: parsed.translation,
-				moderator: locals.user
+				moderator: adminUser
 			});
 			return { referenceSuccess: true };
 		}
@@ -190,7 +201,7 @@ export const actions: Actions = {
 				title: parsed.title,
 				href: parsed.href,
 				note: parsed.note,
-				moderator: locals.user
+				moderator: adminUser
 			});
 			return { referenceSuccess: true };
 		}
@@ -200,35 +211,45 @@ export const actions: Actions = {
 			replyId: replyIdValue || null,
 			type,
 			referencedContentId,
-			moderator: locals.user
+			moderator: adminUser
 		});
 		return { referenceSuccess: true };
 	},
 
-	removeReference: async ({ request, params, locals }) => {
-		if (!canAnswerQuestions(locals.user)) throw error(403, 'Accès refusé');
+	removeReference: async ({ request, params, cookies }) => {
+		const adminUser = await verifyAdminSession(cookies);
+		if (!canAnswerQuestions(adminUser)) throw error(403, 'Accès refusé');
 		if (!params.id) return fail(400, { referenceError: 'Question invalide' });
 		const formData = await request.formData();
 		const referenceId = formData.get('referenceId')?.toString();
 		if (!referenceId) return fail(400, { referenceError: 'Référence invalide' });
-		await removeQuestionReference({ referenceId, questionId: params.id, moderator: locals.user });
+		await removeQuestionReference({ referenceId, questionId: params.id, moderator: adminUser });
 		return { referenceSuccess: true };
 	},
 
-	resolveReport: async ({ request, locals }) => {
-		if (!canModerateQuestions(locals.user)) throw error(403, 'Accès refusé');
+	resolveReport: async ({ request, params, cookies }) => {
+		const adminUser = await verifyAdminSession(cookies);
+		if (!canModerateQuestions(adminUser)) throw error(403, 'Accès refusé');
+		const questionId = objectIdString.safeParse(params.id).data;
 		const formData = await request.formData();
-		const reportId = formData.get('reportId')?.toString();
+		const reportId = objectIdString.safeParse(formData.get('reportId')).data;
 		const status = formData.get('status')?.toString();
-		if (!reportId || (status !== 'reviewed' && status !== 'dismissed')) {
+		if (!reportId || !questionId || (status !== 'reviewed' && status !== 'dismissed')) {
 			return fail(400, { error: 'Paramètres invalides' });
 		}
-		await resolveQuestionReport({ reportId, status, moderator: locals.user });
+		const updated = await resolveQuestionReport({
+			reportId,
+			questionId,
+			status,
+			moderator: adminUser
+		});
+		if (!updated) return fail(404, { error: 'Signalement introuvable' });
 		return { success: true };
 	},
 
-	suspendAuthor: async ({ request, locals, getClientAddress }) => {
-		if (locals.user.role !== 'superadmin') {
+	suspendAuthor: async ({ request, getClientAddress, cookies }) => {
+		const adminUser = await verifyAdminSession(cookies);
+		if (adminUser.role !== 'superadmin') {
 			return fail(403, { suspendError: 'Accès refusé' });
 		}
 		const formData = await request.formData();
@@ -236,8 +257,8 @@ export const actions: Actions = {
 		if (!authorId) return fail(400, { suspendError: 'Auteur invalide' });
 		await toggleAdminUserActive(authorId, false);
 		await logAudit({
-			user_id: locals.user._id ?? locals.user.email,
-			user_email: locals.user.email,
+			user_id: adminUser._id ?? adminUser.email,
+			user_email: adminUser.email,
 			action: 'update',
 			target_collection: 'admin_users',
 			target_id: authorId,

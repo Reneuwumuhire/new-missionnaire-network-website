@@ -116,7 +116,7 @@
 <!-- Title/description/og:*/canonical come from `meta` in this route's
      load — the root layout renders the single canonical tag set ($lib/seo). -->
 <svelte:head>
-	{@html `<script type="application/ld+json">${jsonLd}</script>`}
+	{@html `<script type="application/ld+json">${jsonLd.replaceAll('<', '\\u003c')}</script>`}
 </svelte:head>
 
 <Breadcrumbs items={[{ label: 'Prédications', href: '/predications' }, { label: sermonTitle }]} />

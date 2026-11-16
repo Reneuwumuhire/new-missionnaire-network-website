@@ -1,3 +1,5 @@
+import { z } from 'zod';
+import { objectIdString } from '$lib/server/mongo-input';
 import { error, json } from '@sveltejs/kit';
 import { getPermissions, type AdminUser } from '$lib/models/admin-user';
 import { getDb } from '../../../../db/mongo';
@@ -35,7 +37,8 @@ import {
 } from '$lib/server/studio-ingest';
 
 async function operator(request: Request) {
-	const code = request.headers.get('authorization')?.replace(/^Bearer\s+/, '') ?? '';
+	const code = z.guid().safeParse(request.headers.get('authorization')?.replace(/^Bearer\s+/, '')).data;
+	if (!code) error(401, 'Invalid Studio authorization');
 	const doc = await (await getDb()).collection('studio_authorizations').findOne({
 		code,
 		revoked_at: { $exists: false },
@@ -45,9 +48,10 @@ async function operator(request: Request) {
 		throw error(401, 'Authorize Studio in the admin app first');
 	const admin = await (await getDb()).collection('admin_users').findOne({
 		email: doc.user_email,
-		is_active: { $ne: false }
+		is_active: true,
+		must_change_password: { $ne: true }
 	});
-	if (!admin || !getPermissions(admin as unknown as AdminUser).can_manage_recordings) {
+	if (!admin || !['superadmin', 'editor'].includes(admin.role) || !getPermissions(admin as unknown as AdminUser).can_manage_recordings) {
 		await revokeMissionnaireIngest(code);
 		throw error(403, 'Broadcasting permission required');
 	}
@@ -68,33 +72,37 @@ async function sessionChannelId(
 	throw error(409, 'This older session is not linked to one YouTube channel');
 }
 
+const studioYouTubeBody = z.object({
+	action: z.string().max(30),
+	sessionId: objectIdString.optional(),
+	channelId: z.string().max(128).optional(),
+	title: z.unknown(),
+	description: z.unknown(),
+	scheduledAt: z.unknown(),
+	privacyStatus: z.unknown(),
+	madeForKids: z.unknown(),
+	thumbnailUrl: z.unknown(),
+	thumbnailKey: z.unknown(),
+	subtitleUrl: z.unknown(),
+	subtitleKey: z.unknown(),
+	subtitleFilename: z.unknown(),
+	serviceType: z.unknown(),
+	announce: z.unknown(),
+	reminderEnabled: z.unknown(),
+	notifyOnStart: z.unknown(),
+	filename: z.unknown(),
+	contentType: z.unknown(),
+	size: z.unknown(),
+	deviceInfo: z.unknown()
+});
+
 export async function POST({ request, getClientAddress }) {
-	const body = (await request.json().catch(() => ({}))) as {
-		action?: string;
-		sessionId?: string;
-		title?: unknown;
-		description?: unknown;
-		scheduledAt?: unknown;
-		privacyStatus?: unknown;
-		madeForKids?: unknown;
-		thumbnailUrl?: unknown;
-		thumbnailKey?: unknown;
-		subtitleUrl?: unknown;
-		subtitleKey?: unknown;
-		subtitleFilename?: unknown;
-		serviceType?: unknown;
-		announce?: unknown;
-		reminderEnabled?: unknown;
-		notifyOnStart?: unknown;
-		filename?: unknown;
-		contentType?: unknown;
-		size?: unknown;
-		channelId?: unknown;
-		deviceInfo?: unknown;
-	};
+	const parsed = studioYouTubeBody.safeParse(await request.json().catch(() => null));
+	if (!parsed.success) error(400, 'Invalid Studio request');
+	const body = parsed.data;
 	if (body.action === 'logout') {
-		const code = request.headers.get('authorization')?.replace(/^Bearer\s+/, '') ?? '';
-		await revokeMissionnaireIngest(code);
+		const code = z.guid().safeParse(request.headers.get('authorization')?.replace(/^Bearer\s+/, '')).data;
+		if (code) await revokeMissionnaireIngest(code);
 		return json({ ok: true });
 	}
 	const user = await operator(request);

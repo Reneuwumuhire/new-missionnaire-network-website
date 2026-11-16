@@ -1,3 +1,5 @@
+import { z } from 'zod';
+import { literalSearch, objectIdString, pageLimit, pageNumber as pageSchema, searchText } from '$lib/server/mongo-input';
 import { getDb } from './mongo';
 import { availableTypesTag } from '../utils/data';
 import {
@@ -73,7 +75,10 @@ export async function getCollection(
 	filter?: string,
 	search?: string
 ): Promise<YoutubeVideo[]> {
-	console.log('[DB] Starting query with params:', { collection_name, skip, limit, filter, search });
+	z.enum(['videos', 'audios']).parse(collection_name);
+	z.int().min(0).parse(skip);
+	z.int().min(1).max(1000).parse(limit);
+	const pattern = literalSearch.optional().parse(search);
 
 	try {
 		const db = await getDb();
@@ -81,11 +86,11 @@ export async function getCollection(
 		const conditions: Filter<Document>[] = [];
 
 		// Add search condition if provided
-		if (search?.trim()) {
+		if (pattern) {
 			conditions.push({
 				$or: [
-					{ title: { $regex: search, $options: 'i' } },
-					{ description: { $regex: search, $options: 'i' } }
+					{ title: { $regex: pattern, $options: 'i' } },
+					{ description: { $regex: pattern, $options: 'i' } }
 				]
 			});
 		}
@@ -285,13 +290,15 @@ export async function queryVideos(options: {
 		endDate,
 		orderBy = 'release_timestamp:desc'
 	} = options;
+	pageLimit.parse(limit);
+	pageSchema.parse(pageNumber);
 
 	try {
 		const db = await getDb();
 		const query: Filter<Document> = {};
 
 		if (searchTags && searchTags.length > 0 && !searchTags.includes('any')) {
-			const regexPatterns = searchTags.map((tag) => new RegExp(`^${tag}$`, 'i'));
+			const regexPatterns = searchTags.map((tag) => new RegExp(`^${literalSearch.parse(tag)}$`, 'i'));
 			query.tags = { $in: regexPatterns };
 		}
 
@@ -343,7 +350,7 @@ export async function queryAudios(options: {
 		const query: Filter<Document> = {};
 
 		if (searchTags && searchTags.length > 0 && !searchTags.includes('any')) {
-			const regexPatterns = searchTags.map((tag) => new RegExp(`^${tag}$`, 'i'));
+			const regexPatterns = searchTags.map((tag) => new RegExp(`^${literalSearch.parse(tag)}$`, 'i'));
 			query.tags = { $in: regexPatterns };
 		}
 
@@ -492,6 +499,10 @@ export async function queryMusicAudio(options: {
 		orderBy = 'uploaded_at:desc',
 		seed
 	} = options;
+	pageLimit.parse(limit);
+	pageSchema.parse(pageNumber);
+	searchText.optional().parse(category);
+	searchText.optional().parse(artist);
 
 	try {
 		const db = await getDb();
@@ -503,7 +514,7 @@ export async function queryMusicAudio(options: {
 		}
 
 		if (search && search.trim()) {
-			const searchPattern = buildFuzzySearchPattern(search.trim());
+			const searchPattern = buildFuzzySearchPattern(searchText.parse(search));
 			const fields = ['title', 'book_full_name', 'artist'];
 			const searchConditions: Filter<Document>[] = [];
 			for (const field of fields) {
@@ -518,7 +529,7 @@ export async function queryMusicAudio(options: {
 		}
 
 		if (alpha && alpha.length === 1) {
-			conditions.push({ title: { $regex: `^${alpha}`, $options: 'i' } });
+			conditions.push({ title: { $regex: `^${literalSearch.parse(alpha)}`, $options: 'i' } });
 		}
 
 		if (artist) {
@@ -574,7 +585,7 @@ export async function queryMusicAudio(options: {
 				data = [];
 			} else {
 				const objectIds = pageIds
-					.filter((id) => ObjectId.isValid(id))
+					.filter((id) => objectIdString.safeParse(id).success)
 					.map((id) => new ObjectId(id));
 				const docs = await collection
 					.find({ _id: { $in: objectIds } as Filter<Document>['_id'] })
@@ -649,7 +660,7 @@ export async function getVideoById(videoId: string): Promise<YoutubeVideo | null
 
 		// Try matching by `id` field first (YouTube video ID), then by `_id`
 		let doc = await collection.findOne({ id: videoId });
-		if (!doc && ObjectId.isValid(videoId)) {
+		if (!doc && objectIdString.safeParse(videoId).success) {
 			doc = await collection.findOne({ _id: new ObjectId(videoId) });
 		}
 
@@ -1158,6 +1169,7 @@ export type ScheduledLive = {
 	subtitle_timing_language: string | null;
 	created_at: string;
 	updated_at: string;
+	created_by?: string;
 };
 
 export async function getStudioAuthorization(
@@ -1168,12 +1180,17 @@ export async function getStudioAuthorization(
 		const doc = await db
 			.collection('studio_authorizations')
 			.findOne({ code, revoked_at: { $exists: false }, expires_at: { $gt: new Date() } });
-		return doc && typeof doc.user_email === 'string'
-			? {
-					email: doc.user_email,
-					name: typeof doc.user_name === 'string' ? doc.user_name : doc.user_email
-				}
-			: null;
+		if (typeof doc?.user_email !== 'string') return null;
+		const admin = await db.collection('admin_users').findOne(
+			{ email: doc.user_email, is_active: true, must_change_password: { $ne: true } },
+			{ projection: { role: 1, 'permissions.can_manage_recordings': 1 } }
+		);
+		if (admin?.role !== 'superadmin' &&
+			!(admin?.role === 'editor' && admin.permissions?.can_manage_recordings === true)) return null;
+		return {
+			email: doc.user_email,
+			name: typeof doc.user_name === 'string' ? doc.user_name : doc.user_email
+		};
 	} catch (e) {
 		console.error('[StudioAuthorization] get error:', e);
 		return null;
@@ -1321,7 +1338,7 @@ export async function setStudioScheduledLiveStatus(
 	status: ScheduledLiveStatus,
 	at: string
 ): Promise<boolean> {
-	if (!ObjectId.isValid(id)) return false;
+	if (!objectIdString.safeParse(id).success) return false;
 	const db = await getDb();
 	const extra = status === 'live' ? { live_started_at: at } : { live_ended_at: at };
 	const result = await db
@@ -1346,7 +1363,7 @@ export async function updateStudioLiveSubtitles(
 		>
 	>
 ): Promise<boolean> {
-	if (!ObjectId.isValid(id)) return false;
+	if (!objectIdString.safeParse(id).success) return false;
 	const db = await getDb();
 	const result = await db
 		.collection('scheduled_lives')
@@ -1366,7 +1383,7 @@ export async function updateStudioLiveWorkflow(
 		>
 	>
 ): Promise<boolean> {
-	if (!ObjectId.isValid(id)) return false;
+	if (!objectIdString.safeParse(id).success) return false;
 	const db = await getDb();
 	const result = await db
 		.collection('scheduled_lives')
@@ -1393,7 +1410,7 @@ export async function canAccessStudioTest(
 	id: string | null,
 	token: string | null
 ): Promise<boolean> {
-	if (!id || !token || !ObjectId.isValid(id)) return false;
+	if (!id || !token || !objectIdString.safeParse(id).success) return false;
 	const db = await getDb();
 	return Boolean(
 		await db.collection('scheduled_lives').findOne(
@@ -1409,7 +1426,7 @@ export async function canAccessStudioTest(
 
 export async function getScheduledLiveById(id: string): Promise<ScheduledLive | null> {
 	try {
-		if (!ObjectId.isValid(id)) return null;
+		if (!objectIdString.safeParse(id).success) return null;
 		const db = await getDb();
 		const doc = await db.collection('scheduled_lives').findOne({ _id: new ObjectId(id) });
 		return doc ? serializeDocument<ScheduledLive>(doc) : null;
@@ -1425,7 +1442,7 @@ export async function getScheduledLiveById(id: string): Promise<ScheduledLive | 
  *  admin End Live transition (setScheduledLiveStatus → 'ended' + live_ended_at). */
 export async function endScheduledLiveIfLive(id: string, endedAt: string): Promise<void> {
 	try {
-		if (!ObjectId.isValid(id)) return;
+		if (!objectIdString.safeParse(id).success) return;
 		const db = await getDb();
 		await db
 			.collection('scheduled_lives')
@@ -1461,7 +1478,7 @@ export async function getScheduledLiveByRecordingId(
  *  again next time. */
 export async function setScheduledLiveRecordingId(id: string, recordingId: string): Promise<void> {
 	try {
-		if (!ObjectId.isValid(id)) return;
+		if (!objectIdString.safeParse(id).success) return;
 		const db = await getDb();
 		await db
 			.collection('scheduled_lives')
@@ -1480,7 +1497,7 @@ export async function setScheduledLiveRecordingId(id: string, recordingId: strin
  *  claimed doc, or null if there was nothing pending. */
 export async function claimScheduledLiveAnnouncement(id: string): Promise<ScheduledLive | null> {
 	try {
-		if (!ObjectId.isValid(id)) return null;
+		if (!objectIdString.safeParse(id).success) return null;
 		const db = await getDb();
 		const doc = await db.collection('scheduled_lives').findOneAndUpdate(
 			{ _id: new ObjectId(id), announce_pending: true, status: 'scheduled' },
@@ -1602,14 +1619,17 @@ export async function getSongs(options: {
 	search?: string;
 }): Promise<YoutubeVideo[]> {
 	const { limit = 20, skip = 0, search } = options;
+	pageLimit.parse(limit);
+	z.int().min(0).max(100_000_000).parse(skip);
+	const pattern = literalSearch.optional().parse(search);
 	try {
 		const db = await getDb();
 		const query: Filter<Document> = {};
 
-		if (search?.trim()) {
+		if (pattern) {
 			query.$or = [
-				{ title: { $regex: search, $options: 'i' } },
-				{ description: { $regex: search, $options: 'i' } }
+				{ title: { $regex: pattern, $options: 'i' } },
+				{ description: { $regex: pattern, $options: 'i' } }
 			];
 		}
 
@@ -1629,14 +1649,15 @@ export async function getSongs(options: {
 }
 
 export async function getSongsCount(search?: string): Promise<number> {
+	const pattern = literalSearch.optional().parse(search);
 	try {
 		const db = await getDb();
 		const query: Filter<Document> = {};
 
-		if (search?.trim()) {
+		if (pattern) {
 			query.$or = [
-				{ title: { $regex: search, $options: 'i' } },
-				{ description: { $regex: search, $options: 'i' } }
+				{ title: { $regex: pattern, $options: 'i' } },
+				{ description: { $regex: pattern, $options: 'i' } }
 			];
 		}
 
@@ -1711,11 +1732,15 @@ export async function querySermons(options: {
 		orderBy = 'iso_date:desc',
 		language = 'french'
 	} = options;
+	pageLimit.parse(limit);
+	pageSchema.parse(pageNumber);
+	searchText.optional().parse(author);
 	const languageFields =
 		sermonLanguageFields[language as keyof typeof sermonLanguageFields] ??
 		sermonLanguageFields.french;
 	const allLanguageAudioFields = Object.values(sermonLanguageFields).map(({ audio }) => audio);
 
+	const pattern = literalSearch.optional().parse(search);
 	try {
 		const db = await getDb();
 		await ensureSermonIndexes(db);
@@ -1726,28 +1751,28 @@ export async function querySermons(options: {
 			conditions.push({ author: author });
 		}
 
-		if (search && search.trim()) {
+		if (pattern) {
 			conditions.push({
 				$or: [
-					{ english_title: { $regex: search, $options: 'i' } },
-					{ french_title: { $regex: search, $options: 'i' } },
-					{ 'localizations.rw.title': { $regex: search, $options: 'i' } },
-					{ 'localizations.sw.title': { $regex: search, $options: 'i' } },
-					{ full_date_code: { $regex: search, $options: 'i' } },
+					{ english_title: { $regex: pattern, $options: 'i' } },
+					{ french_title: { $regex: pattern, $options: 'i' } },
+					{ 'localizations.rw.title': { $regex: pattern, $options: 'i' } },
+					{ 'localizations.sw.title': { $regex: pattern, $options: 'i' } },
+					{ full_date_code: { $regex: pattern, $options: 'i' } },
 					// Also match the preacher's name so a search like "Frank" or
 					// "Branham" returns their sermons (the title holds the subject,
 					// not the speaker, so author must be searched explicitly).
-					{ author: { $regex: search, $options: 'i' } }
+					{ author: { $regex: pattern, $options: 'i' } }
 				]
 			});
 		}
 
 		if (alpha && alpha.length === 1) {
-			conditions.push({ [languageFields.title]: { $regex: `^${alpha}`, $options: 'i' } });
+			conditions.push({ [languageFields.title]: { $regex: `^${literalSearch.parse(alpha)}`, $options: 'i' } });
 		}
 
 		if (year) {
-			conditions.push({ iso_date: { $regex: `^${year}` } });
+			conditions.push({ iso_date: { $regex: `^${literalSearch.parse(year)}` } });
 		}
 
 		if (hasAudio) {
@@ -1868,6 +1893,11 @@ export async function queryLiterature(options: {
 		pageNumber = 1,
 		orderBy = 'release_date:desc'
 	} = options;
+	pageLimit.parse(limit);
+	pageSchema.parse(pageNumber);
+	searchText.optional().parse(author);
+	searchText.optional().parse(source);
+	searchText.optional().parse(language);
 
 	try {
 		const db = await getDb();
@@ -1879,11 +1909,11 @@ export async function queryLiterature(options: {
 		}
 
 		if (type && type !== 'All' && type !== 'Tous' && type !== 'Tout') {
-			conditions.push({ type: { $regex: new RegExp(`^${type}$`, 'i') } });
+			conditions.push({ type: { $regex: new RegExp(`^${literalSearch.parse(type)}$`, 'i') } });
 		}
 
 		if (search && search.trim()) {
-			const escaped = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			const escaped = literalSearch.parse(search);
 			conditions.push({
 				$or: [
 					{ title: { $regex: escaped, $options: 'i' } },

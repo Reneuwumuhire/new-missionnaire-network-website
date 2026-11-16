@@ -1,3 +1,4 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
@@ -12,8 +13,9 @@ import {
 	parseYoutubeUrl
 } from '$lib/server/scheduled-live-validation';
 
-export const POST: RequestHandler = async ({ locals, request, getClientAddress }) => {
-	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
+export const POST: RequestHandler = async ({ request, getClientAddress, cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	if (!getPermissions(adminUser).can_manage_recordings) throw error(403, 'Accès refusé');
 
 	const body = (await request.json()) as {
 		title?: unknown;
@@ -68,7 +70,7 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 		announce,
 		reminder_enabled: body.reminder_enabled === true,
 		notify_on_start: body.notify_on_start === true,
-		created_by: locals.user.email
+		created_by: adminUser.email
 	});
 
 	if (announce) {
@@ -76,8 +78,8 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 	}
 
 	await logAudit({
-		user_id: locals.user.email,
-		user_email: locals.user.email,
+		user_id: adminUser.email,
+		user_email: adminUser.email,
 		action: 'create',
 		target_collection: 'scheduled_lives',
 		target_id: live._id,

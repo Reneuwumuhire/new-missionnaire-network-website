@@ -1,3 +1,4 @@
+import { objectIdString } from '$lib/server/mongo-input';
 import { json } from '@sveltejs/kit';
 import { ObjectId, type Collection, type Filter } from 'mongodb';
 import { getDb } from '../../../../db/mongo';
@@ -48,7 +49,7 @@ async function findById(
 	collection: Collection<MusicAudioDoc>,
 	param: string
 ): Promise<MusicAudioDoc | null> {
-	if (!looksLikeObjectId(param) || !ObjectId.isValid(param)) return null;
+	if (!looksLikeObjectId(param) || !objectIdString.safeParse(param).success) return null;
 	return collection.findOne({ _id: new ObjectId(param) } as Filter<MusicAudioDoc>);
 }
 
@@ -63,10 +64,10 @@ async function findBySlug(
 ): Promise<MusicAudioDoc | null> {
 	const firstSegment = slug.split('-')[0] ?? '';
 	if (!firstSegment) return null;
-	const escaped = firstSegment.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+	const titlePrefixPattern = '^' + firstSegment.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 	const candidates = await collection
 		.find(
-			{ title: { $type: 'string', $ne: '', $regex: `^${escaped}`, $options: 'i' } },
+			{ title: { $type: 'string', $ne: '', $regex: titlePrefixPattern, $options: 'i' } },
 			{ projection: { _id: 1, title: 1 } }
 		)
 		.collation({ locale: 'fr', strength: 1 })

@@ -1,11 +1,13 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
 import { RecorderError, recorderStatus, recorderStop } from '$lib/server/recorder-client';
 import { logAudit } from '../../../../db/collections';
 
-export const POST: RequestHandler = async ({ locals, getClientAddress }) => {
-	const user = locals.user;
+export const POST: RequestHandler = async ({ getClientAddress, cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	const user = adminUser;
 	if (!getPermissions(user).can_manage_recordings) throw error(403, 'Accès refusé');
 
 	// Capture who started the recording before we stop it — used to flag

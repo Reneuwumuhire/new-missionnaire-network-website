@@ -1,3 +1,4 @@
+import { objectIdString } from '$lib/server/mongo-input';
 import archive from '$lib/data/channelPosts.json';
 import { publicAssetUrl } from '$lib/utils/librarySearch';
 import { ObjectId } from 'mongodb';
@@ -165,7 +166,7 @@ export async function getExtraitFeed() {
 		const linkedPosts = [...managedPosts, ...archivedPosts].filter(
 			(post) =>
 				post.source &&
-				ObjectId.isValid(post.source.id) &&
+				objectIdString.safeParse(post.source.id).success &&
 				(!post.image ||
 					!post.links.some(({ kind }) => kind === 'pdf') ||
 					(post.source.kind === 'recording' && !post.links.some(({ kind }) => kind === 'video')))

@@ -1,3 +1,4 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { json } from '@sveltejs/kit';
 import { getMusicAudioById, updateMusicAudio, deleteMusicAudio, logAudit } from '../../../../db/collections';
 import { UpdateMusicAudioSchema } from '$lib/models/music-audio';
@@ -5,8 +6,9 @@ import { canManageMusicAudio, getPermissions } from '$lib/models/admin-user';
 import { deleteObject } from '$lib/server/s3';
 import type { RequestEvent } from './$types';
 
-export async function GET({ locals, params }: RequestEvent) {
-	if (!canManageMusicAudio(locals.user)) {
+export async function GET({ params, cookies }: RequestEvent) {
+	const adminUser = await verifyAdminSession(cookies);
+	if (!canManageMusicAudio(adminUser)) {
 		return json({ data: null, error: 'Accès refusé' }, { status: 403 });
 	}
 
@@ -22,8 +24,9 @@ export async function GET({ locals, params }: RequestEvent) {
 	}
 }
 
-export async function PATCH({ params, request, locals, getClientAddress }: RequestEvent) {
-	const perms = getPermissions(locals.user);
+export async function PATCH({ params, request, getClientAddress, cookies }: RequestEvent) {
+	const adminUser = await verifyAdminSession(cookies);
+	const perms = getPermissions(adminUser);
 	if (!perms.can_edit) {
 		return json({ data: null, error: "Vous n'avez pas la permission de modifier des audios" }, { status: 403 });
 	}
@@ -51,7 +54,7 @@ export async function PATCH({ params, request, locals, getClientAddress }: Reque
 			return json({ data: null, error: 'Audio not found' }, { status: 404 });
 		}
 
-		const updated = await updateMusicAudio(params.id, parsed.data, locals.user.email);
+		const updated = await updateMusicAudio(params.id, parsed.data, adminUser.email);
 		if (!updated) {
 			return json({ data: null, error: 'No changes made' }, { status: 400 });
 		}
@@ -66,8 +69,8 @@ export async function PATCH({ params, request, locals, getClientAddress }: Reque
 		}
 
 		await logAudit({
-			user_id: locals.user._id ?? locals.user.email,
-			user_email: locals.user.email,
+			user_id: adminUser._id ?? adminUser.email,
+			user_email: adminUser.email,
 			action: 'update',
 			target_collection: 'music_audio',
 			target_id: params.id,
@@ -83,8 +86,9 @@ export async function PATCH({ params, request, locals, getClientAddress }: Reque
 	}
 }
 
-export async function DELETE({ params, locals, getClientAddress }: RequestEvent) {
-	const permsD = getPermissions(locals.user);
+export async function DELETE({ params, getClientAddress, cookies }: RequestEvent) {
+	const adminUser = await verifyAdminSession(cookies);
+	const permsD = getPermissions(adminUser);
 	if (!permsD.can_delete) {
 		return json({ data: null, error: "Vous n'avez pas la permission de supprimer des audios" }, { status: 403 });
 	}
@@ -103,8 +107,8 @@ export async function DELETE({ params, locals, getClientAddress }: RequestEvent)
 		}
 
 		await logAudit({
-			user_id: locals.user._id ?? locals.user.email,
-			user_email: locals.user.email,
+			user_id: adminUser._id ?? adminUser.email,
+			user_email: adminUser.email,
 			action: 'delete',
 			target_collection: 'music_audio',
 			target_id: params.id,

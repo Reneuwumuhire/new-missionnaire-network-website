@@ -1,3 +1,4 @@
+import { objectIdString } from '$lib/server/mongo-input';
 import { ObjectId } from 'mongodb';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { getDb } from '../../db/mongo';
@@ -11,7 +12,7 @@ import { parseSrt } from '$lib/utils/srt';
 async function pdfForLive(live: ScheduledLive): Promise<{ key: string; id: string } | null> {
 	const db = await getDb();
 	let recording =
-		live.recording_id && ObjectId.isValid(live.recording_id)
+		live.recording_id && objectIdString.safeParse(live.recording_id).success
 			? await db.collection('recordings').findOne({ _id: new ObjectId(live.recording_id) })
 			: null;
 	// Older entries occasionally lost the link. An exact title is safe; a

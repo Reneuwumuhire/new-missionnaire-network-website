@@ -33,7 +33,7 @@
 		        screen icon resumes where they left off instead of always
 		        dropping them at "/". 24h freshness window; one-shot redirect
 		        uses location.replace so it doesn't pollute history. -->
-		<script>
+		<script nonce="%sveltekit.nonce%">
 			(function () {
 				try {
 					var standalone =

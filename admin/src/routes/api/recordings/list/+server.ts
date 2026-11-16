@@ -1,3 +1,4 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
@@ -9,8 +10,9 @@ const VALID_STATUSES = new Set<RecordingStatus>(['recording', 'uploading', 'read
 /** Paginated + searchable recordings list, called by the admin recordings
  *  page for live "load more" and search. The page-level loader returns just
  *  5 rows so first paint is fast; this endpoint serves everything after. */
-export const GET: RequestHandler = async ({ locals, url }) => {
-	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
+export const GET: RequestHandler = async ({ url, cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	if (!getPermissions(adminUser).can_manage_recordings) throw error(403, 'Accès refusé');
 
 	const limit = Math.min(Math.max(1, Number(url.searchParams.get('limit') ?? '5')), 100);
 	const pageNumber = Math.max(1, Number(url.searchParams.get('page') ?? '1'));

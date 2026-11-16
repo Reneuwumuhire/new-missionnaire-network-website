@@ -1,6 +1,8 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { error, redirect } from '@sveltejs/kit';
 
-export function GET({ url }) {
+export async function GET({ url, cookies }) {
+	await verifyAdminSession(cookies);
 	const source = url.searchParams.get('url');
 	if (!source) throw error(400, 'Missing image URL');
 

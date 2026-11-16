@@ -1,3 +1,6 @@
+import { adminEmail } from '$lib/server/mongo-input';
+import { z } from 'zod';
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { fail, redirect } from '@sveltejs/kit';
 import { randomBytes } from 'crypto';
 import { hashPassword, revokeAllSessions } from '$lib/server/auth';
@@ -25,8 +28,9 @@ function generatePassword(length = 12): string {
 	return password;
 }
 
-export const load: PageServerLoad = async ({ locals }) => {
-	if (locals.user.role !== 'superadmin') {
+export const load: PageServerLoad = async ({ cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	if (adminUser.role !== 'superadmin') {
 		throw redirect(303, '/');
 	}
 
@@ -42,15 +46,16 @@ export const load: PageServerLoad = async ({ locals }) => {
 };
 
 export const actions: Actions = {
-	create: async ({ request, locals, getClientAddress }) => {
-		if (locals.user.role !== 'superadmin') {
+	create: async ({ request, getClientAddress, cookies }) => {
+		const adminUser = await verifyAdminSession(cookies);
+		if (adminUser.role !== 'superadmin') {
 			return fail(403, { createError: 'Accès refusé' });
 		}
 
 		const formData = await request.formData();
-		const email = formData.get('email')?.toString()?.trim()?.toLowerCase();
-		const name = formData.get('name')?.toString()?.trim();
-		const role = formData.get('role')?.toString() as 'superadmin' | 'editor' | undefined;
+		const email = adminEmail.safeParse(formData.get('email')?.toString().trim()).data;
+		const name = z.string().trim().min(1).max(150).safeParse(formData.get('name')).data;
+		const role = z.enum(['superadmin', 'editor']).safeParse(formData.get('role')).data;
 
 		// Field-level errors return a { field, code } pair; the page translates
 		// the code and renders it inline under the failing input (aria-invalid).
@@ -61,7 +66,7 @@ export const actions: Actions = {
 			return fail(400, { createFieldError: { field: 'email', code: 'emailRequired' } as const });
 		}
 
-		if (role !== 'superadmin' && role !== 'editor') {
+		if (!role) {
 			return fail(400, { createFieldError: { field: 'role', code: 'roleInvalid' } as const });
 		}
 
@@ -76,8 +81,8 @@ export const actions: Actions = {
 		await createAdminUser({ email, password_hash: hash, name, role });
 
 		await logAudit({
-			user_id: locals.user.email,
-			user_email: locals.user.email,
+			user_id: adminUser.email,
+			user_email: adminUser.email,
 			action: 'create',
 			target_collection: 'admin_users',
 			target_id: email,
@@ -87,13 +92,14 @@ export const actions: Actions = {
 		return { createSuccess: true, generatedPassword, createdEmail: email };
 	},
 
-	toggle: async ({ request, locals, getClientAddress }) => {
-		if (locals.user.role !== 'superadmin') {
+	toggle: async ({ request, getClientAddress, cookies }) => {
+		const adminUser = await verifyAdminSession(cookies);
+		if (adminUser.role !== 'superadmin') {
 			return fail(403, { toggleError: 'Accès refusé' });
 		}
 
 		const formData = await request.formData();
-		const email = formData.get('email')?.toString();
+		const email = adminEmail.safeParse(formData.get('email')).data;
 		const action = formData.get('action')?.toString();
 
 		if (!email || (action !== 'activate' && action !== 'deactivate')) {
@@ -101,7 +107,7 @@ export const actions: Actions = {
 		}
 
 		// Prevent self-deactivation
-		if (email === locals.user.email && action === 'deactivate') {
+		if (email === adminUser.email && action === 'deactivate') {
 			return fail(400, { toggleError: 'Vous ne pouvez pas désactiver votre propre compte' });
 		}
 
@@ -112,8 +118,8 @@ export const actions: Actions = {
 		await toggleAdminUserActive(email, action === 'activate');
 
 		await logAudit({
-			user_id: locals.user.email,
-			user_email: locals.user.email,
+			user_id: adminUser.email,
+			user_email: adminUser.email,
 			action: 'update',
 			target_collection: 'admin_users',
 			target_id: email,
@@ -126,13 +132,14 @@ export const actions: Actions = {
 		return { toggleSuccess: true };
 	},
 
-	reset: async ({ request, locals, getClientAddress }) => {
-		if (locals.user.role !== 'superadmin') {
+	reset: async ({ request, getClientAddress, cookies }) => {
+		const adminUser = await verifyAdminSession(cookies);
+		if (adminUser.role !== 'superadmin') {
 			return fail(403, { resetError: 'Accès refusé' });
 		}
 
 		const formData = await request.formData();
-		const email = formData.get('email')?.toString();
+		const email = adminEmail.safeParse(formData.get('email')).data;
 
 		if (!email) {
 			return fail(400, { resetError: 'Email requis' });
@@ -146,8 +153,8 @@ export const actions: Actions = {
 		await resetAdminPassword(email, hash);
 
 		await logAudit({
-			user_id: locals.user.email,
-			user_email: locals.user.email,
+			user_id: adminUser.email,
+			user_email: adminUser.email,
 			action: 'update',
 			target_collection: 'admin_users',
 			target_id: email,
@@ -158,13 +165,14 @@ export const actions: Actions = {
 		return { resetSuccess: true, resetPassword: generatedPassword, resetEmail: email };
 	},
 
-	permissions: async ({ request, locals, getClientAddress }) => {
-		if (locals.user.role !== 'superadmin') {
+	permissions: async ({ request, getClientAddress, cookies }) => {
+		const adminUser = await verifyAdminSession(cookies);
+		if (adminUser.role !== 'superadmin') {
 			return fail(403, { permError: 'Accès refusé' });
 		}
 
 		const formData = await request.formData();
-		const email = formData.get('email')?.toString();
+		const email = adminEmail.safeParse(formData.get('email')).data;
 		const canAdd = formData.get('can_add') === 'on';
 		const canEdit = formData.get('can_edit') === 'on';
 		const canDelete = formData.get('can_delete') === 'on';
@@ -198,8 +206,8 @@ export const actions: Actions = {
 		await updateAdminPermissions(email, nextPermissions);
 
 		await logAudit({
-			user_id: locals.user.email,
-			user_email: locals.user.email,
+			user_id: adminUser.email,
+			user_email: adminUser.email,
 			action: 'update',
 			target_collection: 'admin_users',
 			target_id: email,

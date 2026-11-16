@@ -15,3 +15,5 @@ package-lock.json
 .vercel
 .lyrics-cache/
 .song-archive/
+
+/cookies.txt

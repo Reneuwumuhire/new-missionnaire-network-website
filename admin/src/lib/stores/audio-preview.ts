@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store';
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 
 /**
  * Singleton inline audio preview. The whole admin shares ONE HTMLAudioElement

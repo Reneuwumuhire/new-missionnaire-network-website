@@ -1,7 +1,8 @@
+import type { Handle } from '@sveltejs/kit/hooks';
 import { connect, getDb } from './db/mongo';
 import { checkAndIngestLiveStream } from './lib/server/youtube-poller';
 import { ensureWebSubSubscription } from '$lib/server/youtube-websub';
-import { redirect, type Handle } from '@sveltejs/kit';
+import { redirect } from '@sveltejs/kit';
 import { isBotUserAgent } from './utils/botDetection';
 import { startRadioProbeScheduler } from '$lib/server/radio-probe-scheduler';
 
@@ -44,6 +45,12 @@ async function trackMissedRoute(event: any, response: Response, isPageRequest: b
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
+	event.setHeaders({
+		'x-content-type-options': 'nosniff',
+		'x-frame-options': 'DENY',
+		'referrer-policy': 'strict-origin-when-cross-origin',
+		'permissions-policy': 'camera=(), microphone=(), geolocation=()'
+	});
 	const { pathname } = event.url;
 
 	// Old /live/archives URLs were renamed to /live/rediffusions. Preserve

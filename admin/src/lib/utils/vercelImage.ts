@@ -1,4 +1,4 @@
-import { dev } from '$app/environment';
+import { dev } from '$app/env';
 
 // Vercel Image Optimization ships as an `/_vercel/image` endpoint on any
 // deployment that declares `images` in svelte.config.js. It resizes +

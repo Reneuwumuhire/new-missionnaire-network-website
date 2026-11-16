@@ -1,3 +1,4 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
@@ -6,8 +7,9 @@ import { generatePresignedUploadUrl, getS3Url } from '$lib/server/s3';
 
 const ALLOWED_CONTENT_TYPES = new Set(['audio/mpeg', 'audio/mp3']);
 
-export const POST: RequestHandler = async ({ locals, params, request }) => {
-	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
+export const POST: RequestHandler = async ({ params, request, cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	if (!getPermissions(adminUser).can_manage_recordings) throw error(403, 'Accès refusé');
 
 	const { id } = params;
 	if (!id) throw error(400, 'ID manquant');

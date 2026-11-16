@@ -5,32 +5,15 @@ import { queryVideos } from '../../../../../db/collections';
 import { parseSearchParams } from '../../../../../utils/url';
 import { YoutubeVideoTagSchema } from '$lib/models/youtube';
 
-const SearchTags = z
-	.string()
-	.optional()
-	.transform((arg, ctx) => {
-		if (!arg) return undefined;
-		try {
-			const values = arg.split(',').map((v) => v.trim());
-			const parsedValue = YoutubeVideoTagSchema.array().parse(values);
-			return parsedValue;
-		} catch (error) {
-			ctx.addIssue({
-				code: 'invalid_type',
-				message: `search tag should be any of the following: ${Object.values(
-					YoutubeVideoTagSchema.enum
-				).join(', ')}`,
-				expected: 'array',
-				received: 'string'
-			});
-			return z.NEVER;
-		}
-	});
+const SearchTags = z.string()
+	.max(250)
+	.transform((value) => value.split(',').map((item) => item.trim()))
+	.pipe(YoutubeVideoTagSchema.array());
 
 const Params = z.object({
-	searchTags: SearchTags.default('any'),
-	limit: z.coerce.number().default(20),
-	pageNumber: z.coerce.number().default(1),
+	searchTags: SearchTags.default(['any']),
+	limit: z.coerce.number().int().min(1).max(1000).default(20),
+	pageNumber: z.coerce.number().int().min(1).max(100_000).default(1),
 	startDate: z.coerce.date().optional(),
 	endDate: z.coerce.date().optional()
 });

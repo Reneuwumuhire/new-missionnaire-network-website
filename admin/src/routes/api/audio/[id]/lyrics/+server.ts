@@ -1,14 +1,12 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { json } from '@sveltejs/kit';
-import { canManageMusicAudio, canReviewLyrics } from '$lib/models/admin-user';
+import { canManageMusicAudio, canReviewLyrics, getPermissions } from '$lib/models/admin-user';
 import { getLyricsTimelineDetail, publishManualLyricsForAudio } from '$lib/server/lyricsTimeline';
 import type { RequestEvent } from './$types';
 
-function canAttachLyrics(event: RequestEvent) {
-	return canManageMusicAudio(event.locals.user) || canReviewLyrics(event.locals.user);
-}
-
 export async function GET(event: RequestEvent) {
-	if (!canAttachLyrics(event)) {
+	const adminUser = await verifyAdminSession(event.cookies);
+	if (!canManageMusicAudio(adminUser) && !canReviewLyrics(adminUser)) {
 		return json({ data: null, error: 'Accès refusé' }, { status: 403 });
 	}
 
@@ -28,7 +26,8 @@ export async function GET(event: RequestEvent) {
 }
 
 export async function POST(event: RequestEvent) {
-	if (!canAttachLyrics(event)) {
+	const adminUser = await verifyAdminSession(event.cookies);
+	if (!getPermissions(adminUser).can_edit && !canReviewLyrics(adminUser)) {
 		return json({ data: null, error: 'Accès refusé' }, { status: 403 });
 	}
 
@@ -42,7 +41,7 @@ export async function POST(event: RequestEvent) {
 			sourceTitle: String(body.sourceTitle ?? ''),
 			sourceUrl: String(body.sourceUrl ?? ''),
 			title: String(body.title ?? ''),
-			updatedBy: event.locals.user.email
+			updatedBy: adminUser.email
 		});
 
 		return json({ data: result, error: null });

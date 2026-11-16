@@ -9,6 +9,17 @@ const isNodeDeployment = process.env.DEPLOY_TARGET === 'node';
 export default defineConfig({
 	plugins: [
 		sveltekit({
+			csp: {
+				mode: 'nonce',
+				directives: {
+					'script-src': ['self'],
+					'worker-src': ['self', 'blob:'],
+					'base-uri': ['none'],
+					'object-src': ['none'],
+					'frame-ancestors': ['none'],
+					'form-action': ['self']
+				}
+			},
 			alias: { $lib: './src/lib', '$lib/*': './src/lib/*' },
 			adapter: isNodeDeployment
 				? nodeAdapter()

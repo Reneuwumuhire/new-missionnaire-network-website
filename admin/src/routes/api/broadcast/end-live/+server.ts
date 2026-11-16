@@ -1,3 +1,4 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
@@ -8,8 +9,9 @@ import {
 	logAudit
 } from '../../../../db/collections';
 
-export const POST: RequestHandler = async ({ locals, getClientAddress }) => {
-	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
+export const POST: RequestHandler = async ({ getClientAddress, cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	if (!getPermissions(adminUser).can_manage_recordings) throw error(403, 'Accès refusé');
 
 	// Bypass cache so a stale `is_live: false` doesn't make us skip the
 	// is_live=false write that End Live needs to perform.
@@ -64,11 +66,11 @@ export const POST: RequestHandler = async ({ locals, getClientAddress }) => {
 	// Track when the admin ending the broadcast is not the same admin who
 	// started it — soft lock: we don't block, but we surface it in the audit log.
 	const startedBy = current.started_by ?? null;
-	const isOverride = Boolean(startedBy) && startedBy !== locals.user.email;
+	const isOverride = Boolean(startedBy) && startedBy !== adminUser.email;
 
 	await logAudit({
-		user_id: locals.user.email,
-		user_email: locals.user.email,
+		user_id: adminUser.email,
+		user_email: adminUser.email,
 		action: 'update',
 		target_collection: 'broadcast_admin_state',
 		target_id: 'current',

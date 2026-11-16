@@ -1,3 +1,4 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
@@ -20,8 +21,9 @@ const MAX_OFFSET_MS = 30 * 60 * 1000;
 
 type Action = 'attach' | 'start' | 'nudge' | 'set-offset' | 'jump-to-cue' | 'clear';
 
-export const POST: RequestHandler = async ({ locals, request, getClientAddress }) => {
-	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
+export const POST: RequestHandler = async ({ request, getClientAddress, cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	if (!getPermissions(adminUser).can_manage_recordings) throw error(403, 'Accès refusé');
 
 	const body = (await request.json()) as {
 		action?: unknown;
@@ -83,8 +85,8 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 			);
 		}
 		await logAudit({
-			user_id: locals.user.email,
-			user_email: locals.user.email,
+			user_id: adminUser.email,
+			user_email: adminUser.email,
 			action: 'update',
 			target_collection: 'broadcast_admin_state',
 			target_id: 'current',
@@ -155,8 +157,8 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 	}
 
 	await logAudit({
-		user_id: locals.user.email,
-		user_email: locals.user.email,
+		user_id: adminUser.email,
+		user_email: adminUser.email,
 		action: 'update',
 		target_collection: 'broadcast_admin_state',
 		target_id: 'current',
@@ -177,8 +179,9 @@ export const POST: RequestHandler = async ({ locals, request, getClientAddress }
 
 // Server-side proxy of the current broadcast's SRT for the sync panel preview
 // (avoids depending on S3 CORS for browser GETs).
-export const GET: RequestHandler = async ({ locals }) => {
-	if (!getPermissions(locals.user).can_manage_recordings) throw error(403, 'Accès refusé');
+export const GET: RequestHandler = async ({ cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	if (!getPermissions(adminUser).can_manage_recordings) throw error(403, 'Accès refusé');
 
 	const gate = await getBroadcastAdminState();
 	if (!gate.subtitle_srt_url) throw error(404, 'Aucune transcription attachée');

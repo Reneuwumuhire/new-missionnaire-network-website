@@ -1,17 +1,20 @@
 import { json } from '@sveltejs/kit';
+import { z } from 'zod';
 import { trackNotificationEvent } from '../../../../db/collections';
 
+const notificationEvent = z.object({
+	action: z.string().min(1).max(64),
+	tag: z.string().min(1).max(256),
+	timestamp: z.number().int().positive().optional()
+});
+
 export async function POST({ request }) {
+	const parsed = notificationEvent.safeParse(await request.json().catch(() => null));
+	if (!parsed.success) return json({ error: 'Invalid notification event' }, { status: 400 });
+
 	try {
-		const body = await request.json();
-		const { action, tag, timestamp } = body;
-
-		if (!action || !tag) {
-			return json({ error: 'Missing action or tag' }, { status: 400 });
-		}
-
-		await trackNotificationEvent({ action, tag, timestamp: timestamp || Date.now() });
-
+		const { action, tag, timestamp = Date.now() } = parsed.data;
+		await trackNotificationEvent({ action, tag, timestamp });
 		return json({ success: true });
 	} catch (error) {
 		console.error('[Notification Ack] Error:', error);

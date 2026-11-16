@@ -1,11 +1,13 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { error } from '@sveltejs/kit';
-import { dev } from '$app/environment';
+import { dev } from '$app/env';
 import { getAudienceData, getAudienceRouteOptions } from '../../lib/server/audience';
 import { resolveAudiencePeriod, resolveAudienceRoute } from '../../lib/server/audience-period';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals, url, depends }) => {
-	if (locals.user?.role !== 'superadmin') throw error(403, 'Accès réservé au super administrateur');
+export const load: PageServerLoad = async ({ url, depends, cookies }) => {
+	const adminUser = await verifyAdminSession(cookies);
+	if (adminUser?.role !== 'superadmin') throw error(403, 'Accès réservé au super administrateur');
 	depends('app:audience');
 	const period = resolveAudiencePeriod(url.searchParams);
 	const route = resolveAudienceRoute(url.searchParams);

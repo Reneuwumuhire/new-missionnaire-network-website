@@ -1,3 +1,4 @@
+import { objectIdString } from '$lib/server/mongo-input';
 import { ObjectId } from 'mongodb';
 import { getDb } from '../../db/mongo';
 
@@ -322,7 +323,7 @@ export async function getTranscriptPdfForRecording(recording: {
 
 	const db = await getDb();
 
-	if (recording.transcript_pdf_id && ObjectId.isValid(recording.transcript_pdf_id)) {
+	if (recording.transcript_pdf_id && objectIdString.safeParse(recording.transcript_pdf_id).success) {
 		const attached = await db
 			.collection('pdfs')
 			.findOne({ _id: new ObjectId(recording.transcript_pdf_id) });

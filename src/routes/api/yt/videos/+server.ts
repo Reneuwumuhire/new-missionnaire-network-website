@@ -12,7 +12,7 @@ export async function GET({ url }: RequestEvent) {
 		let minDuration;
 		let limit = 5;
 		if (url.searchParams.has('maxResults')) {
-			limit = z.coerce.number().parse(url.searchParams.get('maxResults'));
+			limit = z.coerce.number().int().min(1).max(1000).parse(url.searchParams.get('maxResults'));
 		}
 		let videos;
 		let total = 0;

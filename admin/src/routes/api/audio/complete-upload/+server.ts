@@ -1,11 +1,13 @@
+import { verifyAdminSession } from '$lib/server/admin-session';
 import { json } from '@sveltejs/kit';
 import { CreateMusicAudioSchema } from '$lib/models/music-audio';
 import { getPermissions } from '$lib/models/admin-user';
 import { createMusicAudio, checkDuplicateAudio, logAudit } from '../../../../db/collections';
 import type { RequestEvent } from './$types';
 
-export async function POST({ request, locals, getClientAddress }: RequestEvent) {
-	const perms = getPermissions(locals.user);
+export async function POST({ request, getClientAddress, cookies }: RequestEvent) {
+	const adminUser = await verifyAdminSession(cookies);
+	const perms = getPermissions(adminUser);
 	if (!perms.can_add) {
 		return json({ data: null, error: "Vous n'avez pas la permission d'ajouter des audios" }, { status: 403 });
 	}
@@ -36,12 +38,12 @@ export async function POST({ request, locals, getClientAddress }: RequestEvent) 
 			file_size,
 			duration,
 			format,
-			uploaded_by: locals.user.email
+			uploaded_by: adminUser.email
 		});
 
 		await logAudit({
-			user_id: locals.user._id ?? locals.user.email,
-			user_email: locals.user.email,
+			user_id: adminUser._id ?? adminUser.email,
+			user_email: adminUser.email,
 			action: 'create',
 			target_collection: 'music_audio',
 			target_id: insertedId,
