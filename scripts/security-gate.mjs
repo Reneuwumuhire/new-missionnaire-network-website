@@ -22,9 +22,19 @@ const checks = [
 	['npm', 'run', 'security:verify']
 ];
 
+const failures = [];
+
 for (const [command, ...args] of checks) {
-	console.log(`\n> ${[command, ...args].join(' ')}`);
+	const check = [command, ...args].join(' ');
+	console.log(`\n> ${check}`);
 	const result = spawnSync(command, args, { stdio: 'inherit' });
-	if (result.error) console.error(result.error.message);
-	if (result.status !== 0) process.exitCode = 1;
+	if (result.status === 0) continue;
+
+	const reason = result.error?.message ?? result.signal ?? `exit code ${result.status}`;
+	failures.push(`- ${check} (${reason})`);
+}
+
+if (failures.length > 0) {
+	console.error(`\nSecurity gate failed:\n${failures.join('\n')}`);
+	process.exitCode = 1;
 }
