@@ -3713,7 +3713,7 @@
 	<!-- Backfill upload modal — add a recording for a missed live (audio we have
 	     from YouTube/elsewhere). Date is backdated; audio uploads to S3. -->
 	<div
-		class="fixed inset-0 z-40 flex items-center justify-center overflow-y-auto lg:pl-64 bg-stone-900/60 p-4 backdrop-blur-sm animate-lightbox-in"
+		class="fixed inset-0 z-40 flex flex-col items-center overflow-y-auto overscroll-contain lg:pl-64 bg-stone-900/60 p-4 backdrop-blur-sm animate-lightbox-in"
 		onclick={(e) => {
 			if (e.target === e.currentTarget) closeUploadModal();
 		}}
@@ -3725,7 +3725,7 @@
 		aria-labelledby="upload-recording-title"
 		tabindex="-1"
 	>
-		<div class="my-8 w-full max-w-2xl rounded-sm bg-white shadow-2xl">
+		<div class="my-auto w-full max-w-2xl shrink-0 rounded-sm bg-white shadow-2xl">
 			<div class="flex items-center justify-between border-b border-stone-100 px-6 py-4">
 				<h2 id="upload-recording-title" class="font-display text-lg font-semibold text-stone-800">
 					{$t('recordings.upload.title')}
@@ -3997,7 +3997,7 @@
 	{#if editingRec}
 		<!-- Recording metadata edit modal — focused editing with thumbnail + title + description. -->
 		<div
-			class="fixed inset-0 z-40 flex items-center justify-center overflow-y-auto lg:pl-64 overflow-x-hidden bg-stone-900/60 p-3 backdrop-blur-sm animate-lightbox-in sm:p-4"
+			class="fixed inset-0 z-40 flex flex-col items-center overflow-y-auto overscroll-contain lg:pl-64 overflow-x-hidden bg-stone-900/60 p-3 backdrop-blur-sm animate-lightbox-in sm:p-4"
 			onclick={onEditModalBackdropClick}
 			onkeydown={onLightboxKeydown}
 			role="dialog"
@@ -4005,7 +4005,7 @@
 			aria-labelledby="edit-rec-title"
 			tabindex="-1"
 		>
-			<div class="my-4 w-full max-w-3xl overflow-hidden rounded-sm bg-white shadow-2xl sm:my-8">
+			<div class="my-auto w-full max-w-3xl shrink-0 overflow-hidden rounded-sm bg-white shadow-2xl">
 				<!-- Modal header -->
 				<div
 					class="flex items-center justify-between gap-3 border-b border-stone-100 px-4 py-4 sm:px-6"
