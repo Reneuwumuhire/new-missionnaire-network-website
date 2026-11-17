@@ -39,7 +39,7 @@
 		params.delete('year');
 		isHeroSearchLoading = true;
 		try {
-			await goto(`?${params.toString()}`, { keepFocus: true, noScroll: true });
+			await goto(`?${params.toString()}`, { reset: false });
 		} finally {
 			isHeroSearchLoading = false;
 		}

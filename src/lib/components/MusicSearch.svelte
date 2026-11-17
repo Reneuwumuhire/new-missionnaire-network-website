@@ -59,7 +59,7 @@
 		for (const key of ['alpha', 'artist', 'seed', 'play']) params.delete(key);
 		params.set('page', '1');
 		if (song?._id) params.set('play', song._id);
-		void goto(`?${params}`, { keepFocus: true, noScroll: true });
+		void goto(`?${params}`, { reset: false });
 	}
 
 	function onKeydown(event: KeyboardEvent) {

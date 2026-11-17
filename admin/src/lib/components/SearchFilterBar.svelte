@@ -22,7 +22,7 @@
 			params.delete(key);
 		}
 		params.set('pageNumber', '1');
-		goto(`?${params.toString()}`, { replaceState: true, keepFocus: true });
+		goto(`?${params.toString()}`, { replace: true, reset: false });
 	}
 
 	function handleSearch() {

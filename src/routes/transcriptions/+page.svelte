@@ -201,7 +201,7 @@
 		}
 		url.searchParams.set('page', '1');
 		try {
-			await goto(url.toString(), { keepFocus: true });
+			await goto(url.toString(), { reset: false });
 		} catch {
 			isSearching = false;
 		}
