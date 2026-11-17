@@ -1,4 +1,4 @@
-import { controlCloudRecording } from './live-session.svelte';
+import { controlCloudRecording, type RecordingSession } from './live-session.svelte';
 import { studio } from './state.svelte';
 
 export const recording = $state({
@@ -17,27 +17,37 @@ export const recordsLocal = () =>
 export const recordsCloud = () =>
 	studio.service.type === 'live' && ['cloud', 'both'].includes(studio.settings.recordingMode);
 
+let cloudStart: Promise<void> | null = null;
+
+export function pendingCloudRecordingStart() {
+	return cloudStart;
+}
+
 export async function startCloudRecording() {
 	if (!recordsCloud() || recording.cloud || recording.cloudPending) return;
 	recording.cloudPending = true;
 	recording.savedId = null;
-	try {
-		await controlCloudRecording('start');
-		recording.cloud = true;
-		recording.startedAt ??= Date.now();
-		recording.error = null;
-	} catch (error) {
-		recording.error = String(error);
-	} finally {
-		recording.cloudPending = false;
-	}
+	cloudStart = controlCloudRecording('start')
+		.then(() => {
+			recording.cloud = true;
+			recording.startedAt ??= Date.now();
+			recording.error = null;
+		})
+		.catch((error) => {
+			recording.error = String(error);
+		})
+		.finally(() => {
+			recording.cloudPending = false;
+			cloudStart = null;
+		});
+	await cloudStart;
 }
 
-export async function stopCloudRecording() {
-	if (!recording.cloud || recording.cloudPending) return;
+export async function stopCloudRecording(session?: RecordingSession) {
+	if ((!session && !recording.cloud) || recording.cloudPending) return;
 	recording.cloudPending = true;
 	try {
-		const result = await controlCloudRecording('stop');
+		const result = await controlCloudRecording('stop', session);
 		recording.cloud = false;
 		recording.savedId = result?.id ?? null;
 		if (!recording.localPath) recording.startedAt = null;

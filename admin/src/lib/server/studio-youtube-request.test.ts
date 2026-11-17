@@ -42,6 +42,15 @@ test('preserves scheduling fields for action-specific validation', () => {
 	assert.deepEqual(studioYouTubeBody.parse(request), request);
 });
 
+test('preserves the session and start time for a scoped recording stop', () => {
+	const request = {
+		action: 'recorder-stop-session',
+		sessionId: '000000000000000000000001',
+		sessionStartedAt: 1000
+	};
+	assert.deepEqual(studioYouTubeBody.parse(request), request);
+});
+
 test('still rejects malformed actions and identifiers', () => {
 	for (const request of [
 		null,

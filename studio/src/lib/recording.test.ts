@@ -46,4 +46,15 @@ describe('cloud recording controls', () => {
 		expect(controlCloudRecording).not.toHaveBeenCalled();
 		studio.service.type = 'live';
 	});
+
+	it('requests a session-scoped stop for recordings started outside Studio', async () => {
+		recording.cloud = false;
+		controlCloudRecording.mockResolvedValue({ id: 'admin-recording' });
+		const session = { sessionId: 'session-id', sessionStartedAt: 1000 };
+
+		await stopCloudRecording(session);
+
+		expect(controlCloudRecording).toHaveBeenCalledWith('stop', session);
+		expect(recording.savedId).toBe('admin-recording');
+	});
 });

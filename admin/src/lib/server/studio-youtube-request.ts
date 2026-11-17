@@ -5,6 +5,7 @@ import { objectIdString } from './mongo-input';
 export const studioYouTubeBody = z.object({
 	action: z.string().max(30),
 	sessionId: objectIdString.optional(),
+	sessionStartedAt: z.number().optional(),
 	channelId: z.string().max(128).optional(),
 	title: z.unknown().optional(),
 	description: z.unknown().optional(),

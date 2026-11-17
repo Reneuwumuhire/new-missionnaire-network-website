@@ -1286,6 +1286,7 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.notifications.liveStartHint':
 		'Optional · currently {count} notification subscribers. Leave unchecked to start silently.',
 	'recordings.confirm.endLive.message': 'The public site will no longer show the live player.',
+	'recordings.confirm.stopRecording.message': 'Stop the current recording?',
 	'recordings.confirm.stopAll.message': 'End the live AND stop the current recording?',
 	'recordings.confirm.startAll.message': 'Go live AND start recording.',
 	'recordings.confirm.startAll.notifyOne':
