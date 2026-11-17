@@ -1,12 +1,6 @@
-//! The only thing the Rust side owns: one ffmpeg process that takes the
-//! webview's composited MediaRecorder output on stdin and pushes it to every
-//! enabled RTMP destination.
-//!
-//! Everything visual (scenes, layers, lyrics) happens on a canvas in the
-//! webview — switching scenes is just drawing something else, so the encoder
-//! and the RTMP connections never restart mid-broadcast.
+//! Owns the capture encoder and local recording. RTMP outputs consume its encoded packets.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
@@ -15,18 +9,18 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{sync_channel, SyncSender, TrySendError};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::diagnostics::{redact_stream_urls, Logs};
 
-/// Chunks buffered between the webview and ffmpeg's stdin. MediaRecorder emits
-/// one per timeslice (~250 ms), so this is ~30 s of slack. A full queue applies
-/// backpressure; encoded WebM chunks must never be discarded because one chunk
-/// can contain reference video frames and audio from the same time range.
-const CHUNK_QUEUE: usize = 120;
-const NETWORK_TIMEOUT_US: &str = "8000000";
+use crate::publisher::{publish_args, PacketHub, Publisher};
+
+// MediaRecorder chunks contain dependent frames. If this fills, restart the
+// capture instead of discarding bytes from the middle of the container.
+const CHUNK_QUEUE: usize = 12;
 /// stderr lines kept so a crash can be explained instead of just reported.
 const LOG_TAIL: usize = 40;
 
@@ -51,6 +45,8 @@ pub struct StreamConfig {
 	pub encoder: String,
 	pub has_audio: bool,
 	pub record_local: bool,
+	#[serde(default)]
+	pub feed_held: bool,
 	#[serde(default = "default_recording_format")]
 	pub recording_format: String,
 	#[serde(default = "default_recording_video_bitrate")]
@@ -84,35 +80,26 @@ pub struct StreamStats {
 	pub out_time_ms: u64,
 	pub dropped_frames: u64,
 	pub speed: f64,
-	/// Bytes handed to the muxers so far — OBS's "total data output".
+	/// Encoded bytes produced so far, before network congestion or retries.
 	pub total_bytes: u64,
-	/// Times the input queue filled and the producer had to wait for ffmpeg.
-	/// No media is discarded; this remains the operator's congestion signal.
+	/// Times the capture encoder input queue reached its limit.
 	pub backpressure_events: u64,
 }
 
 struct Running {
-	tx: Option<SyncSender<Vec<u8>>>,
+	run_id: u64,
+	tx: SyncSender<Vec<u8>>,
 	child: Arc<Mutex<Child>>,
 	backpressure: Arc<AtomicU64>,
+	hub: Option<Arc<PacketHub>>,
+	main: Vec<Publisher>,
+	held: Vec<Publisher>,
 }
 
-/// Encoders run in named groups so a destination can be held back without
-/// touching the one already on air. `main` starts with Start Streaming; a
-/// held group (YouTube, typically) starts only when the operator says so, and
-/// gets its own ffmpeg fed the same chunks — adding an output to a running
-/// ffmpeg is not possible, and restarting it would drop the congregation's
-/// stream to add a public one.
 #[derive(Default)]
 pub struct Encoder {
-	groups: Mutex<HashMap<String, Running>>,
+	running: Mutex<Option<Running>>,
 	next_run_id: AtomicU64,
-	/// The first chunk MediaRecorder produced this session: the EBML header,
-	/// segment and track definitions. An encoder started later would otherwise
-	/// be handed a WebM stream beginning in the middle, which ffmpeg cannot
-	/// parse at all — it exits immediately. Replaying the header first is what
-	/// lets a held destination join a recording already in progress.
-	header: Mutex<Option<Vec<u8>>>,
 }
 
 // ── ffmpeg discovery ──────────────────────────────────────────────
@@ -205,44 +192,13 @@ pub fn probe_ffmpeg() -> Result<FfmpegInfo, String> {
 	})
 }
 
-/// Which target (if any) an ffmpeg stderr line is complaining about, and the
-/// reason. `tee` numbers its slaves in the order they were listed.
-pub fn parse_target_failure(line: &str, single_target: bool) -> Option<(usize, String)> {
-	// tee: "Slave muxer #1 failed: Connection refused, continuing with 1/2 slaves."
-	if let Some(rest) = line.split("Slave muxer #").nth(1) {
-		let mut parts = rest.splitn(2, ' ');
-		let index: usize = parts.next()?.trim().parse().ok()?;
-		let reason = parts
-			.next()
-			.unwrap_or("failed")
-			.trim_start_matches("failed:")
-			.trim()
-			.trim_end_matches('.')
-			.to_string();
-		return Some((index, reason));
-	}
-	// Single destination: there is no tee, so a connection error is target 0.
-	if single_target
-		&& (line.contains("Cannot open connection")
-			|| line.contains("Connection refused")
-			|| line.contains("Connection timed out")
-			|| line.contains("Server returned 4"))
-	{
-		return Some((0, line.trim().to_string()));
-	}
-	None
-}
-
 // ── argument building ─────────────────────────────────────────────
 
-/// Reject anything that could add an output or a flag we did not intend.
-/// `|` and `[` `]` are tee-muxer syntax: a key containing one would turn a
-/// single destination into two. Values come from the operator's own settings,
-/// but they are typed in and pasted, so this is a real boundary.
+/// Validate the same ingest URL format for preview and held destinations.
 fn validate_url(url: &str) -> Result<(), String> {
 	let scheme_ok = url.starts_with("rtmp://") || url.starts_with("rtmps://");
 	if !scheme_ok {
-		return Err(format!("URL non supportée (rtmp:// ou rtmps:// attendu) : {url}"));
+		return Err("URL non supportée (rtmp:// ou rtmps:// attendu)".into());
 	}
 	if url.len() > 2048 {
 		return Err("URL trop longue".into());
@@ -313,8 +269,8 @@ fn build_args_with_path(cfg: &StreamConfig, local_path: Option<&str>) -> Result<
 	if cfg.targets.is_empty() && local_path.is_none() {
 		return Err("Aucune destination activée".into());
 	}
-	for t in &cfg.targets {
-		validate_url(&t.url).map_err(|e| format!("{} — {e}", t.name))?;
+	for target in &cfg.targets {
+		validate_url(&target.url).map_err(|err| format!("{} — {err}", target.name))?;
 	}
 	let container = match cfg.container.as_str() {
 		"webm" => "webm",
@@ -322,58 +278,34 @@ fn build_args_with_path(cfg: &StreamConfig, local_path: Option<&str>) -> Result<
 		other => return Err(format!("Conteneur inconnu: {other}")),
 	};
 
-	let mut a: Vec<String> = Vec::new();
+	let mut a = Vec::new();
 	macro_rules! push {
 		($($v:expr),+ $(,)?) => { $( a.push($v.to_string()); )+ };
 	}
 
-	push!("-hide_banner", "-loglevel", "warning", "-nostdin");
-	// MediaRecorder timestamps restart oddly across pauses; let ffmpeg rebuild
-	// a monotonic timeline instead of dropping frames on the way in.
-	push!("-fflags", "+genpts", "-thread_queue_size", "512");
-	push!("-f", container, "-i", "pipe:0");
+	push!("-hide_banner", "-loglevel", "warning", "-nostdin", "-nostats");
+	push!("-fflags", "+genpts", "-thread_queue_size", "128", "-f", container, "-i", "pipe:0");
+	push!("-progress", "pipe:2");
 
-	push!("-nostats", "-progress", "pipe:1");
-
-	// Each RTMP destination gets an independent packet queue and reconnect loop.
-	// Two backslashes are intentional: tee parses the slave options first, then
-	// the nested fifo dictionary. This keeps a slow destination from blocking
-	// every other destination or backing up the WebM input pipe.
-	const FIFO_OPTIONS: &str = concat!(
-		r"attempt_recovery\\=1\\:recover_any_error\\=1\\:recovery_wait_time\\=1",
-		r"\\:restart_with_keyframe\\=1\\:queue_size\\=600\\:drop_pkts_on_overflow\\=1"
-	);
-	let outputs = cfg
-		.targets
-		.iter()
-		.map(|t| {
-			format!(
-				"[f=flv:flvflags=no_duration_filesize:rw_timeout={NETWORK_TIMEOUT_US}:onfail=ignore:use_fifo=1:fifo_options={FIFO_OPTIONS}]{}",
-				t.url
-			)
-		})
-		.collect::<Vec<_>>();
-	if let [target] = cfg.targets.as_slice() {
-		if local_path.is_none() {
-			// A single output needs no fan-out queue. Progress now describes
-			// the FLV writer, and an RTMP write failure exits the encoder so
-			// Studio can use its existing reconnect flow.
-			if container == "mp4" {
-				// WebKit already encoded fragmented H.264/AAC for this stream.
-				push!("-map", "0:v:0", "-map", "0:a:0?", "-c", "copy");
-			} else {
-				a.extend(video_args(cfg));
-			}
-			push!(
-				"-rw_timeout", NETWORK_TIMEOUT_US, "-flvflags", "no_duration_filesize",
-				"-f", "flv", &target.url
-			);
-			return Ok(a);
+	let local_video = local_path.filter(|_| cfg.recording_format != "audio");
+	let publish = !cfg.targets.is_empty() || cfg.feed_held;
+	let share = publish && local_video.is_some()
+		&& cfg.video_bitrate_kbps == cfg.recording_video_bitrate_kbps
+		&& (!cfg.has_audio || cfg.audio_bitrate_kbps == cfg.recording_audio_bitrate_kbps);
+	if publish {
+		if container == "mp4" {
+			push!("-map", "0:v:0", "-map", "0:a:0?", "-c", "copy");
+		} else {
+			a.extend(video_args(cfg));
 		}
-	}
-	if !cfg.targets.is_empty() {
-		a.extend(video_args(cfg));
-		push!("-flags", "+global_header", "-f", "tee", outputs.join("|"));
+		if let Some(path) = local_video.filter(|_| share) {
+			// tee's single-quoted token preserves spaces, backslashes and pipes in a directory name.
+			let path = path.replace('\'', "'\\''");
+			push!("-flags", "+global_header", "-flush_packets", "1", "-f", "tee",
+				format!("[f=flv:flvflags=no_duration_filesize:flush_packets=1]pipe:1|[f=mp4:movflags=+frag_keyframe+empty_moov]'{path}'"));
+		} else {
+			push!("-flush_packets", "1", "-flvflags", "no_duration_filesize", "-f", "flv", "pipe:1");
+		}
 	}
 	if let Some(path) = local_path {
 		if !matches!(cfg.recording_format.as_str(), "audio" | "video" | "both") {
@@ -382,7 +314,7 @@ fn build_args_with_path(cfg: &StreamConfig, local_path: Option<&str>) -> Result<
 		if cfg.recording_format != "video" && !cfg.has_audio {
 			return Err("Une source audio est nécessaire pour enregistrer en MP3".into());
 		}
-		if cfg.recording_format != "audio" {
+		if let Some(path) = local_video.filter(|_| !share) {
 			let mut local = cfg.clone();
 			local.video_bitrate_kbps = cfg.recording_video_bitrate_kbps;
 			local.audio_bitrate_kbps = cfg.recording_audio_bitrate_kbps;
@@ -423,276 +355,189 @@ pub fn redact(args: &[String]) -> Vec<String> {
 
 impl Encoder {
 	pub fn is_running(&self) -> bool {
-		self.groups.lock().map(|g| !g.is_empty()).unwrap_or(false)
+		self.running.lock().is_ok_and(|running| running.is_some())
 	}
 
 	pub fn start(
-		&self,
-		app: &AppHandle,
-		cfg: StreamConfig,
-		group: &str,
+		&self, app: &AppHandle, cfg: StreamConfig, group: &str,
 	) -> Result<(Vec<String>, Option<String>, u64), String> {
-		let mut guard = self.groups.lock().map_err(|e| e.to_string())?;
-		if guard.contains_key(group) {
-			return Err("Cette diffusion est déjà en cours".into());
-		}
-		// First encoder of a session: the recorder is about to be created, so
-		// the header we are holding belongs to the previous one.
-		if guard.is_empty() {
-			if let Ok(mut header) = self.header.lock() {
-				*header = None;
-			}
-		}
+		let mut running = self.running.lock().map_err(|error| error.to_string())?;
 		let bin = resolve_ffmpeg()?;
 		let run_id = self.next_run_id.fetch_add(1, Ordering::Relaxed) + 1;
+		for target in &cfg.targets {
+			validate_url(&target.url).map_err(|err| format!("{} — {err}", target.name))?;
+		}
+		let outputs = |hub: &Arc<PacketHub>| {
+			cfg.targets.iter().enumerate().map(|(index, target)| {
+				hub.start(app.clone(), &bin, target.url.clone(), group.to_owned(), run_id, index)
+			}).collect()
+		};
+		if group == "held" {
+			let run = running.as_mut().ok_or("Aucune capture en cours")?;
+			let hub = run.hub.as_ref().ok_or("Aucune sortie en attente au démarrage")?;
+			if !run.held.is_empty() || cfg.targets.is_empty() {
+				return Err("Impossible de démarrer les destinations en attente".into());
+			}
+			run.held = outputs(hub);
+			return Ok((redact(&publish_args(&cfg.targets[0].url)), None, run_id));
+		}
+		if group != "main" || running.is_some() {
+			return Err("Cette diffusion est déjà en cours".into());
+		}
 		let local_path = if cfg.record_local {
-			let dir = app
-				.path()
-				.video_dir()
-				.map_err(|e| format!("Dossier Vidéos/Films introuvable: {e}"))?
+			let dir = app.path().video_dir()
+				.map_err(|error| format!("Dossier Vidéos/Films introuvable: {error}"))?
 				.join("Missionnaire Studio");
-			fs::create_dir_all(&dir).map_err(|e| format!("Dossier d’enregistrement impossible: {e}"))?;
-			Some(
-				dir.join(format!(
-					"Missionnaire Studio {}.{}",
-					chrono_stamp(),
-					if cfg.recording_format == "audio" { "mp3" } else { "mp4" }
-				))
-					.to_string_lossy()
-					.to_string(),
-			)
+			fs::create_dir_all(&dir).map_err(|error| format!("Dossier d’enregistrement impossible: {error}"))?;
+			let extension = if cfg.recording_format == "audio" { "mp3" } else { "mp4" };
+			Some(dir.join(format!("Missionnaire Studio {}-{run_id}.{extension}", chrono_stamp()))
+				.to_string_lossy().into_owned())
 		} else {
 			None
 		};
 		let args = build_args_with_path(&cfg, local_path.as_deref())?;
+		let hub = (!cfg.targets.is_empty() || cfg.feed_held).then(|| Arc::new(PacketHub::default()));
+		let mut child = ffmpeg_command(&bin).args(&args).stdin(Stdio::piped())
+			.stdout(if hub.is_some() { Stdio::piped() } else { Stdio::null() })
+			.stderr(Stdio::piped()).spawn()
+			.map_err(|error| format!("Lancement de ffmpeg impossible: {error}"))?;
 
-		let mut child = ffmpeg_command(&bin)
-			.args(&args)
-			.stdin(Stdio::piped())
-			.stdout(Stdio::piped())
-			.stderr(Stdio::piped())
-			.spawn()
-			.map_err(|e| format!("Lancement de ffmpeg impossible: {e}"))?;
-
-		let mut stdin = child.stdin.take().ok_or("stdin ffmpeg indisponible")?;
-		let stdout = child.stdout.take().ok_or("stdout ffmpeg indisponible")?;
-		let stderr = child.stderr.take().ok_or("stderr ffmpeg indisponible")?;
-
+		let main = if let Some(hub) = &hub {
+			let publishers = outputs(hub);
+			let stdout = child.stdout.take().unwrap();
+			let hub = hub.clone();
+			let app = app.clone();
+			thread::spawn(move || {
+				if let Err(error) = hub.read(stdout) {
+					let _ = app.emit("stream://log", format!("FFmpeg packet relay stopped: {error}"));
+				}
+			});
+			publishers
+		} else {
+			Vec::new()
+		};
 		let (tx, rx) = sync_channel::<Vec<u8>>(CHUNK_QUEUE);
-		let backpressure = Arc::new(AtomicU64::new(0));
-
-		// Writer thread. Each destination is isolated later by ffmpeg's fifo
-		// muxer, so this input pipe normally drains continuously. If the encoder
-		// itself falls behind, the bounded queue applies lossless backpressure.
+		let mut stdin = child.stdin.take().unwrap();
 		thread::spawn(move || {
 			for chunk in rx {
-				if stdin.write_all(&chunk).is_err() {
-					break; // ffmpeg gone; the stderr reader reports why.
-				}
+				if stdin.write_all(&chunk).is_err() { break; }
 			}
-			// Dropping stdin closes the pipe → ffmpeg flushes and exits cleanly.
 		});
-
-		// Progress reader: `-progress pipe:1` emits key=value blocks terminated
-		// by `progress=continue`.
-		let app_stats = app.clone();
-		let group_stats = group.to_string();
-		let backpressure_stats = backpressure.clone();
+		let stderr = child.stderr.take().unwrap();
+		let child = Arc::new(Mutex::new(child));
+		let watched_child = child.clone();
+		let backpressure = Arc::new(AtomicU64::new(0));
+		let watched_backpressure = backpressure.clone();
+		let watched_hub = hub.clone();
+		let app = app.clone();
 		thread::spawn(move || {
+			let mut tail = VecDeque::new();
 			let mut stats = StreamStats::default();
-			for line in BufReader::new(stdout).lines().map_while(Result::ok) {
-				let Some((key, value)) = line.split_once('=') else { continue };
-				let value = value.trim();
-				match key {
-					"frame" => stats.frames = value.parse().unwrap_or(stats.frames),
-					"fps" => stats.fps = value.parse().unwrap_or(stats.fps),
-					"bitrate" => {
-						stats.bitrate_kbps = value
-							.trim_end_matches("kbits/s")
-							.trim()
-							.parse()
-							.unwrap_or(stats.bitrate_kbps)
-					}
-					"out_time_ms" => {
-						stats.out_time_ms = value.parse::<u64>().unwrap_or(0) / 1000;
-					}
-					"drop_frames" => {
-						stats.dropped_frames = value.parse().unwrap_or(stats.dropped_frames)
-					}
-					"total_size" => stats.total_bytes = value.parse().unwrap_or(stats.total_bytes),
-					"speed" => {
-						stats.speed = value.trim_end_matches('x').parse().unwrap_or(stats.speed)
-					}
-					"progress" => {
-						stats.backpressure_events = backpressure_stats.load(Ordering::Relaxed);
-						let _ = app_stats.emit(
-							"stream://stats",
-							serde_json::json!({
-								"group": group_stats,
-								"runId": run_id,
-								"stats": stats.clone()
-							}),
-						);
-					}
-					_ => {}
-				}
-			}
-		});
-
-		// stderr reader: surfaces ffmpeg's own words, and the exit reason.
-		let target_count = cfg.targets.len();
-		let app_log = app.clone();
-		let group_log = group.to_string();
-		let child_handle = Arc::new(Mutex::new(child));
-		let child_wait = child_handle.clone();
-		thread::spawn(move || {
-			let mut tail: VecDeque<String> = VecDeque::with_capacity(LOG_TAIL);
-			let _ = app_log.state::<Logs>().append("ffmpeg", &format!("{group_log} encoder started (run {run_id})"));
 			for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+				if apply_progress(&mut stats, &line) {
+					if line.starts_with("progress=") {
+						stats.backpressure_events = watched_backpressure.load(Ordering::Relaxed);
+						if let Some(hub) = &watched_hub {
+							stats.total_bytes = hub.encoded_bytes();
+							if stats.out_time_ms > 0 {
+								stats.bitrate_kbps = stats.total_bytes as f64 * 8.0 / stats.out_time_ms as f64;
+							}
+						}
+						let _ = app.emit("stream://stats", serde_json::json!({
+							"group": "main", "runId": run_id, "stats": stats
+						}));
+					}
+					continue;
+				}
 				let line = redact_stream_urls(&line);
-				let _ = app_log.state::<Logs>().append("ffmpeg", &format!("{group_log} run {run_id}: {line}"));
-				if tail.len() == LOG_TAIL {
-					tail.pop_front();
-				}
-				tail.push_back(line.clone());
-				if let Some((index, reason)) = parse_target_failure(&line, target_count == 1) {
-					let _ = app_log.emit(
-						"stream://target",
-						serde_json::json!({
-							"group": group_log,
-							"runId": run_id,
-							"index": index,
-							"state": "failed",
-							"reason": reason
-						}),
-					);
-				}
-				let _ = app_log.emit("stream://log", line);
+				let _ = app.state::<Logs>().append("ffmpeg", &line);
+				let _ = app.emit("stream://log", &line);
+				if tail.len() == LOG_TAIL { tail.pop_front(); }
+				tail.push_back(line);
 			}
-			// stderr closed → the process is on its way out. Reap it and tell
-			// the UI, so a dead encoder can never look "live".
-			let status = child_wait.lock().ok().and_then(|mut c| c.wait().ok());
-			let code = status.and_then(|s| s.code()).unwrap_or(-1);
-			let _ = app_log.state::<Logs>().append("ffmpeg", &format!("{group_log} encoder exited (run {run_id}, code {code})"));
-			let _ = app_log.emit(
-				"stream://exited",
-				serde_json::json!({
-					"group": group_log,
-					"runId": run_id,
-					"code": code,
-					"log": tail.iter().cloned().collect::<Vec<_>>(),
-				}),
-			);
+			// Poll without holding the child lock while it exits. Stop can still kill it.
+			let code = loop {
+				match watched_child.lock().map(|mut child| child.try_wait()) {
+					Ok(Ok(None)) => thread::sleep(Duration::from_millis(50)),
+					Ok(Ok(Some(status))) => break status.code().unwrap_or(-1),
+					_ => break -1,
+				}
+			};
+			let _ = app.emit("stream://exited", serde_json::json!({
+				"group": "main", "runId": run_id, "code": code, "log": tail
+			}));
 		});
-
-		// A group joining a session already under way needs the stream's opening
-		// bytes before any cluster, or ffmpeg sees a headerless stream.
-		if let Ok(header) = self.header.lock() {
-			if let Some(bytes) = header.as_ref() {
-				let _ = tx.try_send(bytes.clone());
-			}
-		}
-
-		guard.insert(
-			group.to_string(),
-			Running {
-				tx: Some(tx),
-				child: child_handle,
-				backpressure,
-			},
-		);
+		*running = Some(Running { run_id, tx, child, backpressure, hub, main, held: Vec::new() });
 		Ok((redact(&args), local_path, run_id))
 	}
 
-	/// Every running group gets the same chunk. A group that has died is not
-	/// allowed to fail the others — the held YouTube encoder dropping out must
-	/// not take the church's own stream with it.
-	pub fn push(&self, bytes: &[u8]) -> Result<(), String> {
-		// ponytail: the whole first chunk is kept as the header. MediaRecorder
-		// puts the EBML header and track definitions in it and starts clusters
-		// after, so this is a little more than strictly needed but never less.
-		// Parse the EBML properly if a held encoder ever starts on a bad frame.
-		if let Ok(mut header) = self.header.lock() {
-			if header.is_none() {
-				*header = Some(bytes.to_vec());
+	pub fn push(&self, run_id: u64, bytes: &[u8]) -> Result<(), String> {
+		let running = self.running.lock().map_err(|error| error.to_string())?;
+		let Some(run) = running.as_ref().filter(|run| run.run_id == run_id) else { return Ok(()); };
+		match run.tx.try_send(bytes.to_vec()) {
+			Ok(()) => Ok(()),
+			Err(TrySendError::Full(_)) => {
+				run.backpressure.fetch_add(1, Ordering::Relaxed);
+				Err("Capture encoder queue is full".into())
 			}
+			Err(TrySendError::Disconnected(_)) => Err("Capture encoder stopped".into()),
 		}
-		let runs = self
-			.groups
-			.lock()
-			.map_err(|e| e.to_string())?
-			.values()
-			.filter_map(|run| run.tx.as_ref().map(|tx| (tx.clone(), run.backpressure.clone())))
-			.collect::<Vec<_>>();
-		// A chunk arriving after stop() is normal — MediaRecorder flushes one
-		// last blob on its way down. Silently ignore it.
-		for (tx, backpressure) in runs {
-			match tx.try_send(bytes.to_vec()) {
-				Ok(()) => {}
-				Err(TrySendError::Full(chunk)) => {
-					backpressure.fetch_add(1, Ordering::Relaxed);
-					// Backpressure happens off the webview thread. Waiting is safe and
-					// preserves the complete audio/video timeline; stop() can still take
-					// the groups lock and kill a wedged child, which disconnects this send.
-					let _ = tx.send(chunk);
-				}
-				Err(TrySendError::Disconnected(_)) => {}
-			}
-		}
-		Ok(())
 	}
 
-	/// Stop one group, or every group when `group` is None.
 	pub fn stop_group(&self, group: Option<&str>) -> Result<(), String> {
-		let mut guard = self.groups.lock().map_err(|e| e.to_string())?;
-		let names: Vec<String> = match group {
-			Some(name) => vec![name.to_string()],
-			None => guard.keys().cloned().collect()
-		};
-		for name in names {
-			let Some(mut run) = guard.remove(&name) else { continue };
-			Self::shut_down(&mut run);
-		}
-		Ok(())
+		self.stop_or_abort(group, false)
 	}
 
 	pub fn stop(&self) -> Result<(), String> {
 		self.stop_group(None)
 	}
 
-	/// Recovery cannot wait for a graceful trailer: the remote servers must see
-	/// the dead connection close before the replacement encoder reconnects.
 	pub fn abort_group(&self, group: Option<&str>) -> Result<(), String> {
-		let mut guard = self.groups.lock().map_err(|e| e.to_string())?;
-		let names: Vec<String> = match group {
-			Some(name) => vec![name.to_string()],
-			None => guard.keys().cloned().collect(),
-		};
-		for name in names {
-			let Some(mut run) = guard.remove(&name) else { continue };
-			run.tx = None;
-			if let Ok(mut child) = run.child.lock() {
-				let _ = child.kill();
-			};
+		self.stop_or_abort(group, true)
+	}
+
+	fn stop_or_abort(&self, group: Option<&str>, abort: bool) -> Result<(), String> {
+		let mut running = self.running.lock().map_err(|error| error.to_string())?;
+		if group == Some("held") {
+			if let Some(run) = running.as_mut() { run.held.clear(); }
+			return Ok(());
+		}
+		let Some(Running { tx, child, main, held, .. }) = running.take() else { return Ok(()); };
+		drop(running);
+		drop((tx, main, held));
+		if abort {
+			if let Ok(mut child) = child.lock() { let _ = child.kill(); }
+		} else {
+			thread::spawn(move || {
+				thread::sleep(Duration::from_secs(8));
+				if let Ok(mut child) = child.lock() {
+					if matches!(child.try_wait(), Ok(None)) { let _ = child.kill(); }
+				}
+			});
 		}
 		Ok(())
 	}
+}
 
-	fn shut_down(run: &mut Running) {
-		// Drop the sender → writer thread finishes the queue, closes stdin,
-		// ffmpeg writes its trailer and exits. The stderr thread reaps it.
-		run.tx = None;
-		// Give a wedged ffmpeg a hard stop rather than leaking the process.
-		let child = run.child.clone();
-		thread::spawn(move || {
-			thread::sleep(std::time::Duration::from_secs(8));
-			if let Ok(mut c) = child.lock() {
-				if matches!(c.try_wait(), Ok(None)) {
-					let _ = c.kill();
-				}
-			}
-		});
+// Progress shares stderr with diagnostics because stdout carries encoded media.
+fn apply_progress(stats: &mut StreamStats, line: &str) -> bool {
+	let Some((key, value)) = line.split_once('=') else { return false; };
+	let value = value.trim();
+	match key {
+		"frame" => stats.frames = value.parse().unwrap_or(stats.frames),
+		"fps" => stats.fps = value.parse().unwrap_or(stats.fps),
+		"bitrate" => stats.bitrate_kbps = value.trim_end_matches("kbits/s").trim().parse()
+			.unwrap_or(stats.bitrate_kbps),
+		"out_time_us" => {
+			if let Ok(time) = value.parse::<u64>() { stats.out_time_ms = time / 1000; }
+		}
+		"drop_frames" => stats.dropped_frames = value.parse().unwrap_or(stats.dropped_frames),
+		"total_size" => stats.total_bytes = value.parse().unwrap_or(stats.total_bytes),
+		"speed" => stats.speed = value.trim_end_matches('x').parse().unwrap_or(stats.speed),
+		"out_time_ms" | "out_time" | "dup_frames" | "stream_0_0_q" | "stream_1_0_q" | "progress" => {}
+		_ => return false,
 	}
+	true
 }
 
 fn chrono_stamp() -> u64 {
@@ -719,6 +564,7 @@ mod tests {
 			encoder: "hardware".into(),
 			has_audio: true,
 			record_local: false,
+			feed_held: false,
 			recording_format: default_recording_format(),
 			recording_video_bitrate_kbps: default_recording_video_bitrate(),
 			recording_audio_bitrate_kbps: default_recording_audio_bitrate(),
@@ -765,21 +611,28 @@ mod tests {
 			"-t", "1", "-c:v", "libvpx", "-c:a", "libopus",
 		]).arg(&source).output().unwrap();
 		assert!(generated.status.success(), "{}", String::from_utf8_lossy(&generated.stderr));
-		for streaming in [false, true] {
+		for (streaming, shared) in [(false, false), (true, false), (true, true)] {
 			for format in ["audio", "video", "both"] {
 				let mut c = cfg(if streaming { &["rtmp://localhost/live/test"] } else { &[] });
 				c.encoder = "software".into();
 				c.recording_format = format.into();
 				c.recording_audio_bitrate_kbps = 192;
-				let path = dir.join(format!("{format}-{streaming}.mp4"));
-				let mut args = build_args_with_path(&c, path.to_str()).unwrap();
-				if streaming {
-					let spec = args.iter().position(|arg| arg == "tee").unwrap() + 1;
-					args[spec] = format!("[f=flv]{}", path.with_extension("flv").display());
+				if shared {
+					c.video_bitrate_kbps = c.recording_video_bitrate_kbps;
+					c.audio_bitrate_kbps = c.recording_audio_bitrate_kbps;
 				}
-				let out = Command::new(&ffmpeg).args(args)
+				let file_name = if cfg!(windows) {
+					format!("{format}-{streaming}-{shared}.mp4")
+				} else {
+					format!("{format}-{streaming}-{shared} with '|.mp4")
+				};
+				let path = dir.join(file_name);
+				let out = Command::new(&ffmpeg).args(build_args_with_path(&c, path.to_str()).unwrap())
 					.stdin(fs::File::open(&source).unwrap()).output().unwrap();
 				assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+				if streaming {
+					assert!(out.stdout.starts_with(b"FLV"));
+				}
 				for extension in ["mp3", "mp4"] {
 					let file = path.with_extension(extension);
 					let expected = if extension == "mp3" { format != "video" } else { format != "audio" };
@@ -807,15 +660,15 @@ mod tests {
 	}
 
 	#[test]
-	fn single_target_writes_directly_with_a_network_timeout() {
-		let args = build_args(&cfg(&["rtmp://localhost:1935/live/obs"])).unwrap();
-		assert!(!args.iter().any(|a| a == "tee"));
-		assert!(args.windows(2).any(|pair| pair == ["-rw_timeout", "8000000"]));
+	fn publisher_remuxes_with_a_network_timeout() {
+		let args = publish_args("rtmp://localhost:1935/live/obs");
+		assert!(args.windows(2).any(|pair| pair == ["-c", "copy"]));
+		assert!(args.windows(2).any(|pair| pair == ["-rw_timeout", "4000000"]));
 		assert_eq!(&args[args.len() - 3..], ["-f", "flv", "rtmp://localhost:1935/live/obs"]);
 	}
 
 	#[test]
-	fn single_target_copies_h264_and_aac_from_mp4_capture() {
+	fn copies_h264_and_aac_from_mp4_capture() {
 		let mut c = cfg(&["rtmps://localhost:1936/live/studio"]);
 		c.container = "mp4".into();
 		let args = build_args(&c).unwrap();
@@ -824,31 +677,30 @@ mod tests {
 	}
 
 	#[test]
-	fn recording_keeps_the_network_output_isolated() {
-		let c = cfg(&["rtmp://localhost:1935/live/obs"]);
+	fn equal_profiles_share_one_encode_across_network_and_recording() {
+		let mut c = cfg(&["rtmp://localhost/live/one", "rtmps://example.com/live/two"]);
+		c.video_bitrate_kbps = c.recording_video_bitrate_kbps;
 		let args = build_args_with_path(&c, Some("/tmp/recording.mp4")).unwrap();
-		let tee = args.iter().position(|arg| arg == "tee").unwrap();
-		assert!(args[tee + 1].contains("use_fifo=1"));
-		assert!(args[tee + 1].contains("attempt_recovery"));
-		assert!(args[tee + 1].contains("rw_timeout=8000000"));
+		assert_eq!(args.iter().filter(|arg| arg.as_str() == "-c:v").count(), 1);
+		assert_eq!(args.iter().filter(|arg| arg.as_str() == "-c:a").count(), 1);
+		assert!(args.last().unwrap().contains("pipe:1|[f=mp4:"));
+		assert!(!args.iter().any(|arg| arg.contains("rtmp")));
 	}
 
 	#[test]
-	fn multi_target_tees_and_ignores_failures() {
-		let args = build_args(&cfg(&[
-			"rtmp://localhost:1935/live/obs",
-			"rtmps://a.rtmp.youtube.com/live2/abcd",
-		]))
-		.unwrap();
-		let spec = args.last().unwrap();
-		assert_eq!(spec.matches("onfail=ignore").count(), 2);
-		assert_eq!(spec.matches("use_fifo=1").count(), 2);
-		assert!(spec.contains('|'));
+	fn recording_can_feed_a_held_output_without_an_immediate_destination() {
+		let mut c = cfg(&[]);
+		c.feed_held = true;
+		let args = build_args_with_path(&c, Some("/tmp/recording.mp4")).unwrap();
+		assert!(args.contains(&"pipe:1".to_string()));
+		c.feed_held = false;
+		let args = build_args_with_path(&c, Some("/tmp/recording.mp4")).unwrap();
+		assert!(!args.contains(&"pipe:1".to_string()));
 	}
 
 	#[test]
 	fn rejects_pipe_injection_in_stream_key() {
-		// A key containing tee syntax would silently add a third destination.
+		// Keep stream keys compatible with the ingest URL format.
 		let err = build_args(&cfg(&["rtmp://host/live/key|[f=flv]rtmp://evil/x"])).unwrap_err();
 		assert!(err.starts_with("t — "), "target name should identify the bad entry: {err}");
 		assert!(err.contains("interdit"));
@@ -878,38 +730,18 @@ mod tests {
 	}
 
 	#[test]
-	fn reads_tee_slave_failures_back_to_the_right_destination() {
-		let line = "[tee @ 0x1] Slave muxer #1 failed: Connection refused, continuing with 1/2 slaves.";
-		let (index, reason) = parse_target_failure(line, false).unwrap();
-		assert_eq!(index, 1);
-		assert!(reason.contains("Connection refused"), "{reason}");
-	}
-
-	#[test]
-	fn blames_target_zero_when_there_is_no_tee() {
-		// With one destination ffmpeg writes flv directly, so nothing numbers
-		// the failure — it can only be the single target.
-		let line = "[rtmp @ 0x1] Cannot open connection tcp://host:1935";
-		assert_eq!(parse_target_failure(line, true).unwrap().0, 0);
-		// The same line with several targets is the tee's job to attribute.
-		assert!(parse_target_failure(line, false).is_none());
-	}
-
-	#[test]
-	fn ordinary_log_lines_are_not_failures() {
-		assert!(parse_target_failure("frame= 120 fps=30", false).is_none());
-		assert!(parse_target_failure("[libx264] using cpu capabilities", true).is_none());
+	fn reads_progress_without_logging_it_as_an_error() {
+		let mut stats = StreamStats::default();
+		assert!(apply_progress(&mut stats, "out_time_us=123456"));
+		assert_eq!(stats.out_time_ms, 123);
+		assert!(apply_progress(&mut stats, "progress=continue"));
+		assert!(!apply_progress(&mut stats, "[ffmpeg] cannot write recording"));
 	}
 
 	#[test]
 	fn redact_hides_stream_keys() {
-		let args = build_args(&cfg(&[
-			"rtmp://localhost:1935/live/supersecret",
-			"rtmps://a.rtmp.youtube.com/live2/abcd-efgh",
-		]))
-		.unwrap();
+		let args = publish_args("rtmps://a.rtmp.youtube.com/live2/abcd-efgh");
 		let shown = redact(&args).join(" ");
-		assert!(!shown.contains("supersecret"));
 		assert!(!shown.contains("abcd-efgh"));
 		assert!(shown.contains("a.rtmp.youtube.com/live2/***"));
 	}
