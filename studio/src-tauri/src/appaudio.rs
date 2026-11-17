@@ -24,6 +24,7 @@ pub struct AudioApp {
 #[serde(rename_all = "camelCase")]
 pub struct AudioWindow {
 	pub id: u32,
+	pub preview: Option<String>,
 	pub app_id: String,
 	pub app_name: String,
 	pub title: String,
@@ -155,12 +156,11 @@ mod platform {
 		}
 	}
 
-	/// Include windows on other macOS desktops so an operator can pick a window
-	/// on a second monitor without moving it onto Studio's desktop first.
+	/// Show windows currently visible on a display, including other monitors.
 	pub fn list_windows() -> Result<Vec<AudioWindow>, String> {
 		crate::window_capture::require_screen_recording()?;
 		let content = SCShareableContent::create()
-			.with_on_screen_windows_only(false)
+			.with_on_screen_windows_only(true)
 			.get()
 			.map_err(|e| format!("Could not list shareable windows: {e:?}"))?;
 		Ok(content
@@ -173,8 +173,27 @@ mod platform {
 					return None;
 				}
 				let frame = window.frame();
+				if frame.size.width < 160.0 || frame.size.height < 90.0 { return None; }
+				let preview = if objc2_foundation::NSProcessInfo::processInfo().operatingSystemVersion().majorVersion >= 14 {
+					use base64::Engine;
+					use screencapturekit::screenshot_manager::{CGImageExt, SCScreenshotManager};
+					let filter = screencapturekit::stream::content_filter::SCContentFilter::create().with_window(&window).build();
+					let scale = (320.0 / frame.size.width.max(1.0)).min(180.0 / frame.size.height.max(1.0)).min(1.0);
+					let width = (frame.size.width * scale).round().max(1.0) as u32;
+					let height = (frame.size.height * scale).round().max(1.0) as u32;
+					let config = screencapturekit::stream::configuration::SCStreamConfiguration::new().with_width(width).with_height(height);
+					SCScreenshotManager::capture_image(&filter, &config).ok().and_then(|image| {
+						let pixels = image.rgba_data().ok()?;
+						let rgb: Vec<u8> = pixels.chunks_exact(4).flat_map(|pixel| pixel[..3].iter().copied()).collect();
+						let mut jpeg = Vec::new();
+						image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 70)
+							.encode(&rgb, image.width() as u32, image.height() as u32, image::ExtendedColorType::Rgb8).ok()?;
+						Some(format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(jpeg)))
+					})
+				} else { None };
 				Some(AudioWindow {
 					id: window.window_id(),
+					preview,
 					app_id,
 					app_name: app.application_name(),
 					title: window.title().unwrap_or_default(),

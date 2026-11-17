@@ -113,12 +113,13 @@
 		refreshingWindows = true;
 		try {
 			if (requestAccess) await invoke('request_screen_recording_access');
-			windowChoices = await invoke<AudioWindow[]>('list_windows');
+			windowChoices = (await invoke<AudioWindow[]>('list_windows')).sort(
+				(a, b) => Number(Boolean(b.preview)) - Number(Boolean(a.preview))
+			);
 			windowPickerError = null;
 		} catch (error) {
 			windowChoices = [];
-			windowPickerError =
-				error === SCREEN_RECORDING_ACCESS_REQUIRED ? 'permission' : 'unavailable';
+			windowPickerError = error === SCREEN_RECORDING_ACCESS_REQUIRED ? 'permission' : 'unavailable';
 			if (windowPickerError === 'unavailable') report(`list shareable windows failed: ${error}`);
 		} finally {
 			refreshingWindows = false;
@@ -489,14 +490,26 @@
 		<div class="flex flex-col gap-3 p-5">
 			<p class="text-[12px] leading-relaxed text-muted">{t('sources.pickWindowHint')}</p>
 			{#if windowChoices.length}
-				<div class="max-h-80 space-y-1 overflow-y-auto">
+				<div class="grid max-h-[28rem] grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3">
 					{#each windowChoices as choice (choice.id)}
 						<button
-							class="studio-chip flex w-full flex-col items-start gap-1 text-left"
+							class="studio-chip flex min-w-0 flex-col gap-2 text-left"
 							disabled={choice.id === undefined}
 							onclick={() => pendingWindowLayer && captureNativeWindow(pendingWindowLayer, choice)}
 						>
-							<span class="text-fg">{choice.appName}</span>
+							{#if choice.preview}
+								<img
+									src={choice.preview}
+									alt=""
+									class="h-28 w-full rounded bg-black object-contain"
+								/>
+							{:else}
+								<span
+									class="flex h-28 w-full items-center justify-center rounded bg-ink-800 text-muted"
+									>{t('sources.previewUnavailable')}</span
+								>
+							{/if}
+							<span class="truncate text-fg">{choice.appName}</span>
 							<span class="truncate text-muted">{choice.title || t('sources.untitledWindow')}</span>
 						</button>
 					{/each}
