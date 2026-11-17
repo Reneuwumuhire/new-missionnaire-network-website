@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { browser } from '$app/environment';
-	import { onDestroy, onMount } from 'svelte';
+	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import type { YoutubeVideo } from '$lib/models/youtube';
 	import NotificationBell from '$lib/components/+notificationBell.svelte';
@@ -26,23 +26,21 @@
 	let bellSubscribed = $state(false);
 
 	// Scroll-triggered reveal
-	let heroVisible = $state(false);
 	let sectionsVisible: Record<string, boolean> = $state({});
 	let scrolledPastHero = $state(false);
 
 	onMount(() => {
 		if (!browser) return;
 
-		// Trigger hero reveal
-		requestAnimationFrame(() => {
-			heroVisible = true;
-		});
-
 		// Hide scroll indicator once scrolled past hero
 		const handleScroll = () => {
 			scrolledPastHero = window.scrollY > 200;
 		};
+		handleScroll();
 		window.addEventListener('scroll', handleScroll, { passive: true });
+		if (!('IntersectionObserver' in window)) {
+			return () => window.removeEventListener('scroll', handleScroll);
+		}
 
 		// Intersection observer for scroll reveals
 		const observer = new IntersectionObserver(
@@ -60,11 +58,10 @@
 
 		document.querySelectorAll('[data-reveal]').forEach((el) => observer.observe(el));
 
-		return () => observer.disconnect();
-	});
-
-	onDestroy(() => {
-		clearInterval(heroVerseInterval);
+		return () => {
+			observer.disconnect();
+			window.removeEventListener('scroll', handleScroll);
+		};
 	});
 
 	// Hero Bible verse rotator
@@ -104,16 +101,38 @@
 
 	let heroVerseIndex = $state(0);
 	let heroVerseVisible = $state(true);
-	let heroVerseInterval: ReturnType<typeof setInterval>;
 
 	onMount(() => {
-		heroVerseInterval = setInterval(() => {
-			heroVerseVisible = false;
-			setTimeout(() => {
-				heroVerseIndex = (heroVerseIndex + 1) % heroVerses.length;
-				heroVerseVisible = true;
-			}, 600);
-		}, 7000);
+		const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
+		let interval: ReturnType<typeof setInterval> | undefined;
+		let timeout: ReturnType<typeof setTimeout> | undefined;
+
+		const stop = () => {
+			clearInterval(interval);
+			clearTimeout(timeout);
+			interval = undefined;
+			heroVerseVisible = true;
+		};
+		const syncMotion = () => {
+			if (motionPreference.matches) {
+				stop();
+			} else if (!interval) {
+				interval = setInterval(() => {
+					heroVerseVisible = false;
+					timeout = setTimeout(() => {
+						heroVerseIndex = (heroVerseIndex + 1) % heroVerses.length;
+						heroVerseVisible = true;
+					}, 600);
+				}, 7000);
+			}
+		};
+
+		motionPreference.addEventListener('change', syncMotion);
+		syncMotion();
+		return () => {
+			motionPreference.removeEventListener('change', syncMotion);
+			stop();
+		};
 	});
 
 	const quickLinks = [
@@ -187,10 +206,7 @@
 			aria-hidden="true"
 		></div>
 
-		<div
-			class="relative z-10 max-w-4xl mx-auto text-center hero-content"
-			class:hero-visible={heroVisible}
-		>
+		<div class="relative z-10 max-w-4xl mx-auto text-center hero-content">
 			<p
 				class="hero-label text-[10px] md:text-[11px] font-semibold uppercase tracking-[0.35em] md:tracking-[0.4em] text-missionnaire mb-4 md:mb-6 font-body"
 			>
@@ -697,9 +713,7 @@
 
 	/* ── Cross descending from above ── */
 	.cross-descend {
-		opacity: 0;
-		transform: translate(-50%, -60px);
-		animation: cross-fall 2.2s cubic-bezier(0.22, 1, 0.36, 1) 0.1s forwards;
+		transform: translateX(-50%);
 	}
 	@keyframes cross-fall {
 		0% {
@@ -731,7 +745,6 @@
 			transparent
 		);
 		transform-origin: top;
-		animation: line-extend 1.5s cubic-bezier(0.16, 1, 0.3, 1) 0.8s both;
 	}
 	@keyframes line-extend {
 		from {
@@ -744,62 +757,32 @@
 		}
 	}
 
-	/* ── Hero entrance animations ── */
-	.hero-content .hero-label,
-	.hero-content .hero-title,
-	.hero-content .hero-subtitle,
-	.hero-content .hero-cta,
-	.hero-content .hero-verse {
-		opacity: 0;
-		transform: translateY(24px);
-		transition:
-			opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
-			transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-	}
-
-	.hero-visible .hero-label {
-		opacity: 1;
-		transform: translateY(0);
-		transition-delay: 0.25s;
-	}
-	.hero-visible .hero-title {
-		opacity: 1;
-		transform: translateY(0);
-		transition-delay: 0.4s;
-	}
-	.hero-visible .hero-subtitle {
-		opacity: 1;
-		transform: translateY(0);
-		transition-delay: 0.6s;
-	}
-	.hero-visible .hero-cta {
-		opacity: 1;
-		transform: translateY(0);
-		transition-delay: 0.8s;
-	}
-	.hero-visible .hero-verse {
-		opacity: 1;
-		transform: translateY(0);
-		transition-delay: 1.1s;
+	/* ── Hero entrance works even before JavaScript loads ── */
+	@keyframes hero-enter {
+		from {
+			opacity: 0;
+			transform: translateY(24px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
 	}
 
 	/* ── Hero verse gentle animation ── */
 	.verse-anim {
-		opacity: 0;
-		transform: translateY(8px);
 		transition:
 			opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
 			transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
 	}
-	.verse-visible {
-		opacity: 1;
-		transform: translateY(0);
+	.verse-anim:not(.verse-visible) {
+		opacity: 0;
+		transform: translateY(8px);
 	}
 
 	/* ── Scroll indicator ── */
 	.scroll-indicator {
 		transform: translateX(-50%);
-		animation: indicator-in 1s ease 2.5s both;
 	}
 	@keyframes indicator-in {
 		from {
@@ -810,12 +793,6 @@
 			opacity: 1;
 			transform: translate(-50%, 0);
 		}
-	}
-	.scroll-hint .chevron-1 {
-		animation: chevron-bounce 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-	}
-	.scroll-hint .chevron-2 {
-		animation: chevron-bounce 2s cubic-bezier(0.4, 0, 0.2, 1) 0.15s infinite;
 	}
 	@keyframes chevron-bounce {
 		0%,
@@ -830,22 +807,6 @@
 	}
 
 	/* ── Scroll reveal sections ── */
-	.reveal-section {
-		opacity: 0;
-		transform: translateY(32px);
-		transition:
-			opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
-			transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
-	}
-	.revealed {
-		opacity: 1;
-		transform: translateY(0);
-	}
-
-	/* ── Quick links stagger ── */
-	.revealed .quick-link {
-		animation: fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
-	}
 	@keyframes fade-up {
 		from {
 			opacity: 0;
@@ -857,8 +818,49 @@
 		}
 	}
 
-	/* ── Video cards stagger ── */
-	.revealed .video-card {
-		animation: fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+	@media (prefers-reduced-motion: no-preference) {
+		.cross-descend {
+			animation: cross-fall 2.2s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both;
+		}
+		.line-grow {
+			animation: line-extend 1.5s cubic-bezier(0.16, 1, 0.3, 1) 0.8s both;
+		}
+		.hero-content .hero-label {
+			animation: hero-enter 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.25s both;
+		}
+		.hero-content .hero-title {
+			animation: hero-enter 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.4s both;
+		}
+		.hero-content .hero-subtitle {
+			animation: hero-enter 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.6s both;
+		}
+		.hero-content .hero-cta {
+			animation: hero-enter 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.8s both;
+		}
+		.hero-content .hero-verse {
+			animation: hero-enter 0.8s cubic-bezier(0.16, 1, 0.3, 1) 1.1s both;
+		}
+		.scroll-indicator {
+			animation: indicator-in 1s ease 2.5s both;
+		}
+		.scroll-chevrons .chevron-1 {
+			animation: chevron-bounce 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+		}
+		.scroll-chevrons .chevron-2 {
+			animation: chevron-bounce 2s cubic-bezier(0.4, 0, 0.2, 1) 0.15s infinite;
+		}
+		.reveal-section.revealed {
+			animation: fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+		}
+		.revealed .quick-link,
+		.revealed .video-card {
+			animation: fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.verse-anim {
+			transition: none;
+		}
 	}
 </style>
