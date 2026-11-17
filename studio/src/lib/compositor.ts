@@ -40,7 +40,7 @@ let transition: Transition | null = null;
 let frames = 0;
 const MEDIA_KINDS: Layer['kind'][] = ['camera', 'screen', 'image', 'video'];
 
-/** Diagnostics only: frames the compositor has actually painted. */
+/** Diagnostics: frames painted on the broadcast canvas. */
 export const frameCount = () => frames;
 
 const pinnedIds = (scene?: Scene | null) => scene?.layers.map((layer) => layer.mediaHandleId) ?? [];
@@ -386,7 +386,6 @@ export function renderFrame(
 	withTransition: boolean,
 	nowMs = Date.now()
 ) {
-	frames++;
 	ctx.save();
 	ctx.fillStyle = '#000000';
 	ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
@@ -460,6 +459,7 @@ export function startRenderLoop(
 			// delivered for 30 asked. Keeping the phase averages out to the target.
 			last = now - ((now - last) % interval);
 			renderFrame(ctx, sceneId(), withTransition);
+			if (withTransition) frames++;
 		}
 		schedule();
 	};

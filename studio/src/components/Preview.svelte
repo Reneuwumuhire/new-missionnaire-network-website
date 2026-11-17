@@ -3,9 +3,7 @@
 	import { applyDrag, cursorForHandle, FULL_FRAME, hitHandle, type Handle } from '../lib/geom';
 	import { activeScene, persist, studio } from '../lib/state.svelte';
 
-	// A canvas rendered at broadcast resolution and scaled down with CSS — what
-	// you see is exactly what goes out, pixel for pixel. The program instance is
-	// the one MediaRecorder captures.
+	// Only Program needs broadcast-resolution pixels.
 	let {
 		label,
 		sceneId,
@@ -34,11 +32,16 @@
 	 *  announces what a press would do before it is pressed. */
 	let hover = $state<Handle | null>(null);
 	let fitted = $state({ w: 0, h: 0 });
+	const scale = $derived(
+		program ? 1 : Math.min(1, 960 / studio.settings.width, 540 / studio.settings.height)
+	);
 
 	$effect(() => {
 		if (!canvas) return;
 		oncanvas?.(canvas);
-		return startRenderLoop(canvas, sceneId, program, () => studio.settings.fps);
+		return startRenderLoop(canvas, sceneId, program, () =>
+			program ? studio.settings.fps : Math.min(studio.settings.fps, 15)
+		);
 	});
 
 	// Size the frame from the measured area rather than from `aspect-ratio` plus
@@ -163,8 +166,8 @@
 		>
 			<canvas
 				bind:this={canvas}
-				width={studio.settings.width}
-				height={studio.settings.height}
+				width={Math.round(studio.settings.width * scale)}
+				height={Math.round(studio.settings.height * scale)}
 				class="block h-full w-full"
 			></canvas>
 

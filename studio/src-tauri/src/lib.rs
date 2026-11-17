@@ -2,6 +2,7 @@ mod appaudio;
 mod diagnostics;
 mod fetch;
 mod ffmpeg;
+mod publisher;
 mod local_media;
 mod reference;
 mod service_files;
@@ -341,10 +342,13 @@ fn focus_main_window(app: AppHandle) -> Result<(), String> {
 
 /// Media chunks arrive as a raw IPC body (not JSON) — a JSON number array
 /// would be ~6× the bytes and would stall the webview at broadcast bitrates.
-#[tauri::command]
+#[tauri::command(async)]
 fn push_chunk(encoder: State<'_, Encoder>, request: tauri::ipc::Request<'_>) -> Result<(), String> {
+	let run_id = request.headers().get("x-studio-run-id")
+		.and_then(|value| value.to_str().ok()).and_then(|value| value.parse().ok())
+		.ok_or("Identifiant de capture manquant")?;
 	match request.body() {
-		tauri::ipc::InvokeBody::Raw(bytes) => encoder.push(bytes),
+		tauri::ipc::InvokeBody::Raw(bytes) => encoder.push(run_id, bytes),
 		_ => Err("push_chunk attend un corps binaire".into()),
 	}
 }

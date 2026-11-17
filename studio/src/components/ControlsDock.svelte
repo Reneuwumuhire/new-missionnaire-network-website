@@ -37,7 +37,9 @@
 	);
 
 	// Keep public destinations held until the operator approves the preview.
-	const canGoLive = $derived(broadcast.phase === 'live' && !liveSession.activeId);
+	const canGoLive = $derived(
+		broadcast.phase === 'live' && !broadcast.stopping && !liveSession.activeId
+	);
 	const youtubeReady = $derived(
 		broadcast.targets.some((target) => target.youtube && target.state === 'live')
 	);
@@ -92,15 +94,20 @@
 					: 'border border-red-500/50 text-danger hover:bg-red-600/15'
 				: 'bg-primary text-black hover:bg-missionnaire-400'} disabled:cursor-not-allowed disabled:opacity-40"
 			disabled={broadcast.starting ||
+				broadcast.stopping ||
 				(!isStreaming() && ((enabled.length === 0 && !recordsLocal()) || !liveSession.selectedId))}
 			onclick={onToggleLive}
 		>
-			{#if broadcast.starting}
+			{#if broadcast.stopping}
+				{t('controls.stopping')}
+			{:else if broadcast.starting}
 				{t('controls.starting')}
+			{:else if isStreaming() && confirmStop}
+				{t('controls.confirmStop')}
 			{:else if broadcast.phase === 'connecting'}
 				{t('controls.reaching')}
 			{:else if broadcast.phase === 'live'}
-				{confirmStop ? t('controls.confirmStop') : t('controls.stopStreaming')}
+				{t('controls.stopStreaming')}
 			{:else}
 				{t('controls.startStreaming')}
 			{/if}

@@ -241,8 +241,7 @@
 		const clock = setInterval(() => {
 			now = Date.now();
 			const frames = frameCount();
-			// Two canvases are painting in Studio Mode; report per-canvas rate.
-			renderFps = Math.round((frames - lastFrames) / (studio.settings.studioMode ? 2 : 1));
+			renderFps = frames - lastFrames;
 			lastFrames = frames;
 			if (isStreaming()) renderMissed += Math.max(0, studio.settings.fps - renderFps);
 		}, 1000);
@@ -495,14 +494,13 @@
 		if (broadcast.captureState === 'recovering') {
 			return { tone: 'warn', label: t('status.recoveringCapture') };
 		}
-		if (broadcast.phase === 'connecting') return { tone: 'idle', label: t('status.connecting') };
 		if (broadcast.targets.some((target) => target.state === 'reconnecting')) {
 			return { tone: 'warn', label: t('target.reconnecting') };
 		}
 		if (broadcast.targets.some((target) => target.state === 'failed')) {
 			return { tone: 'warn', label: t('target.failed') };
 		}
-		if (!stats) return { tone: 'idle', label: t('status.connecting') };
+		if (broadcast.phase === 'connecting' || !stats) return { tone: 'idle', label: t('status.connecting') };
 		if (streamHealthIssue(stats, broadcast.captureState)) {
 			return { tone: 'warn', label: t('status.behind') };
 		}
@@ -690,24 +688,17 @@
 							>
 						{/each}
 					</div>
-					<Preview
-						label={t('preview.program')}
-						sceneId={onAirSceneId}
-						program={true}
-						editable={false}
-						live={broadcast.phase === 'live'}
-						oncanvas={(canvas) => (programCanvas = canvas)}
-					/>
-				{:else}
-					<Preview
-						label="{t('preview.program')}: {activeScene().name}"
-						sceneId={onAirSceneId}
-						program={true}
-						editable={true}
-						live={broadcast.phase === 'live'}
-						oncanvas={(canvas) => (programCanvas = canvas)}
-					/>
 				{/if}
+				<Preview
+					label={studio.settings.studioMode
+						? t('preview.program')
+						: `${t('preview.program')}: ${activeScene().name}`}
+					sceneId={onAirSceneId}
+					program={true}
+					editable={!studio.settings.studioMode}
+					live={broadcast.phase === 'live'}
+					oncanvas={(canvas) => (programCanvas = canvas)}
+				/>
 			</div>
 
 			<!-- The transport sits above the source strip, always in reach: a

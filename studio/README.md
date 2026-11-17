@@ -6,26 +6,20 @@ bottom, Studio Mode, dBFS meters), so anyone who has run OBS already knows how
 to run this. What it adds is a lyrics panel, and streaming to the church's own
 ingest and to YouTube at the same time.
 
-Tauri (Rust) + Svelte 5. The Rust side owns exactly one thing: an `ffmpeg`
-process. Everything visual happens on a canvas in the webview.
+Tauri (Rust), Svelte 5, and FFmpeg. The webview composites the Program
+canvas and mixes its audio. The native media pipeline encodes that feed,
+writes local recordings, and distributes encoded packets to RTMP publishers.
 
 ## Why it is built this way
 
-```
-scenes/layers ─► <canvas> ─► captureStream ─┐
-mics/media ────► WebAudio bus ──────────────┴─► MediaRecorder (VP8/Opus)
-                                                      │  250 ms chunks over IPC
-                                                      ▼
-                                       Rust ─► ffmpeg ─► H.264/AAC ─► RTMP ×N
-```
+Switching scenes or toggling Studio Mode keeps the Program canvas connected
+to the recorder. The editing preview uses at most 960×540 at 15 fps.
 
-The canvas **is** the broadcast. Switching a scene only changes what the next
-frame paints, so the encoder and every RTMP connection stay up across a scene
-change — no reconnect, no dropped viewers.
-
-ffmpeg's `tee` muxer fans one encode out to all destinations. Every RTMP output
-has its own packet queue and reconnect loop, with `onfail=ignore`: **a slow or
-reconnecting YouTube output cannot block the church's own stream.**
+Studio encodes an H.264/AAC feed once for its RTMP destinations. A local MP4
+shares that encode when its quality settings match. Each destination has a
+bounded packet queue and its own reconnect loop. When a destination stalls,
+it reconnects with fresh codec headers and a keyframe while the encoder,
+other publishers, and local recording continue.
 
 ## Running it
 
@@ -140,10 +134,9 @@ when streaming starts. YouTube sees no stream, so it has nothing to publish.
 A **Go Live** button then appears in Controls; press it and the held
 destinations connect.
 
-They get their own encoder rather than joining the running one, because an
-output cannot be added to a live ffmpeg and restarting it would drop the
-congregation's stream to bring up a public one. The cost is a second encode
-while both run.
+Held destinations join the encoded feed at the next keyframe. Starting
+YouTube while Missionnaire is on air leaves the Missionnaire connection and
+local recording running.
 
 **This app still cannot stop a YouTube broadcast** — it has no YouTube API. Go
 Live stops _feeding_ YouTube; ending the broadcast is done in Studio, and the
@@ -156,14 +149,15 @@ Studio and turn auto-start off there; the hold works either way.
 
 The fields OBS's Stats dock shows, sourced from ffmpeg:
 
-| Field                         | What it means when it climbs                                                                                                              |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Dropped frames (network)      | ffmpeg gave up on frames it could not send                                                                                                |
-| Encoder backpressure events   | ffmpeg briefly could not accept input. Studio waits instead of discarding encoded audio/video; persistent growth means lower the bitrate. |
-| Frames missed (rendering lag) | the compositor could not paint at the target fps — lower the resolution or fps                                                            |
-| Encoder speed                 | below 1.00× means encoding slower than real time                                                                                          |
+| Field | What it measures |
+| --- | --- |
+| Dropped frames (encoder) | Frames omitted while encoding |
+| Encoder backpressure events | The capture encoder reached its input queue limit |
+| Frames missed (rendering lag) | The Program canvas painted fewer frames than requested |
+| Encoder speed | Below 1.00× means encoding slower than real time |
 
-Bitrate is shown against what you asked for, plus total data sent.
+Each destination shows its own connection state. Use Admin → Recordings →
+Live Monitor to verify that Missionnaire is receiving audible audio.
 
 ## Destinations
 
@@ -399,6 +393,12 @@ STUDIO_SELFTEST=rtmp://127.0.0.1:11950/live/studio pnpm studio
 It prints a line a second (`frames`, `chunks`, encoded `f/kbps`) and finishes
 with `SELFTEST OK`. `ffprobe out.flv` should show H.264 at your configured
 resolution plus AAC 48 kHz stereo.
+
+Use separate ingest infrastructure for network interruption rehearsals. The
+production Fly ingest selects one active publisher across stream paths. Test
+with the production scenes and devices, keep a local recording running, and
+interrupt each destination independently. Check the saved file and listen in
+Live Monitor after the signal returns.
 
 ## Native application menus
 
