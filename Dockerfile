@@ -5,6 +5,7 @@ ENV DEPLOY_TARGET=node
 
 RUN corepack enable
 COPY package.json pnpm-lock.yaml .npmrc ./
+COPY patches ./patches
 RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm build

@@ -74,6 +74,15 @@
 			"undici": "7.30.2",
 			"postcss-selector-parser": "7.1.6",
 			"source-map-js": "1.2.2"
+		},
+		"patchedDependencies": {
+			"picomatch@2.3.2": "patches/picomatch@2.3.2.patch",
+			"picomatch@4.0.7": "patches/picomatch@4.0.7.patch"
+		},
+		"auditConfig": {
+			"ignoreGhsas": [
+				"GHSA-fc5q-39xc-vjpf"
+			]
 		}
 	},
 	"dependencies": {

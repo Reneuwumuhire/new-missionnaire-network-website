@@ -1,0 +1,15 @@
+--- a/lib/parse.js
++++ b/lib/parse.js
+@@ -295,6 +295,12 @@
+       : constants.DEFAULT_MAX_EXTGLOB_RECURSION;
+ 
+   const branches = splitTopLevel(body).map(branch => branch.trim());
++
++  // GHSA-fc5q-39xc-vjpf: one wildcard branch can also nest an unbounded quantifier.
++  // Treat these patterns literally, as we already do for risky alternatives.
++  if (branches.length === 1 && branches[0].includes('*')) {
++    return { risky: true };
++  }
+ 
+   if (branches.length > 1) {
+     if (

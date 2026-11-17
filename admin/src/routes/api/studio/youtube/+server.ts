@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { objectIdString } from '$lib/server/mongo-input';
+import { studioYouTubeBody } from '$lib/server/studio-youtube-request';
 import { error, json } from '@sveltejs/kit';
 import { getPermissions, type AdminUser } from '$lib/models/admin-user';
 import { getDb } from '../../../../db/mongo';
@@ -71,30 +71,6 @@ async function sessionChannelId(
 	if (channels.length === 1) return channels[0].id;
 	throw error(409, 'This older session is not linked to one YouTube channel');
 }
-
-const studioYouTubeBody = z.object({
-	action: z.string().max(30),
-	sessionId: objectIdString.optional(),
-	channelId: z.string().max(128).optional(),
-	title: z.unknown(),
-	description: z.unknown(),
-	scheduledAt: z.unknown(),
-	privacyStatus: z.unknown(),
-	madeForKids: z.unknown(),
-	thumbnailUrl: z.unknown(),
-	thumbnailKey: z.unknown(),
-	subtitleUrl: z.unknown(),
-	subtitleKey: z.unknown(),
-	subtitleFilename: z.unknown(),
-	serviceType: z.unknown(),
-	announce: z.unknown(),
-	reminderEnabled: z.unknown(),
-	notifyOnStart: z.unknown(),
-	filename: z.unknown(),
-	contentType: z.unknown(),
-	size: z.unknown(),
-	deviceInfo: z.unknown()
-});
 
 export async function POST({ request, getClientAddress }) {
 	const parsed = studioYouTubeBody.safeParse(await request.json().catch(() => null));

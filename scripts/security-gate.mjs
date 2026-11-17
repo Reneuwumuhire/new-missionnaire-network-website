@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 
 const checks = [
+	['node', 'scripts/verify-picomatch-patches.mjs'],
 	[
 		'npm',
 		'exec',
