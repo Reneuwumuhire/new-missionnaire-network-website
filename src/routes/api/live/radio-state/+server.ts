@@ -61,6 +61,10 @@ export async function GET({ fetch, url, setHeaders }) {
 
 	const isLive = icecastLive && adminGate.is_live;
 	if (!isLive) listeners = 0;
+	const subtitleUrl =
+		adminGate.is_live && adminGate.subtitle_srt_s3_key
+			? `/api/subtitles/file?key=${encodeURIComponent(adminGate.subtitle_srt_s3_key)}`
+			: null;
 
 	return json({
 		isLive,
@@ -78,16 +82,18 @@ export async function GET({ fetch, url, setHeaders }) {
 		// delay never shifts the text. serverNowMs lets them correct for
 		// client clock skew. Studio supplies the initial anchor and either Studio
 		// or admin can subsequently re-sync it.
-		subtitles:
-			adminGate.is_live && adminGate.subtitle_srt_s3_key
-				? {
-						url: `/api/subtitles/file?key=${encodeURIComponent(adminGate.subtitle_srt_s3_key)}`,
-						anchorEpochMs: adminGate.subtitle_anchor_epoch_ms,
-						offsetMs: adminGate.subtitle_offset_ms ?? 0,
-						pausedPositionMs: adminGate.subtitle_paused_position_ms,
-						timeline: adminGate.subtitle_timeline
-					}
-				: null,
+		subtitles: subtitleUrl
+			? {
+					url: subtitleUrl,
+					anchorEpochMs: adminGate.subtitle_anchor_epoch_ms,
+					offsetMs: adminGate.subtitle_offset_ms ?? 0,
+					pausedPositionMs: adminGate.subtitle_paused_position_ms,
+					// Use the same-origin URL for the current file throughout the timeline.
+					timeline: adminGate.subtitle_timeline.map((segment) =>
+						segment.url === adminGate.subtitle_srt_url ? { ...segment, url: subtitleUrl } : segment
+					)
+				}
+			: null,
 		serverNowMs: Date.now()
 	});
 }
