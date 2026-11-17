@@ -14,6 +14,7 @@
 	} from '../lib/media.svelte';
 	import {
 		DESKTOP_AUDIO,
+		SCREEN_RECORDING_ACCESS_REQUIRED,
 		appAudio,
 		listWindows,
 		matchApp,
@@ -105,18 +106,22 @@
 	});
 	let pendingWindowLayer = $state<Layer | null>(null);
 	let windowChoices = $state<AudioWindow[]>([]);
-	let windowPickerError = $state<string | null>(null);
+	let windowPickerError = $state<'permission' | 'unavailable' | null>(null);
+	let refreshingWindows = $state(false);
 
-	async function refreshWindowChoices() {
+	async function refreshWindowChoices(requestAccess = false) {
+		refreshingWindows = true;
 		try {
+			if (requestAccess) await invoke('request_screen_recording_access');
 			windowChoices = await invoke<AudioWindow[]>('list_windows');
 			windowPickerError = null;
 		} catch (error) {
 			windowChoices = [];
-			const message = String(error);
-			windowPickerError = /TCC|permission|not authorized|declined/i.test(message)
-				? t('sources.noWindows')
-				: message;
+			windowPickerError =
+				error === SCREEN_RECORDING_ACCESS_REQUIRED ? 'permission' : 'unavailable';
+			if (windowPickerError === 'unavailable') report(`list shareable windows failed: ${error}`);
+		} finally {
+			refreshingWindows = false;
 		}
 	}
 
@@ -496,16 +501,37 @@
 						</button>
 					{/each}
 				</div>
-			{:else}
-				<p class="text-[12px] text-warning">{windowPickerError || t('sources.noWindows')}</p>
+			{:else if !refreshingWindows}
+				<p class="text-[12px] text-warning" role="status">
+					{t(
+						windowPickerError === 'permission'
+							? 'sources.screenPermissionRequired'
+							: windowPickerError === 'unavailable'
+								? 'sources.windowsUnavailable'
+								: 'sources.noWindows'
+					)}
+				</p>
 			{/if}
-			<div class="flex justify-between border-t border-ink-700 pt-3">
-				<button class="studio-chip" onclick={() => openPrivacySettings('screen')}>
-					{t('sources.screenPermission')}
-				</button>
-				<button class="studio-chip" onclick={refreshWindowChoices}
-					>{t('sources.refreshWindows')}</button
+			<div class="flex flex-wrap gap-2 border-t border-ink-700 pt-3">
+				{#if windowPickerError === 'permission'}
+					<button
+						class="studio-chip"
+						disabled={refreshingWindows}
+						onclick={() => refreshWindowChoices(true)}
+					>
+						{t('sources.requestScreenPermission')}
+					</button>
+					<button class="studio-chip" onclick={() => openPrivacySettings('screen')}>
+						{t('sources.screenPermission')}
+					</button>
+				{/if}
+				<button
+					class="studio-chip ml-auto"
+					disabled={refreshingWindows}
+					onclick={() => refreshWindowChoices()}
 				>
+					{t(refreshingWindows ? 'sources.refreshingWindows' : 'sources.refreshWindows')}
+				</button>
 			</div>
 		</div>
 	</Modal>

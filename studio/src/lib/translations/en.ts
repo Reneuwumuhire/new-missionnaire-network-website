@@ -69,8 +69,12 @@ const en = {
 	'sources.pickWindowHint':
 		'Choose a window. On macOS 13 or later, audio from its application is added to the mixer automatically.',
 	'sources.untitledWindow': 'Untitled window',
-	'sources.noWindows':
-		'No windows found. Allow Screen Recording for Missionnaire Studio in macOS settings, then refresh.',
+	'sources.noWindows': 'No windows available to capture. Open the window you want to share and refresh.',
+	'sources.windowsUnavailable': 'Studio could not load the available windows. Try refreshing.',
+	'sources.screenPermissionRequired':
+		'macOS has yet to grant screen recording access to this copy of Studio. Enable it in System Settings, then quit Studio with ⌘Q and reopen it from Applications. If it is already enabled, remove the Studio entry and add the copy from Applications again.',
+	'sources.requestScreenPermission': 'Request screen recording access',
+	'sources.refreshingWindows': 'Refreshing windows…',
 	'sources.noVideoFrames':
 		'The window has not sent video. Keep it open and visible, then reconnect this source.',
 	'sources.windowCaptureEnded': 'Window capture ended. Reconnect this source to choose a window.',

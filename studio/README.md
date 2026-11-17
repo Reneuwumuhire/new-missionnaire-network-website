@@ -52,9 +52,20 @@ Downloaded tools are SHA-256 verified, and FFmpeg's license and build
 notes ship beside the binary in Studio's resources.
 The bundled yt-dlp is from [yt-dlp 2026.08.19](https://github.com/yt-dlp/yt-dlp/releases/tag/2026.08.19).
 
-On first launch macOS asks for camera, microphone and screen-recording
-permission. Screen recording additionally needs the app ticked in
-**System Settings › Privacy & Security › Screen Recording**.
+On macOS, install Studio in **Applications**. For window capture, choose
+**Request screen recording access** in Studio and enable it in
+**System Settings › Privacy & Security › Screen & System Audio Recording**.
+Quit Studio with **⌘Q**, then reopen it from **Applications**. If the switch was
+already on and capture still fails, quit Studio, remove its old recording entry
+in System Settings, and add the copy from **Applications** again.
+
+To keep that permission across updates, sign macOS releases with a
+**Developer ID Application** certificate from the same Apple team. Configure
+`APPLE_CERTIFICATE` (the base64-encoded `.p12`) and
+`APPLE_CERTIFICATE_PASSWORD` as GitHub Actions secrets. For notarization,
+also set `APPLE_ID`, `APPLE_PASSWORD` (an app-specific password), and
+`APPLE_TEAM_ID`. The first update from an ad-hoc build may require granting
+access again. Without a certificate the release workflow signs ad hoc.
 
 ## The layout, if you know OBS
 

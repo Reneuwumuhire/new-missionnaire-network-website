@@ -58,6 +58,7 @@ export function matchApp(label: string, apps: AudioApp[]): AudioApp | null {
  *  screen sounds like, and what OBS calls Desktop Audio. Held in the same
  *  `appId` field because from the capture on it is the same strip. */
 export const DESKTOP_AUDIO = '__desktop';
+export const SCREEN_RECORDING_ACCESS_REQUIRED = 'SCREEN_RECORDING_ACCESS_REQUIRED';
 
 export interface AudioWindow {
 	id?: number;

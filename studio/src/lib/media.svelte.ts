@@ -3,7 +3,7 @@
 // here is keyed by layer id and torn down explicitly.
 
 import { invoke } from '@tauri-apps/api/core';
-import { createPcmNode, pcmChannel } from './appaudio.svelte';
+import { createPcmNode, pcmChannel, SCREEN_RECORDING_ACCESS_REQUIRED } from './appaudio.svelte';
 import { t } from './i18n.svelte';
 import { MIX_RATE, type Mixer } from './mixer';
 import { mediaUrl } from './media-url';
@@ -482,7 +482,10 @@ export async function openNativeWindow(layer: Layer, windowId: number): Promise<
 			kind: 'screen',
 			el: null,
 			stream: null,
-			error: describe(err),
+			error:
+				err === SCREEN_RECORDING_ACCESS_REQUIRED
+					? t('sources.screenPermissionRequired')
+					: describe(err),
 			objectUrl: null
 		};
 		return set(layer.id, h, request);

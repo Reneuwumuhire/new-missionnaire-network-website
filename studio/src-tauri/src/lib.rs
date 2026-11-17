@@ -383,8 +383,21 @@ fn list_audio_apps() -> Result<Vec<appaudio::AudioApp>, String> {
 /// Every on-screen window with the application behind it. The webview's own
 /// picker does not say what was shared, so the choice is matched against this.
 #[tauri::command]
-fn list_windows() -> Result<Vec<appaudio::AudioWindow>, String> {
-	appaudio::list_windows()
+async fn list_windows() -> Result<Vec<appaudio::AudioWindow>, String> {
+	tauri::async_runtime::spawn_blocking(appaudio::list_windows)
+		.await
+		.map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+fn request_screen_recording_access() {
+	#[cfg(target_os = "macos")]
+	{
+		let access = core_graphics::access::ScreenCaptureAccess;
+		if !access.preflight() {
+			access.request();
+		}
+	}
 }
 
 #[tauri::command]
@@ -893,6 +906,7 @@ pub fn run() {
 			open_privacy_settings,
 			list_audio_apps,
 			list_windows,
+			request_screen_recording_access,
 			native_window_capture_available,
 			start_window_capture,
 			local_media::pick_local_media,

@@ -29,12 +29,10 @@ jobs:
             platform: macos-latest
             targets: aarch64-apple-darwin,x86_64-apple-darwin
             args: --target universal-apple-darwin
-            apple_signing_identity: '-'
           - name: Windows x64
             platform: windows-latest
             targets: x86_64-pc-windows-msvc
             args: ''
-            apple_signing_identity: ''
 
     steps:
       - uses: actions/checkout@v7
@@ -88,13 +86,45 @@ jobs:
         run: |
           node -e 'require("node:fs").mkdirSync(".svelte-kit", { recursive: true }); require("node:fs").writeFileSync(".svelte-kit/tsconfig.json", "{}\n")'
 
+      - name: Configure macOS signing
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [[ -z "$APPLE_CERTIFICATE" && -z "$APPLE_CERTIFICATE_PASSWORD" ]]; then
+            echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+            echo "::warning::Studio will be ad-hoc signed. macOS may require Screen Recording access again after an update."
+            exit 0
+          fi
+          if [[ -z "$APPLE_CERTIFICATE" || -z "$APPLE_CERTIFICATE_PASSWORD" ]]; then
+            echo "::error::Set both APPLE_CERTIFICATE and APPLE_CERTIFICATE_PASSWORD for Developer ID signing."
+            exit 1
+          fi
+
+          signing_vars=(APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD)
+          if [[ -n "$APPLE_ID" || -n "$APPLE_PASSWORD" || -n "$APPLE_TEAM_ID" ]]; then
+            if [[ -z "$APPLE_ID" || -z "$APPLE_PASSWORD" || -z "$APPLE_TEAM_ID" ]]; then
+              echo "::error::Set APPLE_ID, APPLE_PASSWORD and APPLE_TEAM_ID together for notarization."
+              exit 1
+            fi
+            signing_vars+=(APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID)
+          fi
+          for name in "${signing_vars[@]}"; do
+            delimiter="$(uuidgen)"
+            printf '%s<<%s\n%s\n%s\n' "$name" "$delimiter" "${!name}" "$delimiter" >> "$GITHUB_ENV"
+          done
+
       - name: Build, sign, and publish
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ matrix.apple_signing_identity }}
         with:
           projectPath: studio
           tauriScript: pnpm tauri
