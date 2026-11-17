@@ -202,8 +202,13 @@ async function adminPost<T>(body: object): Promise<T> {
 	) as T;
 }
 
-export function controlCloudRecording(action: 'start' | 'stop') {
-	return adminPost<{ id: string }>({ action: `recorder-${action}` });
+export type RecordingSession = { sessionId: string; sessionStartedAt: number };
+
+export function controlCloudRecording(action: 'start' | 'stop', session?: RecordingSession) {
+	return adminPost<{ id: string | null }>({
+		action: session ? 'recorder-stop-session' : `recorder-${action}`,
+		...session
+	});
 }
 
 export function missionnaireAudioStatus() {

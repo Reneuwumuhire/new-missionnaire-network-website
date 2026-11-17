@@ -28,7 +28,13 @@ import {
 } from '$lib/server/scheduled-live-validation';
 import { buildWatchUrl, pingBroadcastEvent } from '$lib/server/main-site';
 import { generatePresignedUploadUrl, getObjectBytes, getS3Url } from '$lib/server/s3';
-import { RecorderError, recorderStart, recorderStop } from '$lib/server/recorder-client';
+import {
+	RecorderError,
+	recorderStart,
+	recorderStatus,
+	recorderStop,
+	recorderStopById
+} from '$lib/server/recorder-client';
 import { fetchIcecastStatus } from '$lib/server/icecast';
 import {
 	missionnaireIngestForAuthorization,
@@ -37,7 +43,9 @@ import {
 } from '$lib/server/studio-ingest';
 
 async function operator(request: Request) {
-	const code = z.guid().safeParse(request.headers.get('authorization')?.replace(/^Bearer\s+/, '')).data;
+	const code = z
+		.guid()
+		.safeParse(request.headers.get('authorization')?.replace(/^Bearer\s+/, '')).data;
 	if (!code) error(401, 'Invalid Studio authorization');
 	const doc = await (await getDb()).collection('studio_authorizations').findOne({
 		code,
@@ -51,7 +59,11 @@ async function operator(request: Request) {
 		is_active: true,
 		must_change_password: { $ne: true }
 	});
-	if (!admin || !['superadmin', 'editor'].includes(admin.role) || !getPermissions(admin as unknown as AdminUser).can_manage_recordings) {
+	if (
+		!admin ||
+		!['superadmin', 'editor'].includes(admin.role) ||
+		!getPermissions(admin as unknown as AdminUser).can_manage_recordings
+	) {
 		await revokeMissionnaireIngest(code);
 		throw error(403, 'Broadcasting permission required');
 	}
@@ -77,7 +89,9 @@ export async function POST({ request, getClientAddress }) {
 	if (!parsed.success) error(400, 'Invalid Studio request');
 	const body = parsed.data;
 	if (body.action === 'logout') {
-		const code = z.guid().safeParse(request.headers.get('authorization')?.replace(/^Bearer\s+/, '')).data;
+		const code = z
+			.guid()
+			.safeParse(request.headers.get('authorization')?.replace(/^Bearer\s+/, '')).data;
 		if (code) await revokeMissionnaireIngest(code);
 		return json({ ok: true });
 	}
@@ -131,9 +145,43 @@ export async function POST({ request, getClientAddress }) {
 			throw cause;
 		}
 	}
-	if (body.action === 'recorder-stop') {
+	if (body.action === 'recorder-stop' || body.action === 'recorder-stop-session') {
 		try {
-			const result = await recorderStop();
+			let result: { id: string | null };
+			if (body.action === 'recorder-stop-session') {
+				if (!body.sessionId || body.sessionStartedAt === undefined) {
+					throw error(400, 'A scheduled session and start time are required');
+				}
+				const requestedAt = Date.now();
+				const session = await getScheduledLiveById(body.sessionId);
+				if (
+					!session ||
+					!['live', 'ended'].includes(session.status) ||
+					(session.is_test && session.created_by !== user.email)
+				) {
+					return json({ id: null });
+				}
+				const sessionStart = Date.parse(session.live_started_at ?? '');
+				if (sessionStart !== body.sessionStartedAt) return json({ id: null });
+				const sessionEnd = session.live_ended_at
+					? Math.min(requestedAt, Date.parse(session.live_ended_at))
+					: requestedAt;
+				const status = await recorderStatus();
+				// ponytail: match by the live window until recording starts carry an explicit session ID.
+				const startedAt = Date.parse(status.startedAt ?? '');
+				if (
+					!status.recording ||
+					!status.id ||
+					status.stopping ||
+					!(startedAt >= sessionStart && startedAt <= sessionEnd)
+				) {
+					return json({ id: null });
+				}
+				result = await recorderStopById(status.id);
+			} else {
+				result = await recorderStop();
+			}
+			if (!result.id) return json(result);
 			await logAudit({
 				user_id: user.email,
 				user_email: user.email,

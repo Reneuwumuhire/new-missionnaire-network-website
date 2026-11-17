@@ -7,7 +7,13 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { t } from './i18n.svelte';
-import { clearRecording, recording, recordsLocal, stopCloudRecording } from './recording.svelte';
+import {
+	clearRecording,
+	pendingCloudRecordingStart,
+	recording,
+	recordsLocal,
+	stopCloudRecording
+} from './recording.svelte';
 import {
 	endSelectedSession,
 	goLiveYouTube,
@@ -426,11 +432,13 @@ export async function startBroadcast(
 	chain = Promise.resolve();
 	try {
 		const destinations = studio.destinations.filter((d) => d.enabled && !d.hold && d.url.trim());
-		const enabled = targets ?? destinations.map((destination) => ({
-			name: destination.name,
-			url: destinationUrl(destination),
-			missionnaire: destinationPlatform(destination) === 'missionnaire'
-		}));
+		const enabled =
+			targets ??
+			destinations.map((destination) => ({
+				name: destination.name,
+				url: destinationUrl(destination),
+				missionnaire: destinationPlatform(destination) === 'missionnaire'
+			}));
 		const { settings } = studio;
 		const recordLocal = recordsLocal();
 		if (enabled.length === 0 && !recordLocal) throw new Error(t('error.noImmediateDestination'));
@@ -525,7 +533,8 @@ async function attachListeners() {
 			state: TargetState;
 			reason: string;
 		}>('stream://target', (event) => {
-			if (runtime?.runIds[event.payload.group] !== event.payload.runId || broadcast.stopping) return;
+			if (runtime?.runIds[event.payload.group] !== event.payload.runId || broadcast.stopping)
+				return;
 			// Target indices are local to their output group.
 			const target = broadcast.targets.filter((t) => t.group === event.payload.group)[
 				event.payload.index
@@ -577,9 +586,13 @@ export async function stopBroadcast() {
 	stopWatchdog();
 	try {
 		// Close remote sessions even if a Go Live request is still in flight.
-		const closingSession = sessionStart
-			? sessionStart.then(endSelectedSession)
-			: endSelectedSession();
+		const recordingSession = Promise.all([sessionStart, pendingCloudRecordingStart()]).then(() => {
+			const { activeId, activeStartedAt } = liveSession;
+			if (activeId && activeStartedAt !== null) {
+				return { sessionId: activeId, sessionStartedAt: activeStartedAt };
+			}
+		});
+		const closingSession = recordingSession.then(() => endSelectedSession());
 		await stopRecorder();
 		let drainTimeout: ReturnType<typeof setTimeout> | undefined;
 		await Promise.race([
@@ -605,7 +618,8 @@ export async function stopBroadcast() {
 		recoveryTimes = [];
 		clearRecording();
 		await detachListeners();
-		await Promise.all([closingSession, stopCloudRecording()]);
+		await Promise.all([closingSession, recordingSession.then(stopCloudRecording)]);
+		if (recording.error) broadcast.error = recording.error;
 	} finally {
 		broadcast.stopping = false;
 	}
@@ -719,11 +733,15 @@ export async function goLivePublic(): Promise<void> {
 			}
 			await goLiveYouTube();
 		}
-		if (generation !== lifecycle || previewRun !== runtime?.runIds.main || broadcast.stopping || recovering)
+		if (
+			generation !== lifecycle ||
+			previewRun !== runtime?.runIds.main ||
+			broadcast.stopping ||
+			recovering
+		)
 			return;
 		sessionStart = startSelectedSession();
-		if (!(await sessionStart))
-			throw new Error(liveSession.error || t('error.missionnaireGoLive'));
+		if (!(await sessionStart)) throw new Error(liveSession.error || t('error.missionnaireGoLive'));
 		if (generation === lifecycle) await goLiveHeld();
 	} catch (error) {
 		broadcast.error = error instanceof Error ? error.message : String(error);

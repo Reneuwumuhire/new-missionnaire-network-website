@@ -12,10 +12,22 @@
 		if (e.key === 'Escape') {
 			e.preventDefault();
 			confirmDialog.cancel();
-		} else if (e.key === 'Enter') {
-			e.preventDefault();
-			confirmDialog.accept();
 		}
+	}
+
+	function focusCancel(button: HTMLButtonElement, _dialogId: string) {
+		const previousFocus = document.activeElement;
+		button.focus();
+		return {
+			update() {
+				button.focus();
+			},
+			destroy() {
+				if (previousFocus instanceof HTMLElement && previousFocus.isConnected) {
+					previousFocus.focus();
+				}
+			}
+		};
 	}
 </script>
 
@@ -38,21 +50,60 @@
 		>
 			<div class="flex items-start gap-3 border-b border-stone-100 px-6 py-4">
 				{#if $confirmDialog.tone === 'danger'}
-					<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600">
-						<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.2 16c-.77 1.33.2 3 1.73 3z" />
+					<div
+						class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600"
+					>
+						<svg
+							class="h-5 w-5"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							stroke-width="2"
+							aria-hidden="true"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								d="M12 9v2m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.2 16c-.77 1.33.2 3 1.73 3z"
+							/>
 						</svg>
 					</div>
 				{:else if $confirmDialog.tone === 'warning'}
-					<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-600">
-						<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.2 16c-.77 1.33.2 3 1.73 3z" />
+					<div
+						class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-600"
+					>
+						<svg
+							class="h-5 w-5"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							stroke-width="2"
+							aria-hidden="true"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								d="M12 9v2m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.2 16c-.77 1.33.2 3 1.73 3z"
+							/>
 						</svg>
 					</div>
 				{:else}
-					<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-500">
-						<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+					<div
+						class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-500"
+					>
+						<svg
+							class="h-5 w-5"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							stroke-width="2"
+							aria-hidden="true"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+							/>
 						</svg>
 					</div>
 				{/if}
@@ -72,6 +123,7 @@
 			<div class="flex items-center justify-end gap-2 border-t border-stone-100 px-6 py-4">
 				<button
 					type="button"
+					use:focusCancel={$confirmDialog.id}
 					onclick={confirmDialog.cancel}
 					class="rounded-none px-4 py-2.5 font-body text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-700"
 				>
@@ -80,7 +132,8 @@
 				<button
 					type="button"
 					onclick={confirmDialog.accept}
-					class="rounded-none px-5 py-2.5 font-body text-[11px] font-semibold uppercase tracking-[0.18em] text-white transition-colors {$confirmDialog.tone === 'danger'
+					class="rounded-none px-5 py-2.5 font-body text-[11px] font-semibold uppercase tracking-[0.18em] text-white transition-colors {$confirmDialog.tone ===
+					'danger'
 						? 'bg-red-700 hover:bg-red-800'
 						: $confirmDialog.tone === 'warning'
 							? 'bg-amber-600 hover:bg-amber-700'

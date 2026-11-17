@@ -185,8 +185,12 @@ app.post('/start', async (req, reply) => {
 	}
 });
 
-app.post('/stop', async (req, reply) => {
-	if (!isRecording()) return reply.code(409).send({ error: 'not_recording' });
+app.post<{ Params: { id?: string } }>('/stop/:id?', async (req, reply) => {
+	const current = currentStatus();
+	if (req.params.id && (!current.recording || current.id !== req.params.id || current.stopping)) {
+		return reply.send({ id: null });
+	}
+	if (!current.recording) return reply.code(409).send({ error: 'not_recording' });
 	try {
 		const result = await stopRecording();
 		return reply.send(result);

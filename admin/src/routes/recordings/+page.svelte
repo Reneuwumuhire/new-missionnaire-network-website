@@ -2113,6 +2113,14 @@
 			))
 		)
 			return;
+		const ok = await confirmDialog.ask({
+			title: $t('recordings.actions.stopRecording'),
+			message: $t('recordings.confirm.stopRecording.message'),
+			confirmLabel: $t('recordings.actions.stopRecording'),
+			cancelLabel: $t('recordings.common.cancel'),
+			tone: 'warning'
+		});
+		if (!ok) return;
 		busy = true;
 		actionError = null;
 		let stoppedRecording = false;

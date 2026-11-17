@@ -106,6 +106,10 @@ export function recorderStop(): Promise<{ id: string }> {
 	return call<{ id: string }>('/stop', { method: 'POST' });
 }
 
+export function recorderStopById(id: string): Promise<{ id: string | null }> {
+	return call<{ id: string | null }>(`/stop/${encodeURIComponent(id)}`, { method: 'POST' });
+}
+
 export function recorderRetry(id: string): Promise<{ ok: true }> {
 	return call<{ ok: true }>(`/retry/${encodeURIComponent(id)}`, { method: 'POST' });
 }

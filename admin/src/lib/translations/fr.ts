@@ -1303,6 +1303,7 @@ export default {
 	'recordings.notifications.liveStartHint':
 		'Facultatif · actuellement {count} abonnés aux notifications. Laissez décoché pour démarrer silencieusement.',
 	'recordings.confirm.endLive.message': 'Le site public ne montrera plus le lecteur en direct.',
+	'recordings.confirm.stopRecording.message': "Arrêter l'enregistrement en cours ?",
 	'recordings.confirm.stopAll.message': "Terminer le direct ET arrêter l'enregistrement en cours ?",
 	'recordings.confirm.startAll.message': "Aller en direct ET démarrer l'enregistrement.",
 	'recordings.confirm.startAll.notifyOne':
