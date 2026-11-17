@@ -36,6 +36,21 @@
 		testToken?: string | null;
 	}
 
+	type RadioSubtitles = {
+		url: string;
+		anchorEpochMs: number | null;
+		offsetMs: number;
+		pausedPositionMs?: number | null;
+		timeline?: Array<{
+			fromEpochMs: number;
+			toEpochMs: number | null;
+			url: string;
+			anchorEpochMs: number;
+			offsetMs: number;
+			pausedPositionMs: number | null;
+		}>;
+	};
+
 	let {
 		mode = 'live',
 		url = null,
@@ -49,13 +64,13 @@
 
 	let cues: SrtCue[] = $state([]);
 	let loadedUrl: string | null = $state(null);
+	const loadingUrls = new Set<string>();
 	let srtSec: number | null = $state(null); // null → no highlight yet
 
 	// ── Live state (from radio-state polls) ────────────────────────
+	let subtitles = $state.raw<RadioSubtitles | null>(null);
 	let liveUrl: string | null = $state(null);
-	let anchorEpochMs: number | null = $state(null);
-	let offsetMs = 0;
-	let pausedPositionMs: number | null = $state(null);
+	let streamLive = false;
 	let clockSkewMs = 0;
 	let liveActive = $state(false); // gate open + SRT attached
 
@@ -148,37 +163,22 @@
 	}
 
 	async function loadSrt(target: string) {
+		if (loadingUrls.has(target)) return;
+		loadingUrls.add(target);
 		try {
 			const res = await fetch(target);
 			if (!res.ok) return;
-			const parsed = parseSrt(await res.text());
-			// The URL may have changed again while we were fetching.
-			if (liveUrl === target || url === target) {
-				cues = parsed;
+			const text = await res.text();
+			if (srtUrl === target) {
+				cues = parseSrt(text);
 				loadedUrl = target;
 			}
 		} catch {
 			// Network error — keep whatever we had; the next live poll retries.
+		} finally {
+			loadingUrls.delete(target);
 		}
 	}
-
-	type RadioSubtitles = {
-		url: string;
-		anchorEpochMs: number | null;
-		offsetMs: number;
-		pausedPositionMs?: number | null;
-		timeline?: Array<{
-			fromEpochMs: number;
-			toEpochMs: number | null;
-			url: string;
-			anchorEpochMs: number;
-			offsetMs: number;
-			pausedPositionMs: number | null;
-		}>;
-	} | null;
-	type SubtitleTimeline = NonNullable<NonNullable<RadioSubtitles>['timeline']>;
-	let timeline = $state<SubtitleTimeline>([]);
-	let streamLive = $state(false);
 
 	async function pollLiveState() {
 		if (document.hidden) return;
@@ -189,29 +189,15 @@
 			if (!res.ok) return;
 			const data = (await res.json()) as {
 				isLive: boolean;
-				subtitles?: RadioSubtitles;
+				subtitles?: RadioSubtitles | null;
 				serverNowMs?: number;
 			};
 			if (typeof data.serverNowMs === 'number') {
 				clockSkewMs = data.serverNowMs - Date.now();
 			}
-			const subs = data.subtitles ?? null;
 			streamLive = data.isLive;
-			// The SRT may be attached before the sermon. A null anchor is the
-			// operator-controlled gate that keeps songs and introductions blank.
-			liveActive = Boolean(data.isLive && subs && subs.anchorEpochMs !== null);
-			if (subs) {
-				liveUrl = subs.url;
-				if (subs.url !== loadedUrl) void loadSrt(subs.url);
-				anchorEpochMs = subs.anchorEpochMs;
-				offsetMs = subs.offsetMs ?? 0;
-				pausedPositionMs = subs.pausedPositionMs ?? null;
-				timeline = subs.timeline ?? [];
-			} else {
-				// Broadcast ended or subtitles cleared — freeze the transcript as-is
-				// (the watch page redirects to the replay shortly after).
-				anchorEpochMs = null;
-			}
+			subtitles = data.subtitles ?? null;
+			tick();
 		} catch {
 			// Keep current state on network errors.
 		}
@@ -220,26 +206,25 @@
 	function tick() {
 		if (mode === 'live') {
 			const { positionEpochMs, pdt } = $livePlayback;
-			if (positionEpochMs === null) {
-				// No stream connected yet — nothing is being heard, no highlight.
+			const timeline = subtitles?.timeline;
+			const segment =
+				positionEpochMs === null
+					? undefined
+					: timeline?.find(
+							(item) =>
+								positionEpochMs >= item.fromEpochMs &&
+								(item.toEpochMs === null || positionEpochMs < item.toEpochMs)
+						);
+			// The status poll supplies metadata. Only the playback position selects the file.
+			liveUrl = segment?.url ?? subtitles?.url ?? null;
+			const activeAnchor =
+				positionEpochMs !== null && timeline?.length
+					? (segment?.anchorEpochMs ?? null)
+					: (subtitles?.anchorEpochMs ?? null);
+			liveActive = streamLive && activeAnchor !== null;
+			if (positionEpochMs === null || activeAnchor === null) {
 				srtSec = null;
 				return;
-			}
-			const segment = timeline.find(
-				(item) =>
-					positionEpochMs >= item.fromEpochMs &&
-					(item.toEpochMs === null || positionEpochMs < item.toEpochMs)
-			);
-			const activeAnchor = timeline.length ? (segment?.anchorEpochMs ?? null) : anchorEpochMs;
-			if (activeAnchor === null) {
-				liveActive = false;
-				srtSec = null;
-				return;
-			}
-			liveActive = streamLive;
-			if (segment?.url && segment.url !== liveUrl) {
-				liveUrl = segment.url;
-				void loadSrt(segment.url);
 			}
 			// positionEpochMs is frozen while paused and shifts with DVR
 			// scrubbing, so the text always tracks the audio actually heard.
@@ -247,8 +232,8 @@
 			// from the listener's own clock); PDT positions are already server
 			// wall-clock — adding skew there would punish devices with a wrong
 			// clock in the exact mode that is otherwise exact.
-			const activeOffset = segment?.offsetMs ?? offsetMs;
-			const activePaused = segment?.pausedPositionMs ?? pausedPositionMs;
+			const activeOffset = segment?.offsetMs ?? subtitles?.offsetMs ?? 0;
+			const activePaused = segment?.pausedPositionMs ?? subtitles?.pausedPositionMs;
 			const position = positionEpochMs + (pdt ? 0 : clockSkewMs) - activeAnchor + activeOffset;
 			srtSec = Math.min(position, activePaused ?? position) / 1000;
 		} else {
@@ -293,9 +278,9 @@
 		}
 	});
 	let srtUrl = $derived(mode === 'live' ? liveUrl : url);
-	// (Re)load whenever the effective URL changes — covers the admin replacing
-	// the SRT mid-broadcast (new S3 key → new URL in the next poll).
 	$effect(() => {
+		// A fresh status response also retries the selected file after a failed load.
+		if (mode === 'live') void subtitles;
 		if (browser && srtUrl && srtUrl !== loadedUrl) {
 			void loadSrt(srtUrl);
 		}
@@ -312,7 +297,7 @@
 	);
 	let visible = $derived(mode === 'live' ? liveActive && cues.length > 0 : cues.length > 0);
 	let waitingForSync = $derived(
-		mode === 'live' && liveActive && cues.length > 0 && anchorEpochMs === null
+		mode === 'live' && liveActive && cues.length > 0 && subtitles?.anchorEpochMs === null
 	);
 </script>
 
