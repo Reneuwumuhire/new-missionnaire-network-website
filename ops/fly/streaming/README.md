@@ -21,15 +21,24 @@ each time and all players would visibly reload. Three mechanisms prevent that:
   - "Is the broadcast live?" must be answered from `status-json.xsl` by
     checking for the `/radio.mp3` **mount specifically** (bytes always flow on
     the listener URL). Both the site and the admin do this.
-  - The recorder's Icecast read never EOFs at end-of-broadcast; it auto-stops
-    after the real mount has been absent `SOURCE_GONE_STOP_SECONDS`
-    (default 1800).
 - **Icecast buffers** — `burst-size` 256 KB gives every new connection ~16 s
   of instant cushion; `queue-size` 2 MB lets slow listeners lag ~2 min before
   being kicked.
 - **Ingest timeouts** — the RTSP transcoder uses a 10 s socket read timeout so
   a wedged connection dies and restarts instead of holding the source mount
   silent.
+
+## Recording shutdown
+
+The Fly transcoder sends the same MP3 audio to Icecast and to the recorder over
+a loopback-only TCP feed. When Studio stops a live session, Admin asks the
+recorder to drain the matching recording. The recorder reads through EOF
+before finalizing. If the feed fails or the 25-second drain deadline expires,
+the recorder attempts to save the audio it captured and Studio warns that it
+could not confirm the ending.
+
+For sessions that end without an explicit stop, the recorder still watches the
+live Icecast mount and auto-stops after `SOURCE_GONE_STOP_SECONDS` (default 1800).
 
 ## Live DVR (HLS)
 
@@ -140,6 +149,10 @@ fly scale count 1 -a <your-app-name>
 ```
 
 Important: keep this app on exactly one machine. RTMP ingest is stateful per machine.
+
+Deploy the Fly streaming service before rolling out the Admin and Studio changes
+for recording shutdown. On a private test stream, play a distinct tone just
+before clicking **Stop Streaming**, then check the ending of the saved MP3 in Admin.
 
 If multiple machines exist, remove extras:
 

@@ -149,12 +149,12 @@ Studio and turn auto-start off there; the hold works either way.
 
 The fields OBS's Stats dock shows, sourced from ffmpeg:
 
-| Field | What it measures |
-| --- | --- |
-| Dropped frames (encoder) | Frames omitted while encoding |
-| Encoder backpressure events | The capture encoder reached its input queue limit |
+| Field                         | What it measures                                       |
+| ----------------------------- | ------------------------------------------------------ |
+| Dropped frames (encoder)      | Frames omitted while encoding                          |
+| Encoder backpressure events   | The capture encoder reached its input queue limit      |
 | Frames missed (rendering lag) | The Program canvas painted fewer frames than requested |
-| Encoder speed | Below 1.00× means encoding slower than real time |
+| Encoder speed                 | Below 1.00× means encoding slower than real time       |
 
 Each destination shows its own connection state. Use Admin → Recordings →
 Live Monitor to verify that Missionnaire is receiving audible audio.
@@ -361,6 +361,10 @@ is platform-independent.
   uses cloud segment recording plus the configured local safety capture;
   prepared Kinyarwanda reuses its existing sermon asset and cannot start either
   recorder. Saved cloud recordings remain available in `/recordings` in admin.
+- **Stop Streaming** sends queued audio before Studio closes its outputs. The
+  cloud recorder then saves the active Admin recording that began during that
+  live session. Studio warns if it cannot confirm the ending. Recordings
+  started before the session still need a manual stop.
 - In **Settings → Output → Recording**, choose Local (or local and cloud), then
   select **Audio only (MP3)**, **Video with audio (MP4)**, or **Both**. Both writes
   two files with the same name in `Movies/Missionnaire Studio` on macOS or
