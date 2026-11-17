@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{sync_channel, SyncSender, TrySendError};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
@@ -504,18 +504,33 @@ impl Encoder {
 		}
 		let Some(Running { tx, child, main, held, .. }) = running.take() else { return Ok(()); };
 		drop(running);
-		drop((tx, main, held));
+		drop(tx);
 		if abort {
+			drop((main, held));
 			if let Ok(mut child) = child.lock() { let _ = child.kill(); }
-		} else {
-			thread::spawn(move || {
-				thread::sleep(Duration::from_secs(8));
-				if let Ok(mut child) = child.lock() {
-					if matches!(child.try_wait(), Ok(None)) { let _ = child.kill(); }
-				}
-			});
+			return Ok(());
 		}
-		Ok(())
+
+		// Keep the outputs alive until encoder EOF closes their send queues.
+		let deadline = Instant::now() + Duration::from_secs(8);
+		let publishers: Vec<_> = main.into_iter().chain(held).collect();
+		loop {
+			let status = child.lock().map_err(|error| error.to_string())?
+				.try_wait().map_err(|error| error.to_string())?;
+			if let Some(status) = status {
+				if publishers.iter().all(Publisher::finished) {
+					let published = publishers.into_iter().all(Publisher::drained);
+					return if status.success() && published { Ok(()) } else {
+						Err("Studio could not finish sending all queued audio.".into())
+					};
+				}
+			}
+			if Instant::now() >= deadline {
+				if let Ok(mut child) = child.lock() { let _ = child.kill(); }
+				return Err("Studio timed out while sending the final audio.".into());
+			}
+			thread::sleep(Duration::from_millis(50));
+		}
 	}
 }
 

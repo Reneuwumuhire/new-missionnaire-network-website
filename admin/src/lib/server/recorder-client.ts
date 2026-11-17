@@ -47,7 +47,11 @@ export class RecorderError extends Error {
 const RECORDER_STATUS_TIMEOUT_MS = 3000;
 const RECORDER_COMMAND_TIMEOUT_MS = 20_000;
 
-async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function call<T>(
+	path: string,
+	init: RequestInit = {},
+	commandTimeout = RECORDER_COMMAND_TIMEOUT_MS
+): Promise<T> {
 	const baseUrl = process.env.RECORDER_URL;
 	const token = process.env.RECORDER_TOKEN;
 	if (!baseUrl || !token) {
@@ -59,8 +63,7 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
 		headers.set('Content-Type', 'application/json');
 	}
 	const controller = new AbortController();
-	const timeoutMs =
-		init.method === 'GET' ? RECORDER_STATUS_TIMEOUT_MS : RECORDER_COMMAND_TIMEOUT_MS;
+	const timeoutMs = init.method === 'GET' ? RECORDER_STATUS_TIMEOUT_MS : commandTimeout;
 	const timeout = setTimeout(() => controller.abort(), timeoutMs);
 	let res: Response;
 	try {
@@ -106,8 +109,10 @@ export function recorderStop(): Promise<{ id: string }> {
 	return call<{ id: string }>('/stop', { method: 'POST' });
 }
 
-export function recorderStopById(id: string): Promise<{ id: string | null }> {
-	return call<{ id: string | null }>(`/stop/${encodeURIComponent(id)}`, { method: 'POST' });
+export function recorderStopById(
+	id: string
+): Promise<{ id: string | null; tailComplete?: boolean }> {
+	return call(`/stop/${encodeURIComponent(id)}/drain`, { method: 'POST' }, 45_000);
 }
 
 export function recorderRetry(id: string): Promise<{ ok: true }> {

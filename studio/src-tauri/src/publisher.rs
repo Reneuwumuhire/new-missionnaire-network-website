@@ -34,11 +34,25 @@ struct Subscription {
 	stopped: AtomicBool,
 }
 
-pub struct Publisher(Arc<Subscription>);
+pub struct Publisher {
+	subscription: Arc<Subscription>,
+	worker: Option<thread::JoinHandle<bool>>,
+}
+
+impl Publisher {
+	pub fn finished(&self) -> bool {
+		self.worker.as_ref().is_some_and(|worker| worker.is_finished())
+	}
+
+	pub fn drained(mut self) -> bool {
+		// The worker has already finished, so this join cannot block.
+		self.worker.take().is_some_and(|worker| worker.join().unwrap_or(false))
+	}
+}
 
 impl Drop for Publisher {
 	fn drop(&mut self) {
-		self.0.stopped.store(true, Relaxed);
+		self.subscription.stopped.store(true, Relaxed);
 	}
 }
 
@@ -60,7 +74,7 @@ impl PacketHub {
 		let bin = bin.to_owned();
 		let hub = self.clone();
 		let worker = input.clone();
-		thread::spawn(move || {
+		let task = thread::spawn(move || {
 			let stopped = || worker.stopped.load(Relaxed) || hub.closed.load(Relaxed);
 			let status = |state: &str, reason: &str| {
 				if !stopped() {
@@ -80,30 +94,32 @@ impl PacketHub {
 					queued_bytes: queued_bytes.clone(),
 				});
 				let first = loop {
-					if stopped() { return; }
+					if worker.stopped.load(Relaxed) { return false; }
 					if overflowed.load(Relaxed) { break None; }
 					match rx.recv_timeout(TICK) {
 						Ok(keyframe) => break Some(keyframe),
-						Err(std::sync::mpsc::RecvTimeoutError::Timeout) => continue,
-						Err(_) => return,
+						Err(std::sync::mpsc::RecvTimeoutError::Timeout) if !stopped() => continue,
+						Err(_) => return false,
 					}
 				};
-				if stopped() { return; }
 				let mut was_live = false;
-				let reason = first.map(|first| {
+				let outcome = first.map(|first| {
 					publish(&bin, &args, first, rx, queued_bytes, || {
-						stopped() || overflowed.load(Relaxed)
+						worker.stopped.load(Relaxed) || overflowed.load(Relaxed)
 					}, || {
 						was_live = true;
 						status("live", "");
 					})
 				});
 				worker.attempt.lock().unwrap().take();
-				if stopped() { break; }
+				if stopped() {
+					return hub.closed.load(Relaxed) && !overflowed.load(Relaxed) &&
+						outcome.is_some_and(|(_, drained)| drained);
+				}
 				let reason = if overflowed.load(Relaxed) {
 					"RTMP output queue is full".to_owned()
 				} else {
-					reason.unwrap_or_default()
+					outcome.map(|(reason, _)| reason).unwrap_or_default()
 				};
 				let line = format!("{group} RTMP output {}: {reason}", index + 1);
 				let _ = app.state::<Logs>().append("ffmpeg", &line);
@@ -119,8 +135,9 @@ impl PacketHub {
 				while Instant::now() < until && !stopped() { thread::sleep(TICK); }
 				delay = (delay * 2).min(Duration::from_secs(2));
 			}
+			false
 		});
-		Publisher(input)
+		Publisher { subscription: input, worker: Some(task) }
 	}
 
 	pub fn encoded_bytes(&self) -> u64 {
@@ -129,8 +146,16 @@ impl PacketHub {
 
 	pub fn read(&self, input: impl Read) -> std::io::Result<()> {
 		let result = self.relay(input);
-		self.closed.store(true, Relaxed);
+		self.close();
 		result
+	}
+
+	fn close(&self) {
+		self.closed.store(true, Relaxed);
+		for subscriber in self.subscribers.lock().unwrap().iter().filter_map(Weak::upgrade) {
+			// Dropping the sender lets the publisher writer consume every queued packet and close stdin.
+			subscriber.attempt.lock().unwrap().take();
+		}
 	}
 
 	fn relay(&self, input: impl Read) -> std::io::Result<()> {
@@ -222,18 +247,21 @@ pub fn publish_args(url: &str) -> Vec<String> {
 fn publish(
 	bin: &Path, args: &[String], first: Packet, rx: Receiver<Packet>,
 	queued_bytes: Arc<AtomicU64>, stopped: impl Fn() -> bool, mut live: impl FnMut(),
-) -> String {
+) -> (String, bool) {
 	let mut child = match ffmpeg_command(bin).args(args).stdin(Stdio::piped())
 		.stdout(Stdio::piped()).stderr(Stdio::piped()).spawn() {
 		Ok(child) => child,
-		Err(error) => return error.to_string(),
+		Err(error) => return (error.to_string(), false),
 	};
 	let mut stdin = child.stdin.take().unwrap();
-	let writer = thread::spawn(move || {
+	let wrote_all = Arc::new(AtomicBool::new(false));
+	let writer_completed = wrote_all.clone();
+	thread::spawn(move || {
 		for bytes in std::iter::once(first).chain(rx) {
 			queued_bytes.fetch_sub(bytes.len() as u64, Relaxed);
-			if stdin.write_all(&bytes).is_err() { break; }
+			if stdin.write_all(&bytes).is_err() { return; }
 		}
+		writer_completed.store(true, Relaxed);
 	});
 	let progress = Arc::new(AtomicU64::new(0));
 	let reader_progress = progress.clone();
@@ -278,16 +306,16 @@ fn publish(
 		}
 		thread::sleep(TICK);
 	}
-	let _ = child.kill();
+	let exited = child.try_wait().ok().flatten();
+	if exited.is_none() { let _ = child.kill(); }
 	let _ = child.wait();
 	let _ = reader.join();
-	// The caller drops the attempt after this returns, which releases the writer
-	// even when it was waiting for the next packet.
-	drop(writer);
-	match log.join() {
+	let drained = exited.is_some_and(|status| status.success()) && wrote_all.load(Relaxed);
+	let reason = match log.join() {
 		Ok(line) if !line.is_empty() => line,
 		_ => reason.to_owned(),
-	}
+	};
+	(reason, drained)
 }
 
 fn authentication_rejected(line: &str) -> bool {
@@ -332,17 +360,19 @@ mod tests {
 		let audio = tag(8, &[0xaf, 0, 22]);
 		let delta = tag(9, &[0x27, 1, 33]);
 		let key = tag(9, &[0x17, 1, 44]);
+		let last_audio = tag(8, &[0xaf, 1, 55]);
 		let mut header = FLV_HEADER;
 		header[4] = 5;
 		let mut media = header.to_vec();
-		for packet in [&video, &audio, &delta, &key, &delta] {
+		for packet in [&video, &audio, &delta, &key, &delta, &last_audio] {
 			media.extend_from_slice(packet);
 		}
 		hub.read(media.as_slice()).unwrap();
 		let expected = [header.as_slice(), &video, &audio, &key].concat();
 		assert_eq!(*rx.try_recv().unwrap(), expected);
 		assert_eq!(*rx.try_recv().unwrap(), delta);
-		assert!(rx.try_recv().is_err());
+		assert_eq!(*rx.try_recv().unwrap(), last_audio);
+		assert!(matches!(rx.try_recv(), Err(std::sync::mpsc::TryRecvError::Disconnected)));
 	}
 
 	#[test]

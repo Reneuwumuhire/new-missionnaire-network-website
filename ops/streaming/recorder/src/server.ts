@@ -1,5 +1,6 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import { ObjectId } from 'mongodb';
+import { once } from 'node:events';
 import { createReadStream } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
@@ -16,6 +17,7 @@ import { createIngestCredential, ingestToken, verifyIngestCredential } from './i
 import { isRecovering, pendingOrphans, recoverOrphans } from './recover.js';
 import { findRecording, isIngestRevoked } from './mongo.js';
 import { ensureRecordingsDir } from './sidecar.js';
+import { createRecordingFeed } from './recording-feed.js';
 
 const app = Fastify({ logger: true });
 
@@ -185,20 +187,29 @@ app.post('/start', async (req, reply) => {
 	}
 });
 
-app.post<{ Params: { id?: string } }>('/stop/:id?', async (req, reply) => {
+async function handleStop(
+	req: FastifyRequest<{ Params: { id?: string } }>,
+	reply: FastifyReply,
+	drain: boolean
+) {
 	const current = currentStatus();
 	if (req.params.id && (!current.recording || current.id !== req.params.id || current.stopping)) {
 		return reply.send({ id: null });
 	}
 	if (!current.recording) return reply.code(409).send({ error: 'not_recording' });
 	try {
-		const result = await stopRecording();
+		const result = await stopRecording(drain);
 		return reply.send(result);
 	} catch (err) {
 		req.log.error(err, 'stop failed');
 		return reply.code(500).send({ error: 'stop_failed', message: (err as Error).message });
 	}
-});
+}
+
+app.post<{ Params: { id?: string } }>('/stop/:id?', (req, reply) => handleStop(req, reply, false));
+app.post<{ Params: { id?: string } }>('/stop/:id/drain', (req, reply) =>
+	handleStop(req, reply, true)
+);
 
 app.post<{ Params: { id: string } }>('/retry/:id', async (req, reply) => {
 	const { id } = req.params;
@@ -217,6 +228,14 @@ app.post<{ Params: { id: string } }>('/retry/:id', async (req, reply) => {
 
 async function main() {
 	await ensureRecordingsDir();
+	if (ENV.RECORDING_INPUT_URL) {
+		const { port } = new URL(ENV.RECORDING_INPUT_URL);
+		const { input, output } = createRecordingFeed();
+		await Promise.all([
+			once(input.listen(8082, '127.0.0.1'), 'listening'),
+			once(output.listen(Number(port), '127.0.0.1'), 'listening')
+		]);
+	}
 	void recoverOrphans().catch((err) => app.log.error(err, 'orphan recovery failed'));
 	await app.listen({ host: '0.0.0.0', port: ENV.PORT });
 	app.log.info(`Recorder listening on :${ENV.PORT}`);

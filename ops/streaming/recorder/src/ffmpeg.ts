@@ -38,7 +38,7 @@ interface ActiveRecording {
 	/** Currently-running ffmpeg child. Replaced on every restart. */
 	proc: ChildProcess;
 	/** Resolves when the *current* `proc` exits. Replaced on every restart. */
-	exitPromise: Promise<void>;
+	exitPromise: Promise<boolean>;
 
 	/** All segment files captured so far, in chronological order. */
 	segments: Segment[];
@@ -63,11 +63,8 @@ interface ActiveRecording {
 let active: ActiveRecording | null = null;
 
 // ── Source-gone watcher ────────────────────────────────────────────
-// Icecast's silence fallback mount keeps /radio.mp3 delivering bytes even when
-// the broadcaster is gone, so ffmpeg's read never EOFs at end-of-broadcast —
-// left alone it would record silence until the MAX_RECORDING_SECONDS cap. This
-// watcher polls status-json while a recording is active and auto-stops once
-// the REAL source mount has been absent for SOURCE_GONE_STOP_SECONDS.
+// Fallback for sessions that end without an explicit stop. Watch the live
+// Icecast mount even when the recorder reads from the separate TCP feed.
 
 const SOURCE_POLL_INTERVAL_MS = 30_000;
 let sourceWatchTimer: NodeJS.Timeout | null = null;
@@ -139,7 +136,7 @@ function startSourceWatch(rec: ActiveRecording): void {
 			const goneForMs = Date.now() - sourceGoneSince;
 			if (goneForMs < ENV.SOURCE_GONE_STOP_SECONDS * 1000) return;
 			console.warn(
-				`[recorder] ${rec.idStr} source mount absent for ${Math.round(goneForMs / 1000)}s — auto-stopping (silence fallback keeps the stream alive, so this is the end-of-broadcast signal)`
+				`[recorder] ${rec.idStr} source mount absent for ${Math.round(goneForMs / 1000)}s — auto-stopping`
 			);
 			await stopRecording().catch((e) =>
 				console.error(`[recorder] source-gone auto-stop failed for ${rec.idStr}`, e)
@@ -197,24 +194,28 @@ function ffmpegArgsFor(outPath: string): string[] {
 		'-hide_banner',
 		'-loglevel',
 		'warning',
-		'-reconnect',
-		'1',
-		'-reconnect_streamed',
-		'1',
-		'-reconnect_at_eof',
-		'1',
-		'-reconnect_on_network_error',
-		'1',
-		'-reconnect_on_http_error',
-		'4xx,5xx',
-		'-reconnect_delay_max',
-		'5',
+		...(ENV.RECORDING_INPUT_URL
+			? ['-xerror', '-abort_on', 'empty_output', '-f', 'mp3']
+			: [
+					'-reconnect',
+					'1',
+					'-reconnect_streamed',
+					'1',
+					'-reconnect_at_eof',
+					'1',
+					'-reconnect_on_network_error',
+					'1',
+					'-reconnect_on_http_error',
+					'4xx,5xx',
+					'-reconnect_delay_max',
+					'5'
+				]),
 		// 10s I/O read timeout (microseconds) — surfaces a stalled TCP socket fast
 		// after a network switch (e.g. Wi-Fi → hotspot) so reconnect logic can fire.
 		'-rw_timeout',
 		'10000000',
 		'-i',
-		ENV.ICECAST_URL,
+		ENV.RECORDING_INPUT_URL || ENV.ICECAST_URL,
 		'-c',
 		'copy',
 		'-y',
@@ -224,12 +225,13 @@ function ffmpegArgsFor(outPath: string): string[] {
 
 /** Spawn ffmpeg writing to `outPath`. The returned exitPromise resolves
  *  whenever the child exits — caller decides whether that's expected. */
-function spawnFfmpeg(outPath: string): { proc: ChildProcess; exitPromise: Promise<void> } {
+function spawnFfmpeg(outPath: string): { proc: ChildProcess; exitPromise: Promise<boolean> } {
 	const proc = spawn('ffmpeg', ffmpegArgsFor(outPath), {
 		stdio: ['ignore', 'inherit', 'inherit']
 	});
-	const exitPromise = new Promise<void>((resolve) => {
-		proc.once('exit', () => resolve());
+	const exitPromise = new Promise<boolean>((resolve) => {
+		proc.once('exit', (code) => resolve(code === 0));
+		proc.once('error', () => resolve(false));
 	});
 	return { proc, exitPromise };
 }
@@ -246,14 +248,14 @@ async function startSegment(rec: ActiveRecording): Promise<void> {
 	const segIndex = rec.segments.length + 1;
 	const segPath = segmentMp3Path(rec.idStr, segIndex);
 	const segment: Segment = { path: segPath, startedAt: new Date() };
-	rec.segments.push(segment);
-
 	try {
-		await updateSidecar(rec.idStr, { segments: rec.segments.map((s) => s.path) });
+		await updateSidecar(rec.idStr, { segments: [...rec.segments.map((s) => s.path), segPath] });
 	} catch (err) {
 		console.warn(`[recorder] sidecar update failed for ${rec.idStr}`, err);
 	}
 
+	if (rec.stopping || rec.abandoned) return;
+	rec.segments.push(segment);
 	const { proc, exitPromise } = spawnFfmpeg(segPath);
 	rec.proc = proc;
 	rec.exitPromise = exitPromise;
@@ -372,7 +374,7 @@ export async function startRecording(params: {
 		createdBy: params.createdBy,
 		createdByName,
 		proc: null as unknown as ChildProcess,
-		exitPromise: Promise.resolve(),
+		exitPromise: Promise.resolve(false),
 		segments: [],
 		stopping: false,
 		abandoned: false,
@@ -406,7 +408,9 @@ export async function startRecording(params: {
 	return { id: idStr, startedAt: startedAt.toISOString(), title };
 }
 
-export async function stopRecording(): Promise<{ id: string }> {
+export async function stopRecording(
+	drain = false
+): Promise<{ id: string; tailComplete?: boolean }> {
 	if (!active) throw new Error('No active recording');
 	if (active.stopping) throw new Error('Recording is already stopping');
 
@@ -420,6 +424,24 @@ export async function stopRecording(): Promise<{ id: string }> {
 	}
 	rec.restartPending = false;
 
+	let tailComplete: boolean | undefined;
+	if (drain) {
+		tailComplete = false;
+		if (ENV.RECORDING_INPUT_URL) {
+			let timeout: ReturnType<typeof setTimeout> | undefined;
+			try {
+				tailComplete = await Promise.race([
+					rec.exitPromise,
+					new Promise<false>((resolve) => {
+						timeout = setTimeout(() => resolve(false), 25_000);
+					})
+				]);
+			} finally {
+				clearTimeout(timeout);
+			}
+		}
+	}
+
 	// Kill the in-flight ffmpeg if it's still running. If we're between
 	// restarts (proc already exited), there's nothing to kill.
 	if (rec.proc && rec.proc.exitCode === null && rec.proc.signalCode === null) {
@@ -431,10 +453,11 @@ export async function stopRecording(): Promise<{ id: string }> {
 
 	await finalizeAndUpload(rec, endedAt).catch((err) => {
 		console.error(`[recorder] finalize+upload failed for ${rec.idStr}`, err);
+		if (drain) tailComplete = false;
 	});
 
 	active = null;
-	return { id: rec.idStr };
+	return { id: rec.idStr, tailComplete };
 }
 
 /** Recovery gave up — finalize whatever segments we have, mark stopping so
