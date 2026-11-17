@@ -49,12 +49,20 @@ describe('cloud recording controls', () => {
 
 	it('requests a session-scoped stop for recordings started outside Studio', async () => {
 		recording.cloud = false;
-		controlCloudRecording.mockResolvedValue({ id: 'admin-recording' });
+		controlCloudRecording.mockResolvedValue({ id: 'admin-recording', tailComplete: true });
 		const session = { sessionId: 'session-id', sessionStartedAt: 1000 };
 
 		await stopCloudRecording(session);
 
 		expect(controlCloudRecording).toHaveBeenCalledWith('stop', session);
 		expect(recording.savedId).toBe('admin-recording');
+		expect(recording.error).toBeNull();
+	});
+
+	it('keeps the recording ID and warns when the ending could not be confirmed', async () => {
+		controlCloudRecording.mockResolvedValue({ id: 'admin-recording', tailComplete: false });
+		await stopCloudRecording({ sessionId: 'session-id', sessionStartedAt: 1000 });
+		expect(recording.savedId).toBe('admin-recording');
+		expect(recording.error).toContain('could not confirm the ending');
 	});
 });

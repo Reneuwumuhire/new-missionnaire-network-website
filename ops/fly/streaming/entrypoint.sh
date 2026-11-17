@@ -46,6 +46,7 @@ start_recorder() {
 	fi
 	echo "[recorder] starting Node recorder on :8080"
 	ICECAST_URL="${ICECAST_URL:-http://127.0.0.1:8000/${AUDIO_MOUNT}}" \
+	RECORDING_INPUT_URL="tcp://127.0.0.1:8081" \
 	LEGACY_STREAM_KEY="${CONFIGURED_STREAM_KEY}" \
 	RECORDINGS_DIR="${RECORDINGS_DIR:-/data/recordings}" \
 	PORT="${RECORDER_PORT:-8080}" \
@@ -93,6 +94,7 @@ trap cleanup INT TERM
 sleep 2
 
 ICECAST_URL_INGEST="icecast://source:${ICECAST_SOURCE_PASSWORD}@127.0.0.1:8000/${AUDIO_MOUNT}"
+AUDIO_OUTPUTS="[f=mp3:content_type=audio/mpeg]${ICECAST_URL_INGEST}|[f=mp3:rw_timeout=2000000:onfail=ignore]tcp://127.0.0.1:8082"
 
 get_active_path() {
 	api_payload="$(curl -fsS http://127.0.0.1:9997/v3/paths/list 2>/dev/null || true)"
@@ -260,8 +262,7 @@ while true; do
 			-timeout 10000000 \
 			-i "${INPUT_URL}" \
 			-map 0:a:0? -vn -c:a libmp3lame -b:a "${AUDIO_BITRATE}" -ar 48000 -ac 2 \
-			-content_type audio/mpeg \
-			-f mp3 "${ICECAST_URL_INGEST}"
+			-f tee "${AUDIO_OUTPUTS}"
 		;;
 	*)
 		ffmpeg -nostdin -hide_banner -loglevel warning \
@@ -270,8 +271,7 @@ while true; do
 			-thread_queue_size 1024 \
 			-i "${INPUT_URL}" \
 			-map 0:a:0? -vn -c:a libmp3lame -b:a "${AUDIO_BITRATE}" -ar 48000 -ac 2 \
-			-content_type audio/mpeg \
-			-f mp3 "${ICECAST_URL_INGEST}"
+			-f tee "${AUDIO_OUTPUTS}"
 		;;
 	esac
 

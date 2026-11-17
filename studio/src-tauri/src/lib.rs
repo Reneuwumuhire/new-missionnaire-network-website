@@ -251,6 +251,9 @@ fn start_stream(
 }
 
 fn studio_post(body: String, authorization: String, base_url: String, path: &str) -> Result<String, String> {
+	let drain_recording = serde_json::from_str::<serde_json::Value>(&body).ok()
+		.and_then(|value| value.get("action").and_then(|action| action.as_str()).map(str::to_owned))
+		.as_deref() == Some("recorder-stop-session");
 	if authorization.len() < 20 { return Err("Connectez Studio à l’administration d’abord".into()); }
 	if body.len() > 2048 {
 		return Err("Commande Studio non autorisée".into());
@@ -271,11 +274,11 @@ fn studio_post(body: String, authorization: String, base_url: String, path: &str
 			"--silent",
 			"--show-error",
 			"--retry",
-			"2",
+			if drain_recording { "0" } else { "2" },
 			"--retry-delay",
 			"1",
 			"--max-time",
-			"30",
+			if drain_recording { "55" } else { "30" },
 			"-X",
 			"POST",
 		])
@@ -353,7 +356,7 @@ fn push_chunk(encoder: State<'_, Encoder>, request: tauri::ipc::Request<'_>) -> 
 	}
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn stop_stream(encoder: State<'_, Encoder>, group: Option<String>) -> Result<(), String> {
 	encoder.stop_group(group.as_deref())
 }

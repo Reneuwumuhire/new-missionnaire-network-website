@@ -288,19 +288,22 @@ async function stopRecorder() {
 	const current = recorder;
 	if (current && current.state !== 'inactive') {
 		await new Promise<void>((resolve) => {
-			let done = false;
 			const finish = () => {
-				if (done) return;
-				done = true;
+				clearTimeout(timeout);
+				current.removeEventListener('stop', finish);
 				resolve();
 			};
+			const incomplete = () => {
+				if (broadcast.stopping) broadcast.error = 'Studio did not receive the final capture chunk.';
+				finish();
+			};
+			const timeout = setTimeout(incomplete, 1_000);
 			current.addEventListener('stop', finish, { once: true });
 			try {
 				current.stop();
 			} catch {
-				finish();
+				incomplete();
 			}
-			setTimeout(finish, 1_000);
 		});
 	}
 	if (recorder === current) recorder = null;
@@ -592,19 +595,24 @@ export async function stopBroadcast() {
 				return { sessionId: activeId, sessionStartedAt: activeStartedAt };
 			}
 		});
-		const closingSession = recordingSession.then(() => endSelectedSession());
 		await stopRecorder();
 		let drainTimeout: ReturnType<typeof setTimeout> | undefined;
 		await Promise.race([
 			chain,
 			new Promise<void>((resolve) => {
-				drainTimeout = setTimeout(resolve, 2_000);
+				drainTimeout = setTimeout(() => {
+					broadcast.error = 'Studio timed out while queuing the final capture chunk.';
+					resolve();
+				}, 2_000);
 			})
 		]);
 		clearTimeout(drainTimeout);
 		await heldTask;
+		const session = await recordingSession;
+		// Request the drain while Studio is still sending.
+		const drainingRecording = session ? stopCloudRecording(session) : undefined;
 		await invoke('stop_stream', { group: null }).catch((err) => {
-			broadcast.error = String(err);
+			broadcast.error ??= String(err);
 		});
 		broadcast.phase = 'idle';
 		broadcast.heldLive = false;
@@ -618,8 +626,8 @@ export async function stopBroadcast() {
 		recoveryTimes = [];
 		clearRecording();
 		await detachListeners();
-		await Promise.all([closingSession, recordingSession.then(stopCloudRecording)]);
-		if (recording.error) broadcast.error = recording.error;
+		await Promise.all([endSelectedSession(), drainingRecording ?? stopCloudRecording()]);
+		if (recording.error) broadcast.error ??= recording.error;
 	} finally {
 		broadcast.stopping = false;
 	}

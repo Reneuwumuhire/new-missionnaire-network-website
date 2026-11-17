@@ -205,7 +205,7 @@ async function adminPost<T>(body: object): Promise<T> {
 export type RecordingSession = { sessionId: string; sessionStartedAt: number };
 
 export function controlCloudRecording(action: 'start' | 'stop', session?: RecordingSession) {
-	return adminPost<{ id: string | null }>({
+	return adminPost<{ id: string | null; tailComplete?: boolean }>({
 		action: session ? 'recorder-stop-session' : `recorder-${action}`,
 		...session
 	});

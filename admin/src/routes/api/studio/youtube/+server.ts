@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { studioYouTubeBody } from '$lib/server/studio-youtube-request';
 import { error, json } from '@sveltejs/kit';
+import type { RequestHandler } from './$types';
 import { getPermissions, type AdminUser } from '$lib/models/admin-user';
 import { getDb } from '../../../../db/mongo';
 import {
@@ -84,7 +85,7 @@ async function sessionChannelId(
 	throw error(409, 'This older session is not linked to one YouTube channel');
 }
 
-export async function POST({ request, getClientAddress }) {
+export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 	const parsed = studioYouTubeBody.safeParse(await request.json().catch(() => null));
 	if (!parsed.success) error(400, 'Invalid Studio request');
 	const body = parsed.data;
@@ -147,7 +148,7 @@ export async function POST({ request, getClientAddress }) {
 	}
 	if (body.action === 'recorder-stop' || body.action === 'recorder-stop-session') {
 		try {
-			let result: { id: string | null };
+			let result: { id: string | null; tailComplete?: boolean };
 			if (body.action === 'recorder-stop-session') {
 				if (!body.sessionId || body.sessionStartedAt === undefined) {
 					throw error(400, 'A scheduled session and start time are required');
@@ -381,4 +382,4 @@ export async function POST({ request, getClientAddress }) {
 		}
 	}
 	throw error(400, 'Unknown action');
-}
+};

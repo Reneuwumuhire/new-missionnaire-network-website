@@ -51,7 +51,10 @@ export async function stopCloudRecording(session?: RecordingSession) {
 		recording.cloud = false;
 		recording.savedId = result?.id ?? null;
 		if (!recording.localPath) recording.startedAt = null;
-		recording.error = null;
+		recording.error =
+			session && result?.id && result.tailComplete !== true
+				? 'The cloud recorder could not confirm the ending.'
+				: null;
 	} catch (error) {
 		recording.error = String(error);
 	} finally {
