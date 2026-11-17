@@ -1,5 +1,4 @@
 /** @type {import('tailwindcss').Config} */
-import scrollbarHide from './tailwind-scrollbar-hide';
 import scrollbarCustom from './tailwind-scrollbar-custom';
 
 export default {
@@ -69,5 +68,5 @@ export default {
 		// => @media (min-width: 1536px) { ... }
 	},
 
-	plugins: [scrollbarHide, scrollbarCustom]
+	plugins: [scrollbarCustom]
 };

@@ -14,7 +14,6 @@
 	import ResumeRecorder from '$lib/components/+resumeRecorder.svelte';
 	import { selectAudio } from '$lib/stores/global';
 	import type { LayoutData } from './$types';
-	import { QueryClientProvider } from '@tanstack/svelte-query';
 	import { navigating, page } from '$app/state';
 	import { afterNavigate, goto } from '$app/navigation';
 	import { browser, dev } from '$app/environment';
@@ -409,36 +408,35 @@
 	</div>
 {/if}
 
-<QueryClientProvider client={data.queryClient}>
-	<div class="relative">
-		<div
-			bind:this={headerRef}
-			class="flex flex-col fixed top-0 z-[110] bg-[#FAF8F3]/95 backdrop-blur-sm w-full"
-		>
-			<SocialMediaAbove />
-			<NavBar />
-		</div>
-		<div class="relative mt-[120px]" style={browser ? `margin-top: ${headerHeight}px;` : undefined}>
-			{#key page.url.pathname}
-				<div class="page-fade-in">
-					{@render children?.()}
-				</div>
-			{/key}
-		</div>
+<div class="relative">
+	<div
+		bind:this={headerRef}
+		class="flex flex-col fixed top-0 z-[110] bg-[#FAF8F3]/95 backdrop-blur-sm w-full"
+	>
+		<SocialMediaAbove />
+		<NavBar />
 	</div>
-	<Footer />
-	<CopyButton />
-	<VideoPlaylistPlayer />
-	<InstallPrompt />
-	<OfflineIndicator />
-	<PullToRefresh />
-	<UpdateBanner />
-	<!-- Global audio player. Mounted at the root so the bottom bar
+	<div class="relative mt-[120px]" style={browser ? `margin-top: ${headerHeight}px;` : undefined}>
+		{#key page.url.pathname}
+			<div class="page-fade-in">
+				{@render children?.()}
+			</div>
+		{/key}
+	</div>
+</div>
+<Footer />
+<CopyButton />
+<VideoPlaylistPlayer />
+<InstallPrompt />
+<OfflineIndicator />
+<PullToRefresh />
+<UpdateBanner />
+<!-- Global audio player. Mounted at the root so the bottom bar
 	     persists across every navigation — listeners can browse the
 	     site while a sermon or rediffusion keeps playing. Previously
 	     mounted per-section (/musique, /predications), which meant
 	     navigating out of the section unmounted the bar mid-playback. -->
-	<!--
+<!--
 		AudioPlayer mounts unconditionally so the DOM-attached <audio> element
 		inside it exists for the lifetime of the session. The player's own
 		template uses {#if $selectAudio} internally to hide its UI when no
@@ -447,10 +445,9 @@
 		iOS needs to attribute the audio session to *this* PWA's WebKit
 		process rather than the shared media daemon.
 	-->
-	<AudioPlayer />
-	<ResumeRecorder />
-	<!-- Mobile-only bottom navigation. Fixed at the viewport bottom for
+<AudioPlayer />
+<ResumeRecorder />
+<!-- Mobile-only bottom navigation. Fixed at the viewport bottom for
 	     one-tap access to the most-visited sections; the audio player is
 	     lifted above it (see `--bottom-nav-height` in app.css). -->
-	<BottomNav />
-</QueryClientProvider>
+<BottomNav />

@@ -5,7 +5,6 @@
 import fs from 'node:fs/promises';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
-import fetch from 'node-fetch';
 import { MongoClient, ObjectId } from 'mongodb';
 
 export const CATALOGS = {
