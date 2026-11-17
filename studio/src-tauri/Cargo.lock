@@ -1966,6 +1966,7 @@ dependencies = [
 name = "missionnaire-studio"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "chrono",
  "core-graphics",
  "image",

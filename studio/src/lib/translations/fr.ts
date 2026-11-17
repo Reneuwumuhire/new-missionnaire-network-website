@@ -74,7 +74,9 @@ const fr: Record<keyof typeof en, string> = {
 		'Choisissez une fenêtre. Sur macOS 13 ou version ultérieure, le son de son application est ajouté automatiquement au mixeur.',
 	'sources.untitledWindow': 'Fenêtre sans titre',
 	'sources.noWindows': 'Aucune fenêtre disponible. Ouvrez la fenêtre à partager, puis actualisez.',
-	'sources.windowsUnavailable': 'Studio n’a pas pu charger les fenêtres disponibles. Essayez d’actualiser.',
+	'sources.windowsUnavailable':
+		'Studio n’a pas pu charger les fenêtres disponibles. Essayez d’actualiser.',
+	'sources.previewUnavailable': 'Aperçu indisponible',
 	'sources.screenPermissionRequired':
 		'macOS n’a pas accordé l’accès à l’enregistrement de l’écran à cette copie de Studio. Autorisez-la dans Réglages Système, quittez Studio avec ⌘Q, puis rouvrez-le depuis Applications. Si l’accès est déjà activé, supprimez l’entrée Studio et ajoutez à nouveau la copie du dossier Applications.',
 	'sources.requestScreenPermission': 'Demander l’accès à l’enregistrement de l’écran',

@@ -62,6 +62,7 @@ export const SCREEN_RECORDING_ACCESS_REQUIRED = 'SCREEN_RECORDING_ACCESS_REQUIRE
 
 export interface AudioWindow {
 	id?: number;
+	preview?: string | null;
 	appId: string;
 	appName: string;
 	title: string;
@@ -165,7 +166,7 @@ export async function startAppAudio(
 	try {
 		await mixer.resume();
 		const node = await createPcmNode(mixer);
-		const channel = pcmChannel(sourceId, () => nodes.get(sourceId) === node ? node : undefined);
+		const channel = pcmChannel(sourceId, () => (nodes.get(sourceId) === node ? node : undefined));
 
 		// The sentinel travels as an empty bundle id, which the native side reads
 		// as "the whole display".

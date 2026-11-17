@@ -33,8 +33,9 @@ objc2-foundation = "0.3"
 core-graphics = "0.25"
 # Per-application audio capture. macOS 13+; the module is cfg-gated so Windows
 # and Linux builds never see it.
-screencapturekit = "8" 
+screencapturekit = { version = "8", features = ["macos_14_0"] }
 image = { version = "0.25", default-features = false, features = ["jpeg"] }
+base64 = "0.22"
 
 [profile.release]
 codegen-units = 1
