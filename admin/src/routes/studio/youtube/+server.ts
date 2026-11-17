@@ -17,5 +17,7 @@ export async function GET({ url, cookies }) {
 		expires_at: { $gt: new Date() }
 	});
 	if (!authorization) throw error(403, 'Approve this Studio session first');
-	throw redirect(302, await beginYouTubeOAuth(adminUser.email, code));
+	throw redirect(302, await beginYouTubeOAuth(adminUser.email, code), {
+		external: ['https://accounts.google.com']
+	});
 }
