@@ -165,7 +165,7 @@
 		params.delete('alpha');
 		params.delete('year');
 		params.set('page', '1');
-		goto(`?${params.toString()}`, { keepFocus: true, noScroll: true });
+		goto(`?${params.toString()}`, { reset: false });
 	}
 
 	function onSearchInput() {

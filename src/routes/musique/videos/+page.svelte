@@ -221,7 +221,7 @@
 				return;
 			}
 			isSearchLoading = true;
-			goto(`?search=${encodeURIComponent(searchInput)}`, { keepFocus: true, noScroll: true });
+			goto(`?search=${encodeURIComponent(searchInput)}`, { reset: false });
 		};
 
 		if (immediate) {

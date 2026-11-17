@@ -100,14 +100,14 @@
 	}
 
 	// Debounced search: 350ms after the last keystroke, push the new URL.
-	// `replaceState: true` on search keeps browser history clean — typing
+	// `replace: true` on search keeps browser history clean — typing
 	// shouldn't bury the previous page under 12 history entries.
 	let searchTimer: ReturnType<typeof setTimeout> | null = null;
 	function onSearchInput() {
 		if (searchTimer) clearTimeout(searchTimer);
 		searchTimer = setTimeout(() => {
 			const target = `/live/rediffusions${buildQuery({ q: searchInput, page: 1 })}`;
-			goto(target, { keepFocus: true, replaceState: true, noScroll: true });
+			goto(target, { replace: true, reset: false });
 		}, 350);
 	}
 
@@ -116,15 +116,14 @@
 		const year = yearInput === '' ? '' : Number(yearInput);
 		const month = year === '' ? '' : monthInput === '' ? '' : Number(monthInput);
 		goto(`/live/rediffusions${buildQuery({ year, month, page: 1 })}`, {
-			keepFocus: true,
-			noScroll: true
+			reset: false
 		});
 	}
 
 	function selectType(next: RecordingType | '') {
 		// Toggle off when the user clicks the active pill.
 		const value = typeInput === next ? '' : next;
-		goto(`/live/rediffusions${buildQuery({ type: value, page: 1 })}`, { noScroll: true });
+		goto(`/live/rediffusions${buildQuery({ type: value, page: 1 })}`, { reset: false });
 	}
 
 	function resetFilters() {
@@ -132,7 +131,7 @@
 		yearInput = '';
 		monthInput = '';
 		typeInput = '';
-		goto('/live/rediffusions', { noScroll: true });
+		goto('/live/rediffusions', { reset: false });
 	}
 
 	let hasActiveFilters = $derived(

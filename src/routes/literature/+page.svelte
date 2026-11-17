@@ -118,7 +118,7 @@
 		if (target.value) params.set('search', target.value);
 		else params.delete('search');
 		params.set('page', '1');
-		goto(`?${params.toString()}`, { keepFocus: true });
+		goto(`?${params.toString()}`, { reset: false });
 	}
 
 	function formatDate(dateStr: string | undefined) {

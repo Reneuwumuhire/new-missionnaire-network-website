@@ -43,7 +43,7 @@
 		if (browser) {
 			const url = new URL(window.location.href);
 			url.searchParams.set('page', newPage.toString());
-			goto(url.toString(), { keepFocus: true });
+			goto(url.toString(), { reset: false });
 		}
 	}
 

@@ -54,7 +54,6 @@
 	let observerTarget: HTMLElement;
 	let observer: IntersectionObserver | null = null;
 
-
 	function buildLiveVideo(status: YouTubeCachedStatus | null): YoutubeVideo | null {
 		if (!status?.isLive || !status.videoId) return null;
 		return {
@@ -149,7 +148,6 @@
 		}
 	}
 
-
 	async function loadMoreVideos() {
 		if (isLoadingMore || !hasMore) return;
 		isLoadingMore = true;
@@ -208,7 +206,7 @@
 		}
 
 		url.searchParams.delete('v');
-		await goto(url.toString(), { keepFocus: true, noScroll: true });
+		await goto(url.toString(), { reset: false });
 	}
 
 	function handleSearch(immediate = false) {
@@ -291,17 +289,23 @@
 		observer?.disconnect();
 	});
 	let initialVideos = $derived(((data as any).videos || []) as YoutubeVideo[]);
-	let initialLiveStatus = $derived(((data as any).liveStatus || null) as YouTubeCachedStatus | null);
-	let initialRequestedVideo = $derived(((data as any).requestedVideo || null) as YoutubeVideo | null);
+	let initialLiveStatus = $derived(
+		((data as any).liveStatus || null) as YouTubeCachedStatus | null
+	);
+	let initialRequestedVideo = $derived(
+		((data as any).requestedVideo || null) as YoutubeVideo | null
+	);
 	let currentFilter = $derived(((data as any).filter || 'All') as string);
 	let currentSearch = $derived(((data as any).search || '') as string);
 	let currentVideoId = $derived(((data as any).videoId || '') as string);
 	let isDeferredData = $derived(Boolean((data as any).deferred));
-	let requestKey = $derived(JSON.stringify({
-		filter: currentFilter || 'All',
-		search: currentSearch || '',
-		videoId: currentVideoId || ''
-	}));
+	let requestKey = $derived(
+		JSON.stringify({
+			filter: currentFilter || 'All',
+			search: currentSearch || '',
+			videoId: currentVideoId || ''
+		})
+	);
 	$effect(() => {
 		if (requestKey && requestKey !== lastHandledKey) {
 			untrack(() => {
@@ -340,9 +344,11 @@
 		}
 	});
 	let activeLiveVideo = $derived(buildLiveVideo(liveStatus));
-	let displayVideos = $derived(activeLiveVideo
-		? [activeLiveVideo, ...loadedVideos.filter((video) => video.id !== activeLiveVideo.id)]
-		: loadedVideos);
+	let displayVideos = $derived(
+		activeLiveVideo
+			? [activeLiveVideo, ...loadedVideos.filter((video) => video.id !== activeLiveVideo.id)]
+			: loadedVideos
+	);
 	$effect(() => {
 		if (currentSearch !== lastSyncedSearch) {
 			searchInput = currentSearch;
@@ -369,11 +375,15 @@
 <main class="relative max-w-6xl mx-auto px-6">
 	<div class="mt-5 mb-16">
 		<section class="mb-8">
-			<p class="text-[10px] font-semibold uppercase tracking-[0.3em] text-missionnaire mb-3 font-body">
+			<p
+				class="text-[10px] font-semibold uppercase tracking-[0.3em] text-missionnaire mb-3 font-body"
+			>
 				Missionnaire Network
 			</p>
 			<div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-				<h1 class="font-display text-4xl md:text-5xl font-semibold tracking-tight leading-[1.05] text-stone-900">
+				<h1
+					class="font-display text-4xl md:text-5xl font-semibold tracking-tight leading-[1.05] text-stone-900"
+				>
 					{$t('nav.videos')}
 				</h1>
 				<a
@@ -443,7 +453,8 @@
 			<div class="flex flex-wrap gap-2 items-center">
 				{#each availableTypesTag as tagType}
 					<button
-						class="px-3 py-1.5 text-sm font-medium transition-colors duration-200 active:scale-[0.98] border {currentFilter === tagType.label
+						class="px-3 py-1.5 text-sm font-medium transition-colors duration-200 active:scale-[0.98] border {currentFilter ===
+						tagType.label
 							? 'border-missionnaire text-missionnaire bg-missionnaire/5'
 							: 'border-stone-200/60 text-stone-500 hover:border-missionnaire hover:text-missionnaire'}"
 						onclick={() => handleFilterChange(tagType.label)}
@@ -493,14 +504,18 @@
 									? 'bg-red-600'
 									: 'bg-missionnaire'} text-[10px] font-bold uppercase tracking-[0.25em] font-body mb-2"
 							>
-								{displayVideos[0].tags.includes('LIVE') ? $t('videos.liveBadge') : $t('videos.featured')}
+								{displayVideos[0].tags.includes('LIVE')
+									? $t('videos.liveBadge')
+									: $t('videos.featured')}
 							</div>
 							<h2
 								class="font-display font-semibold text-3xl md:text-5xl lg:text-6xl leading-[1.05] tracking-tight line-clamp-2 group-hover:text-stone-200 transition-colors"
 							>
 								{displayVideos[0].title}
 							</h2>
-							<p class="text-white/80 text-sm md:text-base line-clamp-2 max-w-2xl font-body font-light">
+							<p
+								class="text-white/80 text-sm md:text-base line-clamp-2 max-w-2xl font-body font-light"
+							>
 								{displayVideos[0].description}
 							</p>
 							<div class="pt-6 flex items-center gap-4">
@@ -530,7 +545,9 @@
 							>
 								{$t('footer.discover')}
 							</h2>
-							<h3 class="font-display text-2xl md:text-3xl font-semibold tracking-tight leading-[1.05] text-stone-900">
+							<h3
+								class="font-display text-2xl md:text-3xl font-semibold tracking-tight leading-[1.05] text-stone-900"
+							>
 								{$t('videos.recentVideos')}
 							</h3>
 						</div>
