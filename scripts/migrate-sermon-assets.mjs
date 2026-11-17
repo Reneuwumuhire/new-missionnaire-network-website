@@ -6,11 +6,11 @@ import { createReadStream, createWriteStream } from 'node:fs';
 import { mkdtemp, rm, stat, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { pathToFileURL } from 'node:url';
 import { HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { MongoClient } from 'mongodb';
-import fetch from 'node-fetch';
 
 const TRUSTED_SOURCE_HOSTS = new Set([
 	'd21kl6o5a7faj0.cloudfront.net',
@@ -161,11 +161,12 @@ async function download(sourceUrl, destination) {
 	const announcedSize = Number(response.headers.get('content-length'));
 	if (announcedSize > MAX_FILE_BYTES) throw new Error('Source file exceeds 1.5 GB');
 	let received = 0;
-	response.body.on('data', (chunk) => {
+	const source = Readable.fromWeb(response.body);
+	source.on('data', (chunk) => {
 		received += chunk.length;
-		if (received > MAX_FILE_BYTES) response.body.destroy(new Error('Source file exceeds 1.5 GB'));
+		if (received > MAX_FILE_BYTES) source.destroy(new Error('Source file exceeds 1.5 GB'));
 	});
-	await pipeline(response.body, createWriteStream(destination));
+	await pipeline(source, createWriteStream(destination));
 	if (!received) throw new Error('Source file is empty');
 }
 

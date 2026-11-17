@@ -2,15 +2,14 @@
 	import TableAudioList from '$lib/components/+tableAudioList.svelte';
 	import Breadcrumbs from '$lib/components/+breadcrumbs.svelte';
 	import { page } from '$app/state';
+	import type { PageData } from './$types';
 
 	interface Props {
-		data: any;
+		data: PageData;
 	}
 
 	let { data }: Props = $props();
 
-	let songs = $derived(data.songs?.ok ? data.songs.val : []);
-	let isLoading = $derived(!data.songs);
 	let slug = $derived(page.params.slug || '');
 	let pageTitle = $derived(
 		slug.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
@@ -22,8 +21,4 @@
 
 <Breadcrumbs items={[{ label: 'Musique', href: '/musique' }, { label: pageTitle }]} />
 
-{#if isLoading}
-	<p>Loading...</p>
-{:else}
-	<TableAudioList audioList={songs} loading={isLoading} />
-{/if}
+<TableAudioList audioList={data.songs} loading={false} />
