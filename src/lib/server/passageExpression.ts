@@ -56,7 +56,7 @@ export function firstPassage(parts: unknown, query: string, mode: PassageMode = 
 						found: {
 							$reduce: {
 								input: '$$source',
-								initialValue: { tail: '', length: 0, hit: null },
+								initialValue: { tail: '', tailLength: 0, length: 0, hit: null },
 								in: {
 									$cond: [
 										{ $ne: ['$$value.hit', null] },
@@ -80,10 +80,7 @@ export function firstPassage(parts: unknown, query: string, mode: PassageMode = 
 																		start: {
 																			$add: [
 																				{
-																					$subtract: [
-																						'$$value.length',
-																						{ $strLenCP: '$$value.tail' }
-																					]
+																					$subtract: ['$$value.length', '$$value.tailLength']
 																				},
 																				'$$match.idx'
 																			]
@@ -92,6 +89,7 @@ export function firstPassage(parts: unknown, query: string, mode: PassageMode = 
 																},
 																{
 																	hit: null,
+																	tailLength: { $min: ['$$size', overlap] },
 																	tail: {
 																		$substrCP: [
 																			'$$combined',
@@ -102,8 +100,7 @@ export function firstPassage(parts: unknown, query: string, mode: PassageMode = 
 																	length: {
 																		$add: [
 																			'$$value.length',
-																			1,
-																			{ $strLenCP: { $ifNull: ['$$this.text', ''] } }
+																			{ $subtract: ['$$size', '$$value.tailLength'] }
 																		]
 																	}
 																}

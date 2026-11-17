@@ -200,7 +200,8 @@ describe.skipIf(!uri)('library search Mongo integration', () => {
 		expect(result.results[0].type).toBe('sermons');
 		expect(result.results.find((r) => r.type === 'songs')?.startSec).toBe(12.5);
 		expect(result.results.find((r) => r.id === recId.toString())?.startSec).toBe(15);
-		expect(result.results.find((r) => r.id === fallbackId.toString())?.startSec).toBe(6);
+		// Cue time plus the anchor relative to the recording, less the subtitle offset.
+		expect(result.results.find((r) => r.id === fallbackId.toString())?.startSec).toBe(4);
 		expect(result.results.find((r) => r.type === 'transcriptions')?.pageHref).toContain('#page=3');
 		expect(result.results.find((r) => r.type === 'transcriptions')?.href).toContain(
 			'/lecture/transcriptions/'

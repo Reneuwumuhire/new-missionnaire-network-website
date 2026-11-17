@@ -118,6 +118,8 @@ describe.skipIf(!uri)('published passage reader with local Mongo', () => {
 		expect(found.total).toBe(3);
 		expect(found.results.find((r) => r.type === 'songs')?.startSec).toBe(12);
 		expect(found.results.find((r) => r.type === 'recordings')?.startSec).toBe(15);
+		const short = await search('grace nous', 'documents');
+		expect(short.results[0]?.page).toBe(2);
 		const first = await read();
 		expect(first.count).toBe(2);
 		expect(first.pages.map((p) => p.page)).toEqual([2, 3]);

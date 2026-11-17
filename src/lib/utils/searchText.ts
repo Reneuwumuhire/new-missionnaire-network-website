@@ -16,7 +16,7 @@ export function buildFuzzySearchPattern(search: string): string {
 	let pattern = '';
 	for (const char of normalized) {
 		const lower = char.toLowerCase();
-		if (lower in ACCENT_MAP) pattern += '(?:' + ACCENT_MAP[lower].join('|') + ')' + OPT_COMBINING;
+		if (lower in ACCENT_MAP) pattern += '[' + ACCENT_MAP[lower].join('') + ']' + OPT_COMBINING;
 		else if (/[a-z]/i.test(char))
 			pattern += char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + OPT_COMBINING;
 		else if (/[0-9]/.test(char)) pattern += char;
