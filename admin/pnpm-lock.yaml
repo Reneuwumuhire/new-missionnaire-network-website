@@ -9,6 +9,14 @@ overrides:
   postcss-selector-parser: 7.1.6
   source-map-js: 1.2.2
 
+patchedDependencies:
+  picomatch@2.3.2:
+    hash: 132b6fcab15f914434344631b0eebefa9d003d7d75f10ffa528780ad477132a7
+    path: patches/picomatch@2.3.2.patch
+  picomatch@4.0.7:
+    hash: 3272b695dfcbcb750e7716a95ff33b2067aa8d448e567eb104ed4188d7328b29
+    path: patches/picomatch@4.0.7.patch
+
 importers:
 
   .:
@@ -73,7 +81,7 @@ importers:
         version: 5.57.1(@typescript-eslint/types@8.58.0)
       svelte-check:
         specifier: ^4.4.5
-        version: 4.7.6(picomatch@4.0.7)(svelte@5.57.1(@typescript-eslint/types@8.58.0))(typescript@6.0.3)
+        version: 4.7.6(picomatch@4.0.7(patch_hash=3272b695dfcbcb750e7716a95ff33b2067aa8d448e567eb104ed4188d7328b29))(svelte@5.57.1(@typescript-eslint/types@8.58.0))(typescript@6.0.3)
       tailwindcss:
         specifier: ^3.3.3
         version: 3.4.19(tsx@4.23.15)
@@ -2310,7 +2318,7 @@ snapshots:
     dependencies:
       '@types/estree': 1.0.9
       estree-walker: 2.0.2
-      picomatch: 4.0.7
+      picomatch: 4.0.7(patch_hash=3272b695dfcbcb750e7716a95ff33b2067aa8d448e567eb104ed4188d7328b29)
     optionalDependencies:
       rollup: 4.63.4
 
@@ -2517,7 +2525,7 @@ snapshots:
       glob: 13.0.6
       graceful-fs: 4.2.11
       node-gyp-build: 4.8.4
-      picomatch: 4.0.7
+      picomatch: 4.0.7(patch_hash=3272b695dfcbcb750e7716a95ff33b2067aa8d448e567eb104ed4188d7328b29)
       resolve-from: 5.0.0
     transitivePeerDependencies:
       - encoding
@@ -2550,7 +2558,7 @@ snapshots:
   anymatch@3.1.3:
     dependencies:
       normalize-path: 3.0.0
-      picomatch: 2.3.2
+      picomatch: 2.3.2(patch_hash=132b6fcab15f914434344631b0eebefa9d003d7d75f10ffa528780ad477132a7)
 
   arg@5.0.2: {}
 
@@ -2722,9 +2730,9 @@ snapshots:
     dependencies:
       reusify: 1.1.0
 
-  fdir@6.5.0(picomatch@4.0.7):
+  fdir@6.5.0(picomatch@4.0.7(patch_hash=3272b695dfcbcb750e7716a95ff33b2067aa8d448e567eb104ed4188d7328b29)):
     optionalDependencies:
-      picomatch: 4.0.7
+      picomatch: 4.0.7(patch_hash=3272b695dfcbcb750e7716a95ff33b2067aa8d448e567eb104ed4188d7328b29)
 
   file-uri-to-path@1.0.0: {}
 
@@ -2866,7 +2874,7 @@ snapshots:
   micromatch@4.0.8:
     dependencies:
       braces: 3.0.3
-      picomatch: 2.3.2
+      picomatch: 2.3.2(patch_hash=132b6fcab15f914434344631b0eebefa9d003d7d75f10ffa528780ad477132a7)
 
   minimatch@10.2.6:
     dependencies:
@@ -2938,9 +2946,9 @@ snapshots:
 
   picocolors@1.1.1: {}
 
-  picomatch@2.3.2: {}
+  picomatch@2.3.2(patch_hash=132b6fcab15f914434344631b0eebefa9d003d7d75f10ffa528780ad477132a7): {}
 
-  picomatch@4.0.7: {}
+  picomatch@4.0.7(patch_hash=3272b695dfcbcb750e7716a95ff33b2067aa8d448e567eb104ed4188d7328b29): {}
 
   pirates@4.0.7: {}
 
@@ -3002,7 +3010,7 @@ snapshots:
 
   readdirp@3.6.0:
     dependencies:
-      picomatch: 2.3.2
+      picomatch: 2.3.2(patch_hash=132b6fcab15f914434344631b0eebefa9d003d7d75f10ffa528780ad477132a7)
 
   readdirp@4.1.2: {}
 
@@ -3113,12 +3121,12 @@ snapshots:
 
   supports-preserve-symlinks-flag@1.0.0: {}
 
-  svelte-check@4.7.6(picomatch@4.0.7)(svelte@5.57.1(@typescript-eslint/types@8.58.0))(typescript@6.0.3):
+  svelte-check@4.7.6(picomatch@4.0.7(patch_hash=3272b695dfcbcb750e7716a95ff33b2067aa8d448e567eb104ed4188d7328b29))(svelte@5.57.1(@typescript-eslint/types@8.58.0))(typescript@6.0.3):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       '@sveltejs/load-config': 0.2.3
       chokidar: 4.0.3
-      fdir: 6.5.0(picomatch@4.0.7)
+      fdir: 6.5.0(picomatch@4.0.7(patch_hash=3272b695dfcbcb750e7716a95ff33b2067aa8d448e567eb104ed4188d7328b29))
       picocolors: 1.1.1
       sade: 1.8.1
       svelte: 5.57.1(@typescript-eslint/types@8.58.0)
@@ -3196,8 +3204,8 @@ snapshots:
 
   tinyglobby@0.2.17:
     dependencies:
-      fdir: 6.5.0(picomatch@4.0.7)
-      picomatch: 4.0.7
+      fdir: 6.5.0(picomatch@4.0.7(patch_hash=3272b695dfcbcb750e7716a95ff33b2067aa8d448e567eb104ed4188d7328b29))
+      picomatch: 4.0.7(patch_hash=3272b695dfcbcb750e7716a95ff33b2067aa8d448e567eb104ed4188d7328b29)
 
   to-regex-range@5.0.1:
     dependencies:
@@ -3244,7 +3252,7 @@ snapshots:
   vite@8.3.6(@types/node@25.9.8)(esbuild@0.28.2)(jiti@1.21.7)(tsx@4.23.15):
     dependencies:
       lightningcss: 1.33.0
-      picomatch: 4.0.7
+      picomatch: 4.0.7(patch_hash=3272b695dfcbcb750e7716a95ff33b2067aa8d448e567eb104ed4188d7328b29)
       postcss: 8.5.32
       rolldown: 1.2.16
       tinyglobby: 0.2.17
@@ -3268,7 +3276,7 @@ snapshots:
       expect-type: 1.4.0
       magic-string: 1.4.1
       obug: 2.2.1
-      picomatch: 4.0.7
+      picomatch: 4.0.7(patch_hash=3272b695dfcbcb750e7716a95ff33b2067aa8d448e567eb104ed4188d7328b29)
       std-env: 4.3.0
       tinybench: 6.1.4
       tinyexec: 1.3.0
