@@ -133,6 +133,7 @@ mod platform {
 	impl Capture {
 		pub fn start(&self, id: &str, window_id: u32, max_width: u32, max_height: u32,
 			fps: u32, hide_cursor: bool, audio: Channel<InvokeResponseBody>) -> Result<CaptureInfo, String> {
+			super::require_screen_recording()?;
 			self.stop(Some(id));
 			let content = SCShareableContent::create()
 				.with_on_screen_windows_only(false)
@@ -276,3 +277,13 @@ mod platform {
 }
 
 pub use platform::Capture;
+
+// Check without prompting. Saved sources can enumerate windows automatically.
+#[cfg(target_os = "macos")]
+pub fn require_screen_recording() -> Result<(), String> {
+	if core_graphics::access::ScreenCaptureAccess.preflight() {
+		Ok(())
+	} else {
+		Err("SCREEN_RECORDING_ACCESS_REQUIRED".into())
+	}
+}

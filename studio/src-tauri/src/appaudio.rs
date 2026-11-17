@@ -158,10 +158,11 @@ mod platform {
 	/// Include windows on other macOS desktops so an operator can pick a window
 	/// on a second monitor without moving it onto Studio's desktop first.
 	pub fn list_windows() -> Result<Vec<AudioWindow>, String> {
+		crate::window_capture::require_screen_recording()?;
 		let content = SCShareableContent::create()
 			.with_on_screen_windows_only(false)
 			.get()
-			.map_err(|e| format!("Partage d'écran non autorisé ou indisponible: {e:?}"))?;
+			.map_err(|e| format!("Could not list shareable windows: {e:?}"))?;
 		Ok(content
 			.windows()
 			.into_iter()
