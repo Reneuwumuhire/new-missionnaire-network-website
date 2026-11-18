@@ -49,7 +49,7 @@ download() {
 download 'https://ffmpeg.org/releases/ffmpeg-6.1.1.tar.xz' \
   "$temporary/ffmpeg.tar.xz" \
   '8684f4b00f94b85461884c3719382f1261f0d9eb3d59640a1f4ac0873616f968'
-download 'https://code.videolan.org/videolan/x264/-/archive/b35605ace3ddf7c1a5d67a2eb553f034aef41d55/x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55.tar.gz' \
+download 'https://codeload.github.com/mirror/x264/tar.gz/b35605ace3ddf7c1a5d67a2eb553f034aef41d55' \
   "$temporary/x264.tar.gz" \
   'cd71a7515b0e9a012e1ac9b1f8415bebcaf6fc97d4db32286642ac4c0fbe24f9'
 download 'https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz' \
@@ -124,7 +124,7 @@ chmod 755 "$binary"
 cat > "$binary.README" <<'EOF'
 FFmpeg 6.1.1: https://ffmpeg.org/releases/ffmpeg-6.1.1.tar.xz
 x264 b35605ace3ddf7c1a5d67a2eb553f034aef41d55:
-https://code.videolan.org/videolan/x264/-/archive/b35605ace3ddf7c1a5d67a2eb553f034aef41d55/x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55.tar.gz
+https://codeload.github.com/mirror/x264/tar.gz/b35605ace3ddf7c1a5d67a2eb553f034aef41d55
 LAME 3.100: https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz
 The build recipe and hashes are in studio/scripts/build-macos-ffmpeg.sh.
 The RTMPS patch is in studio/scripts/ffmpeg-securetransport-nonblocking.patch.
