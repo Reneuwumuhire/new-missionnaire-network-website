@@ -36,19 +36,21 @@ it('matches a saved window by app and title when its OS id changes', () => {
 
 it('restores saved local files, native windows and links on launch', async () => {
 	const file = makeLayer('image', 'Thumbnail', { filePath: '/media/thumbnail.png' });
+	const display = makeLayer('screen', 'Display', { displayId: 42, captureSurface: 'monitor' });
 	const window = makeLayer('screen', 'Krefeld', {
 		windowId: 1,
 		appId: 'org.browser',
 		windowTitle: 'Krefeld'
 	});
 	const link = makeLayer('video', 'Sermon', { url: 'https://example.com/watch' });
-	studio.scenes = [{ id: 'scene', name: 'Scene', layers: [file, window, link] }];
+	studio.scenes = [{ id: 'scene', name: 'Scene', layers: [file, display, window, link] }];
 	vi.mocked(invoke).mockImplementation((command) => {
 		if (command === 'native_window_capture_available') return Promise.resolve(true) as never;
 		if (command === 'list_windows')
 			return Promise.resolve([
 				{ id: 3, appId: 'org.browser', appName: 'Browser', title: 'Krefeld', width: 10, height: 10 }
 			]) as never;
+		if (command === 'list_displays') return Promise.resolve([{ id: 42 }]) as never;
 		if (command === 'register_local_media') return Promise.resolve({ token: 'local' }) as never;
 		if (command === 'resolve_media')
 			return Promise.resolve({ token: 'remote', duration: 42 }) as never;
@@ -58,6 +60,7 @@ it('restores saved local files, native windows and links on launch', async () =>
 	await restoreSavedSources();
 	expect(openLocalMedia).toHaveBeenCalledWith(file, 'local');
 	expect(openNativeWindow).toHaveBeenCalledWith(window, 3);
+	expect(openNativeWindow).toHaveBeenCalledWith(display, 0, 42);
 	expect(window.windowId).toBe(3);
 	expect(openStream).toHaveBeenCalledWith(link, 'remote');
 	expect(link.duration).toBe(42);

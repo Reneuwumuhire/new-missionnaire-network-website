@@ -9,13 +9,19 @@
 		handleFor,
 		listDevices,
 		openCamera,
+		openNativeWindow,
 		type DeviceOption
 	} from '../lib/media.svelte';
+	import { invoke } from '@tauri-apps/api/core';
 	import { onMount } from 'svelte';
 	import { followMedia, lyrics } from '../lib/lyrics.svelte';
 	import { DEFAULT_TEXT_STYLE, persist, selectedLayer, studio } from '../lib/state.svelte';
 
 	let cameras = $state<DeviceOption[]>([]);
+	type DisplayChoice = { id: number; width: number; height: number; preview: string | null };
+	let displays = $state<DisplayChoice[] | null>(null);
+	let displayError = $state('');
+	let loadingDisplays = $state(false);
 	onMount(async () => {
 		cameras = await listDevices('videoinput');
 	});
@@ -70,6 +76,32 @@
 		persist();
 	}
 
+	async function chooseDisplay() {
+		loadingDisplays = true;
+		displayError = '';
+		try {
+			displays = await invoke<DisplayChoice[]>('list_displays');
+		} catch (error) {
+			displayError = String(error);
+		} finally {
+			loadingDisplays = false;
+		}
+	}
+
+	async function changeDisplay(choice: DisplayChoice) {
+		if (!layer) return;
+		const handle = await openNativeWindow(layer, 0, choice.id);
+		if (!handle.el) {
+			displayError = handle.error ?? t('sources.displaysUnavailable');
+			return;
+		}
+		layer.displayId = choice.id;
+		delete layer.appId;
+		displays = null;
+		displayError = '';
+		commit();
+	}
+
 	function ensureStyle() {
 		if (layer && !layer.style) layer.style = { ...DEFAULT_TEXT_STYLE };
 	}
@@ -120,6 +152,41 @@
 		{/if}
 
 		{#if layer.kind === 'screen'}
+			{#if layer.captureSurface === 'monitor' && /Macintosh|Mac OS X/.test(navigator.userAgent)}
+				<div class="space-y-2">
+					<button class="studio-chip" disabled={loadingDisplays} onclick={chooseDisplay}
+						>{t('props.changeDisplay')}</button
+					>
+					{#if displays}
+						{#if !displays.length}<p class="text-[12px] text-warning">
+								{t('sources.displaysUnavailable')}
+							</p>{/if}
+						<div class="grid grid-cols-2 gap-2">
+							{#each displays as choice, index (choice.id)}
+								<button
+									class="studio-chip flex flex-col gap-2 p-2 text-left"
+									onclick={() => changeDisplay(choice)}
+								>
+									{#if choice.preview}<img
+											src={choice.preview}
+											alt=""
+											class="aspect-video w-full rounded bg-black object-contain"
+										/>{/if}
+									<span
+										>{t('sources.displayNumber', { number: index + 1 })} · {choice.width}×{choice.height}{choice.id ===
+										layer.displayId
+											? ` · ${t('props.currentDisplay')}`
+											: ''}</span
+									>
+								</button>
+							{/each}
+						</div>
+					{/if}
+					{#if displayError}<p class="text-[12px] text-warning" role="status">
+							{displayError}
+						</p>{/if}
+				</div>
+			{/if}
 			<div class="space-y-1">
 				<label class="flex items-center gap-2 text-sm text-fg/70">
 					<input

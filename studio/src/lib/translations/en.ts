@@ -70,6 +70,11 @@ const en = {
 	'sources.video': 'Media Source',
 	'sources.videoHint': 'Clip or loop, with sound',
 	'sources.pickWindow': 'Choose a window to capture',
+	'sources.pickDisplay': 'Choose a display to capture',
+	'sources.displayNumber': 'Display {number}',
+	'sources.displaysUnavailable': 'No displays available to capture. Try refreshing.',
+	'props.changeDisplay': 'Change display',
+	'props.currentDisplay': 'Current',
 	'sources.pickWindowHint':
 		'Choose a window. On macOS 13 or later, audio from its application is added to the mixer automatically.',
 	'sources.untitledWindow': 'Untitled window',
