@@ -151,7 +151,7 @@
 	/** The two audio kinds are not layers: they have no picture, and they are
 	 *  global to the show. They are offered here because OBS offers them here,
 	 *  and appear where they belong — in the Audio Mixer. */
-	type MenuKind = LayerKind | 'audioInput' | 'audioApp';
+	type MenuKind = LayerKind | 'window' | 'audioInput' | 'audioApp';
 
 	const SOURCE_KINDS: {
 		kind: MenuKind;
@@ -181,6 +181,12 @@
 			kind: 'screen',
 			label: () => t('sources.screen'),
 			hint: () => t('sources.screenHint'),
+			icon: 'monitor'
+		},
+		{
+			kind: 'window',
+			label: () => t('sources.window'),
+			hint: () => t('sources.windowHint'),
 			icon: 'monitor'
 		},
 		{
@@ -234,7 +240,7 @@
 		}
 		adding = false;
 		const label = SOURCE_KINDS.find((s) => s.kind === kind)?.label() ?? kind;
-		const layer = makeLayer(kind, label, {
+		const layer = makeLayer(kind === 'window' ? 'screen' : kind, label, {
 			...(kind === 'text' ? { text: t('sources.text'), style: { ...DEFAULT_TEXT_STYLE } } : {}),
 			...(kind === 'lyrics'
 				? {
@@ -244,8 +250,12 @@
 					}
 				: {}),
 			...(kind === 'color' ? { color: '#0B0B0D' } : {}),
-			...(kind === 'screen'
-				? { fit: 'contain' as const, hideCursor: true }
+			...(kind === 'screen' || kind === 'window'
+				? {
+						fit: 'contain' as const,
+						hideCursor: true,
+						captureSurface: kind === 'window' ? 'window' : 'monitor'
+					}
 				: kind === 'video'
 					? { fit: 'contain' as const }
 					: {})
@@ -256,7 +266,7 @@
 		persist();
 
 		if (kind === 'camera') await openCamera(layer, studio.settings.width, studio.settings.height);
-		if (kind === 'screen') await shareScreen(layer);
+		if (layer.kind === 'screen') await shareScreen(layer);
 		if (kind === 'image' || kind === 'video') pickFile(layer);
 	}
 
@@ -272,8 +282,9 @@
 		// The browser requires a user gesture for the screen picker. On Windows
 		// and Linux, call it before any asynchronous native capability probe.
 		if (
+			layer.captureSurface !== 'monitor' &&
 			/Macintosh|Mac OS X/.test(navigator.userAgent) &&
-			(await invoke<boolean>('native_window_capture_available'))
+			(await invoke<boolean>('native_window_capture_available').catch(() => false))
 		) {
 			await refreshWindowChoices();
 			const previous = windowChoices.find(

@@ -62,9 +62,12 @@ const fr: Record<keyof typeof en, string> = {
 		'Le son jou\u00e9 par une autre application \u2014 appara\u00eet dans le m\u00e9langeur audio',
 	'sources.camera': 'Caméra',
 	'sources.cameraHint': 'Webcam ou boîtier de capture',
-	'sources.screen': 'Capture d’écran / de fenêtre',
-	'sources.screenHint':
-		'Capture une fenêtre du navigateur ou un écran avec le son de l’application',
+	'sources.screen': 'Capture d’écran',
+	'sources.screenHint': 'Capturer un écran entier',
+	'sources.window': 'Capture de fenêtre',
+	'sources.windowHint': 'Capturer une seule fenêtre d’application',
+	'sources.selectDisplay': 'Reconnectez la source et choisissez un écran entier dans le sélecteur de partage.',
+	'sources.selectWindow': 'Reconnectez la source et choisissez une fenêtre d’application dans le sélecteur de partage.',
 	'sources.image': 'Image',
 	'sources.imageHint': 'Logo, verset, arrière-plan',
 	'sources.video': 'Source multimédia',
@@ -506,7 +509,7 @@ const fr: Record<keyof typeof en, string> = {
 		'Vérifiez que Paroles est affiché, que la bonne session publique est active et que le MP3 de référence et son SRT français sont chargés. La synchronisation automatique a aussi besoin du son de la source capturée ; utilisez « Le sermon commence maintenant » uniquement en secours.',
 	'help.captureProblem': 'Une fenêtre YouTube capturée est mal cadrée',
 	'help.captureSolution':
-		'Utilisez Capture d’écran / de fenêtre, gardez la vidéo visible dans le navigateur, puis recadrez ou redimensionnez la source dans l’aperçu. Envoyez-la au programme seulement lorsque le résultat est propre.',
+		'Utilisez Capture de fenêtre, gardez la vidéo visible dans le navigateur, puis recadrez ou redimensionnez la source dans l’aperçu. Envoyez-la au programme seulement lorsque le résultat est propre.',
 	'help.openSystem': 'Ouvrir les informations système',
 
 	// ── Stream destinations ─────────────────────────────────────

@@ -59,8 +59,12 @@ const en = {
 	'sources.audioAppHint': 'The sound another app is playing \u2014 appears in the Audio Mixer',
 	'sources.camera': 'Camera',
 	'sources.cameraHint': 'Webcam or capture device',
-	'sources.screen': 'Display / Window Capture',
-	'sources.screenHint': 'Capture a browser window or display with its application audio',
+	'sources.screen': 'Display Capture',
+	'sources.screenHint': 'Capture an entire monitor',
+	'sources.window': 'Window Capture',
+	'sources.windowHint': 'Capture a single application window',
+	'sources.selectDisplay': 'Reconnect and select an entire screen in the sharing picker.',
+	'sources.selectWindow': 'Reconnect and select an application window in the sharing picker.',
 	'sources.image': 'Image',
 	'sources.imageHint': 'Logo, verse, backdrop',
 	'sources.video': 'Media Source',
@@ -494,7 +498,7 @@ const en = {
 		'Confirm Lyrics is Shown, the correct public session is active, and the reference MP3 and matching French SRT are loaded. Automatic sync also needs audio from the captured live source; use “Sermon begins now” only as the fallback.',
 	'help.captureProblem': 'A captured YouTube window looks wrong',
 	'help.captureSolution':
-		'Use Display / Window Capture, keep the video visible in the browser window, and crop or resize the source in Preview. Move it to Program only after the result is clean.',
+		'Use Window Capture, keep the video visible in the browser window, and crop or resize the source in Preview. Move it to Program only after the result is clean.',
 	'help.openSystem': 'Open System Information',
 
 	// ── Stream destinations ─────────────────────────────────────
