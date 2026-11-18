@@ -328,8 +328,8 @@ macOS asks the first time. Studio lists and captures macOS windows with
 ScreenCaptureKit.
 
 **Properties → Hide the mouse pointer** changes the cursor setting on the
-running macOS capture. Browser-managed shares use the video track's `cursor`
-constraint when the webview supports it.
+running macOS capture. macOS window and whole display sources use
+ScreenCaptureKit; Windows shares use the browser picker.
 
 ## Windows
 

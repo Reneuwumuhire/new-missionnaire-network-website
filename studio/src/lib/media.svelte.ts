@@ -384,7 +384,7 @@ export async function openScreen(layer: Layer): Promise<Handle> {
 /** ScreenCaptureKit sends its newest JPEG frame when the compositor asks for
  * it. Only one request and one decode are in flight, so a slow webview cannot
  * build an unbounded frame queue or stall the macOS capture callback. */
-export async function openNativeWindow(layer: Layer, windowId: number): Promise<Handle> {
+export async function openNativeWindow(layer: Layer, windowId: number, displayId?: number): Promise<Handle> {
 	const request = beginOpen(layer.id);
 	const captureId = `${layer.id}:${crypto.randomUUID()}`;
 	try {
@@ -397,6 +397,7 @@ export async function openNativeWindow(layer: Layer, windowId: number): Promise<
 		const info = await invoke<{ width: number; height: number; hasAudio: boolean }>('start_window_capture', {
 			id: captureId,
 			windowId,
+			displayId,
 			width: studio.settings.width,
 			height: studio.settings.height,
 			fps: studio.settings.fps,

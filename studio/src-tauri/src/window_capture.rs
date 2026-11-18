@@ -1,7 +1,6 @@
-//! Native macOS window capture. WebKit's getDisplayMedia path can stall
-//! the desktop while sharing a browser playing live video. ScreenCaptureKit
-//! captures one selected window directly and can omit the pointer before it
-//! becomes part of the frame, as OBS does.
+//! Native macOS window and display capture. WebKit's getDisplayMedia path can
+//! stall the desktop while sharing. ScreenCaptureKit keeps capture work off
+//! the webview and can omit the pointer before it becomes part of the frame.
 
 use serde::Serialize;
 use tauri::ipc::{Channel, InvokeResponseBody};
@@ -14,9 +13,18 @@ pub struct CaptureInfo {
 	pub has_audio: bool,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DisplayInfo {
+	pub id: u32,
+	pub width: u32,
+	pub height: u32,
+	pub preview: Option<String>,
+}
+
 #[cfg(target_os = "macos")]
 mod platform {
-	use super::{CaptureInfo, Channel, InvokeResponseBody};
+	use super::{CaptureInfo, Channel, DisplayInfo, InvokeResponseBody};
 	use crate::appaudio::{configure_audio, send_pcm};
 	use core_graphics::window::{create_window_list, kCGNullWindowID, kCGWindowListOptionAll};
 	use image::{codecs::jpeg::JpegEncoder, ColorType};
@@ -131,7 +139,33 @@ mod platform {
 	}
 
 	impl Capture {
-		pub fn start(&self, id: &str, window_id: u32, max_width: u32, max_height: u32,
+		pub fn displays(with_preview: bool) -> Result<Vec<DisplayInfo>, String> {
+			super::require_screen_recording()?;
+			let content = SCShareableContent::get().map_err(|e| format!("Displays unavailable: {e:?}"))?;
+			Ok(content.displays().into_iter().map(|display| {
+				let preview = if with_preview && NSProcessInfo::processInfo().operatingSystemVersion().majorVersion >= 14 {
+					use base64::Engine;
+					use screencapturekit::screenshot_manager::{CGImageExt, SCScreenshotManager};
+					let filter = SCContentFilter::create().with_display(&display).build();
+					let scale = (320.0 / display.width().max(1) as f64)
+						.min(180.0 / display.height().max(1) as f64).min(1.0);
+					let width = (display.width() as f64 * scale).round().max(1.0) as u32;
+					let height = (display.height() as f64 * scale).round().max(1.0) as u32;
+					let config = SCStreamConfiguration::new().with_width(width).with_height(height);
+					SCScreenshotManager::capture_image(&filter, &config).ok().and_then(|image| {
+						let pixels = image.rgba_data().ok()?;
+						let rgb: Vec<u8> = pixels.chunks_exact(4).flat_map(|pixel| pixel[..3].iter().copied()).collect();
+						let mut jpeg = Vec::new();
+						JpegEncoder::new_with_quality(&mut jpeg, 70)
+							.encode(&rgb, image.width() as u32, image.height() as u32, ColorType::Rgb8.into()).ok()?;
+						Some(format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(jpeg)))
+					})
+				} else { None };
+				DisplayInfo { id: display.display_id(), width: display.width(), height: display.height(), preview }
+			}).collect())
+		}
+
+		pub fn start(&self, id: &str, window_id: u32, display_id: Option<u32>, max_width: u32, max_height: u32,
 			fps: u32, hide_cursor: bool, audio: Channel<InvokeResponseBody>) -> Result<CaptureInfo, String> {
 			super::require_screen_recording()?;
 			self.stop(Some(id));
@@ -139,17 +173,24 @@ mod platform {
 				.with_on_screen_windows_only(false)
 				.get()
 				.map_err(|e| format!("Windows unavailable: {e:?}"))?;
-			let window = content.windows().into_iter()
-				.find(|window| window.window_id() == window_id)
-				.ok_or("The selected window is no longer open")?;
-			let frame = window.frame();
-			let source_width = frame.size.width.max(1.0);
-			let source_height = frame.size.height.max(1.0);
+			let (source_width, source_height, filter) = if let Some(display_id) = display_id {
+				let display = content.displays().into_iter()
+					.find(|display| display.display_id() == display_id)
+					.ok_or("The selected display is no longer connected")?;
+				(display.width() as f64, display.height() as f64,
+					SCContentFilter::create().with_display(&display).build())
+			} else {
+				let window = content.windows().into_iter()
+					.find(|window| window.window_id() == window_id)
+					.ok_or("The selected window is no longer open")?;
+				let frame = window.frame();
+				(frame.size.width.max(1.0), frame.size.height.max(1.0),
+					SCContentFilter::create().with_window(&window).build())
+			};
 			let scale = (max_width.clamp(1, 1920) as f64 / source_width)
 				.min(max_height.clamp(1, 1080) as f64 / source_height).min(1.0);
 			let width = (source_width * scale).round().max(2.0) as u32;
 			let height = (source_height * scale).round().max(2.0) as u32;
-			let filter = SCContentFilter::create().with_window(&window).build();
 			let fps = fps.clamp(1, 30);
 			let has_audio = NSProcessInfo::processInfo().operatingSystemVersion().majorVersion >= 13;
 			let config = configuration(width, height, fps, hide_cursor, has_audio);
@@ -216,7 +257,7 @@ mod platform {
 			let Ok(mut streams) = self.0.lock() else { return vec![CAPTURE_ENDED] };
 			let Some(active) = streams.get_mut(id) else { return vec![CAPTURE_ENDED] };
 			let now = Instant::now();
-			if active.running.load(Ordering::Relaxed) && now >= active.next_window_check {
+			if active.window_id != 0 && active.running.load(Ordering::Relaxed) && now >= active.next_window_check {
 				active.next_window_check = now + WINDOW_CHECK_INTERVAL;
 				// An app can keep playing after its window closes. Check the actual
 				// window ID, including offscreen and minimized windows.
@@ -267,7 +308,8 @@ mod platform {
 	#[derive(Default)]
 	pub struct Capture;
 	impl Capture {
-		pub fn start(&self, _: &str, _: u32, _: u32, _: u32, _: u32, _: bool, _: Channel<InvokeResponseBody>) -> Result<CaptureInfo, String> {
+		pub fn displays(_: bool) -> Result<Vec<super::DisplayInfo>, String> { Ok(Vec::new()) }
+		pub fn start(&self, _: &str, _: u32, _: Option<u32>, _: u32, _: u32, _: u32, _: bool, _: Channel<InvokeResponseBody>) -> Result<CaptureInfo, String> {
 			Err("Native window capture is available on macOS only".into())
 		}
 		pub fn frame(&self, _: &str, _: u64) -> Vec<u8> { Vec::new() }

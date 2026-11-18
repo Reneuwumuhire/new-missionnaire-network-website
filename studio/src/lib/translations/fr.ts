@@ -66,13 +66,20 @@ const fr: Record<keyof typeof en, string> = {
 	'sources.screenHint': 'Capturer un écran entier',
 	'sources.window': 'Capture de fenêtre',
 	'sources.windowHint': 'Capturer une seule fenêtre d’application',
-	'sources.selectDisplay': 'Reconnectez la source et choisissez un écran entier dans le sélecteur de partage.',
-	'sources.selectWindow': 'Reconnectez la source et choisissez une fenêtre d’application dans le sélecteur de partage.',
+	'sources.selectDisplay':
+		'Reconnectez la source et choisissez un écran entier dans le sélecteur de partage.',
+	'sources.selectWindow':
+		'Reconnectez la source et choisissez une fenêtre d’application dans le sélecteur de partage.',
 	'sources.image': 'Image',
 	'sources.imageHint': 'Logo, verset, arrière-plan',
 	'sources.video': 'Source multimédia',
 	'sources.videoHint': 'Clip ou boucle, avec son',
 	'sources.pickWindow': 'Choisir une fenêtre à capturer',
+	'sources.pickDisplay': 'Choisir un écran à capturer',
+	'sources.displayNumber': 'Écran {number}',
+	'sources.displaysUnavailable': 'Aucun écran disponible à capturer. Essayez d’actualiser.',
+	'props.changeDisplay': 'Changer d’écran',
+	'props.currentDisplay': 'Actuel',
 	'sources.pickWindowHint':
 		'Choisissez une fenêtre. Sur macOS 13 ou version ultérieure, le son de son application est ajouté automatiquement au mixeur.',
 	'sources.untitledWindow': 'Fenêtre sans titre',

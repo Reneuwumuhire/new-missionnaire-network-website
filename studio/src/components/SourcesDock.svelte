@@ -105,6 +105,11 @@
 		};
 	});
 	let pendingWindowLayer = $state<Layer | null>(null);
+	let pendingDisplayLayer = $state<Layer | null>(null);
+	type DisplayChoice = { id: number; width: number; height: number; preview: string | null };
+	let displayChoices = $state<DisplayChoice[]>([]);
+	let displayPickerError = $state<'permission' | 'unavailable' | null>(null);
+	let refreshingDisplays = $state(false);
 	let windowChoices = $state<AudioWindow[]>([]);
 	let windowPickerError = $state<'permission' | 'unavailable' | null>(null);
 	let refreshingWindows = $state(false);
@@ -124,6 +129,39 @@
 		} finally {
 			refreshingWindows = false;
 		}
+	}
+
+	async function refreshDisplayChoices(requestAccess = false) {
+		refreshingDisplays = true;
+		try {
+			if (requestAccess) await invoke('request_screen_recording_access');
+			displayChoices = await invoke<DisplayChoice[]>('list_displays');
+			displayPickerError = null;
+		} catch (error) {
+			displayChoices = [];
+			displayPickerError =
+				error === SCREEN_RECORDING_ACCESS_REQUIRED ? 'permission' : 'unavailable';
+			if (displayPickerError === 'unavailable') report(`list displays failed: ${error}`);
+		} finally {
+			refreshingDisplays = false;
+		}
+	}
+
+	async function captureNativeDisplay(layer: Layer, choice: DisplayChoice) {
+		pendingDisplayLayer = null;
+		const handle = await openNativeWindow(layer, 0, choice.id);
+		if (!handle.el) return;
+		const tracked = studio.scenes
+			.flatMap((scene) => scene.layers)
+			.find((candidate) => candidate.id === layer.id);
+		if (!tracked) {
+			release(layer.id);
+			return;
+		}
+		tracked.displayId = choice.id;
+		delete tracked.appId;
+		report(`native display capture id=${choice.id} size=${choice.width}x${choice.height}`);
+		persist();
 	}
 
 	async function captureNativeWindow(layer: Layer, choice: AudioWindow) {
@@ -278,6 +316,16 @@
 		if (layer.youtubeLiveUrl) {
 			layer.hideCursor = true;
 			layer.fit = 'cover';
+		}
+		if (
+			(layer.captureSurface === 'monitor' || (!layer.captureSurface && !layer.windowId)) &&
+			/Macintosh|Mac OS X/.test(navigator.userAgent)
+		) {
+			await refreshDisplayChoices();
+			const previous = displayChoices.find((display) => display.id === layer.displayId);
+			if (previous) await captureNativeDisplay(layer, previous);
+			else pendingDisplayLayer = layer;
+			return;
 		}
 		// The browser requires a user gesture for the screen picker. On Windows
 		// and Linux, call it before any asynchronous native capability probe.
@@ -556,6 +604,64 @@
 				>
 					{t(refreshingWindows ? 'sources.refreshingWindows' : 'sources.refreshWindows')}
 				</button>
+			</div>
+		</div>
+	</Modal>
+{/if}
+
+{#if pendingDisplayLayer}
+	<Modal title={t('sources.pickDisplay')} onclose={() => (pendingDisplayLayer = null)}>
+		<div class="flex flex-col gap-3 p-5">
+			{#if displayChoices.length}
+				<div class="grid grid-cols-2 gap-3">
+					{#each displayChoices as choice, index (choice.id)}
+						<button
+							class="studio-chip flex flex-col gap-2 p-3 text-left"
+							onclick={() =>
+								pendingDisplayLayer && captureNativeDisplay(pendingDisplayLayer, choice)}
+						>
+							{#if choice.preview}
+								<img
+									src={choice.preview}
+									alt=""
+									class="aspect-video w-full rounded bg-black object-contain"
+								/>
+							{:else}
+								<span
+									class="flex aspect-video w-full items-center justify-center rounded bg-ink-800 text-muted"
+									>{t('sources.previewUnavailable')}</span
+								>
+							{/if}
+							<span
+								>{t('sources.displayNumber', { number: index + 1 })} · {choice.width}×{choice.height}</span
+							>
+						</button>
+					{/each}
+				</div>
+			{:else if !refreshingDisplays}
+				<p class="text-warning" role="status">
+					{t(
+						displayPickerError === 'permission'
+							? 'sources.screenPermissionRequired'
+							: 'sources.displaysUnavailable'
+					)}
+				</p>
+			{/if}
+			<div class="flex gap-2 border-t border-ink-700 pt-3">
+				{#if displayPickerError === 'permission'}
+					<button class="studio-chip" onclick={() => refreshDisplayChoices(true)}
+						>{t('sources.requestScreenPermission')}</button
+					>
+					<button class="studio-chip" onclick={() => openPrivacySettings('screen')}
+						>{t('sources.screenPermission')}</button
+					>
+				{/if}
+				<button
+					class="studio-chip ml-auto"
+					disabled={refreshingDisplays}
+					onclick={() => refreshDisplayChoices()}
+					>{t(refreshingDisplays ? 'sources.refreshingWindows' : 'sources.refreshWindows')}</button
+				>
 			</div>
 		</div>
 	</Modal>

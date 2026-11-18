@@ -281,6 +281,23 @@ it.each(['window closes', 'source is removed'])('clears captured window audio wh
 	}
 });
 
+it('starts a selected display through native capture', async () => {
+	vi.mocked(invoke).mockImplementation(async (command) =>
+		command === 'start_window_capture'
+			? ({ width: 1280, height: 720, hasAudio: false } as never)
+			: (undefined as never)
+	);
+	vi.stubGlobal('HTMLVideoElement', class {});
+	vi.stubGlobal('document', { createElement: () => ({ getContext: () => ({}) }) });
+	const layer = makeLayer('screen', 'Display', { captureSurface: 'monitor', displayId: 42 });
+	const handle = await openNativeWindow(layer, 0, 42);
+	expect(invoke).toHaveBeenCalledWith('start_window_capture', expect.objectContaining({
+		windowId: 0, displayId: 42
+	}));
+	expect(handle.el).toBeTruthy();
+	release(layer.id);
+});
+
 it('backs off repeated window frame errors without refreshing the UI again', async () => {
 	vi.useFakeTimers();
 	const layer = makeLayer('screen', 'Live');

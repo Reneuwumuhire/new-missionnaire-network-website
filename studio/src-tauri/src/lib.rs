@@ -413,12 +413,20 @@ fn native_window_capture_available() -> bool {
 }
 
 #[tauri::command]
-fn start_window_capture(
-	capture: State<'_, window_capture::Capture>, id: String, window_id: u32,
+async fn list_displays(preview: Option<bool>) -> Result<Vec<window_capture::DisplayInfo>, String> {
+	tauri::async_runtime::spawn_blocking(move || window_capture::Capture::displays(preview.unwrap_or(true)))
+		.await.map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn start_window_capture(
+	app: AppHandle, id: String, window_id: u32, display_id: Option<u32>,
 	width: u32, height: u32, fps: u32, hide_cursor: bool,
 	audio: tauri::ipc::Channel<tauri::ipc::InvokeResponseBody>,
 ) -> Result<window_capture::CaptureInfo, String> {
-	capture.start(&id, window_id, width, height, fps, hide_cursor, audio)
+	tauri::async_runtime::spawn_blocking(move || {
+		app.state::<window_capture::Capture>().start(&id, window_id, display_id, width, height, fps, hide_cursor, audio)
+	}).await.map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -915,6 +923,7 @@ pub fn run() {
 			list_windows,
 			request_screen_recording_access,
 			native_window_capture_available,
+			list_displays,
 			start_window_capture,
 			local_media::pick_local_media,
 			local_media::register_local_media,

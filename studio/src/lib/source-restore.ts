@@ -26,11 +26,12 @@ function stillSaved(layer: Layer): boolean {
 	return studio.scenes.some((scene) => scene.layers.some((candidate) => candidate.id === layer.id));
 }
 
-/** Reopen persisted media after setup. A browser-managed display share has no
- * reusable capture id, so only native windows are restored without a picker. */
+/** Reopen persisted media after setup. Native window and display IDs can be
+ * reused while their capture target is still present. */
 export async function restoreSavedSources(): Promise<void> {
 	const layers = studio.scenes.flatMap((scene) => scene.layers);
 	let windows: AudioWindow[] = [];
+	let displays: { id: number }[] = [];
 	if (layers.some((layer) => layer.kind === 'screen' && layer.windowId)) {
 		try {
 			if (await invoke<boolean>('native_window_capture_available')) {
@@ -40,10 +41,22 @@ export async function restoreSavedSources(): Promise<void> {
 			report(`list saved windows failed: ${error}`);
 		}
 	}
+	if (layers.some((layer) => layer.kind === 'screen' && layer.displayId)) {
+		try {
+			displays = await invoke<{ id: number }[]>('list_displays', { preview: false });
+		} catch (error) {
+			report(`list saved displays failed: ${error}`);
+		}
+	}
 	await Promise.all(
 		layers.map(async (layer) => {
 			try {
-				if (layer.kind === 'screen' && layer.windowId) {
+				if (layer.kind === 'screen' && layer.displayId) {
+					if (!displays.some((display) => display.id === layer.displayId)) return;
+					if (!stillSaved(layer) || handleFor(layer.id)) return;
+					await openNativeWindow(layer, 0, layer.displayId);
+					if (!stillSaved(layer)) release(layer.id);
+				} else if (layer.kind === 'screen' && layer.windowId) {
 					const window = savedWindowMatch(layer, windows);
 					if (window?.id === undefined) return;
 					if (!stillSaved(layer) || handleFor(layer.id)) return;

@@ -54,6 +54,8 @@ export interface Layer {
 	appId?: string;
 	/** macOS ScreenCaptureKit window selected for native capture. */
 	windowId?: number;
+	/** macOS ScreenCaptureKit display selected for native capture. */
+	displayId?: number;
 	captureSurface?: 'monitor' | 'window';
 	/** screen: leave the mouse pointer out of the shared window, where the
 	 *  engine lets us ask. */
