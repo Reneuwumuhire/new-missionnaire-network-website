@@ -327,8 +327,15 @@ export async function openScreen(layer: Layer): Promise<Handle> {
 	try {
 		// Chromium can offer the selected application's audio in the picker.
 		// Apply video constraints after selection so WebView2 can open the picker.
-		const options: DisplayMediaStreamOptions & { windowAudio?: 'window' } = {
-			video: true,
+		const surface = layer.captureSurface;
+		const options: DisplayMediaStreamOptions & {
+			windowAudio: 'window';
+			monitorTypeSurfaces?: 'exclude';
+			surfaceSwitching?: 'exclude';
+		} = {
+			video: surface ? { displaySurface: surface } : true,
+			...(surface === 'window' ? { monitorTypeSurfaces: 'exclude' } : {}),
+			...(surface ? { surfaceSwitching: 'exclude' } : {}),
 			audio: true,
 			windowAudio: 'window'
 		};
@@ -337,6 +344,11 @@ export async function openScreen(layer: Layer): Promise<Handle> {
 		if (!track) {
 			stream.getTracks().forEach((track) => track.stop());
 			throw new Error(t('source.notFound'));
+		}
+		// The picker can still offer other surfaces despite the requested preference.
+		if (surface && track.getSettings().displaySurface !== surface) {
+			stream.getTracks().forEach((track) => track.stop());
+			throw new Error(t(surface === 'monitor' ? 'sources.selectDisplay' : 'sources.selectWindow'));
 		}
 		void track
 			.applyConstraints({

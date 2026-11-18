@@ -47,7 +47,14 @@ it('only calls a microphone failure a permission denial when access is refused',
 	expect(permissions.message).toBe('');
 });
 
-it('marks a shared display disconnected when the user stops Windows screen sharing', async () => {
+it.each([
+	{ requested: undefined, selected: 'monitor', accepted: true },
+	{ requested: 'monitor', selected: 'monitor', accepted: true },
+	{ requested: 'window', selected: 'window', accepted: true },
+	{ requested: 'monitor', selected: 'window', accepted: false },
+	{ requested: 'window', selected: 'browser', accepted: false }
+] as const)('handles $selected for a $requested capture in WebView2', async ({ requested, selected, accepted }) => {
+	vi.mocked(invoke).mockResolvedValue(undefined);
 	class Video {
 		srcObject: unknown;
 		muted = false;
@@ -61,6 +68,7 @@ it('marks a shared display disconnected when the user stops Windows screen shari
 	}
 	const track = Object.assign(new EventTarget(), {
 		stop: vi.fn(),
+		getSettings: () => ({ displaySurface: selected }),
 		applyConstraints: vi.fn().mockResolvedValue(undefined)
 	});
 	const audioTrack = { stop: vi.fn() };
@@ -72,10 +80,23 @@ it('marks a shared display disconnected when the user stops Windows screen shari
 	vi.stubGlobal('HTMLVideoElement', Video);
 	vi.stubGlobal('document', { createElement: () => new Video() });
 	const getDisplayMedia = vi.fn().mockResolvedValue(stream);
-	vi.stubGlobal('navigator', { mediaDevices: { getDisplayMedia } });
-	const layer = makeLayer('screen', 'Display');
-	await openScreen(layer);
-	expect(getDisplayMedia).toHaveBeenCalledWith({ video: true, audio: true, windowAudio: 'window' });
+	vi.stubGlobal('navigator', { userAgent: 'Windows NT 10.0', mediaDevices: { getDisplayMedia } });
+	const layer = makeLayer('screen', 'Display', { captureSurface: requested });
+	const handle = await openScreen(layer);
+	expect(getDisplayMedia).toHaveBeenCalledWith({
+		video: requested ? { displaySurface: requested } : true,
+		audio: true,
+		windowAudio: 'window',
+		...(requested === 'window' ? { monitorTypeSurfaces: 'exclude' } : {}),
+		...(requested ? { surfaceSwitching: 'exclude' } : {})
+	});
+	if (!accepted) {
+		expect(handle.el).toBeNull();
+		expect(handle.error).toContain('Reconnect');
+		expect(track.stop).toHaveBeenCalledOnce();
+		expect(audioTrack.stop).toHaveBeenCalledOnce();
+		return;
+	}
 	expect(handleFor(layer.id)?.el).toBeInstanceOf(Video);
 	const pin = pinHandle(layer.id)!;
 	track.dispatchEvent(new Event('ended'));

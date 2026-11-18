@@ -268,7 +268,7 @@ and stopping one leaves the others playing. Configured strips start themselves:
 after a restart, or when a scene comes back on air, a strip that already knows
 its application does not ask again.
 
-On macOS 13+, **Display / Window Capture** automatically adds the selected
+On macOS 13+, **Window Capture** automatically adds the selected
 window's application to the mixer, even if playback starts later. The same
 ScreenCaptureKit stream captures the picture and audio across monitors. macOS
 captures audio at the application level, so other windows or tabs of that app

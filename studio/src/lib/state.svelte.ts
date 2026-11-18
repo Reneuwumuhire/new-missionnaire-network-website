@@ -54,6 +54,7 @@ export interface Layer {
 	appId?: string;
 	/** macOS ScreenCaptureKit window selected for native capture. */
 	windowId?: number;
+	captureSurface?: 'monitor' | 'window';
 	/** screen: leave the mouse pointer out of the shared window, where the
 	 *  engine lets us ask. */
 	hideCursor?: boolean;
@@ -327,7 +328,7 @@ function starterScenes(): Scene[] {
 			id: id(),
 			name: t('scenes.starterScreen'),
 			layers: [
-				makeLayer('screen', t('sources.screen'), { fit: 'contain' }),
+				makeLayer('screen', t('sources.screen'), { fit: 'contain', captureSurface: 'monitor' }),
 				makeLayer('color', t('sources.starterBackground'), { color: '#0B0B0D' })
 			]
 		},
