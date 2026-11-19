@@ -159,6 +159,7 @@
 			return;
 		}
 		tracked.displayId = choice.id;
+		tracked.captureSurface = 'monitor';
 		delete tracked.appId;
 		report(`native display capture id=${choice.id} size=${choice.width}x${choice.height}`);
 		persist();

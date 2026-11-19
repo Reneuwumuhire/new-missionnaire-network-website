@@ -96,6 +96,7 @@
 			return;
 		}
 		layer.displayId = choice.id;
+		layer.captureSurface = 'monitor';
 		delete layer.appId;
 		displays = null;
 		displayError = '';
@@ -152,7 +153,7 @@
 		{/if}
 
 		{#if layer.kind === 'screen'}
-			{#if layer.captureSurface === 'monitor' && /Macintosh|Mac OS X/.test(navigator.userAgent)}
+			{#if (layer.captureSurface === 'monitor' || (!layer.captureSurface && !layer.windowId)) && /Macintosh|Mac OS X/.test(navigator.userAgent)}
 				<div class="space-y-2">
 					<button class="studio-chip" disabled={loadingDisplays} onclick={chooseDisplay}
 						>{t('props.changeDisplay')}</button
