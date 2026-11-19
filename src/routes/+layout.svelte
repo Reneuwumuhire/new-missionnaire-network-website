@@ -14,7 +14,7 @@
 	import ResumeRecorder from '$lib/components/+resumeRecorder.svelte';
 	import { selectAudio } from '$lib/stores/global';
 	import type { LayoutData } from './$types';
-	import { navigating, page } from '$app/state';
+	import { page } from '$app/state';
 	import { afterNavigate, goto } from '$app/navigation';
 	import { browser, dev } from '$app/environment';
 	import { onMount, tick } from 'svelte';
@@ -401,12 +401,6 @@
 	<meta name="twitter:description" content={ogDescription} />
 	<meta name="twitter:image" content={ogImage} />
 </svelte:head>
-
-{#if navigating}
-	<div class="fixed top-0 left-0 right-0 z-[9999] h-[2px] overflow-hidden">
-		<div class="h-full w-full animate-progress"></div>
-	</div>
-{/if}
 
 <div class="relative">
 	<div
