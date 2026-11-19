@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page, navigating } from '$app/state';
+	import { onDestroy } from 'svelte';
 	import type { Literature } from '$lib/models/literature';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
@@ -37,6 +38,8 @@
 	);
 
 	let expandedItems = $state(new Set<string>());
+	let searchTimer: ReturnType<typeof setTimeout>;
+	onDestroy(() => clearTimeout(searchTimer));
 
 	function toggleDescription(id: string | undefined) {
 		if (!id) return;
@@ -114,11 +117,15 @@
 
 	function handleSearch(e: Event) {
 		const target = e.target as HTMLInputElement;
-		const params = new URLSearchParams(page.url.searchParams);
-		if (target.value) params.set('search', target.value);
-		else params.delete('search');
-		params.set('page', '1');
-		goto(`?${params.toString()}`, { reset: false });
+		const search = target.value;
+		clearTimeout(searchTimer);
+		searchTimer = setTimeout(() => {
+			const params = new URLSearchParams(page.url.searchParams);
+			if (search) params.set('search', search);
+			else params.delete('search');
+			params.set('page', '1');
+			void goto(`?${params.toString()}`, { reset: false });
+		}, 300);
 	}
 
 	function formatDate(dateStr: string | undefined) {
@@ -329,9 +336,7 @@
 	<!-- Main List -->
 	<div class="relative min-h-[400px]">
 		{#if navigating}
-			<div
-				class="absolute inset-0 z-20 flex items-center justify-center bg-white/70 backdrop-blur-[1px]"
-			>
+			<div class="pointer-events-none fixed inset-0 z-[120] flex items-center justify-center">
 				<div
 					class="flex items-center gap-3 rounded-lg border border-stone-200 bg-white px-4 py-3 shadow-sm"
 				>

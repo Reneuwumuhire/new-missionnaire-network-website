@@ -90,38 +90,6 @@ body {
 	}
 }
 
-/* ── Navigation progress bar ── */
-@keyframes progress {
-	0% {
-		transform: translateX(-100%);
-	}
-	40% {
-		transform: translateX(-25%);
-	}
-	100% {
-		transform: translateX(-5%);
-	}
-}
-
-.animate-progress {
-	animation: progress 1.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-	transform-origin: left center;
-	background: linear-gradient(
-		90deg,
-		transparent 0%,
-		var(--color-missionnaire, #b08a3e) 25%,
-		var(--color-missionnaire, #b08a3e) 75%,
-		transparent 100%
-	);
-	box-shadow: 0 0 8px rgba(176, 138, 62, 0.45);
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.animate-progress {
-		animation: none !important;
-	}
-}
-
 /* ── Global link hover accent ── */
 a {
 	transition: color 0.2s ease;
