@@ -26,6 +26,11 @@ pub struct DisplayInfo {
 mod platform {
 	use super::{CaptureInfo, Channel, DisplayInfo, InvokeResponseBody};
 	use crate::appaudio::{configure_audio, send_pcm};
+	use core_graphics::base::{kCGBitmapByteOrder32Big, kCGImageAlphaPremultipliedLast};
+	use core_graphics::color_space::CGColorSpace;
+	use core_graphics::context::CGContext;
+	use core_graphics::display::CGDisplay;
+	use core_graphics::geometry::{CGPoint, CGRect, CGSize};
 	use core_graphics::window::{create_window_list, kCGNullWindowID, kCGWindowListOptionAll};
 	use image::{codecs::jpeg::JpegEncoder, ColorType};
 	use objc2_foundation::NSProcessInfo;
@@ -158,6 +163,21 @@ mod platform {
 						let mut jpeg = Vec::new();
 						JpegEncoder::new_with_quality(&mut jpeg, 70)
 							.encode(&rgb, image.width() as u32, image.height() as u32, ColorType::Rgb8.into()).ok()?;
+						Some(format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(jpeg)))
+					})
+				} else if with_preview {
+					use base64::Engine;
+					let scale = (320.0 / display.width().max(1) as f64)
+						.min(180.0 / display.height().max(1) as f64).min(1.0);
+					let width = (display.width() as f64 * scale).round().max(1.0) as usize;
+					let height = (display.height() as f64 * scale).round().max(1.0) as usize;
+					CGDisplay::new(display.display_id()).image().and_then(|image| {
+						let mut context = CGContext::create_bitmap_context(None, width, height, 8, width * 4,
+							&CGColorSpace::create_device_rgb(), kCGBitmapByteOrder32Big | kCGImageAlphaPremultipliedLast);
+						context.draw_image(CGRect::new(&CGPoint::new(0.0, 0.0), &CGSize::new(width as f64, height as f64)), &image);
+						let rgb: Vec<u8> = context.data().chunks_exact(4).flat_map(|pixel| pixel[..3].iter().copied()).collect();
+						let mut jpeg = Vec::new();
+						JpegEncoder::new_with_quality(&mut jpeg, 70).encode(&rgb, width as u32, height as u32, ColorType::Rgb8.into()).ok()?;
 						Some(format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(jpeg)))
 					})
 				} else { None };
