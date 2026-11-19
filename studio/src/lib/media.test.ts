@@ -53,57 +53,60 @@ it.each([
 	{ requested: 'window', selected: 'window', accepted: true },
 	{ requested: 'monitor', selected: 'window', accepted: false },
 	{ requested: 'window', selected: 'browser', accepted: false }
-] as const)('handles $selected for a $requested capture in WebView2', async ({ requested, selected, accepted }) => {
-	vi.mocked(invoke).mockResolvedValue(undefined);
-	class Video {
-		srcObject: unknown;
-		muted = false;
-		playsInline = false;
-		autoplay = false;
-		play() {
-			return Promise.resolve();
+] as const)(
+	'handles $selected for a $requested capture in WebView2',
+	async ({ requested, selected, accepted }) => {
+		vi.mocked(invoke).mockResolvedValue(undefined);
+		class Video {
+			srcObject: unknown;
+			muted = false;
+			playsInline = false;
+			autoplay = false;
+			play() {
+				return Promise.resolve();
+			}
+			pause() {}
+			removeAttribute() {}
 		}
-		pause() {}
-		removeAttribute() {}
-	}
-	const track = Object.assign(new EventTarget(), {
-		stop: vi.fn(),
-		getSettings: () => ({ displaySurface: selected }),
-		applyConstraints: vi.fn().mockResolvedValue(undefined)
-	});
-	const audioTrack = { stop: vi.fn() };
-	const stream = {
-		getVideoTracks: () => [track],
-		getAudioTracks: () => [audioTrack],
-		getTracks: () => [track, audioTrack]
-	};
-	vi.stubGlobal('HTMLVideoElement', Video);
-	vi.stubGlobal('document', { createElement: () => new Video() });
-	const getDisplayMedia = vi.fn().mockResolvedValue(stream);
-	vi.stubGlobal('navigator', { userAgent: 'Windows NT 10.0', mediaDevices: { getDisplayMedia } });
-	const layer = makeLayer('screen', 'Display', { captureSurface: requested });
-	const handle = await openScreen(layer);
-	expect(getDisplayMedia).toHaveBeenCalledWith({
-		video: requested ? { displaySurface: requested } : true,
-		audio: true,
-		windowAudio: 'window',
-		...(requested === 'window' ? { monitorTypeSurfaces: 'exclude' } : {}),
-		...(requested ? { surfaceSwitching: 'exclude' } : {})
-	});
-	if (!accepted) {
-		expect(handle.el).toBeNull();
-		expect(handle.error).toContain('Reconnect');
-		expect(track.stop).toHaveBeenCalledOnce();
+		const track = Object.assign(new EventTarget(), {
+			stop: vi.fn(),
+			getSettings: () => ({ displaySurface: selected }),
+			applyConstraints: vi.fn().mockResolvedValue(undefined)
+		});
+		const audioTrack = { stop: vi.fn() };
+		const stream = {
+			getVideoTracks: () => [track],
+			getAudioTracks: () => [audioTrack],
+			getTracks: () => [track, audioTrack]
+		};
+		vi.stubGlobal('HTMLVideoElement', Video);
+		vi.stubGlobal('document', { createElement: () => new Video() });
+		const getDisplayMedia = vi.fn().mockResolvedValue(stream);
+		vi.stubGlobal('navigator', { userAgent: 'Windows NT 10.0', mediaDevices: { getDisplayMedia } });
+		const layer = makeLayer('screen', 'Display', { captureSurface: requested });
+		const handle = await openScreen(layer);
+		expect(getDisplayMedia).toHaveBeenCalledWith({
+			video: requested ? { displaySurface: requested } : true,
+			audio: true,
+			windowAudio: 'window',
+			...(requested === 'window' ? { monitorTypeSurfaces: 'exclude' } : {}),
+			...(requested ? { surfaceSwitching: 'exclude' } : {})
+		});
+		if (!accepted) {
+			expect(handle.el).toBeNull();
+			expect(handle.error).toContain('Reconnect');
+			expect(track.stop).toHaveBeenCalledOnce();
+			expect(audioTrack.stop).toHaveBeenCalledOnce();
+			return;
+		}
+		expect(handleFor(layer.id)?.el).toBeInstanceOf(Video);
+		const pin = pinHandle(layer.id)!;
+		track.dispatchEvent(new Event('ended'));
+		expect(handleFor(layer.id)).toBeUndefined();
+		expect(handleFor(pin)).toBeUndefined();
 		expect(audioTrack.stop).toHaveBeenCalledOnce();
-		return;
 	}
-	expect(handleFor(layer.id)?.el).toBeInstanceOf(Video);
-	const pin = pinHandle(layer.id)!;
-	track.dispatchEvent(new Event('ended'));
-	expect(handleFor(layer.id)).toBeUndefined();
-	expect(handleFor(pin)).toBeUndefined();
-	expect(audioTrack.stop).toHaveBeenCalledOnce();
-});
+);
 
 it('loads a selected Windows image through WebView2’s custom protocol origin', () => {
 	class ImageElement {
@@ -218,68 +221,107 @@ it('keeps the newest window when an older capture starts late', async () => {
 	release(layer.id);
 });
 
-it.each(['window closes', 'source is removed'])('clears captured window audio when the %s', async (end) => {
-	vi.useFakeTimers();
-	const previousScenes = studio.scenes;
-	const layer = makeLayer('screen', 'Live', { windowId: 1, appId: 'org.browser' });
-	studio.scenes = [{ id: 'scene', name: 'Scene', layers: [layer] }];
-	let channel: Channel<ArrayBuffer | number[]> | undefined;
-	let frame: number[] = [];
-	vi.mocked(invoke).mockImplementation(async (command, args) => {
+it('keeps the live capture when switching displays fails', async () => {
+	const layer = makeLayer('screen', 'Live');
+	vi.mocked(invoke).mockImplementation((command, args) => {
 		if (command === 'start_window_capture') {
-			channel = (args as { audio: typeof channel }).audio;
-			return { width: 640, height: 360, hasAudio: true } as never;
+			return (args as { displayId?: number }).displayId === 2
+				? (Promise.reject(new Error('Display disconnected')) as never)
+				: (Promise.resolve({ width: 640, height: 360, hasAudio: false }) as never);
 		}
-		if (command === 'window_capture_frame') return frame as never;
-		return undefined as never;
+		if (command === 'window_capture_frame') return new Promise(() => {}) as never;
+		return Promise.resolve() as never;
 	});
-	const port = { postMessage: vi.fn(), close: vi.fn() };
-	vi.stubGlobal('AudioWorkletNode', class { port = port; });
 	vi.stubGlobal('HTMLVideoElement', class {});
 	vi.stubGlobal('document', { createElement: () => ({ getContext: () => ({}) }) });
-	const mixer = {
-		ensureWorklet: vi.fn().mockResolvedValue(undefined),
-		resume: vi.fn().mockResolvedValue(undefined),
-		has: vi.fn().mockReturnValue(true),
-		remove: vi.fn()
-	} as unknown as Mixer;
 
-	try {
-		expect(mixerAudioLayers()).toEqual([]);
-		const handle = await openNativeWindow(layer, 1);
-		const captureId = handle.nativeCaptureId;
-		expect(mixerAudioLayers().map((source) => source.id)).toEqual([layer.id]);
-		nativeWindowAudioNode(handle, mixer);
-		await vi.advanceTimersByTimeAsync(0);
-		const samples = new Float32Array([0.5, -0.25]);
-		channel!.onmessage(samples.buffer);
-		expect(port.postMessage).toHaveBeenCalledWith(samples);
-
-		if (end === 'window closes') {
-			frame = [1];
-			await vi.advanceTimersByTimeAsync(100);
-			expect(handleFor(layer.id)?.error).toContain('Window capture ended');
-			expect(handleFor(layer.id)?.el).toBeNull();
-		} else {
-			const pin = pinHandle(layer.id)!;
-			release(layer.id);
-			expect(handleFor(pin)?.el).toBeTruthy();
-			expect(mixerAudioLayers()).toEqual([]);
-			releaseUnusedPins([]);
-		}
-		expect(mixerAudioLayers()).toEqual([]);
-		expect(mixer.remove).toHaveBeenCalledWith(layer.id);
-		expect(port.close).toHaveBeenCalledOnce();
-		expect(invoke).toHaveBeenCalledWith('stop_window_capture', { id: captureId });
-		channel!.onmessage(samples.buffer);
-		expect(port.postMessage).toHaveBeenCalledOnce();
-	} finally {
-		release(layer.id);
-		releaseUnusedPins([]);
-		studio.scenes = previousScenes;
-		vi.useRealTimers();
-	}
+	const original = await openNativeWindow(layer, 0, 1);
+	const failed = await openNativeWindow(layer, 0, 2);
+	expect(failed.error).toContain('Display disconnected');
+	expect(handleFor(layer.id)).toBe(original);
+	expect(original.el).not.toBeNull();
+	expect(
+		vi
+			.mocked(invoke)
+			.mock.calls.some(
+				([command, args]) =>
+					command === 'stop_window_capture' &&
+					(args as { id: string }).id === original.nativeCaptureId
+			)
+	).toBe(false);
+	release(layer.id);
 });
+
+it.each(['window closes', 'source is removed'])(
+	'clears captured window audio when the %s',
+	async (end) => {
+		vi.useFakeTimers();
+		const previousScenes = studio.scenes;
+		const layer = makeLayer('screen', 'Live', { windowId: 1, appId: 'org.browser' });
+		studio.scenes = [{ id: 'scene', name: 'Scene', layers: [layer] }];
+		let channel: Channel<ArrayBuffer | number[]> | undefined;
+		let frame: number[] = [];
+		vi.mocked(invoke).mockImplementation(async (command, args) => {
+			if (command === 'start_window_capture') {
+				channel = (args as { audio: typeof channel }).audio;
+				return { width: 640, height: 360, hasAudio: true } as never;
+			}
+			if (command === 'window_capture_frame') return frame as never;
+			return undefined as never;
+		});
+		const port = { postMessage: vi.fn(), close: vi.fn() };
+		vi.stubGlobal(
+			'AudioWorkletNode',
+			class {
+				port = port;
+			}
+		);
+		vi.stubGlobal('HTMLVideoElement', class {});
+		vi.stubGlobal('document', { createElement: () => ({ getContext: () => ({}) }) });
+		const mixer = {
+			ensureWorklet: vi.fn().mockResolvedValue(undefined),
+			resume: vi.fn().mockResolvedValue(undefined),
+			has: vi.fn().mockReturnValue(true),
+			remove: vi.fn()
+		} as unknown as Mixer;
+
+		try {
+			expect(mixerAudioLayers()).toEqual([]);
+			const handle = await openNativeWindow(layer, 1);
+			const captureId = handle.nativeCaptureId;
+			expect(mixerAudioLayers().map((source) => source.id)).toEqual([layer.id]);
+			nativeWindowAudioNode(handle, mixer);
+			await vi.advanceTimersByTimeAsync(0);
+			const samples = new Float32Array([0.5, -0.25]);
+			channel!.onmessage(samples.buffer);
+			expect(port.postMessage).toHaveBeenCalledWith(samples);
+
+			if (end === 'window closes') {
+				frame = [1];
+				await vi.advanceTimersByTimeAsync(100);
+				expect(handleFor(layer.id)?.error).toContain('Window capture ended');
+				expect(handleFor(layer.id)?.el).toBeNull();
+			} else {
+				const pin = pinHandle(layer.id)!;
+				release(layer.id);
+				expect(handleFor(pin)?.el).toBeTruthy();
+				expect(mixerAudioLayers()).toEqual([]);
+				releaseUnusedPins([]);
+			}
+			expect(mixerAudioLayers()).toEqual([]);
+			expect(mixer.remove).toHaveBeenCalledWith(layer.id);
+			expect(port.close).toHaveBeenCalledOnce();
+			expect(invoke).toHaveBeenCalledWith('stop_window_capture', { id: captureId });
+			channel!.onmessage(samples.buffer);
+			expect(port.postMessage).toHaveBeenCalledOnce();
+		} finally {
+			release(layer.id);
+			releaseUnusedPins([]);
+			studio.scenes = previousScenes;
+			vi.useRealTimers();
+		}
+	}
+);
 
 it('starts a selected display through native capture', async () => {
 	vi.mocked(invoke).mockImplementation(async (command) =>
@@ -291,9 +333,13 @@ it('starts a selected display through native capture', async () => {
 	vi.stubGlobal('document', { createElement: () => ({ getContext: () => ({}) }) });
 	const layer = makeLayer('screen', 'Display', { captureSurface: 'monitor', displayId: 42 });
 	const handle = await openNativeWindow(layer, 0, 42);
-	expect(invoke).toHaveBeenCalledWith('start_window_capture', expect.objectContaining({
-		windowId: 0, displayId: 42
-	}));
+	expect(invoke).toHaveBeenCalledWith(
+		'start_window_capture',
+		expect.objectContaining({
+			windowId: 0,
+			displayId: 42
+		})
+	);
 	expect(handle.el).toBeTruthy();
 	release(layer.id);
 });

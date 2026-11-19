@@ -172,13 +172,14 @@ function set(layerId: string, handle: Handle, request?: symbol): Handle {
 		return { kind: handle.kind, el: null, stream: null, error: null, objectUrl: null };
 	}
 	if (request) openRequests.delete(layerId);
+	if (handles.has(layerId)) release(layerId);
 	handles.set(layerId, handle);
 	mediaVersion.n++;
 	return handle;
 }
 
-function beginOpen(layerId: string): symbol {
-	release(layerId);
+function beginOpen(layerId: string, preserveCurrent = false): symbol {
+	if (!preserveCurrent) release(layerId);
 	const request = Symbol();
 	openRequests.set(layerId, request);
 	return request;
@@ -359,14 +360,18 @@ export async function openScreen(layer: Layer): Promise<Handle> {
 			})
 			.catch((error) => report(`screen constraints unavailable: ${error}`));
 		const h: Handle = { kind: 'screen', el: videoEl(stream), stream, error: null, objectUrl: null };
-		track.addEventListener('ended', () => {
-			if (handles.get(layer.id) === h) handles.delete(layer.id);
-			for (const [id, pinned] of pinnedHandles) {
-				if (pinned === h) pinnedHandles.delete(id);
-			}
-			destroy(h);
-			mediaVersion.n++;
-		}, { once: true });
+		track.addEventListener(
+			'ended',
+			() => {
+				if (handles.get(layer.id) === h) handles.delete(layer.id);
+				for (const [id, pinned] of pinnedHandles) {
+					if (pinned === h) pinnedHandles.delete(id);
+				}
+				destroy(h);
+				mediaVersion.n++;
+			},
+			{ once: true }
+		);
 		return set(layer.id, h, request);
 	} catch (err) {
 		report(`screen capture failed for ${layer.name}: ${err}`);
@@ -384,8 +389,12 @@ export async function openScreen(layer: Layer): Promise<Handle> {
 /** ScreenCaptureKit sends its newest JPEG frame when the compositor asks for
  * it. Only one request and one decode are in flight, so a slow webview cannot
  * build an unbounded frame queue or stall the macOS capture callback. */
-export async function openNativeWindow(layer: Layer, windowId: number, displayId?: number): Promise<Handle> {
-	const request = beginOpen(layer.id);
+export async function openNativeWindow(
+	layer: Layer,
+	windowId: number,
+	displayId?: number
+): Promise<Handle> {
+	const request = beginOpen(layer.id, true);
 	const captureId = `${layer.id}:${crypto.randomUUID()}`;
 	try {
 		const audio = pcmChannel(layer.id, () => {
@@ -394,16 +403,19 @@ export async function openNativeWindow(layer: Layer, windowId: number, displayId
 			const { mixer, node } = handle.nativeAudio ?? {};
 			return node && mixer?.has(layer.id, node) ? node : undefined;
 		});
-		const info = await invoke<{ width: number; height: number; hasAudio: boolean }>('start_window_capture', {
-			id: captureId,
-			windowId,
-			displayId,
-			width: studio.settings.width,
-			height: studio.settings.height,
-			fps: studio.settings.fps,
-			hideCursor: layer.hideCursor ?? false,
-			audio
-		});
+		const info = await invoke<{ width: number; height: number; hasAudio: boolean }>(
+			'start_window_capture',
+			{
+				id: captureId,
+				windowId,
+				displayId,
+				width: studio.settings.width,
+				height: studio.settings.height,
+				fps: studio.settings.fps,
+				hideCursor: layer.hideCursor ?? false,
+				audio
+			}
+		);
 		const canvas = document.createElement('canvas');
 		canvas.width = info.width;
 		canvas.height = info.height;
@@ -501,6 +513,10 @@ export async function openNativeWindow(layer: Layer, windowId: number, displayId
 					: describe(err),
 			objectUrl: null
 		};
+		if (openRequests.get(layer.id) === request && handles.has(layer.id)) {
+			openRequests.delete(layer.id);
+			return h;
+		}
 		return set(layer.id, h, request);
 	}
 }
