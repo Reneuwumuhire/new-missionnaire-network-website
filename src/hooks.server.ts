@@ -47,7 +47,9 @@ async function trackMissedRoute(event: any, response: Response, isPageRequest: b
 export const handle: Handle = async ({ event, resolve }) => {
 	event.setHeaders({
 		'x-content-type-options': 'nosniff',
-		'x-frame-options': 'DENY',
+		'x-frame-options': /^\/predications\/[^/]+\/pdf$/.test(event.url.pathname)
+			? 'SAMEORIGIN'
+			: 'DENY',
 		'referrer-policy': 'strict-origin-when-cross-origin',
 		'permissions-policy': 'camera=(), microphone=(), geolocation=()'
 	});
