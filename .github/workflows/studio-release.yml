@@ -96,8 +96,13 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
+          if [[ -z "$APPLE_CERTIFICATE" && -z "$APPLE_CERTIFICATE_PASSWORD" ]]; then
+            echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+            echo "::warning::Studio will be ad-hoc signed. macOS may require Screen Recording access again after an update."
+            exit 0
+          fi
           if [[ -z "$APPLE_CERTIFICATE" || -z "$APPLE_CERTIFICATE_PASSWORD" ]]; then
-            echo "::error::Set both APPLE_CERTIFICATE and APPLE_CERTIFICATE_PASSWORD. Ad-hoc signing resets macOS Screen Recording access after updates."
+            echo "::error::Set both APPLE_CERTIFICATE and APPLE_CERTIFICATE_PASSWORD for Developer ID signing."
             exit 1
           fi
 
