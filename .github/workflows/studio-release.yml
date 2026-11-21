@@ -97,8 +97,9 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           if [[ -z "$APPLE_CERTIFICATE" || -z "$APPLE_CERTIFICATE_PASSWORD" ]]; then
-            echo "::error::Set both APPLE_CERTIFICATE and APPLE_CERTIFICATE_PASSWORD. Ad-hoc signing resets macOS Screen Recording access after updates."
-            exit 1
+            echo "::warning::Skipping macOS release: set APPLE_CERTIFICATE and APPLE_CERTIFICATE_PASSWORD to preserve Screen Recording access across updates."
+            echo "SKIP_MACOS_RELEASE=1" >> "$GITHUB_ENV"
+            exit 0
           fi
 
           signing_vars=(APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD)
@@ -115,6 +116,7 @@ jobs:
           done
 
       - name: Build, sign, and publish
+        if: env.SKIP_MACOS_RELEASE != '1'
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
