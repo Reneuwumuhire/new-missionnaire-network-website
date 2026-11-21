@@ -58,9 +58,8 @@ To keep that permission across updates, sign macOS releases with a
 `APPLE_CERTIFICATE` (the base64-encoded `.p12`) and
 `APPLE_CERTIFICATE_PASSWORD` as GitHub Actions secrets. For notarization,
 also set `APPLE_ID`, `APPLE_PASSWORD` (an app-specific password), and
-`APPLE_TEAM_ID`. The release workflow requires the certificate so every update
-keeps the same signing identity. The first update from an ad-hoc build may
-require granting access again; subsequent signed updates should retain it.
+`APPLE_TEAM_ID`. The first update from an ad-hoc build may require granting
+access again. Without a certificate the release workflow signs ad hoc.
 
 ## The layout, if you know OBS
 
