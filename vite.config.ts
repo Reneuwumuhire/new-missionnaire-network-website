@@ -18,7 +18,7 @@ export default defineConfig({
 					'script-src': ['self', 'https://www.youtube.com', 'https://s.ytimg.com'],
 					'worker-src': ['self', 'blob:'],
 					'base-uri': ['none'],
-					'object-src': ['none'],
+					'object-src': ['self'],
 					'frame-ancestors': ['none'],
 					'form-action': ['self']
 				}
