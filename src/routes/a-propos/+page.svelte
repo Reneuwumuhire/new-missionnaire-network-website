@@ -1,11 +1,11 @@
 <script lang="ts">
+	import { t } from '../../i18n';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import FaBrandsYoutube from 'svelte-icons-pack/fa/FaBrandsYoutube';
 	import FaBrandsFacebook from 'svelte-icons-pack/fa/FaBrandsFacebook';
 	import RiLogoWhatsappFill from 'svelte-icons-pack/ri/RiLogoWhatsappFill';
 	import ArticleParagraph from '$lib/components/+articleParagraph.svelte';
-	import { EgliseParagraph1 } from './paragraphs';
 	import ContactCard from '$lib/components/+contactCard.svelte';
 </script>
 
@@ -15,7 +15,7 @@
 	<header class="relative h-[40vh] min-h-[300px] max-h-[500px] overflow-hidden">
 		<img
 			src="/img/eglise_header.jpg"
-			alt="Église Murambi"
+			alt={$t('about.churchAlt')}
 			class="absolute inset-0 w-full h-full object-cover"
 		/>
 		<div
@@ -27,22 +27,24 @@
 					class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body"
 					style="color: rgba(255,255,255,0.7);"
 				>
-					À propos
+					{$t('about.kicker')}
 				</p>
-				<h1 class="font-display text-3xl md:text-5xl text-white leading-tight">Qui nous sommes</h1>
+				<h1 class="font-display text-3xl md:text-5xl text-white leading-tight">
+					{$t('about.title')}
+				</h1>
 			</div>
 		</div>
 	</header>
 	<div class="relative flex flex-row justify-center h-auto w-full pt-16 pb-12">
 		<div class="relative flex flex-col items-start w-full max-w-6xl space-y-8 mx-auto px-6">
-			{#each EgliseParagraph1 as paragraph, index}
-				<ArticleParagraph text={paragraph.text} />
-			{/each}
-			<h2 class="font-display text-2xl md:text-3xl font-semibold text-stone-900">Contacter</h2>
+			<ArticleParagraph text={$t('about.intro')} />
+			<h2 class="font-display text-2xl md:text-3xl font-semibold text-stone-900">
+				{$t('about.contact')}
+			</h2>
 			<ContactCard />
 
 			<h2 class="font-display text-2xl md:text-3xl font-semibold text-stone-900">
-				Réseaux sociaux
+				{$t('about.social')}
 			</h2>
 
 			<div

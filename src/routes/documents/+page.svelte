@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../../i18n';
 	import Breadcrumbs from '$lib/components/+breadcrumbs.svelte';
 	import type { PageData } from './$types';
 	import { browser } from '$app/environment';
@@ -103,25 +104,25 @@
      load — the root layout renders the single canonical tag set ($lib/seo). -->
 
 <div class="container mx-auto px-4 pt-4 pb-8 md:pt-6">
-	<Breadcrumbs items={[{ label: 'Documents' }]} />
+	<Breadcrumbs items={[{ label: $t('nav.transcriptions') }]} />
 	<!-- Search Header -->
 	<div class="relative mb-8">
 		<div class="flex flex-row items-center justify-center">
 			<div class="w-full max-w-4xl text-center">
-				<h1 class="text-3xl font-bold mb-4">Transcriptions</h1>
-				<p class="text-gray-600 mb-6">Trouvez les transcriptions des prédications</p>
+				<h1 class="text-3xl font-bold mb-4">{$t('documents.title')}</h1>
+				<p class="text-gray-600 mb-6">{$t('documents.subtitle')}</p>
 				<form onsubmit={handleSearch} class="flex flex-row w-full max-w-xl mx-auto">
 					<input
 						type="text"
 						class="border border-gray-300 rounded-l-full indent-4 p-2 w-full text-gray-900 outline-none focus:ring-2 focus:ring-missionnaire focus:border-transparent"
-						placeholder="Rechercher par titre..."
+						placeholder={$t('documents.searchPlaceholder')}
 						bind:value={searchTerm}
 					/>
 					<button
 						type="submit"
 						class="bg-missionnaire text-white px-6 py-2 rounded-r-full hover:bg-missionnaire/90"
 					>
-						Rechercher
+						{$t('documents.search')}
 					</button>
 				</form>
 			</div>
@@ -139,14 +140,14 @@
 			<div class="flex justify-end mb-4 items-center space-x-4">
 				<!-- Year Filter -->
 				<div class="flex items-center space-x-2">
-					<label for="year-filter" class="text-sm text-gray-600">Année:</label>
+					<label for="year-filter" class="text-sm text-gray-600">{$t('documents.year')}</label>
 					<select
 						id="year-filter"
 						class="border border-gray-300 rounded-md px-3 py-1.5 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-missionnaire focus:border-transparent"
 						value={selectedYear}
 						onchange={handleYearChange}
 					>
-						<option value="">Toutes les années</option>
+						<option value="">{$t('documents.allYears')}</option>
 						{#each data.years as year}
 							<option value={year}>{year}</option>
 						{/each}
@@ -158,7 +159,7 @@
 					onclick={handleSort}
 					class="flex items-center space-x-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-900"
 				>
-					<span>Date de publication</span>
+					<span>{$t('documents.published')}</span>
 					{#if sortOrder === 'desc'}
 						<ArrowDown2 size={20} />
 					{:else}
@@ -169,7 +170,7 @@
 
 			{#if filteredDocuments.length === 0}
 				<div class="text-center py-12">
-					<p class="text-gray-600">Aucun document trouvé</p>
+					<p class="text-gray-600">{$t('documents.empty')}</p>
 				</div>
 			{:else}
 				<div class="border border-gray-300 shadow rounded-md">
@@ -206,7 +207,7 @@
 										target="_blank"
 										rel="noopener noreferrer"
 										class="p-2 text-gray-500 hover:text-missionnaire transition-colors"
-										title="Voir la vidéo"
+										title={$t('documents.watchVideo')}
 									>
 										<VideoPlay size={20} />
 									</a>
@@ -215,7 +216,7 @@
 									href={document.url}
 									download
 									class="p-2 text-gray-500 hover:text-missionnaire transition-colors"
-									title="Télécharger"
+									title={$t('documents.download')}
 								>
 									<Export size={20} />
 								</a>
@@ -234,7 +235,7 @@
 							disabled={currentPage === 1}
 							onclick={() => handlePageChange(currentPage - 1)}
 						>
-							Précédent
+							{$t('documents.previous')}
 						</button>
 						{#each Array(totalPages) as _, i}
 							<button
@@ -253,7 +254,7 @@
 							disabled={currentPage === totalPages}
 							onclick={() => handlePageChange(currentPage + 1)}
 						>
-							Suivant
+							{$t('documents.next')}
 						</button>
 					</div>
 				{/if}
@@ -287,13 +288,13 @@
 						<div class="mb-6">
 							<dl class="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
 								<div>
-									<dt class="text-sm font-medium text-gray-500">Taille du fichier</dt>
+									<dt class="text-sm font-medium text-gray-500">{$t('documents.fileSize')}</dt>
 									<dd class="mt-1 text-sm text-gray-900">
 										{formatFileSize(selectedDocument.size)}
 									</dd>
 								</div>
 								<div>
-									<dt class="text-sm font-medium text-gray-500">Date de publication</dt>
+									<dt class="text-sm font-medium text-gray-500">{$t('documents.published')}</dt>
 									<dd class="mt-1 text-sm text-gray-900">
 										{new Date(selectedDocument.publishedOn).toLocaleDateString()}
 									</dd>
@@ -305,10 +306,9 @@
 							class="relative w-full h-[calc(100vh-300px)] border border-gray-200 rounded-lg bg-gray-50 flex flex-col items-center justify-center p-8 text-center"
 						>
 							<DocumentText1 size={48} color="#9CA3AF" />
-							<h3 class="mt-4 text-lg font-medium text-gray-900">Visualisation du document</h3>
+							<h3 class="mt-4 text-lg font-medium text-gray-900">{$t('documents.preview')}</h3>
 							<p class="mt-2 text-sm text-gray-500 max-w-md">
-								Pour des raisons de sécurité, la prévisualisation du document peut être bloquée par
-								votre navigateur. Vous pouvez :
+								{$t('documents.previewHint')}
 							</p>
 							<div class="mt-6 flex flex-col gap-4">
 								<a
@@ -330,7 +330,7 @@
 											d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
 										/>
 									</svg>
-									Ouvrir dans un nouvel onglet
+									{$t('predications.openNewTab')}
 								</a>
 								<a
 									href={selectedDocument.url}
@@ -340,7 +340,7 @@
 									<div class="mr-2">
 										<Export size={18} />
 									</div>
-									Télécharger le document
+									{$t('documents.downloadDocument')}
 								</a>
 								{#if selectedDocument.videoDisplayId}
 									<a
@@ -352,7 +352,7 @@
 										<div class="mr-2">
 											<VideoPlay size={18} />
 										</div>
-										Voir la vidéo associée
+										{$t('documents.relatedVideo')}
 									</a>
 								{/if}
 							</div>

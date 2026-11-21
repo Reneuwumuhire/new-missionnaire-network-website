@@ -1,7 +1,13 @@
 <script lang="ts">
+	import { t, locale } from '../../i18n';
 	import ArticleParagraph from '$lib/components/+articleParagraph.svelte';
 	import Quotes from '$lib/components/+quotes.svelte';
-	import { EgliseParagraph1, EgliseParagraph2 } from './paragraphs';
+	import {
+		EgliseParagraph1,
+		EgliseParagraph2,
+		EgliseParagraph1English,
+		EgliseParagraph2English
+	} from './paragraphs';
 	import ArticleImage from '$lib/components/+articleImage.svelte';
 	import ArticleCornerImage from '$lib/components/+articleCornerImage.svelte';
 </script>
@@ -10,22 +16,32 @@
      load — the root layout renders the single canonical tag set ($lib/seo). -->
 <div class="flex flex-col">
 	<header class="relative h-[40vh] min-h-[300px] max-h-[500px] overflow-hidden">
-		<img src="/img/eglise_header.jpg" alt="Église Murambi" class="absolute inset-0 w-full h-full object-cover img-zoom" />
-		<div class="absolute inset-0 bg-gradient-to-t from-stone-900/60 via-transparent to-transparent"></div>
+		<img
+			src="/img/eglise_header.jpg"
+			alt={$t('about.churchAlt')}
+			class="absolute inset-0 w-full h-full object-cover img-zoom"
+		/>
+		<div
+			class="absolute inset-0 bg-gradient-to-t from-stone-900/60 via-transparent to-transparent"
+		></div>
 		<div class="absolute bottom-0 left-0 right-0 p-8 md:p-12">
 			<div class="max-w-4xl mx-auto">
-				<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-white/70 mb-3 font-body">Église</p>
-				<h1 class="font-display text-3xl md:text-5xl text-white leading-tight">Assemblée de Kigali/Gatenga/Murambi</h1>
+				<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-white/70 mb-3 font-body">
+					{$t('church.kicker')}
+				</p>
+				<h1 class="font-display text-3xl md:text-5xl text-white leading-tight">
+					{$t('church.title')}
+				</h1>
 			</div>
 		</div>
 	</header>
 	<div class="relative flex flex-row justify-center h-auto w-full py-16">
 		<div class="relative flex flex-col items-start w-full max-w-4xl space-y-8 mx-auto px-6">
-			{#each EgliseParagraph1 as paragraph, index}
+			{#each $locale === 'en' ? EgliseParagraph1English : EgliseParagraph1 as paragraph, index}
 				<ArticleParagraph text={paragraph.text} />
 			{/each}
-			<ArticleImage image="/img/eglise_inside.jpg" alt="Église Murambi - Missionnaire Network" />
-			{#each EgliseParagraph2 as paragraph, index}
+			<ArticleImage image="/img/eglise_inside.jpg" alt={$t('about.churchImageAlt')} />
+			{#each $locale === 'en' ? EgliseParagraph2English : EgliseParagraph2 as paragraph, index}
 				<ArticleParagraph text={paragraph.text} />
 			{/each}
 			<div class="hidden lg:block absolute -right-[400px]">

@@ -1,7 +1,8 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <!-- SomeComponent.svelte -->
 <script lang="ts">
-		import { onMount } from 'svelte';
+	import { t } from '../../i18n';
+	import { onMount } from 'svelte';
 	import { slide } from 'svelte/transition';
 	import More from 'iconsax-svelte/More.svelte';
 	import AudioSquare from 'iconsax-svelte/AudioSquare.svelte';
@@ -84,10 +85,20 @@
 			decoding="async"
 		/>
 		<!-- Play overlay on hover -->
-		<div class="absolute inset-0 bg-stone-900/0 group-hover:bg-stone-900/15 transition-colors duration-300 flex items-center justify-center">
-			<div class="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 scale-90 group-hover:scale-100 shadow-sm">
+		<div
+			class="absolute inset-0 bg-stone-900/0 group-hover:bg-stone-900/15 transition-colors duration-300 flex items-center justify-center"
+		>
+			<div
+				class="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 scale-90 group-hover:scale-100 shadow-sm"
+			>
 				<svg width="12" height="14" viewBox="0 0 14 16" fill="none">
-					<path d="M2 1.5L12.5 8L2 14.5V1.5Z" fill="#292524" stroke="#292524" stroke-width="1.5" stroke-linejoin="round"/>
+					<path
+						d="M2 1.5L12.5 8L2 14.5V1.5Z"
+						fill="#292524"
+						stroke="#292524"
+						stroke-width="1.5"
+						stroke-linejoin="round"
+					/>
 				</svg>
 			</div>
 		</div>
@@ -95,7 +106,9 @@
 
 	<!-- Content -->
 	<div class="px-4 pt-3 pb-3">
-		<p class="text-[13px] font-medium text-stone-700 group-hover:text-stone-900 line-clamp-2 leading-snug font-body">
+		<p
+			class="text-[13px] font-medium text-stone-700 group-hover:text-stone-900 line-clamp-2 leading-snug font-body"
+		>
 			{video.title}
 		</p>
 
@@ -115,33 +128,37 @@
 	{#if visible[index]}
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div
-			transition:slide={{ duration: 200 }}
-			bind:this={downloadDivElement}
-			class="relative"
-		>
-			<div class="absolute w-56 z-20 bg-white border border-stone-200/80 shadow-lg shadow-stone-200/30 right-2 bottom-1">
+		<div transition:slide={{ duration: 200 }} bind:this={downloadDivElement} class="relative">
+			<div
+				class="absolute w-56 z-20 bg-white border border-stone-200/80 shadow-lg shadow-stone-200/30 right-2 bottom-1"
+			>
 				<ul class="w-full text-[13px] font-body">
 					<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 					<li
 						onclick={toggleVisible}
 						class="w-full px-4 py-3 hover:bg-stone-50 flex items-center gap-3 text-stone-600 hover:text-stone-900 transition-colors cursor-pointer"
 					>
-						<AudioSquare size={16} color="currentColor" variant="Linear" /><span>Télécharger MP3</span>
+						<AudioSquare size={16} color="currentColor" variant="Linear" /><span
+							>{$t('videoCard.downloadMp3')}</span
+						>
 					</li>
 					<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 					<li
 						onclick={toggleVisible}
 						class="w-full px-4 py-3 hover:bg-stone-50 flex items-center gap-3 text-stone-600 hover:text-stone-900 transition-colors border-t border-stone-100 cursor-pointer"
 					>
-						<DocumentText1 size={16} color="currentColor" variant="Linear" /><span>Télécharger PDF</span>
+						<DocumentText1 size={16} color="currentColor" variant="Linear" /><span
+							>{$t('videoCard.downloadPdf')}</span
+						>
 					</li>
 					<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 					<li
 						onclick={toggleVisible}
 						class="w-full px-4 py-3 hover:bg-stone-50 flex items-center gap-3 text-stone-600 hover:text-stone-900 transition-colors border-t border-stone-100 cursor-pointer"
 					>
-						<VideoPlay size={16} color="currentColor" variant="Linear" /><span>Télécharger vidéo</span>
+						<VideoPlay size={16} color="currentColor" variant="Linear" /><span
+							>{$t('videoCard.downloadVideo')}</span
+						>
 					</li>
 				</ul>
 			</div>

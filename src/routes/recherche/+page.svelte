@@ -91,7 +91,7 @@
 								value={data.filters.language}
 							>
 								<option value="">{$t('search.allLanguages')}</option><option value="fr"
-									>Français</option
+									>{$t('lang.french')}</option
 								><option value="en">English</option><option value="rw">Kinyarwanda</option><option
 									value="sw">Kiswahili</option
 								><option value="unknown">{$t('search.unspecified')}</option>

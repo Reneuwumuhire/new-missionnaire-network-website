@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../../i18n';
 	import { selectAudio } from '$lib/stores/global';
 	import { onMount } from 'svelte';
 
@@ -61,20 +62,20 @@
 			<p class="font-display text-base font-semibold leading-tight text-stone-900">
 				Missionnaire Network
 			</p>
-			<p class="text-sm text-stone-600">Prédications et cantiques sur votre écran d’accueil.</p>
+			<p class="text-sm text-stone-600">{$t('install.subtitle')}</p>
 		</div>
 		<button
 			type="button"
 			onclick={handleInstall}
 			class="min-h-11 rounded-md bg-missionnaire-100 px-3 text-sm font-semibold text-stone-900 hover:bg-missionnaire/30"
 		>
-			Installer
+			{$t('install.action')}
 		</button>
 		<button
 			type="button"
 			onclick={handleDismiss}
 			class="flex h-11 w-11 items-center justify-center rounded-md text-stone-600 hover:bg-stone-200/60 hover:text-stone-900"
-			aria-label="Fermer la suggestion d’installation"
+			aria-label={$t('install.close')}
 		>
 			<svg
 				class="h-4 w-4"

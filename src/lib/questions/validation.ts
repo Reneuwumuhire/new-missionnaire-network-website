@@ -9,6 +9,35 @@ export const QUESTION_CATEGORIES = [
 	'Autre'
 ] as const;
 
+export const QUESTION_CATEGORY_LABEL_KEYS = {
+	Bible: 'questions.category.bible',
+	Doctrine: 'questions.category.doctrine',
+	'Vie chrétienne': 'questions.category.christianLife',
+	Prière: 'questions.category.prayer',
+	Famille: 'questions.category.family',
+	Jeunesse: 'questions.category.youth',
+	Témoignage: 'questions.category.testimony',
+	Autre: 'questions.category.other'
+} as const;
+
+export const QUESTION_ERROR_KEYS = {
+	'Le titre doit contenir au moins 8 caractères.': 'questionError.shortTitle',
+	'La question doit contenir au moins 20 caractères.': 'questionError.shortQuestion',
+	'Laissez le nom vide ou indiquez au moins 2 caractères.': 'questionError.shortName',
+	'Indiquez un nom lisible.': 'questionError.invalidName',
+	'La réponse doit contenir au moins 5 caractères.': 'questionError.shortReply',
+	'Question invalide.': 'questionError.invalidQuestion',
+	'Question introuvable.': 'questionError.missingQuestion',
+	'Cette discussion est verrouillée.': 'questionDetail.discussionLocked',
+	'Merci de patienter avant de soumettre une nouvelle question.': 'questionError.questionRateLimit',
+	'Une question très similaire a déjà été envoyée.': 'questionError.duplicateQuestion',
+	'Merci de patienter avant de publier une autre réponse.': 'questionError.replyRateLimit',
+	'Cette réponse a déjà été publiée.': 'questionError.duplicateReply'
+} as const;
+
+export const questionErrorKey = (message: string) =>
+	QUESTION_ERROR_KEYS[message as keyof typeof QUESTION_ERROR_KEYS];
+
 export type QuestionCategory = (typeof QUESTION_CATEGORIES)[number];
 
 const CONTROL_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
@@ -91,7 +120,7 @@ export function validateQuestionInput(input: {
 export function validateGuestName(value: unknown): ValidationResult<string> {
 	const name = sanitizePlainText(value, MAX_GUEST_NAME_LENGTH).replace(/\s+/g, ' ');
 	if (name.length < 2) {
-		return { ok: false, error: "Laissez le nom vide ou indiquez au moins 2 caractères." };
+		return { ok: false, error: 'Laissez le nom vide ou indiquez au moins 2 caractères.' };
 	}
 	if (!/[A-Za-zÀ-ÖØ-öø-ÿ0-9]/.test(name)) {
 		return { ok: false, error: 'Indiquez un nom lisible.' };

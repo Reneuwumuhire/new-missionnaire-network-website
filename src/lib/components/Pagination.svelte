@@ -4,20 +4,20 @@
 
 	interface Props {
 		/** Shared pagination used by /live/rediffusions and /predications so both
-	 *  lists render with identical navigation UX. Anchors-based (works with
-	 *  non-JS, right-click open-in-new-tab, and SvelteKit client-side nav).
-	 *
-	 *  Two layouts, CSS-switched by breakpoint to fit whatever screen is in
-	 *  front of the user:
-	 *
-	 *    Mobile (< sm, ~640px):  ‹  [n / total]  ›
-	 *      Just prev/next + a pill showing the current position. No
-	 *      horizontal wrap possible, fits any phone width.
-	 *
-	 *    Desktop (sm+):          ‹  1  2  3  …  n-2  n-1  n  ›
-	 *      Always shows the first 3 pages, the last 3 pages, and the current
-	 *      page with 2 siblings on each side. Gaps collapse into "…".
-	 */
+		 *  lists render with identical navigation UX. Anchors-based (works with
+		 *  non-JS, right-click open-in-new-tab, and SvelteKit client-side nav).
+		 *
+		 *  Two layouts, CSS-switched by breakpoint to fit whatever screen is in
+		 *  front of the user:
+		 *
+		 *    Mobile (< sm, ~640px):  ‹  [n / total]  ›
+		 *      Just prev/next + a pill showing the current position. No
+		 *      horizontal wrap possible, fits any phone width.
+		 *
+		 *    Desktop (sm+):          ‹  1  2  3  …  n-2  n-1  n  ›
+		 *      Always shows the first 3 pages, the last 3 pages, and the current
+		 *      page with 2 siblings on each side. Gaps collapse into "…".
+		 */
 		current: number;
 		total: number;
 		getHref: (page: number) => string;
@@ -81,7 +81,7 @@
 				href={getHref(current - 1)}
 				data-sveltekit-preload-data="hover"
 				class="inline-flex items-center justify-center h-11 min-w-11 px-2 border border-stone-200/80 text-stone-600 hover:border-missionnaire hover:text-missionnaire transition-colors"
-				aria-label="Page précédente">‹</a
+				aria-label={$t('pagination.previous')}>‹</a
 			>
 		{:else}
 			<span
@@ -117,7 +117,7 @@
 				href={getHref(current + 1)}
 				data-sveltekit-preload-data="hover"
 				class="inline-flex items-center justify-center h-11 min-w-11 px-2 border border-stone-200/80 text-stone-600 hover:border-missionnaire hover:text-missionnaire transition-colors"
-				aria-label="Page suivante">›</a
+				aria-label={$t('pagination.next')}>›</a
 			>
 		{:else}
 			<span
@@ -149,7 +149,7 @@
 				href={getHref(current - 1)}
 				data-sveltekit-preload-data="hover"
 				class="inline-flex items-center justify-center h-9 min-w-9 px-3 border border-stone-200/80 text-stone-600 hover:border-missionnaire hover:text-missionnaire transition-colors"
-				aria-label="Page précédente">‹</a
+				aria-label={$t('pagination.previous')}>‹</a
 			>
 		{:else}
 			<span
@@ -187,7 +187,7 @@
 				href={getHref(current + 1)}
 				data-sveltekit-preload-data="hover"
 				class="inline-flex items-center justify-center h-9 min-w-9 px-3 border border-stone-200/80 text-stone-600 hover:border-missionnaire hover:text-missionnaire transition-colors"
-				aria-label="Page suivante">›</a
+				aria-label={$t('pagination.next')}>›</a
 			>
 		{:else}
 			<span

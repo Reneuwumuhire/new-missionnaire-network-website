@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../../../i18n';
 	import type { QuestionReference } from '$lib/models/questions';
 	// @ts-ignore - svelte-icons-pack ships loose icon typings in this project.
 	import Icon from 'svelte-icons-pack/Icon.svelte';
@@ -14,15 +15,15 @@
 
 	let { references = [] }: Props = $props();
 
-	const typeLabel: Record<string, string> = {
+	const typeLabel = $derived({
 		pdf: 'PDF',
 		audio: 'Audio',
-		video: 'Vidéo',
-		sermon: 'Prédication',
-		text: 'Texte',
-		music: 'Cantique',
+		video: $t('nav.videos'),
+		sermon: $t('nav.predications'),
+		text: $t('reference.text'),
+		music: $t('reference.hymn'),
 		bible: 'Bible'
-	};
+	});
 
 	const typeIcon: Record<string, unknown> = {
 		pdf: IoDocumentTextOutline,
@@ -71,7 +72,9 @@
 						<p class="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-missionnaire">
 							{typeLabel[reference.type] ?? reference.type}
 						</p>
-						<p class="line-clamp-2 text-sm font-semibold text-stone-800 group-hover:text-missionnaire">
+						<p
+							class="line-clamp-2 text-sm font-semibold text-stone-800 group-hover:text-missionnaire"
+						>
 							{reference.title}
 						</p>
 						{#if metadataLine(reference)}

@@ -3,7 +3,7 @@
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { page } from '$app/state';
-	import { t } from '../../i18n';
+	import { t, locale } from '../../i18n';
 	import MusicSearch from '$lib/components/MusicSearch.svelte';
 
 	let { children } = $props();
@@ -12,7 +12,7 @@
 	// renders immediately without it — if the count endpoint is slow or
 	// unreachable, the count simply stays hidden instead of blocking.
 	let totalSongs: number | null = $state(null);
-	const formattedTotal = (n: number) => n.toLocaleString('fr-FR');
+	const formattedTotal = (n: number) => n.toLocaleString($locale === 'en' ? 'en-US' : 'fr-FR');
 
 	onMount(async () => {
 		if (!browser) return;
@@ -71,7 +71,7 @@
 				     the same baseline as the inline search field beside it. -->
 				<nav
 					class="inline-flex shrink-0 items-stretch border border-white/25 bg-white/5 p-0.5 md:h-11 md:p-1"
-					aria-label="Audio, instrumental ou vidéos"
+					aria-label={$t('music.mediaTabs')}
 				>
 					<a
 						href="/musique"

@@ -2606,13 +2606,13 @@
 					? (current as Sermon).author
 					: 'Missionnaire Network',
 			album: isLiveStreamTrack(current)
-				? 'En direct'
+				? $t('live.page.kicker')
 				: isMusic
 					? (current as MusicAudio).book_full_name ||
 						(current as MusicAudio).category ||
 						'Missionnaire Network'
 					: isSermon
-						? (current as Sermon).iso_date || 'Prédication'
+						? (current as Sermon).iso_date || $t('reference.sermon')
 						: 'Missionnaire Network',
 			artwork: [
 				{ src: artworkUrl, sizes: '96x96', type: 'image/png' },

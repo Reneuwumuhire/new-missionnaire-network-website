@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../../i18n';
 	import { browser } from '$app/environment';
 	import { recordPlayback } from '$lib/utils/playbackAnalytics';
 	import { tick, onMount, untrack } from 'svelte';
@@ -295,7 +296,7 @@
 		<button
 			onclick={() => isVideoPlaylistActive.set(false)}
 			class="absolute top-4 right-4 text-white/60 hover:text-white transition-all p-2 z-[550] hover:bg-white/10 rounded-full"
-			title="Fermer"
+			title={$t('videoPlayer.close')}
 		>
 			<Icon src={BsX} size="32" />
 		</button>
@@ -348,7 +349,7 @@
 							<button
 								onclick={prevVideo}
 								class="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-all"
-								title="Précédent"
+								title={$t('videoPlayer.previous')}
 							>
 								<Icon src={IoPlaySkipBackOutline} size="24" />
 							</button>
@@ -362,7 +363,7 @@
 							<button
 								onclick={nextVideo}
 								class="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-all"
-								title="Suivant"
+								title={$t('videoPlayer.next')}
 							>
 								<Icon src={IoPlaySkipForwardOutline} size="24" />
 							</button>
@@ -378,7 +379,7 @@
 							else if (e.key === 'ArrowLeft') player.seekTo(currentTime - 5, true);
 						}}
 						role="slider"
-						aria-label="Position de la vidéo"
+						aria-label={$t('videoPlayer.position')}
 						aria-valuemin="0"
 						aria-valuemax={duration}
 						aria-valuenow={currentTime}
@@ -399,7 +400,7 @@
 				<!-- Sidebar Header -->
 				<div class="p-5 border-b border-white/5 bg-[#252525]">
 					<div class="flex items-center justify-between mb-2">
-						<h3 class="font-bold text-lg">À regarder plus tard</h3>
+						<h3 class="font-bold text-lg">{$t('videoPlayer.watchLater')}</h3>
 						<button
 							onclick={() => isVideoPlaylistActive.set(false)}
 							class="text-white/40 hover:text-white lg:hidden"
@@ -409,20 +410,20 @@
 					</div>
 					<div class="flex items-center justify-between text-xs font-medium text-white/50">
 						<span
-							>{currentVideo?.artist || 'Privé'} • {$videoPlaylistIndex + 1} / {$videoPlaylist.length}</span
+							>{currentVideo?.artist || $t('videoPlayer.private')} • {$videoPlaylistIndex + 1} / {$videoPlaylist.length}</span
 						>
 						<div class="flex items-center gap-3">
 							<button
 								onclick={() => isVideoShuffle.update((s) => !s)}
 								class="hover:text-white transition-colors {$isVideoShuffle ? 'text-[#f28f3e]' : ''}"
-								title="Aléatoire"
+								title={$t('musicVideos.shuffle')}
 							>
 								<Icon src={BsShuffle} size="18" />
 							</button>
 							<button
 								onclick={() => (isRepeat = !isRepeat)}
 								class="hover:text-white transition-colors {isRepeat ? 'text-[#f28f3e]' : ''}"
-								title="Répéter"
+								title={$t('videoPlayer.repeat')}
 							>
 								<Icon src={IoRepeat} size="20" />
 							</button>
@@ -519,9 +520,9 @@
 											/>
 										</svg>
 									</span>
-									Chargement...
+									{$t('musicVideos.loading')}
 								{:else}
-									Charger plus de vidéos
+									{$t('musicVideos.loadMore')}
 								{/if}
 							</button>
 						</div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../../../i18n';
 	import Breadcrumbs from '$lib/components/+breadcrumbs.svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
@@ -90,7 +91,7 @@
 			});
 
 			if (token !== currentToken || key !== requestKey) return;
-			if (!response.ok) throw new Error('Impossible de charger les vidéos');
+			if (!response.ok) throw new Error($t('musicVideos.error'));
 
 			const result = await response.json();
 			const videos = (result.data || []) as YoutubeVideo[];
@@ -106,8 +107,7 @@
 		} catch (error) {
 			if ((error as Error).name === 'AbortError') return;
 			if (token !== currentToken || key !== requestKey) return;
-			initialLoadError =
-				error instanceof Error ? error.message : 'Impossible de charger les vidéos';
+			initialLoadError = error instanceof Error ? error.message : $t('musicVideos.error');
 		} finally {
 			if (token === currentToken) isInitialLoading = false;
 			if (abortController === controller) abortController = null;
@@ -294,20 +294,27 @@
      load — the root layout renders the single canonical tag set ($lib/seo). -->
 
 <div class="w-full min-w-0 max-w-6xl mx-auto px-4 pt-0 pb-8 md:px-6">
-	<Breadcrumbs items={[{ label: 'Musique', href: '/musique' }, { label: 'Chants en vidéo' }]} />
+	<Breadcrumbs
+		items={[
+			{ label: $t('nav.musique'), href: '/musique' },
+			{ label: $t('musicVideos.breadcrumb') }
+		]}
+	/>
 	<!-- Page Header -->
 	<div class="mb-10">
 		<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body">
-			Cantiques & Vidéo
+			{$t('musicVideos.kicker')}
 		</p>
-		<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">Chants en Vidéo</h1>
+		<h1 class="font-display text-3xl md:text-4xl font-semibold text-stone-900">
+			{$t('musicVideos.title')}
+		</h1>
 		{#if hasResolved && total}
 			<p class="mt-2 text-[12px] text-stone-400 font-body">
 				<span
 					class="font-display text-missionnaire text-base font-semibold align-middle tabular-nums"
 					>{total}</span
 				>
-				vidéo{total > 1 ? 's' : ''} disponible{total > 1 ? 's' : ''}
+				{$t(total > 1 ? 'musicVideos.availablePlural' : 'musicVideos.availableSingular')}
 			</p>
 		{:else if !hasResolved}
 			<p class="mt-2">
@@ -318,13 +325,13 @@
 
 	<section class="mb-10" aria-labelledby="branham-playlist-title">
 		<h2 id="branham-playlist-title" class="font-display text-2xl font-semibold text-stone-900 mb-4">
-			Chants de William Marrion Branham
+			{$t('musicVideos.branhamSongs')}
 		</h2>
 		<div class="aspect-video w-full overflow-hidden bg-stone-100">
 			<iframe
 				class="h-full w-full"
 				src="https://www.youtube.com/embed/videoseries?list=PLQea2ssRcPE1ARbfWjAL4j3M8KRE7FQWP"
-				title="Playlist des chants de William Marrion Branham"
+				title={$t('musicVideos.playlistTitle')}
 				loading="lazy"
 				allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
 				allowfullscreen
@@ -334,7 +341,7 @@
 			class="mt-3 inline-block text-sm text-missionnaire hover:underline"
 			href="https://www.youtube.com/playlist?list=PLQea2ssRcPE1ARbfWjAL4j3M8KRE7FQWP"
 			target="_blank"
-			rel="noopener noreferrer">Ouvrir la playlist sur YouTube</a
+			rel="noopener noreferrer">{$t('musicVideos.openPlaylist')}</a
 		>
 	</section>
 
@@ -347,7 +354,7 @@
 				disabled={loadedVideos.length === 0}
 			>
 				<Icon src={BsPlayCircleFill} size="14" />
-				Tout Lire
+				{$t('musicVideos.playAll')}
 			</button>
 			<button
 				onclick={shuffleAll}
@@ -355,7 +362,7 @@
 				disabled={loadedVideos.length === 0}
 			>
 				<Icon src={BsShuffle} size="13" />
-				Aléatoire
+				{$t('musicVideos.shuffle')}
 			</button>
 		</div>
 
@@ -365,7 +372,7 @@
 			</div>
 			<input
 				type="text"
-				placeholder="Rechercher une vidéo..."
+				placeholder={$t('musicVideos.search')}
 				class="w-full border border-stone-200/80 bg-white pl-9 pr-24 py-2.5 text-sm font-body text-stone-800 placeholder:text-stone-400 focus:border-missionnaire/40 focus:outline-none focus:ring-1 focus:ring-missionnaire/30 transition-colors"
 				bind:value={searchInput}
 				oninput={() => handleSearch()}
@@ -382,7 +389,7 @@
 						searchInput = '';
 						handleSearch(true);
 					}}
-					aria-label="Effacer la recherche"
+					aria-label={$t('predications.clearSearch')}
 				>
 					<Icon src={BsX} size="16" />
 				</button>
@@ -408,14 +415,14 @@
 				<Icon src={BsSearch} size="56" />
 			</div>
 			<p class="text-stone-500 font-bold uppercase tracking-widest text-sm">
-				La liste n'a pas pu charger
+				{$t('musicVideos.loadFailed')}
 			</p>
 			<p class="mt-2 text-xs text-stone-400">{initialLoadError}</p>
 			<button
 				class="mt-5 inline-flex items-center rounded-full border border-missionnaire px-4 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-missionnaire transition-colors hover:bg-missionnaire/5"
 				onclick={() => void loadInitial({ showLoading: true })}
 			>
-				Réessayer
+				{$t('musicVideos.retry')}
 			</button>
 		</div>
 	{:else if loadedVideos.length > 0}
@@ -444,21 +451,21 @@
 					<p
 						class="text-[10px] font-semibold uppercase tracking-[0.25em] text-missionnaire font-body"
 					>
-						Chargement...
+						{$t('musicVideos.loading')}
 					</p>
 				{:else}
 					<button
 						onclick={loadMoreVideos}
 						class="text-[10px] font-bold text-stone-400 hover:text-missionnaire uppercase tracking-[0.18em] transition-colors font-body"
 					>
-						Charger plus de vidéos
+						{$t('musicVideos.loadMore')}
 					</button>
 				{/if}
 			</div>
 		{:else}
 			<div class="text-center py-16 mt-10 border-t border-stone-200/60">
 				<p class="text-[10px] font-bold text-stone-300 uppercase tracking-[0.4em] font-body">
-					Fin de la collection
+					{$t('musicVideos.end')}
 				</p>
 			</div>
 		{/if}
@@ -468,7 +475,7 @@
 				<Icon src={BsSearch} size="56" />
 			</div>
 			<p class="text-stone-500 font-bold uppercase tracking-[0.2em] text-sm font-body">
-				{lastSearch ? `Aucune vidéo trouvée pour "${lastSearch}"` : 'Aucune vidéo trouvée'}
+				{lastSearch ? $t('musicVideos.noMatch', { query: lastSearch }) : $t('musicVideos.empty')}
 			</p>
 			{#if lastSearch}
 				<button
@@ -478,7 +485,7 @@
 					}}
 					class="mt-5 inline-flex items-center rounded-full border border-missionnaire px-4 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-missionnaire transition-colors hover:bg-missionnaire/5 font-body"
 				>
-					Voir tout
+					{$t('home.seeAll')}
 				</button>
 			{/if}
 		</div>
