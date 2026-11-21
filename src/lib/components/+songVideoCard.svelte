@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../../i18n';
 	import type { YoutubeVideo } from '$lib/models/youtube';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
@@ -20,10 +21,11 @@
 	const maxDescriptionLength = 90;
 	let isPlaying = $state(false);
 
-	let truncatedDescription =
-		$derived(videoData.description.length > maxDescriptionLength
+	let truncatedDescription = $derived(
+		videoData.description.length > maxDescriptionLength
 			? `${videoData.description.slice(0, maxDescriptionLength)}...`
-			: videoData.description);
+			: videoData.description
+	);
 
 	function formatDate(dateStr: string) {
 		if (!dateStr) return '';
@@ -47,10 +49,7 @@
 				frameborder="0"
 			></iframe>
 		{:else}
-			<button
-				class="w-full h-full relative cursor-pointer"
-				onclick={() => (isPlaying = true)}
-			>
+			<button class="w-full h-full relative cursor-pointer" onclick={() => (isPlaying = true)}>
 				<img
 					src={videoData.thumbnail}
 					alt={videoData.title}
@@ -68,9 +67,15 @@
 						role="button"
 						tabindex="0"
 						class="bg-white/95 text-missionnaire p-3 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:scale-105 active:scale-95"
-						onclick={(e) => { e.stopPropagation(); isPlaying = true; }}
-						onkeydown={(e) => { e.stopPropagation(); if (e.key === 'Enter') isPlaying = true; }}
-						title="Lire cette vidéo"
+						onclick={(e) => {
+							e.stopPropagation();
+							isPlaying = true;
+						}}
+						onkeydown={(e) => {
+							e.stopPropagation();
+							if (e.key === 'Enter') isPlaying = true;
+						}}
+						title={$t('videoCard.play')}
 					>
 						<Icon src={IoPlayCircle} size="28" />
 					</div>
@@ -78,9 +83,15 @@
 						role="button"
 						tabindex="0"
 						class="bg-missionnaire text-white p-3 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75 hover:scale-105 active:scale-95"
-						onclick={(e) => { e.stopPropagation(); onplayPlaylist?.(); }}
-						onkeydown={(e) => { e.stopPropagation(); if (e.key === 'Enter') onplayPlaylist?.(); }}
-						title="Lire en playlist à partir d'ici"
+						onclick={(e) => {
+							e.stopPropagation();
+							onplayPlaylist?.();
+						}}
+						onkeydown={(e) => {
+							e.stopPropagation();
+							if (e.key === 'Enter') onplayPlaylist?.();
+						}}
+						title={$t('videoCard.playPlaylist')}
 					>
 						<Icon src={BsShuffle} size="20" />
 					</div>
@@ -112,9 +123,12 @@
 				{#if videoData.description.length > maxDescriptionLength}
 					<button
 						class="text-missionnaire hover:text-missionnaire/80 font-bold ml-1 text-[10px] uppercase tracking-[0.18em] font-body transition-colors"
-						onclick={(e) => { e.stopPropagation(); showFullDescription = !showFullDescription; }}
+						onclick={(e) => {
+							e.stopPropagation();
+							showFullDescription = !showFullDescription;
+						}}
 					>
-						{showFullDescription ? 'Moins' : 'Plus'}
+						{showFullDescription ? $t('literature.seeLess') : $t('literature.seeMore')}
 					</button>
 				{/if}
 			</p>
@@ -141,11 +155,14 @@
 			<button
 				type="button"
 				class="flex items-center gap-1.5 text-[10px] font-bold text-stone-400 group-hover:text-missionnaire hover:text-missionnaire uppercase tracking-[0.2em] transition-colors font-body active:scale-95"
-				onclick={(e) => { e.stopPropagation(); isPlaying = true; }}
-				title="Lire cette vidéo"
+				onclick={(e) => {
+					e.stopPropagation();
+					isPlaying = true;
+				}}
+				title={$t('videoCard.play')}
 			>
 				<Icon src={IoPlayCircle} size="14" />
-				Lire
+				{$t('predications.play')}
 			</button>
 		</div>
 	</div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../../i18n';
 </script>
 
 <div class=" flex flex-row items-center space-x-6">
@@ -8,9 +9,9 @@
 	<div class="flex flex-col justify-between space-y-1 md:space-y-3 text-sm font-semibold">
 		<p class="">François-Xavier CHAUFFEUR</p>
 		<p class="">MISSIONNAIRE NETWORK</p>
-		<p class="">Assemblée de Kigali</p>
+		<p class="">{$t('home.kigaliChurch')}</p>
 		<p class="">P.O.Box 4782, Kigali</p>
-		<p class="">Tél : +250 788 567 415</p>
+		<p class="">{$t('contact.phone')} : +250 788 567 415</p>
 		<p class=" underline">
 			<a href="mailto:xavier@missionnaire.net"> chaufraxa@gmail.com </a>
 		</p>

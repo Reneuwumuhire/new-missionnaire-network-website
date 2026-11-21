@@ -17,13 +17,14 @@
 	let shareFeedback: 'copied' | 'error' | null = $state(null);
 	let shareFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
 	let shareWrapEl: HTMLElement | null = $state(null);
-	let hasNativeShare =
-		$derived(browser && typeof navigator !== 'undefined' && typeof navigator.share === 'function');
+	let hasNativeShare = $derived(
+		browser && typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+	);
 
 	// Title/text for the native share sheet — the page passes the current
 	// live's title when on air, otherwise the generic copy. (The thumbnail
 	// preview comes from the page's server-rendered og:image tags, which the
-	
+
 	// Current broadcast session (epoch-ms), server-rendered by /live's load.
 	// When set, the share link is stamped with it so it later resolves to this
 	// session's replay. We deliberately do NOT fetch /api/live/radio-state here:
@@ -31,10 +32,10 @@
 	// standardised on, and a second fetch per /live load would double traffic to
 	// that no-store endpoint. The cost is that a direct which started while this
 	// page sat in the (≤60s) edge cache yields a plain /live link until the next
-	
+
 	// Stable watch URL (/live/<slug>) — passed by the scheduled-live watch page.
 	// Takes precedence over the session-stamped /live link: the slug URL works
-	
+
 	interface Props {
 		// share-sheet/link-preview crawlers read; it can't be set here.)
 		title?: string;
@@ -45,12 +46,7 @@
 		shareUrl?: string | null;
 	}
 
-	let {
-		title = 'Écoute en direct - Missionnaire Network',
-		text = 'Écoutez Missionnaire Network en direct 🎙️',
-		liveSessionId = null,
-		shareUrl = null
-	}: Props = $props();
+	let { title, text, liveSessionId = null, shareUrl = null }: Props = $props();
 
 	function buildShareUrl(): string {
 		if (!browser) return '';
@@ -90,8 +86,8 @@
 		const url = buildShareUrl();
 		if (!url) return;
 		const shareData: ShareData = {
-			title,
-			text,
+			title: title || $t('live.page.shareTitle'),
+			text: text || $t('live.page.shareText'),
 			url
 		};
 		try {

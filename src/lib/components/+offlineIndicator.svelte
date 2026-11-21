@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../../i18n';
 	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
 
@@ -19,7 +20,9 @@
 			if (isOffline) {
 				justReconnected = true;
 				if (reconnectTimer) clearTimeout(reconnectTimer);
-				reconnectTimer = setTimeout(() => { justReconnected = false; }, 2400);
+				reconnectTimer = setTimeout(() => {
+					justReconnected = false;
+				}, 2400);
 			}
 			isOffline = false;
 		};
@@ -38,12 +41,12 @@
 {#if isOffline}
 	<div class="offline-pill" role="status" aria-live="polite">
 		<span class="offline-pill__dot" aria-hidden="true"></span>
-		<span class="offline-pill__text">Hors ligne — contenu en cache disponible</span>
+		<span class="offline-pill__text">{$t('offline.cached')}</span>
 	</div>
 {:else if justReconnected}
 	<div class="offline-pill offline-pill--online" role="status" aria-live="polite">
 		<span class="offline-pill__dot offline-pill__dot--online" aria-hidden="true"></span>
-		<span class="offline-pill__text">Connexion rétablie</span>
+		<span class="offline-pill__text">{$t('offline.reconnected')}</span>
 	</div>
 {/if}
 
@@ -90,12 +93,23 @@
 		text-overflow: ellipsis;
 	}
 	@keyframes offline-pill-in {
-		from { opacity: 0; transform: translate(-50%, -8px); }
-		to   { opacity: 1; transform: translate(-50%, 0); }
+		from {
+			opacity: 0;
+			transform: translate(-50%, -8px);
+		}
+		to {
+			opacity: 1;
+			transform: translate(-50%, 0);
+		}
 	}
 	@keyframes offline-pill-pulse {
-		0%, 100% { opacity: 1; }
-		50% { opacity: 0.4; }
+		0%,
+		100% {
+			opacity: 1;
+		}
+		50% {
+			opacity: 0.4;
+		}
 	}
 	@media (prefers-reduced-motion: reduce) {
 		.offline-pill,

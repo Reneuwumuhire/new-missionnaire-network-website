@@ -713,10 +713,10 @@
 	let sharedSongPreviewDescription = $derived(
 		sharedSongTitle
 			? sharedSongArtist
-				? `Écoutez « ${sharedSongTitle} » par ${sharedSongArtist} sur Missionnaire Network.`
+				? $t('music.shareArtist', { title: sharedSongTitle, artist: sharedSongArtist })
 				: sharedSongCategory
-					? `Écoutez « ${sharedSongTitle} » (${sharedSongCategory}) sur Missionnaire Network.`
-					: `Écoutez « ${sharedSongTitle} » sur Missionnaire Network.`
+					? $t('music.shareCategory', { title: sharedSongTitle, category: sharedSongCategory })
+					: $t('music.shareDefault', { title: sharedSongTitle })
 			: ''
 	);
 	let sharedSongCanonical = $derived(

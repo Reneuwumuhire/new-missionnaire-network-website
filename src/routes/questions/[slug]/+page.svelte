@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { t, locale } from '../../../i18n';
+	import { QUESTION_CATEGORY_LABEL_KEYS, questionErrorKey } from '$lib/questions/validation';
 	import { enhance } from '$app/forms';
 	import Breadcrumbs from '$lib/components/+breadcrumbs.svelte';
 	import FormattedQuestionText from '$lib/components/questions/FormattedQuestionText.svelte';
@@ -15,6 +17,10 @@
 	}
 
 	let { data, form }: Props = $props();
+	const categoryLabel = (category: string) => {
+		const key = QUESTION_CATEGORY_LABEL_KEYS[category as keyof typeof QUESTION_CATEGORY_LABEL_KEYS];
+		return key ? $t(key) : category;
+	};
 
 	let replying = $state(false);
 
@@ -24,12 +30,18 @@
 	let questionReferences = $derived(data.references.filter((reference) => !reference.replyId));
 	let answerReferences = $derived(data.references.filter((reference) => reference.replyId));
 	let isAdminUser = $derived(data.user?.role === 'superadmin' || data.user?.role === 'editor');
-	let replyDisplayName = $derived(form?.replyDisplayName ?? (!isAdminUser && data.user ? data.user.name : ''));
-	let statusLabel = $derived(question.status === 'answered' ? 'Répondue' : 'Publiée');
+	let replyDisplayName = $derived(
+		form?.replyDisplayName ?? (!isAdminUser && data.user ? data.user.name : '')
+	);
+	let statusLabel = $derived(
+		question.status === 'answered'
+			? $t('questions.status.answered')
+			: $t('questions.status.approved')
+	);
 
 	function formatDate(value: string | null): string {
 		if (!value) return '';
-		return new Date(value).toLocaleDateString('fr-FR', {
+		return new Date(value).toLocaleDateString($locale === 'en' ? 'en-US' : 'fr-FR', {
 			day: 'numeric',
 			month: 'long',
 			year: 'numeric'
@@ -151,12 +163,12 @@
 		>
 			<Icon src={IoArrowBack} className="h-3.5 w-3.5" />
 		</span>
-		<span>Toutes les questions</span>
+		<span>{$t('questions.allQuestions')}</span>
 	</a>
 
 	{#if data.replyPosted}
 		<div class="mb-5 border border-green-200 bg-green-50 p-4 text-sm text-green-800">
-			Votre réponse a été publiée.
+			{$t('questionDetail.replyPosted')}
 		</div>
 	{/if}
 	<article class="overflow-hidden border border-stone-200/70 bg-white/75 shadow-sm">
@@ -174,10 +186,10 @@
 						{statusLabel}
 					</span>
 					{#if question.locked}
-						<span class="bg-stone-800 px-2 py-1 text-white">Verrouillée</span>
+						<span class="bg-stone-800 px-2 py-1 text-white">{$t('questionDetail.locked')}</span>
 					{/if}
 					{#if question.category}
-						<span class="text-stone-400">/ {question.category}</span>
+						<span class="text-stone-400">/ {categoryLabel(question.category)}</span>
 					{/if}
 				</div>
 
@@ -211,20 +223,22 @@
 					{@render messageIcon('h-3.5 w-3.5 shrink-0 text-missionnaire')}
 					<strong class="text-sm text-stone-900">{question.replyCount}</strong>
 					<span class="font-semibold uppercase tracking-[0.14em]">
-						réponse{question.replyCount === 1 ? '' : 's'}
+						{$t(
+							question.replyCount === 1 ? 'questionDetail.replySingular' : 'questionsList.replies'
+						)}
 					</span>
 				</span>
 				<span class="inline-flex h-7 items-center gap-1.5">
 					{@render eyeIcon('h-3.5 w-3.5 shrink-0 text-missionnaire')}
 					<strong class="text-sm text-stone-900">{question.viewCount}</strong>
-					<span class="font-semibold uppercase tracking-[0.14em]">vues</span>
+					<span class="font-semibold uppercase tracking-[0.14em]">{$t('questionsList.views')}</span>
 				</span>
 				<a
 					href="#discussion"
 					class="group inline-flex h-8 items-center gap-1.5 border border-missionnaire/30 bg-missionnaire-50/35 px-3 text-[11px] font-bold uppercase tracking-[0.14em] text-missionnaire transition hover:border-missionnaire hover:bg-white sm:ml-auto"
 				>
 					{@render messageIcon('h-3.5 w-3.5')}
-					Répondre
+					{$t('questionDetail.reply')}
 				</a>
 			</div>
 		</div>
@@ -232,7 +246,7 @@
 		{#if questionReferences.length > 0}
 			<div class="border-t border-stone-100 bg-cream/30 px-4 py-4 md:px-5">
 				<h2 class="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-stone-500">
-					Références
+					{$t('questionDetail.references')}
 				</h2>
 				<QuestionReferenceCards references={questionReferences} />
 			</div>
@@ -242,7 +256,9 @@
 	<section class="mt-6">
 		<div class="mb-3 flex flex-wrap items-end justify-between gap-3">
 			<div>
-				<h2 class="font-display text-2xl font-semibold text-stone-900 md:text-3xl">Réponse</h2>
+				<h2 class="font-display text-2xl font-semibold text-stone-900 md:text-3xl">
+					{$t('questionDetail.answer')}
+				</h2>
 			</div>
 			{#if officialAnswer}
 				<p class="text-xs text-stone-500">{formatDate(officialAnswer.createdAt)}</p>
@@ -260,7 +276,7 @@
 						</span>
 						<div>
 							<p class="text-[11px] font-bold uppercase tracking-[0.18em] text-missionnaire">
-								Réponse officielle
+								{$t('questionDetail.officialAnswer')}
 							</p>
 							<p class="mt-1 text-xs text-stone-500">
 								{officialAnswer.authorDisplayName}
@@ -276,7 +292,7 @@
 				{#if answerReferences.length > 0}
 					<div class="border-t border-stone-100 bg-cream/30 px-4 py-4 md:px-5">
 						<h3 class="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-stone-500">
-							Pour approfondir
+							{$t('questionDetail.furtherReading')}
 						</h3>
 						<QuestionReferenceCards references={answerReferences} />
 					</div>
@@ -284,7 +300,7 @@
 			</div>
 		{:else}
 			<div class="border border-stone-200/70 bg-white/50 p-4 text-sm text-stone-600">
-				Une réponse pastorale officielle n'a pas encore été publiée.
+				{$t('questionDetail.noOfficialAnswer')}
 			</div>
 		{/if}
 	</section>
@@ -292,21 +308,24 @@
 	<section id="discussion" class="mt-7">
 		<div class="mb-3 flex items-end justify-between gap-4">
 			<div>
-				<p class="text-[11px] font-bold uppercase tracking-[0.2em] text-missionnaire">Discussion</p>
+				<p class="text-[11px] font-bold uppercase tracking-[0.2em] text-missionnaire">
+					{$t('questionDetail.discussion')}
+				</p>
 				<h2 class="font-display text-2xl font-semibold text-stone-900 md:text-3xl">
-					Réponses publiques
+					{$t('questionDetail.publicReplies')}
 				</h2>
 			</div>
 			<span
 				class="border border-stone-200 bg-white/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-stone-500"
 			>
-				{replies.length} message{replies.length === 1 ? '' : 's'}
+				{replies.length}
+				{$t(replies.length === 1 ? 'questionDetail.message' : 'questionDetail.messages')}
 			</span>
 		</div>
 
 		{#if replies.length === 0}
 			<div class="border border-stone-200/70 bg-white/50 p-4 text-sm text-stone-600">
-				Aucune réponse publique pour le moment.
+				{$t('questionDetail.noReplies')}
 			</div>
 		{:else}
 			<div class="space-y-3">
@@ -338,22 +357,25 @@
 
 		<div class="mt-5 border border-stone-200/70 bg-white/75 shadow-sm">
 			<div class="border-b border-stone-100 px-4 py-4">
-				<p class="text-[11px] font-bold uppercase tracking-[0.2em] text-missionnaire">Suivi</p>
+				<p class="text-[11px] font-bold uppercase tracking-[0.2em] text-missionnaire">
+					{$t('questions.followUp')}
+				</p>
 				<h3 class="mt-1 font-display text-xl font-semibold text-stone-900 md:text-2xl">
-					{officialAnswer ? 'Demander une précision' : 'Ajouter une réponse'}
+					{officialAnswer ? $t('questionDetail.clarification') : $t('questionDetail.addReply')}
 				</h3>
 				<p class="mt-1 text-sm leading-6 text-stone-500">
-					Vous pouvez répondre sans compte. Votre nom restera associé à ce navigateur pour le suivi.
+					{$t('questionDetail.replyHint')}
 				</p>
 			</div>
 			{#if form?.replyError}
+				{@const errorKey = questionErrorKey(form.replyError)}
 				<div class="mx-5 mt-5 border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-					{form.replyError}
+					{errorKey ? $t(errorKey) : form.replyError}
 				</div>
 			{/if}
 
 			{#if question.locked}
-				<p class="px-4 py-4 text-sm text-stone-500">Cette discussion est verrouillée.</p>
+				<p class="px-4 py-4 text-sm text-stone-500">{$t('questionDetail.discussionLocked')}</p>
 			{:else}
 				<form
 					method="POST"
@@ -372,7 +394,9 @@
 							<label
 								for="reply-display-name"
 								class="mb-2 block text-sm font-semibold text-stone-700"
-								>Nom à afficher <span class="font-normal text-stone-400">(optionnel)</span></label
+								>{$t('questions.displayNameLabel')}
+								<span class="font-normal text-stone-400">{$t('questionDetail.optional')}</span
+								></label
 							>
 							<input
 								id="reply-display-name"
@@ -380,10 +404,10 @@
 								maxlength="60"
 								value={replyDisplayName}
 								class="w-full border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-800 outline-none focus:border-missionnaire focus:ring-2 focus:ring-missionnaire/20"
-								placeholder="Ex: Marie K. ou laisser vide"
+								placeholder={$t('questions.displayNamePlaceholder')}
 							/>
 							<p class="mt-2 text-xs leading-5 text-stone-500">
-								Laissez vide pour utiliser un nom anonyme gardé sur ce navigateur.
+								{$t('questions.displayNameHint')}
 							</p>
 						</div>
 					{/if}
@@ -400,10 +424,10 @@
 						<p class="text-xs text-stone-500">
 							{#if data.user}
 								{data.user.isGuest
-									? `Nom gardé : ${data.user.name}`
-									: `Connecté en tant que ${data.user.name}`}
+									? $t('questions.nameKept', { name: data.user.name })
+									: $t('questions.signedInAs', { name: data.user.name })}
 							{:else}
-								Aucun compte requis.
+								{$t('questions.noAccount')}
 							{/if}
 						</p>
 						<button
@@ -412,7 +436,7 @@
 							class="inline-flex items-center justify-center gap-2 bg-missionnaire px-4 py-2.5 text-xs font-bold uppercase tracking-[0.16em] text-white hover:bg-missionnaire-600 disabled:opacity-60"
 						>
 							<Icon src={IoSendOutline} className="h-4 w-4" />
-							{replying ? 'Publication...' : 'Publier'}
+							{replying ? $t('questionDetail.publishing') : $t('questionDetail.publish')}
 						</button>
 					</div>
 				</form>

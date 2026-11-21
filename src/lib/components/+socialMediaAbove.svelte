@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../../i18n';
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import FaBrandsYoutube from 'svelte-icons-pack/fa/FaBrandsYoutube';
@@ -24,7 +25,7 @@
 		<a
 			href="/live"
 			class="absolute inset-0 z-0 cursor-pointer transition-colors duration-200 hover:bg-red-800"
-			aria-label="Écouter l'audio en direct"
+			aria-label={$t('home.listenLive')}
 		></a>
 	{/if}
 

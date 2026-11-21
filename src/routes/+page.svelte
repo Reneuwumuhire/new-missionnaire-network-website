@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t, locale } from '../i18n';
 	import '../app.css';
 	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
@@ -65,40 +66,18 @@
 	});
 
 	// Hero Bible verse rotator
-	const heroVerses = [
-		{
-			text: 'Car la parole de Dieu est vivante et efficace, plus tranchante qu\u2019une épée quelconque à deux tranchants.',
-			ref: 'Hébreux 4:12'
-		},
-		{
-			text: 'Ainsi la foi vient de ce qu\u2019on entend, et ce qu\u2019on entend vient de la parole de Christ.',
-			ref: 'Romains 10:17'
-		},
-		{
-			text: 'Ta parole est une lampe à mes pieds, et une lumière sur mon sentier.',
-			ref: 'Psaume 119:105'
-		},
-		{ text: 'Veillez donc, car vous ne savez ni le jour, ni l\u2019heure.', ref: 'Matthieu 25:13' },
-		{
-			text: 'Voici, je viens bientôt. Heureux celui qui garde les paroles de la prophétie de ce livre.',
-			ref: 'Apocalypse 22:7'
-		},
-		{ text: 'Car Dieu a tant aimé le monde qu\u2019il a donné son Fils unique.', ref: 'Jean 3:16' },
-		{
-			text: 'Ne crains point, car je suis avec toi ; ne t\u2019effraie point, car je suis ton Dieu.',
-			ref: 'Ésaïe 41:10'
-		},
-		{ text: 'Je puis tout par celui qui me fortifie.', ref: 'Philippiens 4:13' },
-		{
-			text: 'Celui qui a commencé en vous cette bonne œuvre la rendra parfaite pour le jour de Jésus-Christ.',
-			ref: 'Philippiens 1:6'
-		},
-		{
-			text: 'Voici, je me tiens à la porte, et je frappe. Si quelqu\u2019un entend ma voix et ouvre la porte, j\u2019entrerai.',
-			ref: 'Apocalypse 3:20'
-		}
-	];
-
+	const heroVerses = $derived([
+		{ text: $t('home.verse1'), ref: $t('home.verseRef1') },
+		{ text: $t('home.verse2'), ref: $t('home.verseRef2') },
+		{ text: $t('home.verse3'), ref: $t('home.verseRef3') },
+		{ text: $t('home.verse4'), ref: $t('home.verseRef4') },
+		{ text: $t('home.verse5'), ref: $t('home.verseRef5') },
+		{ text: $t('home.verse6'), ref: $t('home.verseRef6') },
+		{ text: $t('home.verse7'), ref: $t('home.verseRef7') },
+		{ text: $t('home.verse8'), ref: $t('home.verseRef8') },
+		{ text: $t('home.verse9'), ref: $t('home.verseRef9') },
+		{ text: $t('home.verse10'), ref: $t('home.verseRef10') }
+	]);
 	let heroVerseIndex = $state(0);
 	let heroVerseVisible = $state(true);
 
@@ -135,14 +114,14 @@
 		};
 	});
 
-	const quickLinks = [
-		{ label: 'Prédications', href: '/predications', icon: '✦' },
-		{ label: 'Vidéos', href: '/videos', icon: '▶' },
-		{ label: 'Musique', href: '/musique', icon: '♪' },
-		{ label: 'Direct', href: '/live', icon: '◉' },
-		{ label: 'Transcriptions', href: '/transcriptions', icon: '¶' },
-		{ label: 'Littérature', href: '/literature', icon: '▣' }
-	];
+	const quickLinks = $derived([
+		{ label: $t('nav.predications'), href: '/predications', icon: '✦' },
+		{ label: $t('nav.videos'), href: '/videos', icon: '▶' },
+		{ label: $t('nav.musique'), href: '/musique', icon: '♪' },
+		{ label: $t('nav.direct'), href: '/live', icon: '◉' },
+		{ label: $t('nav.transcriptions'), href: '/transcriptions', icon: '¶' },
+		{ label: $t('nav.literature'), href: '/literature', icon: '▣' }
+	]);
 
 	function getSmallThumbnail(video: YoutubeVideo): string {
 		const url = video.thumbnail || '';
@@ -155,7 +134,7 @@
 				? video.release_timestamp * 1000
 				: Date.parse(video.upload_date || '');
 		if (!Number.isFinite(timestamp)) return '';
-		return new Date(timestamp).toLocaleDateString('fr-FR', {
+		return new Date(timestamp).toLocaleDateString($locale === 'en' ? 'en-US' : 'fr-FR', {
 			day: '2-digit',
 			month: 'long',
 			year: 'numeric'
@@ -216,15 +195,14 @@
 			<h1
 				class="hero-title font-display font-semibold text-[clamp(2.3rem,7.5vw,5.2rem)] leading-[1.05] tracking-tight text-stone-900"
 			>
-				Le Message de l'Heure<br />
-				<span class="text-missionnaire italic">pour aujourd'hui</span>
+				{$t('home.heroTitle')}<br />
+				<span class="text-missionnaire italic">{$t('home.heroToday')}</span>
 			</h1>
 
 			<p
 				class="hero-subtitle mt-5 md:mt-7 text-stone-400 max-w-md mx-auto leading-relaxed text-[15px] md:text-[17px] font-body font-light px-2"
 			>
-				Prédications, cantiques, transcriptions et enseignements pour fortifier votre marche
-				spirituelle.
+				{$t('home.subtitle')}
 			</p>
 
 			<div class="hero-cta mt-8 md:mt-10 flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
@@ -241,7 +219,7 @@
 							></span>
 							<span class="relative inline-flex h-2 w-2 rounded-full bg-white"></span>
 						</span>
-						<span>Écouter en direct</span>
+						<span>{$t('home.listenLive')}</span>
 					{:else}
 						<svg width="11" height="13" viewBox="0 0 12 14" fill="none"
 							><path
@@ -252,14 +230,14 @@
 								stroke-linejoin="round"
 							/></svg
 						>
-						<span>Écouter le direct</span>
+						<span>{$t('home.listenLive')}</span>
 					{/if}
 				</a>
 				<a
 					href="/predications"
 					class="px-6 sm:px-8 py-3.5 border border-stone-300 text-stone-600 text-[11px] sm:text-[12px] font-semibold uppercase tracking-[0.2em] font-body hover:border-missionnaire hover:text-missionnaire transition-all duration-300 active:scale-[0.98] text-center"
 				>
-					Explorer les prédications
+					{$t('home.exploreSermons')}
 				</a>
 			</div>
 
@@ -291,7 +269,7 @@
 	{#if !scrolledPastHero}
 		<div class="fixed bottom-6 left-1/2 z-30 flex flex-col items-center gap-2 scroll-indicator">
 			<span class="text-[10px] uppercase tracking-[0.3em] text-stone-500 font-body font-semibold"
-				>Défiler</span
+				>{$t('home.scroll')}</span
 			>
 			<div class="scroll-chevrons flex flex-col items-center">
 				<svg
@@ -383,10 +361,10 @@
 							? 'text-red-700 font-semibold'
 							: 'text-stone-700 font-medium'}"
 					>
-						{radioIsLive ? 'Audio en direct' : 'Direct audio hors antenne'}
+						{radioIsLive ? $t('home.onAir') : $t('home.offAir')}
 					</p>
 					<p class="text-[11px] text-stone-400 font-body mt-0.5">
-						{radioIsLive ? 'Cliquez pour écouter' : 'Accéder au direct audio'}
+						{radioIsLive ? $t('home.clickListen') : $t('home.goLive')}
 					</p>
 				</div>
 				<span class="text-stone-300 group-hover:text-missionnaire transition-colors text-xs">→</span
@@ -403,15 +381,17 @@
 				<div class="flex-1 min-w-0 text-left">
 					{#if bellSubscribed}
 						<p class="text-sm font-semibold text-missionnaire font-body">
-							Désactiver les notifications
+							{$t('live.notif.disableTitle')}
 						</p>
 						<p class="text-[11px] text-stone-400 font-body mt-0.5">
-							Notifications activées sur ce navigateur
+							{$t('live.notif.enabledSubtitle')}
 						</p>
 					{:else}
-						<p class="text-sm font-medium text-stone-700 font-body">Activer les notifications</p>
+						<p class="text-sm font-medium text-stone-700 font-body">
+							{$t('live.notif.enableTitle')}
+						</p>
 						<p class="text-[11px] text-stone-400 font-body mt-0.5">
-							Soyez alerté quand le direct audio commence
+							{$t('live.notif.enableSubtitle')}
 						</p>
 					{/if}
 				</div>
@@ -432,16 +412,16 @@
 						<p
 							class="text-[10px] font-semibold uppercase tracking-[0.3em] text-missionnaire font-body mb-2"
 						>
-							Nouveautés
+							{$t('home.new')}
 						</p>
 						<h2
 							class="font-display font-semibold text-3xl md:text-[2.6rem] tracking-tight leading-[1.05] text-stone-900"
 						>
-							Récemment ajouté
+							{$t('home.recent')}
 						</h2>
 					</div>
 					<a href="/videos" class="section-cta hidden sm:inline-flex">
-						<span class="section-cta-label">Tout voir</span>
+						<span class="section-cta-label">{$t('home.seeAll')}</span>
 						<span class="section-cta-arrow" aria-hidden="true">→</span>
 					</a>
 				</div>
@@ -504,7 +484,7 @@
 				</div>
 
 				<a href="/videos" class="section-cta section-cta-mobile sm:hidden mt-8">
-					<span class="section-cta-label">Tout voir</span>
+					<span class="section-cta-label">{$t('home.seeAll')}</span>
 					<span class="section-cta-arrow" aria-hidden="true">→</span>
 				</a>
 			</div>
@@ -534,16 +514,16 @@
 				<p
 					class="text-[10px] font-semibold uppercase tracking-[0.3em] text-missionnaire font-body mb-2"
 				>
-					À propos
+					{$t('about.kicker')}
 				</p>
 				<h2
 					class="font-display font-semibold text-3xl md:text-[2.6rem] tracking-tight leading-[1.05] text-stone-900"
 				>
-					Notre héritage
+					{$t('home.heritage')}
 				</h2>
 			</div>
 			<a href="/a-propos" class="section-cta hidden sm:inline-flex">
-				<span class="section-cta-label">En savoir plus</span>
+				<span class="section-cta-label">{$t('home.learnMore')}</span>
 				<span class="section-cta-arrow" aria-hidden="true">→</span>
 			</a>
 		</div>
@@ -557,7 +537,7 @@
 							<source srcset="/img/eglise_inside.webp" type="image/webp" />
 							<img
 								src="/img/eglise_inside.jpg"
-								alt="Intérieur de l'église"
+								alt={$t('home.churchAlt')}
 								class="w-full aspect-[4/3] object-cover img-zoom"
 								width="400"
 								height="300"
@@ -572,23 +552,22 @@
 							<p
 								class="text-[10px] font-semibold uppercase tracking-[0.3em] text-missionnaire-100 mb-3 font-body"
 							>
-								Notre mission
+								{$t('home.mission')}
 							</p>
 							<h2 class="font-display font-semibold text-3xl md:text-4xl text-white leading-tight">
-								Répandre le <span class="italic">Message</span><br />à travers le monde
+								{$t('home.spread')} <span class="italic">Message</span><br />{$t('home.world')}
 							</h2>
 						</div>
 					</div>
 					<div class="p-6 bg-white/60 border border-t-0 border-stone-200/60">
 						<p class="text-sm text-stone-500 leading-relaxed font-body">
-							Missionnaire Network rend accessible les ressources spirituelles — prédications,
-							cantiques, littérature — pour l'édification des croyants partout dans le monde.
+							{$t('home.missionBody')}
 						</p>
 						<a
 							href="/a-propos"
 							class="inline-block mt-4 text-[11px] font-semibold text-missionnaire uppercase tracking-[0.2em] font-body hover:text-orange-700 transition-colors"
 						>
-							En savoir plus →
+							{$t('home.learnMore')} →
 						</a>
 					</div>
 				</div>
@@ -622,10 +601,10 @@
 							<p
 								class="text-[10px] text-stone-400 mt-1 font-body uppercase tracking-wider tabular-nums"
 							>
-								1909 – 1965 · Prophète du Message
+								{$t('home.branhamDates')}
 							</p>
 							<p class="text-sm text-stone-500 mt-2 leading-relaxed font-body">
-								Son ministère a marqué des millions de croyants à travers le monde.
+								{$t('home.branhamBody')}
 							</p>
 							<span
 								class="inline-block mt-3 text-[11px] font-semibold text-missionnaire uppercase tracking-[0.2em] font-body"
@@ -660,15 +639,15 @@
 								Ewald Frank
 							</p>
 							<p class="text-[10px] text-stone-400 mt-1 font-body uppercase tracking-wider">
-								Krefeld, Allemagne · Missionnaire
+								{$t('home.ewaldLocation')}
 							</p>
 							<p class="text-sm text-stone-500 mt-2 leading-relaxed font-body">
-								Missionnaire international portant le Message aux nations depuis plus de 60 ans.
+								{$t('home.ewaldBody')}
 							</p>
 							<span
 								class="inline-block mt-3 text-[11px] font-semibold text-missionnaire uppercase tracking-[0.2em] font-body"
 							>
-								En savoir plus →
+								{$t('home.learnMore')} →
 							</span>
 						</div>
 					</div>
@@ -685,16 +664,16 @@
 							<p
 								class="text-[10px] font-bold uppercase tracking-[0.3em] text-missionnaire font-body"
 							>
-								Assemblée locale
+								{$t('home.localChurch')}
 							</p>
 						</div>
 						<p
 							class="font-display font-medium text-lg text-stone-900 group-hover:text-missionnaire transition-colors"
 						>
-							Église de Kigali
+							{$t('home.kigaliChurch')}
 						</p>
 						<p class="text-[12px] text-stone-400 mt-1 font-body">
-							Cultes, retransmissions et programme des réunions
+							{$t('home.churchBody')}
 						</p>
 					</div>
 				</a>

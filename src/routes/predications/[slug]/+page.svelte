@@ -5,6 +5,7 @@
 	import { basePlaylist, currentIndex, isPlaying, playlist, selectAudio } from '$lib/stores/global';
 	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
 	import { onMount } from 'svelte';
+	import { t, locale } from '../../../i18n';
 	import Breadcrumbs from '$lib/components/+breadcrumbs.svelte';
 	import {
 		availableSermonVersions,
@@ -72,12 +73,15 @@
 	let selectedVersion = $derived(getSermonVersion(sermon, selectedLanguage));
 	let versions = $derived(availableSermonVersions(sermon));
 	let relatedSermons = $derived((data.relatedSermons || []) as any[]);
-	let sermonTitle = $derived(selectedVersion.title);
+	let sermonTitle = $derived(
+		$locale === 'en' ? sermon.english_title || selectedVersion.title : selectedVersion.title
+	);
 	let sermonDate = $derived(sermon.full_date_code || sermon.date_code || sermon.iso_date || '');
 	let description = $derived(
-		`Écoutez la prédication "${sermonTitle}"${
-			sermonDate ? ` (${sermonDate})` : ''
-		} sur Missionnaire Network.`
+		$t('predications.detailDescription', {
+			title: sermonTitle,
+			date: sermonDate ? ` (${sermonDate})` : ''
+		})
 	);
 	let canonicalUrl = $derived(`https://missionnaire.net/predications/${data.canonicalSlug}`);
 	let jsonLd = $derived(
@@ -119,7 +123,9 @@
 	{@html `<script type="application/ld+json">${jsonLd.replaceAll('<', '\\u003c')}</script>`}
 </svelte:head>
 
-<Breadcrumbs items={[{ label: 'Prédications', href: '/predications' }, { label: sermonTitle }]} />
+<Breadcrumbs
+	items={[{ label: $t('nav.predications'), href: '/predications' }, { label: sermonTitle }]}
+/>
 
 <article class="w-full max-w-4xl mx-auto bg-white/40 border border-stone-200/60 p-6 md:p-8">
 	<div class="max-w-4xl">
@@ -141,7 +147,9 @@
 						class="px-4 py-2 bg-stone-900 text-white text-xs font-semibold uppercase tracking-wider hover:bg-stone-800 transition-colors"
 						onclick={() => toggleSermonAudio(version.language)}
 					>
-						{currentSelectedUrl === version.audioUrl && $isPlaying ? 'Pause' : 'Lire'} audio {version.code.toUpperCase()}
+						{currentSelectedUrl === version.audioUrl && $isPlaying
+							? $t('predications.pause')
+							: $t('predications.play')} audio {version.code.toUpperCase()}
 					</button>
 				{/if}
 			{/each}
@@ -150,7 +158,7 @@
 					href="#pdf-preview"
 					class="px-4 py-2 border border-stone-200/60 bg-white/40 text-stone-700 text-xs font-semibold uppercase tracking-wider hover:border-missionnaire hover:text-missionnaire transition-colors"
 				>
-					Voir PDF sur la page
+					{$t('predications.viewPdfOnPage')}
 				</a>
 			{/if}
 			{#if previewPdfUrl}
@@ -160,7 +168,7 @@
 					rel="noopener noreferrer"
 					class="px-4 py-2 border border-stone-200/60 bg-white/40 text-stone-700 text-xs font-semibold uppercase tracking-wider hover:border-missionnaire hover:text-missionnaire transition-colors"
 				>
-					Ouvrir PDF
+					{$t('predications.openPdf')}
 				</a>
 			{/if}
 			{#each versions as version}
@@ -179,7 +187,7 @@
 
 		{#if versions.some((version) => version.audioUrl)}
 			<p class="mt-5 text-xs text-stone-500">
-				Lancez l'audio puis consultez le document ci-dessous sans quitter cette page.
+				{$t('predications.audioPdfHint')}
 			</p>
 		{/if}
 	</div>
@@ -188,7 +196,7 @@
 		<section id="pdf-preview" class="mt-10 scroll-mt-28">
 			<div class="flex flex-col gap-2 mb-3 sm:flex-row sm:items-center sm:justify-between">
 				<h2 class="text-sm font-semibold uppercase tracking-[0.25em] text-missionnaire">
-					Aperçu PDF
+					{$t('predications.pdfPreview')}
 				</h2>
 				<a
 					href={previewPdfUrl}
@@ -196,7 +204,7 @@
 					rel="noopener noreferrer"
 					class="text-[11px] font-semibold uppercase tracking-wider text-stone-500 hover:text-missionnaire transition-colors"
 				>
-					Ouvrir dans un nouvel onglet
+					{$t('predications.openNewTab')}
 				</a>
 			</div>
 
@@ -210,8 +218,7 @@
 					<div
 						class="min-h-[360px] flex items-center justify-center text-sm text-stone-600 p-6 text-center"
 					>
-						Cet appareil ne peut pas afficher l'aperçu PDF. Utilisez le lien ci-dessus pour ouvrir
-						le document dans un nouvel onglet.
+						{$t('predications.pdfFallback')}
 					</div>
 				</object>
 			</div>
@@ -222,7 +229,7 @@
 {#if relatedSermons.length > 0}
 	<section class="w-full max-w-4xl mx-auto mt-8">
 		<h2 class="text-sm font-semibold uppercase tracking-[0.25em] text-stone-400 mb-4">
-			Du meme auteur
+			{$t('predications.sameAuthor')}
 		</h2>
 		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
 			{#each relatedSermons as related}
@@ -233,7 +240,9 @@
 					<div
 						class="text-sm font-bold text-stone-800 group-hover:text-missionnaire transition-colors line-clamp-2"
 					>
-						{related.french_title || related.english_title || 'Sans titre'}
+						{($locale === 'en'
+							? related.english_title || related.french_title
+							: related.french_title || related.english_title) || $t('predications.untitled')}
 					</div>
 					<div class="flex items-center gap-2 mt-2 text-[12px] text-stone-400 font-body">
 						{#if related.full_date_code || related.date_code}

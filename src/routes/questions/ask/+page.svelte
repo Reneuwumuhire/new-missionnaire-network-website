@@ -5,6 +5,7 @@
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import IoArrowBack from 'svelte-icons-pack/io/IoArrowBack';
 	import { t, type TranslationKey } from '../../../i18n';
+	import { QUESTION_CATEGORY_LABEL_KEYS, questionErrorKey } from '$lib/questions/validation';
 
 	interface Props {
 		data: PageData;
@@ -15,7 +16,9 @@
 
 	let submitting = $state(false);
 	let isAdminUser = $derived(data.user?.role === 'superadmin' || data.user?.role === 'editor');
-	let displayName = $derived(form?.values?.displayName ?? (!isAdminUser && data.user ? data.user.name : ''));
+	let displayName = $derived(
+		form?.values?.displayName ?? (!isAdminUser && data.user ? data.user.name : '')
+	);
 
 	// Status → translation key, resolved through `$t` at render time.
 	const statusLabelKeys: Record<string, TranslationKey> = {
@@ -49,7 +52,9 @@
 		href="/questions"
 		class="group mb-7 inline-flex items-center gap-3 text-xs font-bold uppercase tracking-[0.16em] text-missionnaire transition hover:text-stone-900"
 	>
-		<span class="flex h-8 w-8 items-center justify-center border border-missionnaire/30 bg-white/70 transition group-hover:border-stone-900">
+		<span
+			class="flex h-8 w-8 items-center justify-center border border-missionnaire/30 bg-white/70 transition group-hover:border-stone-900"
+		>
 			<Icon src={IoArrowBack} className="h-4 w-4" />
 		</span>
 		<span>{$t('questions.allQuestions')}</span>
@@ -91,12 +96,19 @@
 					<article class="border border-stone-100 bg-white p-4">
 						<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 							<div>
-								<p class="text-[11px] font-semibold uppercase tracking-[0.16em] {question.status === 'answered' ? 'text-green-700' : 'text-stone-500'}">
+								<p
+									class="text-[11px] font-semibold uppercase tracking-[0.16em] {question.status ===
+									'answered'
+										? 'text-green-700'
+										: 'text-stone-500'}"
+								>
 									{statusLabelKeys[question.status]
 										? $t(statusLabelKeys[question.status])
 										: question.status}
 								</p>
-								<h3 class="mt-1 font-display text-xl font-semibold text-stone-900">{question.title}</h3>
+								<h3 class="mt-1 font-display text-xl font-semibold text-stone-900">
+									{question.title}
+								</h3>
 								<p class="mt-1 text-xs text-stone-500">
 									{$t('questions.askedOn', { date: formatDate(question.createdAt) })}
 									{#if question.answeredAt}
@@ -105,7 +117,10 @@
 								</p>
 							</div>
 							{#if isPublicQuestion(question.status)}
-								<a href={`/questions/${question.slug}`} class="text-xs font-bold uppercase tracking-[0.16em] text-missionnaire hover:text-stone-900">
+								<a
+									href={`/questions/${question.slug}`}
+									class="text-xs font-bold uppercase tracking-[0.16em] text-missionnaire hover:text-stone-900"
+								>
 									{$t('questions.open')}
 								</a>
 							{:else}
@@ -130,8 +145,9 @@
 		}}
 	>
 		{#if form?.error}
+			{@const errorKey = questionErrorKey(form.error)}
 			<div role="alert" class="mb-5 border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-				{form.error}
+				{errorKey ? $t(errorKey) : form.error}
 			</div>
 		{/if}
 
@@ -157,7 +173,9 @@
 			{/if}
 
 			<div>
-				<label for="title" class="mb-2 block text-sm font-semibold text-stone-700">{$t('list.title')}</label>
+				<label for="title" class="mb-2 block text-sm font-semibold text-stone-700"
+					>{$t('list.title')}</label
+				>
 				<input
 					id="title"
 					name="title"
@@ -182,7 +200,11 @@
 					>
 						<option value="">{$t('questions.chooseCategory')}</option>
 						{#each data.categories as category}
-							<option value={category} selected={form?.values?.category === category}>{category}</option>
+							{@const key =
+								QUESTION_CATEGORY_LABEL_KEYS[category as keyof typeof QUESTION_CATEGORY_LABEL_KEYS]}
+							<option value={category} selected={form?.values?.category === category}
+								>{key ? $t(key) : category}</option
+							>
 						{/each}
 					</select>
 				</div>
@@ -212,12 +234,14 @@
 					maxlength="4000"
 					rows="10"
 					class="w-full resize-y border border-stone-200 bg-white px-4 py-3 text-stone-800 outline-none transition focus:border-missionnaire focus:ring-2 focus:ring-missionnaire/20"
-					placeholder={$t('questions.bodyPlaceholder')}
-				>{form?.values?.body ?? ''}</textarea>
+					placeholder={$t('questions.bodyPlaceholder')}>{form?.values?.body ?? ''}</textarea
+				>
 			</div>
 		</div>
 
-		<div class="mt-6 flex flex-col gap-3 border-t border-stone-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+		<div
+			class="mt-6 flex flex-col gap-3 border-t border-stone-100 pt-5 sm:flex-row sm:items-center sm:justify-between"
+		>
 			<p class="text-xs text-stone-500">
 				{#if data.user}
 					{data.user.isGuest

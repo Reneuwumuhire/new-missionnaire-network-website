@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../../../i18n';
 	import TableAudioList from '$lib/components/+tableAudioList.svelte';
 	import Breadcrumbs from '$lib/components/+breadcrumbs.svelte';
 	import { page } from '$app/state';
@@ -19,6 +20,6 @@
 <!-- Title/description/og:*/canonical come from `meta` in this route's
      load — the root layout renders the single canonical tag set ($lib/seo). -->
 
-<Breadcrumbs items={[{ label: 'Musique', href: '/musique' }, { label: pageTitle }]} />
+<Breadcrumbs items={[{ label: $t('nav.musique'), href: '/musique' }, { label: pageTitle }]} />
 
 <TableAudioList audioList={data.songs} loading={false} />

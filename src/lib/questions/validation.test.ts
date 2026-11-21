@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	normalizeForDuplicateCheck,
+	questionErrorKey,
 	sanitizePlainText,
 	slugifyQuestionTitle,
 	validateGuestName,
@@ -42,5 +43,12 @@ describe('question validation', () => {
 	it('validates guest display names', () => {
 		expect(validateGuestName('  Anne Demo  ').value).toBe('Anne Demo');
 		expect(validateGuestName('!').ok).toBe(false);
+	});
+
+	it('maps public validation errors to translation keys', () => {
+		expect(questionErrorKey(validateReplyInput({ body: 'Non' }).error!)).toBe(
+			'questionError.shortReply'
+		);
+		expect(questionErrorKey('Unknown error')).toBeUndefined();
 	});
 });

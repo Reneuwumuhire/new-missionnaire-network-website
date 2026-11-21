@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../../i18n';
 	import { onMount } from 'svelte';
 	import { mobileSearchOpen, mobileFiltersOpen } from '$lib/stores/mobileControls';
 
@@ -9,7 +10,6 @@
 	}
 
 	let { class: className = '' }: Props = $props();
-	
 
 	// Slim sticky toolbar shown above the list on /musique and
 	// /predications (mobile only). It collapses the search field and the
@@ -42,11 +42,19 @@
 		aria-expanded={$mobileSearchOpen}
 		onclick={toggleSearch}
 	>
-		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+		<svg
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2.2"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+			aria-hidden="true"
+		>
 			<circle cx="11" cy="11" r="7" />
 			<line x1="21" y1="21" x2="16.65" y2="16.65" />
 		</svg>
-		<span>Rechercher</span>
+		<span>{$t('search.action')}</span>
 	</button>
 	<button
 		type="button"
@@ -55,12 +63,20 @@
 		aria-expanded={$mobileFiltersOpen}
 		onclick={toggleFilters}
 	>
-		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+		<svg
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2.2"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+			aria-hidden="true"
+		>
 			<line x1="4" y1="6" x2="20" y2="6" />
 			<line x1="7" y1="12" x2="17" y2="12" />
 			<line x1="10" y1="18" x2="14" y2="18" />
 		</svg>
-		<span>Filtres</span>
+		<span>{$t('predications.filters')}</span>
 	</button>
 </div>
 
@@ -105,7 +121,9 @@
 		background: none;
 		border: 0;
 		cursor: pointer;
-		transition: color 0.15s ease, background-color 0.15s ease;
+		transition:
+			color 0.15s ease,
+			background-color 0.15s ease;
 		-webkit-tap-highlight-color: transparent;
 	}
 

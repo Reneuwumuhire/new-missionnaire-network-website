@@ -94,45 +94,20 @@
 	});
 	// ── END: audio cache controls ─────────────────────────────────
 
-	const bibleVerses = [
-		{
-			text: 'Car la parole de Dieu est vivante et efficace, plus tranchante qu\u2019une épée quelconque à deux tranchants.',
-			ref: 'Hébreux 4:12'
-		},
-		{
-			text: 'Ainsi la foi vient de ce qu\u2019on entend, et ce qu\u2019on entend vient de la parole de Christ.',
-			ref: 'Romains 10:17'
-		},
-		{
-			text: 'Ta parole est une lampe à mes pieds, et une lumière sur mon sentier.',
-			ref: 'Psaume 119:105'
-		},
-		{ text: 'Veillez donc, car vous ne savez ni le jour, ni l\u2019heure.', ref: 'Matthieu 25:13' },
-		{
-			text: 'Voici, je viens bientôt. Heureux celui qui garde les paroles de la prophétie de ce livre.',
-			ref: 'Apocalypse 22:7'
-		},
-		{
-			text: 'Ne crains point, car je suis avec toi ; ne t\u2019effraie point, car je suis ton Dieu.',
-			ref: 'Ésaïe 41:10'
-		},
-		{ text: 'Je puis tout par celui qui me fortifie.', ref: 'Philippiens 4:13' },
-		{ text: 'L\u2019Éternel est mon berger : je ne manquerai de rien.', ref: 'Psaume 23:1' },
-		{
-			text: 'Celui qui a commencé en vous cette bonne œuvre la rendra parfaite pour le jour de Jésus-Christ.',
-			ref: 'Philippiens 1:6'
-		},
-		{
-			text: 'Je suis le chemin, la vérité, et la vie. Nul ne vient au Père que par moi.',
-			ref: 'Jean 14:6'
-		},
-		{
-			text: 'Voici, je me tiens à la porte, et je frappe. Si quelqu\u2019un entend ma voix et ouvre la porte, j\u2019entrerai.',
-			ref: 'Apocalypse 3:20'
-		},
-		{ text: 'Car Dieu a tant aimé le monde qu\u2019il a donné son Fils unique.', ref: 'Jean 3:16' }
-	];
-
+	const bibleVerses = $derived([
+		{ text: $t('home.verse1'), ref: $t('home.verseRef1') },
+		{ text: $t('home.verse2'), ref: $t('home.verseRef2') },
+		{ text: $t('home.verse3'), ref: $t('home.verseRef3') },
+		{ text: $t('home.verse4'), ref: $t('home.verseRef4') },
+		{ text: $t('home.verse5'), ref: $t('home.verseRef5') },
+		{ text: $t('home.verse7'), ref: $t('home.verseRef7') },
+		{ text: $t('home.verse8'), ref: $t('home.verseRef8') },
+		{ text: $t('footer.verse1'), ref: $t('footer.verseRef1') },
+		{ text: $t('home.verse9'), ref: $t('home.verseRef9') },
+		{ text: $t('footer.verse2'), ref: $t('footer.verseRef2') },
+		{ text: $t('home.verse10'), ref: $t('home.verseRef10') },
+		{ text: $t('home.verse6'), ref: $t('home.verseRef6') }
+	]);
 	let verseIndex = $state(0);
 	let verseVisible = $state(true);
 	let verseInterval: ReturnType<typeof setInterval>;
@@ -306,7 +281,7 @@
 			</svg>
 
 			<p class="text-[11px] italic text-stone-400 font-display hidden sm:block">
-				« Jésus-Christ est le même hier, aujourd'hui, et éternellement » — Hébreux 13:8
+				{$t('footer.quote')}
 			</p>
 		</div>
 	</div>

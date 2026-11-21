@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../../../i18n';
 	import Breadcrumbs from '$lib/components/+breadcrumbs.svelte';
 	import ArticleParagraph from '$lib/components/+articleParagraph.svelte';
 	import Quotes from '$lib/components/+quotes.svelte';
@@ -10,14 +11,32 @@
 <!-- Title/description/og:*/canonical come from `meta` in this route's
      load — the root layout renders the single canonical tag set ($lib/seo). -->
 <div class="flex flex-col">
-	<Breadcrumbs items={[{ label: 'William Branham', href: '/william-branham/biographie' }, { label: 'Biographie' }]} />
+	<Breadcrumbs
+		items={[
+			{ label: 'William Branham', href: '/william-branham/biographie' },
+			{ label: $t('branham.biography') }
+		]}
+	/>
 	<header class="relative h-[40vh] min-h-[300px] max-h-[500px] overflow-hidden">
-		<img src="/img/branham_page_header.jpg" alt="William Marrion Branham" class="absolute inset-0 w-full h-full object-cover img-zoom" />
-		<div class="absolute inset-0 bg-gradient-to-t from-stone-900/60 via-transparent to-transparent"></div>
+		<img
+			src="/img/branham_page_header.jpg"
+			alt="William Marrion Branham"
+			class="absolute inset-0 w-full h-full object-cover img-zoom"
+		/>
+		<div
+			class="absolute inset-0 bg-gradient-to-t from-stone-900/60 via-transparent to-transparent"
+		></div>
 		<div class="absolute bottom-0 left-0 right-0 p-8 md:p-12">
 			<div class="max-w-3xl mx-auto">
-				<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body" style="color: rgba(255,255,255,0.7);">Prophète du Message</p>
-				<h1 class="font-display text-3xl md:text-5xl text-white leading-tight">William Marrion Branham</h1>
+				<p
+					class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body"
+					style="color: rgba(255,255,255,0.7);"
+				>
+					{$t('branham.kicker')}
+				</p>
+				<h1 class="font-display text-3xl md:text-5xl text-white leading-tight">
+					William Marrion Branham
+				</h1>
 			</div>
 		</div>
 	</header>
@@ -36,27 +55,29 @@
 
 			<!-- Resource Links -->
 			<div class="w-full border-t border-stone-200/60 pt-8 mt-4">
-				<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-4 font-body">
-					Ressources de William Branham
+				<p
+					class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-4 font-body"
+				>
+					{$t('branham.resources')}
 				</p>
 				<div class="flex flex-wrap gap-3">
 					<a
 						href="/predications?author=William Marrion Branham"
 						class="card-lift px-4 py-2 border border-stone-200/60 bg-white/40 text-stone-900 text-xs font-semibold uppercase tracking-wider hover:border-missionnaire hover:text-missionnaire transition-colors"
 					>
-						Prédications
+						{$t('nav.predications')}
 					</a>
 					<a
 						href="/videos?filter=William Branham"
 						class="card-lift px-4 py-2 border border-stone-200/60 bg-white/40 text-stone-700 text-xs font-semibold uppercase tracking-wider hover:border-missionnaire hover:text-missionnaire transition-colors"
 					>
-						Vidéos
+						{$t('nav.videos')}
 					</a>
 					<a
 						href="/literature?author=William Marrion Branham&category=book"
 						class="card-lift px-4 py-2 border border-stone-200/60 bg-white/40 text-stone-700 text-xs font-semibold uppercase tracking-wider hover:border-missionnaire hover:text-missionnaire transition-colors"
 					>
-						Littérature
+						{$t('nav.literature')}
 					</a>
 				</div>
 			</div>

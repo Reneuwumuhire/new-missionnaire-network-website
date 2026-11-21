@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t, locale } from '../../i18n';
 	import { goto } from '$app/navigation';
 	import { page, navigating } from '$app/state';
 	import { onDestroy } from 'svelte';
@@ -151,14 +152,14 @@
 				<p
 					class="font-body text-[9px] font-bold uppercase tracking-[0.35em] text-missionnaire md:text-[10px]"
 				>
-					Bibliothèque du Message
+					{$t('literature.library')}
 				</p>
 				<div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
 					<h1 class="font-display text-[26px] font-semibold leading-none text-white md:text-4xl">
-						Littérature
+						{$t('nav.literature')}
 					</h1>
 					<span class="font-body text-[11px] text-white/50 md:text-xs">
-						Livres, brochures et lettres circulaires
+						{$t('literature.subtitle')}
 					</span>
 				</div>
 			</div>
@@ -166,12 +167,12 @@
 			<label
 				class="hidden h-11 w-72 shrink-0 items-center border border-stone-200/60 bg-white md:flex lg:w-96"
 			>
-				<span class="sr-only">Rechercher dans la littérature</span>
+				<span class="sr-only">{$t('literature.searchAria')}</span>
 				<span class="ml-3 shrink-0 text-stone-400"><Icon src={BsSearch} size="14" /></span>
 				<input
 					type="search"
 					class="min-w-0 flex-1 bg-transparent px-2.5 font-body text-sm text-stone-800 outline-none placeholder:text-stone-400"
-					placeholder="Rechercher par titre ou mot-clé"
+					placeholder={$t('literature.searchPlaceholder')}
 					value={currentSearch}
 					oninput={handleSearch}
 				/>
@@ -184,7 +185,7 @@
 	<div
 		class="mb-4 flex items-center overflow-x-auto border-b border-stone-200/60"
 		role="tablist"
-		aria-label="Auteur"
+		aria-label={$t('literature.author')}
 	>
 		{#each authors as author}
 			<button
@@ -197,7 +198,7 @@
 				onclick={() => handleAuthorChange(author)}
 			>
 				{author === 'Tous'
-					? 'Tous'
+					? $t('literature.all')
 					: author === 'William Marrion Branham'
 						? 'W. M. Branham'
 						: author}
@@ -207,14 +208,14 @@
 
 	<div class="mb-3 flex flex-wrap items-start justify-end gap-2">
 		<label class="relative min-w-0 flex-1 md:hidden">
-			<span class="sr-only">Rechercher dans la littérature</span>
+			<span class="sr-only">{$t('literature.searchAria')}</span>
 			<span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-stone-400">
 				<Icon src={BsSearch} size="14" />
 			</span>
 			<input
 				type="search"
 				class="h-11 w-full border border-stone-200 bg-white/70 pl-9 pr-3 text-base text-stone-800 outline-none placeholder:text-stone-400 focus:border-missionnaire"
-				placeholder="Rechercher un document"
+				placeholder={$t('literature.searchDocument')}
 				value={currentSearch}
 				oninput={handleSearch}
 			/>
@@ -251,7 +252,7 @@
 				{#if currentAuthor !== 'William Marrion Branham'}
 					<fieldset>
 						<legend class="mb-2 text-xs font-bold uppercase tracking-widest text-stone-400"
-							>Format</legend
+							>{$t('literature.format')}</legend
 						>
 						<div class="flex flex-wrap gap-2">
 							{#each categories as cat}
@@ -262,10 +263,10 @@
 									onclick={() => handleTypeChange(cat)}
 								>
 									{cat === 'All'
-										? 'Tous'
+										? $t('literature.all')
 										: cat === 'book'
-											? 'Livres et brochures'
-											: 'Lettres circulaires'}
+											? $t('literature.books')
+											: $t('literature.circularLetters')}
 								</button>
 							{/each}
 						</div>
@@ -274,7 +275,7 @@
 
 				<fieldset>
 					<legend class="mb-2 text-xs font-bold uppercase tracking-widest text-stone-400"
-						>Langue</legend
+						>{$t('literature.language')}</legend
 					>
 					<div class="flex flex-wrap gap-2">
 						{#each languages as lang}
@@ -284,7 +285,7 @@
 									: 'border-stone-200 text-stone-600 hover:border-missionnaire'}"
 								onclick={() => handleLanguageChange(lang.id)}
 							>
-								{lang.name}
+								{lang.id === 'french' ? $t('lang.french') : $t('lang.english')}
 							</button>
 						{/each}
 					</div>
@@ -293,7 +294,7 @@
 				{#if currentAuthor === 'Ewald Frank' && currentType === 'circular_letter'}
 					<fieldset class="md:col-span-2">
 						<legend class="mb-2 text-xs font-bold uppercase tracking-widest text-stone-400"
-							>Source</legend
+							>{$t('literature.source')}</legend
 						>
 						<div class="flex flex-wrap gap-2">
 							{#each sources as src}
@@ -304,7 +305,7 @@
 									onclick={() => handleSourceChange(src)}
 								>
 									{src === 'All'
-										? 'Toutes'
+										? $t('literature.all')
 										: src === 'freie-volksmission'
 											? 'Freie Volksmission'
 											: src.toUpperCase()}
@@ -324,7 +325,7 @@
 				onclick={() => goto('?')}
 			>
 				<Icon src={BsX} size="14" />
-				Réinitialiser
+				{$t('literature.reset')}
 			</button>
 		</div>
 	{/if}
@@ -343,7 +344,7 @@
 					<div class="text-orange-600 animate-spin">
 						<Icon src={IoReload} size="20" />
 					</div>
-					<span class="text-sm font-semibold text-stone-700">Chargement…</span>
+					<span class="text-sm font-semibold text-stone-700">{$t('literature.loading')}</span>
 				</div>
 			</div>
 		{/if}
@@ -367,7 +368,7 @@
 									>
 										<Icon src={IoBookOutline} size="32" />
 									</div>
-									<span class="text-sm font-medium text-stone-400">Pas de couverture</span>
+									<span class="text-sm font-medium text-stone-400">{$t('literature.noCover')}</span>
 								</div>
 							{/if}
 						</div>
@@ -393,7 +394,10 @@
 									<summary
 										class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-bold text-stone-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500"
 									>
-										<span>{item.parts.length} prédication{item.parts.length > 1 ? 's' : ''}</span>
+										<span
+											>{item.parts.length}
+											{$t(item.parts.length > 1 ? 'literature.sermons' : 'literature.sermon')}</span
+										>
 										<span class="book-parts-chevron text-orange-600" aria-hidden="true">
 											<Icon src={BsChevronDown} size="16" />
 										</span>
@@ -419,7 +423,7 @@
 													target="_blank"
 													rel="noopener noreferrer"
 													class="inline-flex min-h-11 items-center px-2 text-xs font-bold text-orange-700 underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500"
-													>Lire</a
+													>{$t('literature.read')}</a
 												>
 											</li>
 										{/each}
@@ -435,14 +439,14 @@
 									class="mb-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-bold text-white hover:bg-orange-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500"
 								>
 									<Icon src={AiOutlineDownload} size="17" />
-									{item.parts.length ? 'Télécharger le livre (.zip)' : 'Télécharger le PDF'}
+									{item.parts.length ? $t('literature.downloadBook') : $t('literature.downloadPdf')}
 								</a>
 							{/if}
 
 							<div
 								class="flex items-center justify-between border-t border-stone-100 pt-4 text-xs font-medium text-stone-500"
 							>
-								<span>{item.language === 'english' ? 'English' : 'Français'}</span>
+								<span>{item.language === 'english' ? $t('lang.english') : $t('lang.french')}</span>
 								{#if item.release_date}
 									<span>{formatDate(item.release_date)}</span>
 								{/if}
@@ -460,9 +464,11 @@
 					>
 						<Icon src={BsSearch} size="26" />
 					</div>
-					<h3 class="font-display text-2xl font-semibold text-stone-800">Aucun livre trouvé</h3>
+					<h3 class="font-display text-2xl font-semibold text-stone-800">
+						{$t('literature.noBooks')}
+					</h3>
 					<p class="mt-1 text-sm text-stone-500">
-						Nous n'avons trouvé aucun livre correspondant à votre recherche.
+						{$t('literature.noBooksHint')}
 					</p>
 				</div>
 			{/if}
@@ -499,8 +505,10 @@
 							/>
 						{/if}
 					</button>
-					<div class="hidden text-left md:block">Format</div>
-					<div class="text-center"><span class="hidden md:inline">Document</span></div>
+					<div class="hidden text-left md:block">{$t('literature.format')}</div>
+					<div class="text-center">
+						<span class="hidden md:inline">{$t('literature.document')}</span>
+					</div>
 				</div>
 
 				<div class="divide-y divide-stone-100 [&>*]:hover:bg-white/60">
@@ -546,7 +554,9 @@
 												class="relative z-10 mt-1 text-xs font-semibold text-orange-700 underline-offset-4 hover:underline"
 												onclick={() => toggleDescription(item._id)}
 											>
-												{expandedItems.has(item._id || '') ? 'Voir moins' : 'Voir plus'}
+												{expandedItems.has(item._id || '')
+													? $t('literature.seeLess')
+													: $t('literature.seeMore')}
 											</button>
 										{/if}
 									</div>
@@ -555,7 +565,7 @@
 									<span class="text-xs font-medium text-stone-500">{item.author}</span>
 									<span class="text-stone-300">•</span>
 									<span class="text-xs font-medium text-orange-700"
-										>{item.type === 'book' ? 'Livre' : 'Lettre'}</span
+										>{item.type === 'book' ? $t('literature.book') : $t('literature.letter')}</span
 									>
 									{#if item.source}
 										<span class="text-stone-300">•</span>
@@ -574,7 +584,7 @@
 										: 'bg-emerald-50 text-emerald-700'}"
 								>
 									<Icon src={item.type === 'book' ? IoBookOutline : IoCreate} size="12" />
-									{item.type === 'book' ? 'Livre' : 'Lettre'}
+									{item.type === 'book' ? $t('literature.book') : $t('literature.letter')}
 								</span>
 							</div>
 							<div class="flex justify-end">
@@ -586,12 +596,12 @@
 										class="relative z-10 inline-flex min-h-10 items-center gap-2 border border-stone-200 bg-white px-3 py-2 text-xs font-bold text-stone-600 transition-colors hover:border-missionnaire hover:text-missionnaire focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500"
 									>
 										<Icon src={AiOutlineDownload} size="16" />
-										<span class="hidden lg:inline">Télécharger</span><span class="lg:hidden"
-											>PDF</span
+										<span class="hidden lg:inline">{$t('literature.download')}</span><span
+											class="lg:hidden">PDF</span
 										>
 									</a>
 								{:else}
-									<span class="text-xs text-stone-400">Indisponible</span>
+									<span class="text-xs text-stone-400">{$t('literature.unavailable')}</span>
 								{/if}
 							</div>
 						</div>
@@ -603,10 +613,10 @@
 								<Icon src={BsSearch} size="26" />
 							</div>
 							<h3 class="font-display text-2xl font-semibold text-stone-800">
-								Aucun document trouvé
+								{$t('literature.noDocuments')}
 							</h3>
 							<p class="mt-1 text-sm text-stone-500">
-								Réessayez avec d'autres filtres ou vérifiez l'orthographe.
+								{$t('literature.noDocumentsHint')}
 							</p>
 						</div>
 					{/each}

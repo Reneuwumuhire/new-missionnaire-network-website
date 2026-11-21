@@ -84,7 +84,7 @@
 		return s ?? 0;
 	}
 	function titleFor(v: AudioVersion): string {
-		return v === 'french' ? `${rec.title} (Français)` : rec.title;
+		return v === 'french' ? `${rec.title} (${$t('lang.french')})` : rec.title;
 	}
 
 	function buildPlayable(v: AudioVersion) {

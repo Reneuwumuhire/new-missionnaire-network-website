@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t, locale } from '../../i18n';
 	import { browser } from '$app/environment';
 	import { onDestroy, onMount } from 'svelte';
 	import {
@@ -8,13 +9,7 @@
 		readResumeState,
 		type ResumeState
 	} from '$lib/utils/audioResume';
-	import {
-		basePlaylist,
-		currentIndex,
-		isPlaying,
-		playlist,
-		selectAudio
-	} from '$lib/stores/global';
+	import { basePlaylist, currentIndex, isPlaying, playlist, selectAudio } from '$lib/stores/global';
 	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
 	import { getPlayableAudioUrl, type PlayableAudio } from '../../utils/audioPlayback';
 
@@ -32,8 +27,8 @@
 	let resumeDuration = 0;
 	let progressPercent = $state(0);
 	let savedAudioUrl: string | null = null;
-	let savedSermon: Record<string, unknown> | null = null;
-	let savedTitle = $state('');
+	let savedSermon: Record<string, unknown> | null = $state(null);
+	let savedTitle = $derived(savedSermon ? pickSavedTitle(savedSermon) : '');
 	let autoDismissTimer: ReturnType<typeof setTimeout> | null = null;
 	let currentAudio: HTMLAudioElement | null = null;
 	let pendingResumeSeek = false;
@@ -76,9 +71,10 @@
 	function pickSavedTitle(sermon: Record<string, unknown>): string {
 		const fr = sermon.french_title;
 		const en = sermon.english_title;
+		if ($locale === 'en' && typeof en === 'string' && en.trim()) return en;
 		if (typeof fr === 'string' && fr.trim()) return fr;
 		if (typeof en === 'string' && en.trim()) return en;
-		return 'cette prédication';
+		return $t('resume.thisSermon');
 	}
 
 	function showToast(state: ResumeState) {
@@ -86,9 +82,7 @@
 		resumeDuration = state.duration;
 		savedAudioUrl = state.audioUrl;
 		savedSermon = state.sermon;
-		savedTitle = pickSavedTitle(state.sermon);
-		progressPercent =
-			resumeDuration > 0 ? Math.min(100, (resumeTime / resumeDuration) * 100) : 0;
+		progressPercent = resumeDuration > 0 ? Math.min(100, (resumeTime / resumeDuration) * 100) : 0;
 		visible = true;
 
 		if (autoDismissTimer) clearTimeout(autoDismissTimer);
@@ -231,17 +225,23 @@
 			type="button"
 			class="resume-toast__close"
 			onclick={onDismissClick}
-			aria-label="Ignorer"
+			aria-label={$t('resume.dismiss')}
 		>
-			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+			<svg
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				aria-hidden="true"
+			>
 				<path d="M6 6l12 12M6 18L18 6" />
 			</svg>
 		</button>
 
-		<p class="resume-toast__eyebrow font-body">Reprendre l'écoute</p>
+		<p class="resume-toast__eyebrow font-body">{$t('resume.title')}</p>
 		<h3 class="resume-toast__title font-display" title={savedTitle}>{savedTitle}</h3>
 		<p class="resume-toast__meta font-body">
-			Vous étiez à <span class="resume-toast__time">{formatTime(resumeTime)}</span>
+			{$t('resume.youWereAt')} <span class="resume-toast__time">{formatTime(resumeTime)}</span>
 		</p>
 
 		<div
@@ -255,19 +255,11 @@
 		</div>
 
 		<div class="resume-toast__actions">
-			<button
-				type="button"
-				class="resume-toast__btn-primary font-body"
-				onclick={onResumeClick}
-			>
-				Reprendre
+			<button type="button" class="resume-toast__btn-primary font-body" onclick={onResumeClick}>
+				{$t('resume.action')}
 			</button>
-			<button
-				type="button"
-				class="resume-toast__btn-secondary font-body"
-				onclick={onDismissClick}
-			>
-				Ignorer
+			<button type="button" class="resume-toast__btn-secondary font-body" onclick={onDismissClick}>
+				{$t('resume.dismiss')}
 			</button>
 		</div>
 	</div>
@@ -295,12 +287,7 @@
 		left: 24px;
 		right: 24px;
 		height: 2px;
-		background: linear-gradient(
-			to right,
-			transparent,
-			#ff880c,
-			transparent
-		);
+		background: linear-gradient(to right, transparent, #ff880c, transparent);
 	}
 	.resume-toast__close {
 		position: absolute;
@@ -381,7 +368,9 @@
 		letter-spacing: 0.1em;
 		padding: 9px 16px;
 		cursor: pointer;
-		transition: background-color 0.15s ease, color 0.15s ease,
+		transition:
+			background-color 0.15s ease,
+			color 0.15s ease,
 			border-color 0.15s ease;
 	}
 	.resume-toast__btn-primary {

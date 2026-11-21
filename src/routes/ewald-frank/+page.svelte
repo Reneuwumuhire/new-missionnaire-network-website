@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../../i18n';
 	import ArticleParagraph from '$lib/components/+articleParagraph.svelte';
 	import Quotes from '$lib/components/+quotes.svelte';
 	import { EwaldFrankParagraph1, EwaldFrankParagraph2, EwaldFrankParagraph3 } from './paragraphs';
@@ -60,10 +61,17 @@
 				class="absolute inset-0 w-full h-full object-cover img-zoom"
 			/>
 		</picture>
-		<div class="absolute inset-0 bg-gradient-to-t from-stone-900/60 via-transparent to-transparent"></div>
+		<div
+			class="absolute inset-0 bg-gradient-to-t from-stone-900/60 via-transparent to-transparent"
+		></div>
 		<div class="absolute bottom-0 left-0 right-0 p-8 md:p-12">
 			<div class="max-w-3xl mx-auto">
-				<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body" style="color: rgba(255,255,255,0.7);">Missionnaire international</p>
+				<p
+					class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-3 font-body"
+					style="color: rgba(255,255,255,0.7);"
+				>
+					{$t('ewald.kicker')}
+				</p>
 				<h1 class="font-display text-3xl md:text-5xl text-white leading-tight">Ewald Frank</h1>
 			</div>
 		</div>
@@ -91,27 +99,29 @@
 
 			<!-- Resource Links -->
 			<div class="w-full border-t border-stone-200/60 pt-8 mt-4">
-				<p class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-4 font-body">
-					Ressources d'Ewald Frank
+				<p
+					class="text-[10px] font-bold uppercase tracking-[0.35em] text-missionnaire mb-4 font-body"
+				>
+					{$t('ewald.resources')}
 				</p>
 				<div class="flex flex-wrap gap-3">
 					<a
 						href="/predications?author=Ewald Frank"
 						class="card-lift px-4 py-2 border border-stone-200/60 bg-white/40 text-stone-900 text-xs font-semibold uppercase tracking-wider hover:border-missionnaire hover:text-missionnaire transition-colors"
 					>
-						Prédications
+						{$t('nav.predications')}
 					</a>
 					<a
 						href="/videos?filter=Ewald Frank"
 						class="card-lift px-4 py-2 border border-stone-200/60 bg-white/40 text-stone-700 text-xs font-semibold uppercase tracking-wider hover:border-missionnaire hover:text-missionnaire transition-colors"
 					>
-						Vidéos
+						{$t('nav.videos')}
 					</a>
 					<a
 						href="/literature?author=Ewald Frank&category=book"
 						class="card-lift px-4 py-2 border border-stone-200/60 bg-white/40 text-stone-700 text-xs font-semibold uppercase tracking-wider hover:border-missionnaire hover:text-missionnaire transition-colors"
 					>
-						Littérature
+						{$t('nav.literature')}
 					</a>
 				</div>
 			</div>
