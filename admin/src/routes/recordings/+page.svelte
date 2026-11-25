@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, tick } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
 	import type { PageData } from './$types';
 	import type HlsType from 'hls.js';
@@ -2074,6 +2074,21 @@
 		});
 	}
 
+	let previewRecordingId = $state<string | null>(null);
+	let previewAudio = $state<HTMLAudioElement>();
+	const desktopActionClass =
+		'inline-flex min-h-8 items-center justify-center whitespace-nowrap border border-stone-200 bg-white px-2.5 text-xs font-medium text-stone-700 transition-colors hover:border-primary hover:text-primary';
+
+	async function toggleRecordingPreview(id: string) {
+		const opening = previewRecordingId !== id;
+		previewAudio?.pause();
+		previewRecordingId = opening ? id : null;
+		if (opening) {
+			await tick();
+			if (previewRecordingId === id) void previewAudio?.play().catch(() => {});
+		}
+	}
+
 	/** Body for /api/recordings/start — carries the monitor's on-air position so
 	 *  the subtitle auto-anchor isn't skewed by the operator's listening latency. */
 	function recordingStartInit(): RequestInit {
@@ -3466,13 +3481,13 @@
 	{/if}
 </div>
 
-<!-- Recordings table (≥ lg). Original dense layout unchanged. -->
-<div class="hidden overflow-hidden border border-stone-200/60 bg-white/40 lg:block">
-	<table class="w-full text-left text-sm">
+<!-- Desktop recordings table. Audio controls expand below the selected row. -->
+<div class="recordings-table hidden border border-stone-200/60 bg-white/40 lg:block">
+	<table class="w-full table-fixed text-left text-sm">
 		<thead>
-			<tr class="border-b border-stone-100 bg-cream/50">
+			<tr class="border-b border-stone-200/70 bg-stone-50/70 text-xs">
 				{#if canDeleteRecordings}
-					<th class="w-10 px-5 py-3.5">
+					<th class="w-10 px-3 py-3">
 						<input
 							type="checkbox"
 							checked={allFilteredSelected}
@@ -3484,27 +3499,34 @@
 						/>
 					</th>
 				{/if}
-				<th class="px-5 py-3.5 font-medium text-stone-500">{$t('recordings.common.title')}</th>
-				<th class="px-5 py-3.5 font-medium text-stone-500">{$t('recordings.table.date')}</th>
-				<th class="px-5 py-3.5 font-medium text-stone-500">{$t('recordings.table.duration')}</th>
-				<th class="px-5 py-3.5 font-medium text-stone-500">{$t('recordings.table.size')}</th>
-				<th class="px-5 py-3.5 font-medium text-stone-500">{$t('recordings.table.status')}</th>
-				<th class="px-5 py-3.5 font-medium text-stone-500">{$t('recordings.list.published')}</th>
-				<th class="px-5 py-3.5 text-right font-medium text-stone-500"
+				<th scope="col" class="px-3 py-3 font-semibold text-stone-600"
+					>{$t('recordings.common.title')}</th
+				>
+				<th scope="col" class="w-32 px-3 py-3 font-semibold text-stone-600"
+					>{$t('recordings.table.date')}</th
+				>
+				<th scope="col" class="w-24 px-3 py-3 font-semibold text-stone-600"
+					>{$t('recordings.table.status')}</th
+				>
+				<th scope="col" class="w-48 px-3 py-3 text-right font-semibold text-stone-600"
 					>{$t('recordings.table.actions')}</th
 				>
 			</tr>
 		</thead>
 		<tbody>
 			{#if !listLoaded}
-				<SkeletonRows rows={5} cols={canDeleteRecordings ? 8 : 7} />
+				<SkeletonRows rows={5} cols={canDeleteRecordings ? 5 : 4} />
 			{/if}
 			{#each filteredRecordings as rec}
 				{@const isEditing = editingRecordingId === rec._id}
 				{@const isSelected = selectedIds.has(rec._id!)}
-				<tr class="border-b border-stone-50 {isSelected ? 'bg-primary/5' : ''}">
+				<tr
+					class="border-b border-stone-200/60 transition-colors hover:bg-white/70 focus-within:bg-white/70 {isSelected
+						? 'bg-primary/5'
+						: ''}"
+				>
 					{#if canDeleteRecordings}
-						<td class="px-5 py-4">
+						<td class="px-3 py-3">
 							<input
 								type="checkbox"
 								checked={isSelected}
@@ -3514,10 +3536,12 @@
 							/>
 						</td>
 					{/if}
-					<td class="px-5 py-4">
-						<div class="flex items-center gap-3">
+					<td class="px-3 py-3">
+						<div class="flex items-center gap-2.5">
 							{#if rec.thumbnail_url && !failedThumbnails.has(rec._id!)}
-								<div class="h-9 w-14 shrink-0 rounded border border-stone-200/60 overflow-hidden">
+								<div
+									class="recording-table-thumbnail h-9 w-14 shrink-0 rounded border border-stone-200/60 overflow-hidden"
+								>
 									<BlurUpImage
 										src={vercelImage(rec.thumbnail_url, 192)}
 										srcset={vercelImageSrcSet(rec.thumbnail_url, 96)}
@@ -3532,7 +3556,7 @@
 								</div>
 							{:else}
 								<div
-									class="flex h-9 w-14 shrink-0 items-center justify-center rounded border border-stone-200/60 bg-cream/60 text-stone-300"
+									class="recording-table-thumbnail flex h-9 w-14 shrink-0 items-center justify-center rounded border border-stone-200/60 bg-cream/60 text-stone-300"
 									aria-hidden="true"
 								>
 									<svg
@@ -3551,19 +3575,31 @@
 								</div>
 							{/if}
 							<div class="min-w-0 flex-1">
-								<span class="block font-medium text-stone-700">{rec.title}</span>
-								<span class="block text-[11px] text-stone-400">
+								<span
+									class="line-clamp-2 break-words font-semibold leading-snug text-stone-800"
+									title={rec.title}>{rec.title}</span
+								>
+								<span class="mt-0.5 block truncate text-xs text-stone-500">
 									{displayName(rec.created_by_name, rec.created_by)}
 								</span>
 							</div>
 						</div>
 					</td>
-					<td class="px-5 py-4 text-stone-500">{formatDateTime(rec.started_at)}</td>
-					<td class="px-5 py-4 font-mono text-xs text-stone-500"
-						>{formatDuration(rec.duration_sec)}</td
-					>
-					<td class="px-5 py-4 text-stone-500">{formatBytes(rec.size_bytes)}</td>
-					<td class="px-5 py-4">
+					<td class="px-3 py-3 text-xs tabular-nums text-stone-600">
+						<span class="block whitespace-nowrap" title={formatDateTime(rec.started_at)}>
+							{new Date(rec.started_at).toLocaleDateString('fr-FR')}
+							<span class="text-[11px] text-stone-500">
+								{new Date(rec.started_at).toLocaleTimeString('fr-FR', {
+									hour: '2-digit',
+									minute: '2-digit'
+								})}
+							</span>
+						</span>
+						<span class="mt-1 block whitespace-nowrap text-[11px] text-stone-500">
+							{formatDuration(rec.duration_sec)} · {formatBytes(rec.size_bytes)}
+						</span>
+					</td>
+					<td class="px-3 py-3">
 						<span
 							class="inline-flex rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {statusClass(
 								rec.status
@@ -3571,32 +3607,61 @@
 						>
 							{$t(statusLabel[rec.status])}
 						</span>
+						<div class="mt-2">
+							<button
+								onclick={() => togglePublish(rec)}
+								aria-pressed={Boolean(rec.published)}
+								disabled={rec.status !== 'ready'}
+								aria-label={rec.published
+									? $t('recordings.list.unpublish')
+									: $t('recordings.list.publish')}
+								title={rec.published
+									? $t('recordings.list.unpublish')
+									: $t('recordings.list.publish')}
+								class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors {rec.published
+									? 'bg-primary'
+									: 'bg-stone-200'} disabled:opacity-40"
+							>
+								<span
+									class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform {rec.published
+										? 'translate-x-4'
+										: 'translate-x-0.5'}"
+								></span>
+							</button>
+						</div>
 					</td>
-					<td class="px-5 py-4">
-						<button
-							onclick={() => togglePublish(rec)}
-							disabled={rec.status !== 'ready'}
-							aria-label={rec.published
-								? $t('recordings.list.unpublish')
-								: $t('recordings.list.publish')}
-							title={rec.published
-								? $t('recordings.list.unpublish')
-								: $t('recordings.list.publish')}
-							class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors {rec.published
-								? 'bg-primary'
-								: 'bg-stone-200'} disabled:opacity-40"
-						>
-							<span
-								class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform {rec.published
-									? 'translate-x-4'
-									: 'translate-x-0.5'}"
-							></span>
-						</button>
-					</td>
-					<td class="px-5 py-4">
-						<div class="flex items-center justify-end gap-2">
+					<td class="px-3 py-3">
+						<div class="flex flex-wrap items-center justify-end gap-1.5">
 							{#if rec.status === 'ready' && rec.s3_url}
-								<audio src={rec.s3_url} controls preload="none" class="h-8 w-44"></audio>
+								<button
+									type="button"
+									class={desktopActionClass}
+									onclick={() => void toggleRecordingPreview(rec._id!)}
+									aria-expanded={previewRecordingId === rec._id}
+									aria-controls={previewRecordingId === rec._id
+										? `recording-preview-${rec._id}`
+										: undefined}
+									aria-label={$t(
+										previewRecordingId === rec._id
+											? 'recordings.list.closeAudioPreview'
+											: 'recordings.list.previewAudio',
+										{ title: rec.title }
+									)}
+									title={$t(
+										previewRecordingId === rec._id
+											? 'recordings.list.closeAudioPreview'
+											: 'recordings.list.previewAudio',
+										{ title: rec.title }
+									)}
+								>
+									<svg viewBox="0 0 20 20" class="h-4 w-4" fill="currentColor" aria-hidden="true">
+										{#if previewRecordingId === rec._id}
+											<path d="M6 6h8v8H6z" />
+										{:else}
+											<path d="m7 4 9 6-9 6z" />
+										{/if}
+									</svg>
+								</button>
 							{/if}
 							{#if rec.status === 'failed'}
 								<button
@@ -3609,7 +3674,7 @@
 							{#if rec.status === 'ready' || rec.status === 'failed'}
 								<button
 									onclick={() => (isEditing ? cancelRecordingEdit() : enterRecordingEdit(rec))}
-									class="border border-stone-200 bg-white/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 hover:border-primary hover:text-primary"
+									class={desktopActionClass}
 								>
 									{isEditing ? $t('recordings.common.close') : $t('recordings.common.edit')}
 								</button>
@@ -3617,7 +3682,7 @@
 							{#if rec.status === 'ready' && rec.s3_url}
 								<button
 									onclick={() => openTrimEditor(rec._id!)}
-									class="border border-stone-200 bg-white/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 hover:border-primary hover:text-primary"
+									class={desktopActionClass}
 									title={$t('recordings.list.trimAudioTitle')}
 								>
 									{$t('recordings.list.trimAudio')}
@@ -3626,7 +3691,8 @@
 							{#if canDeleteRecordings}
 								<button
 									onclick={() => remove(rec._id!)}
-									class="px-2 py-1.5 text-xs text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600"
+									class="inline-flex h-8 w-8 items-center justify-center text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600"
+									aria-label={$t('recordings.common.delete')}
 									title={$t('recordings.common.delete')}
 								>
 									<svg
@@ -3647,10 +3713,27 @@
 						</div>
 					</td>
 				</tr>
+				{#if previewRecordingId === rec._id && rec.status === 'ready' && rec.s3_url}
+					<tr
+						id={`recording-preview-${rec._id}`}
+						class="border-b border-stone-200/60 bg-stone-50/80"
+					>
+						<td colspan={canDeleteRecordings ? 5 : 4} class="px-3 py-3 sm:px-5">
+							<audio
+								bind:this={previewAudio}
+								src={rec.s3_url}
+								controls
+								preload="none"
+								class="h-9 w-full max-w-xl"
+								aria-label={$t('recordings.list.previewAudio', { title: rec.title })}
+							></audio>
+						</td>
+					</tr>
+				{/if}
 			{/each}
 			{#if listLoaded && filteredRecordings.length === 0}
 				<tr>
-					<td colspan={canDeleteRecordings ? 8 : 7} class="px-5 py-12 text-center text-stone-400">
+					<td colspan={canDeleteRecordings ? 5 : 4} class="px-5 py-12 text-center text-stone-400">
 						{#if total === 0}
 							{$t('recordings.list.emptyStart')}
 						{:else if hasActiveFilters}
@@ -3683,7 +3766,7 @@
 			{#if isFetching}
 				{$t('recordings.common.loading')}
 			{:else}
-				Charger plus ({total - recordings.length} restants)
+				{$t('recordings.list.loadMore', { count: total - recordings.length })}
 			{/if}
 		</button>
 	</div>
@@ -4795,6 +4878,16 @@
 		}
 		to {
 			opacity: 1;
+		}
+	}
+
+	.recordings-table {
+		container-type: inline-size;
+	}
+
+	@container (max-width: 46rem) {
+		.recording-table-thumbnail {
+			display: none;
 		}
 	}
 </style>

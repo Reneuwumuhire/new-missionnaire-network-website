@@ -1195,6 +1195,8 @@ export default {
 	'recordings.list.unpublish': 'Dépublier',
 	'recordings.list.retryUpload': "Réessayer l'envoi",
 	'recordings.list.retry': 'Réessayer',
+	'recordings.list.closeAudioPreview': 'Fermer l’aperçu audio de « {title} »',
+	'recordings.list.previewAudio': 'Écouter un aperçu de « {title} »',
 	'recordings.list.trimAudio': "Éditer l'audio",
 	'recordings.list.trimAudioTitle': "Éditer l'audio (couper début/fin)",
 	'recordings.list.emptyFiltered': 'Aucun enregistrement ne correspond aux filtres actifs.',
