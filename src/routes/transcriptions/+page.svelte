@@ -9,7 +9,9 @@
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import AiOutlineDownload from 'svelte-icons-pack/ai/AiOutlineDownload';
-	import AiFillPlayCircle from 'svelte-icons-pack/ai/AiFillPlayCircle';
+	import BsFileEarmarkPdfFill from 'svelte-icons-pack/bs/BsFileEarmarkPdfFill';
+	import IoPlayCircle from 'svelte-icons-pack/io/IoPlayCircle';
+	import { transcriptTitle } from '$lib/utils/transcriptTitle';
 
 	import ArrowDown2 from 'iconsax-svelte/ArrowDown2.svelte';
 	import ArrowUp2 from 'iconsax-svelte/ArrowUp2.svelte';
@@ -27,7 +29,10 @@
 	} from './listCache';
 	import MobileListToolbar from '$lib/components/+mobileListToolbar.svelte';
 	import { mobileSearchOpen, mobileFiltersOpen } from '$lib/stores/mobileControls';
-	import { t } from '../../i18n';
+	import { t, locale } from '../../i18n';
+
+	const rowActionClass =
+		'inline-flex h-11 w-11 shrink-0 items-center justify-center transition-colors hover:text-missionnaire focus-visible:outline-2 focus-visible:outline-missionnaire';
 
 	interface Props {
 		data: PageData;
@@ -420,7 +425,7 @@
 
 				<button
 					onclick={handleSort}
-					class="flex items-center justify-center space-x-2 px-4 py-2 min-h-11 text-sm font-body text-stone-600 hover:text-missionnaire transition-colors duration-200 w-full sm:w-auto border sm:border-0 border-stone-200"
+					class="flex min-h-11 w-full items-center justify-center gap-2 border border-stone-200 bg-white px-4 text-xs font-semibold text-stone-600 transition-colors hover:text-missionnaire sm:w-auto md:hidden"
 				>
 					<span>{$t('transcriptions.publishDate')}</span>
 					{#if sortOrder === 'desc'}
@@ -467,57 +472,109 @@
 				<div class="mb-2 px-2 sm:px-0">
 					<ResultsSummary from={summaryFrom} to={summaryTo} {total} query={currentSearch} />
 				</div>
-				<div class="border border-stone-200/60 bg-white/40 mx-2 sm:mx-0">
-					{#each documents as document (document._id)}
-						<div
-							class="flex items-center border-b border-stone-100 last:border-b-0 hover:bg-white/60"
+				<div class="mx-2 border border-stone-200/60 bg-white/40 sm:mx-0">
+					<table class="w-full table-fixed text-left" aria-label={$t('nav.transcriptions')}>
+						<thead
+							class="border-b border-stone-200/60 bg-white/40 text-[10px] font-bold uppercase tracking-widest text-stone-500 md:text-[11px]"
 						>
-							<a
-								href={`/transcriptions/${document._id}`}
-								class="flex min-w-0 flex-1 items-start space-x-2 p-3 text-left sm:space-x-4 sm:p-4"
-							>
-								<div class="flex-shrink-0 pt-1">
-									<DocumentText1 size={18} color="#6B7280" />
-								</div>
-								<div class="flex-1 min-w-0">
-									<h3 class="text-xs sm:text-sm font-medium text-stone-800 break-words">
-										{document.filename}
-									</h3>
-									<div class="mt-1 flex flex-col sm:flex-row sm:flex-wrap sm:space-x-6">
-										<div class="text-xs text-stone-500 tabular-nums">
-											{formatFileSize(document.size)}
-										</div>
-										<div class="text-xs text-stone-500 tabular-nums">
-											{new Date(document.publishedOn).toLocaleDateString()}
-										</div>
-									</div>
-								</div>
-							</a>
-							<div class="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4">
-								{#if document.videoDisplayId}
-									<a
-										href={`https://www.youtube.com/watch?v=${document.videoDisplayId}`}
-										target="_blank"
-										rel="noopener noreferrer"
-										class="inline-flex items-center gap-1.5 border border-stone-200 bg-white px-2 py-1 sm:px-2.5 sm:py-1.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-stone-600 hover:border-red-500 hover:text-red-600 hover:bg-red-50 transition-colors duration-200 active:scale-[0.98]"
-										title={$t('transcriptions.watchOnYoutube')}
-									>
-										<Icon src={AiFillPlayCircle} size="14" />
-										<span class="hidden sm:inline">{$t('misc.video')}</span>
-									</a>
-								{/if}
-								<a
-									href={document.url}
-									download
-									class="inline-flex items-center gap-1.5 border border-stone-200 bg-white px-2 py-1 sm:px-2.5 sm:py-1.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-stone-600 hover:border-missionnaire hover:text-missionnaire hover:bg-missionnaire/5 transition-colors duration-200 active:scale-[0.98]"
-									title={$t('transcriptions.downloadPdf')}
+							<tr>
+								<th scope="col" class="hidden w-12 py-3 text-center md:table-cell">#</th>
+								<th scope="col" class="px-3 py-3 md:px-4">{$t('list.title')}</th>
+								<th
+									scope="col"
+									aria-sort={sortOrder === 'desc' ? 'descending' : 'ascending'}
+									class="hidden w-32 px-4 py-3 md:table-cell"
 								>
-									<Icon src={AiOutlineDownload} size="14" />
-									<span class="hidden sm:inline">PDF</span>
-								</a>
-							</div>
-						</div>
-					{/each}
+									<button
+										type="button"
+										onclick={handleSort}
+										class="inline-flex items-center gap-1.5 hover:text-missionnaire"
+									>
+										<span aria-hidden="true" class="text-missionnaire"
+											>{sortOrder === 'desc' ? '↓' : '↑'}</span
+										>
+										{$t('list.date')}
+									</button>
+								</th>
+								<th scope="col" class="hidden w-24 px-4 py-3 md:table-cell"
+									>{$t('transcriptions.fileSize')}</th
+								>
+								<th scope="col" class="w-36 py-3 text-center md:w-40">{$t('list.actions')}</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-stone-100">
+							{#each documents as document, index (document._id)}
+								{@const { title } = transcriptTitle(document.filename)}
+								{@const published = new Date(document.publishedOn).toLocaleDateString($locale, {
+									timeZone: 'UTC'
+								})}
+								{@const size = formatFileSize(document.size)}
+								<tr class="transition-colors hover:bg-white/60 focus-within:bg-white/60">
+									<td
+										class="hidden py-4 text-center text-xs font-bold tabular-nums text-stone-400 md:table-cell"
+										>{summaryFrom + index}</td
+									>
+									<td class="px-3 py-4 md:px-4">
+										<a
+											href={`/transcriptions/${document._id}`}
+											class="block break-words text-sm font-bold leading-snug text-stone-900 hover:text-missionnaire"
+										>
+											{title}
+										</a>
+										<div
+											class="mt-1 flex flex-wrap gap-x-3 text-xs tabular-nums text-stone-500 md:hidden"
+										>
+											<span>{published}</span>
+											<span>{size}</span>
+										</div>
+									</td>
+									<td class="hidden px-4 py-4 text-xs tabular-nums text-stone-500 md:table-cell"
+										>{published}</td
+									>
+									<td class="hidden px-4 py-4 text-xs tabular-nums text-stone-500 md:table-cell"
+										>{size}</td
+									>
+									<td class="py-2 md:py-4">
+										<div class="flex items-center justify-center">
+											<a
+												href={document.url}
+												target="_blank"
+												rel="noopener noreferrer"
+												class={`${rowActionClass} text-gray-400`}
+												aria-label={$t('predications.openPdf')}
+												title={$t('predications.openPdf')}
+											>
+												<Icon src={BsFileEarmarkPdfFill} size="18" />
+											</a>
+											<a
+												href={document.url}
+												download
+												class={rowActionClass}
+												aria-label={$t('transcriptions.downloadPdf')}
+												title={$t('transcriptions.downloadPdf')}
+											>
+												<Icon src={AiOutlineDownload} size="20" />
+											</a>
+											{#if document.videoDisplayId}
+												<a
+													href={`https://www.youtube.com/watch?v=${document.videoDisplayId}`}
+													target="_blank"
+													rel="noopener noreferrer"
+													class={rowActionClass}
+													aria-label={$t('transcriptions.watchOnYoutube')}
+													title={$t('transcriptions.watchOnYoutube')}
+												>
+													<Icon src={IoPlayCircle} size="24" />
+												</a>
+											{:else}
+												<span class="w-11 shrink-0" aria-hidden="true"></span>
+											{/if}
+										</div>
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
 				</div>
 
 				{#if showPagination && totalPages > 1}
