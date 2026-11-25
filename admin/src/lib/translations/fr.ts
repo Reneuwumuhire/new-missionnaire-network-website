@@ -1077,7 +1077,7 @@ export default {
 	'recordings.sessionControls': 'Contrôles de session',
 	'recordings.sessionStart': 'Démarrer la session',
 	'recordings.publicLink': 'Lien public',
-	'recordings.waitingForStream': "En attente d'un flux audio… (démarrez OBS)",
+	'recordings.waitingForStream': 'En attente du signal audio du direct…',
 	'recordings.pendingOrphans':
 		'Récupération en cours : {count} enregistrement(s) en attente de téléversement.',
 	'recordings.listenersOne': '{count} auditeur',

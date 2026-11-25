@@ -3031,8 +3031,7 @@
 					</button>
 				</div>
 			{:else}
-				<!-- Idle strip: doubles as the "waiting for a source / start OBS" hint
-			     so the card stays compact instead of carrying a separate pill. -->
+				<!-- Show the waiting hint if the source drops during a live session. -->
 				<div
 					class="flex h-9 flex-1 min-w-[280px] items-center gap-2 bg-stone-50 px-3 text-[11px] text-stone-400"
 				>

@@ -1066,7 +1066,7 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.sessionControls': 'Session controls',
 	'recordings.sessionStart': 'Start the session',
 	'recordings.publicLink': 'Public link',
-	'recordings.waitingForStream': 'Waiting for an audio stream… (start OBS)',
+	'recordings.waitingForStream': 'Waiting for a live audio signal…',
 	'recordings.pendingOrphans': 'Recovery in progress: {count} recording(s) awaiting upload.',
 	'recordings.listenersOne': '{count} listener',
 	'recordings.listenersMany': '{count} listeners',
