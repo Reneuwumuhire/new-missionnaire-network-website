@@ -2539,13 +2539,15 @@
 {/snippet}
 
 <div
-	class="mb-8 border bg-white/40 p-5 {broadcast.is_live ? 'border-red-200' : 'border-stone-200/60'}"
+	class="border bg-white/40 {broadcast.is_live || isRecording || icecast.sourceActive
+		? 'mb-8 p-5'
+		: 'mb-5 px-4 py-3'} {broadcast.is_live ? 'border-red-200' : 'border-stone-200/60'}"
 >
 	<!-- Header: status + timers -->
-	<div class="flex flex-wrap items-center justify-between gap-4">
+	<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
 		<div class="flex items-center gap-3">
 			<div
-				class="flex h-10 w-10 items-center justify-center rounded-full {broadcast.is_live ||
+				class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full {broadcast.is_live ||
 				isRecording
 					? 'bg-red-50'
 					: 'bg-stone-100'}"
@@ -2731,6 +2733,8 @@
 					</div>
 				{/if}
 			</div>
+		{:else if !icecast.sourceActive}
+			<p class="pl-12 text-xs text-stone-500 sm:pl-0">{$t('recordings.waitingForStream')}</p>
 		{/if}
 	</div>
 
@@ -2764,7 +2768,7 @@
 	{/if}
 
 	<!-- Actions — only when there's a session to control or a source to start
-	     from. Idle-with-no-source shows just the compact monitor strip below. -->
+	     from. -->
 	{#if icecast.sourceActive || broadcast.is_live || isRecording}
 		<div class="mt-5 border-t border-stone-100 pt-5">
 			{#if !broadcast.is_live}
@@ -2940,125 +2944,129 @@
 		<p class="mt-4 bg-red-50 px-3 py-2 text-xs text-red-700">{actionError}</p>
 	{/if}
 
-	<!-- Live audio monitor -->
-	<div class="mt-5 flex flex-wrap items-center gap-3 border-t border-stone-100 pt-4">
-		<div
-			class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-stone-500"
-		>
-			<svg
-				class="h-4 w-4 text-missionnaire"
-				fill="none"
-				viewBox="0 0 24 24"
-				stroke="currentColor"
-				stroke-width="2"
-			>
-				<path
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"
-				/>
-			</svg>
-			{$t('recordings.monitor.title')}
-		</div>
-		{#if icecast.sourceActive}
-			<!-- No pause, no seek — always the live edge. Mute is the only
-			     control, so this stays a trustworthy sync reference. -->
-			<div class="flex h-9 flex-1 min-w-[280px] items-center gap-3 bg-stone-50 px-3">
-				{#if monitorLive}
-					<span
-						class="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-red-600"
-					>
-						<span class="relative inline-flex h-1.5 w-1.5">
-							<span
-								class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"
-							></span>
-							<span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500"></span>
-						</span>
-						{$t('recordings.monitor.live')}
-					</span>
-				{:else}
-					<span class="text-[11px] italic text-stone-400"
-						>{$t('recordings.monitor.connecting')}</span
-					>
-				{/if}
-				<span class="min-w-0 flex-1 truncate text-[10px] text-stone-400">
-					{monitorMuted ? $t('recordings.monitor.mutedHint') : $t('recordings.monitor.unmutedHint')}
-				</span>
-				<button
-					type="button"
-					onclick={toggleMonitorMute}
-					class="inline-flex shrink-0 items-center gap-1.5 border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] transition-colors {monitorMuted
-						? 'border-missionnaire bg-missionnaire text-white hover:bg-missionnaire/90'
-						: 'border-stone-200 bg-white text-stone-600 hover:border-stone-900 hover:bg-stone-900 hover:text-white'}"
-				>
-					{#if monitorMuted}
-						<svg
-							class="h-3 w-3"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							aria-hidden="true"
-						>
-							<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-							<path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
-						</svg>
-						{$t('recordings.monitor.unmute')}
-					{:else}
-						<svg
-							class="h-3 w-3"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							aria-hidden="true"
-						>
-							<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-							<line x1="23" y1="9" x2="17" y2="15" />
-							<line x1="17" y1="9" x2="23" y2="15" />
-						</svg>
-						{$t('recordings.monitor.mute')}
-					{/if}
-				</button>
-			</div>
-		{:else}
-			<!-- Idle strip: doubles as the "waiting for a source / start OBS" hint
-			     so the card stays compact instead of carrying a separate pill. -->
+	{#if icecast.sourceActive || broadcast.is_live || isRecording}
+		<!-- Live audio monitor -->
+		<div class="mt-5 flex flex-wrap items-center gap-3 border-t border-stone-100 pt-4">
 			<div
-				class="flex h-9 flex-1 min-w-[280px] items-center gap-2 bg-stone-50 px-3 text-[11px] text-stone-400"
+				class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-stone-500"
 			>
 				<svg
-					class="h-3.5 w-3.5 shrink-0"
+					class="h-4 w-4 text-missionnaire"
 					fill="none"
 					viewBox="0 0 24 24"
 					stroke="currentColor"
 					stroke-width="2"
-					aria-hidden="true"
 				>
 					<path
 						stroke-linecap="round"
 						stroke-linejoin="round"
-						d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+						d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"
 					/>
 				</svg>
-				<span class="truncate">{$t('recordings.waitingForStream')}</span>
+				{$t('recordings.monitor.title')}
 			</div>
-		{/if}
-		{#if icecast.sourceActive}
-			<span class="text-[11px] text-stone-400">{$t('recordings.monitor.sourceActive')}</span>
-		{/if}
-		<audio
-			bind:this={monitorEl}
-			preload="none"
-			muted
-			ontimeupdate={onMonitorTimeUpdate}
-			onpause={onMonitorInterrupted}
-			onended={onMonitorInterrupted}
-			onerror={onMonitorInterrupted}
-		></audio>
-	</div>
+			{#if icecast.sourceActive}
+				<!-- No pause, no seek — always the live edge. Mute is the only
+			     control, so this stays a trustworthy sync reference. -->
+				<div class="flex h-9 flex-1 min-w-[280px] items-center gap-3 bg-stone-50 px-3">
+					{#if monitorLive}
+						<span
+							class="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-red-600"
+						>
+							<span class="relative inline-flex h-1.5 w-1.5">
+								<span
+									class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"
+								></span>
+								<span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500"></span>
+							</span>
+							{$t('recordings.monitor.live')}
+						</span>
+					{:else}
+						<span class="text-[11px] italic text-stone-400"
+							>{$t('recordings.monitor.connecting')}</span
+						>
+					{/if}
+					<span class="min-w-0 flex-1 truncate text-[10px] text-stone-400">
+						{monitorMuted
+							? $t('recordings.monitor.mutedHint')
+							: $t('recordings.monitor.unmutedHint')}
+					</span>
+					<button
+						type="button"
+						onclick={toggleMonitorMute}
+						class="inline-flex shrink-0 items-center gap-1.5 border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] transition-colors {monitorMuted
+							? 'border-missionnaire bg-missionnaire text-white hover:bg-missionnaire/90'
+							: 'border-stone-200 bg-white text-stone-600 hover:border-stone-900 hover:bg-stone-900 hover:text-white'}"
+					>
+						{#if monitorMuted}
+							<svg
+								class="h-3 w-3"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								aria-hidden="true"
+							>
+								<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+								<path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+							</svg>
+							{$t('recordings.monitor.unmute')}
+						{:else}
+							<svg
+								class="h-3 w-3"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								aria-hidden="true"
+							>
+								<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+								<line x1="23" y1="9" x2="17" y2="15" />
+								<line x1="17" y1="9" x2="23" y2="15" />
+							</svg>
+							{$t('recordings.monitor.mute')}
+						{/if}
+					</button>
+				</div>
+			{:else}
+				<!-- Idle strip: doubles as the "waiting for a source / start OBS" hint
+			     so the card stays compact instead of carrying a separate pill. -->
+				<div
+					class="flex h-9 flex-1 min-w-[280px] items-center gap-2 bg-stone-50 px-3 text-[11px] text-stone-400"
+				>
+					<svg
+						class="h-3.5 w-3.5 shrink-0"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+						stroke-width="2"
+						aria-hidden="true"
+					>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+						/>
+					</svg>
+					<span class="truncate">{$t('recordings.waitingForStream')}</span>
+				</div>
+			{/if}
+			{#if icecast.sourceActive}
+				<span class="text-[11px] text-stone-400">{$t('recordings.monitor.sourceActive')}</span>
+			{/if}
+		</div>
+	{/if}
+	<audio
+		bind:this={monitorEl}
+		preload="none"
+		muted
+		ontimeupdate={onMonitorTimeUpdate}
+		onpause={onMonitorInterrupted}
+		onended={onMonitorInterrupted}
+		onerror={onMonitorInterrupted}
+	></audio>
 </div>
 
 <!-- Scheduled lives — moved up to the top of the broadcast tools: schedule

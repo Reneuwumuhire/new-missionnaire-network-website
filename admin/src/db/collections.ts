@@ -1082,7 +1082,10 @@ export async function updateRecording(
 			$set: {
 				...updates,
 				updated_at: new Date()
-			}
+			},
+			...(typeof updates.published === 'boolean'
+				? { $unset: { auto_publish_live_started_at: '' } }
+				: {})
 		}
 	);
 	return result.modifiedCount > 0;
