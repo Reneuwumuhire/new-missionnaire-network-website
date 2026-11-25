@@ -139,8 +139,7 @@ async function getRecentAudienceData(
 							{ $sort: { occurredAt: -1 } },
 							{ $group: { _id: '$visitorId', value: { $first: '$country' } } },
 							{ $group: { _id: '$value', count: { $sum: 1 } } },
-							{ $sort: { count: -1 } },
-							{ $limit: 6 }
+							{ $sort: { count: -1 } }
 						],
 						referrers: [
 							{ $sort: { occurredAt: 1 } },
@@ -321,8 +320,7 @@ export async function getAudienceData(
 							],
 							countries: [
 								{ $group: { _id: { $ifNull: ['$countryFull', 'Unknown'] }, count: { $sum: 1 } } },
-								{ $sort: { count: -1 } },
-								{ $limit: 6 }
+								{ $sort: { count: -1 } }
 							],
 							referrers: [
 								{ $group: { _id: { $ifNull: ['$referrer', 'direct'] }, count: { $sum: 1 } } },

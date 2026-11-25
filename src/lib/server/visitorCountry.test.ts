@@ -18,6 +18,11 @@ it('falls back to trusted country headers when Fly IP lookup is unavailable', ()
 	const headers = new Headers({ 'cf-ipcountry': 'rw', 'fly-client-ip': '127.0.0.1' });
 	expect(visitorCountry(headers, true)).toBe('RW');
 });
+
+it('resolves forwarded proxy IPs when country headers are unavailable', () => {
+	const headers = new Headers({ 'x-forwarded-for': '41.186.0.1, 10.0.0.1' });
+	expect(visitorCountry(headers, false)).toBe('RW');
+});
 it('accepts recognized country headers for other deployments', () => {
 	const headers = new Headers({ 'cf-ipcountry': 'XX', 'x-vercel-ip-country': 'be' });
 	expect(visitorCountry(headers, false)).toBe('BE');
