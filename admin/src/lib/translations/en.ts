@@ -1135,7 +1135,7 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.meta.descriptionPlaceholder': 'Describe this live: topic, speaker, Bible passage…',
 	'recordings.meta.youtubeHint':
 		'Default: the channel /live URL. Replace it with the exact video URL once published.',
-	'recordings.defaults.title': 'Default info',
+	'recordings.defaults.title': 'Instant live defaults',
 	'recordings.defaults.intro':
 		'Used when you start an instant live (not scheduled). A scheduled live keeps its own info.',
 	'recordings.defaults.liveHint':
@@ -1379,7 +1379,13 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.common.youtubeLink': 'YouTube link',
 	'recordings.common.noThumbnail': 'No thumbnail',
 	'recordings.common.imageFormats': 'JPEG, PNG, WebP or GIF · 5 MB max',
-	'recordings.scheduled.title': 'Scheduled lives',
+	'recordings.scheduled.title': 'Scheduled broadcasts',
+	'recordings.scheduled.nextBroadcast': 'Next broadcast',
+	'recordings.scheduled.goLiveNow': 'Go live now',
+	'recordings.scheduled.more': 'More',
+	'recordings.scheduled.openWatchPage': 'Open watch page',
+	'recordings.scheduled.cancelBroadcast': 'Cancel broadcast',
+	'recordings.scheduled.scheduledTimePassed': 'Scheduled time passed',
 	'recordings.scheduled.intro':
 		'Each scheduled live gets a stable share link — usable before, during and after the broadcast.',
 	'recordings.scheduled.schedule': 'Schedule a live',

@@ -3,7 +3,7 @@
 	import type { ScheduledLive, BroadcastAdminState } from '../../db/collections';
 	import { confirmDialog } from '$lib/stores/confirm-dialog';
 	import { toast } from '$lib/stores/toast';
-	import { t, type TranslationKey } from '$lib/i18n';
+	import { locale, t, type TranslationKey } from '$lib/i18n';
 	import { parseSrt } from '$lib/utils/srt';
 	import { correctSubtitleSrt } from '$lib/utils/subtitleCorrections';
 
@@ -59,7 +59,7 @@
 
 	function fmtDate(iso: string): string {
 		try {
-			return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' });
+			return new Date(iso).toLocaleString($locale, { dateStyle: 'full', timeStyle: 'short' });
 		} catch {
 			return iso;
 		}
@@ -68,17 +68,17 @@
 	/** Short clock time (HH:MM) for the "live since" line on an on-air entry. */
 	function fmtTime(iso: string): string {
 		try {
-			return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+			return new Date(iso).toLocaleTimeString($locale, { hour: '2-digit', minute: '2-digit' });
 		} catch {
 			return iso;
 		}
 	}
 
-	// Tick once a minute so the "live since … (elapsed)" label stays fresh while
-	// an entry is on air. Only runs when something is actually live.
+	// Keep countdowns and elapsed time current while there are broadcasts to show.
 	let nowMs = $state(Date.now());
 	$effect(() => {
-		if (!upcoming.some((e) => e.status === 'live')) return;
+		if (!upcoming.length) return;
+		nowMs = Date.now();
 		const id = setInterval(() => (nowMs = Date.now()), 30_000);
 		return () => clearInterval(id);
 	});
@@ -95,10 +95,11 @@
 	}
 
 	/** Coarse "Dans 3 jours / Dans 2 h / Dans 45 min" chip, YouTube-style.
-	 *  Computed once per render — minute-level drift doesn't matter here. */
+	 *  Updated while broadcasts are visible. */
 	function relativeUntil(iso: string): string {
-		const diffMs = Date.parse(iso) - Date.now();
+		const diffMs = Date.parse(iso) - nowMs;
 		if (Number.isNaN(diffMs)) return '';
+		if (diffMs < -60_000) return $t('recordings.scheduled.scheduledTimePassed');
 		if (diffMs <= 60_000) return $t('recordings.scheduled.imminent');
 		const minutes = Math.round(diffMs / 60_000);
 		if (minutes < 60) return $t('recordings.scheduled.inMinutes', { count: minutes });
@@ -739,6 +740,18 @@
 		}
 	}
 
+	const nextId = $derived(
+		(
+			upcoming.find(
+				(entry) => entry.status === 'scheduled' && Date.parse(entry.scheduled_at) >= nowMs
+			) ?? upcoming.find((entry) => entry.status === 'scheduled')
+		)?._id
+	);
+	const actionClass =
+		'inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border border-stone-300 bg-white px-3 text-xs font-semibold text-stone-700 transition-colors hover:border-primary hover:text-stone-900 disabled:opacity-50';
+	const menuActionClass =
+		'block w-full rounded px-3 py-2.5 text-left text-xs font-medium hover:bg-stone-100 focus-visible:bg-stone-100 disabled:opacity-50';
+
 	function statusBadge(entry: ScheduledLive): { label: TranslationKey; cls: string } {
 		switch (entry.status) {
 			case 'live':
@@ -765,377 +778,256 @@
 	}
 </script>
 
-<div class="mb-8 border border-stone-200/60 bg-white/40 p-6">
-	<!-- Section header — same label/action pattern as the broadcast metadata section -->
-	<div class="flex flex-wrap items-start justify-between gap-4">
-		<div class="min-w-0 flex-1">
-			<p class="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500">
+<section
+	aria-labelledby="scheduled-broadcasts-heading"
+	class="mb-6 rounded-lg border border-stone-200 bg-white/60 p-4 sm:p-5"
+>
+	<header class="flex flex-wrap items-center justify-between gap-3">
+		<div class="flex min-w-0 items-center gap-2">
+			<h2
+				id="scheduled-broadcasts-heading"
+				class="font-display text-2xl font-semibold leading-tight text-stone-900"
+			>
 				{$t('recordings.scheduled.title')}
-				{#if upcoming.length > 0}
-					<span
-						class="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary/10 px-1 text-[9px] font-bold text-primary"
-					>
-						{upcoming.length}
-					</span>
-				{/if}
-			</p>
-			<p class="mt-1 text-[10px] text-stone-400">
-				{$t('recordings.scheduled.intro')}
-			</p>
-		</div>
-		<div
-			class="flex w-full flex-col gap-2 sm:w-auto sm:shrink-0 sm:flex-row sm:flex-wrap sm:items-center"
-		>
-			<label
-				class="flex cursor-pointer items-center gap-2 border border-stone-200 bg-stone-50 px-3 py-2 text-[10px] font-semibold text-stone-600"
-			>
-				<input type="checkbox" bind:checked={notifyFromDefaults} class="accent-[#FF880C]" />
-				{$t('recordings.scheduled.notifyThisStart')}
-			</label>
-			<!-- Instant live off the saved default info — sits next to "Schedule a
-			     live" so both ways to go on air live in one place. Full-width
-			     stacked on mobile so the labels don't overflow the card. -->
-			<button
-				type="button"
-				onclick={startFromDefaults}
-				disabled={startingDefaults || broadcast.is_live}
-				data-testid="instant-live-btn"
-				title={$t('recordings.defaults.startFromDefaultsTitle')}
-				class="inline-flex w-full items-center justify-center gap-1.5 border border-primary bg-white px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary transition-all hover:bg-primary hover:text-white disabled:opacity-50 sm:w-auto"
-			>
-				<svg
-					class="h-3 w-3"
-					fill="none"
-					viewBox="0 0 24 24"
-					stroke="currentColor"
-					stroke-width="2"
-					aria-hidden="true"
+			</h2>
+			{#if upcoming.length > 0}
+				<span
+					class="rounded-full bg-stone-100 px-2 py-0.5 text-xs font-semibold tabular-nums text-stone-600"
+					>{upcoming.length}</span
 				>
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						d="M5.6 5.6a9 9 0 000 12.8M8.4 8.4a5 5 0 000 7.2m10-12.8a9 9 0 010 12.8m-2.8-9.2a5 5 0 010 7.2M12 12h.01"
-					/>
-				</svg>
-				{startingDefaults
-					? $t('recordings.busy.starting')
-					: $t('recordings.defaults.startFromDefaults')}
-			</button>
-			<button
-				type="button"
-				onclick={openCreate}
-				class="inline-flex w-full items-center justify-center gap-1.5 border border-primary bg-primary px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white shadow-sm shadow-primary/25 transition-all hover:bg-primary/90 hover:shadow-md sm:w-auto"
-			>
-				<svg
-					class="h-3 w-3"
-					fill="none"
-					viewBox="0 0 24 24"
-					stroke="currentColor"
-					stroke-width="2.5"
-					aria-hidden="true"
-				>
-					<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-				</svg>
-				{$t('recordings.scheduled.schedule')}
-			</button>
+			{/if}
 		</div>
-	</div>
-
-	<!-- Upcoming -->
-	{#if upcoming.length === 0}
-		<div
-			class="mt-5 flex flex-col items-center border border-dashed border-stone-200 bg-stone-50/40 px-6 py-8 text-center"
+		<button
+			type="button"
+			onclick={openCreate}
+			class="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-stone-900 px-3.5 text-xs font-semibold text-white transition-colors hover:bg-stone-700"
 		>
 			<svg
-				class="mb-2.5 h-8 w-8 text-stone-300"
+				class="h-4 w-4"
 				fill="none"
 				viewBox="0 0 24 24"
 				stroke="currentColor"
-				stroke-width="1.5"
+				stroke-width="2"
 				aria-hidden="true"
 			>
-				<path
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-				/>
+				<path stroke-linecap="round" d="M12 4v16m8-8H4" />
 			</svg>
-			<p class="text-sm font-medium text-stone-500">{$t('recordings.scheduled.emptyTitle')}</p>
-			<p class="mt-1 max-w-sm text-xs leading-relaxed text-stone-400">
+			{$t('recordings.scheduled.schedule')}
+		</button>
+	</header>
+
+	{#if upcoming.length === 0}
+		<div
+			class="mt-4 rounded-md border border-dashed border-stone-200 bg-stone-50 px-4 py-5 text-center"
+		>
+			<p class="text-sm font-semibold text-stone-700">{$t('recordings.scheduled.emptyTitle')}</p>
+			<p class="mt-1 text-xs leading-relaxed text-stone-500">
 				{$t('recordings.scheduled.emptyBody')}
 			</p>
 		</div>
 	{:else}
-		<div class="mt-5 space-y-4">
+		<div class="mt-4 space-y-3">
 			{#each upcoming as entry (entry._id)}
+				{@const onAir = entry.status === 'live'}
+				{@const isNext = entry._id === nextId}
 				{@const badge = statusBadge(entry)}
-				<div
-					class="border bg-white/60 p-5 {entry.status === 'live'
-						? 'border-red-200'
-						: 'border-stone-200/60'}"
+				<article
+					class="rounded-md border p-3.5 sm:p-4 {onAir
+						? 'border-red-200 bg-red-50/40'
+						: isNext
+							? 'border-orange-200 bg-orange-50/40'
+							: 'border-stone-200 bg-white'}"
 				>
-					<div class="flex flex-col gap-4 sm:flex-row">
-						<!-- Thumbnail -->
-						<div
-							class="h-24 w-full shrink-0 overflow-hidden border border-stone-200/60 bg-stone-100 sm:w-40"
-						>
-							{#if entry.thumbnail_url}
-								<img
-									src={entry.thumbnail_url}
-									alt={entry.title}
-									class="h-full w-full object-cover"
-								/>
-							{:else}
-								<div class="flex h-full w-full items-center justify-center text-stone-300">
-									<svg
-										class="h-7 w-7"
-										fill="none"
-										viewBox="0 0 24 24"
-										stroke="currentColor"
-										stroke-width="1.5"
+					<div class="flex items-start gap-3">
+						{#if entry.thumbnail_url}
+							<img
+								src={entry.thumbnail_url}
+								alt=""
+								loading="lazy"
+								width="112"
+								height="63"
+								class="aspect-video w-16 shrink-0 rounded-md border border-stone-200/80 object-cover sm:w-28"
+							/>
+						{/if}
+						<div class="min-w-0 flex-1">
+							<div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+								{#if onAir}
+									<span
+										class="rounded-full border px-2 py-0.5 text-[11px] font-semibold {badge.cls}"
+										>{$t(badge.label)}</span
 									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											d="M5.6 5.6a9 9 0 000 12.8M8.4 8.4a5 5 0 000 7.2m10-12.8a9 9 0 010 12.8m-2.8-9.2a5 5 0 010 7.2M12 12h.01"
-										/>
-									</svg>
+								{:else if isNext}
+									<span
+										class="rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-semibold text-orange-800"
+										>{$t('recordings.scheduled.nextBroadcast')}</span
+									>
+								{:else}
+									<span class="text-[11px] font-semibold text-stone-600">{$t(badge.label)}</span>
+								{/if}
+								{#if entry.status === 'scheduled'}
+									<span class="text-xs font-semibold tabular-nums text-stone-600"
+										>{relativeUntil(entry.scheduled_at)}</span
+									>
+								{/if}
+							</div>
+							<h3
+								class="mt-1 break-words font-display text-lg font-semibold leading-tight text-stone-900 sm:text-xl"
+							>
+								{entry.title}
+							</h3>
+							{#if onAir && entry.live_started_at}
+								<p class="mt-1 text-xs font-medium text-red-700">
+									{$t('recordings.scheduled.liveSince', { time: fmtTime(entry.live_started_at) })}
+									<span class="text-stone-500">· {liveElapsed(entry.live_started_at, nowMs)}</span>
+								</p>
+							{:else}
+								<time
+									datetime={entry.scheduled_at}
+									class="mt-1 block text-xs font-medium text-stone-600"
+									>{fmtDate(entry.scheduled_at)}</time
+								>
+							{/if}
+							{#if entry.announced_at || entry.reminder_enabled || entry.notify_on_start || entry.subtitle_filename}
+								<div class="mt-2 flex flex-wrap gap-1.5 text-[11px] font-medium text-stone-600">
+									{#if entry.announced_at}
+										<span class="rounded bg-stone-100 px-2 py-0.5"
+											>{$t('recordings.scheduled.announced')}</span
+										>
+									{/if}
+									{#if entry.reminder_enabled}
+										<span class="rounded bg-stone-100 px-2 py-0.5"
+											>{$t('recordings.scheduled.reminderOn')}</span
+										>
+									{/if}
+									{#if entry.notify_on_start}
+										<span class="rounded bg-sky-50 px-2 py-0.5 text-sky-800"
+											>{$t('recordings.scheduled.liveAlertOn')}</span
+										>
+									{/if}
+									{#if entry.subtitle_filename}
+										<span class="rounded bg-stone-100 px-2 py-0.5" title={entry.subtitle_filename}
+											>{$t('recordings.scheduled.transcript')}</span
+										>
+									{/if}
 								</div>
 							{/if}
 						</div>
+					</div>
 
-						<!-- Infos -->
-						<div class="min-w-0 flex-1">
-							<div class="flex flex-wrap items-center gap-2">
-								<span
-									class="border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.15em] {badge.cls}"
+					<div class="mt-3 flex flex-wrap items-center gap-2 border-t border-stone-200/80 pt-3">
+						{#if onAir}
+							<button
+								type="button"
+								onclick={() => endLiveEntry(entry)}
+								disabled={busyId === entry._id}
+								class="inline-flex min-h-9 items-center rounded-md bg-red-700 px-3 text-xs font-semibold text-white hover:bg-red-800 disabled:opacity-50"
+							>
+								{$t('recordings.actions.endLive')}
+							</button>
+						{:else if entry.status === 'scheduled'}
+							<button
+								type="button"
+								onclick={() => startLive(entry)}
+								disabled={busyId === entry._id || broadcast.is_live}
+								class="inline-flex min-h-9 items-center rounded-md bg-orange-700 px-3 text-xs font-semibold text-white hover:bg-orange-800 disabled:opacity-50"
+							>
+								{$t('recordings.scheduled.startLive')}
+							</button>
+						{/if}
+						<button
+							type="button"
+							class={actionClass}
+							disabled={busyId === entry._id}
+							onclick={() => openEdit(entry)}
+						>
+							{onAir ? $t('recordings.scheduled.editLive') : $t('recordings.common.edit')}
+						</button>
+						<button type="button" class={actionClass} onclick={() => copyLink(entry.slug)}>
+							{$t('recordings.scheduled.copyLink')}
+						</button>
+						<details class="relative ml-auto">
+							<summary
+								class={`${actionClass} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}
+							>
+								{$t('recordings.scheduled.more')}
+								<svg
+									class="h-4 w-4"
+									viewBox="0 0 20 20"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="1.5"
+									aria-hidden="true"
 								>
-									{$t(badge.label)}
-								</span>
-								{#if entry.status === 'scheduled'}
-									<span
-										class="border border-stone-200 bg-stone-50 px-2 py-0.5 text-[10px] font-semibold text-stone-500"
-									>
-										{relativeUntil(entry.scheduled_at)}
-									</span>
-								{/if}
-								{#if entry.announced_at}
-									<span
-										class="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-emerald-600"
-									>
-										<svg
-											class="h-2.5 w-2.5"
-											fill="none"
-											viewBox="0 0 24 24"
-											stroke="currentColor"
-											stroke-width="3"
-											aria-hidden="true"
-										>
-											<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-										</svg>
-										{$t('recordings.scheduled.announced')}
-									</span>
-								{/if}
-								{#if entry.reminder_enabled}
-									<span class="text-[10px] font-semibold uppercase tracking-[0.1em] text-stone-400">
-										{$t('recordings.scheduled.reminderOn')}
-									</span>
-								{/if}
-								{#if entry.notify_on_start}
-									<span class="text-[10px] font-semibold uppercase tracking-[0.1em] text-sky-600">
-										{$t('recordings.scheduled.liveAlertOn')}
-									</span>
-								{/if}
-								{#if entry.subtitle_filename}
-									<span
-										class="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-sky-600"
-										title={entry.subtitle_filename}
-									>
-										<svg
-											class="h-2.5 w-2.5"
-											fill="none"
-											viewBox="0 0 24 24"
-											stroke="currentColor"
-											stroke-width="2.5"
-											aria-hidden="true"
-										>
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												d="M4 6h16M4 12h16M4 18h10"
-											/>
-										</svg>
-										{$t('recordings.scheduled.transcript')}
-									</span>
-								{/if}
-							</div>
-							<h3 class="mt-1.5 truncate font-display text-lg font-semibold text-stone-800">
-								{entry.title}
-							</h3>
-							<!-- Once on air the entry stops advertising its (now-past) scheduled
-							     slot and reports the real go-live time + a running elapsed clock. -->
-							{#if entry.status === 'live' && entry.live_started_at}
-								<p class="inline-flex items-center gap-1.5 text-[13px] font-medium text-red-600">
-									<svg
-										class="h-3.5 w-3.5"
-										fill="none"
-										viewBox="0 0 24 24"
-										stroke="currentColor"
-										stroke-width="1.75"
-										aria-hidden="true"
-									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-										/>
-									</svg>
-									{$t('recordings.scheduled.liveSince', { time: fmtTime(entry.live_started_at) })}
-									<span class="text-stone-400">· {liveElapsed(entry.live_started_at, nowMs)}</span>
-								</p>
-							{:else}
-								<p class="inline-flex items-center gap-1.5 text-[13px] text-stone-500">
-									<svg
-										class="h-3.5 w-3.5 text-stone-400"
-										fill="none"
-										viewBox="0 0 24 24"
-										stroke="currentColor"
-										stroke-width="1.75"
-										aria-hidden="true"
-									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-										/>
-									</svg>
-									{fmtDate(entry.scheduled_at)}
-								</p>
-							{/if}
-
-							<!-- Share link -->
-							<div class="mt-3 flex items-center gap-2">
-								<code
-									class="min-w-0 flex-1 truncate border border-stone-200/60 bg-stone-50 px-3 py-1.5 text-[11px] text-stone-500"
-								>
-									{watchUrl(entry.slug)}
-								</code>
-								<button
-									type="button"
-									class="shrink-0 border border-stone-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-stone-600 transition-colors hover:border-primary hover:bg-primary hover:text-white"
-									onclick={() => copyLink(entry.slug)}
-								>
-									{$t('recordings.common.copy')}
-								</button>
+									<path d="m5 7.5 5 5 5-5" stroke-linecap="round" stroke-linejoin="round" />
+								</svg>
+							</summary>
+							<div
+								class="absolute right-0 top-full z-20 mt-1 w-52 rounded-md border border-stone-200 bg-white p-1 shadow-lg"
+							>
 								<a
 									href={watchUrl(entry.slug)}
 									target="_blank"
 									rel="noopener noreferrer"
-									class="shrink-0 border border-stone-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-stone-600 transition-colors hover:border-stone-900 hover:bg-stone-900 hover:text-white"
+									class={menuActionClass}>{$t('recordings.scheduled.openWatchPage')}</a
 								>
-									{$t('recordings.common.open')}
-								</a>
+								{#if entry.status === 'scheduled'}
+									{#if entry.subtitle_srt_s3_key}
+										<button
+											type="button"
+											onclick={() => autoCorrectEntry(entry)}
+											disabled={busyId === entry._id}
+											class={menuActionClass}
+										>
+											{$t('recordings.scheduled.autoCorrect')}
+										</button>
+									{/if}
+									<button
+										type="button"
+										onclick={() => cancelEntry(entry)}
+										disabled={busyId === entry._id}
+										class={`${menuActionClass} text-red-700 hover:bg-red-50`}
+									>
+										{$t('recordings.scheduled.cancelBroadcast')}
+									</button>
+								{/if}
 							</div>
-						</div>
+						</details>
+						{#if entry.status === 'scheduled' && broadcast.is_live}
+							<p class="basis-full text-xs text-stone-500">
+								{$t('recordings.scheduled.alreadyLiveShort')}
+							</p>
+						{/if}
 					</div>
-
-					<!-- Actions -->
-					{#if entry.status === 'scheduled'}
-						<div class="mt-4 flex flex-wrap items-center gap-2 border-t border-stone-100 pt-4">
-							<button
-								type="button"
-								class="inline-flex items-center gap-2 border border-orange-200 bg-orange-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.15em] text-primary transition-all hover:border-primary hover:bg-primary hover:text-white disabled:opacity-50"
-								disabled={busyId === entry._id || broadcast.is_live}
-								onclick={() => startLive(entry)}
-							>
-								<svg
-									class="h-3.5 w-3.5"
-									fill="none"
-									viewBox="0 0 24 24"
-									stroke="currentColor"
-									stroke-width="2"
-								>
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										d="M5.6 5.6a9 9 0 000 12.8M8.4 8.4a5 5 0 000 7.2m10-12.8a9 9 0 010 12.8m-2.8-9.2a5 5 0 010 7.2M12 12h.01"
-									/>
-								</svg>
-								{$t('recordings.scheduled.startLive')}
-							</button>
-							<button
-								type="button"
-								class="border border-stone-200 bg-white px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-stone-900 hover:bg-stone-900 hover:text-white disabled:opacity-50"
-								disabled={busyId === entry._id}
-								onclick={() => openEdit(entry)}
-							>
-								{$t('recordings.common.edit')}
-							</button>
-							{#if entry.subtitle_srt_s3_key}
-								<button
-									type="button"
-									class="border border-sky-200 bg-sky-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.15em] text-sky-700 transition-colors hover:bg-sky-700 hover:text-white disabled:opacity-50"
-									disabled={busyId === entry._id}
-									onclick={() => autoCorrectEntry(entry)}
-								>
-									{$t('recordings.scheduled.autoCorrect')}
-								</button>
-							{/if}
-							<button
-								type="button"
-								class="border border-rose-200 bg-rose-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.15em] text-rose-700 transition-colors hover:border-rose-600 hover:bg-rose-600 hover:text-white disabled:opacity-50"
-								disabled={busyId === entry._id}
-								onclick={() => cancelEntry(entry)}
-							>
-								{$t('recordings.common.cancel')}
-							</button>
-							{#if broadcast.is_live}
-								<span class="text-[11px] text-stone-400">
-									{$t('recordings.scheduled.alreadyLiveShort')}
-								</span>
-							{/if}
-						</div>
-					{:else if entry.status === 'live'}
-						<div class="mt-4 flex flex-wrap items-center gap-2 border-t border-red-100 pt-4">
-							<button
-								type="button"
-								class="inline-flex items-center gap-2 border border-red-200 bg-red-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.15em] text-red-700 transition-all hover:border-red-600 hover:bg-red-600 hover:text-white disabled:opacity-50"
-								disabled={busyId === entry._id}
-								onclick={() => endLiveEntry(entry)}
-							>
-								<svg
-									class="h-3.5 w-3.5"
-									fill="none"
-									viewBox="0 0 24 24"
-									stroke="currentColor"
-									stroke-width="2"
-								>
-									<rect x="6" y="6" width="12" height="12" rx="1" />
-								</svg>
-								{$t('recordings.actions.endLive')}
-							</button>
-							<!-- Correct the on-air title/description while broadcasting — the
-							     change is mirrored to the public live page immediately. -->
-							<button
-								type="button"
-								class="border border-stone-200 bg-white px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.15em] text-stone-600 transition-colors hover:border-stone-900 hover:bg-stone-900 hover:text-white disabled:opacity-50"
-								disabled={busyId === entry._id}
-								onclick={() => openEdit(entry)}
-							>
-								{$t('recordings.scheduled.editLive')}
-							</button>
-						</div>
-					{/if}
-				</div>
+				</article>
 			{/each}
 		</div>
 	{/if}
+
+	<div
+		class="mt-4 flex flex-wrap items-center justify-between gap-2.5 border-t border-stone-200 pt-3"
+	>
+		<button
+			type="button"
+			onclick={startFromDefaults}
+			disabled={startingDefaults || broadcast.is_live}
+			data-testid="instant-live-btn"
+			title={$t('recordings.defaults.startFromDefaultsTitle')}
+			class={actionClass}
+		>
+			{startingDefaults ? $t('recordings.busy.starting') : $t('recordings.scheduled.goLiveNow')}
+		</button>
+		<label class="flex cursor-pointer items-center gap-2 text-xs font-medium text-stone-600">
+			<input type="checkbox" bind:checked={notifyFromDefaults} class="accent-[#FF880C]" />
+			{$t('recordings.scheduled.notifyThisStart')}
+		</label>
+	</div>
 
 	<!-- Past (collapsed by default) -->
 	{#if past.length > 0}
 		<button
 			type="button"
 			class="mt-5 flex w-full items-center gap-2 text-left text-[11px] font-bold uppercase tracking-[0.2em] text-stone-400 transition-colors hover:text-stone-600"
+			aria-expanded={showPast}
 			onclick={() => (showPast = !showPast)}
 		>
 			<svg
@@ -1228,7 +1120,7 @@
 			</div>
 		{/if}
 	{/if}
-</div>
+</section>
 
 <!-- Create / edit modal -->
 {#if modalOpen}

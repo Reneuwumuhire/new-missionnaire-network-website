@@ -1148,7 +1148,7 @@ export default {
 	'recordings.meta.descriptionPlaceholder': 'Décrivez ce direct : sujet, orateur, texte biblique…',
 	'recordings.meta.youtubeHint':
 		"Par défaut : URL de la chaîne /live. Remplacez par l'URL de la vidéo précise une fois publiée.",
-	'recordings.defaults.title': 'Informations par défaut',
+	'recordings.defaults.title': 'Paramètres du direct immédiat',
 	'recordings.defaults.intro':
 		'Utilisées quand vous démarrez un direct immédiat (non programmé). Un direct programmé garde ses propres informations.',
 	'recordings.defaults.liveHint':
@@ -1402,6 +1402,12 @@ export default {
 	'recordings.common.noThumbnail': 'Aucune vignette',
 	'recordings.common.imageFormats': 'JPEG, PNG, WebP ou GIF · 5 Mo max',
 	'recordings.scheduled.title': 'Directs programmés',
+	'recordings.scheduled.nextBroadcast': 'Prochain direct',
+	'recordings.scheduled.goLiveNow': 'Lancer un direct maintenant',
+	'recordings.scheduled.more': 'Plus',
+	'recordings.scheduled.openWatchPage': 'Ouvrir la page du direct',
+	'recordings.scheduled.cancelBroadcast': 'Annuler le direct',
+	'recordings.scheduled.scheduledTimePassed': 'Horaire prévu dépassé',
 	'recordings.scheduled.intro':
 		'Chaque direct programmé reçoit un lien de partage stable — utilisable avant, pendant et après la diffusion.',
 	'recordings.scheduled.schedule': 'Programmer un direct',
