@@ -18,7 +18,7 @@ export default defineConfig({
 					'script-src': ['self', 'https://www.youtube.com', 'https://s.ytimg.com'],
 					'worker-src': ['self', 'blob:'],
 					'base-uri': ['none'],
-					'object-src': ['self'],
+					'object-src': ['self', 'https://missionnaire-bucket.s3.af-south-1.amazonaws.com/pdf/'],
 					'frame-ancestors': ['none'],
 					'form-action': ['self']
 				}

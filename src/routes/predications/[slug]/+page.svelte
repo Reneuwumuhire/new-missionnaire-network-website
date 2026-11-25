@@ -6,6 +6,7 @@
 	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
 	import { onMount } from 'svelte';
 	import { t, locale } from '../../../i18n';
+	import PdfPreview from '$lib/components/PdfPreview.svelte';
 	import Breadcrumbs from '$lib/components/+breadcrumbs.svelte';
 	import {
 		availableSermonVersions,
@@ -212,18 +213,7 @@
 
 			<div class="border border-stone-200/60 overflow-hidden bg-white/40">
 				{#if previewLoadedFor === previewPdfUrl}
-					<object
-						data={previewPdfUrl}
-						type="application/pdf"
-						title={`PDF ${sermonTitle}`}
-						class="w-full min-h-[360px] h-[62vh] md:h-[75vh] lg:h-[860px]"
-					>
-						<div
-							class="min-h-[360px] flex items-center justify-center text-sm text-stone-600 p-6 text-center"
-						>
-							{$t('predications.pdfFallback')}
-						</div>
-					</object>
+					<PdfPreview url={previewPdfUrl} title={`PDF ${sermonTitle}`} />
 				{:else}
 					<button
 						type="button"

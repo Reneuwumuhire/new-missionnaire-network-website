@@ -13,6 +13,7 @@
 
 	import ArrowDown2 from 'iconsax-svelte/ArrowDown2.svelte';
 	import ArrowUp2 from 'iconsax-svelte/ArrowUp2.svelte';
+	import PdfPreview from '$lib/components/PdfPreview.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import ListSkeleton from '$lib/components/ListSkeleton.svelte';
 	import ErrorCard from '$lib/components/ErrorCard.svelte';
@@ -552,7 +553,7 @@
 		<!-- Document Preview Panel -->
 		{#if $isDocumentOpen && selectedDocument}
 			<div
-				class="fixed inset-0 lg:relative lg:w-1/2 border-l border-stone-200 bg-white p-4 sm:p-6 min-h-screen z-50 lg:z-auto"
+				class="fixed inset-0 z-50 overflow-y-auto overscroll-contain border-l border-stone-200 bg-white p-4 sm:p-6 lg:relative lg:z-auto lg:w-1/2 lg:min-w-0 lg:overflow-visible"
 			>
 				<div class="flex flex-col h-full">
 					<div class="flex justify-between items-start mb-4 sm:mb-6">
@@ -601,62 +602,54 @@
 							</dl>
 						</div>
 
-						<div
-							class="relative w-full h-[calc(100vh-300px)] border border-stone-200 bg-stone-50 flex flex-col items-center justify-center p-4 sm:p-8 text-center"
-						>
-							<DocumentText1 size={40} color="#a8a29e" />
-							<h3 class="mt-4 text-base sm:text-lg font-medium text-stone-900">
-								{$t('transcriptions.previewHeading')}
-							</h3>
-							<p class="mt-2 text-xs sm:text-sm text-stone-500 max-w-md">
-								{$t('transcriptions.previewBlocked')}
-							</p>
-							<div class="mt-4 sm:mt-6 flex flex-col gap-2 sm:gap-4 w-full px-4">
+						<div class="mb-3 flex flex-wrap gap-2">
+							<a
+								href={selectedDocument.url}
+								target="_blank"
+								rel="noopener noreferrer"
+								class="inline-flex items-center justify-center px-4 py-2 border border-stone-300 text-xs sm:text-sm font-medium text-stone-700 bg-white hover:border-missionnaire hover:text-missionnaire transition-colors duration-200 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-missionnaire"
+							>
+								<svg
+									class="w-4 h-4 mr-2 -ml-1"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+									/>
+								</svg>
+								{$t('transcriptions.openNewTab')}
+							</a>
+							<a
+								href={selectedDocument.url}
+								download
+								class="inline-flex items-center justify-center px-4 py-2 border border-transparent text-xs sm:text-sm font-medium text-white bg-missionnaire hover:bg-missionnaire/90 transition-colors duration-200 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-missionnaire"
+							>
+								<div class="mr-2">
+									<Icon src={AiOutlineDownload} size="16" />
+								</div>
+								{$t('transcriptions.downloadDocument')}
+							</a>
+							{#if selectedDocument.videoDisplayId}
 								<a
-									href={selectedDocument.url}
+									href={`https://www.youtube.com/watch?v=${selectedDocument.videoDisplayId}`}
 									target="_blank"
 									rel="noopener noreferrer"
-									class="inline-flex items-center justify-center px-4 py-2 border border-stone-300 text-xs sm:text-sm font-medium text-stone-700 bg-white hover:border-missionnaire hover:text-missionnaire transition-colors duration-200 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-missionnaire w-full"
-								>
-									<svg
-										class="w-4 h-4 mr-2 -ml-1"
-										fill="none"
-										stroke="currentColor"
-										viewBox="0 0 24 24"
-									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-										/>
-									</svg>
-									{$t('transcriptions.openNewTab')}
-								</a>
-								<a
-									href={selectedDocument.url}
-									download
-									class="inline-flex items-center justify-center px-4 py-2 border border-transparent text-xs sm:text-sm font-medium text-white bg-missionnaire hover:bg-missionnaire/90 transition-colors duration-200 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-missionnaire w-full"
+									class="inline-flex items-center justify-center px-4 py-2 border border-stone-300 text-xs sm:text-sm font-medium text-stone-700 bg-white hover:border-missionnaire hover:text-missionnaire transition-colors duration-200 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-missionnaire"
 								>
 									<div class="mr-2">
-										<Icon src={AiOutlineDownload} size="16" />
+										<Icon src={AiFillPlayCircle} size="16" />
 									</div>
-									{$t('transcriptions.downloadDocument')}
+									{$t('transcriptions.watchRelated')}
 								</a>
-								{#if selectedDocument.videoDisplayId}
-									<a
-										href={`https://www.youtube.com/watch?v=${selectedDocument.videoDisplayId}`}
-										target="_blank"
-										rel="noopener noreferrer"
-										class="inline-flex items-center justify-center px-4 py-2 border border-stone-300 text-xs sm:text-sm font-medium text-stone-700 bg-white hover:border-missionnaire hover:text-missionnaire transition-colors duration-200 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-missionnaire w-full"
-									>
-										<div class="mr-2">
-											<Icon src={AiFillPlayCircle} size="16" />
-										</div>
-										{$t('transcriptions.watchRelated')}
-									</a>
-								{/if}
-							</div>
+							{/if}
+						</div>
+						<div class="overflow-hidden border border-stone-200 bg-stone-50">
+							<PdfPreview url={selectedDocument.url} title={selectedDocument.filename} />
 						</div>
 					</div>
 				</div>
