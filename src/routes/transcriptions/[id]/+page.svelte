@@ -9,7 +9,7 @@
 	let previewLoadedFor = $state('');
 </script>
 
-<div class="px-3 pb-24 sm:px-6">
+<div class="px-3 pt-4 pb-24 sm:px-6 md:pt-8">
 	<Breadcrumbs
 		items={[{ label: $t('nav.transcriptions'), href: '/transcriptions' }, { label: data.title }]}
 	/>
