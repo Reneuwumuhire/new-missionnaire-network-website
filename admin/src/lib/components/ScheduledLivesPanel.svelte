@@ -747,10 +747,11 @@
 			) ?? upcoming.find((entry) => entry.status === 'scheduled')
 		)?._id
 	);
-	const actionClass =
-		'inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border border-stone-300 bg-white px-3 text-xs font-semibold text-stone-700 transition-colors hover:border-primary hover:text-stone-900 disabled:opacity-50';
+	const buttonClass =
+		'inline-flex min-h-9 items-center justify-center gap-1.5 border px-3 text-[10px] font-semibold uppercase tracking-[0.15em] transition-colors disabled:cursor-not-allowed disabled:opacity-50';
+	const actionClass = `${buttonClass} border-stone-200 bg-white text-stone-600 hover:border-primary hover:text-primary`;
 	const menuActionClass =
-		'block w-full rounded px-3 py-2.5 text-left text-xs font-medium hover:bg-stone-100 focus-visible:bg-stone-100 disabled:opacity-50';
+		'block w-full px-3 py-2.5 text-left text-xs font-medium hover:bg-stone-100 focus-visible:bg-stone-100 disabled:opacity-50';
 
 	function statusBadge(entry: ScheduledLive): { label: TranslationKey; cls: string } {
 		switch (entry.status) {
@@ -800,7 +801,7 @@
 		<button
 			type="button"
 			onclick={openCreate}
-			class="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-stone-900 px-3.5 text-xs font-semibold text-white transition-colors hover:bg-stone-700"
+			class={`${buttonClass} border-primary bg-primary text-white hover:bg-primary/90`}
 		>
 			<svg
 				class="h-4 w-4"
@@ -920,7 +921,7 @@
 								type="button"
 								onclick={() => endLiveEntry(entry)}
 								disabled={busyId === entry._id}
-								class="inline-flex min-h-9 items-center rounded-md bg-red-700 px-3 text-xs font-semibold text-white hover:bg-red-800 disabled:opacity-50"
+								class={`${buttonClass} border-red-200 bg-red-50 text-red-700 hover:bg-red-700 hover:text-white`}
 							>
 								{$t('recordings.actions.endLive')}
 							</button>
@@ -929,7 +930,7 @@
 								type="button"
 								onclick={() => startLive(entry)}
 								disabled={busyId === entry._id || broadcast.is_live}
-								class="inline-flex min-h-9 items-center rounded-md bg-orange-700 px-3 text-xs font-semibold text-white hover:bg-orange-800 disabled:opacity-50"
+								class={`${buttonClass} border-orange-200 bg-orange-50 text-orange-700 hover:border-primary hover:bg-primary hover:text-white`}
 							>
 								{$t('recordings.scheduled.startLive')}
 							</button>
@@ -962,7 +963,7 @@
 								</svg>
 							</summary>
 							<div
-								class="absolute right-0 top-full z-20 mt-1 w-52 rounded-md border border-stone-200 bg-white p-1 shadow-lg"
+								class="absolute right-0 top-full z-20 mt-1 w-52 border border-stone-200 bg-white p-1 shadow-lg"
 							>
 								<a
 									href={watchUrl(entry.slug)}
