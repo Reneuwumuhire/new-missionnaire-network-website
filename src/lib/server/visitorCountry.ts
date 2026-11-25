@@ -5,9 +5,10 @@ import { countryMapping } from '../../utils/countries';
 export function visitorCountry(headers: Headers, onFly: boolean): string | null {
 	if (onFly) {
 		const ip = headers.get('fly-client-ip');
-		if (!ip || !isIP(ip)) return null;
-		const country = geoip.lookup(ip)?.country;
-		return country && Object.hasOwn(countryMapping, country) ? country : null;
+		if (ip && isIP(ip)) {
+			const country = geoip.lookup(ip)?.country;
+			if (country && Object.hasOwn(countryMapping, country)) return country;
+		}
 	}
 
 	for (const name of ['cf-ipcountry', 'x-vercel-ip-country']) {

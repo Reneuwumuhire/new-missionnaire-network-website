@@ -10,7 +10,13 @@ it('uses the Fly client IP for direct Fly requests', () => {
 	headers.set('fly-client-ip', '2001:4860:4860::8888');
 	expect(visitorCountry(headers, true)).toBe('US');
 	headers.set('fly-client-ip', '127.0.0.1');
+	headers.delete('cf-ipcountry');
 	expect(visitorCountry(headers, true)).toBeNull();
+});
+
+it('falls back to trusted country headers when Fly IP lookup is unavailable', () => {
+	const headers = new Headers({ 'cf-ipcountry': 'rw', 'fly-client-ip': '127.0.0.1' });
+	expect(visitorCountry(headers, true)).toBe('RW');
 });
 
 it('accepts recognized country headers for other deployments', () => {
