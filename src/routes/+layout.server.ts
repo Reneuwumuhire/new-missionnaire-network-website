@@ -34,15 +34,15 @@ export const load: LayoutServerLoad = async () => {
 			getBroadcastAdminState()
 		]);
 		const icecastLive = status?.isLive ?? false;
-		const isLive = icecastLive && adminGate.is_live;
+		const isLive = icecastLive && adminGate.is_live && !adminGate.is_test;
 		radioState = {
 			isLive,
 			checkedAt: status?.checkedAt ?? new Date().toISOString(),
 			listeners: isLive ? (status?.listeners ?? 0) : 0,
 			streamUrl: isLive ? (status?.streamUrl ?? getLiveAudioSourceUrl()) : undefined,
-			title: adminGate.title,
-			description: adminGate.description,
-			thumbnailUrl: adminGate.thumbnail_url
+			title: adminGate.is_test ? null : adminGate.title,
+			description: adminGate.is_test ? null : adminGate.description,
+			thumbnailUrl: adminGate.is_test ? null : adminGate.thumbnail_url
 		};
 	} catch (e) {
 		console.error('[LayoutServerLoad] radio state load failed:', e);

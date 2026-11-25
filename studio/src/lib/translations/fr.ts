@@ -201,10 +201,20 @@ const fr: Record<keyof typeof en, string> = {
 	'target.live': 'Connectée',
 	'target.failed': 'Échec',
 	'controls.reaching': 'Connexion aux serveurs…',
-	'controls.goLive': 'Passer en direct — YouTube + Missionnaire',
+	'controls.goLive': 'Passer en direct',
+	'controls.publicUnknown': 'Non confirmé',
+	'controls.publicOff': 'Hors antenne',
+	'controls.publicWaiting': 'En attente du signal ou de la confirmation',
+	'controls.publicEnded': 'Terminé',
+	'controls.publicUnconfirmed':
+		'Studio n’a pas pu confirmer le changement. Vérifiez la destination et réessayez.',
+	'controls.retryPublicStart': 'Réessayer la mise en direct',
+	'controls.retryPublicEnd': 'Réessayer la fin de diffusion',
+	'controls.endPublic': 'Terminer la diffusion',
+	'controls.startPrivateTest': 'Ouvrir le test privé',
+	'controls.privateTestActive': 'Test privé actif',
 	'controls.goLiveHint':
 		'Démarre le direct YouTube programmé et ouvre le lien public Missionnaire sélectionné.',
-	'controls.publicLive': 'Le lien public est en direct',
 	'controls.connectYouTube': 'Connecter YouTube',
 	'controls.youtubeConnecting': 'En attente de YouTube…',
 	'controls.youtubeConnected': 'YouTube connecté',
@@ -212,10 +222,7 @@ const fr: Record<keyof typeof en, string> = {
 	'controls.stopHeldHint':
 		'Arr\u00eate d\u2019alimenter les destinations retenues. La diffusion principale continue. YouTube termine son direct depuis Studio.',
 	'controls.openYouTube': 'Ouvrir YouTube Studio',
-	'controls.openYouTubeHint':
-		'YouTube reçoit le signal test. Vérifiez l’image, le son et l’état du flux avant le direct.',
-	'error.youtubeChannelMissing': 'Connectez la chaîne YouTube utilisée par ce service.',
-	'error.missionnaireGoLive': 'Missionnaire n’a pas pu passer en direct.',
+	'controls.openYouTubeHint': 'Vérifiez le direct YouTube, le signal d’aperçu et l’état du flux.',
 	'error.missionnaireAudioUnreachable':
 		'Impossible de vérifier le serveur audio Missionnaire. Réessayez de passer en direct.',
 	'error.missionnaireAudioMissing':
@@ -484,7 +491,7 @@ const fr: Record<keyof typeof en, string> = {
 		'Chargez le MP3 préparé du sermon et le SRT français, puis capturez la source en direct. La synchronisation automatique attend pendant les chants et les introductions.',
 	'help.goLiveTitle': 'Vérifier, puis passer en direct',
 	'help.goLive':
-		'Démarrez le signal d’aperçu, surveillez la stabilité des IPS et du débit dans la barre inférieure, puis utilisez Go Live pour la session choisie.',
+		'Démarrez le signal d’aperçu et vérifiez l’image et le son. Passez en direct et vérifiez la confirmation dans Commandes. Si une destination ne démarre pas ou ne s’arrête pas, réessayez depuis Commandes.',
 	'help.safety':
 		'Le programme est ce que les spectateurs reçoivent. Vérifiez toujours le programme — pas seulement l’aperçu — avant de démarrer ou modifier une diffusion.',
 	'help.shortcuts': 'Raccourcis clavier',

@@ -52,7 +52,11 @@
 		liveSession.sessions.find((session) => session._id === liveSession.selectedId) ?? null
 	);
 	const enabledDestinations = $derived(
-		studio.destinations.filter((destination) => destination.enabled)
+		studio.destinations.filter(
+			(destination) =>
+				destination.enabled &&
+				(!selectedSession?.is_test || destinationPlatform(destination) === 'missionnaire')
+		)
 	);
 	const immediateDestinations = $derived(
 		enabledDestinations.filter((destination) => !destination.hold)

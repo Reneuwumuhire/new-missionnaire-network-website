@@ -1,5 +1,5 @@
 import { verifyAdminSession } from '$lib/server/admin-session';
-import { json, error } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
 import { listRecordings } from '../../../../db/collections';
@@ -18,18 +18,20 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 	const pageNumber = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
 	const q = url.searchParams.get('q') ?? undefined;
 	const rawStatus = url.searchParams.get('status');
-	const status = rawStatus && VALID_STATUSES.has(rawStatus as RecordingStatus)
-		? (rawStatus as RecordingStatus)
-		: undefined;
+	const status =
+		rawStatus && VALID_STATUSES.has(rawStatus as RecordingStatus)
+			? (rawStatus as RecordingStatus)
+			: undefined;
 	const rawPub = url.searchParams.get('published');
 	const publishedFilter = rawPub === 'published' || rawPub === 'unpublished' ? rawPub : 'all';
 
 	const result = await listRecordings({
 		limit,
 		pageNumber,
+		recordingId: url.searchParams.get('recording') || undefined,
 		q: q || undefined,
 		status,
 		publishedFilter
 	});
-	return json(result);
+	return Response.json(result);
 };

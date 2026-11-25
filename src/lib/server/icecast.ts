@@ -1,5 +1,6 @@
 import { ICECAST_STATUS_URL } from '$app/env/private';
 import { getLiveAudioHlsUrl, getLiveAudioSourceUrl, probeLiveAudio } from '$lib/server/live-audio';
+import { setRadioCachedStatus, type RadioCachedStatus } from '../../db/collections';
 
 // Reads the real listener count from Icecast's public `/status-json.xsl`, the
 // same source the Fly dashboard reports. This replaces the old per-browser
@@ -162,4 +163,27 @@ export async function checkLiveAudio(fetchFn: typeof fetch): Promise<LiveAudioCh
 	}
 	const probe = await probeLiveAudio(fetchFn);
 	return { ...probe, listeners: 0 };
+}
+
+let radioProbe: Promise<RadioCachedStatus> | null = null;
+
+export async function refreshRadioSnapshot(
+	fetchFn: typeof fetch,
+	cached: RadioCachedStatus | null
+) {
+	if (cached && Date.now() - Date.parse(cached.checkedAt) <= 20_000) return cached;
+	radioProbe ??= (async () => {
+		const check = await checkLiveAudio(fetchFn);
+		const snapshot: RadioCachedStatus = {
+			isLive: check.isLive,
+			checkedAt: new Date().toISOString(),
+			streamUrl: check.isLive ? getLiveAudioSourceUrl() : undefined,
+			listeners: check.isLive ? check.listeners : 0
+		};
+		await setRadioCachedStatus(snapshot);
+		return snapshot;
+	})().finally(() => {
+		radioProbe = null;
+	});
+	return radioProbe.catch(() => cached);
 }

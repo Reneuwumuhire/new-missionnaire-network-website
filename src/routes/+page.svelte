@@ -3,24 +3,23 @@
 	import '../app.css';
 	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
-	import { page } from '$app/state';
 	import type { YoutubeVideo } from '$lib/models/youtube';
 	import NotificationBell from '$lib/components/+notificationBell.svelte';
-	import { radioIsLive as radioIsLiveStore } from '$lib/stores/global';
+	import LiveDiscovery from '$lib/components/LiveDiscovery.svelte';
+	import type { LiveDiscovery as LiveDiscoveryData } from '$lib/server/live-discovery';
 
 	interface Props {
 		data: {
 			data: YoutubeVideo[];
+			discovery: LiveDiscoveryData;
 		};
 	}
 
 	let { data }: Props = $props();
 
-	// Single source of truth: the layout's `radioState` (admin-gate aware) for
-	// SSR + initial paint, the push-driven store thereafter. Banner and button
-	// stay in sync because both pull from this same state.
-	let ssrIsLive = $derived(page.data?.radioState?.isLive ?? false);
-	let radioIsLive = $derived(browser ? $radioIsLiveStore : ssrIsLive);
+	let discovery = $state<LiveDiscoveryData>();
+	let radioIsLive = $derived((discovery ?? data.discovery).kind === 'live');
+	const hasUpcomingService = $derived((discovery ?? data.discovery).kind === 'scheduled');
 	let recentVideos = $derived((data.data || []).slice(0, 3));
 
 	let bellRef: NotificationBell | undefined = $state();
@@ -205,37 +204,17 @@
 				{$t('home.subtitle')}
 			</p>
 
-			<div class="hero-cta mt-8 md:mt-10 flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
-				<a
-					href="/live"
-					class="group px-6 sm:px-8 py-3.5 text-white text-[11px] sm:text-[12px] font-semibold uppercase tracking-[0.2em] font-body overflow-hidden transition-all duration-300 active:scale-[0.98] flex items-center justify-center gap-3 {radioIsLive
-						? 'bg-red-700 hover:bg-red-800'
-						: 'bg-stone-900 hover:bg-missionnaire'}"
-				>
-					{#if radioIsLive}
-						<span class="relative flex h-2 w-2 shrink-0">
-							<span
-								class="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75"
-							></span>
-							<span class="relative inline-flex h-2 w-2 rounded-full bg-white"></span>
-						</span>
-						<span>{$t('home.listenLive')}</span>
-					{:else}
-						<svg width="11" height="13" viewBox="0 0 12 14" fill="none"
-							><path
-								d="M2 1L10 7L2 13V1Z"
-								fill="white"
-								stroke="white"
-								stroke-width="1"
-								stroke-linejoin="round"
-							/></svg
-						>
-						<span>{$t('home.listenLive')}</span>
-					{/if}
-				</a>
+			<div
+				class="hero-cta mx-auto mt-8 flex flex-col justify-center gap-3 md:mt-10 {hasUpcomingService
+					? 'w-full max-w-xl items-center'
+					: 'sm:flex-row sm:gap-4'}"
+			>
+				<LiveDiscovery initial={data.discovery} bind:current={discovery} />
 				<a
 					href="/predications"
-					class="px-6 sm:px-8 py-3.5 border border-stone-300 text-stone-600 text-[11px] sm:text-[12px] font-semibold uppercase tracking-[0.2em] font-body hover:border-missionnaire hover:text-missionnaire transition-all duration-300 active:scale-[0.98] text-center"
+					class="flex items-center justify-center font-body font-semibold text-stone-600 transition-colors hover:text-earth-dark {hasUpcomingService
+						? 'min-h-11 px-3 text-sm underline decoration-stone-300 underline-offset-4 hover:decoration-missionnaire'
+						: 'border border-stone-300 px-6 py-3.5 text-[11px] uppercase tracking-[0.2em] hover:border-missionnaire sm:px-8 sm:text-[12px]'}"
 				>
 					{$t('home.exploreSermons')}
 				</a>
@@ -340,7 +319,7 @@
 	>
 		<div class="flex flex-col sm:flex-row gap-4">
 			<a
-				href="/live"
+				href={radioIsLive ? (discovery ?? data.discovery).href : '/live'}
 				class="group flex items-center gap-4 px-6 py-5 border flex-1 transition-all duration-200 bg-white/40 {radioIsLive
 					? 'border-red-200 bg-red-50/40 hover:bg-red-50'
 					: 'border-stone-200/60 hover:border-missionnaire/30 hover:bg-white/60'}"

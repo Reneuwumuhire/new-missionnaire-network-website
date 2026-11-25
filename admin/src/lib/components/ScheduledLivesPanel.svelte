@@ -741,10 +741,9 @@
 	}
 
 	const nextId = $derived(
-		(
-			upcoming.find(
-				(entry) => entry.status === 'scheduled' && Date.parse(entry.scheduled_at) >= nowMs
-			) ?? upcoming.find((entry) => entry.status === 'scheduled')
+		upcoming.find(
+			(entry) =>
+				entry.status === 'scheduled' && !entry.is_test && Date.parse(entry.scheduled_at) >= nowMs
 		)?._id
 	);
 	const buttonClass =
@@ -833,7 +832,8 @@
 				{@const isNext = entry._id === nextId}
 				{@const badge = statusBadge(entry)}
 				<article
-					class="rounded-md border p-3.5 sm:p-4 {onAir
+					id="scheduled-{entry._id}"
+					class="scroll-mt-20 rounded-md border p-3.5 sm:p-4 {onAir
 						? 'border-red-200 bg-red-50/40'
 						: isNext
 							? 'border-orange-200 bg-orange-50/40'

@@ -147,7 +147,10 @@ export async function queryMusicAudio(options: {
 	if (lyrics === 'with' || lyrics === 'without') {
 		const lyricsAudioIds = await db.collection('music_lyrics').distinct('audio_id');
 		const objectIds = lyricsAudioIds
-			.filter((value): value is string => typeof value === 'string' && objectIdString.safeParse(value).success)
+			.filter(
+				(value): value is string =>
+					typeof value === 'string' && objectIdString.safeParse(value).success
+			)
 			.map((value) => new ObjectId(value));
 		conditions.push({ _id: lyrics === 'with' ? { $in: objectIds } : { $nin: objectIds } });
 	}
@@ -231,7 +234,9 @@ export async function updateMusicAudio(
 
 export async function deleteMusicAudio(id: string): Promise<{ s3_key: string } | null> {
 	const db = await getDb();
-	const doc = await db.collection('music_audio').findOne({ _id: new ObjectId(objectIdString.parse(id)) });
+	const doc = await db
+		.collection('music_audio')
+		.findOne({ _id: new ObjectId(objectIdString.parse(id)) });
 	if (!doc) return null;
 	await db.collection('music_audio').deleteOne({ _id: new ObjectId(objectIdString.parse(id)) });
 	invalidateMusicCatalogCache();
@@ -391,7 +396,10 @@ export async function updateLastLogin(userId: string): Promise<void> {
 	const db = await getDb();
 	await db
 		.collection('admin_users')
-		.updateOne({ _id: new ObjectId(objectIdString.parse(userId)) }, { $set: { last_login: new Date() } });
+		.updateOne(
+			{ _id: new ObjectId(objectIdString.parse(userId)) },
+			{ $set: { last_login: new Date() } }
+		);
 }
 
 export async function updateAdminProfile(
@@ -448,9 +456,20 @@ export async function getAllAdminUsers(): Promise<PublicAdminUser[]> {
 	const db = await getDb();
 	const docs = await db
 		.collection('admin_users')
-		.find({}, {
-			projection: { email: 1, name: 1, role: 1, permissions: 1, created_at: 1, last_login: 1, is_active: 1 }
-		})
+		.find(
+			{},
+			{
+				projection: {
+					email: 1,
+					name: 1,
+					role: 1,
+					permissions: 1,
+					created_at: 1,
+					last_login: 1,
+					is_active: 1
+				}
+			}
+		)
 		.sort({ created_at: -1 })
 		.toArray();
 	return docs.map((doc) => serializeDocument<PublicAdminUser>(doc));
@@ -945,6 +964,7 @@ export async function listRecordings(
 		limit?: number;
 		pageNumber?: number;
 		publishedOnly?: boolean;
+		recordingId?: string;
 		/** Free-text search on title/description/created_by (case-insensitive). */
 		q?: string;
 		/** Optional exact status filter. */
@@ -959,12 +979,17 @@ export async function listRecordings(
 		limit = 50,
 		pageNumber = 1,
 		publishedOnly = false,
+		recordingId,
 		q,
 		status,
 		publishedFilter = 'all'
 	} = options;
 	const db = await getDb();
 	const conditions: Filter<Document>[] = [];
+	if (recordingId) {
+		if (!objectIdString.safeParse(recordingId).success) return { data: [], total: 0 };
+		conditions.push({ _id: new ObjectId(recordingId) });
+	}
 	if (publishedOnly) conditions.push({ published: true, status: 'ready' });
 	if (status) conditions.push({ status });
 	if (publishedFilter === 'published') conditions.push({ published: true });
@@ -1093,7 +1118,9 @@ export async function updateRecording(
 
 export async function deleteRecording(id: string): Promise<{ s3_key: string | null } | null> {
 	const db = await getDb();
-	const doc = await db.collection('recordings').findOne({ _id: new ObjectId(objectIdString.parse(id)) });
+	const doc = await db
+		.collection('recordings')
+		.findOne({ _id: new ObjectId(objectIdString.parse(id)) });
 	if (!doc) return null;
 	await db.collection('recordings').deleteOne({ _id: new ObjectId(objectIdString.parse(id)) });
 	return { s3_key: (doc.s3_key as string | null | undefined) ?? null };
@@ -1130,7 +1157,10 @@ export async function isThumbnailS3KeyReferenced(
 	if (recordingHit) return true;
 
 	const scheduledFilter: Filter<Document> = { thumbnail_s3_key: key };
-	if (options.excludeScheduledLiveId && objectIdString.safeParse(options.excludeScheduledLiveId).success) {
+	if (
+		options.excludeScheduledLiveId &&
+		objectIdString.safeParse(options.excludeScheduledLiveId).success
+	) {
 		scheduledFilter._id = { $ne: new ObjectId(options.excludeScheduledLiveId) };
 	}
 	const scheduledHit = await db
@@ -1539,17 +1569,28 @@ export async function createScheduledLive(input: {
 export async function getScheduledLiveById(id: string): Promise<ScheduledLive | null> {
 	if (!objectIdString.safeParse(id).success) return null;
 	const db = await getDb();
-	const doc = await db.collection('scheduled_lives').findOne({ _id: new ObjectId(objectIdString.parse(id)) });
+	const doc = await db
+		.collection('scheduled_lives')
+		.findOne({ _id: new ObjectId(objectIdString.parse(id)) });
 	return doc ? serializeDocument<ScheduledLive>(doc) : null;
 }
 
 export async function listScheduledLives(
-	options: { statuses?: ScheduledLiveStatus[]; limit?: number; ascending?: boolean } = {}
+	options: {
+		statuses?: ScheduledLiveStatus[];
+		limit?: number;
+		ascending?: boolean;
+		upcomingOnly?: boolean;
+	} = {}
 ): Promise<ScheduledLive[]> {
-	const { statuses, limit = 50, ascending = true } = options;
+	const { statuses, limit = 50, ascending = true, upcomingOnly = false } = options;
 	await ensureScheduledLiveIndexes();
 	const db = await getDb();
 	const query: Filter<Document> = statuses?.length ? { status: { $in: statuses } } : {};
+	if (upcomingOnly) {
+		query.scheduled_at = { $gte: new Date() };
+		query.is_test = { $ne: true };
+	}
 	const docs = await db
 		.collection('scheduled_lives')
 		.find(query)
@@ -1611,29 +1652,32 @@ export async function restoreScheduledLive(id: string): Promise<boolean> {
 	const db = await getDb();
 	const result = await db
 		.collection('scheduled_lives')
-		.updateOne({ _id: new ObjectId(objectIdString.parse(id)), status: { $in: ['ended', 'cancelled'] } }, [
-			{
-				$set: {
-					status: 'scheduled',
-					live_started_at: null,
-					live_ended_at: null,
-					recording_history: {
-						$setUnion: [
-							{ $ifNull: ['$recording_history', []] },
-							{
-								$cond: [
-									{ $ne: [{ $ifNull: ['$recording_id', null] }, null] },
-									['$recording_id'],
-									[]
-								]
-							}
-						]
-					},
-					recording_id: null,
-					updated_at: new Date().toISOString()
+		.updateOne(
+			{ _id: new ObjectId(objectIdString.parse(id)), status: { $in: ['ended', 'cancelled'] } },
+			[
+				{
+					$set: {
+						status: 'scheduled',
+						live_started_at: null,
+						live_ended_at: null,
+						recording_history: {
+							$setUnion: [
+								{ $ifNull: ['$recording_history', []] },
+								{
+									$cond: [
+										{ $ne: [{ $ifNull: ['$recording_id', null] }, null] },
+										['$recording_id'],
+										[]
+									]
+								}
+							]
+						},
+						recording_id: null,
+						updated_at: new Date().toISOString()
+					}
 				}
-			}
-		]);
+			]
+		);
 	return result.matchedCount > 0;
 }
 
@@ -1660,7 +1704,9 @@ export async function deleteScheduledLive(
 ): Promise<{ thumbnail_s3_key: string | null; subtitle_srt_s3_key: string | null } | null> {
 	if (!objectIdString.safeParse(id).success) return null;
 	const db = await getDb();
-	const doc = await db.collection('scheduled_lives').findOne({ _id: new ObjectId(objectIdString.parse(id)) });
+	const doc = await db
+		.collection('scheduled_lives')
+		.findOne({ _id: new ObjectId(objectIdString.parse(id)) });
 	if (!doc) return null;
 	await db.collection('scheduled_lives').deleteOne({ _id: new ObjectId(objectIdString.parse(id)) });
 	return {

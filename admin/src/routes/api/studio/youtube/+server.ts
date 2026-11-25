@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { studioYouTubeBody } from '$lib/server/studio-youtube-request';
-import { error, json } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getPermissions, type AdminUser } from '$lib/models/admin-user';
 import { getDb } from '../../../../db/mongo';
@@ -14,6 +14,7 @@ import {
 	completeYouTubeLive,
 	deleteYouTubeLive,
 	disconnectYouTube,
+	getYouTubeBroadcastStatus,
 	scheduleYouTubeLive,
 	transitionYouTubeLive,
 	youtubeConnection,
@@ -94,16 +95,16 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 			.guid()
 			.safeParse(request.headers.get('authorization')?.replace(/^Bearer\s+/, '')).data;
 		if (code) await revokeMissionnaireIngest(code);
-		return json({ ok: true });
+		return Response.json({ ok: true });
 	}
 	const user = await operator(request);
 	if (body.action === 'status' || body.action === 'heartbeat') {
 		await updateStudioAuthorizationActivity(user.code, body.deviceInfo);
 	}
-	if (body.action === 'heartbeat') return json({ ok: true });
+	if (body.action === 'heartbeat') return Response.json({ ok: true });
 	if (body.action === 'audio-status') {
 		const { reachable, sourceActive } = await fetchIcecastStatus();
-		return json({ reachable, sourceActive });
+		return Response.json({ reachable, sourceActive });
 	}
 	if (body.action === 'status') {
 		const [channels, missionnaire] = await Promise.all([
@@ -115,7 +116,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 					error: cause instanceof Error ? cause.message : 'Missionnaire ingest is unavailable'
 				}))
 		]);
-		return json({
+		return Response.json({
 			operator: { email: user.email, name: user.name },
 			connected: channels.length > 0,
 			channelTitle: channels[0]?.title ?? null,
@@ -127,7 +128,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 	if (body.action === 'disconnect') {
 		if (typeof body.channelId !== 'string') throw error(400, 'A YouTube channel is required');
 		await disconnectYouTube(user.email, body.channelId);
-		return json({ ok: true });
+		return Response.json({ ok: true });
 	}
 	if (body.action === 'recorder-start') {
 		try {
@@ -140,7 +141,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 				target_id: result.id,
 				ip_address: getClientAddress()
 			}).catch((auditError) => console.error('[Studio recorder] start audit failed:', auditError));
-			return json(result);
+			return Response.json(result);
 		} catch (cause) {
 			if (cause instanceof RecorderError) throw error(cause.status, cause.message);
 			throw cause;
@@ -160,10 +161,10 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 					!['live', 'ended'].includes(session.status) ||
 					(session.is_test && session.created_by !== user.email)
 				) {
-					return json({ id: null });
+					return Response.json({ id: null });
 				}
 				const sessionStart = Date.parse(session.live_started_at ?? '');
-				if (sessionStart !== body.sessionStartedAt) return json({ id: null });
+				if (sessionStart !== body.sessionStartedAt) return Response.json({ id: null });
 				const sessionEnd = session.live_ended_at
 					? Math.min(requestedAt, Date.parse(session.live_ended_at))
 					: requestedAt;
@@ -176,13 +177,13 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 					status.stopping ||
 					!(startedAt >= sessionStart && startedAt <= sessionEnd)
 				) {
-					return json({ id: null });
+					return Response.json({ id: null });
 				}
 				result = await recorderStopById(status.id);
 			} else {
 				result = await recorderStop();
 			}
-			if (!result.id) return json(result);
+			if (!result.id) return Response.json(result);
 			await logAudit({
 				user_id: user.email,
 				user_email: user.email,
@@ -192,7 +193,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 				changes: { status: { old: 'recording', new: 'uploading' } },
 				ip_address: getClientAddress()
 			}).catch((auditError) => console.error('[Studio recorder] stop audit failed:', auditError));
-			return json(result);
+			return Response.json(result);
 		} catch (cause) {
 			if (cause instanceof RecorderError) throw error(cause.status, cause.message);
 			throw cause;
@@ -208,7 +209,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 		}
 		const ext = contentType === 'image/png' ? 'png' : 'jpg';
 		const key = `broadcast-thumbnails/${Date.now()}-${crypto.randomUUID()}.${ext}`;
-		return json({
+		return Response.json({
 			uploadUrl: await generatePresignedUploadUrl(key, contentType),
 			key,
 			publicUrl: getS3Url(key)
@@ -222,7 +223,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 		}
 		const key = `subtitles/${Date.now()}-${crypto.randomUUID()}.srt`;
 		const contentType = 'text/plain; charset=utf-8';
-		return json({
+		return Response.json({
 			uploadUrl: await generatePresignedUploadUrl(key, contentType),
 			key,
 			publicUrl: getS3Url(key),
@@ -323,7 +324,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 			},
 			ip_address: getClientAddress()
 		});
-		return json({
+		return Response.json({
 			ok: true,
 			session,
 			shareUrl: buildWatchUrl(session.slug),
@@ -338,7 +339,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 			throw error(404, 'Scheduled YouTube session not found');
 		try {
 			const channelId = await sessionChannelId(user.email, session.youtube_channel_id);
-			return json({
+			return Response.json({
 				ingest: await youtubeIngest(user.email, channelId, session.youtube_url),
 				channelId,
 				youtubeUrl: session.youtube_url
@@ -347,38 +348,36 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 			throw error(409, cause instanceof Error ? cause.message : 'YouTube ingest is unavailable');
 		}
 	}
-	if (body.action === 'go-live') {
+	if (
+		body.action === 'broadcast-status' ||
+		body.action === 'go-live' ||
+		body.action === 'end-live'
+	) {
 		if (typeof body.sessionId !== 'string') throw error(400, 'A scheduled session is required');
 		const session = await getScheduledLiveById(body.sessionId);
-		if (!session || session.is_test || !['scheduled', 'live'].includes(session.status)) {
-			throw error(404, 'Scheduled session not found');
+		if (
+			!session ||
+			session.is_test ||
+			(body.action === 'go-live' && !['scheduled', 'live'].includes(session.status))
+		) {
+			throw error(404, 'Scheduled YouTube session not found');
 		}
 		if (!session.youtube_url)
 			throw error(400, 'Add the scheduled YouTube link to this session first');
 		try {
 			const channelId = await sessionChannelId(user.email, session.youtube_channel_id);
-			return json({
+			const operation =
+				body.action === 'go-live'
+					? transitionYouTubeLive
+					: body.action === 'end-live'
+						? completeYouTubeLive
+						: getYouTubeBroadcastStatus;
+			return Response.json({
 				ok: true,
-				...(await transitionYouTubeLive(user.email, channelId, session.youtube_url))
+				...(await operation(user.email, channelId, session.youtube_url))
 			});
 		} catch (cause) {
-			throw error(409, cause instanceof Error ? cause.message : 'YouTube could not go live');
-		}
-	}
-	if (body.action === 'end-live') {
-		if (typeof body.sessionId !== 'string') throw error(400, 'A scheduled session is required');
-		const session = await getScheduledLiveById(body.sessionId);
-		if (!session || session.is_test) throw error(404, 'Scheduled session not found');
-		if (!session.youtube_url)
-			throw error(400, 'Add the scheduled YouTube link to this session first');
-		try {
-			const channelId = await sessionChannelId(user.email, session.youtube_channel_id);
-			return json({
-				ok: true,
-				...(await completeYouTubeLive(user.email, channelId, session.youtube_url))
-			});
-		} catch (cause) {
-			throw error(409, cause instanceof Error ? cause.message : 'YouTube could not end the live');
+			throw error(409, cause instanceof Error ? cause.message : 'YouTube broadcast is unavailable');
 		}
 	}
 	throw error(400, 'Unknown action');
