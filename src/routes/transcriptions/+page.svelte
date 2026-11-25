@@ -13,12 +13,10 @@
 
 	import ArrowDown2 from 'iconsax-svelte/ArrowDown2.svelte';
 	import ArrowUp2 from 'iconsax-svelte/ArrowUp2.svelte';
-	import PdfPreview, { pdfActionClass } from '$lib/components/PdfPreview.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import ListSkeleton from '$lib/components/ListSkeleton.svelte';
 	import ErrorCard from '$lib/components/ErrorCard.svelte';
 	import ResultsSummary from '$lib/components/ResultsSummary.svelte';
-	import { writable } from 'svelte/store';
 	import LoadingRing from '$lib/components/LoadingRing.svelte';
 	import type { SerializedTranscription } from '$lib/server/transcriptions';
 	import {
@@ -36,9 +34,6 @@
 	}
 
 	let { data }: Props = $props();
-	let selectedDocument: SerializedTranscription | null = $state(null);
-	let previewLoaded = $state(false);
-	const isDocumentOpen = writable(false);
 	let searchTerm = $state('');
 	let isSearching = $state(false);
 	let searchInput: HTMLInputElement | undefined = $state();
@@ -255,12 +250,6 @@
 		}
 	}
 
-	function handleSelectDocument(doc: SerializedTranscription) {
-		if (!$isDocumentOpen || selectedDocument?._id !== doc._id) previewLoaded = false;
-		selectedDocument = doc;
-		isDocumentOpen.set(true);
-	}
-
 	onMount(() => {
 		if (browser) {
 			const url = new URL(window.location.href);
@@ -405,9 +394,7 @@
 
 	<div class="flex w-full h-full flex-col lg:flex-row mt-4 md:mt-0">
 		<!-- List Panel -->
-		<div
-			class="flex-1 min-w-0 {$isDocumentOpen ? 'lg:w-1/2' : 'w-full'} transition-all duration-300"
-		>
+		<div class="w-full min-w-0">
 			<!-- Sort and Filter Controls -->
 			<div
 				class="flex-col sm:flex-row justify-end mb-4 items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 px-2 sm:px-0 {$mobileFiltersOpen
@@ -485,12 +472,9 @@
 						<div
 							class="flex items-center border-b border-stone-100 last:border-b-0 hover:bg-white/60"
 						>
-							<button
-								class="flex-1 p-3 sm:p-4 flex items-start space-x-2 sm:space-x-4 text-left {selectedDocument?.filename ===
-								document.filename
-									? 'bg-stone-100'
-									: ''}"
-								onclick={() => handleSelectDocument(document)}
+							<a
+								href={`/transcriptions/${document._id}`}
+								class="flex min-w-0 flex-1 items-start space-x-2 p-3 text-left sm:space-x-4 sm:p-4"
 							>
 								<div class="flex-shrink-0 pt-1">
 									<DocumentText1 size={18} color="#6B7280" />
@@ -508,7 +492,7 @@
 										</div>
 									</div>
 								</div>
-							</button>
+							</a>
 							<div class="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4">
 								{#if document.videoDisplayId}
 									<a
@@ -551,104 +535,5 @@
 				{/if}
 			{/if}
 		</div>
-
-		<!-- Document Preview Panel -->
-		{#if $isDocumentOpen && selectedDocument}
-			<div
-				class="fixed inset-0 z-50 overflow-y-auto overscroll-contain border-l border-stone-200 bg-white p-4 sm:p-6 lg:relative lg:z-auto lg:w-1/2 lg:min-w-0 lg:overflow-visible"
-			>
-				<div class="flex flex-col h-full">
-					<div class="flex justify-between items-start mb-4 sm:mb-6">
-						<h2
-							class="break-words pr-4 font-display text-2xl font-semibold leading-tight text-stone-900 sm:text-3xl"
-						>
-							{selectedDocument.filename}
-						</h2>
-						<button
-							class="shrink-0 text-stone-400 transition-colors hover:text-stone-600"
-							onclick={() => isDocumentOpen.set(false)}
-							aria-label={$t('misc.close')}
-						>
-							<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M6 18L18 6M6 6l12 12"
-								/>
-							</svg>
-						</button>
-					</div>
-
-					<div class="flex-1">
-						<div class="mb-6">
-							<dl class="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
-								<div>
-									<dt
-										class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.15em] text-stone-400 font-body"
-									>
-										{$t('transcriptions.fileSize')}
-									</dt>
-									<dd class="mt-1 text-xs sm:text-sm text-stone-800 tabular-nums">
-										{formatFileSize(selectedDocument.size)}
-									</dd>
-								</div>
-								<div>
-									<dt
-										class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.15em] text-stone-400 font-body"
-									>
-										{$t('transcriptions.publishDate')}
-									</dt>
-									<dd class="mt-1 text-xs sm:text-sm text-stone-800 tabular-nums">
-										{new Date(selectedDocument.publishedOn).toLocaleDateString()}
-									</dd>
-								</div>
-							</dl>
-						</div>
-
-						<div class="flex flex-wrap gap-3">
-							<button
-								type="button"
-								class={pdfActionClass}
-								onclick={() => {
-									previewLoaded = true;
-									document.getElementById('transcription-pdf-preview')?.scrollIntoView();
-								}}
-							>
-								{$t('predications.viewPdfOnPage')}
-							</button>
-							<a
-								href={selectedDocument.url}
-								target="_blank"
-								rel="noopener noreferrer"
-								class={pdfActionClass}
-							>
-								{$t('predications.openPdf')}
-							</a>
-							<a href={selectedDocument.url} download class={pdfActionClass}>
-								{$t('transcriptions.downloadDocument')}
-							</a>
-							{#if selectedDocument.videoDisplayId}
-								<a
-									href={`https://www.youtube.com/watch?v=${selectedDocument.videoDisplayId}`}
-									target="_blank"
-									rel="noopener noreferrer"
-									class={pdfActionClass}
-								>
-									{$t('transcriptions.watchRelated')}
-								</a>
-							{/if}
-						</div>
-						<PdfPreview
-							id="transcription-pdf-preview"
-							url={selectedDocument.url}
-							title={selectedDocument.filename}
-							loaded={previewLoaded}
-							onloadpreview={() => (previewLoaded = true)}
-						/>
-					</div>
-				</div>
-			</div>
-		{/if}
 	</div>
 </div>
