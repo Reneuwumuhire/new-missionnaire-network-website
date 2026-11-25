@@ -9,7 +9,18 @@
 	let previewLoadedFor = $state('');
 </script>
 
-<div class="px-3 pt-4 pb-24 sm:px-6 md:pt-8">
+<header class="border-b border-stone-800 bg-stone-900 text-white">
+	<div class="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 md:py-8">
+		<a
+			href="/transcriptions"
+			class="font-display text-[26px] font-semibold leading-none transition-colors hover:text-missionnaire md:text-4xl"
+		>
+			{$t('nav.transcriptions')}
+		</a>
+	</div>
+</header>
+
+<div class="mx-auto w-full max-w-7xl px-3 pt-4 pb-24 sm:px-6 md:pt-8">
 	<Breadcrumbs
 		items={[{ label: $t('nav.transcriptions'), href: '/transcriptions' }, { label: data.title }]}
 	/>
@@ -17,9 +28,14 @@
 	<article
 		class="mx-auto w-full max-w-4xl border border-stone-200/60 bg-white/40 p-4 sm:p-6 md:p-8"
 	>
-		<h1 class="break-words font-display text-3xl font-semibold leading-tight text-stone-900">
+		<h1
+			class="text-pretty break-words font-display text-2xl font-semibold leading-tight text-stone-900 sm:text-3xl"
+		>
 			{data.title}
 		</h1>
+		{#if data.recordingDetails}
+			<p class="mt-2 max-w-prose text-sm leading-relaxed text-stone-600">{data.recordingDetails}</p>
+		{/if}
 
 		<dl class="mt-4 flex flex-wrap gap-x-8 gap-y-3 text-xs text-stone-700">
 			<div>
