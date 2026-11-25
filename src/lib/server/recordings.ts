@@ -334,6 +334,10 @@ export async function listPublished(
 			const from = month ? new Date(Date.UTC(year, month - 1, 1)) : new Date(Date.UTC(year, 0, 1));
 			const to = month ? new Date(Date.UTC(year, month, 1)) : new Date(Date.UTC(year + 1, 0, 1));
 			query.started_at = { $gte: from, $lt: to };
+		} else if (month) {
+			query.$expr = {
+				$eq: [{ $month: { $convert: { input: '$started_at', to: 'date', onError: null } } }, month]
+			};
 		}
 
 		const skip = (pageNumber - 1) * limit;

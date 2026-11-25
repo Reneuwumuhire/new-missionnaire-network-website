@@ -4,6 +4,7 @@
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { navigating, page } from '$app/state';
+	import { onDestroy } from 'svelte';
 	import { vercelImage, vercelImageSrcSet, vercelImagePlaceholder } from '$lib/utils/vercelImage';
 	import BlurUpImage from '$lib/components/BlurUpImage.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
@@ -25,8 +26,7 @@
 
 	// ── Filter state ───────────────────────────────────────────────
 	// Local copies of the URL-backed filters so the inputs feel responsive.
-	// Submitting (or debounced search) calls `applyFilters` which updates
-	// the URL and triggers a server reload.
+	// Updating the URL reloads the list with the current filters.
 	let searchInput = $state(data.filters.q);
 	let yearInput: number | '' = $state(data.filters.year ?? '');
 	let monthInput: number | '' = $state(data.filters.month ?? '');
@@ -69,7 +69,7 @@
 		if (pageN > 1) params.set('page', String(pageN));
 		if (q) params.set('q', q);
 		if (year) params.set('year', String(year));
-		if (year && month) params.set('month', String(month));
+		if (month) params.set('month', String(month));
 		if (type) params.set('type', type);
 		const qs = params.toString();
 		return qs ? `?${qs}` : '';
@@ -103,27 +103,43 @@
 	// `replace: true` on search keeps browser history clean — typing
 	// shouldn't bury the previous page under 12 history entries.
 	let searchTimer: ReturnType<typeof setTimeout> | null = null;
-	function onSearchInput() {
+	function cancelSearchTimer() {
 		if (searchTimer) clearTimeout(searchTimer);
-		searchTimer = setTimeout(() => {
-			const target = `/live/rediffusions${buildQuery({ q: searchInput, page: 1 })}`;
-			goto(target, { replace: true, reset: false });
-		}, 350);
+		searchTimer = null;
+	}
+	onDestroy(cancelSearchTimer);
+
+	function applyFilters(replace = false) {
+		cancelSearchTimer();
+		void goto(
+			`/live/rediffusions${buildQuery({
+				q: searchInput.trim(),
+				year: yearInput,
+				month: monthInput,
+				type: typeInput,
+				page: 1
+			})}`,
+			{ replace, reset: false }
+		);
 	}
 
-	function onFilterChange() {
-		// Year cleared → month must clear too (a month without a year is ambiguous).
-		const year = yearInput === '' ? '' : Number(yearInput);
-		const month = year === '' ? '' : monthInput === '' ? '' : Number(monthInput);
-		goto(`/live/rediffusions${buildQuery({ year, month, page: 1 })}`, {
-			reset: false
-		});
+	function onSearchInput() {
+		cancelSearchTimer();
+		searchTimer = setTimeout(() => applyFilters(true), 350);
+	}
+
+	function onFilterChange(event: Event & { currentTarget: HTMLSelectElement }) {
+		const { name, value } = event.currentTarget;
+		const selected = value === '' ? '' : Number(value);
+		if (name === 'year') yearInput = selected;
+		else monthInput = selected;
+		applyFilters();
 	}
 
 	function selectType(next: RecordingType | '') {
 		// Toggle off when the user clicks the active pill.
-		const value = typeInput === next ? '' : next;
-		goto(`/live/rediffusions${buildQuery({ type: value, page: 1 })}`, { reset: false });
+		typeInput = typeInput === next ? '' : next;
+		applyFilters();
 	}
 
 	function resetFilters() {
@@ -131,11 +147,11 @@
 		yearInput = '';
 		monthInput = '';
 		typeInput = '';
-		goto('/live/rediffusions', { reset: false });
+		applyFilters();
 	}
 
 	let hasActiveFilters = $derived(
-		Boolean(data.filters.q || data.filters.year || data.filters.type)
+		Boolean(data.filters.q || data.filters.year || data.filters.month || data.filters.type)
 	);
 
 	let expandedThumb: PublishedRecording | null = $state(null);
@@ -293,6 +309,7 @@
 				</div>
 				<div class="flex gap-2">
 					<select
+						name="year"
 						bind:value={yearInput}
 						onchange={onFilterChange}
 						aria-label={$t('rediffusions.filterByYear')}
@@ -304,11 +321,11 @@
 						{/each}
 					</select>
 					<select
+						name="month"
 						bind:value={monthInput}
 						onchange={onFilterChange}
-						disabled={!yearInput}
 						aria-label={$t('rediffusions.filterByMonth')}
-						class="flex-1 min-w-0 border border-stone-200/80 bg-white px-3 py-2 text-sm font-body text-stone-800 disabled:opacity-50 focus:border-missionnaire/40 focus:outline-none"
+						class="flex-1 min-w-0 border border-stone-200/80 bg-white px-3 py-2 text-sm font-body text-stone-800 focus:border-missionnaire/40 focus:outline-none"
 					>
 						<option value="">{$t('list.allMonths')}</option>
 						{#each MONTHS as m}
@@ -343,7 +360,7 @@
 			action="/live/rediffusions"
 			onsubmit={(e) => {
 				e.preventDefault();
-				onSearchInput();
+				applyFilters(true);
 			}}
 			class="hidden md:block mb-6 border border-stone-200/60 bg-white/40 p-3 sm:p-4"
 		>
@@ -420,8 +437,7 @@
 					name="year"
 					bind:value={yearInput}
 					onchange={onFilterChange}
-					disabled={navigating ? true : false}
-					class="border border-stone-200/80 bg-white px-3 py-2.5 min-h-11 text-sm font-body text-stone-800 disabled:opacity-50 disabled:cursor-not-allowed focus:border-missionnaire/40 focus:outline-none focus:ring-2 focus:ring-missionnaire/30"
+					class="border border-stone-200/80 bg-white px-3 py-2.5 min-h-11 text-sm font-body text-stone-800 focus:border-missionnaire/40 focus:outline-none focus:ring-2 focus:ring-missionnaire/30"
 					aria-label={$t('rediffusions.filterByYear')}
 				>
 					<option value="">{$t('list.allYears')}</option>
@@ -434,8 +450,7 @@
 					name="month"
 					bind:value={monthInput}
 					onchange={onFilterChange}
-					disabled={!yearInput || !!navigating}
-					class="border border-stone-200/80 bg-white px-3 py-2.5 min-h-11 text-sm font-body text-stone-800 disabled:opacity-50 disabled:cursor-not-allowed focus:border-missionnaire/40 focus:outline-none focus:ring-2 focus:ring-missionnaire/30"
+					class="border border-stone-200/80 bg-white px-3 py-2.5 min-h-11 text-sm font-body text-stone-800 focus:border-missionnaire/40 focus:outline-none focus:ring-2 focus:ring-missionnaire/30"
 					aria-label={$t('rediffusions.filterByMonth')}
 				>
 					<option value="">{$t('list.allMonths')}</option>

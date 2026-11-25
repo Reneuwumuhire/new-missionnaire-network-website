@@ -39,7 +39,7 @@ export const load: PageServerLoad = async ({ url }) => {
 	const filters = {
 		q,
 		year: year ?? null,
-		month: year ? (month ?? null) : null,
+		month: month ?? null,
 		type: type ?? null
 	};
 
@@ -50,7 +50,7 @@ export const load: PageServerLoad = async ({ url }) => {
 				pageNumber,
 				q: q || undefined,
 				year,
-				month: year ? month : undefined,
+				month,
 				type
 			}),
 			getAvailableYears(),
