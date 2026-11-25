@@ -33,6 +33,7 @@ export interface RecordingDoc {
 	size_bytes: number | null;
 	status: 'recording' | 'uploading' | 'ready' | 'failed';
 	published: boolean;
+	auto_publish_live_started_at?: string;
 	created_by: string;
 	created_by_name: string | null;
 	failure_reason: string | null;
@@ -60,6 +61,14 @@ interface BroadcastAdminStateSnapshot {
 	thumbnail_url: string | null;
 	thumbnail_s3_key: string | null;
 	youtube_url: string | null;
+}
+
+async function getLiveGate(db: Db) {
+	return db
+		.collection<{ _id: string; is_live?: boolean; is_test?: boolean; started_at?: string }>(
+			'broadcast_admin_state'
+		)
+		.findOne({ _id: 'current' }, { projection: { is_live: 1, is_test: 1, started_at: 1 } });
 }
 
 export async function getBroadcastSnapshot(): Promise<BroadcastAdminStateSnapshot> {
@@ -95,6 +104,11 @@ export async function insertRecordingStarting(params: {
 	createdByName?: string | null;
 }): Promise<void> {
 	const db = await getDb();
+	const live = await getLiveGate(db).catch((error) => {
+		console.error('[recorder/mongo] could not check auto-publish eligibility:', error);
+		return null;
+	});
+	const liveStartedAt = live?.started_at;
 	await db.collection<RecordingDoc>('recordings').insertOne({
 		_id: params.id,
 		title: params.title,
@@ -106,6 +120,12 @@ export async function insertRecordingStarting(params: {
 		size_bytes: null,
 		status: 'recording',
 		published: false,
+		...(live?.is_live === true &&
+		live.is_test !== true &&
+		liveStartedAt &&
+		Date.parse(liveStartedAt) <= params.startedAt.getTime()
+			? { auto_publish_live_started_at: liveStartedAt }
+			: {}),
 		created_by: params.createdBy,
 		created_by_name: params.createdByName ?? null,
 		failure_reason: null,
@@ -167,6 +187,47 @@ export async function markRecordingReady(
 	// Only override the default title if admin set a broadcast-level title.
 	if (params.title) setOps.title = params.title;
 	await db.collection<RecordingDoc>('recordings').updateOne({ _id: id }, { $set: setOps });
+	await publishReadyLiveRecordings();
+}
+
+let publishing = false;
+
+/** A session may still be live when its sermon recording finishes uploading. */
+export async function publishReadyLiveRecordings(): Promise<void> {
+	if (publishing) return;
+	publishing = true;
+	try {
+		const db = await getDb();
+		const recordings = db.collection<RecordingDoc>('recordings');
+		const pending = {
+			status: 'ready' as const,
+			published: false,
+			auto_publish_live_started_at: { $exists: true }
+		};
+		const eligible = await recordings.find(pending, { projection: { _id: 1 } }).toArray();
+		if (eligible.length === 0) return;
+
+		const live = await getLiveGate(db);
+		if (!live || typeof live.is_live !== 'boolean' || (live.is_live && !live.started_at)) return;
+		await recordings.updateMany(
+			{
+				...pending,
+				_id: { $in: eligible.map((recording) => recording._id) },
+				auto_publish_live_started_at: {
+					$exists: true,
+					...(live.is_live === true ? { $ne: live.started_at } : {})
+				}
+			},
+			{
+				$set: { published: true, updated_at: new Date() },
+				$unset: { auto_publish_live_started_at: '' }
+			}
+		);
+	} catch (error) {
+		console.error('[recorder/mongo] automatic publication failed:', error);
+	} finally {
+		publishing = false;
+	}
 }
 
 export async function markRecordingFailed(id: ObjectId, reason: string) {
@@ -188,7 +249,9 @@ export async function findRecording(id: ObjectId): Promise<RecordingDoc | null> 
  * new publisher when that security state cannot be checked. */
 export async function isIngestRevoked(path: string): Promise<boolean> {
 	try {
-		const doc = await (await getDb())
+		const doc = await (
+			await getDb()
+		)
 			.collection<{ _id: string; expires_at: Date }>('studio_ingest_revocations')
 			.findOne({ _id: path, expires_at: { $gt: new Date() } });
 		return Boolean(doc);

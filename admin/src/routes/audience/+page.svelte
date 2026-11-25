@@ -461,7 +461,7 @@
 		{
 			title: copy.countries,
 			rows: data.audience.countries.map((row) => ({
-				name: row.name || copy.unknown,
+				name: !row.name || row.name === 'Unknown' ? copy.unknown : row.name,
 				count: row.count
 			}))
 		},
@@ -493,8 +493,8 @@
 			<h1 class="font-display text-4xl font-semibold text-stone-900 sm:text-5xl">{copy.title}</h1>
 			<p class="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600">{copy.intro}</p>
 		</div>
-		<div class="flex w-full items-stretch gap-2 sm:w-auto sm:shrink-0">
-			<div class="relative min-w-0 flex-1 sm:w-64" bind:this={pickerRef}>
+		<div class="relative flex w-full items-stretch gap-2 sm:w-auto sm:shrink-0">
+			<div class="min-w-0 flex-1 sm:relative sm:w-64" bind:this={pickerRef}>
 				<button
 					type="button"
 					class="flex h-full min-h-11 w-full items-center justify-between gap-3 border border-stone-300 bg-white px-4 text-left text-sm font-semibold text-stone-900 hover:border-stone-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
@@ -511,7 +511,7 @@
 				{#if pickerOpen}
 					<div
 						id="audience-range-menu"
-						class="absolute right-0 top-full z-30 mt-1 max-h-[min(75vh,40rem)] w-[min(25rem,calc(100vw-2rem))] overflow-y-auto border border-stone-300 bg-white p-4 shadow-xl"
+						class="absolute inset-x-0 top-full z-30 mt-1 max-h-[min(65dvh,40rem)] overflow-y-auto overscroll-contain border border-stone-300 bg-white p-3 shadow-xl sm:left-auto sm:max-h-[min(75dvh,40rem)] sm:w-[25rem] sm:p-4"
 					>
 						<nav aria-label={copy.quickRanges}>
 							<p class="mb-2 text-xs font-semibold text-stone-500">{copy.quickRanges}</p>
@@ -554,7 +554,7 @@
 							<p class="mb-3 text-xs font-semibold text-stone-500">{copy.customRange}</p>
 							<input type="hidden" name="days" value="custom" />
 							{#if data.route}<input type="hidden" name="route" value={data.route} />{/if}
-							<div class="grid grid-cols-2 gap-3">
+							<div class="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2">
 								<label class="space-y-1 text-xs font-medium text-stone-600">
 									<span>{copy.fromDate}</span>
 									<input
@@ -563,7 +563,7 @@
 										max={maxDate}
 										required
 										bind:value={customFrom}
-										class="w-full border border-stone-300 bg-white px-2 py-2 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-primary"
+										class="block min-w-0 w-full border border-stone-300 bg-white px-2 py-2 text-base text-stone-900 sm:text-sm focus-visible:outline-2 focus-visible:outline-primary"
 									/>
 								</label>
 								<label class="space-y-1 text-xs font-medium text-stone-600">
@@ -575,7 +575,7 @@
 										max={maxDate}
 										required
 										bind:value={customThrough}
-										class="w-full border border-stone-300 bg-white px-2 py-2 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-primary"
+										class="block min-w-0 w-full border border-stone-300 bg-white px-2 py-2 text-base text-stone-900 sm:text-sm focus-visible:outline-2 focus-visible:outline-primary"
 									/>
 								</label>
 							</div>
@@ -620,36 +620,26 @@
 			{/if}
 			<label class="min-w-[12rem] flex-1 space-y-1.5 text-xs font-semibold text-stone-700">
 				<span>{copy.route}</span>
-				<div class="relative">
-					<select
-						name="route"
-						class="h-11 w-full appearance-none border border-stone-300 bg-white pl-3 pr-12 text-sm font-medium text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-					>
-						<option value="" selected={!data.route}>{copy.allPages}</option>
-						<optgroup label={copy.mainPages}>
-							{#each data.routeOptions.main as path}<option
+				<select
+					name="route"
+					class="h-11 w-full border border-stone-300 bg-white px-3 text-sm font-medium text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+				>
+					<option value="" selected={!data.route}>{copy.allPages}</option>
+					<optgroup label={copy.mainPages}>
+						{#each data.routeOptions.main as path}<option
+								value={path}
+								selected={data.route === path}>{path}</option
+							>{/each}
+					</optgroup>
+					{#if data.routeOptions.visited.length}
+						<optgroup label={copy.visitedDetails}>
+							{#each data.routeOptions.visited as path}<option
 									value={path}
 									selected={data.route === path}>{path}</option
 								>{/each}
 						</optgroup>
-						{#if data.routeOptions.visited.length}
-							<optgroup label={copy.visitedDetails}>
-								{#each data.routeOptions.visited as path}<option
-										value={path}
-										selected={data.route === path}>{path}</option
-									>{/each}
-							</optgroup>
-						{/if}
-					</select>
-					<svg
-						class="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-600"
-						viewBox="0 0 20 20"
-						fill="none"
-						aria-hidden="true"
-					>
-						<path d="m5 7.5 5 5 5-5" stroke="currentColor" stroke-width="1.7" />
-					</svg>
-				</div>
+					{/if}
+				</select>
 			</label>
 			<button
 				type="submit"

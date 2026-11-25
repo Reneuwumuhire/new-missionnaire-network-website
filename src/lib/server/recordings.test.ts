@@ -7,7 +7,9 @@ const mocks = vi.hoisted(() => {
 		sort: vi.fn(),
 		skip: vi.fn(),
 		limit: vi.fn(),
-		toArray: vi.fn(async () => [])
+		toArray: vi.fn<
+			() => Promise<Array<{ _id: string; transcript_pdf_id?: string; source_video_id?: string }>>
+		>(async () => [])
 	};
 	for (const method of ['hint', 'project', 'sort', 'skip', 'limit'] as const) {
 		cursor[method].mockReturnValue(cursor);
@@ -17,7 +19,7 @@ const mocks = vi.hoisted(() => {
 		createIndexes: vi.fn(async () => []),
 		countDocuments: vi.fn(async () => 0),
 		find: vi.fn(() => cursor),
-		findOne: vi.fn(async () => ({
+		findOne: vi.fn<() => Promise<Record<string, unknown> | null>>(async () => ({
 			_id: { toString: () => '6abd477a1473609269a4fcb7' },
 			title: 'Retransmission',
 			started_at: new Date('2026-09-30T17:30:00Z'),
@@ -41,7 +43,38 @@ vi.mock('../../db/mongo', () => ({
 	})
 }));
 
-import { getPublishedById, getRetransmissionYears, listRetransmissions } from './recordings';
+import {
+	getPublishedById,
+	getReplayIdForTranscript,
+	getRetransmissionYears,
+	listRetransmissions
+} from './recordings';
+
+it('prefers the original replay over another explicit attachment or the video fallback', async () => {
+	const pdf = '6b02f6a653ce4dc8b618dfd9';
+	const replay = '6abd477a1473609269a4fcb7';
+	mocks.cursor.toArray.mockResolvedValueOnce([
+		{ _id: 'another', transcript_pdf_id: pdf },
+		{ _id: replay, transcript_pdf_id: pdf },
+		{ _id: 'fallback', source_video_id: 'video-id' }
+	]);
+	await expect(getReplayIdForTranscript(pdf, replay, 'video-id')).resolves.toBe(replay);
+	expect(mocks.find).toHaveBeenLastCalledWith(
+		expect.objectContaining({ published: true, status: 'ready' }),
+		expect.objectContaining({ projection: { _id: 1, transcript_pdf_id: 1, source_video_id: 1 } })
+	);
+});
+
+it('uses the shared video only when there is one eligible replay', async () => {
+	const pdf = '6b02f6a653ce4dc8b618dfd9';
+	const replay = { _id: '6abd477a1473609269a4fcb7', source_video_id: 'video-id' };
+	const detached = { _id: 'detached', source_video_id: 'video-id', transcript_pdf_id: 'none' };
+	mocks.cursor.toArray
+		.mockResolvedValueOnce([replay, detached])
+		.mockResolvedValueOnce([replay, { ...replay, _id: 'other' }]);
+	await expect(getReplayIdForTranscript(pdf, null, 'video-id')).resolves.toBe(replay._id);
+	await expect(getReplayIdForTranscript(pdf, null, 'video-id')).resolves.toBeNull();
+});
 
 it('includes the French audio on a recording detail page', async () => {
 	await expect(getPublishedById('6abd477a1473609269a4fcb7')).resolves.toMatchObject({

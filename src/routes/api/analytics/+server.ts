@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import { dev } from '$app/environment';
 import { getAnalyticsStats, type AnalyticsStats } from '$lib/server/analytics';
 import { getDb } from '../../../db/mongo';
+import { visitorCountry } from '$lib/server/visitorCountry';
 import { getFullCountryName } from '../../../utils/countries';
 import { classifyDevice, isBotUserAgent } from '../../../utils/botDetection';
 import { getTodayInKigali } from '../../../utils/time';
@@ -81,10 +82,6 @@ export const POST: RequestHandler = async ({ request, cookies, url }) => {
 			}
 		}
 
-		const countryCode =
-			request.headers.get('cf-ipcountry') ||
-			request.headers.get('x-vercel-ip-country') ||
-			'Unknown';
 		const now = Date.now();
 		const today = getTodayInKigali();
 		const db = await getDb();
@@ -121,6 +118,8 @@ export const POST: RequestHandler = async ({ request, cookies, url }) => {
 			});
 			return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } });
 		}
+		const countryCode = visitorCountry(request.headers, Boolean(process.env.FLY_APP_NAME));
+		const country = getFullCountryName(countryCode);
 		if (!dev)
 			await db.collection('analytics').updateOne(
 				{ _id: `human:${today}:${visitorId}` as never },
@@ -128,12 +127,11 @@ export const POST: RequestHandler = async ({ request, cookies, url }) => {
 					$setOnInsert: {
 						visitorId,
 						date: today,
-						countryShort: countryCode,
-						countryFull: getFullCountryName(countryCode),
 						referrer,
 						firstSeen: now
 					},
 					$set: {
+						...(countryCode ? { countryShort: countryCode, countryFull: country } : {}),
 						verifiedHuman: true,
 						userAgent,
 						device: classifyDevice(userAgent),
@@ -156,7 +154,7 @@ export const POST: RequestHandler = async ({ request, cookies, url }) => {
 			visitorId,
 			path,
 			device: classifyDevice(userAgent),
-			country: getFullCountryName(countryCode),
+			country,
 			referrer
 		});
 

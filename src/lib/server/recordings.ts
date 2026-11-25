@@ -334,6 +334,10 @@ export async function listPublished(
 			const from = month ? new Date(Date.UTC(year, month - 1, 1)) : new Date(Date.UTC(year, 0, 1));
 			const to = month ? new Date(Date.UTC(year, month, 1)) : new Date(Date.UTC(year + 1, 0, 1));
 			query.started_at = { $gte: from, $lt: to };
+		} else if (month) {
+			query.$expr = {
+				$eq: [{ $month: { $convert: { input: '$started_at', to: 'date', onError: null } } }, month]
+			};
 		}
 
 		const skip = (pageNumber - 1) * limit;
@@ -565,6 +569,77 @@ export interface RecordingTranscript {
 	size: number;
 }
 
+type TranscriptReplaySource = {
+	transcriptId: string;
+	recordingId?: unknown;
+	sourceVideoId?: string | null;
+};
+
+export async function getReplayIdsForTranscripts(sources: TranscriptReplaySource[]) {
+	const result = new Map<string, string>();
+	if (!sources.length) return result;
+
+	try {
+		const db = await getDb();
+		const originIds = sources.flatMap(({ recordingId }) => {
+			const id = objectIdString.safeParse(String(recordingId ?? ''));
+			return id.success ? [new ObjectId(id.data)] : [];
+		});
+		const recordings = await db
+			.collection('recordings')
+			.find(
+				{
+					published: true,
+					status: 'ready',
+					$or: [
+						{ _id: { $in: originIds } },
+						{ transcript_pdf_id: { $in: sources.map(({ transcriptId }) => transcriptId) } },
+						{
+							source_video_id: {
+								$in: sources.flatMap(({ sourceVideoId }) => (sourceVideoId ? [sourceVideoId] : []))
+							},
+							transcript_pdf_id: null
+						}
+					]
+				},
+				{
+					projection: { _id: 1, transcript_pdf_id: 1, source_video_id: 1 },
+					sort: { started_at: -1, _id: -1 }
+				}
+			)
+			.toArray();
+
+		for (const { transcriptId, recordingId, sourceVideoId } of sources) {
+			const origin = recordings.find(
+				(row) =>
+					String(row._id) === String(recordingId ?? '').toLowerCase() &&
+					(row.transcript_pdf_id == null || row.transcript_pdf_id === transcriptId)
+			);
+			const attached = origin ?? recordings.find((row) => row.transcript_pdf_id === transcriptId);
+			if (attached) {
+				result.set(transcriptId, String(attached._id));
+			} else if (sourceVideoId) {
+				const matches = recordings.filter(
+					(row) => row.source_video_id === sourceVideoId && row.transcript_pdf_id == null
+				);
+				if (matches.length === 1) result.set(transcriptId, String(matches[0]._id));
+			}
+		}
+	} catch (error) {
+		console.error('[recordings] getReplayIdsForTranscripts failed', error);
+	}
+	return result;
+}
+
+export async function getReplayIdForTranscript(
+	transcriptId: string,
+	recordingId: unknown,
+	sourceVideoId: string | null
+): Promise<string | null> {
+	const replays = await getReplayIdsForTranscripts([{ transcriptId, recordingId, sourceVideoId }]);
+	return replays.get(transcriptId) ?? null;
+}
+
 /** Find the `videos._id` for a recording from its stored YouTube id only.
  *  The previous date-based title fallback was removed: matching any video
  *  whose title merely contained the recording's YYYY-MM-DD attached the wrong
@@ -599,7 +674,10 @@ export async function getTranscriptForRecording(recording: {
 		if (recording.transcript_pdf_id === 'none') return null;
 
 		const db = await getDb();
-		if (recording.transcript_pdf_id && objectIdString.safeParse(recording.transcript_pdf_id).success) {
+		if (
+			recording.transcript_pdf_id &&
+			objectIdString.safeParse(recording.transcript_pdf_id).success
+		) {
 			const attached = await db
 				.collection('pdfs')
 				.findOne(

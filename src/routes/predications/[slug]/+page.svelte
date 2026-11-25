@@ -6,6 +6,7 @@
 	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
 	import { onMount } from 'svelte';
 	import { t, locale } from '../../../i18n';
+	import PdfPreview, { pdfActionClass } from '$lib/components/PdfPreview.svelte';
 	import Breadcrumbs from '$lib/components/+breadcrumbs.svelte';
 	import {
 		availableSermonVersions,
@@ -114,6 +115,7 @@
 			? `/predications/${data.canonicalSlug}/pdf?lang=${previewVersion.language}`
 			: ''
 	);
+	let previewLoadedFor = $state('');
 	let currentSelectedUrl = $derived(getCurrentAudioUrl($selectAudio));
 </script>
 
@@ -156,18 +158,14 @@
 			{#if previewPdfUrl}
 				<a
 					href="#pdf-preview"
-					class="px-4 py-2 border border-stone-200/60 bg-white/40 text-stone-700 text-xs font-semibold uppercase tracking-wider hover:border-missionnaire hover:text-missionnaire transition-colors"
+					onclick={() => (previewLoadedFor = previewPdfUrl)}
+					class={pdfActionClass}
 				>
 					{$t('predications.viewPdfOnPage')}
 				</a>
 			{/if}
 			{#if previewPdfUrl}
-				<a
-					href={previewPdfUrl}
-					target="_blank"
-					rel="noopener noreferrer"
-					class="px-4 py-2 border border-stone-200/60 bg-white/40 text-stone-700 text-xs font-semibold uppercase tracking-wider hover:border-missionnaire hover:text-missionnaire transition-colors"
-				>
+				<a href={previewPdfUrl} target="_blank" rel="noopener noreferrer" class={pdfActionClass}>
 					{$t('predications.openPdf')}
 				</a>
 			{/if}
@@ -177,7 +175,7 @@
 						href={`/predications/${data.canonicalSlug}/pdf?lang=${version.language}`}
 						target="_blank"
 						rel="noopener noreferrer"
-						class="px-4 py-2 border border-stone-200/60 bg-white/40 text-stone-700 text-xs font-semibold uppercase tracking-wider hover:border-missionnaire hover:text-missionnaire transition-colors"
+						class={pdfActionClass}
 					>
 						PDF {version.code.toUpperCase()}
 					</a>
@@ -193,36 +191,13 @@
 	</div>
 
 	{#if previewPdfUrl}
-		<section id="pdf-preview" class="mt-10 scroll-mt-28">
-			<div class="flex flex-col gap-2 mb-3 sm:flex-row sm:items-center sm:justify-between">
-				<h2 class="text-sm font-semibold uppercase tracking-[0.25em] text-missionnaire">
-					{$t('predications.pdfPreview')}
-				</h2>
-				<a
-					href={previewPdfUrl}
-					target="_blank"
-					rel="noopener noreferrer"
-					class="text-[11px] font-semibold uppercase tracking-wider text-stone-500 hover:text-missionnaire transition-colors"
-				>
-					{$t('predications.openNewTab')}
-				</a>
-			</div>
-
-			<div class="border border-stone-200/60 overflow-hidden bg-white/40">
-				<object
-					data={previewPdfUrl}
-					type="application/pdf"
-					title={`PDF ${sermonTitle}`}
-					class="w-full min-h-[360px] h-[62vh] md:h-[75vh] lg:h-[860px]"
-				>
-					<div
-						class="min-h-[360px] flex items-center justify-center text-sm text-stone-600 p-6 text-center"
-					>
-						{$t('predications.pdfFallback')}
-					</div>
-				</object>
-			</div>
-		</section>
+		<PdfPreview
+			id="pdf-preview"
+			url={previewPdfUrl}
+			title={`PDF ${sermonTitle}`}
+			loaded={previewLoadedFor === previewPdfUrl}
+			onloadpreview={() => (previewLoadedFor = previewPdfUrl)}
+		/>
 	{/if}
 </article>
 

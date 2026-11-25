@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, tick } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
 	import type { PageData } from './$types';
 	import type HlsType from 'hls.js';
@@ -2074,6 +2074,21 @@
 		});
 	}
 
+	let previewRecordingId = $state<string | null>(null);
+	let previewAudio = $state<HTMLAudioElement>();
+	const desktopActionClass =
+		'recording-action relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-colors';
+
+	async function toggleRecordingPreview(id: string) {
+		const opening = previewRecordingId !== id;
+		previewAudio?.pause();
+		previewRecordingId = opening ? id : null;
+		if (opening) {
+			await tick();
+			if (previewRecordingId === id) void previewAudio?.play().catch(() => {});
+		}
+	}
+
 	/** Body for /api/recordings/start — carries the monitor's on-air position so
 	 *  the subtitle auto-anchor isn't skewed by the operator's listening latency. */
 	function recordingStartInit(): RequestInit {
@@ -2524,13 +2539,15 @@
 {/snippet}
 
 <div
-	class="mb-8 border bg-white/40 p-5 {broadcast.is_live ? 'border-red-200' : 'border-stone-200/60'}"
+	class="border bg-white/40 {broadcast.is_live || isRecording || icecast.sourceActive
+		? 'mb-8 p-5'
+		: 'mb-5 px-4 py-3'} {broadcast.is_live ? 'border-red-200' : 'border-stone-200/60'}"
 >
 	<!-- Header: status + timers -->
-	<div class="flex flex-wrap items-center justify-between gap-4">
+	<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
 		<div class="flex items-center gap-3">
 			<div
-				class="flex h-10 w-10 items-center justify-center rounded-full {broadcast.is_live ||
+				class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full {broadcast.is_live ||
 				isRecording
 					? 'bg-red-50'
 					: 'bg-stone-100'}"
@@ -2716,6 +2733,8 @@
 					</div>
 				{/if}
 			</div>
+		{:else if !icecast.sourceActive}
+			<p class="pl-12 text-xs text-stone-500 sm:pl-0">{$t('recordings.waitingForStream')}</p>
 		{/if}
 	</div>
 
@@ -2749,7 +2768,7 @@
 	{/if}
 
 	<!-- Actions — only when there's a session to control or a source to start
-	     from. Idle-with-no-source shows just the compact monitor strip below. -->
+	     from. -->
 	{#if icecast.sourceActive || broadcast.is_live || isRecording}
 		<div class="mt-5 border-t border-stone-100 pt-5">
 			{#if !broadcast.is_live}
@@ -2925,125 +2944,128 @@
 		<p class="mt-4 bg-red-50 px-3 py-2 text-xs text-red-700">{actionError}</p>
 	{/if}
 
-	<!-- Live audio monitor -->
-	<div class="mt-5 flex flex-wrap items-center gap-3 border-t border-stone-100 pt-4">
-		<div
-			class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-stone-500"
-		>
-			<svg
-				class="h-4 w-4 text-missionnaire"
-				fill="none"
-				viewBox="0 0 24 24"
-				stroke="currentColor"
-				stroke-width="2"
-			>
-				<path
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"
-				/>
-			</svg>
-			{$t('recordings.monitor.title')}
-		</div>
-		{#if icecast.sourceActive}
-			<!-- No pause, no seek — always the live edge. Mute is the only
-			     control, so this stays a trustworthy sync reference. -->
-			<div class="flex h-9 flex-1 min-w-[280px] items-center gap-3 bg-stone-50 px-3">
-				{#if monitorLive}
-					<span
-						class="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-red-600"
-					>
-						<span class="relative inline-flex h-1.5 w-1.5">
-							<span
-								class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"
-							></span>
-							<span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500"></span>
-						</span>
-						{$t('recordings.monitor.live')}
-					</span>
-				{:else}
-					<span class="text-[11px] italic text-stone-400"
-						>{$t('recordings.monitor.connecting')}</span
-					>
-				{/if}
-				<span class="min-w-0 flex-1 truncate text-[10px] text-stone-400">
-					{monitorMuted ? $t('recordings.monitor.mutedHint') : $t('recordings.monitor.unmutedHint')}
-				</span>
-				<button
-					type="button"
-					onclick={toggleMonitorMute}
-					class="inline-flex shrink-0 items-center gap-1.5 border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] transition-colors {monitorMuted
-						? 'border-missionnaire bg-missionnaire text-white hover:bg-missionnaire/90'
-						: 'border-stone-200 bg-white text-stone-600 hover:border-stone-900 hover:bg-stone-900 hover:text-white'}"
-				>
-					{#if monitorMuted}
-						<svg
-							class="h-3 w-3"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							aria-hidden="true"
-						>
-							<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-							<path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
-						</svg>
-						{$t('recordings.monitor.unmute')}
-					{:else}
-						<svg
-							class="h-3 w-3"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							aria-hidden="true"
-						>
-							<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-							<line x1="23" y1="9" x2="17" y2="15" />
-							<line x1="17" y1="9" x2="23" y2="15" />
-						</svg>
-						{$t('recordings.monitor.mute')}
-					{/if}
-				</button>
-			</div>
-		{:else}
-			<!-- Idle strip: doubles as the "waiting for a source / start OBS" hint
-			     so the card stays compact instead of carrying a separate pill. -->
+	{#if icecast.sourceActive || broadcast.is_live || isRecording}
+		<!-- Live audio monitor -->
+		<div class="mt-5 flex flex-wrap items-center gap-3 border-t border-stone-100 pt-4">
 			<div
-				class="flex h-9 flex-1 min-w-[280px] items-center gap-2 bg-stone-50 px-3 text-[11px] text-stone-400"
+				class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-stone-500"
 			>
 				<svg
-					class="h-3.5 w-3.5 shrink-0"
+					class="h-4 w-4 text-missionnaire"
 					fill="none"
 					viewBox="0 0 24 24"
 					stroke="currentColor"
 					stroke-width="2"
-					aria-hidden="true"
 				>
 					<path
 						stroke-linecap="round"
 						stroke-linejoin="round"
-						d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+						d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"
 					/>
 				</svg>
-				<span class="truncate">{$t('recordings.waitingForStream')}</span>
+				{$t('recordings.monitor.title')}
 			</div>
-		{/if}
-		{#if icecast.sourceActive}
-			<span class="text-[11px] text-stone-400">{$t('recordings.monitor.sourceActive')}</span>
-		{/if}
-		<audio
-			bind:this={monitorEl}
-			preload="none"
-			muted
-			ontimeupdate={onMonitorTimeUpdate}
-			onpause={onMonitorInterrupted}
-			onended={onMonitorInterrupted}
-			onerror={onMonitorInterrupted}
-		></audio>
-	</div>
+			{#if icecast.sourceActive}
+				<!-- No pause, no seek — always the live edge. Mute is the only
+			     control, so this stays a trustworthy sync reference. -->
+				<div class="flex h-9 flex-1 min-w-[280px] items-center gap-3 bg-stone-50 px-3">
+					{#if monitorLive}
+						<span
+							class="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-red-600"
+						>
+							<span class="relative inline-flex h-1.5 w-1.5">
+								<span
+									class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75"
+								></span>
+								<span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500"></span>
+							</span>
+							{$t('recordings.monitor.live')}
+						</span>
+					{:else}
+						<span class="text-[11px] italic text-stone-400"
+							>{$t('recordings.monitor.connecting')}</span
+						>
+					{/if}
+					<span class="min-w-0 flex-1 truncate text-[10px] text-stone-400">
+						{monitorMuted
+							? $t('recordings.monitor.mutedHint')
+							: $t('recordings.monitor.unmutedHint')}
+					</span>
+					<button
+						type="button"
+						onclick={toggleMonitorMute}
+						class="inline-flex shrink-0 items-center gap-1.5 border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] transition-colors {monitorMuted
+							? 'border-missionnaire bg-missionnaire text-white hover:bg-missionnaire/90'
+							: 'border-stone-200 bg-white text-stone-600 hover:border-stone-900 hover:bg-stone-900 hover:text-white'}"
+					>
+						{#if monitorMuted}
+							<svg
+								class="h-3 w-3"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								aria-hidden="true"
+							>
+								<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+								<path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+							</svg>
+							{$t('recordings.monitor.unmute')}
+						{:else}
+							<svg
+								class="h-3 w-3"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								aria-hidden="true"
+							>
+								<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+								<line x1="23" y1="9" x2="17" y2="15" />
+								<line x1="17" y1="9" x2="23" y2="15" />
+							</svg>
+							{$t('recordings.monitor.mute')}
+						{/if}
+					</button>
+				</div>
+			{:else}
+				<!-- Show the waiting hint if the source drops during a live session. -->
+				<div
+					class="flex h-9 flex-1 min-w-[280px] items-center gap-2 bg-stone-50 px-3 text-[11px] text-stone-400"
+				>
+					<svg
+						class="h-3.5 w-3.5 shrink-0"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+						stroke-width="2"
+						aria-hidden="true"
+					>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+						/>
+					</svg>
+					<span class="truncate">{$t('recordings.waitingForStream')}</span>
+				</div>
+			{/if}
+			{#if icecast.sourceActive}
+				<span class="text-[11px] text-stone-400">{$t('recordings.monitor.sourceActive')}</span>
+			{/if}
+		</div>
+	{/if}
+	<audio
+		bind:this={monitorEl}
+		preload="none"
+		muted
+		ontimeupdate={onMonitorTimeUpdate}
+		onpause={onMonitorInterrupted}
+		onended={onMonitorInterrupted}
+		onerror={onMonitorInterrupted}
+	></audio>
 </div>
 
 <!-- Scheduled lives — moved up to the top of the broadcast tools: schedule
@@ -3466,13 +3488,13 @@
 	{/if}
 </div>
 
-<!-- Recordings table (≥ lg). Original dense layout unchanged. -->
-<div class="hidden overflow-hidden border border-stone-200/60 bg-white/40 lg:block">
-	<table class="w-full text-left text-sm">
+<!-- Desktop recordings table. Audio controls expand below the selected row. -->
+<div class="recordings-table hidden border border-stone-200/60 bg-white/40 lg:block">
+	<table class="w-full table-fixed text-left text-sm">
 		<thead>
-			<tr class="border-b border-stone-100 bg-cream/50">
+			<tr class="border-b border-stone-200/70 bg-stone-50/70 text-xs">
 				{#if canDeleteRecordings}
-					<th class="w-10 px-5 py-3.5">
+					<th class="w-10 px-3 py-3">
 						<input
 							type="checkbox"
 							checked={allFilteredSelected}
@@ -3484,27 +3506,34 @@
 						/>
 					</th>
 				{/if}
-				<th class="px-5 py-3.5 font-medium text-stone-500">{$t('recordings.common.title')}</th>
-				<th class="px-5 py-3.5 font-medium text-stone-500">{$t('recordings.table.date')}</th>
-				<th class="px-5 py-3.5 font-medium text-stone-500">{$t('recordings.table.duration')}</th>
-				<th class="px-5 py-3.5 font-medium text-stone-500">{$t('recordings.table.size')}</th>
-				<th class="px-5 py-3.5 font-medium text-stone-500">{$t('recordings.table.status')}</th>
-				<th class="px-5 py-3.5 font-medium text-stone-500">{$t('recordings.list.published')}</th>
-				<th class="px-5 py-3.5 text-right font-medium text-stone-500"
+				<th scope="col" class="px-3 py-3 font-semibold text-stone-600"
+					>{$t('recordings.common.title')}</th
+				>
+				<th scope="col" class="w-32 px-3 py-3 font-semibold text-stone-600"
+					>{$t('recordings.table.date')}</th
+				>
+				<th scope="col" class="w-24 px-3 py-3 font-semibold text-stone-600"
+					>{$t('recordings.table.status')}</th
+				>
+				<th scope="col" class="w-44 px-3 py-3 text-right font-semibold text-stone-600"
 					>{$t('recordings.table.actions')}</th
 				>
 			</tr>
 		</thead>
 		<tbody>
 			{#if !listLoaded}
-				<SkeletonRows rows={5} cols={canDeleteRecordings ? 8 : 7} />
+				<SkeletonRows rows={5} cols={canDeleteRecordings ? 5 : 4} />
 			{/if}
 			{#each filteredRecordings as rec}
 				{@const isEditing = editingRecordingId === rec._id}
 				{@const isSelected = selectedIds.has(rec._id!)}
-				<tr class="border-b border-stone-50 {isSelected ? 'bg-primary/5' : ''}">
+				<tr
+					class="border-b border-stone-200/60 transition-colors hover:bg-white/70 focus-within:bg-white/70 {isSelected
+						? 'bg-primary/5'
+						: ''}"
+				>
 					{#if canDeleteRecordings}
-						<td class="px-5 py-4">
+						<td class="px-3 py-3">
 							<input
 								type="checkbox"
 								checked={isSelected}
@@ -3514,10 +3543,12 @@
 							/>
 						</td>
 					{/if}
-					<td class="px-5 py-4">
-						<div class="flex items-center gap-3">
+					<td class="px-3 py-3">
+						<div class="flex items-center gap-2.5">
 							{#if rec.thumbnail_url && !failedThumbnails.has(rec._id!)}
-								<div class="h-9 w-14 shrink-0 rounded border border-stone-200/60 overflow-hidden">
+								<div
+									class="recording-table-thumbnail h-9 w-14 shrink-0 rounded border border-stone-200/60 overflow-hidden"
+								>
 									<BlurUpImage
 										src={vercelImage(rec.thumbnail_url, 192)}
 										srcset={vercelImageSrcSet(rec.thumbnail_url, 96)}
@@ -3532,7 +3563,7 @@
 								</div>
 							{:else}
 								<div
-									class="flex h-9 w-14 shrink-0 items-center justify-center rounded border border-stone-200/60 bg-cream/60 text-stone-300"
+									class="recording-table-thumbnail flex h-9 w-14 shrink-0 items-center justify-center rounded border border-stone-200/60 bg-cream/60 text-stone-300"
 									aria-hidden="true"
 								>
 									<svg
@@ -3551,19 +3582,31 @@
 								</div>
 							{/if}
 							<div class="min-w-0 flex-1">
-								<span class="block font-medium text-stone-700">{rec.title}</span>
-								<span class="block text-[11px] text-stone-400">
+								<span
+									class="line-clamp-2 break-words font-semibold leading-snug text-stone-800"
+									title={rec.title}>{rec.title}</span
+								>
+								<span class="mt-0.5 block truncate text-xs text-stone-500">
 									{displayName(rec.created_by_name, rec.created_by)}
 								</span>
 							</div>
 						</div>
 					</td>
-					<td class="px-5 py-4 text-stone-500">{formatDateTime(rec.started_at)}</td>
-					<td class="px-5 py-4 font-mono text-xs text-stone-500"
-						>{formatDuration(rec.duration_sec)}</td
-					>
-					<td class="px-5 py-4 text-stone-500">{formatBytes(rec.size_bytes)}</td>
-					<td class="px-5 py-4">
+					<td class="px-3 py-3 text-xs tabular-nums text-stone-600">
+						<span class="block whitespace-nowrap" title={formatDateTime(rec.started_at)}>
+							{new Date(rec.started_at).toLocaleDateString('fr-FR')}
+							<span class="text-[11px] text-stone-500">
+								{new Date(rec.started_at).toLocaleTimeString('fr-FR', {
+									hour: '2-digit',
+									minute: '2-digit'
+								})}
+							</span>
+						</span>
+						<span class="mt-1 block whitespace-nowrap text-[11px] text-stone-500">
+							{formatDuration(rec.duration_sec)} · {formatBytes(rec.size_bytes)}
+						</span>
+					</td>
+					<td class="px-3 py-3">
 						<span
 							class="inline-flex rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {statusClass(
 								rec.status
@@ -3571,86 +3614,186 @@
 						>
 							{$t(statusLabel[rec.status])}
 						</span>
+						<div class="mt-2">
+							<button
+								onclick={() => togglePublish(rec)}
+								aria-pressed={Boolean(rec.published)}
+								disabled={rec.status !== 'ready'}
+								aria-label={rec.published
+									? $t('recordings.list.unpublish')
+									: $t('recordings.list.publish')}
+								title={rec.published
+									? $t('recordings.list.unpublish')
+									: $t('recordings.list.publish')}
+								class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors {rec.published
+									? 'bg-primary'
+									: 'bg-stone-200'} disabled:opacity-40"
+							>
+								<span
+									class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform {rec.published
+										? 'translate-x-4'
+										: 'translate-x-0.5'}"
+								></span>
+							</button>
+						</div>
 					</td>
-					<td class="px-5 py-4">
-						<button
-							onclick={() => togglePublish(rec)}
-							disabled={rec.status !== 'ready'}
-							aria-label={rec.published
-								? $t('recordings.list.unpublish')
-								: $t('recordings.list.publish')}
-							title={rec.published
-								? $t('recordings.list.unpublish')
-								: $t('recordings.list.publish')}
-							class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors {rec.published
-								? 'bg-primary'
-								: 'bg-stone-200'} disabled:opacity-40"
-						>
-							<span
-								class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform {rec.published
-									? 'translate-x-4'
-									: 'translate-x-0.5'}"
-							></span>
-						</button>
-					</td>
-					<td class="px-5 py-4">
-						<div class="flex items-center justify-end gap-2">
+					<td class="px-3 py-3">
+						<div class="flex items-center justify-end gap-0.5">
 							{#if rec.status === 'ready' && rec.s3_url}
-								<audio src={rec.s3_url} controls preload="none" class="h-8 w-44"></audio>
+								<button
+									type="button"
+									class={`${desktopActionClass} ${previewRecordingId === rec._id ? 'bg-primary/10 text-orange-700' : 'text-stone-700 hover:bg-primary/10 hover:text-orange-700'}`}
+									onclick={() => void toggleRecordingPreview(rec._id!)}
+									aria-expanded={previewRecordingId === rec._id}
+									aria-controls={previewRecordingId === rec._id
+										? `recording-preview-${rec._id}`
+										: undefined}
+									aria-label={$t(
+										previewRecordingId === rec._id
+											? 'recordings.list.closeAudioPreview'
+											: 'recordings.list.previewAudio',
+										{ title: rec.title }
+									)}
+									data-tooltip={$t(
+										previewRecordingId === rec._id
+											? 'recordings.list.closePreview'
+											: 'audio.edit.preview'
+									)}
+								>
+									<svg
+										viewBox="0 0 20 20"
+										class="h-[18px] w-[18px]"
+										fill="currentColor"
+										aria-hidden="true"
+									>
+										{#if previewRecordingId === rec._id}
+											<path d="M6 6h8v8H6z" />
+										{:else}
+											<path d="m7 4 9 6-9 6z" />
+										{/if}
+									</svg>
+								</button>
 							{/if}
 							{#if rec.status === 'failed'}
 								<button
+									type="button"
 									onclick={() => retryUpload(rec._id!)}
-									class="bg-amber-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-700 hover:bg-amber-200"
+									class={`${desktopActionClass} text-amber-700 hover:bg-amber-100`}
+									aria-label={$t('recordings.list.retry')}
+									data-tooltip={$t('recordings.list.retry')}
 								>
-									{$t('recordings.list.retry')}
+									<svg
+										viewBox="0 0 24 24"
+										class="h-[18px] w-[18px]"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="1.6"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"
+									>
+										<path d="M4 11a8 8 0 1 1 2.3 5.7M4 5v6h6" />
+									</svg>
 								</button>
 							{/if}
 							{#if rec.status === 'ready' || rec.status === 'failed'}
+								{@const editLabel = isEditing
+									? $t('recordings.common.close')
+									: $t('recordings.common.edit')}
 								<button
+									type="button"
 									onclick={() => (isEditing ? cancelRecordingEdit() : enterRecordingEdit(rec))}
-									class="border border-stone-200 bg-white/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 hover:border-primary hover:text-primary"
+									class={`${desktopActionClass} text-stone-600 hover:bg-stone-200/70 hover:text-stone-900`}
+									aria-label={editLabel}
+									data-tooltip={editLabel}
 								>
-									{isEditing ? $t('recordings.common.close') : $t('recordings.common.edit')}
+									<svg
+										viewBox="0 0 24 24"
+										class="h-[18px] w-[18px]"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="1.6"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"
+									>
+										{#if isEditing}
+											<path d="m6 6 12 12M18 6 6 18" />
+										{:else}
+											<path d="m14 6 4 4M4 20l4-.8L20 7l-4-4L4 15z" />
+										{/if}
+									</svg>
 								</button>
 							{/if}
 							{#if rec.status === 'ready' && rec.s3_url}
 								<button
+									type="button"
 									onclick={() => openTrimEditor(rec._id!)}
-									class="border border-stone-200 bg-white/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-600 hover:border-primary hover:text-primary"
-									title={$t('recordings.list.trimAudioTitle')}
+									class={`${desktopActionClass} text-stone-600 hover:bg-stone-200/70 hover:text-stone-900`}
+									aria-label={$t('recordings.list.trimAudio')}
+									data-tooltip={$t('recordings.list.trimAudio')}
 								>
-									{$t('recordings.list.trimAudio')}
+									<svg
+										viewBox="0 0 24 24"
+										class="h-[18px] w-[18px]"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="1.6"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"
+									>
+										<circle cx="6" cy="6" r="2.5" /><circle cx="6" cy="18" r="2.5" />
+										<path d="m8 7.5 12 11M8 16.5l12-11" />
+									</svg>
 								</button>
 							{/if}
 							{#if canDeleteRecordings}
 								<button
+									type="button"
 									onclick={() => remove(rec._id!)}
-									class="px-2 py-1.5 text-xs text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600"
-									title={$t('recordings.common.delete')}
+									class={`${desktopActionClass} text-stone-500 hover:bg-red-50 hover:text-red-600`}
+									aria-label={$t('recordings.common.delete')}
+									data-tooltip={$t('recordings.common.delete')}
 								>
 									<svg
-										class="h-4 w-4"
-										fill="none"
 										viewBox="0 0 24 24"
+										class="h-[18px] w-[18px]"
+										fill="none"
 										stroke="currentColor"
-										stroke-width="2"
+										stroke-width="1.6"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"
 									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"
-										/>
+										<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v6m4-6v6" />
 									</svg>
 								</button>
 							{/if}
 						</div>
 					</td>
 				</tr>
+				{#if previewRecordingId === rec._id && rec.status === 'ready' && rec.s3_url}
+					<tr
+						id={`recording-preview-${rec._id}`}
+						class="border-b border-stone-200/60 bg-stone-50/80"
+					>
+						<td colspan={canDeleteRecordings ? 5 : 4} class="px-3 py-3 sm:px-5">
+							<audio
+								bind:this={previewAudio}
+								src={rec.s3_url}
+								controls
+								preload="none"
+								class="h-9 w-full max-w-xl"
+								aria-label={$t('recordings.list.previewAudio', { title: rec.title })}
+							></audio>
+						</td>
+					</tr>
+				{/if}
 			{/each}
 			{#if listLoaded && filteredRecordings.length === 0}
 				<tr>
-					<td colspan={canDeleteRecordings ? 8 : 7} class="px-5 py-12 text-center text-stone-400">
+					<td colspan={canDeleteRecordings ? 5 : 4} class="px-5 py-12 text-center text-stone-400">
 						{#if total === 0}
 							{$t('recordings.list.emptyStart')}
 						{:else if hasActiveFilters}
@@ -3683,7 +3826,7 @@
 			{#if isFetching}
 				{$t('recordings.common.loading')}
 			{:else}
-				Charger plus ({total - recordings.length} restants)
+				{$t('recordings.list.loadMore', { count: total - recordings.length })}
 			{/if}
 		</button>
 	</div>
@@ -4795,6 +4938,37 @@
 		}
 		to {
 			opacity: 1;
+		}
+	}
+
+	.recordings-table {
+		container-type: inline-size;
+	}
+
+	.recording-action::after {
+		content: attr(data-tooltip) / '';
+		position: absolute;
+		z-index: 5;
+		inset-block-end: calc(100% + 0.2rem);
+		inset-inline-end: 0;
+		padding: 0.2rem 0.45rem;
+		border-radius: 0.25rem;
+		background: #292524;
+		color: white;
+		font-size: 0.6875rem;
+		white-space: nowrap;
+		pointer-events: none;
+		visibility: hidden;
+	}
+
+	.recording-action:hover::after,
+	.recording-action:focus-visible::after {
+		visibility: visible;
+	}
+
+	@container (max-width: 46rem) {
+		.recording-table-thumbnail {
+			display: none;
 		}
 	}
 </style>

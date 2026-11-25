@@ -2,6 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Single-choice selects keep the native menu and reserve space for one chevron. */
+select:not([multiple]):is(:not([size]), [size='1']) {
+	appearance: none;
+	padding-inline-end: 2.25rem;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m5 7.5 5 5 5-5' stroke='%2378716c' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+	background-position: right 0.75rem center;
+	background-repeat: no-repeat;
+	background-size: 1rem;
+}
+
+@media (forced-colors: active) {
+	select:not([multiple]):is(:not([size]), [size='1']) {
+		appearance: auto;
+		background-image: none;
+	}
+}
+
 /* Three themes off one set of variables. `ink` is a scale of surface depth
    rather than luminance — ink-950 is always the page, ink-700 always a border
    — so every component works in all of them without a single dark: variant.
@@ -131,13 +148,8 @@ textarea {
 	}
 
 	.studio-select {
-		appearance: none;
-		-webkit-appearance: none;
 		color-scheme: dark;
-		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237f7f87' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E");
-		background-position: right 12px center;
-		background-repeat: no-repeat;
-		@apply min-h-10 cursor-pointer rounded-lg py-2.5 pl-3.5 pr-10 shadow-sm hover:border-accent focus:ring-2 focus:ring-primary/20;
+		@apply min-h-10 cursor-pointer rounded-lg py-2.5 pl-3.5 shadow-sm hover:border-accent focus:ring-2 focus:ring-primary/20;
 	}
 
 	:root.light .studio-select {

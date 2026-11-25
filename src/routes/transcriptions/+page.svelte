@@ -9,7 +9,9 @@
 	// @ts-ignore
 	import Icon from 'svelte-icons-pack/Icon.svelte';
 	import AiOutlineDownload from 'svelte-icons-pack/ai/AiOutlineDownload';
-	import AiFillPlayCircle from 'svelte-icons-pack/ai/AiFillPlayCircle';
+	import BsFileEarmarkPdfFill from 'svelte-icons-pack/bs/BsFileEarmarkPdfFill';
+	import IoPlayCircle from 'svelte-icons-pack/io/IoPlayCircle';
+	import { transcriptTitle } from '$lib/utils/transcriptTitle';
 
 	import ArrowDown2 from 'iconsax-svelte/ArrowDown2.svelte';
 	import ArrowUp2 from 'iconsax-svelte/ArrowUp2.svelte';
@@ -17,7 +19,6 @@
 	import ListSkeleton from '$lib/components/ListSkeleton.svelte';
 	import ErrorCard from '$lib/components/ErrorCard.svelte';
 	import ResultsSummary from '$lib/components/ResultsSummary.svelte';
-	import { writable } from 'svelte/store';
 	import LoadingRing from '$lib/components/LoadingRing.svelte';
 	import type { SerializedTranscription } from '$lib/server/transcriptions';
 	import {
@@ -28,15 +29,16 @@
 	} from './listCache';
 	import MobileListToolbar from '$lib/components/+mobileListToolbar.svelte';
 	import { mobileSearchOpen, mobileFiltersOpen } from '$lib/stores/mobileControls';
-	import { t } from '../../i18n';
+	import { t, locale } from '../../i18n';
+
+	const rowActionClass =
+		'inline-flex h-11 w-11 shrink-0 items-center justify-center transition-colors hover:text-missionnaire focus-visible:outline-2 focus-visible:outline-missionnaire';
 
 	interface Props {
 		data: PageData;
 	}
 
 	let { data }: Props = $props();
-	let selectedDocument: SerializedTranscription | null = $state(null);
-	const isDocumentOpen = writable(false);
 	let searchTerm = $state('');
 	let isSearching = $state(false);
 	let searchInput: HTMLInputElement | undefined = $state();
@@ -253,11 +255,6 @@
 		}
 	}
 
-	function handleSelectDocument(doc: SerializedTranscription) {
-		selectedDocument = doc;
-		isDocumentOpen.set(true);
-	}
-
 	onMount(() => {
 		if (browser) {
 			const url = new URL(window.location.href);
@@ -402,9 +399,7 @@
 
 	<div class="flex w-full h-full flex-col lg:flex-row mt-4 md:mt-0">
 		<!-- List Panel -->
-		<div
-			class="flex-1 min-w-0 {$isDocumentOpen ? 'lg:w-1/2' : 'w-full'} transition-all duration-300"
-		>
+		<div class="w-full min-w-0">
 			<!-- Sort and Filter Controls -->
 			<div
 				class="flex-col sm:flex-row justify-end mb-4 items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 px-2 sm:px-0 {$mobileFiltersOpen
@@ -417,7 +412,7 @@
 					>
 					<select
 						id="year-filter"
-						class="border border-stone-200 px-3 py-2 text-sm font-body text-stone-700 bg-white tabular-nums focus:outline-none focus:ring-2 focus:ring-missionnaire/30 focus:border-missionnaire/40 w-full sm:w-auto"
+						class="w-full min-w-0 border border-stone-200 bg-white px-3 py-2 sm:w-auto font-body text-sm tabular-nums text-stone-700 focus:border-missionnaire/40 focus:ring-2 focus:ring-missionnaire/30 focus:outline-none"
 						value={selectedYear}
 						onchange={handleYearChange}
 					>
@@ -430,7 +425,7 @@
 
 				<button
 					onclick={handleSort}
-					class="flex items-center justify-center space-x-2 px-4 py-2 min-h-11 text-sm font-body text-stone-600 hover:text-missionnaire transition-colors duration-200 w-full sm:w-auto border sm:border-0 border-stone-200"
+					class="flex min-h-11 w-full items-center justify-center gap-2 border border-stone-200 bg-white px-4 text-xs font-semibold text-stone-600 transition-colors hover:text-missionnaire sm:w-auto md:hidden"
 				>
 					<span>{$t('transcriptions.publishDate')}</span>
 					{#if sortOrder === 'desc'}
@@ -477,60 +472,116 @@
 				<div class="mb-2 px-2 sm:px-0">
 					<ResultsSummary from={summaryFrom} to={summaryTo} {total} query={currentSearch} />
 				</div>
-				<div class="border border-stone-200/60 bg-white/40 mx-2 sm:mx-0">
-					{#each documents as document (document._id)}
-						<div
-							class="flex items-center border-b border-stone-100 last:border-b-0 hover:bg-white/60"
+				<div class="mx-2 border border-stone-200/60 bg-white/40 sm:mx-0">
+					<table class="w-full table-fixed text-left" aria-label={$t('nav.transcriptions')}>
+						<thead
+							class="border-b border-stone-200/60 bg-white/40 text-[10px] font-bold uppercase tracking-widest text-stone-500 md:text-[11px]"
 						>
-							<button
-								class="flex-1 p-3 sm:p-4 flex items-start space-x-2 sm:space-x-4 text-left {selectedDocument?.filename ===
-								document.filename
-									? 'bg-stone-100'
-									: ''}"
-								onclick={() => handleSelectDocument(document)}
-							>
-								<div class="flex-shrink-0 pt-1">
-									<DocumentText1 size={18} color="#6B7280" />
-								</div>
-								<div class="flex-1 min-w-0">
-									<h3 class="text-xs sm:text-sm font-medium text-stone-800 break-words">
-										{document.filename}
-									</h3>
-									<div class="mt-1 flex flex-col sm:flex-row sm:flex-wrap sm:space-x-6">
-										<div class="text-xs text-stone-500 tabular-nums">
-											{formatFileSize(document.size)}
-										</div>
-										<div class="text-xs text-stone-500 tabular-nums">
-											{new Date(document.publishedOn).toLocaleDateString()}
-										</div>
-									</div>
-								</div>
-							</button>
-							<div class="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4">
-								{#if document.videoDisplayId}
-									<a
-										href={`https://www.youtube.com/watch?v=${document.videoDisplayId}`}
-										target="_blank"
-										rel="noopener noreferrer"
-										class="inline-flex items-center gap-1.5 border border-stone-200 bg-white px-2 py-1 sm:px-2.5 sm:py-1.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-stone-600 hover:border-red-500 hover:text-red-600 hover:bg-red-50 transition-colors duration-200 active:scale-[0.98]"
-										title={$t('transcriptions.watchOnYoutube')}
-									>
-										<Icon src={AiFillPlayCircle} size="14" />
-										<span class="hidden sm:inline">{$t('misc.video')}</span>
-									</a>
-								{/if}
-								<a
-									href={document.url}
-									download
-									class="inline-flex items-center gap-1.5 border border-stone-200 bg-white px-2 py-1 sm:px-2.5 sm:py-1.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-stone-600 hover:border-missionnaire hover:text-missionnaire hover:bg-missionnaire/5 transition-colors duration-200 active:scale-[0.98]"
-									title={$t('transcriptions.downloadPdf')}
+							<tr>
+								<th scope="col" class="hidden w-12 py-3 text-center md:table-cell">#</th>
+								<th scope="col" class="px-3 py-3 md:px-4">{$t('list.title')}</th>
+								<th
+									scope="col"
+									aria-sort={sortOrder === 'desc' ? 'descending' : 'ascending'}
+									class="hidden w-32 px-4 py-3 md:table-cell"
 								>
-									<Icon src={AiOutlineDownload} size="14" />
-									<span class="hidden sm:inline">PDF</span>
-								</a>
-							</div>
-						</div>
-					{/each}
+									<button
+										type="button"
+										onclick={handleSort}
+										class="inline-flex items-center gap-1.5 hover:text-missionnaire"
+									>
+										<span aria-hidden="true" class="text-missionnaire"
+											>{sortOrder === 'desc' ? '↓' : '↑'}</span
+										>
+										{$t('list.date')}
+									</button>
+								</th>
+								<th scope="col" class="hidden w-24 px-4 py-3 md:table-cell"
+									>{$t('transcriptions.fileSize')}</th
+								>
+								<th scope="col" class="w-36 py-3 text-center md:w-40">{$t('list.actions')}</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-stone-100">
+							{#each documents as document, index (document._id)}
+								{@const { title } = transcriptTitle(document.filename)}
+								{@const published = new Date(document.publishedOn).toLocaleDateString($locale, {
+									timeZone: 'UTC'
+								})}
+								{@const size = formatFileSize(document.size)}
+								<tr class="transition-colors hover:bg-white/60 focus-within:bg-white/60">
+									<td
+										class="hidden py-4 text-center text-xs font-bold tabular-nums text-stone-400 md:table-cell"
+										>{summaryFrom + index}</td
+									>
+									<td class="px-3 py-4 md:px-4">
+										<a
+											href={`/transcriptions/${document._id}`}
+											class="block break-words text-sm font-bold leading-snug text-stone-900 hover:text-missionnaire"
+										>
+											{title}
+										</a>
+										<div
+											class="mt-1 flex flex-wrap gap-x-3 text-xs tabular-nums text-stone-500 md:hidden"
+										>
+											<span>{published}</span>
+											<span>{size}</span>
+										</div>
+									</td>
+									<td class="hidden px-4 py-4 text-xs tabular-nums text-stone-500 md:table-cell"
+										>{published}</td
+									>
+									<td class="hidden px-4 py-4 text-xs tabular-nums text-stone-500 md:table-cell"
+										>{size}</td
+									>
+									<td class="py-2 md:py-4">
+										<div class="flex items-center justify-center">
+											<a
+												href={document.url}
+												target="_blank"
+												rel="noopener noreferrer"
+												class={`${rowActionClass} text-gray-400`}
+												aria-label={$t('predications.openPdf')}
+												title={$t('predications.openPdf')}
+											>
+												<Icon src={BsFileEarmarkPdfFill} size="18" />
+											</a>
+											<a
+												href={document.url}
+												download
+												class={rowActionClass}
+												aria-label={$t('transcriptions.downloadPdf')}
+												title={$t('transcriptions.downloadPdf')}
+											>
+												<Icon src={AiOutlineDownload} size="20" />
+											</a>
+											{#if document.replayId || document.videoDisplayId}
+												{@const playLabel = $t(
+													document.replayId
+														? 'transcriptions.openReplay'
+														: 'transcriptions.watchOnYoutube'
+												)}
+												<a
+													href={document.replayId
+														? `/live/rediffusions/${document.replayId}`
+														: `https://www.youtube.com/watch?v=${encodeURIComponent(document.videoDisplayId ?? '')}`}
+													target={document.replayId ? undefined : '_blank'}
+													rel={document.replayId ? undefined : 'noopener noreferrer'}
+													class={rowActionClass}
+													aria-label={playLabel}
+													title={playLabel}
+												>
+													<Icon src={IoPlayCircle} size="24" />
+												</a>
+											{:else}
+												<span class="w-11 shrink-0" aria-hidden="true"></span>
+											{/if}
+										</div>
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
 				</div>
 
 				{#if showPagination && totalPages > 1}
@@ -548,119 +599,5 @@
 				{/if}
 			{/if}
 		</div>
-
-		<!-- Document Preview Panel -->
-		{#if $isDocumentOpen && selectedDocument}
-			<div
-				class="fixed inset-0 lg:relative lg:w-1/2 border-l border-stone-200 bg-white p-4 sm:p-6 min-h-screen z-50 lg:z-auto"
-			>
-				<div class="flex flex-col h-full">
-					<div class="flex justify-between items-start mb-4 sm:mb-6">
-						<h2 class="text-lg sm:text-xl font-semibold text-stone-900 pr-8">
-							{selectedDocument.filename}
-						</h2>
-						<button
-							class="text-stone-400 hover:text-stone-600 transition-colors duration-200"
-							onclick={() => isDocumentOpen.set(false)}
-							aria-label={$t('misc.close')}
-						>
-							<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M6 18L18 6M6 6l12 12"
-								/>
-							</svg>
-						</button>
-					</div>
-
-					<div class="flex-1">
-						<div class="mb-6">
-							<dl class="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
-								<div>
-									<dt
-										class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.15em] text-stone-400 font-body"
-									>
-										{$t('transcriptions.fileSize')}
-									</dt>
-									<dd class="mt-1 text-xs sm:text-sm text-stone-800 tabular-nums">
-										{formatFileSize(selectedDocument.size)}
-									</dd>
-								</div>
-								<div>
-									<dt
-										class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.15em] text-stone-400 font-body"
-									>
-										{$t('transcriptions.publishDate')}
-									</dt>
-									<dd class="mt-1 text-xs sm:text-sm text-stone-800 tabular-nums">
-										{new Date(selectedDocument.publishedOn).toLocaleDateString()}
-									</dd>
-								</div>
-							</dl>
-						</div>
-
-						<div
-							class="relative w-full h-[calc(100vh-300px)] border border-stone-200 bg-stone-50 flex flex-col items-center justify-center p-4 sm:p-8 text-center"
-						>
-							<DocumentText1 size={40} color="#a8a29e" />
-							<h3 class="mt-4 text-base sm:text-lg font-medium text-stone-900">
-								{$t('transcriptions.previewHeading')}
-							</h3>
-							<p class="mt-2 text-xs sm:text-sm text-stone-500 max-w-md">
-								{$t('transcriptions.previewBlocked')}
-							</p>
-							<div class="mt-4 sm:mt-6 flex flex-col gap-2 sm:gap-4 w-full px-4">
-								<a
-									href={selectedDocument.url}
-									target="_blank"
-									rel="noopener noreferrer"
-									class="inline-flex items-center justify-center px-4 py-2 border border-stone-300 text-xs sm:text-sm font-medium text-stone-700 bg-white hover:border-missionnaire hover:text-missionnaire transition-colors duration-200 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-missionnaire w-full"
-								>
-									<svg
-										class="w-4 h-4 mr-2 -ml-1"
-										fill="none"
-										stroke="currentColor"
-										viewBox="0 0 24 24"
-									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-										/>
-									</svg>
-									{$t('transcriptions.openNewTab')}
-								</a>
-								<a
-									href={selectedDocument.url}
-									download
-									class="inline-flex items-center justify-center px-4 py-2 border border-transparent text-xs sm:text-sm font-medium text-white bg-missionnaire hover:bg-missionnaire/90 transition-colors duration-200 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-missionnaire w-full"
-								>
-									<div class="mr-2">
-										<Icon src={AiOutlineDownload} size="16" />
-									</div>
-									{$t('transcriptions.downloadDocument')}
-								</a>
-								{#if selectedDocument.videoDisplayId}
-									<a
-										href={`https://www.youtube.com/watch?v=${selectedDocument.videoDisplayId}`}
-										target="_blank"
-										rel="noopener noreferrer"
-										class="inline-flex items-center justify-center px-4 py-2 border border-stone-300 text-xs sm:text-sm font-medium text-stone-700 bg-white hover:border-missionnaire hover:text-missionnaire transition-colors duration-200 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-missionnaire w-full"
-									>
-										<div class="mr-2">
-											<Icon src={AiFillPlayCircle} size="16" />
-										</div>
-										{$t('transcriptions.watchRelated')}
-									</a>
-								{/if}
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
-		{/if}
 	</div>
 </div>

@@ -26,7 +26,10 @@ function parseDate(value: string | Date | null | undefined): Date | null {
 	return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function publishedDateFromFilename(filename: string, fallback: string | Date | null | undefined): Date {
+function publishedDateFromFilename(
+	filename: string,
+	fallback: string | Date | null | undefined
+): Date {
 	const match = filename.match(/(19\d{2}|20\d{2})[\s_.-]*([01]\d)[\s_.-]*([0-3]\d)/);
 	if (match) {
 		const [, year, month, day] = match;
@@ -99,7 +102,9 @@ export const POST: RequestHandler = async ({ params, request, getClientAddress, 
 		uploadDate: existingForReplace ? existingPdfFields.uploadDate || now : now,
 		updatedAt: now,
 		publishedOn: publishedDateFromFilename(fileName, recording.started_at),
-		createdFrom: existingForReplace ? existingPdfFields.createdFrom || 'live_recording' : 'live_recording',
+		createdFrom: existingForReplace
+			? existingPdfFields.createdFrom || 'live_recording'
+			: 'live_recording',
 		recordingId: new ObjectId(params.id)
 	};
 
@@ -114,19 +119,31 @@ export const POST: RequestHandler = async ({ params, request, getClientAddress, 
 		await pdfs.insertOne(updatedPdfInfo);
 	}
 
-	await videos.updateOne(
-		{ _id: videoObjectId },
-		{ $pull: { pdfInfo: { s3Key: { $in: [previousS3Key, s3Key].filter(Boolean) } } } } as Document
-	);
-	await videos.updateOne({ _id: videoObjectId }, { $pull: { pdfInfo: { _id: pdfInfo._id } } } as Document);
-	await videos.updateOne({ _id: videoObjectId }, { $pull: { pdfInfo: { _id: String(pdfInfo._id) } } } as Document);
-	await videos.updateOne({ _id: videoObjectId }, { $push: { pdfInfo: updatedPdfInfo } } as Document);
+	await videos.updateOne({ _id: videoObjectId }, {
+		$pull: { pdfInfo: { s3Key: { $in: [previousS3Key, s3Key].filter(Boolean) } } }
+	} as Document);
+	await videos.updateOne({ _id: videoObjectId }, {
+		$pull: { pdfInfo: { _id: pdfInfo._id } }
+	} as Document);
+	await videos.updateOne({ _id: videoObjectId }, {
+		$pull: { pdfInfo: { _id: String(pdfInfo._id) } }
+	} as Document);
+	await videos.updateOne({ _id: videoObjectId }, {
+		$push: { pdfInfo: updatedPdfInfo }
+	} as Document);
 	await updateRecording(params.id, { transcript_pdf_id: String(updatedPdfInfo._id) });
 
 	if (previousS3Key && previousS3Key !== s3Key) {
-		deleteObject(previousS3Key).catch((err) =>
-			console.error('[recordings/transcript/finalize] old PDF delete failed:', err)
-		);
+		Promise.all([
+			pdfs.findOne({ s3Key: previousS3Key }, { projection: { _id: 1 } }),
+			videos.findOne({ 'pdfInfo.s3Key': previousS3Key }, { projection: { _id: 1 } })
+		])
+			.then(([pdfReference, videoReference]) => {
+				if (!pdfReference && !videoReference) return deleteObject(previousS3Key);
+			})
+			.catch((err) =>
+				console.error('[recordings/transcript/finalize] old PDF delete failed:', err)
+			);
 	}
 
 	await logAudit({

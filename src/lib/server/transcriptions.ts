@@ -2,12 +2,14 @@ import { z } from 'zod';
 import { literalSearch, objectIdString, pageLimit, pageNumber } from '$lib/server/mongo-input';
 import { ObjectId, type Db, type Filter } from 'mongodb';
 import { getDb } from '../../db/mongo';
+import { getReplayIdsForTranscripts } from './recordings';
 import type { PDF } from '../../core/model/pdf';
 
 export type SerializedTranscription = Omit<PDF, '_id' | 'videoId'> & {
 	_id: string;
 	videoId?: string;
 	videoDisplayId?: string;
+	replayId?: string;
 };
 
 const YEARS_TTL_MS = 5 * 60_000;
@@ -57,13 +59,18 @@ export async function queryTranscriptions(options: {
 	year?: string | null;
 	search?: string | null;
 }): Promise<{ documents: SerializedTranscription[]; total: number }> {
-	const { page, limit, sort, year, search } = z.object({
-		page: pageNumber.default(1),
-		limit: pageLimit.default(12),
-		sort: z.enum(['asc', 'desc']).default('desc'),
-		year: z.string().regex(/^\d{4}$/).nullish(),
-		search: literalSearch.nullish()
-	}).parse(options);
+	const { page, limit, sort, year, search } = z
+		.object({
+			page: pageNumber.default(1),
+			limit: pageLimit.default(12),
+			sort: z.enum(['asc', 'desc']).default('desc'),
+			year: z
+				.string()
+				.regex(/^\d{4}$/)
+				.nullish(),
+			search: literalSearch.nullish()
+		})
+		.parse(options);
 
 	const db = await getDb();
 	await ensureListIndex(db);
@@ -83,21 +90,61 @@ export async function queryTranscriptions(options: {
 
 	const skip = (page - 1) * limit;
 
-	const [total, documents] = await Promise.all([
-		collection.countDocuments(query),
-		collection
-			.find(query)
-			.project({ library_search: 0 })
-			.sort({
-				publishedOn: sort === 'desc' ? -1 : 1,
-				filename: sort === 'desc' ? -1 : 1,
-				_id: sort === 'desc' ? -1 : 1
-			})
-			.collation({ locale: 'fr', numericOrdering: true })
-			.skip(skip)
-			.limit(limit)
-			.toArray()
-	]);
+	const direction = sort === 'desc' ? -1 : 1;
+	const order = { publishedOn: direction, filename: direction, _id: direction };
+	const [result] = await collection
+		.aggregate<{
+			documents: Array<PDF & { recordingId?: ObjectId | string }>;
+			count: Array<{ total: number }>;
+		}>(
+			[
+				{ $match: query },
+				{
+					$project: {
+						filename: 1,
+						url: 1,
+						s3Key: 1,
+						size: 1,
+						publishedOn: 1,
+						uploadDate: 1,
+						videoId: 1,
+						recordingId: 1
+					}
+				},
+				{ $set: { hasRecording: { $ne: [{ $ifNull: ['$recordingId', null] }, null] } } },
+				{ $sort: { hasRecording: -1, publishedOn: -1, _id: -1 } },
+				// Hash the bucket key before grouping so French collation cannot merge
+				// distinct S3 keys that differ only in Unicode form or digit padding.
+				{
+					$group: {
+						_id: {
+							$cond: [
+								{ $gt: [{ $strLenCP: { $ifNull: ['$s3Key', ''] } }, 0] },
+								{ key: '$s3Key', exact: { $toHashedIndexKey: '$s3Key' } },
+								'$_id'
+							]
+						},
+						document: { $first: '$$ROOT' }
+					}
+				},
+				{ $replaceWith: '$document' },
+				{
+					$facet: {
+						documents: [
+							{ $sort: order },
+							{ $skip: skip },
+							{ $limit: limit },
+							{ $unset: 'hasRecording' }
+						],
+						count: [{ $count: 'total' }]
+					}
+				}
+			],
+			{ collation: { locale: 'fr', numericOrdering: true } }
+		)
+		.toArray();
+	const documents = result?.documents ?? [];
+	const total = result?.count[0]?.total ?? 0;
 
 	const videoIds = documents
 		.map((d) => d.videoId)
@@ -115,6 +162,14 @@ export async function queryTranscriptions(options: {
 		}
 	}
 
+	const replays = await getReplayIdsForTranscripts(
+		documents.map((doc) => ({
+			transcriptId: String(doc._id),
+			recordingId: doc.recordingId,
+			sourceVideoId: videoMap.get(String(doc.videoId))
+		}))
+	);
+
 	const serialized: SerializedTranscription[] = documents.map((doc) => {
 		const idStr = String(doc._id);
 		const videoIdStr = doc.videoId ? String(doc.videoId) : undefined;
@@ -123,6 +178,7 @@ export async function queryTranscriptions(options: {
 			_id: idStr,
 			videoId: videoIdStr,
 			videoDisplayId: videoIdStr ? videoMap.get(videoIdStr) : undefined,
+			replayId: replays.get(idStr),
 			publishedOn: doc.publishedOn instanceof Date ? doc.publishedOn : new Date(doc.publishedOn)
 		} as SerializedTranscription;
 	});

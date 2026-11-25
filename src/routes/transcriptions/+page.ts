@@ -4,7 +4,7 @@ import { pageMeta } from '$lib/seo';
 
 export const load = async ({ fetch, url }) => {
 	const page = Number(url.searchParams.get('page')) || 1;
-	const limit = 12;
+	const limit = 100;
 	const sortOrder = url.searchParams.get('sort') === 'asc' ? 'asc' : 'desc';
 	const selectedYear = url.searchParams.get('year');
 	const searchTerm = url.searchParams.get('search');

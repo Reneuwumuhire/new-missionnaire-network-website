@@ -15,7 +15,7 @@ import {
 } from './ffmpeg.js';
 import { createIngestCredential, ingestToken, verifyIngestCredential } from './ingest-auth.js';
 import { isRecovering, pendingOrphans, recoverOrphans } from './recover.js';
-import { findRecording, isIngestRevoked } from './mongo.js';
+import { findRecording, isIngestRevoked, publishReadyLiveRecordings } from './mongo.js';
 import { ensureRecordingsDir } from './sidecar.js';
 import { createRecordingFeed } from './recording-feed.js';
 
@@ -237,7 +237,13 @@ async function main() {
 		]);
 	}
 	void recoverOrphans().catch((err) => app.log.error(err, 'orphan recovery failed'));
+	const publicationTimer = setInterval(() => void publishReadyLiveRecordings(), 30_000);
+	publicationTimer.unref();
+	app.addHook('onClose', async () => {
+		clearInterval(publicationTimer);
+	});
 	await app.listen({ host: '0.0.0.0', port: ENV.PORT });
+	void publishReadyLiveRecordings();
 	app.log.info(`Recorder listening on :${ENV.PORT}`);
 }
 

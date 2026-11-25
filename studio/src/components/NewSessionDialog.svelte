@@ -177,21 +177,11 @@
 			<label class="block">
 				<span class="studio-label">Channel</span>
 				{#if liveSession.youtubeChannels.length > 0}
-					<div class="relative">
-						<select
-							class="studio-input h-10 w-full appearance-none pr-9"
-							bind:value={youtubeChannelId}
-						>
-							{#each liveSession.youtubeChannels as channel (channel.id)}
-								<option value={channel.id}>{channel.title}</option>
-							{/each}
-						</select>
-						<span
-							class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-muted"
-						>
-							<Icon name="down" size={14} />
-						</span>
-					</div>
+					<select class="studio-input h-10 w-full" bind:value={youtubeChannelId}>
+						{#each liveSession.youtubeChannels as channel (channel.id)}
+							<option value={channel.id}>{channel.title}</option>
+						{/each}
+					</select>
 				{:else}
 					<button
 						class="studio-chip h-10 w-full justify-center border-primary/40 text-accent"
@@ -204,16 +194,11 @@
 			</label>
 			<label class="block">
 				<span class="studio-label">Visibility</span>
-				<div class="relative">
-					<select class="studio-input h-10 w-full appearance-none pr-9" bind:value={privacyStatus}>
-						<option value="public">Public</option>
-						<option value="unlisted">Unlisted</option>
-						<option value="private">Private</option>
-					</select>
-					<span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-muted">
-						<Icon name="down" size={14} />
-					</span>
-				</div>
+				<select class="studio-input h-10 w-full" bind:value={privacyStatus}>
+					<option value="public">Public</option>
+					<option value="unlisted">Unlisted</option>
+					<option value="private">Private</option>
+				</select>
 			</label>
 		</div>
 		<label
