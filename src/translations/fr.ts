@@ -480,6 +480,7 @@ export default {
 	'transcriptions.openNewTab': 'Ouvrir dans un nouvel onglet',
 	'transcriptions.downloadDocument': 'Télécharger le document',
 	'transcriptions.watchRelated': 'Voir la vidéo associée',
+	'transcriptions.openReplay': 'Ouvrir la rediffusion',
 	'transcriptions.loadFailed': 'Impossible de charger les transcriptions',
 
 	// ── Videos page ─────────────────────────────────────────────

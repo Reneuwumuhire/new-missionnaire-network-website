@@ -565,6 +565,50 @@ export interface RecordingTranscript {
 	size: number;
 }
 
+export async function getReplayIdForTranscript(
+	transcriptId: string,
+	recordingId: unknown,
+	sourceVideoId: string | null
+): Promise<string | null> {
+	try {
+		const db = await getDb();
+		const recordings = db.collection('recordings');
+		const publicReplay = { published: true, status: 'ready' };
+		const projection = { _id: 1 };
+		const origin = objectIdString.safeParse(String(recordingId ?? ''));
+		if (origin.success) {
+			const recording = await recordings.findOne(
+				{
+					...publicReplay,
+					_id: new ObjectId(origin.data),
+					transcript_pdf_id: { $in: [transcriptId, null] }
+				},
+				{ projection }
+			);
+			if (recording) return String(recording._id);
+		}
+
+		const attached = await recordings.findOne(
+			{ ...publicReplay, transcript_pdf_id: transcriptId },
+			{ projection, sort: { started_at: -1, _id: -1 } }
+		);
+		if (attached) return String(attached._id);
+		if (!sourceVideoId) return null;
+
+		const matches = await recordings
+			.find(
+				{ ...publicReplay, source_video_id: sourceVideoId, transcript_pdf_id: null },
+				{ projection }
+			)
+			.limit(2)
+			.toArray();
+		return matches.length === 1 ? String(matches[0]._id) : null;
+	} catch (error) {
+		console.error('[recordings] getReplayIdForTranscript failed', error);
+		return null;
+	}
+}
+
 /** Find the `videos._id` for a recording from its stored YouTube id only.
  *  The previous date-based title fallback was removed: matching any video
  *  whose title merely contained the recording's YYYY-MM-DD attached the wrong
@@ -599,7 +643,10 @@ export async function getTranscriptForRecording(recording: {
 		if (recording.transcript_pdf_id === 'none') return null;
 
 		const db = await getDb();
-		if (recording.transcript_pdf_id && objectIdString.safeParse(recording.transcript_pdf_id).success) {
+		if (
+			recording.transcript_pdf_id &&
+			objectIdString.safeParse(recording.transcript_pdf_id).success
+		) {
 			const attached = await db
 				.collection('pdfs')
 				.findOne(

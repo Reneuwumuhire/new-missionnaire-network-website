@@ -476,6 +476,7 @@ const en: Record<keyof typeof fr, string> = {
 	'transcriptions.openNewTab': 'Open in a new tab',
 	'transcriptions.downloadDocument': 'Download the document',
 	'transcriptions.watchRelated': 'Watch the related video',
+	'transcriptions.openReplay': 'Open the live replay',
 	'transcriptions.loadFailed': 'Could not load the transcripts',
 
 	// ── Videos page ─────────────────────────────────────────────

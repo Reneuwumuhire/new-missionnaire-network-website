@@ -64,7 +64,11 @@
 			<a href={data.pdfUrl} download class={pdfActionClass}>
 				{$t('transcriptions.downloadDocument')}
 			</a>
-			{#if data.videoUrl}
+			{#if data.replayUrl}
+				<a href={data.replayUrl} class={pdfActionClass}>
+					{$t('transcriptions.openReplay')}
+				</a>
+			{:else if data.videoUrl}
 				<a href={data.videoUrl} target="_blank" rel="noopener noreferrer" class={pdfActionClass}>
 					{$t('transcriptions.watchRelated')}
 				</a>
