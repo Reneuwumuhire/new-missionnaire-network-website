@@ -1181,6 +1181,7 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.list.unpublish': 'Unpublish',
 	'recordings.list.retryUpload': 'Retry upload',
 	'recordings.list.retry': 'Retry',
+	'recordings.list.closePreview': 'Close preview',
 	'recordings.list.closeAudioPreview': 'Close audio preview for {title}',
 	'recordings.list.previewAudio': 'Preview audio for {title}',
 	'recordings.list.trimAudio': 'Edit audio',

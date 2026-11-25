@@ -2077,7 +2077,7 @@
 	let previewRecordingId = $state<string | null>(null);
 	let previewAudio = $state<HTMLAudioElement>();
 	const desktopActionClass =
-		'inline-flex min-h-8 items-center justify-center whitespace-nowrap border border-stone-200 bg-white px-2.5 text-xs font-medium text-stone-700 transition-colors hover:border-primary hover:text-primary';
+		'recording-action relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-colors';
 
 	async function toggleRecordingPreview(id: string) {
 		const opening = previewRecordingId !== id;
@@ -3508,7 +3508,7 @@
 				<th scope="col" class="w-24 px-3 py-3 font-semibold text-stone-600"
 					>{$t('recordings.table.status')}</th
 				>
-				<th scope="col" class="w-48 px-3 py-3 text-right font-semibold text-stone-600"
+				<th scope="col" class="w-44 px-3 py-3 text-right font-semibold text-stone-600"
 					>{$t('recordings.table.actions')}</th
 				>
 			</tr>
@@ -3631,11 +3631,11 @@
 						</div>
 					</td>
 					<td class="px-3 py-3">
-						<div class="flex flex-wrap items-center justify-end gap-1.5">
+						<div class="flex items-center justify-end gap-0.5">
 							{#if rec.status === 'ready' && rec.s3_url}
 								<button
 									type="button"
-									class={desktopActionClass}
+									class={`${desktopActionClass} ${previewRecordingId === rec._id ? 'bg-primary/10 text-orange-700' : 'text-stone-700 hover:bg-primary/10 hover:text-orange-700'}`}
 									onclick={() => void toggleRecordingPreview(rec._id!)}
 									aria-expanded={previewRecordingId === rec._id}
 									aria-controls={previewRecordingId === rec._id
@@ -3647,14 +3647,18 @@
 											: 'recordings.list.previewAudio',
 										{ title: rec.title }
 									)}
-									title={$t(
+									data-tooltip={$t(
 										previewRecordingId === rec._id
-											? 'recordings.list.closeAudioPreview'
-											: 'recordings.list.previewAudio',
-										{ title: rec.title }
+											? 'recordings.list.closePreview'
+											: 'audio.edit.preview'
 									)}
 								>
-									<svg viewBox="0 0 20 20" class="h-4 w-4" fill="currentColor" aria-hidden="true">
+									<svg
+										viewBox="0 0 20 20"
+										class="h-[18px] w-[18px]"
+										fill="currentColor"
+										aria-hidden="true"
+									>
 										{#if previewRecordingId === rec._id}
 											<path d="M6 6h8v8H6z" />
 										{:else}
@@ -3665,48 +3669,97 @@
 							{/if}
 							{#if rec.status === 'failed'}
 								<button
+									type="button"
 									onclick={() => retryUpload(rec._id!)}
-									class="bg-amber-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-700 hover:bg-amber-200"
+									class={`${desktopActionClass} text-amber-700 hover:bg-amber-100`}
+									aria-label={$t('recordings.list.retry')}
+									data-tooltip={$t('recordings.list.retry')}
 								>
-									{$t('recordings.list.retry')}
+									<svg
+										viewBox="0 0 24 24"
+										class="h-[18px] w-[18px]"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="1.6"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"
+									>
+										<path d="M4 11a8 8 0 1 1 2.3 5.7M4 5v6h6" />
+									</svg>
 								</button>
 							{/if}
 							{#if rec.status === 'ready' || rec.status === 'failed'}
+								{@const editLabel = isEditing
+									? $t('recordings.common.close')
+									: $t('recordings.common.edit')}
 								<button
+									type="button"
 									onclick={() => (isEditing ? cancelRecordingEdit() : enterRecordingEdit(rec))}
-									class={desktopActionClass}
+									class={`${desktopActionClass} text-stone-600 hover:bg-stone-200/70 hover:text-stone-900`}
+									aria-label={editLabel}
+									data-tooltip={editLabel}
 								>
-									{isEditing ? $t('recordings.common.close') : $t('recordings.common.edit')}
+									<svg
+										viewBox="0 0 24 24"
+										class="h-[18px] w-[18px]"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="1.6"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"
+									>
+										{#if isEditing}
+											<path d="m6 6 12 12M18 6 6 18" />
+										{:else}
+											<path d="m14 6 4 4M4 20l4-.8L20 7l-4-4L4 15z" />
+										{/if}
+									</svg>
 								</button>
 							{/if}
 							{#if rec.status === 'ready' && rec.s3_url}
 								<button
+									type="button"
 									onclick={() => openTrimEditor(rec._id!)}
-									class={desktopActionClass}
-									title={$t('recordings.list.trimAudioTitle')}
+									class={`${desktopActionClass} text-stone-600 hover:bg-stone-200/70 hover:text-stone-900`}
+									aria-label={$t('recordings.list.trimAudio')}
+									data-tooltip={$t('recordings.list.trimAudio')}
 								>
-									{$t('recordings.list.trimAudio')}
+									<svg
+										viewBox="0 0 24 24"
+										class="h-[18px] w-[18px]"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="1.6"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"
+									>
+										<circle cx="6" cy="6" r="2.5" /><circle cx="6" cy="18" r="2.5" />
+										<path d="m8 7.5 12 11M8 16.5l12-11" />
+									</svg>
 								</button>
 							{/if}
 							{#if canDeleteRecordings}
 								<button
+									type="button"
 									onclick={() => remove(rec._id!)}
-									class="inline-flex h-8 w-8 items-center justify-center text-stone-500 transition-colors hover:bg-red-50 hover:text-red-600"
+									class={`${desktopActionClass} text-stone-500 hover:bg-red-50 hover:text-red-600`}
 									aria-label={$t('recordings.common.delete')}
-									title={$t('recordings.common.delete')}
+									data-tooltip={$t('recordings.common.delete')}
 								>
 									<svg
-										class="h-4 w-4"
-										fill="none"
 										viewBox="0 0 24 24"
+										class="h-[18px] w-[18px]"
+										fill="none"
 										stroke="currentColor"
-										stroke-width="2"
+										stroke-width="1.6"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"
 									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"
-										/>
+										<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v6m4-6v6" />
 									</svg>
 								</button>
 							{/if}
@@ -4883,6 +4936,27 @@
 
 	.recordings-table {
 		container-type: inline-size;
+	}
+
+	.recording-action::after {
+		content: attr(data-tooltip) / '';
+		position: absolute;
+		z-index: 5;
+		inset-block-end: calc(100% + 0.2rem);
+		inset-inline-end: 0;
+		padding: 0.2rem 0.45rem;
+		border-radius: 0.25rem;
+		background: #292524;
+		color: white;
+		font-size: 0.6875rem;
+		white-space: nowrap;
+		pointer-events: none;
+		visibility: hidden;
+	}
+
+	.recording-action:hover::after,
+	.recording-action:focus-visible::after {
+		visibility: visible;
 	}
 
 	@container (max-width: 46rem) {
