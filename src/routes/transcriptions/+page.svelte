@@ -13,7 +13,7 @@
 
 	import ArrowDown2 from 'iconsax-svelte/ArrowDown2.svelte';
 	import ArrowUp2 from 'iconsax-svelte/ArrowUp2.svelte';
-	import PdfPreview from '$lib/components/PdfPreview.svelte';
+	import PdfPreview, { pdfActionClass } from '$lib/components/PdfPreview.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import ListSkeleton from '$lib/components/ListSkeleton.svelte';
 	import ErrorCard from '$lib/components/ErrorCard.svelte';
@@ -37,6 +37,7 @@
 
 	let { data }: Props = $props();
 	let selectedDocument: SerializedTranscription | null = $state(null);
+	let previewLoaded = $state(false);
 	const isDocumentOpen = writable(false);
 	let searchTerm = $state('');
 	let isSearching = $state(false);
@@ -255,6 +256,7 @@
 	}
 
 	function handleSelectDocument(doc: SerializedTranscription) {
+		if (!$isDocumentOpen || selectedDocument?._id !== doc._id) previewLoaded = false;
 		selectedDocument = doc;
 		isDocumentOpen.set(true);
 	}
@@ -557,11 +559,13 @@
 			>
 				<div class="flex flex-col h-full">
 					<div class="flex justify-between items-start mb-4 sm:mb-6">
-						<h2 class="text-lg sm:text-xl font-semibold text-stone-900 pr-8">
+						<h2
+							class="break-words pr-4 font-display text-2xl font-semibold leading-tight text-stone-900 sm:text-3xl"
+						>
 							{selectedDocument.filename}
 						</h2>
 						<button
-							class="text-stone-400 hover:text-stone-600 transition-colors duration-200"
+							class="shrink-0 text-stone-400 transition-colors hover:text-stone-600"
 							onclick={() => isDocumentOpen.set(false)}
 							aria-label={$t('misc.close')}
 						>
@@ -602,36 +606,26 @@
 							</dl>
 						</div>
 
-						<div class="mb-3 flex flex-wrap gap-2">
+						<div class="flex flex-wrap gap-3">
+							<button
+								type="button"
+								class={pdfActionClass}
+								onclick={() => {
+									previewLoaded = true;
+									document.getElementById('transcription-pdf-preview')?.scrollIntoView();
+								}}
+							>
+								{$t('predications.viewPdfOnPage')}
+							</button>
 							<a
 								href={selectedDocument.url}
 								target="_blank"
 								rel="noopener noreferrer"
-								class="inline-flex items-center justify-center px-4 py-2 border border-stone-300 text-xs sm:text-sm font-medium text-stone-700 bg-white hover:border-missionnaire hover:text-missionnaire transition-colors duration-200 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-missionnaire"
+								class={pdfActionClass}
 							>
-								<svg
-									class="w-4 h-4 mr-2 -ml-1"
-									fill="none"
-									stroke="currentColor"
-									viewBox="0 0 24 24"
-								>
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width="2"
-										d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-									/>
-								</svg>
-								{$t('transcriptions.openNewTab')}
+								{$t('predications.openPdf')}
 							</a>
-							<a
-								href={selectedDocument.url}
-								download
-								class="inline-flex items-center justify-center px-4 py-2 border border-transparent text-xs sm:text-sm font-medium text-white bg-missionnaire hover:bg-missionnaire/90 transition-colors duration-200 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-missionnaire"
-							>
-								<div class="mr-2">
-									<Icon src={AiOutlineDownload} size="16" />
-								</div>
+							<a href={selectedDocument.url} download class={pdfActionClass}>
 								{$t('transcriptions.downloadDocument')}
 							</a>
 							{#if selectedDocument.videoDisplayId}
@@ -639,18 +633,19 @@
 									href={`https://www.youtube.com/watch?v=${selectedDocument.videoDisplayId}`}
 									target="_blank"
 									rel="noopener noreferrer"
-									class="inline-flex items-center justify-center px-4 py-2 border border-stone-300 text-xs sm:text-sm font-medium text-stone-700 bg-white hover:border-missionnaire hover:text-missionnaire transition-colors duration-200 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-missionnaire"
+									class={pdfActionClass}
 								>
-									<div class="mr-2">
-										<Icon src={AiFillPlayCircle} size="16" />
-									</div>
 									{$t('transcriptions.watchRelated')}
 								</a>
 							{/if}
 						</div>
-						<div class="overflow-hidden border border-stone-200 bg-stone-50">
-							<PdfPreview url={selectedDocument.url} title={selectedDocument.filename} />
-						</div>
+						<PdfPreview
+							id="transcription-pdf-preview"
+							url={selectedDocument.url}
+							title={selectedDocument.filename}
+							loaded={previewLoaded}
+							onloadpreview={() => (previewLoaded = true)}
+						/>
 					</div>
 				</div>
 			</div>
