@@ -1,46 +1,30 @@
 import { expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => {
-	const cursor = {
-		project: vi.fn(),
-		sort: vi.fn(),
-		collation: vi.fn(),
-		skip: vi.fn(),
-		limit: vi.fn(),
-		toArray: vi.fn(async () => [])
-	};
-	for (const method of ['project', 'sort', 'collation', 'skip', 'limit'] as const) {
-		cursor[method].mockReturnValue(cursor);
-	}
-	return {
-		cursor,
-		createIndex: vi.fn(async () => 'transcriptions_list_desc'),
-		countDocuments: vi.fn(async () => 0),
-		find: vi.fn(() => cursor)
-	};
-});
+const mocks = vi.hoisted(() => ({
+	createIndex: vi.fn(async () => 'transcriptions_list_desc'),
+	aggregate: vi.fn(() => ({ toArray: async () => [] }))
+}));
 
 vi.mock('../../db/mongo', () => ({
-	getDb: async () => ({
-		collection: () => ({
-			createIndex: mocks.createIndex,
-			countDocuments: mocks.countDocuments,
-			find: mocks.find
-		})
-	})
+	getDb: async () => ({ collection: () => mocks })
 }));
 
 import { queryTranscriptions } from './transcriptions';
 
-it('uses the transcription list index without loading full-text data', async () => {
-	await queryTranscriptions({});
+it('groups stored PDF keys before counting and paging without projecting full text', async () => {
+	await queryTranscriptions({ page: 2, limit: 100 });
 
-	expect(mocks.createIndex).toHaveBeenCalledWith(
-		{ publishedOn: -1, filename: -1, _id: -1 },
-		{
-			name: 'transcriptions_list_desc',
-			collation: { locale: 'fr', numericOrdering: true }
-		}
+	expect(mocks.aggregate).toHaveBeenCalledWith(
+		expect.arrayContaining([
+			{ $project: expect.not.objectContaining({ library_search: expect.anything() }) },
+			{ $group: expect.objectContaining({ document: { $first: '$$ROOT' } }) },
+			{
+				$facet: {
+					documents: expect.arrayContaining([{ $skip: 100 }, { $limit: 100 }]),
+					count: [{ $count: 'total' }]
+				}
+			}
+		]),
+		{ collation: { locale: 'fr', numericOrdering: true } }
 	);
-	expect(mocks.cursor.project).toHaveBeenCalledWith({ library_search: 0 });
 });

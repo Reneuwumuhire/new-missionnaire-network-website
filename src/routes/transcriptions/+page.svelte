@@ -571,14 +571,21 @@
 											>
 												<Icon src={AiOutlineDownload} size="20" />
 											</a>
-											{#if document.videoDisplayId}
+											{#if document.replayId || document.videoDisplayId}
+												{@const playLabel = $t(
+													document.replayId
+														? 'transcriptions.openReplay'
+														: 'transcriptions.watchOnYoutube'
+												)}
 												<a
-													href={`https://www.youtube.com/watch?v=${document.videoDisplayId}`}
-													target="_blank"
-													rel="noopener noreferrer"
+													href={document.replayId
+														? `/live/rediffusions/${document.replayId}`
+														: `https://www.youtube.com/watch?v=${encodeURIComponent(document.videoDisplayId ?? '')}`}
+													target={document.replayId ? undefined : '_blank'}
+													rel={document.replayId ? undefined : 'noopener noreferrer'}
 													class={rowActionClass}
-													aria-label={$t('transcriptions.watchOnYoutube')}
-													title={$t('transcriptions.watchOnYoutube')}
+													aria-label={playLabel}
+													title={playLabel}
 												>
 													<Icon src={IoPlayCircle} size="24" />
 												</a>

@@ -565,48 +565,75 @@ export interface RecordingTranscript {
 	size: number;
 }
 
+type TranscriptReplaySource = {
+	transcriptId: string;
+	recordingId?: unknown;
+	sourceVideoId?: string | null;
+};
+
+export async function getReplayIdsForTranscripts(sources: TranscriptReplaySource[]) {
+	const result = new Map<string, string>();
+	if (!sources.length) return result;
+
+	try {
+		const db = await getDb();
+		const originIds = sources.flatMap(({ recordingId }) => {
+			const id = objectIdString.safeParse(String(recordingId ?? ''));
+			return id.success ? [new ObjectId(id.data)] : [];
+		});
+		const recordings = await db
+			.collection('recordings')
+			.find(
+				{
+					published: true,
+					status: 'ready',
+					$or: [
+						{ _id: { $in: originIds } },
+						{ transcript_pdf_id: { $in: sources.map(({ transcriptId }) => transcriptId) } },
+						{
+							source_video_id: {
+								$in: sources.flatMap(({ sourceVideoId }) => (sourceVideoId ? [sourceVideoId] : []))
+							},
+							transcript_pdf_id: null
+						}
+					]
+				},
+				{
+					projection: { _id: 1, transcript_pdf_id: 1, source_video_id: 1 },
+					sort: { started_at: -1, _id: -1 }
+				}
+			)
+			.toArray();
+
+		for (const { transcriptId, recordingId, sourceVideoId } of sources) {
+			const origin = recordings.find(
+				(row) =>
+					String(row._id) === String(recordingId ?? '').toLowerCase() &&
+					(row.transcript_pdf_id == null || row.transcript_pdf_id === transcriptId)
+			);
+			const attached = origin ?? recordings.find((row) => row.transcript_pdf_id === transcriptId);
+			if (attached) {
+				result.set(transcriptId, String(attached._id));
+			} else if (sourceVideoId) {
+				const matches = recordings.filter(
+					(row) => row.source_video_id === sourceVideoId && row.transcript_pdf_id == null
+				);
+				if (matches.length === 1) result.set(transcriptId, String(matches[0]._id));
+			}
+		}
+	} catch (error) {
+		console.error('[recordings] getReplayIdsForTranscripts failed', error);
+	}
+	return result;
+}
+
 export async function getReplayIdForTranscript(
 	transcriptId: string,
 	recordingId: unknown,
 	sourceVideoId: string | null
 ): Promise<string | null> {
-	try {
-		const db = await getDb();
-		const recordings = db.collection('recordings');
-		const publicReplay = { published: true, status: 'ready' };
-		const projection = { _id: 1 };
-		const origin = objectIdString.safeParse(String(recordingId ?? ''));
-		if (origin.success) {
-			const recording = await recordings.findOne(
-				{
-					...publicReplay,
-					_id: new ObjectId(origin.data),
-					transcript_pdf_id: { $in: [transcriptId, null] }
-				},
-				{ projection }
-			);
-			if (recording) return String(recording._id);
-		}
-
-		const attached = await recordings.findOne(
-			{ ...publicReplay, transcript_pdf_id: transcriptId },
-			{ projection, sort: { started_at: -1, _id: -1 } }
-		);
-		if (attached) return String(attached._id);
-		if (!sourceVideoId) return null;
-
-		const matches = await recordings
-			.find(
-				{ ...publicReplay, source_video_id: sourceVideoId, transcript_pdf_id: null },
-				{ projection }
-			)
-			.limit(2)
-			.toArray();
-		return matches.length === 1 ? String(matches[0]._id) : null;
-	} catch (error) {
-		console.error('[recordings] getReplayIdForTranscript failed', error);
-		return null;
-	}
+	const replays = await getReplayIdsForTranscripts([{ transcriptId, recordingId, sourceVideoId }]);
+	return replays.get(transcriptId) ?? null;
 }
 
 /** Find the `videos._id` for a recording from its stored YouTube id only.
