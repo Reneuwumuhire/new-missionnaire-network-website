@@ -2,6 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Single-choice selects keep the native menu and reserve space for one chevron. */
+select:not([multiple]):is(:not([size]), [size='1']) {
+	appearance: none;
+	padding-inline-end: 2.25rem;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m5 7.5 5 5 5-5' stroke='%2378716c' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+	background-position: right 0.75rem center;
+	background-repeat: no-repeat;
+	background-size: 1rem;
+}
+
+@media (forced-colors: active) {
+	select:not([multiple]):is(:not([size]), [size='1']) {
+		appearance: auto;
+		background-image: none;
+	}
+}
+
 /* ═══════════════════════════════════════════
    MISSIONNAIRE ADMIN — Design System
    Font pairing: Cormorant Garamond (display) + Outfit (body)

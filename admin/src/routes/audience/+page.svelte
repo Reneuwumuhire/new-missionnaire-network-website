@@ -620,36 +620,26 @@
 			{/if}
 			<label class="min-w-[12rem] flex-1 space-y-1.5 text-xs font-semibold text-stone-700">
 				<span>{copy.route}</span>
-				<div class="relative">
-					<select
-						name="route"
-						class="h-11 w-full appearance-none border border-stone-300 bg-white pl-3 pr-12 text-sm font-medium text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-					>
-						<option value="" selected={!data.route}>{copy.allPages}</option>
-						<optgroup label={copy.mainPages}>
-							{#each data.routeOptions.main as path}<option
+				<select
+					name="route"
+					class="h-11 w-full border border-stone-300 bg-white px-3 text-sm font-medium text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+				>
+					<option value="" selected={!data.route}>{copy.allPages}</option>
+					<optgroup label={copy.mainPages}>
+						{#each data.routeOptions.main as path}<option
+								value={path}
+								selected={data.route === path}>{path}</option
+							>{/each}
+					</optgroup>
+					{#if data.routeOptions.visited.length}
+						<optgroup label={copy.visitedDetails}>
+							{#each data.routeOptions.visited as path}<option
 									value={path}
 									selected={data.route === path}>{path}</option
 								>{/each}
 						</optgroup>
-						{#if data.routeOptions.visited.length}
-							<optgroup label={copy.visitedDetails}>
-								{#each data.routeOptions.visited as path}<option
-										value={path}
-										selected={data.route === path}>{path}</option
-									>{/each}
-							</optgroup>
-						{/if}
-					</select>
-					<svg
-						class="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-600"
-						viewBox="0 0 20 20"
-						fill="none"
-						aria-hidden="true"
-					>
-						<path d="m5 7.5 5 5 5-5" stroke="currentColor" stroke-width="1.7" />
-					</svg>
-				</div>
+					{/if}
+				</select>
 			</label>
 			<button
 				type="submit"
