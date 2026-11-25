@@ -16,6 +16,20 @@ const RECENT_EVENT_RETENTION_SECONDS = 7 * 24 * 60 * 60;
 let pageEventIndex: Promise<unknown> | null = null;
 let playEventIndex: Promise<unknown> | null = null;
 
+function logGeoDiagnostic(request: Request, countryCode: string | null): void {
+	if (process.env.ANALYTICS_GEO_DEBUG !== '1') return;
+
+	console.info('[Analytics Geo Diagnostic]', {
+		flyRuntime: Boolean(process.env.FLY_APP_NAME),
+		flyClientIp: request.headers.get('fly-client-ip'),
+		forwardedFor: request.headers.get('x-forwarded-for'),
+		realIp: request.headers.get('x-real-ip'),
+		cfCountry: request.headers.get('cf-ipcountry'),
+		vercelCountry: request.headers.get('x-vercel-ip-country'),
+		resolvedCountry: countryCode
+	});
+}
+
 export const GET: RequestHandler = async () => {
 	try {
 		if (!cached || cached.expiresAt <= Date.now()) {
@@ -120,6 +134,7 @@ export const POST: RequestHandler = async ({ request, cookies, url }) => {
 		}
 		const countryCode = visitorCountry(request.headers, Boolean(process.env.FLY_APP_NAME));
 		const country = getFullCountryName(countryCode);
+		logGeoDiagnostic(request, countryCode);
 		if (!dev)
 			await db.collection('analytics').updateOne(
 				{ _id: `human:${today}:${visitorId}` as never },
