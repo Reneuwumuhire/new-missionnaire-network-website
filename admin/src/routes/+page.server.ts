@@ -1,6 +1,11 @@
 import { verifyAdminSession } from '$lib/server/admin-session';
 import { redirect } from '@sveltejs/kit';
-import { getDashboardStats, getRecentAuditLogs, listScheduledLives } from '../db/collections';
+import {
+	getDashboardStats,
+	getRecentAuditLogs,
+	listRecordings,
+	listScheduledLives
+} from '../db/collections';
 import { getAdminLandingPath, getPermissions } from '$lib/models/admin-user';
 import { listAdminQuestions } from '../db/questions';
 import type { PageServerLoad } from './$types';
@@ -22,13 +27,19 @@ export const load: PageServerLoad = async ({ cookies }) => {
 			? listAdminQuestions({ limit: 1 }).then((result) => result.stats)
 			: null,
 		permissions.can_manage_recordings
-			? listScheduledLives({ statuses: ['scheduled'], limit: 1 })
-			: []
-	]).then(([stats, recentActivity, questions, upcoming]) => ({
+			? listScheduledLives({ statuses: ['scheduled'], upcomingOnly: true, limit: 1 })
+			: [],
+		permissions.can_manage_recordings
+			? listRecordings({ status: 'ready', publishedFilter: 'unpublished', limit: 1 }).then(
+					({ data }) => data[0] ?? null
+				)
+			: null
+	]).then(([stats, recentActivity, questions, upcoming, replayToReview]) => ({
 		stats,
 		recentActivity,
 		questions,
-		upcoming
+		upcoming,
+		replayToReview
 	}));
 	// Rejections surface via the page's {:catch}; this avoids an unhandled
 	// rejection if the client disconnects before consuming the stream.

@@ -7,7 +7,13 @@
 	import { t } from '../lib/i18n.svelte';
 	import { streamHealthIssue } from '../lib/stream-health';
 	import { destinationUrl, requiresYouTubeGoLive, studio } from '../lib/state.svelte';
-	import { connectYouTube, liveSession, sessionYouTubeChannelId } from '../lib/live-session.svelte';
+	import {
+		connectYouTube,
+		endSelectedSession,
+		liveSession,
+		sessionYouTubeChannelId
+	} from '../lib/live-session.svelte';
+	import type { PublicStatus } from '../lib/public-destinations';
 	import { recordsLocal } from '../lib/recording.svelte';
 
 	let {
@@ -32,14 +38,31 @@
 	const recordingLabel = $derived(t(`recording.${recordingMode}` as never));
 	const selectedSession = $derived(
 		liveSession.sessions.find(
-			(session) => session._id === (liveSession.activeId ?? liveSession.selectedId)
+			(session) => session._id === (liveSession.publicRun?.id ?? liveSession.selectedId)
 		)
 	);
 
 	// Keep public destinations held until the operator approves the preview.
-	const canGoLive = $derived(
-		broadcast.phase === 'live' && !broadcast.stopping && !liveSession.activeId
+	const publicRun = $derived(liveSession.publicRun);
+	const destinations = liveSession.publicDestinations;
+	const publicNames: (keyof typeof destinations)[] = $derived(
+		publicRun?.youtube ? ['missionnaire', 'youtube'] : ['missionnaire']
 	);
+	const canGoLive = $derived(
+		broadcast.phase === 'live' &&
+			!broadcast.stopping &&
+			!publicRun?.ending &&
+			(!publicRun ||
+				destinations.missionnaire.status !== 'live' ||
+				(publicRun.youtube && destinations.youtube.status !== 'live'))
+	);
+	const publicLabels = {
+		unknown: 'controls.publicUnknown',
+		off: 'controls.publicOff',
+		waiting: 'controls.publicWaiting',
+		live: 'status.live',
+		ended: 'controls.publicEnded'
+	} as const satisfies Record<PublicStatus, string>;
 	const youtubeReady = $derived(
 		broadcast.targets.some((target) => target.youtube && target.state === 'live')
 	);
@@ -63,6 +86,16 @@
 		return '';
 	});
 	let copiedTestLink = $state(false);
+	let confirmRemoteEnd = $state(false);
+	function endRemote() {
+		if (!publicRun?.ending && !confirmRemoteEnd) {
+			confirmRemoteEnd = true;
+			setTimeout(() => (confirmRemoteEnd = false), 4_000);
+			return;
+		}
+		confirmRemoteEnd = false;
+		void endSelectedSession();
+	}
 
 	async function copyTestLink() {
 		if (!liveSession.testUrl) return;
@@ -95,7 +128,10 @@
 				: 'bg-primary text-black hover:bg-missionnaire-400'} disabled:cursor-not-allowed disabled:opacity-40"
 			disabled={broadcast.starting ||
 				broadcast.stopping ||
-				(!isStreaming() && ((enabled.length === 0 && !recordsLocal()) || !liveSession.selectedId))}
+				(!isStreaming() &&
+					(publicRun?.ending ||
+						(enabled.length === 0 && !recordsLocal()) ||
+						!liveSession.selectedId))}
 			onclick={onToggleLive}
 		>
 			{#if broadcast.stopping}
@@ -115,27 +151,64 @@
 		{#if canGoLive}
 			<button
 				class="flex h-10 w-full items-center justify-center gap-2 bg-red-600 text-[13px] font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-wait disabled:opacity-50"
-				disabled={broadcast.publishing ||
-					liveSession.starting ||
-					(youtubeRequired && !youtubeSessionConnected)}
+				disabled={broadcast.publishing || liveSession.publicBusy}
 				title={t('controls.goLiveHint')}
 				onclick={() => void goLivePublic()}
 			>
-				{#if broadcast.publishing || liveSession.starting}
+				{#if broadcast.publishing}
 					<span
 						class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/35 border-t-white"
 					></span>
 					{t('controls.starting')}
 				{:else}
-					{t('controls.goLive')}
+					{t(
+						publicRun
+							? 'controls.retryPublicStart'
+							: selectedSession?.is_test
+								? 'controls.startPrivateTest'
+								: 'controls.goLive'
+					)}
 				{/if}
 			</button>
-		{:else if liveSession.activeId}
-			<div
-				class="flex h-8 items-center justify-center border border-red-500/40 bg-red-600/10 text-[12px] font-medium text-danger"
-			>
-				{t('controls.publicLive')}
+		{/if}
+		{#if publicRun}
+			<div class="space-y-1 border border-ink-700 p-2 text-[12px]" aria-live="polite">
+				{#each publicNames as name (name)}
+					{@const destination = destinations[name]}
+					<div class="flex justify-between gap-2">
+						<span>{name === 'youtube' ? 'YouTube' : 'Missionnaire'}</span>
+						<span
+							class={destination.error
+								? 'text-danger'
+								: destination.status === 'live'
+									? 'text-success'
+									: 'text-muted'}
+						>
+							{publicRun.isTest && destination.status === 'live'
+								? t('controls.privateTestActive')
+								: t(publicLabels[destination.status])}
+						</span>
+					</div>
+					{#if destination.error}<p class="break-words leading-snug text-danger">
+							{destination.error}
+						</p>{/if}
+				{/each}
 			</div>
+			{#if !isStreaming() && !broadcast.starting && !broadcast.stopping}
+				<button
+					class="h-8 w-full border border-red-500/50 text-[12px] text-danger disabled:opacity-50"
+					disabled={liveSession.publicBusy}
+					onclick={endRemote}
+				>
+					{t(
+						publicRun.ending
+							? 'controls.retryPublicEnd'
+							: confirmRemoteEnd
+								? 'controls.confirmStop'
+								: 'controls.endPublic'
+					)}
+				</button>
+			{/if}
 		{/if}
 		{#if liveSession.operatorName && youtubeRequired}
 			<button
@@ -175,7 +248,7 @@
 		{/if}
 		<button
 			class="flex h-8 w-full items-center justify-between border border-ink-700 px-2 text-[12px] text-muted transition-colors hover:border-ink-500 hover:text-fg"
-			disabled={isStreaming()}
+			disabled={isStreaming() || Boolean(publicRun)}
 			onclick={onSelectSession}
 			title={isStreaming()
 				? 'Live session is locked while streaming'
@@ -183,7 +256,7 @@
 		>
 			<span>Live session</span>
 			<span class={selectedSession ? 'max-w-36 truncate text-success' : 'text-warning'}
-				>{selectedSession?.title ?? 'Choose one'}</span
+				>{selectedSession?.title ?? publicRun?.title ?? 'Choose one'}</span
 			>
 		</button>
 		<button
@@ -195,7 +268,7 @@
 			<span class={recordingMode === 'off' ? 'text-muted' : 'text-success'}>{recordingLabel}</span>
 		</button>
 
-		{#if youtubeReady}
+		{#if youtubeReady || publicRun?.youtube}
 			<button
 				class="h-9 w-full bg-red-600 text-[13px] font-medium text-white transition-colors hover:bg-red-700"
 				title={t('controls.openYouTubeHint')}

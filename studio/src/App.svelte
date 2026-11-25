@@ -64,17 +64,12 @@
 		selftestMixer,
 		selftestTarget
 	} from './lib/selftest';
-	import {
-		activeScene,
-		onAirSceneId,
-		persist,
-		resetLayout,
-		studio
-	} from './lib/state.svelte';
+	import { activeScene, onAirSceneId, persist, resetLayout, studio } from './lib/state.svelte';
 	import {
 		heartbeatStudio,
 		liveSession,
 		logoutStudio,
+		refreshPublicDestinations,
 		refreshSessions,
 		refreshYouTubeStatus,
 		syncLiveLyrics,
@@ -163,9 +158,12 @@
 		initReferenceMatcher();
 		void initUpdater();
 		const checkWhenVisible = () => {
-			if (!document.hidden) void checkForUpdate(true);
+			if (document.hidden) return;
+			void checkForUpdate(true);
+			void refreshPublicDestinations();
 		};
 		window.addEventListener('focus', checkWhenVisible);
+		window.addEventListener('online', checkWhenVisible);
 		document.addEventListener('visibilitychange', checkWhenVisible);
 		void listen<string>('studio://menu', (event) => openMenuItem(event.payload)).then(
 			(unlisten) => (stopMenuListener = unlisten)
@@ -255,6 +253,7 @@
 			clearInterval(clock);
 			clearInterval(heartbeat);
 			window.removeEventListener('focus', checkWhenVisible);
+			window.removeEventListener('online', checkWhenVisible);
 			document.removeEventListener('visibilitychange', checkWhenVisible);
 			window.removeEventListener('pointerdown', wake);
 			void stopBroadcast();
@@ -282,6 +281,7 @@
 				serviceSetupOpen = true;
 				break;
 			case 'studio-live-session':
+				if (isStreaming() || liveSession.publicRun) break;
 				serviceSetupOpen = false;
 				dialog = 'live-session';
 				break;
@@ -377,7 +377,10 @@
 					bus.addNode(layer.id, node);
 					wanted.add(layer.id);
 				}
-			} else if (handle?.stream?.getAudioTracks().length && bus.addStream(layer.id, handle.stream)) {
+			} else if (
+				handle?.stream?.getAudioTracks().length &&
+				bus.addStream(layer.id, handle.stream)
+			) {
 				wanted.add(layer.id);
 			} else if (layer.appId && bus.has(layer.id)) {
 				wanted.add(layer.id);
@@ -461,8 +464,9 @@
 			await stopBroadcast();
 			return;
 		}
+		if (liveSession.publicRun?.ending) return;
 		if (!liveSession.selectedId) {
-			dialog = 'live-session';
+			if (!liveSession.publicRun) dialog = 'live-session';
 			return;
 		}
 		if (!programCanvas) return;
@@ -470,7 +474,7 @@
 	}
 
 	async function startAfterPreflight() {
-		if (!programCanvas || isStreaming()) return;
+		if (!programCanvas || isStreaming() || liveSession.publicRun?.ending) return;
 		dialog = null;
 		renderMissed = 0;
 		await mixer?.resume();
@@ -485,7 +489,7 @@
 	);
 	const selectedLiveSession = $derived(
 		liveSession.sessions.find(
-			(session) => session._id === (liveSession.activeId ?? liveSession.selectedId)
+			(session) => session._id === (liveSession.publicRun?.id ?? liveSession.selectedId)
 		) ?? null
 	);
 	const health = $derived.by(() => {
@@ -500,7 +504,8 @@
 		if (broadcast.targets.some((target) => target.state === 'failed')) {
 			return { tone: 'warn', label: t('target.failed') };
 		}
-		if (broadcast.phase === 'connecting' || !stats) return { tone: 'idle', label: t('status.connecting') };
+		if (broadcast.phase === 'connecting' || !stats)
+			return { tone: 'idle', label: t('status.connecting') };
 		if (streamHealthIssue(stats, broadcast.captureState)) {
 			return { tone: 'warn', label: t('status.behind') };
 		}
@@ -528,6 +533,14 @@
 		recording.startedAt ? Math.max(0, Math.floor((now - recording.startedAt) / 1000)) : 0
 	);
 	const durationLabel = (seconds: number) => new Date(seconds * 1000).toISOString().slice(11, 19);
+	const publicLive = $derived(
+		Boolean(
+			liveSession.publicRun &&
+			!liveSession.publicRun.isTest &&
+			(liveSession.publicDestinations.missionnaire.status === 'live' ||
+				(liveSession.publicRun.youtube && liveSession.publicDestinations.youtube.status === 'live'))
+		)
+	);
 	const publicDuration = $derived(
 		liveSession.activeStartedAt
 			? Math.max(0, Math.floor((now - liveSession.activeStartedAt) / 1000))
@@ -587,14 +600,16 @@
 		>
 			Missionnaire <span class="text-accent">Studio</span>
 		</h1>
-		{#if liveSession.activeId}
+		{#if publicLive}
 			<!-- pointer-events-none so the whole title bar drags, not just the gaps. -->
 			<span
 				class="pointer-events-none flex items-center gap-2 bg-red-600/15 px-2.5 py-0.5 text-[12px] font-semibold uppercase tracking-[0.14em] text-danger"
 			>
 				<span class="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500"></span>
 				{t('status.live')}
-				<span class="font-mono tracking-normal text-danger">{durationLabel(publicDuration)}</span>
+				<span class="font-mono tracking-normal text-danger"
+					>{#if liveSession.activeStartedAt}{durationLabel(publicDuration)}{/if}</span
+				>
 			</span>
 		{:else if broadcast.phase === 'live'}
 			<span
@@ -606,9 +621,10 @@
 		{/if}
 		{#if liveSession.operatorName}
 			<button
-				class="ml-auto text-[12px] text-muted hover:text-fg"
+				class="ml-auto text-[12px] text-muted hover:text-fg disabled:opacity-50"
+				disabled={Boolean(liveSession.publicRun)}
 				onclick={() => void logoutStudio()}
-				title="Sign out of Studio"
+				title={liveSession.publicRun ? t('controls.endPublic') : 'Sign out of Studio'}
 			>
 				{liveSession.operatorName} · Sign out
 			</button>
@@ -793,7 +809,7 @@
 	>
 		<span class="flex items-center gap-1.5">
 			<span
-				class="h-1.5 w-1.5 rounded-full {liveSession.activeId
+				class="h-1.5 w-1.5 rounded-full {publicLive
 					? 'bg-red-500'
 					: broadcast.phase === 'live'
 						? 'bg-amber-400'
@@ -802,9 +818,9 @@
 			<!-- Never the word LIVE while off air. It read "LIVE: 00:00:00" with the
 			     dot grey and the title bar saying Offline — the one word in this app
 			     that must not be on screen when it is not true. -->
-			{#if liveSession.activeId}
+			{#if publicLive}
 				<span class="text-danger">{t('status.live')}</span>
-				{durationLabel(publicDuration)}
+				{#if liveSession.activeStartedAt}{durationLabel(publicDuration)}{/if}
 				{#if selectedLiveSession}<span class="max-w-80 truncate font-body text-fg/70"
 						>{selectedLiveSession.title}</span
 					>{/if}

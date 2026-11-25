@@ -1,5 +1,6 @@
 import { redirect } from '@sveltejs/kit';
 import { getPublishedNearSession, getRecentPublished } from '$lib/server/recordings';
+import { getLiveDiscovery } from '$lib/server/live-discovery';
 import { getBroadcastAdminState, getRadioCachedStatus } from '../../db/collections';
 import type { PageServerLoad } from './$types';
 
@@ -29,17 +30,20 @@ async function resolveSharedReplayPath(
 }
 
 export const load: PageServerLoad = async ({ setHeaders, url }) => {
-	const [recentRecordings, adminGate, status] = await Promise.all([
-		getRecentPublished(5),
-		getBroadcastAdminState(),
-		getRadioCachedStatus()
+	const recordings = getRecentPublished(5);
+	const gate = getBroadcastAdminState();
+	const radio = getRadioCachedStatus();
+	const [recentRecordings, adminGate, discovery] = await Promise.all([
+		recordings,
+		gate,
+		getLiveDiscovery({ gate, radio, recordings })
 	]);
 
 	// "Live" exactly as /api/live/radio-state computes it: the admin gate must
 	// be on AND Icecast must actually be serving audio. Mirroring it keeps the
 	// share preview consistent with what the player shows — no "live" card when
 	// the audio isn't really flowing.
-	const isLive = (status?.isLive ?? false) && adminGate.is_live;
+	const isLive = discovery.kind === 'live';
 
 	const liveParam = url.searchParams.get('live');
 	if (liveParam) {
@@ -61,6 +65,7 @@ export const load: PageServerLoad = async ({ setHeaders, url }) => {
 		// `stale-while-revalidate` keeps every later hit instant — the edge returns
 		// the stale copy immediately and refreshes it in the background, so a fresh
 		// recording propagates on the next request instead of blocking on the DB.
+		// The primary action also refreshes independently while this page is open.
 		setHeaders({
 			'cache-control': 'public, s-maxage=60, stale-while-revalidate=600'
 		});
@@ -110,6 +115,7 @@ export const load: PageServerLoad = async ({ setHeaders, url }) => {
 
 	return {
 		recentRecordings,
+		discovery,
 		liveSessionId: liveSessionId && !Number.isNaN(liveSessionId) ? liveSessionId : null,
 		liveMeta: {
 			isLive,

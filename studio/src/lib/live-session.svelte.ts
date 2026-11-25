@@ -3,6 +3,12 @@ import { followedMediaElement, lyrics } from './lyrics.svelte';
 import { t } from './i18n.svelte';
 import { id, persist, studio } from './state.svelte';
 import {
+	publicDestinationReady,
+	reconcilePublicDestination,
+	youtubePublicStatus,
+	type PublicStatus
+} from './public-destinations';
+import {
 	outputAlignedPositionMs,
 	outputEpochMs,
 	sampleServerClock,
@@ -102,8 +108,41 @@ type StudioDeviceInfo = {
 let deviceInfoPromise: Promise<StudioDeviceInfo> | null = null;
 let youtubeStatusRequest = 0;
 const AUTH_STORAGE_KEY = 'missionnaire-studio-authorization-v1';
+const PUBLIC_RUN_KEY = 'missionnaire-studio-public-run';
 const INSTALLATION_STORAGE_KEY = 'missionnaire-studio-installation-v1';
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type PublicRun = { id: string; title: string; isTest: boolean; youtube: boolean; ending: boolean };
+
+function restorePublicRun(): PublicRun | null {
+	try {
+		const value = JSON.parse(localStorage.getItem(PUBLIC_RUN_KEY) ?? 'null');
+		if (
+			value &&
+			typeof value.id === 'string' &&
+			/^[\da-f]{24}$/i.test(value.id) &&
+			typeof value.title === 'string' &&
+			typeof value.isTest === 'boolean' &&
+			typeof value.youtube === 'boolean' &&
+			typeof value.ending === 'boolean'
+		) {
+			return value;
+		}
+	} catch {
+		// Studio can still broadcast when local storage is unavailable.
+	}
+	return null;
+}
+
+function savePublicRun(run: PublicRun | null) {
+	liveSession.publicRun = run;
+	try {
+		if (run) localStorage.setItem(PUBLIC_RUN_KEY, JSON.stringify(run));
+		else localStorage.removeItem(PUBLIC_RUN_KEY);
+	} catch {
+		// Current in-memory progress remains usable.
+	}
+}
 
 type AuthorizationStorage = Pick<Storage, 'getItem'>;
 
@@ -161,8 +200,13 @@ export const liveSession = $state({
 	selectedId: null as string | null,
 	activeId: null as string | null,
 	activeStartedAt: null as number | null,
+	publicRun: restorePublicRun(),
+	publicBusy: false,
+	publicDestinations: {
+		missionnaire: { status: 'unknown' as PublicStatus, error: null as string | null },
+		youtube: { status: 'unknown' as PublicStatus, error: null as string | null }
+	},
 	error: null as string | null,
-	starting: false,
 	pairingCode:
 		typeof localStorage === 'undefined' ? null : restoreStudioAuthorization(localStorage),
 	operatorName: null as string | null,
@@ -417,12 +461,11 @@ export async function disconnectYouTube(channelId: string) {
 	}
 }
 
-export async function goLiveYouTube() {
-	if (!liveSession.selectedId) throw new Error('Choose a live session first.');
-	for (let attempt = 0; attempt < 45; attempt++) {
+async function goLiveYouTube(sessionId: string, canChange: () => boolean) {
+	for (let attempt = 0; attempt < 45 && canChange(); attempt++) {
 		const { status } = await adminPost<{ status: string }>({
 			action: 'go-live',
-			sessionId: liveSession.selectedId
+			sessionId
 		});
 		if (status === 'live') return;
 		if (!['testStarting', 'testing', 'liveStarting'].includes(status)) {
@@ -430,6 +473,7 @@ export async function goLiveYouTube() {
 		}
 		await new Promise((resolve) => setTimeout(resolve, 2000));
 	}
+	if (!canChange()) return;
 	throw new Error(
 		'YouTube is still preparing after 90 seconds. Check YouTube Studio and try again.'
 	);
@@ -668,6 +712,7 @@ export async function createSession(draft: NewSession) {
 }
 
 export async function selectSession(sessionId: string) {
+	if (liveSession.publicRun && liveSession.publicRun.id !== sessionId) return;
 	liveSession.selectedId = sessionId;
 	// Never let a previous service's channel/key survive while the next one's
 	// credentials are being resolved.
@@ -724,22 +769,38 @@ export async function refreshSessions() {
 			operator: { name: string };
 			sessions: LiveSession[];
 			previousSessions: LiveSession[];
+			recoverySession?: LiveSession | null;
 			serverReceivedAtMs: number;
 			serverSentAtMs: number;
 		}>({
-			action: 'list'
+			action: 'list',
+			sessionId: liveSession.publicRun?.id ?? liveSession.selectedId ?? undefined
 		});
 		sampleServerClock(result.serverReceivedAtMs, result.serverSentAtMs, sentAtMs, Date.now());
 		liveSession.sessions = result.sessions;
+		if (
+			result.recoverySession &&
+			!result.sessions.some((session) => session._id === result.recoverySession?._id)
+		) {
+			liveSession.sessions.push(result.recoverySession);
+		}
 		liveSession.previousSessions = result.previousSessions ?? [];
 		liveSession.operatorName = result.operator.name;
-		void refreshYouTubeStatus();
+		const run = liveSession.publicRun;
+		if (run && !run.ending && result.recoverySession && !liveSession.selectedId) {
+			await refreshYouTubeStatus();
+			await selectSession(run.id);
+		} else {
+			void refreshYouTubeStatus();
+		}
+		await refreshPublicDestinations();
 	} catch (error) {
 		liveSession.error = error instanceof Error ? error.message : String(error);
 	}
 }
 
 export async function logoutStudio(): Promise<boolean> {
+	if (liveSession.publicRun) return false;
 	const attempts = await Promise.allSettled([
 		adminPost({ action: 'logout' }),
 		post({ action: 'logout' })
@@ -774,54 +835,144 @@ export async function logoutStudio(): Promise<boolean> {
 	return true;
 }
 
-export async function startSelectedSession(): Promise<boolean> {
-	if (!liveSession.selectedId || liveSession.starting || liveSession.activeId) return false;
-	liveSession.error = null;
-	liveSession.starting = true;
-	try {
-		const result = await post<{ startedAt: string }>({
-			action: 'start',
-			sessionId: liveSession.selectedId,
-			// Both guided workflows arm captions. The service controller opens the
-			// clock at the sermon boundary, never at public-session startup.
-			subtitleMode: 'armed'
-		});
-		liveSession.activeId = liveSession.selectedId;
-		liveSession.error = null;
-		liveSession.activeStartedAt = new Date(result.startedAt).getTime();
-		attachedSessionId = null;
-		attachedSubtitleKey = null;
-		await syncLiveLyrics();
-		return true;
-	} catch (error) {
-		liveSession.error = error instanceof Error ? error.message : String(error);
-		return false;
-	} finally {
-		liveSession.starting = false;
+type Destination = keyof typeof liveSession.publicDestinations;
+let publicRefresh: Promise<void> | null = null;
+
+export function beginPublicRun(session: LiveSession) {
+	if (liveSession.publicRun) return;
+	savePublicRun({
+		id: session._id,
+		title: session.title,
+		isTest: Boolean(session.is_test),
+		youtube: Boolean(session.youtube_url && !session.is_test),
+		ending: false
+	});
+	for (const destination of Object.values(liveSession.publicDestinations)) {
+		destination.status = 'unknown';
+		destination.error = null;
 	}
 }
 
-export async function endSelectedSession() {
-	if (!liveSession.activeId) return;
-	const sessionId = liveSession.activeId;
-	const session = liveSession.sessions.find((item) => item._id === sessionId);
-	try {
-		const requests: Promise<unknown>[] = [post({ action: 'end', sessionId })];
-		if (session?.youtube_url && !session.is_test) {
-			requests.push(adminPost({ action: 'end-live', sessionId }));
+export function markPublicEnding() {
+	const run = liveSession.publicRun;
+	if (run && !run.ending) savePublicRun({ ...run, ending: true });
+}
+
+async function readMissionnaire(run: PublicRun): Promise<PublicStatus> {
+	const { active, startedAt, status } = await post<{
+		active: boolean;
+		startedAt: string | null;
+		status: LiveSession['status'];
+	}>({ action: 'session-status', sessionId: run.id });
+
+	if (active) {
+		liveSession.activeId = run.id;
+		liveSession.activeStartedAt = startedAt ? Date.parse(startedAt) : null;
+		const audio = await missionnaireAudioStatus().catch(() => null);
+		return audio?.sourceActive ? 'live' : 'waiting';
+	}
+	liveSession.activeId = null;
+	liveSession.activeStartedAt = null;
+	attachedSessionId = null;
+	attachedSubtitleKey = null;
+	if (status === 'live') return 'waiting';
+	return status === 'ended' || status === 'cancelled' ? 'ended' : 'off';
+}
+
+async function readYouTube(sessionId: string): Promise<PublicStatus> {
+	const { status } = await adminPost<{ status: string }>({ action: 'broadcast-status', sessionId });
+	return youtubePublicStatus(status);
+}
+
+async function endYouTube(sessionId: string) {
+	for (let attempt = 0; attempt < 10; attempt++) {
+		const status = await readYouTube(sessionId);
+		if (publicDestinationReady(status, true)) return;
+		if (status === 'live') {
+			await adminPost({ action: 'end-live', sessionId });
+			return;
 		}
-		const failures = (await Promise.allSettled(requests)).filter(
-			(result): result is PromiseRejectedResult => result.status === 'rejected'
+		await new Promise<void>((resolve) => setTimeout(resolve, 2_000));
+	}
+}
+
+async function updatePublicDestinations(allowChange: boolean, canContinue = () => true) {
+	const run = liveSession.publicRun;
+	if (!run || !liveSession.pairingCode || liveSession.publicBusy) return;
+	liveSession.publicBusy = true;
+	try {
+		const destinations: Destination[] = run.youtube
+			? ['missionnaire', 'youtube']
+			: ['missionnaire'];
+		const isCurrentRun = () =>
+			liveSession.publicRun?.id === run.id && liveSession.publicRun.ending === run.ending;
+		const canChange = () => allowChange && isCurrentRun() && canContinue();
+		const complete = await Promise.all(
+			destinations.map(async (name) => {
+				const destination = liveSession.publicDestinations[name];
+				if (allowChange && destination.status === (run.ending ? 'ended' : 'live')) return true;
+				if (allowChange) destination.error = null;
+				const read = () => (name === 'youtube' ? readYouTube(run.id) : readMissionnaire(run));
+				try {
+					const ready = await reconcilePublicDestination({
+						read,
+						observe: (status) => {
+							destination.status = status;
+						},
+						ending: run.ending,
+						canChange,
+						change: async () => {
+							if (name === 'youtube') {
+								if (run.ending) await endYouTube(run.id);
+								else await goLiveYouTube(run.id, canChange);
+							} else if (run.ending) {
+								await post({ action: 'end', sessionId: run.id });
+							} else {
+								const audio = await missionnaireAudioStatus();
+								if (!audio.reachable) throw new Error(t('error.missionnaireAudioUnreachable'));
+								if (!audio.sourceActive) throw new Error(t('error.missionnaireAudioMissing'));
+								if (!canChange()) return;
+								await post({ action: 'start', sessionId: run.id, subtitleMode: 'armed' });
+							}
+						}
+					});
+					if (ready) {
+						destination.error = null;
+						if (run.ending) destination.status = 'ended';
+					}
+					if (!ready && canChange()) destination.error = t('controls.publicUnconfirmed');
+					return ready;
+				} catch (error) {
+					if (destination.status === (run.ending ? 'ended' : 'live'))
+						destination.status = 'unknown';
+					destination.error = error instanceof Error ? error.message : String(error);
+					return false;
+				}
+			})
 		);
-		if (failures.length) {
-			liveSession.error = failures
-				.map(({ reason }) => (reason instanceof Error ? reason.message : String(reason)))
-				.join(' · ');
+		if (isCurrentRun() && run.ending && complete.every(Boolean)) {
+			savePublicRun(null);
+			if (liveSession.selectedId === run.id) liveSession.selectedId = null;
 		}
 	} finally {
-		liveSession.activeId = null;
-		liveSession.activeStartedAt = null;
-		attachedSessionId = null;
-		attachedSubtitleKey = null;
+		liveSession.publicBusy = false;
 	}
+}
+
+export function refreshPublicDestinations() {
+	if (!liveSession.publicRun || liveSession.publicBusy) return publicRefresh;
+	publicRefresh = updatePublicDestinations(false).finally(() => {
+		publicRefresh = null;
+	});
+	return publicRefresh;
+}
+
+export function startPublicDestinations(canContinue: () => boolean) {
+	return updatePublicDestinations(true, canContinue);
+}
+
+export async function endSelectedSession() {
+	markPublicEnding();
+	await publicRefresh;
+	await updatePublicDestinations(true);
 }

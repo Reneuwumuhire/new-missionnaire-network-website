@@ -11,7 +11,7 @@ import {
 import { RecorderError, recorderStatus, type RecorderStatus } from '$lib/server/recorder-client';
 import { getIcecastSnapshot, icecastStreamUrl, liveAudioHlsUrl } from '$lib/server/icecast';
 
-export const load: PageServerLoad = async ({ cookies }) => {
+export const load: PageServerLoad = async ({ cookies, url }) => {
 	const adminUser = await verifyAdminSession(cookies);
 	if (!getPermissions(adminUser).can_manage_recordings) throw error(403, 'Accès refusé');
 
@@ -19,7 +19,14 @@ export const load: PageServerLoad = async ({ cookies }) => {
 	// fetched on demand via /api/recordings/list (search / load more). The
 	// list is STREAMED (not awaited) so the control center renders with
 	// skeleton rows while MongoDB works; the page resolves it in onMount.
-	const list = listRecordings({ limit: 5 });
+	const recordingId = url.searchParams.get('recording') || undefined;
+	const initialStatus: 'failed' | 'all' =
+		url.searchParams.get('status') === 'failed' ? 'failed' : 'all';
+	const list = listRecordings({
+		limit: 5,
+		recordingId,
+		status: initialStatus === 'failed' ? initialStatus : undefined
+	});
 	list.catch(() => {});
 
 	const [statusResult, icecast, broadcast, subscriberCount, upcomingLives, pastLives] =
@@ -44,6 +51,8 @@ export const load: PageServerLoad = async ({ cookies }) => {
 
 	return {
 		list,
+		recordingId,
+		initialStatus,
 		recorder,
 		icecast,
 		liveStreamUrl: icecastStreamUrl(),

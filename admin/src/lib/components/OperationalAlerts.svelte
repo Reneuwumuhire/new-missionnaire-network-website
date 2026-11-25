@@ -127,7 +127,10 @@
 		<div class="space-y-2">
 			{#each alerts as alert (alert.id)}
 				<a
-					href="/recordings"
+					href={alert.id === 'failed-recordings'
+						? '/recordings?status=failed#recording-library'
+						: '/recordings#live-controls'}
+					data-sveltekit-reload={alert.id === 'failed-recordings' ? '' : undefined}
 					role={alert.severity === 'critical' ? 'alert' : undefined}
 					class="flex items-start gap-3 border px-4 py-3 transition-opacity hover:opacity-80 {colors(
 						alert

@@ -192,10 +192,20 @@ const en = {
 	'target.live': 'Connected',
 	'target.failed': 'Failed',
 	'controls.reaching': 'Reaching servers…',
-	'controls.goLive': 'Go Live — YouTube + Missionnaire',
+	'controls.goLive': 'Go Live',
+	'controls.publicUnknown': 'Unconfirmed',
+	'controls.publicOff': 'Off air',
+	'controls.publicWaiting': 'Waiting for signal or confirmation',
+	'controls.publicEnded': 'Ended',
+	'controls.publicUnconfirmed':
+		'Studio could not confirm the change. Check the destination and retry.',
+	'controls.retryPublicStart': 'Retry going live',
+	'controls.retryPublicEnd': 'Retry ending broadcast',
+	'controls.endPublic': 'End broadcast',
+	'controls.startPrivateTest': 'Open private test',
+	'controls.privateTestActive': 'Private test active',
 	'controls.goLiveHint':
 		'Start the scheduled YouTube broadcast and open the selected Missionnaire public link.',
-	'controls.publicLive': 'Public link is live',
 	'controls.connectYouTube': 'Connect YouTube',
 	'controls.youtubeConnecting': 'Waiting for YouTube…',
 	'controls.youtubeConnected': 'YouTube connected',
@@ -203,10 +213,7 @@ const en = {
 	'controls.stopHeldHint':
 		'Stop feeding the held destinations. The main stream keeps running. YouTube ends its own broadcast in Studio.',
 	'controls.openYouTube': 'Open YouTube Studio',
-	'controls.openYouTubeHint':
-		'YouTube is receiving the preview signal. Check its picture, sound and stream health before Go Live.',
-	'error.youtubeChannelMissing': 'Connect the YouTube channel used by this service.',
-	'error.missionnaireGoLive': 'Missionnaire could not go live.',
+	'controls.openYouTubeHint': 'Check the YouTube broadcast, preview signal and stream health.',
 	'error.missionnaireAudioUnreachable':
 		'Could not check the Missionnaire audio server. Try Go Live again.',
 	'error.missionnaireAudioMissing':
@@ -471,7 +478,7 @@ const en = {
 		'Load the prepared sermon MP3 and French SRT, then capture the live source. Automatic sermon sync waits through songs and introductions.',
 	'help.goLiveTitle': 'Verify, then go live',
 	'help.goLive':
-		'Start the Preview Signal, watch the bottom status for stable FPS and bitrate, then use Go Live for the selected session.',
+		'Start the Preview Signal and check the picture and sound. Use Go Live for the selected session, then check confirmation in Controls. If a destination fails to start or end, retry it from Controls.',
 	'help.safety':
 		'Program is what viewers receive. Always check Program—not only Preview—before starting or changing a broadcast.',
 	'help.shortcuts': 'Keyboard Shortcuts',

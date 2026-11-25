@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import { literalSearch, objectIdString, pageLimit, pageNumber as pageSchema, searchText } from '$lib/server/mongo-input';
+import {
+	literalSearch,
+	objectIdString,
+	pageLimit,
+	pageNumber as pageSchema,
+	searchText
+} from '$lib/server/mongo-input';
 import { getDb } from './mongo';
 import { availableTypesTag } from '../utils/data';
 import {
@@ -298,7 +304,9 @@ export async function queryVideos(options: {
 		const query: Filter<Document> = {};
 
 		if (searchTags && searchTags.length > 0 && !searchTags.includes('any')) {
-			const regexPatterns = searchTags.map((tag) => new RegExp(`^${literalSearch.parse(tag)}$`, 'i'));
+			const regexPatterns = searchTags.map(
+				(tag) => new RegExp(`^${literalSearch.parse(tag)}$`, 'i')
+			);
 			query.tags = { $in: regexPatterns };
 		}
 
@@ -350,7 +358,9 @@ export async function queryAudios(options: {
 		const query: Filter<Document> = {};
 
 		if (searchTags && searchTags.length > 0 && !searchTags.includes('any')) {
-			const regexPatterns = searchTags.map((tag) => new RegExp(`^${literalSearch.parse(tag)}$`, 'i'));
+			const regexPatterns = searchTags.map(
+				(tag) => new RegExp(`^${literalSearch.parse(tag)}$`, 'i')
+			);
 			query.tags = { $in: regexPatterns };
 		}
 
@@ -1047,7 +1057,7 @@ const BROADCAST_DEFAULT: BroadcastAdminState = {
 	updated_at: new Date(0).toISOString()
 };
 
-export async function getBroadcastAdminState(): Promise<BroadcastAdminState> {
+export async function getBroadcastAdminState(strict = false): Promise<BroadcastAdminState> {
 	try {
 		const db = await getDb();
 		const doc = await db
@@ -1089,12 +1099,17 @@ export async function getBroadcastAdminState(): Promise<BroadcastAdminState> {
 			updated_at: (doc.updated_at as string) ?? new Date(0).toISOString()
 		};
 	} catch (e) {
+		if (strict) throw e;
 		console.error('[BroadcastAdminState] get error:', e);
 		return BROADCAST_DEFAULT;
 	}
 }
 
-export async function setBroadcastAdminState(updates: Partial<BroadcastAdminState>): Promise<void> {
+export async function setBroadcastAdminState(
+	updates: Partial<BroadcastAdminState>,
+	guard?:
+		{ is_live: false } | { is_live: true; scheduled_live_id: string; started_at: string | null }
+): Promise<boolean> {
 	// Single-anchor controls must not leave an older Studio timeline overriding
 	// their file/timing. Studio sync/hide supplies its own DVR timeline.
 	const resetTimeline =
@@ -1104,8 +1119,11 @@ export async function setBroadcastAdminState(updates: Partial<BroadcastAdminStat
 		);
 	try {
 		const db = await getDb();
-		await db.collection('broadcast_admin_state').updateOne(
-			{ _id: 'current' as unknown as ObjectId },
+		const result = await db.collection('broadcast_admin_state').updateOne(
+			{
+				_id: 'current' as unknown as ObjectId,
+				...(guard?.is_live === false ? { is_live: { $ne: true } } : guard)
+			},
 			{
 				$set: {
 					...updates,
@@ -1113,10 +1131,14 @@ export async function setBroadcastAdminState(updates: Partial<BroadcastAdminStat
 					updated_at: new Date().toISOString()
 				}
 			},
-			{ upsert: true }
+			{ upsert: guard?.is_live !== true }
 		);
+		return result.matchedCount > 0 || result.upsertedCount > 0;
 	} catch (e) {
+		if (guard?.is_live === false && e instanceof MongoServerError && e.code === 11000) return false;
+		if (guard) throw e;
 		console.error('[BroadcastAdminState] set error:', e);
+		return false;
 	}
 }
 
@@ -1181,12 +1203,17 @@ export async function getStudioAuthorization(
 			.collection('studio_authorizations')
 			.findOne({ code, revoked_at: { $exists: false }, expires_at: { $gt: new Date() } });
 		if (typeof doc?.user_email !== 'string') return null;
-		const admin = await db.collection('admin_users').findOne(
-			{ email: doc.user_email, is_active: true, must_change_password: { $ne: true } },
-			{ projection: { role: 1, 'permissions.can_manage_recordings': 1 } }
-		);
-		if (admin?.role !== 'superadmin' &&
-			!(admin?.role === 'editor' && admin.permissions?.can_manage_recordings === true)) return null;
+		const admin = await db
+			.collection('admin_users')
+			.findOne(
+				{ email: doc.user_email, is_active: true, must_change_password: { $ne: true } },
+				{ projection: { role: 1, 'permissions.can_manage_recordings': 1 } }
+			);
+		if (
+			admin?.role !== 'superadmin' &&
+			!(admin?.role === 'editor' && admin.permissions?.can_manage_recordings === true)
+		)
+			return null;
 		return {
 			email: doc.user_email,
 			name: typeof doc.user_name === 'string' ? doc.user_name : doc.user_email
@@ -1252,6 +1279,24 @@ export async function listStudioScheduledLives(): Promise<ScheduledLive[]> {
 		.limit(50)
 		.toArray();
 	return docs.map((doc) => serializeDocument<ScheduledLive>(doc));
+}
+
+export async function getNextPublicScheduledLive() {
+	const db = await getDb();
+	const next = await db.collection('scheduled_lives').findOne<{
+		slug: string;
+		title: string;
+		scheduled_at: Date;
+	}>(
+		{
+			status: 'scheduled',
+			is_test: { $ne: true },
+			privacy_status: { $ne: 'private' },
+			scheduled_at: { $gte: new Date() }
+		},
+		{ sort: { scheduled_at: 1 }, projection: { _id: 0, slug: 1, title: 1, scheduled_at: 1 } }
+	);
+	return next && { ...next, scheduled_at: next.scheduled_at.toISOString() };
 }
 
 export async function listStudioPreviousLives(): Promise<ScheduledLive[]> {
@@ -1768,7 +1813,9 @@ export async function querySermons(options: {
 		}
 
 		if (alpha && alpha.length === 1) {
-			conditions.push({ [languageFields.title]: { $regex: `^${literalSearch.parse(alpha)}`, $options: 'i' } });
+			conditions.push({
+				[languageFields.title]: { $regex: `^${literalSearch.parse(alpha)}`, $options: 'i' }
+			});
 		}
 
 		if (year) {

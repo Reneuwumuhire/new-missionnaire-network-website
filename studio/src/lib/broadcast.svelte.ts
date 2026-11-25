@@ -15,15 +15,15 @@ import {
 	stopCloudRecording
 } from './recording.svelte';
 import {
+	beginPublicRun,
 	endSelectedSession,
-	goLiveYouTube,
 	liveSession,
-	missionnaireAudioStatus,
-	sessionYouTubeChannelId,
-	startSelectedSession,
+	markPublicEnding,
+	refreshPublicDestinations,
+	startPublicDestinations,
 	studioDeviceInfo
 } from './live-session.svelte';
-import { destinationPlatform, destinationUrl, requiresYouTubeGoLive, studio } from './state.svelte';
+import { destinationPlatform, destinationUrl, studio } from './state.svelte';
 import { sampleOutputClock, startStreamClock, stopStreamClock } from './stream-clock';
 import { captureHasStalled, retryRecovery, type CaptureState } from './stream-health';
 
@@ -103,7 +103,7 @@ let recorderHasChunks = false;
 let lastOutputAt = 0;
 let recovering = false;
 let heldTask: Promise<void> | null = null;
-let sessionStart: Promise<boolean> | null = null;
+let publicStartTask: Promise<void> | null = null;
 let lifecycle = 0;
 let recoveryTimes: number[] = [];
 
@@ -160,7 +160,6 @@ interface Runtime {
 	audioTrack?: MediaStreamTrack;
 	mime: string;
 	main: StreamConfig;
-	checkMissionnaireAudio: boolean;
 	held?: StreamConfig;
 	runIds: Partial<Record<StreamGroup, number>>;
 }
@@ -434,7 +433,16 @@ export async function startBroadcast(
 	recoveryTimes = [];
 	chain = Promise.resolve();
 	try {
-		const destinations = studio.destinations.filter((d) => d.enabled && !d.hold && d.url.trim());
+		const isTest = liveSession.sessions.some(
+			(session) => session._id === liveSession.selectedId && session.is_test
+		);
+		const destinations = studio.destinations.filter(
+			(d) =>
+				d.enabled &&
+				!d.hold &&
+				d.url.trim() &&
+				(!isTest || destinationPlatform(d) === 'missionnaire')
+		);
 		const enabled =
 			targets ??
 			destinations.map((destination) => ({
@@ -481,7 +489,6 @@ export async function startBroadcast(
 			audioTrack,
 			mime,
 			main: config,
-			checkMissionnaireAudio,
 			runIds: {}
 		};
 		await attachListeners();
@@ -514,6 +521,7 @@ export async function startBroadcast(
 }
 
 function markPreviewLive() {
+	if (broadcast.phase !== 'live') void refreshPublicDestinations();
 	broadcast.phase = 'live';
 	broadcast.startedAt ??= Date.now();
 }
@@ -543,6 +551,7 @@ async function attachListeners() {
 				event.payload.index
 			];
 			if (!target) return;
+			const wasLive = target.state === 'live';
 			if (target.state !== 'reconnecting' && event.payload.state === 'reconnecting') {
 				broadcast.recoveries++;
 			}
@@ -550,13 +559,11 @@ async function attachListeners() {
 			target.reason = event.payload.reason || null;
 			if (target.group === 'main') {
 				const ready = broadcast.targets.some(
-					(output) =>
-						output.group === 'main' &&
-						output.state === 'live' &&
-						(!runtime?.checkMissionnaireAudio || output.missionnaire)
+					(output) => output.group === 'main' && output.state === 'live'
 				);
 				if (ready) markPreviewLive();
 				else broadcast.phase = 'connecting';
+				if (wasLive !== (target.state === 'live')) void refreshPublicDestinations();
 			}
 		}),
 		await listen<string>('stream://log', (event) => {
@@ -583,18 +590,21 @@ async function detachListeners() {
 }
 
 export async function stopBroadcast() {
-	if (broadcast.stopping) return;
+	if (broadcast.stopping || (!isStreaming() && !broadcast.starting && !publicStartTask)) return;
 	++lifecycle;
+	markPublicEnding();
 	broadcast.stopping = true;
 	stopWatchdog();
 	try {
 		// Close remote sessions even if a Go Live request is still in flight.
-		const recordingSession = Promise.all([sessionStart, pendingCloudRecordingStart()]).then(() => {
-			const { activeId, activeStartedAt } = liveSession;
-			if (activeId && activeStartedAt !== null) {
-				return { sessionId: activeId, sessionStartedAt: activeStartedAt };
+		const recordingSession = Promise.all([publicStartTask, pendingCloudRecordingStart()]).then(
+			() => {
+				const { activeId, activeStartedAt } = liveSession;
+				if (activeId && activeStartedAt !== null) {
+					return { sessionId: activeId, sessionStartedAt: activeStartedAt };
+				}
 			}
-		});
+		);
 		await stopRecorder();
 		let drainTimeout: ReturnType<typeof setTimeout> | undefined;
 		await Promise.race([
@@ -701,60 +711,40 @@ export async function goLiveHeld(): Promise<void> {
 	await startHeld(active, config);
 }
 
-/** Open the selected Missionnaire watch page only after the operator has
- * checked the incoming signal in admin and YouTube Studio. */
 export async function goLivePublic(): Promise<void> {
+	const session = liveSession.sessions.find((item) => item._id === liveSession.selectedId);
 	if (
+		!session ||
 		broadcast.phase !== 'live' ||
 		broadcast.publishing ||
-		liveSession.activeId ||
+		liveSession.publicBusy ||
+		liveSession.publicRun?.ending ||
 		recovering ||
 		broadcast.stopping
 	)
 		return;
+	beginPublicRun(session);
 	broadcast.publishing = true;
+	broadcast.error = null;
 	const generation = lifecycle;
 	const previewRun = runtime?.runIds.main;
-	const session = liveSession.sessions.find((item) => item._id === liveSession.selectedId);
-	const youtube =
-		!session?.is_test &&
-		(Boolean(session?.youtube_url) || requiresYouTubeGoLive(studio.destinations));
-	broadcast.error = null;
+	const canContinue = () =>
+		generation === lifecycle &&
+		previewRun === runtime?.runIds.main &&
+		!recovering &&
+		!broadcast.stopping;
 	try {
-		if (runtime?.checkMissionnaireAudio) {
-			const audio = await missionnaireAudioStatus();
-			if (
-				generation !== lifecycle ||
-				previewRun !== runtime?.runIds.main ||
-				broadcast.phase !== 'live' ||
-				broadcast.stopping ||
-				recovering
-			)
-				return;
-			if (!audio.reachable) throw new Error(t('error.missionnaireAudioUnreachable'));
-			if (!audio.sourceActive) throw new Error(t('error.missionnaireAudioMissing'));
-		}
-		if (youtube) {
-			const channelId = sessionYouTubeChannelId(session, liveSession.youtubeChannels);
-			if (!channelId || !liveSession.youtubeChannels.some((channel) => channel.id === channelId)) {
-				throw new Error(t('error.youtubeChannelMissing'));
-			}
-			await goLiveYouTube();
-		}
+		publicStartTask = startPublicDestinations(canContinue);
+		await publicStartTask;
 		if (
-			generation !== lifecycle ||
-			previewRun !== runtime?.runIds.main ||
-			broadcast.stopping ||
-			recovering
-		)
-			return;
-		sessionStart = startSelectedSession();
-		if (!(await sessionStart)) throw new Error(liveSession.error || t('error.missionnaireGoLive'));
-		if (generation === lifecycle) await goLiveHeld();
-	} catch (error) {
-		broadcast.error = error instanceof Error ? error.message : String(error);
+			!session.is_test &&
+			canContinue() &&
+			Object.values(liveSession.publicDestinations).some(({ status }) => status === 'live')
+		) {
+			await goLiveHeld();
+		}
 	} finally {
-		sessionStart = null;
+		publicStartTask = null;
 		broadcast.publishing = false;
 	}
 }

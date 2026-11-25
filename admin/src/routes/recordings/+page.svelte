@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, onDestroy, tick } from 'svelte';
+	import { onMount, onDestroy, tick, untrack } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
 	import type { PageData } from './$types';
 	import type HlsType from 'hls.js';
@@ -156,7 +156,7 @@
 	// /api/recordings/list. Client-side filtering is gone — it would only
 	// see the 5 loaded rows, not the full archive, which is misleading.
 	let searchQuery = $state('');
-	let statusFilter = $state<'all' | RecordingStatus>('all');
+	let statusFilter = $state<'all' | RecordingStatus>(untrack(() => data.initialStatus));
 	let publishedFilter = $state<'all' | 'published' | 'unpublished'>('all');
 	let selectedIds = $state<Set<string>>(new Set());
 	let bulkDeleting = $state(false);
@@ -190,6 +190,7 @@
 		const params = new URLSearchParams();
 		params.set('limit', String(limit));
 		params.set('page', String(page));
+		if (data.recordingId) params.set('recording', data.recordingId);
 		if (searchQuery.trim()) params.set('q', searchQuery.trim());
 		if (statusFilter !== 'all') params.set('status', statusFilter);
 		if (publishedFilter !== 'all') params.set('published', publishedFilter);
@@ -2539,7 +2540,8 @@
 {/snippet}
 
 <div
-	class="border bg-white/40 {broadcast.is_live || isRecording || icecast.sourceActive
+	id="live-controls"
+	class="scroll-mt-20 border bg-white/40 {broadcast.is_live || isRecording || icecast.sourceActive
 		? 'mb-8 p-5'
 		: 'mb-5 px-4 py-3'} {broadcast.is_live ? 'border-red-200' : 'border-stone-200/60'}"
 >
@@ -3093,7 +3095,14 @@
 <BroadcastDefaultsPanel {broadcast} />
 
 <!-- Search + filters toolbar -->
-<div class="mb-3 flex flex-wrap items-center gap-2 sm:gap-3">
+<div id="recording-library" class="mb-3 flex scroll-mt-20 flex-wrap items-center gap-2 sm:gap-3">
+	{#if data.recordingId}
+		<a
+			href="/recordings#recording-library"
+			data-sveltekit-reload
+			class="text-sm font-semibold text-primary hover:underline">{$t('dashboard.allRecordings')}</a
+		>
+	{/if}
 	{#if canManageRecordings}
 		<button
 			type="button"

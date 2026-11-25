@@ -64,7 +64,7 @@
 
 {#if data.user?.permissions.can_manage_recordings}
 	<a
-		href="/recordings"
+		href="/recordings#live-controls"
 		class="mb-6 flex items-center justify-between gap-4 border border-stone-200 bg-white p-4"
 	>
 		<span
@@ -102,9 +102,38 @@
 {#await data.deferred}
 	<ListSkeleton variant="panel" rows={3} />
 {:then dash}
+	{#if data.user?.permissions.can_manage_recordings}
+		<section class="mb-6 border border-stone-200/60 bg-white/60 p-4 sm:p-6">
+			<h2 class="font-display text-xl font-semibold">{$t('dashboard.nextLive')}</h2>
+			{#each dash.upcoming as live}
+				<a href="/recordings#scheduled-{live._id}" class="mt-3 block hover:text-primary"
+					><span class="block text-sm font-semibold">{live.title}</span><span
+						class="mt-1 block text-xs text-stone-500"
+						>{formatDate(live.scheduled_at)} · {formatTime(live.scheduled_at)} · {$t(
+							'dashboard.prepareService'
+						)}</span
+					></a
+				>
+			{:else}<p class="mt-2 text-sm text-stone-500">{$t('dashboard.noUpcoming')}</p>{/each}
+			<a
+				href="/recordings#scheduled-broadcasts-heading"
+				class="mt-4 inline-block text-sm font-medium text-primary"
+				>{$t('dashboard.manageSchedule')} →</a
+			>
+		</section>
+	{/if}
 	<section class="mb-6 border border-stone-200/60 bg-white/60 p-4 sm:p-6">
 		<h2 class="mb-3 font-display text-xl font-semibold">{$t('dashboard.attention')}</h2>
 		<div class="divide-y divide-stone-200/60">
+			{#if dash.replayToReview}
+				<a
+					class="block py-3 text-sm hover:text-primary"
+					href="/recordings?recording={dash.replayToReview._id}#recording-library"
+				>
+					<span class="block font-semibold">{$t('dashboard.reviewReplay')} →</span>
+					<span class="mt-1 block text-xs text-stone-500">{dash.replayToReview.title}</span>
+				</a>
+			{/if}
 			{#if dash.stats}
 				<a
 					class="flex items-center justify-between gap-3 py-3 text-sm hover:text-primary"
@@ -141,22 +170,6 @@
 			{/if}
 		</div>
 	</section>
-	{#if data.user?.permissions.can_manage_recordings}
-		<section class="mb-6 border border-stone-200/60 bg-white/60 p-4 sm:p-6">
-			<h2 class="font-display text-xl font-semibold">{$t('dashboard.nextLive')}</h2>
-			{#each dash.upcoming as live}
-				<a href="/recordings" class="mt-3 block hover:text-primary"
-					><span class="block text-sm font-semibold">{live.title}</span><span
-						class="mt-1 block text-xs text-stone-500"
-						>{formatDate(live.scheduled_at)} · {formatTime(live.scheduled_at)}</span
-					></a
-				>
-			{:else}<p class="mt-2 text-sm text-stone-500">{$t('dashboard.noUpcoming')}</p>{/each}
-			<a href="/recordings" class="mt-4 inline-block text-sm font-medium text-primary"
-				>{$t('dashboard.manageSchedule')} →</a
-			>
-		</section>
-	{/if}
 	{#if dash.stats}
 		<div class="grid grid-cols-1 gap-6">
 			<!-- Recent uploads -->

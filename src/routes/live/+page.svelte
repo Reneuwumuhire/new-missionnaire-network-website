@@ -3,6 +3,7 @@
 	import ShareLive from '$lib/components/+shareLive.svelte';
 	import NotificationBell from '$lib/components/+notificationBell.svelte';
 	import RecentRecordings from '$lib/components/+recentRecordings.svelte';
+	import LiveDiscovery from '$lib/components/LiveDiscovery.svelte';
 	import { t } from '../../i18n';
 	import type { PageData } from './$types';
 
@@ -28,7 +29,7 @@
 <section class="w-full px-6 pt-4 pb-10 md:pt-6">
 	<div class="max-w-2xl mx-auto">
 		<!-- Header -->
-		<div class="text-center mb-6 md:mb-12">
+		<div class="mb-6 text-center md:mb-8">
 			<div class="flex justify-center mb-3 md:mb-5">
 				<!-- Audio waveform icon -->
 				<svg width="32" height="28" viewBox="0 0 32 28" fill="none">
@@ -59,17 +60,21 @@
 			>
 				{$t('live.page.kicker')}
 			</p>
-			<h1 class="font-display text-4xl md:text-5xl font-semibold tracking-tight leading-[1.05] text-stone-900">
+			<h1
+				class="font-display text-4xl md:text-5xl font-semibold tracking-tight leading-[1.05] text-stone-900"
+			>
 				{$t('live.page.title')}
 			</h1>
 			<p
-				class="mt-2 md:mt-3 text-[13px] md:text-[15px] text-stone-400 font-body font-light max-w-md mx-auto leading-relaxed"
+				class="mx-auto mt-2 max-w-md font-body text-sm leading-relaxed text-stone-600 md:mt-3 md:text-[15px]"
 			>
 				{$t('live.page.subtitle')}
 			</p>
 		</div>
 
-		<!-- Player -->
+		<div class="mb-4 flex flex-col items-center gap-3 empty:hidden">
+			<LiveDiscovery initial={data.discovery} onLivePage />
+		</div>
 		<LiveRadioPlayer />
 
 		<!-- Share the live stream with others -->

@@ -113,9 +113,10 @@ from one set of CSS variables, so nothing is styled twice.
 
 ## Going live
 
-**Start Streaming** opens the connections; the button reads _Reaching servers…_
-until ffmpeg has actually pushed something, and only then does the clock start
-and the header say LIVE. You are never told you are on air before you are.
+**Start Preview Signal** opens the connections. Studio shows **Preview** when
+the signal reaches ingest. **Go Live** opens the scheduled Missionnaire and
+connected YouTube broadcasts. Controls shows which destinations have confirmed
+they are live, separately from the encoder's connection status.
 
 Controls lists every destination with its own state — Connecting / Connected /
 Failed, and the host it is talking to. A destination that fails is named: with
@@ -138,12 +139,11 @@ Held destinations join the encoded feed at the next keyframe. Starting
 YouTube while Missionnaire is on air leaves the Missionnaire connection and
 local recording running.
 
-**This app still cannot stop a YouTube broadcast** — it has no YouTube API. Go
-Live stops _feeding_ YouTube; ending the broadcast is done in Studio, and the
-_Open YouTube Studio_ button takes you there.
-
-If you would rather have YouTube's own two-stage flow, schedule the stream in
-Studio and turn auto-start off there; the hold works either way.
+For a scheduled YouTube broadcast connected through Admin, Studio verifies
+start and end through YouTube. If one destination succeeds, use **Retry going
+live** or **Retry ending broadcast** for the unresolved destination. After a
+restart, Studio checks the previous service before offering recovery. For a
+manual YouTube stream key, verify and end the broadcast in YouTube Studio.
 
 ### Stream health
 

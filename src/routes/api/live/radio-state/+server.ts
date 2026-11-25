@@ -1,20 +1,10 @@
-import { json } from '@sveltejs/kit';
 import { getLiveAudioSourceUrl, getLiveAudioHlsUrl } from '$lib/server/live-audio';
-import { checkLiveAudio } from '$lib/server/icecast';
+import { refreshRadioSnapshot } from '$lib/server/icecast';
 import {
 	canAccessStudioTest,
 	getRadioCachedStatus,
-	getBroadcastAdminState,
-	setRadioCachedStatus
+	getBroadcastAdminState
 } from '../../../../db/collections';
-
-// How stale the cached Icecast probe may get before this endpoint refreshes it
-// itself. The cron is the primary refresher, but it only writes while the gate
-// is open and only every few minutes — so right after "Go Live", or during any
-// cron gap, the cache lags and users see "offline" while audio is actually
-// flowing. Probing here when stale closes that gap. Bounded by this window +
-// the cache write so concurrent listeners don't each hammer Icecast.
-const CACHE_STALE_MS = 20_000;
 
 export async function GET({ fetch, url, setHeaders }) {
 	setHeaders({
@@ -29,48 +19,22 @@ export async function GET({ fetch, url, setHeaders }) {
 		adminGate.is_test &&
 		!(await canAccessStudioTest(adminGate.scheduled_live_id, url.searchParams.get('test')))
 	) {
-		return json({ isLive: false, checkedAt: new Date().toISOString(), listeners: 0 });
+		return Response.json({ broadcastOpen: false, isLive: false, checkedAt: null, listeners: 0 });
 	}
 
-	// Listener count comes from the cached Icecast snapshot (same source Fly
-	// reports). The self-heal probe below refreshes it when the cache is stale.
-	let listeners = status?.listeners ?? 0;
-
-	let icecastLive = status?.isLive ?? false;
-	let checkedAt = status?.checkedAt ?? null;
-	let streamUrl = status?.streamUrl;
-
-	// Self-heal a stale cache: if the gate is open but the cron hasn't refreshed
-	// recently, probe live now so the user app reflects the real stream state
-	// instead of a stale "offline". Result is written back so concurrent polls
-	// within CACHE_STALE_MS reuse it rather than re-probing.
-	const cacheAgeMs = checkedAt ? Date.now() - new Date(checkedAt).getTime() : Infinity;
-	if (adminGate.is_live && cacheAgeMs > CACHE_STALE_MS) {
-		try {
-			const check = await checkLiveAudio(fetch);
-			icecastLive = check.isLive;
-			checkedAt = new Date().toISOString();
-			streamUrl = check.isLive ? getLiveAudioSourceUrl() : undefined;
-			// Real listener count comes from the same status snapshot.
-			listeners = check.isLive ? check.listeners : 0;
-			await setRadioCachedStatus({ isLive: icecastLive, checkedAt, streamUrl, listeners });
-		} catch {
-			// Probe failed — keep whatever the cache had.
-		}
-	}
-
-	const isLive = icecastLive && adminGate.is_live;
-	if (!isLive) listeners = 0;
+	const audio = adminGate.is_live ? await refreshRadioSnapshot(fetch, status) : null;
+	const isLive = Boolean(audio?.isLive && adminGate.is_live);
 	const subtitleUrl =
 		adminGate.is_live && adminGate.subtitle_srt_s3_key
 			? `/api/subtitles/file?key=${encodeURIComponent(adminGate.subtitle_srt_s3_key)}`
 			: null;
 
-	return json({
+	return Response.json({
+		broadcastOpen: adminGate.is_live,
 		isLive,
-		checkedAt: checkedAt ?? new Date().toISOString(),
-		listeners,
-		streamUrl: isLive ? (streamUrl ?? getLiveAudioSourceUrl()) : undefined,
+		checkedAt: audio?.checkedAt ?? null,
+		listeners: isLive ? (audio?.listeners ?? 0) : 0,
+		streamUrl: isLive ? (audio?.streamUrl ?? getLiveAudioSourceUrl()) : undefined,
 		// DVR playlist — lets the player offer pause/resume + seek-back +
 		// jump-to-live. Absent when LIVE_AUDIO_HLS_URL isn't configured.
 		hlsUrl: isLive ? getLiveAudioHlsUrl() || undefined : undefined,

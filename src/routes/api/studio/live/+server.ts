@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { objectIdString } from '$lib/server/mongo-input';
-import { json, error } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import {
 	getStudioAuthorization,
 	revokeStudioAuthorization,
@@ -47,10 +47,10 @@ const studioLiveBody = z.object({
 });
 const pairingCode = z.guid();
 
-async function authorized(
-	request: Request
-): Promise<{ email: string; name: string }> {
-	const code = pairingCode.safeParse(request.headers.get('authorization')?.replace(/^Bearer\s+/, '')).data;
+async function authorized(request: Request): Promise<{ email: string; name: string }> {
+	const code = pairingCode.safeParse(
+		request.headers.get('authorization')?.replace(/^Bearer\s+/, '')
+	).data;
 	if (!code) error(401, 'Invalid Studio authorization');
 	const authorization = await getStudioAuthorization(code);
 	if (!authorization) throw error(401, 'Authorize Studio in the admin app first');
@@ -90,20 +90,27 @@ export async function POST({ request, url }) {
 	if (!parsed.success) error(400, 'Invalid Studio request');
 	const body = parsed.data;
 	if (body.action === 'logout') {
-		const code = pairingCode.safeParse(request.headers.get('authorization')?.replace(/^Bearer\s+/, '')).data;
+		const code = pairingCode.safeParse(
+			request.headers.get('authorization')?.replace(/^Bearer\s+/, '')
+		).data;
 		if (code) await revokeStudioAuthorization(code);
-		return json({ ok: true });
+		return Response.json({ ok: true });
 	}
 	const operator = await authorized(request);
 	if (body.action === 'list') {
-		const [sessions, previousSessions] = await Promise.all([
+		const [sessions, previousSessions, recoverySession] = await Promise.all([
 			listStudioScheduledLives(),
-			listStudioPreviousLives()
+			listStudioPreviousLives(),
+			body.sessionId ? getScheduledLiveById(body.sessionId) : null
 		]);
-		return json({
+		return Response.json({
 			operator,
 			sessions,
 			previousSessions,
+			recoverySession:
+				recoverySession?.is_test && recoverySession.created_by !== operator.email
+					? null
+					: recoverySession,
 			serverReceivedAtMs,
 			serverSentAtMs: Date.now()
 		});
@@ -120,7 +127,7 @@ export async function POST({ request, url }) {
 		if (!ext || !body.size || body.size > 5 * 1024 * 1024)
 			throw error(400, 'Thumbnail must be a JPEG, PNG, WebP or GIF under 5 MB');
 		const key = `broadcast-thumbnails/${Date.now()}-${crypto.randomUUID()}.${ext}`;
-		return json({
+		return Response.json({
 			uploadUrl: await presignUpload(key, body.contentType as string),
 			key,
 			publicUrl: s3Url(key)
@@ -130,7 +137,7 @@ export async function POST({ request, url }) {
 		if (!body.filename?.toLowerCase().endsWith('.srt') || !body.size || body.size > 2 * 1024 * 1024)
 			throw error(400, 'Subtitle must be an .srt file under 2 MB');
 		const key = `subtitles/${Date.now()}-${crypto.randomUUID()}.srt`;
-		return json({
+		return Response.json({
 			uploadUrl: await presignUpload(key, 'text/plain; charset=utf-8'),
 			key,
 			publicUrl: s3Url(key),
@@ -158,7 +165,7 @@ export async function POST({ request, url }) {
 			reminderEnabled: body.reminderEnabled === true,
 			notifyOnStart: body.notifyOnStart === true
 		});
-		return json({ session });
+		return Response.json({ session });
 	}
 	if (body.action === 'quick-test') {
 		const current = await getBroadcastAdminState();
@@ -175,7 +182,7 @@ export async function POST({ request, url }) {
 			reminderEnabled: false,
 			testAccessToken: accessToken
 		});
-		return json({
+		return Response.json({
 			session,
 			watchUrl: new URL(
 				`/live/${session.slug}?test=${encodeURIComponent(accessToken)}`,
@@ -200,7 +207,7 @@ export async function POST({ request, url }) {
 				typeof body.sermonEndMs === 'number' ? Math.max(0, Math.round(body.sermonEndMs)) : null,
 			subtitle_timing_language: body.subtitleTimingLanguage?.slice(0, 80) || null
 		});
-		return json({ ok: true });
+		return Response.json({ ok: true });
 	}
 	if (body.action === 'attach-subtitles') {
 		const current = await getBroadcastAdminState();
@@ -225,7 +232,7 @@ export async function POST({ request, url }) {
 			subtitle_offset_ms: 0,
 			subtitle_paused_position_ms: null
 		});
-		return json({ ok: true });
+		return Response.json({ ok: true });
 	}
 	if (body.action === 'hide-subtitles') {
 		const current = await getBroadcastAdminState();
@@ -247,7 +254,7 @@ export async function POST({ request, url }) {
 			subtitle_paused_position_ms: null,
 			subtitle_timeline: timeline
 		});
-		return json({ ok: true });
+		return Response.json({ ok: true });
 	}
 	if (body.action === 'sync-subtitles') {
 		const current = await getBroadcastAdminState();
@@ -312,18 +319,57 @@ export async function POST({ request, url }) {
 			subtitle_paused_position_ms: pausedPositionMs,
 			subtitle_timeline: timeline
 		});
-		return json({ ok: true, anchorEpochMs, offsetMs, pausedPositionMs });
+		return Response.json({ ok: true, anchorEpochMs, offsetMs, pausedPositionMs });
 	}
-	if (body.action === 'start') {
+	if (body.action === 'session-status' || body.action === 'start' || body.action === 'end') {
 		const session = await getScheduledLiveById(body.sessionId);
 		if (!session || (session.is_test && session.created_by !== operator.email)) {
 			error(404, 'Session not found');
 		}
-		if (session.status !== 'scheduled') throw error(400, 'Session is no longer available');
-		const current = await getBroadcastAdminState();
+		const current = await getBroadcastAdminState(true);
+		const active = current.is_live && current.scheduled_live_id === session._id;
+		if (active && current.is_test && current.started_by !== operator.email) {
+			throw error(404, 'Session not found');
+		}
+		if (body.action === 'session-status') {
+			return Response.json({
+				active,
+				startedAt: active ? current.started_at : null,
+				status: session.status
+			});
+		}
+		if (body.action === 'end') {
+			const endedAt = new Date().toISOString();
+			if (
+				active &&
+				!(await setBroadcastAdminState(
+					{
+						is_live: false,
+						ended_at: endedAt,
+						notification_pending: false,
+						is_test: false,
+						subtitle_paused_position_ms: null
+					},
+					{ is_live: true, scheduled_live_id: session._id, started_at: current.started_at }
+				))
+			) {
+				throw error(409, 'The live session changed. Check its status and try again.');
+			}
+			if (session.status === 'live')
+				await setStudioScheduledLiveStatus(session._id, 'ended', endedAt);
+			return Response.json({ ok: true, endedAt });
+		}
+		const watchPath = `/live/${session.slug}`;
+		if (active) return Response.json({ ok: true, startedAt: current.started_at, watchPath });
 		if (current.is_live) throw error(409, 'Another session is already live');
-		const startedAt = new Date().toISOString();
-		if (!(await setStudioScheduledLiveStatus(session._id, 'live', startedAt))) {
+		// An interrupted start can leave the schedule marked live before the gate opens.
+		const interruptedStart = session.status === 'live' && current.scheduled_live_id !== session._id;
+		const startedAt = (interruptedStart && session.live_started_at) || new Date().toISOString();
+		if (
+			!interruptedStart &&
+			(session.status !== 'scheduled' ||
+				!(await setStudioScheduledLiveStatus(session._id, 'live', startedAt)))
+		) {
 			throw error(409, 'Session is no longer available');
 		}
 		// A transcript attached while scheduling should work without a second
@@ -340,47 +386,37 @@ export async function POST({ request, url }) {
 				subtitle_offset_ms: 0
 			});
 		}
-		await setBroadcastAdminState({
-			is_live: true,
-			started_at: startedAt,
-			ended_at: null,
-			started_by: operator.email,
-			started_by_name: operator.name,
-			icecast_offline_since: null,
-			is_test: Boolean(session.is_test),
-			// Test links are deliberately unlisted and silent: no subscriber push
-			// may be sent merely because an operator is checking the signal.
-			notification_pending: !session.is_test && session.notify_on_start === true,
-			title: session.title,
-			description: session.description,
-			thumbnail_url: session.thumbnail_url,
-			thumbnail_s3_key: session.thumbnail_s3_key,
-			scheduled_live_id: session._id,
-			scheduled_live_slug: session.slug,
-			subtitle_srt_url: session.subtitle_srt_url,
-			subtitle_srt_s3_key: session.subtitle_srt_s3_key,
-			subtitle_anchor_epoch_ms: subtitleAnchorEpochMs,
-			subtitle_offset_ms: 0,
-			subtitle_paused_position_ms: null,
-			subtitle_timeline: []
-		});
-		return json({ ok: true, startedAt, watchPath: `/live/${session.slug}` });
-	}
-
-	if (body.action === 'end') {
-		const current = await getBroadcastAdminState();
-		if (!current.is_live || current.scheduled_live_id !== body.sessionId) return json({ ok: true });
-		if (current.is_test && current.started_by !== operator.email) error(404, 'Session not found');
-		const endedAt = new Date().toISOString();
-		await setBroadcastAdminState({
-			is_live: false,
-			ended_at: endedAt,
-			notification_pending: false,
-			is_test: false,
-			subtitle_paused_position_ms: null
-		});
-		await setStudioScheduledLiveStatus(body.sessionId, 'ended', endedAt);
-		return json({ ok: true, endedAt });
+		if (
+			!(await setBroadcastAdminState(
+				{
+					is_live: true,
+					started_at: startedAt,
+					ended_at: null,
+					started_by: operator.email,
+					started_by_name: operator.name,
+					icecast_offline_since: null,
+					is_test: Boolean(session.is_test),
+					// Test links are deliberately unlisted and silent: no subscriber push
+					// may be sent merely because an operator is checking the signal.
+					notification_pending: !session.is_test && session.notify_on_start === true,
+					title: session.title,
+					description: session.description,
+					thumbnail_url: session.thumbnail_url,
+					thumbnail_s3_key: session.thumbnail_s3_key,
+					scheduled_live_id: session._id,
+					scheduled_live_slug: session.slug,
+					subtitle_srt_url: session.subtitle_srt_url,
+					subtitle_srt_s3_key: session.subtitle_srt_s3_key,
+					subtitle_anchor_epoch_ms: subtitleAnchorEpochMs,
+					subtitle_offset_ms: 0,
+					subtitle_paused_position_ms: null,
+					subtitle_timeline: []
+				},
+				{ is_live: false }
+			))
+		)
+			throw error(409, 'Another session is already live');
+		return Response.json({ ok: true, startedAt, watchPath });
 	}
 
 	throw error(400, 'Unknown action');

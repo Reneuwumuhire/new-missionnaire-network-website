@@ -2,6 +2,7 @@ import type { PageServerLoad } from './$types';
 import { redirect } from '@sveltejs/kit';
 import { getCollection } from '../db/collections';
 import { pageMeta } from '$lib/seo';
+import { getLiveDiscovery } from '$lib/server/live-discovery';
 
 export const load: PageServerLoad = async ({ url, setHeaders }) => {
 	const filter = url.searchParams.get('filter');
@@ -15,21 +16,19 @@ export const load: PageServerLoad = async ({ url, setHeaders }) => {
 		throw redirect(301, `/videos?${params.toString()}`);
 	}
 
-	// Brief edge cache so the homepage stays cheap under load without
-	// pinning a stale "live" badge for long. The banner + button both read
-	// from the layout's `radioState` (admin-gate aware), so if admin ends a
-	// broadcast within this window the next visitor (≤10s later) sees the
-	// updated state. Open tabs already in the page get an instant push via
-	// the SW broadcast for *go-live* events; *end-live* still requires a
-	// reload or in-app navigation today.
+	// The live action revalidates on visible tabs independently of the page cache.
 	setHeaders({
 		'cache-control': 'public, s-maxage=10, stale-while-revalidate=60'
 	});
 
-	const videos = await getCollection('videos', 0, 3, 'All', '');
+	const [videos, discovery] = await Promise.all([
+		getCollection('videos', 0, 3, 'All', ''),
+		getLiveDiscovery()
+	]);
 
 	return {
 		data: videos,
+		discovery,
 		meta: pageMeta('/', {
 			title: 'Missionnaire Network - Accueil | Prédications et Cantiques du Message',
 			description:
