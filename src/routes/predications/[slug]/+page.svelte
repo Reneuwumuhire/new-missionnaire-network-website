@@ -114,6 +114,7 @@
 			? `/predications/${data.canonicalSlug}/pdf?lang=${previewVersion.language}`
 			: ''
 	);
+	let previewLoadedFor = $state('');
 	let currentSelectedUrl = $derived(getCurrentAudioUrl($selectAudio));
 </script>
 
@@ -156,6 +157,7 @@
 			{#if previewPdfUrl}
 				<a
 					href="#pdf-preview"
+					onclick={() => (previewLoadedFor = previewPdfUrl)}
 					class="px-4 py-2 border border-stone-200/60 bg-white/40 text-stone-700 text-xs font-semibold uppercase tracking-wider hover:border-missionnaire hover:text-missionnaire transition-colors"
 				>
 					{$t('predications.viewPdfOnPage')}
@@ -209,18 +211,28 @@
 			</div>
 
 			<div class="border border-stone-200/60 overflow-hidden bg-white/40">
-				<object
-					data={previewPdfUrl}
-					type="application/pdf"
-					title={`PDF ${sermonTitle}`}
-					class="w-full min-h-[360px] h-[62vh] md:h-[75vh] lg:h-[860px]"
-				>
-					<div
-						class="min-h-[360px] flex items-center justify-center text-sm text-stone-600 p-6 text-center"
+				{#if previewLoadedFor === previewPdfUrl}
+					<object
+						data={previewPdfUrl}
+						type="application/pdf"
+						title={`PDF ${sermonTitle}`}
+						class="w-full min-h-[360px] h-[62vh] md:h-[75vh] lg:h-[860px]"
 					>
-						{$t('predications.pdfFallback')}
-					</div>
-				</object>
+						<div
+							class="min-h-[360px] flex items-center justify-center text-sm text-stone-600 p-6 text-center"
+						>
+							{$t('predications.pdfFallback')}
+						</div>
+					</object>
+				{:else}
+					<button
+						type="button"
+						onclick={() => (previewLoadedFor = previewPdfUrl)}
+						class="w-full min-h-[360px] text-sm font-semibold text-missionnaire hover:underline"
+					>
+						{$t('predications.viewPdfOnPage')}
+					</button>
+				{/if}
 			</div>
 		</section>
 	{/if}
