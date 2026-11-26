@@ -1,3 +1,4 @@
+import { dropIndex } from './layout';
 import { describe, expect, it } from 'vitest';
 import { MIN_WEIGHT, clamp, popoverFit, splitWeights } from './layout';
 
@@ -70,4 +71,11 @@ describe('popover fitting', () => {
 		expect(popoverFit(4, 24, 1000).maxHeight).toBeGreaterThanOrEqual(96);
 		expect(popoverFit(4, 8, 20).maxHeight).toBeGreaterThanOrEqual(96);
 	});
+});
+
+it('drops a source before or after a row and treats both adjacent gaps as no-ops', () => {
+	expect(dropIndex(0, 3)).toBe(2);
+	expect(dropIndex(2, 0)).toBe(0);
+	expect(dropIndex(1, 1)).toBe(1);
+	expect(dropIndex(1, 2)).toBe(1);
 });

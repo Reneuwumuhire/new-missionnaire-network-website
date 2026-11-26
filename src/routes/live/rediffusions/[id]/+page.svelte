@@ -2,6 +2,7 @@
 	import type { PageData } from './$types';
 	import { downloadAudioFile } from '../../../../utils/downloadAudio';
 	import { selectAudio, playlist, basePlaylist, currentIndex, isPlaying } from '$lib/stores/global';
+	import { activeAudioElement, pendingPlaybackSeek } from '$lib/utils/audioResume';
 	import { dispatchAudioPlayerAction } from '$lib/utils/audioPlayerControls';
 	import type { MusicAudio } from '$lib/models/music-audio';
 	import { derived as derivedStore } from 'svelte/store';
@@ -160,9 +161,26 @@
 		browser && typeof navigator !== 'undefined' && typeof navigator.share === 'function'
 	);
 
-	function buildShareUrl(): string {
+	function currentSharePosition() {
+		const position = $activeAudioElement?.currentTime;
+		return $selectAudio &&
+			's3_url' in $selectAudio &&
+			$selectAudio.s3_url === activeAudioUrl &&
+			position !== undefined &&
+			Number.isFinite(position) &&
+			position >= 1
+			? Math.floor(position)
+			: null;
+	}
+
+	function buildShareUrl(fromMoment = false): string {
 		if (!browser) return '';
-		return `${window.location.origin}/live/rediffusions/${rec.id}?autoplay=1`;
+		const url = new URL(`/live/rediffusions/${rec.id}`, window.location.origin);
+		url.searchParams.set('autoplay', '1');
+		if (audioVersion === 'french') url.searchParams.set('audio', audioVersion);
+		const position = fromMoment ? currentSharePosition() : null;
+		if (position !== null) url.searchParams.set('t', String(position));
+		return url.href;
 	}
 
 	function flashShareFeedback(state: 'copied' | 'error') {
@@ -191,9 +209,9 @@
 		}
 	}
 
-	async function nativeShare() {
+	async function nativeShare(fromMoment = false) {
 		closeShareMenu();
-		const url = buildShareUrl();
+		const url = buildShareUrl(fromMoment);
 		if (!url) return;
 		const shareData: ShareData = {
 			title: rec.title,
@@ -234,7 +252,13 @@
 	onMount(() => {
 		if (!browser) return;
 		if (page.url.searchParams.get('autoplay') !== '1') return;
-		playRecording();
+		if (page.url.searchParams.get('audio') === 'french' && hasFrenchAudio) audioVersion = 'french';
+		const time = Number(page.url.searchParams.get('t'));
+		const duration = audioVersion === 'french' ? rec.french_audio_duration_sec : rec.duration_sec;
+		if (Number.isFinite(time) && time > 0 && (duration == null || time < duration)) {
+			pendingPlaybackSeek.set({ url: urlFor(audioVersion), time });
+		}
+		loadVersionIntoPlayer(audioVersion, true);
 		try {
 			window.history.replaceState(window.history.state, '', `/live/rediffusions/${rec.id}`);
 		} catch {
@@ -765,7 +789,7 @@
 										type="button"
 										role="menuitem"
 										class="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-xs font-semibold text-stone-700 transition-colors motion-reduce:transition-none hover:bg-stone-50 hover:text-missionnaire"
-										onclick={nativeShare}
+										onclick={() => nativeShare()}
 									>
 										<svg
 											width="16"
@@ -809,6 +833,16 @@
 									</svg>
 									<span>{$t('rediffDetail.copyLink')}</span>
 								</button>
+								{#if currentSharePosition() !== null}
+									<button
+										type="button"
+										role="menuitem"
+										class="flex w-full items-center px-3 py-2.5 text-left text-xs font-semibold text-stone-700 hover:bg-stone-50 hover:text-missionnaire"
+										onclick={() => nativeShare(true)}
+									>
+										{$t('rediffDetail.shareMoment')}
+									</button>
+								{/if}
 							</div>
 						{/if}
 					</div>

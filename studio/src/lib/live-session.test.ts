@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+	currentStudioSessionTitle,
 	isLatestStatusRequest,
+	liveSession,
 	reusableSessionDraft,
 	restoreStudioAuthorization,
 	sessionYouTubeChannelId,
@@ -43,6 +45,37 @@ it('reuses stream settings without reusing its schedule or transcript', () => {
 	});
 	expect(draft.subtitle).toBeNull();
 	expect(draft.announce).toBe(false);
+});
+
+it('uses the visible session title for captures before and during a public run', () => {
+	const previous = {
+		sessions: liveSession.sessions,
+		selectedId: liveSession.selectedId,
+		activeId: liveSession.activeId,
+		publicRun: liveSession.publicRun
+	};
+	const selected = {
+		_id: 'scheduled',
+		slug: 'scheduled',
+		title: '2026-11-26 TEST',
+		scheduled_at: '2026-11-26T06:00:00Z',
+		status: 'scheduled' as const
+	};
+	try {
+		liveSession.sessions = [selected];
+		liveSession.selectedId = selected._id;
+		expect(currentStudioSessionTitle()).toBe(selected.title);
+		liveSession.publicRun = {
+			id: 'live',
+			title: 'Live service',
+			isTest: false,
+			youtube: false,
+			ending: false
+		};
+		expect(currentStudioSessionTitle()).toBe('Live service');
+	} finally {
+		Object.assign(liveSession, previous);
+	}
 });
 
 it('ignores an older status response after a newer refresh starts', () => {

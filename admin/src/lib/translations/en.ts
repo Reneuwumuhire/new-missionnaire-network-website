@@ -214,6 +214,12 @@ const en: Record<keyof typeof fr, string> = {
 	'dashboard.noUpcoming': 'No upcoming live scheduled.',
 	'dashboard.manageSchedule': 'Manage schedule',
 	'dashboard.prepareService': 'Open service setup',
+	'dashboard.replayRecording': 'Recording',
+	'dashboard.replayLanguage': 'Audio language',
+	'dashboard.replayCaptions': 'Captions',
+	'dashboard.replayTranscript': 'Transcript',
+	'dashboard.chooseReplay': 'Choose a ready replay',
+	'dashboard.attachReplay': 'Attach replay',
 	'dashboard.reviewReplay': 'Review unpublished replay',
 	'dashboard.allRecordings': 'View all recordings',
 	'dashboard.overview': 'Library overview',
@@ -1291,7 +1297,8 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.notifications.liveStartLabel': 'Notify subscribers when this live starts',
 	'recordings.notifications.liveStartHint':
 		'Optional · currently {count} notification subscribers. Leave unchecked to start silently.',
-	'recordings.confirm.endLive.message': 'The public site will no longer show the live player.',
+	'recordings.confirm.endLive.message':
+		'The broadcast will end and any active recording will be saved.',
 	'recordings.confirm.stopRecording.message': 'Stop the current recording?',
 	'recordings.confirm.stopAll.message': 'End the live AND stop the current recording?',
 	'recordings.confirm.startAll.message': 'Go live AND start recording.',
@@ -1484,7 +1491,7 @@ const en: Record<keyof typeof fr, string> = {
 	'recordings.scheduled.confirm.deleteMessage':
 		'"{title}" will be permanently deleted. Its share link will stop working.',
 	'recordings.scheduled.confirm.endMessage':
-		'"{title}" will end now: the public site stops showing the live player and the entry moves to history.',
+		'"{title}" will end now and move to history. Any active recording will be saved.',
 	'recordings.scheduled.error.alreadyLive':
 		'A live is already running — end it before starting another one',
 	'recordings.scheduled.toast.createdLinkCopied': 'Live scheduled — share link copied',

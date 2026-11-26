@@ -55,6 +55,11 @@ export function splitWeights(
 	return [a, b];
 }
 
+/** Translate a gap in the visible list to an index after the dragged row is removed. */
+export function dropIndex(from: number, insertion: number): number {
+	return insertion > from ? insertion - 1 : insertion;
+}
+
 /** Room for a popover that opens upward from `anchorTop`, and downward from
  *  `anchorBottom`. Returns the direction with more room and how tall it may be,
  *  so a menu never runs off the window however the panels are sized. */

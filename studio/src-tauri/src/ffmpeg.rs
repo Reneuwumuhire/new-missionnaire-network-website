@@ -3,7 +3,7 @@
 use std::collections::VecDeque;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{sync_channel, SyncSender, TrySendError};
@@ -49,6 +49,7 @@ pub struct StreamConfig {
 	pub feed_held: bool,
 	#[serde(default = "default_recording_format")]
 	pub recording_format: String,
+	pub recording_title: Option<String>,
 	#[serde(default = "default_recording_video_bitrate")]
 	pub recording_video_bitrate_kbps: u32,
 	#[serde(default = "default_recording_audio_bitrate")]
@@ -381,26 +382,39 @@ impl Encoder {
 			run.held = outputs(hub);
 			return Ok((redact(&publish_args(&cfg.targets[0].url)), None, run_id));
 		}
-		if group != "main" || running.is_some() {
+		if !matches!(group, "main" | "recording") || running.is_some() {
 			return Err("Cette diffusion est déjà en cours".into());
 		}
+		let mut reserved = None;
 		let local_path = if cfg.record_local {
 			let dir = app.path().video_dir()
 				.map_err(|error| format!("Dossier Vidéos/Films introuvable: {error}"))?
 				.join("Missionnaire Studio");
 			fs::create_dir_all(&dir).map_err(|error| format!("Dossier d’enregistrement impossible: {error}"))?;
+			let purpose = if group == "recording" { "Manual" } else { "Broadcast" };
 			let extension = if cfg.recording_format == "audio" { "mp3" } else { "mp4" };
-			Some(dir.join(format!("Missionnaire Studio {}-{run_id}.{extension}", chrono_stamp()))
-				.to_string_lossy().into_owned())
+			if cfg.recording_format != "video" {
+				if let Some(title) = cfg.recording_title.as_deref() {
+					reserved = reserve_session_recording(&dir, title, extension)
+						.map_err(|error| format!("Fichier d’enregistrement impossible: {error}"))?;
+				}
+			}
+			let path = reserved.as_ref().map(|files| files.paths[0].clone()).unwrap_or_else(|| dir.join(
+				format!("Missionnaire Studio {purpose} {}-{run_id}.{extension}", chrono_stamp())
+			));
+			Some(path.to_string_lossy().into_owned())
 		} else {
 			None
 		};
-		let args = build_args_with_path(&cfg, local_path.as_deref())?;
+		let event_group = group.to_owned();
+		let mut args = build_args_with_path(&cfg, local_path.as_deref())?;
+		if reserved.is_some() { args.insert(0, "-y".into()); }
 		let hub = (!cfg.targets.is_empty() || cfg.feed_held).then(|| Arc::new(PacketHub::default()));
 		let mut child = ffmpeg_command(&bin).args(&args).stdin(Stdio::piped())
 			.stdout(if hub.is_some() { Stdio::piped() } else { Stdio::null() })
 			.stderr(Stdio::piped()).spawn()
 			.map_err(|error| format!("Lancement de ffmpeg impossible: {error}"))?;
+		if let Some(files) = reserved.as_mut() { files.paths.clear(); }
 
 		let main = if let Some(hub) = &hub {
 			let publishers = outputs(hub);
@@ -444,7 +458,7 @@ impl Encoder {
 							}
 						}
 						let _ = app.emit("stream://stats", serde_json::json!({
-							"group": "main", "runId": run_id, "stats": stats
+							"group": event_group, "runId": run_id, "stats": stats
 						}));
 					}
 					continue;
@@ -464,7 +478,7 @@ impl Encoder {
 				}
 			};
 			let _ = app.emit("stream://exited", serde_json::json!({
-				"group": "main", "runId": run_id, "code": code, "log": tail
+				"group": event_group, "runId": run_id, "code": code, "log": tail
 			}));
 		});
 		*running = Some(Running { run_id, tx, child, backpressure, hub, main, held: Vec::new() });
@@ -555,6 +569,50 @@ fn apply_progress(stats: &mut StreamStats, line: &str) -> bool {
 	true
 }
 
+#[derive(Default)]
+struct RecordingReservation {
+	paths: Vec<PathBuf>,
+}
+
+impl Drop for RecordingReservation {
+	fn drop(&mut self) {
+		for path in &self.paths { let _ = fs::remove_file(path); }
+	}
+}
+
+fn reserve_session_recording(root: &Path, title: &str, extension: &str) -> std::io::Result<Option<RecordingReservation>> {
+	let mut name = String::new();
+	for ch in title.chars() {
+		if name.len() + ch.len_utf8() > 220 { break; }
+		name.push(if ch.is_control() || r#"<>:"/\|?*"#.contains(ch) { '_' } else { ch });
+	}
+	let name = name.trim_end_matches([' ', '.']);
+	if name.trim().is_empty() { return Ok(None); }
+	let device = name.split('.').next().unwrap_or_default().trim_end().to_ascii_uppercase();
+	let reserved = matches!(device.as_str(), "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$")
+		|| (device.starts_with("COM") || device.starts_with("LPT"))
+			&& device[3..].chars().count() == 1
+			&& device[3..].contains(|ch: char| matches!(ch, '0'..='9' | '¹' | '²' | '³'));
+	let name = if reserved { format!("_{name}") } else { name.to_owned() };
+
+	// Reserve both outputs before ffmpeg starts so simultaneous takes cannot overwrite them.
+	'takes: for take in 1.. {
+		let stem = if take == 1 { name.clone() } else { format!("{name} ({take})") };
+		let extensions = if extension == "mp4" { &["mp4", "mp3"][..] } else { &["mp3"][..] };
+		let mut files = RecordingReservation::default();
+		for ext in extensions {
+			let path = root.join(format!("{stem}.{ext}"));
+			match fs::OpenOptions::new().write(true).create_new(true).open(&path) {
+				Ok(_) => files.paths.push(path),
+				Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => continue 'takes,
+				Err(err) => return Err(err),
+			}
+		}
+		return Ok(Some(files));
+	}
+	unreachable!()
+}
+
 fn chrono_stamp() -> u64 {
 	std::time::SystemTime::now()
 		.duration_since(std::time::UNIX_EPOCH)
@@ -581,9 +639,28 @@ mod tests {
 			record_local: false,
 			feed_held: false,
 			recording_format: default_recording_format(),
+			recording_title: None,
 			recording_video_bitrate_kbps: default_recording_video_bitrate(),
 			recording_audio_bitrate_kbps: default_recording_audio_bitrate(),
 		}
+	}
+
+	#[test]
+	fn scheduled_audio_is_saved_in_the_parent_without_overwriting_other_takes() {
+		let root = std::env::temp_dir().join(format!("studio-recording-name-{}-{}", std::process::id(), chrono_stamp()));
+		fs::create_dir(&root).unwrap();
+		let title = "Culte de soirée - Kinyarwanda";
+		let first = reserve_session_recording(&root, title, "mp3").unwrap().unwrap();
+		fs::write(&first.paths[0], b"first take").unwrap();
+		let second = reserve_session_recording(&root, title, "mp4").unwrap().unwrap();
+		assert_eq!(first.paths, [root.join(format!("{title}.mp3"))]);
+		assert_eq!(second.paths, [root.join(format!("{title} (2).mp4")), root.join(format!("{title} (2).mp3"))]);
+		assert!(!root.join(format!("{title}.mp4")).exists());
+		assert_eq!(fs::read(&first.paths[0]).unwrap(), b"first take");
+		let safe = reserve_session_recording(&root, "Culte 20:30/Replay", "mp3").unwrap().unwrap();
+		assert_eq!(safe.paths[0].file_name().unwrap(), "Culte 20_30_Replay.mp3");
+		drop((first, second, safe));
+		fs::remove_dir_all(root).unwrap();
 	}
 
 	#[test]
@@ -636,13 +713,20 @@ mod tests {
 					c.video_bitrate_kbps = c.recording_video_bitrate_kbps;
 					c.audio_bitrate_kbps = c.recording_audio_bitrate_kbps;
 				}
-				let file_name = if cfg!(windows) {
-					format!("{format}-{streaming}-{shared}.mp4")
+				let mut reservation = None;
+				let path = if format == "video" {
+					let suffix = if cfg!(windows) { "" } else { " with '|" };
+					dir.join(format!("{format}-{streaming}-{shared}{suffix}.mp4"))
 				} else {
-					format!("{format}-{streaming}-{shared} with '|.mp4")
+					let extension = if format == "audio" { "mp3" } else { "mp4" };
+					let files = reserve_session_recording(&dir, "Culte de l'Église 20.30", extension).unwrap().unwrap();
+					let path = files.paths[0].clone();
+					reservation = Some(files);
+					path
 				};
-				let path = dir.join(file_name);
-				let out = Command::new(&ffmpeg).args(build_args_with_path(&c, path.to_str()).unwrap())
+				let mut args = build_args_with_path(&c, path.to_str()).unwrap();
+				if reservation.is_some() { args.insert(0, "-y".into()); }
+				let out = Command::new(&ffmpeg).args(args)
 					.stdin(fs::File::open(&source).unwrap()).output().unwrap();
 				assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
 				if streaming {

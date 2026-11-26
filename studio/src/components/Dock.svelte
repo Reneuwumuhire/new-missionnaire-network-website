@@ -9,12 +9,14 @@
 	let {
 		id,
 		title,
+		width,
 		actions,
 		footer,
 		children
 	}: {
 		id: DockId;
 		title: string;
+		width?: number;
 		actions?: Snippet;
 		footer?: Snippet;
 		children: Snippet;
@@ -25,7 +27,7 @@
 
 <section
 	class="flex min-w-0 flex-col {id === 'mixer' ? 'studio-obs-mixer' : ''}"
-	style="flex: {weight} 1 0"
+	style:flex={width === undefined ? `${weight} 1 0` : `0 0 ${width}px`}
 >
 	<header
 		class="flex h-8 shrink-0 items-center justify-between border-b border-ink-700 bg-ink-850 px-3"

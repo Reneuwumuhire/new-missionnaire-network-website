@@ -1,7 +1,8 @@
 import { verifyAdminSession } from '$lib/server/admin-session';
-import { json, error } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
+import { RecorderError, recorderStatus, recorderStopById } from '$lib/server/recorder-client';
 import {
 	getBroadcastAdminState,
 	setBroadcastAdminState,
@@ -17,7 +18,7 @@ export const POST: RequestHandler = async ({ getClientAddress, cookies }) => {
 	// is_live=false write that End Live needs to perform.
 	const current = await getBroadcastAdminState({ fresh: true });
 	if (!current.is_live) {
-		return json({ ok: true, alreadyOffline: true, state: current });
+		return Response.json({ ok: true, alreadyOffline: true, state: current });
 	}
 
 	const endedAt = new Date().toISOString();
@@ -79,7 +80,43 @@ export const POST: RequestHandler = async ({ getClientAddress, cookies }) => {
 			...(isOverride ? { override_started_by: { old: startedBy, new: null } } : {})
 		},
 		ip_address: getClientAddress()
-	});
+	}).catch((err) => console.error('[broadcast/end-live] Broadcast audit failed:', err));
 
-	return json({ ok: true, endedAt });
+	let recordingId: string | null = null;
+	let recordingError: string | null = null;
+	if (!current.is_test) {
+		try {
+			const status = await recorderStatus();
+			if (
+				status.recording &&
+				status.id &&
+				!status.stopping &&
+				Date.parse(status.startedAt ?? '') <= Date.parse(endedAt)
+			) {
+				// Admin can end the live gate while the source still sends audio.
+				({ id: recordingId } = await recorderStopById(status.id, false));
+				if (recordingId)
+					await logAudit({
+						user_id: adminUser.email,
+						user_email: adminUser.email,
+						action: 'update',
+						target_collection: 'recordings',
+						target_id: recordingId,
+						changes: {
+							status: { old: 'recording', new: 'uploading' },
+							...(status.createdBy && status.createdBy !== adminUser.email
+								? { override_started_by: { old: status.createdBy, new: null } }
+								: {})
+						},
+						ip_address: getClientAddress()
+					}).catch((err) => console.error('[broadcast/end-live] Recording audit failed:', err));
+			}
+		} catch (err) {
+			if (!(err instanceof RecorderError && err.code === 'not_configured')) {
+				recordingError = err instanceof Error ? err.message : String(err);
+			}
+		}
+	}
+
+	return Response.json({ ok: true, endedAt, recordingId, recordingError });
 };

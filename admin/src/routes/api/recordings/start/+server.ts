@@ -1,13 +1,15 @@
 import { verifyAdminSession } from '$lib/server/admin-session';
-import { json, error } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
 import { RecorderError, recorderStart } from '$lib/server/recorder-client';
+import { finishLateRecording } from '$lib/server/finish-late-recording';
 import {
 	getBroadcastAdminState,
 	setBroadcastAdminState,
 	updateScheduledLive,
-	logAudit
+	logAudit,
+	setScheduledLiveRecordingId
 } from '../../../../db/collections';
 
 /** Recording start usually coincides with the start of the subtitled audio
@@ -64,18 +66,36 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
 	}
 
 	try {
+		const gate = await getBroadcastAdminState({ fresh: true });
 		const result = await recorderStart(user.email, user.name || null);
-		const subtitlesAnchored = await autoAnchorSubtitles(monitorAtEpochMs);
+		const linked =
+			gate.is_live &&
+			!gate.is_test &&
+			gate.scheduled_live_id &&
+			gate.started_at &&
+			(await setScheduledLiveRecordingId(gate.scheduled_live_id, result.id, {
+				startedAt: gate.started_at
+			}).catch((cause) => {
+				console.error('[Recorder] link failed:', cause);
+				return false;
+			}));
+		const stopped = await finishLateRecording(gate, result.id);
+		const subtitlesAnchored = !stopped && (await autoAnchorSubtitles(monitorAtEpochMs));
 		await logAudit({
 			user_id: user.email,
 			user_email: user.email,
 			action: 'create',
 			target_collection: 'recordings',
 			target_id: result.id,
-			...(subtitlesAnchored ? { changes: { subtitle_auto_anchor: { old: null, new: 'recording-start' } } } : {}),
+			changes: {
+				...(linked ? { scheduled_live_id: { old: null, new: gate.scheduled_live_id } } : {}),
+				...(subtitlesAnchored
+					? { subtitle_auto_anchor: { old: null, new: 'recording-start' } }
+					: {})
+			},
 			ip_address: getClientAddress()
 		});
-		return json({ ...result, subtitlesAnchored });
+		return Response.json({ ...result, subtitlesAnchored, stopped });
 	} catch (err) {
 		if (err instanceof RecorderError) throw error(err.status, err.message);
 		throw err;

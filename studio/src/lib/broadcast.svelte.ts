@@ -9,14 +9,18 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { t } from './i18n.svelte';
 import {
 	clearRecording,
+	cloudRecordingSession,
 	pendingCloudRecordingStart,
 	recording,
 	recordsLocal,
+	startCloudRecording,
 	stopCloudRecording
 } from './recording.svelte';
 import {
 	beginPublicRun,
+	currentStudioSessionTitle,
 	endSelectedSession,
+	getPublicSessionStatus,
 	liveSession,
 	markPublicEnding,
 	refreshPublicDestinations,
@@ -145,6 +149,7 @@ interface StreamConfig {
 	record_local: boolean;
 	feed_held: boolean;
 	recording_format?: 'audio' | 'video' | 'both';
+	recording_title?: string;
 	recording_video_bitrate_kbps?: number;
 	recording_audio_bitrate_kbps?: number;
 }
@@ -282,28 +287,30 @@ function startRecorder(active: Runtime) {
 	startWatchdog();
 }
 
+function stopMediaRecorder(current: MediaRecorder): Promise<boolean> {
+	if (current.state === 'inactive') return Promise.resolve(true);
+	return new Promise((resolve) => {
+		const stopped = () => finish(true);
+		const finish = (complete: boolean) => {
+			clearTimeout(timeout);
+			current.removeEventListener('stop', stopped);
+			resolve(complete);
+		};
+		const timeout = setTimeout(() => finish(false), 1_000);
+		current.addEventListener('stop', stopped, { once: true });
+		try {
+			current.stop();
+		} catch {
+			finish(false);
+		}
+	});
+}
+
 async function stopRecorder() {
 	stopWatchdog();
 	const current = recorder;
-	if (current && current.state !== 'inactive') {
-		await new Promise<void>((resolve) => {
-			const finish = () => {
-				clearTimeout(timeout);
-				current.removeEventListener('stop', finish);
-				resolve();
-			};
-			const incomplete = () => {
-				if (broadcast.stopping) broadcast.error = 'Studio did not receive the final capture chunk.';
-				finish();
-			};
-			const timeout = setTimeout(incomplete, 1_000);
-			current.addEventListener('stop', finish, { once: true });
-			try {
-				current.stop();
-			} catch {
-				incomplete();
-			}
-		});
+	if (current && !(await stopMediaRecorder(current)) && broadcast.stopping) {
+		broadcast.error = 'Studio did not receive the final capture chunk.';
 	}
 	if (recorder === current) recorder = null;
 	captureVideoTrack?.stop();
@@ -481,6 +488,7 @@ export async function startBroadcast(
 			record_local: recordLocal,
 			feed_held: heldDestinations().length > 0,
 			recording_format: settings.recordingFormat,
+			recording_title: currentStudioSessionTitle(),
 			recording_video_bitrate_kbps: settings.recordingVideoBitrateKbps,
 			recording_audio_bitrate_kbps: settings.recordingAudioBitrateKbps
 		};
@@ -590,19 +598,32 @@ async function detachListeners() {
 }
 
 export async function stopBroadcast() {
-	if (broadcast.stopping || (!isStreaming() && !broadcast.starting && !publicStartTask)) return;
+	if (
+		broadcast.stopping ||
+		(!isStreaming() &&
+			!broadcast.starting &&
+			!publicStartTask &&
+			!liveSession.publicRun &&
+			!manualRecording.active &&
+			!manualTask)
+	)
+		return;
+	const { activeId, activeStartedAt } = liveSession;
 	++lifecycle;
 	markPublicEnding();
 	broadcast.stopping = true;
 	stopWatchdog();
 	try {
+		const savingLocal = stopManualLocalRecording();
 		// Close remote sessions even if a Go Live request is still in flight.
 		const recordingSession = Promise.all([publicStartTask, pendingCloudRecordingStart()]).then(
 			() => {
-				const { activeId, activeStartedAt } = liveSession;
-				if (activeId && activeStartedAt !== null) {
-					return { sessionId: activeId, sessionStartedAt: activeStartedAt };
+				const sessionId = activeId ?? liveSession.activeId;
+				const sessionStartedAt = activeStartedAt ?? liveSession.activeStartedAt;
+				if (sessionId && sessionStartedAt !== null) {
+					return { sessionId, sessionStartedAt };
 				}
+				return cloudRecordingSession();
 			}
 		);
 		await stopRecorder();
@@ -636,10 +657,32 @@ export async function stopBroadcast() {
 		recoveryTimes = [];
 		clearRecording();
 		await detachListeners();
-		await Promise.all([endSelectedSession(), drainingRecording ?? stopCloudRecording()]);
+		await Promise.all([
+			endSelectedSession(),
+			drainingRecording ?? stopCloudRecording(),
+			savingLocal
+		]);
 		if (recording.error) broadcast.error ??= recording.error;
 	} finally {
 		broadcast.stopping = false;
+	}
+}
+
+let checkingPublicEnd = false;
+
+export async function checkPublicBroadcastEnd() {
+	const run = liveSession.publicRun;
+	if (!run || run.ending || checkingPublicEnd || broadcast.stopping) return;
+	checkingPublicEnd = true;
+	try {
+		const session = await getPublicSessionStatus(run.id).catch(() => null);
+		if (session && !session.active && session.status === 'ended' && liveSession.publicRun === run) {
+			await stopBroadcast().catch((error) => {
+				broadcast.error ??= String(error);
+			});
+		}
+	} finally {
+		checkingPublicEnd = false;
 	}
 }
 
@@ -768,4 +811,162 @@ export function uptimeLabel(nowMs: number): string {
 	const m = String(Math.floor((total % 3600) / 60)).padStart(2, '0');
 	const s = String(total % 60).padStart(2, '0');
 	return `${h}:${m}:${s}`;
+}
+
+let manualCloud = $state(false);
+
+export const manualRecording = $state({
+	localStartedAt: null as number | null,
+	get active() {
+		return this.localStartedAt !== null || (manualCloud && recording.cloud);
+	},
+	pending: null as 'starting' | 'stopping' | null,
+	path: null as string | null
+});
+let finishLocalCapture: (() => Promise<void>) | null = null;
+let manualTask: Promise<void> | null = null;
+
+async function finishManualLocalCapture() {
+	const finish = finishLocalCapture;
+	finishLocalCapture = null;
+	try {
+		await finish?.();
+	} catch (error) {
+		manualRecording.path = null;
+		throw error;
+	} finally {
+		manualRecording.localStartedAt = null;
+	}
+}
+
+async function stopManualLocalRecording() {
+	await manualTask;
+	if (!finishLocalCapture) return;
+	manualRecording.pending = 'stopping';
+	try {
+		await finishManualLocalCapture();
+	} catch (error) {
+		broadcast.error ??= String(error);
+	} finally {
+		manualRecording.pending = null;
+	}
+}
+
+export function toggleManualRecording(canvas: HTMLCanvasElement, audio?: MediaStreamTrack) {
+	if (manualTask || broadcast.stopping) return;
+	manualTask = changeManualRecording(canvas, audio).finally(() => {
+		manualTask = null;
+	});
+	return manualTask;
+}
+
+async function changeManualRecording(canvas: HTMLCanvasElement, audio?: MediaStreamTrack) {
+	manualRecording.pending = manualRecording.active ? 'stopping' : 'starting';
+	recording.error = null;
+	try {
+		if (manualRecording.active) {
+			const results = await Promise.allSettled([
+				finishManualLocalCapture(),
+				manualCloud ? stopCloudRecording() : undefined
+			]);
+			manualCloud = manualCloud && recording.cloud;
+			for (const result of results) {
+				if (result.status === 'rejected') throw result.reason;
+			}
+			return;
+		}
+		const settings = studio.settings;
+		const local = settings.recordingMode === 'local' || settings.recordingMode === 'both';
+		const cloud = settings.recordingMode === 'cloud' || settings.recordingMode === 'both';
+		if (!local && !cloud) return;
+		const canRecordCloud = Boolean(liveSession.activeId && !liveSession.publicRun?.isTest);
+		if (cloud && !canRecordCloud && !local) {
+			throw new Error('Start a live service before recording to the cloud.');
+		}
+		if (local) {
+			const mime = pickMimeType();
+			if (!mime) throw new Error(t('error.noRecorder'));
+			if (settings.recordingFormat !== 'video' && !audio)
+				throw new Error('Add an audio source before recording audio.');
+			const stream = canvas.captureStream(settings.fps);
+			if (audio) stream.addTrack(audio);
+			const video = stream.getVideoTracks()[0];
+			let queued = Promise.resolve();
+			let pendingBytes = 0;
+			let writeError: unknown;
+			try {
+				const capture = new MediaRecorder(stream, { mimeType: mime });
+				const result = await invoke<StartedStream>('start_stream', {
+					group: 'recording',
+					config: {
+						container: containerOf(mime),
+						targets: [],
+						fps: settings.fps,
+						video_bitrate_kbps: settings.videoBitrateKbps,
+						audio_bitrate_kbps: settings.audioBitrateKbps,
+						encoder: settings.encoder,
+						has_audio: Boolean(audio),
+						record_local: true,
+						feed_held: false,
+						recording_format: settings.recordingFormat,
+						recording_title: currentStudioSessionTitle(),
+						recording_video_bitrate_kbps: settings.recordingVideoBitrateKbps,
+						recording_audio_bitrate_kbps: settings.recordingAudioBitrateKbps
+					} satisfies StreamConfig
+				});
+				manualRecording.path = result.localRecordingPath ?? null;
+				capture.ondataavailable = ({ data }) => {
+					if (!data.size || writeError) return;
+					if (pendingBytes + data.size > MAX_PENDING_CAPTURE_BYTES) {
+						writeError = new Error('The local recorder could not keep up.');
+						recording.error = String(writeError);
+						if (capture.state !== 'inactive') capture.stop();
+						return;
+					}
+					pendingBytes += data.size;
+					queued = queued
+						.then(async () => {
+							if (!writeError)
+								await invoke('push_chunk', new Uint8Array(await data.arrayBuffer()), {
+									headers: { 'x-studio-run-id': String(result.runId), 'x-studio-recording': '1' }
+								});
+						})
+						.catch((cause) => {
+							writeError = cause;
+							recording.error = String(cause);
+							if (capture.state !== 'inactive') capture.stop();
+						})
+						.finally(() => {
+							pendingBytes -= data.size;
+						});
+				};
+				finishLocalCapture = async () => {
+					const complete = await stopMediaRecorder(capture);
+					video?.stop();
+					await queued;
+					await invoke('stop_stream', { group: 'recording' });
+					if (writeError) throw writeError;
+					if (!complete) throw new Error('Studio did not receive the final local recording chunk.');
+				};
+				capture.start(500);
+				manualRecording.localStartedAt = Date.now();
+			} catch (cause) {
+				video?.stop();
+				manualRecording.path = null;
+				await invoke('stop_stream', { group: 'recording' }).catch(() => {});
+				throw cause;
+			}
+		}
+		if (cloud && canRecordCloud) {
+			await startCloudRecording(true);
+			manualCloud = recording.cloud;
+		} else if (cloud) {
+			recording.error = 'Local recording started. Start a live service to use cloud recording.';
+		}
+	} catch (cause) {
+		recording.error = String(cause);
+	} finally {
+		if (!manualRecording.active) finishLocalCapture = null;
+		manualRecording.pending = null;
+	}
 }

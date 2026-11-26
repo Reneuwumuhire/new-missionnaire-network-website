@@ -141,14 +141,12 @@ export function onAirLines(nowMs = Date.now(), onProgram = false): OnAirLines {
 		const pos = timedPositionMs(nowMs, onProgram);
 		if (pos === null) return { current: '', next: '', index: -1 };
 		const i = findCueIndex(lyrics.cues, pos);
-		// Past the end of the file: hold nothing rather than the last line
-		// forever — a finished transcript should leave the screen clean.
 		const cue = i >= 0 ? lyrics.cues[i] : null;
-		const expired = cue ? pos > cue.endMs + 5000 : false;
+		const current = cue && pos < cue.endMs ? cue.text : '';
 		return {
-			current: cue && !expired ? cue.text : '',
+			current,
 			next: lyrics.cues[i + 1]?.text ?? '',
-			index: i
+			index: current ? i : -1
 		};
 	}
 	return {

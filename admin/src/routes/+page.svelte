@@ -106,7 +106,9 @@
 		<section class="mb-6 border border-stone-200/60 bg-white/60 p-4 sm:p-6">
 			<h2 class="font-display text-xl font-semibold">{$t('dashboard.nextLive')}</h2>
 			{#each dash.upcoming as live}
-				<a href="/recordings#scheduled-{live._id}" class="mt-3 block hover:text-primary"
+				<a
+					href="/recordings?service={live._id}#service-details"
+					class="mt-3 block hover:text-primary"
 					><span class="block text-sm font-semibold">{live.title}</span><span
 						class="mt-1 block text-xs text-stone-500"
 						>{formatDate(live.scheduled_at)} · {formatTime(live.scheduled_at)} · {$t(

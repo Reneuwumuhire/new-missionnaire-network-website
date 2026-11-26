@@ -40,6 +40,10 @@ export interface PushPayload {
 	// Tabs ignore events they don't handle, so adding kinds here is safe
 	// without a Service Worker change.
 	event?: 'radio-live' | 'radio-end' | 'live-scheduled' | 'live-reminder';
+	scheduledAtIso?: string;
+	scheduledTitle?: string;
+	broadcastTitle?: string;
+	broadcastDescription?: string;
 }
 
 // One tag for the whole live/radio lifecycle (announcement → reminder →
@@ -82,8 +86,8 @@ export async function sendPushToAll(payload: PushPayload): Promise<void> {
 	if (!ensureVapidConfigured()) return;
 
 	// Older records predate endpoint validation.
-	const subscriptions = (await getAllPushSubscriptions()).filter((sub) =>
-		pushEndpoint.safeParse(sub.endpoint).success
+	const subscriptions = (await getAllPushSubscriptions()).filter(
+		(sub) => pushEndpoint.safeParse(sub.endpoint).success
 	);
 	if (subscriptions.length === 0) return;
 
@@ -161,7 +165,9 @@ export function radioLivePayload(opts?: {
 		url: opts?.watchPath || '/live',
 		icon: '/favicon.png',
 		tag: RADIO_TAG,
-		event: 'radio-live'
+		event: 'radio-live',
+		broadcastTitle: broadcastTitle || undefined,
+		broadcastDescription: broadcastDescription || undefined
 	};
 	const image = notificationImage(opts?.thumbnailUrl);
 	if (image) payload.image = image;
@@ -181,16 +187,16 @@ export function radioEndPayload(opts?: { broadcastTitle?: string | null }): Push
 		// Same tag as the go-live push \u2014 REPLACES the "En direct" card instead
 		// of stacking a second notification for the same broadcast.
 		tag: RADIO_TAG,
-		event: 'radio-end'
+		event: 'radio-end',
+		broadcastTitle: broadcastTitle || undefined
 	};
 }
 
-// Broadcasts are announced/scheduled in Berlin/Zurich time (see the radio-probe
-// cron schedule) \u2014 format the push body in that zone, not the server's.
+// Scheduled live notifications show the broadcast time in Rwanda.
 function formatScheduledDateFr(scheduledAtIso: string): string {
 	try {
 		return new Intl.DateTimeFormat('fr-FR', {
-			timeZone: 'Europe/Zurich',
+			timeZone: 'Africa/Kigali',
 			dateStyle: 'full',
 			timeStyle: 'short'
 		}).format(new Date(scheduledAtIso));
@@ -204,7 +210,7 @@ function formatScheduledDateFr(scheduledAtIso: string): string {
 function formatScheduledTimeFr(scheduledAtIso: string): string {
 	try {
 		return new Intl.DateTimeFormat('fr-FR', {
-			timeZone: 'Europe/Zurich',
+			timeZone: 'Africa/Kigali',
 			hour: '2-digit',
 			minute: '2-digit'
 		}).format(new Date(scheduledAtIso));
@@ -231,7 +237,9 @@ export function liveScheduledPayload(opts: {
 		// Per-broadcast tag: the later "starts soon" reminder replaces this
 		// announcement instead of stacking next to it.
 		tag: `mn-live-${opts.slug}`,
-		event: 'live-scheduled'
+		event: 'live-scheduled',
+		scheduledAtIso: opts.scheduledAtIso,
+		scheduledTitle: opts.title
 	};
 	const image = notificationImage(opts.thumbnailUrl);
 	if (image) payload.image = image;
@@ -254,7 +262,9 @@ export function liveReminderPayload(opts: {
 		icon: '/favicon.png',
 		// Replaces the earlier announcement card for this same broadcast.
 		tag: `mn-live-${opts.slug}`,
-		event: 'live-reminder'
+		event: 'live-reminder',
+		scheduledAtIso: opts.scheduledAtIso,
+		scheduledTitle: opts.title
 	};
 	const image = notificationImage(opts.thumbnailUrl);
 	if (image) payload.image = image;

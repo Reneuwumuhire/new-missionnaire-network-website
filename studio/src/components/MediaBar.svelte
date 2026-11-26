@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	// Transport for a media source, under the preview where OBS keeps its source
 	// toolbar. It was in the Properties dialog, which is the wrong place for it:
 	// a recording is paused and wound back *while the service is running*, and
@@ -49,23 +50,29 @@
 		return () => clearInterval(timer);
 	});
 
-	// A timed SRT selected alongside an audio/video source belongs to that
-	// source. Starting it should never require a second "follow" click: its
-	// own clock also covers pause, seek and resume automatically.
+	const canSyncCaptions = $derived(
+		Boolean(
+			layer &&
+			element &&
+			lyrics.mode === 'timed' &&
+			lyrics.cues.length > 0 &&
+			(studio.service.type !== 'prepared' || layer.id === studio.service.sermonLayerId)
+		)
+	);
+
 	$effect(() => {
 		const source = element;
 		const sourceId = layer?.id;
-		if (!source || !sourceId || lyrics.mode !== 'timed' || lyrics.cues.length === 0) return;
-		if (studio.service.type === 'prepared' && sourceId !== studio.service.sermonLayerId) return;
+		if (!source || !sourceId || !canSyncCaptions) return;
 		const sync = () => {
-			followMedia(sourceId);
+			if (lyrics.followLayerId !== sourceId) followMedia(sourceId);
 			void syncLiveLyrics();
 		};
 		const update = () => void syncLiveLyrics();
 		source.addEventListener('play', sync);
 		source.addEventListener('pause', update);
 		source.addEventListener('seeked', update);
-		if (!source.paused) sync();
+		if (!source.paused) untrack(sync);
 		return () => {
 			source.removeEventListener('play', sync);
 			source.removeEventListener('pause', update);
@@ -85,12 +92,8 @@
 
 	function toggle() {
 		if (!element) return;
-		if (element.paused) {
-			if (lyrics.mode === 'timed' && lyrics.cues.length > 0) {
-				followMedia(layer!.id);
-			}
-			void element.play();
-		} else element.pause();
+		if (element.paused) void element.play();
+		else element.pause();
 		playing = !element.paused;
 	}
 
@@ -210,10 +213,13 @@
 		</button>
 		<button
 			class="studio-chip {following ? 'border-primary/40 bg-primary/15 text-accent' : ''}"
-			title={t('props.followLyricsHint')}
+			title={t(canSyncCaptions ? 'props.followLyricsHint' : 'media.captionsUnavailable')}
 			aria-pressed={following}
-			disabled={!layer}
-			onclick={() => followMedia(following ? null : layer.id)}
+			disabled={!canSyncCaptions}
+			onclick={() => {
+				followMedia(following ? null : layer.id);
+				void syncLiveLyrics();
+			}}
 		>
 			{t('media.followShort')}
 		</button>

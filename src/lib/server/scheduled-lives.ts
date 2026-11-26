@@ -29,7 +29,10 @@ export interface WatchState {
 	replayPath: string | null;
 }
 
-export async function getWatchState(slug: string, testToken?: string | null): Promise<WatchState | null> {
+export async function getWatchState(
+	slug: string,
+	testToken?: string | null
+): Promise<WatchState | null> {
 	const live = await getScheduledLiveBySlug(slug);
 	if (!live) return null;
 	if (live.is_test && !(await canAccessStudioTest(live._id, testToken ?? null))) return null;
@@ -55,7 +58,7 @@ export async function getWatchState(slug: string, testToken?: string | null): Pr
 	// timestamp-proximity matching the legacy ?live= links use.
 	if (live.status === 'ended' || live.status === 'live') {
 		let replay = live.recording_id ? await getPublishedById(live.recording_id) : null;
-		if (!replay) {
+		if (!live.recording_id && !live.is_test) {
 			const sessionIso = live.live_started_at ?? live.scheduled_at;
 			replay = await getPublishedNearSession(sessionIso);
 			if (replay) {

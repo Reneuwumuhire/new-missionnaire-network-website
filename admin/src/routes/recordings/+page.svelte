@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy, tick, untrack } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
-	import type { PageData } from './$types';
+	import type { ActionData, PageData } from './$types';
 	import type HlsType from 'hls.js';
 	import type { Recording, RecordingStatus } from '$lib/models/recording';
 	import type { ScheduledLive } from '../../db/collections';
@@ -45,7 +45,7 @@
 	}
 	import { vercelImage, vercelImageSrcSet, vercelImagePlaceholder } from '$lib/utils/vercelImage';
 
-	let { data }: { data: PageData } = $props();
+	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	type RecorderSnapshot = PageData['recorder'];
 	type IcecastSnapshot = PageData['icecast'];
@@ -201,6 +201,7 @@
 		append: boolean,
 		options: { limit?: number; showLoading?: boolean; silentErrors?: boolean } = {}
 	) {
+		if (data.service && !data.recordingId) return;
 		const limit = options.limit ?? PAGE_SIZE;
 		const showLoading = options.showLoading ?? true;
 		if (showLoading) isFetching = true;
@@ -1669,22 +1670,32 @@
 		}
 	}
 
-	onMount(() => {
-		// Resolve the streamed initial recordings list (skeleton rows until
-		// then). A user-triggered fetch (search while loading) wins the race.
-		void data.list.then(
+	$effect(() => {
+		const list = data.list;
+		const scoped = Boolean(data.service);
+		let cancelled = false;
+		void list.then(
 			(result) => {
-				if (listLoaded) return;
+				// Regular library filters own the list once loaded. A service refresh owns
+				// the scoped list, including when the first replay has just been attached.
+				if (cancelled || (!scoped && listLoaded)) return;
 				recordings = result.data;
 				total = result.total;
+				currentPage = 1;
 				listLoaded = true;
 			},
 			() => {
-				if (listLoaded) return;
+				if (cancelled || (!scoped && listLoaded)) return;
 				listLoaded = true;
-				fetchError = fetchError ?? $t('recordings.error.network');
+				fetchError = $t('recordings.error.network');
 			}
 		);
+		return () => {
+			cancelled = true;
+		};
+	});
+
+	onMount(() => {
 		recomputeElapsed();
 		pollTimer = setInterval(refreshStatus, 5000);
 		tickTimer = setInterval(recomputeElapsed, 1000);
@@ -2207,12 +2218,21 @@
 	}
 
 	async function endLive() {
-		if (broadcastBusy) return;
+		if (broadcastBusy || busy) return;
 		if (
 			!(await confirmOverride(
 				broadcastStartedBy,
 				broadcastStartedByName,
 				$t('recordings.confirm.override.liveLabel')
+			))
+		)
+			return;
+		if (
+			isRecording &&
+			!(await confirmOverride(
+				recordingStartedBy,
+				recordingStartedByName,
+				$t('recordings.confirm.override.recordingLabel')
 			))
 		)
 			return;
@@ -2225,16 +2245,27 @@
 		});
 		if (!ok) return;
 		broadcastBusy = true;
+		busy = true;
 		actionError = null;
 		try {
 			const res = await fetch('/api/broadcast/end-live', { method: 'POST' });
 			if (!res.ok) {
 				const text = await res.text();
 				actionError = text || $t('recordings.error.http', { status: res.status });
+			} else {
+				const { recordingId, recordingError } = (await res.json()) as {
+					recordingId?: string | null;
+					recordingError?: string | null;
+				};
+				watchRecordingList(recordingId);
+				if (recordingError)
+					actionError = $t('recordings.error.stopRecording', { detail: recordingError });
 			}
+			await refreshStatus();
 			await invalidateAll();
 		} finally {
 			broadcastBusy = false;
+			busy = false;
 		}
 	}
 
@@ -2257,64 +2288,6 @@
 	function getEditingRecording(): Recording | null {
 		if (!editingRecordingId) return null;
 		return recordings.find((r) => r._id === editingRecordingId) ?? null;
-	}
-
-	/** End the live broadcast AND stop the recording in one click. Order matters:
-	 *  end-live first so the public site flips offline immediately, then stop
-	 *  recording (which triggers the S3 upload). Single confirmation for both. */
-	async function stopBoth() {
-		if (broadcastBusy || busy) return;
-		if (
-			!(await confirmOverride(
-				broadcastStartedBy,
-				broadcastStartedByName,
-				$t('recordings.confirm.override.liveLabel')
-			))
-		)
-			return;
-		if (
-			!(await confirmOverride(
-				recordingStartedBy,
-				recordingStartedByName,
-				$t('recordings.confirm.override.recordingLabel')
-			))
-		)
-			return;
-		const ok = await confirmDialog.ask({
-			title: $t('recordings.actions.stopAll'),
-			message: $t('recordings.confirm.stopAll.message'),
-			confirmLabel: $t('recordings.actions.stopAll'),
-			cancelLabel: $t('recordings.common.cancel'),
-			tone: 'warning'
-		});
-		if (!ok) return;
-		broadcastBusy = true;
-		busy = true;
-		actionError = null;
-		let stoppedRecording = false;
-		try {
-			const liveRes = await fetch('/api/broadcast/end-live', { method: 'POST' });
-			if (!liveRes.ok) {
-				actionError =
-					(await liveRes.text()) || $t('recordings.error.endLiveHttp', { status: liveRes.status });
-			}
-			const recRes = await fetch('/api/recordings/stop', { method: 'POST' });
-			if (!recRes.ok) {
-				const recErr = (await recRes.text()) || `${recRes.status}`;
-				actionError = actionError
-					? $t('recordings.error.stopRecordingCombined', { error: actionError, detail: recErr })
-					: $t('recordings.error.stopRecording', { detail: recErr });
-			} else {
-				stoppedRecording = true;
-				watchRecordingList(await readRecordingId(recRes));
-			}
-			await refreshStatus();
-			if (stoppedRecording && !watchedRecordingId) await refreshVisibleRecordings();
-			await invalidateAll();
-		} finally {
-			broadcastBusy = false;
-			busy = false;
-		}
 	}
 
 	/** Fire both actions in sequence. Confirmation happens once up-front; if
@@ -2789,24 +2762,13 @@
 				</label>
 			{/if}
 			{#if broadcast.is_live && isRecording}
-				<!-- All three actions stay visible, equal-height, each with a distinct
-			     tonal identity at rest so they're recognizable at a glance:
-			     stone = direct, rose = enregistrement, red-700 = session totale. -->
 				<p class="mb-2.5 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400">
 					{$t('recordings.sessionControls')}
 				</p>
-				<div class="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-					<button
-						onclick={endLive}
-						disabled={broadcastBusy}
-						class="inline-flex items-center justify-center gap-2 border border-stone-300 bg-stone-100 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-stone-800 transition-all hover:border-stone-900 hover:bg-stone-900 hover:text-white disabled:opacity-50 sm:order-1"
-					>
-						{@render iconLiveStop()}
-						<span>{broadcastBusy ? '…' : $t('recordings.actions.endLive')}</span>
-					</button>
+				<div class="grid gap-2 sm:grid-cols-2">
 					<button
 						onclick={stop}
-						disabled={busy}
+						disabled={busy || broadcastBusy}
 						class="inline-flex items-center justify-center gap-2 border border-rose-200 bg-rose-50 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-rose-700 transition-all hover:border-rose-600 hover:bg-rose-600 hover:text-white disabled:opacity-50 sm:order-2"
 					>
 						{@render iconRecordStop()}
@@ -2817,9 +2779,9 @@
 						>
 					</button>
 					<button
-						onclick={stopBoth}
+						onclick={endLive}
 						disabled={broadcastBusy || busy}
-						class="order-first inline-flex items-center justify-center gap-2 bg-red-700 px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white shadow-sm shadow-red-700/30 ring-1 ring-red-700/60 transition-all hover:bg-red-800 hover:shadow-md hover:shadow-red-700/40 disabled:opacity-50 sm:order-3"
+						class="order-first inline-flex items-center justify-center gap-2 bg-red-700 px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white shadow-sm shadow-red-700/30 ring-1 ring-red-700/60 transition-all hover:bg-red-800 hover:shadow-md hover:shadow-red-700/40 disabled:opacity-50 sm:order-1"
 					>
 						{@render iconStop()}
 						<span
@@ -2879,7 +2841,7 @@
 				<div class="grid gap-2 sm:grid-cols-2">
 					<button
 						onclick={endLive}
-						disabled={broadcastBusy}
+						disabled={broadcastBusy || busy}
 						class="inline-flex items-center justify-center gap-2 bg-stone-800 px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white shadow-sm shadow-stone-900/20 ring-1 ring-stone-900/40 transition-all hover:bg-stone-900 hover:shadow-md hover:shadow-stone-900/30 disabled:opacity-50"
 					>
 						{@render iconLiveStop()}
@@ -2913,7 +2875,7 @@
 				<div class="grid gap-2 sm:grid-cols-2">
 					<button
 						onclick={stop}
-						disabled={busy}
+						disabled={busy || broadcastBusy}
 						class="inline-flex items-center justify-center gap-2 bg-rose-600 px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white shadow-sm shadow-rose-600/30 ring-1 ring-rose-600/50 transition-all hover:bg-rose-700 hover:shadow-md hover:shadow-rose-600/40 disabled:opacity-50"
 					>
 						{@render iconRecordStop()}
@@ -3093,6 +3055,70 @@
      below the scheduled lives since it changes rarely and isn't part of the
      live-from-a-schedule workflow. -->
 <BroadcastDefaultsPanel {broadcast} />
+
+{#if data.service}
+	<section id="service-details" class="mb-6 scroll-mt-20 border border-stone-200 bg-white/60 p-5">
+		<h2 class="font-display text-xl font-semibold">{data.service.title}</h2>
+		<p class="my-2 text-sm text-stone-600">
+			{new Date(data.service.scheduled_at).toLocaleString()} · {data.service.status}
+		</p>
+		<div class="flex flex-wrap gap-4 text-sm font-semibold text-primary">
+			<a href="{data.publicBaseUrl}/live/{data.service.slug}">{$t('recordings.common.open')}</a>
+			<a href="/recordings#scheduled-broadcasts-heading" data-sveltekit-reload
+				>{$t('dashboard.manageSchedule')}</a
+			>
+			{#if !data.service.recording_id && data.service.status === 'ended'}
+				<button onclick={() => attachReplayToScheduledLive(data.service!)}
+					>{$t('recordings.common.upload')}</button
+				>
+			{/if}
+		</div>
+		{#await data.list then result}
+			{#if data.service.recording_id && result.data[0]}
+				{@const replay = result.data[0]}
+				<ul class="mt-4 grid gap-2 text-sm text-stone-600 sm:grid-cols-2">
+					<li>{$t('dashboard.replayRecording')} · {replay.status}</li>
+					<li>{$t('dashboard.replayLanguage')} · {replay.original_audio_language || '—'}</li>
+					<li>
+						{$t('dashboard.replayCaptions')} · {replay.subtitles_hidden
+							? '—'
+							: replay.subtitle_filename || data.service.subtitle_filename || '—'}
+					</li>
+					<li>{$t('dashboard.replayTranscript')} · {replay.transcript_pdf_id ? 'PDF' : '—'}</li>
+				</ul>
+				<a href="#recording-library" class="mt-3 inline-block text-sm font-semibold text-primary"
+					>{$t('dashboard.reviewReplay')}</a
+				>
+			{/if}
+		{/await}
+		{#if data.replayChoices.length}
+			<form
+				method="POST"
+				action="?service={data.service._id}&amp;/attachReplay"
+				class="mt-4 flex flex-wrap items-center gap-2"
+			>
+				<input type="hidden" name="service" value={data.service._id} />
+				<select
+					name="recording"
+					required
+					aria-label={$t('dashboard.chooseReplay')}
+					class="max-w-full border border-stone-300 px-3 py-2 text-sm"
+				>
+					<option value="">{$t('dashboard.chooseReplay')}</option>
+					{#each data.replayChoices as replay (replay._id)}
+						<option value={replay._id}>{replay.title}</option>
+					{/each}
+				</select>
+				<button class="border border-primary px-3 py-2 text-sm font-semibold text-primary"
+					>{$t('dashboard.attachReplay')}</button
+				>
+			</form>
+		{/if}
+		{#if form?.replayError}<p role="alert" class="mt-2 text-sm text-red-700">
+				{form.replayError}
+			</p>{/if}
+	</section>
+{/if}
 
 <!-- Search + filters toolbar -->
 <div id="recording-library" class="mb-3 flex scroll-mt-20 flex-wrap items-center gap-2 sm:gap-3">

@@ -41,6 +41,7 @@ export function initLocale(): void {
 	const saved = readSavedLocale();
 	if (saved) {
 		locale.set(saved);
+		document.cookie = `${COOKIE_NAME}=${saved}; max-age=${COOKIE_MAX_AGE}; path=/; SameSite=Lax`;
 		document.documentElement.lang = saved;
 	}
 }

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const controlCloudRecording = vi.hoisted(() => vi.fn());
 
-vi.mock('./live-session.svelte', () => ({ controlCloudRecording }));
+vi.mock('./live-session.svelte', () => ({ controlCloudRecording, liveSession: {} }));
 vi.mock('./state.svelte', () => ({
 	studio: { settings: { recordingMode: 'cloud' }, service: { type: 'live' } }
 }));
@@ -26,7 +26,7 @@ describe('cloud recording controls', () => {
 
 		const stopping = stopCloudRecording();
 		expect(recording.cloudPending).toBe(true);
-		void stopCloudRecording();
+		expect(stopCloudRecording()).toBe(stopping);
 		expect(controlCloudRecording).toHaveBeenCalledTimes(1);
 
 		finish();
@@ -57,6 +57,14 @@ describe('cloud recording controls', () => {
 		expect(controlCloudRecording).toHaveBeenCalledWith('stop', session);
 		expect(recording.savedId).toBe('admin-recording');
 		expect(recording.error).toBeNull();
+	});
+
+	it('keeps cloud stop available and points to Admin when the recorder lacks the drain route', async () => {
+		controlCloudRecording.mockRejectedValue(new Error('Route POST:/stop/rec/drain not found'));
+		await stopCloudRecording();
+		expect(recording.cloud).toBe(true);
+		expect(recording.cloudPending).toBe(false);
+		expect(recording.error).toContain('Admin → Recordings');
 	});
 
 	it('keeps the recording ID and warns when the ending could not be confirmed', async () => {

@@ -7,6 +7,7 @@
 	import { subtitlePrefs, type SubtitleTheme, type SubtitleSize } from '$lib/stores/subtitlePrefs';
 	import { t, type TranslationKey } from '../../i18n';
 	import SyncedLyrics from './SyncedLyrics.svelte';
+	import { liveSubtitlePosition, type LiveSubtitleTrack } from '$lib/utils/liveTimeline';
 
 	// Synced sermon transcript, two modes sharing the same renderer:
 	//
@@ -36,21 +37,6 @@
 		testToken?: string | null;
 	}
 
-	type RadioSubtitles = {
-		url: string;
-		anchorEpochMs: number | null;
-		offsetMs: number;
-		pausedPositionMs?: number | null;
-		timeline?: Array<{
-			fromEpochMs: number;
-			toEpochMs: number | null;
-			url: string;
-			anchorEpochMs: number;
-			offsetMs: number;
-			pausedPositionMs: number | null;
-		}>;
-	};
-
 	let {
 		mode = 'live',
 		url = null,
@@ -68,10 +54,12 @@
 	let srtSec: number | null = $state(null); // null → no highlight yet
 
 	// ── Live state (from radio-state polls) ────────────────────────
-	let subtitles = $state.raw<RadioSubtitles | null>(null);
+	let subtitles = $state.raw<LiveSubtitleTrack | null>(null);
 	let liveUrl: string | null = $state(null);
 	let streamLive = false;
 	let clockSkewMs = 0;
+	// shortcut: per-viewer correction until the relay and Studio share an audio clock.
+	let subtitleDelaySeconds = $state<number | undefined>(0);
 	let liveActive = $state(false); // gate open + SRT attached
 
 	let pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -183,17 +171,19 @@
 	async function pollLiveState() {
 		if (document.hidden) return;
 		try {
+			const sentAt = Date.now();
 			const res = await fetch(
 				`/api/live/radio-state${testToken ? `?test=${encodeURIComponent(testToken)}` : ''}`
 			);
 			if (!res.ok) return;
+			const receivedAt = Date.now();
 			const data = (await res.json()) as {
 				isLive: boolean;
-				subtitles?: RadioSubtitles | null;
+				subtitles?: LiveSubtitleTrack | null;
 				serverNowMs?: number;
 			};
 			if (typeof data.serverNowMs === 'number') {
-				clockSkewMs = data.serverNowMs - Date.now();
+				clockSkewMs = data.serverNowMs - (sentAt + receivedAt) / 2;
 			}
 			streamLive = data.isLive;
 			subtitles = data.subtitles ?? null;
@@ -206,36 +196,12 @@
 	function tick() {
 		if (mode === 'live') {
 			const { positionEpochMs, pdt } = $livePlayback;
-			const timeline = subtitles?.timeline;
-			const segment =
-				positionEpochMs === null
-					? undefined
-					: timeline?.find(
-							(item) =>
-								positionEpochMs >= item.fromEpochMs &&
-								(item.toEpochMs === null || positionEpochMs < item.toEpochMs)
-						);
-			// The status poll supplies metadata. Only the playback position selects the file.
-			liveUrl = segment?.url ?? subtitles?.url ?? null;
-			const activeAnchor =
-				positionEpochMs !== null && timeline?.length
-					? (segment?.anchorEpochMs ?? null)
-					: (subtitles?.anchorEpochMs ?? null);
-			liveActive = streamLive && activeAnchor !== null;
-			if (positionEpochMs === null || activeAnchor === null) {
-				srtSec = null;
-				return;
-			}
-			// positionEpochMs is frozen while paused and shifts with DVR
-			// scrubbing, so the text always tracks the audio actually heard.
-			// Clock-skew correction applies ONLY to the Icecast estimate (built
-			// from the listener's own clock); PDT positions are already server
-			// wall-clock — adding skew there would punish devices with a wrong
-			// clock in the exact mode that is otherwise exact.
-			const activeOffset = segment?.offsetMs ?? subtitles?.offsetMs ?? 0;
-			const activePaused = segment?.pausedPositionMs ?? subtitles?.pausedPositionMs;
-			const position = positionEpochMs + (pdt ? 0 : clockSkewMs) - activeAnchor + activeOffset;
-			srtSec = Math.min(position, activePaused ?? position) / 1000;
+			const position = positionEpochMs === null ? null : positionEpochMs + (pdt ? 0 : clockSkewMs);
+			const delay = Math.min(15, Math.max(-15, subtitleDelaySeconds ?? 0));
+			const timing = liveSubtitlePosition(subtitles, position, delay * 1000);
+			liveUrl = timing.url;
+			liveActive = streamLive && timing.anchored;
+			srtSec = timing.timeSec;
 		} else {
 			const { trackId: playingId, timeSec } = $replayPlayback;
 			if (!trackId || playingId !== trackId) {
@@ -287,7 +253,7 @@
 	});
 	// SyncedLyrics highlights the line whose start ≤ currentTime; -1 keeps
 	// everything unhighlighted until a position is known.
-	let displayTime = $derived(srtSec ?? -1);
+	let displayTime = $derived(loadedUrl === srtUrl ? (srtSec ?? -1) : -1);
 	let lines = $derived(
 		cues.map((cue) => ({
 			text: cue.text,
@@ -381,6 +347,24 @@
 						</button>
 					{/each}
 				</div>
+				{#if mode === 'live'}
+					<label
+						class="mt-3.5 flex items-center justify-between gap-2 border-t border-stone-200 pt-3 font-body text-xs text-stone-600"
+					>
+						{$t('liveTranscript.delay')}
+						<input
+							type="number"
+							min="-15"
+							max="15"
+							step="0.1"
+							bind:value={subtitleDelaySeconds}
+							class="w-16 border border-stone-200 bg-white px-2 py-1.5 text-right tabular-nums"
+						/>
+					</label>
+					<p class="mt-1.5 font-body text-[11px] leading-snug text-stone-500">
+						{$t('liveTranscript.delayHint')}
+					</p>
+				{/if}
 			</div>
 		{/if}
 	</div>

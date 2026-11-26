@@ -1,6 +1,8 @@
 <script lang="ts">
 	import {
 		handleFor,
+		isAudioFile,
+		mediaSourceName,
 		mediaVersion,
 		openCamera,
 		openLocalMedia,
@@ -32,7 +34,8 @@
 	import { lyrics } from '../lib/lyrics.svelte';
 	import { referenceMatcher } from '../lib/reference-match.svelte';
 	import Icon, { type IconName } from './Icon.svelte';
-	import { popoverFit } from '../lib/layout';
+	import { createListReorder } from '../lib/list-reorder.svelte';
+	import { popoverFit, dropIndex } from '../lib/layout';
 	import { t } from '../lib/i18n.svelte';
 	import { observeReferenceStream, useReferenceSource } from '../lib/reference-match.svelte';
 	import { youtubeChatUrl, youtubePlayerUrl, youtubeVideoId } from '../lib/youtube';
@@ -424,8 +427,8 @@
 			if (!tracked) return;
 			tracked.fileName = picked.name;
 			tracked.filePath = picked.path;
-			tracked.audioOnly = /\.(mp3|m4a|aac|wav|flac|ogg|opus|aiff|aif)$/i.test(picked.name);
-			tracked.name = picked.name.replace(/\.[^.]+$/, '');
+			tracked.audioOnly = isAudioFile(picked.name);
+			tracked.name = mediaSourceName(picked.name);
 			openLocalMedia(tracked, picked.token);
 			persist();
 			report(`selected local source ${tracked.name}`);
@@ -446,14 +449,29 @@
 	function move(layer: Layer | null, delta: number) {
 		if (!layer) return;
 		const scene = activeScene();
-		const from = scene.layers.indexOf(layer);
+		const from = scene.layers.findIndex(({ id }) => id === layer.id);
 		const to = from + delta;
-		if (to < 0 || to >= scene.layers.length) return;
+		if (from < 0 || from === to || to < 0 || to >= scene.layers.length) return;
 		const next = [...scene.layers];
-		next.splice(from, 1);
-		next.splice(to, 0, layer);
+		const [moved] = next.splice(from, 1);
+		next.splice(to, 0, moved);
 		scene.layers = next;
 		persist();
+	}
+
+	const sourceReorder = createListReorder();
+
+	function startSourceDrag(event: PointerEvent, layer: Layer) {
+		const sceneId = activeScene().id;
+		if (
+			sourceReorder.start(event, (insertion) => {
+				const scene = activeScene();
+				if (scene.id !== sceneId) return;
+				const from = scene.layers.findIndex(({ id }) => id === layer.id);
+				if (from >= 0) move(layer, dropIndex(from, insertion) - from);
+			})
+		)
+			studio.selectedLayerId = layer.id;
 	}
 
 	/** Re-open a source: a camera taken by another app, a screen share ended
@@ -683,22 +701,55 @@
 		>
 	{/snippet}
 	<ul>
-		{#each activeScene().layers as layer (layer.id)}
+		{#each activeScene().layers as layer, index (layer.id)}
 			{@const issue = problem(layer)}
 			<li
-				class="group flex items-center gap-1 pr-1 {layer.id === studio.selectedLayerId
+				class="group relative flex touch-none cursor-grab items-center gap-1 pr-1 active:cursor-grabbing {layer.id ===
+				studio.selectedLayerId
 					? 'bg-primary text-black'
 					: 'hover:bg-fg/5'}"
+				onpointerdown={(event) => startSourceDrag(event, layer)}
+				onpointermove={sourceReorder.move}
+				onpointerup={sourceReorder.finish}
+				onlostpointercapture={sourceReorder.cancel}
 			>
+				{#if sourceReorder.insertion === index || (index === activeScene().layers.length - 1 && sourceReorder.insertion === index + 1)}
+					<span
+						aria-hidden="true"
+						class="pointer-events-none absolute inset-x-0 z-10 h-0.5 bg-accent {sourceReorder.insertion ===
+						index
+							? 'top-0'
+							: 'bottom-0'}"
+					></span>
+				{/if}
 				<button
-					class="flex min-w-0 flex-1 items-center gap-2 py-1.5 pl-3 text-left"
+					class="flex w-6 shrink-0 touch-none cursor-grab self-stretch items-center justify-center active:cursor-grabbing {layer.id ===
+					studio.selectedLayerId
+						? 'text-black/80'
+						: 'text-muted'}"
+					title={t('sources.reorder')}
+					aria-label={t('sources.reorderSource', { name: layer.name })}
+					data-reorder-grip
+					onkeydown={(event) => {
+						if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+						event.preventDefault();
+						event.stopPropagation();
+						studio.selectedLayerId = layer.id;
+						move(layer, event.key === 'ArrowUp' ? -1 : 1);
+					}}
+				>
+					<Icon name="more" size={13} />
+				</button>
+				<button
+					class="flex min-w-0 flex-1 cursor-grab items-center gap-2 py-1.5 text-left active:cursor-grabbing"
+					data-reorder-grip
 					onclick={() => (studio.selectedLayerId = layer.id)}
-					ondblclick={() =>
-						layer.url || layer.youtubeLiveUrl
-							? reconnect(layer)
-							: layer.kind === 'image' || layer.kind === 'video'
-								? pickFile(layer)
-								: onproperties()}
+					ondblclick={(event) => {
+						if (sourceReorder.wasDrag(event)) return;
+						if (layer.url || layer.youtubeLiveUrl) void reconnect(layer);
+						else if (layer.kind === 'image' || layer.kind === 'video') void pickFile(layer);
+						else onproperties();
+					}}
 				>
 					<Icon
 						name={iconFor(layer.kind)}

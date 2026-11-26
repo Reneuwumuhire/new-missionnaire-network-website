@@ -8,14 +8,21 @@
 		clampTime,
 		handleFor,
 		listDevices,
+		replaceLocalMedia,
+		type RegisteredLocalMedia,
 		openCamera,
 		openNativeWindow,
 		type DeviceOption
 	} from '../lib/media.svelte';
 	import { invoke } from '@tauri-apps/api/core';
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { followMedia, lyrics } from '../lib/lyrics.svelte';
+	import { bindPreparedQueue } from '../lib/service-workflow.svelte';
 	import { DEFAULT_TEXT_STYLE, persist, selectedLayer, studio } from '../lib/state.svelte';
+
+	let { onreplaced }: { onreplaced: () => void } = $props();
+	let mounted = true;
+	onDestroy(() => (mounted = false));
 
 	let cameras = $state<DeviceOption[]>([]);
 	type DisplayChoice = { id: number; width: number; height: number; preview: string | null };
@@ -27,6 +34,44 @@
 	});
 
 	const layer = $derived(selectedLayer());
+
+	let replacing = $state(false);
+	let replaceError = $state('');
+	const preparedAudio = $derived(
+		layer &&
+			[
+				studio.service.openingLayerId,
+				studio.service.sermonLayerId,
+				studio.service.closingLayerId
+			].includes(layer.id)
+	);
+	const preparedPlaying = $derived(
+		preparedAudio &&
+			studio.service.type === 'prepared' &&
+			['opening', 'sermon', 'closing'].includes(studio.service.phase)
+	);
+
+	async function replaceFile() {
+		const source = layer;
+		if (!source || replacing || preparedPlaying) return;
+		replacing = true;
+		replaceError = '';
+		try {
+			const file = await invoke<RegisteredLocalMedia | null>('pick_local_media', {
+				kind: preparedAudio ? 'audio' : source.kind
+			});
+			if (!file || !mounted || layer?.id !== source.id || preparedPlaying) return;
+			if (await replaceLocalMedia(source, file)) {
+				bindPreparedQueue();
+				commit();
+				if (mounted) onreplaced();
+			}
+		} catch (error) {
+			replaceError = error instanceof Error ? error.message : String(error);
+		} finally {
+			replacing = false;
+		}
+	}
 
 	// The transport reads the element, which is not reactive state — so it is
 	// polled while this panel is open. `timeupdate` alone fires about four times
@@ -254,80 +299,106 @@
 			</label>
 		{/if}
 
+		{#if layer.kind === 'image' || layer.kind === 'video'}
+			<div>
+				<span class="studio-label">{t('props.mediaFile')}</span>
+				<div class="flex items-center gap-3">
+					<span class="min-w-0 flex-1 truncate text-[12px] text-muted" title={layer.fileName}>
+						{layer.fileName ?? t('props.noMediaFile')}
+					</span>
+					<button
+						class="studio-chip shrink-0"
+						disabled={replacing || preparedPlaying}
+						onclick={replaceFile}
+					>
+						{t(replacing ? 'props.loadingFile' : 'props.replaceFile')}
+					</button>
+				</div>
+				{#if preparedPlaying}
+					<p class="mt-1 text-[12px] text-muted">{t('props.replaceAfterProgramme')}</p>
+				{/if}
+				{#if replaceError}<p role="alert" class="mt-1 text-[12px] text-danger">
+						{replaceError}
+					</p>{/if}
+			</div>
+		{/if}
+
 		{#if layer.kind === 'video'}
 			<!-- The transport lives under the preview, not behind a dialog: this
 			     panel is for what a source *is*, not for driving it mid-service. -->
 			<p class="text-[12px] leading-relaxed text-muted">{t('props.transportMoved')}</p>
 		{/if}
 
-		<!-- ── Geometry ─────────────────────────────────────── -->
-		<div>
-			<div class="mb-1.5 flex items-center justify-between">
-				<span class="studio-label mb-0">{t('props.position')}</span>
-				<button
-					class="studio-chip"
-					onclick={() => {
-						layer.rect = { ...FULL_FRAME };
-						commit();
-					}}>{t('props.fullFrame')}</button
-				>
-			</div>
-			<div class="grid grid-cols-4 gap-1.5">
-				{#each [['x', 'X'], ['y', 'Y'], ['w', 'L'], ['h', 'H']] as [key, label] (key)}
-					<label class="block">
-						<span class="mb-0.5 block text-center text-[12px] text-muted">{label}</span>
-						<input
-							type="number"
-							step="0.5"
-							class="studio-input w-full text-center font-mono text-xs"
-							value={PCT(layer.rect[key as 'x'])}
-							onchange={(e) => {
-								layer.rect = {
-									...layer.rect,
-									[key]: Number((e.currentTarget as HTMLInputElement).value) / 100
-								};
-								commit();
-							}}
-						/>
-					</label>
-				{/each}
-			</div>
-		</div>
-
-		{#if ['camera', 'screen', 'image', 'video'].includes(layer.kind)}
+		{#if !layer.audioOnly}
+			<!-- ── Geometry ─────────────────────────────────────── -->
 			<div>
-				<span class="studio-label">{t('props.crop')}</span>
-				<div class="flex gap-1">
-					{#each [['cover', t('props.cover')], ['contain', t('props.contain')], ['stretch', t('props.stretch')]] as [mode, label] (mode)}
-						<button
-							class="studio-chip flex-1 {layer.fit === mode ? 'bg-primary/20 text-accent' : ''}"
-							onclick={() => {
-								layer.fit = mode as typeof layer.fit;
-								commit();
-							}}>{label}</button
-						>
+				<div class="mb-1.5 flex items-center justify-between">
+					<span class="studio-label mb-0">{t('props.position')}</span>
+					<button
+						class="studio-chip"
+						onclick={() => {
+							layer.rect = { ...FULL_FRAME };
+							commit();
+						}}>{t('props.fullFrame')}</button
+					>
+				</div>
+				<div class="grid grid-cols-4 gap-1.5">
+					{#each [['x', 'X'], ['y', 'Y'], ['w', 'L'], ['h', 'H']] as [key, label] (key)}
+						<label class="block">
+							<span class="mb-0.5 block text-center text-[12px] text-muted">{label}</span>
+							<input
+								type="number"
+								step="0.5"
+								class="studio-input w-full text-center font-mono text-xs"
+								value={PCT(layer.rect[key as 'x'])}
+								onchange={(e) => {
+									layer.rect = {
+										...layer.rect,
+										[key]: Number((e.currentTarget as HTMLInputElement).value) / 100
+									};
+									commit();
+								}}
+							/>
+						</label>
 					{/each}
 				</div>
 			</div>
-		{/if}
 
-		<label class="block">
-			<span class="studio-label"
-				>{t('props.opacity', { percent: Math.round(layer.opacity * 100) })}</span
-			>
-			<input
-				type="range"
-				min="0"
-				max="1"
-				step="0.01"
-				class="w-full accent-primary"
-				value={layer.opacity}
-				oninput={(e) => {
-					layer.opacity = Number((e.currentTarget as HTMLInputElement).value);
-					commit();
-				}}
-			/>
-		</label>
+			{#if ['camera', 'screen', 'image', 'video'].includes(layer.kind)}
+				<div>
+					<span class="studio-label">{t('props.crop')}</span>
+					<div class="flex gap-1">
+						{#each [['cover', t('props.cover')], ['contain', t('props.contain')], ['stretch', t('props.stretch')]] as [mode, label] (mode)}
+							<button
+								class="studio-chip flex-1 {layer.fit === mode ? 'bg-primary/20 text-accent' : ''}"
+								onclick={() => {
+									layer.fit = mode as typeof layer.fit;
+									commit();
+								}}>{label}</button
+							>
+						{/each}
+					</div>
+				</div>
+			{/if}
+
+			<label class="block">
+				<span class="studio-label"
+					>{t('props.opacity', { percent: Math.round(layer.opacity * 100) })}</span
+				>
+				<input
+					type="range"
+					min="0"
+					max="1"
+					step="0.01"
+					class="w-full accent-primary"
+					value={layer.opacity}
+					oninput={(e) => {
+						layer.opacity = Number((e.currentTarget as HTMLInputElement).value);
+						commit();
+					}}
+				/>
+			</label>
+		{/if}
 
 		<!-- ── Text styling ─────────────────────────────────── -->
 		{#if layer.kind === 'text' || layer.kind === 'lyrics'}

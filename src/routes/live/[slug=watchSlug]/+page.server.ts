@@ -58,7 +58,7 @@ export const load: PageServerLoad = async ({ params, url, setHeaders }) => {
 			: new URL(rawThumb, url.origin).toString()
 		: null;
 	const ogImageOptimized = ogImage
-		? `${url.origin}/_vercel/image?url=${encodeURIComponent(ogImage)}&w=1080&q=50`
+		? `${url.origin}/_vercel/image?url=${encodeURIComponent(ogImage)}&w=1080&q=50&play=1`
 		: null;
 
 	const scheduledAtFr = formatScheduledAtFr(live.scheduled_at);

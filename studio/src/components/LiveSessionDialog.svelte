@@ -57,13 +57,14 @@
 					></span>
 					Creating test…
 				{:else}
-					Quick private test
+					Rehearse privately
 				{/if}
 			</button>
 		</div>
 		<p class="text-[12px] leading-relaxed text-muted">
-			Uses the admin default information. The unlisted link is only opened here and never notifies
-			subscribers.
+			Start the preview signal, then open the private listener link to hear the program. For a
+			prepared service, play the opening, sermon with captions, and closing. For Krefeld, check the
+			interpreter mic, headphones, and caption timing.
 		</p>
 	{/if}
 	{#if liveSession.sessions.length > 0}

@@ -33,3 +33,22 @@ it('rejects non-S3 URLs before fetching', async () => {
 	).rejects.toMatchObject({ status: 400 });
 	expect(fetch).not.toHaveBeenCalled();
 });
+
+it('adds a visible play icon only when requested by a live preview', async () => {
+	const original = await sharp({
+		create: { width: 800, height: 450, channels: 3, background: '#cc7722' }
+	})
+		.png()
+		.toBuffer();
+	const fetch = vi.fn().mockResolvedValue(new Response(new Uint8Array(original)));
+	const response = await GET({
+		url: new URL(
+			'https://missionnaire.net/_vercel/image?url=https://missionnaire-bucket.s3.af-south-1.amazonaws.com/live.png&play=1'
+		),
+		fetch
+	} as any);
+	const image = sharp(Buffer.from(await response.arrayBuffer()));
+	const center = await image.extract({ left: 400, top: 225, width: 1, height: 1 }).raw().toBuffer();
+	expect(center[1]).toBeGreaterThan(200);
+	expect(Number(response.headers.get('content-length'))).toBeLessThan(300_000);
+});

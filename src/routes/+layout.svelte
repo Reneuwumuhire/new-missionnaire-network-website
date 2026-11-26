@@ -14,11 +14,11 @@
 	import ResumeRecorder from '$lib/components/+resumeRecorder.svelte';
 	import { selectAudio } from '$lib/stores/global';
 	import type { LayoutData } from './$types';
-	import { page } from '$app/state';
+	import { navigating, page } from '$app/state';
 	import { afterNavigate, goto } from '$app/navigation';
 	import { browser, dev } from '$app/environment';
 	import { onMount, tick } from 'svelte';
-	import { initLocale } from '../i18n';
+	import { initLocale, t } from '../i18n';
 	import { radioIsLive } from '$lib/stores/global';
 	import {
 		SITE_URL,
@@ -34,6 +34,7 @@
 	}
 
 	let { data, children }: Props = $props();
+	const navigationPending = $derived(Boolean(navigating.to && !navigating.willUnload));
 	const LAST_MUSIC_PATH_KEY = 'missionnaire:last-music-path';
 	let headerRef: HTMLDivElement | null = $state(null);
 	let headerHeight = $state(120);
@@ -402,6 +403,16 @@
 	<meta name="twitter:image" content={ogImage} />
 </svelte:head>
 
+{#if navigationPending}
+	<div
+		class="pointer-events-none fixed inset-x-0 top-0 z-[121] h-[3px] overflow-hidden bg-missionnaire/20"
+		aria-hidden="true"
+	>
+		<div class="navigation-progress h-full w-1/3 bg-missionnaire"></div>
+	</div>
+{/if}
+<p class="sr-only" role="status">{navigationPending ? $t('nav.loading') : ''}</p>
+
 <div class="relative">
 	<div
 		bind:this={headerRef}
@@ -445,3 +456,20 @@
 	     one-tap access to the most-visited sections; the audio player is
 	     lifted above it (see `--bottom-nav-height` in app.css). -->
 <BottomNav />
+
+<style>
+	@media (prefers-reduced-motion: no-preference) {
+		.navigation-progress {
+			animation: navigation-sweep 1.2s ease-in-out infinite;
+		}
+	}
+
+	@keyframes navigation-sweep {
+		from {
+			transform: translateX(-65%);
+		}
+		to {
+			transform: translateX(300%);
+		}
+	}
+</style>

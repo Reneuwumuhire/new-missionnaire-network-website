@@ -14,7 +14,8 @@ import {
 	permissions,
 	previewAudioLayer,
 	release,
-	releaseUnusedPins
+	releaseUnusedPins,
+	replaceLocalMedia
 } from './media.svelte';
 import { makeLayer, studio } from './state.svelte';
 import type { Mixer } from './mixer';
@@ -127,6 +128,54 @@ it('loads a selected Windows image through WebView2’s custom protocol origin',
 		expect((handle.el as unknown as ImageElement).crossOrigin).toBe('anonymous');
 	} finally {
 		release(layer.id);
+	}
+});
+
+it('replaces a playable file in place and keeps the current and pinned files on failure', async () => {
+	class Video extends EventTarget {
+		set src(url: string) {
+			this.dispatchEvent(new Event(url.endsWith('bad') ? 'error' : 'loadedmetadata'));
+		}
+		pause() {}
+		removeAttribute() {}
+	}
+	vi.stubGlobal('navigator', { userAgent: 'Macintosh' });
+	vi.stubGlobal('HTMLVideoElement', Video);
+	vi.stubGlobal('document', { createElement: () => new Video() });
+	const layer = makeLayer('video', 'Sermon', { fileName: 'old.mp3', filePath: '/old.mp3' });
+	const original = openLocalMedia(layer, 'original');
+	const pin = pinHandle(layer.id)!;
+	try {
+		await expect(
+			replaceLocalMedia(layer, {
+				name: 'bad.mp3',
+				path: '/bad.mp3',
+				token: 'bad',
+				size: 10
+			})
+		).rejects.toThrow();
+		expect(handleFor(layer.id)).toBe(original);
+		expect(layer).toMatchObject({ name: 'Sermon', fileName: 'old.mp3' });
+
+		await expect(
+			replaceLocalMedia(layer, {
+				name: 'new.mp3',
+				path: '/new.mp3',
+				token: 'replacement',
+				size: 10
+			})
+		).resolves.toBe(true);
+		expect(layer).toMatchObject({
+			name: 'new',
+			fileName: 'new.mp3',
+			filePath: '/new.mp3',
+			audioOnly: true
+		});
+		expect(handleFor(layer.id)).not.toBe(original);
+		expect(handleFor(pin)).toBe(original);
+	} finally {
+		release(layer.id);
+		releaseUnusedPins([]);
 	}
 });
 

@@ -8,7 +8,8 @@ import {
 	createScheduledLive,
 	getBroadcastAdminState,
 	getScheduledLiveById,
-	logAudit
+	logAudit,
+	setScheduledLiveRecordingId
 } from '../../../../db/collections';
 import {
 	completeYouTubeLive,
@@ -38,6 +39,7 @@ import {
 	recorderStopById
 } from '$lib/server/recorder-client';
 import { fetchIcecastStatus } from '$lib/server/icecast';
+import { finishLateRecording } from '$lib/server/finish-late-recording';
 import {
 	missionnaireIngestForAuthorization,
 	revokeMissionnaireIngest,
@@ -131,17 +133,42 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 		return Response.json({ ok: true });
 	}
 	if (body.action === 'recorder-start') {
+		const gate = await getBroadcastAdminState({ fresh: true });
+		if (
+			body.sessionId &&
+			(!gate.is_live ||
+				gate.scheduled_live_id !== body.sessionId ||
+				Date.parse(gate.started_at ?? '') !== body.sessionStartedAt ||
+				gate.is_test)
+		) {
+			throw error(409, 'The selected service is no longer on air');
+		}
 		try {
 			const result = await recorderStart(user.email, user.name || null);
+			const linked =
+				gate.is_live &&
+				!gate.is_test &&
+				gate.scheduled_live_id &&
+				gate.started_at &&
+				(await setScheduledLiveRecordingId(gate.scheduled_live_id, result.id, {
+					startedAt: gate.started_at
+				}).catch((cause) => {
+					console.error('[Studio recorder] link failed:', cause);
+					return false;
+				}));
+			const stopped = await finishLateRecording(gate, result.id);
 			await logAudit({
 				user_id: user.email,
 				user_email: user.email,
 				action: 'create',
 				target_collection: 'recordings',
 				target_id: result.id,
+				...(linked
+					? { changes: { scheduled_live_id: { old: null, new: gate.scheduled_live_id } } }
+					: {}),
 				ip_address: getClientAddress()
 			}).catch((auditError) => console.error('[Studio recorder] start audit failed:', auditError));
-			return Response.json(result);
+			return Response.json({ ...result, stopped });
 		} catch (cause) {
 			if (cause instanceof RecorderError) throw error(cause.status, cause.message);
 			throw cause;
@@ -156,11 +183,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 				}
 				const requestedAt = Date.now();
 				const session = await getScheduledLiveById(body.sessionId);
-				if (
-					!session ||
-					!['live', 'ended'].includes(session.status) ||
-					(session.is_test && session.created_by !== user.email)
-				) {
+				if (!session || session.is_test || !['live', 'ended'].includes(session.status)) {
 					return Response.json({ id: null });
 				}
 				const sessionStart = Date.parse(session.live_started_at ?? '');
@@ -169,15 +192,19 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 					? Math.min(requestedAt, Date.parse(session.live_ended_at))
 					: requestedAt;
 				const status = await recorderStatus();
-				// ponytail: match by the live window until recording starts carry an explicit session ID.
 				const startedAt = Date.parse(status.startedAt ?? '');
-				if (
-					!status.recording ||
-					!status.id ||
-					status.stopping ||
-					!(startedAt >= sessionStart && startedAt <= sessionEnd)
-				) {
+				if (!status.recording || !status.id || status.stopping || !(startedAt <= sessionEnd)) {
 					return Response.json({ id: null });
+				}
+				if (startedAt < sessionStart) {
+					// An admin can start recording before opening the live gate.
+					const gate = await getBroadcastAdminState({ fresh: true });
+					if (
+						!gate.is_live ||
+						gate.scheduled_live_id !== session._id ||
+						Date.parse(gate.started_at ?? '') !== sessionStart
+					)
+						return Response.json({ id: null });
 				}
 				result = await recorderStopById(status.id);
 			} else {

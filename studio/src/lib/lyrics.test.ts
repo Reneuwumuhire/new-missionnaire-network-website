@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	anchorAt,
 	clearSync,
@@ -13,6 +13,8 @@ import {
 	step,
 	timedPositionMs
 } from './lyrics.svelte';
+import { renderFrame } from './compositor';
+import { makeLayer, studio } from './state.svelte';
 import { parseSrt } from './srt';
 import { clampTime, shownDuration } from './media.svelte';
 
@@ -70,6 +72,19 @@ describe('timed transcript', () => {
 		expect(onAirLines(t).current).toBe('Ligne deux');
 	});
 
+	it('shows no current subtitle in a gap and advances exactly at the next start', () => {
+		loadSrt(
+			SRT.replace('00:00:14,000 --> 00:00:18,000', '00:00:16,000 --> 00:00:18,000'),
+			'gap.srt'
+		);
+		const t = 1_000_000;
+		anchorAt(14_000, t);
+		expect(onAirLines(t)).toEqual({ current: '', next: 'Ligne deux', index: -1 });
+		expect(onAirLines(t + 1999).current).toBe('');
+		expect(onAirLines(t + 2000).current).toBe('Ligne deux');
+		expect(onAirLines(t + 4000).current).toBe('');
+	});
+
 	it('clears the screen once the file has run out', () => {
 		loadSrt(SRT, 'test.srt');
 		const t = 1_000_000;
@@ -77,6 +92,45 @@ describe('timed transcript', () => {
 		// Well past the last cue's end: hold nothing rather than the last line
 		// staying up for the rest of the service.
 		expect(onAirLines(t + 60_000).current).toBe('');
+	});
+
+	it('paints only the current timed cue with a background fitted to each line', () => {
+		const originalScenes = studio.scenes;
+		studio.scenes = [
+			{
+				id: 'subtitle-test',
+				name: 'Subtitle test',
+				layers: [
+					makeLayer('lyrics', 'Subtitles', { showNext: true }),
+					makeLayer('color', 'Background')
+				]
+			}
+		];
+		const fillText = vi.fn();
+		const fillRect = vi.fn();
+		const ctx = {
+			canvas: { width: 1280, height: 720 },
+			save: vi.fn(),
+			restore: vi.fn(),
+			fillRect,
+			fillText,
+			measureText: (text: string) => ({ width: text.length * 10 })
+		};
+		try {
+			loadSrt(SRT.replace('Ligne une', 'Ligne une\nCourte'), 'test.srt');
+			const t = 1_000_000;
+			anchorAt(10_000, t);
+			renderFrame(ctx as unknown as CanvasRenderingContext2D, 'subtitle-test', false, t);
+			expect(fillText.mock.calls.map(([text]) => text)).toEqual(['Ligne une', 'Courte']);
+			const backings = fillRect.mock.calls.slice(-2);
+			expect(backings[0][2] - backings[1][2]).toBeCloseTo(30);
+			expect(backings[0][2]).toBeGreaterThan(120);
+			expect(backings[0][3]).toBeGreaterThan(65);
+			expect(backings[1][1] + backings[1][3]).toBeLessThan(710);
+			expect(backings.every(([x, , width]) => Math.abs(x + width / 2 - 640) < 0.01)).toBe(true);
+		} finally {
+			studio.scenes = originalScenes;
+		}
 	});
 
 	it('the master switch blanks every lyrics layer at once', () => {
