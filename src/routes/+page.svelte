@@ -10,6 +10,15 @@
 	import LiveDiscovery from '$lib/components/LiveDiscovery.svelte';
 	import LibrarySearchField from '$lib/components/LibrarySearchField.svelte';
 	import type { LiveDiscovery as LiveDiscoveryData } from '$lib/server/live-discovery';
+	import ArrowRight2 from 'iconsax-svelte/ArrowRight2.svelte';
+	import Book1 from 'iconsax-svelte/Book1.svelte';
+	import DocumentText from 'iconsax-svelte/DocumentText.svelte';
+	import Location from 'iconsax-svelte/Location.svelte';
+	import Microphone2 from 'iconsax-svelte/Microphone2.svelte';
+	import Musicnote from 'iconsax-svelte/Musicnote.svelte';
+	import BellIcon from 'iconsax-svelte/Notification.svelte';
+	import PlayCircle from 'iconsax-svelte/PlayCircle.svelte';
+	import Radio from 'iconsax-svelte/Radio.svelte';
 
 	interface Props {
 		data: {
@@ -30,23 +39,16 @@
 
 	let bellRef: NotificationBell | undefined = $state();
 	let bellSubscribed = $state(false);
+	let bellSupported = $state(false);
+	let bellPermission = $state<NotificationPermission>('default');
+	let bellPending = $state(false);
+	const bellAvailable = $derived(bellSupported && bellPermission !== 'denied');
 
 	// Scroll-triggered reveal
 	let sectionsVisible: Record<string, boolean> = $state({});
-	let scrolledPastHero = $state(false);
 
 	onMount(() => {
-		if (!browser) return;
-
-		// Hide scroll indicator once scrolled past hero
-		const handleScroll = () => {
-			scrolledPastHero = window.scrollY > 200;
-		};
-		handleScroll();
-		window.addEventListener('scroll', handleScroll, { passive: true });
-		if (!('IntersectionObserver' in window)) {
-			return () => window.removeEventListener('scroll', handleScroll);
-		}
+		if (!browser || !('IntersectionObserver' in window)) return;
 
 		// Intersection observer for scroll reveals
 		const observer = new IntersectionObserver(
@@ -64,10 +66,7 @@
 
 		document.querySelectorAll('[data-reveal]').forEach((el) => observer.observe(el));
 
-		return () => {
-			observer.disconnect();
-			window.removeEventListener('scroll', handleScroll);
-		};
+		return () => observer.disconnect();
 	});
 
 	// Hero Bible verse rotator
@@ -120,12 +119,31 @@
 	});
 
 	const quickLinks = $derived([
-		{ label: $t('nav.predications'), href: '/predications', icon: '✦' },
-		{ label: $t('nav.videos'), href: '/videos', icon: '▶' },
-		{ label: $t('nav.musique'), href: '/musique', icon: '♪' },
-		{ label: $t('nav.direct'), href: '/live', icon: '◉' },
-		{ label: $t('nav.transcriptions'), href: '/transcriptions', icon: '¶' },
-		{ label: $t('nav.literature'), href: '/literature', icon: '▣' }
+		{ label: $t('nav.predications'), href: '/predications', icon: Microphone2 },
+		{ label: $t('nav.videos'), href: '/videos', icon: PlayCircle },
+		{ label: $t('nav.musique'), href: '/musique', icon: Musicnote },
+		{ label: $t('nav.direct'), href: '/live', icon: Radio },
+		{ label: $t('nav.transcriptions'), href: '/transcriptions', icon: DocumentText },
+		{ label: $t('nav.literature'), href: '/literature', icon: Book1 }
+	]);
+
+	const profiles = $derived([
+		{
+			name: 'William M. Branham',
+			href: '/william-branham/biographie',
+			portrait: '/img/branham_icon.png',
+			webp: '/img/branham_icon.webp',
+			detail: $t('home.branhamDates'),
+			description: $t('home.branhamBody')
+		},
+		{
+			name: 'Ewald Frank',
+			href: '/ewald-frank',
+			portrait: '/img/ewald_frank_second_img.jpg',
+			webp: '/img/ewald_frank_second_img.webp',
+			detail: $t('home.ewaldLocation'),
+			description: $t('home.ewaldBody')
+		}
 	]);
 
 	function getSmallThumbnail(video: YoutubeVideo): string {
@@ -165,9 +183,7 @@
 	</div>
 
 	<!-- ═══ HERO ═══ -->
-	<section
-		class="relative min-h-svh flex flex-col items-center justify-center overflow-hidden px-5 pt-20 pb-12"
-	>
+	<section class="relative flex flex-col items-center overflow-hidden px-5 pb-8 pt-28">
 		<!-- Radial warm glow -->
 		<div
 			class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] md:w-[900px] h-[600px] md:h-[900px] rounded-full pointer-events-none"
@@ -177,7 +193,7 @@
 
 		<!-- Cross at the origin of the vertical line — descends from above -->
 		<div
-			class="absolute left-1/2 top-[80px] md:top-[90px] -translate-x-1/2 z-10 pointer-events-none cross-descend"
+			class="absolute left-1/2 top-12 -translate-x-1/2 z-10 pointer-events-none cross-descend"
 			aria-hidden="true"
 		>
 			<svg width="22" height="30" viewBox="0 0 28 38" fill="none" class="md:w-7 md:h-[38px]">
@@ -188,11 +204,11 @@
 
 		<!-- Decorative vertical line — grows from below the cross -->
 		<div
-			class="absolute left-1/2 top-[118px] md:top-[128px] bottom-0 w-px -translate-x-1/2 pointer-events-none line-grow"
+			class="absolute left-1/2 top-[4.875rem] md:top-[5.375rem] bottom-0 w-px -translate-x-1/2 pointer-events-none line-grow"
 			aria-hidden="true"
 		></div>
 
-		<div class="relative z-10 max-w-4xl mx-auto text-center hero-content">
+		<div class="hero-content relative z-10 mx-auto w-full max-w-4xl text-center">
 			<p
 				class="hero-label text-[10px] md:text-[11px] font-semibold uppercase tracking-[0.35em] md:tracking-[0.4em] text-missionnaire mb-4 md:mb-6 font-body"
 			>
@@ -241,7 +257,7 @@
 			<p class="sr-only" role="status">{searchPending ? $t('search.loading') : ''}</p>
 
 			<!-- Animated Bible verse below buttons -->
-			<div class="hero-verse mt-8 md:mt-12 max-w-xl mx-auto">
+			<div class="hero-verse mt-7 md:mt-9 max-w-xl mx-auto">
 				<div class="ornament-line text-missionnaire/30 mb-4 md:mb-5">
 					<svg width="10" height="10" viewBox="0 0 14 14" fill="none"
 						><path
@@ -250,7 +266,7 @@
 						/></svg
 					>
 				</div>
-				<div class="verse-anim" class:verse-visible={heroVerseVisible} style="min-height: 3.5rem;">
+				<div class="verse-anim min-h-[6.5rem] md:min-h-24" class:verse-visible={heroVerseVisible}>
 					<p class="font-display text-base md:text-xl italic text-stone-500 leading-relaxed px-2">
 						« {heroVerses[heroVerseIndex].text} »
 					</p>
@@ -264,136 +280,118 @@
 		</div>
 	</section>
 
-	<!-- Scroll indicator — fixed to viewport bottom, hidden after scroll -->
-	{#if !scrolledPastHero}
-		<div class="fixed bottom-6 left-1/2 z-30 flex flex-col items-center gap-2 scroll-indicator">
-			<span class="text-[10px] uppercase tracking-[0.3em] text-stone-500 font-body font-semibold"
-				>{$t('home.scroll')}</span
-			>
-			<div class="scroll-chevrons flex flex-col items-center">
-				<svg
-					width="22"
-					height="12"
-					viewBox="0 0 22 12"
-					fill="none"
-					class="chevron-1 text-stone-400"
-				>
-					<path
-						d="M2 2L11 9L20 2"
-						stroke="currentColor"
-						stroke-width="1.8"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					/>
-				</svg>
-				<svg
-					width="22"
-					height="12"
-					viewBox="0 0 22 12"
-					fill="none"
-					class="chevron-2 text-missionnaire -mt-1"
-				>
-					<path
-						d="M2 2L11 9L20 2"
-						stroke="currentColor"
-						stroke-width="1.8"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					/>
-				</svg>
-			</div>
-		</div>
-	{/if}
-
 	<!-- ═══ QUICK NAV ═══ -->
-	<nav
-		data-reveal="nav"
-		class="reveal-section max-w-6xl mx-auto px-6 py-16 border-t border-stone-200/60"
-		class:revealed={sectionsVisible['nav']}
-	>
-		<div class="grid grid-cols-3 md:grid-cols-6 gap-3">
-			{#each quickLinks as link, i}
-				<a
-					href={link.href}
-					class="quick-link group flex flex-col items-center gap-3 py-6 px-3 border border-transparent hover:border-stone-200 hover:bg-white/50 transition-all duration-300"
-					style="animation-delay: {i * 80}ms"
-				>
-					<span
-						class="text-lg text-stone-300 group-hover:text-missionnaire transition-colors duration-300"
-						>{link.icon}</span
+	<nav aria-label={$t('nav.resources')} class="mx-auto max-w-6xl px-5 sm:px-6">
+		<ul
+			class="grid grid-cols-2 gap-2.5 border-t border-stone-200 pt-6 pb-2.5 sm:grid-cols-3 sm:gap-3 sm:pt-8 sm:pb-3 lg:grid-cols-6"
+		>
+			{#each quickLinks as link (link.href)}
+				<li class="min-w-0">
+					<a
+						href={link.href}
+						class="group flex h-full min-h-[5.25rem] flex-col justify-between gap-2.5 border border-stone-300 bg-cream px-3.5 py-3 text-stone-800 transition-colors hover:border-missionnaire-Yellow-600 hover:bg-missionnaire-50 focus-visible:border-missionnaire-Yellow-600 focus-visible:bg-missionnaire-50 active:bg-missionnaire-100 motion-reduce:transition-none sm:px-4"
 					>
-					<span
-						class="text-[11px] font-semibold uppercase tracking-[0.15em] text-stone-500 group-hover:text-stone-800 transition-colors duration-300 font-body"
-						>{link.label}</span
-					>
-				</a>
+						<span aria-hidden="true" class="flex items-center justify-between gap-2">
+							<span class="text-missionnaire-Yellow-700">
+								<link.icon size={22} color="currentColor" />
+							</span>
+							<span
+								class="text-stone-500 group-hover:text-missionnaire-Yellow-700 group-focus-visible:text-missionnaire-Yellow-700"
+							>
+								<ArrowRight2 size={18} color="currentColor" />
+							</span>
+						</span>
+						<span class="font-body text-sm font-semibold">{link.label}</span>
+					</a>
+				</li>
 			{/each}
-		</div>
+		</ul>
 	</nav>
 
 	<!-- ═══ RADIO STATUS ═══ -->
-	<div
-		data-reveal="radio"
-		class="reveal-section max-w-6xl mx-auto px-6 mb-16"
-		class:revealed={sectionsVisible['radio']}
-	>
-		<div class="flex flex-col sm:flex-row gap-4">
+	<div class="mx-auto mb-10 max-w-6xl px-5 sm:mb-14 sm:px-6">
+		<div class="grid gap-2.5 sm:gap-3 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
 			<a
 				href={radioIsLive ? (discovery ?? data.discovery).href : '/live'}
-				class="group flex items-center gap-4 px-6 py-5 border flex-1 transition-all duration-200 bg-white/40 {radioIsLive
-					? 'border-red-200 bg-red-50/40 hover:bg-red-50'
-					: 'border-stone-200/60 hover:border-missionnaire/30 hover:bg-white/60'}"
+				class="group flex min-h-[5.5rem] items-center gap-3 border px-3.5 py-3.5 text-stone-800 transition-colors motion-reduce:transition-none sm:px-4 {radioIsLive
+					? 'border-red-300 bg-red-50/60 hover:border-red-500 hover:bg-red-50'
+					: 'border-stone-300 bg-cream hover:border-missionnaire-Yellow-600 hover:bg-missionnaire-50'}"
 			>
-				<span class="relative flex h-2.5 w-2.5 shrink-0">
-					{#if radioIsLive}
-						<span
-							class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"
-						></span>
-						<span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500"></span>
-					{:else}
-						<span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-stone-300"></span>
-					{/if}
-				</span>
-				<div class="flex-1 min-w-0">
-					<p
-						class="text-sm font-body {radioIsLive
-							? 'text-red-700 font-semibold'
-							: 'text-stone-700 font-medium'}"
-					>
-						{radioIsLive ? $t('home.onAir') : $t('home.offAir')}
-					</p>
-					<p class="text-[11px] text-stone-400 font-body mt-0.5">
-						{radioIsLive ? $t('home.clickListen') : $t('home.goLive')}
-					</p>
-				</div>
-				<span class="text-stone-300 group-hover:text-missionnaire transition-colors text-xs">→</span
+				<span
+					aria-hidden="true"
+					class="grid h-10 w-10 shrink-0 place-items-center border {radioIsLive
+						? 'border-red-200 bg-red-50 text-red-700'
+						: 'border-stone-200 bg-cream-dark/60 text-missionnaire-Yellow-700'}"
 				>
+					<Radio size={22} color="currentColor" />
+				</span>
+				<span class="min-w-0 flex-1 font-body">
+					<span class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+						<span class="text-sm font-semibold">{$t('home.onAir')}</span>
+						<span
+							class="inline-flex items-center gap-1.5 border px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-tight tracking-[0.08em] {radioIsLive
+								? 'border-red-200 bg-red-50 text-red-800'
+								: 'border-stone-200 bg-cream-dark/60 text-stone-600'}"
+						>
+							<span
+								aria-hidden="true"
+								class="h-1.5 w-1.5 rounded-full {radioIsLive ? 'bg-red-600' : 'bg-stone-500'}"
+							></span>
+							{radioIsLive ? $t('live.atLive') : $t('live.offAir')}
+						</span>
+					</span>
+					<span class="mt-1 block text-xs leading-normal text-stone-600">
+						{radioIsLive ? $t('home.clickListen') : $t('home.goLive')}
+					</span>
+				</span>
+				<span
+					aria-hidden="true"
+					class="shrink-0 text-stone-500 group-hover:text-missionnaire-Yellow-700 group-focus-visible:text-missionnaire-Yellow-700"
+				>
+					<ArrowRight2 size={17} color="currentColor" />
+				</span>
 			</a>
 
 			<button
+				type="button"
 				onclick={() => bellRef?.toggle()}
-				class="group flex items-center gap-4 px-6 py-5 border-2 transition-all duration-200 active:scale-[0.98] cursor-pointer sm:w-auto {bellSubscribed
-					? 'border-missionnaire bg-orange-50/70'
-					: 'border-stone-200/60 bg-white/40 hover:border-missionnaire/30 hover:bg-white/60'}"
+				disabled={!bellAvailable || bellPending}
+				aria-busy={bellPending}
+				class="flex min-h-[5.5rem] items-center gap-3 border px-3.5 py-3.5 text-left font-body text-stone-800 transition-colors enabled:hover:border-missionnaire-Yellow-600 enabled:hover:bg-missionnaire-50 aria-busy:cursor-wait motion-reduce:transition-none sm:px-4 {bellSubscribed
+					? 'border-missionnaire-Yellow-600 bg-missionnaire-50'
+					: 'border-stone-300 bg-cream'}"
 			>
-				<NotificationBell bind:this={bellRef} bind:isSubscribed={bellSubscribed} />
-				<div class="flex-1 min-w-0 text-left">
-					{#if bellSubscribed}
-						<p class="text-sm font-semibold text-missionnaire font-body">
-							{$t('live.notif.disableTitle')}
-						</p>
-						<p class="text-[11px] text-stone-400 font-body mt-0.5">
-							{$t('live.notif.enabledSubtitle')}
-						</p>
-					{:else}
-						<p class="text-sm font-medium text-stone-700 font-body">
-							{$t('live.notif.enableTitle')}
-						</p>
-						<p class="text-[11px] text-stone-400 font-body mt-0.5">
-							{$t('live.notif.enableSubtitle')}
-						</p>
+				<span
+					aria-hidden="true"
+					class="grid h-10 w-10 shrink-0 place-items-center border border-stone-200 bg-cream-dark/60 text-missionnaire-Yellow-700 [&_svg]:text-current motion-reduce:[&_*]:animate-none"
+				>
+					<NotificationBell
+						bind:this={bellRef}
+						bind:isSubscribed={bellSubscribed}
+						bind:isSupported={bellSupported}
+						bind:permission={bellPermission}
+						bind:loading={bellPending}
+					/>
+					{#if !bellAvailable}
+						<BellIcon size={21} color="currentColor" />
 					{/if}
-				</div>
+				</span>
+				<span class="min-w-0 flex-1">
+					<span class="block text-sm font-semibold"
+						>{$t(bellSubscribed ? 'live.notif.disableTitle' : 'live.notif.enableTitle')}</span
+					>
+					<span class="mt-1 block text-xs leading-normal text-stone-600">
+						{$t(
+							!bellSupported
+								? 'live.notif.unavailable'
+								: bellPermission === 'denied'
+									? 'live.notif.blocked'
+									: bellSubscribed
+										? 'live.notif.enabledSubtitle'
+										: 'live.notif.enableSubtitle'
+						)}
+					</span>
+				</span>
 			</button>
 		</div>
 	</div>
@@ -402,11 +400,11 @@
 	{#if recentVideos.length > 0}
 		<section
 			data-reveal="videos"
-			class="reveal-section max-w-6xl mx-auto px-6 pb-16"
+			class="reveal-section max-w-6xl mx-auto px-5 pb-12 sm:px-6 sm:pb-16"
 			class:revealed={sectionsVisible['videos']}
 		>
-			<div class="pt-4">
-				<div class="flex items-end justify-between mb-10">
+			<div>
+				<div class="flex items-end justify-between mb-6 sm:mb-8">
 					<div>
 						<p
 							class="text-[10px] font-semibold uppercase tracking-[0.3em] text-missionnaire font-body mb-2"
@@ -505,183 +503,142 @@
 	<!-- ═══ MISSION + KEY FIGURES ═══ -->
 	<section
 		data-reveal="mission"
-		class="reveal-section max-w-6xl mx-auto px-6 mb-20"
+		aria-labelledby="heritage-heading"
+		class="reveal-section mx-auto mb-16 max-w-6xl px-5 sm:px-6 lg:mb-20"
 		class:revealed={sectionsVisible['mission']}
 	>
-		<div class="flex items-end justify-between mb-10">
-			<div>
-				<p
-					class="text-[10px] font-semibold uppercase tracking-[0.3em] text-missionnaire font-body mb-2"
-				>
-					{$t('about.kicker')}
-				</p>
-				<h2
-					class="font-display font-semibold text-3xl md:text-[2.6rem] tracking-tight leading-[1.05] text-stone-900"
-				>
-					{$t('home.heritage')}
-				</h2>
-			</div>
-			<a href="/a-propos" class="section-cta hidden sm:inline-flex">
-				<span class="section-cta-label">{$t('home.learnMore')}</span>
-				<span class="section-cta-arrow" aria-hidden="true">→</span>
-			</a>
-		</div>
+		<header class="mb-6 sm:mb-8">
+			<p
+				class="mb-2 font-body text-[10px] font-semibold uppercase tracking-[0.3em] text-missionnaire-Yellow-700"
+			>
+				{$t('about.kicker')}
+			</p>
+			<h2
+				id="heritage-heading"
+				class="font-display text-3xl font-semibold leading-[1.05] tracking-tight text-stone-900 md:text-[2.6rem]"
+			>
+				{$t('home.heritage')}
+			</h2>
+		</header>
 
-		<div class="grid md:grid-cols-12 gap-6 md:gap-8">
-			<!-- Mission editorial image block -->
-			<div class="md:col-span-7">
-				<div class="relative group card-lift">
-					<div class="relative overflow-hidden">
-						<picture>
-							<source srcset="/img/eglise_inside.webp" type="image/webp" />
-							<img
-								src="/img/eglise_inside.jpg"
-								alt={$t('home.churchAlt')}
-								class="w-full aspect-[4/3] object-cover img-zoom"
-								width="400"
-								height="300"
-								sizes="(max-width: 768px) 100vw, 58vw"
-								fetchpriority="high"
-							/>
-						</picture>
-						<div
-							class="absolute inset-0 bg-gradient-to-t from-stone-900/70 via-stone-900/20 to-transparent"
-						></div>
-						<div class="absolute bottom-0 left-0 right-0 p-6 md:p-8">
-							<p
-								class="text-[10px] font-semibold uppercase tracking-[0.3em] text-missionnaire-100 mb-3 font-body"
-							>
-								{$t('home.mission')}
-							</p>
-							<h2 class="font-display font-semibold text-3xl md:text-4xl text-white leading-tight">
-								{$t('home.spread')} <span class="italic">Message</span><br />{$t('home.world')}
-							</h2>
-						</div>
-					</div>
-					<div class="p-6 bg-white/60 border border-t-0 border-stone-200/60">
-						<p class="text-sm text-stone-500 leading-relaxed font-body">
-							{$t('home.missionBody')}
-						</p>
-						<a
-							href="/a-propos"
-							class="inline-block mt-4 text-[11px] font-semibold text-missionnaire uppercase tracking-[0.2em] font-body hover:text-orange-700 transition-colors"
+		<div class="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:gap-6">
+			<a
+				href="/a-propos"
+				aria-labelledby="mission-kicker mission-heading"
+				class="group flex flex-col border border-stone-300 bg-white/40 transition-colors hover:border-missionnaire-Yellow-600 hover:bg-missionnaire-50 focus-visible:border-missionnaire-Yellow-600 focus-visible:bg-missionnaire-50 motion-reduce:transition-none"
+			>
+				<div class="relative">
+					<picture>
+						<source srcset="/img/eglise_inside.webp" type="image/webp" />
+						<img
+							src="/img/eglise_inside.jpg"
+							alt={$t('home.churchAlt')}
+							class="block aspect-[3/2] w-full object-cover object-[center_55%] sm:aspect-video"
+							width="776"
+							height="539"
+							loading="lazy"
+							decoding="async"
+						/>
+					</picture>
+					<div
+						class="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-stone-900/90 via-stone-900/35 to-transparent p-5 sm:p-7"
+					>
+						<p
+							id="mission-kicker"
+							class="mb-2 font-body text-[10px] font-semibold uppercase tracking-[0.25em] text-missionnaire-100"
 						>
-							{$t('home.learnMore')} →
-						</a>
+							{$t('home.mission')}
+						</p>
+						<h3
+							id="mission-heading"
+							class="font-display text-3xl font-semibold leading-[1.05] text-white sm:text-4xl"
+						>
+							{$t('home.spread')} <span class="italic">Message</span><br />{$t('home.world')}
+						</h3>
 					</div>
 				</div>
-			</div>
+				<div class="flex flex-1 flex-col justify-center gap-2.5 px-5 py-4 sm:px-7 sm:py-5">
+					<p class="font-body text-sm leading-relaxed text-stone-600">
+						{$t('home.missionBody')}
+					</p>
+					<span
+						class="inline-flex items-center gap-2 self-start font-body text-sm font-semibold text-missionnaire-Yellow-700 group-hover:underline group-focus-visible:underline"
+					>
+						{$t('home.learnMore')}
+						<span aria-hidden="true"><ArrowRight2 size={15} color="currentColor" /></span>
+					</span>
+				</div>
+			</a>
 
-			<!-- Key figures -->
-			<div class="md:col-span-5 flex flex-col gap-6">
-				<a
-					href="/william-branham/biographie"
-					class="group block border border-stone-200/60 hover:border-missionnaire/30 bg-white/40 transition-all duration-300 card-lift flex-1"
-				>
-					<div class="p-6 flex items-start gap-5">
-						<picture class="shrink-0">
-							<source srcset="/img/branham_icon.webp" type="image/webp" />
-							<img
-								src="/img/branham_icon.png"
-								alt="William Branham"
-								class="w-16 h-16 rounded-full object-cover ring-2 ring-stone-100 group-hover:ring-missionnaire/20 transition-all duration-300"
-								width="160"
-								height="160"
-								loading="lazy"
-								decoding="async"
-							/>
-						</picture>
-						<div>
-							<p
-								class="font-display font-medium text-xl text-stone-900 group-hover:text-missionnaire transition-colors"
-							>
-								William M. Branham
-							</p>
-							<p
-								class="text-[10px] text-stone-400 mt-1 font-body uppercase tracking-wider tabular-nums"
-							>
-								{$t('home.branhamDates')}
-							</p>
-							<p class="text-sm text-stone-500 mt-2 leading-relaxed font-body">
-								{$t('home.branhamBody')}
-							</p>
-							<span
-								class="inline-block mt-3 text-[11px] font-semibold text-missionnaire uppercase tracking-[0.2em] font-body"
-							>
-								Biographie →
+			<ul
+				class="flex min-w-0 flex-col divide-y divide-stone-300 border border-stone-300 bg-white/40"
+			>
+				{#each profiles as profile (profile.href)}
+					<li class="flex flex-1">
+						<a href={profile.href} class="heritage-link">
+							<picture class="shrink-0">
+								<source srcset={profile.webp} type="image/webp" />
+								<img
+									src={profile.portrait}
+									alt=""
+									class="size-11 rounded-full object-cover sm:size-14"
+									width="56"
+									height="56"
+									loading="lazy"
+									decoding="async"
+								/>
+							</picture>
+							<div class="min-w-0 flex-1">
+								<h3 class="heritage-title">{profile.name}</h3>
+								<p class="mt-1 font-body text-xs text-stone-500">{profile.detail}</p>
+								<p class="mt-1.5 font-body text-sm leading-snug text-stone-600">
+									{profile.description}
+								</p>
+							</div>
+							<span class="heritage-chevron" aria-hidden="true">
+								<ArrowRight2 size={20} color="currentColor" />
 							</span>
-						</div>
-					</div>
-				</a>
-
-				<a
-					href="/ewald-frank"
-					class="group block border border-stone-200/60 hover:border-missionnaire/30 bg-white/40 transition-all duration-300 card-lift flex-1"
-				>
-					<div class="p-6 flex items-start gap-5">
-						<picture class="shrink-0">
-							<source srcset="/img/ewald_frank_second_img.webp" type="image/webp" />
-							<img
-								src="/img/ewald_frank_second_img.jpg"
-								alt="Ewald Frank"
-								class="w-16 h-16 rounded-full object-cover ring-2 ring-stone-100 group-hover:ring-missionnaire/20 transition-all duration-300"
-								width="160"
-								height="160"
-								loading="lazy"
-								decoding="async"
-							/>
-						</picture>
-						<div>
-							<p
-								class="font-display font-medium text-xl text-stone-900 group-hover:text-missionnaire transition-colors"
-							>
-								Ewald Frank
-							</p>
-							<p class="text-[10px] text-stone-400 mt-1 font-body uppercase tracking-wider">
-								{$t('home.ewaldLocation')}
-							</p>
-							<p class="text-sm text-stone-500 mt-2 leading-relaxed font-body">
-								{$t('home.ewaldBody')}
-							</p>
-							<span
-								class="inline-block mt-3 text-[11px] font-semibold text-missionnaire uppercase tracking-[0.2em] font-body"
-							>
-								{$t('home.learnMore')} →
-							</span>
-						</div>
-					</div>
-				</a>
-
-				<!-- Église de Kigali -->
-				<a
-					href="/eglise"
-					class="group block border border-stone-200/60 hover:border-missionnaire/30 bg-white/40 transition-all duration-300 card-lift"
-				>
-					<div class="p-6">
-						<div class="flex items-center gap-3 mb-2">
-							<span class="w-2 h-2 rounded-full bg-missionnaire/40"></span>
-							<p
-								class="text-[10px] font-bold uppercase tracking-[0.3em] text-missionnaire font-body"
-							>
+						</a>
+					</li>
+				{/each}
+				<li class="flex flex-1">
+					<a href="/eglise" class="heritage-link">
+						<span
+							aria-hidden="true"
+							class="grid size-11 shrink-0 place-items-center rounded-full bg-cream-dark text-missionnaire-Yellow-700 sm:size-14"
+						>
+							<Location size={23} color="currentColor" />
+						</span>
+						<div class="min-w-0 flex-1">
+							<p class="mb-1 font-body text-xs font-medium text-missionnaire-Yellow-700">
 								{$t('home.localChurch')}
 							</p>
+							<h3 class="heritage-title">{$t('home.kigaliChurch')}</h3>
+							<p class="mt-1.5 font-body text-sm leading-snug text-stone-600">
+								{$t('home.churchBody')}
+							</p>
 						</div>
-						<p
-							class="font-display font-medium text-lg text-stone-900 group-hover:text-missionnaire transition-colors"
-						>
-							{$t('home.kigaliChurch')}
-						</p>
-						<p class="text-[12px] text-stone-400 mt-1 font-body">
-							{$t('home.churchBody')}
-						</p>
-					</div>
-				</a>
-			</div>
+						<span class="heritage-chevron" aria-hidden="true">
+							<ArrowRight2 size={20} color="currentColor" />
+						</span>
+					</a>
+				</li>
+			</ul>
 		</div>
 	</section>
 </main>
 
 <style>
+	.heritage-link {
+		@apply flex w-full items-center gap-3 px-3.5 py-4 transition-colors hover:bg-missionnaire-50 focus-visible:bg-missionnaire-50 focus-visible:-outline-offset-2 motion-reduce:transition-none sm:gap-4 sm:px-5;
+	}
+	.heritage-title {
+		@apply font-display text-xl font-semibold leading-tight text-stone-900;
+	}
+	.heritage-chevron {
+		@apply shrink-0 text-missionnaire-Yellow-700;
+	}
+
 	/* ── Grain texture ── */
 	.grain-texture {
 		background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
@@ -758,32 +715,6 @@
 		transform: translateY(8px);
 	}
 
-	/* ── Scroll indicator ── */
-	.scroll-indicator {
-		transform: translateX(-50%);
-	}
-	@keyframes indicator-in {
-		from {
-			opacity: 0;
-			transform: translate(-50%, 12px);
-		}
-		to {
-			opacity: 1;
-			transform: translate(-50%, 0);
-		}
-	}
-	@keyframes chevron-bounce {
-		0%,
-		100% {
-			opacity: 0.3;
-			transform: translateY(0);
-		}
-		50% {
-			opacity: 1;
-			transform: translateY(4px);
-		}
-	}
-
 	/* ── Scroll reveal sections ── */
 	@keyframes fade-up {
 		from {
@@ -818,19 +749,9 @@
 		.hero-content .hero-verse {
 			animation: hero-enter 0.8s cubic-bezier(0.16, 1, 0.3, 1) 1.1s both;
 		}
-		.scroll-indicator {
-			animation: indicator-in 1s ease 2.5s both;
-		}
-		.scroll-chevrons .chevron-1 {
-			animation: chevron-bounce 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-		}
-		.scroll-chevrons .chevron-2 {
-			animation: chevron-bounce 2s cubic-bezier(0.4, 0, 0.2, 1) 0.15s infinite;
-		}
 		.reveal-section.revealed {
 			animation: fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
 		}
-		.revealed .quick-link,
 		.revealed .video-card {
 			animation: fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 		}

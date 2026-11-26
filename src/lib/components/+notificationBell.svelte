@@ -5,14 +5,19 @@
 	import { get } from 'svelte/store';
 	import { t } from '../../i18n';
 
-	let permission: NotificationPermission = $state('default');
 	interface Props {
 		isSubscribed?: boolean;
 		isSupported?: boolean;
+		permission?: NotificationPermission;
+		loading?: boolean;
 	}
 
-	let { isSubscribed = $bindable(false), isSupported = $bindable(false) }: Props = $props();
-	let loading = $state(false);
+	let {
+		isSubscribed = $bindable(false),
+		isSupported = $bindable(false),
+		permission = $bindable('default'),
+		loading = $bindable(false)
+	}: Props = $props();
 	let justToggled = $state(false);
 
 	onMount(async () => {
