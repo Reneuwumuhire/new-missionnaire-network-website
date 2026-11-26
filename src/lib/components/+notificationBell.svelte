@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { PUBLIC_VAPID_KEY } from '$app/env/public';
-	import { browser } from '$app/environment';
+	import { browser, dev } from '$app/environment';
 	import { onMount } from 'svelte';
 	import { get } from 'svelte/store';
 	import { t } from '../../i18n';
@@ -10,42 +10,50 @@
 		isSupported?: boolean;
 		permission?: NotificationPermission;
 		loading?: boolean;
+		failed?: boolean;
 	}
 
 	let {
 		isSubscribed = $bindable(false),
 		isSupported = $bindable(false),
 		permission = $bindable('default'),
-		loading = $bindable(false)
+		loading = $bindable(false),
+		failed = $bindable(false)
 	}: Props = $props();
 	let justToggled = $state(false);
 
 	onMount(async () => {
+		const hasNotificationApi = 'Notification' in window;
+		if (hasNotificationApi) permission = Notification.permission;
+
 		isSupported =
 			browser &&
+			!dev &&
+			Boolean(PUBLIC_VAPID_KEY) &&
 			'serviceWorker' in navigator &&
 			'PushManager' in window &&
-			'Notification' in window;
+			hasNotificationApi;
 
-		if (!isSupported) return;
+		if (!isSupported || permission !== 'granted') return;
 
-		permission = Notification.permission;
-
-		if (permission === 'granted') {
-			// getRegistration() resolves immediately (undefined when no SW).
-			// navigator.serviceWorker.ready would hang forever when no service
-			// worker is registered — which is always the case in dev, where the
-			// root layout deliberately unregisters them — leaving isSubscribed
-			// stuck at false even for subscribed users.
+		loading = true;
+		try {
+			// A previously subscribed browser already has a registration.
 			const reg = await navigator.serviceWorker.getRegistration();
 			const sub = reg ? await reg.pushManager.getSubscription() : null;
 			isSubscribed = !!sub;
+		} catch (error) {
+			failed = true;
+			console.error('[NotificationBell] Could not check subscription:', error);
+		} finally {
+			loading = false;
 		}
 	});
 
 	export async function toggle() {
 		if (loading || !isSupported) return;
 		loading = true;
+		failed = false;
 
 		try {
 			if (isSubscribed) {
@@ -54,6 +62,7 @@
 				await subscribe();
 			}
 		} catch (e) {
+			failed = true;
 			console.error('[NotificationBell] Error:', e);
 		} finally {
 			loading = false;
@@ -69,42 +78,41 @@
 		if (perm !== 'granted') return;
 
 		const reg = await navigator.serviceWorker.getRegistration();
-		if (!reg) {
-			// No service worker — push can't work here. Dev mode unregisters
-			// SWs on purpose, so this path is expected there.
-			console.warn('[NotificationBell] No service worker registration — cannot subscribe');
-			return;
+		if (!reg) throw new Error('Service worker is unavailable');
+
+		const existing = await reg.pushManager.getSubscription();
+		const sub =
+			existing ??
+			(await reg.pushManager.subscribe({
+				userVisibleOnly: true,
+				applicationServerKey: urlBase64ToUint8Array(PUBLIC_VAPID_KEY)
+			}));
+
+		try {
+			const response = await fetch('/api/notifications/subscribe', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(sub.toJSON())
+			});
+			if (!response.ok) throw new Error('Could not save the push subscription');
+		} catch (error) {
+			// A rejected save should not appear enabled after a reload.
+			if (!existing) await sub.unsubscribe();
+			throw error;
 		}
-		const vapidKey = PUBLIC_VAPID_KEY;
 
-		if (!vapidKey) {
-			console.error('[NotificationBell] PUBLIC_VAPID_KEY not set');
-			return;
-		}
+		isSubscribed = true;
 
-		const sub = await reg.pushManager.subscribe({
-			userVisibleOnly: true,
-			applicationServerKey: urlBase64ToUint8Array(vapidKey)
-		});
-
-		const response = await fetch('/api/notifications/subscribe', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(sub.toJSON())
-		});
-
-		if (response.ok) {
-			isSubscribed = true;
-
-			// Show a sample notification so the user sees what to expect
-			const translate = get(t);
-			reg.showNotification(translate('live.notif.enabledTitle'), {
+		// The sample notification can fail independently of the subscription.
+		const translate = get(t);
+		reg
+			.showNotification(translate('live.notif.enabledTitle'), {
 				body: translate('live.notif.sampleBody'),
 				icon: '/favicon.png',
 				badge: '/favicon.png',
 				tag: 'welcome-notification'
-			});
-		}
+			})
+			.catch((error) => console.warn('[NotificationBell] Sample notification failed:', error));
 	}
 
 	async function unsubscribe() {

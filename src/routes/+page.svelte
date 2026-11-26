@@ -2,7 +2,7 @@
 	import ResumeToast from '$lib/components/+resumeToast.svelte';
 	import { t, locale } from '../i18n';
 	import '../app.css';
-	import { browser } from '$app/environment';
+	import { browser, dev } from '$app/environment';
 	import { navigating } from '$app/state';
 	import { onMount } from 'svelte';
 	import type { YoutubeVideo } from '$lib/models/youtube';
@@ -19,6 +19,7 @@
 	import BellIcon from 'iconsax-svelte/Notification.svelte';
 	import PlayCircle from 'iconsax-svelte/PlayCircle.svelte';
 	import Radio from 'iconsax-svelte/Radio.svelte';
+	import TickCircle from 'iconsax-svelte/TickCircle.svelte';
 
 	interface Props {
 		data: {
@@ -42,7 +43,17 @@
 	let bellSupported = $state(false);
 	let bellPermission = $state<NotificationPermission>('default');
 	let bellPending = $state(false);
+	let bellFailed = $state(false);
 	const bellAvailable = $derived(bellSupported && bellPermission !== 'denied');
+	const bellTitle = $derived(
+		dev
+			? 'live.notif.localTitle'
+			: !bellAvailable
+				? 'live.notif.unavailableTitle'
+				: bellSubscribed
+					? 'live.notif.enabledTitle'
+					: 'live.notif.enableTitle'
+	);
 
 	// Scroll-triggered reveal
 	let sectionsVisible: Record<string, boolean> = $state({});
@@ -371,28 +382,44 @@
 						bind:isSupported={bellSupported}
 						bind:permission={bellPermission}
 						bind:loading={bellPending}
+						bind:failed={bellFailed}
 					/>
 					{#if !bellAvailable}
 						<BellIcon size={21} color="currentColor" />
 					{/if}
 				</span>
 				<span class="min-w-0 flex-1">
-					<span class="block text-sm font-semibold"
-						>{$t(bellSubscribed ? 'live.notif.disableTitle' : 'live.notif.enableTitle')}</span
-					>
+					<span class="block text-sm font-semibold">{$t(bellTitle)}</span>
 					<span class="mt-1 block text-xs leading-normal text-stone-600">
-						{$t(
-							!bellSupported
-								? 'live.notif.unavailable'
-								: bellPermission === 'denied'
-									? 'live.notif.blocked'
-									: bellSubscribed
-										? 'live.notif.enabledSubtitle'
-										: 'live.notif.enableSubtitle'
-						)}
+						{#if dev}
+							{#if bellPermission === 'granted'}{$t('live.notif.permissionAllowed')}{' '}{/if}
+							{$t('live.notif.localHint')}
+						{:else}
+							{$t(
+								!bellSupported
+									? 'live.notif.unavailable'
+									: bellPermission === 'denied'
+										? 'live.notif.blocked'
+										: bellPending
+											? 'live.notif.updating'
+											: bellFailed
+												? 'live.notif.updateFailed'
+												: bellSubscribed
+													? 'live.notif.disableTitle'
+													: 'live.notif.enableSubtitle'
+							)}
+						{/if}
 					</span>
 				</span>
+				{#if bellAvailable && bellSubscribed}
+					<span aria-hidden="true" class="shrink-0 text-green-700">
+						<TickCircle size={22} color="currentColor" />
+					</span>
+				{/if}
 			</button>
+			<span role="status" class="sr-only">
+				{bellFailed ? $t('live.notif.updateFailed') : bellSubscribed ? $t(bellTitle) : ''}
+			</span>
 		</div>
 	</div>
 
