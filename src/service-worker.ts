@@ -5,7 +5,7 @@
 
 import { version } from '$app/env';
 import { assets, immutable } from '$app/manifest';
-import { scheduledNotificationBody } from '$lib/scheduled-notification-body';
+import { pushNotificationContent } from '$lib/push-notification-content';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
@@ -185,34 +185,44 @@ sw.addEventListener('push', (event) => {
 			event?: string;
 			scheduledAtIso?: string;
 			scheduledTitle?: string;
+			broadcastTitle?: string;
+			broadcastDescription?: string;
 		};
 
 		// Server-chosen tag first (lets go-live/end pushes for the same
 		// broadcast replace each other); URL keeps older payloads grouped.
 		const tag = payload.tag || payload.url || 'missionnaire-notification';
 
-		const options: NotificationOptions & {
-			renotify?: boolean;
-			image?: string;
-			actions?: { action: string; title: string; icon?: string }[];
-		} = {
-			body: scheduledNotificationBody(payload),
-			icon: payload.icon || '/favicon.png',
-			badge: '/favicon.png',
-			data: { url: payload.url || '/' },
-			tag,
-			renotify: true,
-			actions: [
-				{ action: 'open', title: 'Ouvrir' },
-				{ action: 'dismiss', title: 'Ignorer' }
-			]
-		};
-		if (payload.image) options.image = payload.image;
-
 		event.waitUntil(
 			(async () => {
+				let locale: 'fr' | 'en' = 'fr';
+				try {
+					const response = await fetch('/api/notifications/locale', { credentials: 'same-origin' });
+					if (response.ok && (await response.json()).locale === 'en') locale = 'en';
+				} catch {
+					// Offline pushes retain the French server copy.
+				}
+				const content = pushNotificationContent(payload, locale);
+				const options: NotificationOptions & {
+					renotify?: boolean;
+					image?: string;
+					actions?: { action: string; title: string; icon?: string }[];
+				} = {
+					body: content.body,
+					icon: payload.icon || '/favicon.png',
+					badge: '/favicon.png',
+					data: { url: payload.url || '/' },
+					tag,
+					renotify: true,
+					actions: [
+						{ action: 'open', title: content.open },
+						{ action: 'dismiss', title: content.dismiss }
+					]
+				};
+				if (payload.image) options.image = payload.image;
+
 				// Show the OS notification.
-				await sw.registration.showNotification(payload.title, options);
+				await sw.registration.showNotification(content.title, options);
 				ackNotification('received', tag);
 
 				// AND broadcast the same payload to every open tab so the in-app UI

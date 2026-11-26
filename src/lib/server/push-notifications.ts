@@ -42,6 +42,8 @@ export interface PushPayload {
 	event?: 'radio-live' | 'radio-end' | 'live-scheduled' | 'live-reminder';
 	scheduledAtIso?: string;
 	scheduledTitle?: string;
+	broadcastTitle?: string;
+	broadcastDescription?: string;
 }
 
 // One tag for the whole live/radio lifecycle (announcement → reminder →
@@ -163,7 +165,9 @@ export function radioLivePayload(opts?: {
 		url: opts?.watchPath || '/live',
 		icon: '/favicon.png',
 		tag: RADIO_TAG,
-		event: 'radio-live'
+		event: 'radio-live',
+		broadcastTitle: broadcastTitle || undefined,
+		broadcastDescription: broadcastDescription || undefined
 	};
 	const image = notificationImage(opts?.thumbnailUrl);
 	if (image) payload.image = image;
@@ -183,7 +187,8 @@ export function radioEndPayload(opts?: { broadcastTitle?: string | null }): Push
 		// Same tag as the go-live push \u2014 REPLACES the "En direct" card instead
 		// of stacking a second notification for the same broadcast.
 		tag: RADIO_TAG,
-		event: 'radio-end'
+		event: 'radio-end',
+		broadcastTitle: broadcastTitle || undefined
 	};
 }
 
