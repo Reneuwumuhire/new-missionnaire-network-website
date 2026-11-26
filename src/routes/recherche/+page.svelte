@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { MAX_PASSAGE_QUERY } from '$lib/utils/passageSearch';
 	import { playLibraryResult } from '$lib/utils/playLibraryResult';
 	import { page, navigating } from '$app/state';
 	import { t } from '../../i18n';
@@ -9,6 +8,7 @@
 		type LibraryResult as Result
 	} from '$lib/utils/librarySearch';
 	import LibraryResult from '$lib/components/LibraryResult.svelte';
+	import LibrarySearchField from '$lib/components/LibrarySearchField.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 	let { data } = $props();
 	let playbackMessage = $state('');
@@ -28,31 +28,17 @@
 			<form
 				action="/recherche"
 				method="GET"
-				class="mt-7 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm sm:p-6"
+				class="mt-7 border border-stone-300 bg-white/40 p-4 sm:p-6"
 				role="search"
 				aria-label={$t('search.library')}
+				aria-busy={searchPending}
 			>
-				<div class="flex flex-col gap-2 sm:flex-row">
-					<label for="library-query" class="sr-only">{$t('search.placeholder')}</label>
-					<input
-						id="library-query"
-						name="q"
-						type="search"
-						required
-						minlength="2"
-						maxlength={MAX_PASSAGE_QUERY}
-						value={data.filters.q}
-						placeholder={$t('search.placeholder')}
-						class="search-field query-field flex-1"
-					/>
-					<button
-						class="form-action bg-missionnaire text-stone-950 hover:bg-missionnaire-100 sm:px-7"
-						type="submit">{$t('search.action')}</button
-					>
-				</div>
+				<LibrarySearchField value={data.filters.q} pending={searchPending} />
 				<fieldset class="mt-4 min-w-0">
 					<legend class="sr-only">{$t('search.matchMode')}</legend>
-					<div class="inline-grid w-full grid-cols-2 gap-1 rounded-xl bg-stone-100 p-1 sm:w-auto">
+					<div
+						class="grid w-full grid-cols-2 divide-x divide-stone-300 border border-stone-300 bg-cream sm:w-fit"
+					>
 						{#each ['phrase', 'words'] as mode}
 							<label class="relative">
 								<input
@@ -63,16 +49,18 @@
 									class="peer sr-only"
 								/>
 								<span
-									class="mode-option peer-checked:bg-white peer-checked:text-stone-950 peer-checked:shadow-sm peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-stone-700"
+									class="mode-option peer-checked:border-missionnaire-Yellow-700 peer-checked:bg-missionnaire-50 peer-checked:font-semibold peer-checked:text-stone-900 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-[-3px] peer-focus-visible:outline-missionnaire-Yellow-600"
 									>{$t(mode === 'phrase' ? 'search.exactPhrase' : 'search.similarPassages')}</span
 								>
 							</label>
 						{/each}
 					</div>
 				</fieldset>
-				<fieldset class="mt-5 min-w-0 border-t border-stone-200">
-					<legend class="pr-3 text-sm font-semibold">{$t('predications.filters')}</legend>
-					<div class="mt-3 grid gap-3 min-[360px]:grid-cols-2 md:grid-cols-3">
+				<fieldset class="mt-6 min-w-0 border-t border-stone-300">
+					<legend class="pr-3 text-sm font-semibold text-stone-800"
+						>{$t('predications.filters')}</legend
+					>
+					<div class="mt-3 grid gap-x-4 gap-y-3 min-[360px]:grid-cols-2 md:grid-cols-3">
 						<label class="filter-label min-[360px]:col-span-2 sm:col-span-1"
 							>{$t('search.contentType')}<select
 								name="type"
@@ -132,25 +120,24 @@
 					</div>
 				</fieldset>
 				<div
-					class="mt-4 flex flex-wrap items-center gap-2 border-t border-stone-200 pt-4 sm:justify-end"
+					class="mt-5 flex flex-wrap items-center gap-2 border-t border-stone-300 pt-4 sm:justify-end"
 				>
 					<a
 						href={clearFiltersHref}
 						data-sveltekit-reload={new URL(clearFiltersHref, page.url).href === page.url.href}
-						class="form-action flex-1 border border-stone-300 text-stone-700 hover:bg-stone-100 sm:flex-none"
+						class="form-action flex-1 border border-stone-300 bg-cream text-stone-700 hover:border-missionnaire-Yellow-600 sm:flex-none"
 						>{$t('search.resetFilters')}</a
 					>
 					<button
 						type="submit"
-						class="form-action flex-1 bg-stone-800 text-white hover:bg-stone-700 sm:flex-none"
+						disabled={searchPending}
+						class="form-action flex-1 border border-stone-900 bg-stone-900 text-cream hover:bg-stone-700 disabled:cursor-wait disabled:opacity-70 sm:flex-none"
 						>{$t('search.applyFilters')}</button
 					>
 				</div>
-				{#if searchPending}
-					<p class="mt-3 text-sm text-stone-600" role="status">{$t('search.loading')}</p>
-				{/if}
 			</form>
 		{/key}
+		<p class="sr-only" role="status">{searchPending ? $t('search.loading') : ''}</p>
 	</div>
 </section>
 
@@ -203,8 +190,8 @@
 		min-height: 44px;
 		padding: 8px 10px;
 		border: 1px solid #d6d3d1;
-		border-radius: 8px;
-		background: #fafaf9;
+		border-radius: 0;
+		background: #faf8f3;
 		color: #292524;
 		font: inherit;
 	}
@@ -226,21 +213,15 @@
 			background-image: none;
 		}
 	}
-	.query-field {
-		min-height: 48px;
-		padding-inline: 14px;
-		font-size: 1rem;
-		background: #fff;
-	}
 	.mode-option {
-		@apply flex min-h-11 cursor-pointer items-center justify-center rounded-lg px-2 text-center text-sm font-medium text-stone-600 sm:px-4;
+		@apply flex min-h-11 cursor-pointer items-center justify-center border-b-2 border-transparent px-2 py-1 text-center text-sm font-medium text-stone-600 hover:bg-cream-dark sm:px-5;
 	}
 	.form-action {
-		@apply inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-center text-sm font-semibold;
+		@apply inline-flex min-h-11 items-center justify-center px-3 text-center text-[10px] font-semibold uppercase leading-tight tracking-[0.12em] transition-colors motion-reduce:transition-none sm:px-5 sm:text-[11px] sm:tracking-[0.16em];
 	}
 	.form-action:focus-visible,
 	.search-field:focus-visible {
-		outline: 2px solid #57534e;
+		outline: 2px solid #cc6a0a;
 		outline-offset: 2px;
 	}
 	.filter-label {

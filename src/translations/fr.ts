@@ -26,6 +26,7 @@ export default {
 	'nav.breadcrumb': "Fil d'Ariane",
 	'nav.englishSermons': 'Prédications en anglais',
 	'nav.quickNav': 'Navigation rapide',
+	'nav.loading': 'Chargement de la page…',
 	'nav.submenuOpen': '{name} - ouvrir le sous-menu',
 	'nav.submenuClose': '{name} - fermer le sous-menu',
 
@@ -260,6 +261,7 @@ export default {
 	// ── Global search ───────────────────────────────────────────
 	'search.open': 'Rechercher sur le site',
 	'search.library': 'Rechercher dans la bibliothèque',
+	'search.queryPlaceholder': 'Titre ou passage',
 	'search.libraryDescription':
 		'Retrouvez une prédication, un chant ou un passage dans les transcriptions et documents.',
 	'search.documents': 'Documents et littérature',

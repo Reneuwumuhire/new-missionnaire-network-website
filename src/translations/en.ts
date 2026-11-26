@@ -27,6 +27,7 @@ const en: Record<keyof typeof fr, string> = {
 	'nav.breadcrumb': 'Breadcrumb',
 	'nav.englishSermons': 'Sermons in English',
 	'nav.quickNav': 'Quick navigation',
+	'nav.loading': 'Loading page…',
 	'nav.submenuOpen': '{name} - open submenu',
 	'nav.submenuClose': '{name} - close submenu',
 
@@ -259,6 +260,7 @@ const en: Record<keyof typeof fr, string> = {
 	// ── Global search ───────────────────────────────────────────
 	'search.open': 'Search the site',
 	'search.library': 'Search the library',
+	'search.queryPlaceholder': 'Title or passage',
 	'search.libraryDescription': 'Find a sermon, song or passage across transcripts and documents.',
 	'search.documents': 'Documents and literature',
 	'search.contentType': 'Content type',

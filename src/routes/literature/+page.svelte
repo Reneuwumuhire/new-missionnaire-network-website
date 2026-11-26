@@ -336,7 +336,7 @@
 
 	<!-- Main List -->
 	<div class="relative min-h-[400px]">
-		{#if navigating}
+		{#if navigating.to?.route.id === '/literature'}
 			<div class="pointer-events-none fixed inset-0 z-[120] flex items-center justify-center">
 				<div
 					class="flex items-center gap-3 rounded-lg border border-stone-200 bg-white px-4 py-3 shadow-sm"

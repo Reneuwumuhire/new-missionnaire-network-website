@@ -3,10 +3,12 @@
 	import { t, locale } from '../i18n';
 	import '../app.css';
 	import { browser } from '$app/environment';
+	import { navigating } from '$app/state';
 	import { onMount } from 'svelte';
 	import type { YoutubeVideo } from '$lib/models/youtube';
 	import NotificationBell from '$lib/components/+notificationBell.svelte';
 	import LiveDiscovery from '$lib/components/LiveDiscovery.svelte';
+	import LibrarySearchField from '$lib/components/LibrarySearchField.svelte';
 	import type { LiveDiscovery as LiveDiscoveryData } from '$lib/server/live-discovery';
 
 	interface Props {
@@ -17,6 +19,9 @@
 	}
 
 	let { data }: Props = $props();
+	const searchPending = $derived(
+		navigating.type === 'form' && navigating.to?.route.id === '/recherche'
+	);
 
 	let discovery = $state<LiveDiscoveryData>();
 	let radioIsLive = $derived((discovery ?? data.discovery).kind === 'live');
@@ -226,22 +231,14 @@
 			<form
 				action="/recherche"
 				method="GET"
-				class="mx-auto mt-4 flex max-w-xl border border-stone-300 bg-white/60 text-left font-body"
+				role="search"
+				aria-label={$t('search.library')}
+				aria-busy={searchPending}
+				class="mx-auto mt-5 max-w-[32.5rem]"
 			>
-				<input
-					name="q"
-					required
-					minlength="2"
-					maxlength="500"
-					type="search"
-					aria-label={$t('search.library')}
-					placeholder={$t('search.library')}
-					class="min-w-0 flex-1 bg-transparent px-4 py-2 text-sm"
-				/>
-				<button class="px-4 py-2 text-sm font-semibold text-earth-dark"
-					>{$t('search.library')}</button
-				>
+				<LibrarySearchField pending={searchPending} />
 			</form>
+			<p class="sr-only" role="status">{searchPending ? $t('search.loading') : ''}</p>
 
 			<!-- Animated Bible verse below buttons -->
 			<div class="hero-verse mt-8 md:mt-12 max-w-xl mx-auto">
