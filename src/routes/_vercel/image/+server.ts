@@ -22,6 +22,7 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 	}
 	const width = Number(url.searchParams.get('w') || 1080);
 	const quality = Number(url.searchParams.get('q') || 50);
+	const play = url.searchParams.get('play') === '1';
 	if (
 		!Number.isInteger(width) ||
 		width < 24 ||
@@ -54,10 +55,18 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 		await reader.cancel();
 		reader.releaseLock();
 	}
-	const image = await sharp(Buffer.concat(chunks), { limitInputPixels: 25_000_000 })
+	const resized = await sharp(Buffer.concat(chunks), { limitInputPixels: 25_000_000 })
 		.rotate()
 		.resize({ width, withoutEnlargement: true })
 		.flatten({ background: '#ffffff' })
+		.toBuffer();
+	const { width: imageWidth, height: imageHeight } = await sharp(resized).metadata();
+	const playSize = Math.round(Math.min(imageWidth!, imageHeight!) * 0.2);
+	const playIcon = Buffer.from(
+		`<svg width="${playSize}" height="${playSize}" xmlns="http://www.w3.org/2000/svg"><circle cx="${playSize / 2}" cy="${playSize / 2}" r="${playSize * 0.48}" fill="#000" fill-opacity=".62"/><path d="M ${playSize * 0.39} ${playSize * 0.27} L ${playSize * 0.39} ${playSize * 0.73} L ${playSize * 0.75} ${playSize * 0.5} Z" fill="#fff"/></svg>`
+	);
+	const image = await sharp(resized)
+		.composite(play ? [{ input: playIcon, gravity: 'centre' }] : [])
 		.jpeg({ quality, mozjpeg: true })
 		.toBuffer();
 	return new Response(new Uint8Array(image), {

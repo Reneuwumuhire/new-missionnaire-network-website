@@ -104,7 +104,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
 	// w=1080 is in svelte.config's images.sizes; crawler Accept headers get
 	// the original format back, so previews stay compatible.
 	const ogImage = absoluteThumb
-		? `${url.origin}/_vercel/image?url=${encodeURIComponent(absoluteThumb)}&w=1080&q=50`
+		? `${url.origin}/_vercel/image?url=${encodeURIComponent(absoluteThumb)}&w=1080&q=50&play=1`
 		: undefined;
 	const meta = pageMeta(`/live/rediffusions/${recording.id}`, {
 		title: shareTitle(recording.title || 'Rediffusion'),
