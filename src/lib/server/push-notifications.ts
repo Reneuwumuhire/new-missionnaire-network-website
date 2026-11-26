@@ -40,6 +40,8 @@ export interface PushPayload {
 	// Tabs ignore events they don't handle, so adding kinds here is safe
 	// without a Service Worker change.
 	event?: 'radio-live' | 'radio-end' | 'live-scheduled' | 'live-reminder';
+	scheduledAtIso?: string;
+	scheduledTitle?: string;
 }
 
 // One tag for the whole live/radio lifecycle (announcement → reminder →
@@ -230,7 +232,9 @@ export function liveScheduledPayload(opts: {
 		// Per-broadcast tag: the later "starts soon" reminder replaces this
 		// announcement instead of stacking next to it.
 		tag: `mn-live-${opts.slug}`,
-		event: 'live-scheduled'
+		event: 'live-scheduled',
+		scheduledAtIso: opts.scheduledAtIso,
+		scheduledTitle: opts.title
 	};
 	const image = notificationImage(opts.thumbnailUrl);
 	if (image) payload.image = image;
@@ -253,7 +257,9 @@ export function liveReminderPayload(opts: {
 		icon: '/favicon.png',
 		// Replaces the earlier announcement card for this same broadcast.
 		tag: `mn-live-${opts.slug}`,
-		event: 'live-reminder'
+		event: 'live-reminder',
+		scheduledAtIso: opts.scheduledAtIso,
+		scheduledTitle: opts.title
 	};
 	const image = notificationImage(opts.thumbnailUrl);
 	if (image) payload.image = image;

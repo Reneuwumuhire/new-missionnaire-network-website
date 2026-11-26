@@ -5,6 +5,7 @@
 
 import { version } from '$app/env';
 import { assets, immutable } from '$app/manifest';
+import { scheduledNotificationBody } from '$lib/scheduled-notification-body';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
@@ -181,6 +182,9 @@ sw.addEventListener('push', (event) => {
 			icon?: string;
 			image?: string;
 			tag?: string;
+			event?: string;
+			scheduledAtIso?: string;
+			scheduledTitle?: string;
 		};
 
 		// Server-chosen tag first (lets go-live/end pushes for the same
@@ -192,7 +196,7 @@ sw.addEventListener('push', (event) => {
 			image?: string;
 			actions?: { action: string; title: string; icon?: string }[];
 		} = {
-			body: payload.body,
+			body: scheduledNotificationBody(payload),
 			icon: payload.icon || '/favicon.png',
 			badge: '/favicon.png',
 			data: { url: payload.url || '/' },
