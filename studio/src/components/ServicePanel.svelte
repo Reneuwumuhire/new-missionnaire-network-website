@@ -398,7 +398,7 @@
 						<label class="min-w-0"
 							><span class="studio-label">Images only — sound excluded</span>
 							<select
-								class="studio-input h-8 w-full"
+								class="studio-input studio-select h-10 w-full"
 								value={studio.service.krefeldLayerId ?? ''}
 								onchange={(event) => setKrefeld(event.currentTarget.value)}
 							>
@@ -411,7 +411,7 @@
 						<label class="min-w-0"
 							><span class="studio-label">Continuous Krefeld live</span>
 							<select
-								class="studio-input h-8 w-full"
+								class="studio-input studio-select h-10 w-full"
 								value={studio.service.krefeldLayerId ?? ''}
 								onchange={(e) => setKrefeld(e.currentTarget.value)}
 							>
@@ -423,7 +423,7 @@
 						<label class="min-w-0"
 							><span class="studio-label">Interpreter</span>
 							<select
-								class="studio-input h-8 w-full"
+								class="studio-input studio-select h-10 w-full"
 								value={interpreterId}
 								onchange={(e) => setInterpreter(e.currentTarget.value)}
 							>
@@ -449,7 +449,7 @@
 						<label class="min-w-0"
 							><span class="studio-label">Interpreter headphones</span>
 							<select
-								class="studio-input h-8 w-full"
+								class="studio-input studio-select h-10 w-full"
 								value={studio.settings.interpreterOutputDeviceId}
 								onchange={(event) => void setHeadphones(event.currentTarget.value)}
 							>
