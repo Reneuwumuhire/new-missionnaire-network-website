@@ -1,5 +1,5 @@
 import { verifyAdminSession } from '$lib/server/admin-session';
-import { json, error } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getPermissions } from '$lib/models/admin-user';
 import {
@@ -167,5 +167,5 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
 		ip_address: getClientAddress()
 	});
 
-	return json({ id });
+	return Response.json({ id });
 };
