@@ -6,6 +6,7 @@ import {
 	createRecording,
 	getScheduledLiveById,
 	setScheduledLiveRecordingId,
+	deleteRecording,
 	logAudit
 } from '../../../../../db/collections';
 import {
@@ -137,7 +138,10 @@ export const POST: RequestHandler = async ({ request, getClientAddress, cookies 
 	// starts resolving to it as soon as the recording is published. Status,
 	// dates and the rest of the history entry stay as they were.
 	if (scheduledLiveId) {
-		await setScheduledLiveRecordingId(scheduledLiveId, id);
+		if (!(await setScheduledLiveRecordingId(scheduledLiveId, id))) {
+			await deleteRecording(id);
+			throw error(409, 'Ce direct a déjà une rediffusion');
+		}
 		await logAudit({
 			user_id: adminUser.email,
 			user_email: adminUser.email,

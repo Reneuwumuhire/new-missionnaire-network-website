@@ -140,8 +140,16 @@
 	const cursor = $derived(cursorForHandle(drag?.handle ?? hover, drag !== null));
 </script>
 
-<div class="flex min-h-0 min-w-0 flex-1 flex-col">
-	<div class="flex h-5 shrink-0 items-center justify-center gap-2">
+<div
+	class="flex min-h-0 min-w-0 flex-1 flex-col {studio.settings.studioMode
+		? 'border border-ink-700 bg-ink-950'
+		: ''}"
+>
+	<div
+		class="flex shrink-0 items-center justify-center gap-2 {studio.settings.studioMode
+			? 'h-7 border-b border-ink-700 bg-ink-850'
+			: 'h-5'}"
+	>
 		<span
 			class="text-[12px] font-bold uppercase tracking-[0.2em] {live ? 'text-danger' : 'text-muted'}"
 			>{label}</span

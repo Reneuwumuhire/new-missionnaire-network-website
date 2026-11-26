@@ -1686,16 +1686,20 @@ export async function restoreScheduledLive(id: string): Promise<boolean> {
  *  setScheduledLiveRecordingId in main src/db/collections.ts. */
 export async function setScheduledLiveRecordingId(
 	id: string,
-	recordingId: string
+	recordingId: string,
+	options: { startedAt?: string; replacesMissing?: string } = {}
 ): Promise<boolean> {
 	if (!objectIdString.safeParse(id).success) return false;
 	const db = await getDb();
-	const result = await db
-		.collection('scheduled_lives')
-		.updateOne(
-			{ _id: new ObjectId(objectIdString.parse(id)) },
-			{ $set: { recording_id: recordingId, updated_at: new Date().toISOString() } }
-		);
+	const result = await db.collection('scheduled_lives').updateOne(
+		{
+			_id: new ObjectId(objectIdString.parse(id)),
+			recording_id: { $in: [options.replacesMissing ?? null, recordingId] },
+			...(options.startedAt ? { live_started_at: options.startedAt } : {}),
+			...(options.replacesMissing ? { status: 'ended' } : {})
+		},
+		{ $set: { recording_id: recordingId, updated_at: new Date().toISOString() } }
+	);
 	return result.matchedCount > 0;
 }
 

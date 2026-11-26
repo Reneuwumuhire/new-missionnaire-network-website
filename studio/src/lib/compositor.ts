@@ -6,7 +6,7 @@
 import { drawColorBars, shouldShowBars } from './bars';
 import { drawBox, toPixels, type Rect } from './geom';
 import { handleForLayer, pinHandle, releaseUnusedPins } from './media.svelte';
-import { onAirLines } from './lyrics.svelte';
+import { lyrics, onAirLines } from './lyrics.svelte';
 import {
 	activeScene,
 	onAirSceneId,
@@ -37,6 +37,24 @@ export interface Transition extends TransitionPlan {
 }
 
 let transition: Transition | null = null;
+let blackFade = { from: 0, startedAt: 0, duration: 0 };
+
+export function programBlackOpacity(now = performance.now()) {
+	const target = Number(studio.programBlack);
+	if (blackFade.duration <= 0) return target;
+	const progress = Math.min(1, Math.max(0, (now - blackFade.startedAt) / blackFade.duration));
+	return blackFade.from + (target - blackFade.from) * progress;
+}
+
+function fadeBlackTo(black: boolean, duration: number) {
+	const now = performance.now();
+	blackFade = { from: programBlackOpacity(now), startedAt: now, duration };
+	studio.programBlack = black;
+}
+
+export function toggleProgramBlack(duration = studio.settings.transitionMs) {
+	fadeBlackTo(!studio.programBlack, duration);
+}
 let frames = 0;
 const MEDIA_KINDS: Layer['kind'][] = ['camera', 'screen', 'image', 'video'];
 
@@ -65,7 +83,7 @@ export function transitionPlan(
 	type: TransitionType,
 	durationMs: number
 ): TransitionPlan | null {
-	if (type === 'cut' || durationMs <= 0) return null;
+	if (type !== 'fade' || durationMs <= 0) return null;
 	// Re-taking the scene already on air is a no-op, not a fade to itself.
 	if (from === to) return null;
 	return { fromSceneId: from, durationMs, type };
@@ -79,19 +97,29 @@ export function takeToProgram(
 	durationMs = studio.settings.transitionMs,
 	from = onAirSceneId(),
 	/** Quick-transition override: take with this instead of the configured one. */
-	type: TransitionType = studio.settings.transitionType
+	type: TransitionType = studio.settings.transitionType,
+	{ preserveBlack = false } = {}
 ): TransitionPlan | null {
+	if (type === 'fadeToBlack' && durationMs > 0) {
+		toggleProgramBlack(durationMs);
+		return null;
+	}
 	const source = studio.scenes.find((scene) => scene.id === sceneId);
 	if (!source) return null;
-	const frozenFrom = studio.settings.studioMode ? snapshotScene(programScene()) : undefined;
-	// Re-taking an edited scene in Studio Mode is still a real transition: its
-	// source id is unchanged, but its frozen Program snapshot is not.
-	const plan = transitionPlan(
-		from,
-		studio.settings.studioMode && from === sceneId ? `${sceneId}:preview` : sceneId,
-		type,
-		durationMs
-	);
+	const reveal = !preserveBlack && (studio.programBlack || programBlackOpacity() > 0);
+	if (reveal) fadeBlackTo(false, type === 'fade' ? durationMs : 0);
+	const frozenFrom =
+		!reveal && studio.settings.studioMode ? snapshotScene(programScene()) : undefined;
+	// Re-taking an edited scene in Studio Mode can fade even when both snapshots share an ID.
+	// When leaving black, reveal the new scene directly so the old scene cannot flash through.
+	const plan = reveal
+		? null
+		: transitionPlan(
+				from,
+				studio.settings.studioMode && from === sceneId ? `${sceneId}:preview` : sceneId,
+				type,
+				durationMs
+			);
 	studio.programSceneId = sceneId;
 	studio.programSceneSnapshot = studio.settings.studioMode ? snapshotForProgram(source) : null;
 	transition = plan ? { ...plan, startedAt: performance.now(), fromScene: frozenFrom } : null;
@@ -141,8 +169,15 @@ export function selectScene(sceneId: string) {
 	}
 	studio.activeSceneId = sceneId;
 	studio.selectedLayerId = null;
-	if (!studio.settings.studioMode) takeToProgram(sceneId, studio.settings.transitionMs, from);
-	else persist();
+	if (!studio.settings.studioMode) {
+		const type = studio.settings.transitionType;
+		takeToProgram(
+			sceneId,
+			studio.settings.transitionMs,
+			from,
+			type === 'fadeToBlack' ? 'fade' : type
+		);
+	} else persist();
 }
 
 const FONTS = {
@@ -185,7 +220,8 @@ function drawTextBlocks(
 	ctx: CanvasRenderingContext2D,
 	blocks: TextBlock[],
 	box: Rect,
-	style: TextStyle
+	style: TextStyle,
+	lineBackground = false
 ) {
 	const visible = blocks.filter((b) => b.text.trim().length > 0);
 	if (visible.length === 0) return;
@@ -193,6 +229,7 @@ function drawTextBlocks(
 	const basePx = style.size * ctx.canvas.height;
 	const padding = basePx * 0.45;
 	const innerWidth = Math.max(10, box.w - padding * 2);
+	const lineSpacing = style.lineHeight + (lineBackground ? 0.14 : 0);
 
 	// Lay out first, then paint: the background box has to be sized to the
 	// wrapped text, and the text has to be positioned inside that box.
@@ -201,16 +238,17 @@ function drawTextBlocks(
 		ctx.font = `${style.weight} ${px}px ${FONTS[style.font]}`;
 		const content = style.uppercase ? block.text.toUpperCase() : block.text;
 		const lines = wrap(ctx, content, innerWidth);
-		return { ...block, px, lines, height: lines.length * px * style.lineHeight };
+		return { ...block, px, lines, height: lines.length * px * lineSpacing };
 	});
 
-	const totalHeight = laid.reduce((sum, b) => sum + b.height, 0) + padding * 2;
+	const verticalPadding = lineBackground ? 0 : padding;
+	const totalHeight = laid.reduce((sum, b) => sum + b.height, 0) + verticalPadding * 2;
 	let top: number;
 	if (style.valign === 'top') top = box.y;
 	else if (style.valign === 'middle') top = box.y + (box.h - totalHeight) / 2;
-	else top = box.y + box.h - totalHeight;
+	else top = box.y + box.h - totalHeight - (lineBackground ? basePx * 0.35 : 0);
 
-	if (style.background !== 'transparent') {
+	if (!lineBackground && style.background !== 'transparent') {
 		ctx.fillStyle = style.background;
 		ctx.fillRect(box.x, top, box.w, totalHeight);
 	}
@@ -224,11 +262,22 @@ function drawTextBlocks(
 	ctx.textAlign = style.align;
 	ctx.textBaseline = 'top';
 
-	let y = top + padding;
+	let y = top + verticalPadding;
+	const layerAlpha = ctx.globalAlpha;
 	for (const block of laid) {
 		ctx.font = `${style.weight} ${block.px}px ${FONTS[style.font]}`;
-		ctx.globalAlpha = block.alpha;
+		const lineHeight = block.px * lineSpacing;
 		for (const line of block.lines) {
+			if (lineBackground && line && style.background !== 'transparent') {
+				const width = Math.min(ctx.measureText(line).width, innerWidth);
+				const inset = block.px * 0.4;
+				const left =
+					style.align === 'left' ? x : style.align === 'right' ? x - width : x - width / 2;
+				ctx.globalAlpha = layerAlpha;
+				ctx.fillStyle = style.background;
+				ctx.fillRect(left - inset, y, width + inset * 2, lineHeight);
+			}
+			ctx.globalAlpha = lineBackground ? layerAlpha * block.alpha : block.alpha;
 			if (style.shadow) {
 				// A stage is bright and a projector wall is not; the shadow is what
 				// keeps white text readable over both.
@@ -237,11 +286,12 @@ function drawTextBlocks(
 				ctx.shadowOffsetY = block.px * 0.04;
 			}
 			ctx.fillStyle = style.color;
-			ctx.fillText(line, x, y);
+			if (lineBackground) ctx.fillText(line, x, y + (lineHeight - block.px) / 2, innerWidth);
+			else ctx.fillText(line, x, y);
 			ctx.shadowColor = 'transparent';
 			ctx.shadowBlur = 0;
 			ctx.shadowOffsetY = 0;
-			y += block.px * style.lineHeight;
+			y += lineHeight;
 		}
 	}
 	ctx.globalAlpha = 1;
@@ -274,17 +324,24 @@ function drawLayer(
 		} else {
 			const { current, next } = onAirLines(nowMs, frozen);
 			wrote = Boolean(current.trim());
-			drawTextBlocks(
-				ctx,
-				[
-					{ text: current, alpha: 1, scale: 1 },
-					// The next line at 55% keeps a singer ahead of the beat without
-					// competing with the line being sung.
-					{ text: layer.showNext ? next : '', alpha: 0.55, scale: 0.72 }
-				],
-				box,
-				style
-			);
+			if (wrote) {
+				drawTextBlocks(
+					ctx,
+					[
+						{ text: current, alpha: 1, scale: 1 },
+						{
+							text: lyrics.mode === 'manual' && layer.showNext ? next : '',
+							alpha: 0.55,
+							scale: 0.72
+						}
+					],
+					box,
+					style.background === DEFAULT_TEXT_STYLE.background
+						? { ...style, background: 'rgba(0,0,0,0.82)' }
+						: style,
+					true
+				);
+			}
 		}
 		ctx.globalAlpha = 1;
 		return wrote;
@@ -386,46 +443,33 @@ export function renderFrame(
 	withTransition: boolean,
 	nowMs = Date.now()
 ) {
+	const black = withTransition ? programBlackOpacity() : 0;
 	ctx.save();
 	ctx.fillStyle = '#000000';
 	ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-	const currentScene = withTransition && studio.settings.studioMode ? programScene() : sceneId;
-
-	if (withTransition && transition) {
-		const t = (performance.now() - transition.startedAt) / transition.durationMs;
-		if (t >= 1) {
-			transition = null;
-			releaseUnusedPins(pinnedIds(studio.programSceneSnapshot));
+	const fade = withTransition ? transition : null;
+	const progress = fade ? (performance.now() - fade.startedAt) / fade.durationMs : 1;
+	if (fade && progress >= 1) {
+		transition = null;
+		releaseUnusedPins(pinnedIds(studio.programSceneSnapshot));
+	}
+	if (black < 1) {
+		const currentScene = withTransition && studio.settings.studioMode ? programScene() : sceneId;
+		const scene = fade && progress < 1 ? scratchContext(ctx.canvas.width, ctx.canvas.height) : null;
+		if (scene && fade) {
+			drawScene(ctx, fade.fromScene ?? fade.fromSceneId, nowMs);
+			drawScene(scene, currentScene, nowMs);
+			ctx.globalAlpha = progress;
+			ctx.drawImage(scene.canvas, 0, 0);
 		} else {
-			const scene = scratchContext(ctx.canvas.width, ctx.canvas.height);
-			if (!scene) {
-				// No scratch context: cut rather than freeze the outgoing scene
-				// for the length of the transition.
-				drawScene(ctx, currentScene, nowMs);
-			} else if (transition.type === 'fadeToBlack') {
-				// Out to black over the first half, in from black over the second.
-				// The canvas is already black, so only one scene is ever drawn.
-				const first = t < 0.5;
-				drawScene(
-					scene,
-					first ? (transition.fromScene ?? transition.fromSceneId) : currentScene,
-					nowMs
-				);
-				ctx.globalAlpha = first ? 1 - t * 2 : (t - 0.5) * 2;
-				ctx.drawImage(scene.canvas, 0, 0);
-				ctx.globalAlpha = 1;
-			} else {
-				drawScene(ctx, transition.fromScene ?? transition.fromSceneId, nowMs);
-				drawScene(scene, currentScene, nowMs);
-				ctx.globalAlpha = t;
-				ctx.drawImage(scene.canvas, 0, 0);
-				ctx.globalAlpha = 1;
-			}
-			ctx.restore();
-			return;
+			drawScene(ctx, currentScene, nowMs);
+		}
+		if (black > 0) {
+			ctx.fillStyle = '#000000';
+			ctx.globalAlpha = black;
+			ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 		}
 	}
-	drawScene(ctx, currentScene, nowMs);
 	ctx.restore();
 }
 

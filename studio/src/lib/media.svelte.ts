@@ -644,34 +644,96 @@ export function openFile(layer: Layer, file: Blob): Handle {
 
 /** Play a file selected through Studio's native picker. The Rust side serves
  * bounded byte ranges, so a long recording is never copied into webview RAM. */
-export function openLocalMedia(layer: Layer, token: string): Handle {
-	release(layer.id);
-	const url = mediaUrl('localmedia', token, navigator.userAgent);
+function createLocalMediaHandle(
+	layer: Layer
+): Handle & { el: HTMLImageElement | HTMLVideoElement } {
 	if (layer.kind === 'image') {
 		const el = new Image();
 		el.crossOrigin = 'anonymous';
-		const h: Handle = { kind: 'image', el, stream: null, error: null, objectUrl: null };
+		const h: Handle & { el: HTMLImageElement } = {
+			kind: 'image',
+			el,
+			stream: null,
+			error: null,
+			objectUrl: null
+		};
 		el.onerror = () => {
 			h.error = t('source.badImage');
 			mediaVersion.n++;
 		};
 		el.onload = () => mediaVersion.n++;
-		el.src = url;
-		return set(layer.id, h);
+		return h;
 	}
 	const el = document.createElement('video');
 	el.crossOrigin = 'anonymous';
 	el.preload = 'auto';
 	el.playsInline = true;
 	el.muted = true;
-	el.src = url;
-	const h: Handle = { kind: 'video', el, stream: null, error: null, objectUrl: null };
+	const h: Handle & { el: HTMLVideoElement } = {
+		kind: 'video',
+		el,
+		stream: null,
+		error: null,
+		objectUrl: null
+	};
 	el.onerror = () => {
 		h.error = t('source.badVideo');
 		mediaVersion.n++;
 	};
 	el.onloadedmetadata = () => mediaVersion.n++;
-	return set(layer.id, h);
+	return h;
+}
+
+export function openLocalMedia(layer: Layer, token: string): Handle {
+	release(layer.id);
+	const handle = createLocalMediaHandle(layer);
+	handle.el.src = mediaUrl('localmedia', token, navigator.userAgent);
+	return set(layer.id, handle);
+}
+
+export function mediaSourceName(fileName: string) {
+	return fileName.replace(/\.[^.]+$/, '') || fileName;
+}
+
+export function isAudioFile(name: string) {
+	return /\.(mp3|m4a|aac|wav|flac|ogg|opus|aiff|aif)$/i.test(name);
+}
+
+/** Load the new file before replacing the editable handle. Program can keep its pin. */
+export async function replaceLocalMedia(layer: Layer, file: RegisteredLocalMedia) {
+	const request = beginOpen(layer.id, true);
+	const handle = createLocalMediaHandle(layer);
+	const { el } = handle;
+	try {
+		await new Promise<void>((resolve, reject) => {
+			const ready = layer.kind === 'image' ? 'load' : 'loadedmetadata';
+			const error = () =>
+				finish(new Error(t(layer.kind === 'image' ? 'source.badImage' : 'source.badVideo')));
+			const loaded = () => finish();
+			const timer = setTimeout(error, 10_000);
+			function finish(cause?: Error) {
+				clearTimeout(timer);
+				el.removeEventListener(ready, loaded);
+				el.removeEventListener('error', error);
+				if (cause) reject(cause);
+				else resolve();
+			}
+			el.addEventListener(ready, loaded);
+			el.addEventListener('error', error);
+			el.src = mediaUrl('localmedia', file.token, navigator.userAgent);
+		});
+	} catch (error) {
+		if (openRequests.get(layer.id) === request) openRequests.delete(layer.id);
+		destroy(handle);
+		throw error;
+	}
+	if (!set(layer.id, handle, request).el) return false;
+	layer.fileName = file.name;
+	layer.name = mediaSourceName(file.name);
+	layer.filePath = file.path;
+	layer.audioOnly = layer.kind === 'video' && isAudioFile(file.name);
+	delete layer.url;
+	return true;
 }
 
 function describe(err: unknown): string {

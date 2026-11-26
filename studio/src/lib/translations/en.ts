@@ -11,7 +11,7 @@ const en = {
 	'dock.audioMixer': 'Audio Mixer',
 	'dock.sceneTransitions': 'Scene Transitions',
 	'dock.controls': 'Controls',
-	'dock.lyrics': 'Lyrics',
+	'dock.lyrics': 'Subtitles',
 
 	// ── Common ──────────────────────────────────────────────────
 	'common.add': 'Add',
@@ -50,6 +50,8 @@ const en = {
 	'scenes.starterBreak': 'Break',
 
 	// ── Sources ─────────────────────────────────────────────────
+	'sources.reorder': 'Drag to reorder. Use Up or Down on the handle to move one position.',
+	'sources.reorderSource': 'Reorder {name}',
 	'sources.empty': 'You don’t have any sources. Click the + button below.',
 	'sources.addSource': 'Add source',
 	'sources.reconnect': 'Reconnect',
@@ -95,8 +97,8 @@ const en = {
 	'web.reading': 'Reading the link…',
 	'sources.text': 'Text',
 	'sources.textHint': 'Title, standing message',
-	'sources.lyrics': 'Lyrics',
-	'sources.lyricsHint': 'Current line from the Lyrics dock',
+	'sources.lyrics': 'Subtitles',
+	'sources.lyricsHint': 'Current line from the Subtitles dock',
 	'sources.color': 'Color Source',
 	'sources.colorHint': 'Solid colour',
 	'sources.starterBackground': 'Background',
@@ -157,12 +159,16 @@ const en = {
 	// ── Transitions ─────────────────────────────────────────────
 	'transitions.fade': 'Fade',
 	'transitions.cut': 'Cut',
+	'transitions.fadeFromBlack': 'Fade Back In',
 	'transitions.fadeToBlack': 'Fade to Black',
 	'transitions.quick': 'Quick transitions',
 	'transitions.duration': 'Duration',
 
 	// ── Controls ────────────────────────────────────────────────
 	'controls.startStreaming': 'Start Preview Signal',
+	'controls.streamDetails': 'Stream details',
+	'controls.stopPreviewSignal': 'Stop Preview Signal',
+	'health.attention': 'Needs attention',
 	'controls.stopStreaming': 'Stop Streaming',
 	'controls.confirmStop': 'Confirm stop',
 	'controls.starting': 'Starting…',
@@ -170,8 +176,13 @@ const en = {
 	'controls.studioMode': 'Studio Mode',
 	'controls.settings': 'Settings',
 	'controls.recording': 'Recording',
-	'controls.recordingHint':
-		'Choose Local, Cloud or Both in Settings → Output. Recording starts and stops with the broadcast.',
+	'controls.youtubePreparing': 'Preparing',
+	'controls.startingRecording': 'Starting recording…',
+	'controls.savingRecording': 'Saving recording…',
+	'controls.broadcastRecording': 'Broadcast recording active',
+	'controls.startRecording': 'Start Recording',
+	'controls.stopRecording': 'Stop Recording',
+	'controls.recordingHint': 'Choose Local, Cloud or Both in Settings → Output.',
 
 	// ── Stream health (OBS's Stats dock, with what ffmpeg can tell us) ──
 	'health.title': 'Stream health',
@@ -277,24 +288,25 @@ const en = {
 	'status.shortcutsStudio': 'Space = next line · 1-9 = scene · Enter = transition',
 
 	// ── Lyrics ──────────────────────────────────────────────────
+	'lyrics.upNext': 'Up next',
 	'lyrics.onAir': 'On air',
 	'lyrics.shown': 'Shown',
 	'lyrics.hidden': 'Hidden',
-	'lyrics.toggleHint': 'Show or hide every Lyrics source at once',
+	'lyrics.toggleHint': 'Show or hide every Subtitles source at once',
 	'lyrics.open': 'Open .srt / .txt',
-	'lyrics.paste': 'Paste lyrics',
+	'lyrics.paste': 'Paste subtitles',
 	'lyrics.exportSrt': 'Export .srt',
 	'lyrics.exportHint': 'Writes out the timings you tapped',
 	'lyrics.pastePlaceholder': 'One line per screen…',
 	'lyrics.load': 'Load',
-	'lyrics.emptyList': 'No lyrics loaded',
+	'lyrics.emptyList': 'No subtitles loaded',
 	'lyrics.loadedCues': '{count} cues loaded',
 	'lyrics.loadedLines': '{count} lines loaded',
 	'lyrics.unreadableSrt': 'No readable cues in that .srt',
 	'lyrics.emptyFile': 'Empty file',
 	'lyrics.nothingToLoad': 'Nothing to load',
 	'lyrics.noTimings': 'No lines timed yet',
-	'lyrics.hintTimed': 'Load a timed .srt, or paste lyrics to step through them by hand.',
+	'lyrics.hintTimed': 'Load a timed .srt, or paste subtitles to step through them by hand.',
 	'lyrics.start': 'Start — first cue begins now',
 	'lyrics.startHint':
 		'Press exactly as the first line is spoken. Or click the line being sung in the list below.',
@@ -310,7 +322,8 @@ const en = {
 	'lyrics.cueHintTimed': 'This cue is being spoken now',
 	'lyrics.cueHintManual': 'Show this line',
 	'lyrics.pastedName': 'Pasted',
-	'lyrics.starterLayer': 'Lyrics',
+	'lyrics.starterLayer': 'Subtitles',
+	'lyrics.referenceSetupNeeded': 'Setup needed',
 	'lyrics.referenceTitle': 'Automatic sermon sync',
 	'lyrics.referenceAudio': 'Choose reference audio',
 	'lyrics.referenceMissing': 'Load the prepared sermon MP3 and its French .srt.',
@@ -334,7 +347,13 @@ const en = {
 	'media.back': 'Back ten seconds',
 	'media.forward': 'Forward ten seconds',
 	'media.scrub': 'Position in the recording',
-	'media.followShort': 'Lyrics',
+	'media.followShort': 'Sync subtitles to audio',
+	'media.captionsUnavailable': 'Load a timed SRT for this source to sync subtitles to playback.',
+	'props.mediaFile': 'Media file',
+	'props.noMediaFile': 'No file selected',
+	'props.replaceFile': 'Replace file…',
+	'props.loadingFile': 'Loading file…',
+	'props.replaceAfterProgramme': 'This file can be replaced after the programme ends.',
 	'props.transportMoved':
 		'Play, pause and scrubbing are on the transport bar under the preview, where they stay in reach during a service.',
 	'props.title': 'Source properties',
@@ -343,16 +362,16 @@ const en = {
 	'props.defaultCamera': 'Default camera',
 	'props.color': 'Color',
 	'props.text': 'Text',
-	'props.showNextLine': 'Also show the next line',
+	'props.showNextLine': 'Show next line in manual mode',
 	'props.hideCursor': 'Hide the mouse pointer',
 	'props.hideCursorUnsupported':
 		'This system paints the pointer into the shared window before we see it, so the switch has no effect here. It is kept for the machines that honour it.',
 	'props.play': 'Play',
 	'props.pause': 'Pause',
 	'props.restart': 'Restart',
-	'props.followLyrics': 'Lyrics follow this recording',
+	'props.followLyrics': 'Subtitles follow this recording',
 	'props.followLyricsHint':
-		'The .srt runs off the track\u2019s own position, so pausing or winding back takes the lyrics with it.',
+		'The .srt runs off the track\u2019s own position, so pausing or winding back takes the subtitles with it.',
 	'props.loop': 'Loop',
 	'props.position': 'Position (% of frame)',
 	'props.fullFrame': 'Fit to screen',
@@ -482,7 +501,7 @@ const en = {
 	'help.safety':
 		'Program is what viewers receive. Always check Program—not only Preview—before starting or changing a broadcast.',
 	'help.shortcuts': 'Keyboard Shortcuts',
-	'help.toggleLyricsPanel': 'Show or hide the lyrics panel',
+	'help.toggleLyricsPanel': 'Show or hide the subtitles panel',
 	'help.toggleBottomPanels': 'Show or hide the bottom panels',
 	'help.interfaceZoom': 'Zoom in, zoom out, or return to actual size',
 	'help.recordingsFolder': 'Open the local recordings folder',
@@ -507,7 +526,7 @@ const en = {
 		'Confirm the source is connected in Audio Mixer, its meter moves, and it is not muted. Check microphone or screen-recording permission in the operating system when a device or captured app is missing.',
 	'help.subtitleProblem': 'Subtitles are missing or out of sync',
 	'help.subtitleSolution':
-		'Confirm Lyrics is Shown, the correct public session is active, and the reference MP3 and matching French SRT are loaded. Automatic sync also needs audio from the captured live source; use “Sermon begins now” only as the fallback.',
+		'Confirm Subtitles is Shown, the correct public session is active, and the reference MP3 and matching French SRT are loaded. Automatic sync also needs audio from the captured live source; use “Sermon begins now” only as the fallback.',
 	'help.captureProblem': 'A captured YouTube window looks wrong',
 	'help.captureSolution':
 		'Use Window Capture, keep the video visible in the browser window, and crop or resize the source in Preview. Move it to Program only after the result is clean.',
@@ -570,7 +589,7 @@ const en = {
 
 	// ── Splitters ───────────────────────────────────────────────
 	'splitter.docks': 'Panel height',
-	'splitter.lyrics': 'Lyrics panel width',
+	'splitter.lyrics': 'Subtitles panel width',
 	'splitter.between': 'Width of {name}'
 };
 

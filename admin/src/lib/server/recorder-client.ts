@@ -109,10 +109,25 @@ export function recorderStop(): Promise<{ id: string }> {
 	return call<{ id: string }>('/stop', { method: 'POST' });
 }
 
-export function recorderStopById(
-	id: string
+export async function recorderStopById(
+	id: string,
+	drain = true
 ): Promise<{ id: string | null; tailComplete?: boolean }> {
-	return call(`/stop/${encodeURIComponent(id)}/drain`, { method: 'POST' }, 45_000);
+	const path = `/stop/${encodeURIComponent(id)}`;
+	if (!drain) return call(path, { method: 'POST' });
+	try {
+		return await call(`${path}/drain`, { method: 'POST' }, 45_000);
+	} catch (error) {
+		// Older recorders can stop this exact recording, but cannot drain its tail.
+		if (
+			!(error instanceof RecorderError) ||
+			error.status !== 404 ||
+			error.message !== `Route POST:${path}/drain not found`
+		)
+			throw error;
+		const result = await call<{ id: string | null }>(path, { method: 'POST' });
+		return { ...result, tailComplete: false };
+	}
 }
 
 export function recorderRetry(id: string): Promise<{ ok: true }> {

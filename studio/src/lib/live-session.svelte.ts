@@ -224,6 +224,15 @@ export const liveSession = $state({
 	subtitleStatus: 'idle' as 'idle' | 'uploading' | 'uploaded' | 'attached' | 'synced' | 'error'
 });
 
+export function currentStudioSession() {
+	const id = liveSession.publicRun?.id ?? liveSession.activeId ?? liveSession.selectedId;
+	return liveSession.sessions.find((session) => session._id === id);
+}
+
+export function currentStudioSessionTitle() {
+	return currentStudioSession()?.title || liveSession.publicRun?.title;
+}
+
 async function post<T>(body: object): Promise<T> {
 	if (!liveSession.pairingCode) throw new Error('Continue with admin first.');
 	return JSON.parse(
@@ -249,8 +258,8 @@ async function adminPost<T>(body: object): Promise<T> {
 export type RecordingSession = { sessionId: string; sessionStartedAt: number };
 
 export function controlCloudRecording(action: 'start' | 'stop', session?: RecordingSession) {
-	return adminPost<{ id: string | null; tailComplete?: boolean }>({
-		action: session ? 'recorder-stop-session' : `recorder-${action}`,
+	return adminPost<{ id: string | null; tailComplete?: boolean; stopped?: boolean }>({
+		action: session && action === 'stop' ? 'recorder-stop-session' : `recorder-${action}`,
 		...session
 	});
 }
@@ -858,12 +867,16 @@ export function markPublicEnding() {
 	if (run && !run.ending) savePublicRun({ ...run, ending: true });
 }
 
-async function readMissionnaire(run: PublicRun): Promise<PublicStatus> {
-	const { active, startedAt, status } = await post<{
+export function getPublicSessionStatus(sessionId: string) {
+	return post<{
 		active: boolean;
 		startedAt: string | null;
 		status: LiveSession['status'];
-	}>({ action: 'session-status', sessionId: run.id });
+	}>({ action: 'session-status', sessionId });
+}
+
+async function readMissionnaire(run: PublicRun): Promise<PublicStatus> {
+	const { active, startedAt, status } = await getPublicSessionStatus(run.id);
 
 	if (active) {
 		liveSession.activeId = run.id;

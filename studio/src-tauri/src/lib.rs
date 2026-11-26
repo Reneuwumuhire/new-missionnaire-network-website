@@ -239,14 +239,22 @@ async fn extract_reference_features(path: String) -> Result<reference::Reference
 
 /// Returns the ffmpeg command line with stream keys redacted, so the UI can
 /// show exactly what is running without leaking secrets into a screenshot.
+#[derive(Default)]
+struct ManualRecorder(Encoder);
+
 #[tauri::command]
 fn start_stream(
 	app: AppHandle,
 	encoder: State<'_, Encoder>,
+	manual: State<'_, ManualRecorder>,
 	config: StreamConfig,
 	group: String,
 ) -> Result<StartedStream, String> {
-	let (command, local_recording_path, run_id) = encoder.start(&app, config, &group)?;
+	let (command, local_recording_path, run_id) = if group == "recording" {
+		manual.0.start(&app, config, &group)?
+	} else {
+		encoder.start(&app, config, &group)?
+	};
 	Ok(StartedStream { command, local_recording_path, run_id })
 }
 
@@ -346,18 +354,21 @@ fn focus_main_window(app: AppHandle) -> Result<(), String> {
 /// Media chunks arrive as a raw IPC body (not JSON) — a JSON number array
 /// would be ~6× the bytes and would stall the webview at broadcast bitrates.
 #[tauri::command(async)]
-fn push_chunk(encoder: State<'_, Encoder>, request: tauri::ipc::Request<'_>) -> Result<(), String> {
+fn push_chunk(encoder: State<'_, Encoder>, manual: State<'_, ManualRecorder>, request: tauri::ipc::Request<'_>) -> Result<(), String> {
 	let run_id = request.headers().get("x-studio-run-id")
 		.and_then(|value| value.to_str().ok()).and_then(|value| value.parse().ok())
 		.ok_or("Identifiant de capture manquant")?;
 	match request.body() {
+		tauri::ipc::InvokeBody::Raw(bytes) if request.headers().contains_key("x-studio-recording") =>
+			manual.0.push(run_id, bytes),
 		tauri::ipc::InvokeBody::Raw(bytes) => encoder.push(run_id, bytes),
 		_ => Err("push_chunk attend un corps binaire".into()),
 	}
 }
 
 #[tauri::command(async)]
-fn stop_stream(encoder: State<'_, Encoder>, group: Option<String>) -> Result<(), String> {
+fn stop_stream(encoder: State<'_, Encoder>, manual: State<'_, ManualRecorder>, group: Option<String>) -> Result<(), String> {
+	if group.as_deref() == Some("recording") { return manual.0.stop(); }
 	encoder.stop_group(group.as_deref())
 }
 
@@ -703,7 +714,7 @@ pub fn run() {
 				view
 			};
 			view.prepend_items(&[
-				&item("studio-toggle-lyrics", "Toggle Lyrics Panel", Some("CmdOrCtrl+Shift+L"))?,
+				&item("studio-toggle-lyrics", "Toggle Subtitles Panel", Some("CmdOrCtrl+Shift+L"))?,
 				&item("studio-toggle-docks", "Toggle Bottom Panels", Some("CmdOrCtrl+Shift+D"))?,
 				&item("studio-toggle-mode", "Toggle Studio Mode", Some("CmdOrCtrl+Shift+M"))?,
 				&item("studio-reset-layout", "Restore Default Layout", None)?,
@@ -758,6 +769,7 @@ pub fn run() {
 		})
 		.manage(InterfaceZoom::default())
 		.manage(Encoder::default())
+		.manage(ManualRecorder::default())
 		.manage(appaudio::Capture::default())
 		.manage(window_capture::Capture::default())
 		.manage(fetch::Streams::default())
@@ -945,6 +957,7 @@ pub fn run() {
 						.app_handle()
 						.try_state::<Encoder>()
 						.is_some_and(|encoder| encoder.is_running())
+						|| window.app_handle().try_state::<ManualRecorder>().is_some_and(|rec| rec.0.is_running())
 					{
 						api.prevent_close();
 						notify_close_blocked(window.app_handle());
@@ -974,6 +987,7 @@ pub fn run() {
 				if app
 					.try_state::<Encoder>()
 					.is_some_and(|encoder| encoder.is_running())
+					|| app.try_state::<ManualRecorder>().is_some_and(|rec| rec.0.is_running())
 				{
 					api.prevent_exit();
 					notify_close_blocked(app);

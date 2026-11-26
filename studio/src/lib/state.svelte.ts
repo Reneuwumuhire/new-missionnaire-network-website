@@ -447,7 +447,11 @@ function load(): Persisted {
 		return {
 			scenes: uniqueById(parsed.scenes).map((scene) => ({
 				...scene,
-				layers: uniqueById(scene.layers)
+				layers: uniqueById(scene.layers).map((layer) =>
+					layer.kind === 'lyrics' && (layer.name === 'Lyrics' || layer.name === 'Paroles')
+						? { ...layer, name: t('lyrics.starterLayer') }
+						: layer
+				)
 			})),
 			activeSceneId: parsed.activeSceneId ?? parsed.scenes[0].id,
 			programSceneId: parsed.programSceneId ?? parsed.activeSceneId ?? parsed.scenes[0].id,
@@ -506,6 +510,7 @@ export const studio = $state({
 	/** The scene actually going out. Same as activeSceneId unless Studio Mode
 	 *  is on; this is the one the program canvas paints and the encoder sees. */
 	programSceneId: initial.programSceneId,
+	programBlack: false,
 	/** Frozen layer settings and media generations for Program while Studio
 	 *  Mode edits or reconnects the source. */
 	programSceneSnapshot: snapshotScene(

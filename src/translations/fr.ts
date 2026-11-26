@@ -541,6 +541,7 @@ export default {
 	'rediffDetail.copyFailed': "Échec — copiez l'URL",
 	'rediffDetail.share': 'Partager',
 	'rediffDetail.shareNative': 'Partager…',
+	'rediffDetail.shareMoment': 'Partager à partir de ce moment',
 	'rediffDetail.copyLink': 'Copier le lien',
 	'rediffDetail.transcriptPdf': 'Transcription PDF',
 	'rediffDetail.watchOnYoutube': 'Voir sur YouTube',
@@ -647,6 +648,9 @@ export default {
 	'liveTranscript.appearance': 'Affichage',
 	'liveTranscript.theme': 'Thème',
 	'liveTranscript.textSize': 'Taille du texte',
+	'liveTranscript.delay': 'Retard des sous-titres (s)',
+	'liveTranscript.delayHint':
+		'Augmentez si les sous-titres sont en avance. Diminuez s’ils sont en retard.',
 	'liveTranscript.theme.cream': 'Crème',
 	'liveTranscript.theme.sepia': 'Sépia',
 	'liveTranscript.theme.dark': 'Sombre',

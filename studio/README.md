@@ -3,7 +3,7 @@
 A live broadcast switcher for the Missionnaire Network — the piece that used to
 be OBS. It is laid out like OBS on purpose (preview on top, docks along the
 bottom, Studio Mode, dBFS meters), so anyone who has run OBS already knows how
-to run this. What it adds is a lyrics panel, and streaming to the church's own
+to run this. What it adds is a subtitles panel, and streaming to the church's own
 ingest and to YouTube at the same time.
 
 Tauri (Rust), Svelte 5, and FFmpeg. The webview composites the Program
@@ -65,7 +65,7 @@ access again. Without a certificate the release workflow signs ad hoc.
 
 ```
 ┌──────────────────────────────────────────────┬──────────┐
-│  preview   (Studio Mode: Preview │ Program)  │  Lyrics  │
+│  preview   (Studio Mode: Preview │ Program)  │  Subtitles  │
 ├──────────────────────────────────────────────┤          │
 │  canvas size · selected source · Properties  │          │
 ├────────┬─────────┬────────────┬───────┬──────┤          │
@@ -87,17 +87,20 @@ permanent panels, and the stream destinations live under **Settings → Stream**
 exactly where OBS keeps them.
 
 **Every seam is draggable** — between the preview and the dock row, between the
-lyrics column and the preview, and between each pair of docks. Sizes are saved
+subtitles column and the preview, and between each pair of docks. Sizes are saved
 with the scene collection. The dividers also take focus, so arrow keys resize
 (hold shift for bigger steps). _Settings → Layout → Reset panels_ puts them
 back. Docks are laid out by proportion, so the row still fills the window
 whatever size you drag it to.
 
-**Scene Transitions** holds the type (Fade, Cut or Fade to Black) and the
-duration, as OBS does. They are separate settings: switching to Cut and back
-keeps the duration you chose. In Studio Mode the column between the two
-canvases also has OBS's **Quick Transitions** — take with one specific
-transition without changing the configured default.
+**Scene Transitions** sets the transition type and duration. Studio remembers
+the duration while Cut is selected. In Studio Mode, choose a quick transition
+between Preview and Program and adjust its duration just below. In single-view
+mode, set the default transition type and duration in the bottom dock.
+Quick transitions leave the default selected. Press **Fade to Black** to
+hold Program black while Preview stays visible. Press **Fade Back In** when
+you are ready to restore the picture, or choose **Cut** or **Fade** to bring
+Preview straight to Program.
 
 **Studio Mode** (Controls → _Studio Mode_) splits the preview in two: the left
 canvas is the scene you are editing, the right one is what is actually going
@@ -199,7 +202,7 @@ session is created:
 - **Pre-recorded Kinyarwanda** loads opening music, an existing Kinyarwanda
   sermon, closing music and its SRT. **Start programme** runs that queue once;
   subtitles follow only the sermon media clock. Krefeld can supply pictures,
-  but its audio route remains excluded. No recorder is started in this mode.
+  but its audio route remains excluded. This workflow starts no automatic recording.
 - **Live from Krefeld** keeps one Krefeld source running. **Start sermon** opens
   the interpreter microphone, lowers Krefeld publicly, starts the sermon
   recording marker and subtitles; **End sermon** reverses the mix and saves the
@@ -212,28 +215,26 @@ the workflow restores safely at Ready with the microphone closed; use the file
 inputs to locate local files again. Rehearse microphone and headphone hardware
 with a private destination before the service.
 
-## Lyrics
+## Subtitles
 
-A **lyrics ribbon sits directly above the Program canvas**: the line on air is
-large and lit, the two either side are dimmed and smaller, and the column glides
-rather than jumps — the way a lyrics app shows a song. It follows the program,
-not the scene you are editing, so it always matches the picture going out. The
-badge next to it blanks every Lyrics source at once.
+The right-hand **Subtitles** panel shows the current and next lines and lets you
+show or hide all Subtitles sources. Service controls and clocks sit above Preview
+and Program.
 
-The `Lyrics` dock drives every Lyrics source in every scene, and there are two
+The `Subtitles` dock drives every Subtitles source in every scene, and there are two
 ways to run a service:
 
 **Timed** — load a `.srt`. Press _Start_ on the first spoken line, or click
 the line being sung right now in the list; nudge ±1/5/30 s if it drifts. Same
 anchor + offset model the admin panel's live-transcript panel already uses.
 
-**Manual** — paste the lyrics, one line per screen, and tap through with
+**Manual** — paste the subtitles, one line per screen, and tap through with
 **Space** (↑/↓ to correct). Every tap is timestamped, so _Export .srt_ gives you
 a real subtitle file for the recording afterwards.
 
 ### What this does and does not sync
 
-The lyrics are painted into the video, so YouTube viewers and anyone watching
+The subtitles are painted into the video, so YouTube viewers and anyone watching
 the video stream see them on the same frame. For the **audio-only** website,
 Studio publishes the SRT position on ffmpeg's emitted media clock, corrected to
 the website server clock. The player then follows the audio frame it is actually
@@ -357,18 +358,22 @@ is platform-independent.
   otherwise the room mic picks up the speakers.
 - Meters are dBFS, like a real desk: green to about −20, amber to −9, red above
   that, with a peak-hold marker. Aim for the top of the green.
-- Recording controls belong to the live sermon workflow. Live interpretation
-  uses cloud segment recording plus the configured local safety capture;
-  prepared Kinyarwanda reuses its existing sermon asset and cannot start either
-  recorder. Saved cloud recordings remain available in `/recordings` in admin.
-- **Stop Streaming** sends queued audio before Studio closes its outputs. The
-  cloud recorder then saves the active Admin recording that began during that
-  live session. Studio warns if it cannot confirm the ending. Recordings
-  started before the session still need a manual stop.
+- The **Recording** row opens **Settings → Output**. Use **Start Recording** and
+  **Stop Recording** in Controls to record manually. Local capture can run on
+  its own. Cloud capture requires an active public Missionnaire service. In
+  **Both** mode, Studio can start local capture while cloud is unavailable.
+- The guided live interpretation workflow uses cloud segment recording and the
+  configured local safety capture. The prepared workflow reuses its sermon
+  asset. Saved cloud recordings are available in Admin.
+- **Stop Streaming** sends queued audio and finalizes active local and cloud
+  recordings. Ending the live in Admin also finalizes the cloud recording and
+  tells connected Studio apps to finish local capture for that session.
 - In **Settings → Output → Recording**, choose Local (or local and cloud), then
   select **Audio only (MP3)**, **Video with audio (MP4)**, or **Both**. Both writes
   two files with the same name in `Movies/Missionnaire Studio` on macOS or
   `Videos/Missionnaire Studio` on Windows, ready to share once recording stops.
+  With a scheduled session selected, local audio uses the session title as its
+  filename in the recording folder. Repeat takes add a number before the extension.
   Recording audio quality ranges from 96 to 320 kb/s; video has Compact, Standard,
   and High presets at the canvas resolution. These settings are saved separately
   from streaming quality and apply to the next recording. Existing setups keep
@@ -379,7 +384,7 @@ is platform-independent.
 Unit tests:
 
 ```bash
-pnpm test                        # geometry, srt, lyrics, metering, layout, i18n, transitions
+pnpm test                        # geometry, srt, subtitles, metering, layout, i18n, transitions
 cd src-tauri && cargo test       # ffmpeg argument building, key redaction
 ```
 
@@ -408,7 +413,7 @@ Live Monitor after the signal returns.
 
 File provides Service Setup (⌘/Ctrl+Shift+S), Choose Live Session (⌘/Ctrl+Shift+O),
 Recording Settings, and Open Recordings Folder (⌘/Ctrl+Shift+R).
-View provides Toggle Lyrics Panel (⌘/Ctrl+Shift+L), Toggle Bottom Panels
+View provides Toggle Subtitles Panel (⌘/Ctrl+Shift+L), Toggle Bottom Panels
 (⌘/Ctrl+Shift+D), Toggle Studio Mode (⌘/Ctrl+Shift+M), Restore Default Layout,
 and interface Zoom In / Out / Actual Size (⌘/Ctrl with + / − / 0).
 Panel visibility persists; restoring the default layout brings both panels back.

@@ -12,7 +12,7 @@ const fr: Record<keyof typeof en, string> = {
 	'dock.audioMixer': 'Mélangeur audio',
 	'dock.sceneTransitions': 'Transitions de scène',
 	'dock.controls': 'Contrôles',
-	'dock.lyrics': 'Paroles',
+	'dock.lyrics': 'Sous-titres',
 
 	// ── Common ──────────────────────────────────────────────────
 	'common.add': 'Ajouter',
@@ -51,6 +51,9 @@ const fr: Record<keyof typeof en, string> = {
 	'scenes.starterBreak': 'Pause',
 
 	// ── Sources ─────────────────────────────────────────────────
+	'sources.reorder':
+		'Glissez pour réorganiser. Utilisez Haut ou Bas sur la poignée pour déplacer la source.',
+	'sources.reorderSource': 'Réorganiser {name}',
 	'sources.empty': 'Vous n’avez aucune source. Cliquez sur le bouton + ci-dessous.',
 	'sources.addSource': 'Ajouter une source',
 	'sources.reconnect': 'Reconnecter',
@@ -101,8 +104,8 @@ const fr: Record<keyof typeof en, string> = {
 	'web.reading': 'Lecture du lien…',
 	'sources.text': 'Texte',
 	'sources.textHint': 'Titre, message fixe',
-	'sources.lyrics': 'Paroles',
-	'sources.lyricsHint': 'Ligne en cours du panneau Paroles',
+	'sources.lyrics': 'Sous-titres',
+	'sources.lyricsHint': 'Ligne en cours du panneau Sous-titres',
 	'sources.color': 'Source de couleur',
 	'sources.colorHint': 'Couleur pleine',
 	'sources.starterBackground': 'Arrière-plan',
@@ -166,12 +169,16 @@ const fr: Record<keyof typeof en, string> = {
 	// ── Transitions ─────────────────────────────────────────────
 	'transitions.fade': 'Fondu',
 	'transitions.cut': 'Coupure',
+	'transitions.fadeFromBlack': 'Sortir du noir',
 	'transitions.fadeToBlack': 'Fondu au noir',
 	'transitions.quick': 'Transitions rapides',
 	'transitions.duration': 'Durée',
 
 	// ── Controls ────────────────────────────────────────────────
 	'controls.startStreaming': 'Démarrer le signal test',
+	'controls.streamDetails': 'Détails du flux',
+	'controls.stopPreviewSignal': 'Arrêter le signal test',
+	'health.attention': 'À vérifier',
 	'controls.stopStreaming': 'Arrêter la diffusion',
 	'controls.confirmStop': 'Confirmer l’arrêt',
 	'controls.starting': 'Démarrage…',
@@ -179,8 +186,13 @@ const fr: Record<keyof typeof en, string> = {
 	'controls.studioMode': 'Mode Studio',
 	'controls.settings': 'Paramètres',
 	'controls.recording': 'Enregistrement',
-	'controls.recordingHint':
-		'Choisissez Local, Cloud ou Les deux dans Paramètres → Sortie. L’enregistrement démarre et s’arrête avec la diffusion.',
+	'controls.youtubePreparing': 'Préparation',
+	'controls.startingRecording': 'Démarrage de l’enregistrement…',
+	'controls.savingRecording': 'Sauvegarde de l’enregistrement…',
+	'controls.broadcastRecording': 'Enregistrement de la diffusion en cours',
+	'controls.startRecording': 'Démarrer l’enregistrement',
+	'controls.stopRecording': 'Arrêter l’enregistrement',
+	'controls.recordingHint': 'Choisissez Local, Cloud ou Les deux dans Paramètres → Sortie.',
 
 	// ── Stream health ───────────────────────────────────────────
 	'health.title': 'État de la diffusion',
@@ -286,17 +298,18 @@ const fr: Record<keyof typeof en, string> = {
 	'status.shortcutsStudio': 'Espace = ligne suivante · 1-9 = scène · Entrée = transition',
 
 	// ── Lyrics ──────────────────────────────────────────────────
+	'lyrics.upNext': 'À suivre',
 	'lyrics.onAir': 'À l’antenne',
 	'lyrics.shown': 'Affiché',
 	'lyrics.hidden': 'Masqué',
-	'lyrics.toggleHint': 'Affiche ou masque toutes les sources Paroles d’un coup',
+	'lyrics.toggleHint': 'Affiche ou masque toutes les sources Sous-titres d’un coup',
 	'lyrics.open': 'Ouvrir .srt / .txt',
-	'lyrics.paste': 'Coller des paroles',
+	'lyrics.paste': 'Coller des sous-titres',
 	'lyrics.exportSrt': 'Exporter .srt',
 	'lyrics.exportHint': 'Écrit les minutages que vous avez tapés',
 	'lyrics.pastePlaceholder': 'Une ligne par écran…',
 	'lyrics.load': 'Charger',
-	'lyrics.emptyList': 'Aucune parole chargée',
+	'lyrics.emptyList': 'Aucun sous-titre chargé',
 	'lyrics.loadedCues': '{count} répliques chargées',
 	'lyrics.loadedLines': '{count} lignes chargées',
 	'lyrics.unreadableSrt': 'Aucune réplique lisible dans ce .srt',
@@ -304,7 +317,7 @@ const fr: Record<keyof typeof en, string> = {
 	'lyrics.nothingToLoad': 'Rien à charger',
 	'lyrics.noTimings': 'Aucune ligne minutée pour l’instant',
 	'lyrics.hintTimed':
-		'Chargez un .srt minuté, ou collez des paroles pour les faire défiler à la main.',
+		'Chargez un .srt minuté, ou collez des sous-titres pour les faire défiler à la main.',
 	'lyrics.start': 'Démarrer — la 1re réplique commence maintenant',
 	'lyrics.startHint':
 		'Appuyez au moment exact où la première phrase est prononcée. Sinon, cliquez la réplique en cours dans la liste ci-dessous.',
@@ -320,7 +333,8 @@ const fr: Record<keyof typeof en, string> = {
 	'lyrics.cueHintTimed': 'Cette réplique est dite maintenant',
 	'lyrics.cueHintManual': 'Afficher cette ligne',
 	'lyrics.pastedName': 'Collé',
-	'lyrics.starterLayer': 'Paroles',
+	'lyrics.starterLayer': 'Sous-titres',
+	'lyrics.referenceSetupNeeded': 'Configuration requise',
 	'lyrics.referenceTitle': 'Synchronisation automatique du sermon',
 	'lyrics.referenceAudio': 'Choisir l’audio de référence',
 	'lyrics.referenceMissing': 'Chargez le MP3 préparé du sermon et son fichier .srt français.',
@@ -346,7 +360,14 @@ const fr: Record<keyof typeof en, string> = {
 	'media.back': 'Dix secondes en arri\u00e8re',
 	'media.forward': 'Dix secondes en avant',
 	'media.scrub': 'Position dans l\u2019enregistrement',
-	'media.followShort': 'Paroles',
+	'media.followShort': 'Synchroniser les sous-titres avec l’audio',
+	'media.captionsUnavailable':
+		'Chargez un fichier SRT pour synchroniser les sous-titres avec cette source.',
+	'props.mediaFile': 'Fichier média',
+	'props.noMediaFile': 'Aucun fichier sélectionné',
+	'props.replaceFile': 'Remplacer le fichier…',
+	'props.loadingFile': 'Chargement du fichier…',
+	'props.replaceAfterProgramme': 'Vous pourrez remplacer ce fichier après la fin du programme.',
 	'props.transportMoved':
 		'La lecture, la pause et le d\u00e9filement sont sur la barre sous l\u2019aper\u00e7u, \u00e0 port\u00e9e pendant le culte.',
 	'props.title': 'Propriétés de la source',
@@ -355,16 +376,16 @@ const fr: Record<keyof typeof en, string> = {
 	'props.defaultCamera': 'Caméra par défaut',
 	'props.color': 'Couleur',
 	'props.text': 'Texte',
-	'props.showNextLine': 'Afficher aussi la ligne suivante',
+	'props.showNextLine': 'Afficher la ligne suivante en mode manuel',
 	'props.hideCursor': 'Masquer le pointeur de la souris',
 	'props.hideCursorUnsupported':
 		'Ce syst\u00e8me dessine le pointeur dans la fen\u00eatre partag\u00e9e avant que nous la recevions : l\u2019option reste sans effet ici. Elle est conserv\u00e9e pour les machines qui la respectent.',
 	'props.play': 'Lecture',
 	'props.pause': 'Pause',
 	'props.restart': 'Début',
-	'props.followLyrics': 'Les paroles suivent cet enregistrement',
+	'props.followLyrics': 'Les sous-titres suivent cet enregistrement',
 	'props.followLyricsHint':
-		'Le .srt suit la position de la piste : mettre en pause ou revenir en arri\u00e8re emm\u00e8ne les paroles avec.',
+		'Le .srt suit la position de la piste : mettre en pause ou revenir en arri\u00e8re emm\u00e8ne les sous-titres avec.',
 	'props.loop': 'Boucle',
 	'props.position': 'Position (% du cadre)',
 	'props.fullFrame': 'Plein cadre',
@@ -495,12 +516,12 @@ const fr: Record<keyof typeof en, string> = {
 	'help.safety':
 		'Le programme est ce que les spectateurs reçoivent. Vérifiez toujours le programme — pas seulement l’aperçu — avant de démarrer ou modifier une diffusion.',
 	'help.shortcuts': 'Raccourcis clavier',
-	'help.toggleLyricsPanel': 'Afficher ou masquer le panneau des paroles',
+	'help.toggleLyricsPanel': 'Afficher ou masquer le panneau des sous-titres',
 	'help.toggleBottomPanels': 'Afficher ou masquer les panneaux inférieurs',
 	'help.interfaceZoom': 'Agrandir, réduire ou revenir à la taille réelle',
 	'help.recordingsFolder': 'Ouvrir le dossier des enregistrements locaux',
 	'help.shortcutsIntro':
-		'Les raccourcis des scènes et paroles sont ignorés pendant la saisie. Ceux des menus restent disponibles.',
+		'Les raccourcis des scènes et sous-titres sont ignorés pendant la saisie. Ceux des menus restent disponibles.',
 	'help.nextSubtitle': 'Sous-titre manuel suivant',
 	'help.previousSubtitle': 'Sous-titre manuel précédent',
 	'help.selectScene': 'Choisir une scène selon sa position',
@@ -520,7 +541,7 @@ const fr: Record<keyof typeof en, string> = {
 		'Vérifiez que la source est connectée dans le Mélangeur audio, que son vumètre réagit et qu’elle n’est pas coupée. Contrôlez les autorisations du microphone ou d’enregistrement d’écran du système si une source manque.',
 	'help.subtitleProblem': 'Les sous-titres manquent ou sont décalés',
 	'help.subtitleSolution':
-		'Vérifiez que Paroles est affiché, que la bonne session publique est active et que le MP3 de référence et son SRT français sont chargés. La synchronisation automatique a aussi besoin du son de la source capturée ; utilisez « Le sermon commence maintenant » uniquement en secours.',
+		'Vérifiez que Sous-titres est affiché, que la bonne session publique est active et que le MP3 de référence et son SRT français sont chargés. La synchronisation automatique a aussi besoin du son de la source capturée ; utilisez « Le sermon commence maintenant » uniquement en secours.',
 	'help.captureProblem': 'Une fenêtre YouTube capturée est mal cadrée',
 	'help.captureSolution':
 		'Utilisez Capture de fenêtre, gardez la vidéo visible dans le navigateur, puis recadrez ou redimensionnez la source dans l’aperçu. Envoyez-la au programme seulement lorsque le résultat est propre.',
@@ -584,7 +605,7 @@ const fr: Record<keyof typeof en, string> = {
 
 	// ── Splitters ───────────────────────────────────────────────
 	'splitter.docks': 'Hauteur des panneaux',
-	'splitter.lyrics': 'Largeur du panneau Paroles',
+	'splitter.lyrics': 'Largeur du panneau Sous-titres',
 	'splitter.between': 'Largeur de {name}'
 };
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getLiveTimeline } from './liveTimeline';
+import { getLiveTimeline, liveSubtitlePosition } from './liveTimeline';
 
 describe('live timeline', () => {
 	const live = { start: 0, end: 300, position: 280, syncPosition: 282, playing: true };
@@ -51,4 +51,41 @@ describe('live timeline', () => {
 		expect(getLiveTimeline({ start: 0, end: 0, position: 0, playing: false }).fill).toBe(0);
 		expect(getLiveTimeline({ start: 100, end: 105, position: 0, playing: false }).edge).toBe(100);
 	});
+});
+
+it('uses the historical audio segment without inheriting the latest pause', () => {
+	const playing = {
+		fromEpochMs: 1000,
+		toEpochMs: 8000,
+		anchorEpochMs: 1000,
+		url: 'earlier.srt',
+		offsetMs: 0,
+		pausedPositionMs: null
+	};
+	const paused = {
+		fromEpochMs: 8000,
+		toEpochMs: null,
+		anchorEpochMs: 7000,
+		url: 'later.srt',
+		offsetMs: 0,
+		pausedPositionMs: 1000
+	};
+	const subtitles = { ...paused, timeline: [playing, paused] };
+	expect(liveSubtitlePosition(subtitles, 5000)).toEqual({
+		url: 'earlier.srt',
+		anchored: true,
+		timeSec: 4
+	});
+	expect(liveSubtitlePosition(subtitles, 8500)).toEqual({
+		url: 'later.srt',
+		anchored: true,
+		timeSec: 1
+	});
+	expect(liveSubtitlePosition(subtitles, 500).timeSec).toBeNull();
+	expect(liveSubtitlePosition(subtitles, 8500, 3200)).toEqual({
+		url: 'earlier.srt',
+		anchored: true,
+		timeSec: 4.3
+	});
+	expect(liveSubtitlePosition(subtitles, 7500, -1000).timeSec).toBe(1);
 });

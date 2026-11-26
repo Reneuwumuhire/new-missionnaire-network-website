@@ -3,6 +3,8 @@
 	import { release } from '../lib/media.svelte';
 	import Dock from './Dock.svelte';
 	import Icon from './Icon.svelte';
+	import { createListReorder } from '../lib/list-reorder.svelte';
+	import { dropIndex } from '../lib/layout';
 	import { t } from '../lib/i18n.svelte';
 	import { id, makeLayer, onAirSceneId, persist, studio } from '../lib/state.svelte';
 
@@ -25,19 +27,29 @@
 		studio.scenes = studio.scenes.filter((s) => s.id !== sceneId);
 		if (studio.activeSceneId === sceneId) selectScene(studio.scenes[0].id);
 		// A deleted scene must never stay on air.
-		if (onAirSceneId() === sceneId) takeToProgram(studio.scenes[0].id, 0);
+		if (onAirSceneId() === sceneId)
+			takeToProgram(studio.scenes[0].id, 0, undefined, 'cut', { preserveBlack: true });
 		persist();
 	}
 
 	function move(sceneId: string, delta: number) {
 		const from = studio.scenes.findIndex((s) => s.id === sceneId);
 		const to = from + delta;
-		if (to < 0 || to >= studio.scenes.length) return;
+		if (from < 0 || from === to || to < 0 || to >= studio.scenes.length) return;
 		const next = [...studio.scenes];
 		const [moved] = next.splice(from, 1);
 		next.splice(to, 0, moved);
 		studio.scenes = next;
 		persist();
+	}
+
+	const sceneReorder = createListReorder();
+
+	function startSceneDrag(event: PointerEvent, sceneId: string) {
+		sceneReorder.start(event, (insertion) => {
+			const from = studio.scenes.findIndex((scene) => scene.id === sceneId);
+			if (from >= 0) move(sceneId, dropIndex(from, insertion) - from);
+		});
 	}
 
 	const selectedIndex = $derived(studio.scenes.findIndex((s) => s.id === studio.activeSceneId));
@@ -46,7 +58,22 @@
 <Dock id="scenes" title={t('dock.scenes')}>
 	<ul>
 		{#each studio.scenes as scene, index (scene.id)}
-			<li class="group flex items-center">
+			<li
+				class="group relative flex items-center"
+				onpointerdown={(event) => startSceneDrag(event, scene.id)}
+				onpointermove={sceneReorder.move}
+				onpointerup={sceneReorder.finish}
+				onlostpointercapture={sceneReorder.cancel}
+			>
+				{#if sceneReorder.insertion === index || (index === studio.scenes.length - 1 && sceneReorder.insertion === index + 1)}
+					<span
+						aria-hidden="true"
+						class="pointer-events-none absolute inset-x-0 z-10 h-0.5 bg-accent {sceneReorder.insertion ===
+						index
+							? 'top-0'
+							: 'bottom-0'}"
+					></span>
+				{/if}
 				{#if renamingId === scene.id}
 					<!-- svelte-ignore a11y_autofocus -->
 					<input
@@ -65,12 +92,17 @@
 					/>
 				{:else}
 					<button
-						class="flex min-w-0 flex-1 items-center gap-2 px-3 py-1.5 text-left text-[13px] transition-colors {scene.id ===
+						class="flex min-w-0 flex-1 touch-none cursor-grab items-center gap-2 px-3 py-1.5 active:cursor-grabbing text-left text-[13px] transition-colors {scene.id ===
 						studio.activeSceneId
 							? 'bg-primary font-medium text-black'
 							: 'text-fg/70 hover:bg-fg/5'}"
-						onclick={() => selectScene(scene.id)}
-						ondblclick={() => (renamingId = scene.id)}
+						data-reorder-grip
+						onclick={(event) => {
+							if (!sceneReorder.wasDrag(event)) selectScene(scene.id);
+						}}
+						ondblclick={(event) => {
+							if (!sceneReorder.wasDrag(event)) renamingId = scene.id;
+						}}
 					>
 						<span
 							class="w-3 shrink-0 font-mono text-[12px] {scene.id === studio.activeSceneId

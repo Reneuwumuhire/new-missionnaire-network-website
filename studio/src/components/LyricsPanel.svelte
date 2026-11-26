@@ -12,7 +12,6 @@
 		onAirLines,
 		timedPositionMs
 	} from '../lib/lyrics.svelte';
-	import { findCueIndex } from '../lib/srt';
 	import { t } from '../lib/i18n.svelte';
 	import { hideLiveLyrics, prepareLiveSubtitles, syncLiveLyrics } from '../lib/live-session.svelte';
 	import { referenceSourceLayer } from '../lib/state.svelte';
@@ -37,15 +36,9 @@
 		return () => clearInterval(timer);
 	});
 
-	const live = $derived(onAirLines(now));
-	const positionMs = $derived(timedPositionMs(now));
-	const activeIndex = $derived(
-		lyrics.mode === 'timed'
-			? positionMs === null
-				? -1
-				: findCueIndex(lyrics.cues, positionMs)
-			: lyrics.index
-	);
+	const live = $derived(onAirLines(now, true));
+	const positionMs = $derived(timedPositionMs(now, true));
+	const activeIndex = $derived(live.index);
 
 	$effect(() => {
 		const source = referenceSourceLayer();
@@ -116,7 +109,7 @@
 		const url = URL.createObjectURL(new Blob([srt], { type: 'text/plain;charset=utf-8' }));
 		const a = document.createElement('a');
 		a.href = url;
-		a.download = `${(lyrics.fileName || 'lyrics').replace(/\.[^.]+$/, '')}.srt`;
+		a.download = `${(lyrics.fileName || 'subtitles').replace(/\.[^.]+$/, '')}.srt`;
 		a.click();
 		URL.revokeObjectURL(url);
 	}
@@ -181,9 +174,18 @@
 				{lyrics.onAir ? t('lyrics.shown') : t('lyrics.hidden')}
 			</button>
 		</div>
-		<p class="mt-2 min-h-[2.5rem] text-lg leading-snug text-fg">{live.current || '—'}</p>
+		<p
+			class="mt-2 min-h-[2.5rem] whitespace-pre-wrap text-lg font-semibold leading-snug {live.current
+				? 'border-l-2 border-primary bg-primary/10 px-2 py-1 text-fg'
+				: 'text-muted'}"
+		>
+			{live.current || '—'}
+		</p>
 		{#if live.next}
-			<p class="truncate text-sm text-muted">{live.next}</p>
+			<p class="mt-2 truncate text-[12px] text-muted">
+				<span class="mr-1 font-semibold">{t('lyrics.upNext')}</span>
+				{live.next}
+			</p>
 		{/if}
 	</div>
 
@@ -222,54 +224,70 @@
 	{/if}
 
 	{#if lyrics.mode === 'timed'}
-		<div class="border-b border-ink-700 px-3 py-2.5">
-			<div class="flex items-center justify-between gap-2">
-				<span class="text-[12px] font-semibold uppercase tracking-[0.12em] text-muted">
-					{t('lyrics.referenceTitle')}
+		<details class="border-b border-ink-700">
+			<summary class="cursor-pointer px-3 py-2 text-[12px] text-muted hover:bg-fg/5">
+				<span class="inline-flex max-w-[calc(100%-1.5rem)] align-middle items-center gap-2">
+					<span class="min-w-0 truncate font-semibold text-fg/85" title={t('lyrics.referenceTitle')}
+						>{t('lyrics.referenceTitle')}</span
+					>
+					<span
+						class="max-w-[48%] shrink-0 truncate {referenceMatcher.status === 'error'
+							? 'text-danger'
+							: 'text-muted'}"
+						title={referenceStatus}
+					>
+						{referenceMatcher.status === 'idle'
+							? t('lyrics.referenceSetupNeeded')
+							: referenceStatus}
+					</span>
 				</span>
+			</summary>
+			<div class="border-t border-ink-700 px-3 py-2">
 				{#if referenceMatcher.fileName}
-					<span class="min-w-0 truncate text-[12px] text-muted">{referenceMatcher.fileName}</span>
+					<p class="mb-1 truncate text-[12px] text-muted" title={referenceMatcher.fileName}>
+						{referenceMatcher.fileName}
+					</p>
 				{/if}
-			</div>
-			<p
-				class="mt-1.5 text-[12px] leading-relaxed {referenceMatcher.status === 'error'
-					? 'text-danger'
-					: 'text-muted'}"
-			>
-				{referenceStatus}
-			</p>
-			{#if !referenceMatcher.fileName}
-				<p class="mt-1 text-[12px] text-muted">{t('lyrics.referenceMissing')}</p>
-			{:else if !referenceMatcher.sourceId}
-				<p class="mt-1 text-[12px] text-muted">{t('lyrics.referenceSourceMissing')}</p>
-			{/if}
-			<div class="mt-2 flex flex-wrap gap-1.5">
-				<button
-					class="studio-chip"
-					onclick={chooseReferenceAudio}
-					disabled={referenceMatcher.status === 'loading'}
+				<p
+					class="text-[12px] leading-relaxed {referenceMatcher.status === 'error'
+						? 'text-danger'
+						: 'text-muted'}"
 				>
-					{t('lyrics.referenceAudio')}
-				</button>
-				{#if referenceMatcher.enabled}
-					<button class="studio-chip" onclick={hideReferenceSubtitles}
-						>{t('lyrics.referenceHide')}</button
-					>
-				{:else if referenceMatcher.fileName}
-					<button class="studio-chip" onclick={resumeReferenceMatching}
-						>{t('lyrics.referenceResume')}</button
-					>
+					{referenceStatus}
+				</p>
+				{#if !referenceMatcher.fileName}
+					<p class="mt-1 text-[12px] text-muted">{t('lyrics.referenceMissing')}</p>
+				{:else if !referenceMatcher.sourceId}
+					<p class="mt-1 text-[12px] text-muted">{t('lyrics.referenceSourceMissing')}</p>
 				{/if}
-				<button
-					class="studio-chip ml-auto"
-					title={t('lyrics.referenceFallbackHint')}
-					disabled={lyrics.cues.length === 0}
-					onclick={sermonBeginsNow}
-				>
-					{t('lyrics.referenceFallback')}
-				</button>
+				<div class="mt-2 flex flex-wrap gap-1.5">
+					<button
+						class="studio-chip"
+						onclick={chooseReferenceAudio}
+						disabled={referenceMatcher.status === 'loading'}
+					>
+						{t('lyrics.referenceAudio')}
+					</button>
+					{#if referenceMatcher.enabled}
+						<button class="studio-chip" onclick={hideReferenceSubtitles}
+							>{t('lyrics.referenceHide')}</button
+						>
+					{:else if referenceMatcher.fileName}
+						<button class="studio-chip" onclick={resumeReferenceMatching}
+							>{t('lyrics.referenceResume')}</button
+						>
+					{/if}
+					<button
+						class="studio-chip ml-auto"
+						title={t('lyrics.referenceFallbackHint')}
+						disabled={lyrics.cues.length === 0}
+						onclick={sermonBeginsNow}
+					>
+						{t('lyrics.referenceFallback')}
+					</button>
+				</div>
 			</div>
-		</div>
+		</details>
 	{/if}
 
 	<!-- ── Transport ──────────────────────────────────────── -->
@@ -326,17 +344,21 @@
 		{#each rows as row (row.index)}
 			<button
 				data-index={row.index}
+				aria-current={row.index === activeIndex ? 'true' : undefined}
 				class="flex w-full items-start gap-3 border-b border-ink-800 px-3 py-2 text-left transition-colors hover:bg-primary/10 {row.index ===
 				activeIndex
-					? 'bg-primary/15'
+					? 'border-l-2 border-l-primary bg-primary/15'
 					: ''}"
 				onclick={() =>
 					lyrics.mode === 'timed' ? startTimed(lyrics.cues[row.index].startMs) : goTo(row.index)}
 				title={lyrics.mode === 'timed' ? t('lyrics.cueHintTimed') : t('lyrics.cueHintManual')}
 			>
 				<span class="w-12 shrink-0 pt-0.5 font-mono text-[12px] text-muted">{row.time}</span>
-				<span class="min-w-0 flex-1 whitespace-pre-wrap text-[13px] leading-snug text-fg/75"
-					>{row.text}</span
+				<span
+					class="min-w-0 flex-1 whitespace-pre-wrap text-[13px] leading-snug {row.index ===
+					activeIndex
+						? 'font-semibold text-fg'
+						: 'text-fg/75'}">{row.text}</span
 				>
 			</button>
 		{:else}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ResumeToast from '$lib/components/+resumeToast.svelte';
 	import { t, locale } from '../i18n';
 	import '../app.css';
 	import { browser } from '$app/environment';
@@ -147,6 +148,8 @@
 	<meta name="google-site-verification" content="5KUjbDomG7hhFBwtEU79pKDetc2q3I2qhEE_0BO4o_o" />
 </svelte:head>
 
+<ResumeToast />
+
 <main class="homepage relative overflow-hidden">
 	<!-- Grain overlay -->
 	<div
@@ -219,6 +222,26 @@
 					{$t('home.exploreSermons')}
 				</a>
 			</div>
+
+			<form
+				action="/recherche"
+				method="GET"
+				class="mx-auto mt-4 flex max-w-xl border border-stone-300 bg-white/60 text-left font-body"
+			>
+				<input
+					name="q"
+					required
+					minlength="2"
+					maxlength="500"
+					type="search"
+					aria-label={$t('search.library')}
+					placeholder={$t('search.library')}
+					class="min-w-0 flex-1 bg-transparent px-4 py-2 text-sm"
+				/>
+				<button class="px-4 py-2 text-sm font-semibold text-earth-dark"
+					>{$t('search.library')}</button
+				>
+			</form>
 
 			<!-- Animated Bible verse below buttons -->
 			<div class="hero-verse mt-8 md:mt-12 max-w-xl mx-auto">

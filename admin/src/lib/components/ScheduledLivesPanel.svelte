@@ -721,7 +721,10 @@
 				toast.error((await res.text()) || $t('recordings.error.http', { status: res.status }));
 				return;
 			}
-			const data = (await res.json().catch(() => ({}))) as { alreadyOffline?: boolean };
+			const data = (await res.json().catch(() => ({}))) as {
+				alreadyOffline?: boolean;
+				recordingError?: string | null;
+			};
 			// Gate already offline → this entry was stranded on 'live'; end-live left
 			// it untouched, so force-reconcile just this entry.
 			if (data.alreadyOffline) {
@@ -733,7 +736,11 @@
 					return;
 				}
 			}
-			toast.success($t('recordings.scheduled.toast.ended'));
+			if (data.recordingError) {
+				toast.error($t('recordings.error.stopRecording', { detail: data.recordingError }));
+			} else {
+				toast.success($t('recordings.scheduled.toast.ended'));
+			}
 			await invalidateAll();
 		} finally {
 			busyId = null;

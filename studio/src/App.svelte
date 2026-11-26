@@ -7,7 +7,7 @@
 	import HelpPanel, { type HelpSection } from './components/HelpPanel.svelte';
 	import Icon from './components/Icon.svelte';
 	import LyricsPanel from './components/LyricsPanel.svelte';
-	import LyricsRibbon from './components/LyricsRibbon.svelte';
+	import StudioClocks from './components/StudioClocks.svelte';
 	import LiveSessionDialog from './components/LiveSessionDialog.svelte';
 	import NewSessionDialog from './components/NewSessionDialog.svelte';
 	import MediaBar from './components/MediaBar.svelte';
@@ -28,9 +28,11 @@
 	import { restoreSavedSources } from './lib/source-restore';
 	import {
 		broadcast,
+		checkPublicBroadcastEnd,
 		isStreaming,
 		startBroadcast,
 		stopBroadcast,
+		toggleManualRecording,
 		uptimeLabel
 	} from './lib/broadcast.svelte';
 	import {
@@ -245,6 +247,7 @@
 		}, 1000);
 		void heartbeatStudio();
 		const heartbeat = setInterval(() => void heartbeatStudio(), 60_000);
+		const publicEndCheck = setInterval(() => void checkPublicBroadcastEnd(), 5_000);
 		if (liveSession.pairingCode) void refreshSessions();
 		return () => {
 			stopMenuListener?.();
@@ -252,6 +255,7 @@
 			stopCloseListener?.();
 			clearInterval(clock);
 			clearInterval(heartbeat);
+			clearInterval(publicEndCheck);
 			window.removeEventListener('focus', checkWhenVisible);
 			window.removeEventListener('online', checkWhenVisible);
 			document.removeEventListener('visibilitychange', checkWhenVisible);
@@ -550,7 +554,10 @@
 	const QUICK: { type: TransitionType; label: () => string }[] = [
 		{ type: 'cut', label: () => t('transitions.cut') },
 		{ type: 'fade', label: () => t('transitions.fade') },
-		{ type: 'fadeToBlack', label: () => t('transitions.fadeToBlack') }
+		{
+			type: 'fadeToBlack',
+			label: () => t(studio.programBlack ? 'transitions.fadeFromBlack' : 'transitions.fadeToBlack')
+		}
 	];
 
 	// ── Panel resizing ────────────────────────────────────
@@ -558,12 +565,16 @@
 	let previewRow = $state<HTMLDivElement | null>(null);
 	let transitionHeight = $state(190);
 	const layout = $derived(studio.settings.layout);
+	let windowWidth = $state(0);
+	const rightColumnWidth = $derived(
+		windowWidth ? clamp(layout.lyricsWidth, 240, windowWidth - 560) : layout.lyricsWidth
+	);
 
 	/** Dragging down grows the preview, so the dock row loses that much. Capped
 	 *  so neither the docks nor the preview can be squeezed out of existence. */
 	function resizeDockRow(delta: number) {
 		const current = dockRow?.clientHeight ?? layout.dockHeight;
-		const minimum = studio.settings.studioMode ? transitionHeight + 20 : 180;
+		const minimum = studio.settings.studioMode ? transitionHeight + 44 : 180;
 		layout.dockHeight = clamp(
 			current - delta,
 			140,
@@ -573,13 +584,20 @@
 	}
 
 	function resizeLyrics(delta: number) {
-		layout.lyricsWidth = clamp(layout.lyricsWidth - delta, 240, window.innerWidth - 560);
+		layout.lyricsWidth = clamp(rightColumnWidth - delta, 240, windowWidth - 560);
 		persist();
 	}
 
 	function resizeDocks(left: DockId, right: DockId, delta: number) {
-		const total = Object.values(layout.weights).reduce((sum, w) => sum + w, 0);
-		const pxPerWeight = (dockRow?.clientWidth ?? 0) / total;
+		const total =
+			Object.values(layout.weights).reduce((sum, w) => sum + w, 0) -
+			(studio.settings.studioMode ? layout.weights.transition : 0) -
+			(layout.lyricsVisible ? layout.weights.controls : 0);
+		const flexibleWidth =
+			(dockRow?.clientWidth ?? 0) -
+			(layout.lyricsVisible ? rightColumnWidth : 0) -
+			(studio.settings.studioMode ? 3 : 4);
+		const pxPerWeight = flexibleWidth / total;
 		const [a, b] = splitWeights(layout.weights[left], layout.weights[right], delta, pxPerWeight);
 		layout.weights[left] = a;
 		layout.weights[right] = b;
@@ -587,7 +605,7 @@
 	}
 </script>
 
-<svelte:window onkeydown={onKeydown} />
+<svelte:window onkeydown={onKeydown} bind:innerWidth={windowWidth} />
 
 <div class="flex h-full flex-col bg-ink-950 font-body text-fg/90">
 	<!-- ── Title bar ──────────────────────────────────────── -->
@@ -654,12 +672,16 @@
 	<!-- ── Preview + lyrics ───────────────────────────────── -->
 	<div class="flex min-h-[540px] flex-1">
 		<div class="flex min-h-0 min-w-0 flex-1 flex-col">
-			<LyricsRibbon />
-			<ServicePanel {mixer} bind:setupOpen={serviceSetupOpen} />
+			<div
+				class="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-ink-700 bg-ink-900 px-4 py-2.5"
+			>
+				<ServicePanel {mixer} bind:setupOpen={serviceSetupOpen} />
+				<StudioClocks />
+			</div>
 			<div
 				bind:this={previewRow}
-				class="flex flex-1 gap-4 bg-ink-950 px-4 pt-1.5"
-				style:min-height={studio.settings.studioMode ? `${transitionHeight + 20}px` : '180px'}
+				class="flex flex-1 gap-4 bg-ink-950 px-4 {studio.settings.studioMode ? 'py-2' : 'pt-1.5'}"
+				style:min-height={studio.settings.studioMode ? `${transitionHeight + 44}px` : '180px'}
 			>
 				{#if studio.settings.studioMode}
 					<Preview
@@ -670,39 +692,48 @@
 					/>
 					<div
 						bind:clientHeight={transitionHeight}
-						class="flex w-44 shrink-0 self-start flex-col gap-1.5 font-sans"
+						class="mt-7 w-44 shrink-0 self-center space-y-2 bg-ink-900 p-2"
 					>
 						<button
-							class="h-9 w-full shrink-0 text-[12px] font-medium leading-tight transition-colors {canTake
-								? 'bg-primary text-black hover:bg-missionnaire-400'
-								: 'border border-ink-600 text-muted'}"
+							class="studio-btn-primary min-h-9 w-full px-2.5 text-center tracking-normal"
+							aria-keyshortcuts="Enter"
 							disabled={!canTake}
 							title={t('preview.transitionHint')}
 							onclick={() => takeToProgram(studio.activeSceneId)}
 						>
 							{t('preview.transition')}
 						</button>
-						<!-- OBS's Quick Transitions: take with a specific transition
-						     without disturbing the configured default. -->
-						<span class="shrink-0 whitespace-nowrap text-[12px] text-muted">
-							{t('transitions.quick')}
-						</span>
-						{#each QUICK as quick (quick.type)}
-							<button
-								class="studio-chip h-9 w-full shrink-0 justify-center px-2 py-0 text-[12px] disabled:opacity-30"
-								disabled={!canTake}
-								onclick={() =>
-									takeToProgram(
-										studio.activeSceneId,
-										quick.type === 'cut' ? 0 : studio.settings.transitionMs,
-										undefined,
-										quick.type
-									)}
-								>{quick.label()}{quick.type === 'cut'
-									? ''
-									: ` (${studio.settings.transitionMs}ms)`}</button
-							>
-						{/each}
+						<div class="border-t border-ink-700 pt-2">
+							<p class="mb-1.5 text-[12px] font-medium text-muted">
+								{t('transitions.quick')}
+							</p>
+							<div class="space-y-1">
+								{#each QUICK as quick (quick.type)}
+									<button
+										class="studio-chip flex min-h-8 w-full items-center justify-between gap-2 py-1 text-left {quick.type ===
+											'fadeToBlack' && studio.programBlack
+											? 'border-primary/60 bg-primary/15 text-accent'
+											: ''}"
+										disabled={!canTake && quick.type !== 'fadeToBlack'}
+										aria-pressed={quick.type === 'fadeToBlack' ? studio.programBlack : undefined}
+										onclick={() =>
+											takeToProgram(
+												studio.activeSceneId,
+												quick.type === 'cut' ? 0 : studio.settings.transitionMs,
+												undefined,
+												quick.type
+											)}
+									>
+										<span>{quick.label()}</span>
+										{#if quick.type === 'fadeToBlack' && studio.programBlack}
+											<span class="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden="true"
+											></span>
+										{/if}
+									</button>
+								{/each}
+							</div>
+						</div>
+						<TransitionsDock embedded />
 					</div>
 				{/if}
 				<Preview
@@ -747,7 +778,7 @@
 
 		<aside
 			class="flex shrink-0 flex-col bg-ink-900"
-			style="width: {layout.lyricsWidth}px"
+			style:width={`${rightColumnWidth}px`}
 			style:display={layout.lyricsVisible ? undefined : 'none'}
 		>
 			<div class="flex h-8 shrink-0 items-center border-b border-ink-700 bg-ink-850 px-3">
@@ -783,21 +814,38 @@
 			onmove={(d) => resizeDocks('sources', 'mixer', d)}
 		/>
 		<MixerDock {mixer} />
-		<Splitter
-			orientation="vertical"
-			label={t('splitter.between', { name: t('dock.audioMixer') })}
-			onmove={(d) => resizeDocks('mixer', 'transition', d)}
-		/>
-		<TransitionsDock />
-		<Splitter
-			orientation="vertical"
-			label={t('splitter.between', { name: t('dock.sceneTransitions') })}
-			onmove={(d) => resizeDocks('transition', 'controls', d)}
-		/>
+		{#if studio.settings.studioMode}
+			<Splitter
+				orientation="vertical"
+				label={t('splitter.between', { name: t('dock.audioMixer') })}
+				onmove={layout.lyricsVisible ? resizeLyrics : (d) => resizeDocks('mixer', 'controls', d)}
+			/>
+		{:else}
+			<Splitter
+				orientation="vertical"
+				label={t('splitter.between', { name: t('dock.audioMixer') })}
+				onmove={(d) => resizeDocks('mixer', 'transition', d)}
+			/>
+			<TransitionsDock />
+			<Splitter
+				orientation="vertical"
+				label={t('splitter.between', { name: t('dock.sceneTransitions') })}
+				onmove={layout.lyricsVisible
+					? resizeLyrics
+					: (d) => resizeDocks('transition', 'controls', d)}
+			/>
+		{/if}
 		<ControlsDock
+			width={layout.lyricsVisible ? rightColumnWidth : undefined}
 			{confirmStop}
 			onToggleLive={toggleLive}
 			onSettings={() => openSettings()}
+			onRecordingSettings={() => openSettings('output')}
+			onRecord={async () => {
+				if (!programCanvas) return;
+				await mixer?.resume();
+				await toggleManualRecording(programCanvas, mixer?.audioTrack);
+			}}
 			onSelectSession={() => (dialog = 'live-session')}
 			{renderMissed}
 		/>
@@ -879,7 +927,7 @@
 
 {#if dialog === 'properties'}
 	<Modal title={t('props.title')} onclose={() => (dialog = null)}>
-		<PropertiesPanel />
+		<PropertiesPanel onreplaced={() => (dialog = null)} />
 	</Modal>
 {:else if dialog === 'settings'}
 	<Modal title={t('settings.title')} onclose={() => (dialog = null)}>

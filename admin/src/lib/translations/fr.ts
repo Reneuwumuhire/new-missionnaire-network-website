@@ -214,6 +214,12 @@ export default {
 	'dashboard.noUpcoming': 'Aucun direct programmé.',
 	'dashboard.manageSchedule': 'Gérer le programme',
 	'dashboard.prepareService': 'Ouvrir la préparation du culte',
+	'dashboard.replayRecording': 'Enregistrement',
+	'dashboard.replayLanguage': 'Langue audio',
+	'dashboard.replayCaptions': 'Sous-titres',
+	'dashboard.replayTranscript': 'Transcription',
+	'dashboard.chooseReplay': 'Choisir une rediffusion prête',
+	'dashboard.attachReplay': 'Associer la rediffusion',
 	'dashboard.reviewReplay': 'Vérifier la rediffusion non publiée',
 	'dashboard.allRecordings': 'Voir tous les enregistrements',
 	'dashboard.overview': 'La bibliothèque en chiffres',
@@ -1308,7 +1314,8 @@ export default {
 	'recordings.notifications.liveStartLabel': 'Notifier les abonnés au démarrage de ce direct',
 	'recordings.notifications.liveStartHint':
 		'Facultatif · actuellement {count} abonnés aux notifications. Laissez décoché pour démarrer silencieusement.',
-	'recordings.confirm.endLive.message': 'Le site public ne montrera plus le lecteur en direct.',
+	'recordings.confirm.endLive.message':
+		'Le direct se terminera et tout enregistrement en cours sera sauvegardé.',
 	'recordings.confirm.stopRecording.message': "Arrêter l'enregistrement en cours ?",
 	'recordings.confirm.stopAll.message': "Terminer le direct ET arrêter l'enregistrement en cours ?",
 	'recordings.confirm.startAll.message': "Aller en direct ET démarrer l'enregistrement.",
@@ -1506,7 +1513,7 @@ export default {
 	'recordings.scheduled.confirm.deleteMessage':
 		'« {title} » sera supprimé définitivement. Son lien de partage cessera de fonctionner.',
 	'recordings.scheduled.confirm.endMessage':
-		'« {title} » se terminera maintenant : le site public n’affichera plus le lecteur en direct et l’entrée passera dans l’historique.',
+		'« {title} » se terminera et passera dans l’historique. Tout enregistrement en cours sera sauvegardé.',
 	'recordings.scheduled.error.alreadyLive':
 		'Un direct est déjà en cours — terminez-le avant d’en démarrer un autre',
 	'recordings.scheduled.toast.createdLinkCopied': 'Direct programmé — lien de partage copié',

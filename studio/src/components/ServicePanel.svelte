@@ -265,34 +265,69 @@
 	});
 </script>
 
-<section
-	class="mx-4 mt-2 shrink-0 rounded-lg border border-ink-700 bg-ink-900/80 px-4 py-3"
-	aria-label="Service workflow"
->
-	<div class="flex flex-wrap items-center gap-3">
-		<div class="mr-auto">
-			<div class="flex items-center gap-2">
-				<span class="h-2 w-2 rounded-full {missing.length ? 'bg-amber-400' : 'bg-emerald-400'}"
-				></span>
-				<span class="text-xs font-semibold text-fg/90"
-					>{studio.service.type === 'prepared'
-						? 'Pre-recorded Kinyarwanda'
-						: 'Live from Krefeld'}</span
-				>
-				<span class="rounded bg-ink-700 px-2 py-0.5 text-[12px] text-muted"
-					>{phaseNames[studio.service.phase]}</span
-				>
-			</div>
-			<p class="mt-1 text-[12px] text-muted">
-				{studio.service.type === 'prepared'
-					? 'Opening music → Kinyarwanda sermon → Closing music'
-					: 'Krefeld programme with live Kinyarwanda interpretation'}
-			</p>
+<section class="min-w-0 flex-1 basis-[400px]" aria-label="Service workflow">
+	<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+		<div class="flex min-w-0 flex-wrap items-center gap-2">
+			<h2 class="text-[14px] font-semibold leading-tight text-fg">
+				{studio.service.type === 'prepared' ? 'Pre-recorded Kinyarwanda' : 'Live from Krefeld'}
+			</h2>
+			<span
+				class="rounded-full px-2 py-0.5 text-[12px] font-medium {studio.service.phase === 'ready' &&
+				missing.length
+					? 'bg-amber-400/10 text-warning'
+					: 'bg-ink-700 text-fg/80'}"
+			>
+				{studio.service.phase === 'ready' && missing.length
+					? 'Setup needed'
+					: phaseNames[studio.service.phase]}
+			</span>
 		</div>
-		<button class="studio-chip rounded px-3 py-2" onclick={() => (setupOpen = true)}
-			>{editable ? 'Set up service' : 'View setup'}</button
-		>
+		<div class="flex flex-wrap items-center gap-2">
+			<button
+				class="studio-chip min-h-8 px-3 {studio.service.phase === 'ready' && missing.length
+					? 'border-primary/60 bg-primary/10 text-accent'
+					: ''}"
+				onclick={() => (setupOpen = true)}>{editable ? 'Set up service' : 'View setup'}</button
+			>
+			{#if studio.service.type === 'prepared'}
+				<button
+					class="studio-btn-primary min-h-8 px-3 text-[12px] disabled:opacity-35"
+					disabled={serviceRuntime.busy || studio.service.phase !== 'ready' || missing.length > 0}
+					onclick={() => void startPreparedProgramme()}>Start programme</button
+				>
+			{:else if studio.service.phase === 'ready'}
+				<button
+					class="studio-btn-primary min-h-8 px-3 text-[12px] disabled:opacity-35"
+					disabled={missing.length > 0 || serviceRuntime.busy}
+					onclick={() => void takeKrefeldLive()}>Take Krefeld live</button
+				>
+			{:else if studio.service.phase === 'opening'}
+				<button
+					class="bg-primary px-3 py-2 text-[12px] font-semibold text-black"
+					disabled={serviceRuntime.busy}
+					onclick={() => void startLiveSermon(outputMs())}>Start sermon</button
+				>
+			{:else if studio.service.phase === 'sermon'}
+				<button
+					class="bg-red-700 px-3 py-2 text-[12px] font-semibold text-white"
+					disabled={serviceRuntime.busy}
+					onclick={() => void endLiveSermon(outputMs())}>End sermon</button
+				>
+			{:else}
+				<span class="max-w-56 text-[12px] text-muted"
+					>Sermon ended — recording {serviceRuntime.recordingStatus}; Krefeld continues</span
+				>
+			{/if}
+			{#if studio.service.phase !== 'ready'}<button class="studio-chip" onclick={resetService}
+					>Reset</button
+				>{/if}
+		</div>
 	</div>
+	{#if missing.length && studio.service.phase === 'ready'}
+		<p class="mt-2 text-[12px] leading-snug text-muted">
+			<span class="font-medium text-warning">Required</span> · {missing.join(' · ')}
+		</p>
+	{/if}
 	{#if setupOpen}
 		<Modal title="Service setup" onclose={() => (setupOpen = false)}>
 			<div class="space-y-5 p-5">
@@ -503,41 +538,6 @@
 		</Modal>
 	{/if}
 
-	<div class="mt-2 flex flex-wrap items-center justify-end gap-2">
-		{#if studio.service.type === 'prepared'}
-			<button
-				class="bg-primary px-3 py-2 text-[12px] font-semibold text-black disabled:opacity-35"
-				disabled={serviceRuntime.busy || studio.service.phase !== 'ready' || missing.length > 0}
-				onclick={() => void startPreparedProgramme()}>Start programme</button
-			>
-		{:else if studio.service.phase === 'ready'}
-			<button
-				class="studio-chip px-3 py-2"
-				disabled={missing.length > 0 || serviceRuntime.busy}
-				onclick={() => void takeKrefeldLive()}>Take Krefeld live</button
-			>
-		{:else if studio.service.phase === 'opening'}
-			<button
-				class="bg-primary px-3 py-2 text-[12px] font-semibold text-black"
-				disabled={serviceRuntime.busy}
-				onclick={() => void startLiveSermon(outputMs())}>Start sermon</button
-			>
-		{:else if studio.service.phase === 'sermon'}
-			<button
-				class="bg-red-700 px-3 py-2 text-[12px] font-semibold text-white"
-				disabled={serviceRuntime.busy}
-				onclick={() => void endLiveSermon(outputMs())}>End sermon</button
-			>
-		{:else}
-			<span class="max-w-56 text-[12px] text-muted"
-				>Sermon ended — recording {serviceRuntime.recordingStatus}; Krefeld continues</span
-			>
-		{/if}
-		{#if studio.service.phase !== 'ready'}<button class="studio-chip" onclick={resetService}
-				>Reset</button
-			>{/if}
-	</div>
-
 	{#if studio.service.type === 'live' && studio.service.phase === 'sermon'}
 		<div class="mt-2 flex items-center gap-2 text-[12px] text-muted">
 			<span
@@ -550,9 +550,14 @@
 			<button class="studio-chip" onclick={() => correctLiveTiming(250)}>+0.25s</button>
 		</div>
 	{/if}
-	{#if missing.length && studio.service.phase === 'ready'}<p class="mt-1 text-[12px] text-warning">
-			Required: {missing.join(', ')}
-		</p>{/if}
+	{#if liveSession.sessions.some((session) => session._id === liveSession.selectedId && session.is_test)}
+		<p class="mt-2 border-l-2 border-primary/50 pl-2 text-[12px] text-muted">
+			<span class="font-semibold text-fg/90">Private rehearsal.</span>
+			{studio.service.type === 'prepared'
+				? 'Play the opening, check captions over the sermon, then play the closing.'
+				: 'Listen to source audio in headphones, test the interpreter mic, check the caption clock, then verify the sermon marker.'}
+		</p>
+	{/if}
 	{#if serviceRuntime.error}<p class="mt-1 text-[12px] text-danger">{serviceRuntime.error}</p>{/if}
 	{#if serviceRuntime.recordingStatus === 'failed' && studio.service.phase === 'sermon'}
 		<button
@@ -563,9 +568,11 @@
 	{#if serviceRuntime.recordingStatus === 'saved' && recording.savedId}
 		<a
 			class="ml-2 text-[12px] text-accent underline"
-			href={`${studio.settings.adminSiteUrl}/recordings`}
+			href={recording.serviceId
+				? `${studio.settings.adminSiteUrl}/recordings?service=${encodeURIComponent(recording.serviceId)}#service-details`
+				: `${studio.settings.adminSiteUrl}/recordings?recording=${encodeURIComponent(recording.savedId)}#recording-library`}
 			target="_blank"
-			rel="noreferrer">Open saved recording</a
+			rel="noreferrer">{recording.serviceId ? 'Open service in Admin' : 'Open saved recording'}</a
 		>
 	{/if}
 	{#if headphoneError}<p class="mt-1 text-[12px] text-danger">{headphoneError}</p>{/if}

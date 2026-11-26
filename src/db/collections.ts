@@ -1528,7 +1528,7 @@ export async function setScheduledLiveRecordingId(id: string, recordingId: strin
 		await db
 			.collection('scheduled_lives')
 			.updateOne(
-				{ _id: new ObjectId(id) },
+				{ _id: new ObjectId(id), recording_id: null },
 				{ $set: { recording_id: recordingId, updated_at: new Date().toISOString() } }
 			);
 	} catch (e) {
