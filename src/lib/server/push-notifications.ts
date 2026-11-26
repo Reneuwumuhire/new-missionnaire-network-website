@@ -82,8 +82,8 @@ export async function sendPushToAll(payload: PushPayload): Promise<void> {
 	if (!ensureVapidConfigured()) return;
 
 	// Older records predate endpoint validation.
-	const subscriptions = (await getAllPushSubscriptions()).filter((sub) =>
-		pushEndpoint.safeParse(sub.endpoint).success
+	const subscriptions = (await getAllPushSubscriptions()).filter(
+		(sub) => pushEndpoint.safeParse(sub.endpoint).success
 	);
 	if (subscriptions.length === 0) return;
 
@@ -185,12 +185,11 @@ export function radioEndPayload(opts?: { broadcastTitle?: string | null }): Push
 	};
 }
 
-// Broadcasts are announced/scheduled in Berlin/Zurich time (see the radio-probe
-// cron schedule) \u2014 format the push body in that zone, not the server's.
+// Scheduled live notifications show the broadcast time in Rwanda.
 function formatScheduledDateFr(scheduledAtIso: string): string {
 	try {
 		return new Intl.DateTimeFormat('fr-FR', {
-			timeZone: 'Europe/Zurich',
+			timeZone: 'Africa/Kigali',
 			dateStyle: 'full',
 			timeStyle: 'short'
 		}).format(new Date(scheduledAtIso));
@@ -204,7 +203,7 @@ function formatScheduledDateFr(scheduledAtIso: string): string {
 function formatScheduledTimeFr(scheduledAtIso: string): string {
 	try {
 		return new Intl.DateTimeFormat('fr-FR', {
-			timeZone: 'Europe/Zurich',
+			timeZone: 'Africa/Kigali',
 			hour: '2-digit',
 			minute: '2-digit'
 		}).format(new Date(scheduledAtIso));
