@@ -9,6 +9,7 @@
 	import NotificationBell from '$lib/components/+notificationBell.svelte';
 	import LiveDiscovery from '$lib/components/LiveDiscovery.svelte';
 	import LibrarySearchField from '$lib/components/LibrarySearchField.svelte';
+	import HymnAppStoreLinks from '$lib/components/HymnAppStoreLinks.svelte';
 	import type { LiveDiscovery as LiveDiscoveryData } from '$lib/server/live-discovery';
 	import ArrowRight2 from 'iconsax-svelte/ArrowRight2.svelte';
 	import Book1 from 'iconsax-svelte/Book1.svelte';
@@ -240,31 +241,38 @@
 			</p>
 
 			<div
-				class="hero-cta mx-auto mt-8 flex flex-col justify-center gap-3 md:mt-10 {hasUpcomingService
-					? 'w-full max-w-xl items-center'
-					: 'sm:flex-row sm:gap-4'}"
+				class="mx-auto mt-8 flex w-full flex-col md:mt-10 {hasUpcomingService
+					? 'max-w-xl'
+					: 'max-w-full sm:w-fit'}"
 			>
-				<LiveDiscovery initial={data.discovery} bind:current={discovery} />
-				<a
-					href="/predications"
-					class="flex items-center justify-center font-body font-semibold text-stone-600 transition-colors hover:text-earth-dark {hasUpcomingService
-						? 'min-h-11 px-3 text-sm underline decoration-stone-300 underline-offset-4 hover:decoration-missionnaire'
-						: 'border border-stone-300 px-6 py-3.5 text-[11px] uppercase tracking-[0.2em] hover:border-missionnaire sm:px-8 sm:text-[12px]'}"
+				<div
+					class="hero-cta flex flex-col justify-center gap-3 {hasUpcomingService
+						? 'items-center'
+						: 'sm:flex-row sm:gap-4'}"
 				>
-					{$t('home.exploreSermons')}
-				</a>
-			</div>
+					<LiveDiscovery initial={data.discovery} bind:current={discovery} />
+					<a
+						href="/predications"
+						class="flex items-center justify-center font-body font-semibold text-stone-600 transition-colors hover:text-earth-dark {hasUpcomingService
+							? 'min-h-11 px-3 text-sm underline decoration-stone-300 underline-offset-4 hover:decoration-missionnaire'
+							: 'border border-stone-300 px-6 py-3.5 text-[11px] uppercase tracking-[0.2em] hover:border-missionnaire sm:px-8 sm:text-[12px]'}"
+					>
+						{$t('home.exploreSermons')}
+					</a>
+				</div>
 
-			<form
-				action="/recherche"
-				method="GET"
-				role="search"
-				aria-label={$t('search.library')}
-				aria-busy={searchPending}
-				class="mx-auto mt-5 max-w-[32.5rem]"
-			>
-				<LibrarySearchField pending={searchPending} />
-			</form>
+				<!-- Let the translated buttons set the width, then stretch the form to match. -->
+				<form
+					action="/recherche"
+					method="GET"
+					role="search"
+					aria-label={$t('search.library')}
+					aria-busy={searchPending}
+					class="mt-5 w-0 min-w-full"
+				>
+					<LibrarySearchField pending={searchPending} />
+				</form>
+			</div>
 			<p class="sr-only" role="status">{searchPending ? $t('search.loading') : ''}</p>
 
 			<!-- Animated Bible verse below buttons -->
@@ -422,6 +430,22 @@
 			</span>
 		</div>
 	</div>
+
+	<section aria-labelledby="home-hymn-app" class="mx-auto mb-10 max-w-6xl px-5 sm:mb-14 sm:px-6">
+		<div
+			class="flex flex-col gap-5 border-l-4 border-missionnaire bg-stone-900 px-4 py-5 text-cream sm:px-7 sm:py-6 md:flex-row md:items-center md:justify-between md:gap-8"
+		>
+			<div>
+				<h2 id="home-hymn-app" class="font-display text-3xl font-semibold leading-none md:text-4xl">
+					Indirimbo Zikundwa
+				</h2>
+				<p class="mt-2 max-w-lg font-body text-sm leading-relaxed text-stone-300 sm:text-base">
+					{$t('appBanner.tagline')}
+				</p>
+			</div>
+			<HymnAppStoreLinks />
+		</div>
+	</section>
 
 	<!-- ═══ LATEST VIDEOS (moved above Mission) ═══ -->
 	{#if recentVideos.length > 0}

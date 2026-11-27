@@ -460,12 +460,9 @@ export default {
 	'music.loadFailed': 'Impossible de charger la liste de musique',
 	'music.loadArtistsFailed': 'Impossible de charger les artistes',
 
-	// ── Android app strip ───────────────────────────────────────
-	'androidBanner.title': 'Application Android',
-	'androidBanner.tagline': 'plus de 1 500 cantiques sur votre téléphone.',
-	'androidBanner.taglineShort': '1 500 cantiques hors ligne.',
-	'androidBanner.download': 'Télécharger',
-	'androidBanner.close': 'Fermer la bannière Android',
+	'appBanner.tagline':
+		'17 recueils et plus de 5 000 cantiques, accessibles instantanément sans connexion.',
+	'appBanner.close': 'Masquer les liens de téléchargement',
 	'music.letterLabel': 'lettre {letter}',
 	'music.allSongs': 'tous les chants',
 
