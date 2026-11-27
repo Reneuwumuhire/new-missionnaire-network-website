@@ -49,14 +49,15 @@ export const livePlayback = writable<{
 	pdt: false
 });
 
-// Global audio player position bridge — written by +audioPlayer (throttled),
-// read by the replay transcript on the rediffusion page. trackId is the
-// playing item's _id so the transcript only follows its own recording.
-export const replayPlayback = writable<{
+// Throttled state from the shared player for inline controls and replay transcripts.
+export const audioPlayback = writable<{
 	trackId: string | null;
 	timeSec: number;
-	playing: boolean;
-}>({ trackId: null, timeSec: 0, playing: false });
+	durationSec: number;
+	status: 'paused' | 'loading' | 'playing' | 'error';
+}>({ trackId: null, timeSec: 0, durationSec: 0, status: 'paused' });
+
+export const visibleInlineAudioTrack = writable<string | null>(null);
 
 // Video Playlist Search
 export const videoPlaylist = writable<YoutubeVideo[]>([]);

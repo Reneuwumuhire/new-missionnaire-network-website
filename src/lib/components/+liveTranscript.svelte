@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { onDestroy, onMount } from 'svelte';
-	import { livePlayback, replayPlayback } from '$lib/stores/global';
+	import { livePlayback, audioPlayback } from '$lib/stores/global';
 	import { parseSrt, type SrtCue } from '$lib/utils/srt';
 	import { dispatchAudioPlayerSeek } from '$lib/utils/audioPlayerControls';
 	import { subtitlePrefs, type SubtitleTheme, type SubtitleSize } from '$lib/stores/subtitlePrefs';
@@ -24,7 +24,7 @@
 	//          start and SRT 00:00 (computed server-side); position follows
 
 	interface Props {
-		//          the global audio player via the replayPlayback store.
+		//          the global audio player via the audioPlayback store.
 		mode?: 'live' | 'replay';
 		/** Replay mode only — proxy URL of the SRT file. */
 		url?: string | null;
@@ -203,7 +203,7 @@
 			liveActive = streamLive && timing.anchored;
 			srtSec = timing.timeSec;
 		} else {
-			const { trackId: playingId, timeSec } = $replayPlayback;
+			const { trackId: playingId, timeSec } = $audioPlayback;
 			if (!trackId || playingId !== trackId) {
 				// Not this recording (or nothing played yet) — show the text
 				// unhighlighted from the top.
