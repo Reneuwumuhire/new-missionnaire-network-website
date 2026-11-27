@@ -1,8 +1,8 @@
-import { browser } from '$app/environment';
 import type { SerializedTranscription } from '$lib/server/transcriptions';
 import { pageMeta } from '$lib/seo';
+import type { PageServerLoad } from './$types';
 
-export const load = async ({ fetch, url }) => {
+export const load: PageServerLoad = async ({ fetch, url, isDataRequest }) => {
 	const page = Number(url.searchParams.get('page')) || 1;
 	const limit = 100;
 	const sortOrder = url.searchParams.get('sort') === 'asc' ? 'asc' : 'desc';
@@ -22,7 +22,7 @@ export const load = async ({ fetch, url }) => {
 		})
 	};
 
-	if (browser) {
+	if (isDataRequest) {
 		return {
 			...baseShape,
 			documents: [] as SerializedTranscription[],

@@ -83,13 +83,13 @@
 	let regularFavorites = $derived($favorites.filter((item) => item.category !== 'Instrumental'));
 	let regularRecent = $derived($recentlyPlayed.filter((item) => item.category !== 'Instrumental'));
 
-	let musicList: MusicAudio[] = $state([]);
-	let musicPlaylist: MusicAudio[] = $state([]);
-	let artists: string[] = $state([]);
-	let totalSongs = $state(0);
+	let musicList: MusicAudio[] = $state(untrack(() => data.musicAudio ?? []));
+	let musicPlaylist: MusicAudio[] = $state(untrack(() => data.playlistAudio ?? []));
+	let artists: string[] = $state(untrack(() => data.artists));
+	let totalSongs = $state(untrack(() => data.total ?? 0));
 	let isListLoading = $state(false);
 	let listLoadError = $state('');
-	let hasResolvedMusicList = $state(false);
+	let hasResolvedMusicList = $state(untrack(() => !data.deferred));
 	let musicListAbortController: AbortController | null = null;
 	let currentListRequestToken = 0;
 	let lastHandledMusicRequestKey = $state('');
@@ -1427,7 +1427,15 @@
 										? 'text-missionnaire'
 										: 'text-stone-800 group-hover:text-missionnaire'}"
 								>
-									{song.title || 'Sans titre'}
+									{#if song._id && song.title && song.s3_url}
+										<a
+											href={`/musique/cantiques/${song._id}`}
+											onclick={(event) => event.stopPropagation()}
+											class="underline-offset-2 hover:underline">{song.title}</a
+										>
+									{:else}
+										{song.title || 'Sans titre'}
+									{/if}
 								</div>
 								{#if song.has_lyrics}
 									<!-- Slight clue: this song has published lyrics. Three text-line

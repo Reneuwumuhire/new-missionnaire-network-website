@@ -9,6 +9,8 @@
 	import LoadingRing from '$lib/components/LoadingRing.svelte';
 
 	let { children } = $props();
+	const isCatalog = $derived(page.url.pathname === '/predications');
+	const isReplayCatalog = $derived(page.url.searchParams.get('author') === 'Retransmissions');
 	// Seeded from the URL (not load data) so there's no initial-value capture;
 	// the sync $effect below keeps it aligned on every navigation.
 	let heroSearchValue = $state(page.url.searchParams.get('search') || '');
@@ -91,12 +93,18 @@
 					{$t('predications.headerKicker')}
 				</p>
 				<div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-					<h1 class="font-display text-[26px] font-semibold leading-none text-white md:text-4xl">
-						{$t('nav.predications')}
-					</h1>
-					<span class="font-body text-[11px] text-white/50 md:text-xs">
-						{$t('predications.headerSubtitle')}
-					</span>
+					{#if isCatalog}
+						<h1 class="font-display text-[26px] font-semibold leading-none text-white md:text-4xl">
+							{$t(isReplayCatalog ? 'misc.retransmissionBadge' : 'predications.branhamCatalog')}
+						</h1>
+					{:else}
+						<a
+							href="/predications"
+							class="font-display text-[26px] font-semibold leading-none text-white hover:text-missionnaire md:text-4xl"
+						>
+							{$t('nav.predications')}
+						</a>
+					{/if}
 				</div>
 			</div>
 

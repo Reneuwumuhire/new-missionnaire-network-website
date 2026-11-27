@@ -5,6 +5,7 @@ import { ensureWebSubSubscription } from '$lib/server/youtube-websub';
 import { redirect } from '@sveltejs/kit';
 import { isBotUserAgent } from './utils/botDetection';
 import { startRadioProbeScheduler } from '$lib/server/radio-probe-scheduler';
+import { SITE_URL } from '$lib/seo';
 
 if (process.env.RAILWAY_PRIVATE_DOMAIN) startRadioProbeScheduler();
 
@@ -54,6 +55,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 		'permissions-policy': 'camera=(), microphone=(), geolocation=()'
 	});
 	const { pathname } = event.url;
+	if (
+		event.url.hostname === 'www.missionnaire.net' &&
+		(event.request.method === 'GET' || event.request.method === 'HEAD')
+	) {
+		redirect(308, `${SITE_URL}${pathname}${event.url.search}`, { external: [SITE_URL] });
+	}
 
 	// Old /live/archives URLs were renamed to /live/rediffusions. Preserve
 	// inbound links (bookmarks, search results) with a permanent redirect.

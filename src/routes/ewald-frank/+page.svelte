@@ -106,10 +106,10 @@
 				</p>
 				<div class="flex flex-wrap gap-3">
 					<a
-						href="/predications?author=Ewald Frank"
+						href="/ewald-frank/predications"
 						class="card-lift px-4 py-2 border border-stone-200/60 bg-white/40 text-stone-900 text-xs font-semibold uppercase tracking-wider hover:border-missionnaire hover:text-missionnaire transition-colors"
 					>
-						{$t('nav.predications')}
+						{$t('ewald.sermons')}
 					</a>
 					<a
 						href="/videos?filter=Ewald Frank"

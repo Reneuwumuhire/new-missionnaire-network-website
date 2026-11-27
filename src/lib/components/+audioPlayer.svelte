@@ -38,7 +38,8 @@
 		isPlaying,
 		playbackIntent,
 		repeatOne,
-		replayPlayback,
+		audioPlayback,
+		visibleInlineAudioTrack,
 		livePlayback
 	} from '../stores/global';
 	import { isLiveStreamTrack, type LiveStreamTrack } from '$lib/utils/liveTrack';
@@ -104,6 +105,7 @@
 	let isMuted = $state(false);
 	let audioSrc: string = '';
 	let isAudioReady = $state(false);
+	let hasPlaybackError = $state(false);
 	let shouldAutoplayOnLoad = false;
 	let playerShell: HTMLDivElement | null = $state(null);
 	let playerResizeObserver: ResizeObserver | null = null;
@@ -587,6 +589,13 @@
 	}
 	let lyricsLines: LyricLine[] = $state([]);
 	let lyricsPanelOpen = $state(false);
+	const inlineControlsActive = $derived(
+		!lyricsPanelOpen &&
+			!!$visibleInlineAudioTrack &&
+			!!$selectAudio &&
+			'_id' in $selectAudio &&
+			$selectAudio._id === $visibleInlineAudioTrack
+	);
 	let hasLyrics = $derived(lyricsLines.length > 0);
 	let lyricsFetchToken = 0;
 	let lastLyricsAudioId = '';
@@ -597,6 +606,8 @@
 
 	function playCurrentAudio() {
 		if (!audio) return;
+		if (!isLiveTrack && audio.error) audio.load();
+		hasPlaybackError = false;
 		setPendingPlaybackIntent('play');
 		setUserWantsToPlay(true);
 		consecutiveFailedResumes = 0;
@@ -945,7 +956,7 @@
 
 	function syncPlayerInset() {
 		if (!browser) return;
-		if (!playerShell) {
+		if (!playerShell || inlineControlsActive) {
 			lastPlayerInset = 0;
 			document.documentElement.style.setProperty('--audio-player-height', '0px');
 			return;
@@ -1060,6 +1071,7 @@
 		audio.currentTime = Math.max(0, event.detail.time);
 		rememberPlaybackPosition(audio.currentTime, audio.duration);
 		updateAudioTime();
+		publishAudioPlayback(true);
 	}
 
 	/** Same as handleLyricsSeek but for window-level events from outside the
@@ -1659,6 +1671,7 @@
 
 	function handleAudioPlaying() {
 		isAudioReady = true;
+		hasPlaybackError = false;
 		clearTimeout(playbackAnalyticsTimer);
 		const item = $selectAudio;
 		if (!item) return;
@@ -1706,6 +1719,7 @@
 		console.error('[AudioPlayer] Audio error:', e);
 		isPlaying.set(false);
 		isAudioReady = false;
+		hasPlaybackError = true;
 		shouldAutoplayOnLoad = false;
 		// Native-HLS failures (no hls.js instance watching) count toward
 		// abandoning HLS mode — the reconnect below then lands on Icecast.
@@ -1843,6 +1857,7 @@
 		lastSuccessfulPlayAt = 0;
 		audioElementRebuilt = false;
 		isAudioReady = false;
+		hasPlaybackError = false;
 		currentTime = 0;
 		duration = 0;
 		progressBarWidth = 0;
@@ -1989,21 +2004,27 @@
 			rememberPlaybackPosition(currentTime, duration);
 			progressBarWidth = (currentTime / duration) * 100;
 			pushMediaSessionPosition();
-			publishReplayPlayback();
+			publishAudioPlayback();
 		}
 	};
 
-	// Position bridge for the rediffusion-page transcript. Throttled — the
-	// transcript only needs ~2 updates/s, while timeupdate fires 4-60×/s.
-	let lastReplayPublishMs = 0;
-	function publishReplayPlayback(force = false) {
+	// Throttle time updates while publishing play, seek and buffering changes immediately.
+	let lastPlaybackPublishMs = 0;
+	function publishAudioPlayback(force = false) {
 		const now = Date.now();
-		if (!force && now - lastReplayPublishMs < 500) return;
-		lastReplayPublishMs = now;
-		replayPlayback.set({
+		if (!force && now - lastPlaybackPublishMs < 500) return;
+		lastPlaybackPublishMs = now;
+		audioPlayback.set({
 			trackId: ($selectAudio as { _id?: string } | null)?._id ?? null,
 			timeSec: audio?.currentTime ?? 0,
-			playing: $isPlaying
+			durationSec: Number.isFinite(duration) ? duration : 0,
+			status: hasPlaybackError
+				? 'error'
+				: $isPlaying
+					? isAudioReady
+						? 'playing'
+						: 'loading'
+					: 'paused'
 		});
 	}
 	const updateIndicator = () => {
@@ -2957,13 +2978,9 @@
 			}
 		}
 	});
-	// Publish play/pause flips immediately (not throttled) so the transcript
-	// freezes/resumes without a half-second lag.
 	$effect(() => {
 		if (browser && audio) {
-			void $isPlaying;
-			void $selectAudio;
-			publishReplayPlayback(true);
+			publishAudioPlayback(true);
 		}
 	});
 	$effect(() => {
@@ -2978,6 +2995,7 @@
 		if (browser && playerShell) {
 			lyricsPanelOpen;
 			lyricsLines.length;
+			inlineControlsActive;
 			void tick().then(syncPlayerInset);
 		}
 	});
@@ -3092,6 +3110,7 @@
 {#if $selectAudio}
 	<div
 		bind:this={playerShell}
+		class:hidden={inlineControlsActive}
 		class:lyrics-open={lyricsPanelOpen && hasLyrics}
 		class="audio-player-shell fixed z-[100] bottom-0 left-0 right-0 w-full bg-white/95 backdrop-blur-md border-t border-stone-200 shadow-[0_-4px_20px_rgb(0,0,0,0.06)] pt-2 lg:pt-4"
 		style={lyricsPanelOpen && hasLyrics

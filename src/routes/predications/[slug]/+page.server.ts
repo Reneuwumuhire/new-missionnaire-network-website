@@ -54,16 +54,17 @@ export const load: PageServerLoad = async ({ params, url }) => {
 	// Share preview (og:*/twitter:*) — rendered by the root layout as the
 	// single canonical tag set, mirroring the page's JSON-LD values.
 	const sermonTitle = version.title;
+	const author = typeof normalized.author === 'string' ? normalized.author.trim() : '';
 	const sermonDate =
 		(normalized as any).full_date_code ||
 		(normalized as any).date_code ||
 		(normalized as any).iso_date ||
 		'';
 	const meta = pageMeta(`/predications/${canonicalSlug}`, {
-		title: `${sermonTitle} | Prédications - Missionnaire Network`,
-		description: `Écoutez la prédication "${sermonTitle}"${
+		title: `${sermonTitle}${author ? ` – ${author}` : ''} | Missionnaire Network`,
+		description: `« ${sermonTitle} »${author ? `, prédication de ${author}` : ''}${
 			sermonDate ? ` (${sermonDate})` : ''
-		} sur Missionnaire Network.`,
+		}.${version.audioUrl ? ' Écouter la prédication.' : ''}${version.pdfUrl ? ' Lire la transcription PDF.' : ''}`,
 		type: 'article'
 	});
 

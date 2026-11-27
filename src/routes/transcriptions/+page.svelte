@@ -46,12 +46,12 @@
 	let lastSearch = $state('');
 	let lastSyncedSearch = $state('');
 
-	let documents: SerializedTranscription[] = $state([]);
-	let total = $state(0);
-	let years: number[] = $state([]);
+	let documents: SerializedTranscription[] = $state(untrack(() => data.documents));
+	let total = $state(untrack(() => data.pagination.total));
+	let years: number[] = $state(untrack(() => data.years));
 	let isListLoading = $state(false);
 	let listLoadError = $state('');
-	let hasResolvedList = $state(false);
+	let hasResolvedList = $state(untrack(() => !data.deferred));
 	let abortController: AbortController | null = null;
 	let currentRequestToken = 0;
 	let lastHandledKey = $state('');

@@ -97,6 +97,11 @@ export const NavigationLinkList: NavigationLink[] = [
 				subText: 'nav.sub.frankAboutText',
 				link: '/ewald-frank',
 				image: '/img/ewald_frank_menu.png'
+			},
+			{
+				subName: 'ewald.sermons',
+				link: '/ewald-frank/predications',
+				icon: FiPlayCircle
 			}
 		]
 	},
