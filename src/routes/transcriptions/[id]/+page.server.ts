@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { ObjectId } from 'mongodb';
 import { transcriptTitle } from '$lib/utils/transcriptTitle';
-import { pageMeta } from '$lib/seo';
+import { pageMeta, shareDescription } from '$lib/seo';
 import { objectIdString } from '$lib/server/mongo-input';
 import { getReplayIdForTranscript } from '$lib/server/recordings';
 import { getDb } from '../../../db/mongo';
@@ -48,7 +48,10 @@ export const load: PageServerLoad = async ({ params }) => {
 			? `https://www.youtube.com/watch?v=${encodeURIComponent(sourceVideoId)}`
 			: null,
 		meta: pageMeta(`/transcriptions/${id.data}`, {
-			title: `${title} | Missionnaire Network`
+			title: `${title} – Transcription PDF | Missionnaire Network`,
+			description: shareDescription(
+				`Lisez la transcription PDF de « ${title} ». ${recordingDetails}`
+			)
 		})
 	};
 };

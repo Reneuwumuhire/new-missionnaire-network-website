@@ -378,7 +378,13 @@
 							<h3
 								class="mb-2 font-display text-2xl font-semibold leading-tight text-stone-900 transition-colors group-hover:text-orange-700"
 							>
-								{item.title}
+								{#if item._id && readingUrl(item)}
+									<a href={`/literature/${item._id}`} class="underline-offset-4 hover:underline"
+										>{item.title}</a
+									>
+								{:else}
+									{item.title}
+								{/if}
 							</h3>
 
 							{#if item.description}
@@ -524,7 +530,13 @@
 								{i + 1 + (currentPage - 1) * limit}
 							</div>
 							<div class="flex flex-col min-w-0">
-								{#if readingUrl(item)}
+								{#if item._id && readingUrl(item)}
+									<a
+										href={`/literature/${item._id}`}
+										class="text-sm font-bold leading-snug text-stone-800 underline-offset-2 hover:underline"
+										>{item.title}</a
+									>
+								{:else if readingUrl(item)}
 									<a
 										href={readingUrl(item)}
 										target="_blank"

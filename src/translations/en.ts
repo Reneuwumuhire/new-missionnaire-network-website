@@ -350,7 +350,7 @@ const en: Record<keyof typeof fr, string> = {
 
 	// ── Sermons list page ───────────────────────────────────────
 	'predications.headerKicker': 'All sermons',
-	'predications.headerSubtitle': 'Branham, Ewald Frank and local preachers',
+	'predications.branhamCatalog': 'William Branham sermons',
 	'predications.searchPlaceholder': 'Search by title, year, preacher...',
 	'predications.clearSearch': 'Clear search',
 	'predications.filters': 'Filters',
@@ -723,6 +723,10 @@ const en: Record<keyof typeof fr, string> = {
 	'church.title': 'Kigali/Gatenga/Murambi congregation',
 	'ewald.kicker': 'International missionary',
 	'ewald.resources': 'Ewald Frank resources',
+	'ewald.sermons': 'Ewald Frank sermons',
+	'ewald.sermonsIntro':
+		'Watch Ewald Frank’s sermons from Krefeld, read the PDF transcripts, and browse his books, brochures and circular letters.',
+	'ewald.books': 'Ewald Frank books and letters',
 	'branham.biography': 'Biography',
 	'branham.kicker': 'Prophet of the Message',
 	'branham.resources': 'William Branham resources',

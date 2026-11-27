@@ -32,7 +32,7 @@ export const load: PageServerLoad = async ({ url, setHeaders }) => {
 		meta: pageMeta('/', {
 			title: 'Missionnaire Network - Accueil | Prédications et Cantiques du Message',
 			description:
-				"Découvrez les prédications et cantiques inspirants du Message de l'Heure pour votre édification spirituelle."
+				'Prédications de William Branham et d’Ewald Frank, audio, transcriptions PDF, livres et cantiques. Posez vos questions sur la Bible et l’Évangile.'
 		})
 	};
 };

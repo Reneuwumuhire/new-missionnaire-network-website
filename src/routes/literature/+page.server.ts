@@ -39,9 +39,9 @@ export const load: PageServerLoad = async ({ url }) => {
 		total: result.total,
 		// Rendered by the root layout as the single og:*/twitter:* tag set.
 		meta: pageMeta('/literature', {
-			title: 'Littérature - Missionnaire Network',
+			title: 'Livres, brochures et lettres de Branham et Ewald Frank | Missionnaire Network',
 			description:
-				'Découvrez la littérature du Message : livres, brochures et lettres circulaires disponibles en plusieurs langues.'
+				'Lisez et téléchargez les livres et brochures de William Branham, ainsi que les livres et lettres circulaires d’Ewald Frank, en PDF.'
 		}),
 		author,
 		category: type,

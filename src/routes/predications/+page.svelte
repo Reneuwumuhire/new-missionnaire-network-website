@@ -45,17 +45,17 @@
 
 	let { data } = $props();
 
-	let sermons: Sermon[] = $state([]);
-	let recordings: PublishedRecording[] = $state([]);
-	let recordingsTotal = $state(0);
-	let showBlendedRetransmissions = $state(false);
-	let totalSermons = $state(0);
-	let years: string[] = $state([]);
-	let availableAuthors: string[] = $state([]);
-	let filterType: 'sermon' | 'retransmission' = $state('sermon');
+	let sermons: Sermon[] = $state(untrack(() => data.sermons));
+	let recordings: PublishedRecording[] = $state(untrack(() => data.recordings));
+	let recordingsTotal = $state(untrack(() => data.recordingsTotal));
+	let showBlendedRetransmissions = $state(untrack(() => data.showBlendedRetransmissions));
+	let totalSermons = $state(untrack(() => data.total));
+	let years: string[] = $state(untrack(() => data.years));
+	let availableAuthors: string[] = $state(untrack(() => data.availableAuthors));
+	let filterType: 'sermon' | 'retransmission' = $state(untrack(() => data.filterType));
 	let isListLoading = $state(false);
 	let listLoadError = $state('');
-	let hasResolvedList = $state(false);
+	let hasResolvedList = $state(untrack(() => !data.deferred));
 	let abortController: AbortController | null = null;
 	let currentRequestToken = 0;
 	let lastHandledKey = $state('');
@@ -484,6 +484,12 @@
      load — the root layout renders the single canonical tag set ($lib/seo). -->
 
 <div class="w-full max-w-6xl mx-auto px-4 pt-0 pb-8 md:px-6">
+	<a
+		href="/ewald-frank/predications"
+		class="mb-3 inline-flex min-h-11 items-center text-sm font-semibold text-stone-700 underline decoration-stone-300 underline-offset-4 hover:decoration-missionnaire"
+	>
+		{$t('ewald.sermons')}
+	</a>
 	<!-- Content-type tabs: Branham sermons vs recorded live broadcasts.
 	     Page identity now lives in the layout's compact band; the video
 	     cross-link sits beside the tabs instead of a second header. -->

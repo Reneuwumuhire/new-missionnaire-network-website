@@ -1,8 +1,8 @@
-import { browser } from '$app/environment';
 import type { MusicAudio } from '$lib/models/music-audio';
 import { songSlug } from '$lib/utils/songSlug';
+import type { PageServerLoad } from './$types';
 
-export const load = async ({ fetch, url }) => {
+export const load: PageServerLoad = async ({ fetch, url, isDataRequest }) => {
 	const category = url.searchParams.get('category') || 'All';
 	const search = url.searchParams.get('search') || '';
 	const alpha = url.searchParams.get('alpha') || '';
@@ -38,7 +38,7 @@ export const load = async ({ fetch, url }) => {
 		!!artist ||
 		(category && category !== 'All') ||
 		parsedPageNumber > 1;
-	if (browser) {
+	if (isDataRequest) {
 		return {
 			musicAudio: [] as MusicAudio[],
 			playlistAudio: [] as MusicAudio[],

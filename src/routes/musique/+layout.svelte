@@ -31,6 +31,7 @@
 	let isAudioActive = $derived(page.url.pathname === '/musique');
 	let isInstrumentalActive = $derived(page.url.pathname === '/musique/instrumental');
 	let isVideoActive = $derived(page.url.pathname === '/musique/videos');
+	let isHymnDetail = $derived(page.route.id === '/musique/cantiques/[id]');
 </script>
 
 <!-- Compact header band: one line of identity (kicker + Cormorant title +
@@ -49,9 +50,17 @@
 					{$t('music.headerKicker')}
 				</p>
 				<div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-					<h1 class="font-display text-[26px] font-semibold leading-none text-white md:text-4xl">
-						{isInstrumentalActive ? $t('music.instrumentalHeaderTitle') : $t('music.headerTitle')}
-					</h1>
+					{#if isHymnDetail}
+						<a
+							href="/musique"
+							class="font-display text-[26px] font-semibold leading-none text-white hover:text-missionnaire md:text-4xl"
+							>{$t('music.headerTitle')}</a
+						>
+					{:else}
+						<h1 class="font-display text-[26px] font-semibold leading-none text-white md:text-4xl">
+							{isInstrumentalActive ? $t('music.instrumentalHeaderTitle') : $t('music.headerTitle')}
+						</h1>
+					{/if}
 					{#if !isInstrumentalActive && totalSongs !== null}
 						<span class="font-body text-[11px] tabular-nums text-white/50 md:text-xs">
 							{$t('music.headerCount', { count: formattedTotal(totalSongs) })}

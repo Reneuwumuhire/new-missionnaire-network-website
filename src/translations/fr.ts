@@ -352,7 +352,7 @@ export default {
 
 	// ── Sermons list page ───────────────────────────────────────
 	'predications.headerKicker': 'Toutes les prédications',
-	'predications.headerSubtitle': 'Branham, Ewald Frank et locales',
+	'predications.branhamCatalog': 'Prédications de William Branham',
 	'predications.searchPlaceholder': 'Rechercher par titre, année, prédicateur...',
 	'predications.clearSearch': 'Effacer la recherche',
 	'predications.filters': 'Filtres',
@@ -729,6 +729,10 @@ export default {
 	'church.title': 'Assemblée de Kigali/Gatenga/Murambi',
 	'ewald.kicker': 'Missionnaire international',
 	'ewald.resources': "Ressources d'Ewald Frank",
+	'ewald.sermons': 'Prédications d’Ewald Frank',
+	'ewald.sermonsIntro':
+		'Retrouvez les prédications d’Ewald Frank à Krefeld en vidéo et en transcription PDF, ainsi que ses livres, brochures et lettres circulaires.',
+	'ewald.books': 'Livres et lettres d’Ewald Frank',
 	'branham.biography': 'Biographie',
 	'branham.kicker': 'Prophète du Message',
 	'branham.resources': 'Ressources de William Branham',

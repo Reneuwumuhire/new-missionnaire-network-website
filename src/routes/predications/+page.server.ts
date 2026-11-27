@@ -1,7 +1,8 @@
-import { browser } from '$app/environment';
 import type { Sermon } from '$lib/models/sermon';
 import type { PublishedRecording } from '$lib/server/recordings';
 import { pageMeta } from '$lib/seo';
+import { redirect } from '@sveltejs/kit';
+import type { PageServerLoad } from './$types';
 
 const RETRANSMISSIONS_FILTER = 'Retransmissions';
 const BRANHAM_AUTHOR = 'William Marrion Branham';
@@ -21,11 +22,16 @@ function sermonSortToRecordingSort(sort: string): { field: string; order: 'asc' 
 	}
 }
 
-export const load = async ({ fetch, url }) => {
+export const load: PageServerLoad = async ({ fetch, url, isDataRequest }) => {
+	if (url.searchParams.get('author')?.trim().toLowerCase() === 'ewald frank') {
+		redirect(301, '/ewald-frank/predications');
+	}
+
 	const author =
 		url.searchParams.get('author') === RETRANSMISSIONS_FILTER
 			? RETRANSMISSIONS_FILTER
 			: BRANHAM_AUTHOR;
+	const isRetransmissions = author === RETRANSMISSIONS_FILTER;
 	const search = url.searchParams.get('search') || '';
 	const alpha = url.searchParams.get('alpha') || '';
 	const year = url.searchParams.get('year') || '';
@@ -49,14 +55,17 @@ export const load = async ({ fetch, url }) => {
 		page: parsedPage,
 		limit: parsedLimit,
 		// Rendered by the root layout as the single og:*/twitter:* tag set.
-		meta: pageMeta('/predications', {
-			title: 'Prédications - Missionnaire Network',
-			description:
-				"Explorez les prédications de William Branham, Ewald Frank et de l'église locale par auteur, année, langue et thème. Lecture audio et recherche rapide."
+		meta: pageMeta(isRetransmissions ? '/predications?author=Retransmissions' : '/predications', {
+			title: isRetransmissions
+				? 'Retransmissions des cultes et prédications | Missionnaire Network'
+				: 'Prédications de William Branham – Audio et PDF | Missionnaire Network',
+			description: isRetransmissions
+				? 'Retrouvez les enregistrements et retransmissions des cultes et prédications.'
+				: 'Écoutez les prédications de William Marrion Branham et consultez leurs transcriptions PDF. Retrouvez un sermon par titre, date ou langue.'
 		})
 	};
 
-	if (browser) {
+	if (isDataRequest) {
 		return {
 			...baseShape,
 			filterType: 'sermon' as 'sermon' | 'retransmission',
@@ -70,8 +79,6 @@ export const load = async ({ fetch, url }) => {
 			deferred: true
 		};
 	}
-
-	const isRetransmissions = author === RETRANSMISSIONS_FILTER;
 
 	const sermonParams = new URLSearchParams({
 		author,

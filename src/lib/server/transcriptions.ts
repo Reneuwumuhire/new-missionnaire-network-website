@@ -16,6 +16,39 @@ const YEARS_TTL_MS = 5 * 60_000;
 let yearsCache: { value: number[]; expires: number } | null = null;
 let listIndexEnsured: Promise<string> | null = null;
 
+// Prefer the transcript linked to a recording when several documents share a PDF.
+const uniqueTranscripts = [
+	{ $set: { hasRecording: { $ne: [{ $ifNull: ['$recordingId', null] }, null] } } },
+	{ $sort: { hasRecording: -1, publishedOn: -1, _id: -1 } },
+	{
+		$group: {
+			_id: {
+				$cond: [
+					{ $gt: [{ $strLenCP: { $ifNull: ['$s3Key', ''] } }, 0] },
+					{ key: '$s3Key', exact: { $toHashedIndexKey: '$s3Key' } },
+					'$_id'
+				]
+			},
+			document: { $first: '$$ROOT' }
+		}
+	},
+	{ $replaceWith: '$document' }
+];
+
+export async function getTranscriptionSitemapEntries(db: Db) {
+	return db
+		.collection('pdfs')
+		.aggregate<{ _id: ObjectId; updatedAt?: Date; uploadDate?: Date }>(
+			[
+				{ $match: { _id: { $type: 'objectId' }, url: { $type: 'string', $ne: '' } } },
+				...uniqueTranscripts,
+				{ $project: { _id: 1, updatedAt: 1, uploadDate: 1 } }
+			],
+			{ collation: { locale: 'fr', numericOrdering: true } }
+		)
+		.toArray();
+}
+
 function ensureListIndex(db: Db) {
 	listIndexEnsured ??= db
 		.collection('pdfs')
@@ -111,23 +144,7 @@ export async function queryTranscriptions(options: {
 						recordingId: 1
 					}
 				},
-				{ $set: { hasRecording: { $ne: [{ $ifNull: ['$recordingId', null] }, null] } } },
-				{ $sort: { hasRecording: -1, publishedOn: -1, _id: -1 } },
-				// Hash the bucket key before grouping so French collation cannot merge
-				// distinct S3 keys that differ only in Unicode form or digit padding.
-				{
-					$group: {
-						_id: {
-							$cond: [
-								{ $gt: [{ $strLenCP: { $ifNull: ['$s3Key', ''] } }, 0] },
-								{ key: '$s3Key', exact: { $toHashedIndexKey: '$s3Key' } },
-								'$_id'
-							]
-						},
-						document: { $first: '$$ROOT' }
-					}
-				},
-				{ $replaceWith: '$document' },
+				...uniqueTranscripts,
 				{
 					$facet: {
 						documents: [

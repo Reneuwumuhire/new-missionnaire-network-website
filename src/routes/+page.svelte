@@ -629,6 +629,20 @@
 					</li>
 				{/each}
 				<li class="flex flex-1">
+					<a href="/ewald-frank/predications" class="heritage-link">
+						<span
+							aria-hidden="true"
+							class="grid size-11 shrink-0 place-items-center rounded-full bg-cream-dark text-missionnaire-Yellow-700 sm:size-14"
+						>
+							<PlayCircle size={23} color="currentColor" />
+						</span>
+						<span class="heritage-title flex-1">{$t('ewald.sermons')}</span>
+						<span class="heritage-chevron" aria-hidden="true">
+							<ArrowRight2 size={20} color="currentColor" />
+						</span>
+					</a>
+				</li>
+				<li class="flex flex-1">
 					<a href="/eglise" class="heritage-link">
 						<span
 							aria-hidden="true"

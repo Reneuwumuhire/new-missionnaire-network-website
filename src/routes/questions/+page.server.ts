@@ -15,9 +15,9 @@ export const load: PageServerLoad = async ({ url }) => {
 
 	// Rendered by the root layout as the single og:*/twitter:* tag set.
 	const meta = pageMeta('/questions', {
-		title: 'Questions et réponses - Missionnaire Network',
+		title: 'Questions bibliques et réponses sur l’Évangile | Missionnaire Network',
 		description:
-			'Parcourez les questions bibliques publiées, les réponses pastorales et leurs références audio, vidéo et littérature.'
+			'Posez une question sur la Bible ou l’Évangile et lisez les réponses pastorales, avec des références bibliques, des prédications et des lectures complémentaires.'
 	});
 
 	try {
