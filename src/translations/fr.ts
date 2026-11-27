@@ -431,6 +431,8 @@ export default {
 	'music.recentlyPlayed': 'Récemment joués',
 	'music.playAll': 'Tout lire',
 	'music.song': 'chant',
+	'music.listenHymn': 'Écouter le cantique',
+	'music.repeatTimes': 'Répéter {count} fois',
 	'music.songs': 'chants',
 	'music.cachedOneSuffix': 'chant disponible hors ligne',
 	'music.cachedManySuffix': 'chants disponibles hors ligne',

@@ -427,6 +427,8 @@ const en: Record<keyof typeof fr, string> = {
 	'music.recentlyPlayed': 'Recently played',
 	'music.playAll': 'Play all',
 	'music.song': 'song',
+	'music.listenHymn': 'Listen to hymn',
+	'music.repeatTimes': 'Repeat {count} times',
 	'music.songs': 'songs',
 	'music.cachedOneSuffix': 'song available offline',
 	'music.cachedManySuffix': 'songs available offline',
