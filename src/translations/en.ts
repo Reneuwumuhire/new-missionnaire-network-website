@@ -456,12 +456,9 @@ const en: Record<keyof typeof fr, string> = {
 	'music.loadFailed': 'Could not load the music list',
 	'music.loadArtistsFailed': 'Could not load the artists',
 
-	// ── Android app strip ───────────────────────────────────────
-	'androidBanner.title': 'Android app',
-	'androidBanner.tagline': 'over 1,500 hymns on your phone.',
-	'androidBanner.taglineShort': '1,500 hymns offline.',
-	'androidBanner.download': 'Download',
-	'androidBanner.close': 'Close the Android banner',
+	'appBanner.tagline':
+		'17 collections and more than 5,000 hymns, available instantly without a connection.',
+	'appBanner.close': 'Dismiss app downloads',
 	'music.letterLabel': 'letter {letter}',
 	'music.allSongs': 'all songs',
 

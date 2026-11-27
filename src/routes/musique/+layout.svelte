@@ -1,5 +1,4 @@
 <script lang="ts">
-	import AndroidBanner from '$lib/components/+androidBanner.svelte';
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { page } from '$app/state';
@@ -115,12 +114,6 @@
 >
 	<div class="flex w-full max-w-7xl flex-col px-2 md:px-5">
 		{@render children?.()}
-
-		<!-- Android app strip: quiet, dismissible, above the footer — out of
-		     the way of the list. Single render keeps the dismiss state whole. -->
-		<div class="mt-10 md:mt-12">
-			<AndroidBanner />
-		</div>
 	</div>
 </div>
 
