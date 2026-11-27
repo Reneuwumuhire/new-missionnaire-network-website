@@ -810,6 +810,7 @@ const en: Record<keyof typeof fr, string> = {
 	'literature.loading': 'Loading…',
 	'literature.noCover': 'No cover',
 	'literature.read': 'Read',
+	'literature.contents': 'In this volume',
 	'literature.noBooks': 'No books found',
 	'literature.noBooksHint': 'No books matched your search.',
 	'literature.document': 'Document',

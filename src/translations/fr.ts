@@ -820,6 +820,7 @@ export default {
 	'literature.loading': 'Chargement…',
 	'literature.noCover': 'Pas de couverture',
 	'literature.read': 'Lire',
+	'literature.contents': 'Dans ce volume',
 	'literature.noBooks': 'Aucun livre trouvé',
 	'literature.noBooksHint': "Nous n'avons trouvé aucun livre correspondant à votre recherche.",
 	'literature.document': 'Document',

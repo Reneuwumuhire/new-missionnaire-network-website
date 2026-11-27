@@ -24,6 +24,7 @@ export const load: PageServerLoad = async ({ params }) => {
 				type: 1,
 				language: 1,
 				description: 1,
+				cover_url: 1,
 				pdf_url: 1,
 				parts: 1
 			}
@@ -36,6 +37,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		author: item.author,
 		language: item.language,
 		description: item.description,
+		coverUrl: item.cover_url,
 		pdfUrl: /^https?:\/\//i.test(item.pdf_url ?? '') ? item.pdf_url : null,
 		parts: (item.parts ?? []).filter((part) => /^https?:\/\//i.test(part.url)),
 		meta: pageMeta(path, {

@@ -11,7 +11,13 @@ export const load: PageServerLoad = async () => {
 	]);
 
 	return {
-		videos: videos.filter((video) => video.id).map(({ id, title }) => ({ id, title })),
+		videos: videos
+			.filter((video) => video.id)
+			.map(({ id, title, thumbnail }) => ({
+				id,
+				title,
+				thumbnail: thumbnail?.replace(/maxresdefault|hqdefault/, 'mqdefault')
+			})),
 		transcripts: documents.map((doc) => ({ id: doc._id, ...transcriptTitle(doc.filename) })),
 		meta: pageMeta('/ewald-frank/predications', {
 			title: 'Prédications d’Ewald Frank – Vidéos et transcriptions | Missionnaire Network',
