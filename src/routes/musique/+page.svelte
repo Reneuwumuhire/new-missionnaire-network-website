@@ -18,6 +18,7 @@
 	} from '$lib/stores/global';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import MusicSearch from '$lib/components/MusicSearch.svelte';
+	import HymnAppDownload from '$lib/components/HymnAppDownload.svelte';
 	import ListSkeleton from '$lib/components/ListSkeleton.svelte';
 	import ErrorCard from '$lib/components/ErrorCard.svelte';
 	import ResultsSummary from '$lib/components/ResultsSummary.svelte';
@@ -1042,6 +1043,8 @@
 			</button>
 		</div>
 	</div>
+
+	<HymnAppDownload />
 
 	{#if activeMusicSong && !isActiveMusicSongVisible}
 		<div class="mb-4 border border-stone-300 bg-stone-100/80 px-4 py-3">
